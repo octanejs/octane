@@ -12,7 +12,7 @@ describe('@octanejs/three renderer preset', () => {
 			server: 'client-only',
 			intrinsics: '@octanejs/three/intrinsics',
 			text: 'ignore',
-			capabilities: ['local-host-callback', 'visibility'],
+			capabilities: ['local-host-callback', 'portal', 'visibility'],
 		});
 		expect(config.boundaries['@octanejs/three'].Canvas).toEqual({
 			ownerRenderer: 'dom',

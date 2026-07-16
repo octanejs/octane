@@ -478,10 +478,59 @@ export function useRootStoreSelector<T>(
 	return slot === undefined ? run(false) : withSlot(slot, () => run(true));
 }
 
+function bindRootStore(api: StoreApi<RootState>): RootStore {
+	let store!: RootStore;
+	const bound = ((...args: unknown[]) => {
+		const tail = args.at(-1);
+		const userArgs = typeof tail === 'symbol' ? args.slice(0, -1) : args;
+		const selector = (typeof userArgs[0] === 'function' ? userArgs[0] : identity) as (
+			state: RootState,
+		) => unknown;
+		const equalityFn = (typeof userArgs[1] === 'function' ? userArgs[1] : Object.is) as (
+			previous: unknown,
+			next: unknown,
+		) => boolean;
+		return useRootStoreSelector(
+			store,
+			selector,
+			equalityFn,
+			typeof tail === 'symbol' ? tail : undefined,
+		);
+	}) as RootStore;
+	Object.assign(bound, api);
+	store = bound;
+	return store;
+}
+
+/** Create an isolated callable store whose initial state is supplied by a portal layer. */
+export function createPortalStore(initialState: RootState): RootStore {
+	let store!: RootStore;
+	const api = createVanillaStore<RootState>()((set, get) => ({
+		...initialState,
+		set,
+		get,
+	}));
+	store = bindRootStore(api);
+	return store;
+}
+
+/** Walk a portal chain to the one root that owns scheduling and native events. */
+export function getInitialRootStore(store: RootStore): RootStore {
+	const seen = new Set<RootStore>();
+	let current = store;
+	while (current.getState().previousRoot !== undefined) {
+		if (seen.has(current)) {
+			throw new Error('@octanejs/three: Portal store ancestry contains a cycle.');
+		}
+		seen.add(current);
+		current = current.getState().previousRoot!;
+	}
+	return current;
+}
+
 /** Create the callable R3F-shaped store around Zustand's vanilla API. */
 export function createRootStore(invalidate: Invalidate, advance: Advance): RootStore {
 	let performanceTimeout: ReturnType<typeof setTimeout> | undefined;
-	let store!: RootStore;
 	const api = createVanillaStore<RootState>()((set, get) => {
 		const position = new THREE.Vector3();
 		const defaultTarget = new THREE.Vector3();
@@ -641,25 +690,7 @@ export function createRootStore(invalidate: Invalidate, advance: Advance): RootS
 		return state;
 	});
 
-	const bound = ((...args: unknown[]) => {
-		const tail = args.at(-1);
-		const userArgs = typeof tail === 'symbol' ? args.slice(0, -1) : args;
-		const selector = (typeof userArgs[0] === 'function' ? userArgs[0] : identity) as (
-			state: RootState,
-		) => unknown;
-		const equalityFn = (typeof userArgs[1] === 'function' ? userArgs[1] : Object.is) as (
-			previous: unknown,
-			next: unknown,
-		) => boolean;
-		return useRootStoreSelector(
-			store,
-			selector,
-			equalityFn,
-			typeof tail === 'symbol' ? tail : undefined,
-		);
-	}) as RootStore;
-	Object.assign(bound, api);
-	store = bound;
+	const store = bindRootStore(api);
 
 	let oldSize = store.getState().size;
 	let oldDpr = store.getState().viewport.dpr;

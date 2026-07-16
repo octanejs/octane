@@ -9,6 +9,7 @@ const cache = join(directory, '.react-cache');
 const fixtures = [
 	'basic.three',
 	'events-differential.three',
+	'portal-differential.three',
 	'suspense-differential.three',
 ] as const;
 

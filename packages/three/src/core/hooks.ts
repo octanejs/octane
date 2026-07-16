@@ -14,7 +14,7 @@ import {
 	useRef,
 	useSyncExternalStore,
 } from 'octane/universal';
-import { getThreeInstance, type Instance } from './driver.js';
+import { getThreeEventStore, getThreeInstance, type Instance } from './driver.js';
 import {
 	getRootObjectStore,
 	RootStoreContext,
@@ -179,9 +179,7 @@ export function useGraph(object: THREE.Object3D, slot?: symbol): ObjectMap {
 export function getRootState<T extends THREE.Object3D = THREE.Object3D>(
 	object: T,
 ): RootState | undefined {
-	return (
-		getThreeInstance(object)?.root.environment.store ?? getRootObjectStore(object)
-	)?.getState();
+	return (getThreeEventStore(object) ?? getRootObjectStore(object))?.getState();
 }
 
 /** Exposes the stable public instance descriptor behind a managed Three ref. */

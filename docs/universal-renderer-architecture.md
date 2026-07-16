@@ -51,7 +51,8 @@ The universal client target establishes and proves these seams:
   universal-to-DOM directions, without changing `Block` or guessing renderer
   identity from dynamic ancestry;
 - renderer-declared text, visibility, intrinsic-type, and client-only server
-  policies shared by the compiler and bundler adapters;
+  policies plus same-renderer portal support shared by the compiler and bundler
+  adapters;
 - prepared host acceptance, stable-ID public-instance recreation, host
   lifecycle/local callbacks, prop codecs and resource handles, nested event
   scopes, and retained Activity/Suspense ownership;
@@ -60,12 +61,13 @@ The universal client target establishes and proves these seams:
 
 The current implementation does **not**:
 
-- port the React Three Fiber API;
+- embed React Reconciler or claim complete React Three Fiber, Drei, native, or
+  WebGPU parity;
 - replace or generalize the DOM compiler/runtime;
 - implement a Lynx runtime, Rspeedy integration, or cross-thread commit
   acknowledgement;
 - define renderer-neutral style sheets, assets, layout measurement, live host
-  serialization/adoption, or general portals;
+  serialization/adoption, or cross-renderer portal targets;
 - project a universal child suspension or DOM-owner Activity state across a
   mixed-renderer boundary; those are Three integration gates rather than
   partial properties of the host-neutral core;
@@ -162,7 +164,7 @@ export default defineConfig({
 					server: 'client-only',
 					intrinsics: '@octanejs/three/intrinsics',
 					text: 'ignore',
-					capabilities: ['visibility'],
+					capabilities: ['visibility', 'portal'],
 				},
 				object: {
 					module: '/src/testing/object-renderer.js',
@@ -420,8 +422,13 @@ The executable universal target accepts normal Octane component composition:
   error ownership, HMR, profiling, and parallel-`use()` planning;
 - `<Activity mode="visible"|"hidden">` when the selected renderer declares
   `visibility`, with retained hosts and renderer-owned effect/event semantics.
+- `createPortal(children, target)` descriptors, whose execution requires the
+  active driver's `portals` capability; renderer metadata may advertise
+  `portal` for tooling while component/context/error/effect ownership stays at
+  the authored location and only physical host placement is redirected through
+  an opaque driver target handle.
 
-Scoped `<style>`, general portals, async template collections, and live
+Scoped `<style>`, cross-renderer portals, async template collections, and live
 universal server output remain capability gaps and diagnose rather than
 silently changing targets. Static authored text follows the selected
 descriptor's `host`/`ignore`/`reject` policy; dynamic primitive materialization
@@ -511,12 +518,34 @@ branches, keyed loops, try/pending/catch ownership, and Providers without
 turning the template back into JSX. Plan construction validates and freezes
 static records so a renderer cannot observe a half-mutated plan.
 
+Same-renderer portals enter that plan as an opaque renderable descriptor rather
+than a host node:
+
+```ts
+interface UniversalPortalValue {
+	readonly children: UniversalRenderable;
+	readonly target: unknown;
+	// Plus a private immutable runtime discriminator.
+}
+
+declare function createPortal(
+	children: UniversalRenderable,
+	target: unknown,
+): UniversalPortalValue;
+```
+
+The raw target remains local to materialization and target preparation. It is
+never treated as a host, serialized as a host prop, or inserted into logical
+children.
+
 ### Logical records
 
 Each universal root owns records with a core ID, key, kind, host type/props,
-logical parent, and ordered logical children. Range records have no physical
-host instance. Flattening a range yields its physical host descendants only
-when commands are planned for a concrete parent.
+logical parent, and ordered logical children. Range and portal records have no
+physical host instance. Flattening a range yields its physical host descendants
+only when commands are planned for a concrete parent. A portal is instead a
+logical placement boundary: its descendants flatten beneath its registered
+target handle and never leak into the authored physical parent.
 
 This topology provides three things a driver must not emulate:
 
@@ -536,11 +565,20 @@ The deliberately small driver surface is DOM-like in vocabulary, not in data
 model:
 
 ```ts
+interface UniversalPortalTargetHandle {
+	readonly $$kind: 'octane.universal.portal-target';
+	readonly renderer: string;
+	readonly root: number;
+	readonly id: string | number;
+}
+
+type UniversalHostParent = number | null | UniversalPortalTargetHandle;
+
 type UniversalHostCommand =
 	| { op: 'create'; id: number; type: string; props: Readonly<Record<string, unknown>> }
 	| { op: 'update'; id: number; props: Readonly<Record<string, unknown>> }
 	| { op: 'recreate'; id: number; type: string; props: Readonly<Record<string, unknown>> }
-	| { op: 'insert' | 'move'; parent: number | null; id: number; before: number | null }
+	| { op: 'insert' | 'move'; parent: UniversalHostParent; id: number; before: number | null }
 	| {
 			op: 'event';
 			id: number;
@@ -554,13 +592,32 @@ type UniversalHostCommand =
 			listener: { id: number } | null;
 	  }
 	| { op: 'visibility'; id: number; state: 'hidden' | 'visible' }
-	| { op: 'remove'; parent: number | null; id: number }
+	| { op: 'remove'; parent: UniversalHostParent; id: number }
 	| { op: 'destroy'; id: number };
 
 interface UniversalHostBatch {
 	readonly renderer: string;
 	readonly version: number;
 	readonly commands: readonly UniversalHostCommand[];
+}
+
+interface UniversalPortalTargetRegistration {
+	readonly handle: UniversalPortalTargetHandle;
+	release(): void;
+}
+
+interface UniversalPortalTargetContext<Container> {
+	readonly container: Container;
+	readonly renderer: string;
+	readonly target: unknown;
+	readonly transported: boolean;
+	createPortalTargetHandle(id: string | number): UniversalPortalTargetHandle;
+}
+
+interface UniversalPortalCapability<Container> {
+	prepareTarget(
+		context: UniversalPortalTargetContext<Container>,
+	): UniversalPortalTargetRegistration;
 }
 
 interface UniversalHostDriver<Container, PublicInstance> {
@@ -579,6 +636,7 @@ interface UniversalHostDriver<Container, PublicInstance> {
 	readonly updates?: {
 		classify(type: string, previous: object, next: object): 'update' | 'recreate';
 	};
+	readonly portals?: UniversalPortalCapability<Container>;
 	prepareBatch(
 		container: Container,
 		batch: UniversalHostBatch,
@@ -598,12 +656,29 @@ interface UniversalHostCommitContext {
 }
 ```
 
-`parent: null` means the root container. IDs and `before` references name
-core records, not driver object identity. `remove` detaches a live instance;
-`destroy` releases its renderer-owned resources. `recreate` keeps the core ID
-and logical children while replacing the public instance, transferring final
-placement, callback/ref ownership, and disposal in one accepted commit.
-`visibility` changes physical presentation without deleting logical ownership.
+`parent: null` means the root container. A numeric parent names a core host
+record. A portal parent is an opaque, immutable handle minted by the current
+root through the driver's `prepareTarget()` call; the raw target never enters a
+host batch. IDs and `before` references otherwise name core records, not driver
+object identity. `remove` detaches a live instance; `destroy` releases its
+renderer-owned resources. `recreate` keeps the core ID and logical children
+while replacing the public instance, transferring final placement, callback/ref
+ownership, and disposal in one accepted commit. `visibility` changes physical
+presentation without deleting logical ownership.
+
+Portal target registration is transactional. The core validates that the
+returned handle was minted for the active renderer and root, reuses a committed
+registration when a rerender resolves to the same handle, and calls `release()`
+exactly once when staged work aborts or fails, an accepted portal is removed or
+retargeted, or the root unmounts. Retained Suspense keeps the committed target
+registration and hidden host identity until reveal or deletion.
+
+`transported` tells the capability whether commands will cross the optional
+commit transport. Only the opaque handle may appear there. A transport-capable
+renderer can map a serializable/root-registered target token to that handle; a
+local-object renderer must reject instead of sharing its target object. The
+Three driver therefore rejects transported `Object3D` targets and also rejects
+stale, foreign-root, and concurrently cross-root targets before host mutation.
 
 `version` is a monotonic prepared-batch sequence, so aborted attempts may leave
 gaps in the versions observed by a driver. Drivers order accepted batches by
@@ -659,9 +734,10 @@ interface UniversalTransaction {
 ```
 
 During `prepare`, the core evaluates the component, materializes a blueprint,
-reconciles draft records, and stages:
+prepares any portal target registrations, reconciles draft records, and stages:
 
 - ordered host commands;
+- root-scoped portal registrations and their release paths;
 - the next logical topology and hook cells;
 - ref detach/attach work;
 - insertion, layout, and passive effect work.
@@ -978,6 +1054,13 @@ The object driver and executable fixtures demonstrate:
   rejection, and aborted/rejected transactions;
 - one recorded batch for each successful root commit and one teardown batch.
 
+A focused portal-capable proof driver separately demonstrates physical target
+isolation, logical context and host identity, retargeting, retained Suspense,
+opaque transported handles, foreign-handle rejection, and exact registration
+release across abort, supersession, host rejection, removal, and unmount. The
+plain object driver intentionally rejects portal-parent commands because it
+does not declare that capability.
+
 Text is represented as a `#text` host only because the object driver declares a
 text capability. Materialization rejects a driver that has not opted into that
 capability. The spelling is an internal convention for this proof, not a
@@ -991,11 +1074,11 @@ declare, implement, or reject these independently.
 | Capability | Implemented behavior | Remaining contract gate |
 | --- | --- | --- |
 | Text | Registry and driver policies independently choose `host`, `ignore`, or `reject`; static authored text diagnoses at compile time and dynamic primitives fail at materialization when unsupported. | A concrete renderer defines whether and how it allocates/updates text hosts. |
-| Events | Driver classification lowers event props to listener-ID/priority commands; replacement, removal, teardown, owner-routed dispatch, and scoped multi-listener delivery are transactional. | A Three driver must classify its ray/pointer surface; a transported renderer must serialize native delivery/priority semantics. There is deliberately no synthetic event layer. |
+| Events | Driver classification lowers event props to listener-ID/priority commands; replacement, removal, teardown, owner-routed dispatch, and scoped multi-listener delivery are transactional. The local Three driver supplies the R3F-shaped ray/pointer surface. | A transported renderer must serialize native delivery/priority semantics. There is deliberately no synthetic event layer. |
 | Styles | No renderer-neutral style object or stylesheet lifecycle. | Add typed renderer extensions for material/style application and disposal; do not copy CSS rules into native renderers. |
 | Assets | No prepare-time asset allocation. | Add cancellable/resource-owned capabilities whose acquisition is staged or externally cached. |
-| Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, disconnect events and layout/passive effects, and apply their distinct ref contracts. | Three maps visibility onto `Object3D.visible` versus attachment/resource detachment; DOM-owner Activity and Three-to-DOM pending projection remain Milestone 5. |
-| Portal | `createPortal` fails clearly; the same-renderer target-handle, logical/physical ownership, root/transport scope, and event-enclave contract is specified by the Three port plan. | Implement and validate the Three capability without treating renderer regions as portals. |
+| Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, disconnect events and layout/passive effects, and apply their distinct ref contracts. Three maps that state onto `Object3D.visible`, and its client pending/error projection is implemented. | Cross-boundary DOM-owner Activity propagation remains separate from local Three visibility. |
+| Portal | `createPortal` creates a logical range whose hosts are placed under an opaque, root-scoped driver target handle. Registration, stable reuse, retarget, retained Suspense, abort, rejected preparation, removal, and teardown are transactional. Three Milestone 6 supplies borrowed `Object3D` targets, R3F-style state/event enclaves, nested context, shared frame/interaction state, and physical Three event bubbling. | Transported renderers must resolve serializable target tokens without sharing local objects; cross-renderer portals remain unsupported. |
 | Hydration / serialization | Client-only renderers preserve server exports, omit declared regions, and expose stable manifest identity for one client mount without serializing the host tree. | A live renderer serializer/adopter must define seed identity and mismatch behavior separately; absence remains valid. |
 | Layout measurement | Public instances are available after commit; there is no neutral measure call. | Define synchronous-local versus transport-acknowledged layout and the point at which layout effects may run. |
 | Specialized collections | Not forced into generic child insertion. | Add renderer-namespaced commands/capabilities for Three `attach`, render lists, native collections, or other ownership models. |
@@ -1069,7 +1152,8 @@ observation boundaries:
 | Retained ownership | Activity and Suspense prove host/state/resource identity, visibility, distinct ref semantics, insertion retention, layout/passive disconnection, event suppression, fallback coexistence, reveal/reject, and capability failure. |
 | Client-only graph | Neutral, Vite, Rspack, and Rsbuild builds remove server imports/regions, preserve exports without authored execution, reject live use, and agree on client-reference/manifest identity; raw Rspack proves graph split and Vite/Rsbuild prove one client mount over an adopted DOM shell. |
 | Compiler facilities | Universal maps point to authored TSRX; HMR, profiling, and parallel-`use()` plans remain executable; Volar chooses file-local intrinsics without global merging; the DOM golden stays byte-identical. |
-| Capability gates | Text and Activity/visibility compile and execute only under explicit policies; portals and every unsupported renderer concept fail clearly. |
+| Capability gates | Text and Activity/visibility compile only under explicit policies. Portal descriptors materialize normally, renderer metadata may advertise them for tooling, and preparation requires an active driver target capability. Missing capabilities and every unsupported renderer concept fail clearly. |
+| Portals | Public target placement, stable identity, logical context, retained Suspense, retargeting, invalid/foreign scope diagnostics, registration release, and Three state/event behavior are covered without exposing raw targets in transported batches. |
 
 Repository-wide typechecking and formatting remain required after the focused
 compiler/runtime/adapter suites. A user-facing experimental config or package
@@ -1086,16 +1170,17 @@ are implemented. Normal
 componentized client authoring—including `Canvas`-shaped DOM-to-universal and
 `Html`-shaped reverse child regions—is executable rather than an RFC-only
 design. Stable-ID recreation, host lifecycle/local callbacks, prop codecs,
-event scopes, retained visibility, client-only server graphs/manifests, and
-file-local intrinsic catalogues are executable. Universal maps compose to TSRX,
-the high-level Vite plugin loads the same renderer config early, and the
-Vite/Rspack/Rsbuild paths share normalized target and boundary decisions.
+event scopes, retained visibility, transactional portal target handles,
+client-only server graphs/manifests, and file-local intrinsic catalogues are
+executable. Universal maps compose to TSRX, the high-level Vite plugin loads the
+same renderer config early, and the Vite/Rspack/Rsbuild paths share normalized
+target and boundary decisions.
 
 The remaining foundation limitations are capability/scheduler boundaries:
 
-- live universal host serialization/adoption, general portals, async template
-  collections, scoped styles, neutral layout measurement, and asynchronous
-  transport acknowledgement are not implemented;
+- live universal host serialization/adoption, cross-renderer portals, async
+  template collections, scoped styles, neutral layout measurement, and
+  asynchronous transport acknowledgement are not implemented;
 - mixed-boundary suspension retains committed external content but does not yet
   drive the parent renderer's fallback or transition-hold timing, and a DOM
   Activity does not yet propagate offscreen state into an external root;
@@ -1108,14 +1193,14 @@ The remaining foundation limitations are capability/scheduler boundaries:
   renderer and transport implementations validate disposal, attachment, frame
   scheduling, and delivery semantics.
 
-### Next: `@octanejs/three` proving renderer
+### Implemented: `@octanejs/three` proving renderer through Milestone 6
 
-Build the smallest real Three package on the implemented seam:
+The real Three package now exercises the implemented seam locally:
 
 The R3F compatibility target, ABI gates, implementation phases, effort, and
 validation matrix are tracked in [`three-port-plan.md`](./three-port-plan.md).
 
-- a typed Three intrinsic catalog and concrete `Canvas` root/container;
+- a typed Three intrinsic catalogue and concrete `Canvas` root/container;
 - Three object creation, prop application/diffing, insert/move/remove, disposal,
   and public instances;
 - renderer-specific `attach`/collection ownership rather than encoding it as
@@ -1123,12 +1208,16 @@ validation matrix are tracked in [`three-port-plan.md`](./three-port-plan.md).
 - frame invalidation and layout/effect timing;
 - classification and delivery of Three ray/pointer events through the universal
   event capability;
-- asset/Suspense ownership and Three portals if justified;
+- asset/Suspense ownership plus same-renderer portals with local state/event
+  enclaves and ownership-safe teardown;
 - a concrete `Html` host that mounts the compiled reverse DOM region into its
-  owned DOM container and tears it down deterministically.
+  owned DOM container and tears it down deterministically remains a later
+  milestone.
 
-Only after a real Three proof should helper names, driver extensions, or
-boundary authoring APIs be considered for a stable public renderer SDK.
+This local proof is necessary but not sufficient for a stable public renderer
+SDK. The transported proof must still validate serialized target/resource
+handles, acknowledgement, event delivery, and layout timing before helper names
+or driver extensions become compatibility promises.
 
 ### Phase 3: transport and Lynx/native proof
 

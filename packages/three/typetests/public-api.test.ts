@@ -2,6 +2,7 @@ import type { UniversalComponent } from 'octane/universal';
 import type * as THREE from 'three';
 import {
 	createEvents,
+	createPortal,
 	createRoot,
 	events,
 	useFrame,
@@ -17,6 +18,7 @@ import {
 	type FilterFunction,
 	type Intersection,
 	type IntersectionEvent,
+	type InjectState,
 	type PointerCaptureTarget,
 	type PrimitiveProps,
 	type RaycastableRepresentation,
@@ -36,6 +38,26 @@ import {
 declare const canvas: HTMLCanvasElement;
 declare const renderer: Renderer;
 declare const Scene: UniversalComponent<{ name: string }>;
+declare const portalTarget: THREE.Group;
+
+const portalState: InjectState = {
+	events: {
+		enabled: true,
+		priority: 2,
+		compute(event, state, previous) {
+			state.pointer.set(event.offsetX, event.offsetY);
+			void previous;
+		},
+	},
+	size: { width: 320, height: 180, top: 0, left: 0 },
+};
+const portal = createPortal(null, portalTarget, portalState);
+void portal;
+// @ts-expect-error Portal targets must be Three Object3D instances.
+createPortal(null, {});
+// @ts-expect-error Portal event overrides expose the narrowed event layer surface.
+const invalidPortalState: InjectState = { events: { enabled: 'yes' } };
+void invalidPortalState;
 
 const root: ThreeRoot<HTMLCanvasElement> = createRoot(canvas);
 const configured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({

@@ -4,7 +4,7 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
-Milestones 0, 2, 3, 4, and 5 are implemented on top of Octane's renderer SDK
+Milestones 0, 2, 3, 4, 5, and 6 are implemented on top of Octane's renderer SDK
 foundation. The current technical preview includes:
 
 - the serializable compiler preset, renderer entry point, renderer-local Three
@@ -27,12 +27,15 @@ foundation. The current technical preview includes:
   scalar and array inputs, extensions, progress, GLTF graph augmentation,
   `preload`, `clear`, and cached error routing;
 - retained Three Suspense and Activity visibility, ownership-safe teardown, and
-  client-side Three-to-DOM pending/error projection; and
+  client-side Three-to-DOM pending/error projection;
+- same-renderer `createPortal` placement into borrowed `Object3D` targets,
+  R3F-shaped state/event enclaves, nested context retention, one shared frame
+  loop, physical Three event bubbling, and root-scoped target teardown; and
 - public behavior, prepared-driver, and same-source compiled scene evidence
   against R3F 9.6.1 with the exact Three r172 oracle.
 
-Portals and portal event layers, full Canvas SSR/hydration adoption, XR,
-OffscreenCanvas lifecycle, and live HMR behavior follow in later milestones.
+Full Canvas SSR/hydration adoption, XR, OffscreenCanvas lifecycle, and live HMR
+behavior follow in later milestones.
 
 Three deliberate correctness fixes differ from R3F 9.6.1:
 
@@ -132,6 +135,36 @@ custom `events(store)` manager factory and update it through `state.setEvents()`
 that call its own lexical hook slot; keep that compatibility form unconditional
 and in stable order. Prefer `useStore(selector, equality?)` or
 `useThree(selector, equality?)` when using Octane's conditional-hook semantics.
+
+## Portals
+
+`createPortal` keeps its children in the authored Octane owner/context tree but
+places their Three hosts below a borrowed `Object3D`. The optional state layer
+matches R3F's portal model: it has its own scene, raycaster, pointer, and event
+priority while sharing the outer root's interaction registry and frame loop.
+
+```tsx
+import { createPortal, useThree } from '@octanejs/three';
+
+function Overlay() @{
+	const scene = useThree((state) => state.scene);
+	<group name={scene.name + '-overlay'} />
+}
+
+export function Scene(props) @{
+	<>
+		{createPortal(<Overlay />, props.overlayTarget, {
+			events: { priority: 2 },
+		})}
+	</>
+}
+```
+
+Portal targets are borrowed and never disposed by Octane. A managed target must
+belong to the same root; a local `Object3D` target also cannot cross a commit
+transport. Pointer hits use the portal layer's camera/raycaster, then bubble
+through physical `Object3D.parent` ancestry as they do in R3F. Component errors,
+effects, context, and scheduling continue to follow logical Octane ownership.
 
 ## Assets, Suspense, and errors
 

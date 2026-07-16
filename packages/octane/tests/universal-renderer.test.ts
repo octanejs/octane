@@ -920,7 +920,10 @@ describe('universal logical topology and transactions', () => {
 			/driver "object", container "other", batch "object"/,
 		);
 		mismatchedRoot.unmount();
-		expect(() => createPortal()).toThrow(/portal capability/);
+		const Portal = defineUniversalComponent('object', () =>
+			createPortal(universalValue(objectPlan), {}),
+		);
+		expect(() => root.render(Portal, undefined)).toThrow(/portal capability/);
 	});
 
 	it('requires drivers to opt into text instead of assuming a fake-DOM text API', () => {
