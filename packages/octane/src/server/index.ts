@@ -133,6 +133,8 @@ export {
 	ssrPortal,
 	injectStyle,
 	ssrHeadEl,
+	namespaceHead,
+	namespaceHeadElement,
 	// SSR parallel-use mirror (compiler targets — see suspense-parallel-use plan).
 	puMemo,
 	puBatch,

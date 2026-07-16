@@ -5451,12 +5451,26 @@ export function useId(slot?: HookSlot): string {
 // Templates: parse-once HTML → clone-per-instance
 // ---------------------------------------------------------------------------
 
-// Namespace flag: 0 = HTML, 1 = SVG, 2 = MathML. The compiler picks the
-// constant; we never look at namespaceURI at runtime.
-export function template(html: string, ns: number = 0, frag: number = 0): Element {
+// Namespace flags: 0 = HTML, 1 = SVG, 2 = MathML, 3 = opaque component
+// destination. An opaque template is not parsed at module evaluation: ordinary
+// component bodies and component children can be inserted under HTML, SVG, or
+// MathML, so clone() resolves their concrete parser context from the render
+// block's actual parent and caches one parsed template per destination.
+interface OpaqueTemplateRecord {
+	html: string;
+	frag: number;
+	parsed: Array<Element | undefined>;
+}
+
+const OPAQUE_TEMPLATE = Symbol('octane.opaque-template');
+
+function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
 	const t = document.createElement('template');
 	if (ns === 0) {
-		t.innerHTML = html;
+		// Fixed HTML multi-root templates arrive pre-wrapped by the compiler. Opaque
+		// multi-root templates carry raw markup because their eventual namespace is
+		// unknown, so add the equivalent wrapper only after HTML wins at clone time.
+		t.innerHTML = frag ? `<octane-frag>${html}</octane-frag>` : html;
 		const root = t.content.firstChild as Element;
 		// Multi-root HTML templates arrive wrapped in a synthetic <octane-frag>. The
 		// wrapper never exists in the server DOM (the roots render bare), so stamp it
@@ -5481,6 +5495,15 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 		return wrapEl;
 	}
 	return wrapEl.firstChild as Element;
+}
+
+export function template(html: string, ns: number = 0, frag: number = 0): Element {
+	if (ns === 3) {
+		return {
+			[OPAQUE_TEMPLATE]: { html, frag, parsed: [] } satisfies OpaqueTemplateRecord,
+		} as unknown as Element;
+	}
+	return parseTemplate(html, ns === 1 ? 1 : ns === 2 ? 2 : 0, frag);
 }
 
 // ---------------------------------------------------------------------------
@@ -6051,6 +6074,24 @@ function parseSeedJson(raw: string): unknown[] | null {
 }
 
 export function clone<T extends Node>(node: T, loc?: string): T {
+	// Every ordinary template is a DOM Node, so keep its hot path to one numeric
+	// property read. Only the compiler's flag-3 token consults the private Symbol.
+	const opaque =
+		(node as any).nodeType === undefined
+			? ((node as any)[OPAQUE_TEMPLATE] as OpaqueTemplateRecord | undefined)
+			: undefined;
+	if (opaque !== undefined) {
+		const inherited =
+			CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
+		const ns: 0 | 1 | 2 = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
+		let parsed = opaque.parsed[ns];
+		if (parsed === undefined) {
+			parsed = parseTemplate(opaque.html, ns, opaque.frag);
+			opaque.parsed[ns] = parsed;
+		}
+		const hydration = activeHydration();
+		return (hydration === null ? parsed.cloneNode(true) : hydration.clone(parsed, loc)) as T;
+	}
 	const hydration = activeHydration();
 	return hydration === null ? (node.cloneNode(true) as T) : hydration.clone(node, loc);
 }
@@ -6931,6 +6972,7 @@ const XMLNS_NS = 'http://www.w3.org/2000/xmlns/';
 // `template(html, ns)` instead). HTML_NS is what document.createElement produces in
 // an HTML document, so it's the reuse-check baseline for non-SVG elements.
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const MATHML_NS = 'http://www.w3.org/1998/Math/MathML';
 const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
 // Namespace for a de-opt host tag: `<svg>` always opens SVG; an SVG-ONLY tag
@@ -6941,8 +6983,22 @@ const HTML_NS = 'http://www.w3.org/1999/xhtml';
 // and de-opt descriptors namespace identically.
 function inferTagNs(tag: string, inherited: string | undefined): string | undefined {
 	if (tag === 'svg') return SVG_NS;
+	if (tag === 'math') return MATHML_NS;
 	if (inherited === undefined && SVG_ONLY_TAGS.has(tag)) return SVG_NS;
 	return inherited;
+}
+
+// Namespace inherited by a de-opt child from the DOM node it is actually being
+// inserted into. Component children are an opaque compile-time boundary, so the
+// runtime parent is the only authoritative source. `foreignObject` is itself an
+// SVG element but switches its children back to HTML; HTML is represented by an
+// undefined namespace because document.createElement is the fast/default path.
+function deoptChildNamespace(parent: Node): string | undefined {
+	if (parent.nodeType !== 1) return undefined;
+	const el = parent as Element;
+	if (el.namespaceURI === SVG_NS) return el.localName === 'foreignObject' ? undefined : SVG_NS;
+	if (el.namespaceURI === MATHML_NS) return MATHML_NS;
+	return undefined;
 }
 
 function attrNamespace(name: string): string | null {
@@ -7712,6 +7768,72 @@ export function headBlock(
 		const t = String(text);
 		if (el.textContent !== t) el.textContent = t;
 	}
+}
+
+interface NamespaceHeadProps {
+	headKey: string;
+	tag: string;
+	attrs: Record<string, any> | null;
+	text: unknown;
+}
+
+// Compiler ABI for a head singleton passed through an opaque component's
+// `children` prop. The caller cannot know whether that component will place the
+// child in HTML or foreign content, so resolve against this component block's
+// actual DOM parent. Slot 0 is reserved for renderReturnedValue; the conditional
+// head state deliberately lives at slot 1.
+//
+// This is a component (rather than a special descriptor kind) so normal block
+// ownership handles hydration, keys, updates, refs, and teardown. HTML owns a
+// document-head entry; SVG/MathML returns an ordinary host descriptor and lets
+// the return-value child slot own the inline element.
+/** @internal Compiler-generated. */
+export function namespaceHead(props: NamespaceHeadProps, scope: Scope): ElementDescriptor | null {
+	const slot = 1;
+	const inherited = deoptChildNamespace(scope.block.parentNode);
+	if (inherited !== undefined) {
+		// A retained component can move between an HTML and foreign-content
+		// destination without changing identity. Tear down the prior head entry
+		// before returning the inline descriptor for this pass.
+		const state = scope.slots[slot] as HeadSlot | undefined;
+		if (state !== undefined) {
+			state.el.remove();
+			scope.slots[slot] = undefined;
+		}
+		return createElement(props.tag, props.attrs ?? undefined, props.text);
+	}
+
+	// Direct `key`/`ref`/`class` attributes are omitted by the compiler; filter
+	// the same names out of spreads here. Event props intentionally remain —
+	// headBlock attaches them directly because document.head sits outside the
+	// delegated event root.
+	let headAttrs: Record<string, any> | null = null;
+	if (props.attrs !== null) {
+		headAttrs = {};
+		for (const key in props.attrs) {
+			if (key === 'key' || key === 'ref' || key === 'class' || key === 'className') continue;
+			headAttrs[key] = props.attrs[key];
+		}
+	}
+	headBlock(scope, slot, props.headKey, props.tag, headAttrs, props.text);
+	return null;
+}
+
+/** @internal Compiler-generated descriptor factory for namespaceHead. */
+export function namespaceHeadElement(
+	headKey: string,
+	tag: string,
+	attrs: Record<string, any> | null,
+	text: unknown,
+	authoredKey?: unknown,
+): ElementDescriptor {
+	// A key from an explicit attribute wins; otherwise preserve a key copied by
+	// an already-evaluated spread. The raw attrs object is built once by generated
+	// code, so getters/spreads never run twice merely to discover the key.
+	const key = authoredKey !== undefined ? authoredKey : attrs?.key;
+	const config: any = { headKey, tag, attrs, text };
+	if (key !== undefined) config.key = key;
+	return createElement(namespaceHead, config);
 }
 
 export function injectStyle(id: string, css: string): void {
@@ -11163,8 +11285,7 @@ function reconcileDeoptNode(
 		}
 		setDeoptDesc(el, value);
 		if (!hasDangerHTML(value.props)) {
-			const childNs = elNs === SVG_NS && value.type !== 'foreignObject' ? SVG_NS : undefined;
-			reconcileDeoptChildren(el, value.children, ownerBlock, childNs);
+			reconcileDeoptChildren(el, value.children, ownerBlock);
 		}
 		return el;
 	}
@@ -11183,12 +11304,11 @@ function reconcileDeoptNode(
 // children match by `key`, unkeyed children match positionally (React-shape). Nodes
 // not reused are removed; survivors are reordered to match the descriptor. No markers
 // are introduced — the element fully owns its children, so this is raw-DOM reuse.
-function reconcileDeoptChildren(
-	el: Element,
-	children: any,
-	ownerBlock: Block,
-	childNs?: string,
-): void {
+function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): void {
+	// The element that owns these children is authoritative. This matters when a
+	// component or dynamic tag made the lexical namespace unknowable, and when an
+	// SVG foreignObject resets its descendants to HTML.
+	const childNs = deoptChildNamespace(el);
 	const next: any[] = [];
 	const nextKeys: any[] = [];
 	flattenDeoptChildrenKeyed(next, nextKeys, children, '');
@@ -11475,7 +11595,7 @@ function deoptItemBody(item: any, scope: Scope): void {
 		prev = startM != null ? startM.nextSibling : null;
 		if (prev === endM) prev = null; // empty item range → nothing to adopt
 	}
-	const node = reconcileDeoptNode(prev, item, block);
+	const node = reconcileDeoptNode(prev, item, block, deoptChildNamespace(block.parentNode));
 	if (node !== prev) {
 		// Built a fresh node (first mount, or a tag/type change) — insert it at
 		// the old node's position, THEN drop the old one. Insert-before-remove
@@ -11552,12 +11672,10 @@ function descNeedsBlocks(value: any): boolean {
 function hostElementBody(d: ElementDescriptor, block: Block): void {
 	let el = block.deoptNode as Element | null;
 	const hydration = activeHydration();
-	// A root `<svg>` — or any SVG-ONLY tag (see SVG_ONLY_TAGS) — opens the SVG
-	// namespace. (Component children inside an SVG are an uncommon case; they
-	// mount via childSlot below, which does not yet thread the SVG namespace —
-	// the pure-host SVG path through reconcileDeoptChildren does, and SVG-only
-	// child tags self-infer through the same table.)
-	const elNs = inferTagNs(d.type as string, undefined);
+	// Component/value boundaries are namespace-transparent. Derive the inherited
+	// namespace from the block's actual DOM parent; explicit <svg>/<math> roots
+	// still override it through inferTagNs.
+	const elNs = inferTagNs(d.type as string, deoptChildNamespace(block.parentNode));
 	// Hydration first render: ADOPT the server-rendered host element sitting at the
 	// cursor instead of building a fresh one (which would orphan the server node and
 	// desync the marker walk). Then point the cursor at its first child so the childSlot
@@ -11661,9 +11779,9 @@ function hostStringTagBody(d: ElementDescriptor, block: Block): void {
 	const tag = d.type as string;
 	let el = block.deoptNode as Element | null;
 	const hydration = activeHydration();
-	// A root `<svg>` or SVG-only tag opens the SVG namespace (parity with
-	// hostElementBody).
-	const elNs = inferTagNs(tag, undefined);
+	// Component tags can resolve to host strings under SVG/MathML. Inherit from
+	// the actual destination rather than assuming every dynamic host is HTML.
+	const elNs = inferTagNs(tag, deoptChildNamespace(block.parentNode));
 	if (el === null) {
 		if (
 			hydration !== null &&
@@ -12210,7 +12328,7 @@ export function childSlot(
 				// always yields a node for a host descriptor; the null checks are
 				// shape-parity with the marked path below.
 				const prev = state.hostNode;
-				const node = reconcileDeoptNode(prev, value, parentBlock);
+				const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 				if (node !== prev) {
 					if (prev !== null && prev.parentNode !== null) {
 						if (node !== null) prev.parentNode.insertBefore(node, prev);
@@ -12234,7 +12352,7 @@ export function childSlot(
 				prev = state.start.nextSibling;
 				if (prev === state.end) prev = null;
 			}
-			const node = reconcileDeoptNode(prev, value, parentBlock);
+			const node = reconcileDeoptNode(prev, value, parentBlock, deoptChildNamespace(domParent));
 			if (node !== prev) {
 				if (prev != null && prev !== node && prev.parentNode !== null) {
 					detachDeoptTreeRefs(prev, null);
@@ -12373,7 +12491,8 @@ export function childSlot(
 			state.hostNode.nodeType === 1 /* Element */ &&
 			(state.hostNode as Element).localName === (props as ElementDescriptor).type &&
 			(state.hostNode as Element).namespaceURI ===
-				(inferTagNs((props as ElementDescriptor).type as string, undefined) ?? HTML_NS) &&
+				(inferTagNs((props as ElementDescriptor).type as string, deoptChildNamespace(domParent)) ??
+					HTML_NS) &&
 			!hasDangerHTML((props as ElementDescriptor).props) &&
 			!hasDangerHTML(getDeoptDesc(state.hostNode)?.props ?? null)
 		) {

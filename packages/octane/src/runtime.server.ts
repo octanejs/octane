@@ -69,6 +69,11 @@ interface SSRScope {
 
 type ParserNamespace = 'html' | 'svg' | 'mathml';
 
+// Public string descriptors are HTML-ASCII-case-insensitive. Keep foreign
+// namespace inference on the same contract even though the shared table stores
+// SVG's canonical mixed-case spellings (for example foreignObject/clipPath).
+const SVG_ONLY_LOWERCASE_TAGS = new Set(Array.from(SVG_ONLY_TAGS, (tag) => tag.toLowerCase()));
+
 interface SsrElementContext {
 	tag: string;
 	parent: SsrElementContext | null;
@@ -225,30 +230,37 @@ function ssrScope(parent: SSRScope | null): SSRScope {
 	return { parent, $$ctxValues: null };
 }
 
+function parserNamespacesForTag(
+	tag: string,
+	inherited: ParserNamespace,
+): { namespace: ParserNamespace; childrenNamespace: ParserNamespace } {
+	const semanticTag = tag.toLowerCase();
+	const namespace: ParserNamespace =
+		semanticTag === 'svg'
+			? 'svg'
+			: semanticTag === 'math'
+				? 'mathml'
+				: inherited === 'html' && SVG_ONLY_LOWERCASE_TAGS.has(semanticTag)
+					? 'svg'
+					: inherited;
+	const childrenNamespace: ParserNamespace =
+		semanticTag === 'foreignobject'
+			? 'html'
+			: semanticTag === 'svg'
+				? 'svg'
+				: semanticTag === 'math'
+					? 'mathml'
+					: inherited === 'html' && SVG_ONLY_LOWERCASE_TAGS.has(semanticTag)
+						? 'svg'
+						: inherited;
+	return { namespace, childrenNamespace };
+}
+
 function ssrElementNamespaces(
 	tag: string,
 	parent: SsrElementContext | null,
 ): { namespace: ParserNamespace; childrenNamespace: ParserNamespace } {
-	const inherited = parent?.childrenNamespace ?? FRAME?.namespace ?? 'html';
-	const namespace: ParserNamespace =
-		tag === 'svg'
-			? 'svg'
-			: tag === 'math'
-				? 'mathml'
-				: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
-					? 'svg'
-					: inherited;
-	const childrenNamespace: ParserNamespace =
-		tag === 'foreignObject'
-			? 'html'
-			: tag === 'svg'
-				? 'svg'
-				: tag === 'math'
-					? 'mathml'
-					: inherited === 'html' && SVG_ONLY_TAGS.has(tag)
-						? 'svg'
-						: inherited;
-	return { namespace, childrenNamespace };
+	return parserNamespacesForTag(tag, parent?.childrenNamespace ?? FRAME?.namespace ?? 'html');
 }
 
 function reportInvalidHtmlNesting(message: string): void {
@@ -1069,6 +1081,7 @@ function ssrHostElement(
 	} else if (rawInner !== undefined) {
 		inner = rawInner;
 	} else if (hasChildren) {
+		const { childrenNamespace } = parserNamespacesForTag(semanticTag, FRAME?.namespace ?? 'html');
 		// A de-opt host whose children contain COMPONENTS renders those children on the
 		// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
 		// on hydration), so they must carry the full childSlot/block marker structure —
@@ -1076,9 +1089,11 @@ function ssrHostElement(
 		// children are rebuilt by the client de-opt reconciler, so they stay as plain
 		// marker-less markup via `ssrDescriptorContent`.
 		const build = () =>
-			serverDescNeedsBlocks(children)
-				? ssrDeoptBlockChildren(children, scope)
-				: ssrDescriptorContent(children, scope);
+			ssrInNamespace(childrenNamespace, () =>
+				serverDescNeedsBlocks(children)
+					? ssrDeoptBlockChildren(children, scope)
+					: ssrDescriptorContent(children, scope),
+			);
 		// A controlled <select> projects `selected` onto the options serialized
 		// inside its children (compiled options included — the scope is global).
 		inner =
@@ -2094,14 +2109,10 @@ export function ssrComponent(
 		// a render FUNCTION from a template one.
 		if (typeof comp === 'string') {
 			const inheritedNamespace = explicitNamespace ?? FRAME?.namespace ?? 'html';
-			const childNamespace =
-				comp === 'foreignObject'
-					? 'html'
-					: comp === 'svg' || (inheritedNamespace === 'html' && SVG_ONLY_TAGS.has(comp))
-						? 'svg'
-						: comp === 'math'
-							? 'mathml'
-							: inheritedNamespace;
+			const childNamespace = parserNamespacesForTag(
+				comp.toLowerCase(),
+				inheritedNamespace,
+			).childrenNamespace;
 			return ssrInNamespace(childNamespace, () => {
 				const kids = props?.children;
 				if (typeof kids === 'function') {
@@ -3481,6 +3492,48 @@ export function ssrHeadEl(
 		s += '>' + (text == null ? '' : escapeHtml(text)) + '</' + tag + '>';
 	}
 	HEAD.html += s;
+}
+
+interface NamespaceHeadProps {
+	headKey: string;
+	tag: string;
+	attrs: Record<string, unknown> | null;
+	text: unknown;
+}
+
+// Server twin of runtime.ts's namespaceHead compiler ABI. An opaque component
+// boundary inherits its parser namespace through FRAME. HTML children contribute
+// to the render's head buffer; SVG/MathML children serialize as an ordinary host
+// descriptor in the component's body range.
+/** @internal Compiler-generated. */
+export function namespaceHead(props: NamespaceHeadProps): ElementDescriptor | null {
+	if ((FRAME?.namespace ?? 'html') !== 'html') {
+		return createElement(props.tag, props.attrs, props.text);
+	}
+	let headAttrs: Record<string, unknown> | null = null;
+	if (props.attrs !== null) {
+		headAttrs = {};
+		for (const key in props.attrs) {
+			if (key === 'key' || key === 'ref' || key === 'class' || key === 'className') continue;
+			headAttrs[key] = props.attrs[key];
+		}
+	}
+	ssrHeadEl(props.headKey, props.tag, headAttrs, props.text);
+	return null;
+}
+
+/** @internal Compiler-generated descriptor factory for namespaceHead. */
+export function namespaceHeadElement(
+	headKey: string,
+	tag: string,
+	attrs: Record<string, unknown> | null,
+	text: unknown,
+	authoredKey?: unknown,
+): ElementDescriptor {
+	const key = authoredKey !== undefined ? authoredKey : (attrs as any)?.key;
+	const config: any = { headKey, tag, attrs, text };
+	if (key !== undefined) config.key = key;
+	return createElement(namespaceHead as unknown as ServerComponent, config);
 }
 
 // ---------------------------------------------------------------------------

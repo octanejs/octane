@@ -153,6 +153,8 @@ export {
 	queueRefDetach,
 	injectStyle,
 	headBlock,
+	namespaceHead,
+	namespaceHeadElement,
 	delegateEvents,
 	delegateCaptureEvents,
 	forBlock,
