@@ -41,6 +41,18 @@ async function shapeBodyBox(shape: Locator) {
 	return box;
 }
 
+async function storedShapeX(page: Page, boardId: string, shapeId: string) {
+	return page.evaluate(
+		({ boardId, shapeId }) => {
+			const raw = localStorage.getItem(`draftboard.document.v1.${boardId}`);
+			if (raw === null) return null;
+			const document = JSON.parse(raw) as { shapes?: Array<{ id?: string; x?: number }> };
+			return document.shapes?.find((shape) => shape.id === shapeId)?.x ?? null;
+		},
+		{ boardId, shapeId },
+	);
+}
+
 function expectNear(actual: number, expected: number, tolerance = 4) {
 	expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
 }
@@ -330,14 +342,25 @@ test('focuses the canvas imperatively, runs keyboard history, and restores focus
 	await expect(shortcuts).toBeFocused();
 });
 
-test('retries load and save failures while rapid offline edits converge to the latest persisted canvas', async ({
+test('retries failures while overlapping saves and offline edits converge to the latest persisted canvas', async ({
 	page,
 	context,
 }) => {
-	await page.goto('/boards/launch?scenario=load-failure,save-failure');
+	await page.goto('/boards/launch?scenario=load-failure,save-failure,save-race');
 	await expect(page.getByRole('alert')).toContainText('We couldn’t load this board');
 	await page.getByRole('button', { name: 'Retry loading' }).click();
 	await expect(page.getByTestId('board-ready')).toBeVisible();
+	const persistenceControls = page.getByRole('region', {
+		name: 'Autosave persistence controls',
+	});
+	const completeOldestSave = persistenceControls.getByRole('button', {
+		name: 'Complete oldest pending save',
+	});
+	const completeNewestSave = persistenceControls.getByRole('button', {
+		name: 'Complete newest pending save',
+	});
+	const persistenceStatus = persistenceControls.getByRole('status');
+	await expect(persistenceControls).toBeVisible();
 
 	const audience = page.locator('[data-shape-id="audience"]');
 	await audience.click();
@@ -346,6 +369,31 @@ test('retries load and save failures while rapid offline edits converge to the l
 	await expect(audience).toHaveAttribute('data-x', '124');
 	await expect(page.getByRole('alert')).toContainText('We couldn’t save the latest board');
 	await page.getByRole('button', { name: 'Retry save' }).click();
+	await expect(persistenceStatus).toContainText('1 save is waiting for persistence.');
+	await completeNewestSave.click();
+	await expect(page.getByText('Synced · all changes saved')).toBeVisible();
+	await expect.poll(() => storedShapeX(page, 'launch', 'audience')).toBe(124);
+
+	// Hold two real save attempts at the persistence boundary, then complete the newest first.
+	// Releasing the older request afterward must not regress the durable or user-visible result.
+	await page.getByRole('button', { name: 'Focus canvas' }).click();
+	await page.keyboard.press('ArrowRight');
+	await expect(audience).toHaveAttribute('data-x', '126');
+	await expect(persistenceStatus).toContainText('1 save is waiting for persistence.');
+	await page.keyboard.press('ArrowRight');
+	await expect(audience).toHaveAttribute('data-x', '128');
+	await expect(persistenceStatus).toContainText('2 saves are waiting for persistence.');
+	await completeNewestSave.click();
+	await expect(persistenceStatus).toContainText('1 save is waiting for persistence.');
+	await expect(persistenceStatus).toContainText('Latest save completion applied.');
+	await expect.poll(() => storedShapeX(page, 'launch', 'audience')).toBe(128);
+	await expect(page.getByText('Synced · all changes saved')).toBeVisible();
+	await completeOldestSave.click();
+	await expect(persistenceStatus).toContainText('No saves are waiting for persistence.');
+	await expect(persistenceStatus).toContainText(
+		'Older save completion ignored; latest saved canvas was preserved.',
+	);
+	expect(await storedShapeX(page, 'launch', 'audience')).toBe(128);
 	await expect(page.getByText('Synced · all changes saved')).toBeVisible();
 
 	await context.setOffline(true);
@@ -364,7 +412,7 @@ test('retries load and save failures while rapid offline edits converge to the l
 	await expect(page.locator('[data-shape-id="first-idea"]')).toHaveAttribute('data-x', '400');
 	await page.getByRole('link', { name: /Launch/ }).click();
 	await expect(page.getByTestId('board-ready')).toBeVisible();
-	await expect(page.locator('[data-shape-id="audience"]')).toHaveAttribute('data-x', '124');
+	await expect(page.locator('[data-shape-id="audience"]')).toHaveAttribute('data-x', '128');
 	await expect(page.locator('[data-shape-id="audience"]')).toHaveAttribute('data-y', '142');
 	await page.getByRole('link', { name: /Blank/ }).click();
 	await expect(page.getByTestId('board-ready')).toBeVisible();
@@ -374,7 +422,7 @@ test('retries load and save failures while rapid offline edits converge to the l
 	await expect(page.getByText('Synced · all changes saved')).toBeVisible();
 	await page.goto('/boards/launch');
 	await expect(page.getByTestId('board-ready')).toBeVisible();
-	await expect(page.locator('[data-shape-id="audience"]')).toHaveAttribute('data-x', '124');
+	await expect(page.locator('[data-shape-id="audience"]')).toHaveAttribute('data-x', '128');
 	await expect(page.locator('[data-shape-id="audience"]')).toHaveAttribute('data-y', '142');
 	await page.goto('/boards/empty');
 	await expect(page.getByTestId('board-ready')).toBeVisible();

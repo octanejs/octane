@@ -15,6 +15,7 @@
     "vite": {
       "optimizeDeps": {
         "exclude": [
+          "@lexical/*",
           "lexical"
         ]
       }

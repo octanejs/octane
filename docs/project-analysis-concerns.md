@@ -349,8 +349,9 @@ validator contains an executable Hook Form SSR probe as well; treat that as a
 proven runtime gate only when the complete `pnpm packages:pack:check` run
 passes. Vite discovers installed raw Octane dependency graphs, excludes source
 packages from prebundling/SSR externalization, preserves manifest-declared manual
-hook-slot directories, and honors package-owned optimizer exclusions for
-identity-sensitive transitive dependencies.
+hook-slot directories, and honors package-owned optimizer exclusions (including
+`family/*` rules expanded to exact declared dependency names) for identity-sensitive
+transitive dependencies.
 Bindings and the Vite plugin peer on Octane while retaining workspace-only dev
 dependencies; the adapter peers on the plugin.
 

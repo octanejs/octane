@@ -64,16 +64,17 @@ constraint in its manifest:
 	"octane": {
 		"vite": {
 			"optimizeDeps": {
-				"exclude": ["identity-sensitive-core"]
+				"exclude": ["identity-sensitive-core", "@identity-sensitive/*"]
 			}
 		}
 	}
 }
 ```
 
-The Vite adapter adds those entries to `optimizeDeps.exclude` automatically. This
-metadata is for raw binding authors; applications consuming the binding do not need
-to repeat it in `vite.config.ts`.
+The Vite adapter adds exact entries to `optimizeDeps.exclude` automatically and
+expands a terminal `family/*` rule to matching packages declared by the binding or
+application. This metadata is for raw binding authors; applications consuming the
+binding do not need to repeat it in `vite.config.ts`.
 
 <h2 id="rspack">Rspack</h2>
 

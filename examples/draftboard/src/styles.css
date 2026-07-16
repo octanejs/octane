@@ -275,6 +275,61 @@ svg:focus-visible {
 	font-size: 13px;
 }
 
+.persistence-fixture {
+	position: relative;
+	z-index: 3;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 18px;
+	padding: 10px 24px;
+	color: #38336a;
+	font-size: 13px;
+	background: #f0efff;
+	border-bottom: 1px solid #d6d2f5;
+}
+
+.persistence-fixture-copy,
+.persistence-fixture-controls {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	gap: 8px;
+}
+
+.persistence-fixture-copy {
+	flex: 1 1 260px;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 2px;
+}
+
+.persistence-fixture-controls {
+	flex: 1 1 520px;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.persistence-live-status {
+	flex: 1 1 260px;
+	overflow-wrap: anywhere;
+}
+
+.persistence-fixture button {
+	padding: 7px 12px;
+	color: white;
+	font-weight: 750;
+	background: #6250d7;
+	border: 0;
+	border-radius: 10px;
+}
+
+.persistence-fixture button:disabled {
+	cursor: not-allowed;
+	opacity: 0.45;
+}
+
 .offline-banner {
 	color: #5c4521;
 	background: #fff2c8;
@@ -867,6 +922,22 @@ kbd {
 	.sync-state {
 		max-width: 160px;
 		font-size: 10px;
+	}
+
+	.persistence-fixture {
+		align-items: stretch;
+		flex-direction: column;
+		padding-inline: 14px;
+	}
+
+	.persistence-fixture-copy,
+	.persistence-fixture-controls {
+		flex-basis: auto;
+		justify-content: flex-start;
+	}
+
+	.persistence-fixture-controls button {
+		flex: 1 1 190px;
 	}
 
 	.tool-cluster--history button:last-child,

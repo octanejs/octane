@@ -194,7 +194,7 @@ describe('vite plugin gate routing', () => {
 		expect(config.resolve.dedupe).toContain('octane');
 	});
 
-	it('honors source-package Vite exclusions without rebasing dependency resolution', () => {
+	it('honors source-package Vite family exclusions without rebasing dependency resolution', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-vite-exclusions-'));
 		try {
 			writeFileSync(
@@ -202,7 +202,10 @@ describe('vite plugin gate routing', () => {
 				JSON.stringify({
 					name: 'binding-only-consumer',
 					private: true,
-					dependencies: { '@octanejs/lexical': '0.1.6' },
+					dependencies: {
+						'@lexical/selection': '0.46.0',
+						'@octanejs/lexical': '0.1.6',
+					},
 				}),
 			);
 			const scope = join(fixtureRoot, 'node_modules/@octanejs');
@@ -211,12 +214,23 @@ describe('vite plugin gate routing', () => {
 
 			const config = (octane().config as any)({ root: fixtureRoot });
 			expect(config.optimizeDeps.exclude).toEqual(
-				expect.arrayContaining(['@octanejs/lexical', 'lexical']),
+				expect.arrayContaining([
+					'@lexical/list',
+					'@lexical/rich-text',
+					'@lexical/selection',
+					'@octanejs/lexical',
+					'lexical',
+				]),
 			);
+			// Vite's package resolver requires exact package IDs here. Octane expands
+			// the binding-owned family rule across both the binding and app manifests.
+			expect(config.optimizeDeps.exclude).not.toContain('@lexical/*');
 			expect(config.resolve.dedupe).toContain('octane');
 			expect(config.resolve.dedupe).not.toContain('lexical');
+			expect(config.resolve.dedupe).not.toContain('@lexical/selection');
 			expect(config.ssr.noExternal).toContain('@octanejs/lexical');
 			expect(config.ssr.noExternal).not.toContain('lexical');
+			expect(config.ssr.noExternal).not.toContain('@lexical/selection');
 		} finally {
 			rmSync(fixtureRoot, { recursive: true, force: true });
 		}

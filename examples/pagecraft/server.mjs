@@ -178,7 +178,6 @@ async function handleSave(request, response, documentId) {
 		});
 		return;
 	}
-	currentAtAcceptance.acceptedVersion = version;
 
 	const failureKey = `${sessionId}:${documentId}:save`;
 	if (url.searchParams.get('fault') === 'save' && !session.failures.has(failureKey)) {
@@ -187,6 +186,9 @@ async function handleSave(request, response, documentId) {
 		json(response, 200, { ok: false, message: 'Autosave paused. Try again when you are ready.' });
 		return;
 	}
+	// Failed requests do not reserve a version. Successful requests reserve before
+	// their delay so a newer save still wins when overlapping requests settle out of order.
+	currentAtAcceptance.acceptedVersion = version;
 
 	const milliseconds = /first slow draft/i.test(plainText)
 		? 650

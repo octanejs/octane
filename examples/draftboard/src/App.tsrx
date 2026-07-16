@@ -28,8 +28,22 @@ interface BoardDraft {
 	savedRevision: number;
 }
 
+type PersistenceSettlement = 'released' | 'cancelled';
+
+interface PersistenceRecord {
+	id: number;
+	boardId: BoardId;
+	generation: number;
+	revision: number;
+}
+
+interface PersistenceWaiter extends PersistenceRecord {
+	settle(result: PersistenceSettlement): void;
+}
+
 const VIEW_WIDTH = 1200;
 const VIEW_HEIGHT = 720;
+const SAVE_DEBOUNCE_MS = 300;
 const SHAPE_COLORS = ['#ffd166', '#74d3ae', '#8ec5ff', '#f6a6c1'] as const;
 
 function scenarioIncludes(name: string): boolean {
@@ -57,6 +71,7 @@ function syncLabel(state: SyncState, online: boolean, pendingChanges: number): s
 }
 
 export function App() @{
+	const saveRaceScenario = scenarioIncludes('save-race');
 	const [boardId, setBoardId] = useState<BoardId>(() => readBoardId());
 	const [loadState, setLoadState] = useState<LoadState>('loading');
 	const [document, setDocument] = useState<BoardDocument | null>(null);
@@ -71,6 +86,12 @@ export function App() @{
 	const [saveRetry, setSaveRetry] = useState(0);
 	const [activity, setActivity] = useState('Opening Draftboard');
 	const [showShortcuts, setShowShortcuts] = useState(false);
+	const [pendingPersistenceRecords, setPendingPersistenceRecords] = useState<
+		PersistenceRecord[]
+	>([]);
+	const [persistenceOutcome, setPersistenceOutcome] = useState(
+		'Release saves to reproduce an overlapping completion.',
+	);
 	const loadFailurePendingRef = useRef(scenarioIncludes('load-failure'));
 	const saveFailurePendingRef = useRef(scenarioIncludes('save-failure'));
 	const loadTimerRef = useRef<number | null>(null);
@@ -83,6 +104,9 @@ export function App() @{
 	const savedRevisionRef = useRef(0);
 	const onlineRef = useRef(navigator.onLine);
 	const boardDraftsRef = useRef(new Map<BoardId, BoardDraft>());
+	const persistenceSequenceRef = useRef(0);
+	const persistenceWaitersRef = useRef<PersistenceWaiter[]>([]);
+	const mountedRef = useRef(true);
 	const canvasApiRef = useRef<CanvasHandle | null>(null);
 	const shortcutsTriggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -92,7 +116,62 @@ export function App() @{
 	savedRevisionRef.current = savedRevision;
 	onlineRef.current = online;
 
+	const publishPendingPersistence = useCallback(() => {
+		if (!mountedRef.current) return;
+		setPendingPersistenceRecords(
+			persistenceWaitersRef.current.map(
+				({ id, boardId, generation, revision }) => ({
+					id,
+					boardId,
+					generation,
+					revision,
+				}),
+			),
+		);
+	}, []);
+
+	const settlePersistence = useCallback((id: number, result: PersistenceSettlement) => {
+		const index = persistenceWaitersRef.current.findIndex((waiter) => waiter.id === id);
+		if (index === -1) return;
+		const [waiter] = persistenceWaitersRef.current.splice(index, 1);
+		publishPendingPersistence();
+		waiter.settle(result);
+	}, [publishPendingPersistence]);
+
+	const cancelPersistence = useCallback((outcome: string) => {
+		const waiters = persistenceWaitersRef.current.splice(0);
+		if (waiters.length === 0) return;
+		if (mountedRef.current) {
+			setPendingPersistenceRecords([]);
+			setPersistenceOutcome(outcome);
+		}
+		for (const waiter of waiters) waiter.settle('cancelled');
+	}, []);
+
+	const waitForSavePersistence = useCallback((record: Omit<PersistenceRecord, 'id'>) => {
+		if (!saveRaceScenario) return Promise.resolve<PersistenceSettlement>('released');
+		return new Promise<PersistenceSettlement>((settle) => {
+			persistenceWaitersRef.current.push({
+				...record,
+				id: ++persistenceSequenceRef.current,
+				settle,
+			});
+			publishPendingPersistence();
+		});
+	}, [publishPendingPersistence, saveRaceScenario]);
+
+	const releaseOldestPersistence = useCallback(() => {
+		const oldest = persistenceWaitersRef.current[0];
+		if (oldest !== undefined) settlePersistence(oldest.id, 'released');
+	}, [settlePersistence]);
+
+	const releaseNewestPersistence = useCallback(() => {
+		const newest = persistenceWaitersRef.current[persistenceWaitersRef.current.length - 1];
+		if (newest !== undefined) settlePersistence(newest.id, 'released');
+	}, [settlePersistence]);
+
 	const loadBoard = useCallback((nextBoardId: BoardId) => {
+		cancelPersistence('Pending saves cancelled because the board was reloaded.');
 		const outgoingDocument = documentRef.current;
 		if (outgoingDocument !== null && outgoingDocument.id !== nextBoardId) {
 			const outgoingDraft = boardDraftsRef.current.get(outgoingDocument.id);
@@ -162,14 +241,21 @@ export function App() @{
 					: `${nextDocument.shapes.length} objects loaded`,
 			);
 		}, 220);
-	}, []);
+	}, [cancelPersistence]);
 
 	useEffect(() => {
 		loadBoard(boardId);
 	}, [boardId, loadBoard]);
 
 	useEffect(() => {
-		const handleRoute = () => setBoardId(readBoardId());
+		mountedRef.current = true;
+		const handleRoute = () => {
+			const nextBoardId = readBoardId();
+			activeBoardIdRef.current = nextBoardId;
+			++saveGenerationRef.current;
+			cancelPersistence('Pending saves cancelled because the board route changed.');
+			setBoardId(nextBoardId);
+		};
 		const handleOnline = () => {
 			onlineRef.current = true;
 			setOnline(true);
@@ -191,19 +277,28 @@ export function App() @{
 		};
 		const handleOffline = () => {
 			onlineRef.current = false;
+			++saveGenerationRef.current;
+			if (saveTimerRef.current !== null) {
+				window.clearTimeout(saveTimerRef.current);
+				saveTimerRef.current = null;
+			}
+			cancelPersistence('Pending saves cancelled while Draftboard is offline.');
 			setOnline(false);
 		};
 		window.addEventListener('popstate', handleRoute);
 		window.addEventListener('online', handleOnline);
 		window.addEventListener('offline', handleOffline);
 		return () => {
+			mountedRef.current = false;
+			++saveGenerationRef.current;
+			cancelPersistence('Pending saves cancelled because Draftboard closed.');
 			window.removeEventListener('popstate', handleRoute);
 			window.removeEventListener('online', handleOnline);
 			window.removeEventListener('offline', handleOffline);
 			if (loadTimerRef.current !== null) window.clearTimeout(loadTimerRef.current);
 			if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
 		};
-	}, []);
+	}, [cancelPersistence]);
 
 	useEffect(() => {
 		if (loadState !== 'ready' || changeRevision <= savedRevision) return;
@@ -211,13 +306,20 @@ export function App() @{
 		if (currentDocument === null) return;
 		if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current);
 		const generation = ++saveGenerationRef.current;
+		const revision = changeRevision;
+		const documentToSave = cloneDocument(currentDocument);
 		if (!online) {
 			setSyncState('queued');
 			return;
 		}
 		setSyncState('saving');
-		saveTimerRef.current = window.setTimeout(() => {
-			if (generation !== saveGenerationRef.current) return;
+		saveTimerRef.current = window.setTimeout(async () => {
+			if (
+				generation !== saveGenerationRef.current || revision !== changeRevisionRef.current ||
+					activeBoardIdRef.current !== documentToSave.id
+			) {
+				return;
+			}
 			saveTimerRef.current = null;
 			if (saveFailurePendingRef.current) {
 				saveFailurePendingRef.current = false;
@@ -225,43 +327,94 @@ export function App() @{
 				setActivity('Autosave failed. Your edits are still on this canvas.');
 				return;
 			}
-			const latestDocument = documentRef.current;
-			if (latestDocument === null || latestDocument.id !== currentDocument.id) return;
-			if (!writeStoredBoard(latestDocument)) {
+			const persistenceResult = await waitForSavePersistence({
+				boardId: documentToSave.id,
+				generation,
+				revision,
+			});
+			if (persistenceResult === 'cancelled' || !mountedRef.current) return;
+			if (
+				generation !== saveGenerationRef.current || revision !== changeRevisionRef.current ||
+					activeBoardIdRef.current !== documentToSave.id
+			) {
+				if (
+					saveRaceScenario && onlineRef.current && activeBoardIdRef.current === documentToSave.id
+				) {
+					setPersistenceOutcome(
+						'Older save completion ignored; latest saved canvas was preserved.',
+					);
+				}
+				return;
+			}
+			const didSave = writeStoredBoard(documentToSave);
+			if (!mountedRef.current) return;
+			if (
+				generation !== saveGenerationRef.current || revision !== changeRevisionRef.current ||
+					activeBoardIdRef.current !== documentToSave.id
+			) {
+				if (
+					saveRaceScenario && onlineRef.current && activeBoardIdRef.current === documentToSave.id
+				) {
+					setPersistenceOutcome(
+						'Older save completion ignored; latest saved canvas was preserved.',
+					);
+				}
+				return;
+			}
+			if (!didSave) {
 				setSyncState('error');
 				setActivity('Browser storage refused the save. Your canvas is still open.');
 				return;
 			}
-			const latestDraft = boardDraftsRef.current.get(latestDocument.id);
-			if (latestDraft !== undefined) {
-				boardDraftsRef.current.set(latestDocument.id, {
+			const latestDraft = boardDraftsRef.current.get(documentToSave.id);
+			if (latestDraft !== undefined && latestDraft.changeRevision === revision) {
+				boardDraftsRef.current.set(documentToSave.id, {
 					...latestDraft,
-					savedRevision: changeRevision,
+					savedRevision: revision,
 				});
 			}
-			savedRevisionRef.current = changeRevision;
-			setSavedRevision(changeRevision);
+			savedRevisionRef.current = revision;
+			setSavedRevision(revision);
 			setSyncState('saved');
 			setActivity('Latest board changes saved');
-		}, 300);
+			if (saveRaceScenario) setPersistenceOutcome('Latest save completion applied.');
+		}, SAVE_DEBOUNCE_MS);
 		return () => {
 			if (saveTimerRef.current !== null) {
 				window.clearTimeout(saveTimerRef.current);
 				saveTimerRef.current = null;
 			}
 		};
-	}, [boardId, changeRevision, loadState, online, saveRetry, savedRevision]);
+	}, [
+		boardId,
+		changeRevision,
+		loadState,
+		online,
+		saveRaceScenario,
+		saveRetry,
+		savedRevision,
+		waitForSavePersistence,
+	]);
 
 	const navigateToBoard = useCallback((nextBoardId: BoardId) => {
 		if (nextBoardId === boardId) return;
+		activeBoardIdRef.current = nextBoardId;
+		++saveGenerationRef.current;
+		cancelPersistence('Pending saves cancelled because the board route changed.');
 		history.pushState(null, '', boardURL(nextBoardId));
 		setBoardId(nextBoardId);
-	}, [boardId]);
+	}, [boardId, cancelPersistence]);
 
 	const markDocumentChanged = useCallback((next: BoardDocument) => {
+		++saveGenerationRef.current;
+		if (saveTimerRef.current !== null) {
+			window.clearTimeout(saveTimerRef.current);
+			saveTimerRef.current = null;
+		}
 		const nextRevision = changeRevisionRef.current + 1;
 		changeRevisionRef.current = nextRevision;
 		setChangeRevision(nextRevision);
+		setSyncState('queued');
 		boardDraftsRef.current.set(next.id, {
 			document: next,
 			changeRevision: nextRevision,
@@ -333,6 +486,7 @@ export function App() @{
 	}, []);
 
 	const pendingChanges = Math.max(0, changeRevision - savedRevision);
+	const pendingPersistenceCount = pendingPersistenceRecords.length;
 	const selectedShapes = document?.shapes.filter((shape) => selectedIds.includes(shape.id)) ?? [];
 
 	<div
@@ -426,6 +580,40 @@ export function App() @{
 					Gestures and history stay available; Draftboard will save the latest canvas when you
 					reconnect.
 				</div>
+			}
+
+			@if (saveRaceScenario) {
+				<section class="persistence-fixture" aria-label="Autosave persistence controls">
+					<div class="persistence-fixture-copy">
+						<strong>Deterministic persistence gate</strong>
+						<span>Release a specific pending save to control completion order.</span>
+					</div>
+					<div class="persistence-fixture-controls">
+						<span
+							class="persistence-live-status"
+							role="status"
+							aria-live="polite"
+							aria-atomic="true"
+						>
+							{pendingPersistenceCount === 0
+								? 'No saves are waiting for persistence.'
+								: pendingPersistenceCount === 1
+									? '1 save is waiting for persistence.'
+									: `${pendingPersistenceCount} saves are waiting for persistence.`}
+							{' ' + persistenceOutcome}
+						</span>
+						<button
+							type="button"
+							disabled={pendingPersistenceCount === 0}
+							onClick={releaseOldestPersistence}
+						>Complete oldest pending save</button>
+						<button
+							type="button"
+							disabled={pendingPersistenceCount === 0}
+							onClick={releaseNewestPersistence}
+						>Complete newest pending save</button>
+					</div>
+				</section>
 			}
 
 			@if (syncState === 'error') {

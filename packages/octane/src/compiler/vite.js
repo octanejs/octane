@@ -192,8 +192,9 @@ export function octane(options = {}) {
 				},
 				// Raw Octane dependencies must reach this plugin, never esbuild's dep
 				// prebundle or Node's SSR external loader. A raw package can also declare
-				// dependencies that must stay out of Vite's rolling optimizer; this keeps
-				// module-identity-sensitive packages from mixing cold-crawl generations.
+				// exact dependencies or an installed `family/*` that must stay out of
+				// Vite's rolling optimizer; this keeps module-identity-sensitive packages
+				// from mixing cold-crawl generations.
 				optimizeDeps: { exclude: optimizeDepsExclusions },
 				resolve: { dedupe: ['octane'] },
 				ssr: { noExternal: sourceDependencies },

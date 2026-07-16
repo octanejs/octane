@@ -115,6 +115,24 @@ function packageViteOptimizeDepsExclusions(pkg) {
 	];
 }
 
+// Vite does not expand globs in optimizeDeps.exclude. Resolve a terminal family
+// rule against dependency names declared by the app and raw source packages so
+// the adapter emits the exact package IDs Vite's resolver requires.
+function expandViteOptimizeDepsExclusions(configured, dependencyNames) {
+	const exclusions = new Set();
+	for (const request of configured) {
+		if (!request.endsWith('/*')) {
+			exclusions.add(request);
+			continue;
+		}
+		const prefix = request.slice(0, -1);
+		for (const dependency of dependencyNames) {
+			if (dependency.startsWith(prefix)) exclusions.add(dependency);
+		}
+	}
+	return exclusions;
+}
+
 function metadata(dependencies = [], missingDependencies = []) {
 	return { dependencies, missingDependencies };
 }
@@ -416,7 +434,8 @@ class OctaneBundlerCompiler {
 			for (const name of Object.keys(projectManifest[field] ?? {})) dependencyNames.add(name);
 		}
 		const sourceDependencies = new Set();
-		const viteOptimizeDepsExclusions = new Set();
+		const viteOptimizeDepsExclusionRules = new Set();
+		const viteOptimizeDepsCandidates = new Set(dependencyNames);
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
 			const packageRequire = createRequire(join(issuerRoot, 'package.json'));
@@ -427,7 +446,10 @@ class OctaneBundlerCompiler {
 				if (!lookup.rule?.usesOctane) return;
 				sourceDependencies.add(name);
 				for (const dependency of lookup.rule.viteOptimizeDepsExclusions) {
-					viteOptimizeDepsExclusions.add(dependency);
+					viteOptimizeDepsExclusionRules.add(dependency);
+				}
+				for (const dependency of lookup.rule.runtimeDependencies) {
+					viteOptimizeDepsCandidates.add(dependency);
 				}
 				let packageRoot = lookup.rule.root;
 				try {
@@ -457,6 +479,10 @@ class OctaneBundlerCompiler {
 			}
 		};
 		for (const name of dependencyNames) visit(name, this.root);
+		const viteOptimizeDepsExclusions = expandViteOptimizeDepsExclusions(
+			viteOptimizeDepsExclusionRules,
+			viteOptimizeDepsCandidates,
+		);
 
 		this.discoveryCache = {
 			packages: [...sourceDependencies].sort(),

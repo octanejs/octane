@@ -41,8 +41,9 @@ across dependency-optimizer restarts as well as normal application behavior.
   `EditorState` survives a server round trip and reload.
 - Every edit enters a visible debounced autosave lifecycle. Each mutation carries
   a monotonic document version owned above the route-mounted editor, so immediate
-  navigation cannot drop a timer or reset a version. A deliberately slow older
-  response cannot replace or misreport a newer draft.
+  navigation cannot drop a timer or reset a version. Failed requests do not reserve
+  a version, while a deliberately slow successful response cannot replace or
+  misreport a newer draft.
 - Serialized editor state is parsed by Lexical before it crosses either side of
   the persistence boundary. Unknown nodes are rejected without replacing the
   currently usable document or surfacing an uncaught browser error.
@@ -58,8 +59,9 @@ across dependency-optimizer restarts as well as normal application behavior.
    and prove the rich text survives reload.
 3. Start a slow save, switch away and remount the editor, make a newer edit, then
    prove the remount keeps version ownership and the older completion is harmless.
-4. Retry a rejected autosave, edit while Chromium is offline, reconnect, and
-   verify that the retained local draft is persisted.
+4. Reject an autosave, reload and successfully reuse the same next version, then
+   edit while Chromium is offline, reconnect, and verify that the retained local
+   draft is persisted.
 5. Recover a deterministic load failure by keyboard, reject corrupt save and load
    payloads, open a genuine blank document, and enter a missing SPA route without
    ever leaking the previous editor.

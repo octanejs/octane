@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import {
 	collectBrowserDiagnostics,
 	settleBrowserFrames,
@@ -6,6 +6,10 @@ import {
 } from '../../_shared/e2e/browser.ts';
 
 const runtimeDiagnostics = new WeakMap<Page, BrowserDiagnostics>();
+
+function sessionForAttempt(label: string, testInfo: TestInfo): string {
+	return `${label}-repeat${testInfo.repeatEachIndex}-retry${testInfo.retry}-worker${testInfo.workerIndex}`;
+}
 
 test.beforeEach(async ({ page }) => {
 	runtimeDiagnostics.set(page, collectBrowserDiagnostics(page));
@@ -24,9 +28,10 @@ test.afterEach(async ({ page }, testInfo) => {
 
 test('opens deep-linked documents and keeps keyboard navigation focused on mobile', async ({
 	page,
-}) => {
+}, testInfo) => {
+	const session = sessionForAttempt('pagecraft-navigation', testInfo);
 	await page.setViewportSize({ width: 620, height: 820 });
-	await page.goto('/documents/field-notes?session=pagecraft-navigation');
+	await page.goto(`/documents/field-notes?session=${session}`);
 
 	const editor = page.getByRole('textbox', { name: 'Document body' });
 	await expect(editor).toContainText('People protect their focus');
@@ -38,7 +43,7 @@ test('opens deep-linked documents and keeps keyboard navigation focused on mobil
 	const launchLink = page.locator('.document-link[href^="/documents/launch-brief"]');
 	await launchLink.focus();
 	await launchLink.press('Enter');
-	await expect(page).toHaveURL(/\/documents\/launch-brief\?session=pagecraft-navigation$/);
+	await expect(page).toHaveURL(new RegExp(`/documents/launch-brief\\?session=${session}$`));
 	await expect(page.getByRole('status')).toContainText('Opening document');
 	await expect(editor).toContainText('A quieter way to launch');
 	await expect(launchLink).toBeFocused();
@@ -73,8 +78,9 @@ test('opens deep-linked documents and keeps keyboard navigation focused on mobil
 
 test('formats a live selection, preserves editor focus, and restores history before autosaving', async ({
 	page,
-}) => {
-	await page.goto('/documents/blank-page?session=pagecraft-formatting');
+}, testInfo) => {
+	const session = sessionForAttempt('pagecraft-formatting', testInfo);
+	await page.goto(`/documents/blank-page?session=${session}`);
 	const editor = page.getByRole('textbox', { name: 'Document body' });
 	await expect(page.getByRole('heading', { level: 1, name: 'Blank page' })).toBeVisible();
 	await expect(page.getByText('Start with a thought, a question, or a title…')).toBeVisible();
@@ -112,8 +118,11 @@ test('formats a live selection, preserves editor focus, and restores history bef
 	await expect(editor.locator('strong')).toHaveText('A reversible sentence');
 });
 
-test('keeps the newest draft when overlapping autosaves settle out of order', async ({ page }) => {
-	await page.goto('/documents/blank-page?session=pagecraft-overlap');
+test('keeps the newest draft when overlapping autosaves settle out of order', async ({
+	page,
+}, testInfo) => {
+	const session = sessionForAttempt('pagecraft-overlap', testInfo);
+	await page.goto(`/documents/blank-page?session=${session}`);
 	const editor = page.getByRole('textbox', { name: 'Document body' });
 	const firstStarted = page.waitForRequest(
 		(request) =>
@@ -150,18 +159,43 @@ test('keeps the newest draft when overlapping autosaves settle out of order', as
 test('recovers a rejected save and carries offline edits through reconnection', async ({
 	page,
 	context,
-}) => {
-	await page.goto('/documents/launch-brief?session=pagecraft-recovery&fault=save');
+}, testInfo) => {
+	const session = sessionForAttempt('pagecraft-recovery', testInfo);
+	await page.goto(`/documents/launch-brief?session=${session}&fault=save`);
 	const editor = page.getByRole('textbox', { name: 'Document body' });
-	await editor.fill('Recovered after a deliberate save pause');
+	const failedSave = page.waitForResponse(
+		(response) =>
+			response.request().method() === 'PUT' &&
+			response.request().postData()?.includes('A deliberate save pause') === true,
+	);
+	await editor.fill('A deliberate save pause');
+	const failedResponse = await failedSave;
+	const failedVersion = (failedResponse.request().postDataJSON() as { version: number }).version;
+	expect(failedVersion).toBe(1);
 	const saveAlert = page.getByRole('alert');
 	await expect(saveAlert).toContainText('We could not autosave');
 	await expect(saveAlert).toContainText('Autosave paused');
 
-	const retry = page.getByRole('button', { name: 'Retry save' });
-	await retry.focus();
-	await retry.press('Enter');
+	await page.reload();
+	await expect(editor).toContainText('A quieter way to launch');
+	const recoveredSave = page.waitForResponse(
+		(response) =>
+			response.request().method() === 'PUT' &&
+			response.request().postData()?.includes('Recovered after reusing the next version') === true,
+	);
+	await editor.fill('Recovered after reusing the next version');
+	const recoveredResponse = await recoveredSave;
+	expect((recoveredResponse.request().postDataJSON() as { version: number }).version).toBe(
+		failedVersion,
+	);
+	await expect(recoveredResponse.json()).resolves.toMatchObject({
+		ok: true,
+		applied: true,
+		version: failedVersion,
+	});
 	await expect(page.getByRole('status')).toContainText('All changes saved');
+	await page.reload();
+	await expect(editor).toHaveText('Recovered after reusing the next version');
 
 	await context.setOffline(true);
 	await editor.fill('An offline note that stays with me');
@@ -176,8 +210,9 @@ test('recovers a rejected save and carries offline edits through reconnection', 
 
 test('retries a failed load, opens an intentional blank page, and rejects stale content for missing links', async ({
 	page,
-}) => {
-	await page.goto('/documents/field-notes?session=pagecraft-loading&fault=load');
+}, testInfo) => {
+	const session = sessionForAttempt('pagecraft-loading', testInfo);
+	await page.goto(`/documents/field-notes?session=${session}&fault=load`);
 	const alert = page.getByRole('alert');
 	await expect(alert).toContainText('Let’s try that document again');
 	await expect(alert).toContainText('wrong turn');
@@ -202,19 +237,25 @@ test('retries a failed load, opens an intentional blank page, and rejects stale 
 			version: 1,
 		},
 	});
-	const rejectedSave = (await page.evaluate(async (editorState) => {
-		const response = await fetch('/api/documents/blank-page?session=pagecraft-loading', {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				title: 'Corrupt replacement',
-				editorState,
-				plainText: 'This must never persist',
-				version: 999,
-			}),
-		});
-		return response.json();
-	}, malformedEditorState)) as { ok: boolean; message: string };
+	const rejectedSave = (await page.evaluate(
+		async ({ editorState, session }) => {
+			const response = await fetch(
+				`/api/documents/blank-page?session=${encodeURIComponent(session)}`,
+				{
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						title: 'Corrupt replacement',
+						editorState,
+						plainText: 'This must never persist',
+						version: 999,
+					}),
+				},
+			);
+			return response.json();
+		},
+		{ editorState: malformedEditorState, session },
+	)) as { ok: boolean; message: string };
 	expect(rejectedSave.ok).toBe(false);
 	expect(rejectedSave.message).toContain('invalid');
 	await page.reload();
@@ -289,14 +330,14 @@ test('retries a failed load, opens an intentional blank page, and rejects stale 
 		'Three stories for late summer',
 	);
 
-	await page.evaluate(() => {
+	await page.evaluate((session) => {
 		window.history.pushState(
 			{},
 			'',
-			'/documents/a-page-that-never-existed?session=pagecraft-loading',
+			`/documents/a-page-that-never-existed?session=${encodeURIComponent(session)}`,
 		);
 		window.dispatchEvent(new PopStateEvent('popstate'));
-	});
+	}, session);
 	await expect(page.getByRole('alert')).toContainText('That document is not in this workspace');
 	await expect(page.getByRole('textbox', { name: 'Document body' })).toHaveCount(0);
 	expect(
