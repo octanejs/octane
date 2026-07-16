@@ -1,0 +1,79 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "gridlab",
+  "title": "Gridlab",
+  "summary": "A local-first virtualized spreadsheet proving Octane keyboard, clipboard, IME, formula, focus, and overlapping sync behavior.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/tanstack-virtual"],
+  "octaneFeatures": [
+    "controlled-inputs",
+    "keyed-reconciliation",
+    "native-events",
+    "refs-as-props",
+    "tsrx-control-flow",
+    "two-axis-virtualization"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "deterministic-formulas-empty-responsive",
+      "title": "Open deterministic formulas, restore an empty workbook, and keep the mobile grid usable",
+      "kind": "golden",
+      "spec": "e2e/gridlab.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "two-axis-virtual-focus",
+      "title": "Scroll both virtual axes while selection focus survives and navigate to a distant cell",
+      "kind": "golden",
+      "spec": "e2e/gridlab.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "native-clipboard-range",
+      "title": "Copy and paste a native tabular selection without losing cell focus",
+      "kind": "golden",
+      "spec": "e2e/gridlab.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "ime-editor-formulas",
+      "title": "Keep composition in the cell editor and recalculate committed formulas",
+      "kind": "golden",
+      "spec": "e2e/gridlab.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "offline-overlap-recovery",
+      "title": "Retry load and sync failures without dropping rapid edits across an offline interleaving",
+      "kind": "resilience",
+      "spec": "e2e/gridlab.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "initial-load-failure",
+      "description": "The deterministic fixture fails once before a user-triggered retry opens the workbook."
+    },
+    {
+      "id": "offline-edit-queue",
+      "description": "Repeated and cross-cell changes remain local while the browser is offline and sync on reconnection."
+    },
+    {
+      "id": "overlapping-sync-failure",
+      "description": "The first save fails while a newer edit overlaps its in-flight snapshot; retry preserves the latest revision."
+    },
+    {
+      "id": "corrupt-local-workbook",
+      "description": "Out-of-range or malformed persisted cells are discarded before the deterministic sample workbook opens."
+    }
+  ]
+}

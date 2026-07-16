@@ -137,9 +137,9 @@ browser tests cover many of these axes. The website browser suite now checks
 all public routes in development and production, fails on page/hydration
 errors, exercises client navigation, and interacts with the sandboxed
 playground. A separate example-app CI job builds the release-gated Hacker News,
-Lexical Playground, Cinebase, Threadline, Flowboard, Streambox, Relay, and Cartlane
-applications and runs their Playwright journeys; its result is aggregated by the
-protected `typecheck` context.
+Lexical Playground, Cinebase, Threadline, Flowboard, Streambox, Relay, Cartlane,
+Pagecraft, Gridlab, and Draftboard applications and runs their Playwright
+journeys; its result is aggregated by the protected `typecheck` context.
 Keeping it outside the sharded `pnpm test` command avoids repeating each browser
 suite per shard.
 
@@ -347,9 +347,11 @@ also installs packed core and Hook Form into an isolated consumer and asserts
 one physical Octane runtime before running Vite client/server builds. The
 validator contains an executable Hook Form SSR probe as well; treat that as a
 proven runtime gate only when the complete `pnpm packages:pack:check` run
-passes. Vite discovers direct installed raw Octane dependencies, excludes them
-from prebundling/SSR externalization, and preserves manifest-declared manual
-hook-slot directories.
+passes. Vite discovers installed raw Octane dependency graphs, excludes source
+packages from prebundling/SSR externalization, preserves manifest-declared manual
+hook-slot directories, and honors package-owned optimizer exclusions (including
+`family/*` rules expanded to exact declared dependency names) for identity-sensitive
+transitive dependencies.
 Bindings and the Vite plugin peer on Octane while retaining workspace-only dev
 dependencies; the adapter peers on the plugin.
 

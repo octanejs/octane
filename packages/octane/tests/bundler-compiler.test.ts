@@ -725,7 +725,13 @@ export default interface ErasedShape { value: string }
 			const projectManifest = join(root, 'package.json');
 			writeFileSync(
 				projectManifest,
-				JSON.stringify({ name: 'app', dependencies: { 'raw-octane': '1.0.0' } }),
+				JSON.stringify({
+					name: 'app',
+					dependencies: {
+						'@identity-sensitive/app-extension': '1.0.0',
+						'raw-octane': '1.0.0',
+					},
+				}),
 			);
 			const packageRoot = join(root, 'node_modules/raw-octane');
 			mkdirSync(packageRoot, { recursive: true });
@@ -735,8 +741,27 @@ export default interface ErasedShape { value: string }
 				JSON.stringify({
 					name: 'raw-octane',
 					main: 'index.js',
+					dependencies: {
+						'@identity-sensitive/binding-extension': '1.0.0',
+						'identity-sensitive-core': '1.0.0',
+					},
 					peerDependencies: { octane: '*' },
 					optionalDependencies: { 'missing-child': '1.0.0' },
+					octane: {
+						vite: {
+							optimizeDeps: {
+								exclude: [
+									'@identity-sensitive/*',
+									'@identity-sensitive/*',
+									'identity-sensitive-core',
+									'identity-sensitive-core',
+									'',
+									' padded ',
+									42,
+								],
+							},
+						},
+					},
 				}),
 			);
 			writeFileSync(join(packageRoot, 'index.js'), 'export const value = 1;\n');
@@ -744,6 +769,11 @@ export default interface ErasedShape { value: string }
 			const discovered = createOctaneCompiler({ root }).discoverSourceDependencies();
 			const resolvedPackageRoot = realpathSync(packageRoot);
 			expect(discovered.packages).toEqual(['raw-octane']);
+			expect(discovered.viteOptimizeDepsExclusions).toEqual([
+				'@identity-sensitive/app-extension',
+				'@identity-sensitive/binding-extension',
+				'identity-sensitive-core',
+			]);
 			expect(discovered.dependencies).toEqual(
 				expect.arrayContaining([projectManifest, join(resolvedPackageRoot, 'package.json')]),
 			);

@@ -1,0 +1,82 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "pagecraft",
+  "title": "Pagecraft",
+  "summary": "A resilient document workspace proving real Lexical selection, rich-text history, and versioned autosave across network races.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/lexical"],
+  "octaneFeatures": [
+    "compiler-inferred-effects",
+    "keyed-reconciliation",
+    "native-events",
+    "refs",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "deep-link-keyboard-navigation",
+      "title": "Open a document deep link, retain keyboard focus, and flush edits through immediate navigation",
+      "kind": "golden",
+      "spec": "e2e/pagecraft.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "selection-format-history",
+      "title": "Format a live contenteditable selection and restore it through undo, redo, and reload",
+      "kind": "golden",
+      "spec": "e2e/pagecraft.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "overlapping-autosave",
+      "title": "Retain save ownership across route remounts and settle versioned autosaves out of order",
+      "kind": "resilience",
+      "spec": "e2e/pagecraft.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "save-failure-offline-recovery",
+      "title": "Retry a rejected save and persist an offline edit after reconnection",
+      "kind": "resilience",
+      "spec": "e2e/pagecraft.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "load-retry-empty-missing",
+      "title": "Reject malformed editor data, recover loading, and distinguish blank and missing documents",
+      "kind": "resilience",
+      "spec": "e2e/pagecraft.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "temporary-load-failure",
+      "description": "The fault=load query rejects one deterministic document load and then succeeds from the retry control."
+    },
+    {
+      "id": "rejected-autosave",
+      "description": "The fault=save query rejects the first debounced mutation while retaining the local editor state for an explicit retry."
+    },
+    {
+      "id": "out-of-order-autosave",
+      "description": "A slow first mutation completes after a fast second mutation, and version checks preserve the newest serialized editor state."
+    },
+    {
+      "id": "offline-edit",
+      "description": "Browser offline state pauses autosave while keeping the visible draft, then reconnect automatically persists it."
+    },
+    {
+      "id": "malformed-editor-state",
+      "description": "Lexical parses untrusted serialized state at both the save and load boundaries, rejecting unknown nodes without mounting corrupt content."
+    }
+  ]
+}

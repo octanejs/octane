@@ -1,0 +1,76 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "draftboard",
+  "title": "Draftboard",
+  "summary": "A production-built SVG whiteboard proving Octane pointer capture, imperative refs, keyed identity, keyboard history, portals, and resilient autosave.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "high-frequency-updates",
+    "imperative-handles",
+    "keyed-reconciliation",
+    "native-events",
+    "portals",
+    "refs-as-props",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "deep-link-load-empty-autosave",
+      "title": "Load deterministic deep-linked boards and persist a first object from the empty canvas",
+      "kind": "golden",
+      "spec": "e2e/draftboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "captured-group-drag-identity",
+      "title": "Capture a high-frequency multi-object drag beyond the SVG while a keyed survivor retains identity",
+      "kind": "golden",
+      "spec": "e2e/draftboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "draw-pan-zoom",
+      "title": "Draw a rectangle, zoom through the canvas handle, and pan the native SVG surface",
+      "kind": "golden",
+      "spec": "e2e/draftboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "imperative-focus-keyboard-history-portal",
+      "title": "Focus imperatively, undo and redo keyboard edits, and restore focus from portaled help",
+      "kind": "golden",
+      "spec": "e2e/draftboard.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "failure-offline-rapid-convergence",
+      "title": "Retry deterministic failures while rapid offline edits converge to the latest saved board",
+      "kind": "resilience",
+      "spec": "e2e/draftboard.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "initial-load-failure",
+      "description": "The load-failure scenario fails one deterministic board load and succeeds on explicit retry."
+    },
+    {
+      "id": "autosave-failure",
+      "description": "The save-failure scenario keeps edits visible through one failed autosave and saves the latest document on retry."
+    },
+    {
+      "id": "offline-edit-queue",
+      "description": "Native offline events queue completed canvas actions and reconnect saves the latest document."
+    }
+  ]
+}
