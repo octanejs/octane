@@ -51,13 +51,16 @@ export function useDocument<TDoc extends object>(
 	}
 
 	const providerRef = useRef<DexieYProvider<TDoc> | null>(null, subSlot(slot, 'document:provider'));
-	let unregisterToken: object | undefined;
+	const unregisterTokenRef = useRef<object | undefined>(
+		undefined,
+		subSlot(slot, 'document:unregister'),
+	);
 
 	if (doc) {
 		if (doc !== providerRef.current?.doc) {
 			providerRef.current = providerConstructor.load(doc, { gracePeriod });
-			unregisterToken = Object.create(null);
-			finalizationRegistry.register(providerRef, doc, unregisterToken);
+			unregisterTokenRef.current = Object.create(null);
+			finalizationRegistry.register(providerRef, doc, unregisterTokenRef.current);
 		}
 	} else if (providerRef.current?.doc) {
 		providerRef.current = null;
@@ -66,7 +69,10 @@ export function useDocument<TDoc extends object>(
 	useEffect(
 		() => {
 			if (!doc) return;
-			if (unregisterToken) finalizationRegistry.unregister(unregisterToken);
+			if (unregisterTokenRef.current) {
+				finalizationRegistry.unregister(unregisterTokenRef.current);
+				unregisterTokenRef.current = undefined;
+			}
 			const provider = providerConstructor.for(doc);
 			if (!provider) {
 				throw new Error(
@@ -75,7 +81,7 @@ export function useDocument<TDoc extends object>(
 			}
 			return () => providerConstructor.release(doc);
 		},
-		[doc, unregisterToken],
+		[doc],
 		subSlot(slot, 'document:effect'),
 	);
 

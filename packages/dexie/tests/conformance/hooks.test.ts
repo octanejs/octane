@@ -162,4 +162,46 @@ describe('@octanejs/dexie hooks', () => {
 			dexieWithProvider.DexieYProvider = previous;
 		}
 	});
+
+	// Per Bugbot discussion_r3597912063: same-doc re-renders must not flip effect
+	// deps via a render-local unregisterToken and spuriously release ownership.
+	it('does not release a document when re-rendering with the same doc identity', () => {
+		const docs = new Map<object, { doc: object }>();
+		const released: object[] = [];
+		const provider = {
+			load(doc: object) {
+				const value = { doc };
+				docs.set(doc, value);
+				return value;
+			},
+			for(doc: object) {
+				return docs.get(doc);
+			},
+			release(doc: object) {
+				released.push(doc);
+				docs.delete(doc);
+			},
+		};
+		const dexieWithProvider = Dexie as typeof Dexie & { DexieYProvider?: typeof provider };
+		const previous = dexieWithProvider.DexieYProvider;
+		dexieWithProvider.DexieYProvider = provider;
+		try {
+			const doc = { id: 'stable' };
+			const result = mount(DocumentReader, { doc, nonce: 0 });
+			flushEffects();
+			expect(result.find('#document').textContent).toBe('stable');
+			expect(released).toEqual([]);
+
+			result.update(DocumentReader, { doc, nonce: 1 });
+			flushEffects();
+			expect(result.find('#document').textContent).toBe('stable');
+			expect(released).toEqual([]);
+
+			result.unmount();
+			flushEffects();
+			expect(released).toEqual([doc]);
+		} finally {
+			dexieWithProvider.DexieYProvider = previous;
+		}
+	});
 });

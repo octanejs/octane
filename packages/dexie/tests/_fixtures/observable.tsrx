@@ -33,7 +33,7 @@ export function FactoryReader({ observable, version }: { observable: any; versio
 	</div>
 }
 
-export function DocumentReader({ doc }: { doc: any }) @{
+export function DocumentReader({ doc, nonce: _nonce }: { doc: any; nonce?: number }) @{
 	const provider = useDocument(doc);
 	<div id="document">
 		{provider?.doc?.id as string}
