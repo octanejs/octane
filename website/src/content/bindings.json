@@ -11,9 +11,10 @@
     ]
   },
   {
-    "title": "Data and routing",
-    "description": "GraphQL, server state, live IndexedDB data, type-safe routes, and React Router-style APIs.",
+    "title": "AI, data, and routing",
+    "description": "Streaming AI, GraphQL, server state, live IndexedDB data, type-safe routes, and React Router-style APIs.",
     "packages": [
+      "@octanejs/tanstack-ai",
       "@octanejs/apollo-client",
       "@octanejs/dexie",
       "@octanejs/tanstack-query",

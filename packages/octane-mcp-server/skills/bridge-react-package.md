@@ -12,6 +12,7 @@ of bridging by hand:
 | `zustand` | `@octanejs/zustand` |
 | `jotai` | `@octanejs/jotai` |
 | `@apollo/client` | `@octanejs/apollo-client` |
+| `@tanstack/ai-react` | `@octanejs/tanstack-ai` |
 | `@tanstack/react-form` | `@octanejs/tanstack-form` |
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
 | `@tanstack/react-router` | `@octanejs/tanstack-router` |
