@@ -3,21 +3,22 @@
     "package": "@react-three/fiber",
     "version": "9.6.1 (2a528745)"
   },
-  "surface": "Technical-preview Milestones 0, 2, and 3 surface: renderer configuration and DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning programmatic roots, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, plus a deterministic testing harness. Pointer events and later asset/portal surfaces remain deferred.",
+  "surface": "Technical-preview Milestones 0, 2, 3, and 4 surface: renderer configuration and DOM Canvas boundary, compiler ABI and renderer-local Three intrinsic types, catalogue and both extend forms, primitive/args construction, Three prop application, attachment, ordered placement/recreation, retained visibility, lifecycle/ref delivery, ownership-aware disposal, promise-returning programmatic roots, callable root state, scene/camera/raycaster and resize/DPR/viewport configuration, shadows/colors, one shared frame loop, global effects, useStore/useThree/useFrame/useGraph and managed-instance helpers, the ray/pointer event system with DOM sources and custom managers, and a deterministic testing harness. Asset and portal surfaces remain deferred.",
   "divergences": [
     "Octane owns component execution, hooks, context, scheduling, Suspense, refs, and effects instead of embedding React Reconciler.",
     "The programmatic root renders an Octane component plus props rather than a React element descriptor.",
     "The upstream callable store selector remains order-based because dynamic function calls cannot receive compiler slots; compiler-visible useStore(selector) and useThree(selector) preserve Octane's conditional-hook semantics.",
-    "Pointer event configuration rejects clearly until the Milestone 4 event system lands.",
     "buildGraph omits unnamed mesh and material entries, plus array-valued material entries, instead of publishing empty or undefined keys.",
-    "Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object."
+    "Removing a pierced prop resets its original nested target; R3F 9.6.1 mistakenly writes that default to the leaf key on the root object.",
+    "Reconstructing a captured or hovered object rewrites nested stored intersections to the replacement; R3F 9.6.1 updates only the outer hover identity and capture-map key, which leaves captured delivery pointing at the retired object.",
+    "Hidden retained Activity subtrees are excluded from recursive raycasts; Three r172 ignores Object3D.visible during raycasting, so R3F 9.6.1 can otherwise pierce a hidden descendant through an interactive visible ancestor."
   ],
   "ssr": "Three scene modules are classified client-only and Canvas.children is configured as an omitted server region. Package-level DOM-shell server output and hydration adoption remain Milestone 7 work.",
   "verified": "2026-07-16",
   "notes": [
     "The behavioral oracle is pinned to three@0.172.0; the broad upstream three >=0.156 range is not advertised until a minimum-version lane passes.",
-    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; Milestone 3 adds public root/configuration, Canvas, frame-loop, hook, selector, testing-helper, compiler-preset, bundler, and real-browser evidence to the existing host-driver and same-source R3F differential suite.",
-    "Ray and pointer events begin in Milestone 4; asset loading, portals, full Canvas SSR/hydration, and XR/HMR hardening follow in later milestones.",
+    "The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified cases; Milestone 4 adds public raycast, bubbling, propagation, hover, misses, capture, event-source, custom-manager, reconstruction, testing-helper, differential, and browser evidence.",
+    "Asset loading, portals and portal event layers, full Canvas SSR/hydration, and XR/HMR hardening follow in later milestones.",
     "React Native/Expo, R3F 10 WebGPU/TSL APIs, and Drei are outside this package's current compatibility target."
   ],
   "docs": ["docs/three-port-plan.md", "packages/three/UPSTREAM.md"]
