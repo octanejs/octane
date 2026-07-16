@@ -1,15 +1,21 @@
 import type { UniversalComponent } from 'octane/universal';
 import type * as THREE from 'three';
 import {
+	act,
 	createEvents,
 	createPortal,
 	createRoot,
 	events,
+	flushSync,
+	unmountComponentAtNode,
 	useFrame,
 	useStore,
 	useThree,
+	type Act,
 	type CanvasProps,
 	type ComputeFunction,
+	type DOMRegionProps,
+	type DOMRegionTarget,
 	type DomEvent,
 	type EventHandlers,
 	type EventManager,
@@ -36,6 +42,7 @@ import {
 } from '@octanejs/three/testing';
 
 declare const canvas: HTMLCanvasElement;
+declare const offscreenCanvas: OffscreenCanvas;
 declare const renderer: Renderer;
 declare const Scene: UniversalComponent<{ name: string }>;
 declare const portalTarget: THREE.Group;
@@ -60,6 +67,9 @@ const invalidPortalState: InjectState = { events: { enabled: 'yes' } };
 void invalidPortalState;
 
 const root: ThreeRoot<HTMLCanvasElement> = createRoot(canvas);
+const typedAct: Act = act;
+const acted: Promise<number> = typedAct(async () => 42);
+const flushed: number = flushSync(() => 42);
 const configured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({
 	gl: renderer,
 	size: { width: 640, height: 360 },
@@ -74,6 +84,26 @@ const asyncConfigured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({
 	},
 });
 root.render(Scene, { name: 'typed-scene' });
+unmountComponentAtNode(canvas, (unmountedCanvas) => {
+	const typedCanvas: HTMLCanvasElement = unmountedCanvas;
+	void typedCanvas;
+});
+
+const offscreenRoot: ThreeRoot<OffscreenCanvas> = createRoot(offscreenCanvas);
+const configuredOffscreen: Promise<ThreeRoot<OffscreenCanvas>> = offscreenRoot.configure({
+	gl: async (defaults) => {
+		const configuredCanvas: OffscreenCanvas = defaults.canvas;
+		void configuredCanvas;
+		return renderer;
+	},
+});
+unmountComponentAtNode(offscreenCanvas, (unmountedCanvas) => {
+	const typedCanvas: OffscreenCanvas = unmountedCanvas;
+	void typedCanvas;
+});
+
+const domRegionTarget: DOMRegionTarget = { current: document.body };
+const domRegionProps: DOMRegionProps = { target: domRegionTarget };
 
 const canvasProps: CanvasProps = {
 	gl: () => renderer,
@@ -181,6 +211,10 @@ root.configure({ gl: renderer, dpr: ['low', 'high'] });
 
 void configured;
 void asyncConfigured;
+void acted;
+void flushed;
+void configuredOffscreen;
+void domRegionProps;
 void canvasProps;
 void coreEvents;
 void coreEventHandler;
