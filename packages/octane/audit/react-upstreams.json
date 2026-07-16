@@ -136,20 +136,20 @@
       "workstream": "Fizz streaming",
       "filePattern": "/ReactDOMFizzServer[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "in_progress",
       "classification": "adaptable",
       "owner": "SSR + hydration",
-      "rationale": "Filter and port applicable streaming, abort, error, shell, resource, and hydration behavior."
+      "rationale": "Wave 4 has exact executable evidence for 38 cases in the stable/canary union (35 stable and 38 canary), with 81 conservative durable dispositions and 104 still planned. Coverage includes public transport, suspension, abort, parser-context, context-isolation, Usable-node, hydration, and deep-tree outcomes; class, selective-hydration, experimental, internal, and document-orchestration cases remain outside Octane's supported surface."
     },
     {
       "id": "server-integration-matrix",
       "workstream": "Server integration matrix",
       "filePattern": "/ReactDOMServerIntegration[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "planned",
+      "status": "in_progress",
       "classification": "adaptable",
       "owner": "SSR + hydration",
-      "rationale": "Build the client, buffered SSR, streaming SSR, matching hydration, and mismatch-recovery matrix."
+      "rationale": "Wave 4 has exact executable evidence for 46 rendering, serialization, hook, ref, form-control, hydration-adoption, and mismatch-recovery cases in both stable and canary, including a shared five-mode matrix. Wave 1 supplies another 17 untrusted-URL cases, for 63 covered cases in this policy; 57 cases carry durable dispositions and 286 remain planned. Class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types are explicit non-goals."
     },
     {
       "id": "react-repo-eslint-rules",
@@ -163,20 +163,20 @@
     }
   ],
   "octaneSuiteBaseline": {
-    "normalCoreCases": 2591,
+    "normalCoreCases": 2756,
     "normalCoreBreakdown": {
-      "conformance": 1219,
+      "conformance": 1330,
       "differential": 137,
       "hydration": 135,
-      "other": 1100
+      "other": 1154
     },
     "profilingOnlyCases": 14,
-    "distinctCoreCasesIncludingProfiling": 2605,
-    "productionModeReruns": 2591,
-    "allWorkspaceExecutions": 7813,
-    "reactSourceAttributedFileUpperBound": 1202,
-    "reactSourceAttributedFiles": 74,
+    "distinctCoreCasesIncludingProfiling": 2770,
+    "productionModeReruns": 2756,
+    "allWorkspaceExecutions": 8162,
+    "reactSourceAttributedFileUpperBound": 1345,
+    "reactSourceAttributedFiles": 78,
     "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
-    "measuredOn": "2026-07-15"
+    "measuredOn": "2026-07-16"
   }
 }

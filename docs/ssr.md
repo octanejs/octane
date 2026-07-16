@@ -84,8 +84,17 @@ rejected boundary hydrates directly into its server-rendered `@catch` arm). Node
 destinations honor `write(false)`/`drain`; destination errors or an early close
 cancel the render.
 
+A Promise or Context may also be rendered directly as a React-19-style Usable
+node; nested Usables are unwrapped recursively. A pending Usable outside a
+Suspense boundary delays the shell until it resolves. Streamed replacements are
+parsed in their real HTML, table/select, SVG, or MathML context, so revealing a
+boundary preserves both valid structure and namespace identity.
+
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
-`onShellError(err)`, and `onAllReady()`.
+`onShellError(err)`, and `onAllReady()`. Calling `abort(reason)` after the shell
+reports the reason through `onError`, preserves the fallback for client
+recovery, closes the destination, and invokes `onAllReady` once as the terminal
+readiness notification.
 
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
 
@@ -159,6 +168,9 @@ and the resolved server function share one SSR runtime.
 - Renders are concurrency-safe: each pass saves and restores the ambient module
   state around its synchronous run, so overlapping requests cannot observe each
   other.
+- Deep function-component trees retain bounded hook replay. Replay snapshots
+  live outside the recursive invocation frame to reduce stack pressure; the
+  conformance suite exercises a 1,000-level cold tree.
 
 ## SSR via the Vite plugin
 
@@ -262,3 +274,8 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
 - **Error digests**: `onError` and the shell callbacks exist, but there are no
   React-style error digests; a post-shell error ends the stream with the
   affected boundaries marked for client render.
+- **React Fizz document orchestration options**: core rendering deliberately
+  does not own doctype/preamble insertion, bootstrap script/module lists,
+  import-map construction, response headers, or `onHeaders`. Compose the
+  returned stream into the surrounding document and set headers in the Vite
+  plugin, adapter, or application server instead.
