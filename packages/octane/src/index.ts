@@ -129,6 +129,9 @@ export {
 	setText,
 	setScriptText,
 	setHTML,
+	setDangerouslySetInnerHTML,
+	setDangerouslySetInnerHTMLSources,
+	markDangerouslySetInnerHTMLChildren,
 	setAttribute,
 	setStringData,
 	setClassName,
@@ -136,11 +139,14 @@ export {
 	normalizeClass,
 	setStyle,
 	setSpread,
+	snapshotSpread,
+	setHostPropSources,
 	setFormAction,
 	// Controlled form components (value/checked/defaultValue/defaultChecked
 	// property bindings on input/textarea/select — React-parity semantics on
 	// native events).
 	setValue,
+	setFormControlSources,
 	setChecked,
 	setCheckedCheckable,
 	setSelectValue,

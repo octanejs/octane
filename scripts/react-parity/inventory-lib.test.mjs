@@ -6,6 +6,7 @@ import { describe, test } from 'node:test';
 import {
 	extractTestCases,
 	inventoryFingerprint,
+	syncLedger,
 	validateInventory,
 	validateLedger,
 } from './inventory-lib.mjs';
@@ -289,6 +290,83 @@ function priorityValidatorFixture() {
 }
 
 describe('React parity validators', () => {
+	test('applies title-scoped triage policies only to matching cases', () => {
+		const { inventory, upstreams, entry } = validatorFixture();
+		upstreams.triagePolicies = [
+			{
+				id: 'legacy-case-policy',
+				filePattern: '/Example-test\\.js$',
+				titlePattern: 'class component',
+				status: 'documented',
+				classification: 'non_goal',
+				risk: 'low',
+				owner: 'out of scope',
+				workstream: 'Legacy cases',
+				rationale: 'Class components are intentionally unsupported.',
+			},
+		];
+		inventory.suites[0].cases[0].title = 'supports a class component';
+		inventory.fingerprint = inventoryFingerprint(inventory);
+
+		const [matched] = syncLedger({ entries: [] }, [inventory], upstreams).entries;
+		assert.equal(matched.status, 'documented');
+		assert.equal(matched.classification, 'non_goal');
+
+		inventory.suites[0].cases[0].title = 'supports a function component';
+		inventory.fingerprint = inventoryFingerprint(inventory);
+		const [unmatched] = syncLedger({ entries: [] }, [inventory], upstreams).entries;
+		assert.equal(unmatched.status, 'untriaged');
+		assert.equal(unmatched.classification, undefined);
+	});
+
+	test('can replace planned title matches without overwriting completed dispositions', () => {
+		const { inventory, upstreams, entry } = validatorFixture();
+		inventory.suites[0].cases[0].title = 'supports a class component';
+		inventory.fingerprint = inventoryFingerprint(inventory);
+		upstreams.triagePolicies = [
+			{
+				id: 'legacy-case-policy',
+				filePattern: '/Example-test\\.js$',
+				titlePattern: 'class component',
+				status: 'documented',
+				classification: 'non_goal',
+				risk: 'low',
+				owner: 'out of scope',
+				workstream: 'Legacy cases',
+				rationale: 'Class components are intentionally unsupported.',
+				replacePlanned: true,
+			},
+		];
+		const planned = {
+			...entry,
+			title: 'supports a class component',
+			status: 'planned',
+			classification: 'adaptable',
+			risk: 'medium',
+		};
+
+		const [replaced] = syncLedger({ entries: [planned] }, [inventory], upstreams).entries;
+		assert.equal(replaced.status, 'documented');
+		assert.equal(replaced.classification, 'non_goal');
+
+		const [preserved] = syncLedger(
+			{
+				entries: [
+					{
+						...planned,
+						status: 'covered',
+						classification: 'portable',
+						evidence: [{ file: 'packages/octane/tests/example.test.ts' }],
+					},
+				],
+			},
+			[inventory],
+			upstreams,
+		).entries;
+		assert.equal(preserved.status, 'covered');
+		assert.equal(preserved.classification, 'portable');
+	});
+
 	test('rejects duplicate, missing, and unknown ledger IDs', () => {
 		const { inventory, upstreams, entry } = validatorFixture();
 		const duplicate = validateLedger(

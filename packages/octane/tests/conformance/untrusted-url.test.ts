@@ -54,20 +54,6 @@ function expectAttr(root: ParentNode, selector: string, name: string, value: str
 	expect(element!.getAttribute(name)).toBe(value);
 }
 
-function expectCaseFoldedAttr(
-	root: ParentNode,
-	selector: string,
-	name: string,
-	value: string,
-): void {
-	const element = root.querySelector(selector);
-	expect(element, `missing ${selector}`).not.toBeNull();
-	const attribute = Array.from(element!.attributes).find(
-		(candidate) => candidate.name.toLowerCase() === name.toLowerCase(),
-	);
-	expect(attribute?.value).toBe(value);
-}
-
 function expectHtmlAttr(html: string, id: string, name: string, value: string): void {
 	const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	expect(html).toMatch(new RegExp(`<[^>]+id=["']${id}["'][^>]+${name}=["']${escaped}["']`));
@@ -546,16 +532,19 @@ describe('conformance: ReactDOMServerIntegrationUntrustedURL', () => {
 			},
 		});
 
-		// Hyphenated reserved tags currently bypass the general JSX alias table,
-		// so pin sanitization of the raw `xlinkHref` spelling too. Namespace/alias
-		// normalization for these obsolete tags is a separate compatibility concern.
+		// A hyphenated SVG tag is still a native foreign-content element, not an
+		// HTML custom element. Its camelCase prop therefore uses the XLink namespace.
 		await expectInRenderMatrix({
 			component: 'ReservedHyphenatedXlinkSink',
 			props: () => ({ url: UNSAFE_URL }),
 			mismatchServerProps: () => ({ url: SAFE_SERVER_URL }),
 			modes: ['client', 'server-string', 'server-stream'],
 			assert: ({ root }) => {
-				expectCaseFoldedAttr(root, '#reserved-font-face-uri-xlink', 'xlinkHref', EXPECTED_SAFE_URL);
+				const link = root.querySelector('#reserved-font-face-uri-xlink');
+				expect(link).not.toBeNull();
+				expect(link!.getAttributeNS('http://www.w3.org/1999/xlink', 'href')).toBe(
+					EXPECTED_SAFE_URL,
+				);
 			},
 		});
 	});

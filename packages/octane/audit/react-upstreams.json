@@ -109,7 +109,7 @@
       "status": "covered",
       "classification": "adaptable",
       "owner": "runtime",
-      "rationale": "Nineteen lazy resolution, rejection, function-component default-prop, memo, identity, and reorder cases have executable evidence; three ergonomic/component-form differences and twenty unsupported class, forwardRef, legacy-root, owner-stack, or exotic-type cases have durable documented dispositions."
+      "rationale": "Eighteen lazy resolution, rejection, function-component default-prop, memo, identity, and reorder cases have executable evidence; four ergonomic/component-form differences and twenty unsupported class, forwardRef, legacy-root, owner-stack, or exotic-type cases have durable documented dispositions."
     },
     {
       "id": "external-store",
@@ -146,10 +146,10 @@
       "workstream": "Server integration matrix",
       "filePattern": "/ReactDOMServerIntegration[^/]*-test(?:\\.internal)?\\.js$",
       "risk": "high",
-      "status": "in_progress",
+      "status": "covered",
       "classification": "adaptable",
       "owner": "SSR + hydration",
-      "rationale": "Wave 4 has exact executable evidence for 89 rendering, serialization, hook, ref, form-control, hydration-adoption, and mismatch-recovery cases in both stable and canary, including a shared five-mode matrix. Wave 1 supplies another 17 untrusted-URL cases, for 106 covered cases in this policy; 57 cases carry durable dispositions and 243 remain planned. Class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types are explicit non-goals."
+      "rationale": "Wave 4 is complete: exact executable evidence covers 330 of the 389 non-URL server-integration cases and durable dispositions cover the other 59, with none still planned. Wave 1 separately covers all 17 untrusted-URL cases, bringing the full 406-case source family to 347 covered and 59 documented. The five-mode matrix exercises client rendering, buffered and streaming SSR, matching and mismatching hydration, and production compilation; class components, legacy roots/context, StrictMode double-invoke, private dispatchers, and unsupported types remain explicit non-goals."
     },
     {
       "id": "react-repo-eslint-rules",
@@ -160,22 +160,216 @@
       "classification": "non_goal",
       "owner": "tooling",
       "rationale": "React's internal ESLint RuleTester fixtures validate repository tooling, not observable UI framework behavior in Octane."
+    },
+    {
+      "id": "server-components-flight",
+      "workstream": "Server Components and Flight",
+      "filePattern": "^packages/(?:react-client|react-server(?:-dom-(?:webpack|turbopack|fb))?)/|/(?:Activity|ViewTransition)ReactServer-test|/ReactDOMInReactServer-test",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "rationale": "Octane does not implement React Server Components, Flight serialization, server references, or the webpack/turbopack Flight transports; these cases do not exercise the supported client or SSR APIs."
+    },
+    {
+      "id": "non-dom-react-renderers",
+      "workstream": "Non-DOM React renderers",
+      "filePattern": "^packages/(?:react-native-renderer|react-art|react-test-renderer|react-markup)/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "rationale": "React Native, Fabric, ART, react-test-renderer, shallow-renderer, and react-markup host protocols are separate renderer products rather than Octane's observable DOM/runtime contract."
+    },
+    {
+      "id": "react-refresh-tooling",
+      "workstream": "React Refresh tooling",
+      "filePattern": "^packages/react-refresh/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "compiler + integrations",
+      "rationale": "React Refresh's Babel transform, global family registry, and renderer injection protocol are React-specific tooling; Octane owns its compiler and Vite HMR contract independently."
+    },
+    {
+      "id": "react-devtools-internals",
+      "workstream": "React DevTools and profiling internals",
+      "filePattern": "^packages/(?:react-debug-tools|react-devtools-timeline)/|/ReactProfiler[^/]*-test",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "rationale": "React DevTools hook inspection, timeline geometry, Fiber duration accounting, and Profiler callbacks are not Octane public APIs."
+    },
+    {
+      "id": "react-test-infrastructure",
+      "workstream": "React repository test infrastructure",
+      "filePattern": "^packages/(?:internal-test-utils|dom-event-testing-library)/|^scripts/(?:babel|error-codes|shared)/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "tooling",
+      "rationale": "React's Jest helpers, gate transforms, error-code build transforms, and event-test utilities validate the React repository's own test/build infrastructure rather than consumer-visible framework behavior."
+    },
+    {
+      "id": "react-scheduler-package",
+      "workstream": "React Scheduler package",
+      "filePattern": "^packages/scheduler/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "scheduler",
+      "rationale": "The standalone React Scheduler package, mock scheduler, profiling buffer, and host fallback implementations are not exported by Octane; observable Octane scheduling semantics are audited through runtime tests instead."
+    },
+    {
+      "id": "legacy-class-strict-ref-surfaces",
+      "workstream": "Legacy, class, StrictMode, and forwardRef surfaces",
+      "filePattern": "/(?:ReactClass|ReactComponent(?:LifeCycle)?|ReactCompositeComponent|ReactLegacy|ReactDOMLegacy|ReactDOMConsoleErrorReportingLegacy|ReactES6Class|ReactCoffeeScriptClass|ReactTypeScriptClass|createReactClassIntegration|forwardRef|findDOMNodeFB|refsLegacy|ReactStrictMode|StrictEffectsMode|ReactCreateRef)[^/]*-test",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "replacePlanned": true,
+      "rationale": "Octane intentionally has no class components, legacy roots/context/lifecycles, StrictMode double invocation, forwardRef, or createRef; renderer-level outcomes are ported separately through function components and ref-as-prop tests."
+    },
+    {
+      "id": "synthetic-event-internals",
+      "workstream": "React synthetic event system",
+      "filePattern": "^packages/react-dom/src/events/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "events",
+      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; native observable outcomes are covered separately."
+    },
+    {
+      "id": "selective-hydration-internals",
+      "workstream": "Selective and partial hydration",
+      "filePattern": "/ReactDOMServer(?:Partial|Selective)Hydration[^/]*-test",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "hydration",
+      "rationale": "Octane hydrates synchronously and has no synthetic event replay or Fiber lane machinery for selective or priority hydration; full-root and streamed-boundary adoption remain covered public contracts."
+    },
+    {
+      "id": "unsupported-suspense-surfaces",
+      "workstream": "Unsupported Suspense surfaces",
+      "filePattern": "/(?:ReactSuspenseList|ReactDOMFizzSuspenseList|ReactCPUSuspense|ReactSuspenseCallback|ReactSuspenseyCommitPhase|ReactSuspensePlaceholder|ActivityLegacySuspense|ActivityStrictMode)[^/]*-test",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "suspense",
+      "rationale": "SuspenseList, CPU/expected-load-time Suspense, suspense callbacks, suspensey host-resource commit semantics, placeholder internals, and legacy/Strict Activity variants are outside Octane's supported component surface."
+    },
+    {
+      "id": "event-traversal-outcomes",
+      "workstream": "Event traversal outcomes",
+      "filePattern": "/ReactTreeTraversal-test\\.js$",
+      "risk": "high",
+      "status": "covered",
+      "classification": "adaptable",
+      "owner": "events",
+      "rationale": "Eleven executable client and production-compile adaptations cover two-phase click traversal and native enter/leave outcomes through Octane's public delegated-event surface; React's private traversal helpers and synthetic mechanism are not asserted."
+    },
+    {
+      "id": "private-dom-renderer-surfaces",
+      "workstream": "Private DOM renderer surfaces",
+      "filePattern": "/(?:ReactDOMTestSelectors|ReactDOMSingletonComponents|ReactRenderDocument|ReactDOMSelection|ReactDOMComponentTree|ReactChildReconciler|ReactTreeTraversal|ReactWrongReturnPointer|ReactScope|getNodeForCharacterOffset)[^/]*-test",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "replacePlanned": true,
+      "rationale": "React's private test-selector, Scope, singleton/document ownership, DOM-to-Fiber lookup, character-offset, child-reconciler, traversal, and return-pointer protocols are not Octane public APIs."
+    },
+    {
+      "id": "unsupported-react-packages",
+      "workstream": "Unsupported React packages",
+      "filePattern": "^packages/(?:react-cache|react-is|shared)/",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "rationale": "React's deprecated cache package, react-is exotic Fiber type inspection, and shared private build helpers are not Octane package surfaces."
+    },
+    {
+      "id": "legacy-class-case-surfaces",
+      "workstream": "Legacy and class case-level surfaces",
+      "filePattern": "^(?:packages|scripts)/",
+      "titlePattern": "(?:\\bclass components?\\b|\\bclass instances?\\b|\\bclass refs?\\b|\\bclass contextType\\b|\\bclass setState\\b|\\bclass with a render method\\b|\\bclasses\\b|e\\.g\\. a class|mounted class|lazy class|hidden class|non-pure class|inside class components|used in a class|forwardRef|findDOMNode|legacy (?:mode|roots?|render|context|suspense|hidden|api|apis)|ReactDOM\\.render|StrictMode|Strict Mode|strict effects|createRef|string refs?|childContextTypes|getChildContext\\b)",
+      "risk": "low",
+      "status": "documented",
+      "classification": "non_goal",
+      "owner": "out of scope",
+      "replacePlanned": true,
+      "rationale": "Cases whose individual outcome requires class components, legacy roots/context, StrictMode double invocation, forwardRef/createRef/findDOMNode, or string refs are explicit non-goals even when they live in an otherwise modern React suite; supported function-component outcomes in the same files remain planned or covered independently."
+    },
+    {
+      "id": "external-store-compat-packages",
+      "workstream": "External-store compatibility packages",
+      "filePattern": "^packages/(?:use-subscription|use-sync-external-store)/",
+      "risk": "medium",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "The standalone compatibility packages are not shipped by Octane, but their observable subscription, snapshot, and notification semantics are actionable through Octane's useSyncExternalStore API."
+    },
+    {
+      "id": "react-core-residual",
+      "workstream": "React core residual audit",
+      "filePattern": "^packages/react/",
+      "risk": "medium",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "public API + runtime",
+      "rationale": "Remaining function-component, element, JSX-runtime, context, transition, and diagnostic outcomes require exact Octane public-API evidence or a narrower case-level divergence disposition."
+    },
+    {
+      "id": "react-dom-residual",
+      "workstream": "React DOM residual audit",
+      "filePattern": "^packages/react-dom/",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime + SSR + hydration",
+      "rationale": "Remaining public DOM rendering, attributes, forms, native event outcomes, resource hints, SSR, hydration, refs, and reconciliation cases require exact behavioral evidence or a narrower case-level disposition."
+    },
+    {
+      "id": "react-reconciler-residual",
+      "workstream": "React reconciler residual audit",
+      "filePattern": "^packages/react-reconciler/",
+      "risk": "high",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "runtime",
+      "rationale": "Remaining function-component hooks, effects, context, Suspense, transitions, Activity, batching, error recovery, and reconciliation outcomes require exact observable Octane evidence; Fiber-only mechanics will receive case-level non-goal dispositions."
+    },
+    {
+      "id": "residual-repository-surface",
+      "workstream": "Residual repository surface",
+      "filePattern": "^(?:packages|scripts)/",
+      "risk": "low",
+      "status": "planned",
+      "classification": "adaptable",
+      "owner": "parity audit",
+      "rationale": "This final audited catch-all keeps newly discovered or uncommon React suites visible and actionable until they receive executable public evidence or a narrower documented non-goal/divergence disposition."
     }
   ],
   "octaneSuiteBaseline": {
-    "normalCoreCases": 2853,
+    "normalCoreCases": 3584,
     "normalCoreBreakdown": {
-      "conformance": 1413,
+      "conformance": 2075,
       "differential": 137,
       "hydration": 135,
-      "other": 1168
+      "other": 1237
     },
     "profilingOnlyCases": 14,
-    "distinctCoreCasesIncludingProfiling": 2867,
-    "productionModeReruns": 2853,
-    "allWorkspaceExecutions": 8477,
-    "reactSourceAttributedFileUpperBound": 1421,
-    "reactSourceAttributedFiles": 81,
+    "distinctCoreCasesIncludingProfiling": 3598,
+    "productionModeReruns": 3584,
+    "allWorkspaceExecutions": 9955,
+    "reactSourceAttributedFileUpperBound": 2079,
+    "reactSourceAttributedFiles": 84,
     "reactSourceAttributedDefinition": "Every collected normal-core case in a local file containing at least one React upstream *-test.js or *-test.ts filename citation; this is a generous file-level upper bound, not a one-to-one port count.",
     "measuredOn": "2026-07-16"
   }

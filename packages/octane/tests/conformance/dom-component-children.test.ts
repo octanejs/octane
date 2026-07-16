@@ -156,22 +156,18 @@ describe('ReactDOMComponent — dangerouslySetInnerHTML validation', () => {
 	// Per ReactDOMComponent-test.js:1852 — should validate against multiple children props
 	// Per ReactDOMComponent-test.js:1879 — should validate use of dangerouslySetInnerHTM with JSX
 	// Per ReactDOMComponent-test.js:1888 — should validate use of dangerouslySetInnerHTML with object
-	// GAP: React throws for a dangerouslySetInnerHTML value that is not
-	// `{__html: …}` (a string, or an object without __html) in DEV *and* prod;
-	// octane reads `.__html` off whatever it gets (undefined → '') and renders
-	// silently. Runtime location: setAttribute's dangerouslySetInnerHTML arm
-	// (runtime.ts:3508) / applyDeoptProps — no shape validation.
+	// Direct, spread, and de-opt writers all retain the complete value object so
+	// the shared runtime path can validate the required `{__html: …}` shape in
+	// development and production compilation.
 	it('throws for a malformed dangerouslySetInnerHTML value', () => {
 		expect(() => mount(MalformedDanger, { d: '<span>Hi Jim!</span>' })).toThrow();
 		expect(() => mount(MalformedDanger, { d: { foo: 'bar' } })).toThrow();
 	});
 
 	// Per ReactDOMComponent-test.js:2068 — should validate against multiple children props (update)
-	// GAP: React throws when `children` and `dangerouslySetInnerHTML` are both
-	// present ("Can only set one…"); octane lets the raw HTML own the content and
-	// ignores the children (see danger-html.test.ts DeoptDanger note) — no error.
-	// Runtime location: hostElementBody / applyDeoptProps (hasDangerHTML,
-	// runtime.ts ~5377).
+	// The runtime validates the update after resolving direct/spread source order;
+	// null/undefined are the only child values allowed beside an active raw-HTML
+	// writer.
 	it('throws when children and dangerouslySetInnerHTML are both set', () => {
 		const r = mount(ChildrenPlusDanger, { on: false });
 		expect(() => r.update(ChildrenPlusDanger, { on: true })).toThrow();

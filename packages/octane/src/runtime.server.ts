@@ -68,6 +68,7 @@ interface SSRScope {
 }
 
 type ParserNamespace = 'html' | 'svg' | 'mathml';
+type AttributeNamespace = ParserNamespace | 'opaque';
 
 // Public string descriptors are HTML-ASCII-case-insensitive. Keep foreign
 // namespace inference on the same contract even though the shared table stores
@@ -706,12 +707,20 @@ function resolveChildrenThenable(thenable: ChildrenThenable): any {
 	throw thenable;
 }
 
+function describeObjectForError(value: object): string {
+	let rendered: string;
+	try {
+		rendered = String(value);
+	} catch {
+		return 'object with keys {' + Object.keys(value).join(', ') + '}';
+	}
+	return rendered === '[object Object]'
+		? 'object with keys {' + Object.keys(value).join(', ') + '}'
+		: rendered;
+}
+
 function invalidChildError(child: object): Error {
-	const rendered = String(child);
-	const found =
-		rendered === '[object Object]'
-			? 'object with keys {' + Object.keys(child).join(', ') + '}'
-			: rendered;
+	const found = describeObjectForError(child);
 	return new Error(
 		'Objects are not valid as an Octane child (found: ' +
 			found +
@@ -886,8 +895,19 @@ export function escapeAttr(v: unknown): string {
 // with these calls. All return a string fragment.
 // ---------------------------------------------------------------------------
 
+let DANGER_HTML_CHILD_PROBE = 0;
+
+function probingDangerHtmlChild(value: unknown): boolean {
+	if (DANGER_HTML_CHILD_PROBE === 0) return false;
+	if (value !== null && value !== undefined) {
+		throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+	}
+	return true;
+}
+
 /** A dynamic text hole. null/false/undefined render as empty (React parity). */
 export function ssrText(v: unknown): string {
+	if (probingDangerHtmlChild(v)) return '';
 	if (v == null || v === false) return '';
 	return escapeHtml(v);
 }
@@ -924,6 +944,7 @@ function ssrComponentDescriptor(d: ElementDescriptor, scope: SSRScope): string {
  * `{x as string}` / literals / `+`-concats to `ssrText`, everything else here.
  */
 export function ssrChild(v: unknown, scope: SSRScope): string {
+	if (probingDangerHtmlChild(v)) return '';
 	return ssrChildValue(v, scope, true);
 }
 
@@ -940,7 +961,7 @@ function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean)
 	// ordinary child classifier serializes the final value. Pending thenables
 	// still route through the nearest streaming/buffered Suspense boundary.
 	if (
-		typeof v === 'object' &&
+		(typeof v === 'object' || typeof v === 'function') &&
 		((v as any).$$kind === CONTEXT_TAG || typeof (v as any).then === 'function')
 	) {
 		return ssrChildValue(
@@ -993,11 +1014,7 @@ function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean)
 		if ((v as any).$$kind === PORTAL_TAG) return ssrBlock(ssrPortal());
 		// A plain object is never a renderable child — serializing `String(v)` puts
 		// '[object Object]' in the markup. Throw like React so the bug is loud.
-		throw new Error(
-			'Objects are not valid as a child (found: object with keys {' +
-				Object.keys(v as object).join(', ') +
-				'}). If you meant to render a collection of children, use an array instead.',
-		);
+		throw invalidChildError(v as object);
 	}
 	return ssrBlock(escapeHtml(v));
 }
@@ -1009,6 +1026,7 @@ function ssrChildValue(v: unknown, scope: SSRScope, includeKeyedSingle: boolean)
 // it); empty renders nothing (the host is sole-child, so there's no sibling cursor
 // to keep aligned).
 export function ssrChildText(v: unknown, scope: SSRScope): string {
+	if (probingDangerHtmlChild(v)) return '';
 	if (v == null || v === false || v === true) return '';
 	if (typeof v === 'object' || typeof v === 'function') return ssrChild(v, scope);
 	return escapeHtml(v);
@@ -1041,105 +1059,141 @@ function ssrHostElement(
 	// semantics even when the authored spelling is uppercase. Preserve that
 	// spelling in the serialized tag, but normalize every behavior/safety check.
 	const semanticTag = tag.toLowerCase();
-	const iterable = iterableChildArray(children);
-	const iterableChildren = iterable !== null;
-	if (iterable !== null) children = iterable;
-	let attrs = '';
-	let innerHTML: unknown = undefined;
-	// Controlled form props (mirrors the compiled ssrEmitElement routing):
-	// input maps the value/defaultValue and checked/defaultChecked cascades
-	// onto the native attributes; textarea routes value/defaultValue into the
-	// CONTENT position; select feeds them to the option-projection scope.
-	const isCtlTag =
-		semanticTag === 'input' || semanticTag === 'textarea' || semanticTag === 'select';
-	if (props != null) {
-		for (const k in props) {
-			const val = props[k];
-			// `dangerouslySetInnerHTML` is element CONTENT, not an attribute — capture
-			// it here (last write wins) and route everything else through the shared
-			// filter/serializer.
-			if (k === 'dangerouslySetInnerHTML') {
-				innerHTML = val == null || val.__html == null ? '' : val.__html;
-				continue;
+	const parentElement = CURRENT_SSR_ELEMENT;
+	const { namespace, childrenNamespace } = ssrElementNamespaces(semanticTag, parentElement);
+	CURRENT_SSR_ELEMENT = {
+		tag: semanticTag,
+		parent: parentElement,
+		namespace,
+		childrenNamespace,
+		location: undefined,
+	};
+	try {
+		const iterable = iterableChildArray(children);
+		const iterableChildren = iterable !== null;
+		if (iterable !== null) children = iterable;
+		let attrs = '';
+		let innerHTMLValue: unknown = undefined;
+		let hasInnerHTMLProp = false;
+		// Controlled form props (mirrors the compiled ssrEmitElement routing):
+		// input maps the value/defaultValue and checked/defaultChecked cascades
+		// onto the native attributes; textarea routes value/defaultValue into the
+		// CONTENT position; select feeds them to the option-projection scope.
+		const isCtlTag =
+			semanticTag === 'input' || semanticTag === 'textarea' || semanticTag === 'select';
+		if (props != null) {
+			for (const k in props) {
+				const val = props[k];
+				// `dangerouslySetInnerHTML` is element CONTENT, not an attribute — capture
+				// it here (last write wins) and route everything else through the shared
+				// filter/serializer.
+				if (k === 'dangerouslySetInnerHTML') {
+					hasInnerHTMLProp = true;
+					innerHTMLValue = val;
+					continue;
+				}
+				if (
+					isCtlTag &&
+					(k === 'value' ||
+						k === 'defaultValue' ||
+						(semanticTag === 'input' && (k === 'checked' || k === 'defaultChecked')))
+				) {
+					continue; // serialized from the cascade below / the content position
+				}
+				attrs += ssrAttrEntry(k, val, semanticTag, namespace);
 			}
-			if (
-				isCtlTag &&
-				(k === 'value' ||
-					k === 'defaultValue' ||
-					(semanticTag === 'input' && (k === 'checked' || k === 'defaultChecked')))
-			) {
-				continue; // serialized from the cascade below / the content position
+			if (semanticTag === 'input') {
+				attrs += ssrValueAttr(props.value != null ? props.value : props.defaultValue);
+				attrs += ssrCheckedAttr(props.checked != null ? props.checked : props.defaultChecked);
 			}
-			attrs += ssrAttrEntry(k, val, semanticTag);
 		}
-		if (semanticTag === 'input') {
-			attrs += ssrValueAttr(props.value != null ? props.value : props.defaultValue);
-			attrs += ssrCheckedAttr(props.checked != null ? props.checked : props.defaultChecked);
+		const hasChildren =
+			rawInner !== undefined
+				? rawInner !== ''
+				: children != null && children !== false && children !== true && children !== '';
+		if (
+			hasInnerHTMLProp &&
+			innerHTMLValue != null &&
+			(typeof innerHTMLValue !== 'object' || !('__html' in innerHTMLValue))
+		) {
+			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
 		}
-	}
-	const hasChildren =
-		rawInner !== undefined
-			? rawInner !== ''
-			: children != null && children !== false && children !== true && children !== '';
-	// Controlled <textarea>: the prop IS the content — React's contract
-	// (children + defaultValue throws; children + value warns dev-side, the
-	// value wins; the compiled path rejects both at compile time).
-	if (
-		semanticTag === 'textarea' &&
-		props != null &&
-		(props.value != null || props.defaultValue != null)
-	) {
-		if (hasChildren && props.value == null) {
-			throw new Error('If you supply `defaultValue` on a <textarea>, do not pass children.');
+		const hasDangerHTML = hasInnerHTMLProp && innerHTMLValue != null;
+		if (hasDangerHTML && (children != null || (rawInner !== undefined && rawInner !== ''))) {
+			throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
 		}
-		const inner = ssrTextareaValue(props.value != null ? props.value : props.defaultValue);
-		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
-	}
-	if (VOID_ELEMENTS.has(semanticTag) && !hasChildren && innerHTML === undefined) {
-		return '<' + tag + attrs + '/>';
-	}
-	let inner = '';
-	if (innerHTML !== undefined) {
-		const raw = innerHTML == null ? '' : String(innerHTML);
-		// HTML tag names are ASCII case-insensitive on the public descriptor path
-		// (`createElement('SCRIPT', …)` creates a real script in the browser too).
-		inner =
-			semanticTag === 'script'
-				? escapeEntireInlineScriptContent(raw)
-				: semanticTag === 'style'
-					? escapeEntireInlineStyleContent(raw)
-					: raw;
-	} else if (rawInner !== undefined) {
-		inner = rawInner;
-	} else if (hasChildren) {
-		const { childrenNamespace } = parserNamespacesForTag(semanticTag, FRAME?.namespace ?? 'html');
-		// A de-opt host whose children contain COMPONENTS renders those children on the
-		// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
-		// on hydration), so they must carry the full childSlot/block marker structure —
-		// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
-		// children are rebuilt by the client de-opt reconciler, so they stay as plain
-		// marker-less markup via `ssrDescriptorContent`.
-		const build = () =>
-			ssrInNamespace(childrenNamespace, () =>
-				iterableChildren || serverDescNeedsBlocks(children)
-					? ssrDeoptBlockChildren(children, scope)
-					: ssrDescriptorContent(children, scope),
-			);
-		// A controlled <select> projects `selected` onto the options serialized
-		// inside its children (compiled options included — the scope is global).
-		inner =
-			semanticTag === 'select' &&
+		// Controlled <textarea>: the prop IS the content — React's contract
+		// (children + defaultValue throws; children + value warns dev-side, the
+		// value wins; the compiled path rejects both at compile time).
+		if (
+			semanticTag === 'textarea' &&
 			props != null &&
 			(props.value != null || props.defaultValue != null)
-				? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
-				: build();
+		) {
+			if (hasChildren && props.value == null) {
+				throw new Error('If you supply `defaultValue` on a <textarea>, do not pass children.');
+			}
+			const inner = ssrTextareaValue(props.value != null ? props.value : props.defaultValue);
+			return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
+		}
+		if (VOID_ELEMENTS.has(semanticTag) && hasDangerHTML) {
+			throw new Error(
+				`\`${semanticTag}\` is a void element tag and must neither have ` +
+					'`children` nor use `dangerouslySetInnerHTML`.',
+			);
+		}
+		if (VOID_ELEMENTS.has(semanticTag) && !hasChildren) {
+			return '<' + tag + attrs + '/>';
+		}
+		let inner = '';
+		if (hasDangerHTML) {
+			const html = (innerHTMLValue as { __html?: unknown }).__html;
+			const raw = html == null ? '' : String(html);
+			// HTML tag names are ASCII case-insensitive on the public descriptor path
+			// (`createElement('SCRIPT', …)` creates a real script in the browser too).
+			inner =
+				semanticTag === 'script'
+					? escapeEntireInlineScriptContent(raw)
+					: semanticTag === 'style'
+						? escapeEntireInlineStyleContent(raw)
+						: raw;
+		} else if (rawInner !== undefined) {
+			inner = rawInner;
+		} else if (hasChildren) {
+			// A de-opt host whose children contain COMPONENTS renders those children on the
+			// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
+			// on hydration), so they must carry the full childSlot/block marker structure —
+			// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
+			// children are rebuilt by the client de-opt reconciler, so they stay as plain
+			// marker-less markup via `ssrDescriptorContent`.
+			const build = () =>
+				ssrInNamespace(childrenNamespace, () =>
+					iterableChildren || serverDescNeedsBlocks(children)
+						? ssrDeoptBlockChildren(children, scope)
+						: ssrDescriptorContent(children, scope),
+				);
+			// A controlled <select> projects `selected` onto the options serialized
+			// inside its children (compiled options included — the scope is global).
+			inner =
+				semanticTag === 'select' &&
+				props != null &&
+				(props.value != null || props.defaultValue != null)
+					? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
+					: build();
+		}
+		// <option> assembles via ssrOption so an active select scope can mark it
+		// ` selected` (its value prop already serialized as a plain attribute).
+		if (semanticTag === 'option') {
+			return ssrOption(
+				props != null && props.value != null ? props.value : undefined,
+				attrs,
+				inner,
+			);
+		}
+		return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
+	} finally {
+		CURRENT_SSR_ELEMENT = parentElement;
 	}
-	// <option> assembles via ssrOption so an active select scope can mark it
-	// ` selected` (its value prop already serialized as a plain attribute).
-	if (semanticTag === 'option') {
-		return ssrOption(props != null && props.value != null ? props.value : undefined, attrs, inner);
-	}
-	return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 }
 
 // Serialize a de-opt host's component-bearing children the way the client's
@@ -1224,6 +1278,7 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 		return ssrComponentDescriptor(d, scope);
 	}
 	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
+	if (typeof v === 'object') throw invalidChildError(v as object);
 	return escapeHtml(v);
 }
 
@@ -1358,15 +1413,28 @@ export function ssrPortal(): string {
 	return EMPTY_COMMENT;
 }
 
+// An `opaque` compiler site inherits the namespace chosen for the component at
+// runtime. Resolve it before applying namespace-sensitive custom-element and
+// native SVG/MathML attribute rules.
+function resolveAttributeNamespace(namespace: AttributeNamespace): ParserNamespace {
+	return namespace === 'opaque' ? (FRAME?.namespace ?? 'html') : namespace;
+}
+
 /**
  * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
- * `tag` (the owning element's tag name, when the emit site knows it) gates the
- * tag-sensitive React-parity rules: custom elements get RAW attribute
+ * `tag` and `namespace` (when the emit site knows them) gate the tag-sensitive
+ * React-parity rules: HTML custom elements get RAW attribute
  * semantics (no alias, no value tables), and the empty-URL strip exempts
  * `<a>`/`<area>` href. Mirrors the client's setAttribute policies (runtime.ts).
  */
-export function ssrAttr(name: string, v: unknown, tag?: string): string {
-	const isCustomTag = tag !== undefined && tag.indexOf('-') !== -1;
+export function ssrAttr(
+	name: string,
+	v: unknown,
+	tag?: string,
+	namespace: AttributeNamespace = 'html',
+): string {
+	namespace = resolveAttributeNamespace(namespace);
+	const isCustomTag = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
 	// React-parity aliases (ATTRIBUTE_ALIASES, constants.ts): `htmlFor` → `for`,
 	// `strokeWidth` → `stroke-width`, `xlinkHref` → `xlink:href`, … — serialize
 	// the attribute the browser actually parses, byte-matching the client's
@@ -1442,7 +1510,7 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 	}
 	if (v == null || v === false) return '';
 	const s = v === true ? '' : String(v);
-	// An empty `src`/`href` resolves to the CURRENT PAGE's URL — browsers would
+	// An empty `src`/`href`/`<object data>` resolves to the CURRENT PAGE's URL — browsers would
 	// re-fetch the whole document as an image/script/stylesheet. React strips
 	// these; so does the client's setAttribute (element-agnostic, custom
 	// elements included — and `true` coerces to '' first, exactly like the
@@ -1450,7 +1518,9 @@ export function ssrAttr(name: string, v: unknown, tag?: string): string {
 	// legitimate "link to this page".
 	if (
 		s === '' &&
-		(name === 'src' || (name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area'))
+		(name === 'src' ||
+			(name === 'href' && tag !== undefined && tag !== 'a' && tag !== 'area') ||
+			(name === 'data' && tag === 'object'))
 	) {
 		return '';
 	}
@@ -1494,19 +1564,142 @@ const VALID_TAG_NAME = /^[a-zA-Z][a-zA-Z0-9:._-]*$/;
 // route to their dedicated serializers, and VALID_ATTR_NAME rejects
 // injection-unsafe names. `dangerouslySetInnerHTML` is element CONTENT, not an
 // attribute — callers must intercept it BEFORE routing an entry here.
-function ssrAttrEntry(k: string, v: unknown, tag?: string): string {
+function ssrAttrEntry(
+	k: string,
+	v: unknown,
+	tag?: string,
+	namespace: AttributeNamespace = 'html',
+): string {
+	namespace = resolveAttributeNamespace(namespace);
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
 	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
 	// `autoFocus` never serializes (client focuses at its mount commit).
-	if (k === 'autoFocus' && (tag === undefined || tag.indexOf('-') === -1)) return '';
+	if (k === 'autoFocus' && (namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1))
+		return '';
 	// Function/symbol values never serialize (client parity: setAttribute removes
 	// them) — stringifying a function would put its SOURCE into the markup.
 	if (typeof v === 'function' || typeof v === 'symbol') return '';
 	if (k === 'style') return ssrStyle(v);
-	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag);
-	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag);
+	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag, namespace);
+	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag, namespace);
 	return '';
+}
+
+type SsrAttributeSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+
+function normalizeSsrAttributeName(
+	name: string,
+	tag: string | undefined,
+	namespace: AttributeNamespace,
+): string {
+	namespace = resolveAttributeNamespace(namespace);
+	if (name === 'className') return 'class';
+	const isCustom = namespace === 'html' && tag !== undefined && tag.indexOf('-') !== -1;
+	if (!isCustom) return ATTRIBUTE_ALIASES.get(name) ?? name;
+	return name;
+}
+
+function isAggregatedFormAttribute(tag: string | undefined, name: string): boolean {
+	if (name === 'value' || name === 'defaultValue') {
+		return tag === 'input' || tag === 'textarea' || tag === 'select';
+	}
+	if (tag === 'input' && (name === 'checked' || name === 'defaultChecked')) return true;
+	return tag === 'select' && name === 'multiple';
+}
+
+/**
+ * Resolve all serializable attributes across direct JSX writers and spread
+ * snapshots. HTML parsers keep the first duplicate attribute, while JSX props
+ * use last-write wins; collecting by the normalized native name before
+ * serialization keeps server markup aligned with client application. Repeated
+ * writes of the same JSX prop retain its first insertion position like
+ * Object.assign. Distinct aliases that target one native attr still choose the
+ * latest authored writer and retain that winning prop's insertion position.
+ */
+export function ssrAttrs(
+	sources: readonly SsrAttributeSource[],
+	tag?: string,
+	namespace: AttributeNamespace = 'html',
+	skipFormControls = false,
+): string {
+	namespace = resolveAttributeNamespace(namespace);
+	interface PropWriter {
+		rawName: string;
+		value: unknown;
+		firstOrder: number;
+		lastOrder: number;
+	}
+	const props = new Map<string, PropWriter>();
+	let sourceOrder = 0;
+	const record = (rawName: unknown, value: unknown): void => {
+		if (typeof rawName !== 'string') return;
+		const order = sourceOrder++;
+		const previous = props.get(rawName);
+		props.set(rawName, {
+			rawName,
+			value,
+			firstOrder: previous?.firstOrder ?? order,
+			lastOrder: order,
+		});
+	};
+
+	for (const [isSpread, sourceOrName, directValue] of sources) {
+		if (!isSpread) {
+			record(sourceOrName, directValue);
+			continue;
+		}
+		const source = sourceOrName;
+		if (source == null || (typeof source !== 'object' && typeof source !== 'function')) {
+			continue;
+		}
+		for (const name of Object.keys(Object(source))) {
+			record(name, (source as Record<string, unknown>)[name]);
+		}
+	}
+
+	const resolved = new Map<
+		string,
+		readonly [name: string, value: unknown, firstOrder: number, lastOrder: number]
+	>();
+	for (const writer of props.values()) {
+		const { rawName, value, firstOrder, lastOrder } = writer;
+		if (
+			rawName === 'key' ||
+			rawName === 'ref' ||
+			rawName === 'children' ||
+			rawName === 'dangerouslySetInnerHTML' ||
+			rawName === 'suppressHydrationWarning' ||
+			rawName === 'suppressContentEditableWarning'
+		)
+			continue;
+		if (skipFormControls && isAggregatedFormAttribute(tag, rawName)) continue;
+		if (rawName.length > 2 && rawName[0] === 'o' && rawName[1] === 'n') {
+			const c = rawName.charCodeAt(2);
+			if (c >= 65 && c <= 90) continue;
+		}
+		if (
+			rawName === 'autoFocus' &&
+			(namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1)
+		)
+			continue;
+		const name = normalizeSsrAttributeName(rawName, tag, namespace);
+		if (!VALID_ATTR_NAME.test(name)) continue;
+		// Attribute identity is ASCII-case-insensitive in the HTML namespace.
+		// SVG/MathML retain their case-sensitive qualified names.
+		const identity = namespace === 'html' ? name.toLowerCase() : name;
+		const previous = resolved.get(identity);
+		if (previous === undefined || previous[3] < lastOrder) {
+			resolved.set(identity, [name, value, firstOrder, lastOrder]);
+		}
+	}
+
+	let out = '';
+	const ordered = [...resolved.values()].sort((a, b) => a[2] - b[2]);
+	for (const [name, value] of ordered) {
+		out += ssrAttrEntry(name, value, tag, namespace);
+	}
+	return out;
 }
 
 /**
@@ -1525,7 +1718,7 @@ export function ssrClass(sources: Array<[boolean, unknown]>): string {
 			continue;
 		}
 		if (source == null || (typeof source !== 'object' && typeof source !== 'function')) continue;
-		for (const key in source as Record<string, unknown>) {
+		for (const key of Object.keys(Object(source))) {
 			if (key === 'class' || key === 'className') {
 				found = true;
 				value = (source as Record<string, unknown>)[key];
@@ -1535,33 +1728,103 @@ export function ssrClass(sources: Array<[boolean, unknown]>): string {
 	return found ? ssrAttr('class', value) : '';
 }
 
+/**
+ * Snapshot one JSX spread with Object.assign semantics. Only own enumerable
+ * string keys participate, and getters run once at the spread's authored
+ * evaluation position before later direct prop expressions.
+ */
+export function ssrSnapshotSpread(obj: unknown): Record<string, unknown> | null {
+	if (obj == null) return null;
+	const source = Object(obj) as Record<PropertyKey, unknown>;
+	const snapshot: Record<string, unknown> = Object.create(null);
+	// Object spread evaluates every own enumerable key, including symbols. The
+	// DOM router ignores symbol props, but their getters still run at the spread's
+	// authored position; retain only string keys after performing each read.
+	for (const key of Reflect.ownKeys(source)) {
+		if (!Object.prototype.propertyIsEnumerable.call(source, key)) continue;
+		const value = source[key];
+		if (typeof key === 'string') snapshot[key] = value;
+	}
+	return snapshot;
+}
+
 /** A spread `{...obj}`: serialize attr-like keys; drop events/refs/key/children. */
-export function ssrSpread(obj: unknown, tag?: string, skipClass = false): string {
-	if (obj == null || typeof obj !== 'object') return '';
+export function ssrSpread(
+	obj: unknown,
+	tag?: string,
+	skipClass = false,
+	namespace: AttributeNamespace = 'html',
+	skipFormControls = false,
+): string {
+	namespace = resolveAttributeNamespace(namespace);
+	if (obj == null) return '';
 	let out = '';
-	for (const k in obj as Record<string, unknown>) {
+	for (const k of Object.keys(Object(obj))) {
 		// When direct and spread class writers coexist, the compiler emits one
 		// ssrClass call after all sources. Do not manufacture duplicate native
 		// class attributes here: HTML parsing would keep the wrong (first) one.
 		if (skipClass && (k === 'class' || k === 'className')) continue;
+		// Native form controls with any spread resolve their controlled/default
+		// cascades through one tag-specific helper. Skip those keys here so input
+		// never sees duplicate value/checked attrs, textarea never receives a value
+		// attr instead of content, and select can project its value onto options.
+		if (
+			skipFormControls &&
+			(k === 'value' || k === 'defaultValue') &&
+			(tag === 'input' || tag === 'textarea' || tag === 'select')
+		)
+			continue;
+		if (skipFormControls && tag === 'input' && (k === 'checked' || k === 'defaultChecked'))
+			continue;
+		if (skipFormControls && tag === 'select' && k === 'multiple') continue;
 		// A spread `dangerouslySetInnerHTML` is element content, not an attribute —
 		// the compiler collects it at the emit site (compile.js `htmlSources`, which
 		// feeds `ssrInnerHtml`), so the attr serializer drops it here.
 		if (k === 'dangerouslySetInnerHTML') continue;
-		out += ssrAttrEntry(k, (obj as Record<string, unknown>)[k], tag);
+		out += ssrAttrEntry(k, (obj as Record<string, unknown>)[k], tag, namespace);
 	}
 	return out;
 }
 
-// Pick the effective `dangerouslySetInnerHTML` content from a set of source
-// objects given in SOURCE ORDER (explicit `dangerouslySetInnerHTML={…}` attrs and
-// spread `.dangerouslySetInnerHTML` values). The LAST present object wins (matching
-// the client's last-write-wins ordering); a present-but-null `__html` renders ''.
-// Returns undefined when no source is present, so the caller falls back to children.
-export function ssrInnerHtml(sources: unknown[]): string | undefined {
+// Pick the effective `dangerouslySetInnerHTML` content from `[present, value]`
+// sources in JSX order. A present null/undefined value disables an earlier writer;
+// an omitted spread key does not. When raw HTML is active, probe dynamic children
+// exactly once so only null/undefined coexist; the compiler separately reports
+// definitely-present static children without evaluating their render bodies.
+export function ssrInnerHtml(
+	sources: readonly (readonly [boolean, unknown])[],
+	renderChildren?: () => string,
+	definitelyHasChildren = false,
+	childrenSources: readonly (readonly [boolean, unknown])[] = [],
+): string | undefined {
 	for (let i = sources.length - 1; i >= 0; i--) {
-		const s = sources[i] as { __html?: unknown } | null | undefined;
-		if (s != null) return s.__html == null ? '' : String(s.__html);
+		const [present, value] = sources[i];
+		if (!present) continue;
+		if (value == null) return undefined;
+		if (typeof value !== 'object' || !('__html' in value)) {
+			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+		}
+		let childValue: unknown;
+		let hasChildSource = false;
+		for (let childI = childrenSources.length - 1; childI >= 0; childI--) {
+			if (!childrenSources[childI][0]) continue;
+			hasChildSource = true;
+			childValue = childrenSources[childI][1];
+			break;
+		}
+		if (definitelyHasChildren || (hasChildSource && childValue != null)) {
+			throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+		}
+		if (renderChildren !== undefined) {
+			DANGER_HTML_CHILD_PROBE++;
+			try {
+				renderChildren();
+			} finally {
+				DANGER_HTML_CHILD_PROBE--;
+			}
+		}
+		const html = (value as { __html?: unknown }).__html;
+		return html == null ? '' : String(html);
 	}
 	return undefined;
 }
@@ -1599,9 +1862,54 @@ function escapeEntireInlineScriptContent(value: string): string {
  * the resulting whole-script body safe to concatenate into an HTML response.
  * `undefined` still means "no writer", preserving the normal children fallback.
  */
-export function ssrScriptInnerHtml(sources: unknown[]): string | undefined {
-	const html = ssrInnerHtml(sources);
+export function ssrScriptInnerHtml(
+	sources: readonly (readonly [boolean, unknown])[],
+	renderChildren?: () => string,
+	definitelyHasChildren = false,
+	childrenSources: readonly (readonly [boolean, unknown])[] = [],
+): string | undefined {
+	const html = ssrInnerHtml(sources, renderChildren, definitelyHasChildren, childrenSources);
 	return html === undefined ? undefined : escapeEntireInlineScriptContent(html);
+}
+
+function finalPresentSource(
+	sources: readonly (readonly [boolean, unknown])[],
+): readonly [present: boolean, value: unknown] {
+	for (let i = sources.length - 1; i >= 0; i--) {
+		if (sources[i][0]) return [true, sources[i][1]];
+	}
+	return [false, undefined];
+}
+
+/**
+ * Render the effective direct/spread `children` prop for an otherwise empty
+ * host. Prop-driven content is the host's sole child, so primitive text stays
+ * markerless while descriptors/lists retain the normal child-slot framing.
+ */
+export function ssrChildrenSources(
+	sources: readonly (readonly [boolean, unknown])[],
+	renderFallback: () => string,
+	scope: SSRScope,
+): string {
+	const child = finalPresentSource(sources);
+	return child[0] ? ssrChildText(child[1], scope) : renderFallback();
+}
+
+/** Validate runtime spread/direct content props before closing a void host. */
+export function ssrVoidContent(
+	tag: string,
+	dangerSources: readonly (readonly [boolean, unknown])[],
+	childrenSources: readonly (readonly [boolean, unknown])[],
+): string {
+	const danger = finalPresentSource(dangerSources);
+	const children = finalPresentSource(childrenSources);
+	if ((danger[0] && danger[1] != null) || (children[0] && children[1] != null)) {
+		throw new Error(
+			`\`<${tag}>\` is a void element tag and must neither have children nor use ` +
+				'`dangerouslySetInnerHTML`.',
+		);
+	}
+	return '';
 }
 
 // ---------------------------------------------------------------------------
@@ -1629,6 +1937,89 @@ export function ssrCheckedAttr(v: unknown): string {
 }
 
 /**
+ * Resolve `<input>`'s value/defaultValue and checked/defaultChecked cascades
+ * across direct props and spreads. HTML keeps the first duplicate attribute,
+ * so the compiler must emit one effective native attribute for each cascade.
+ * Controlled writers win over default writers regardless of source order;
+ * repeated writers of the same prop retain normal last-write-wins semantics.
+ */
+export function ssrInputAttrs(
+	sources: Array<readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown]>,
+): string {
+	const props = resolveFormControlSources(sources);
+	return (
+		ssrValueAttr(props.value ?? props.defaultValue) +
+		ssrCheckedAttr(props.checked ?? props.defaultChecked)
+	);
+}
+
+type SsrFormControlSource = readonly [isSpread: boolean, sourceOrName: unknown, value?: unknown];
+
+interface ResolvedFormControlSources {
+	value: unknown;
+	defaultValue: unknown;
+	checked: unknown;
+	defaultChecked: unknown;
+	multiple: unknown;
+	hasValue: boolean;
+	hasDefaultValue: boolean;
+	hasMultiple: boolean;
+}
+
+/** Resolve source-ordered direct/spread form writers with JSX last-write wins. */
+function resolveFormControlSources(
+	sources: readonly SsrFormControlSource[],
+): ResolvedFormControlSources {
+	const resolved: ResolvedFormControlSources = {
+		value: undefined,
+		defaultValue: undefined,
+		checked: undefined,
+		defaultChecked: undefined,
+		multiple: undefined,
+		hasValue: false,
+		hasDefaultValue: false,
+		hasMultiple: false,
+	};
+	for (const [isSpread, sourceOrName, directValue] of sources) {
+		if (isSpread) {
+			const source = sourceOrName;
+			if (source == null || (typeof source !== 'object' && typeof source !== 'function')) {
+				continue;
+			}
+			for (const name of Object.keys(Object(source))) {
+				const next = (source as Record<string, unknown>)[name];
+				if (name === 'value') {
+					resolved.hasValue = true;
+					resolved.value = next;
+				} else if (name === 'defaultValue') {
+					resolved.hasDefaultValue = true;
+					resolved.defaultValue = next;
+				} else if (name === 'checked') resolved.checked = next;
+				else if (name === 'defaultChecked') resolved.defaultChecked = next;
+				else if (name === 'multiple') {
+					resolved.hasMultiple = true;
+					resolved.multiple = next;
+				}
+			}
+			continue;
+		}
+		if (sourceOrName === 'value') {
+			resolved.hasValue = true;
+			resolved.value = directValue;
+		} else if (sourceOrName === 'defaultValue') {
+			resolved.hasDefaultValue = true;
+			resolved.defaultValue = directValue;
+		} else if (sourceOrName === 'checked') resolved.checked = directValue;
+		else if (sourceOrName === 'defaultChecked') resolved.defaultChecked = directValue;
+		else if (sourceOrName === 'multiple') {
+			resolved.hasMultiple = true;
+			resolved.multiple = directValue;
+		}
+	}
+	return resolved;
+}
+
+/**
  * Controlled `<textarea>` content: escaped text + the leading-newline guard
  * (the parser eats a '\n' right after the opening tag — see ssrTextPre).
  * Mirrors the client's toControlledString (booleans/numbers stringify).
@@ -1637,6 +2028,25 @@ export function ssrTextareaValue(v: unknown): string {
 	if (v == null) return '';
 	const s = escapeHtml(typeof v === 'string' ? v : String(v));
 	return s.charCodeAt(0) === 10 ? '\n' + s : s;
+}
+
+/**
+ * Resolve direct and spread textarea value/defaultValue writers. A nullish
+ * effective value is uncontrolled and leaves ordinary authored children in
+ * place, matching the client helpers' no-op for null/undefined.
+ */
+export function ssrTextareaValueSources(
+	sources: readonly SsrFormControlSource[],
+): string | undefined {
+	const props = resolveFormControlSources(sources);
+	const value = props.value ?? props.defaultValue;
+	return value == null ? undefined : ssrTextareaValue(value);
+}
+
+/** Serialize one effective select `multiple` attribute across JSX sources. */
+export function ssrSelectAttrs(sources: readonly SsrFormControlSource[]): string {
+	const props = resolveFormControlSources(sources);
+	return props.hasMultiple ? ssrAttr('multiple', props.multiple, 'select') : '';
 }
 
 // The active controlled-<select> scopes. A MODULE-LEVEL stack (not an SSRScope
@@ -1683,12 +2093,40 @@ export function ssrSelectScope(
 	}
 }
 
+/** Resolve spread/direct select props, then project the effective value. */
+export function ssrSelectScopeSources(
+	sources: readonly SsrFormControlSource[],
+	children: () => string,
+): string {
+	const props = resolveFormControlSources(sources);
+	return ssrSelectScope(props.value, props.defaultValue, props.multiple, children);
+}
+
 // Reverse escapeHtml for an option's TEXT content — the React fallback compare
 // key when the option carries no `value` attribute. Only the entities
 // escapeHtml produces (& < >) need reversing; order matters (&amp; last).
 function unescapeOptionText(s: string): string {
 	if (s.indexOf('&') === -1) return s;
 	return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+
+/** Return the final raw option value from the same source set as ssrAttrs. */
+export function ssrOptionValueSources(sources: readonly SsrAttributeSource[]): unknown {
+	let value: unknown;
+	for (const [isSpread, sourceOrName, directValue] of sources) {
+		if (!isSpread) {
+			if (sourceOrName === 'value') value = directValue;
+			continue;
+		}
+		const source = sourceOrName;
+		if (source == null || (typeof source !== 'object' && typeof source !== 'function')) {
+			continue;
+		}
+		if (Object.prototype.propertyIsEnumerable.call(Object(source), 'value')) {
+			value = (source as Record<string, unknown>).value;
+		}
+	}
+	return value;
 }
 
 /**
@@ -1751,6 +2189,14 @@ interface GetterHookRec extends HookRec {
 	/** Allocated only for compiler-selected third-tuple consumers. */
 	getter?: () => unknown;
 }
+interface MemoHookRec {
+	value: unknown;
+	deps: readonly unknown[];
+}
+interface RefHookRec {
+	ref: { current: unknown };
+}
+type AnyHookRec = HookRec | MemoHookRec | RefHookRec;
 type ServerHookSlot = symbol | string | number;
 
 // Server twin of the client helper/custom-hook ABI. Modules reserve a range
@@ -1764,7 +2210,7 @@ export function hookSlots(count: number): number {
 
 interface HookPass {
 	/** Slot → occurrence-indexed records, persisting across this body's passes. */
-	hooks: Map<ServerHookSlot, HookRec[]>;
+	hooks: Map<ServerHookSlot, AnyHookRec[]>;
 	/** Per-pass occurrence counters (fresh each pass, like Frame.occ). */
 	occ: Map<ServerHookSlot, number>;
 	/** A dispatch fired during the current pass → re-invoke the body. */
@@ -1821,11 +2267,28 @@ function basicStateReducer(s: unknown, a: unknown): unknown {
 	return typeof a === 'function' ? (a as (v: unknown) => unknown)(s) : a;
 }
 
+function hookPosition(slot: unknown): {
+	hp: HookPass;
+	list: AnyHookRec[];
+	index: number;
+} | null {
+	const hp = HOOK_PASS;
+	if (hp === null) return null;
+	const key = resolveHookSlot(slot);
+	const index = hp.occ.get(key) ?? 0;
+	hp.occ.set(key, index + 1);
+	let list = hp.hooks.get(key);
+	if (list === undefined) hp.hooks.set(key, (list = []));
+	return { hp, list, index };
+}
+
 // The shared useState/useReducer server cell. Getter-free hooks keep Fizz's lean
 // queue: the next pass folds actions with that pass's reducer. Getter-enabled
 // hooks additionally fold each action into `pendingValue` immediately so index 2
-// sees scheduled state synchronously; the next pass adopts it without invoking a
-// functional updater or reducer twice.
+// sees scheduled state synchronously. The next pass adopts that eager result when
+// the reducer is unchanged (so a functional updater/reducer runs only once), but
+// replays the queue when the current render supplies a different reducer, matching
+// React's current-reducer semantics.
 function stateHook<S, A>(
 	reducer: (s: S, a: A) => S,
 	create: () => S,
@@ -1838,12 +2301,9 @@ function stateHook<S, A>(
 		const value = create();
 		return withGetter ? [value, NOOP, () => value] : [value, NOOP];
 	}
-	const key = resolveHookSlot(slot);
-	const n = hp.occ.get(key) ?? 0;
-	hp.occ.set(key, n + 1);
-	let list = hp.hooks.get(key);
-	if (list === undefined) hp.hooks.set(key, (list = []));
-	let rec = list[n];
+	const position = hookPosition(slot)!;
+	const { list, index: n } = position;
+	let rec = list[n] as HookRec | undefined;
 	if (rec === undefined) {
 		const value = create();
 		if (withGetter) {
@@ -1880,8 +2340,16 @@ function stateHook<S, A>(
 	} else if (rec.queue.length > 0) {
 		if (withGetter) {
 			const getterRec = rec as GetterHookRec;
+			if (getterRec.reducer === reducer) {
+				rec.value = getterRec.pendingValue;
+			} else {
+				let value = rec.value as S;
+				const queue = rec.queue;
+				for (let i = 0; i < queue.length; i++) value = reducer(value, queue[i] as A);
+				rec.value = value;
+				getterRec.pendingValue = value;
+			}
 			rec.queue = [];
-			rec.value = getterRec.pendingValue;
 		} else {
 			let value = rec.value as S;
 			const queue = rec.queue;
@@ -2568,14 +3036,14 @@ const CONTEXT_TAG = Symbol.for('octane.context');
 // field drives the client's provider-change invalidation machinery, which has no
 // server analogue (an SSR pass reads each provider value exactly once, top-down).
 export interface Context<T> {
+	(props: { value: T; children?: any }, scope: SSRScope): string;
 	$$kind: typeof CONTEXT_TAG;
 	defaultValue: T;
 	Provider: (props: { value: T; children?: any }, scope: SSRScope) => string;
 }
 
 export function createContext<T>(defaultValue: T): Context<T> {
-	const ctx = { $$kind: CONTEXT_TAG, defaultValue } as Context<T>;
-	ctx.Provider = function ProviderBody(props, scope) {
+	const ctx = function ProviderBody(props, scope) {
 		if (scope.$$ctxValues === null) scope.$$ctxValues = new Map();
 		scope.$$ctxValues.set(ctx, props.value);
 		const children = props.children;
@@ -2588,7 +3056,10 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		return typeof children === 'function'
 			? (children(undefined, scope) ?? '')
 			: ssrChild(children, scope);
-	};
+	} as Context<T>;
+	ctx.$$kind = CONTEXT_TAG;
+	ctx.defaultValue = defaultValue;
+	ctx.Provider = ctx;
 	return ctx;
 }
 
@@ -3409,14 +3880,44 @@ export const useLayoutEffect = useEffect;
 export const useInsertionEffect = useEffect;
 export function useImperativeHandle(): void {}
 
-export function useMemo<T>(compute: (...deps: any[]) => T, deps?: any[] | null | symbol): T {
-	// deps may be a real array, omitted, or (per the trailing-slot ABI) a symbol.
-	const d = Array.isArray(deps) ? deps : [];
-	return compute.apply(null, d);
+function serverHookDepsEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+	return true;
 }
 
-export function useCallback<F>(fn: F): F {
-	return fn;
+export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: symbol): T;
+export function useMemo<T>(
+	compute: () => T,
+	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
+	maybeSlot?: ServerHookSlot,
+): T {
+	const deps = Array.isArray(depsOrSlot) ? depsOrSlot : null;
+	const slot =
+		maybeSlot ?? (Array.isArray(depsOrSlot) || depsOrSlot === null ? undefined : depsOrSlot);
+	// `null` means recompute every pass. Omitted dependency arrays reach the
+	// runtime as compiler-inferred arrays, preserving Octane's documented API.
+	if (deps === null) return compute();
+	const position = hookPosition(slot);
+	if (position === null) return compute();
+	let rec = position.list[position.index] as MemoHookRec | undefined;
+	if (rec === undefined) {
+		rec = { value: compute(), deps: deps.slice() };
+		position.list[position.index] = rec;
+	} else if (!serverHookDepsEqual(rec.deps, deps)) {
+		rec.value = compute();
+		rec.deps = deps.slice();
+	}
+	return rec.value as T;
+}
+
+export function useCallback<F>(fn: F, deps?: readonly unknown[] | null, slot?: symbol): F;
+export function useCallback<F>(
+	fn: F,
+	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
+	maybeSlot?: ServerHookSlot,
+): F {
+	return (useMemo as any)(() => fn, depsOrSlot, maybeSlot) as F;
 }
 
 export function useRef<T = undefined>(): { current: T | undefined };
@@ -3424,8 +3925,18 @@ export function useRef<T>(initial: T, slot?: symbol): { current: T };
 export function useRef<T>(initial?: T, slot?: ServerHookSlot): { current: T | undefined } {
 	// A spread-shaped zero-argument call cannot be padded positionally, so the
 	// compiler retains the self-identifying Symbol ABI: `useRef(slot)`.
-	if (slot === undefined && typeof initial === 'symbol') initial = undefined;
-	return { current: initial };
+	if (slot === undefined && typeof initial === 'symbol') {
+		slot = initial;
+		initial = undefined;
+	}
+	const position = hookPosition(slot);
+	if (position === null) return { current: initial };
+	let rec = position.list[position.index] as RefHookRec | undefined;
+	if (rec === undefined) {
+		rec = { ref: { current: initial } };
+		position.list[position.index] = rec;
+	}
+	return rec.ref as { current: T | undefined };
 }
 
 /** React's `useDebugValue` — devtools-only on the client, no-op everywhere. */

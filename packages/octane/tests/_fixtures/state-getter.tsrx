@@ -30,6 +30,22 @@ export function ReducerGetter(props) @{
 	</button>
 }
 
+export function RenderPhaseNullableReducerGetter(props) @{
+	const [value, dispatch, getValue] = useReducer((state: any, action: string) => {
+		if (action === 'empty') return props.empty;
+		if (state === null) return 'saw:null';
+		if (state === undefined) return 'saw:undefined';
+		return 'saw:' + state;
+	}, 'seed');
+	if (value === 'seed') {
+		dispatch('empty');
+		props.observe(getValue());
+		dispatch('describe');
+		props.observe(getValue());
+	}
+	<span id="nullable-reducer">{String(value)}</span>
+}
+
 export function ServerGetter() @{
 	const [count, setCount, getCount] = useState(0);
 	if (count < 2) setCount(count + 1);
