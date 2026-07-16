@@ -2,12 +2,15 @@
 title: Bindings
 ---
 
+import { BindingsDirectory } from '../../components/BindingsDirectory.tsrx';
+import { BINDING_COUNT } from '../bindings.ts';
+
 <div className="doc-hero">
-	<p className="doc-eyebrow">Bring your favourite libraries</p>
+	<p className="doc-eyebrow">{BINDING_COUNT + ' first-party bindings'}</p>
 	<h1>Bindings</h1>
 	<p className="doc-lede">
 		{
-			'A binding connects a library’s hooks and components to Octane. You keep the library’s familiar ideas and APIs; the binding replaces its React-facing layer.'
+			'Keep the APIs you know across state, data, routing, UI, forms, charts, 3D, and more. Each binding replaces a library’s React-facing layer with one built for Octane.'
 		}
 	</p>
 </div>
@@ -25,186 +28,13 @@ title: Bindings
 
 Moving an existing app? Start with the libraries it already uses. Starting fresh? Pick
 the group that matches the problem, then learn the library itself from its upstream
-documentation.
+documentation. The directory covers every first-party binding in the repository.
 
-<div className="doc-card-grid">
-	<section className="doc-card">
-		<h3>Shared state</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/zustand">
-					<code>@octanejs/zustand</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/jotai">
-					<code>@octanejs/jotai</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/redux">
-					<code>@octanejs/redux</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/redux-toolkit">
-					<code>@octanejs/redux-toolkit</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-store">
-					<code>@octanejs/tanstack-store</code>
-				</a>
-				<span>Small stores, atoms, Redux, RTK Query, and TanStack Store.</span>
-			</li>
-		</ul>
-	</section>
-	<section className="doc-card">
-		<h3>AI, data, and routing</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-ai">
-					<code>@octanejs/tanstack-ai</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/apollo-client">
-					<code>@octanejs/apollo-client</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-query">
-					<code>@octanejs/tanstack-query</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-router">
-					<code>@octanejs/tanstack-router</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/remix-router">
-					<code>@octanejs/remix-router</code>
-				</a>
-				<span>
-					Streaming AI, GraphQL, server data, type-safe routes, and React Router-style APIs.
-				</span>
-			</li>
-		</ul>
-	</section>
-	<section className="doc-card">
-		<h3>UI and interaction</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/radix">
-					<code>@octanejs/radix</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/base-ui">
-					<code>@octanejs/base-ui</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/floating-ui">
-					<code>@octanejs/floating-ui</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/motion">
-					<code>@octanejs/motion</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/dnd-kit">
-					<code>@octanejs/dnd-kit</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/sonner">
-					<code>@octanejs/sonner</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/lucide">
-					<code>@octanejs/lucide</code>
-				</a>
-				<span>Primitives, positioning, motion, drag and drop, toasts, and icons.</span>
-			</li>
-		</ul>
-	</section>
-	<section className="doc-card">
-		<h3>Forms and content</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/hook-form">
-					<code>@octanejs/hook-form</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-form">
-					<code>@octanejs/tanstack-form</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/lexical">
-					<code>@octanejs/lexical</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/mdx">
-					<code>@octanejs/mdx</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/i18next">
-					<code>@octanejs/i18next</code>
-				</a>
-				<span>Forms, rich-text editing, MDX, and translations.</span>
-			</li>
-		</ul>
-	</section>
-	<section className="doc-card">
-		<h3>Data-heavy screens</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-table">
-					<code>@octanejs/tanstack-table</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/tanstack-virtual">
-					<code>@octanejs/tanstack-virtual</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/recharts">
-					<code>@octanejs/recharts</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/visx">
-					<code>@octanejs/visx</code>
-				</a>
-				<span>
-					Tables, large virtual lists, charts, and visualization primitives. Recharts is currently
-					partial; Visx exposes the complete current 4.x web surface.
-				</span>
-			</li>
-		</ul>
-	</section>
-	<section className="doc-card">
-		<h3>Web 3D</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/three">
-					<code>@octanejs/three</code>
-				</a>
-				<span>
-					React Three Fiber-compatible scene graphs on Octane's universal renderer. The package is
-					currently experimental and delivered in milestones.
-				</span>
-			</li>
-		</ul>
-	</section>
-	<section className="doc-card">
-		<h3>Styling and tests</h3>
-		<ul>
-			<li>
-				<a href="https://github.com/octanejs/octane/tree/main/packages/stylex">
-					<code>@octanejs/stylex</code>
-				</a>
-				{' / '}
-				<a href="https://github.com/octanejs/octane/tree/main/packages/testing-library">
-					<code>@octanejs/testing-library</code>
-				</a>
-				<span>Compiled StyleX and DOM-first component tests.</span>
-			</li>
-		</ul>
-	</section>
-</div>
+<BindingsDirectory />
 
-Base UI is currently alpha. Follow each package link for its README and exact supported
-surface.
+Maturity ranges from complete ports to scoped, partial, and technical-preview bindings.
+Follow each package link for its README, then use the status table below for the exact
+supported surface and SSR coverage.
 
 <h2 id="install-and-use">Install it, then change the import</h2>
 
@@ -239,7 +69,8 @@ things:
 
 The generated
 [bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md)
-answers those questions for all 30 first-party bindings and is checked in CI.
+answers those questions for all {BINDING_COUNT + ' first-party bindings'} and is checked
+in CI.
 
 <aside className="doc-callout tip">
 	<p className="doc-callout-title">App tooling is a separate layer</p>
