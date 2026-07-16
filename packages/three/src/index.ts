@@ -1,4 +1,25 @@
-export { applyProps, dispose, extend } from './core/index.js';
+export {
+	addAfterEffect,
+	addEffect,
+	addTail,
+	advance,
+	applyProps,
+	buildGraph,
+	calculateDpr,
+	context,
+	createRoot,
+	dispose,
+	extend,
+	flushGlobalEffects,
+	getRootState,
+	invalidate,
+	unmountComponentAtNode,
+	useFrame,
+	useGraph,
+	useInstanceHandle,
+	useStore,
+	useThree,
+} from './core/index.js';
 export type {
 	Args,
 	Attach,
@@ -17,3 +38,31 @@ export type {
 	ThreeRef,
 	ThreeToJSXElements,
 } from './core/index.js';
+export type {
+	Camera,
+	CameraProps,
+	CanvasLike,
+	DefaultGLProps,
+	Dpr,
+	EventManager,
+	Frameloop,
+	GLProps,
+	GlobalEffectType,
+	GlobalRenderCallback,
+	InternalState,
+	ObjectMap,
+	Performance,
+	RefObject,
+	RenderCallback,
+	Renderer,
+	RenderProps,
+	RootState,
+	RootStore,
+	Size,
+	Subscription,
+	ThreeRoot,
+	Viewport,
+	XRManager,
+} from './core/index.js';
+export { Canvas } from './web/Canvas.tsrx';
+export type { CanvasProps, CanvasRef, CanvasStyle } from './web/Canvas.tsrx';

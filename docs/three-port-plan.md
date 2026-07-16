@@ -538,6 +538,21 @@ disposal assertions.
 
 ### Milestone 3 — store, Canvas, loop, and hooks (2–3 engineer-weeks)
 
+Status: implemented. The technical-preview surface now includes the callable
+vanilla store, serialized promise-returning root configuration, pending
+configuration teardown, package-owned universal store provider, measured DOM
+Canvas boundary, shared frame scheduler, public hooks/graph helpers, and the
+deterministic testing harness. Dedicated client-only Vite, Rsbuild, raw Rspack,
+and Chromium evidence closes the milestone without claiming the full Canvas
+SSR/hydration lifecycle reserved for Milestone 7.
+
+The upstream `useStore()(selector)` compatibility form remains order-based:
+the compiler cannot assign lexical slots to calls through arbitrary dynamic
+function values. Octane scene code should use the compiler-visible
+`useStore(selector, equality?)` extension or `useThree(selector, equality?)`
+when relying on conditional-hook semantics. Fully slotting arbitrary returned
+hook functions would require a separate compiler/dataflow contract.
+
 - Root store/configuration, scene/camera/raycaster/renderer, resize/DPR/
   viewport, color/shadows, Canvas boundary, cleanup, frame loop, global effects,
   `useStore`, `useThree`, `useFrame`, `useGraph`, and basic testing helper.
