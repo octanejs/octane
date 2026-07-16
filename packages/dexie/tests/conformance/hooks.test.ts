@@ -114,4 +114,52 @@ describe('@octanejs/dexie hooks', () => {
 			dexieWithProvider.DexieYProvider = previous;
 		}
 	});
+
+	it('reports a clear error when the optional provider is unavailable', () => {
+		const dexieWithProvider = Dexie as typeof Dexie & { DexieYProvider?: unknown };
+		const previous = dexieWithProvider.DexieYProvider;
+		delete dexieWithProvider.DexieYProvider;
+		try {
+			expect(() => mount(DocumentReader, { doc: { id: 'missing-provider' } })).toThrow(
+				/DexieYProvider is not available/,
+			);
+		} finally {
+			dexieWithProvider.DexieYProvider = previous;
+		}
+	});
+
+	it('releases a document when the hook receives null', () => {
+		const docs = new Map<object, { doc: object }>();
+		const released: object[] = [];
+		const provider = {
+			load(doc: object) {
+				const value = { doc };
+				docs.set(doc, value);
+				return value;
+			},
+			for(doc: object) {
+				return docs.get(doc);
+			},
+			release(doc: object) {
+				released.push(doc);
+				docs.delete(doc);
+			},
+		};
+		const dexieWithProvider = Dexie as typeof Dexie & { DexieYProvider?: typeof provider };
+		const previous = dexieWithProvider.DexieYProvider;
+		dexieWithProvider.DexieYProvider = provider;
+		try {
+			const doc = { id: 'clear-me' };
+			const result = mount(DocumentReader, { doc });
+			flushEffects();
+			result.update(DocumentReader, { doc: null });
+			flushEffects();
+			expect(result.find('#document').textContent).toBe('');
+			expect(released).toEqual([doc]);
+			result.unmount();
+			flushEffects();
+		} finally {
+			dexieWithProvider.DexieYProvider = previous;
+		}
+	});
 });

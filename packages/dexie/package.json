@@ -48,7 +48,9 @@
   "devDependencies": {
     "@tsrx/react": "catalog:default",
     "dexie": "catalog:default",
+    "dexie-react-hooks": "4.4.0",
     "esbuild": "catalog:default",
+    "fake-indexeddb": "catalog:default",
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-dom": "catalog:default",

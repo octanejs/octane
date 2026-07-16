@@ -9,6 +9,6 @@
     "Hook call-site slots are forwarded through Octane's compiler binding ABI.",
     "useDocument requires consumers to install and import y-dexie and yjs before using the hook; those integrations remain optional."
   ],
-  "ssr": "Dexie's core exports are available during SSR; live-query subscriptions are client-side and server rendering returns the configured default for non-suspending hooks. Dedicated SSR and hydration tests are not yet included.",
+  "ssr": "Supported for non-suspending live queries: SSR returns the configured default without opening IndexedDB, and hydration adopts the server host before replacing the default with live data. Suspending live queries remain client-oriented and do not claim server data loading.",
   "verified": "2026-07-16"
 }

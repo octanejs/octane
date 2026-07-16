@@ -42,6 +42,13 @@ inside a live query, follow Dexie's guidance and wrap the returned promise with
 before calling the hook. Those packages are intentionally not dependencies of
 `@octanejs/dexie`.
 
+## SSR and hydration
+
+Non-suspending live queries are SSR-safe: the configured default result renders
+without opening IndexedDB, and the client hydrates the existing host before
+replacing that default with live data. Suspending live queries are intended for
+client-side Suspense boundaries and do not load IndexedDB data during SSR.
+
 ## Status
 
 Current scope, known divergences, and verification status are tracked in the
