@@ -229,6 +229,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *   hmr?: boolean,
  *   profile?: boolean,
  *   parallelUse?: boolean,
+ *   autoMemo?: boolean,
  *   exclude?: string[],
  *   clientEnvironment?: string,
  *   serverEnvironment?: string,
@@ -504,6 +505,7 @@ export function pluginOctane(inlineOptions = {}) {
 						...(inlineOptions.parallelUse === undefined
 							? null
 							: { parallelUse: inlineOptions.parallelUse }),
+						...(inlineOptions.autoMemo === undefined ? null : { autoMemo: inlineOptions.autoMemo }),
 						...(inlineOptions.exclude === undefined ? null : { exclude: inlineOptions.exclude }),
 						renderers: initialConfig?.compiler.renderers,
 					}),

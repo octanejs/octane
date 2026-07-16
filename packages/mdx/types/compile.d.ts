@@ -17,6 +17,8 @@ export interface CompileMdxOptions {
 	dev?: boolean;
 	/** octane compiler profiling metadata (client only). */
 	profile?: boolean;
+	/** Enable compiler-inferred component/calculation-region memoization in production. Default `true`. */
+	autoMemo?: boolean;
 	/**
 	 * Module the emitted document reads the provider mapping from
 	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /

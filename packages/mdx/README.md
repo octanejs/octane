@@ -44,8 +44,9 @@ hazards. SSR target selection matches the octane plugin: per-module
 auto-detection, `ssr: true|false` to force.
 
 Options: `md: false` (leave `.md` alone), `providerImportSource: null` (disable
-the provider wiring), `remarkPlugins` / `rehypePlugins` / `recmaPlugins`,
-`format`, `mdxOptions` (escape hatch). The default remark set is
+the provider wiring), `autoMemo: false` (disable production component/calculation
+memoization), `remarkPlugins` / `rehypePlugins` / `recmaPlugins`, `format`,
+`mdxOptions` (escape hatch). The default remark set is
 `defaultRemarkPlugins` = GFM + frontmatter + `export const frontmatter`.
 
 ## Usage

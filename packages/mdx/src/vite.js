@@ -37,6 +37,8 @@ import { createOctaneCompiler } from 'octane/compiler/bundler';
  * `hmr` is the octane HMR/dev metadata override; defaults to on in serve mode
  * (client only).
  * `profile` enables profiling metadata in client modules only.
+ * `autoMemo` enables compiler-inferred component/calculation-region memoization in
+ * production client modules and defaults to `true`.
  */
 
 /**

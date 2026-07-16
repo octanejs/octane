@@ -101,6 +101,7 @@ export function octane(options = {}) {
 		exclude: options.exclude,
 		profile: profileEnabled,
 		parallelUse: options.parallelUse,
+		autoMemo: options.autoMemo,
 		renderers: options.renderers,
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
@@ -113,6 +114,7 @@ export function octane(options = {}) {
 			exclude: options.exclude,
 			profile: profileEnabled,
 			parallelUse: options.parallelUse,
+			autoMemo: options.autoMemo,
 			renderers: options.renderers,
 		});
 	};
@@ -174,6 +176,11 @@ export function octane(options = {}) {
 					dev: !server && !!hmrEnabled,
 					profile: !server && profileEnabled,
 					parallelUse: options.parallelUse,
+					// autoMemo is a production-safe local transform, not a graph-wide root
+					// specialization. An explicit `hmr: false` serve (notably the
+					// octane-prod Vitest project) must exercise the same default-on output as
+					// a build; normal dev keeps HMR on and the compiler declines it.
+					autoMemo: !server && !hmrEnabled && !profileEnabled && options.autoMemo !== false,
 					collectVoidComponentExports:
 						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
 					...(proven?.size

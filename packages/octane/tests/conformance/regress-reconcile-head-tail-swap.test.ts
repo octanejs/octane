@@ -61,12 +61,14 @@ describe('regression — reconcileKeyed head/tail swap on multi-node Blocks', ()
 
 		// Action 1: swap a=5,b=4 → [1,2,3,4,6,5]
 		[items[5], items[4]] = [items[4], items[5]];
+		items = items.slice();
 		r.update(FuzzListNested, { items });
 		expect(keys(r.container as HTMLElement)).toEqual(['1', '2', '3', '4', '6', '5']);
 
 		// Action 2: reverse-slice lo=2,hi=6 → reverse [3,4,6,5] → [5,6,4,3]
 		const slice = items.slice(2, 6).reverse();
 		items.splice(2, 4, ...slice);
+		items = items.slice();
 		r.update(FuzzListNested, { items });
 		expect(keys(r.container as HTMLElement)).toEqual(['1', '2', '5', '6', '4', '3']);
 
@@ -86,6 +88,7 @@ describe('regression — reconcileKeyed head/tail swap on multi-node Blocks', ()
 		// head=5 to be re-mounted as a fresh block instead of recognised as
 		// the surviving block(5).
 		[items[2], items[0]] = [items[0], items[2]];
+		items = items.slice();
 		r.update(FuzzListNested, { items });
 		expect(keys(r.container as HTMLElement)).toEqual(['5', '3', '2']);
 		r.unmount();

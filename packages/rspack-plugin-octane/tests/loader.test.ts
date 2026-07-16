@@ -85,6 +85,7 @@ describe('octane Rspack loader', () => {
 		const output = runLoader({
 			hot: true,
 			options: {
+				autoMemo: false,
 				renderers: {
 					registry: { object: '/src/object-renderer.js' },
 					boundaries: {
@@ -105,6 +106,7 @@ describe('octane Rspack loader', () => {
 		expect(mocks.createOctaneCompiler).toHaveBeenCalledWith(
 			expect.objectContaining({
 				root: '/project',
+				autoMemo: false,
 				renderers: expect.objectContaining({
 					registry: expect.objectContaining({
 						object: { module: '/src/object-renderer.js', target: 'universal' },
@@ -124,7 +126,12 @@ describe('octane Rspack loader', () => {
 		expect(mocks.transform).toHaveBeenCalledWith(
 			'export function App() @{ <div /> }',
 			'/project/src/App.tsrx?cache=1',
-			expect.objectContaining({ environment: 'client', hmr: 'webpack', dev: true }),
+			expect.objectContaining({
+				environment: 'client',
+				hmr: 'webpack',
+				dev: true,
+				autoMemo: false,
+			}),
 		);
 		expect(output.dependencies).toEqual(['/project/package.json', '/project/src/package.json']);
 		expect(output.missingDependencies).toEqual(['/project/src/missing/package.json']);

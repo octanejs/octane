@@ -81,6 +81,7 @@ describe('declarative options', () => {
 	it.each([
 		[{ environment: 'worker' }, /environment/],
 		[{ hmr: 'webpack' }, /hmr/],
+		[{ autoMemo: 'yes' }, /autoMemo/],
 		[{ exclude: 'vendor' }, /exclude/],
 		[{ renderers: { default: 'missing' } }, /default references unknown renderer/],
 		[{ transform: () => {} }, /unknown option/],

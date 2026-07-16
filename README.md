@@ -170,6 +170,17 @@ Normal production builds omit the compiler metadata and tree-shake the recorder
 unless application code imports `octane/profiling` directly. See the
 [profiling guide](https://octanejs.dev/docs/profiling).
 
+Production client compilation automatically caches conservative same-module
+pure component regions and render-used imported calculations by inferred
+lexical dependencies, using React-Compiler-style strict-identity snapshots and
+the normal context-aware Block/keyed-list machinery. Pass `autoMemo: false` to
+the compiler integration to opt out. HMR, dev, profiling, and server builds use
+normal reconciliation; effects, refs, mutable ambient reads, custom
+comparators, and Suspense/transition boundaries also fall back. This first
+phase targets compiled TSRX component positions, including return-JSX
+components, plus immutable-snapshot helper/list output. Per-key descriptor
+reuse remains a future phase.
+
 ### Mount
 
 ```ts

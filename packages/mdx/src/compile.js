@@ -58,6 +58,7 @@ import { SourceMapGenerator } from 'source-map';
  * @property {boolean} [hmr] octane compiler HMR wrapping (client only; the vite plugin wires this to serve mode).
  * @property {boolean} [dev] octane compiler dev metadata (client only; same gate as `hmr`).
  * @property {boolean} [profile] octane compiler profiling metadata (client only).
+ * @property {boolean} [autoMemo] compiler-inferred component/calculation-region memoization in production. Default `true`.
  * @property {string | null} [providerImportSource]
  *   Module the emitted document reads the provider mapping from
  *   (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
@@ -154,6 +155,7 @@ function octaneStage(jsxSource, mdxMap, id, options) {
 		hmr: mode === 'client' && !!options.hmr,
 		dev: mode === 'client' && !!options.dev,
 		profile: mode === 'client' && !!options.profile,
+		...(options.autoMemo === undefined ? null : { autoMemo: options.autoMemo }),
 	});
 	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
 	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.

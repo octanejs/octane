@@ -1190,6 +1190,527 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 	return modified ? { ...stmt, declarations: newDecls } : stmt;
 }
 
+function allocAutoMemoCell(ctx, dependencyCount, storesValue = false) {
+	const base = ctx.currentAutoMemoOffset || 0;
+	const init = base + dependencyCount;
+	const value = storesValue ? init + 1 : null;
+	ctx.currentAutoMemoOffset = init + 1 + (storesValue ? 1 : 0);
+	return { base, init, value };
+}
+
+function ensureAutoMemoValueValidator(ctx) {
+	if (ctx.autoMemoValueValidator !== null) return ctx.autoMemoValueValidator;
+	const validator = `_memoValueSafe$${ctx.nextHelperId++}`;
+	const propsValidator = `_memoPropsSafe$${ctx.nextHelperId++}`;
+	const safe = `_memoSafe$${ctx.nextHelperId++}`;
+	const element = `_memoElement$${ctx.nextHelperId++}`;
+	ctx.hoistedHelpers.push(
+		`const ${safe} = new WeakSet();\n` +
+			`const ${element} = Symbol.for('octane.element');\n` +
+			`function ${propsValidator}(value, seen, trustedProps) {\n` +
+			`  try {\n` +
+			`  if (value == null) return true;\n` +
+			`  const kind = typeof value;\n` +
+			`  if (kind !== 'object') return true;\n` +
+			`  if (value.$$kind === ${element}) return ${validator}(value, seen);\n` +
+			`  if (seen.has(value)) return false;\n` +
+			`  seen.add(value);\n` +
+			`  let valid = true;\n` +
+			`  if (Array.isArray(value)) {\n` +
+			`    for (let i = 0; i < value.length; i++) { if (!${propsValidator}(value[i], seen, false)) { valid = false; break; } }\n` +
+			`  } else if (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null) {\n` +
+			`    if (trustedProps) {\n` +
+			`      for (const key in value) {\n` +
+			`        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;\n` +
+			`        const child = value[key];\n` +
+			`        if (key === 'current' || (child !== null && typeof child === 'object' && !${propsValidator}(child, seen, false))) { valid = false; break; }\n` +
+			`      }\n` +
+			`    } else {\n` +
+			`      for (const key of Object.keys(value)) {\n` +
+			`        const descriptor = Object.getOwnPropertyDescriptor(value, key);\n` +
+			`        if (key === 'current' || descriptor == null || descriptor.get !== undefined || descriptor.set !== undefined || !${propsValidator}(descriptor.value, seen, false)) { valid = false; break; }\n` +
+			`      }\n` +
+			`    }\n` +
+			`  } else valid = false;\n` +
+			`  seen.delete(value);\n` +
+			`  return valid;\n` +
+			`  } catch { return false; }\n` +
+			`}\n` +
+			`function ${validator}(value, seen) {\n` +
+			`  try {\n` +
+			`  if (value == null) return true;\n` +
+			`  const kind = typeof value;\n` +
+			`  if (kind !== 'object') return kind !== 'function';\n` +
+			`  if (${safe}.has(value)) return true;\n` +
+			`  if (seen === undefined) seen = new WeakSet();\n` +
+			`  if (seen.has(value)) return false;\n` +
+			`  seen.add(value);\n` +
+			`  let valid = false;\n` +
+			`  if (Array.isArray(value)) {\n` +
+			`    valid = true;\n` +
+			`    for (let i = 0; i < value.length; i++) { if (!${validator}(value[i], seen)) { valid = false; break; } }\n` +
+			`  } else if (value.$$kind === ${element} && value.ref == null) {\n` +
+			`    valid = typeof value.type === 'string'\n` +
+			`      ? ${validator}(value.children, seen)\n` +
+			`      : typeof value.type === 'function' && value.type.__memo === true && value.type.__compare === undefined && ${propsValidator}(value.props, seen, true);\n` +
+			`  }\n` +
+			`  seen.delete(value);\n` +
+			`  if (valid) ${safe}.add(value);\n` +
+			`  return valid;\n` +
+			`  } catch { return false; }\n` +
+			`}`,
+	);
+	ctx.autoMemoValueValidator = validator;
+	return validator;
+}
+
+function autoMemoCacheMember(ctx, index) {
+	return {
+		type: 'MemberExpression',
+		object: { type: 'Identifier', name: ctx.currentAutoMemoCacheName },
+		property: { type: 'Literal', value: index },
+		computed: true,
+		optional: false,
+	};
+}
+
+function autoMemoAssignment(left, right) {
+	return {
+		type: 'ExpressionStatement',
+		expression: {
+			type: 'AssignmentExpression',
+			operator: '=',
+			left,
+			right,
+		},
+	};
+}
+
+function autoMemoEnsureWritable(ctx) {
+	return {
+		type: 'IfStatement',
+		test: {
+			type: 'BinaryExpression',
+			operator: '===',
+			left: { type: 'Identifier', name: ctx.currentAutoMemoCacheName },
+			right: { type: 'Identifier', name: ctx.currentAutoMemoCommittedName },
+		},
+		consequent: {
+			type: 'ExpressionStatement',
+			expression: {
+				type: 'AssignmentExpression',
+				operator: '=',
+				left: { type: 'Identifier', name: ctx.currentAutoMemoCacheName },
+				right: {
+					type: 'CallExpression',
+					callee: {
+						type: 'MemberExpression',
+						object: { type: 'Identifier', name: ctx.currentAutoMemoCacheName },
+						property: { type: 'Identifier', name: 'slice' },
+						computed: false,
+					},
+					arguments: [],
+					optional: false,
+				},
+			},
+		},
+		alternate: null,
+	};
+}
+
+// Build the same flat dependency/value cell shape React Compiler emits, but
+// place it directly on this compiled scope instead of routing through a hook or
+// a memo-aware runtime helper. Dependency expressions are first evaluated into
+// temporaries so getters and live imported callees retain normal JS evaluation
+// order and are observed exactly once per render.
+function makeAutoMemoCalculation(call, ctx, validator) {
+	const dependencies = [call.callee, ...call.arguments];
+	const cell = allocAutoMemoCell(ctx, dependencies.length, true);
+	const depNames = dependencies.map((_, index) => allocCompilerName(ctx, `__memoDep${index}`));
+	const valueName = allocCompilerName(ctx, '__memoValue');
+	const declarations = dependencies.map((dependency, index) => ({
+		type: 'VariableDeclaration',
+		kind: 'const',
+		declarations: [
+			{
+				type: 'VariableDeclarator',
+				id: { type: 'Identifier', name: depNames[index] },
+				init: dependency,
+			},
+		],
+	}));
+	let changed = {
+		type: 'BinaryExpression',
+		operator: '!==',
+		left: autoMemoCacheMember(ctx, cell.init),
+		right: { type: 'Literal', value: true },
+	};
+	for (let index = 0; index < depNames.length; index++) {
+		changed = {
+			type: 'LogicalExpression',
+			operator: '||',
+			left: changed,
+			right: {
+				type: 'BinaryExpression',
+				operator: '!==',
+				left: autoMemoCacheMember(ctx, cell.base + index),
+				right: { type: 'Identifier', name: depNames[index] },
+			},
+		};
+	}
+	const valueDeclaration = {
+		type: 'VariableDeclaration',
+		kind: 'const',
+		declarations: [
+			{
+				type: 'VariableDeclarator',
+				id: { type: 'Identifier', name: valueName },
+				init: {
+					type: 'CallExpression',
+					callee: { type: 'Identifier', name: depNames[0] },
+					arguments: depNames.slice(1).map((name) => ({ type: 'Identifier', name })),
+					optional: false,
+				},
+			},
+		],
+	};
+	const publish = [autoMemoEnsureWritable(ctx)];
+	for (let index = 0; index < depNames.length; index++) {
+		publish.push(
+			autoMemoAssignment(autoMemoCacheMember(ctx, cell.base + index), {
+				type: 'Identifier',
+				name: depNames[index],
+			}),
+		);
+	}
+	publish.push(
+		autoMemoAssignment(autoMemoCacheMember(ctx, cell.value), {
+			type: 'Identifier',
+			name: valueName,
+		}),
+		autoMemoAssignment(autoMemoCacheMember(ctx, cell.init), {
+			type: 'Literal',
+			value: true,
+		}),
+	);
+	return {
+		type: 'CallExpression',
+		callee: {
+			type: 'ArrowFunctionExpression',
+			params: [],
+			body: {
+				type: 'BlockStatement',
+				body: [
+					...declarations,
+					{
+						type: 'IfStatement',
+						test: changed,
+						consequent: {
+							type: 'BlockStatement',
+							body: [
+								valueDeclaration,
+								{
+									type: 'IfStatement',
+									test: {
+										type: 'CallExpression',
+										callee: { type: 'Identifier', name: validator },
+										arguments: [{ type: 'Identifier', name: valueName }],
+										optional: false,
+									},
+									consequent: { type: 'BlockStatement', body: publish },
+									alternate: null,
+								},
+								{
+									type: 'ReturnStatement',
+									argument: { type: 'Identifier', name: valueName },
+								},
+							],
+						},
+						alternate: null,
+					},
+					{ type: 'ReturnStatement', argument: autoMemoCacheMember(ctx, cell.value) },
+				],
+			},
+			expression: false,
+			async: false,
+		},
+		arguments: [],
+		optional: false,
+	};
+}
+
+// React-Compiler-style render calculation caching. This first calculation
+// shape is intentionally narrow: a top-level const, consumed by the render
+// tree, whose value comes from a bare imported helper applied only to immutable
+// snapshot paths. The normal pure-render contract makes the helper a pure
+// function of those arguments; calls with dynamic receivers, refs, spreads,
+// optional chaining, zero witnessed component inputs, or hook-shaped names
+// retain their authored every-render behavior.
+//
+// The generated flat cell records the live imported function followed by its
+// already-evaluated argument snapshots, then stores the calculated value.
+function rewriteAutoMemoCalculations(statements, jsxNodes, ctx) {
+	const memoValues = new Set();
+	if (!ctx.autoMemo || !ctx.currentComponentLocals || ctx.currentAutoMemoCallsitesSafe === false) {
+		return { statements, memoValues };
+	}
+	const renderRefs = collectFreeIdentifiers(jsxNodes, []);
+	const mutableSnapshotLocals = collectAutoMemoMutableSnapshotLocals(statements);
+	let changed = false;
+	const rewritten = statements.map((stmt) => {
+		if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
+		let declarationChanged = false;
+		const declarations = stmt.declarations.map((decl) => {
+			if (decl.id?.type !== 'Identifier' || !renderRefs.has(decl.id.name)) return decl;
+			const call = unwrapTsExpr(decl.init);
+			if (
+				call?.type !== 'CallExpression' ||
+				call.optional ||
+				call.callee?.type !== 'Identifier' ||
+				!ctx.importedNames.has(call.callee.name) ||
+				ctx.currentComponentLocals.has(call.callee.name) ||
+				ctx.octaneImportLocals?.has(call.callee.name) ||
+				HOOK_NAMES.has(call.callee.name) ||
+				call.callee.name === 'use' ||
+				call.callee.name === 'useContext' ||
+				/^use[A-Z]/.test(call.callee.name) ||
+				call.arguments.length === 0 ||
+				!call.arguments.every(isAutoMemoCalculationDependency)
+			) {
+				return decl;
+			}
+			// Hide this declaration's binding momentarily: any remaining free use in
+			// setup means the result escaped into an effect/unknown call/calculation,
+			// where changing call frequency would be observable.
+			const resultName = decl.id.name;
+			decl.id.name = '';
+			let setupEscape;
+			try {
+				setupEscape = collectFreeIdentifiers(statements, []).has(resultName);
+			} finally {
+				decl.id.name = resultName;
+			}
+			if (setupEscape) return decl;
+			let witnessedComponentInput = false;
+			let invalidRoot = false;
+			for (const arg of call.arguments) {
+				for (const name of collectFreeIdentifiers(arg, [])) {
+					if (
+						(!ctx.currentComponentLocals.has(name) && !ctx.importedNames.has(name)) ||
+						mutableSnapshotLocals.has(name)
+					) {
+						invalidRoot = true;
+						break;
+					}
+					if (ctx.currentComponentLocals.has(name)) {
+						witnessedComponentInput = true;
+					}
+				}
+				if (invalidRoot) break;
+			}
+			if (invalidRoot || !witnessedComponentInput) return decl;
+
+			declarationChanged = true;
+			changed = true;
+			memoValues.add(decl.id.name);
+			const validator = ensureAutoMemoValueValidator(ctx);
+			return {
+				...decl,
+				init: makeAutoMemoCalculation(call, ctx, validator),
+			};
+		});
+		return declarationChanged ? { ...stmt, declarations } : stmt;
+	});
+	return { statements: changed ? rewritten : statements, memoValues };
+}
+
+function collectAutoMemoMutableSnapshotLocals(statements) {
+	const unsafe = new Set();
+	const tupleGetters = new Set();
+	const addUnsafeBindings = (pattern) => {
+		const bindings = new Set();
+		collectBindings(pattern, bindings);
+		let added = false;
+		for (const name of bindings) {
+			if (!unsafe.has(name)) {
+				unsafe.add(name);
+				added = true;
+			}
+		}
+		return added;
+	};
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const stmt of statements) {
+			if (stmt.type === 'FunctionDeclaration' && stmt.id && !unsafe.has(stmt.id.name)) {
+				unsafe.add(stmt.id.name);
+				changed = true;
+				continue;
+			}
+			if (stmt.type !== 'VariableDeclaration') continue;
+			if (stmt.kind !== 'const') {
+				// A dependency snapshot can only witness the binding's current value;
+				// later setup assignments are not represented in the generated tuple.
+				// Keep the first pass simple and reject every mutable local binding.
+				for (const decl of stmt.declarations || []) {
+					if (addUnsafeBindings(decl.id)) changed = true;
+				}
+			}
+			for (const decl of stmt.declarations || []) {
+				const init = unwrapTsExpr(decl.init);
+				if (!init) continue;
+				if (init.type === 'CallExpression') {
+					const hook =
+						stableHookCallName(init) ??
+						(init.callee?.type === 'Identifier' && init.callee._octaneGenerated === true
+							? init.callee.name
+							: null);
+					const hookLikeName =
+						init.callee?.type === 'Identifier'
+							? init.callee.name
+							: init.callee?.type === 'MemberExpression' &&
+								  !init.callee.computed &&
+								  init.callee.property?.type === 'Identifier'
+								? init.callee.property.name
+								: null;
+					if (hook === null && hookLikeName !== null && /^use[A-Z]/.test(hookLikeName)) {
+						// An unknown/custom hook can return a stable carrier for mutable state
+						// (notably Octane's current-state getter). Its identity is not a complete
+						// dependency witness, so conservatively taint every produced binding.
+						if (addUnsafeBindings(decl.id)) changed = true;
+					}
+					if (hook === 'useRef') {
+						if (addUnsafeBindings(decl.id)) changed = true;
+					}
+					if (hook === 'useCallback' || hook === 'useEffectEvent') {
+						if (addUnsafeBindings(decl.id)) changed = true;
+					}
+					if (hook === 'useState' || hook === 'useReducer') {
+						if (decl.id.type === 'Identifier') {
+							if (!tupleGetters.has(decl.id.name)) {
+								tupleGetters.add(decl.id.name);
+								changed = true;
+							}
+							if (!unsafe.has(decl.id.name)) {
+								unsafe.add(decl.id.name);
+								changed = true;
+							}
+						}
+						if (decl.id.type === 'ArrayPattern') {
+							for (let i = 0; i < (decl.id.elements?.length ?? 0); i++) {
+								const element = decl.id.elements[i];
+								// Only the plain first state snapshot is a reactive value whose
+								// identity can safely witness this render. Setters/getters, rest,
+								// defaults, and nested patterns are stable carriers or executable.
+								if (i === 0 && (element === null || element?.type === 'Identifier')) continue;
+								if (addUnsafeBindings(element)) changed = true;
+							}
+						} else if (decl.id.type !== 'Identifier') {
+							if (addUnsafeBindings(decl.id)) changed = true;
+						}
+					}
+					if (hook !== 'useState' && hook !== 'useReducer') {
+						// Unknown calls, custom hooks, and hooks returning functions/refs can
+						// hide mutable state behind a stable result identity. The imported helper
+						// being transformed is still admitted under the pure-render contract, but
+						// its result cannot become an inferred dependency of another calculation.
+						if (addUnsafeBindings(decl.id)) changed = true;
+					}
+				} else if (decl.id.type !== 'Identifier' || !isAutoMemoCalculationDependency(init)) {
+					// Only immutable identifier/member snapshot aliases enter the dependency
+					// graph. Fresh objects, arrays, classes, assignments, and other computed
+					// values either provide no reuse or require a deeper purity proof.
+					if (addUnsafeBindings(decl.id)) changed = true;
+				}
+				if (decl.id.type !== 'Identifier') {
+					if (
+						decl.id.type === 'ArrayPattern' &&
+						init.type === 'Identifier' &&
+						tupleGetters.has(init.name)
+					) {
+						const getter = decl.id.elements?.[2];
+						if (getter?.type === 'Identifier' && !unsafe.has(getter.name)) {
+							unsafe.add(getter.name);
+							changed = true;
+						}
+					}
+					const initRefs = collectFreeIdentifiers(init, []);
+					if ([...initRefs].some((name) => unsafe.has(name))) {
+						if (addUnsafeBindings(decl.id)) changed = true;
+					}
+					continue;
+				}
+				if (
+					(init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression') &&
+					!unsafe.has(decl.id.name)
+				) {
+					unsafe.add(decl.id.name);
+					changed = true;
+				}
+				if (
+					init.type === 'Identifier' &&
+					tupleGetters.has(init.name) &&
+					!tupleGetters.has(decl.id.name)
+				) {
+					tupleGetters.add(decl.id.name);
+					changed = true;
+				}
+				if (init.type === 'Identifier' && unsafe.has(init.name) && !unsafe.has(decl.id.name)) {
+					unsafe.add(decl.id.name);
+					changed = true;
+				} else if (
+					init.type === 'MemberExpression' &&
+					init.object?.type === 'Identifier' &&
+					unsafe.has(init.object.name) &&
+					!unsafe.has(decl.id.name)
+				) {
+					unsafe.add(decl.id.name);
+					changed = true;
+				} else if (
+					init.type === 'MemberExpression' &&
+					init.computed &&
+					init.object?.type === 'Identifier' &&
+					tupleGetters.has(init.object.name) &&
+					init.property?.type === 'Literal' &&
+					(init.property.value === 2 || init.property.value === '2') &&
+					!unsafe.has(decl.id.name)
+				) {
+					unsafe.add(decl.id.name);
+					changed = true;
+				}
+				// Treat every value derived from a mutable hook/ref/callback carrier as
+				// mutable too. Besides plain aliases this covers tuple.at(2), object
+				// destructuring, and spread/member forms without trying to prove the
+				// semantics of each JavaScript operation independently.
+				const initRefs = collectFreeIdentifiers(init, []);
+				if ([...initRefs].some((name) => unsafe.has(name)) && !unsafe.has(decl.id.name)) {
+					unsafe.add(decl.id.name);
+					changed = true;
+				}
+			}
+		}
+	}
+	return unsafe;
+}
+
+function isAutoMemoCalculationDependency(node) {
+	node = unwrapTsExpr(node);
+	if (!node || node.type === 'SpreadElement') return false;
+	if (node.type === 'Identifier') return true;
+	if (isInvariantLiteral(node)) return true;
+	if (
+		node.type === 'MemberExpression' &&
+		!node.optional &&
+		!node.computed &&
+		node.property?.type === 'Identifier' &&
+		node.property.name !== 'current'
+	) {
+		return isAutoMemoCalculationDependency(node.object);
+	}
+	return false;
+}
+
 // Compiler-owned callbacks that only ever feed lifetime-stable native event
 // slots do not need a hook at all: the DOM slot is written only on mount, so the
 // closure can be created in that same mount branch. This analysis deliberately
@@ -1429,6 +1950,27 @@ function collectFreeIdentifiers(root, initiallyBound) {
 		if (seen.has(n)) return;
 		seen.add(n);
 
+		// TypeScript annotations are erased and cannot be reactive dependencies.
+		// Preserve only wrappers whose `.expression` is runtime JavaScript.
+		if (
+			t === 'TSAsExpression' ||
+			t === 'TSTypeAssertion' ||
+			t === 'TSSatisfiesExpression' ||
+			t === 'TSNonNullExpression' ||
+			t === 'TSInstantiationExpression'
+		) {
+			walk(n.expression, scope);
+			return;
+		}
+		// `module server {}` is represented with TypeScript's namespace container
+		// nodes even though its body is runtime code. Isolation validation depends on
+		// seeing those references; only the container name itself is non-reactive.
+		if (t === 'TSModuleDeclaration' || t === 'TSModuleBlock') {
+			walk(n.body, scope);
+			return;
+		}
+		if (t.startsWith('TS')) return;
+
 		if (t === 'Identifier') {
 			if (!scope.has(n.name)) free.add(n.name);
 			return;
@@ -1545,6 +2087,22 @@ function collectFreeIdentifiers(root, initiallyBound) {
 			walk(n.body, newScope);
 			return;
 		}
+		// New TSRX template for-expression. Its item/index bindings are visible to
+		// the key and body, but not to the iterable or @empty arm.
+		if (t === 'JSXForExpression') {
+			const newScope = new Set(scope);
+			if (n.left?.type === 'VariableDeclaration') {
+				for (const d of n.left.declarations || []) collectBindings(d.id, newScope);
+			} else if (n.left) {
+				collectBindings(n.left, newScope);
+			}
+			if (n.index) collectBindings(n.index, newScope);
+			walk(n.right, scope);
+			walk(n.key, newScope);
+			walk(n.body, newScope);
+			walk(n.empty, scope);
+			return;
+		}
 
 		// Default: walk all child fields.
 		for (const key in n) {
@@ -1620,6 +2178,130 @@ function containsComponentCallOrControlFlow(stmts) {
 }
 
 /**
+ * Classify the narrow opaque shape that an automatically memoized keyed item
+ * may safely contain: ordinary JSX component calls, but no template control
+ * flow or portals. Imported callees are validated at runtime on the first
+ * render (only default memo boundaries remain reusable); same-module compiler
+ * boundaries carry their own proof. Keeping this separate from the established
+ * PURE/DEP-PURE predicate leaves its host-only contract unchanged.
+ */
+function hasOnlyComponentItemBoundaries(stmts) {
+	let hasComponent = false;
+	let disallowed = false;
+	const seen = new WeakSet();
+	function walk(n) {
+		if (disallowed || !n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n !== 'object') return;
+		const t = n.type;
+		if (!t || seen.has(n)) return;
+		seen.add(n);
+		if ((t === 'Element' || t === 'JSXElement') && isComponentTag(n)) {
+			hasComponent = true;
+		}
+		if (
+			t === 'IfStatement' ||
+			t === 'ForOfStatement' ||
+			t === 'TryStatement' ||
+			t === 'SwitchStatement' ||
+			t === 'JSXIfExpression' ||
+			t === 'JSXForExpression' ||
+			t === 'JSXTryExpression' ||
+			t === 'JSXSwitchExpression'
+		) {
+			disallowed = true;
+			return;
+		}
+		if (t === 'TSRXExpression' && n.expression && isCreatePortalCall(n.expression)) {
+			disallowed = true;
+			return;
+		}
+		if (t === 'JSXExpressionContainer' && n.expression && isCreatePortalCall(n.expression)) {
+			disallowed = true;
+			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	for (const s of stmts) walk(s);
+	return hasComponent && !disallowed;
+}
+
+function collectImportedComponentReferences(root, importedNames) {
+	const components = new Set();
+	const seen = new WeakSet();
+	function walk(node) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
+			const tag = node.openingElement?.name || node.id || node.name;
+			if (
+				(tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') &&
+				importedNames.has(tag.name)
+			) {
+				components.add(tag.name);
+			}
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
+	walk(root);
+	return components;
+}
+
+function containsAutoMemoContextRead(root, ctx) {
+	let found = false;
+	const seen = new WeakSet();
+	function walk(node) {
+		if (found || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'ArrowFunctionExpression' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration'
+		) {
+			return;
+		}
+		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
+			const name = node._octaneImportedHook ?? ctx.octaneImportLocals?.get(node.callee.name);
+			if (
+				name === 'useContext' ||
+				name === 'use' ||
+				(name === undefined &&
+					node._octaneUnboundCallee === true &&
+					(node.callee.name === 'useContext' || node.callee.name === 'use'))
+			) {
+				found = true;
+				return;
+			}
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
+	walk(root);
+	return found;
+}
+
+/**
  * True when the keyed-item body executes any call DURING render:
  * CallExpression / NewExpression / TaggedTemplateExpression in render-value
  * position (holes, attribute values, locals). Such a call can read mutable
@@ -1657,6 +2339,207 @@ function containsRenderCall(stmts) {
 		if (t === 'CallExpression' || t === 'NewExpression' || t === 'TaggedTemplateExpression') {
 			found = true;
 			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	for (const s of stmts) walk(s);
+	return found;
+}
+
+// Conservative semantic boundary for compiler-owned component-region memoization.
+// The cached region assumes React Compiler's pure-render / immutable-snapshot
+// contract, but still fails closed for constructs whose commit or retry behavior
+// needs a dedicated proof. Calls are checked separately by containsRenderCall.
+function isRefCurrentMember(n) {
+	if (n?.type !== 'MemberExpression') return false;
+	return !n.computed
+		? n.property?.type === 'Identifier' && n.property.name === 'current'
+		: (n.property?.type === 'Literal' && n.property.value === 'current') ||
+				(n.property?.type === 'TemplateLiteral' &&
+					n.property.expressions?.length === 0 &&
+					n.property.quasis?.[0]?.value?.cooked === 'current');
+}
+
+function containsDeferredRefRead(root) {
+	let found = false;
+	const seen = new WeakSet();
+	function walk(n) {
+		if (found || !n) return;
+		if (Array.isArray(n)) {
+			for (const item of n) walk(item);
+			return;
+		}
+		if (typeof n !== 'object' || seen.has(n)) return;
+		seen.add(n);
+		if (n.type === 'MemberExpression' && (n.computed || isRefCurrentMember(n))) {
+			// Without type information, an arbitrary computed access may be a disguised
+			// ref read (`ref[key]`, where key is "current"). Decline rather than cache a
+			// mutable value behind a stable object identity.
+			found = true;
+			return;
+		}
+		if (
+			n.type === 'ObjectPattern' &&
+			(n.properties || []).some(
+				(property) =>
+					property.computed ||
+					property.key?.name === 'current' ||
+					property.key?.value === 'current',
+			)
+		) {
+			found = true;
+			return;
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	walk(root);
+	return found;
+}
+
+function containsImportedMemberRead(root, importedNames, includeJsx = true) {
+	let found = false;
+	const seen = new WeakSet();
+	function walk(n) {
+		if (found || !n) return;
+		if (Array.isArray(n)) {
+			for (const item of n) walk(item);
+			return;
+		}
+		if (typeof n !== 'object' || seen.has(n)) return;
+		seen.add(n);
+		if (n.type === 'MemberExpression' || (includeJsx && n.type === 'JSXMemberExpression')) {
+			let object = n;
+			while (object?.type === 'MemberExpression' || object?.type === 'JSXMemberExpression') {
+				object = object.object;
+			}
+			if (object?.type === 'Identifier' && importedNames.has(object.name)) {
+				found = true;
+				return;
+			}
+		}
+		for (const key in n) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(n[key]);
+		}
+	}
+	walk(root);
+	return found;
+}
+
+function containsAutoMemoUnsafeStructure(stmts) {
+	let found = false;
+	const seen = new WeakSet();
+	function walk(n) {
+		if (found || !n) return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n !== 'object' || !n.type || seen.has(n)) return;
+		seen.add(n);
+		const t = n.type;
+		// Function values are deferred. Their captures are still collected by the
+		// dependency walker, but calls/mutations inside them happen after render.
+		if (
+			t === 'ArrowFunctionExpression' ||
+			t === 'FunctionExpression' ||
+			t === 'FunctionDeclaration'
+		) {
+			// A callback passed to a component may be invoked synchronously during
+			// that child's render. Keep mutable ref reads opaque even though ordinary
+			// event-handler calls/mutations remain deferred.
+			if (containsDeferredRefRead(n)) found = true;
+			return;
+		}
+		if (
+			t === 'AssignmentExpression' ||
+			t === 'AssignmentPattern' ||
+			t === 'UpdateExpression' ||
+			t === 'ImportExpression' ||
+			t === 'AwaitExpression' ||
+			t === 'YieldExpression' ||
+			t === 'ThrowStatement' ||
+			t === 'TryStatement' ||
+			t === 'JSXTryExpression' ||
+			t === 'SpreadAttribute' ||
+			t === 'JSXSpreadAttribute'
+		) {
+			found = true;
+			return;
+		}
+		if (t === 'UnaryExpression' && n.operator === 'delete') {
+			found = true;
+			return;
+		}
+		if (
+			(t === 'Property' ||
+				t === 'ObjectMethod' ||
+				t === 'MethodDefinition' ||
+				t === 'ClassMethod') &&
+			(n.kind === 'get' || n.kind === 'set' || n.method === true)
+		) {
+			// Accessors execute on a later property read, and object/class methods can
+			// execute through implicit coercion. Their skipped function bodies would
+			// otherwise hide mutable reads from this conservative proof.
+			found = true;
+			return;
+		}
+		if (t === 'MemberExpression') {
+			if (n.computed || isRefCurrentMember(n)) {
+				// Ref contents are mutable outside render; ref identity is not a complete
+				// dependency witness. Any computed access may alias `ref.current` when the
+				// property name is only known at runtime.
+				found = true;
+				return;
+			}
+		}
+		if (
+			t === 'ObjectPattern' &&
+			(n.properties || []).some(
+				(property) =>
+					property.computed ||
+					property.key?.name === 'current' ||
+					property.key?.value === 'current',
+			)
+		) {
+			// Computed binding keys execute arbitrary reads, while ref contents are
+			// mutable outside render; neither has a complete dependency witness here.
+			found = true;
+			return;
+		}
+		if (t === 'Attribute' || t === 'JSXAttribute') {
+			const name = n.name?.name || n.name;
+			if (name === 'ref') {
+				found = true;
+				return;
+			}
+		}
+		if (t === 'Element' || t === 'JSXElement') {
+			const tag = n.openingElement?.name || n.id;
+			if (
+				tag?.type === 'JSXExpressionContainer' ||
+				tag?.type === 'MemberExpression' ||
+				tag?.type === 'JSXMemberExpression'
+			) {
+				found = true;
+				return;
+			}
+			const name = tag?.name;
+			if (
+				name === 'Suspense' ||
+				name === 'ErrorBoundary' ||
+				name === 'ViewTransition' ||
+				name === 'Activity'
+			) {
+				found = true;
+				return;
+			}
 		}
 		for (const key in n) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
@@ -2969,7 +3852,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, renderer?: { id: string, module: string, target: 'dom' | 'universal' }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' }>> }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, parallelUse?: boolean, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal' }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal' }>> }} [options] —
  *   `dev: true` emits dev-only hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`); strictly gated so production output is byte-identical.
  *   `hmr: true` (backwards-compatible shorthand for `hmr: 'vite'`) wraps each
@@ -3109,6 +3992,11 @@ export function compile(source, filename, options) {
 	// emits component/hook identity metadata but no hydration-warning expandos.
 	// Server compilation returns above, so profile metadata is client-only.
 	const profileEnabled = !!(options && options.profile);
+	// React-Compiler-style whole-component region caching. It is enabled for
+	// production client compilation unless explicitly disabled: HMR can replace
+	// component contracts in place, while dev/profiling observe every entry.
+	const autoMemoEnabled =
+		options?.autoMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
 	// parallelUse: the parallel-`use()` transform pipeline (auto-memoized
 	// creations → hoisted parallel starts → batched unwrap → __warm fetch
 	// plans; docs/suspense-parallel-use-plan.md). ON by default — pass
@@ -3124,6 +4012,7 @@ export function compile(source, filename, options) {
 		mode,
 		dev: devEnabled,
 		profile: profileEnabled,
+		autoMemo: autoMemoEnabled,
 		parallelUse: parallelUseEnabled,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
@@ -3137,6 +4026,12 @@ export function compile(source, filename, options) {
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
 		currentComponentLocals: null, // Set<string> while compiling a component body; null otherwise
+		currentAutoMemoValues: null, // memoized calculation bindings visible while planning JSX helpers
+		currentAutoMemoOffset: 0, // flat compiler-cache cell offset for the body being emitted
+		currentAutoMemoCacheName: null, // collision-free local bound to the body's cache array
+		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
+		autoMemoValueValidator: null, // module-local descriptor safety validator, emitted on demand
+		nextAutoMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
 		currentProfileComponentId: null,
@@ -3192,10 +4087,45 @@ export function compile(source, filename, options) {
 	// re-resolves per render, and a markerless slot regime must never be chosen
 	// off an identity that can change (see makeCompCall).
 	ctx.importedNames = new Set();
+	ctx.importNamespaceNames = new Set();
+	const memoImportNames = new Set();
 	for (const node of ast.body) {
 		if (node.type !== 'ImportDeclaration') continue;
+		if (node.importKind === 'type') continue;
 		for (const sp of node.specifiers || []) {
+			if (sp.importKind === 'type') continue;
 			if (sp.local && sp.local.name) ctx.importedNames.add(sp.local.name);
+			if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
+				ctx.importNamespaceNames.add(sp.local.name);
+			}
+			if (
+				node.source.value === 'octane' &&
+				(sp.imported?.name || sp.imported?.value) === 'memo' &&
+				sp.local?.name
+			) {
+				memoImportNames.add(sp.local.name);
+			}
+		}
+	}
+	// A top-level `const X = memo(Component)` is an immutable default-memo wall.
+	// A pure enclosing region may safely skip it for equal props while existing
+	// context/child scheduling remains live. Explicit comparators stay opaque.
+	ctx.defaultMemoBindings = new Set();
+	for (const statement of ast.body) {
+		const declaration =
+			statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement;
+		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			const init = item.init;
+			if (
+				item.id?.type === 'Identifier' &&
+				init?.type === 'CallExpression' &&
+				init.callee?.type === 'Identifier' &&
+				memoImportNames.has(init.callee.name) &&
+				(init.arguments?.length ?? 0) === 1
+			) {
+				ctx.defaultMemoBindings.add(item.id.name);
+			}
 		}
 	}
 	// M3 inherit-range exclusion set (see inheritSoleCompRoot).
@@ -3238,6 +4168,12 @@ export function compile(source, filename, options) {
 		if (compNode && compNode.id) {
 			ctx.componentInfo.set(compNode.id.name, {
 				eligible: false,
+				autoMemoSafe: false,
+				autoMemoCallsitesSafe: true,
+				autoMemoCaptures: [],
+				autoMemoComponentDeps: [],
+				autoMemoImportedComponents: [],
+				autoMemoMayReadContext: false,
 				node: compNode,
 				returnJsx: isReturnJsxFunction(compNode),
 				voidOutput: isVoidJsxCodeBlockFunction(compNode),
@@ -3253,6 +4189,70 @@ export function compile(source, filename, options) {
 		if (compNode.body.render) stmts.push(compNode.body.render);
 		const root = { type: 'BlockStatement', body: stmts };
 		const free = collectFreeIdentifiers(root, locals);
+		const autoMemoImportedComponents = collectImportedComponentReferences(root, ctx.importedNames);
+		let autoMemoCallsitesSafe =
+			!containsDeferredRefRead(root) && !containsImportedMemberRead(root, ctx.importedNames, false);
+		for (const name of free) {
+			if (
+				ctx._octaneBoundaryNames.has(name) ||
+				ctx.importNamespaceNames.has(name) ||
+				(!ctx.importedNames.has(name) &&
+					!ctx.defaultMemoBindings.has(name) &&
+					!ctx.componentInfo.has(name))
+			) {
+				autoMemoCallsitesSafe = false;
+				break;
+			}
+		}
+		// autoMemo's first proof is intentionally narrower than lite eligibility.
+		// It models a pure component as a function of one ordinary props snapshot;
+		// destructuring/default/rest parameters can be admitted once their evaluation
+		// is included in the shared dependency/purity analysis.
+		const ordinaryPropsParam =
+			(compNode.params?.length ?? 0) <= 1 &&
+			(compNode.params?.length !== 1 || compNode.params[0]?.type === 'Identifier');
+		let autoMemoSafe =
+			ordinaryPropsParam &&
+			!containsRenderCall(stmts) &&
+			!containsAutoMemoUnsafeStructure(stmts) &&
+			!containsImportedMemberRead(root, ctx.importedNames);
+		const autoMemoCaptures = [];
+		const autoMemoComponentDeps = [];
+		if (autoMemoSafe) {
+			for (const name of free) {
+				// Imported bindings are live, so include them in the runtime snapshot.
+				// Same-module function declarations are immutable identities. Ambient
+				// globals/module lets are not witnessed and therefore fail closed.
+				if (ctx._octaneBoundaryNames.has(name)) {
+					autoMemoSafe = false;
+					break;
+				}
+				if (ctx.importNamespaceNames.has(name)) {
+					// A namespace object's identity is stable while its exported properties
+					// remain live. `[namespace]` cannot witness `namespace.value` changing.
+					autoMemoSafe = false;
+					break;
+				} else if (ctx.importedNames.has(name)) autoMemoCaptures.push(name);
+				else if (ctx.defaultMemoBindings.has(name)) {
+					// Immutable const wrapper; its default memo contract is the wall.
+					continue;
+				} else if (ctx.componentInfo.has(name)) autoMemoComponentDeps.push(name);
+				else {
+					autoMemoSafe = false;
+					break;
+				}
+			}
+		}
+		info.autoMemoSafe = autoMemoSafe;
+		info.autoMemoCallsitesSafe = autoMemoCallsitesSafe;
+		info.autoMemoCaptures = autoMemoSafe ? autoMemoCaptures.sort() : [];
+		info.autoMemoComponentDeps = autoMemoSafe ? autoMemoComponentDeps.sort() : [];
+		info.autoMemoImportedComponents = autoMemoSafe ? [...autoMemoImportedComponents].sort() : [];
+		info.autoMemoMayReadContext =
+			autoMemoSafe &&
+			(containsAutoMemoContextRead(root, ctx) ||
+				autoMemoImportedComponents.size > 0 ||
+				[...free].some((name) => ctx.defaultMemoBindings.has(name)));
 		// Hookless check.
 		// Return-JSX functions reconcile their returned descriptor through
 		// renderBlock. componentSlotLite intentionally ignores return values, so
@@ -3340,6 +4340,58 @@ export function compile(source, filename, options) {
 		// like a single-root `@for` item. (Output-shape based — independent of which
 		// hooks it calls.)
 		info.singleRoot = singleHostComponentRoot(compNode);
+	}
+	// Purity is transitive for same-module component calls. Iterate to a fixed
+	// point so declaration order and mutually recursive pure components do not
+	// matter. Imported components remain an explicit pure-render contract; the
+	// runtime still taints known custom-comparator/Suspense/transition boundaries.
+	let autoMemoChanged = true;
+	while (autoMemoChanged) {
+		autoMemoChanged = false;
+		for (const [, info] of ctx.componentInfo) {
+			if (!info.autoMemoSafe) continue;
+			for (const name of info.autoMemoComponentDeps) {
+				if (ctx.componentInfo.get(name)?.autoMemoSafe !== true) {
+					info.autoMemoSafe = false;
+					info.autoMemoCaptures = [];
+					info.autoMemoImportedComponents = [];
+					autoMemoChanged = true;
+					break;
+				}
+			}
+		}
+	}
+	// Pull live imported captures through the safe same-module call graph. This
+	// is a second fixed point because A -> B -> C chains and pure recursion may
+	// be declared in any order.
+	let autoMemoCapturesChanged = true;
+	while (autoMemoCapturesChanged) {
+		autoMemoCapturesChanged = false;
+		for (const [, info] of ctx.componentInfo) {
+			if (!info.autoMemoSafe) continue;
+			const captures = new Set(info.autoMemoCaptures);
+			const importedComponents = new Set(info.autoMemoImportedComponents);
+			let mayReadContext = info.autoMemoMayReadContext;
+			for (const name of info.autoMemoComponentDeps) {
+				const child = ctx.componentInfo.get(name);
+				if (!child?.autoMemoSafe) continue;
+				for (const capture of child.autoMemoCaptures) captures.add(capture);
+				for (const component of child.autoMemoImportedComponents) {
+					importedComponents.add(component);
+				}
+				if (child.autoMemoMayReadContext) mayReadContext = true;
+			}
+			if (
+				captures.size !== info.autoMemoCaptures.length ||
+				importedComponents.size !== info.autoMemoImportedComponents.length ||
+				mayReadContext !== info.autoMemoMayReadContext
+			) {
+				info.autoMemoCaptures = [...captures].sort();
+				info.autoMemoImportedComponents = [...importedComponents].sort();
+				info.autoMemoMayReadContext = mayReadContext;
+				autoMemoCapturesChanged = true;
+			}
+		}
 	}
 
 	let body = emitServerModulePrelude(serverModuleInfo, ctx);
@@ -3947,6 +4999,7 @@ function ssrCompileBody(
 		}
 		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	}
+
 	const rewritten = workingStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
@@ -5094,9 +6147,11 @@ function compileComponent(node, ctx, options) {
 	// can reach it; restore on exit so sibling components don't see this one's
 	// locals.
 	const prevLocals = ctx.currentComponentLocals;
+	const prevAutoMemoCallsitesSafe = ctx.currentAutoMemoCallsitesSafe;
 	const prevKnownStr = ctx.knownStringLocals;
 	const prevProfileComponentId = ctx.currentProfileComponentId;
 	ctx.currentComponentLocals = collectComponentLocals(node);
+	ctx.currentAutoMemoCallsitesSafe = ctx.componentInfo.get(name)?.autoMemoCallsitesSafe !== false;
 	ctx.knownStringLocals = collectKnownStringLocals(node);
 	if (ctx.profile) ctx.currentProfileComponentId = profileComponentId(ctx, name, node);
 	let fn;
@@ -5111,6 +6166,7 @@ function compileComponent(node, ctx, options) {
 		});
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
+		ctx.currentAutoMemoCallsitesSafe = prevAutoMemoCallsitesSafe;
 		ctx.knownStringLocals = prevKnownStr;
 		ctx.currentProfileComponentId = prevProfileComponentId;
 	}
@@ -5156,6 +6212,15 @@ function compileComponent(node, ctx, options) {
  * resolve `{style ('cls')}` expressions to "<hash> cls" strings.
  */
 function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null, options = null) {
+	const prevAutoMemoOffset = ctx.currentAutoMemoOffset;
+	const prevAutoMemoCacheName = ctx.currentAutoMemoCacheName;
+	const prevAutoMemoCommittedName = ctx.currentAutoMemoCommittedName;
+	const autoMemoCacheName = allocCompilerName(ctx, '__memoCache');
+	const autoMemoCommittedName = allocCompilerName(ctx, '__memoCommitted');
+	const autoMemoCacheProperty = `_m$${ctx.nextAutoMemoCacheId++}`;
+	ctx.currentAutoMemoOffset = 0;
+	ctx.currentAutoMemoCacheName = autoMemoCacheName;
+	ctx.currentAutoMemoCommittedName = autoMemoCommittedName;
 	const params = node.params.map((p) => printNode(p)).join(', ');
 
 	// Body splitting. Two shapes to handle:
@@ -5237,6 +6302,21 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	}
 
+	// Cache render-used imported calculations in this body's compiler-owned flat
+	// cell. Keep this at the component-body level: directive/item helpers are
+	// distinct scopes and receive their own cells.
+	// Component-child render helpers close over their parent's calculation
+	// bindings. Carry those tags through the synthetic body, while dropping any
+	// name shadowed by this helper's own params/declarations.
+	let autoMemoValues = new Set(ctx.currentAutoMemoValues || []);
+	for (const local of collectComponentLocals(node)) autoMemoValues.delete(local);
+	for (const capture of options?.autoMemoCaptures || []) autoMemoValues.add(capture);
+	if (options?.autoCallback === true && ctx.autoMemo) {
+		const transformed = rewriteAutoMemoCalculations(workingStatements, jsxNodes, ctx);
+		workingStatements = transformed.statements;
+		for (const value of transformed.memoValues) autoMemoValues.add(value);
+	}
+
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
 	// is hoisted as a render function in inlinedSubs and replaced with an
@@ -5309,13 +6389,27 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// consumes the flag once (nested planJsx calls see it cleared).
 	const prevInheritBody = ctx._inheritBody;
 	ctx._inheritBody = !!(node.body && node.body.type === 'JSXCodeBlock');
-	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
+	const prevAutoMemoValues = ctx.currentAutoMemoValues;
+	ctx.currentAutoMemoValues = autoMemoValues;
+	let plan;
+	try {
+		plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
+	} finally {
+		ctx.currentAutoMemoValues = prevAutoMemoValues;
+	}
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	ctx._inheritBody = prevInheritBody;
 	ctx._foldedDirectiveCalls = prevFDC;
 
 	const lines = [];
+	const autoMemoSize = ctx.currentAutoMemoOffset;
+	if (autoMemoSize > 0) {
+		lines.push(
+			`  const ${autoMemoCommittedName} = __s.slots.${autoMemoCacheProperty};`,
+			`  let ${autoMemoCacheName} = ${autoMemoCommittedName} === undefined ? [] : ${autoMemoCommittedName};`,
+		);
+	}
 	// Closure-dep snapshot prologue (raw JS string). Used by impure for-of item
 	// bodies that close over parent locals but have no hooks / no component
 	// calls / no control flow — they can short-circuit when every captured
@@ -5356,6 +6450,11 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// Hoisted `<title>`/`<meta>`/`<link>` → headBlock into document.head
 	// (out-of-band; re-applied each render for reactivity, removed on unmount).
 	if (plan.head) lines.push(plan.head);
+	if (autoMemoSize > 0) {
+		lines.push(
+			`  if (${autoMemoCacheName} !== ${autoMemoCommittedName}) __s.slots.${autoMemoCacheProperty} = ${autoMemoCacheName};`,
+		);
+	}
 
 	// PROPS-FIRST convention: `(…userProps, __s, __extra)`. The scope is the 2nd arg
 	// (a placeholder leads when there are no user params), so a plain function
@@ -5367,6 +6466,9 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		// Omitting the header shifts every setup statement up by one generated line.
 		for (const mapping of setupMaps) mapping.fnRelLine--;
 	}
+	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
+	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
+	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
 	return `function ${name}(${sig}) {\n${needsBlock ? '  const __block = __s.block;\n' : ''}${bodyCode}\n}`;
 }
 
@@ -6755,10 +7857,12 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 		}
 		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
 			const localName = n.callee.name;
+			const generated = n.callee._octaneGenerated === true;
 			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
 			const profileOwner = annotatedOwner?.name || componentName;
 			const importedName = n._octaneImportedHook;
-			const shadowsImport = ctx.octaneImportLocals?.has(localName) && importedName === undefined;
+			const shadowsImport =
+				!generated && ctx.octaneImportLocals?.has(localName) && importedName === undefined;
 			const name = importedName ?? localName;
 			// Three kinds of call get a trailing per-call-site hook slot:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
@@ -6774,9 +7878,12 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			// NB: a `use*` NAME is reserved for hooks (React's convention) — a non-hook
 			// function named like one gets a harmless extra trailing argument (though
 			// inside a plain JS loop the convention is enforced: rejectHookInJsLoop).
-			const isBuiltin = !shadowsImport && HOOK_NAMES.has(name);
+			const isBuiltin = (generated || !shadowsImport) && HOOK_NAMES.has(name);
 			const isCustom =
-				importedName === undefined && /^use[A-Z]/.test(localName) && localName !== 'useContext';
+				!generated &&
+				importedName === undefined &&
+				/^use[A-Z]/.test(localName) &&
+				localName !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
 				// Keep a Symbol at custom-hook call boundaries: published bindings split
@@ -8443,6 +9550,39 @@ function stripTsOnlyWrappers(node) {
 	return node;
 }
 
+function emitAutoMemoRegion(
+	ctx,
+	dependencies,
+	slotIndex,
+	statement,
+	extraMiss = null,
+	requireSlot = slotIndex !== null,
+	publishWhen = null,
+	contextAware = slotIndex !== null,
+) {
+	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0), false);
+	const contextIndex = contextAware ? cell.base + dependencies.length : null;
+	const cache = ctx.currentAutoMemoCacheName;
+	const misses = [];
+	if (requireSlot && slotIndex !== null) misses.push(`__s.slots[${slotIndex}] === undefined`);
+	if (extraMiss !== null) misses.push(`(${extraMiss})`);
+	misses.push(`${cache}[${cell.init}] !== true`);
+	for (let index = 0; index < dependencies.length; index++) {
+		misses.push(`${cache}[${cell.base + index}] !== (${dependencies[index]})`);
+	}
+	const publish = dependencies
+		.map((dependency, index) => `${cache}[${cell.base + index}] = (${dependency});`)
+		.join(' ');
+	const writable = `if (${cache} === ${ctx.currentAutoMemoCommittedName}) ${cache} = ${cache}.slice();`;
+	const publishPrefix = publishWhen === null ? '' : `if (${publishWhen}) { `;
+	const publishSuffix = publishWhen === null ? '' : ' }';
+	if (!contextAware) {
+		return `{ if (${misses.join(' || ')}) { ${statement} ${publishPrefix}${writable} ${publish} ${cache}[${cell.init}] = true;${publishSuffix} } }`;
+	}
+	ctx.runtimeNeeded.add('compilerCacheContext');
+	return `{ if (${misses.join(' || ')}) { ${statement} ${publishPrefix}const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); ${writable} ${publish} ${cache}[${contextIndex}] = _c; ${cache}[${cell.init}] = true;${publishSuffix} } else { const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); if (_c !== ${cache}[${contextIndex}]) { ${writable} ${cache}[${contextIndex}] = _c; } } }`;
+}
+
 function planJsx(
 	jsxNodesRaw,
 	ctx,
@@ -9133,9 +10273,16 @@ function planJsx(
 		// helpers captured anything, not only for the dep-pure promotion. A deps
 		// arg forces the flags placeholder too (positional alignment).
 		const hasDeps = fc.depNames.length > 0;
-		const flagsExpr = fc.singleRootExpr
-			? `(${flags} | (${fc.singleRootExpr}.$$singleRoot === true ? 2 : 0))`
-			: String(flags || 0);
+		let flagsExpr = String(flags || 0);
+		if (fc.itemMemoFlags !== 0) {
+			const witnesses = fc.itemMemoWitnesses
+				.map((name) => `${name}.__memo === true && ${name}.__compare === undefined`)
+				.join(' && ');
+			flagsExpr = `(${flags} | ((${witnesses}) ? ${fc.itemMemoFlags} : 0))`;
+		}
+		if (fc.singleRootExpr) {
+			flagsExpr = `(${flagsExpr} | (${fc.singleRootExpr}.$$singleRoot === true ? 2 : 0))`;
+		}
 		const flagsPart =
 			flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor ? ', ' + flagsExpr : '';
 		const depsPart = hasDeps
@@ -9149,10 +10296,28 @@ function planJsx(
 		// list's trailing boundary. Let forBlock reuse it as its end marker instead
 		// of retaining it beside a newly-created `/for` comment.
 		const ownEndPart = fc.anchorVar ? ', true' : '';
-		pushAfter(
-			fc.id,
-			`  _$forBlock(__s, ${slotIndex}, ${hostExpr}, ${fc.itemsExpr}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart}${ownEndPart});`,
-		);
+		const itemsArg = fc.autoMemoDeps !== null ? '_v' : fc.itemsExpr;
+		const call = `_$forBlock(__s, ${slotIndex}, ${hostExpr}, ${itemsArg}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart}${ownEndPart});`;
+		if (fc.autoMemoDeps !== null) {
+			const witnessMiss = fc.autoMemoWitnesses.length
+				? fc.autoMemoWitnesses
+						.map((name) => `${name}.__memo !== true || ${name}.__compare !== undefined`)
+						.join(' || ')
+				: null;
+			const guarded = emitAutoMemoRegion(
+				ctx,
+				['_v', ...fc.autoMemoDeps],
+				slotIndex,
+				call,
+				witnessMiss,
+				true,
+				null,
+				fc.autoMemoContextAware,
+			);
+			pushAfter(fc.id, `  { const _v = (${fc.itemsExpr}); ${guarded} }`);
+		} else {
+			pushAfter(fc.id, `  ${call}`);
+		}
 	}
 	for (const ic of ifCalls) {
 		const slotIndex = ic.slotIndex;
@@ -9195,10 +10360,19 @@ function planJsx(
 				ctx.runtimeNeeded.add('childTextHole');
 				const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
 				const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
-				pushAfter(
-					cc.id,
-					`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); } }`,
-				);
+				const update = `const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); }`;
+				const guarded = cc.autoMemoValue
+					? emitAutoMemoRegion(
+							ctx,
+							['_v'],
+							slotIndex,
+							update,
+							null,
+							false,
+							`${ctx.autoMemoValueValidator}(_v)`,
+						)
+					: update;
+				pushAfter(cc.id, `  { const _v = (${cc.valueExpr}); ${guarded} }`);
 				continue;
 			}
 			// Anchor expression (no leading comma; 'null' = append into an
@@ -9214,10 +10388,19 @@ function planJsx(
 						? ', undefined, true'
 						: ', undefined, undefined, true'
 					: '';
-				pushAfter(
-					cc.id,
-					`  _$textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg}${coalesceArg});`,
-				);
+				const call = `_$textSlot(__s, ${slotIndex}, ${hostExpr}, _v${anchorArg}${coalesceArg});`;
+				const update = cc.autoMemoValue
+					? emitAutoMemoRegion(
+							ctx,
+							['_v'],
+							slotIndex,
+							call,
+							null,
+							true,
+							`${ctx.autoMemoValueValidator}(_v)`,
+						)
+					: call;
+				pushAfter(cc.id, `  { const _v = (${cc.valueExpr}); ${update} }`);
 				continue;
 			}
 			// Template body: INLINE the text-hole hot path. Cache the text node
@@ -9238,9 +10421,43 @@ function planJsx(
 			const coalesceArg = cc.coalesceRange ? (cc.anchorVar ? ', true' : ', undefined, true') : '';
 			const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
 			const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
+			const update = `const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); }`;
+			const guarded = cc.autoMemoValue
+				? emitAutoMemoRegion(
+						ctx,
+						['_v'],
+						slotIndex,
+						update,
+						null,
+						false,
+						`${ctx.autoMemoValueValidator}(_v)`,
+					)
+				: update;
+			pushAfter(cc.id, `  { const _v = (${cc.valueExpr}); ${guarded} }`);
+			continue;
+		}
+		// Compiler-owned whole-component region cache. The flat array belongs to
+		// this compiled scope; the ordinary component runtime never sees memo deps.
+		if (cc.autoMemoDeps !== null) {
+			const componentHelper = cc.voidComponent ? 'componentSlotVoid' : 'componentSlot';
+			ctx.runtimeNeeded.add(componentHelper);
+			const memoAnchor = anchorExprFor(cc, 'compAnchor');
+			let trailing = memoAnchor ? `, ${memoAnchor}` : '';
+			if (cc.inheritRange) {
+				if (trailing === '') trailing = ', undefined';
+				trailing += ', undefined, undefined, true';
+			} else if (cc.singleRoot) {
+				if (trailing === '') trailing = ', undefined';
+				trailing += ', undefined, true';
+			}
+			const witnessMiss = cc.autoMemoWitnesses.length
+				? cc.autoMemoWitnesses
+						.map((name) => `${name}.__memo !== true || ${name}.__compare !== undefined`)
+						.join(' || ')
+				: null;
 			pushAfter(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); } }`,
+				`  ${emitAutoMemoRegion(ctx, cc.autoMemoDeps, slotIndex, `_$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${trailing});`, witnessMiss, true, null, cc.autoMemoContextAware)}`,
 			);
 			continue;
 		}
@@ -10804,11 +12021,14 @@ function unionEnv(ctx, bodies) {
 // block.extra channel to ride).
 function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssHash, envNames) {
 	const helperName = `${prefix}$${ctx.nextHelperId++}`;
+	const ownEnvNames = envNames === null ? null : helperCaptures(ctx, stmts, params);
+	const ownEnv = new Set(ownEnvNames || []);
 	let bodyStmts = stmts;
 	if (envNames && envNames.length > 0) {
 		// Destructure the construct's shared env tuple. The layout is the UNION
-		// across the construct's helpers, so every helper destructures the same
-		// slots (names a body doesn't use are harmless consts).
+		// across the construct's helpers. An arm leaves holes for union-only names:
+		// binding them could collide with a same-named local that shadows a capture
+		// used only by another arm.
 		bodyStmts = [
 			{
 				type: 'VariableDeclaration',
@@ -10818,7 +12038,9 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 						type: 'VariableDeclarator',
 						id: {
 							type: 'ArrayPattern',
-							elements: envNames.map((n) => ({ type: 'Identifier', name: n })),
+							elements: envNames.map((n) =>
+								ownEnv.has(n) ? { type: 'Identifier', name: n } : null,
+							),
 						},
 						init: { type: 'Identifier', name: '__extra' },
 					},
@@ -10849,14 +12071,18 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	for (const n of collectComponentLocals(fake)) extended.add(n);
 	ctx.currentComponentLocals = extended;
 	ctx.currentInvariantLocals = new Set(
-		(envNames || []).filter((name) => prevInvariantLocals?.has(name) === true),
+		(ownEnvNames || []).filter((name) => prevInvariantLocals?.has(name) === true),
 	);
 	ctx.currentEventInvariantLocals = new Set(
-		(envNames || []).filter((name) => prevEventInvariantLocals?.has(name) === true),
+		(ownEnvNames || []).filter((name) => prevEventInvariantLocals?.has(name) === true),
 	);
 	let code;
 	try {
-		code = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash);
+		code = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash, {
+			autoMemoCaptures: (ownEnvNames || []).filter(
+				(name) => ctx.currentAutoMemoValues?.has(name) === true,
+			),
+		});
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
@@ -11063,6 +12289,9 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash) {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, expr),
 		isChild: true,
+		autoMemoValue:
+			unwrapTsExpr(expr)?.type === 'Identifier' &&
+			ctx.currentAutoMemoValues?.has(unwrapTsExpr(expr).name) === true,
 		valueExpr: printExprWithTsrx(
 			resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
 			ctx,
@@ -11070,6 +12299,71 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash) {
 			inlinedSubs,
 		),
 	};
+}
+
+function collectAutoMemoDependencyExpressions(nodes) {
+	const dependencies = new Set();
+	const coveredRoots = new Set();
+	const seen = new WeakSet();
+	let safe = true;
+	let hasComponentValue = false;
+	function addFree(node) {
+		for (const name of collectFreeIdentifiers(node, [])) {
+			dependencies.add(name);
+			coveredRoots.add(name);
+		}
+	}
+	function walk(original) {
+		const node = unwrapTsExpr(original);
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (isInvariantLiteral(node)) return;
+		if ((node.type === 'Element' || node.type === 'JSXElement') && isComponentTag(node)) {
+			hasComponentValue = true;
+		}
+		// A flat guard evaluates every dependency eagerly. Preserve JavaScript's
+		// short-circuit/optional evaluation order by leaving these call sites on the
+		// ordinary reconciliation path until the cache owns expression temporaries.
+		if (
+			node.type === 'LogicalExpression' ||
+			node.type === 'ConditionalExpression' ||
+			node.type === 'ChainExpression' ||
+			((node.type === 'MemberExpression' || node.type === 'CallExpression') && node.optional)
+		) {
+			safe = false;
+			return;
+		}
+		if (isAutoMemoCalculationDependency(node)) {
+			const expression = printExpr(node);
+			dependencies.add(expression);
+			for (const name of collectFreeIdentifiers(node, [])) coveredRoots.add(name);
+			return;
+		}
+		if (
+			node.type === 'ArrowFunctionExpression' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'FunctionDeclaration'
+		) {
+			addFree(node);
+			return;
+		}
+		if (node.type === 'Property') {
+			if (node.computed) walk(node.key);
+			walk(node.value);
+			return;
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(node[key]);
+		}
+	}
+	for (const node of nodes) walk(node);
+	return { dependencies, coveredRoots, safe, hasComponentValue };
 }
 
 function makeCompCall(
@@ -11093,6 +12387,7 @@ function makeCompCall(
 	// values, not identity.
 	const attrs = node.attributes || node.openingElement?.attributes || [];
 	const propParts = [];
+	const propDependencyNodes = [];
 	// `key={expr}` is consumed by the componentSlot runtime (drives key-driven
 	// remount on identity change), NOT passed as a prop — matches React, where
 	// `props.key` is undefined inside the component body. When `key` follows a
@@ -11119,6 +12414,7 @@ function makeCompCall(
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+		if (inner.type !== 'Literal') propDependencyNodes.push(inner);
 		// Lower any JSX in the prop value to createElement(...) — e.g.
 		// `<Suspense fallback={<span/>}>` or a render-prop returning JSX — so esrap
 		// emits a real descriptor instead of raw (unprintable) JSX.
@@ -11182,6 +12478,11 @@ function makeCompCall(
 	//     hookless component that passed the pre-pass)
 	//   - no key=, no spread, no JSX children at the call site
 	let liteEligible = false;
+	// Null = ordinary call. An array (including []) selects the production-only
+	// compiler-owned dependency boundary and is emitted as expressions in order.
+	let autoMemoDeps = null;
+	let autoMemoWitnesses = [];
+	let autoMemoContextAware = false;
 	// A same-module compiled callee whose JavaScript return is provably void can
 	// use a Block that omits generic return-value reconciliation. HMR deliberately
 	// keeps the generic path: an update can replace the implementation with a
@@ -11211,6 +12512,57 @@ function makeCompCall(
 				if (keyExpr == null) {
 					if (calleeInfo.eligible) liteEligible = callSiteOk;
 					else if (calleeInfo.singleRoot) singleRoot = callSiteOk;
+					if (
+						ctx.autoMemo &&
+						ctx.currentComponentLocals &&
+						ctx.currentAutoMemoCallsitesSafe !== false &&
+						callSiteOk &&
+						calleeInfo.autoMemoSafe === true &&
+						!containsRenderCall([node]) &&
+						!containsAutoMemoUnsafeStructure([node]) &&
+						!containsImportedMemberRead(node, ctx.importedNames)
+					) {
+						const free = collectFreeIdentifiers(node, []);
+						const calleeCaptures = calleeInfo.autoMemoCaptures || [];
+						const deps = new Set(calleeCaptures);
+						const callsiteDeps = collectAutoMemoDependencyExpressions(propDependencyNodes);
+						for (const dependency of callsiteDeps.dependencies) deps.add(dependency);
+						let depsSafe =
+							callsiteDeps.safe &&
+							!callsiteDeps.hasComponentValue &&
+							!ctx.currentComponentLocals.has(compExpr);
+						// A caller-local shadow would make `[capture]` name the wrong value;
+						// decline until module captures receive compiler-owned aliases.
+						for (const capture of calleeCaptures) {
+							if (ctx.currentComponentLocals.has(capture)) depsSafe = false;
+						}
+						for (const witness of calleeInfo.autoMemoImportedComponents || []) {
+							if (ctx.currentComponentLocals.has(witness)) depsSafe = false;
+						}
+						for (const name of free) {
+							if (name === compExpr) continue;
+							if (ctx.importNamespaceNames.has(name)) {
+								depsSafe = false;
+							} else if (ctx.currentComponentLocals.has(name) || ctx.importedNames.has(name)) {
+								if (!callsiteDeps.coveredRoots.has(name)) deps.add(name);
+							} else if (ctx.componentInfo.has(name) || ctx.defaultMemoBindings.has(name)) {
+								// Same-module FunctionDeclaration identity is immutable.
+								continue;
+							} else {
+								// A module/global read at the call site is not a reactive witness.
+								depsSafe = false;
+							}
+						}
+						if (depsSafe) {
+							autoMemoDeps = [...deps].sort();
+							autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
+							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
+							// The cache needs a real context-stamping Block. Preserve the
+							// same-module single-root proof, but never use componentSlotLite.
+							liteEligible = false;
+							singleRoot = calleeInfo.singleRoot === true;
+						}
+					}
 				}
 			} else if (
 				keyExpr == null &&
@@ -11233,6 +12585,9 @@ function makeCompCall(
 		hostPath: null,
 		keyExpr,
 		liteEligible,
+		autoMemoDeps,
+		autoMemoWitnesses,
+		autoMemoContextAware,
 		voidComponent,
 		singleRoot,
 		maybeSingleRoot,
@@ -11560,6 +12915,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	let pure = false;
 	const depNames = [];
 	let depEligible = false;
+	let itemMemo = false;
+	let itemMemoContextAware = false;
+	let itemMemoWitnesses = [];
+	let itemMemoFlags = 0;
+	let autoMemoDeps = null;
+	let autoMemoWitnesses = [];
+	let autoMemoContextAware = false;
 	if (ctx.currentComponentLocals) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
@@ -11588,8 +12950,138 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// bodies unconditionally. Property reads stay eligible (the measured
 		// js-framework-benchmark/dbmon wins are read-only bodies).
 		const hasRenderCall = containsRenderCall(subStmts);
-		pure = !hasParentClosure && !hasHook && !hasNestedComp && !hasRenderCall;
-		depEligible = !pure && hasParentClosure && !hasHook && !hasNestedComp && !hasRenderCall;
+		itemMemo =
+			ctx.autoMemo === true &&
+			hasNestedComp &&
+			hasOnlyComponentItemBoundaries(subStmts) &&
+			!hasHook &&
+			!hasRenderCall &&
+			!containsAutoMemoUnsafeStructure(subStmts) &&
+			!containsImportedMemberRead(bodyAst, ctx.importedNames);
+		if (itemMemo) {
+			itemMemoWitnesses = [
+				...collectImportedComponentReferences(bodyAst, ctx.importedNames),
+			].sort();
+			if (itemMemoWitnesses.length > 0) itemMemoContextAware = true;
+			for (const name of free) {
+				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
+					itemMemo = false;
+					break;
+				}
+				if (ctx.currentComponentLocals.has(name)) continue;
+				if (ctx.importedNames.has(name)) {
+					if (!seenDeps.has(name)) {
+						seenDeps.add(name);
+						depNames.push(name);
+					}
+					continue;
+				}
+				if (ctx.defaultMemoBindings.has(name)) {
+					// A local memo() wrapper may hide a context consumer. The whole-list
+					// guard below can carry that exceptional dependency; a bare PURE item
+					// promotion cannot.
+					itemMemoContextAware = true;
+					continue;
+				}
+				const child = ctx.componentInfo.get(name);
+				if (child !== undefined) {
+					// A compiler-proven child can itself close over live imports. The item
+					// boundary sits outside that child call, so it must witness the same
+					// transitive captures before deciding not to enter the item helper.
+					if (child.autoMemoSafe !== true) {
+						itemMemo = false;
+						break;
+					}
+					for (const capture of child.autoMemoCaptures) {
+						if (!seenDeps.has(capture)) {
+							seenDeps.add(capture);
+							depNames.push(capture);
+						}
+					}
+					if (child.autoMemoMayReadContext) itemMemoContextAware = true;
+					continue;
+				}
+				// Ambient globals and module locals are not reactive witnesses. Imported
+				// live bindings are handled above; everything else fails closed.
+				itemMemo = false;
+				break;
+			}
+		}
+		// Whole-list expression cache. Evaluate the iterable snapshot every render,
+		// then skip the forBlock call entirely while that identity and every lexical
+		// body/key/@empty capture are unchanged. Direct render-time calls, refs,
+		// mutations, effects, portals, and opaque module/global reads fail closed.
+		const regionStmts = emptyStmts ? [...subStmts, ...emptyStmts] : subStmts;
+		const regionAst = { type: 'BlockStatement', body: regionStmts };
+		const regionFree = collectFreeIdentifiers(regionAst, bodyScope);
+		if (node.key) {
+			for (const name of collectFreeIdentifiers(node.key, bodyScope)) regionFree.add(name);
+		}
+		let listSafe =
+			ctx.autoMemo === true &&
+			isAutoMemoCalculationDependency(node.right) &&
+			!hasHook &&
+			!containsRenderCall(regionStmts) &&
+			!containsRenderCall(node.key ? [node.key] : []) &&
+			!containsAutoMemoUnsafeStructure(regionStmts) &&
+			!containsAutoMemoUnsafeStructure(node.key ? [node.key] : []) &&
+			!containsImportedMemberRead(regionAst, ctx.importedNames);
+		const listDeps = new Set();
+		const witnesses = collectImportedComponentReferences(regionAst, ctx.importedNames);
+		let listMayReadContext = witnesses.size > 0 || containsAutoMemoContextRead(regionAst, ctx);
+		if (listSafe) {
+			for (const name of regionFree) {
+				if (ctx._octaneBoundaryNames.has(name) || ctx.importNamespaceNames.has(name)) {
+					listSafe = false;
+					break;
+				}
+				if (ctx.currentComponentLocals.has(name)) {
+					listDeps.add(name);
+					continue;
+				}
+				if (ctx.importedNames.has(name)) {
+					listDeps.add(name);
+					continue;
+				}
+				if (ctx.defaultMemoBindings.has(name)) {
+					listMayReadContext = true;
+					continue;
+				}
+				const child = ctx.componentInfo.get(name);
+				if (child?.autoMemoSafe === true) {
+					for (const capture of child.autoMemoCaptures) listDeps.add(capture);
+					for (const witness of child.autoMemoImportedComponents || []) {
+						witnesses.add(witness);
+					}
+					if (child.autoMemoMayReadContext) listMayReadContext = true;
+					continue;
+				}
+				listSafe = false;
+				break;
+			}
+		}
+		if (listSafe) {
+			autoMemoDeps = [...listDeps].sort();
+			autoMemoWitnesses = [...witnesses].sort();
+			autoMemoContextAware = listMayReadContext;
+		}
+
+		// A context-bearing component-only body may skip its item helper only when
+		// the enclosing list guard owns context invalidation. Without that guard,
+		// PURE would strand consumers on Provider updates (the ordinary forBlock
+		// survivor shortcut has no compiler-cache epoch cell to consult).
+		if (itemMemoContextAware && autoMemoDeps === null) itemMemo = false;
+		const hostPure = !hasParentClosure && !hasHook && !hasNestedComp && !hasRenderCall;
+		const hostDepEligible =
+			!hostPure && !hasHook && hasParentClosure && !hasNestedComp && !hasRenderCall;
+		if (itemMemo && itemMemoWitnesses.length > 0) {
+			pure = hostPure;
+			depEligible = hostDepEligible;
+			itemMemoFlags = depNames.length === 0 ? 1 : 4;
+		} else {
+			pure = hostPure || (itemMemo && depNames.length === 0);
+			depEligible = !pure && !hasHook && (hostDepEligible || (itemMemo && depNames.length > 0));
+		}
 		depNames.sort();
 	}
 
@@ -11604,6 +13096,13 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		{ stmts: itemAllStmts, params: itemParams },
 		emptyStmts && { stmts: emptyStmts, params: [] },
 	]);
+	// The helper destructures only component-local captures (`envNames`) from the
+	// tuple prefix. Compiler memoization may additionally need live imported
+	// bindings as dependency witnesses; append them without disturbing that ABI.
+	const runtimeDepNames =
+		envNames === null
+			? depNames
+			: [...envNames, ...depNames.filter((name) => !envNames.includes(name))];
 	let emptyHelperName = 'null';
 	if (emptyStmts) {
 		emptyHelperName = hoistBodyHelper(
@@ -11696,9 +13195,15 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// The env union doubles as the deps array: emitted whenever the helpers
 		// capture anything (Phase 2 — the runtime stamps it as block.extra), and
 		// ALSO compared for the dep-pure survivor short-circuit when depEligible.
-		// depNames must be exactly the tuple layout the helpers destructure.
+		// Component-local entries remain the tuple prefix the helpers destructure;
+		// any appended import witnesses are comparison-only.
 		depEligible,
-		depNames: envNames || depNames,
+		itemMemoWitnesses,
+		itemMemoFlags,
+		autoMemoDeps,
+		autoMemoWitnesses,
+		autoMemoContextAware,
+		depNames: runtimeDepNames,
 		// True only when the header binds NO `index <name>` — the body then can't
 		// observe an item's position, so a pure reorder (same item ref, position
 		// changed) need not re-render the survivor. Conservative: an index binding

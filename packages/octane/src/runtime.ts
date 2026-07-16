@@ -4390,6 +4390,12 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 // ---------------------------------------------------------------------------
 
 const CONTEXT_TAG = Symbol.for('octane.context');
+// Compiler-owned output caches compare their own lexical dependencies, but a
+// Provider update is propagated lazily through the already-mounted Block tree
+// rather than scheduling every consumer. One module-wide epoch lets generated
+// cache guards notice that exceptional channel without retaining any concrete
+// Context, boundary, or component identity in the runtime.
+let COMPILER_CACHE_CONTEXT_EPOCH = 0;
 
 export interface Context<T> {
 	$$kind: typeof CONTEXT_TAG;
@@ -4427,6 +4433,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 		// over-invalidate every memo'd consumer of this context elsewhere.)
 		if (scope.$$ctxValues.has(ctx) && !Object.is(scope.$$ctxValues.get(ctx), props.value)) {
 			ctx.$$version++;
+			COMPILER_CACHE_CONTEXT_EPOCH++;
 		}
 		scope.$$ctxValues.set(ctx, props.value);
 		// Children between the Provider tags reach us in one of two shapes:
@@ -4458,6 +4465,7 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 	// Bump the version only when an existing value actually changes (see Provider).
 	if (scope.$$ctxValues.has(context) && !Object.is(scope.$$ctxValues.get(context), value)) {
 		context.$$version++;
+		COMPILER_CACHE_CONTEXT_EPOCH++;
 	}
 	scope.$$ctxValues.set(context, value);
 }
@@ -12414,6 +12422,37 @@ function refreshBlockForContext(block: Block): void {
 		// consumer it strands. Bounded by this bailed boundary's subtree.
 		refreshContextConsumers(block);
 	}
+}
+
+/**
+ * Compiler ABI for a flat output-cache hit. Context consumers are normally
+ * reached while their parent slot reconciles; a cache hit intentionally skips
+ * that reconciliation, so an intervening Provider commit must refresh the
+ * slot's existing Block(s) directly. The common path is one numeric equality
+ * check. `previous === undefined` snapshots the epoch after a cache miss
+ * without refreshing the freshly-rendered subtree.
+ * @internal
+ */
+export function compilerCacheContext(
+	scope: Scope,
+	slotKey: number,
+	previous: number | undefined,
+): number {
+	const current = COMPILER_CACHE_CONTEXT_EPOCH;
+	if (previous === undefined || previous === current) return current;
+	const slot = scope.slots[slotKey];
+	if (slot === undefined || slot === null) return current;
+	if (slot.__kind === 'forBlockSlot') {
+		for (const item of slot.items.values()) refreshBlockForContext(item);
+		if (slot.emptyBlock) refreshBlockForContext(slot.emptyBlock);
+	} else if (slot.block) {
+		refreshBlockForContext(slot.block);
+	} else if (slot.__kind === 'childSlot' && slot.forSlot) {
+		for (const item of slot.forSlot.items.values()) refreshBlockForContext(item);
+	} else if (slot.__kind === 'childSlot' && slot.portal?.block) {
+		refreshBlockForContext(slot.portal.block);
+	}
+	return current;
 }
 
 const hasOwnProp = Object.prototype.hasOwnProperty;

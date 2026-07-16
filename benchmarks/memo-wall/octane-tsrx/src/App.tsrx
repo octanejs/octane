@@ -8,9 +8,10 @@ import { bindWallA, bindWallB, initialItemsA, initialItemsB, selectRow } from '.
 //
 //   wall A — compiled: `@for (…; key it.id) { <Row …/> }` inside RowsA. Each
 //     row is a compiled component position → componentSlot → the componentSlot
-//     arm of tryMemoBail. (The @for body contains a nested component, so the
-//     compiler does NOT mark it pure/dep-eligible — survivors re-run the body
-//     and hit the memo bail every parent render, which is the measured path.)
+//     arm of tryMemoBail. Production autoMemo first witnesses Row's default
+//     memo contract and promotes unchanged keyed survivors to the existing PURE
+//     item path. It then caches the pure RowsA call by `items`, stopping before
+//     the loop entirely on an unrelated parent update.
 //     The list lives in its own RowsA component (host-element root) rather
 //     than inline in the Provider children so the .tsx twin's `.map` lowers to
 //     the same compiled forBlock — the JSX dialect only folds a keyed `.map`
@@ -20,13 +21,16 @@ import { bindWallA, bindWallB, initialItemsA, initialItemsB, selectRow } from '.
 //   wall B — value-position: the plain-.ts wall-b helper builds
 //     `createElement(Row, props)` descriptors that reach the DOM through the
 //     `{rows}` children hole → childSlot's keyed de-opt list → the childSlot
-//     arm of tryMemoBail. This is the shape every @octanejs binding produces.
+//     arm of tryMemoBail. Production autoMemo caches both the helper result and
+//     that output region while `items` is unchanged; an item change deliberately
+//     rebuilds all descriptors. This is the shape every @octanejs binding produces.
 //
 // Each wall owns its items, an unrelated `tick`, and its theme. The theme
 // provider sits ABOVE the rows inside the wall, so a ctx op re-renders the
 // wall body, bails all 1000 rows on props, and refreshes only the leaves.
-// RowsA is deliberately NOT memo'd: it must re-render on every wall op so the
-// per-row memo boundaries (not a wrapper bail) absorb the re-render.
+// RowsA is deliberately NOT wrapped in memo(): the automatic compiler region,
+// not a source-level wrapper, owns the equal-items bailout. Changed items still
+// enter the original 1000-row memo wall, preserving the one-change workload.
 
 function RowsA(props) @{
 	<div class="rows">

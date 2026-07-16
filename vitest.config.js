@@ -253,6 +253,8 @@ export default defineConfig({
 				plugins: [
 					octane({
 						hmr: false,
+						// Exercise the default production component-region transform across
+						// the same behavioral suite; impure/logging fixtures fail its proof.
 						renderers: {
 							registry: { object: 'octane/universal' },
 							boundaries: {

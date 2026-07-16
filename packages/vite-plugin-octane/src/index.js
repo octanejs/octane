@@ -188,7 +188,7 @@ function has_route_config(config) {
  * node builtins external) exporting `handler`/`nodeHandler` and auto-booting
  * under `node`. See server/virtual-entry.js and server/production.js.
  *
- * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, autoMemo?: boolean, exclude?: string[], renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -794,6 +794,7 @@ export function octane(inlineOptions = {}) {
 	 * @type {{
 	 *   hmr?: boolean,
 	 *   profile?: boolean,
+	 *   autoMemo?: boolean,
 	 *   exclude?: string[],
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
 	 * }}
@@ -801,6 +802,7 @@ export function octane(inlineOptions = {}) {
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
+	if (inlineOptions.autoMemo !== undefined) compilerOptions.autoMemo = inlineOptions.autoMemo;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.renderers !== undefined) compilerOptions.renderers = inlineOptions.renderers;
 	const compilerPlugin = /** @type {Plugin} */ (octaneCompiler(compilerOptions));

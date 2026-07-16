@@ -117,6 +117,7 @@ describe('OctaneRspackPlugin', () => {
 			hmr: false,
 			dev: true,
 			parallelUse: false,
+			autoMemo: false,
 			exclude: ['generated'],
 			renderers: {
 				registry: { object: '/src/object-renderer.js' },
@@ -145,6 +146,7 @@ describe('OctaneRspackPlugin', () => {
 			hmr: false,
 			dev: true,
 			parallelUse: false,
+			autoMemo: false,
 			exclude: ['generated'],
 			renderers: expect.objectContaining({
 				default: 'dom',
@@ -167,21 +169,24 @@ describe('OctaneRspackPlugin', () => {
 						object: { module: '/src/object-renderer.js', target: 'universal' },
 					}),
 				}),
+				autoMemo: false,
 			}),
 		);
 	});
 
-	it('salts persistent caches with the normalized renderer configuration', () => {
+	it('salts persistent caches with code-generation options', () => {
 		const createCachedCompiler = () => {
 			const compiler = createCompiler('web');
 			(compiler.options as any).cache = { type: 'persistent', version: 'user-cache' };
 			return compiler;
 		};
 		const dom = createCachedCompiler();
+		const withoutAutoMemo = createCachedCompiler();
 		const object = createCachedCompiler();
 		const boundedObject = createCachedCompiler();
 
 		new OctaneRspackPlugin().apply(dom as any);
+		new OctaneRspackPlugin({ autoMemo: false }).apply(withoutAutoMemo as any);
 		new OctaneRspackPlugin({
 			renderers: {
 				registry: { object: '/src/object-renderer.js' },
@@ -205,9 +210,13 @@ describe('OctaneRspackPlugin', () => {
 		}).apply(boundedObject as any);
 
 		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
+		expect((withoutAutoMemo.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((boundedObject.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).not.toBe((dom.options as any).cache.version);
+		expect((withoutAutoMemo.options as any).cache.version).not.toBe(
+			(dom.options as any).cache.version,
+		);
 		expect((boundedObject.options as any).cache.version).not.toBe(
 			(object.options as any).cache.version,
 		);
