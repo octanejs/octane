@@ -171,8 +171,14 @@ export const REACT_API_MAP = {
 		status: 'rewrite',
 		note: 'No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.',
 	},
-	useDebugValue: { status: 'rewrite', note: 'Not present. Shim as a no-op.' },
-	lazy: { status: 'rewrite', note: 'Not present. Use dynamic import plus use()/Suspense.' },
+	useDebugValue: {
+		status: 'same',
+		note: 'Supported as an accepted no-op (devtools-only label; there is no DevTools integration).',
+	},
+	lazy: {
+		status: 'same',
+		note: "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not).",
+	},
 	Component: {
 		status: 'unsupported',
 		note: 'No class components. Rewrite as a function component.',
@@ -192,13 +198,17 @@ export const REACT_API_MAP = {
 		status: 'rewrite',
 		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
 	},
+	renderToStaticMarkup: {
+		status: 'rewrite',
+		note: 'Use renderToStaticMarkup() from octane/server (clean, non-hydratable HTML; returns { html, css }).',
+	},
 	renderToPipeableStream: {
-		status: 'unsupported',
-		note: 'No streaming SSR yet. Use render() from octane/server.',
+		status: 'rewrite',
+		note: 'Supported natively: import renderToPipeableStream from octane/server (Octane argument convention: component, props?, options?; returns { pipe, abort } with onShellReady/onShellError/onAllReady StreamOptions).',
 	},
 	renderToReadableStream: {
-		status: 'unsupported',
-		note: 'No streaming SSR yet. Use render() from octane/server.',
+		status: 'rewrite',
+		note: 'Supported natively: import renderToReadableStream from octane/server (Octane argument convention; resolves with a ReadableStream once the shell is ready, same StreamOptions).',
 	},
 	onChange: {
 		status: 'rewrite',

@@ -104,6 +104,34 @@ describe('bridgeReport', () => {
 		expect(report.plan.join('\n')).toContain('forwardRef');
 	});
 
+	it('lazy plus Suspense stays bridgeable', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+		await writeFakePackage(root, 'lazy-lib', {
+			'index.js': `
+				import { lazy, Suspense } from 'react';
+				export const Panel = lazy(() => import('./panel.js'));
+				export { Suspense };
+			`,
+		});
+		const report = await bridgeReport({ packageName: 'lazy-lib', projectRoot: root });
+		expect(report.apis.find((row) => row.name === 'lazy').status).toBe('same');
+		expect(report.verdict).toBe('bridgeable');
+	});
+
+	it('routes streaming SSR entry points to octane/server as a rewrite', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
+		await writeFakePackage(root, 'streamer', {
+			'index.js': `
+				import { renderToPipeableStream } from 'react-dom/server';
+				export const ssr = (el) => renderToPipeableStream(el);
+			`,
+		});
+		const report = await bridgeReport({ packageName: 'streamer', projectRoot: root });
+		expect(report.apis.find((row) => row.name === 'renderToPipeableStream').status).toBe('rewrite');
+		expect(report.verdict).toBe('bridgeable-with-rewrites');
+		expect(report.plan.join('\n')).toContain('octane/server');
+	});
+
 	it('reports class components as needs-rework', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-bridge-'));
 		await writeFakePackage(root, 'classy', {

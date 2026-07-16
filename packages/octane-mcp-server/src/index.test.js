@@ -6,8 +6,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
 	areaForPath,
+	BENCHMARK_SUITES,
 	BUNDLED_SKILLS,
 	isOctaneRepo,
+	runCommand,
 	scaffoldReactPort,
 	validationFor,
 } from './index.js';
@@ -23,8 +25,47 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(areaForPath('packages/zustand/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/radix/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/octane-mcp-server/src/index.js')).toBe('mcp-server');
+		expect(areaForPath('packages/adapter-vercel/src/index.ts')).toBe('deploy-adapter');
+		expect(areaForPath('packages/octane-evals/tools/run.mjs')).toBe('evals');
+		expect(areaForPath('website/src/pages/index.tsrx')).toBe('website');
 		expect(areaForPath('benchmarks/news/run.mjs')).toBe('benchmark');
 		expect(areaForPath('.rulesync/rules/project.md')).toBe('rulesync-source');
+	});
+
+	it('recommends the adapter, evals, and website test projects', () => {
+		const commands = validationFor(
+			[
+				'packages/adapter-vercel/src/index.ts',
+				'packages/octane-evals/tools/run.mjs',
+				'website/src/pages/index.tsrx',
+			],
+			'feature',
+		);
+
+		expect(commands).toContain(
+			'./node_modules/.bin/vitest run packages/adapter-vercel/tests --project adapter-vercel',
+		);
+		expect(commands).toContain(
+			'./node_modules/.bin/vitest run packages/octane-evals/tests --project octane-evals',
+		);
+		expect(commands).toContain('./node_modules/.bin/vitest run website/tests --project website');
+		expect(commands).toContain('pnpm typecheck');
+	});
+
+	it('keeps the benchmark suite list in sync with the unified runner manifest', async () => {
+		// BENCHMARK_SUITES is hand-maintained in index.js; the runner manifest in
+		// benchmarks/bench.mjs is the source of truth. --list prints one suite
+		// name per line, in manifest order.
+		const repoRoot = resolve(PACKAGE_ROOT, '../..');
+		const result = await runCommand(process.execPath, ['benchmarks/bench.mjs', '--list'], {
+			cwd: repoRoot,
+		});
+		expect(result.code).toBe(0);
+		const suites = result.stdout
+			.split('\n')
+			.map((line) => line.trim())
+			.filter((line) => line && line !== 'Available suites:');
+		expect(suites).toEqual(BENCHMARK_SUITES);
 	});
 
 	it('classifies every maintained binding and recommends its test project', () => {
