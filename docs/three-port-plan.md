@@ -610,14 +610,21 @@ unmount release only owned resources.
 
 ### Milestone 6 — portals and portal events (2–3 engineer-weeks)
 
+Status: implemented. Universal core now owns logical portal ranges,
+transactional root-scoped target registrations, and portal placement domains.
+The Three adapter supplies borrowed Object3D targets, R3F-style state/event
+enclaves, shared frame/interaction state, physical event ancestry, target
+validation, and deterministic teardown.
+
 - Three portal target handles and state enclaves, inherited/overridden root
   state, logical context retention, event-manager integration, teardown, and
   invalid target/scope diagnostics.
 
 Exit: portals preserve logical context while targeting an external `Object3D`;
-state overrides are isolated; ray/pointer events cross the portal's physical
-scene and logical ancestry correctly; teardown removes handlers and resources
-without corrupting either root.
+state overrides are isolated; ray/pointer events use the portal layer and
+bubble through physical Three ancestry while retaining logical handler
+ownership; teardown removes handlers and resources without corrupting either
+root.
 
 ### Milestone 7 — client-only Canvas SSR and hydration (2–3 engineer-weeks)
 

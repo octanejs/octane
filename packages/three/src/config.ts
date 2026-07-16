@@ -13,7 +13,7 @@ export const threeRenderer = {
 	server: 'client-only',
 	intrinsics: '@octanejs/three/intrinsics',
 	text: 'ignore',
-	capabilities: ['local-host-callback', 'visibility'],
+	capabilities: ['local-host-callback', 'visibility', 'portal'],
 } as const;
 
 export const threeRendererRegistry = {
