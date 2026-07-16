@@ -25,11 +25,13 @@ import {
 	MAX_PLAYGROUND_SOURCE_LENGTH,
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
 } from '../../lib/playground-hash.ts';
+import { useTitle } from '../../hooks/use-title.ts';
 
 const HASH_DEBOUNCE_MS = 400;
 const COMPILE_DEBOUNCE_MS = 250;
 
 export function Playground() @{
+	useTitle('Octane — Playground');
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Mobile only: which panel is visible (desktop always shows both).

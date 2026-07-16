@@ -113,6 +113,9 @@ catalogs:
     '@solidjs/web': '2.0.0-beta.14'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
+    '@tanstack/ai': 0.41.0
+    '@tanstack/ai-client': 0.21.0
+    '@tanstack/ai-react': 0.17.0
     '@tanstack/history': 1.162.0
     '@tanstack/query-core': ^5.0.0
     '@tanstack/react-query': ^5.0.0
@@ -274,3 +277,8 @@ catalogs:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': patches/@tsrx__core@0.1.37.patch
+
+minimumReleaseAgeExclude:
+  - '@tanstack/ai-client@0.21.0'
+  - '@tanstack/ai-react@0.17.0'
+  - '@tanstack/ai@0.41.0'

@@ -42,6 +42,34 @@ jobs:
 
       - name: Create or update release pull request
         id: changesets
+        continue-on-error: true
+        uses: changesets/action@v1
+        with:
+          github-token: ${{ github.token }}
+          version: pnpm changeset:version
+          commit: Version Packages
+          title: Version Packages
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # A failed action leaves its generated changes and local release branch behind.
+      # Restore the triggering commit so the retry can recreate that branch cleanly.
+      - name: Restore checkout before retry
+        if: steps.changesets.outcome == 'failure'
+        run: |
+          git reset --hard "$GITHUB_SHA"
+          git clean -fd
+          git checkout --detach "$GITHUB_SHA"
+          if git show-ref --verify --quiet "refs/heads/changeset-release/${GITHUB_REF_NAME}"; then
+            git branch --delete --force "changeset-release/${GITHUB_REF_NAME}"
+          fi
+
+      - name: Wait before retrying the GitHub API
+        if: steps.changesets.outcome == 'failure'
+        run: sleep 15
+
+      - name: Retry creating or updating the release pull request
+        if: steps.changesets.outcome == 'failure'
         uses: changesets/action@v1
         with:
           github-token: ${{ github.token }}
