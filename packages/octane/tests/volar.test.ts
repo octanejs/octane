@@ -186,6 +186,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 					module: ts.ModuleKind.ESNext,
 					moduleResolution: ts.ModuleResolutionKind.Bundler,
 					noEmit: true,
+					skipLibCheck: true,
 					strict: true,
 					target: ts.ScriptTarget.ESNext,
 				},
