@@ -422,7 +422,7 @@ function TrendPanel(props: {
 				@for (const option of ['7d', '30d'] as const; key option) {
 					<button
 						type="button"
-						aria-pressed={props.range === option && props.pendingRange === null}
+						aria-pressed={(props.pendingRange ?? props.range) === option}
 						onClick={() => props.onRange(option)}
 					>
 						{option === '7d' ? '7 days' : '30 days'}
@@ -816,6 +816,17 @@ export function App() @{
 	};
 
 	const changeRange = (nextRange: DateRange) => {
+		if (nextRange === range) {
+			if (pendingRange !== null) {
+				rangeGenerationRef.current += 1;
+				if (rangeTimerRef.current !== null) {
+					window.clearTimeout(rangeTimerRef.current);
+					rangeTimerRef.current = null;
+				}
+				setPendingRange(null);
+			}
+			return;
+		}
 		if (rangeTimerRef.current !== null) window.clearTimeout(rangeTimerRef.current);
 		const generation = ++rangeGenerationRef.current;
 		setPendingRange(nextRange);

@@ -93,6 +93,7 @@ test('loads a measured deep link and keeps chart geometry responsive across repo
 test('supports compact keyboard chart exploration while rapid range requests converge to the latest choice', async ({
 	page,
 }) => {
+	await page.clock.install();
 	await page.setViewportSize({ width: 560, height: 900 });
 	await openDashboard(page);
 	await page.keyboard.press('Tab');
@@ -146,13 +147,28 @@ test('supports compact keyboard chart exploration while rapid range requests con
 
 	const thirtyDays = page.getByRole('button', { name: '30 days' });
 	const sevenDays = page.getByRole('button', { name: '7 days' });
-	await thirtyDays.click();
-	await sevenDays.click();
-	await thirtyDays.click();
-	await expect(
-		page.getByRole('status').filter({ hasText: 'Loading the 30-day window' }),
-	).toBeVisible();
-	await expect(thirtyDays).toHaveAttribute('aria-pressed', 'true');
+	const rangeProgress = page.getByRole('status').filter({ hasText: /Loading the .* window/ });
+	const browserNow = await page.evaluate(() => Date.now());
+	await page.clock.pauseAt(browserNow + 1_000);
+	try {
+		await sevenDays.click();
+		await expect(rangeProgress).toHaveCount(0);
+		await expect(sevenDays).toHaveAttribute('aria-pressed', 'true');
+		await expect(thirtyDays).toHaveAttribute('aria-pressed', 'false');
+
+		await thirtyDays.click();
+		await sevenDays.click();
+		await thirtyDays.click();
+		await expect(
+			page.getByRole('status').filter({ hasText: 'Loading the 30-day window' }),
+		).toBeVisible();
+		await expect(thirtyDays).toHaveAttribute('aria-pressed', 'true');
+		await expect(sevenDays).toHaveAttribute('aria-pressed', 'false');
+		await page.clock.runFor(1_000);
+		await expect(rangeProgress).toHaveCount(0);
+	} finally {
+		await page.clock.resume();
+	}
 	await expect(page).toHaveURL(/range=30d/);
 	chart = page.getByRole('group', { name: 'Visitors trend, last 30 days' });
 	await expect(chart.getByRole('button')).toHaveCount(30);
