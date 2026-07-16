@@ -1,0 +1,13 @@
+{
+	"name": "Octane",
+	"short_name": "Octane",
+	"description": "React's programming model, compiled ahead of time. No VDOM, no rules of hooks.",
+	"icons": [
+		{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+		{ "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+	],
+	"theme_color": "#23272f",
+	"background_color": "#23272f",
+	"display": "browser",
+	"start_url": "/"
+}

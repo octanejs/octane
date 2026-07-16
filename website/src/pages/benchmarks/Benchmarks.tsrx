@@ -10,10 +10,12 @@ import { BenchBars } from '../../components/BenchBars.tsrx';
 import { BenchmarkExplorer } from '../../components/BenchmarkExplorer.tsrx';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../../content/benchmarks.ts';
 import { createHomeSummary } from '../../content/home-benchmark.ts';
+import { useTitle } from '../../hooks/use-title.ts';
 
 const OVERVIEW = createHomeSummary(FRAMEWORK_CARDS);
 
 export function Benchmarks() @{
+	useTitle('Octane — Benchmarks');
 	<div class="benchpage">
 		<header class="benchpage-head">
 			<h1 class="benchpage-title">Benchmarks</h1>

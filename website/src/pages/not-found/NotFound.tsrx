@@ -1,6 +1,8 @@
 import { Link } from '@octanejs/tanstack-router';
+import { useTitle } from '../../hooks/use-title.ts';
 
 export function NotFound() @{
+	useTitle('Octane — Page not found');
 	<div class="notfound">
 		<p class="notfound-code">404</p>
 		<h1 class="notfound-title">Page not found</h1>

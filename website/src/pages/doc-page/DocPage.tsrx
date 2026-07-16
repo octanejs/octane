@@ -4,6 +4,7 @@
 import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
+import { useTitle } from '../../hooks/use-title.ts';
 
 function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...tableProps } = props;
@@ -31,6 +32,7 @@ const docComponents = { table: DocTable, pre: DocPre };
 export function DocPage() @{
 	const params = useParams({ strict: false }) as { slug?: string };
 	const doc = findDoc(params.slug);
+	useTitle(doc ? 'Octane — ' + doc.title : 'Octane — Docs');
 	const Doc = doc ? doc.component : null;
 	const sections = doc?.sections ?? [];
 	const currentIndex =
