@@ -1,10 +1,12 @@
-import { useFrame, useThree } from '@octanejs/three';
+import { useFrame, useLoader, useThree } from '@octanejs/three';
 import type { RootState, ThreeEvent } from '@octanejs/three';
 import { useState as useThreeState } from '@octanejs/three/renderer';
+import { FileLoader } from 'three';
 import type { Mesh } from 'three';
 
 type ThreeBrowserProof = typeof globalThis & {
 		__octaneThreeFrameCount?: number;
+		__octaneThreeAsset?: string;
 		__octaneThreeSceneReady?: boolean;
 		__octaneThreeState?: RootState;
 		__octaneThreeEventLog?: Array<Record<string, unknown>>;
@@ -12,6 +14,14 @@ type ThreeBrowserProof = typeof globalThis & {
 		__octaneThreeRemoveOnDown?: boolean;
 		__octaneThreeReleaseOnUp?: boolean;
 	};
+
+function BrowserAsset(props) @{
+	const proof = globalThis as ThreeBrowserProof;
+	const asset = useLoader(FileLoader, '/three-loader-proof.txt');
+	if (typeof asset !== 'string') throw new Error('The browser loader returned a non-text asset.');
+	proof.__octaneThreeAsset = asset;
+	<group name={'browser-asset-' + props.copy + ':' + asset.trim()} />
+}
 
 export function Scene() @{
 	const proof = globalThis as ThreeBrowserProof;
@@ -37,6 +47,14 @@ export function Scene() @{
 	});
 
 	<>
+		@try {
+			<>
+				<BrowserAsset copy="first" />
+				<BrowserAsset copy="second" />
+			</>
+		} @pending {
+			<group name="browser-asset-pending" />
+		}
 		@if (visible) {
 			<mesh
 				name="bundler-proof-cube"

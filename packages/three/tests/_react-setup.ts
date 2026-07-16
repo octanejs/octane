@@ -6,7 +6,11 @@ import { fileURLToPath } from 'node:url';
 
 const directory = dirname(fileURLToPath(import.meta.url));
 const cache = join(directory, '.react-cache');
-const fixtures = ['basic.three', 'events-differential.three'] as const;
+const fixtures = [
+	'basic.three',
+	'events-differential.three',
+	'suspense-differential.three',
+] as const;
 
 function assertPinnedOracle(): void {
 	const fiberPackage = JSON.parse(

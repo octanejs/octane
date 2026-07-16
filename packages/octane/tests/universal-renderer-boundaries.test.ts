@@ -23,6 +23,11 @@ import { ReverseScene } from './_fixtures/universal-mixed-scene.object.tsrx';
 import { ReverseOwnerDom } from './_fixtures/universal-reverse-owner.tsrx';
 import { OwnedCanvasApp } from './_fixtures/universal-owned-canvas-app.tsrx';
 import { getOwnedCanvasContainer } from './_fixtures/universal-owned-canvas.tsrx';
+import {
+	PreparedThenSiblingBoundaryApp,
+	ProjectedBoundaryApp,
+	SequentialProjectedBoundaryApp,
+} from './_fixtures/universal-projected-boundary.tsrx';
 import { Canvas } from './_fixtures/universal-renderer-boundaries.tsrx';
 import { UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 
@@ -110,6 +115,149 @@ async function flushBridgeWork(): Promise<void> {
 }
 
 describe('compiler-owned renderer child regions', () => {
+	it('projects an initial host suspension and clears its abandoned owner bridge', async () => {
+		const { container, root } = objectRoot();
+		const never = new Promise<string>(() => {});
+		const suspended = mount(ProjectedBoundaryApp, { root, resource: never });
+		expect(suspended.find('.projected-pending').textContent).toBe('pending');
+		expect(container.children).toEqual([]);
+
+		await flushBridgeWork();
+		suspended.unmount();
+
+		const ready = {
+			status: 'fulfilled' as const,
+			value: 'ready after abandon',
+			then() {},
+		};
+		const remounted = mount(ProjectedBoundaryApp, { root, resource: ready });
+		expect(remounted.container.querySelector('.projected-pending')).toBeNull();
+		expect(container.children).toHaveLength(1);
+		expect(container.children[0].props.value).toBe('ready after abandon');
+
+		remounted.unmount();
+		expect(container.children).toEqual([]);
+	});
+
+	it('retains a committed host root and accepts newer props while an older suspension is pending', async () => {
+		const { container, root } = objectRoot();
+		const ready = {
+			status: 'fulfilled' as const,
+			value: 'first',
+			then() {},
+		};
+		const mounted = mount(ProjectedBoundaryApp, { root, resource: ready });
+		const scene = container.children[0];
+		expect(scene.props.value).toBe('first');
+
+		const obsolete = new Promise<string>(() => {});
+		mounted.update(ProjectedBoundaryApp, { root, resource: obsolete });
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+		expect(container.children).toEqual([scene]);
+
+		const latest = {
+			status: 'fulfilled' as const,
+			value: 'latest',
+			then() {},
+		};
+		mounted.update(ProjectedBoundaryApp, { root, resource: latest });
+		await flushBridgeWork();
+		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
+		expect(container.children).toEqual([scene]);
+		expect(scene.props.value).toBe('latest');
+
+		mounted.unmount();
+		expect(container.children).toEqual([]);
+	});
+
+	it('keeps the DOM fallback visible across sequential projected suspensions', async () => {
+		const { container, root } = objectRoot();
+		let resolveFirst!: (value: string) => void;
+		let resolveSecond!: (value: string) => void;
+		const first = new Promise<string>((resolve) => {
+			resolveFirst = resolve;
+		});
+		const second = new Promise<string>((resolve) => {
+			resolveSecond = resolve;
+		});
+		const secondFor = vi.fn(() => second);
+		const mounted = mount(SequentialProjectedBoundaryApp, { root, first, secondFor });
+
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+		expect(container.children).toEqual([]);
+
+		resolveFirst('asset-key');
+		await first;
+		await flushBridgeWork();
+		expect(secondFor).toHaveBeenCalledWith('asset-key');
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+		expect(container.children).toEqual([]);
+
+		resolveSecond('sequential asset ready');
+		await second;
+		await flushBridgeWork();
+		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
+		expect(container.children).toHaveLength(1);
+		expect(container.children[0].props.value).toBe('sequential asset ready');
+
+		mounted.unmount();
+		expect(container.children).toEqual([]);
+	});
+
+	it('retains one boundary owner when a later DOM sibling suspends before layout', async () => {
+		const { container, root } = objectRoot();
+		let resolve!: (value: string) => void;
+		const resource = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const mounted = mount(PreparedThenSiblingBoundaryApp, {
+			root,
+			resource,
+			value: 'prepared before sibling',
+		});
+
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+		expect(container.children).toEqual([]);
+		await flushBridgeWork();
+
+		resolve('sibling ready');
+		await resource;
+		await flushBridgeWork();
+		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
+		expect(mounted.find('.projected-sibling').textContent).toBe('sibling ready');
+		expect(container.children).toHaveLength(1);
+		expect(container.children[0].props.value).toBe('prepared before sibling');
+
+		mounted.unmount();
+		expect(container.children).toEqual([]);
+	});
+
+	it('rejects replacing a hidden boundary root after its insertion lifetime commits', async () => {
+		const first = objectRoot();
+		const second = objectRoot();
+		const resource = new Promise<string>(() => {});
+		const mounted = mount(PreparedThenSiblingBoundaryApp, {
+			root: first.root,
+			resource,
+			value: 'first root',
+		});
+
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+		await flushBridgeWork();
+		mounted.update(PreparedThenSiblingBoundaryApp, {
+			root: second.root,
+			resource,
+			value: 'replacement root',
+		});
+
+		expect(mounted.find('.projected-error').textContent).toBe(
+			'Changing the root owned by a mounted universal boundary is not supported.',
+		);
+		expect(first.container.children).toEqual([]);
+		expect(second.container.children).toEqual([]);
+		mounted.unmount();
+	});
+
 	it('executes the package-facing Canvas authoring form with an owned root', () => {
 		const mounted = mount(OwnedCanvasApp);
 		const canvas = mounted.find('.owned-object-canvas');

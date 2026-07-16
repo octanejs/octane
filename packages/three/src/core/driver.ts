@@ -425,6 +425,12 @@ function detachPhysical(instance: ThreeHostInstance): void {
 	placement.parent.remove(placement.object);
 }
 
+function receivesVisibilityOverlay(instance: ThreeHostInstance, state: ThreeDriverState): boolean {
+	if (instance.visible) return false;
+	if (instance.parent === null || instance.parent === undefined) return true;
+	return state.instances.get(instance.parent)?.visible !== false;
+}
+
 function reorderManagedChildren(parent: THREE.Object3D, desired: readonly THREE.Object3D[]): void {
 	if (desired.length < 2) return;
 	const desiredSet = new Set(desired);
@@ -478,7 +484,12 @@ function synchronizePhysicalTree(
 				});
 			}
 			attachTasks.push(() => {
-				instance.object.visible = instance.visible && instance.props.visible !== false;
+				// React hides only the first host objects in a retained range. Their
+				// descendants remain authored as-is and are culled by the hidden parent.
+				// Logical visibility still remains false throughout the range so events,
+				// effects, and local callbacks stay disconnected while it is retained.
+				instance.object.visible =
+					!receivesVisibilityOverlay(instance, state) && instance.props.visible !== false;
 			});
 		} else if (target.kind === 'attachment' && instance.physical === null) {
 			attachTasks.push(() => {
@@ -1006,6 +1017,7 @@ export function createThreeDriver(
 								const instance = state.instances.get(command.id)!;
 								const previousObject = instance.object;
 								const previousOwned = instance.owned;
+								const previousProps = instance.props;
 								OBJECT_INSTANCES.delete(previousObject);
 								instance.object = replacement.object;
 								instance.owned = replacement.owned;
@@ -1013,6 +1025,9 @@ export function createThreeDriver(
 								instance.type = replacement.type;
 								OBJECT_INSTANCES.set(instance.object, instance);
 								unpublishedOwned.delete(replacement.object);
+								if (isObject3D(previousObject)) {
+									previousObject.visible = previousProps.visible !== false;
+								}
 								if (previousOwned && instance.type !== 'primitive') {
 									enqueueDisposal(container, previousObject);
 								}
@@ -1063,6 +1078,12 @@ export function createThreeDriver(
 							const store = container.environment.store;
 							if (store !== undefined && isObject3D(instance.object)) {
 								removeInteractivity(store, instance.object);
+							}
+							// Visibility is a renderer-owned retention overlay. Do not leak a
+							// suspense/activity-hidden flag onto an object after ownership ends;
+							// restore the authored value before refs and consumers can observe it.
+							if (isObject3D(instance.object)) {
+								instance.object.visible = instance.props.visible !== false;
 							}
 							if (shouldDisposeRemoved(instance, state, destroyed)) {
 								enqueueDisposal(container, instance.object);

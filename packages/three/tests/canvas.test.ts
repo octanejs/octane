@@ -3,7 +3,13 @@ import { flushSync } from 'octane';
 import { events as createPointerEvents } from '../src/index.js';
 import type { EventManager, Renderer, RootState } from '../src/core/index.js';
 import { mount, type MountResult } from '../../octane/tests/_helpers.js';
-import { CanvasApp, ContextCanvasApp, EmptyCanvasApp } from './_fixtures/canvas-app.tsrx';
+import {
+	CanvasApp,
+	CanvasPendingProjectionApp,
+	CanvasSceneErrorApp,
+	ContextCanvasApp,
+	EmptyCanvasApp,
+} from './_fixtures/canvas-app.tsrx';
 
 class ControlledResizeObserver implements ResizeObserver {
 	static instances: ControlledResizeObserver[] = [];
@@ -411,5 +417,62 @@ describe('Canvas', () => {
 		await flushCanvasWork();
 
 		expect(objectRef.current?.name).toBe('renderer-bridge');
+	});
+
+	it('projects Three suspension to the nearest DOM pending arm until the asset resolves', async () => {
+		const { factory } = rendererHarness();
+		let resolve!: (value: string) => void;
+		const resource = new Promise<string>((done) => {
+			resolve = done;
+		});
+		const objectRef = { current: null as { name: string } | null };
+		mounted = mount(CanvasPendingProjectionApp, { gl: factory, resource, objectRef });
+
+		ControlledResizeObserver.instances[0].emit({ width: 320, height: 180 });
+		await flushCanvasWork();
+		expect(mounted.find('.canvas-pending').textContent).toBe('Loading 3D asset');
+		expect(objectRef.current).toBeNull();
+
+		resolve('projected asset ready');
+		await resource;
+		await flushCanvasWork();
+		expect(mounted.container.querySelector('.canvas-pending')).toBeNull();
+		expect(objectRef.current?.name).toBe('projected asset ready');
+	});
+
+	it('projects a rejected Three asset to the nearest DOM catch arm', async () => {
+		const { factory } = rendererHarness();
+		let reject!: (error: unknown) => void;
+		const resource = new Promise<string>((_done, fail) => {
+			reject = fail;
+		});
+		const objectRef = { current: null as { name: string } | null };
+		mounted = mount(CanvasPendingProjectionApp, { gl: factory, resource, objectRef });
+
+		ControlledResizeObserver.instances[0].emit({ width: 320, height: 180 });
+		await flushCanvasWork();
+		expect(mounted.find('.canvas-pending').textContent).toBe('Loading 3D asset');
+
+		reject(new Error('projected asset failed'));
+		await resource.catch(() => undefined);
+		await flushCanvasWork();
+		expect(mounted.find('.canvas-error').textContent).toBe('projected asset failed');
+		expect(objectRef.current).toBeNull();
+	});
+
+	it('projects a Three render error to the nearest DOM catch arm', async () => {
+		const { factory } = rendererHarness();
+		const objectRef = { current: null as { name: string } | null };
+		mounted = mount(CanvasSceneErrorApp, {
+			gl: factory,
+			error: new Error('Three scene failed'),
+			objectRef,
+		});
+
+		ControlledResizeObserver.instances[0].emit({ width: 320, height: 180 });
+		await flushCanvasWork();
+
+		expect(mounted.find('.canvas-error').textContent).toBe('Three scene failed');
+		expect(objectRef.current).toBeNull();
 	});
 });

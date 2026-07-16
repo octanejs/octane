@@ -483,7 +483,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"Extensions\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+      "evidenceTarget": "packages/three/typetests/loader-api.test.ts"
     },
     {
       "id": "export:FilterFunction",
@@ -663,7 +663,7 @@
       },
       "classification": "type-package",
       "reason": "Pinned public export \"LoaderResult\" belongs to the package and compile-time compatibility matrix.",
-      "evidenceTarget": "packages/three/typetests/public-api.test.ts"
+      "evidenceTarget": "packages/three/typetests/loader-api.test.ts"
     },
     {
       "id": "export:MathProps",
@@ -1023,7 +1023,7 @@
       },
       "classification": "behavioral",
       "reason": "Public runtime export \"useLoader\" has an observable Octane equivalent that requires direct behavioral coverage.",
-      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
     },
     {
       "id": "export:useStore",
@@ -1445,7 +1445,7 @@
       },
       "classification": "behavioral",
       "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
-      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
     },
     {
       "id": "test:fiber:hooks:116",
@@ -1457,7 +1457,7 @@
       },
       "classification": "behavioral",
       "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
-      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
     },
     {
       "id": "test:fiber:hooks:162",
@@ -1469,7 +1469,7 @@
       },
       "classification": "behavioral",
       "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
-      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
     },
     {
       "id": "test:fiber:hooks:180",
@@ -1481,7 +1481,7 @@
       },
       "classification": "behavioral",
       "reason": "The hook exposes public root, frame, loader, graph, or instance behavior that Octane must reproduce directly.",
-      "evidenceTarget": "packages/three/tests/hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
     },
     {
       "id": "test:fiber:hooks:197",
@@ -2033,7 +2033,7 @@
       },
       "classification": "behavioral",
       "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
-      "evidenceTarget": "packages/three/tests/driver.test.ts"
+      "evidenceTarget": "packages/three/tests/suspense.test.ts"
     },
     {
       "id": "test:fiber:renderer:608",
@@ -2045,7 +2045,7 @@
       },
       "classification": "behavioral",
       "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
-      "evidenceTarget": "packages/three/tests/driver.test.ts"
+      "evidenceTarget": "packages/three/tests/suspense.test.ts"
     },
     {
       "id": "test:fiber:renderer:632",
@@ -2057,7 +2057,7 @@
       },
       "classification": "behavioral",
       "reason": "The case observes public Three identity, topology, refs, lifecycle, attachment, visibility, or disposal behavior.",
-      "evidenceTarget": "packages/three/tests/driver.test.ts"
+      "evidenceTarget": "packages/three/tests/suspense.test.ts"
     },
     {
       "id": "test:fiber:renderer:748",
@@ -2921,7 +2921,7 @@
       },
       "classification": "behavioral",
       "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
-      "evidenceTarget": "packages/three/tests/testing-hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
     },
     {
       "id": "test:test-renderer:rttr-hooks:37",
@@ -2933,7 +2933,7 @@
       },
       "classification": "behavioral",
       "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
-      "evidenceTarget": "packages/three/tests/testing-hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/loader.test.ts"
     },
     {
       "id": "test:test-renderer:rttr-hooks:55",
@@ -2945,7 +2945,7 @@
       },
       "classification": "behavioral",
       "reason": "The case defines observable behavior for the planned framework-neutral Three testing helper.",
-      "evidenceTarget": "packages/three/tests/testing-hooks.test.ts"
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
     },
     {
       "id": "test:test-renderer:rttr-methods:21",
