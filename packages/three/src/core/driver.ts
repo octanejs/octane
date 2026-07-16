@@ -48,6 +48,13 @@ const THREE_EVENT_PRIORITIES: Readonly<Record<string, UniversalEventPriority>> =
 	onPointerLeave: 'continuous',
 });
 
+/** Canonical priority lookup shared by host descriptors and native dispatch. */
+export function getThreeHostEventPriority(name: string): UniversalEventPriority | undefined {
+	return Object.prototype.hasOwnProperty.call(THREE_EVENT_PRIORITIES, name)
+		? THREE_EVENT_PRIORITIES[name]
+		: undefined;
+}
+
 type ParentId = number | null | undefined;
 
 type PhysicalPlacement =
@@ -348,8 +355,12 @@ function reconcileInteractivity(
 	}
 	if (previous !== undefined) {
 		const previousObject = transfersIdentity ? next!.object : previous.object;
-		if (next?.live === true) removeInteractionMembership(store, previousObject);
-		else removeInteractivity(store, previousObject);
+		const lostEligibility = previous.eligible && next?.live === true && !next.eligible;
+		if (next?.live === true && !lostEligibility) {
+			removeInteractionMembership(store, previousObject);
+		} else {
+			removeInteractivity(store, previousObject);
+		}
 	}
 	if (next?.eligible === true) appendInteractivity(store, next.object);
 }
@@ -693,7 +704,7 @@ export function createThreeDriver(
 		capabilities: { text: 'ignore', localHostCallbacks: true, visibility: true },
 		events: {
 			classify(name) {
-				const priority = THREE_EVENT_PRIORITIES[name];
+				const priority = getThreeHostEventPriority(name);
 				return priority === undefined ? null : { type: name, priority };
 			},
 		},

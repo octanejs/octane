@@ -429,6 +429,81 @@ describe('Three ray and pointer events', () => {
 		expect(canvas.releasePointerCapture).toHaveBeenCalledWith(7);
 	});
 
+	it('releases retained hover and capture when an object becomes non-raycastable', async () => {
+		const { canvas, root } = await createEventRoot();
+		const object = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+		const raycast = object.raycast;
+		const log: string[] = [];
+		let target: ThreeEvent<PointerEvent>['target'] | undefined;
+		const props = (nextRaycast: THREE.Object3D['raycast'] | null) => ({
+			object,
+			objectRef: null,
+			raycast: nextRaycast,
+			onPointerDown(event: ThreeEvent<PointerEvent>) {
+				target = event.target;
+				event.target.setPointerCapture(event.pointerId);
+			},
+			onPointerMove: () => log.push('move'),
+			onPointerOver: () => log.push('over'),
+		});
+
+		root.render(PrimitiveEventScene, props(raycast));
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointermove', 50, 50, 21);
+		dispatchPointer(canvas, 'pointerdown', 50, 50, 21);
+		expect(log).toEqual(['over', 'move']);
+		expect(target?.hasPointerCapture(21)).toBe(true);
+
+		root.render(PrimitiveEventScene, props(null));
+		expect(target?.hasPointerCapture(21)).toBe(false);
+		expect(canvas.releasePointerCapture).toHaveBeenCalledWith(21);
+		dispatchPointer(canvas, 'pointermove', 99, 99, 21);
+		expect(log).toEqual(['over', 'move']);
+
+		root.render(PrimitiveEventScene, props(raycast));
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointermove', 50, 50, 21);
+		expect(log).toEqual(['over', 'move', 'over', 'move']);
+	});
+
+	it('resets retained hover and capture when an object removes its last handler', async () => {
+		const { canvas, root } = await createEventRoot();
+		const object = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+		const over = vi.fn();
+		let target: ThreeEvent<PointerEvent>['target'] | undefined;
+		const interactiveProps = {
+			object,
+			objectRef: null,
+			raycast: object.raycast,
+			onPointerDown(event: ThreeEvent<PointerEvent>) {
+				target = event.target;
+				event.target.setPointerCapture(event.pointerId);
+			},
+			onPointerMove() {},
+			onPointerOver: over,
+		};
+
+		root.render(PrimitiveEventScene, interactiveProps);
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointermove', 50, 50, 22);
+		dispatchPointer(canvas, 'pointerdown', 50, 50, 22);
+		expect(over).toHaveBeenCalledOnce();
+		expect(target?.hasPointerCapture(22)).toBe(true);
+
+		root.render(PrimitiveEventScene, {
+			object,
+			objectRef: null,
+			raycast: object.raycast,
+		});
+		expect(target?.hasPointerCapture(22)).toBe(false);
+		expect(canvas.releasePointerCapture).toHaveBeenCalledWith(22);
+
+		root.render(PrimitiveEventScene, interactiveProps);
+		prepareRaycast(root.store.getState());
+		dispatchPointer(canvas, 'pointermove', 50, 50, 22);
+		expect(over).toHaveBeenCalledTimes(2);
+	});
+
 	it('transfers retained pointer-down capture facades across reconstruction', async () => {
 		const { canvas, root } = await createEventRoot();
 		const first = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());

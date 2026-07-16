@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import type { UniversalEventListenerDescriptor, UniversalEventPriority } from 'octane/universal';
 import {
 	dispatchThreeEvent,
+	getThreeHostEventPriority,
 	getThreeEventListener,
 	getThreeEventStore,
 	hasThreeEventListeners,
@@ -142,26 +143,29 @@ const POINTER_MOVE_LISTENERS = [
 	'onPointerLeave',
 ] as const;
 
-const EVENT_PRIORITIES: Readonly<Record<keyof Events, UniversalEventPriority>> = {
-	onClick: 'discrete',
-	onContextMenu: 'discrete',
-	onDoubleClick: 'discrete',
-	onWheel: 'continuous',
-	onPointerDown: 'discrete',
-	onPointerUp: 'discrete',
-	onPointerLeave: 'continuous',
-	onPointerMove: 'continuous',
-	onPointerCancel: 'discrete',
-	onLostPointerCapture: 'discrete',
-};
+const NATIVE_EVENT_NAMES: Readonly<Record<keyof Events, true>> = Object.freeze({
+	onClick: true,
+	onContextMenu: true,
+	onDoubleClick: true,
+	onWheel: true,
+	onPointerDown: true,
+	onPointerUp: true,
+	onPointerLeave: true,
+	onPointerMove: true,
+	onPointerCancel: true,
+	onLostPointerCapture: true,
+});
 
 /** Event priority shared by the host classifier and native event manager. */
 export function getThreeEventPriority(name: keyof Events): UniversalEventPriority {
-	return EVENT_PRIORITIES[name];
+	const priority = getThreeHostEventPriority(name);
+	if (priority === undefined)
+		throw new TypeError(`Unsupported Three event name ${JSON.stringify(name)}`);
+	return priority;
 }
 
 function isThreeEventName(name: string): name is keyof Events {
-	return Object.prototype.hasOwnProperty.call(EVENT_PRIORITIES, name);
+	return Object.prototype.hasOwnProperty.call(NATIVE_EVENT_NAMES, name);
 }
 
 function raycastLiveObject(

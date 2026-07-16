@@ -59,6 +59,7 @@ export function PrimitiveEventScene(props) @{
 	<primitive
 		object={props.object}
 		ref={props.objectRef}
+		raycast={props.raycast}
 		onPointerDown={props.onPointerDown}
 		onPointerMove={props.onPointerMove}
 		onPointerOver={props.onPointerOver}
