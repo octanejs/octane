@@ -2416,8 +2416,8 @@ export function addTransitionType(_type: string): void {}
  * `@try { … } @catch (e) { fallback }`. `fallback` is a renderable or a
  * `(error, reset) => renderable` render prop (react-error-boundary style). A real
  * error during render swaps to the fallback; a suspension rethrows so an outer
- * `<Suspense>`/`@pending` handles it (matches the client, whose ErrorBoundary
- * passes `pending = null` to tryBlock). `reset` is a server no-op (no re-render).
+ * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
+ * suspension propagation). `reset` is a server no-op (no re-render).
  */
 export function ErrorBoundary(
 	props: { fallback?: unknown; children?: unknown },

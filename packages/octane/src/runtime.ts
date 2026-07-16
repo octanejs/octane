@@ -4648,6 +4648,7 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> = (props, scope)
  * `@try { … } @catch (e) { fallback }`. `fallback` is either a renderable or a
  * `(error, reset) => renderable` render prop (react-error-boundary style). When a
  * descendant throws during render/effects, the boundary swaps to the fallback.
+ * Suspensions propagate to an enclosing Suspense boundary instead.
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
@@ -4672,6 +4673,8 @@ export const ErrorBoundary: ComponentBody<{
 		catchBody,
 		null,
 		block.endMarker,
+		undefined,
+		true,
 	);
 };
 
@@ -13148,6 +13151,12 @@ interface TrySlot {
 	catchBody: ComponentBody | null;
 	pendingBody: ComponentBody | null;
 	/**
+	 * JSX ErrorBoundary catches errors but lets suspensions reach an enclosing
+	 * Suspense boundary. Compiler-authored @try blocks keep their existing
+	 * no-@pending behavior when this is false.
+	 */
+	propagateSuspense: boolean;
+	/**
 	 * Hoisted-helper env tuple (compiled-output Phase 2): the construct's
 	 * captured parent locals, shared by the try/pending/catch helpers and
 	 * refreshed by the compiled call site every parent render. Stamped as
@@ -13207,6 +13216,8 @@ export function tryBlock(
 	anchor?: Node | null,
 	// Hoisted-helper env tuple (compiled-output Phase 2) — see TrySlot.env.
 	env?: any[],
+	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
+	propagateSuspense = false,
 ): void {
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
@@ -13245,6 +13256,7 @@ export function tryBlock(
 			tryBody,
 			catchBody,
 			pendingBody,
+			propagateSuspense,
 			env,
 			hasResolved: false,
 			err: null,
@@ -13263,6 +13275,7 @@ export function tryBlock(
 		state.tryBody = tryBody;
 		state.catchBody = catchBody;
 		state.pendingBody = pendingBody;
+		state.propagateSuspense = propagateSuspense;
 		state.env = env;
 	}
 	const s = state;
@@ -13290,8 +13303,10 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
-			if (isSuspenseException(err)) handleSuspense(s, err.thenable, s.tryBlock);
-			else switchToCatch(s, err);
+			if (isSuspenseException(err)) {
+				if (s.propagateSuspense) throw err;
+				handleSuspense(s, err.thenable, s.tryBlock);
+			} else switchToCatch(s, err);
 		}
 	} else if (s.tryBlock && s.savedDom) {
 		// Pending is visible AND we have a preserved try block — re-render it
@@ -13413,9 +13428,11 @@ function mountTry(state: TrySlot): void {
 	(b as any).__trySlot = state;
 	// Register handlers so descendant effect/render errors can find us.
 	(b as any).$$tryHandler = (err: any) => switchToCatch(state, err);
-	(b as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
-		handleSuspense(state, thenable, sourceBlock);
-	};
+	if (!state.propagateSuspense) {
+		(b as any).__suspenseHandler = (thenable: TrackedThenable<any>, sourceBlock: Block) => {
+			handleSuspense(state, thenable, sourceBlock);
+		};
+	}
 	state.tryBlock = b;
 	state.block = b;
 	// Install this boundary's streamed seed scope (if any) for the subtree render.
@@ -13430,6 +13447,7 @@ function mountTry(state: TrySlot): void {
 		state.hasResolved = true;
 	} catch (err) {
 		if (isSuspenseException(err)) {
+			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
 		} else {
 			const adoptServerCatch = hydration?.isRejection(err) === true;
