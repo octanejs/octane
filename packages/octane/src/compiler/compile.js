@@ -9873,7 +9873,11 @@ function emitAutoMemoRegion(
 		.join(' ');
 	const writable = `if (${cache} === ${ctx.currentAutoMemoCommittedName}) ${cache} = ${cache}.slice();`;
 	const publishPrefix = publishWhen === null ? '' : `if (${publishWhen}) { `;
-	const publishSuffix = publishWhen === null ? '' : ' }';
+	// A completed non-publishable miss still changed the rendered output. Clear
+	// any older guard before the body-level cache commits, or a later render that
+	// returns to that older dependency snapshot could skip reconciliation.
+	const publishSuffix =
+		publishWhen === null ? '' : ` } else { ${writable} ${cache}[${cell.init}] = false; }`;
 	if (!contextAware) {
 		return `{ if (${misses.join(' || ')}) { ${statement} ${publishPrefix}${writable} ${publish} ${cache}[${cell.init}] = true;${publishSuffix} } }`;
 	}

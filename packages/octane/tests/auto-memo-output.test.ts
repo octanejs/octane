@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mount } from './_helpers';
-import { AutoMemoOutputApp } from './_fixtures/auto-memo-output.tsrx';
+import { AutoMemoOutputApp, AutoMemoOutputSafetyApp } from './_fixtures/auto-memo-output.tsrx';
 
 function values(root: ReturnType<typeof mount>): string[] {
 	return root.findAll('.output-value').map((node) => node.textContent ?? '');
@@ -14,7 +14,20 @@ function nestedVersion(root: ReturnType<typeof mount>): number {
 	return Number(root.find('.output-nested-value').textContent?.match(/(\d+)$/)?.[1]);
 }
 
-describe('imported keyed render output', () => {
+describe('imported render output', () => {
+	it('reconciles safe to component to safe output from an imported calculation', () => {
+		const root = mount(AutoMemoOutputSafetyApp);
+		expect(root.find('#output-safety-value').textContent).toBe('safe');
+
+		root.click('#output-safety-toggle');
+		expect(root.find('#output-safety-value').textContent).toBe('unsafe');
+
+		root.click('#output-safety-toggle');
+		expect(root.find('#output-safety-value').textContent).toBe('safe');
+
+		root.unmount();
+	});
+
 	it('preserves row identity and state while item and context values update', () => {
 		const root = mount(AutoMemoOutputApp);
 		const initialRows = root.findAll('.output-row');

@@ -5,6 +5,7 @@ import {
 	AutoMemoOpaqueOutputRow,
 	AutoMemoOutputRow,
 	AutoMemoProxyOutput,
+	AutoMemoUnsafeCalculationOutput,
 } from './auto-memo-output-child.tsrx';
 
 const revoked = Proxy.revocable({}, {});
@@ -46,4 +47,8 @@ export function buildAutoMemoProxyOutput(items: Array<{ id: number; label: strin
 			data: revoked.proxy,
 		}),
 	);
+}
+
+export function buildAutoMemoSafetyTransitionOutput(unsafe: boolean) {
+	return unsafe ? createElement(AutoMemoUnsafeCalculationOutput, {}) : 'safe';
 }

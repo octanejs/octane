@@ -8,6 +8,7 @@ import {
 	buildAutoMemoOpaqueOutput,
 	buildAutoMemoOutput,
 	buildAutoMemoProxyOutput,
+	buildAutoMemoSafetyTransitionOutput,
 } from './auto-memo-output-helper';
 
 export function AutoMemoOutputApp() @{
@@ -51,5 +52,18 @@ export function AutoMemoOutputApp() @{
 			<ul id="auto-memo-nested-output-rows">{nestedRows}</ul>
 			<ul id="auto-memo-proxy-output-rows">{proxyRows}</ul>
 		</AutoMemoOutputContext.Provider>
+	</section>
+}
+
+export function AutoMemoOutputSafetyApp() @{
+	const [unsafe, setUnsafe] = useState(false);
+	const output = buildAutoMemoSafetyTransitionOutput(unsafe);
+
+	<section id="auto-memo-output-safety">
+		<button
+			id="output-safety-toggle"
+			onClick={() => setUnsafe((value) => !value)}
+		>{'toggle output'}</button>
+		<div id="output-safety-value">{output}</div>
 	</section>
 }

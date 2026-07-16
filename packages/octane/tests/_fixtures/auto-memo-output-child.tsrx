@@ -50,6 +50,13 @@ function AutoMemoProxyOutputImpl(props) @{
 
 export const AutoMemoProxyOutput = memo(AutoMemoProxyOutputImpl);
 
+// Imported calculation output can cross from a cacheable primitive to an
+// opaque component descriptor. Keep this component deliberately non-memo so
+// the parent compiler must take its conservative output path.
+export function AutoMemoUnsafeCalculationOutput() @{
+	<span class="output-unsafe-calculation">{'unsafe'}</span>
+}
+
 // Deliberately not wrapped in memo(). Imported component bodies are opaque to
 // the module compiling the parent list, so the enclosing inferred cache must
 // fall back while preserving context propagation.
