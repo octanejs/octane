@@ -1,0 +1,80 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "relay",
+  "title": "Relay",
+  "summary": "A production-built team chat proving real SSE subscriptions, anchored history prepends, and duplicate-free reconnect replay.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "keyed-reconciliation",
+    "layout-effects",
+    "native-events",
+    "portals",
+    "realtime-subscriptions",
+    "refs-as-props",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "responsive-channel-thread-links",
+      "title": "Deep-link responsive channels and complete a portaled thread by keyboard",
+      "kind": "golden",
+      "spec": "e2e/relay.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "production-sse-delivery",
+      "title": "Receive and reconcile teammate and optimistic messages through the production SSE boundary",
+      "kind": "golden",
+      "spec": "e2e/relay.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "anchored-history-prepend",
+      "title": "Preserve the visual anchor, focus, and survivor identity while rejecting stale cross-channel history",
+      "kind": "golden",
+      "spec": "e2e/relay.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "reconnect-replay-interleaving",
+      "title": "Replay missed updates once and settle rapid sends acknowledged out of order",
+      "kind": "resilience",
+      "spec": "e2e/relay.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "history-failure-recovery",
+      "title": "Recover a failed history load without losing a draft and visit an intentional empty channel",
+      "kind": "resilience",
+      "spec": "e2e/relay.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "history-load-failure",
+      "description": "The fault=history URL fails its first deterministic history result and succeeds on retry without replacing the composer draft."
+    },
+    {
+      "id": "cross-channel-history-race",
+      "description": "A completed general-channel pagination response is held across navigation and released only after the design channel is active, where it must be ignored."
+    },
+    {
+      "id": "disconnected-event-replay",
+      "description": "Teammate events published while the EventSource is paused replay by sequence on reconnect and remain deduplicated."
+    },
+    {
+      "id": "out-of-order-acknowledgements",
+      "description": "A deliberately slow first send settles after a fast second send while final message order and uniqueness remain stable."
+    }
+  ]
+}

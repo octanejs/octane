@@ -1,0 +1,27 @@
+{
+  "name": "cartlane-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A deterministic commerce checkout exercising Octane native form actions, pending state, and production server functions.",
+  "scripts": {
+    "dev": "vite --host --port 5225 --strictPort",
+    "build": "vite build",
+    "preview": "octane-preview --port 5225 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:e2e": "pnpm test:e2e:production && pnpm test:e2e:dev",
+    "test:e2e:production": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
+    "test:e2e:dev": "playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
+  },
+  "dependencies": {
+    "@octanejs/vite-plugin": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

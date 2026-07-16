@@ -1,0 +1,71 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "streambox",
+  "title": "Streambox",
+  "summary": "A production-built video platform proving Octane native media events, persistent player DOM state, and virtualized comments.",
+  "status": "active",
+  "renderModes": ["client"],
+  "dialects": ["tsrx"],
+  "bindings": ["@octanejs/tanstack-virtual"],
+  "octaneFeatures": [
+    "controlled-inputs",
+    "keyed-reconciliation",
+    "native-events",
+    "persistent-dom",
+    "refs-as-props",
+    "tsrx-control-flow"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "native-media-lifecycle",
+      "title": "Play, pause, seek, change volume, and finish through native media events",
+      "kind": "golden",
+      "spec": "e2e/streambox.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "persistent-player-navigation",
+      "title": "Preserve the live video node through same-video routes and isolate engagement across videos",
+      "kind": "golden",
+      "spec": "e2e/streambox.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "virtual-comment-conversation",
+      "title": "Window 180 comments, sort them, and recover from an empty search",
+      "kind": "golden",
+      "spec": "e2e/streambox.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "responsive-keyboard-deep-link",
+      "title": "Open a transcript deep link on mobile and control playback by keyboard",
+      "kind": "golden",
+      "spec": "e2e/streambox.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "failure-offline-interleaving",
+      "title": "Retry a catalog failure and queue rapid actions while local playback stays offline",
+      "kind": "resilience",
+      "spec": "e2e/streambox.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "initial-catalog-failure",
+      "description": "The scenario query fails the first deterministic catalog load and succeeds on explicit retry."
+    },
+    {
+      "id": "offline-local-playback",
+      "description": "The browser disconnects after media is ready; playback remains usable and product actions queue until reconnect."
+    }
+  ]
+}

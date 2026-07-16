@@ -137,8 +137,9 @@ browser tests cover many of these axes. The website browser suite now checks
 all public routes in development and production, fails on page/hydration
 errors, exercises client navigation, and interacts with the sandboxed
 playground. A separate example-app CI job builds the release-gated Hacker News,
-Lexical Playground, Cinebase, Threadline, and Flowboard applications and runs their
-Playwright journeys; its result is aggregated by the protected `typecheck` context.
+Lexical Playground, Cinebase, Threadline, Flowboard, Streambox, Relay, and Cartlane
+applications and runs their Playwright journeys; its result is aggregated by the
+protected `typecheck` context.
 Keeping it outside the sharded `pnpm test` command avoids repeating each browser
 suite per shard.
 

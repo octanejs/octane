@@ -1,0 +1,90 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "cartlane",
+  "title": "Cartlane",
+  "summary": "A production-built commerce checkout proving Octane native form actions, pending state, idempotent server functions, SSR, and hydration.",
+  "status": "active",
+  "renderModes": ["client", "streaming-ssr", "hydration"],
+  "dialects": ["tsrx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "controlled-inputs",
+    "form-actions",
+    "hydration",
+    "module-server",
+    "native-events",
+    "streaming-ssr",
+    "tsrx-control-flow",
+    "use-action-state",
+    "use-form-status"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "adopt-product-and-add-by-keyboard",
+      "title": "Adopt a server-rendered product input, preserve its value, and add to the basket by keyboard",
+      "kind": "ssr-hydration",
+      "spec": "e2e/cartlane.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "recover-catalog-offline-mobile",
+      "title": "Retry the catalog, recover from an empty filter, and use the mobile basket offline",
+      "kind": "resilience",
+      "spec": "e2e/cartlane.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "validate-and-place-order",
+      "title": "Reject a tampered cart, validate native checkout, and place an order through a server function",
+      "kind": "golden",
+      "spec": "e2e/cartlane.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "idempotent-overlapping-submit",
+      "title": "Queue rapid checkout submissions and resolve both to one charged order",
+      "kind": "resilience",
+      "spec": "e2e/cartlane.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "decline-offline-retry",
+      "title": "Preserve checkout details through a payment decline and an offline retry",
+      "kind": "resilience",
+      "spec": "e2e/cartlane.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "delayed-hydration",
+      "description": "An opt-in delay leaves the real server product form interactive before hydration so adoption and typed-value preservation are observable."
+    },
+    {
+      "id": "catalog-load-failure",
+      "description": "The scenario query fails one deterministic collection load and succeeds on explicit retry without changing the basket."
+    },
+    {
+      "id": "fixture-card-decline",
+      "description": "The local server function rejects the documented 4000 fixture card while preserving every uncontrolled native form field for retry."
+    },
+    {
+      "id": "tampered-cart-payload",
+      "description": "A negative quantity is injected into the submitted cart; the server-owned catalog rejects it without an order or charge before a valid retry succeeds."
+    },
+    {
+      "id": "offline-checkout",
+      "description": "A disconnected browser retains the basket and checkout fields, reports the blocked action, and safely retries after reconnecting."
+    },
+    {
+      "id": "duplicate-order-submit",
+      "description": "Two rapid native submissions cross the RPC boundary but share one idempotency key and resolve to one order and one charge."
+    }
+  ]
+}

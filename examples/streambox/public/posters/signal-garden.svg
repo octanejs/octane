@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Signal garden</title>
+  <desc id="desc">Abstract lavender radio waves blooming into colorful flowers.</desc>
+  <defs>
+    <radialGradient id="bg" cx=".78" cy=".2" r="1"><stop stop-color="#704da4"/><stop offset=".55" stop-color="#221d45"/><stop offset="1" stop-color="#0d1022"/></radialGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <g fill="none" stroke="#e0c9ff" opacity=".55">
+    <path d="M-20 232c220-168 438-168 656 0s436 168 654 0" stroke-width="5"/>
+    <path d="M-20 302c220-168 438-168 656 0s436 168 654 0" stroke-width="3"/>
+    <path d="M-20 366c220-168 438-168 656 0s436 168 654 0" stroke-width="2"/>
+  </g>
+  <path d="M0 588c176-69 322-16 460-40 169-30 242-116 416-68 149 41 241-9 404-47v287H0z" fill="#121b2d"/>
+  <g stroke="#82d8ad" stroke-width="7" stroke-linecap="round">
+    <path d="M224 612V449"/><path d="M446 634V394"/><path d="M694 608V434"/><path d="M928 616V354"/><path d="M1090 608V463"/>
+  </g>
+  <g>
+    <g transform="translate(224 430)" fill="#ff799f"><circle cx="0" cy="-25" r="30"/><circle cx="27" r="30"/><circle cy="26" r="30"/><circle cx="-27" r="30"/><circle fill="#ffd27a" r="16"/></g>
+    <g transform="translate(446 380)" fill="#b995ff"><circle cx="0" cy="-30" r="34"/><circle cx="30" r="34"/><circle cy="30" r="34"/><circle cx="-30" r="34"/><circle fill="#f3d7ff" r="18"/></g>
+    <g transform="translate(694 418)" fill="#67d6b0"><circle cx="0" cy="-27" r="31"/><circle cx="27" r="31"/><circle cy="27" r="31"/><circle cx="-27" r="31"/><circle fill="#f9f09f" r="17"/></g>
+    <g transform="translate(928 339)" fill="#ffbc68"><circle cx="0" cy="-34" r="38"/><circle cx="34" r="38"/><circle cy="34" r="38"/><circle cx="-34" r="38"/><circle fill="#ffeff0" r="20"/></g>
+    <g transform="translate(1090 448)" fill="#71bdf2"><circle cx="0" cy="-24" r="28"/><circle cx="24" r="28"/><circle cy="24" r="28"/><circle cx="-24" r="28"/><circle fill="#fff4b8" r="15"/></g>
+  </g>
+</svg>
