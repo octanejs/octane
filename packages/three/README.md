@@ -4,8 +4,8 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
-Milestones 0 and 2 are implemented on top of Octane's renderer SDK foundation.
-The current package includes:
+Milestones 0, 2, 3, and 4 are implemented on top of Octane's renderer SDK
+foundation. The current technical preview includes:
 
 - the serializable compiler preset, renderer entry point, renderer-local Three
   intrinsic types, and pinned upstream export/test crosswalk;
@@ -14,19 +14,33 @@ The current package includes:
 - real Three host objects with prop diff/application, automatic, string, and
   function attachments, ordered placement and moves, reconstruction, retained
   visibility, lifecycle/ref delivery, and ownership-aware disposal; and
+- the DOM `Canvas` boundary, programmatic roots, promise-returning renderer
+  configuration, the callable root store, camera/scene/raycaster setup,
+  resize/DPR/viewport state, shadows and color configuration;
+- one shared `always`/`demand`/`never` frame loop, global frame effects,
+  `useStore`, `useThree`, `useFrame`, `useGraph`, managed-instance helpers, and
+  the deterministic `@octanejs/three/testing` harness;
+- R3F-compatible ray and pointer events, including 3D bubbling, hit ordering,
+  propagation, hover transitions, missed clicks, pointer capture, custom event
+  managers, external DOM sources, and coordinate prefixes; and
 - public behavior, prepared-driver, and same-source compiled scene evidence
   against R3F 9.6.1 with the exact Three r172 oracle.
 
-`Canvas`, `createRoot` and root configuration/store state, the frame loop and
-hooks are not implemented yet; they are Milestone 3 work. Ray and pointer
-events begin in Milestone 4, with assets, portals, browser rendering, and
-Canvas SSR/hydration following in later milestones. Until the technical-preview
-gate is reached, unsupported APIs should be treated as unavailable rather than
-inferred from React Three Fiber.
+Asset loading, portals and portal event layers, full Canvas SSR/hydration
+adoption, XR, OffscreenCanvas lifecycle, and live HMR behavior follow in later
+milestones.
 
-One deliberate correctness fix differs from R3F 9.6.1: removing a pierced prop
-such as `material-color` resets the nested material property, instead of
-writing the default to a same-named leaf on the root object.
+Three deliberate correctness fixes differ from R3F 9.6.1:
+
+- removing a pierced prop such as `material-color` resets the nested material
+  property, instead of writing the default to a same-named leaf on the root
+  object; and
+- reconstructing a captured or hovered object rewrites every stored
+  intersection to the replacement, so subsequent captured events reach the
+  live handler instead of retaining the retired object; and
+- retained Activity subtrees are excluded from recursive raycasts while
+  hidden, rather than allowing an interactive visible ancestor to pierce an
+  invisible descendant.
 
 ## Compiler configuration
 
@@ -49,10 +63,71 @@ low-level Rspack integrations. Vite and Rsbuild additionally own application
 SSR and hydration; the Rspack plugin owns compilation and HMR only.
 
 The preset selects `@octanejs/three/renderer`, keeps Three scene modules
-client-only on the server, ignores authored text inside scenes, and exposes a
-renderer-local intrinsic catalogue without merging Three tags into DOM JSX.
-This is compiler/host wiring only in the current milestone; it does not yet
-provide the DOM `Canvas` or programmatic root APIs.
+client-only on the server, ignores authored text inside scenes, exposes a
+renderer-local intrinsic catalogue without merging Three tags into DOM JSX,
+and declares `Canvas.children` as the DOM-to-Three renderer boundary.
+
+## Canvas and scene modules
+
+The application remains a normal DOM Octane app. Only scene modules use the
+`.three.tsrx` convention:
+
+```tsx
+// App.tsrx
+import { Canvas } from '@octanejs/three';
+import { Scene } from './Scene.three.tsrx';
+
+export function App() @{
+	<Canvas frameloop="demand">
+		<Scene />
+	</Canvas>
+}
+```
+
+```tsx
+// Scene.three.tsrx
+import { useFrame } from '@octanejs/three';
+import { useRef } from '@octanejs/three/renderer';
+
+export function Scene() @{
+	const mesh = useRef(null);
+	useFrame((_state, delta) => (mesh.current.rotation.x += delta));
+	<mesh ref={mesh}>
+		<boxGeometry args={[1, 1, 1]} />
+		<meshBasicMaterial color="hotpink" />
+	</mesh>
+}
+```
+
+The low-level API follows Octane's component-plus-props root convention. Both
+synchronous and asynchronous renderer factories settle before the component
+can execute:
+
+```ts
+import { createRoot } from '@octanejs/three';
+
+const root = createRoot(canvas);
+await root.configure({ frameloop: 'never', dpr: 1 });
+root.render(Scene, { color: 'hotpink' });
+root.store.getState().advance(1 / 60);
+```
+
+Tests can inject the WebGL-free deterministic harness from
+`@octanejs/three/testing`; it drives the same root, host commits, hooks, and
+public `advance()` loop as an application. Its awaitable `fireEvent()` helper
+directly invokes the latest committed handler and settles scheduled work when
+raycasting itself is not under test.
+
+`Canvas` installs the default web event manager. Use `eventSource` to subscribe
+through another element and `eventPrefix` (`offset`, `client`, `page`, `layer`,
+or `screen`) to choose the coordinate pair. Programmatic roots can supply a
+custom `events(store)` manager factory and update it through `state.setEvents()`.
+
+`useStore()` returns the upstream-compatible callable store. Because a later
+`store(selector)` call is a dynamic function call, the compiler cannot assign
+that call its own lexical hook slot; keep that compatibility form unconditional
+and in stable order. Prefer `useStore(selector, equality?)` or
+`useThree(selector, equality?)` when using Octane's conditional-hook semantics.
 
 ## Compatibility target
 

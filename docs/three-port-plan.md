@@ -433,7 +433,7 @@ decision and tests.
 - Typed `ThreeElements`, math/color shorthand props, constructor inference,
   events on raycastable objects, and custom `extend` types.
 - Vite and Rsbuild application builds, a raw Rspack compilation/HMR fixture,
-  and one real-browser WebGL smoke. Pointer parity remains a later milestone.
+  and real-browser WebGL and pointer-event smoke coverage.
 
 ### Required for stable R3F v9 web/core parity
 
@@ -538,6 +538,21 @@ disposal assertions.
 
 ### Milestone 3 — store, Canvas, loop, and hooks (2–3 engineer-weeks)
 
+Status: implemented. The technical-preview surface now includes the callable
+vanilla store, serialized promise-returning root configuration, pending
+configuration teardown, package-owned universal store provider, measured DOM
+Canvas boundary, shared frame scheduler, public hooks/graph helpers, and the
+deterministic testing harness. Dedicated client-only Vite, Rsbuild, raw Rspack,
+and Chromium evidence closes the milestone without claiming the full Canvas
+SSR/hydration lifecycle reserved for Milestone 7.
+
+The upstream `useStore()(selector)` compatibility form remains order-based:
+the compiler cannot assign lexical slots to calls through arbitrary dynamic
+function values. Octane scene code should use the compiler-visible
+`useStore(selector, equality?)` extension or `useThree(selector, equality?)`
+when relying on conditional-hook semantics. Fully slotting arbitrary returned
+hook functions would require a separate compiler/dataflow contract.
+
 - Root store/configuration, scene/camera/raycaster/renderer, resize/DPR/
   viewport, color/shadows, Canvas boundary, cleanup, frame loop, global effects,
   `useStore`, `useThree`, `useFrame`, `useGraph`, and basic testing helper.
@@ -553,6 +568,15 @@ Async renderer creation settles `configure()` before rendering. This is the
 technical-preview cut if deferred features reject clearly.
 
 ### Milestone 4 — ray/pointer events (2–3 engineer-weeks)
+
+Status: implemented. The renderer-neutral dispatcher, default web event
+manager, Canvas source/prefix binding, interaction-state transfer, and direct
+testing helper now cover R3F 9.6.1 hit ordering, Three ancestry bubbling,
+hover, misses, propagation, pointer capture, custom managers, and reconstruction.
+The same-source differential suite compares normalized R3F/Octane event logs
+and resulting interaction state; the Chromium fixture proves native connection,
+capture, release, lost-capture cleanup, removal, and misses. Retained Activity
+subtrees leave raycast eligibility while hidden and rejoin it when visible.
 
 - Universal event classification and priority, DOM event connection, pointer
   normalization, intersections, bubbling, hover, misses, propagation, capture,
