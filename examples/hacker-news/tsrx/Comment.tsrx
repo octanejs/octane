@@ -16,13 +16,9 @@ export function Comment({ id, depth }: { id: number; depth: number }) @{
 	// Dead/deleted comments (and the occasional missing item) render nothing.
 	if (!data || data.deleted || data.dead) return null;
 
-	// Stop recursing past MAX_DEPTH by rendering no children (an empty `@for`)
-	// rather than wrapping the loop in an `@if` — keeps the suspense `@try` at the
-	// loop's top level, which the SSR compiler supports. Kids are capped to
-	// COMMENT_KIDS_LIMIT so the render matches the server's bounded prefetch (an
-	// unprefetched comment would suspend mid-SSR and stall) — identical in both apps.
-	const childIds =
-		depth < MAX_DEPTH ? (data.kids ?? []).slice(0, COMMENT_KIDS_LIMIT) : [];
+	// Kids are capped to COMMENT_KIDS_LIMIT so the render matches the server's
+	// bounded prefetch; an unprefetched comment would suspend mid-SSR and stall.
+	const childIds = (data.kids ?? []).slice(0, COMMENT_KIDS_LIMIT);
 
 	<div data-testid="comment" {...stylex.props(styles.comment)}>
 		<div {...stylex.props(styles.commentMeta)}>
@@ -40,11 +36,13 @@ export function Comment({ id, depth }: { id: number; depth: number }) @{
 			{...stylex.props(styles.commentText)}
 			dangerouslySetInnerHTML={{ __html: data.text ?? '' }}
 		/>
-		@for (const kid of childIds; key kid) {
-			@try {
-				<Comment id={kid} depth={depth + 1} />
-			} @pending {
-				<div {...stylex.props(styles.comment)}>{'…'}</div>
+		@if (depth < MAX_DEPTH) {
+			@for (const kid of childIds; key kid) {
+				@try {
+					<Comment id={kid} depth={depth + 1} />
+				} @pending {
+					<div {...stylex.props(styles.comment)}>{'…'}</div>
+				};
 			}
 		}
 	</div>

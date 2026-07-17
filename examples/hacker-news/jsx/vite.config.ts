@@ -1,35 +1,20 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vite';
 import { octane } from 'octane/compiler/vite';
 import { stylex } from '@octanejs/stylex/vite';
-
-// SSR alias: on the server, bare `import … from 'octane'` must resolve to the
-// SERVER runtime (`octane/server`), never the client runtime (which touches
-// `document`). The octane compiler already rewrites this for the app's own
-// `.tsx`/`.tsrx` it transforms, but the `@octanejs/*` binding packages' raw `.ts`
-// sources (excluded from the compiler below) import bare `'octane'` — so we
-// redirect those for the SSR module graph here. Client builds are untouched.
-function octaneServerAlias(): Plugin {
-	return {
-		name: 'octane-ssr-server-alias',
-		enforce: 'pre',
-		async resolveId(source, importer, options) {
-			if (!options?.ssr) return null;
-			if (source !== 'octane') return null;
-			// Avoid recursing on the already-redirected id.
-			const resolved = await this.resolve('octane/server', importer, { skipSelf: true });
-			return resolved?.id ?? null;
-		},
-	};
-}
 
 export default defineConfig({
 	// index.html lives here; ../shared is imported across the dir boundary.
 	root: fileURLToPath(new URL('.', import.meta.url)),
+	// JSX and TSRX servers run concurrently in the E2E fixture. Give each client
+	// graph its own optimizer cache so one Vite process cannot replace another
+	// process's cold-start metadata.
+	cacheDir: fileURLToPath(new URL('../node_modules/.vite-jsx-client', import.meta.url)),
 
 	plugins: [
-		octaneServerAlias(),
-		// Full-compile the app's `.tsx`/`.tsrx`. The binding packages'
+		// The compiler discovers raw bindings from the parent package manifest,
+		// routes their bare `octane` imports to the SSR runtime, and full-compiles
+		// the app's `.tsx`/`.tsrx`. The binding packages'
 		// hand-written slot-forwarding `.ts` sources declare
 		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
 		// plugin skips re-slotting them automatically. The shared app `.ts` files
@@ -38,24 +23,6 @@ export default defineConfig({
 		octane(),
 		stylex(),
 	],
-
-	// `octane` (+ the @octanejs/* bindings) ship raw TS, so Vite must TRANSFORM
-	// them for the SSR module graph instead of externalizing (a Node require of
-	// raw `.ts`/`.tsrx` would fail, and the server runtime needs compiling).
-	ssr: {
-		noExternal: [/^octane($|\/)/, /^@octanejs\//],
-	},
-
-	optimizeDeps: {
-		// All workspace:* pointing at raw TS sources — pre-bundling would snapshot
-		// stale output and demand `vite --force` on every workspace edit.
-		exclude: [
-			'octane',
-			'@octanejs/tanstack-router',
-			'@octanejs/stylex',
-			'@octanejs/tanstack-query',
-		],
-	},
 
 	build: {
 		target: 'esnext',

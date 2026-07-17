@@ -558,14 +558,35 @@ class OctaneBundlerCompiler {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
 		};
-		const projectManifestPath = join(this.root, 'package.json');
-		let projectManifest;
-		try {
-			projectManifest = JSON.parse(readFileSync(projectManifestPath, 'utf8'));
-			collected.dependencies.add(projectManifestPath);
-		} catch {
-			if (existsSync(projectManifestPath)) collected.dependencies.add(projectManifestPath);
-			else collected.missingDependencies.add(projectManifestPath);
+		// Vite's root is the directory containing index.html, not necessarily the
+		// package root. Multi-entry examples commonly keep one package.json above
+		// sibling roots (for example `jsx/` and `tsrx/`). Walk upward to the nearest
+		// owning manifest while watching every missing nearer path: creating a new
+		// nested package boundary must invalidate discovery on the next rebuild.
+		let projectManifestPath = null;
+		let projectManifestRoot = null;
+		let projectManifest = null;
+		let candidateRoot = this.root;
+		for (;;) {
+			const candidate = join(candidateRoot, 'package.json');
+			if (existsSync(candidate)) {
+				collected.dependencies.add(candidate);
+				projectManifestPath = candidate;
+				projectManifestRoot = candidateRoot;
+				try {
+					projectManifest = JSON.parse(readFileSync(candidate, 'utf8'));
+				} catch {
+					// The nearest manifest owns this root even when it is temporarily
+					// unreadable or invalid. Do not silently inherit a parent package.
+				}
+				break;
+			}
+			collected.missingDependencies.add(candidate);
+			const parent = dirname(candidateRoot);
+			if (parent === candidateRoot) break;
+			candidateRoot = parent;
+		}
+		if (projectManifestPath === null || projectManifestRoot === null || projectManifest === null) {
 			this.discoveryCache = {
 				packages: [],
 				viteOptimizeDepsExclusions: [],
@@ -623,7 +644,7 @@ class OctaneBundlerCompiler {
 				}
 			}
 		};
-		for (const name of dependencyNames) visit(name, this.root);
+		for (const name of dependencyNames) visit(name, projectManifestRoot);
 		const viteOptimizeDepsExclusions = expandViteOptimizeDepsExclusions(
 			viteOptimizeDepsExclusionRules,
 			viteOptimizeDepsCandidates,

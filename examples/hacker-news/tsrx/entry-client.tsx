@@ -36,13 +36,10 @@ if (dataEl) {
 	// hydrate, not the <HydrationBoundary> wrapper), so the first hydration render
 	// of the route's useSuspenseQuery is a cache hit and matches the server DOM.
 	hydrate(queryClient, state);
-	// The client store factory commits the router matches inside a transition, so
-	// wait until they've landed before hydrating — otherwise the first render sees
-	// an empty route tree and the adopt would wipe the server DOM.
+	// `router.load()` is the binding's render-readiness boundary: once it resolves,
+	// active matches have committed even when a platform View Transition deferred
+	// the update callback, so hydration can begin without polling router internals.
 	await router.load();
-	for (let i = 0; i < 50 && (router.stores.matches.get?.() ?? []).length === 0; i++) {
-		await new Promise((r) => setTimeout(r, 0));
-	}
 	hydrateRoot(container, tree);
 } else {
 	await router.load();

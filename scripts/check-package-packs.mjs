@@ -37,6 +37,7 @@ const viteToolRequire = createRequire(
 	path.join(REPO_ROOT, 'packages/vite-plugin-octane/package.json'),
 );
 const viteVersion = viteToolRequire('vite/package.json').version;
+const nodeTypesVersion = viteToolRequire('@types/node/package.json').version;
 const packedExampleCanaries = [
 	{
 		artifacts: ['dist/index.html'],
@@ -347,6 +348,10 @@ async function validatePackedConsumer(tempRoot, archives) {
 					rxjs: '^7.8.2',
 					three: '0.172.0',
 				},
+				devDependencies: {
+					'@types/node': nodeTypesVersion,
+					vite: viteVersion,
+				},
 			},
 			null,
 			2,
@@ -430,6 +435,25 @@ export function packageSurfaceProbe() {
 `,
 	);
 	writeFileSync(
+		path.join(sourceDirectory, 'compiler-plugin.ts'),
+		`import type { Plugin } from 'vite';
+import {
+	discoverOctaneSourceDependencies,
+	octane,
+	type OctaneVitePluginOptions,
+} from 'octane/compiler/vite';
+
+const options = {
+	hmr: false,
+	profile: false,
+	requireDirective: true,
+} satisfies OctaneVitePluginOptions;
+
+export const compilerPlugin: Plugin = octane(options);
+export const sourceDependencies: string[] = discoverOctaneSourceDependencies(process.cwd());
+`,
+	);
+	writeFileSync(
 		path.join(sourceDirectory, 'main.tsrx'),
 		`import { createRoot } from 'octane';
 import { App } from './App.tsrx';
@@ -461,8 +485,9 @@ export function renderProbe() {
 					skipLibCheck: false,
 					strict: true,
 					target: 'esnext',
+					types: ['node'],
 				},
-				include: ['src/package-surface.ts'],
+				include: ['src/compiler-plugin.ts', 'src/package-surface.ts'],
 			},
 			null,
 			2,
