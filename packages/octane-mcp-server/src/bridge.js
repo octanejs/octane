@@ -370,6 +370,28 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 	return report;
 }
 
+// Filesystem-free variant of bridgeReport for hosted/remote use: the caller
+// pastes source text instead of pointing at an installed package, so there is
+// no node_modules resolution, no version, and no file counting. Everything
+// else (API rows, verdict, plan) matches bridgeReport.
+export function bridgeReportFromSource(source, { packageName } = {}) {
+	const report = {
+		target: packageName ?? 'pasted-source',
+		existingBinding: packageName ? (KNOWN_BINDINGS[packageName] ?? null) : null,
+	};
+	if (packageName) {
+		report.vanillaCore = detectVanillaCore(packageName, null);
+	}
+	const scan = scanSource(source);
+	const rows = apiRows(scan.apis);
+	report.reactImports = [...scan.imports];
+	report.classComponents = scan.classComponent;
+	report.apis = rows;
+	report.verdict = verdictFor(rows, scan.classComponent);
+	report.plan = planFor(report);
+	return report;
+}
+
 function planFor(report) {
 	const steps = [];
 	if (report.existingBinding) {
