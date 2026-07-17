@@ -74,4 +74,35 @@ describe('@octanejs/tiptap useEditor', () => {
 		expect(replacementEditor.isDestroyed).toBe(true);
 		expect(destroys.at(-1)).toBe('replacement');
 	});
+
+	it('tolerates the deferred destroy firing after the environment is torn down', () => {
+		vi.useFakeTimers();
+		const noop = () => {};
+		const editors: any[] = [];
+		const result = mount(LifecycleEditor as any, {
+			onEditor: (editor: any) => editors.push(editor),
+			onMount: noop,
+			onUnmount: noop,
+			onDestroy: noop,
+			onUpdate: noop,
+			dependency: 'only',
+			label: 'torn-down',
+		});
+		settle();
+		expect(editors.at(-1)).toBeTruthy();
+
+		result.unmount();
+		flushEffects();
+
+		// Unmount defers the final Editor.destroy by a timer tick. A test runner
+		// can dispose the jsdom environment inside that window (the `window`
+		// global disappears), and the late destroy must not surface an unhandled
+		// error from prosemirror-view's window access.
+		vi.stubGlobal('window', undefined);
+		try {
+			expect(() => vi.runAllTimers()).not.toThrow();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
 });

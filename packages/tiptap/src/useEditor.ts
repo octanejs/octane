@@ -205,7 +205,20 @@ class EditorInstanceManager {
 		const currentInstanceId = this.instanceId;
 		const currentEditor = this.editor;
 
+		// Re-arming replaces any pending destruction timer so two can never race.
+		clearTimeout(this.scheduledDestructionTimeout);
 		this.scheduledDestructionTimeout = setTimeout(() => {
+			this.scheduledDestructionTimeout = undefined;
+
+			// This timer outlives the owning component by a tick, so it can fire
+			// after the DOM environment the editor lives in is gone (e.g. a test
+			// runner disposing jsdom between files). Touching the editor then would
+			// crash inside prosemirror-view's `window` access, and there is nothing
+			// left to release anyway.
+			if (typeof window === 'undefined') {
+				return;
+			}
+
 			if (this.isComponentMounted && this.instanceId === currentInstanceId) {
 				currentEditor?.setOptions(this.options.current);
 				return;
