@@ -38,7 +38,7 @@
     "evals:test": "pnpm --filter @octanejs/evals test",
     "changeset": "changeset && pnpm changeset:check",
     "changeset:check": "node scripts/check-changesets.js",
-    "changeset:version": "pnpm changeset:check && changeset version && pnpm bindings:status && pnpm packages:inventory",
+    "changeset:version": "pnpm changeset:check && changeset version && pnpm bindings:status && pnpm packages:inventory && pnpm --filter @octanejs/evals corpus:generate",
     "changeset:publish": "pnpm changeset:check && changeset publish",
     "prepare": "rulesync generate || true",
     "rules:generate": "rulesync generate",
