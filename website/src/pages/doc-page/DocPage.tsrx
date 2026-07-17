@@ -133,6 +133,9 @@ export function DocPage() @{
 			track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
 		};
 		place();
+		// The observer is a browser-only enhancement over the essential place()
+		// above — jsdom (the website unit tests) doesn't implement it.
+		if (typeof ResizeObserver === 'undefined') return;
 		const observer = new ResizeObserver(place);
 		observer.observe(track);
 		observer.observe(link);
