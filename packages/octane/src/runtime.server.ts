@@ -86,6 +86,11 @@ interface SsrElementContext {
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 
 let CURRENT_SCOPE: SSRScope | null = null;
+// Empty compiler batches register child-only warm plans for the synchronous
+// component call stack. A pending descendant batch activates the live plans;
+// invokeComponentBody checkpoints keep nested renders and retries isolated.
+const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
+let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
 let CSS: Map<string, string> | null = null;
@@ -2509,8 +2514,10 @@ function invokeComponentBody(
 	const prevHP = HOOK_PASS;
 	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
 	const snapshot = captureComponentReplayState(scope, frame);
+	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 	HOOK_PASS = hp;
 	try {
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		let out = comp(props ?? {}, scope, undefined);
 		let passes = 1;
 		while (hp.update) {
@@ -2522,10 +2529,12 @@ function invokeComponentBody(
 			hp.update = false;
 			hp.occ = new Map();
 			rewindComponentReplayState(snapshot, scope, frame);
+			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			out = comp(props ?? {}, scope, undefined);
 		}
 		return out;
 	} finally {
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
 	}
 }
@@ -3442,12 +3451,13 @@ let PU_ID = 0;
 export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
 	const res = RESOLVED as ResolvedMap | null;
 	if (res === null) return fn();
+	const resolvedSiteKey = siteKey === undefined ? undefined : resolveHookSlot(siteKey);
 	const base =
-		siteKey === undefined
+		resolvedSiteKey === undefined
 			? '@pu'
-			: typeof siteKey === 'symbol'
-				? (siteKey as symbol).toString()
-				: String(siteKey);
+			: typeof resolvedSiteKey === 'symbol'
+				? (resolvedSiteKey as symbol).toString()
+				: String(resolvedSiteKey);
 	const frame = FRAME;
 	let n = 0;
 	let prefix = ASYNC_SCOPE;
@@ -3461,23 +3471,29 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 	// Warm adoption: a parent's warm walk may have prefetched this creation
 	// (keyed by the shared slot symbol). Deps must match — a drift between the
 	// warm-time and render-time props is a clean miss (the orphaned entry dies
-	// with the render). TRANSFER: the entry moves into the frame-keyed created
-	// cache so later passes hit it directly.
+	// with the render). The value is adopted once into the frame-keyed created
+	// cache; its unavailable warm tombstone prevents later speculative refetches.
 	if (siteKey !== undefined) {
 		const wlist = res.pu.warm.get(siteKey);
 		if (wlist !== undefined) {
 			for (let i = 0; i < wlist.length; i++) {
 				if (puDepsEqual(wlist[i].deps, deps)) {
+					if (!wlist[i].available) continue;
+					wlist[i].available = false;
 					const value = wlist[i].value;
-					wlist.splice(i, 1);
-					res.pu.created.set(key, { deps, value });
+					res.pu.created.set(key, {
+						deps,
+						value,
+						site: resolvedSiteKey,
+						frame,
+					});
 					return value as T;
 				}
 			}
 		}
 	}
 	const value = fn();
-	res.pu.created.set(key, { deps, value });
+	res.pu.created.set(key, { deps, value, site: resolvedSiteKey, frame });
 	return value;
 }
 
@@ -3490,6 +3506,12 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
  * again. Falls through silently when everything is already resolved.
  */
 export function puBatch(thenables: unknown[], warm?: () => void): void {
+	// Compiler registration form. Keep the plan lazy so synchronous component
+	// trees perform no speculative walk and allocate no warm entries.
+	if (thenables.length === 0) {
+		if (warm !== undefined) ACTIVE_PU_WARM_PLANS.push(warm);
+		return;
+	}
 	const res = RESOLVED as ResolvedMap | null;
 	const pu = res !== null ? res.pu : null;
 	let pending = false;
@@ -3552,16 +3574,33 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 	}
 	if (!pending) return;
 	// About to suspend — run the warm walk first (the compiler passes the thunk
-	// on the FIRST in-body batch): descendant components' independent creations
+	// on the active component stack): descendant components' independent creations
 	// start AND register with this round via warmMemo, so their data resolves
 	// before their bodies ever run — component depth collapses to true
 	// data-dependency depth. Speculative: a throwing plan just means fewer
 	// prefetches.
-	if (warm !== undefined) {
+	if (ACTIVE_PU_WARM_PLANS.length !== 0 || warm !== undefined) {
+		const previousClaims = CURRENT_PU_WARM_CLAIMS;
+		CURRENT_PU_WARM_CLAIMS = new Set();
 		try {
-			warm();
-		} catch {
-			/* speculative */
+			for (let i = 0; i < ACTIVE_PU_WARM_PLANS.length; i++) {
+				CURRENT_PU_WARM_CLAIMS = new Set();
+				try {
+					ACTIVE_PU_WARM_PLANS[i]();
+				} catch {
+					// Independent speculative plans cannot block adjacent warming.
+				}
+			}
+			if (warm !== undefined) {
+				CURRENT_PU_WARM_CLAIMS = new Set();
+				try {
+					warm();
+				} catch {
+					/* speculative */
+				}
+			}
+		} finally {
+			CURRENT_PU_WARM_CLAIMS = previousClaims;
 		}
 	}
 	// Same discovery-job bookkeeping as a suspending use(): register the
@@ -3584,16 +3623,18 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 // compiler cannot prove finite (mirrors the client's cap).
 let WARM_DEPTH = 0;
 const WARM_DEPTH_CAP = 64;
-const WARM_SLOT_CAP = 64;
+// Per-slot occurrence queues are render-local and must remain complete: dropping
+// their FIFO head would give a repeated component a later instance's value.
 
 /**
  * Start (and cache) one prefetched creation from a component's compiled fetch
- * plan (`Comp.__warm`). Dedups on (slot, deps) so a re-warm during a later
- * suspending pass never double-starts a fetch. The resulting thenable is
- * REGISTERED with the render loop so the current round awaits it — that is
- * the whole point: the descendant's data settles before its body runs, and
- * its unwraps then resolve by identity (resolvedT). Speculative: a throwing
- * creation is simply not warmed.
+ * plan (`Comp.__warm`). Each plan occurrence claims one matching (slot, deps)
+ * entry, so later passes reuse concrete work while repeated equal-dependency
+ * instances still start separately. The resulting thenable is REGISTERED with
+ * the render loop so the current round awaits it — that is the whole point: the
+ * descendant's data settles before its body runs, and its unwraps then resolve
+ * by identity (resolvedT). Speculative: a throwing creation is simply not
+ * warmed.
  */
 export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): void {
 	const res = RESOLVED;
@@ -3602,8 +3643,38 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	let list = warm.get(slot);
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
-			if (puDepsEqual(list[i].deps, deps)) return; // already warmed
+			const entry = list[i];
+			if (!puDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
+			CURRENT_PU_WARM_CLAIMS?.add(entry);
+			return; // this concrete occurrence already ran or warmed
 		}
+	}
+	// A parent plan recurses through the currently-rendering source component as
+	// well as earlier siblings. Claim every matching created occurrence across
+	// the current render request, not only frame ancestors, before speculating.
+	let activeCreation:
+		| { deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
+		| undefined;
+	for (const created of res.pu.created.values()) {
+		if (
+			created.site === slot &&
+			puDepsEqual(created.deps, deps) &&
+			!CURRENT_PU_WARM_CLAIMS?.has(created)
+		) {
+			activeCreation = created;
+			break;
+		}
+	}
+	if (activeCreation !== undefined) {
+		CURRENT_PU_WARM_CLAIMS?.add(activeCreation);
+		if (list === undefined) {
+			list = [];
+			warm.set(slot, list);
+		}
+		const entry = { deps, value: undefined, available: false };
+		list.push(entry);
+		CURRENT_PU_WARM_CLAIMS?.add(entry);
+		return;
 	}
 	let value: unknown;
 	try {
@@ -3615,8 +3686,9 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 		list = [];
 		warm.set(slot, list);
 	}
-	list.push({ deps, value });
-	if (list.length > WARM_SLOT_CAP) list.shift();
+	const entry = { deps, value, available: true };
+	list.push(entry);
+	CURRENT_PU_WARM_CLAIMS?.add(entry);
 	if (
 		value != null &&
 		typeof (value as any).then === 'function' &&
@@ -4332,12 +4404,15 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
 	nestingWarnings?: Set<string>;
 	pu: {
-		created: Map<string, { deps: unknown[]; value: unknown }>;
+		created: Map<
+			string,
+			{ deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
+		>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
 		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
-		// deps-matched, TRANSFER semantics: the descendant's real puMemo adopts
-		// (and removes) its entry, so a warmed fetch is consumed exactly once.
-		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown }[]>;
+		// a value is adoptable once, while its retained tombstone prevents a later
+		// dependency stratum from speculatively recreating the same request.
+		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown; available: boolean }[]>;
 	};
 };
 function newResolvedMap(): ResolvedMap {
@@ -4372,6 +4447,8 @@ interface FullPassResult {
 // in-flight pass — the globals are always restored before we yield the tick.
 interface Ambient {
 	scope: SSRScope | null;
+	warmPlans: Array<() => void>;
+	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
 	css: Map<string, string> | null;
@@ -4395,6 +4472,8 @@ interface Ambient {
 function saveAmbient(): Ambient {
 	return {
 		scope: CURRENT_SCOPE,
+		warmPlans: ACTIVE_PU_WARM_PLANS.slice(),
+		warmClaims: CURRENT_PU_WARM_CLAIMS,
 		id: ID_COUNTER,
 		idPrefix: ID_PREFIX,
 		css: CSS,
@@ -4418,6 +4497,9 @@ function saveAmbient(): Ambient {
 }
 function restoreAmbient(a: Ambient): void {
 	CURRENT_SCOPE = a.scope;
+	ACTIVE_PU_WARM_PLANS.length = 0;
+	ACTIVE_PU_WARM_PLANS.push(...a.warmPlans);
+	CURRENT_PU_WARM_CLAIMS = a.warmClaims;
 	ID_COUNTER = a.id;
 	ID_PREFIX = a.idPrefix;
 	CSS = a.css;
@@ -4461,6 +4543,8 @@ function runFullFramedPass(
 	markers: boolean = true,
 ): FullPassResult {
 	const saved = saveAmbient();
+	ACTIVE_PU_WARM_PLANS.length = 0;
+	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
 	ASYNC_SCOPE = '';
@@ -4549,6 +4633,8 @@ function runDiscoveryRound(
 	identifierPrefix: string,
 ): { suspended: SuspendedList; deferred: Job[] } {
 	const saved = saveAmbient();
+	ACTIVE_PU_WARM_PLANS.length = 0;
+	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
 	ASYNC_SCOPE = '';

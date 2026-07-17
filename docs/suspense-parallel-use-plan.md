@@ -15,6 +15,12 @@
 > 19.1ms update (1.2–1.3× the 16ms parallel floor, Solid 2.0/Ripple
 > territory)** vs React 307.3/190.1ms, ratio-guarded both ways (≤0.25× React,
 > ≤1.5× solid/ripple).
+>
+> **Composition follow-up LANDED 2026-07-17.**
+> `benchmarks/async-composition` now covers imported plain-TypeScript custom
+> hooks, adjacent async siblings, nested async children, and one true data
+> dependency. Octane reaches the honest **2-wave / 8-call** floor (about 105ms
+> at 50ms simulated latency), versus the original 6 waves / 23 calls.
 
 ## Execution record (2026-07-09)
 
@@ -114,6 +120,21 @@ What shipped, and where it deviates from the phases as written:
   compiler/plugin branches. The homepage "Compiled templates" copy and the
   RuleSync intentional-divergence entry (AGENTS/CLAUDE/etc.) shipped with the
   original default flip.
+- **Real-world composition follow-up LANDED 2026-07-17.** Plain `.ts`/`.js`
+  modules now apply the same memoize/stratify/batch transform to lexically
+  imported `use()` calls (including aliases), with client `useMemo`/`useBatch`
+  and server `puMemo`/`puBatch` twins. The first direct batch carries its warm
+  thunk; once setup reaches the final output, child-only plans register through
+  an empty compiler batch and stay lazy until a descendant batch actually
+  suspends. Components with setup early returns conservatively publish no
+  descendant plan. Every live ancestor plan warms into an episode-scoped cache
+  owned above adjacent siblings. Warmable creation slots use globally
+  composable Symbols (scope-local integers collide across sibling components),
+  while occurrence-aware claims give repeated instances with equal dependencies
+  separate entries. Consumed entries and real-memo tombstones prevent later
+  true-dependency strata or siblings from refetching prior work. Client, SSR,
+  production, and universal-renderer regressions pin distinct and repeated
+  same-dependency siblings plus exactly-once creation.
 - **Decision points resolved:** (1) unconditional, with no serial-timing mode;
   (2) loops excluded — mandatory (Phase 0); (3) member-path deps; (4)
   AbortSignal not shipped; (5)

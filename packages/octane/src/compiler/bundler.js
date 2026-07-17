@@ -627,6 +627,7 @@ class OctaneBundlerCompiler {
 			const specializeVoidRoot =
 				environment === 'client' && hmr === false && dev === false && profile === false;
 			const out = slotHooks(code, filename, {
+				environment,
 				hmr: !!hmr,
 				profile,
 				profileFilename,

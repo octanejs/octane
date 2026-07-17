@@ -245,16 +245,16 @@
     "op": "init_waves",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.0,
-    "note": "Cross-framework cold-mount topology guard: Octane and React both take 6 waves in the initial 2026-07-16 record. The suite separately enforces Octane's absolute six-wave ceiling; tighten this ratio toward the honest two-wave floor after composition gaps close."
+    "maxRatio": 0.5,
+    "note": "Cross-framework cold-mount topology guard: Octane reaches the honest 2-wave dependency floor vs React's 6 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
     "suite": "async-composition",
     "op": "update_waves",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 2.0,
-    "note": "Cross-framework transition topology guard: Octane takes 6 waves vs React's 3 on the initial 2026-07-16 record. The suite separately enforces Octane's absolute six-wave ceiling; tighten this ratio toward 1.0 as composition warming improves."
+    "maxRatio": 1.0,
+    "note": "Cross-framework transition topology guard: Octane reaches the honest 2-wave dependency floor vs React's 3 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
     "suite": "js-framework",

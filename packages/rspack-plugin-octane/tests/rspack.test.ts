@@ -143,6 +143,7 @@ export const universalChildren = (value) => value;
 export const universalContext = () => null;
 export const universalActivity = () => null;
 export const rendererRegion = (_owner, _child, body) => body;
+export const useBatch = () => undefined;
 export const warmChild = () => undefined;
 `,
 		);
