@@ -63,6 +63,14 @@ function identifierCallCount(code: string, name: string): number {
 	return count;
 }
 
+function nodeTypeCount(code: string, type: string): number {
+	let count = 0;
+	walkAst(parseModule(code, 'compiled.js'), (node) => {
+		if (node.type === type) count++;
+	});
+	return count;
+}
+
 function runtimeExports(code: string): Set<string> {
 	const names = new Set<string>();
 	for (const node of parseModule(code, 'compiled.js').body as any[]) {
@@ -482,6 +490,35 @@ export function App(Deferred) @{ <Deferred when={gate}><b>child</b></Deferred> }
 		).toEqual(new Set());
 	});
 
+	it('preserves nested component hooks and ordinary-function receivers in split children', () => {
+		const source = `
+import { Hydrate, useState } from 'octane';
+import { Renderer } from './Renderer.tsrx';
+export function App() @{
+  <Hydrate when={gate}>
+    <Renderer
+      component={function Inline() { const [value] = useState('ready'); return <span>{value}</span>; }}
+      behavior={{ read() { return super.read(); } }}
+    />
+    <button onClick={function () { this.disabled = true; }}>go</button>
+  </Hydrate>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(dynamicImports(root.code)).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+		expect(staticImportLocals(root.code, './Renderer.tsrx')).toEqual([]);
+
+		const child = instance.transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(runtimeExports(child.code)).toEqual(new Set(['default']));
+		expect(staticImportLocals(child.code, './Renderer.tsrx')).toEqual(['Renderer']);
+		expect(identifierCallCount(child.code, 'useState')).toBeGreaterThan(0);
+		expect(nodeTypeCount(child.code, 'ThisExpression')).toBeGreaterThan(0);
+		expect(nodeTypeCount(child.code, 'Super')).toBeGreaterThan(0);
+	});
+
 	it.each([
 		{
 			code: 'OCTANE_HYDRATE_FUNCTION_CHILD',
@@ -504,6 +541,26 @@ export function App(Deferred) @{ <Deferred when={gate}><b>child</b></Deferred> }
 			source: `import { Hydrate } from 'octane'; export function App(child) @{ <Hydrate when={gate} children={child}></Hydrate> }`,
 		},
 	])('reports unsupported extraction as $code', ({ source, code }) => {
+		let thrown: any = null;
+		try {
+			compiler().transform(source, FILE, { environment: 'client' });
+		} catch (error) {
+			thrown = error;
+		}
+		expect(thrown).toMatchObject({ code, filename: '/src/App.tsrx' });
+		expect(thrown.message).toContain('split={false}');
+	});
+
+	it.each([
+		{
+			code: 'OCTANE_HYDRATE_THIS_CAPTURE',
+			source: `import { Hydrate } from 'octane'; class App { render() { return <Hydrate when={gate}><button onClick={() => this.value} /></Hydrate> } }`,
+		},
+		{
+			code: 'OCTANE_HYDRATE_SUPER_CAPTURE',
+			source: `import { Hydrate } from 'octane'; class Base { read() {} } class App extends Base { render() { return <Hydrate when={gate}><button onClick={() => super.read()} /></Hydrate> } }`,
+		},
+	])('still reports lexical arrow capture as $code', ({ source, code }) => {
 		let thrown: any = null;
 		try {
 			compiler().transform(source, FILE, { environment: 'client' });

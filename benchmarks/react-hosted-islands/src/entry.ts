@@ -109,3 +109,56 @@ export function mountIslandPage(count: number, scenario: Scenario): IslandPage {
 export function registerLateEventType(type: string): void {
 	delegateEvents([type]);
 }
+
+// ── Phase 2 structural scenario: transparent React context ──────────────────
+
+import { OctaneCompat, __hostContextFiberWalks } from 'octane/react';
+import { BenchTheme } from './host-context.js';
+import { ContextIsland } from './islands.tsrx';
+
+export { __hostContextFiberWalks };
+
+export interface ContextIslandPage {
+	setTheme(theme: string): void;
+	unmount(): void;
+}
+
+/**
+ * N public OctaneCompat islands, each reading one REAL React context, under a
+ * single provider whose value the harness updates. Provider walks must happen
+ * only at discovery (§13): the run.mjs gate fails on any post-subscription walk.
+ */
+export function mountContextIslandPage(count: number): ContextIslandPage {
+	const container = document.createElement('div');
+	document.body.appendChild(container);
+	const reactRoot = createReactRoot(container);
+	const h = React.createElement;
+	let setThemeState!: (theme: string) => void;
+	function App() {
+		const [theme, setTheme] = React.useState('t0');
+		setThemeState = setTheme;
+		return h(
+			BenchTheme,
+			{ value: theme },
+			h(
+				'main',
+				null,
+				Array.from({ length: count }, (_, index) =>
+					h(OctaneCompat, { key: index }, h(ContextIsland as never)),
+				),
+			),
+		);
+	}
+	reactFlushSync(() => {
+		reactRoot.render(h(App));
+	});
+	return {
+		setTheme(theme) {
+			reactFlushSync(() => setThemeState(theme));
+		},
+		unmount() {
+			reactFlushSync(() => reactRoot.unmount());
+			container.remove();
+		},
+	};
+}

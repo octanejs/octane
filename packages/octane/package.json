@@ -33,6 +33,7 @@
     ".": "./src/index.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
+    "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
@@ -61,6 +62,10 @@
       "./hydration": {
         "types": "./dist/hydration/index.d.ts",
         "default": "./dist/hydration/index.js"
+      },
+      "./react/server": {
+        "types": "./dist/react/server.d.ts",
+        "default": "./dist/react/server.js"
       },
       "./server": {
         "types": "./dist/server/index.d.ts",

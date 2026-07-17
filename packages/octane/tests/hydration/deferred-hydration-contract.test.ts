@@ -43,27 +43,81 @@ describe('deferred hydration contract edges', () => {
 		vi.unstubAllGlobals();
 	});
 
-	it('captures and replays interaction intent dispatched before hydrateRoot', () => {
-		const when = interaction({ events: 'click' });
+	for (const dynamic of [false, true]) {
+		it(`captures and replays ${dynamic ? 'dynamic ' : ''}interaction intent dispatched before hydrateRoot`, () => {
+			const when = dynamic
+				? () => interaction({ events: 'click' })
+				: interaction({ events: 'click' });
+			const onClick = vi.fn();
+			const onHydrated = vi.fn();
+			const { html } = renderToString(server.EarlyInteractionHydration, { when });
+			container.innerHTML = html;
+			const button = container.querySelector('#early-interaction') as HTMLButtonElement;
+
+			button.click();
+			expect(onClick).not.toHaveBeenCalled();
+
+			root = hydrateRoot(container, client.EarlyInteractionHydration, {
+				when,
+				onClick,
+				onHydrated,
+			});
+			flushSync(() => {});
+			flushEffects();
+
+			expect(container.querySelector('#early-interaction')).toBe(button);
+			expect(onHydrated).toHaveBeenCalledOnce();
+			expect(onClick).toHaveBeenCalledOnce();
+		});
+	}
+
+	it('keeps function-form visibility dormant after hydrateRoot interaction setup', async () => {
+		let intersect!: IntersectionObserverCallback;
+		const observe = vi.fn();
+		vi.stubGlobal(
+			'IntersectionObserver',
+			class {
+				constructor(callback: IntersectionObserverCallback) {
+					intersect = callback;
+				}
+				observe = observe;
+				unobserve = vi.fn();
+				disconnect = vi.fn();
+			},
+		);
+		const when = () => visible();
 		const onClick = vi.fn();
 		const onHydrated = vi.fn();
-		const { html } = renderToString(server.EarlyInteractionHydration, { when });
-		container.innerHTML = html;
+		container.innerHTML = renderToString(server.EarlyInteractionHydration, { when }).html;
 		const button = container.querySelector('#early-interaction') as HTMLButtonElement;
-
-		button.click();
-		expect(onClick).not.toHaveBeenCalled();
 
 		root = hydrateRoot(container, client.EarlyInteractionHydration, {
 			when,
 			onClick,
 			onHydrated,
 		});
-		flushSync(() => {});
-		flushEffects();
+		await act(() => {});
+		const wrapper = button.parentElement!;
+		expect(observe).toHaveBeenCalledWith(wrapper);
+		expect(container.querySelector('#early-interaction')).toBe(button);
+		expect(onHydrated).not.toHaveBeenCalled();
+		expect(onClick).not.toHaveBeenCalled();
 
+		await act(() => button.click());
+		expect(container.querySelector('#early-interaction')).toBe(button);
+		expect(onHydrated).not.toHaveBeenCalled();
+		expect(onClick).not.toHaveBeenCalled();
+
+		await act(() =>
+			intersect(
+				[{ isIntersecting: true, target: wrapper } as IntersectionObserverEntry],
+				{} as IntersectionObserver,
+			),
+		);
 		expect(container.querySelector('#early-interaction')).toBe(button);
 		expect(onHydrated).toHaveBeenCalledOnce();
+
+		await act(() => button.click());
 		expect(onClick).toHaveBeenCalledOnce();
 	});
 

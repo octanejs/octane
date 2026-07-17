@@ -22,11 +22,19 @@
  * ancestors observe real capture/bubble order, targets, and
  * `stopPropagation()`/`preventDefault()`.
  *
- * Phase status (§14): this is the Phase 1 client shell, carrying the root
- * suspension/error escape protocol validated by the Phase 0 spike
- * (packages/octane/tests/react-hosted/). Not yet implemented:
- * - transparent React context (Phase 2) — an island's `use(context)` sees its
- *   own local Octane providers and context defaults only;
+ * Transparent React context (Phase 2): an island's ordinary `use()`/
+ * `useContext()` accepts a REAL React 19 context object. The owner resolves
+ * it to a root-local Octane mirror, bootstraps the committed nearest-provider
+ * value from the host Fiber ONCE (see ./fiber-adapter.ts — the only
+ * Fiber-touching module), and subscribes by replaying `React.use(context)`
+ * for every registered entry in the wrapper render; committed snapshots
+ * publish in the layout phase with mirror version bumps. When the adapter
+ * cannot serve a read (unavailable, unknown Fiber shape, or a providerless
+ * read whose default only React may supply), the §6.3 HostContextRequest
+ * handshake retries with the authoritative value before paint.
+ *
+ * Phase status (§14): Phases 1–2 shipped (client shell + escape protocol +
+ * transparent context). Not yet implemented:
  * - server rendering/hydration of islands (Phase 4) — under React SSR the
  *   host renders empty and the island mounts on the client;
  * - selective per-island event delegation (Phase 5) — hosted roots currently
@@ -37,54 +45,63 @@
 import * as React from 'react';
 import {
 	bindRendererRegionOwner,
+	createContext as createOctaneContext,
 	createElement as createOctaneElement,
+	createHostContextRequest,
 	createRoot as createOctaneRoot,
+	hydrateRoot as hydrateOctaneRoot,
 	flushSync as octaneFlushSync,
 	type ComponentBody,
 	type Context as OctaneContext,
 	type Root as OctaneRoot,
 } from '../index.js';
+import {
+	OPAQUE_HOST_SENTINEL,
+	OPAQUE_HOST_SENTINEL_COMMENT,
+	REACT_CONTEXT_TAG,
+	validateIslandChild,
+	type OctaneCompatProps,
+	type TransportedChild,
+} from './shared.js';
+
+export type { OctaneCompatProps, OctaneReactComponent, OctaneRenderedNode } from './shared.js';
 import { drainPassiveEffects } from '../runtime.js';
+import { readNearestProviderValue } from './fiber-adapter.js';
 
-export interface OctaneCompatProps {
-	/** Exactly one compiled Octane component element. */
-	children: React.ReactElement;
-}
-
-declare const OCTANE_RENDERED: unique symbol;
-
-/**
- * Opaque branded node type for the JSX-facing view of a compiled Octane
- * component: assignable to `React.ReactNode` so React JSX accepts the child
- * site, but never actually produced at runtime — `OctaneCompat` consumes the
- * child element as a `{ type, props }` transport and React never invokes it.
- */
-export type OctaneRenderedNode = React.ReactElement & {
-	readonly [OCTANE_RENDERED]: 'octane';
-};
-
-/**
- * The React-JSX-facing type of a compiled Octane component. The runtime value
- * is the compiled body; only the declared type differs so `<Island …/>` is
- * valid zero-cast inside `<OctaneCompat>`. Intersects cleanly with
- * `ComponentBody<P>` so one declaration can serve both hosts.
- */
-export type OctaneReactComponent<P = Record<string, never>> = (props: P) => OctaneRenderedNode;
+// Structural bench/test hook (§13): provider walks happen only at discovery.
+export { __hostContextFiberWalks } from './fiber-adapter.js';
 
 /** Shared registry key the Octane runtime reads the owner bridge from. */
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
-
-interface TransportedChild {
-	type: ComponentBody;
-	props: Record<string, unknown>;
-	/** React key of the transported element — part of island identity (§3/§10). */
-	key: string | null;
-}
 
 interface PendingEpisode {
 	relay: Promise<void>;
 	resolve: () => void;
 }
+
+/**
+ * One registered foreign context (§6.2): the React context, its root-local
+ * Octane mirror (root-local so a provider change in one island never advances
+ * memo-invalidation versions in another), and the latest COMMITTED React
+ * snapshot the island may observe.
+ */
+interface HostedContextEntry {
+	foreign: object;
+	mirror: OctaneContext<unknown>;
+	value: unknown;
+	hasValue: boolean;
+	/** Pending §6.3 request settlers awaiting the first committed snapshot. */
+	settle: (() => void)[] | null;
+}
+
+/** Render-local pairing of the registry with its `React.use` reads (§5: never
+ * mutate an array a concurrent React render may be iterating). */
+interface ContextSnapshot {
+	entries: HostedContextEntry[];
+	values: unknown[];
+}
+
+const EMPTY_SNAPSHOT: ContextSnapshot = { entries: [], values: [] };
 
 /**
  * Private hosted-root envelope. A plain function is a valid Octane component
@@ -144,6 +161,9 @@ class HostedIslandController {
 	payload: unknown = null; // null, relay promise, or the original error
 	notify: () => void = () => {};
 
+	/** Foreign-context registry — immutable snapshots, replaced on discovery (§6.2). */
+	entries: HostedContextEntry[] = [];
+
 	private root: OctaneRoot | null = null;
 	private rootLive = false;
 	private attached = false;
@@ -156,14 +176,74 @@ class HostedIslandController {
 	private lifecycleGeneration = 0;
 	private attemptSuspended = false;
 	private attemptErrored = false;
+	/** §6.3 request thenables this controller minted (recognized in routeSuspense). */
+	private contextRequests = new WeakSet<PromiseLike<unknown>>();
+	/** True while an attach is adopting server DOM (hydration). */
+	private hydrating = false;
+	/** A §6.3 handshake unwound the last attempt; the next commit retries the root. */
+	private pendingContextRetry = false;
 
 	// ── RendererRegionOwnerBridge ──────────────────────────────────────────
 
+	/**
+	 * Foreign-context resolution (§6.2 steps 1–7): find or create the
+	 * root-local mirror for a real React context read inside the island. First
+	 * discovery bootstraps the committed nearest-provider value from the host
+	 * Fiber (bootstrap-only — the wrapper's `React.use` replay is the
+	 * subscription) and coalesces one React notification.
+	 */
+	resolveForeignContext(foreign: object): OctaneContext<any> | null {
+		if (this.disposed) return null;
+		// Only React context objects resolve here; anything else keeps the
+		// core diagnostic.
+		if ((foreign as { $$typeof?: unknown }).$$typeof !== REACT_CONTEXT_TAG) return null;
+		let entry = this.entries.find((candidate) => candidate.foreign === foreign);
+		if (entry === undefined) {
+			entry = {
+				foreign,
+				mirror: createOctaneContext<unknown>(undefined),
+				value: undefined,
+				hasValue: false,
+				settle: null,
+			};
+			if (this.host !== null) {
+				const boot = readNearestProviderValue(this.host, foreign);
+				if (boot.found) {
+					entry.value = boot.value;
+					entry.hasValue = true;
+				}
+				// found:false covers BOTH an unavailable adapter and a providerless
+				// read — no `_currentValue` inference; the §6.3 handshake supplies
+				// the authoritative value (including the context default).
+			}
+			this.entries = [...this.entries, entry];
+			this.notify();
+		}
+		return entry.mirror;
+	}
+
 	readContext<T>(context: OctaneContext<T>): T {
-		// Phase 2 resolves foreign React contexts here. Until then an island
-		// read with no local Octane provider sees the context default — the
-		// same value a bare Octane root would produce.
-		return context.defaultValue;
+		const entry = this.entries.find(
+			(candidate) => (candidate.mirror as OctaneContext<T>) === context,
+		);
+		if (entry === undefined) {
+			// An ordinary Octane context with no island-local provider — the same
+			// value a bare Octane root would produce.
+			return context.defaultValue;
+		}
+		if (entry.hasValue) return entry.value as T;
+		// §6.3 HostContextRequest: the value cannot be produced synchronously
+		// (adapter unavailable, or a providerless read whose default only
+		// `React.use` may supply). Unwind the attempt with the control signal;
+		// the wrapper's next commit publishes the authoritative snapshot,
+		// settles this request, and retries the root — all before paint.
+		let settle!: () => void;
+		const request = new Promise<void>((done) => {
+			settle = done;
+		});
+		(entry.settle ??= []).push(settle);
+		this.contextRequests.add(request);
+		throw createHostContextRequest(request);
 	}
 
 	routeError(error: unknown): boolean {
@@ -186,6 +266,22 @@ class HostedIslandController {
 
 	routeSuspense(thenable: PromiseLike<unknown>): boolean {
 		if (this.disposed) return false;
+		if (this.contextRequests.has(thenable)) {
+			// §6.3 handshake: no relay, no episode. The discovery notification is
+			// already queued, so the wrapper re-renders, its layout commit
+			// publishes the authoritative `React.use` snapshot, settles the
+			// request, and retries the root synchronously — all before paint.
+			if (this.hydrating && process.env.NODE_ENV !== 'production') {
+				// Adoption cannot be retried atomically: the handshake retry
+				// client-remounts only this island (§6.3 hydration fallback).
+				console.warn(
+					'<OctaneCompat> abandoned hydration for an island whose context ' +
+						'read needed the request handshake; the island was client-remounted.',
+				);
+			}
+			this.pendingContextRetry = true;
+			return true;
+		}
 		this.attemptSuspended = true;
 		let episode = this.episode;
 		if (episode === null) {
@@ -225,6 +321,55 @@ class HostedIslandController {
 
 	// ── wrapper integration ────────────────────────────────────────────────
 
+	/**
+	 * §6.2 step 8: render-local replay of every registered context read.
+	 * Runs during EVERY wrapper render — including one about to throw the
+	 * relay/error — so React records the dependencies (§7 step 3; retention
+	 * across suspended attempts is pinned by the Phase 0 tests).
+	 */
+	readReactSnapshots(): ContextSnapshot {
+		const entries = this.entries;
+		if (entries.length === 0) return EMPTY_SNAPSHOT;
+		const values: unknown[] = new Array(entries.length);
+		for (let index = 0; index < entries.length; index++) {
+			values[index] = React.use(entries[index].foreign as React.Context<unknown>);
+		}
+		return { entries, values };
+	}
+
+	/**
+	 * Layout-commit publish of the committed React snapshot (§6.2 step 9):
+	 * every `Object.is`-different value advances its root-local mirror's
+	 * version — without the bump, memo/context dependency checks would bail
+	 * out on the stale mirror value — and settles any §6.3 requests waiting on
+	 * a first value. Returns whether the island must re-render.
+	 */
+	private publishSnapshots(snapshot: ContextSnapshot): boolean {
+		let changed = false;
+		const live = this.entries;
+		const entries = snapshot.entries;
+		for (let index = 0; index < entries.length; index++) {
+			const entry = entries[index];
+			// A child-identity reset may have retired this entry between the
+			// wrapper render and this commit — never publish into a former tree.
+			if (live !== entries && !live.includes(entry)) continue;
+			const next = snapshot.values[index];
+			if (!entry.hasValue || !Object.is(entry.value, next)) {
+				entry.value = next;
+				entry.hasValue = true;
+				entry.mirror.$$version++;
+				changed = true;
+			}
+			if (entry.settle !== null) {
+				const settlers = entry.settle;
+				entry.settle = null;
+				for (const settle of settlers) settle();
+				changed = true;
+			}
+		}
+		return changed;
+	}
+
 	hostAttached(node: HTMLElement): void {
 		this.host = node;
 		this.lifecycleGeneration++;
@@ -260,12 +405,23 @@ class HostedIslandController {
 	 * changed nothing (§10 republish policy): the transported child element is
 	 * recreated every parent render, so `React.memo` cannot provide this bail.
 	 */
-	commit(child: TransportedChild, identifierPrefix: string): void {
+	commit(child: TransportedChild, identifierPrefix: string, snapshot: ContextSnapshot): void {
 		if (this.disposed) return;
 		this.lifecycleGeneration++;
 		this.identifierPrefix = identifierPrefix;
 		const previous = this.committed;
+		// A child identity/key change replaces the island — and resets context
+		// discovery associated with the former tree (§10): the registry is
+		// monotonic only within one child identity.
+		if (previous !== null && (previous.type !== child.type || previous.key !== child.key)) {
+			this.entries = [];
+		}
+		const contextsChanged = this.publishSnapshots(snapshot);
+		const needsContextRetry = this.pendingContextRetry;
+		this.pendingContextRetry = false;
 		if (
+			!contextsChanged &&
+			!needsContextRetry &&
 			this.attached &&
 			this.rootLive &&
 			this.status === 0 &&
@@ -339,6 +495,30 @@ class HostedIslandController {
 		if (this.host === null || this.committed === null || this.disposed) {
 			return { suspended: false, errored: false };
 		}
+		if (this.root === null && hasServerIslandMarkup(this.host)) {
+			// A server-rendered island (octane/react/server wrote the real HTML;
+			// React hydrated around it without touching descendants — §9.3):
+			// adopt the exact server node identities. The prefix is passed
+			// VERBATIM so Octane ids hydrate byte-identically (§5 rule 2).
+			// Same flushSync contract as the render path below: island layout
+			// effects and refs commit before this layout effect returns, so
+			// ancestor React layout effects observe the settled island DOM.
+			const host = this.host;
+			this.hydrating = true;
+			try {
+				octaneFlushSync(() => {
+					this.root = hydrateOctaneRoot(
+						host,
+						hostedRootEnvelope as unknown as ComponentBody,
+						this.envelopeProps(),
+						{ identifierPrefix: this.identifierPrefix },
+					);
+				});
+			} finally {
+				this.hydrating = false;
+			}
+			return { suspended: this.attemptSuspended, errored: this.attemptErrored };
+		}
 		if (this.root === null || !this.rootLive) {
 			// First attach, or the runtime unmounted the previous root after an
 			// initial routed failure — a React retry binds a fresh root (§5 rule 9).
@@ -372,53 +552,6 @@ class HostedIslandController {
 	}
 }
 
-function describeChildType(type: unknown): string {
-	if (typeof type === 'string') return `the DOM element <${type}>`;
-	if (type === React.Fragment) return 'a Fragment';
-	if (typeof type === 'function')
-		return `the component ${(type as Function).name || '(anonymous)'}`;
-	return 'an exotic React element';
-}
-
-function validateIslandChild(children: React.ReactNode): TransportedChild {
-	if (React.Children.count(children) !== 1) {
-		throw new Error(
-			'<OctaneCompat> expects exactly one Octane component element child; received ' +
-				`${React.Children.count(children)} children.`,
-		);
-	}
-	if (!React.isValidElement(children)) {
-		throw new Error('<OctaneCompat> expects an Octane component element, not a plain renderable.');
-	}
-	const type = children.type as unknown;
-	if (typeof type !== 'function') {
-		throw new Error(
-			`<OctaneCompat> cannot host ${describeChildType(type)}; ` +
-				'pass one compiled Octane component. (memo/forwardRef/lazy wrappers are React-only ' +
-				'element types — use Octane memo()/lazy() inside the island instead.)',
-		);
-	}
-	if (process.env.NODE_ENV !== 'production') {
-		// A class component is provably a React-only component. A PLAIN function
-		// cannot be distinguished from a prod-compiled or plain-TS Octane
-		// component today (the compiler does not yet emit a runtime brand), so
-		// unbranded plain functions are accepted; passing an ordinary React
-		// function component here fails inside the island when it calls React
-		// hooks against the Octane runtime.
-		if ((type as { prototype?: { isReactComponent?: unknown } }).prototype?.isReactComponent) {
-			throw new Error(
-				`<OctaneCompat> cannot host ${describeChildType(type)}: class components are ` +
-					'React-only; pass one compiled Octane component.',
-			);
-		}
-	}
-	return {
-		type: type as unknown as ComponentBody,
-		props: (children.props ?? {}) as Record<string, unknown>,
-		key: children.key ?? null,
-	};
-}
-
 /**
  * Host exactly one compiled Octane component element inside a React tree.
  *
@@ -435,9 +568,13 @@ export function OctaneCompat(props: OctaneCompatProps): React.ReactNode {
 	controller.notify = bump;
 
 	// Render-local transport: an aborted concurrent React render must never
-	// mutate the running Octane tree, so the child is captured here and
-	// published only from the committed layout effect below (§5 rule 5).
+	// mutate the running Octane tree, so the child and context snapshot are
+	// captured here and published only from the committed layout effect below
+	// (§5 rules 4–5).
 	const child = validateIslandChild(props.children);
+	// Context reads replay during EVERY wrapper render — including one about
+	// to throw the relay/error — so React records the dependencies (§7 step 3).
+	const snapshot = controller.readReactSnapshots();
 	// SSR-stable island identifier prefix (§5 rule 2); Phase 4 pairs this with
 	// the hosted server renderer for hydration parity.
 	const identifierPrefix = React.useId();
@@ -450,12 +587,31 @@ export function OctaneCompat(props: OctaneCompatProps): React.ReactNode {
 		else controller.hostDetached();
 	});
 	React.useLayoutEffect(() => {
-		controller.commit(child, identifierPrefix);
+		controller.commit(child, identifierPrefix, snapshot);
 	});
 	React.useEffect(() => {
 		controller.passiveAlive();
 		return () => controller.passiveDetached();
 	}, [controller]);
 
-	return React.createElement('div', { 'data-octane-compat': '', ref: hostRef });
+	return React.createElement('div', {
+		'data-octane-compat': '',
+		ref: hostRef,
+		// §9.3 opaque-host contract: the server writes real island HTML; the
+		// client ALWAYS supplies this stable frozen sentinel so React neither
+		// diffs nor clears the Octane-owned descendants — on any render, forever.
+		suppressHydrationWarning: true,
+		dangerouslySetInnerHTML: OPAQUE_HOST_SENTINEL,
+	});
+}
+
+/** Server island markup present? (Anything beyond the client's own sentinel.) */
+function hasServerIslandMarkup(host: HTMLElement): boolean {
+	const first = host.firstChild;
+	if (first === null) return false;
+	return !(
+		first.nodeType === 8 &&
+		(first as Comment).data === OPAQUE_HOST_SENTINEL_COMMENT &&
+		first.nextSibling === null
+	);
 }

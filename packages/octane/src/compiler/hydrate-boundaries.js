@@ -441,15 +441,19 @@ function validateBoundary(boundary, filename, hookNames) {
 	}
 
 	const seen = new WeakSet();
-	const visit = (node) => {
+	const visit = (node, directHooks = true, capturesThis = true, capturesSuper = true) => {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
-			for (const child of node) visit(child);
+			for (const child of node) visit(child, directHooks, capturesThis, capturesSuper);
 			return;
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
-		if (node.type === 'ThisExpression') {
+		if (TRANSPARENT_TS_EXPRESSIONS.has(node.type)) {
+			visit(node.expression, directHooks, capturesThis, capturesSuper);
+			return;
+		}
+		if (node.type === 'ThisExpression' && capturesThis) {
 			throw extractionError(
 				'OCTANE_HYDRATE_THIS_CAPTURE',
 				filename,
@@ -457,7 +461,7 @@ function validateBoundary(boundary, filename, hookNames) {
 				'`this` cannot be captured by a split child. Pass its value through a local or set `split={false}`',
 			);
 		}
-		if (node.type === 'Super') {
+		if (node.type === 'Super' && capturesSuper) {
 			throw extractionError(
 				'OCTANE_HYDRATE_SUPER_CAPTURE',
 				filename,
@@ -465,13 +469,29 @@ function validateBoundary(boundary, filename, hookNames) {
 				'`super` cannot be captured by a split child. Extract a component or set `split={false}`',
 			);
 		}
-		if (isHookCall(node, hookNames)) {
+		if (directHooks && isHookCall(node, hookNames)) {
 			throw extractionError(
 				'OCTANE_HYDRATE_DIRECT_HOOK',
 				filename,
 				node,
 				'direct hook calls cannot move into a split child. Call the hook in a child component or set `split={false}`',
 			);
+		}
+		if (isFunction(node)) {
+			// A nested function keeps hook calls in its own invocation. Ordinary
+			// functions also bind their own receiver; arrows still capture `this`
+			// and `super` from the component scope that extraction would replace.
+			const lexicalReceiver = unwrapExpression(node).type === 'ArrowFunctionExpression';
+			for (const [key, value] of Object.entries(node)) {
+				if (
+					SKIP_KEYS.has(key) ||
+					(key === 'expression' && TRANSPARENT_TS_EXPRESSIONS.has(node.type))
+				) {
+					continue;
+				}
+				visit(value, false, lexicalReceiver && capturesThis, lexicalReceiver && capturesSuper);
+			}
+			return;
 		}
 		for (const [key, value] of Object.entries(node)) {
 			if (
@@ -480,9 +500,8 @@ function validateBoundary(boundary, filename, hookNames) {
 			) {
 				continue;
 			}
-			visit(value);
+			visit(value, directHooks, capturesThis, capturesSuper);
 		}
-		if (TRANSPARENT_TS_EXPRESSIONS.has(node.type)) visit(node.expression);
 	};
 	visit(boundary.node.children);
 }

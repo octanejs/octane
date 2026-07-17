@@ -118,6 +118,15 @@ export interface RendererRegionOwnerBridge {
 	routeError(error: unknown): boolean;
 	routeSuspense(thenable: PromiseLike<unknown>): boolean;
 	registerDispose(dispose: () => void): () => void;
+	/**
+	 * Resolve a foreign (host-renderer) context object to a root-local Octane
+	 * mirror context. `use()`/`useContext()` consult this on their cold
+	 * unknown-usable path when the reading component lives under an owned root;
+	 * the returned mirror then flows through the ordinary Octane context reader
+	 * (local-provider-first, memo dependency recording, owner fallback).
+	 * Returning null declines the object and restores the normal diagnostic.
+	 */
+	resolveForeignContext?(context: object): Context<any> | null;
 }
 
 interface EffectEventCell {
@@ -5089,17 +5098,22 @@ function hydrateMarkerInteractionEvents(marker: Element): ReadonlyArray<string> 
 	return custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
 }
 
+function hydrateStrategyInteractionEvents(
+	strategy: HydrationStrategy,
+): ReadonlyArray<string> | null {
+	if (strategy._t !== 'interaction') return null;
+	const custom = strategy._a?.()?.[HYDRATE_INTERACTION_EVENTS_ATTR];
+	return custom === undefined
+		? HYDRATE_DEFAULT_INTERACTION_EVENTS
+		: custom.split(/\s+/).filter(Boolean);
+}
+
 function markerHandlesEarlyHydrationIntent(marker: Element, eventType: string): boolean {
 	const state = HYDRATE_SLOTS_BY_MARKER.get(marker);
 	if (state !== undefined) {
-		const strategy = resolveHydrateStrategy(state);
-		if (strategy._t !== 'interaction') return false;
-		const custom = strategy._a?.()?.[HYDRATE_INTERACTION_EVENTS_ATTR];
-		const events: ReadonlyArray<string> =
-			custom === undefined
-				? HYDRATE_DEFAULT_INTERACTION_EVENTS
-				: custom.split(/\s+/).filter(Boolean);
-		return events.includes(eventType);
+		return (
+			hydrateStrategyInteractionEvents(resolveHydrateStrategy(state))?.includes(eventType) ?? false
+		);
 	}
 
 	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
@@ -5159,6 +5173,19 @@ function handleEarlyHydrationIntent(event: Event): void {
 		break;
 	}
 	if (candidate === null) return;
+	// Preserve only intent discovered before a dynamic child's slot exists. Once
+	// a slot has resolved `when()`, its concrete strategy owns event matching.
+	for (let i = 0; i < markers.length; i++) {
+		const current = markers[i];
+		if (
+			current !== candidate &&
+			candidate.contains(current) &&
+			current.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic' &&
+			!HYDRATE_SLOTS_BY_MARKER.has(current)
+		) {
+			HYDRATE_DELEGATED_DYNAMIC_MARKERS.add(current);
+		}
+	}
 
 	const path = eventPathWithin(candidate, event.target);
 	if (path === null) return;
@@ -5194,18 +5221,11 @@ function ensureEarlyHydrationIntentCapture(ownerDocument: Document): void {
 if (typeof document !== 'undefined') ensureEarlyHydrationIntentCapture(document);
 
 function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrategy): () => void {
-	const attrs = strategy._a?.();
-	const custom = attrs?.[HYDRATE_INTERACTION_EVENTS_ATTR];
-	const ownEvents: ReadonlyArray<string> =
-		strategy._t === 'interaction'
-			? custom === undefined
-				? HYDRATE_DEFAULT_INTERACTION_EVENTS
-				: custom.split(/\s+/).filter(Boolean)
-			: state.wrapper.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic'
-				? state.delegatedDynamicIntent
-					? HYDRATE_SUPPORTED_INTERACTION_EVENTS
-					: ['click']
-				: [];
+	const ownEvents =
+		hydrateStrategyInteractionEvents(strategy) ??
+		// A parent-first replay may carry conservative intent for a dynamic marker
+		// whose strategy could not yet be evaluated. Resolved boundaries get none.
+		(state.delegatedDynamicIntent ? HYDRATE_SUPPORTED_INTERACTION_EVENTS : []);
 	const events = new Set<string>(ownEvents);
 	const descendants = state.wrapper.querySelectorAll(HYDRATE_MARKER_SELECTOR);
 	for (let i = 0; i < descendants.length; i++) {
@@ -5705,14 +5725,54 @@ export const ErrorBoundary: ComponentBody<{
  * Per-block `thenableState[]` keyed by call index lets the body replay
  * synchronously after the promise resolves.
  */
-export function use<T>(usable: Context<T> | PromiseLike<T> | TrackedThenable<T>): T {
+/**
+ * Structural view of a foreign host-renderer context (a real `React.Context<T>`
+ * inside an `octane/react` island). Deliberately matches React 19's Consumer
+ * shape WITHOUT importing React types — core stays host-agnostic; only hosted
+ * roots can actually resolve one (§6.2).
+ */
+export interface ForeignHostContext<T> {
+	readonly Consumer: (props: { children: (value: T) => any }) => any;
+}
+
+export function use<T>(
+	usable: Context<T> | PromiseLike<T> | TrackedThenable<T> | ForeignHostContext<T>,
+): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
 		return useContextInternal(usable as Context<T>);
 	}
 	if (usable == null || typeof (usable as any).then !== 'function') {
-		throw new Error('use(): argument is not a Context nor a thenable');
+		// Cold path: not an Octane context, not a thenable. Under a hosted root
+		// this may be a FOREIGN host-renderer context (a real React context
+		// inside an octane/react island) — the owner bridge resolves it to a
+		// root-local mirror. Normal roots fall through to the diagnostic.
+		return useForeignContext(usable, 'use');
 	}
 	return useThenable(usable as TrackedThenable<T>);
+}
+
+// React 19 context objects carry $$typeof: Symbol.for('react.context') — used
+// ONLY to sharpen the out-of-hosted-root diagnostic, never as a read strategy.
+const REACT_FOREIGN_CONTEXT_TAG = /* @__PURE__ */ Symbol.for('react.context');
+
+/**
+ * Resolve a non-Octane usable through the enclosing renderer-region owner
+ * (docs/react-hosted-octane-compat-plan.md §6.2). Kept out of `use()` so the
+ * hot paths carry no extra code; only already-failing calls reach here.
+ */
+function useForeignContext<T>(usable: unknown, api: string): T {
+	if (usable !== null && typeof usable === 'object') {
+		const bridge = rendererRegionOwnerForBlock(CURRENT_BLOCK);
+		const mirror = bridge?.resolveForeignContext?.(usable as object);
+		if (mirror != null) return useContextInternal(mirror as Context<T>);
+		if ((usable as { $$typeof?: unknown }).$$typeof === REACT_FOREIGN_CONTEXT_TAG) {
+			throw new Error(
+				`${api}(): a React context can only be read inside a React-hosted Octane ` +
+					'island (see octane/react); this component is not rendered under one.',
+			);
+		}
+	}
+	throw new Error(`${api}(): argument is not a Context nor a thenable`);
 }
 
 /**
@@ -5733,8 +5793,14 @@ export function useRendererThenable<T>(thenable: PromiseLike<T>): T {
  * needs no rewrite. Provided for React familiarity; `use(Context)` is the
  * React-19 idiom and remains the primary form.
  */
-export function useContext<T>(context: Context<T>): T {
-	return useContextInternal(context);
+export function useContext<T>(context: Context<T> | ForeignHostContext<T>): T {
+	if (context && (context as any).$$kind === CONTEXT_TAG) {
+		return useContextInternal(context as Context<T>);
+	}
+	// Same cold foreign-context path as `use()` — a real React context resolves
+	// through the hosted owner; anything else gets the targeted diagnostic
+	// (previously a non-context read silently produced `undefined`).
+	return useForeignContext(context, 'useContext');
 }
 
 // Sentinel cached in a consumer's resolved-provider slots to mean "no provider —
@@ -5793,15 +5859,18 @@ export function bindRendererRegionOwner(props: unknown): void {
 		);
 	}
 	const root = CURRENT_BLOCK;
-	const disposeRoot = DOM_ROOT_DISPOSERS.get(root);
-	if (disposeRoot === undefined) {
+	// hydrateRoot() runs its adoption pass BEFORE the Root object (and its
+	// disposer) exists, so a hydrating owned root is bound with a LAZY disposer
+	// lookup; every other caller must already have a live root.
+	if (DOM_ROOT_DISPOSERS.get(root) === undefined && currentHydration?.rootBlock !== root) {
 		throw new Error('A renderer-owned DOM region requires a live DOM root.');
 	}
 	const previous = RENDERER_REGION_DOM_BINDINGS.get(root);
 	if (previous?.bridge === bridge) return;
 	// A distinct callback avoids deleting a newly-registered disposer when two
-	// successive descriptor bridges share one committed lifecycle cell.
-	const dispose = () => disposeRoot();
+	// successive descriptor bridges share one committed lifecycle cell. The
+	// lookup is lazy so a disposer registered after a hydration pass is honored.
+	const dispose = () => DOM_ROOT_DISPOSERS.get(root)?.();
 	const release = bridge.registerDispose(dispose);
 	previous?.release();
 	const binding = { bridge, release };
@@ -5817,6 +5886,40 @@ export function bindRendererRegionOwner(props: unknown): void {
 			RENDERER_REGION_DOM_OWNERS.delete(root);
 		});
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Hosted-root control signal (§6.3 HostContextRequest): thrown by an owner
+// bridge's readContext when a foreign-context read cannot be satisfied
+// synchronously. handleRenderError recognizes it BEFORE local boundary
+// routing, so island @catch/@pending arms never observe it; the owner
+// receives the carried thenable through routeSuspense and settles it once
+// the authoritative host value has committed.
+// ---------------------------------------------------------------------------
+
+const HOST_CONTEXT_REQUEST_TAG = Symbol.for('octane.host-context-request');
+
+interface HostContextRequestSignal {
+	$$kind: typeof HOST_CONTEXT_REQUEST_TAG;
+	thenable: PromiseLike<unknown>;
+}
+
+/**
+ * Build the §6.3 control signal for an owner bridge to THROW from
+ * `readContext`. The thenable must settle when the owner has committed the
+ * requested foreign value; the owner then retries the owned root.
+ * @internal owner-bridge ABI (octane/react and future hosts).
+ */
+export function createHostContextRequest(thenable: PromiseLike<unknown>): HostContextRequestSignal {
+	return { $$kind: HOST_CONTEXT_REQUEST_TAG, thenable };
+}
+
+function isHostContextRequest(err: unknown): err is HostContextRequestSignal {
+	return (
+		err !== null &&
+		typeof err === 'object' &&
+		(err as { $$kind?: unknown }).$$kind === HOST_CONTEXT_REQUEST_TAG
+	);
 }
 
 function recordContextDependency(block: Block | null, context: Context<any>): void {
@@ -9456,10 +9559,16 @@ export function namespaceHeadElement(
 export function injectStyle(id: string, css: string): void {
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-octane="hash">`). On a hydrated page
-	// the per-runtime Set is empty, so also check the DOM before re-injecting —
-	// otherwise hydration would append a duplicate <style>.
-	if (typeof document !== 'undefined' && document.querySelector(`style[data-octane="${id}"]`)) {
+	// the RenderResult, a `<style data-octane="hash">` — or, for a React-hosted
+	// island, a React 19 style RESOURCE whose href React serializes as
+	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
+	// resources). On a hydrated page the per-runtime Set is empty, so also
+	// check the DOM before re-injecting — otherwise hydration would append a
+	// duplicate <style>.
+	if (
+		typeof document !== 'undefined' &&
+		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
+	) {
 		_injectedStyles.add(id);
 		return;
 	}
@@ -15251,6 +15360,10 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
+			// §6.3 control signal — never an application failure: pass it through
+			// so the renderer-region owner (handleRenderError) receives it; a
+			// local catch arm must not render a hosted context handshake.
+			if (isHostContextRequest(err)) throw err;
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
 				handleSuspense(s, err.thenable, s.tryBlock);
@@ -15386,6 +15499,9 @@ function mountTry(state: TrySlot): void {
 		renderBlock(b);
 		state.hasResolved = true;
 	} catch (err) {
+		// §6.3 control signal — bypass the local boundary (see the try-body
+		// re-render catch above); the renderer-region owner handles it.
+		if (isHostContextRequest(err)) throw err;
 		if (isSuspenseException(err)) {
 			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
@@ -16955,6 +17071,19 @@ function findTryHandler(block: Block | null): ((err: any) => void) | null {
  * which surfaces to the scheduler's caller (matches the prior behavior).
  */
 function handleRenderError(block: Block, err: any): void {
+	// §6.3 HostContextRequest: a foreign-context read the owner could not
+	// satisfy synchronously. This is a hosted-root control signal, NOT an
+	// application failure — it must bypass the island's own @catch/@pending
+	// arms and reach the owner, which settles the carried thenable once the
+	// authoritative host value has committed and then retries the root.
+	if (isHostContextRequest(err)) {
+		const bridge = rendererRegionOwnerForBlock(block);
+		if (bridge !== null && bridge.routeSuspense(err.thenable)) return;
+		err = new Error(
+			'A hosted foreign-context request escaped its renderer-region owner; ' +
+				'the owning bridge is gone or declined it.',
+		);
+	}
 	if (isSuspenseException(err)) {
 		let b: Block | null = block;
 		while (b) {
@@ -19918,6 +20047,32 @@ export function hydrateRoot(
 		// anything left at the root cursor instead of leaving visible unmanaged DOM.
 		hydration.finishRoot();
 		hydrationCompleted = true;
+	} catch (error) {
+		// An OWNED hydrating root (a renderer-region bridge bound during this
+		// pass — e.g. an octane/react island) mirrors createRoot's initial-render
+		// contract: route the escape (error, suspension, or host context request)
+		// to the owner, unmount the failed root, and release the container so a
+		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
+		// retry client-remounts). Unowned hydration failures keep their existing
+		// behavior and rethrow untouched.
+		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
+		try {
+			handleRenderError(rootBlock, error);
+		} finally {
+			DOM_ROOT_DISPOSERS.delete(rootBlock);
+			unmountBlock(rootBlock, false);
+			drainRefDetaches();
+			container.textContent = '';
+			// Mirror root.unmount()'s full release: this pass registered the
+			// container as a delegation target, and the retry's fresh root
+			// re-registers — a leftover refcount would strand the map entry and
+			// its listeners past the island's final teardown.
+			unregisterDelegationTarget(container);
+			releaseRootContainer(container, ownerToken);
+		}
+		// Routed: hand back an empty lazy root owning NO claim or delegation
+		// registration (both released above); the owner's retry recreates.
+		return makeRoot(container, null, null, null, idState, renderReturnedValue, null);
 	} finally {
 		currentHydration = previousHydration;
 	}
