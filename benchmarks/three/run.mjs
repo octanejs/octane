@@ -84,11 +84,10 @@ async function runTarget(browser, target) {
 				const api = globalThis.__threeBench;
 				const started = performance.now();
 				await api.run(operation);
-				let duration = performance.now() - started;
-				if (operation === 'frame_1k_subscribers') duration /= 20;
-				if (operation === 'raycast_event') duration /= 20;
-				return { duration, snapshot: api.snapshot() };
+				return { duration: performance.now() - started, snapshot: api.snapshot() };
 			}, op);
+			if (op === 'frame_1k_subscribers') sample.duration /= FRAME_REPS;
+			if (op === 'raycast_event') sample.duration /= EVENT_REPS;
 			verify(op, sample.snapshot);
 			checksums[op] = sample.snapshot;
 			if (index >= WARMUP) samples.push(sample.duration);
