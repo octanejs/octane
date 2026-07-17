@@ -1,0 +1,11 @@
+{
+  "upstream": { "package": "react-aria", "version": "3.50.0" },
+  "surface": "Phase 0 complete: the utils foundation (mergeProps, chain, mergeRefs, useId/mergeIds, useObjectRef, RouterProvider, SSRProvider/useIsSSR) and the complete interactions area (usePress, useHover, useFocus, useFocusWithin, useFocusVisible, useKeyboard, useLongPress, useMove, useInteractOutside, useFocusable/Focusable, Pressable/PressResponder) from the react-aria 3.50.0 monopackage, plus useControlledState from react-stately 3.48.0 under `@octanejs/aria/stately`. Differential-verified byte-identical against the real react-aria (press/hover/focus-within/keyboard/mergeIds fixtures). Later-phase areas (focus scope, leaf hooks, collections, overlays, react-aria-components) are not started — see the migration plan.",
+  "divergences": [
+    "Text-input DOM wiring uses octane's native `onInput` (per keystroke) instead of React's synthetic `onChange`; React Aria's public value-level `onChange(value)` callbacks are unchanged.",
+    "`forwardRef` becomes octane's ref-as-prop."
+  ],
+  "ssr": "Not yet covered (planned for Phase 8; see the migration plan).",
+  "verified": "2026-07-17",
+  "docs": ["docs/aria-migration-plan.md"]
+}

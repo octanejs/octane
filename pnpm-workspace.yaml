@@ -259,6 +259,10 @@ catalogs:
     'victory-vendor': ^37.0.2
     react: ^19.2.0
     'react-router': 8.2.0
+    react-aria: 3.50.0
+    react-aria-components: 1.19.0
+    react-stately: 3.48.0
+    '@react-types/shared': ^3.36.0
     react-dom: ^19.2.0
     react-i18next: 17.0.9
     ripple: ^0.3.86

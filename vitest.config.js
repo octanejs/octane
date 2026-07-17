@@ -1450,6 +1450,16 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tiptap-browser',
+					include: ['packages/tiptap/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -1529,6 +1539,35 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/floating-ui$/,
 							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'aria',
+					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					// Differential precompile for aria fixtures: rewrites `@octanejs/aria` →
+					// `react-aria` (and `/stately` → `react-stately`, `/components` →
+					// `react-aria-components`) so the React side runs the real React Aria.
+					globalSetup: ['packages/aria/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				// aria's `.ts` hooks forward the caller's slot via subSlot — the package
+				// declares manual hook slots in its package.json, so the auto-slotting pass
+				// skips them (the `.tsx`/`.tsrx` fixtures that call them are full-compiled
+				// and inject the trailing slot).
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/aria$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src') + '/$1/index.ts',
 						},
 					],
 				},

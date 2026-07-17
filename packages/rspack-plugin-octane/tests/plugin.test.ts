@@ -222,6 +222,13 @@ describe('OctaneRspackPlugin', () => {
 		expect((boundedObject.options as any).cache.version).not.toBe(
 			(object.options as any).cache.version,
 		);
+
+		// requireDirective flips which modules compile vs pass through, so a
+		// toggle must never reuse cached transform results.
+		const directive = createCachedCompiler();
+		new OctaneRspackPlugin({ requireDirective: true }).apply(directive as any);
+		expect((directive.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
+		expect((directive.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 	});
 
 	it('resolves a relative root from the Rspack context', () => {

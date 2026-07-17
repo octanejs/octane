@@ -3,19 +3,22 @@
     "package": "@tiptap/react",
     "version": "3.28.0"
   },
-  "surface": "Stage 1–3 port of @tiptap/react: the root entry re-exports @tiptap/core and provides the editor hooks, contexts, EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, plus BubbleMenu and FloatingMenu from ./menus.",
+  "surface": "Complete @tiptap/react 3.28.0 adapter surface across the root and ./menus entries: @tiptap/core re-exports, editor hooks and contexts, the EditorContent portal bridge, compound Tiptap API, ReactRenderer, custom NodeView/MarkView renderers and helpers, BubbleMenu, and FloatingMenu.",
   "divergences": [
     "Subscriptions use Octane's native useSyncExternalStore implementation, so the published binding does not depend on React or use-sync-external-store.",
     "EditorConsumer is a render-prop compatibility component because Octane contexts do not expose React's .Consumer property.",
     "Renderer components are Octane component bodies and refs are ordinary props; the React-prefixed public names are retained for TipTap source compatibility without a React dependency.",
+    "NodeViewWrapper consumes its as prop after selecting the host tag; @tiptap/react 3.28.0 also forwards that prop as an invalid DOM attribute.",
     "BubbleMenu and FloatingMenu handlers receive native browser events rather than React synthetic events.",
     "ReactMarkView tears down its portal when ProseMirror destroys the mark view, closing a renderer leak present in @tiptap/react 3.28.0."
   ],
-  "ssr": "Covered for the current surface: hooks use null server snapshots and suppress editor construction without a DOM, static NodeView/MarkView helpers render without a DOM renderer, detached menu targets are client-only, and hydration adopts deferred server output before mounting the live editor.",
+  "ssr": "Covered across the complete surface: hooks use null server snapshots and suppress editor construction without a DOM, static NodeView/MarkView helpers render without a DOM renderer, detached menu targets are client-only, and hydration adopts deferred server shells before mounting live custom views and menus.",
   "notes": [
     "Pinned to the @tiptap/react, @tiptap/core, and @tiptap/pm 3.28.0 release family.",
     "EditorContent owns one external-store portal registry so custom views preserve context, event ownership, and lifecycle beneath the editor host.",
-    "Behavioral tests use real TipTap editors for editor lifecycle, custom views, and menu plugins; a shared-fixture differential test compares the common surface with @tiptap/react."
+    "Package-boundary tests lock the root and ./menus runtime exports plus their client directives to @tiptap/react 3.28.0.",
+    "Behavioral tests use real TipTap editors for lifecycle, custom views, and menu plugins; shared-fixture differential tests compare editor and custom-view behavior with @tiptap/react.",
+    "A real Chromium harness covers caret-preserving input, selection, NodeView dragging, and BubbleMenu/FloatingMenu visibility and positioning."
   ],
   "verified": "2026-07-17"
 }

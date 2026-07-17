@@ -1,0 +1,49 @@
+# @octanejs/tanstack-ai
+
+## 0.0.2
+
+### Patch Changes
+
+- 2367bd5: Add the Octane binding for TanStack AI (`@tanstack/ai-react` 0.17.0), porting the
+  hook surface — `useChat`, `useRealtimeChat`, `useGeneration`, the media generation
+  hooks, `useTranscription`, `useSummarize`, `useAudioRecorder`, and
+  `useMcpAppBridge` — while reusing `@tanstack/ai` and `@tanstack/ai-client`
+  unchanged. Includes ported behavioral tests, differential React parity coverage,
+  SSR support, and type tests. The `./mcp-apps` `MCPAppResource` component is not
+  ported (it renders the React-only `@mcp-ui/client` `AppRenderer`); the
+  framework-agnostic `useMcpAppBridge` hook is available on the main entry. Realtime
+  sessions support live configuration updates and use current authentication and
+  adapter callbacks across reconnects and token refreshes.
+- Updated dependencies [156f213]
+- Updated dependencies [2a5f44f]
+- Updated dependencies [f8e94f2]
+- Updated dependencies [a12a3d9]
+- Updated dependencies [1b21731]
+- Updated dependencies [7a123d2]
+- Updated dependencies [95b3081]
+- Updated dependencies [38d95eb]
+- Updated dependencies [ba36091]
+- Updated dependencies [6ccdbce]
+- Updated dependencies [d1bb5c3]
+- Updated dependencies [9c21887]
+- Updated dependencies [674f1a4]
+- Updated dependencies [6ceab55]
+- Updated dependencies [3445fa6]
+- Updated dependencies [6cfb63d]
+- Updated dependencies [c68562b]
+- Updated dependencies [4de2b4f]
+- Updated dependencies [6868005]
+- Updated dependencies [1b21731]
+- Updated dependencies [1b21731]
+- Updated dependencies [1b21731]
+- Updated dependencies [7efdbdd]
+- Updated dependencies [314b38d]
+- Updated dependencies [dcd2707]
+- Updated dependencies [d63b0d0]
+- Updated dependencies [39e779c]
+- Updated dependencies [1b21731]
+- Updated dependencies [f07c628]
+- Updated dependencies [fac1c66]
+- Updated dependencies [dbbcee1]
+- Updated dependencies [5287eac]
+  - octane@0.1.8

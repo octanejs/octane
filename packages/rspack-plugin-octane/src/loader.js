@@ -104,6 +104,11 @@ export default function octaneLoader(source, inputSourceMap) {
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(options.renderers === undefined ? null : { renderers: options.renderers }),
+			...(options.requireDirective === undefined
+				? null
+				: { requireDirective: options.requireDirective }),
+			// Ownership diagnostics surface through Rspack's own module warnings.
+			warn: (message) => this.emitWarning?.(new Error(message)),
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
 		const finish = (clientOnlyImports, callback) => {
