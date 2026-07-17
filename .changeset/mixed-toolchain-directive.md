@@ -14,6 +14,9 @@ the host framework's own pipeline (with a warning when they import from
 linked packages keep their Octane package-manifest decision. Paths routed
 through a different tsrx compiler (for example `@tsrx/react`) can be carved out
 with the integration's `exclude` option — excluded paths are never Octane's in
-this mode, even when a file declares the directive. The directive
-composes with `'use client'`, is stripped from compiled output, and is
-tolerated even when the option is off.
+this mode, even when a file declares the directive. The directive is purely an
+Octane-compilation ownership marker (not part of the tsrx language), composes
+with `'use client'`, is stripped from compiled output, and is tolerated even
+when the option is off. Client-only classification (`clientReferenceForFile`)
+applies the same ownership gate, so importers never hold a client reference
+for a module whose own transform passes through to the host toolchain.

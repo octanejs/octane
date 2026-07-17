@@ -905,7 +905,9 @@ Ownership is therefore declared in-band, `'use client'`-style: with
 `requireDirective: true` on the bundler integration (a shared
 `octane/compiler/bundler` decision inherited by the Vite, Rspack, and Rsbuild
 adapters), Octane compiles only modules that open with a `'use octane'`
-directive.
+directive. The directive is purely an Octane-compilation ownership marker —
+not part of the tsrx language; tsrx modules compiled by other tsrx toolchains
+never carry it.
 
 - Directed project modules: full compile (`.tsrx`/`.tsx`) or hook slotting
   (`.ts`/`.js`); the directive composes with `'use client'` in the prologue and

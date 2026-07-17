@@ -910,3 +910,44 @@ describe('requireDirective ownership gate', () => {
 		);
 	});
 });
+
+describe('requireDirective and client-only classification', () => {
+	it('classifies client references with the same ownership gate as transforms', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-directive-client-only-'));
+		try {
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			mkdirSync(join(root, 'src/scenes'), { recursive: true });
+			const reactScene =
+				"import * as React from 'react';\nexport function Scene() { return <p/>; }\n";
+			const octaneScene = "'use octane';\nexport function Scene() @{ <node /> }\n";
+			const reactFile = join(root, 'src/scenes/ReactScene.tsx');
+			const octaneFile = join(root, 'src/scenes/OctaneScene.tsx');
+			writeFileSync(reactFile, reactScene);
+			writeFileSync(octaneFile, octaneScene);
+			const compiler = createOctaneCompiler({
+				root,
+				requireDirective: true,
+				renderers: {
+					registry: { object: { module: '/src/object-renderer.js', server: 'client-only' } },
+					rules: [{ include: 'src/scenes/**', renderer: 'object' }],
+				},
+			});
+			// An undirected project module matched by a client-only renderer rule
+			// is NOT Octane's: importers must not receive a client reference for
+			// a module whose own transform passes through to the host toolchain.
+			expect(compiler.clientReferenceForFile(reactFile)).toBeNull();
+			const serverTransform = compiler.transform(reactScene, reactFile, {
+				environment: 'server',
+			});
+			expect(serverTransform).toBeNull();
+			// The directed module keeps full client-only behavior: reference and
+			// server stub agree on identity.
+			const reference = compiler.clientReferenceForFile(octaneFile);
+			expect(reference).toMatchObject({ renderer: 'object' });
+			const stub = compiler.transform(octaneScene, octaneFile, { environment: 'server' });
+			expect(stub).toMatchObject({ kind: 'client-only-stub', clientReference: reference });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});

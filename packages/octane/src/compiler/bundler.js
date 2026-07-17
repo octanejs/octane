@@ -644,11 +644,36 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
+	/**
+	 * requireDirective ownership for code-less classification: read the module
+	 * prologue from disk. The transform (which receives real code) remains the
+	 * authoritative gate; an unreadable file is conservatively not Octane's, so
+	 * importers can never hold a client reference for a module whose own
+	 * transform passes through to the host toolchain.
+	 */
+	_directiveOwnershipForFile(file) {
+		if (!this.requireDirective) return true;
+		if (!this._isProjectOwnedSource(file)) return true;
+		if (this.exclude.some((path) => file.includes(path))) return false;
+		let code;
+		try {
+			code = readFileSync(isAbsolute(file) ? resolve(file) : resolve(this.root, file), 'utf8');
+		} catch {
+			return false;
+		}
+		return findUseOctaneDirective(code) !== null;
+	}
+
 	/** Classify a bundler-resolved module without loading or evaluating it. */
 	clientReferenceForFile(id) {
 		const file = cleanModuleId(id);
 		const filename = this._canonicalModuleId(file);
 		const renderer = resolveRendererForFile(this.renderers, filename);
+		// A renderer rule can only claim modules Octane owns. Under the
+		// requireDirective gate an undirected project module belongs to the
+		// host toolchain: no client reference, matching its pass-through
+		// transform (server-graph identity must not split from output).
+		if (renderer.server === 'client-only' && !this._directiveOwnershipForFile(file)) return null;
 		const collected = { dependencies: new Set(), missingDependencies: new Set() };
 		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		return renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
