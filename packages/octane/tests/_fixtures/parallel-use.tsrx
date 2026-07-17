@@ -1,12 +1,12 @@
 import { use } from 'octane';
 
 // Fixtures for the parallel-use pipeline (docs/suspense-parallel-use-plan.md).
-// The test suite compiles with `parallelUse: true` (see vitest.config.js), so
-// these exercise the memoize/hoist/batch transforms and fetch-tree warming.
+// These exercise the compiler's unconditional memoize/hoist/batch transforms
+// and fetch-tree warming.
 
 // 3-level nested async chain — the benchmark shape (benchmarks/async-waterfall):
 // each level fetches its own independent data and renders the next level as
-// its child. Under parallelUse, level 0's batch warm-walks the whole chain
+// its child. The level 0 batch warm-walks the whole chain
 // (`ChainLevel.__warm` recursion), so every level's fetch starts in the FIRST
 // attempt instead of one level per suspension round.
 export function ChainLevel(props) @{

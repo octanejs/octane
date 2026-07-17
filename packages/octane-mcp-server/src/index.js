@@ -53,6 +53,7 @@ export const BENCHMARK_SUITES = [
 	'dbmon-deopt',
 	'js-framework-deopt',
 	'async-waterfall',
+	'async-composition',
 	'codegen-size',
 	'bundle-size',
 ];

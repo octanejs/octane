@@ -38,6 +38,7 @@ import {
 	type RootState,
 	type RootStore,
 	type Size,
+	type XRManager,
 } from './store.js';
 import { createUniversalRoot } from 'octane/universal';
 
@@ -132,6 +133,10 @@ interface ThreeRootInternals<TCanvas extends CanvasLike> {
 	pendingRender: PendingRender | null;
 	lastConfiguredCamera?: CameraProps;
 	onCreated?: (state: RootState) => void;
+	contextLifecycleInitialized: boolean;
+	contextLifecycleCleanup: (() => void) | null;
+	xrInitialized: boolean;
+	xrManager: XRManager | null;
 }
 
 interface RootRecord<TCanvas extends CanvasLike = CanvasLike> {
@@ -202,6 +207,147 @@ function disposeRenderer(renderer: Renderer | null | undefined): void {
 	} catch {
 		// Renderer cleanup is best effort, matching Three/R3F teardown.
 	}
+}
+
+interface ContextLifecycleTarget {
+	addEventListener(type: string, listener: (event: Event) => void): void;
+	removeEventListener(type: string, listener: (event: Event) => void): void;
+}
+
+function isContextLifecycleTarget(value: unknown): value is ContextLifecycleTarget {
+	const target = value as Partial<ContextLifecycleTarget> | null;
+	return (
+		target !== null &&
+		typeof target === 'object' &&
+		typeof target.addEventListener === 'function' &&
+		typeof target.removeEventListener === 'function'
+	);
+}
+
+function initializeContextLifecycle(internals: ThreeRootInternals<any>, renderer: Renderer): void {
+	if (internals.contextLifecycleInitialized) return;
+	const target = isContextLifecycleTarget(renderer.domElement)
+		? renderer.domElement
+		: isContextLifecycleTarget(internals.canvas)
+			? internals.canvas
+			: null;
+	if (target === null) {
+		internals.contextLifecycleInitialized = true;
+		return;
+	}
+
+	const handleContextLoss = (event: Event) => {
+		event.preventDefault();
+	};
+	const handleContextRestore = () => {
+		if (!internals.disposed) internals.store.getState().invalidate();
+	};
+	target.addEventListener('webglcontextlost', handleContextLoss);
+	try {
+		target.addEventListener('webglcontextrestored', handleContextRestore);
+	} catch (error) {
+		target.removeEventListener('webglcontextlost', handleContextLoss);
+		throw error;
+	}
+	internals.contextLifecycleCleanup = () => {
+		try {
+			target.removeEventListener('webglcontextlost', handleContextLoss);
+		} finally {
+			target.removeEventListener('webglcontextrestored', handleContextRestore);
+		}
+	};
+	internals.contextLifecycleInitialized = true;
+}
+
+function createXRManager(internals: ThreeRootInternals<any>, renderer: Renderer): XRManager {
+	let connected = false;
+	let frameCallback: ((timestamp: number, frame?: XRFrame) => void) | null = null;
+
+	const handleSessionChange = () => {
+		if (!connected || internals.disposed) return;
+		const xr = renderer.xr;
+		if (xr === undefined) return;
+		const presenting = xr.isPresenting === true;
+		xr.enabled = presenting;
+		if (presenting) {
+			if (frameCallback === null) {
+				let currentFrame!: (timestamp: number, frame?: XRFrame) => void;
+				currentFrame = (timestamp, frame) => {
+					if (!connected || internals.disposed || frameCallback !== currentFrame) {
+						return;
+					}
+					const state = internals.store.getState();
+					if (state.frameloop !== 'never') advance(timestamp, true, state, frame);
+				};
+				frameCallback = currentFrame;
+			}
+			xr.setAnimationLoop?.(frameCallback);
+		} else {
+			frameCallback = null;
+			xr.setAnimationLoop?.(null);
+			internals.store.getState().invalidate();
+		}
+	};
+
+	return {
+		connect() {
+			if (connected || internals.disposed) return;
+			const xr = renderer.xr;
+			if (
+				xr === undefined ||
+				typeof xr.addEventListener !== 'function' ||
+				typeof xr.removeEventListener !== 'function'
+			) {
+				return;
+			}
+			xr.addEventListener('sessionstart', handleSessionChange);
+			try {
+				xr.addEventListener('sessionend', handleSessionChange);
+			} catch (error) {
+				xr.removeEventListener('sessionstart', handleSessionChange);
+				throw error;
+			}
+			connected = true;
+		},
+		disconnect() {
+			const xr = renderer.xr;
+			const wasConnected = connected;
+			connected = false;
+			frameCallback = null;
+			if (xr === undefined) return;
+			try {
+				if (wasConnected && typeof xr.removeEventListener === 'function') {
+					xr.removeEventListener('sessionstart', handleSessionChange);
+				}
+			} finally {
+				try {
+					if (wasConnected && typeof xr.removeEventListener === 'function') {
+						xr.removeEventListener('sessionend', handleSessionChange);
+					}
+				} finally {
+					try {
+						xr.setAnimationLoop?.(null);
+					} finally {
+						xr.enabled = false;
+					}
+				}
+			}
+		},
+	};
+}
+
+function initializeXR(internals: ThreeRootInternals<any>, renderer: Renderer): void {
+	if (internals.xrInitialized) return;
+	const xr = createXRManager(internals, renderer);
+	xr.connect();
+	try {
+		internals.store.setState({ xr });
+	} catch (error) {
+		xr.disconnect();
+		throw error;
+	}
+	internals.xrManager = xr;
+	internals.xrInitialized = true;
 }
 
 function computeInitialSize(canvas: CanvasLike, size?: RenderProps<any>['size']): Size {
@@ -402,6 +548,8 @@ async function applyConfiguration<TCanvas extends CanvasLike>(
 	} = props;
 	const renderer = await ensureRenderer(internals, glConfig, generation);
 	if (renderer === null || internals.disposed || internals.generation !== generation) return;
+	initializeContextLifecycle(internals, renderer);
+	initializeXR(internals, renderer);
 
 	let state = internals.store.getState();
 	if (state.raycaster == null) internals.store.setState({ raycaster: new THREE.Raycaster() });
@@ -579,14 +727,23 @@ export function createRoot<TCanvas extends CanvasLike>(canvas: TCanvas): ThreeRo
 				try {
 					internals.hostRoot?.unmount();
 				} finally {
-					internals.container?.flushDisposals();
 					try {
-						state.xr.disconnect();
+						internals.container?.flushDisposals();
 					} finally {
-						disposeRenderer(state.gl);
-						destroyRootStore(store);
-						roots.delete(canvas);
-						rootInternals.delete(controller);
+						try {
+							internals.contextLifecycleCleanup?.();
+						} finally {
+							internals.contextLifecycleCleanup = null;
+							try {
+								internals.xrManager?.disconnect();
+							} finally {
+								internals.xrManager = null;
+								disposeRenderer(state.gl);
+								destroyRootStore(store);
+								roots.delete(canvas);
+								rootInternals.delete(controller);
+							}
+						}
 					}
 				}
 			}
@@ -610,6 +767,10 @@ export function createRoot<TCanvas extends CanvasLike>(canvas: TCanvas): ThreeRo
 		generation: 0,
 		pendingRender: null,
 		lastConfiguredCamera: undefined,
+		contextLifecycleInitialized: false,
+		contextLifecycleCleanup: null,
+		xrInitialized: false,
+		xrManager: null,
 	};
 	rootInternals.set(controller, internals);
 	roots.set(canvas, { store, root: controller });
@@ -617,8 +778,14 @@ export function createRoot<TCanvas extends CanvasLike>(canvas: TCanvas): ThreeRo
 	return controller;
 }
 
-export function unmountComponentAtNode<TCanvas extends CanvasLike>(canvas: TCanvas): void {
-	roots.get(canvas)?.root.unmount();
+export function unmountComponentAtNode<TCanvas extends CanvasLike>(
+	canvas: TCanvas,
+	callback?: (canvas: TCanvas) => void,
+): void {
+	const record = roots.get(canvas);
+	if (record === undefined) return;
+	record.root.unmount();
+	callback?.(canvas);
 }
 
 export interface ThreeBoundaryMount {

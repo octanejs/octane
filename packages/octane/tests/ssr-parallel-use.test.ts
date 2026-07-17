@@ -266,10 +266,4 @@ describe('SSR parallel use() — the server mirror', () => {
 		expect(i2).toBeGreaterThan(i1);
 		expect(i3).toBeGreaterThan(i2);
 	});
-
-	it('parallelUse: false opts the server out (serial registration)', async () => {
-		let { code } = compile(INDEPENDENT, 'opt.tsrx', { mode: 'server', parallelUse: false });
-		expect(code).not.toContain('puMemo');
-		expect(code).not.toContain('puBatch');
-	});
 });
