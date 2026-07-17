@@ -2,6 +2,8 @@
 title: Quick start
 ---
 
+import { PackageInstall } from '../../components/PackageInstall.tsrx';
+
 <div className="doc-hero">
 	<h1>Quick start</h1>
 	<p className="doc-lede">
@@ -24,9 +26,7 @@ title: Quick start
 
 Install the runtime and the recommended Vite integration:
 
-```bash
-pnpm add octane @octanejs/vite-plugin
-```
+<PackageInstall packages="octane @octanejs/vite-plugin" />
 
 Then add the plugin to Vite:
 

@@ -2,6 +2,8 @@
 title: Build tools
 ---
 
+import { PackageInstall } from '../../components/PackageInstall.tsrx';
+
 <div className="doc-hero">
 	<p className="doc-eyebrow">Choose your build pipeline</p>
 	<h1>Build tools</h1>
@@ -35,10 +37,7 @@ console API, and the recommended production-style workflow.
 
 Use `@octanejs/vite-plugin` for every Vite app:
 
-```bash
-pnpm add octane @octanejs/vite-plugin
-pnpm add -D vite
-```
+<PackageInstall packages="octane @octanejs/vite-plugin" dev="vite" />
 
 ```ts
 // vite.config.ts
@@ -82,10 +81,7 @@ The Rspack package is deliberately low-level. It compiles `.tsrx`, eligible
 Octane `.tsx`, and raw Octane `.ts`/`.js` dependency sources, but leaves HTML,
 routing, and server orchestration to your application.
 
-```bash
-pnpm add octane
-pnpm add -D @rspack/core @octanejs/rspack-plugin
-```
+<PackageInstall packages="octane" dev="@rspack/core @octanejs/rspack-plugin" />
 
 ```js
 // rspack.config.mjs
@@ -117,10 +113,7 @@ Rsbuild is the closest equivalent to the full Vite metaframework integration.
 Its Environment API builds a browser hydration environment and a Node SSR
 environment with the correct Octane runtime in each.
 
-```bash
-pnpm add octane @octanejs/rsbuild-plugin
-pnpm add -D @rsbuild/core
-```
+<PackageInstall packages="octane @octanejs/rsbuild-plugin" dev="@rsbuild/core" />
 
 ```ts
 // rsbuild.config.ts
