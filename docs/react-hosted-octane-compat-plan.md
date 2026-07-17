@@ -1104,9 +1104,10 @@ publish build), exercised consumer-shaped by
 - The private root envelope is a PLAIN function body (bind the owner, return a
   value-position element for the transported child) — no compiled `.tsrx`
   ships in the package.
-- The §10 unchanged-parent-rerender bail (shallow `{ type, props }` compare)
-  is implemented and tested; scale-testing it under hundreds of islands
-  remains Phase 5 work.
+- The §10 unchanged-parent-rerender bail (shallow `{ type, props, key }`
+  compare) is implemented and tested — a key-only change replaces the island
+  with fresh state through octane's keyed identity semantics; scale-testing
+  the bail under hundreds of islands remains Phase 5 work.
 - The client half of Phase 3 (lazy relay episodes, post-Octane-commit
   resolution, rejection routing, supersession/no-op guards, local-boundary
   priority) was pulled forward — the Phase 0 spike had already validated it.

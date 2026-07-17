@@ -101,6 +101,38 @@ describe('octane/react — mount, update, unmount', () => {
 		await mounted.unmount();
 	});
 
+	it('treats the transported child key as island identity', async () => {
+		// The transport is { type, props, key } (§3/§10): a key-only change must
+		// replace the island (fresh state), not bail as an unchanged re-render —
+		// matching what React key semantics promise the author.
+		const log = createLog();
+		function App(props: { islandKey: string }) {
+			return h(
+				OctaneCompat,
+				null,
+				h(GreetingIsland as any, { key: props.islandKey, name: 'keyed', log: log.push }),
+			);
+		}
+		const mounted = await mountReactHost(h(App, { islandKey: 'a' }));
+		const button = () => mounted.host().querySelector('.count') as HTMLElement;
+		await reactAct(async () => button().click());
+		expect(button().textContent).toBe('count:1');
+		log.clear();
+
+		// Key change, identical type + props: remount with fresh state.
+		await mounted.render(h(App, { islandKey: 'b' }));
+		expect(button().textContent).toBe('count:0');
+		expect(log.drain()).toEqual(['island-cleanup:keyed', 'island-layout:keyed']);
+
+		// Stable key: parent re-renders still bail (state preserved).
+		await reactAct(async () => button().click());
+		await mounted.render(h(App, { islandKey: 'b' }));
+		expect(button().textContent).toBe('count:1');
+		expect(log.drain()).toEqual([]);
+
+		await mounted.unmount();
+	});
+
 	it('remounts the island when the transported child type changes', async () => {
 		const log = createLog();
 		const mounted = await mountReactHost(

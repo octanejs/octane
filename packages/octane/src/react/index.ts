@@ -77,6 +77,8 @@ const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 interface TransportedChild {
 	type: ComponentBody;
 	props: Record<string, unknown>;
+	/** React key of the transported element — part of island identity (§3/§10). */
+	key: string | null;
 }
 
 interface PendingEpisode {
@@ -90,9 +92,19 @@ interface PendingEpisode {
  * then renders the transported child as an ordinary value-position component,
  * so the child itself stays an unmodified compiled Octane component.
  */
-function hostedRootEnvelope(props: { body: ComponentBody; bodyProps: unknown }): unknown {
+function hostedRootEnvelope(props: {
+	body: ComponentBody;
+	bodyProps: unknown;
+	bodyKey: string | null;
+}): unknown {
 	bindRendererRegionOwner(props);
-	return createOctaneElement(props.body, props.bodyProps as never);
+	// The transported key rides the octane element so a key change replaces the
+	// island subtree (octane's keyed identity semantics), never updates in place.
+	const config =
+		props.bodyKey === null
+			? props.bodyProps
+			: { ...(props.bodyProps as object), key: props.bodyKey };
+	return createOctaneElement(props.body, config as never);
 }
 
 function reportHostedFault(error: unknown): void {
@@ -194,7 +206,10 @@ class HostedIslandController {
 		this.rootLive = true;
 		return () => {
 			this.disposers.delete(dispose);
-			this.rootLive = false;
+			// A rebind registers the successor BEFORE releasing the predecessor
+			// (bindRendererRegionOwner), so the root is only dead when no disposer
+			// remains — an unconditional clear would strand a live root.
+			this.rootLive = this.disposers.size > 0;
 		};
 	}
 
@@ -247,6 +262,7 @@ class HostedIslandController {
 			this.episode === null &&
 			previous !== null &&
 			previous.type === child.type &&
+			previous.key === child.key &&
 			shallowEqualProps(previous.props, child.props)
 		) {
 			return;
@@ -298,6 +314,7 @@ class HostedIslandController {
 		const props: Record<string, unknown> = {
 			body: committed.type,
 			bodyProps: committed.props,
+			bodyKey: committed.key,
 		};
 		Object.defineProperty(props, RENDERER_REGION_OWNER, {
 			value: this,
@@ -387,6 +404,7 @@ function validateIslandChild(children: React.ReactNode): TransportedChild {
 	return {
 		type: type as unknown as ComponentBody,
 		props: (children.props ?? {}) as Record<string, unknown>,
+		key: children.key ?? null,
 	};
 }
 
