@@ -1,7 +1,7 @@
 // One documentation page: render compiled MDX in a readable article, add the
 // navigation supplied by the registry, and keep a local table of contents
 // beside longer guides.
-import { useEffect, useRef, useState } from 'octane';
+import { useEffect, useLayoutEffect, useRef, useState } from 'octane';
 import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
@@ -49,7 +49,20 @@ export function DocPage() @{
 		link.closest('details')?.removeAttribute('open');
 	};
 
-	const [activeId, setActiveId] = useState('');
+	// The active section id is stored WITH the slug that measured it, and only
+	// counts for that doc: a client navigation to another doc that shares a
+	// section id (e.g. #next-steps) must not light the new TOC — or slide the
+	// indicator to a same-named row — before the new page's own scroll-spy has
+	// run. Deriving (rather than clearing in an effect) keeps the very first
+	// render of the new doc clean; the setter bails on no-change so the per-frame
+	// scroll spy doesn't re-render every scroll step.
+	const [active, setActive] = useState({ slug: '', id: '' });
+	const slug = doc?.slug ?? '';
+	const activeId =
+		active.slug === slug ? active.id : '';
+	const setActiveId = (id: string) => setActive(
+		(prev) => (prev.slug === slug && prev.id === id ? prev : { slug, id }),
+	);
 	const tocTrack = useRef<HTMLDivElement | null>(null);
 	// A TOC click claims its target here so the scroll-spy can hold that row lit
 	// through the smooth scroll instead of walking the highlight through every
@@ -117,22 +130,50 @@ export function DocPage() @{
 	// Slide the accent indicator onto the active row: measure its real position
 	// within the track and hand the numbers to CSS, which animates the transform
 	// and height. Measuring the rendered link (not an assumed row height) keeps it
-	// exact when titles wrap or nest. Geometry can also shift with NO activeId
-	// change — the desktop rail is display:none under 1180px (measuring 0×0), so
-	// widening the viewport back must remeasure, as must title rewraps and font
-	// swaps — hence the ResizeObserver on both the track (overall layout) and the
-	// link (its own box). doc?.slug is a dependency so a route change re-targets
-	// the new track/link nodes even when the new doc's active id is identical.
-	useEffect(() => {
+	// exact when titles wrap or nest. This is a LAYOUT effect so the numbers land
+	// before the paint that reveals the bar (is-active flips in the same commit) —
+	// with a passive effect the bar painted once at the default top position and
+	// slid from there. On the first reveal of a track the transform/height
+	// transitions are suppressed for one placement, so the bar fades in already
+	// sitting on the active row instead of animating in from the old value.
+	// Geometry can also shift with NO activeId change — the desktop rail is
+	// display:none under 1180px (measuring 0×0), so widening the viewport back
+	// must remeasure, as must title rewraps and font swaps — hence the
+	// ResizeObserver on both the track (overall layout) and the link (its own
+	// box). doc?.slug is a dependency so a route change re-targets the new
+	// track/link nodes even when the new doc's active id is identical.
+	useLayoutEffect(() => {
 		const track = tocTrack.current;
-		if (!track || activeId === '') return;
+		if (!track) return;
+		if (activeId === '') {
+			// Inactive (fresh doc before its first measure): the next activation is
+			// a first reveal again.
+			delete track.dataset.placed;
+			return;
+		}
 		const link = track.querySelector<HTMLElement>('[data-id="' + activeId + '"]');
 		if (!link) return;
 		const place = () => {
 			track.style.setProperty('--indicator-y', link.offsetTop + 'px');
 			track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
 		};
-		place();
+		if (track.dataset.placed === undefined) {
+			const indicator = track.querySelector<HTMLElement>('.toc-indicator');
+			if (indicator) {
+				// Keep only the opacity transition for this placement: position and
+				// size snap, then the full transition list is restored after a forced
+				// style flush so later moves animate again.
+				indicator.style.transitionProperty = 'opacity';
+				place();
+				void indicator.offsetWidth;
+				indicator.style.transitionProperty = '';
+			} else {
+				place();
+			}
+			track.dataset.placed = '';
+		} else {
+			place();
+		}
 		// The observer is a browser-only enhancement over the essential place()
 		// above — jsdom (the website unit tests) doesn't implement it.
 		if (typeof ResizeObserver === 'undefined') return;
