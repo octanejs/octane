@@ -21,6 +21,7 @@ import { h, mountReactHost, reactAct, SpikeErrorBoundary } from './_react-host.j
 import {
 	ConditionalHostReadIsland,
 	DuplicateReadIsland,
+	GuardedHostThemeIsland,
 	HostThemeIsland,
 	HostThemeViaUseContextIsland,
 	LoggingHostThemeIsland,
@@ -362,6 +363,48 @@ describe('octane/react — §6.3 HostContextRequest fallback', () => {
 			),
 		);
 		expect(mounted.host().querySelector('.two-host')?.textContent).toBe('t:hs-t l:hs-l');
+		await mounted.unmount();
+	});
+
+	it('bypasses a local @try boundary on INITIAL mount — providerless read lands the default', async () => {
+		// The reader sits inside the island's own @try with @pending and @catch
+		// arms. A providerless first read raises the §6.3 request from the
+		// mountTry path; the signal must reach the owner, never a local arm.
+		const mounted = await mountReactHost(
+			h(OctaneCompat, null, h(GuardedHostThemeIsland as any, { read: true })),
+		);
+		expect(mounted.host().querySelector('.guard-theme')?.textContent).toBe(
+			'theme:host-theme-default',
+		);
+		expect(mounted.host().querySelector('.guard-caught')).toBeNull();
+		expect(mounted.host().querySelector('.guard-pending')).toBeNull();
+		await mounted.unmount();
+	});
+
+	it('bypasses a local @try boundary when the first read appears on a try-body RE-RENDER', async () => {
+		// The try body commits WITHOUT a context read, then a prop flip makes the
+		// re-render path raise the request — the in-place try re-render catch
+		// must also pass the signal through instead of switching to @catch.
+		__setHostFiberAdapterEnabled(false);
+		let setTheme!: (value: string) => void;
+		function App(props: { read: boolean }) {
+			const [theme, set] = React.useState('g0');
+			setTheme = set;
+			return themed(
+				theme,
+				h(OctaneCompat, null, h(GuardedHostThemeIsland as any, { read: props.read })),
+			);
+		}
+		const mounted = await mountReactHost(h(App, { read: false }));
+		expect(mounted.host().querySelector('.guard-theme')?.textContent).toBe('theme:(off)');
+
+		await mounted.render(h(App, { read: true }));
+		expect(mounted.host().querySelector('.guard-theme')?.textContent).toBe('theme:g0');
+		expect(mounted.host().querySelector('.guard-caught')).toBeNull();
+
+		// The handshake installed a real subscription through the boundary.
+		await reactAct(async () => setTheme('g1'));
+		expect(mounted.host().querySelector('.guard-theme')?.textContent).toBe('theme:g1');
 		await mounted.unmount();
 	});
 

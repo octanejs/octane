@@ -14439,6 +14439,10 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
+			// §6.3 control signal — never an application failure: pass it through
+			// so the renderer-region owner (handleRenderError) receives it; a
+			// local catch arm must not render a hosted context handshake.
+			if (isHostContextRequest(err)) throw err;
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
 				handleSuspense(s, err.thenable, s.tryBlock);
@@ -14574,6 +14578,9 @@ function mountTry(state: TrySlot): void {
 		renderBlock(b);
 		state.hasResolved = true;
 	} catch (err) {
+		// §6.3 control signal — bypass the local boundary (see the try-body
+		// re-render catch above); the renderer-region owner handles it.
+		if (isHostContextRequest(err)) throw err;
 		if (isSuspenseException(err)) {
 			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
