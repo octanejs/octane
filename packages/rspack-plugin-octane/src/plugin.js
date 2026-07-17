@@ -237,6 +237,9 @@ export class OctaneRspackPlugin {
 			profile,
 			exclude: this.options.exclude ?? [],
 			renderers: this.options.renderers?.signature,
+			// Ownership flips which modules compile vs pass through — cached
+			// transform results must not survive a requireDirective toggle.
+			requireDirective: this.options.requireDirective === true,
 			transpile: this.options.transpile !== false,
 		});
 		installProfilingDefine(compiler, profile);

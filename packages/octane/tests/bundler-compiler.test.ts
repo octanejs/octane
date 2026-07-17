@@ -876,6 +876,18 @@ describe('requireDirective ownership gate', () => {
 		expect(slotted?.code).not.toContain('use octane');
 	});
 
+	it('keeps the directive out of Octane-owned pass-through results', () => {
+		// A directed module with nothing to rewrite (no hooks to slot) is still
+		// Octane output: whatever code the result carries omits the build-time
+		// directive, matching compiled and slotted modules.
+		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
+		const untouched = compiler.transform(
+			"'use octane';\nimport { createRoot } from 'octane';\nexport const boot = createRoot;\n",
+			'/project/src/boot.ts',
+		);
+		expect(untouched?.code ?? '').not.toContain('use octane');
+	});
+
 	it('recognizes the directive after comments and other directives', () => {
 		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
 		const source = '// island\n/* mixed */\n"use client";\n\'use octane\';\n' + COMPONENT;
@@ -904,6 +916,11 @@ describe('requireDirective ownership gate', () => {
 		).toBeNull();
 		expect(warnings.some((message) => message.includes('/src/react-app/Island.tsrx'))).toBe(true);
 		expect(warnings.some((message) => message.includes('exclu'))).toBe(true);
+		// The same conflict diagnostic covers the .ts/.js hook-slot exclusion.
+		expect(
+			compiler.transform("'use octane';\n" + HOOK, '/project/src/react-app/util.ts'),
+		).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/util.ts'))).toBe(true);
 		// Outside the excluded paths the gate is unchanged.
 		expect(() => compiler.transform(COMPONENT, '/project/src/islands/Bad.tsrx')).toThrow(
 			/has no 'use octane' module directive/,

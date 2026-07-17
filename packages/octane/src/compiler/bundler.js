@@ -448,12 +448,7 @@ class OctaneBundlerCompiler {
 		if (!this.requireDirective) return true;
 		if (!this._isProjectOwnedSource(file)) return true;
 		if (this.exclude.some((path) => file.includes(path))) {
-			if (directive !== null && this.warn !== null && !this.warnedUndirected.has(filename)) {
-				this.warnedUndirected.add(filename);
-				this.warn(
-					`${filename} declares 'use octane' but matches an excluded path — the exclusion wins and Octane will not compile it.`,
-				);
-			}
+			this._warnExcludedDirectiveConflict(file, filename, directive);
 			return false;
 		}
 		if (directive !== null) return true;
@@ -466,6 +461,21 @@ class OctaneBundlerCompiler {
 			throw error;
 		}
 		return false;
+	}
+
+	/**
+	 * requireDirective diagnostic: an exclusion beats a `'use octane'`
+	 * directive, and the module stays with its excluded-path owner. Warn once
+	 * so the conflicting signals never resolve as a silent no-op. Shared by
+	 * the full-compile gate and the `.ts`/`.js` hook-slot exclusion.
+	 */
+	_warnExcludedDirectiveConflict(file, filename, directive) {
+		if (directive === null || this.warn === null) return;
+		if (!this._isProjectOwnedSource(file) || this.warnedUndirected.has(filename)) return;
+		this.warnedUndirected.add(filename);
+		this.warn(
+			`${filename} declares 'use octane' but matches an excluded path — the exclusion wins and Octane will not compile it.`,
+		);
 	}
 
 	/**
@@ -803,7 +813,14 @@ class OctaneBundlerCompiler {
 
 		if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
 			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
-			if (this.exclude.some((path) => file.includes(path))) return null;
+			if (this.exclude.some((path) => file.includes(path))) {
+				// Same conflict diagnostic as the full-compile gate: a directive
+				// inside an excluded path must not fail silent.
+				if (this.requireDirective) {
+					this._warnExcludedDirectiveConflict(file, filename, directive);
+				}
+				return null;
+			}
 			if (!/from\s*['"]octane['"]/.test(code)) return null;
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return this._passThrough(code, collected);
@@ -814,8 +831,11 @@ class OctaneBundlerCompiler {
 				this._warnUndirectedOctaneImport(code, filename);
 				return this._passThrough(code, collected);
 			}
+			// From here the module is Octane-owned even when nothing gets
+			// rewritten (manual slots, or no hooks to slot) — the returned code
+			// is Octane output, so the build-time directive never appears in it.
 			if (this._hasManualHookSlots(file, collected)) {
-				return this._passThrough(code, collected);
+				return this._passThrough(source, collected);
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
@@ -831,7 +851,7 @@ class OctaneBundlerCompiler {
 						}
 					: {}),
 			});
-			if (out === null) return this._passThrough(code, collected);
+			if (out === null) return this._passThrough(source, collected);
 			return {
 				code: out.code,
 				map: out.map,
