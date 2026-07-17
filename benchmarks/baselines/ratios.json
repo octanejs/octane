@@ -198,7 +198,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.25,
-    "note": "10-level nested-use() init vs React 19. Compiler-parallelized use (parallelUse pipeline, docs/suspense-parallel-use-plan.md, recorded 2026-07-09) collapses the waterfall to the parallel floor: measured 0.065x (20.1ms vs 307.3ms). Guard at 0.25x so a regression back toward per-level rounds fails loudly."
+    "note": "10-level nested-use() init vs React 19. Compiler-parallelized use (docs/suspense-parallel-use-plan.md, recorded 2026-07-09) collapses the waterfall to the parallel floor: measured 0.065x (20.1ms vs 307.3ms). Guard at 0.25x so a regression back toward per-level rounds fails loudly."
   },
   {
     "suite": "async-waterfall",
@@ -214,7 +214,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 1.5,
-    "note": "init vs Solid 2.0 (parallel by model): measured 1.06x on record 2026-07-09 (20.1ms vs 19.0ms). The win the parallelUse pipeline earned - must not regress."
+    "note": "init vs Solid 2.0 (parallel by model): measured 1.06x on record 2026-07-09 (20.1ms vs 19.0ms). The compiler's waterfall-elimination win must not regress."
   },
   {
     "suite": "async-waterfall",
@@ -239,6 +239,22 @@
     "reference": "ripple",
     "maxRatio": 1.5,
     "note": "update vs ripple: measured 1.09x on record 2026-07-09."
+  },
+  {
+    "suite": "async-composition",
+    "op": "init_waves",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.0,
+    "note": "Cross-framework cold-mount topology guard: Octane and React both take 6 waves in the initial 2026-07-16 record. The suite separately enforces Octane's absolute six-wave ceiling; tighten this ratio toward the honest two-wave floor after composition gaps close."
+  },
+  {
+    "suite": "async-composition",
+    "op": "update_waves",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 2.0,
+    "note": "Cross-framework transition topology guard: Octane takes 6 waves vs React's 3 on the initial 2026-07-16 record. The suite separately enforces Octane's absolute six-wave ceiling; tighten this ratio toward 1.0 as composition warming improves."
   },
   {
     "suite": "js-framework",

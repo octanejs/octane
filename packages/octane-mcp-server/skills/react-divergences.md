@@ -45,7 +45,7 @@ platform, not React's wrapper.
 
 ## Parallel `use()` — no suspense waterfalls
 
-The compiler (on by default; `parallelUse: false` opts out) memoizes `use()`
+The compiler unconditionally memoizes `use()`
 argument creations per call site, starts provably-independent fetches together,
 suspends once per stratum, and prefetches independent descendant fetch trees.
 React runs the same code as a serial waterfall — do not "fix" fetch-start

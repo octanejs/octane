@@ -4,7 +4,7 @@ import * as ServerRuntime from 'octane/server';
 import { prerender } from 'octane/static';
 
 function evalServer(source: string, filename: string): Record<string, any> {
-	let code = compile(source, filename, { mode: 'server', parallelUse: false }).code;
+	let code = compile(source, filename, { mode: 'server' }).code;
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,

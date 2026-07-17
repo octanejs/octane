@@ -3646,7 +3646,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, parallelUse?: boolean, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -3804,14 +3804,6 @@ export function compile(source, filename, options) {
 	// a stale-UI report can be bisected memoizer-vs-elsewhere in one line.
 	const autoMemoEnabled =
 		options?.autoMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
-	// parallelUse: the parallel-`use()` transform pipeline (auto-memoized
-	// creations → hoisted parallel starts → batched unwrap → __warm fetch
-	// plans; docs/suspense-parallel-use-plan.md). ON by default — pass
-	// `parallelUse: false` to opt out (React-timing waterfall semantics).
-	// Output is byte-identical with the flag off, and the pipeline is a no-op
-	// for use()-free modules either way.
-	const parallelUseEnabled = !(options && options.parallelUse === false);
-
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -3820,7 +3812,6 @@ export function compile(source, filename, options) {
 		dev: devEnabled,
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
-		parallelUse: parallelUseEnabled,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
@@ -4660,8 +4651,7 @@ function compileServer(source, filename, options) {
 		// transforms run on server bodies, emitting `_$puMemo`/`_$puBatch` — the
 		// server-runtime twins with cross-pass creation identity — so independent
 		// fetches REGISTER before the first suspend and a body stratum costs ONE
-		// network round instead of one per use(). Same opt-out flag as the client.
-		parallelUse: !(options && options.parallelUse === false),
+		// network round instead of one per use().
 		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
 		_pendingWarm: null, // `X.__warm = …` source, set by ssrCompileBody, drained by compileServerComponent
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
@@ -4893,20 +4883,18 @@ function ssrCompileBody(
 	// subs (statement arrays) run Pass B only. Loops/functions are excluded by
 	// the passes themselves (same rules as the client).
 	let workingStatements = statements;
-	if (ctx.parallelUse) {
-		let warmThunk = null;
-		const isTopBody = !Array.isArray(node.body);
-		if (isTopBody) {
-			const creations = [];
-			const warmChildren = [];
-			workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
-			jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
-			const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
-			warmThunk = warm.thunk;
-			ctx._pendingWarm = warm.warmSrc;
-		}
-		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
+	let warmThunk = null;
+	const isTopBody = !Array.isArray(node.body);
+	if (isTopBody) {
+		const creations = [];
+		const warmChildren = [];
+		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
+		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
+		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
+		warmThunk = warm.thunk;
+		ctx._pendingWarm = warm.warmSrc;
 	}
+	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	const rewritten = workingStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
@@ -6483,7 +6471,7 @@ function compileComponent(node, ctx, options) {
 		ctx.currentProfileComponentId = prevProfileComponentId;
 	}
 
-	// parallelUse warm plan: attached to the INNER function object (not the
+	// Parallel-use warm plan: attached to the INNER function object (not the
 	// module const) so the component's own body — where the function-
 	// expression name shadows the const — resolves `_$warmChild(Self, …)` to
 	// an object that carries the plan. hmr() forwards `__warm` from the
@@ -6591,7 +6579,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		);
 	}
 
-	// parallelUse: the parallel-`use()` pipeline (docs/suspense-parallel-use-plan.md)
+	// The parallel-`use()` pipeline (docs/suspense-parallel-use-plan.md)
 	// slots in HERE — after autoCallback (so memoized creations aren't re-wrapped),
 	// before rewriteHookCalls (so the _$useMemo/_$useBatch calls it emits are
 	// compiler-aliased, not user identifiers). Top-level component bodies run the
@@ -6600,19 +6588,17 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// transformed), the warm plan is derived from that same analysis, and Pass B
 	// hoists+batches. Sub-bodies (hoisted @try/@if arms via hoistBodyHelper's
 	// legacy path) arrive pre-memoized and run Pass B only.
-	if (ctx.parallelUse) {
-		let warmThunk = null;
-		if (options && options.autoCallback) {
-			const creations = [];
-			const warmChildren = [];
-			workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
-			jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
-			const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
-			warmThunk = warm.thunk;
-			ctx._pendingWarm = warm.warmSrc;
-		}
-		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
+	let warmThunk = null;
+	if (options && options.autoCallback) {
+		const creations = [];
+		const warmChildren = [];
+		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
+		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
+		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
+		warmThunk = warm.thunk;
+		ctx._pendingWarm = warm.warmSrc;
 	}
+	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
@@ -6795,7 +6781,7 @@ function universalRuntimeUnitForTopLevelNode(node, ctx) {
 }
 
 function transformUniversalParallelUse(ast, ctx, metadata) {
-	if ((!ctx.parallelUse && !ctx.profile) || !metadata?.componentHelper) return;
+	if (!metadata?.componentHelper) return;
 	const previousUseAliases = ctx._parallelUseAliases;
 	const previousUniversalUnit = ctx._universalRuntimeUnit;
 	ctx._universalRuntimeUnit = metadata;
@@ -6985,10 +6971,6 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 		if (!isFunction(fn) || transformed.has(fn)) return fn;
 		transformed.add(fn);
 		annotateAuthoredHooks(fn, component, name);
-		if (!ctx.parallelUse) {
-			scan(fn.body, name);
-			return fn;
-		}
 		if (fn.body?.type !== 'BlockStatement') {
 			scan(fn.body, name);
 			return fn;
@@ -7092,7 +7074,7 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 // Parallel use() — docs/suspense-parallel-use-plan.md
 // ===========================================================================
 
-// The parallel-`use()` pipeline (gated on ctx.parallelUse). Three cooperating
+// The parallel-`use()` pipeline. Three cooperating
 // transforms reconstruct Solid/Ripple's "fetch starts at creation, suspension
 // happens at read" property for React-shaped `use()` code:
 //
@@ -7120,9 +7102,6 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 //     recurses down the tree — the whole descendant fetch tree starts in the
 //     first attempt.
 //
-// With the flag off, the parallel-use rewrite is skipped; the server and
-// Suspense suites cover the resulting behavior through compiled fixtures.
-
 // Names bound by a binding pattern (params, declarator ids). Mirrors the
 // pattern handling of collectFreeIdentifiers' collectBindings.
 function collectPatternNames(pat, into) {

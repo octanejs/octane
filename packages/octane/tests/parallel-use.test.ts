@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mount, act } from './_helpers';
 import { ChainHost, DependentChain, BatchCatch, GatedHost } from './_fixtures/parallel-use.tsrx';
 
-// Runtime behavior of the parallel-use pipeline (the suite compiles fixtures
-// with `parallelUse: true` — see vitest.config.js).
+// Runtime behavior of the compiler's unconditional parallel-use pipeline.
 
 interface Deferred<T> {
 	promise: Promise<T>;

@@ -5165,8 +5165,8 @@ function trackThenable(thenable: TrackedThenable<any>): void {
 
 // ---------------------------------------------------------------------------
 // Parallel use() — batched unwrap + fetch-tree warming.
-// (docs/suspense-parallel-use-plan.md; emitted by the compiler's parallelUse
-// pipeline as _$useBatch / _$warmMemo / _$warmChild.)
+// (docs/suspense-parallel-use-plan.md; emitted by the compiler as _$useBatch /
+// _$warmMemo / _$warmChild.)
 // ---------------------------------------------------------------------------
 
 /**
@@ -5192,8 +5192,8 @@ function warnUncachedUsePromise(block: Block): void {
 		'A component was suspended by an uncached promise: a replay created a fresh ' +
 			'promise for a use() slot that already had one, so the stored promise was ' +
 			'reused and the fresh request was wasted. Create the promise outside the ' +
-			'component, cache it, or enable the compiler`s parallelUse transform ' +
-			'(which memoizes use() arguments per call site).',
+			'component or cache it. The compiler automatically memoizes analyzable ' +
+			'component-local use() arguments per call site.',
 	);
 }
 const warnedWaterfall = new WeakSet<Block>();
@@ -5205,8 +5205,8 @@ function warnUseWaterfall(block: Block, idx: number): void {
 		`use() waterfall: a replay discovered a new pending promise at call index ${idx} ` +
 			'that only starts after the earlier use() resolved. If it does not depend on ' +
 			'the earlier value, restructure so both promises are created before the first ' +
-			'use() (the parallelUse compiler transform does this automatically for ' +
-			'independent arguments).',
+			'use(). The compiler does this automatically for analyzable independent ' +
+			'component-local arguments.',
 	);
 }
 

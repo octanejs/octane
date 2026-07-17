@@ -103,7 +103,6 @@ export default function octaneLoader(source, inputSourceMap) {
 			root,
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
-			...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 			...(options.renderers === undefined ? null : { renderers: options.renderers }),
 		});
 		const id = realModuleId(this.resource ?? this.resourcePath);
@@ -114,7 +113,6 @@ export default function octaneLoader(source, inputSourceMap) {
 					hmr,
 					dev,
 					profile,
-					...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 				});
 

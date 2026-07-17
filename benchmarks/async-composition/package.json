@@ -1,0 +1,13 @@
+{
+  "name": "octane-async-composition-benchmarks",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Dashboard-style Suspense composition benchmark for Octane and React.",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "playwright": "catalog:default"
+  }
+}

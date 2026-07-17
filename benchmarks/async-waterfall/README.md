@@ -13,7 +13,7 @@ its child.
 ## What it demonstrates
 
 - **octane** (`use(fetch)` under `<Suspense>`, `startTransition` updates,
-  compiled with the `parallelUse` pipeline — see the app's vite config and
+  compiled with Octane's unconditional waterfall-elimination transform — see
   docs/suspense-parallel-use-plan.md): the code is idiomatic nested `use`,
   deliberately NOT hand-hoisted — the COMPILER memoizes each level's fetch
   creation, batches the suspension, and warm-walks the child chain
@@ -29,7 +29,7 @@ its child.
   effect-driven fetch): parallel by model — the whole tree is created
   immediately; init/update land near the `DELAY` floor.
 
-Recorded medians (2026-07-09, parallelUse on): octane-tsrx init 20.1ms
+Recorded medians (2026-07-09): octane-tsrx init 20.1ms
 (1.3× floor) / update 19.1ms; React init 307.3ms (19.2×) / update 190.1ms;
 solid 19.0/18.6ms; ripple 19.2/17.5ms. (Pre-pipeline, 2026-07-08: octane was
 174.8/172.4ms — 10.9× the floor, the waterfall this suite existed to pin.)
@@ -38,7 +38,7 @@ solid 19.0/18.6ms; ripple 19.2/17.5ms. (Pre-pipeline, 2026-07-08: octane was
 
 Octane is ratio-guarded on BOTH sides now: ≤0.25× React (a regression back
 toward per-level rounds fails loudly) and ≤1.5× solid/ripple on init+update
-(the parallel-floor win the parallelUse pipeline earned must not regress).
+(the compiler's parallel-floor win must not regress).
 
 - **Preact** uses its documented cached-resource Suspense pattern. A level
   suspends before creating its child, so the nested tree serializes honestly.

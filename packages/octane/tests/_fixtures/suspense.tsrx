@@ -319,8 +319,7 @@ export function ParallelInOneBoundary(props) @{
 	</>
 }
 
-// Sequential use() WITHOUT hand-written useMemo. Under the parallelUse
-// pipeline (the test-suite default) the compiler memoizes both creations,
+// Sequential use() WITHOUT hand-written useMemo. The compiler memoizes both creations,
 // hoists them above the first unwrap, and batches the suspension — both
 // fetches start in the first attempt and each factory runs exactly once.
 // (Pre-pipeline this was the waterfall regression-pin: startB() never ran

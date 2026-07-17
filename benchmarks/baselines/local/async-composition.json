@@ -1,0 +1,314 @@
+{
+  "suite": "async-composition",
+  "iterations": 10,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "init": {
+          "score": 312.8900000035763,
+          "median": 313.5,
+          "min": 310.10000002384186,
+          "mean": 312.8900000035763,
+          "p95": 314.60000002384186,
+          "sd": 1.387603840736863,
+          "rme": 0.31722427286077587,
+          "scoreRme": 0.31722427286077587,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update": {
+          "score": 309.5600000023842,
+          "median": 309.69999998807907,
+          "min": 308.5,
+          "mean": 309.5600000023842,
+          "p95": 311,
+          "sd": 0.8289216568394182,
+          "rme": 0.1915407788303765,
+          "scoreRme": 0.1915407788303765,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_waves": {
+          "score": 6,
+          "median": 6,
+          "min": 6,
+          "mean": 6,
+          "p95": 6,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_waves": {
+          "score": 6,
+          "median": 6,
+          "min": 6,
+          "mean": 6,
+          "p95": 6,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_calls": {
+          "score": 23,
+          "median": 23,
+          "min": 23,
+          "mean": 23,
+          "p95": 23,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_calls": {
+          "score": 23,
+          "median": 23,
+          "min": 23,
+          "mean": 23,
+          "p95": 23,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_mixed_states": {
+          "score": 6,
+          "median": 6,
+          "min": 6,
+          "mean": 6,
+          "p95": 6,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_start_span": {
+          "score": 259.7700000166893,
+          "median": 260,
+          "min": 257.30000001192093,
+          "mean": 259.7700000166893,
+          "p95": 261.2000000476837,
+          "sd": 1.1700427430017315,
+          "rme": 0.3221850122021817,
+          "scoreRme": 0.3221850122021817,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_start_span": {
+          "score": 257.46000000238416,
+          "median": 257.2999999523163,
+          "min": 256.80000001192093,
+          "mean": 257.46000000238416,
+          "p95": 258.89999997615814,
+          "sd": 0.6883151668986977,
+          "rme": 0.19123623062988498,
+          "scoreRme": 0.19123623062988498,
+          "warmupRatio": 1,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "delayMs": 50,
+        "resources": 8,
+        "independentResources": 7,
+        "idealRounds": 2,
+        "idealFloorMs": 100,
+        "units": {
+          "init_waves": "waves",
+          "update_waves": "waves",
+          "init_calls": "calls",
+          "update_calls": "calls",
+          "update_mixed_states": "states"
+        },
+        "init": {
+          "waveCounts": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+          "firstWaveCounts": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [23, 23, 23, 23, 23, 23, 23, 23, 23, 23],
+          "wavePatterns": [
+            "project -> viewer -> badge -> owner -> activity+activity-summary -> insights+insights-chart"
+          ],
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
+        },
+        "update": {
+          "waveCounts": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+          "firstWaveCounts": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [23, 23, 23, 23, 23, 23, 23, 23, 23, 23],
+          "wavePatterns": [
+            "project -> viewer -> badge -> owner -> activity+activity-summary -> insights+insights-chart"
+          ],
+          "mixedStateCounts": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+          "mixedStateSignatures": [
+            "project=project:v1|viewer=viewer:v1|badge=badge:v0|owner=owner:v0:owner-0|activity=activity:v0|activity-summary=activity-summary:v0|insights=insights:v0|insights-chart=insights-chart:v0",
+            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v0:owner-0|activity=activity:v0|activity-summary=activity-summary:v0|insights=insights:v0|insights-chart=insights-chart:v0",
+            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v1:owner-1|activity=activity:v0|activity-summary=activity-summary:v0|insights=insights:v0|insights-chart=insights-chart:v0",
+            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v1:owner-1|activity=activity:v1|activity-summary=activity-summary:v0|insights=insights:v0|insights-chart=insights-chart:v0",
+            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v1:owner-1|activity=activity:v1|activity-summary=activity-summary:v1|insights=insights:v0|insights-chart=insights-chart:v0",
+            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v1:owner-1|activity=activity:v1|activity-summary=activity-summary:v1|insights=insights:v1|insights-chart=insights-chart:v0"
+          ]
+        }
+      }
+    },
+    {
+      "name": "react",
+      "ops": {
+        "init": {
+          "score": 309.69999999403956,
+          "median": 309.80000001192093,
+          "min": 308.30000001192093,
+          "mean": 309.69999999403956,
+          "p95": 310.80000001192093,
+          "sd": 0.7615773078036449,
+          "rme": 0.17589981813514033,
+          "scoreRme": 0.17589981813514033,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update": {
+          "score": 154.12000000476837,
+          "median": 154.30000001192093,
+          "min": 152.89999997615814,
+          "mean": 154.12000000476837,
+          "p95": 154.60000002384186,
+          "sd": 0.5138093106740659,
+          "rme": 0.23847099844199754,
+          "scoreRme": 0.23847099844199754,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_waves": {
+          "score": 6,
+          "median": 6,
+          "min": 6,
+          "mean": 6,
+          "p95": 6,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_waves": {
+          "score": 3,
+          "median": 3,
+          "min": 3,
+          "mean": 3,
+          "p95": 3,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_calls": {
+          "score": 35,
+          "median": 35,
+          "min": 35,
+          "mean": 35,
+          "p95": 35,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_calls": {
+          "score": 25,
+          "median": 25,
+          "min": 25,
+          "mean": 25,
+          "p95": 25,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_mixed_states": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_start_span": {
+          "score": 256.7800000071526,
+          "median": 256.7999999523163,
+          "min": 255.5,
+          "mean": 256.7800000071526,
+          "p95": 257.69999998807907,
+          "sd": 0.6579429200377999,
+          "rme": 0.18328191927212653,
+          "scoreRme": 0.18328191927212653,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_start_span": {
+          "score": 102.31000000238419,
+          "median": 102.5,
+          "min": 101.70000004768372,
+          "mean": 102.31000000238419,
+          "p95": 102.60000002384186,
+          "sd": 0.3510302119739741,
+          "rme": 0.24542512012425224,
+          "scoreRme": 0.24542512012425224,
+          "warmupRatio": 1,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "delayMs": 50,
+        "resources": 8,
+        "independentResources": 7,
+        "idealRounds": 2,
+        "idealFloorMs": 100,
+        "units": {
+          "init_waves": "waves",
+          "update_waves": "waves",
+          "init_calls": "calls",
+          "update_calls": "calls",
+          "update_mixed_states": "states"
+        },
+        "init": {
+          "waveCounts": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+          "firstWaveCounts": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [35, 35, 35, 35, 35, 35, 35, 35, 35, 35],
+          "wavePatterns": [
+            "project+activity+insights -> viewer -> badge -> owner -> activity-summary -> insights-chart"
+          ],
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
+        },
+        "update": {
+          "waveCounts": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "firstWaveCounts": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [25, 25, 25, 25, 25, 25, 25, 25, 25, 25],
+          "wavePatterns": [
+            "project+activity+insights -> viewer+activity-summary+insights-chart -> badge+owner"
+          ],
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}

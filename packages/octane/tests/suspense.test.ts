@@ -395,10 +395,10 @@ describe('Suspense — parallel boundaries (no waterfall)', () => {
 		r.unmount();
 	});
 
-	it('sequential use() inside one body starts both fetches in parallel (parallelUse transform)', async () => {
+	it('sequential use() inside one body starts both fetches in parallel', async () => {
 		// INTENTIONAL DIVERGENCE FROM REACT (docs/suspense-parallel-use-plan.md):
 		// this used to be the waterfall regression-pin — the first use() threw
-		// before startB() ever ran. The parallelUse pipeline memoizes both
+		// before startB() ever ran. The compiler memoizes both
 		// creations, hoists them above the first unwrap, and batches the
 		// suspension, so BOTH fetches start in the first attempt and each
 		// factory runs exactly once (memo deps [props.startA]/[props.startB]).

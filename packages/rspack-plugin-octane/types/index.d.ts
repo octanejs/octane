@@ -77,8 +77,6 @@ export interface OctaneRspackLoaderOptions {
 	dev?: boolean;
 	/** Emit client profiling metadata and enable the profiling runtime. Default `false`. */
 	profile?: boolean;
-	/** Enable Octane's parallel `use()` compilation pipeline. Default `true`. */
-	parallelUse?: boolean;
 	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */
