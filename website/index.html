@@ -16,6 +16,28 @@
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 		<link rel="manifest" href="/site.webmanifest" />
 		<meta name="theme-color" content="#23272f" />
+		<!-- Social link previews. Scrapers don't run JS and every route serves this
+		     template, so these are site-wide; per-route cards would need injection
+		     through the ssr-head slot. No rel=canonical / og:url for the same
+		     reason: a homepage URL baked into every route would tell crawlers and
+		     share-aggregators that subpages are duplicates of the homepage.
+		     X/Twitter falls back to og:* for title/description/image, so only
+		     twitter:card is declared explicitly. -->
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="Octane" />
+		<meta property="og:title" content="Octane — React's programming model, compiled" />
+		<meta
+			property="og:description"
+			content="React's programming model, compiled ahead of time. No VDOM, no rules of hooks."
+		/>
+		<meta property="og:image" content="https://octanejs.dev/og-image.png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta
+			property="og:image:alt"
+			content="Octane — React's programming model, compiled ahead of time"
+		/>
+		<meta name="twitter:card" content="summary_large_image" />
 		<style>
 			/* Global base — everything component-scoped lives in scoped <style> blocks;
 			   only the document-level reset/palette belongs here (inline so the SSR

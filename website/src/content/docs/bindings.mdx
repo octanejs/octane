@@ -4,6 +4,7 @@ title: Bindings
 
 import { BindingsDirectory } from '../../components/BindingsDirectory.tsrx';
 import { BINDING_COUNT } from '../bindings.ts';
+import { PackageInstall } from '../../components/PackageInstall.tsrx';
 
 <div className="doc-hero">
 	<p className="doc-eyebrow">{BINDING_COUNT + ' first-party bindings'}</p>
@@ -40,9 +41,7 @@ supported surface and SSR coverage.
 
 Install the Octane package instead of the React-facing one:
 
-```sh
-pnpm add @octanejs/zustand
-```
+<PackageInstall packages="@octanejs/zustand" />
 
 The library API stays familiar; the import points at its Octane binding:
 
