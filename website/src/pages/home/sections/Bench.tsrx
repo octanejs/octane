@@ -11,7 +11,7 @@ export function Bench() @{
 			<Link to="/benchmarks" class="bench-all">All suites →</Link>
 		</div>
 		<div class="bench-grid">
-			<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
+			<BenchBars card={HOME_SUMMARY} />
 		</div>
 		<p class="bench-note">
 			{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}
