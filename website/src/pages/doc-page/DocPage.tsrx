@@ -32,6 +32,24 @@ function DocPre(props: { children?: unknown; [key: string]: unknown }) @{
 
 const docComponents = { table: DocTable, pre: DocPre };
 
+// The scroll-spy's activation line: a section is "current" once its heading has
+// crossed this line under the sticky header (~60px) plus a little breathing
+// room. Shared by live tracking and the click-settle check below.
+const ACTIVATION_LINE = 100;
+// How long after the last scroll tick a TOC click is considered settled. Long
+// enough to bridge the gap between smooth-scroll frames (and the delay before
+// the first one); short enough that live tracking resumes promptly.
+const CLICK_SETTLE_MS = 250;
+
+// True when a scrollable page is parked at its very bottom. Guarded on
+// scrollability because on a short doc that fits the viewport the bottom test
+// would be satisfied from the very top.
+function isAtPageBottom(): boolean {
+	const scrollable = document.documentElement.scrollHeight - window.innerHeight > 1;
+	return scrollable &&
+		window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+}
+
 export function DocPage() @{
 	const params = useParams({ strict: false }) as { slug?: string };
 	const doc = findDoc(params.slug);
@@ -66,25 +84,39 @@ export function DocPage() @{
 	const tocTrack = useRef<HTMLDivElement | null>(null);
 	// A TOC click claims its target here so the scroll-spy can hold that row lit
 	// through the smooth scroll instead of walking the highlight through every
-	// section the animation sweeps past. The lock is released when the target
-	// reaches the activation line, or — for targets that can never reach it —
-	// once scrolling SETTLES: every locked scroll tick re-arms the release
-	// timer, so a fixed deadline can't expire mid-flight on a long smooth
-	// scroll and let the highlight walk after all. The spy publishes measure()
-	// through measureRef so releasing resumes live tracking immediately.
+	// section the animation sweeps past. The lock is held for the WHOLE flight —
+	// every locked scroll tick re-arms the settle timer, so a fixed deadline
+	// can't expire mid-scroll — and released exactly once, when scrolling has
+	// settled. The release then judges the outcome: if the click LANDED (the
+	// target sits at the activation line, or the page parked at the bottom with
+	// the target still in view — a near-bottom heading that can never reach the
+	// line), the clicked row stays lit; the bottom-snap rule must not steal the
+	// highlight the reader just chose. Only if the reader went somewhere else
+	// mid-flight (an interrupted scroll) does the spy re-measure, resuming live
+	// tracking from wherever they actually are.
 	const clickLock = useRef<string | null>(null);
 	const clickTimer = useRef(0);
 	const measureRef = useRef<(() => void) | null>(null);
-	// Long enough to bridge the gap between smooth-scroll frames (and the delay
-	// before the first one); short enough that tracking resumes promptly.
-	const CLICK_SETTLE_MS = 250;
 	const armClickRelease = () => {
 		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
 		clickTimer.current = window.setTimeout(() => {
+			const id = clickLock.current;
 			clickLock.current = null;
 			clickTimer.current = 0;
-			// Resume live tracking right away: with no fresh measure the clicked
-			// row would stay lit until the next scroll or resize event.
+			const heading =
+				id !== null ? document.getElementById(id) : null;
+			if (heading) {
+				const top = heading.getBoundingClientRect().top;
+				// scrollIntoView lands the heading just under the sticky header
+				// (scroll-margin-top ≈ 88px, line = 100), so a small tolerance on
+				// the line covers rounding; the bottom clause accepts any visible
+				// resting spot when the page ran out of scroll room.
+				const landed =
+					top >= -2 && (top <= ACTIVATION_LINE + 4 || isAtPageBottom() && top < window.innerHeight);
+				if (landed) return;
+			}
+			// The reader ended up elsewhere — resume live tracking right away
+			// rather than leaving the clicked row lit until the next scroll.
 			measureRef.current?.();
 		}, CLICK_SETTLE_MS);
 	};
@@ -102,41 +134,25 @@ export function DocPage() @{
 		) as HTMLElement[];
 		if (headings.length === 0) return;
 
-		const ACTIVATION_LINE = 100; // sticky header (~60px) + a little breathing room
 		let frame = 0;
 		const measure = () => {
+			// While a TOC click is in flight, hold the clicked row and only push the
+			// settle timer out — ALL release decisions (including whether the click
+			// landed) happen once, in the settle callback, where the bottom-snap
+			// rule below can no longer steal the highlight mid-judgement.
+			if (clickLock.current !== null) {
+				armClickRelease();
+				return;
+			}
 			let current = headings[0].id;
 			for (const heading of headings) {
 				if (heading.getBoundingClientRect().top <= ACTIVATION_LINE) current = heading.id;
 				else break;
 			}
-			// Only snap to the final heading when the page can actually scroll and is
-			// parked at the bottom. On a short doc whose content fits the viewport the
-			// bottom test is satisfied from the very top, which would otherwise light
-			// the last row while the reader is still at the first section.
-			const scrollable = document.documentElement.scrollHeight - window.innerHeight > 1;
-			const atBottom =
-				scrollable &&
-					window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
-			if (atBottom) current = headings[headings.length - 1].id;
-
-			// While a TOC click is smooth-scrolling to its target, keep that target
-			// lit and ignore the sections the animation passes through. The lock
-			// releases when the target reaches the activation line; until then each
-			// tick pushes the settle timer out, so the lock outlives the whole
-			// animation however long the scroll is.
-			if (clickLock.current !== null) {
-				if (current === clickLock.current) {
-					clickLock.current = null;
-					if (clickTimer.current !== 0) {
-						clearTimeout(clickTimer.current);
-						clickTimer.current = 0;
-					}
-				} else {
-					armClickRelease();
-				}
-				return;
-			}
+			// At the very bottom of a scrollable page, force the final section: a
+			// short trailing section whose heading can't reach the activation line
+			// could otherwise never light up.
+			if (isAtPageBottom()) current = headings[headings.length - 1].id;
 			setActiveId(current);
 		};
 		// The rAF wrapper owns the frame bookkeeping — measure() itself must not
@@ -243,11 +259,9 @@ export function DocPage() @{
 		event.preventDefault();
 		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		// Claim the target before scrolling so the spy holds it through the smooth
-		// animation. The settle timer covers targets that never reach the
-		// activation line (e.g. a heading near the page bottom): scroll ticks keep
-		// re-arming it, so it fires only once scrolling has actually stopped —
-		// then live tracking resumes. This initial arm covers the no-scroll case
-		// where the target is already in position and no tick ever fires.
+		// animation; the settle timer (re-armed by every scroll tick) then judges
+		// the outcome once scrolling stops. This initial arm covers the no-scroll
+		// case where the target is already in position and no tick ever fires.
 		clickLock.current = id;
 		armClickRelease();
 		heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
