@@ -1250,7 +1250,19 @@ public release, §13). What shipped:
   (tested), node identity/state/events adopt, and a §6.3 request during
   adoption abandons it for a client remount with a dev diagnostic. Core
   gained a lazy root-disposer lookup so `bindRendererRegionOwner` works from
-  a hydration pass.
+  a hydration pass, and `hydrateRoot` now mirrors `createRoot`'s
+  initial-render contract for OWNED roots: an escape during the adoption pass
+  routes to the renderer-region owner, the failed root unmounts, and the
+  container is released for the retry's fresh root (review-found: previously
+  the escape blew through the React layout effect uncaught). Known v1
+  limitation (pinned as an OCTANE DIVERGENCE test): a BARE root suspension
+  during hydration keeps the server content visible via React's dehydrated
+  revert, but that revert discards the wrapper attempt and orphans the
+  episode — live completion is only guaranteed for the supported pattern,
+  a local Octane @try owning its pending UI. React style RESOURCES are
+  exempt from positional hydration, so CSS-producing islands hydrate
+  mismatch-free alongside their hoisted styles (tested; refutes the
+  sibling-mismatch concern).
 - CSS/head (§9.2): island CSS emits as React 19 style resources (stable
   per-hash `href`, `precedence="octane"`) — Fizz hoists and dedupes across
   islands, and `injectStyle`'s detection now also recognizes React's

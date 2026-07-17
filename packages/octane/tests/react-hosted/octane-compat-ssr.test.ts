@@ -8,7 +8,7 @@
  * retry-state evidence; real-browser E2E re-verifies paint-level behavior and
  * streamed `completeBoundary` segment relocation (§13 — deferred).
  */
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { renderToString as reactRenderToString, renderToPipeableStream } from 'react-dom/server';
 import { PassThrough } from 'node:stream';
@@ -18,12 +18,17 @@ import { OctaneCompat as OctaneCompatServer } from 'octane/react/server';
 import { loadServerFixture } from '../_server-fixture.js';
 import { createLog } from '../_helpers.js';
 import { h, mountReactHost, reactAct } from './_react-host.js';
+import { __setHostFiberAdapterEnabled } from '../../src/react/fiber-adapter.js';
 import {
+	SsrAsync as ClientSsrAsync,
 	SsrGreeting as ClientSsrGreeting,
 	SsrIdIsland as ClientSsrIdIsland,
 	SsrLocallyGuarded as ClientSsrLocallyGuarded,
+	SsrStyled as ClientSsrStyled,
 	SsrThemed as ClientSsrThemed,
 } from './_fixtures/ssr-islands.tsrx';
+
+afterEach(() => __setHostFiberAdapterEnabled(true));
 
 const server = loadServerFixture(
 	join(process.cwd(), 'packages/octane/tests/react-hosted/_fixtures/ssr-islands.tsrx'),
@@ -216,6 +221,112 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 			await clientResource.promise;
 		});
 		expect(mounted.host().querySelector('.ssr-inner')?.textContent).toBe('value:client-data');
+		await mounted.unmount();
+	});
+
+	it('abandons adoption for a §6.3 context request during hydration and client-remounts (dev diagnostic)', async () => {
+		// With the Fiber adapter unavailable, the first hydration attempt raises
+		// the request handshake. The routed escape must unwind the ADOPTION —
+		// never the React layout effect — and the retry client-remounts this
+		// island only, with the authoritative React.use value.
+		__setHostFiberAdapterEnabled(false);
+		const Theme = React.createContext('unset');
+		const warned = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const serverPage = h(
+				Theme,
+				{ value: 'hy-dark' } as any,
+				h(OctaneCompatServer, null, h(server.SsrThemed, { themeContext: Theme })),
+			);
+			function ClientPage(props: { theme: string }) {
+				return h(
+					Theme,
+					{ value: props.theme } as any,
+					h(OctaneCompat, null, h(ClientSsrThemed as any, { themeContext: Theme })),
+				);
+			}
+			const mounted = await hydratePage(serverPage, h(ClientPage, { theme: 'hy-dark' }));
+			expect(mounted.host().querySelector('.ssr-theme')?.textContent).toBe('theme:hy-dark');
+			expect(
+				warned.mock.calls.some((call) => String(call[0]).includes('abandoned hydration')),
+			).toBe(true);
+
+			// The remounted island holds a live subscription.
+			await mounted.render(h(ClientPage, { theme: 'hy-light' }));
+			expect(mounted.host().querySelector('.ssr-theme')?.textContent).toBe('theme:hy-light');
+			await mounted.unmount();
+		} finally {
+			warned.mockRestore();
+		}
+	});
+
+	it('keeps server content visible when a BARE root suspension interrupts hydration (v1 limitation)', async () => {
+		// The client hydrates with a still-pending resource and NO local
+		// boundary: the adoption attempt suspends, the escape routes to the
+		// owner, and React reverts the boundary to its dehydrated state — the
+		// SERVER content stays visible; nothing crashes, blanks, or errors.
+		// OCTANE DIVERGENCE (v1, recorded in the plan): React's dehydrated
+		// revert discards the wrapper attempt, orphaning the pending episode, so
+		// live completion of a bare root suspension during hydration is not
+		// guaranteed — async islands should own their pending UI with a local
+		// @try (the supported pattern, tested above with SsrLocallyGuarded).
+		const ready = { status: 'fulfilled' as const, value: 'ssr-data', then() {} };
+		const clientResource = deferred<string>();
+		const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const serverPage = h(
+				'main',
+				null,
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompatServer, null, h(server.SsrAsync, { resource: ready })),
+				),
+			);
+			const clientPage = h(
+				'main',
+				null,
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompat, null, h(ClientSsrAsync as any, { resource: clientResource.promise })),
+				),
+			);
+			const mounted = await hydratePage(serverPage, clientPage);
+			expect(mounted.serverHtml).toContain('value:ssr-data');
+			// Server content preserved; no fallback flash, no teardown.
+			expect(mounted.container.querySelector('.react-fallback')).toBeNull();
+			expect(mounted.container.querySelector('.ssr-async')?.textContent).toBe('value:ssr-data');
+
+			await reactAct(async () => {
+				clientResource.resolve('client-data');
+				await clientResource.promise;
+			});
+			// Still standing — no crash and no blank host after the settle.
+			expect(mounted.container.querySelector('.ssr-async')).not.toBeNull();
+			await mounted.unmount();
+		} finally {
+			quiet.mockRestore();
+		}
+	});
+
+	it('hydrates a CSS-producing island without mismatch alongside hoisted style resources', async () => {
+		const errors = vi.spyOn(console, 'error');
+		const serverPage = h(
+			'main',
+			null,
+			h(OctaneCompatServer, null, h(server.SsrStyled, { name: 'hy' })),
+		);
+		const clientPage = h(
+			'main',
+			null,
+			h(OctaneCompat, null, h(ClientSsrStyled as any, { name: 'hy' })),
+		);
+		const mounted = await hydratePage(serverPage, clientPage);
+		expect(mounted.serverHtml).toContain('rgb(1, 2, 3)');
+		expect(errors).not.toHaveBeenCalled();
+		errors.mockRestore();
+		expect(mounted.host().querySelector('.ssr-styled')?.textContent).toContain('styled hy');
 		await mounted.unmount();
 	});
 

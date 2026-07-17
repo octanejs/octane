@@ -19133,6 +19133,26 @@ export function hydrateRoot(
 		// anything left at the root cursor instead of leaving visible unmanaged DOM.
 		hydration.finishRoot();
 		hydrationCompleted = true;
+	} catch (error) {
+		// An OWNED hydrating root (a renderer-region bridge bound during this
+		// pass — e.g. an octane/react island) mirrors createRoot's initial-render
+		// contract: route the escape (error, suspension, or host context request)
+		// to the owner, unmount the failed root, and release the container so a
+		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
+		// retry client-remounts). Unowned hydration failures keep their existing
+		// behavior and rethrow untouched.
+		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
+		try {
+			handleRenderError(rootBlock, error);
+		} finally {
+			DOM_ROOT_DISPOSERS.delete(rootBlock);
+			unmountBlock(rootBlock, false);
+			drainRefDetaches();
+			container.textContent = '';
+			releaseRootContainer(container, ownerToken);
+		}
+		// Routed: hand back an empty lazy root; the owner's retry recreates.
+		return makeRoot(container, null, null, null, idState, renderReturnedValue, null);
 	} finally {
 		currentHydration = previousHydration;
 	}
