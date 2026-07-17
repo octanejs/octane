@@ -314,19 +314,6 @@ export function DocPage() @{
 					height 0.32s cubic-bezier(0.22, 0.61, 0.36, 1),
 					opacity 0.2s ease;
 			}
-			/* The travelling dot, centred on the active row. */
-			.toc-indicator::after {
-				content: '';
-				position: absolute;
-				left: 1px;
-				top: 50%;
-				width: 6px;
-				height: 6px;
-				border-radius: 50%;
-				background: var(--accent);
-				transform: translate(-50%, -50%);
-				box-shadow: 0 0 0 4px rgba(255, 65, 90, 0.15);
-			}
 			/* Shown only once JS has measured a target, so SSR / no-JS shows no stray
 			   accent bar pinned at the top. */
 			.toc-track.is-active .toc-indicator {
