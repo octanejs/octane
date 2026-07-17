@@ -1,6 +1,9 @@
 {
-  "upstream": { "package": "react-aria", "version": "3.50.0" },
-  "surface": "Phase 0 complete: the utils foundation (mergeProps, chain, mergeRefs, useId/mergeIds, useObjectRef, RouterProvider, SSRProvider/useIsSSR) and the complete interactions area (usePress, useHover, useFocus, useFocusWithin, useFocusVisible, useKeyboard, useLongPress, useMove, useInteractOutside, useFocusable/Focusable, Pressable/PressResponder) from the react-aria 3.50.0 monopackage, plus useControlledState from react-stately 3.48.0 under `@octanejs/aria/stately`. Differential-verified byte-identical against the real react-aria (press/hover/focus-within/keyboard/mergeIds fixtures). Later-phase areas (focus scope, leaf hooks, collections, overlays, react-aria-components) are not started — see the migration plan.",
+  "upstream": {
+    "package": "react-aria",
+    "version": "3.50.0"
+  },
+  "surface": "Phases 0-1 complete: the utils foundation, SSR utilities, the complete interactions area (usePress, useHover, focus/keyboard family, useLongPress, useMove, Pressable/PressResponder), the focus area (FocusScope with containment/restore/focus managers, FocusRing, useFocusRing, useHasTabbableChild), the i18n area (I18nProvider, locale/collator/formatter/filter hooks), form validation (useFormValidation + stately useFormValidationState), and the leaf hooks: useButton/useToggleButton(+Group), useLabel/useField, useCheckbox(+Group/+Item), useRadio/useRadioGroup, useSwitch, useTextField, useSearchField, useProgressBar, useMeter, useSeparator, useLink, useDisclosure, useToolbar, VisuallyHidden \u2014 plus the matching react-stately state hooks under `@octanejs/aria/stately`. Differential-verified byte-identical against the real react-aria (interactions + button/toggle/checkbox/switch/radio/textfield/progress fixtures). Collections, overlays, and react-aria-components are not started \u2014 see the migration plan.",
   "divergences": [
     "Text-input DOM wiring uses octane's native `onInput` (per keystroke) instead of React's synthetic `onChange`; React Aria's public value-level `onChange(value)` callbacks are unchanged.",
     "`forwardRef` becomes octane's ref-as-prop."

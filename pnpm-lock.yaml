@@ -63,6 +63,15 @@ catalogs:
     '@graphql-typed-document-node/core':
       specifier: ^3.1.1
       version: 3.2.0
+    '@internationalized/date':
+      specifier: ^3.12.2
+      version: 3.12.2
+    '@internationalized/number':
+      specifier: ^3.6.7
+      version: 3.6.7
+    '@internationalized/string':
+      specifier: ^3.2.9
+      version: 3.2.9
     '@jridgewell/remapping':
       specifier: ^2.3.5
       version: 2.3.5
@@ -2835,6 +2844,15 @@ importers:
 
   packages/aria:
     dependencies:
+      '@internationalized/date':
+        specifier: catalog:default
+        version: 3.12.2
+      '@internationalized/number':
+        specifier: catalog:default
+        version: 3.6.7
+      '@internationalized/string':
+        specifier: catalog:default
+        version: 3.2.9
       '@react-types/shared':
         specifier: catalog:default
         version: 3.36.0(react@19.2.7)

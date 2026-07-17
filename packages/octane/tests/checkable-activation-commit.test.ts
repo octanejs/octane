@@ -1,0 +1,35 @@
+import { describe, it, expect } from 'vitest';
+import { act, mount } from './_helpers';
+import {
+	ActivationCommitCheckbox,
+	ActivationCommitRejectedCheckbox,
+} from './_fixtures/checkable-activation.tsx';
+
+// A click on a checkable toggles the DOM BEFORE the click dispatch, and the native
+// `input`/`change` events fire AFTER it. A handler that forces a synchronous commit
+// during the click (flushSync — press-state machinery does this) must not have the
+// controlled `checked` reassert revert the in-flight toggle: React's update path
+// diffs prev props (not the DOM), leaving the drift for the event-side restore.
+describe('controlled checkable with a mid-activation commit', () => {
+	it('a flushSync commit inside onClick does not revert the toggle before onInput', async () => {
+		const r = mount(ActivationCommitCheckbox);
+		const cb = r.container.querySelector('input')!;
+		await act(() => {
+			cb.click();
+		});
+		expect(cb.getAttribute('data-pressed')).toBe('true'); // the mid-click commit happened
+		expect(cb.checked).toBe(true); // and the user's toggle survived it
+		r.unmount();
+	});
+
+	it('a rejected toggle (no onInput) still snaps back to the controlled prop', async () => {
+		const r = mount(ActivationCommitRejectedCheckbox);
+		const cb = r.container.querySelector('input')!;
+		await act(() => {
+			cb.click();
+		});
+		expect(cb.getAttribute('data-pressed')).toBe('true');
+		expect(cb.checked).toBe(false); // restore reverted the unheard edit
+		r.unmount();
+	});
+});

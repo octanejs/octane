@@ -10013,6 +10013,10 @@ function maybeFlushDiscrete(type: string): void {
 	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
 	// is exactly the case that must snap back (React's restoreControlledState).
 	if (pendingRestores.length > 0) restoreControlledStates();
+	// The outermost click flush is done; the activation's input/change (if the
+	// activation wasn't canceled) dispatch next in this task and clear the mark
+	// themselves — this is the backstop for canceled/eventless activations.
+	if (type === 'click') activationCheckable = null;
 }
 
 function finishCaptureDispatch(event: Event): void {
@@ -10517,6 +10521,15 @@ const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 let pendingRestores: Element[] = [];
 let restoreMicrotaskScheduled = false;
 
+// The checkable input whose click ACTIVATION is currently in flight: the
+// platform has toggled `checked` but the activation's `input`/`change`
+// post-steps have not been dispatched yet. Commits inside this window use
+// React's prop-diff (not DOM-diff) semantics for `checked`, so a handler's
+// flushSync cannot revert the user's toggle before the native input/change
+// handlers get to read it. Set/cleared by maybeEnqueueRestore, and cleared
+// at the end of the outermost click flush (maybeFlushDiscrete).
+let activationCheckable: Element | null = null;
+
 // A native select choice emits `input` immediately followed by `change`. Octane
 // exposes native onChange, so restoring the controlled selection at the end of
 // the first dispatch would make the second handler observe the old value. Hold
@@ -10772,8 +10785,14 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
+	// While this element's click activation is in flight (platform toggled the
+	// DOM; input/change not yet dispatched), an UNCHANGED prop must not clobber
+	// the user's toggle — React's update path diffs prev props, not the DOM, so
+	// a mid-dispatch flushSync commit leaves the drift for the event-side
+	// restore. A prop that actually CHANGED in this window still writes.
+	const changed = b !== ctrl.c;
 	ctrl.c = b;
-	if (input.checked !== b) input.checked = b;
+	if ((changed || input !== activationCheckable) && input.checked !== b) input.checked = b;
 }
 
 export function setChecked(el: Element, value: unknown): void {
@@ -11246,7 +11265,22 @@ function maybeEnqueueRestore(event: Event): void {
 	// A checkable's click never arms — its `input`/`change` follow-ups do
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
-	if (event.type === 'click') return;
+	if (event.type === 'click') {
+		// Mark the checkable whose ACTIVATION is in flight: the platform toggled
+		// `checked` before this click dispatch, and its `input`/`change` post-steps
+		// have not fired yet. A commit inside this window (a handler's flushSync —
+		// press-state machinery does this) must not reassert the still-uncommitted
+		// prop over the user's toggle: the checked binding switches to React's
+		// prop-diff semantics for the marked element (see setCheckedState), and the
+		// follow-up input/change arms the ordinary restore at the right time.
+		const ctrl = t.$$ctrl as ControlledState;
+		if (ctrl.c !== -1 && t.localName === 'input') {
+			activationCheckable = t as Element;
+		}
+		return;
+	}
+	// The activation's follow-up events have arrived — the window is over.
+	if (t === activationCheckable) activationCheckable = null;
 	if (event.type === 'input' && t.localName === 'select') {
 		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
 		if (!selectInputRestoreScheduled) {
