@@ -263,6 +263,9 @@ export class OctaneRspackPlugin {
 			...(this.options.dev === undefined ? null : { dev: this.options.dev }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
+			...(this.options.requireDirective === undefined
+				? null
+				: { requireDirective: this.options.requireDirective }),
 		};
 		compiler.options.module.rules.push({
 			test: OCTANE_RULE,

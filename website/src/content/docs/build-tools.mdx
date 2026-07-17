@@ -134,6 +134,74 @@ Rspack's generated runtime. Rsbuild accepts one ES level, `modules`, `false`, or
 esbuild-style browser targets such as `['chrome100', 'firefox100']`; do not mix
 ES levels and browser targets in the same array.
 
+<h2 id="mixed-toolchains">Mixed toolchains and `'use octane'`</h2>
+
+By default the Octane compiler owns every project `.tsrx` and `.tsx` module. In
+a codebase where another framework's toolchain also compiles `.tsx` — for
+example a React app hosting Octane islands through `octane/react`, or any other
+framework sharing the repository — that default would send the host framework's
+modules through the wrong compiler.
+
+Set `requireDirective: true` (accepted by all three integrations) to switch
+module ownership to an explicit, per-file declaration: Octane compiles only
+modules that open with a `'use octane'` directive.
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { octane } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+	plugins: [octane({ requireDirective: true }), react()],
+});
+```
+
+```tsrx
+// src/islands/Counter.tsrx — compiled by Octane
+'use octane';
+import { useState } from 'octane';
+
+export function Counter() @{
+	const [count, setCount] = useState(0);
+	<button onClick={() => setCount(count + 1)}>
+		{'clicks:' + count}
+	</button>
+}
+```
+
+```tsx
+// src/App.tsx — no directive: compiled by the host framework's own pipeline
+import { OctaneCompat } from 'octane/react';
+import { Counter } from './islands/Counter.tsrx';
+
+export function App() {
+	return (
+		<OctaneCompat>
+			<Counter />
+		</OctaneCompat>
+	);
+}
+```
+
+The rules with `requireDirective` enabled:
+
+- A project module with `'use octane'` (any of `.tsrx`, `.tsx`, `.ts`, `.js`)
+  belongs to Octane — full compilation for `.tsrx`/`.tsx`, hook slotting for
+  `.ts`/`.js`. The directive composes with `'use client'` and friends in the
+  module prologue, and is always stripped from compiled output.
+- A project `.tsx`/`.ts`/`.js` without the directive passes through untouched
+  for the host toolchain. If such a module imports from `octane`, the build
+  emits a warning naming the file, since that is usually a forgotten directive.
+- A project `.tsrx` without the directive is a build error — no other compiler
+  understands the syntax, so a silent pass-through would only surface as a
+  confusing parse error downstream.
+- Installed and linked packages are exempt: their package manifest's Octane
+  declaration remains the per-package decision, so bindings need no directives.
+
+The directive is tolerated (and stripped) even when `requireDirective` is off,
+so shared code and libraries can adopt it unconditionally.
+
 <h2 id="full-app-configuration">Full app configuration</h2>
 
 The config surface is shared by the Vite and Rsbuild integrations. Keep route

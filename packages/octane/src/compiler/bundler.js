@@ -219,6 +219,73 @@ export function findVoidComponentExports(source, id) {
 	return exports;
 }
 
+const USE_OCTANE_DIRECTIVE = 'use octane';
+
+/**
+ * Locate a `'use octane'` directive in the module's directive prologue.
+ *
+ * Directives are string-literal expression statements before any other
+ * statement; comments, a BOM, and other directives (`'use client'`,
+ * `'use strict'`, …) may precede it, in any order. Returns the directive's
+ * `[start, end)` source span — including a same-line trailing semicolon — or
+ * `null`. A string containing escape sequences is not a directive (spec
+ * semantics) but still ends the candidate only if unterminated.
+ */
+export function findUseOctaneDirective(code) {
+	const length = code.length;
+	let i = code.charCodeAt(0) === 0xfeff ? 1 : 0;
+	for (;;) {
+		while (i < length && /\s/.test(code[i])) i++;
+		if (code.startsWith('//', i)) {
+			const newline = code.indexOf('\n', i);
+			if (newline === -1) return null;
+			i = newline + 1;
+			continue;
+		}
+		if (code.startsWith('/*', i)) {
+			const close = code.indexOf('*/', i + 2);
+			if (close === -1) return null;
+			i = close + 2;
+			continue;
+		}
+		const quote = code[i];
+		if (quote !== '"' && quote !== "'") return null;
+		const start = i;
+		let value = '';
+		let escaped = false;
+		let closed = false;
+		for (i++; i < length; i++) {
+			const ch = code[i];
+			if (ch === '\\') {
+				escaped = true;
+				i++;
+				continue;
+			}
+			if (ch === quote) {
+				closed = true;
+				i++;
+				break;
+			}
+			if (ch === '\n' || ch === '\r') break;
+			value += ch;
+		}
+		if (!closed) return null;
+		let end = i;
+		while (end < length && (code[end] === ' ' || code[end] === '\t')) end++;
+		if (code[end] === ';') end++;
+		if (!escaped && value === USE_OCTANE_DIRECTIVE) return { start, end };
+		i = end;
+	}
+}
+
+/**
+ * Blank a directive span with equal-length whitespace so every later source
+ * position — and therefore every source map — survives unchanged.
+ */
+function stripDirective(code, span) {
+	return code.slice(0, span.start) + ' '.repeat(span.end - span.start) + code.slice(span.end);
+}
+
 class OctaneBundlerCompiler {
 	constructor(options) {
 		this.root = resolve(options.root ?? process.cwd());
@@ -235,6 +302,16 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
+		// Ownership gate for mixed-toolchain projects (e.g. a React app hosting
+		// Octane islands): when enabled, a project-owned module is Octane's only
+		// if it declares `'use octane'` in its directive prologue. Undirected
+		// project `.tsx`/`.ts`/`.js` pass through to the host toolchain; an
+		// undirected project `.tsrx` is a hard error. Installed/linked packages
+		// keep their manifest `usesOctane` decision. The directive itself is
+		// tolerated (and stripped from compiled output) in every mode.
+		this.requireDirective = options.requireDirective === true;
+		this.warn = typeof options.warn === 'function' ? options.warn : null;
+		this.warnedUndirected = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
@@ -329,19 +406,19 @@ class OctaneBundlerCompiler {
 		});
 	}
 
-	_isInstalledOctaneSource(file, collected) {
+	_isProjectOwnedSource(file) {
 		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
-		const isInstalledPath = /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile);
+		if (/(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile)) return false;
+		return isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile);
+	}
+
+	_isInstalledOctaneSource(file, collected) {
 		// Project-owned TS/JS/TSX is always eligible. A linked package is commonly
 		// handed to bundlers as its real path, without a node_modules segment, so
 		// external files must make the same manifest-declared Octane decision as an
 		// installed package instead of being mistaken for application source.
-		if (
-			!isInstalledPath &&
-			(isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile))
-		) {
-			return true;
-		}
+		if (this._isProjectOwnedSource(file)) return true;
+		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
 		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		return lookup.rule?.usesOctane === true;
@@ -351,6 +428,44 @@ class OctaneBundlerCompiler {
 		return (
 			file.endsWith('.tsrx') ||
 			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected))
+		);
+	}
+
+	/**
+	 * The requireDirective ownership gate for one project-owned module.
+	 * Returns whether Octane owns the module; throws for an undirected
+	 * project-owned `.tsrx` (nothing else can compile the syntax, so a silent
+	 * pass-through is a guaranteed confusing downstream parse error).
+	 * Installed and linked packages are exempt: their manifest `usesOctane`
+	 * rule is already the explicit per-package decision.
+	 */
+	_passesDirectiveGate(file, filename, directive) {
+		if (!this.requireDirective) return true;
+		if (directive !== null) return true;
+		if (!this._isProjectOwnedSource(file)) return true;
+		if (file.endsWith('.tsrx')) {
+			const error = new Error(
+				`${filename} is Octane source (.tsrx) but has no 'use octane' module directive, and this build enables requireDirective. Add 'use octane' at the top of the module (alongside any other directives, before imports), or disable requireDirective.`,
+			);
+			error.code = 'OCTANE_DIRECTIVE_REQUIRED';
+			error.filename = filename;
+			throw error;
+		}
+		return false;
+	}
+
+	/**
+	 * requireDirective diagnostic: a project-owned module imports from
+	 * 'octane' but declared no ownership, so Octane leaves it to the host
+	 * toolchain untouched. Usually a forgotten directive; occasionally an
+	 * intentional type-only import — hence a warning, never an error.
+	 */
+	_warnUndirectedOctaneImport(code, filename) {
+		if (this.warn === null || this.warnedUndirected.has(filename)) return;
+		if (!/from\s*['"]octane['"]/.test(code)) return;
+		this.warnedUndirected.add(filename);
+		this.warn(
+			`${filename} imports from 'octane' but has no 'use octane' module directive — with requireDirective enabled, Octane will not compile or transform it. Add 'use octane' at the top of the module if Octane should own it.`,
 		);
 	}
 
@@ -567,8 +682,14 @@ class OctaneBundlerCompiler {
 				: [];
 
 		const renderer = resolveRendererForFile(this.renderers, filename);
-		const fullCompile = this._isFullCompileSource(file, collected);
+		const directive = findUseOctaneDirective(code);
+		const fullCompile =
+			this._isFullCompileSource(file, collected) &&
+			this._passesDirectiveGate(file, filename, directive);
 		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
+		// The directive is a build-time ownership signal only — never ship it.
+		// Blanking (not deleting) keeps positions stable for source maps.
+		const source = directive === null ? code : stripDirective(code, directive);
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const clientReference =
@@ -586,11 +707,13 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			// Hydrate-boundary preparation consumes the directive-stripped source;
+			// blanking preserved every position, so its maps stay consistent.
 			const hydratePreparation =
 				environment === 'client'
-					? prepareHydrateBoundaries(code, filename, hydrateBoundaryPath)
-					: prepareServerHydrateBoundaries(code, filename);
-			const compileSource = hydratePreparation?.source ?? code;
+					? prepareHydrateBoundaries(source, filename, hydrateBoundaryPath)
+					: prepareServerHydrateBoundaries(source, filename);
+			const compileSource = hydratePreparation?.source ?? source;
 			const out = compile(compileSource, filename, {
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
@@ -613,7 +736,7 @@ class OctaneBundlerCompiler {
 			});
 			if (hydratePreparation?.map && out.map) {
 				out.map = composeSourceMaps(out.map, hydratePreparation.map);
-				out.map = addSourceMapNeedles(out.map, out.code, code, hydratePreparation.mappingNeedles);
+				out.map = addSourceMapNeedles(out.map, out.code, source, hydratePreparation.mappingNeedles);
 			}
 			return {
 				code: out.code,
@@ -630,7 +753,14 @@ class OctaneBundlerCompiler {
 		if (clientOnlyImports.length > 0) {
 			assertNoLiveClientOnlyImports(code, filename, clientOnlyImports);
 		}
-		if (file.endsWith('.tsx')) return this._passThrough(code, collected);
+		if (file.endsWith('.tsx')) {
+			// Either not Octane-eligible, or an undirected project module in a
+			// requireDirective build — the host toolchain's JSX pipeline owns it.
+			if (this.requireDirective && directive === null && this._isProjectOwnedSource(file)) {
+				this._warnUndirectedOctaneImport(code, filename);
+			}
+			return this._passThrough(code, collected);
+		}
 
 		if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
 			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
@@ -639,13 +769,19 @@ class OctaneBundlerCompiler {
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return this._passThrough(code, collected);
 			}
+			// Hook slotting is an Octane-ownership rewrite, so the directive gate
+			// applies to it exactly as to full compilation.
+			if (this.requireDirective && directive === null && this._isProjectOwnedSource(file)) {
+				this._warnUndirectedOctaneImport(code, filename);
+				return this._passThrough(code, collected);
+			}
 			if (this._hasManualHookSlots(file, collected)) {
 				return this._passThrough(code, collected);
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
 				environment === 'client' && hmr === false && dev === false && profile === false;
-			const out = slotHooks(code, filename, {
+			const out = slotHooks(source, filename, {
 				environment,
 				hmr: !!hmr,
 				profile,

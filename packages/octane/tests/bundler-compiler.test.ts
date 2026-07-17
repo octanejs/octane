@@ -788,3 +788,99 @@ export default interface ErasedShape { value: string }
 		}
 	});
 });
+
+describe('requireDirective ownership gate', () => {
+	const DIRECTIVE_COMPONENT = "'use octane';\n" + COMPONENT;
+	const REACT_TSX =
+		"import * as React from 'react';\n" +
+		'export function Host() {\n' +
+		'  return <p className="host">{\'react\'}</p>;\n' +
+		'}\n';
+
+	it('compiles only directive-carrying project modules when enabled', () => {
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+		});
+		// Directive-carrying .tsrx compiles; the directive never ships.
+		const island = compiler.transform(DIRECTIVE_COMPONENT, '/project/src/Island.tsrx');
+		expect(island?.kind).toBe('compile');
+		expect(island?.code).not.toContain('use octane');
+		// Octane-in-.tsx authoring survives behind the directive.
+		const octaneTsx = compiler.transform(
+			"'use octane';\nexport function App() @{\n  <p>{'oct'}</p>\n}\n",
+			'/project/src/App.tsx',
+		);
+		expect(octaneTsx?.kind).toBe('compile');
+		// An undirected project .tsx belongs to the host toolchain, untouched.
+		expect(compiler.transform(REACT_TSX, '/project/src/Host.tsx')).toBeNull();
+		// An undirected project .tsrx has no other compiler — hard error.
+		expect(() => compiler.transform(COMPONENT, '/project/src/Bad.tsrx')).toThrow(
+			/has no 'use octane' module directive/,
+		);
+	});
+
+	it('gates hook slotting and reports likely-forgotten directives once', () => {
+		const warnings: string[] = [];
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+			warn: (message: string) => warnings.push(message),
+		});
+		// Undirected octane-importing .ts: untouched, one diagnostic.
+		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
+		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('/src/useCount.ts');
+		expect(warnings[0]).toContain("'use octane'");
+		// The directive turns slotting back on, and is stripped from output.
+		const directed = compiler.transform("'use octane';\n" + HOOK, '/project/src/useDirected.ts');
+		expect(directed?.kind).toBe('slots');
+		expect(directed?.code).not.toContain('use octane');
+	});
+
+	it('keeps manifest-declared packages exempt from the directive gate', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-directive-manifest-'));
+		try {
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			const packageRoot = join(root, 'node_modules/raw-octane');
+			mkdirSync(join(packageRoot, 'src'), { recursive: true });
+			writeFileSync(
+				join(packageRoot, 'package.json'),
+				JSON.stringify({ name: 'raw-octane', peerDependencies: { octane: '*' } }),
+			);
+			const compiler = createOctaneCompiler({ root, requireDirective: true });
+			// Installed packages made their Octane decision in their manifest —
+			// no directive required, exactly as without the gate.
+			expect(
+				compiler.transform(
+					`export function App() { return <p>{'raw'}</p>; }`,
+					join(packageRoot, 'src/App.tsx'),
+				)?.kind,
+			).toBe('compile');
+			expect(compiler.transform(COMPONENT, join(packageRoot, 'src/Island.tsrx'))?.kind).toBe(
+				'compile',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('tolerates and strips the directive when the gate is off', () => {
+		const compiler = createOctaneCompiler({ root: resolve('/project') });
+		const island = compiler.transform(DIRECTIVE_COMPONENT, '/project/src/Island.tsrx');
+		expect(island?.kind).toBe('compile');
+		expect(island?.code).not.toContain('use octane');
+		const slotted = compiler.transform("'use octane';\n" + HOOK, '/project/src/useCount.ts');
+		expect(slotted?.kind).toBe('slots');
+		expect(slotted?.code).not.toContain('use octane');
+	});
+
+	it('recognizes the directive after comments and other directives', () => {
+		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
+		const source = '// island\n/* mixed */\n"use client";\n\'use octane\';\n' + COMPONENT;
+		const out = compiler.transform(source, '/project/src/Island.tsrx');
+		expect(out?.kind).toBe('compile');
+		expect(out?.code).not.toContain('use octane');
+	});
+});

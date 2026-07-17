@@ -15,6 +15,13 @@ export interface OctaneRsbuildPluginOptions {
 	profile?: boolean;
 	/** Ad-hoc path fragments skipped by the plain TypeScript/JavaScript hook-slot pass. */
 	exclude?: string[];
+	/**
+	 * Mixed-toolchain ownership gate: compile only project modules declaring
+	 * `'use octane'`; undirected project `.tsx`/`.ts` pass through to the host
+	 * framework's own pipeline. See `@octanejs/rspack-plugin` for details.
+	 * @default false
+	 */
+	requireDirective?: boolean;
 	/** Rsbuild environment name used for the browser bundle. @default 'web' */
 	clientEnvironment?: string;
 	/** Rsbuild environment name used for the Node SSR bundle. @default 'node' */
