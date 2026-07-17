@@ -28,6 +28,9 @@ function assertPinnedOracle(): void {
 }
 
 export async function setup(): Promise<void> {
+	// Compatibility lanes intentionally select only Octane-owned behavior tests;
+	// the differential oracle remains pinned to the exact r172 pair below.
+	if (process.env.OCTANE_THREE_COMPAT_VERSION !== undefined) return;
 	assertPinnedOracle();
 	mkdirSync(cache, { recursive: true });
 	for (const name of fixtures) {

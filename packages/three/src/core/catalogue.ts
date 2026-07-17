@@ -41,6 +41,10 @@ type ArgsProp<T extends ConstructorRepresentation> =
 export type ThreeAttachFunction<T = unknown> = (parent: unknown, self: T) => void | (() => void);
 
 export type Attach<T = unknown> = string | ThreeAttachFunction<T>;
+/** R3F-compatible name for a function attachment, adapted to Octane cleanup callbacks. */
+export type AttachFnType<T = unknown> = ThreeAttachFunction<T>;
+/** R3F-compatible name for the public attachment union. */
+export type AttachType<T = unknown> = Attach<T>;
 export type ThreeKey = string | number | symbol | bigint;
 
 export type ThreeRef<T> =
@@ -100,15 +104,40 @@ export type MathType<T extends MathTypes> = T extends THREE.Color
 		? T | MutableOrReadonlyParameters<T['set']> | number
 		: T | MutableOrReadonlyParameters<T['set']>;
 
-type MathProps<T> = {
+export type MathProps<T> = {
 	[K in keyof T as T[K] extends MathTypes ? K : never]: T[K] extends MathTypes
 		? MathType<T[K]>
 		: never;
 };
 
+export type Vector2 = MathType<THREE.Vector2>;
+export type Vector3 = MathType<THREE.Vector3>;
+export type Vector4 = MathType<THREE.Vector4>;
+export type Color = MathType<THREE.Color>;
+export type Layers = MathType<THREE.Layers>;
+export type Quaternion = MathType<THREE.Quaternion>;
+export type Euler = MathType<THREE.Euler>;
+export type Matrix3 = MathType<THREE.Matrix3>;
+export type Matrix4 = MathType<THREE.Matrix4>;
+
+/**
+ * R3F-compatible authored-node props with Octane refs and renderable children.
+ * The historical name is retained for source compatibility without importing
+ * React or exposing React ownership semantics.
+ */
+export interface ReactProps<T> {
+	children?: unknown;
+	ref?: ThreeRef<T>;
+	key?: ThreeKey;
+}
+
+export type ElementProps<T extends ConstructorRepresentation, P = InstanceType<T>> = Partial<
+	Overwrite<P, MathProps<P> & ReactProps<P> & EventProps<P>>
+>;
+
 export type ThreeElement<T extends ConstructorRepresentation> = Mutable<
 	Overwrite<
-		Partial<Overwrite<Properties<InstanceType<T>>, MathProps<InstanceType<T>>>>,
+		ElementProps<T, Properties<InstanceType<T>>>,
 		ArgsProp<T> & ThreeInstanceProps<InstanceType<T>> & EventProps<InstanceType<T>>
 	>
 >;

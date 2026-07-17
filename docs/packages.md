@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**38 publishable package(s), including 31 framework binding(s).**
+**39 publishable package(s), including 32 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -37,6 +37,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.2` | 2 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.6` | 2 |
 | `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.1` | 1 |
+| `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.1` | 1 |
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.1` | 1 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.6` | 1 |
 | `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.6` | 2 |
@@ -45,11 +46,11 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.4` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.4` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.0` | 7 |
-| `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.1` | 1 |
+| `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.1` | 2 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.1` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.7` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.6` | 5 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.7` | 12 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.7` | 13 |
 
 ## Private packages
 

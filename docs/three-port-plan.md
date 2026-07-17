@@ -143,9 +143,9 @@ The v9.6.1 web/core is about 3.4k source lines. The boundary is favorable:
 
 Do not depend on React, ReactDOM, React Reconciler, `scheduler`, `its-fine`,
 `react-use-measure`, `use-sync-external-store`, or `suspend-react`. Keep `three`
-as a peer dependency. Start with a pinned Three 0.172.x oracle—the version used
-by the v9.6.1 repository—and a current-version CI lane. Advertise R3F's broad
-`three >=0.156` range only after a minimum-version lane passes.
+as a peer dependency. Preserve Three 0.172.x as the immutable differential
+oracle used by the v9.6.1 repository, while separate minimum (`0.156.0`) and
+current-version CI lanes validate the advertised `three >=0.156` range.
 
 Internally call the active rendering object `renderer`, retain `state.gl` for
 v9 compatibility, and consider a `state.renderer` alias. This avoids baking a
@@ -658,6 +658,14 @@ and `OffscreenCanvas` roots clean up deterministically.
 
 ### Milestone 9 — transported SDK proof (2–3 engineer-weeks)
 
+Status: implemented. A versioned asynchronous transport now carries immutable
+host batches through a real `MessageChannel` to an independent remote object
+driver. The acknowledgement point gates logical publication, lifecycle/ref/
+layout delivery, event versioning, and teardown. Executable development and
+production-mode evidence covers structured-cloned values, resource and portal
+handles, listener IDs, pre-ack rejection and retry, post-ack faults, version
+gaps and stale messages, and one-batch scheduling after a transported event.
+
 - Add a minimal loopback/worker-style proving driver that serializes batches,
   encoded props, listener/lifecycle IDs, and root-scoped resource/portal
   handles without sharing objects or functions.
@@ -666,11 +674,19 @@ and `OffscreenCanvas` roots clean up deterministically.
   which refs/layout reads may become visible.
 
 Exit: the new renderer SDK vocabulary works without shared objects or function
-props. Until this gate passes, `octane/universal`, renderer config extensions,
-and the Three renderer ABI remain explicitly experimental even if the local
-Three package reaches web behavior parity.
+props. This gate is complete. `octane/universal` remains explicitly experimental
+while the protocol has only the loopback proving host rather than a production
+native/worker adapter; the Three web package no longer depends on an unproven
+transport vocabulary.
 
 ### Milestone 10 — API and release hardening (1–2 engineer-weeks)
+
+Status: implemented. The package now has a checked public export/subpath type
+matrix, minimum and current Three compatibility lanes, a packed external
+consumer, existence-checked upstream evidence, real-browser WebGL creation-
+failure and context-loss/recovery tests, and semantic-checksummed renderer and
+bundle-size benchmarks with committed ratio guards. Status/docs generation and
+a patch changeset complete the release gate.
 
 - Export/type matrix, current/minimum Three lanes, pack checks, docs, browser
   failures/context loss, performance baselines, status generation, and a patch
@@ -753,8 +769,10 @@ Compare Octane, R3F 9.6.1, and plain Three for:
 - representative raycast/event delivery;
 - minimal and full-catalogue bundle size.
 
-Every benchmark carries a semantic checksum so a no-op cannot win. Record the
-first baseline before choosing regression thresholds.
+Every benchmark carries a semantic checksum so a no-op cannot win. The first
+local baseline and conservative cross-framework ratio guards establish the
+initial regression thresholds; tighten them only from repeated comparable
+records.
 
 ## Effort and critical path
 
@@ -792,7 +810,7 @@ client-only graph rule -> equivalent raw Rspack server/client compilation
 prepare/accept + codecs -> transported acknowledgement and native events
 ```
 
-The first implementation worktree should therefore be the renderer-SDK slice,
-not the full Three package. It gives the driver a sound contract and prevents
-ref, lifecycle, suspension, and SSR compromises from becoming package-local
-behavior.
+The implementation followed this dependency order: the renderer-SDK slice
+landed before the full Three package, giving the driver a sound contract and
+preventing ref, lifecycle, suspension, and SSR compromises from becoming
+package-local behavior.

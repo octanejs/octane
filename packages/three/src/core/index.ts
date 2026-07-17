@@ -12,6 +12,7 @@ export {
 export { useLoader } from './loader.js';
 export { createPortal } from './portal.js';
 export { dispose } from './props.js';
+export type { Disposable } from './props.js';
 export {
 	addAfterEffect,
 	addEffect,
@@ -26,15 +27,26 @@ export { createEvents } from './events.js';
 export type {
 	Args,
 	Attach,
+	AttachFnType,
+	AttachType,
 	Catalogue,
+	Color,
 	ConstructorRepresentation,
+	ElementProps,
+	Euler,
 	EventProps,
 	InstanceProps,
+	Layers,
 	MathRepresentation,
+	MathProps,
 	MathType,
 	MathTypes,
+	Matrix3,
+	Matrix4,
 	PrimitiveProps,
+	Quaternion,
 	RaycastableRepresentation,
+	ReactProps,
 	ThreeElement,
 	ThreeElements,
 	ThreeInstanceProps,
@@ -42,6 +54,9 @@ export type {
 	ThreeRef,
 	ThreeToElements,
 	ThreeToJSXElements,
+	Vector2,
+	Vector3,
+	Vector4,
 	VectorRepresentation,
 } from './catalogue.js';
 export type {
@@ -66,6 +81,7 @@ export type {
 	CanvasLike,
 	DefaultGLProps,
 	GLProps,
+	ThreeRoot as ReconcilerRoot,
 	RenderProps,
 	ThreeRoot,
 } from './root.js';

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
+import { defineUniversalComponent } from 'octane/universal';
 import { create } from '@octanejs/three/testing';
 import { TestingScene } from './_fixtures/testing.three.tsrx';
 
@@ -8,6 +9,16 @@ afterEach(() => {
 });
 
 describe('@octanejs/three deterministic testing helper', () => {
+	it('keeps the public scene empty for a component with no host output', async () => {
+		const EmptyScene = defineUniversalComponent('three', () => null);
+		const testRoot = await create(EmptyScene, undefined);
+
+		expect(testRoot.scene.children).toEqual([]);
+		testRoot.unmount();
+		expect(testRoot.scene.children).toEqual([]);
+		expect(testRoot.renderer.disposed).toBe(true);
+	});
+
 	it('mounts and updates a real root, then advances its public frame loop', async () => {
 		const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext');
 		const deltas: number[] = [];
