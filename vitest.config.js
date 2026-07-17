@@ -1691,17 +1691,17 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'mcp',
-					include: ['mcp/tests/**/*.test.ts'],
+					name: 'website-mcp',
+					include: ['website-mcp/tests/**/*.test.ts'],
 					environment: 'node',
 					globals: false,
 					// built-handler.e2e runs a REAL production `vite build` into
-					// mcp/dist and mcp/.vercel/output and then imports the emitted
+					// website-mcp/dist and website-mcp/.vercel/output and then imports the emitted
 					// server entry; file-serial so parallel test files can't clobber
 					// the artifacts another file is building or importing.
 					fileParallelism: false,
 				},
-				// No app plugins: the mcp tests exercise plain .ts modules (the
+				// No app plugins: the website-mcp tests exercise plain .ts modules (the
 				// content snapshot uses only Vite built-ins — ?raw and
 				// import.meta.glob) plus the production build driven through the
 				// vite JS API, which loads the app's own config and plugins itself.

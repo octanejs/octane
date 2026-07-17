@@ -46,15 +46,15 @@ remote surface.
 ## Develop
 
 ```bash
-pnpm --filter mcp dev        # dev SSR on http://localhost:5180
-pnpm --filter mcp test       # content/search/tool tests + built-handler e2e
+pnpm --filter website-mcp dev        # dev SSR on http://localhost:5180
+pnpm --filter website-mcp test       # content/search/tool tests + built-handler e2e
 ```
 
 ## Build & preview
 
 ```bash
-pnpm --filter mcp build      # → dist/client + dist/server + .vercel/output
-pnpm --filter mcp preview    # octane-preview: serves the PRODUCTION build on :3000
+pnpm --filter website-mcp build      # → dist/client + dist/server + .vercel/output
+pnpm --filter website-mcp preview    # octane-preview: serves the PRODUCTION build on :3000
 ```
 
 Smoke-test the production build locally:

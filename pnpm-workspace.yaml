@@ -33,7 +33,7 @@ packages:
   - playground/*
   - examples/*
   - website
-  - mcp
+  - website-mcp
 
 allowBuilds:
   esbuild: true

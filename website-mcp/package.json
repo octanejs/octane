@@ -1,5 +1,5 @@
 {
-  "name": "mcp",
+  "name": "website-mcp",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "octane-preview",
-    "test": "cd ../.. && vitest run --project mcp"
+    "test": "cd ../.. && vitest run --project website-mcp"
   },
   "dependencies": {
     "octane": "workspace:*",
