@@ -4,15 +4,19 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # The action force-updates one shared release branch. A newer main reconciliation
+  # must supersede an older push or manual run so stale work cannot land last.
+  cancel-in-progress: true
 
 permissions: {}
 
 jobs:
   release-pr:
-    if: github.repository == 'octanejs/octane'
+    if: github.repository == 'octanejs/octane' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
       issues: read
@@ -40,22 +44,48 @@ jobs:
       - name: Disallow major and minor bumps in changesets
         run: pnpm changeset:check
 
+      # Prove the repository-owned release plan before making the GitHub API
+      # boundary best-effort. A malformed changeset, generator regression, or
+      # formatting failure remains a hard workflow failure during an API outage.
+      - name: Validate generated release plan
+        run: |
+          pnpm changeset:version
+          git diff --check
+          pnpm format:check
+
+      - name: Restore checkout after release validation
+        run: |
+          git reset --hard "$GITHUB_SHA"
+          git clean -fd
+          git checkout --detach "$GITHUB_SHA"
+
+      # Reconciliation retries should produce the same release commit instead of
+      # force-pushing timestamp-only changes and retriggering pull request CI.
+      - name: Set deterministic release commit date
+        id: release_commit
+        run: |
+          release_commit_date=$(git show -s --format=%cI "$GITHUB_SHA")
+          echo "date=$release_commit_date" >> "$GITHUB_OUTPUT"
+
       - name: Create or update release pull request
-        id: changesets
+        id: release_pr_first
         continue-on-error: true
         uses: changesets/action@v1
         with:
+          branch: main
           github-token: ${{ github.token }}
           version: pnpm changeset:version
           commit: Version Packages
           title: Version Packages
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GIT_AUTHOR_DATE: ${{ steps.release_commit.outputs.date }}
+          GIT_COMMITTER_DATE: ${{ steps.release_commit.outputs.date }}
 
       # A failed action leaves its generated changes and local release branch behind.
       # Restore the triggering commit so the retry can recreate that branch cleanly.
-      - name: Restore checkout before retry
-        if: steps.changesets.outcome == 'failure'
+      - name: Restore checkout before release retry
+        if: steps.release_pr_first.outcome == 'failure'
         run: |
           git reset --hard "$GITHUB_SHA"
           git clean -fd
@@ -65,16 +95,94 @@ jobs:
           fi
 
       - name: Wait before retrying the GitHub API
-        if: steps.changesets.outcome == 'failure'
+        if: steps.release_pr_first.outcome == 'failure'
         run: sleep 15
 
       - name: Retry creating or updating the release pull request
-        if: steps.changesets.outcome == 'failure'
+        id: release_pr_retry
+        if: steps.release_pr_first.outcome == 'failure'
+        continue-on-error: true
         uses: changesets/action@v1
         with:
+          branch: main
           github-token: ${{ github.token }}
           version: pnpm changeset:version
           commit: Version Packages
           title: Version Packages
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          GIT_AUTHOR_DATE: ${{ steps.release_commit.outputs.date }}
+          GIT_COMMITTER_DATE: ${{ steps.release_commit.outputs.date }}
+
+      # changesets/action does not expose its HTTP status. Probe the exact first
+      # API call with the same token so only GitHub 5xx/network outages can defer
+      # synchronization; permission and healthy-API failures stay red.
+      - name: Check GitHub release API availability
+        id: release_api
+        if: >-
+          steps.release_pr_first.outcome == 'failure' &&
+          steps.release_pr_retry.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            try {
+              await github.rest.pulls.list({
+                owner,
+                repo,
+                state: "open",
+                head: `${owner}:changeset-release/main`,
+                base: "main",
+                per_page: 1,
+              });
+              core.setOutput("degraded", "false");
+              core.setOutput("status", "200");
+            } catch (error) {
+              const status = Number(error.status ?? error.response?.status ?? 0);
+              const code = String(error.code ?? error.cause?.code ?? "unknown");
+              const networkErrors = new Set([
+                "ECONNRESET",
+                "ETIMEDOUT",
+                "EAI_AGAIN",
+                "ENOTFOUND",
+              ]);
+
+              core.setOutput("status", status > 0 ? String(status) : code);
+              if (status >= 500 || networkErrors.has(code)) {
+                core.setOutput("degraded", "true");
+                core.warning(
+                  `GitHub release API is unavailable (${status || code}); deferring PR synchronization.`,
+                );
+                return;
+              }
+              throw error;
+            }
+
+      - name: Defer release pull request synchronization
+        if: >-
+          steps.release_pr_first.outcome == 'failure' &&
+          steps.release_pr_retry.outcome == 'failure' &&
+          steps.release_api.outputs.degraded == 'true'
+        env:
+          OCTANE_RELEASE_API_STATUS: ${{ steps.release_api.outputs.status }}
+        run: |
+          echo "::warning title=Release PR sync deferred::GitHub API returned $OCTANE_RELEASE_API_STATUS after both synchronization attempts. The next main push or a manual Release PR run will retry."
+          {
+            echo "### Release PR synchronization deferred"
+            echo
+            echo "The generated release plan and formatting passed, but both PR synchronization attempts failed during a verified GitHub API outage ($OCTANE_RELEASE_API_STATUS)."
+            echo
+            echo "The next push to main or a manual Release PR workflow run will retry."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail unexplained release pull request errors
+        if: >-
+          always() &&
+          steps.release_pr_first.outcome == 'failure' &&
+          steps.release_pr_retry.outcome == 'failure' &&
+          steps.release_api.outputs.degraded != 'true'
+        env:
+          OCTANE_RELEASE_API_STATUS: ${{ steps.release_api.outputs.status }}
+        run: |
+          echo "::error title=Release PR sync failed::Both synchronization attempts failed while the GitHub API probe was healthy or returned a non-outage error (${OCTANE_RELEASE_API_STATUS:-unknown})."
+          exit 1
