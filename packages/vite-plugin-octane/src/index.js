@@ -214,7 +214,7 @@ function collect_hydrate_module_paths(config) {
  * node builtins external) exporting `handler`/`nodeHandler` and auto-booting
  * under `node`. See server/virtual-entry.js and server/production.js.
  *
- * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
+ * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -818,6 +818,7 @@ export function octane(inlineOptions = {}) {
 	 *   hmr?: boolean,
 	 *   profile?: boolean,
 	 *   exclude?: string[],
+	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
 	 * }}
 	 */
@@ -825,6 +826,9 @@ export function octane(inlineOptions = {}) {
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
+	if (inlineOptions.requireDirective !== undefined) {
+		compilerOptions.requireDirective = inlineOptions.requireDirective;
+	}
 	if (inlineOptions.renderers !== undefined) compilerOptions.renderers = inlineOptions.renderers;
 	const compilerPlugin = /** @type {Plugin} */ (octaneCompiler(compilerOptions));
 	const compilerConfigHook = compilerPlugin.config;

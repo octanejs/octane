@@ -890,6 +890,45 @@ Do not reuse PR #23's `react()` Vite alias plugin in a React host application. I
 would replace the actual React renderer whose context dependencies, boundaries,
 and root event system this design needs.
 
+### 12.1 Module ownership in a mixed pipeline (`requireDirective`)
+
+Two compilers share one build in a React-hosted app: the host framework's JSX
+transform owns the React modules, the Octane compiler owns the islands. The
+transforms never meet inside a module — a module has exactly one compiler, and
+everything crossing the boundary is a plain value (a React element whose `type`
+is a compiled Octane component). What must be routed is per-module OWNERSHIP,
+and extension alone cannot answer it: Octane deliberately compiles project
+`.tsx`, and tsrx syntax may itself target React (`@tsrx/react` is the
+differential-rig oracle).
+
+Ownership is therefore declared in-band, `'use client'`-style: with
+`requireDirective: true` on the bundler integration (a shared
+`octane/compiler/bundler` decision inherited by the Vite, Rspack, and Rsbuild
+adapters), Octane compiles only modules that open with a `'use octane'`
+directive. The directive is purely an Octane-compilation ownership marker —
+not part of the tsrx language; tsrx modules compiled by other tsrx toolchains
+never carry it.
+
+- Directed project modules: full compile (`.tsrx`/`.tsx`) or hook slotting
+  (`.ts`/`.js`); the directive composes with `'use client'` in the prologue and
+  is stripped from output (blank-preserving, so source maps survive).
+- Undirected project `.tsx`/`.ts`/`.js`: untouched for the host toolchain, with
+  a once-per-file warning when the module imports from `octane` (usually a
+  forgotten directive).
+- Undirected project `.tsrx`: hard error — in an Octane-only pipeline nothing
+  else compiles the syntax. A project routing part of its `.tsrx` through a
+  different tsrx compiler (`@tsrx/react`) lists those paths in `exclude`:
+  excluded paths are never Octane's, and the exclusion wins even over a
+  directive (with a conflict warning).
+- Installed/linked packages: exempt; the package-manifest `usesOctane` rule
+  stays the per-package decision, so bindings need no directives.
+
+The mixed pipeline is pinned end-to-end by
+`tests/react-hosted/react-jsx-pipeline.test.ts`: a host module compiled by the
+real automatic-runtime JSX transform (`react/jsx-runtime` emit) renders a
+directive-carrying Octane island through `OctaneCompat`, while the Octane
+compiler provably passes the host `.tsx` through untouched.
+
 ## 13. Test and benchmark plan
 
 All behavioral tests must use actual React 19 plus actual compiled Octane output.

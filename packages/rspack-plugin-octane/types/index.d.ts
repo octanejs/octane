@@ -77,10 +77,26 @@ export interface OctaneRspackLoaderOptions {
 	dev?: boolean;
 	/** Emit client profiling metadata and enable the profiling runtime. Default `false`. */
 	profile?: boolean;
-	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */
+	/**
+	 * Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. With
+	 * `requireDirective`, excluded paths are exempt from Octane ownership
+	 * entirely — including `.tsrx`/`.tsx` — for projects routing those paths
+	 * through a different tsrx compiler (e.g. `@tsrx/react`).
+	 */
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */
 	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
+	/**
+	 * Mixed-toolchain ownership gate: when `true`, Octane compiles only
+	 * project modules that declare `'use octane'` in their directive prologue.
+	 * Undirected project `.tsx`/`.ts`/`.js` pass through to the host
+	 * framework's own pipeline; an undirected project `.tsrx` is a build
+	 * error. Installed and linked packages keep their Octane package-manifest
+	 * decision. The directive is always tolerated and stripped from compiled
+	 * output, even when this option is off.
+	 * @default false
+	 */
+	requireDirective?: boolean;
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
