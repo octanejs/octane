@@ -4952,15 +4952,18 @@ export function bindRendererRegionOwner(props: unknown): void {
 		);
 	}
 	const root = CURRENT_BLOCK;
-	const disposeRoot = DOM_ROOT_DISPOSERS.get(root);
-	if (disposeRoot === undefined) {
+	// hydrateRoot() runs its adoption pass BEFORE the Root object (and its
+	// disposer) exists, so a hydrating owned root is bound with a LAZY disposer
+	// lookup; every other caller must already have a live root.
+	if (DOM_ROOT_DISPOSERS.get(root) === undefined && currentHydration?.rootBlock !== root) {
 		throw new Error('A renderer-owned DOM region requires a live DOM root.');
 	}
 	const previous = RENDERER_REGION_DOM_BINDINGS.get(root);
 	if (previous?.bridge === bridge) return;
 	// A distinct callback avoids deleting a newly-registered disposer when two
-	// successive descriptor bridges share one committed lifecycle cell.
-	const dispose = () => disposeRoot();
+	// successive descriptor bridges share one committed lifecycle cell. The
+	// lookup is lazy so a disposer registered after a hydration pass is honored.
+	const dispose = () => DOM_ROOT_DISPOSERS.get(root)?.();
 	const release = bridge.registerDispose(dispose);
 	previous?.release();
 	const binding = { bridge, release };
@@ -8644,10 +8647,16 @@ export function namespaceHeadElement(
 export function injectStyle(id: string, css: string): void {
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-octane="hash">`). On a hydrated page
-	// the per-runtime Set is empty, so also check the DOM before re-injecting —
-	// otherwise hydration would append a duplicate <style>.
-	if (typeof document !== 'undefined' && document.querySelector(`style[data-octane="${id}"]`)) {
+	// the RenderResult, a `<style data-octane="hash">` — or, for a React-hosted
+	// island, a React 19 style RESOURCE whose href React serializes as
+	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
+	// resources). On a hydrated page the per-runtime Set is empty, so also
+	// check the DOM before re-injecting — otherwise hydration would append a
+	// duplicate <style>.
+	if (
+		typeof document !== 'undefined' &&
+		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
+	) {
 		_injectedStyles.add(id);
 		return;
 	}

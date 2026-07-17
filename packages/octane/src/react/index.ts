@@ -49,59 +49,35 @@ import {
 	createElement as createOctaneElement,
 	createHostContextRequest,
 	createRoot as createOctaneRoot,
+	hydrateRoot as hydrateOctaneRoot,
 	flushSync as octaneFlushSync,
 	type ComponentBody,
 	type Context as OctaneContext,
 	type Root as OctaneRoot,
 } from '../index.js';
+import {
+	OPAQUE_HOST_SENTINEL,
+	OPAQUE_HOST_SENTINEL_COMMENT,
+	REACT_CONTEXT_TAG,
+	validateIslandChild,
+	type OctaneCompatProps,
+	type TransportedChild,
+} from './shared.js';
+
+export type { OctaneCompatProps, OctaneReactComponent, OctaneRenderedNode } from './shared.js';
 import { drainPassiveEffects } from '../runtime.js';
 import { readNearestProviderValue } from './fiber-adapter.js';
 
 // Structural bench/test hook (§13): provider walks happen only at discovery.
 export { __hostContextFiberWalks } from './fiber-adapter.js';
 
-export interface OctaneCompatProps {
-	/** Exactly one compiled Octane component element. */
-	children: React.ReactElement;
-}
-
-declare const OCTANE_RENDERED: unique symbol;
-
-/**
- * Opaque branded node type for the JSX-facing view of a compiled Octane
- * component: assignable to `React.ReactNode` so React JSX accepts the child
- * site, but never actually produced at runtime — `OctaneCompat` consumes the
- * child element as a `{ type, props }` transport and React never invokes it.
- */
-export type OctaneRenderedNode = React.ReactElement & {
-	readonly [OCTANE_RENDERED]: 'octane';
-};
-
-/**
- * The React-JSX-facing type of a compiled Octane component. The runtime value
- * is the compiled body; only the declared type differs so `<Island …/>` is
- * valid zero-cast inside `<OctaneCompat>`. Intersects cleanly with
- * `ComponentBody<P>` so one declaration can serve both hosts.
- */
-export type OctaneReactComponent<P = Record<string, never>> = (props: P) => OctaneRenderedNode;
-
 /** Shared registry key the Octane runtime reads the owner bridge from. */
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
-
-interface TransportedChild {
-	type: ComponentBody;
-	props: Record<string, unknown>;
-	/** React key of the transported element — part of island identity (§3/§10). */
-	key: string | null;
-}
 
 interface PendingEpisode {
 	relay: Promise<void>;
 	resolve: () => void;
 }
-
-// React 19 context objects carry $$typeof: Symbol.for('react.context').
-const REACT_CONTEXT_TAG = Symbol.for('react.context');
 
 /**
  * One registered foreign context (§6.2): the React context, its root-local
@@ -202,6 +178,8 @@ class HostedIslandController {
 	private attemptErrored = false;
 	/** §6.3 request thenables this controller minted (recognized in routeSuspense). */
 	private contextRequests = new WeakSet<PromiseLike<unknown>>();
+	/** True while an attach is adopting server DOM (hydration). */
+	private hydrating = false;
 	/** A §6.3 handshake unwound the last attempt; the next commit retries the root. */
 	private pendingContextRetry = false;
 
@@ -293,6 +271,14 @@ class HostedIslandController {
 			// already queued, so the wrapper re-renders, its layout commit
 			// publishes the authoritative `React.use` snapshot, settles the
 			// request, and retries the root synchronously — all before paint.
+			if (this.hydrating && process.env.NODE_ENV !== 'production') {
+				// Adoption cannot be retried atomically: the handshake retry
+				// client-remounts only this island (§6.3 hydration fallback).
+				console.warn(
+					'<OctaneCompat> abandoned hydration for an island whose context ' +
+						'read needed the request handshake; the island was client-remounted.',
+				);
+			}
 			this.pendingContextRetry = true;
 			return true;
 		}
@@ -509,6 +495,24 @@ class HostedIslandController {
 		if (this.host === null || this.committed === null || this.disposed) {
 			return { suspended: false, errored: false };
 		}
+		if (this.root === null && hasServerIslandMarkup(this.host)) {
+			// A server-rendered island (octane/react/server wrote the real HTML;
+			// React hydrated around it without touching descendants — §9.3):
+			// adopt the exact server node identities. The prefix is passed
+			// VERBATIM so Octane ids hydrate byte-identically (§5 rule 2).
+			this.hydrating = true;
+			try {
+				this.root = hydrateOctaneRoot(
+					this.host,
+					hostedRootEnvelope as unknown as ComponentBody,
+					this.envelopeProps(),
+					{ identifierPrefix: this.identifierPrefix },
+				);
+			} finally {
+				this.hydrating = false;
+			}
+			return { suspended: this.attemptSuspended, errored: this.attemptErrored };
+		}
 		if (this.root === null || !this.rootLive) {
 			// First attach, or the runtime unmounted the previous root after an
 			// initial routed failure — a React retry binds a fresh root (§5 rule 9).
@@ -540,53 +544,6 @@ class HostedIslandController {
 		drainPassiveEffects();
 		episode.resolve();
 	}
-}
-
-function describeChildType(type: unknown): string {
-	if (typeof type === 'string') return `the DOM element <${type}>`;
-	if (type === React.Fragment) return 'a Fragment';
-	if (typeof type === 'function')
-		return `the component ${(type as Function).name || '(anonymous)'}`;
-	return 'an exotic React element';
-}
-
-function validateIslandChild(children: React.ReactNode): TransportedChild {
-	if (React.Children.count(children) !== 1) {
-		throw new Error(
-			'<OctaneCompat> expects exactly one Octane component element child; received ' +
-				`${React.Children.count(children)} children.`,
-		);
-	}
-	if (!React.isValidElement(children)) {
-		throw new Error('<OctaneCompat> expects an Octane component element, not a plain renderable.');
-	}
-	const type = children.type as unknown;
-	if (typeof type !== 'function') {
-		throw new Error(
-			`<OctaneCompat> cannot host ${describeChildType(type)}; ` +
-				'pass one compiled Octane component. (memo/forwardRef/lazy wrappers are React-only ' +
-				'element types — use Octane memo()/lazy() inside the island instead.)',
-		);
-	}
-	if (process.env.NODE_ENV !== 'production') {
-		// A class component is provably a React-only component. A PLAIN function
-		// cannot be distinguished from a prod-compiled or plain-TS Octane
-		// component today (the compiler does not yet emit a runtime brand), so
-		// unbranded plain functions are accepted; passing an ordinary React
-		// function component here fails inside the island when it calls React
-		// hooks against the Octane runtime.
-		if ((type as { prototype?: { isReactComponent?: unknown } }).prototype?.isReactComponent) {
-			throw new Error(
-				`<OctaneCompat> cannot host ${describeChildType(type)}: class components are ` +
-					'React-only; pass one compiled Octane component.',
-			);
-		}
-	}
-	return {
-		type: type as unknown as ComponentBody,
-		props: (children.props ?? {}) as Record<string, unknown>,
-		key: children.key ?? null,
-	};
 }
 
 /**
@@ -631,5 +588,24 @@ export function OctaneCompat(props: OctaneCompatProps): React.ReactNode {
 		return () => controller.passiveDetached();
 	}, [controller]);
 
-	return React.createElement('div', { 'data-octane-compat': '', ref: hostRef });
+	return React.createElement('div', {
+		'data-octane-compat': '',
+		ref: hostRef,
+		// §9.3 opaque-host contract: the server writes real island HTML; the
+		// client ALWAYS supplies this stable frozen sentinel so React neither
+		// diffs nor clears the Octane-owned descendants — on any render, forever.
+		suppressHydrationWarning: true,
+		dangerouslySetInnerHTML: OPAQUE_HOST_SENTINEL,
+	});
+}
+
+/** Server island markup present? (Anything beyond the client's own sentinel.) */
+function hasServerIslandMarkup(host: HTMLElement): boolean {
+	const first = host.firstChild;
+	if (first === null) return false;
+	return !(
+		first.nodeType === 8 &&
+		(first as Comment).data === OPAQUE_HOST_SENTINEL_COMMENT &&
+		first.nextSibling === null
+	);
 }

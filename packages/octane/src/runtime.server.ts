@@ -3080,7 +3080,9 @@ function readContext<T>(ctx: Context<T>): T {
 }
 
 export function useContext<T>(ctx: Context<T>): T {
-	return readContext(ctx);
+	if (ctx && (ctx as any).$$kind === CONTEXT_TAG) return readContext(ctx);
+	// Same cold foreign-context path as `use()` (§6.4).
+	return readHostedForeignContext(ctx, 'useContext');
 }
 
 // Sentinel thrown by `use(thenable)` on the server when the value isn't resolved
@@ -3284,6 +3286,11 @@ function recordHydrationRejection(reason: unknown): void {
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | string): T;
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
+	if (usable == null || typeof (usable as any).then !== 'function') {
+		// Cold path: a FOREIGN host context inside a hosted server pass reads
+		// through the installed host hook (§6.4); anything else diagnoses.
+		return readHostedForeignContext(usable, 'use');
+	}
 	// A thenable. Key it by the current FRAME path + the compiler-injected
 	// call-site key + a per-frame occurrence index (so a use() inside an @for gets
 	// a distinct key per iteration). Scoping to the frame makes the key identical
@@ -4920,6 +4927,142 @@ export async function prerender(
 ): Promise<RenderResult> {
 	const nonceAttr = nonceAttrOf(options);
 	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Hosted server rendering — react-hosted-octane-compat-plan.md §9.1.
+//
+// A React host (octane/react/server) runs one SYNCHRONOUS hosted attempt per
+// Fizz task execution, inside the React component render. The session — kept
+// by the host, keyed on Fizz's replay-stable task identity — persists the
+// resolved/parallel-use maps across that island's Fizz retries, so a replayed
+// pass reuses puMemo's original thenables and every settled outcome replays
+// synchronously. An unhandled suspension is NOT awaited here: the attempt
+// returns one identity-stable, status-stamped STRATUM aggregate that records
+// outcomes into the session as they settle; the host delegates the wait to
+// `React.use(stratum)` (Fizz's positional replay state — Phase 0 evidence).
+// Do NOT call public renderToString for this: its bare-root suspension
+// contract returns partial output and a fresh resolved map per call.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Read hook for FOREIGN host contexts during a hosted pass (§6.4): the server
+// wrapper reads React contexts directly (React.use) — no mirror or registry.
+let HOSTED_FOREIGN_CONTEXT_READER: ((context: object) => unknown) | null = null;
+
+function readHostedForeignContext<T>(usable: unknown, api: string): T {
+	if (usable !== null && typeof usable === 'object' && HOSTED_FOREIGN_CONTEXT_READER !== null) {
+		return HOSTED_FOREIGN_CONTEXT_READER(usable as object) as T;
+	}
+	throw new Error(`${api}(): argument is not a Context nor a thenable`);
+}
+
+/** @internal hosted-host ABI. Opaque outside octane/react/server. */
+export interface HostedServerSession {
+	resolved: ResolvedMap;
+	/** Identity-stable settled-work aggregates, one per suspension stratum. */
+	strata: (PromiseLike<void> & { status?: string })[];
+}
+
+/** @internal hosted-host ABI. */
+export function createHostedServerSession(): HostedServerSession {
+	return { resolved: newResolvedMap(), strata: [] };
+}
+
+export interface HostedAttemptOptions {
+	identifierPrefix?: string;
+	/** CSP nonce for inline seed scripts (same contract as RenderOptions.nonce). */
+	nonce?: string;
+	readForeignContext?: (context: object) => unknown;
+}
+
+export type HostedAttemptResult =
+	| {
+			status: 'complete';
+			html: string;
+			/** Hoisted head output — the host must translate or reject it (§9.2). */
+			head: string;
+			/** Per-hash scoped stylesheets for host-level dedupe (§9.2). */
+			cssEntries: Map<string, string>;
+	  }
+	| { status: 'suspended'; stratum: PromiseLike<void> };
+
+/**
+ * One stratum recorder: settles every suspended job into the session maps
+ * (both string-keyed and thenable-identity parallel-use outcomes), never
+ * rejects, and stamps its own status in place so a Fizz replay's
+ * `React.use(stratum)` unwraps settled strata synchronously.
+ * @internal hosted-host ABI.
+ */
+function recordHostedStratum(
+	suspended: SuspendedList,
+	resolved: ResolvedMap,
+): PromiseLike<void> & { status?: string; value?: unknown } {
+	const pu = resolved.pu;
+	const recorders = suspended.map(({ promise, key }) =>
+		(async () => {
+			const isPu = key.startsWith('|pu#');
+			try {
+				const value = await promise;
+				if (!resolved.has(key)) resolved.set(key, { value });
+				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { value });
+			} catch (reason) {
+				if (!resolved.has(key)) resolved.set(key, { reason });
+				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { reason });
+			}
+		})(),
+	);
+	const aggregate = Promise.all(recorders).then(() => {
+		aggregate.status = 'fulfilled';
+		aggregate.value = undefined;
+	}) as Promise<void> & { status?: string; value?: unknown };
+	aggregate.status = 'pending';
+	return aggregate;
+}
+
+/**
+ * Run ONE synchronous hosted pass against a persistent session. Complete
+ * passes return body HTML (suspense seeds appended, view-transition residue
+ * stripped) plus separated head/css channels; a suspended pass registers and
+ * returns its stratum. Unhandled render ERRORS throw out of this call — the
+ * host lets them escape to Fizz (§9.1).
+ * @internal hosted-host ABI.
+ */
+export function renderHostedAttempt(
+	session: HostedServerSession,
+	component: ServerComponent,
+	props: any,
+	options?: HostedAttemptOptions,
+): HostedAttemptResult {
+	const nonceAttr = nonceAttrOf(options as RenderOptions | undefined);
+	const previousReader = HOSTED_FOREIGN_CONTEXT_READER;
+	HOSTED_FOREIGN_CONTEXT_READER = options?.readForeignContext ?? null;
+	let pass: FullPassResult;
+	try {
+		pass = withStream(null, () =>
+			runFullFramedPass(
+				component,
+				props,
+				session.resolved,
+				nonceAttr,
+				options?.identifierPrefix ?? '',
+			),
+		);
+	} finally {
+		HOSTED_FOREIGN_CONTEXT_READER = previousReader;
+	}
+	// Delegate to the host ONLY for a bare suspension that escaped the root.
+	// A suspension OWNED by a local @try ships its @pending arm in this pass's
+	// HTML (the §9.1 v1 contract: hydration/client retry completes it), so the
+	// island is complete from the host's perspective.
+	if (pass.rootSuspended) {
+		const stratum = recordHostedStratum(pass.suspended, session.resolved);
+		session.strata.push(stratum);
+		return { status: 'suspended', stratum };
+	}
+	let body = pass.body;
+	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.vtCandidates) body = vtSsrStrip(body);
+	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
 
 /**
