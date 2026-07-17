@@ -609,12 +609,15 @@ function collectOctaneImportBindings(astBody) {
 // compile modes (client stamp ↔ server pair-skip ↔ hydration adopt-nothing
 // agree by construction). Exclusions:
 //   - `key=` (key-driven identity forces the slot to own its range),
-//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity / Hydrate —
+//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity / Hydrate /
+//     ViewTransition —
 //     their pairs are load-bearing for streaming). Direct imported names are
 //     excluded here (collectOctaneBoundaryNames); member/dynamic/aliased tags
-//     that RESOLVE to a boundary builtin are declined at RUNTIME by identity —
-//     componentSlot and ssrComponent both check the resolved comp against the
-//     builtins, so the two sides always agree.
+//     that RESOLVE to a callable boundary builtin are declined at RUNTIME through
+//     the component's boundary capability bit. componentSlot and ssrComponent
+//     read the same bit from the resolved component, so the two sides always
+//     agree without retaining the concrete builtins in the generic component
+//     path. Activity remains a compiler-lowered sentinel rather than a function.
 // `bodyNodes` is the normalized, HeadHoist-filtered root list of a `@{ … }`
 // (JSXCodeBlock) body — callers gate on the body form.
 function inheritSoleCompRoot(bodyNodes, ctx) {
@@ -667,10 +670,10 @@ function collectOctaneBoundaryNames(astBody) {
 
 // Does this module import ViewTransition from 'octane' (any local alias)?
 // Drives the client prelude's `_$vtSeen()` module-load hint: the runtime's
-// view-transition machinery is gated on a sticky VT_SEEN flag, and without
-// the hint the very FIRST transition flush that mounts a boundary would only
-// learn "this app uses ViewTransition" mid-drain — after the chance to
-// snapshot the old state has passed (docs/view-transitions-plan.md).
+// optional view-transition driver must be installed before the very FIRST
+// transition flush that mounts a boundary; otherwise it would only learn
+// "this app uses ViewTransition" mid-drain — after the chance to snapshot the
+// old state has passed (docs/view-transitions-plan.md).
 function moduleImportsViewTransition(astBody) {
 	const namespaces = new Set();
 	for (const node of astBody) {

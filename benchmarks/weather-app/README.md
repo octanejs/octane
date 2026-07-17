@@ -74,7 +74,10 @@ weather, and every audit must load the local mock without making external reques
 The repository-wide `bundle-size` suite also builds all six weather targets with the same
 normalized production minifier used for its other app comparisons. Its `weather_*`
 operations report raw, gzip, and Brotli bytes for the total JavaScript, authored app
-chunk, and framework chunk.
+bucket, and framework bucket. The displayed total models each emitted JavaScript file as
+an independently compressed response and sums the app and framework buckets; it does not
+inspect a server's content encoding. The framework bucket includes the Octane workspace
+runtime or the reference framework's dependencies together with bundler virtual helpers.
 
 ## Run
 

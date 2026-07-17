@@ -58,13 +58,14 @@ itself (the runner loops its per-target invocations and merges them),
 **What fails CI vs what is local-only:**
 
 - **CI enforces `--ratios` only.** Ratio guards compare two targets measured on
-  the *same machine in the same run*, so they are hardware-independent and safe
-  on shared runners. `.github/workflows/bench.yml` runs
+  the *same machine in the same run*. That cancels shared variation; byte/count
+  ratios are deterministic for a fixed toolchain, while timing guards retain
+  explicit noise headroom. `.github/workflows/bench.yml` runs
   `node benchmarks/bench.mjs --quick --ratios` on manual dispatch + a weekly
   cron, uploads `benchmarks/results/` as an artifact, and fails on a breach.
-- **`--record` / `--compare` are local-only.** The absolute millisecond baselines
-  in `baselines/local/*.json` are specific to the machine that recorded them, so
-  they are a personal regression aid, not a gate. See
+- **`--record` / `--compare` are local-only.** Absolute timing baselines are
+  specific to the recording machine; deterministic byte/count records are
+  portable only across the same fixture and toolchain. Neither is a CI gate. See
   [`baselines/README.md`](baselines/README.md).
 
 The **compare rule** is noise-aware: an op is a regression only if
@@ -105,7 +106,7 @@ after printing its normal tables:
 }
 ```
 
-- Times are **milliseconds**. `score` is the headline value for comparisons:
+- Timing operations are **milliseconds**. `score` is the headline value for comparisons:
   the mean of the latest stable sample window (or `median` when a quick run has
   too few samples to infer a window). This mirrors Benchmark.js's preference for
   mean period + uncertainty over median-only reporting, while keeping sample
@@ -177,12 +178,16 @@ baseline, re-record when you change it), `bundle-size` is the cross-framework
 comparison (all targets built with one normalized minify so solid's
 `minify:false` dev config and octane's terser passes don't skew the compare).
 
-`bundle-size` splits every build into an `app` chunk (modules under the app's
-own src/) and a `framework` chunk (node_modules + the octane workspace runtime
-+ virtual helpers) and reports both, plus totals: `app_*` / `fw_*` / `js_*` ×
-raw/gzip/brotli. The `app_*` ops are the primary ratchet — in real apps user
-code eclipses the framework runtime, so the per-component codegen share is
-what must scale; `fw_*` tracks the one-time runtime cost separately. App-shaped
+`bundle-size` classifies every build's emitted JavaScript into an `app` bucket
+(modules under the app's own src/) and a `framework` bucket (node_modules + the
+Octane workspace runtime + virtual helpers) and reports both, plus totals:
+`app_*` / `fw_*` / `js_*` ×
+raw/gzip/brotli. The harness models each emitted JavaScript file as an
+independently compressed response and sums those modeled transfer sizes; it
+does not inspect a server's content encoding. A bundler's default single chunk
+can be slightly smaller through cross-module compression. The `app_*` ops are
+the primary scaling ratchet as applications grow; `fw_*` tracks the one-time
+runtime cost separately. App-shaped
 sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
 service and formatting modules count as app code in both framework builds.
 

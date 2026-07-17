@@ -16,12 +16,13 @@
 // to every column rather than measure framework output. Bytes are deterministic
 // per build, so median === min.
 //
-// Each build is split into two chunks via rolldown codeSplitting — `app`
+// Each build's emitted JavaScript is classified into two buckets: `app`
 // (authored app modules, including weather's shared sources) and `framework`
 // (node_modules, virtual helpers, AND the octane workspace runtime, which pnpm
-// resolves to packages/octane/src, never node_modules). The app-only ops
-// (`app_*`) are the numbers that scale with app size — in real apps user code
-// eclipses the framework runtime, so the per-component codegen share is what
+// resolves to packages/octane/src, never node_modules). Rolldown codeSplitting
+// forces the main app/framework separation and may emit additional runtime
+// files, which are charged to framework. The app-only ops (`app_*`) are the
+// scaling term as applications grow, so the per-component codegen share is what
 // the compiled-output plan must ratchet; the runtime is a one-time cost tracked
 // by the `fw_*` ops. `js_*` totals stay for the whole-page view.
 //
