@@ -135,12 +135,13 @@ export class Router extends (RouterCore as any) {
 			// RouterCore derives the final HTTP status immediately after its internal
 			// load promise resolves. A platform-deferred View Transition can commit the
 			// new tree only after that point, so finalize every branch once the
-			// render-ready tree is present. Preserve a current redirect's own status;
-			// otherwise a successful tree must also clear a stale 404/500.
+			// render-ready tree is present. RouterCore has already committed a
+			// redirect and its HTTP status together, so preserve that authoritative
+			// status; otherwise a successful tree must also clear a stale 404/500.
 			const state = this.state;
 			const statusCode =
 				state.redirect != null
-					? state.redirect.status
+					? state.statusCode
 					: this.hasNotFoundMatch()
 						? 404
 						: state.matches.some((match: any) => match.status === 'error')

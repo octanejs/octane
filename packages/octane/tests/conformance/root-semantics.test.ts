@@ -144,6 +144,28 @@ describe('ReactDOMRoot public conformance', () => {
 		);
 	});
 
+	// Per ReactIncrementalErrorHandling-test.internal.js:883/:1338 — an
+	// uncaught mount error discards the failed tree but the root can recover.
+	it('discards an uncaught initial render without leaking its effects', () => {
+		const log: string[] = [];
+		const root = trackRoot(createRoot(container));
+
+		expect(() =>
+			root.render(client.EffectThenThrowRoot, {
+				log: (entry: string) => log.push(entry),
+			}),
+		).toThrow('failed initial render');
+		expect(container.textContent).toBe('');
+
+		flushEffects();
+		expect(log).toEqual([]);
+
+		// The failed tree is gone, but React permits a later render on the same
+		// root to recover from an uncaught mount error.
+		render(root, client.TextRoot, { text: 'recovered' });
+		expect(container.textContent).toBe('recovered');
+	});
+
 	// Per ReactDOMRoot-test.js:136 (stable), :120 (canary).
 	it('supports hydration', () => {
 		const props = { className: 'server', text: 'Hello' };

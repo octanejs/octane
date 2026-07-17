@@ -114,6 +114,9 @@ describe('@octanejs/tanstack-router — same-route search-param navigation (conc
 		// Server integrations can follow canonical redirects through the public
 		// RouterState snapshot rather than reaching into the reactive store graph.
 		expect(router.state.redirect?.options.href).toBe('/?page=1');
-		expect(router.state.statusCode).toBe(307);
+		// Redirect is a Response in the pinned RouterCore API. The router's
+		// separately exposed status must preserve that same non-success code.
+		expect(router.state.redirect?.status).toBe(307);
+		expect(router.state.statusCode).toBe(router.state.redirect?.status);
 	});
 });
