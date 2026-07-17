@@ -40,9 +40,9 @@ const LOADER_OPTION_KEYS = new Set([
 	'hmr',
 	'dev',
 	'profile',
-	'parallelUse',
 	'exclude',
 	'renderers',
+	'requireDirective',
 ]);
 const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'transpile']);
 
@@ -76,7 +76,7 @@ function normalizeOptions(value, plugin) {
 	assertBooleanOption(options, 'hmr');
 	assertBooleanOption(options, 'dev');
 	assertBooleanOption(options, 'profile');
-	assertBooleanOption(options, 'parallelUse');
+	assertBooleanOption(options, 'requireDirective');
 	if (
 		options.exclude !== undefined &&
 		(!Array.isArray(options.exclude) || options.exclude.some((entry) => typeof entry !== 'string'))
@@ -93,9 +93,11 @@ function normalizeOptions(value, plugin) {
 		...(options.hmr === undefined ? null : { hmr: options.hmr }),
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
-		...(options.parallelUse === undefined ? null : { parallelUse: options.parallelUse }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
+		...(options.requireDirective === undefined
+			? null
+			: { requireDirective: options.requireDirective }),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
 	};
 	if (normalized.exclude) Object.freeze(normalized.exclude);

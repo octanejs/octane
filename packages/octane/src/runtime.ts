@@ -15,6 +15,10 @@
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	HYDRATE_ID_ATTR,
+	HYDRATE_WHEN_ATTR,
+	HYDRATE_ID_COUNT_ATTR,
+	HYDRATE_SEED_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SCRIPT_ATTR,
 	STREAM_SEED_COMMENT,
@@ -46,6 +50,19 @@ import {
 	__profileTrackComponent,
 	type ProfileFrame,
 } from './profiling.js';
+import type {
+	HydrateProps,
+	HydrationPrefetchFunction,
+	HydrationPrefetchStrategy,
+	HydrationPrefetchWaitReason,
+	HydrationRuntimeGate,
+	HydrationStrategy,
+	HydrationWhen,
+} from './hydration/types.js';
+import {
+	HYDRATE_DEFAULT_INTERACTION_EVENTS,
+	HYDRATE_INTERACTION_EVENTS_ATTR,
+} from './hydration/interaction-config.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
@@ -105,6 +122,15 @@ export interface RendererRegionOwnerBridge {
 	routeError(error: unknown): boolean;
 	routeSuspense(thenable: PromiseLike<unknown>): boolean;
 	registerDispose(dispose: () => void): () => void;
+	/**
+	 * Resolve a foreign (host-renderer) context object to a root-local Octane
+	 * mirror context. `use()`/`useContext()` consult this on their cold
+	 * unknown-usable path when the reading component lives under an owned root;
+	 * the returned mirror then flows through the ordinary Octane context reader
+	 * (local-provider-first, memo dependency recording, owner fallback).
+	 * Returning null declines the object and restores the normal diagnostic.
+	 */
+	resolveForeignContext?(context: object): Context<any> | null;
 }
 
 interface EffectEventCell {
@@ -431,6 +457,10 @@ type OutputHandler = (block: Block, value: unknown) => void;
 interface RootIdState {
 	prefix: string;
 	next: number;
+	/** Exclusive end of an SSR-reserved deferred-boundary range. */
+	limit?: number;
+	/** Root allocator used if a hydration mismatch consumes beyond that range. */
+	overflow?: RootIdState;
 }
 
 // Client-only roots need a namespace beyond their root-local useId counter: two
@@ -621,6 +651,21 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
+interface ActiveWarmPlan {
+	block: Block;
+	fn: () => void;
+}
+// Compiler-emitted empty useBatch calls register child-only warm plans on the
+// synchronous component render stack. A descendant's first pending batch runs
+// the active plans while every ancestor frame (and its current props closure)
+// is still live; render entry/exit checkpoints below provide stack discipline.
+const ACTIVE_WARM_PLANS: ActiveWarmPlan[] = [];
+// Warm entries live for exactly one outer render/suspension episode. A retry
+// re-enters with the episode recorded on its block; an ordinary update starts
+// a new one so consumed entries cannot suppress warming after prop changes or
+// a remount that happens to reuse the same dependency values.
+let NEXT_WARM_EPISODE = 1;
+let CURRENT_WARM_EPISODE = 0;
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
@@ -3109,6 +3154,8 @@ function enqueueEffectEventCommitAction(action: () => void): void {
 function renderBlockInner(block: Block): void {
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
+	const prevWarmEpisode = CURRENT_WARM_EPISODE;
+	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	const prevEffectEventTarget = EFFECT_EVENT_RENDER_TARGET;
 	const prevEffectEventActionTarget = EFFECT_EVENT_ACTION_TARGET;
 	const effectEventTarget = WIP_CAPTURE?.events ?? prevEffectEventTarget;
@@ -3117,6 +3164,19 @@ function renderBlockInner(block: Block): void {
 	const effectEventActionCheckpoint = effectEventActionTarget.length;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
+	if (!continuesParentTree) {
+		// A true Suspense retry enters from no ambient block and resumes its saved
+		// episode. A synchronously nested independent root has an ambient block but
+		// no ancestry relationship, so it starts its own episode even while the
+		// caller happens to be replaying.
+		const replayEpisode =
+			prevBlock === null && RESUME_REPLAY ? (block as any).__warmEpisode : undefined;
+		CURRENT_WARM_EPISODE = typeof replayEpisode === 'number' ? replayEpisode : NEXT_WARM_EPISODE++;
+	} else if (CURRENT_WARM_EPISODE === 0) {
+		CURRENT_WARM_EPISODE = NEXT_WARM_EPISODE++;
+	}
+	(block as any).__warmEpisode = CURRENT_WARM_EPISODE;
 	EFFECT_EVENT_RENDER_TARGET = effectEventTarget;
 	EFFECT_EVENT_ACTION_TARGET = effectEventActionTarget;
 	// Invalidate any Effect Event payload queued by an earlier render in this
@@ -3213,6 +3273,8 @@ function renderBlockInner(block: Block): void {
 		}
 		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
 		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
+		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		CURRENT_WARM_EPISODE = prevWarmEpisode;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 	}
@@ -3474,6 +3536,7 @@ export function componentSlotLite<P>(
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
 	}
 	const prevScope = CURRENT_SCOPE;
+	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	CURRENT_SCOPE = scope;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(scope, comp);
@@ -3493,6 +3556,7 @@ export function componentSlotLite<P>(
 	} finally {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
+		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
@@ -3687,6 +3751,13 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 					unmountBlock(b, detachDom);
 				// An @empty branch (if any) hangs off the same slot.
 				if (val.emptyBlock) unmountBlock(val.emptyBlock, detachDom);
+			} else if (k === 'hydrateBlockSlot') {
+				// A load() strategy can begin procedural prefetch during the initial
+				// hydration render, before this slot's passive installer ever runs.
+				// Tear down the slot lifecycle directly so an immediate root unmount
+				// still aborts that work and resolves any pending waitFor subscribers.
+				teardownHydrateBoundary(val);
+				if (val.block) unmountBlock(val.block, detachDom);
 			} else if (k === 'childSlot') {
 				// A `{expr}` value slot holds EITHER a component Block (a component /
 				// host-with-components value) OR a `forSlot` keyed list (an array value,
@@ -4167,10 +4238,17 @@ export function useMemo<T>(
 ): T {
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
-	const prev = scope.hooks?.get(s) as { deps: any[] | undefined; value: T } | undefined;
+	const prev = scope.hooks?.get(s) as
+		| { deps: any[] | undefined; value: T; warmEpisode?: number }
+		| undefined;
 	// deps === undefined → recompute every render (`null` at the public API;
 	// direct/uncompiled omitted calls also retain this runtime fallback).
-	if (prev && d !== undefined && !depsChanged(prev.deps, d)) return prev.value;
+	if (prev && d !== undefined && !depsChanged(prev.deps, d)) {
+		if (prev.warmEpisode !== CURRENT_WARM_EPISODE && recordRealWarmMemo(s, d, prev)) {
+			prev.warmEpisode = CURRENT_WARM_EPISODE;
+		}
+		return prev.value;
+	}
 	// Parallel-use warming: before recomputing, adopt a prefetched creation for
 	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
 	// the fetch is already in flight. Only compiler-warmed slots can hit;
@@ -4178,7 +4256,11 @@ export function useMemo<T>(
 	if (WARM_EVER && d !== undefined) {
 		const adopted = adoptWarmValue(s, d);
 		if (adopted !== WARM_MISS) {
-			ensureHooks(scope).set(s, { deps: d, value: adopted });
+			ensureHooks(scope).set(s, {
+				deps: d,
+				value: adopted,
+				warmEpisode: CURRENT_WARM_EPISODE,
+			});
 			return adopted as T;
 		}
 	}
@@ -4187,7 +4269,11 @@ export function useMemo<T>(
 	// React-style factories ignore the extra args.
 	// eslint-disable-next-line prefer-spread
 	const value = compute.apply(null, (d ?? []) as []);
-	ensureHooks(scope).set(s, { deps: d, value });
+	const entry: { deps: any[] | undefined; value: T; warmEpisode?: number } = { deps: d, value };
+	ensureHooks(scope).set(s, entry);
+	if (d !== undefined && recordRealWarmMemo(s, d, entry)) {
+		entry.warmEpisode = CURRENT_WARM_EPISODE;
+	}
 	return value;
 }
 
@@ -4658,6 +4744,900 @@ function childrenAsBody(children: unknown): ComponentBody {
 	};
 }
 
+// ---------------------------------------------------------------------------
+// Deferred hydration — `<Hydrate when={...}>`
+// ---------------------------------------------------------------------------
+
+const HYDRATE_ID_SLOT = Symbol('octane.hydrate.id');
+const HYDRATE_SETUP_SLOT = Symbol('octane.hydrate.setup');
+const HYDRATE_NOTIFY_SLOT = Symbol('octane.hydrate.notify');
+const HYDRATE_SUPPORTED_INTERACTION_EVENTS = [
+	'auxclick',
+	'click',
+	'contextmenu',
+	'dblclick',
+	'focusin',
+	'keydown',
+	'keyup',
+	'mousedown',
+	'mouseenter',
+	'mouseover',
+	'mouseup',
+	'pointerdown',
+	'pointerenter',
+	'pointerover',
+	'pointerup',
+] as const;
+const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
+	'load',
+	'idle',
+	'visible',
+	'media',
+	'interaction',
+	'condition',
+	'never',
+	'dynamic',
+]);
+const HYDRATE_MARKER_SELECTOR = `[${HYDRATE_ID_ATTR}]`;
+const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>();
+const HYDRATE_SLOTS_BY_MARKER = /* @__PURE__ */ new WeakMap<Element, HydrateSlot>();
+const HYDRATE_PENDING_INTENTS = /* @__PURE__ */ new WeakMap<Element, HydrationReplayIntent[]>();
+const HYDRATE_HANDLED_INTENT_EVENTS = /* @__PURE__ */ new WeakSet<Event>();
+const HYDRATE_INTENT_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
+
+type HydrateLoadResult = ComponentBody | { default: ComponentBody };
+
+type InternalHydrateProps = HydrateProps & {
+	/** Compiler-injected split-child loader. */
+	__load?: () => Promise<HydrateLoadResult>;
+	/** Latest lexical values consumed by the compiler-generated split child. */
+	__data?: unknown[];
+};
+
+interface HydrationReplayIntent {
+	event: Event;
+	path: number[];
+}
+
+interface HydrateSlot {
+	__kind: 'hydrateBlockSlot';
+	block: Block;
+	wrapper: HTMLDivElement;
+	start: Comment;
+	end: Comment;
+	parentBlock: Block;
+	props: InternalHydrateProps;
+	boundaryId: string;
+	delegatedDynamicIntent: boolean;
+	serverPreserved: boolean;
+	/** Snapshot used instead of authored fallback for an initial SSR boundary. */
+	preservedFallbackNodes: Node[] | null;
+	seedRaw: string | null;
+	idState: RootIdState;
+	/** One-shot result of the client-only function form of `when`. */
+	dynamicStrategy: HydrationStrategy | null;
+	/** Most recently observed effective strategy, used for post-hydration notification. */
+	strategy: HydrationStrategy | null;
+	gate: HydrationRuntimeGate | null;
+	strategyCleanup: (() => void) | null;
+	prefetchCleanup: (() => void) | null;
+	prefetchAbort: AbortController | null;
+	prefetchStarted: boolean;
+	prefetchPromise: Promise<void> | null;
+	preloadPromise: Promise<void> | null;
+	loadedBody: ComponentBody | null;
+	hydrationWaiters: Set<(reason: HydrationPrefetchWaitReason) => void>;
+	/** Invalidates async completions from an earlier hydration request. */
+	activationGeneration: number;
+	activationRequested: boolean;
+	activationReady: boolean;
+	/** An SSR activation attempt currently owns the try slot's suspended retry. */
+	serverActivationStarted: boolean;
+	hydrated: boolean;
+	didNotify: boolean;
+	hasError: boolean;
+	error: unknown;
+	replays: HydrationReplayIntent[];
+}
+
+function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
+	return typeof when === 'function' ? 'dynamic' : (when?._t ?? 'dynamic');
+}
+
+function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
+	const raw = state.props.when;
+	let strategy: HydrationStrategy;
+	if (typeof raw === 'function') {
+		strategy = state.dynamicStrategy ?? raw();
+	} else {
+		strategy = raw;
+	}
+	if (
+		strategy === null ||
+		typeof strategy !== 'object' ||
+		!HYDRATE_STRATEGY_TYPES.has((strategy as HydrationStrategy)._t)
+	) {
+		throw new Error(
+			'Hydrate: `when` must synchronously return a hydration strategy with a valid type.',
+		);
+	}
+	if (typeof raw === 'function') state.dynamicStrategy = strategy;
+	state.strategy = strategy;
+	return strategy;
+}
+
+function resolveHydrateLoadResult(value: HydrateLoadResult): ComponentBody {
+	const body =
+		value !== null && typeof value === 'object' && 'default' in value ? value.default : value;
+	if (typeof body !== 'function') {
+		throw new Error('Hydrate: the compiler-generated child loader did not resolve to a component.');
+	}
+	return body;
+}
+
+function renderHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): void {
+	if (state.loadedBody !== null) {
+		// The module is cached, but its captures are render data. Read the latest
+		// array from props on every pass so prefetching and later parent updates do
+		// not freeze the values that happened to exist when the chunk first loaded.
+		state.loadedBody(state.props.__data, scope, extra);
+		return;
+	}
+	childrenAsBody(state.props.children)(undefined, scope, extra);
+}
+
+function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+	const contentBody: ComponentBody = (_props, scope, extra) => {
+		if (state.loadedBody === null) {
+			const preload = beginHydratePreload(state);
+			if (preload !== null) {
+				// This internal code-chunk thenable is not application `use()` data and
+				// must never consume a server seed. Track/throw it directly through the
+				// enclosing tryBlock; the stable cached promise makes retries safe.
+				const thenable = preload as TrackedThenable<void>;
+				trackThenable(thenable);
+				if (thenable.status === 'rejected') throw thenable.reason;
+				if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
+			}
+		}
+		renderHydrateChild(state, scope, extra);
+		state.hydrated = true;
+		useEffect(() => notifyHydrateBoundary(state), [state], HYDRATE_NOTIFY_SLOT);
+	};
+	const pendingBody: ComponentBody = (_props, scope) => {
+		if (state.serverPreserved && state.preservedFallbackNodes !== null) {
+			// Initial-document boundaries keep showing their server result if their
+			// first client attempt suspends. The authored fallback is exclusively for
+			// a later/client-only mount. A slot sentinel prevents a pending-body
+			// refresh from appending the snapshot twice; the pending Block's own range
+			// removes these raw cloned nodes when the child is ready.
+			if (scope.slots[0] === undefined) {
+				for (let i = 0; i < state.preservedFallbackNodes.length; i++) {
+					scope.block.parentNode.insertBefore(
+						state.preservedFallbackNodes[i].cloneNode(true),
+						scope.block.endMarker,
+					);
+				}
+				scope.slots[0] = { __kind: 'hydratePreservedFallback' };
+			}
+			return;
+		}
+		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
+	};
+	return (_props, scope) => {
+		tryBlock(
+			scope,
+			0,
+			scope.block.parentNode,
+			contentBody,
+			null,
+			pendingBody,
+			scope.block.endMarker,
+		);
+	};
+}
+
+function failHydrateBoundary(state: HydrateSlot, error: unknown): void {
+	if (state.hasError || state.block.disposed) return;
+	state.hasError = true;
+	state.error = error;
+	scheduleRender(state.parentBlock);
+}
+
+function beginHydratePreload(state: HydrateSlot): Promise<void> | null {
+	const load = state.props.__load;
+	if (load === undefined) return null;
+	if (state.preloadPromise !== null) return state.preloadPromise;
+	let pending: Promise<HydrateLoadResult>;
+	try {
+		pending = load();
+	} catch (error) {
+		pending = Promise.reject(error);
+	}
+	const promise = Promise.resolve(pending).then((result) => {
+		state.loadedBody = resolveHydrateLoadResult(result);
+	});
+	state.preloadPromise = promise;
+	// Prefetch can start without a later hydration request. Keep a rejection from
+	// becoming unhandled and route it through the boundary's normal render path.
+	void promise.catch((error) => failHydrateBoundary(state, error));
+	return promise;
+}
+
+function resolveHydrateWaiters(state: HydrateSlot, reason: HydrationPrefetchWaitReason): void {
+	if (state.hydrationWaiters.size === 0) return;
+	const waiters = [...state.hydrationWaiters];
+	state.hydrationWaiters.clear();
+	for (let i = 0; i < waiters.length; i++) waiters[i](reason);
+}
+
+function waitForHydratePrefetchStrategy(
+	state: HydrateSlot,
+	strategy: HydrationPrefetchStrategy,
+): Promise<HydrationPrefetchWaitReason> {
+	const controller = state.prefetchAbort;
+	if (controller === null || controller.signal.aborted) return Promise.resolve('abort');
+	// A procedural prefetch may begin in the same turn that `when` requests
+	// hydration (load() is the common case). Preserve that already-fired signal
+	// for late waitFor() subscribers instead of installing a strategy that can
+	// now win only after the hydration request it was meant to race.
+	if (state.activationRequested) return Promise.resolve('hydrate');
+	return new Promise((resolve) => {
+		const signal = controller.signal;
+		let settled = false;
+		let cleanup: (() => void) | void;
+		const finish = (reason: HydrationPrefetchWaitReason) => {
+			if (settled) return;
+			settled = true;
+			cleanup?.();
+			state.hydrationWaiters.delete(onHydrate);
+			signal.removeEventListener('abort', onAbort);
+			resolve(reason);
+		};
+		const onHydrate = () => finish('hydrate');
+		const onAbort = () => finish('abort');
+		state.hydrationWaiters.add(onHydrate);
+		signal.addEventListener('abort', onAbort, { once: true });
+		cleanup = strategy._s?.({
+			element: state.wrapper,
+			prefetch: () => finish('prefetch'),
+		});
+		if (settled) cleanup?.();
+	});
+}
+
+function beginProceduralHydratePrefetch(state: HydrateSlot): Promise<void> | null {
+	const prefetch = state.props.prefetch;
+	if (typeof prefetch !== 'function') return null;
+	if (state.prefetchStarted) return state.prefetchPromise;
+	state.prefetchStarted = true;
+	const controller = (state.prefetchAbort = new AbortController());
+	let result: ReturnType<HydrationPrefetchFunction>;
+	try {
+		result = prefetch({
+			element: state.wrapper,
+			signal: controller.signal,
+			preload: () => beginHydratePreload(state) ?? Promise.resolve(),
+			waitFor: (strategy) => waitForHydratePrefetchStrategy(state, strategy),
+		});
+	} catch (error) {
+		failHydrateBoundary(state, error);
+		return null;
+	}
+	if (result === undefined || result === null || typeof (result as any).then !== 'function') {
+		return null;
+	}
+	const promise = Promise.resolve(result).then(() => undefined);
+	state.prefetchPromise = promise;
+	void promise.catch((error) => failHydrateBoundary(state, error));
+	return promise;
+}
+
+function cleanupHydrateStrategy(state: HydrateSlot): void {
+	state.strategyCleanup?.();
+	state.strategyCleanup = null;
+	state.gate = null;
+}
+
+function cleanupHydrateInstallers(state: HydrateSlot): void {
+	cleanupHydrateStrategy(state);
+	state.prefetchCleanup?.();
+	state.prefetchCleanup = null;
+}
+
+function invalidateHydrateActivation(state: HydrateSlot): void {
+	state.activationGeneration++;
+	state.activationRequested = false;
+	state.activationReady = false;
+	if (state.serverPreserved) {
+		// Once server activation enters the internal try slot, its Suspense resume
+		// listener is independent of the request generation above. Supersede that
+		// listener without removing the visible preserved-server pending block, and
+		// let a later non-never strategy start a fresh activation attempt.
+		const activationSlot = state.block.slots[0] as TrySlot | undefined;
+		if (activationSlot?.__kind === 'trySlotSlot') activationSlot.pendingThenable = null;
+		state.serverActivationStarted = false;
+	}
+	// An interaction that requested the cancelled activation must not replay if
+	// the boundary is changed away from never() again at some later point.
+	state.replays = [];
+}
+
+function teardownHydrateBoundary(state: HydrateSlot): void {
+	cleanupHydrateInstallers(state);
+	state.prefetchAbort?.abort();
+	resolveHydrateWaiters(state, 'abort');
+	HYDRATE_SLOTS_BY_MARKER.delete(state.wrapper);
+}
+
+function eventPathWithin(root: Element, target: EventTarget | null): number[] | null {
+	if (!(target instanceof Node)) return null;
+	const path: number[] = [];
+	let node: Element | null = target instanceof Element ? target : target.parentElement;
+	while (node !== root) {
+		const parent: Element | null = node?.parentElement ?? null;
+		if (parent === null) return null;
+		const index = Array.prototype.indexOf.call(parent.children, node) as number;
+		if (index < 0) return null;
+		path.push(index);
+		node = parent;
+	}
+	path.reverse();
+	return path;
+}
+
+function resolveEventPath(root: Element, path: number[]): Element | null {
+	let node: Element = root;
+	for (let i = 0; i < path.length; i++) {
+		const next = node.children[path[i]];
+		if (next === undefined) return null;
+		node = next;
+	}
+	return node;
+}
+
+function hydrateMarkerInteractionEvents(marker: Element): ReadonlyArray<string> | null {
+	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
+	if (when === 'dynamic') return HYDRATE_SUPPORTED_INTERACTION_EVENTS;
+	if (when !== 'interaction') return null;
+	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
+	return custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
+}
+
+function hydrateStrategyInteractionEvents(
+	strategy: HydrationStrategy,
+): ReadonlyArray<string> | null {
+	if (strategy._t !== 'interaction') return null;
+	const custom = strategy._a?.()?.[HYDRATE_INTERACTION_EVENTS_ATTR];
+	return custom === undefined
+		? HYDRATE_DEFAULT_INTERACTION_EVENTS
+		: custom.split(/\s+/).filter(Boolean);
+}
+
+function markerHandlesEarlyHydrationIntent(marker: Element, eventType: string): boolean {
+	const state = HYDRATE_SLOTS_BY_MARKER.get(marker);
+	if (state !== undefined) {
+		return (
+			hydrateStrategyInteractionEvents(resolveHydrateStrategy(state))?.includes(eventType) ?? false
+		);
+	}
+
+	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
+	// Before a function-form strategy has run, its server marker can only promise
+	// the same conservative click intent TanStack exposes. Once the component has
+	// registered its slot, the branch above consults the concrete strategy instead.
+	if (when === 'dynamic') return eventType === 'click';
+	if (when !== 'interaction') return false;
+	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
+	const events: ReadonlyArray<string> =
+		custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
+	return events.includes(eventType);
+}
+
+function queueHydrateIntent(state: HydrateSlot, intent: HydrationReplayIntent): void {
+	if (state.hydrated || resolveHydrateStrategy(state)._t === 'never') return;
+	state.replays.push(intent);
+	requestHydrateBoundary(state);
+}
+
+/**
+ * Capture intent as soon as the client runtime module is evaluated. This is
+ * deliberately document-level: an interaction may happen before hydrateRoot
+ * creates a boundary slot, before its passive setup effect, or after streaming
+ * inserts a nested marker that an ancestor could not have observed earlier.
+ */
+function handleEarlyHydrationIntent(event: Event): void {
+	const target = event.target;
+	if (!(target instanceof Element)) return;
+
+	const markers: Element[] = [];
+	let marker: Element | null = target.closest(HYDRATE_MARKER_SELECTOR);
+	let matches = false;
+	while (marker !== null) {
+		markers.push(marker);
+		matches ||= markerHandlesEarlyHydrationIntent(marker, event.type);
+		marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
+	}
+	if (!matches || markers.length === 0) return;
+
+	// Parent-first: queue only the outermost still-dormant marker. Its replay is
+	// captured again for the next nested marker after the parent has hydrated.
+	markers.reverse();
+	let candidate: Element | null = null;
+	let candidateState: HydrateSlot | undefined;
+	for (let i = 0; i < markers.length; i++) {
+		const current = markers[i];
+		const when = current.getAttribute(HYDRATE_WHEN_ATTR);
+		if (when === null) continue;
+		const state = HYDRATE_SLOTS_BY_MARKER.get(current);
+		if (state?.hydrated) continue;
+		if (when === 'never' || (state !== undefined && resolveHydrateStrategy(state)._t === 'never')) {
+			return;
+		}
+		candidate = current;
+		candidateState = state;
+		break;
+	}
+	if (candidate === null) return;
+	// Preserve only intent discovered before a dynamic child's slot exists. Once
+	// a slot has resolved `when()`, its concrete strategy owns event matching.
+	for (let i = 0; i < markers.length; i++) {
+		const current = markers[i];
+		if (
+			current !== candidate &&
+			candidate.contains(current) &&
+			current.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic' &&
+			!HYDRATE_SLOTS_BY_MARKER.has(current)
+		) {
+			HYDRATE_DELEGATED_DYNAMIC_MARKERS.add(current);
+		}
+	}
+
+	const path = eventPathWithin(candidate, event.target);
+	if (path === null) return;
+	const intent = { event, path };
+	HYDRATE_HANDLED_INTENT_EVENTS.add(event);
+	if (event.bubbles) {
+		event.preventDefault();
+		event.stopPropagation();
+		event.stopImmediatePropagation();
+	}
+
+	if (candidateState !== undefined) {
+		queueHydrateIntent(candidateState, intent);
+	} else {
+		const pending = HYDRATE_PENDING_INTENTS.get(candidate) ?? [];
+		pending.push(intent);
+		HYDRATE_PENDING_INTENTS.set(candidate, pending);
+	}
+}
+
+function ensureEarlyHydrationIntentCapture(ownerDocument: Document): void {
+	if (HYDRATE_INTENT_DOCUMENTS.has(ownerDocument)) return;
+	HYDRATE_INTENT_DOCUMENTS.add(ownerDocument);
+	for (let i = 0; i < HYDRATE_SUPPORTED_INTERACTION_EVENTS.length; i++) {
+		ownerDocument.addEventListener(
+			HYDRATE_SUPPORTED_INTERACTION_EVENTS[i],
+			handleEarlyHydrationIntent,
+			true,
+		);
+	}
+}
+
+if (typeof document !== 'undefined') ensureEarlyHydrationIntentCapture(document);
+
+function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrategy): () => void {
+	const ownEvents =
+		hydrateStrategyInteractionEvents(strategy) ??
+		// A parent-first replay may carry conservative intent for a dynamic marker
+		// whose strategy could not yet be evaluated. Resolved boundaries get none.
+		(state.delegatedDynamicIntent ? HYDRATE_SUPPORTED_INTERACTION_EVENTS : []);
+	const events = new Set<string>(ownEvents);
+	const descendants = state.wrapper.querySelectorAll(HYDRATE_MARKER_SELECTOR);
+	for (let i = 0; i < descendants.length; i++) {
+		const nestedEvents = hydrateMarkerInteractionEvents(descendants[i]);
+		if (nestedEvents !== null) {
+			for (let j = 0; j < nestedEvents.length; j++) events.add(nestedEvents[j]);
+		}
+	}
+	if (events.size === 0) return () => undefined;
+
+	const onIntent = (event: Event) => {
+		if (HYDRATE_HANDLED_INTENT_EVENTS.has(event)) return;
+		if (state.hydrated) return;
+		const rawTarget = event.target;
+		let target =
+			rawTarget instanceof Element
+				? rawTarget
+				: rawTarget instanceof Node
+					? rawTarget.parentElement
+					: null;
+		let marker: Element | null = target?.closest(HYDRATE_MARKER_SELECTOR) ?? state.wrapper;
+		let matches = ownEvents.includes(event.type);
+		const delegatedDynamicMarkers: Element[] = [];
+		while (marker !== null && state.wrapper.contains(marker)) {
+			if (marker !== state.wrapper) {
+				const nestedEvents = hydrateMarkerInteractionEvents(marker);
+				if (nestedEvents?.includes(event.type)) {
+					matches = true;
+					if (marker.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic') {
+						delegatedDynamicMarkers.push(marker);
+					}
+				}
+			}
+			if (marker === state.wrapper) break;
+			marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
+		}
+		if (!matches) return;
+		for (let i = 0; i < delegatedDynamicMarkers.length; i++) {
+			HYDRATE_DELEGATED_DYNAMIC_MARKERS.add(delegatedDynamicMarkers[i]);
+		}
+		const path = eventPathWithin(state.wrapper, event.target);
+		if (path === null) return;
+		state.replays.push({ event, path });
+		if (event.bubbles) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+		}
+		requestHydrateBoundary(state);
+	};
+	for (const eventName of events) state.wrapper.addEventListener(eventName, onIntent, true);
+	return () => {
+		for (const eventName of events) state.wrapper.removeEventListener(eventName, onIntent, true);
+	};
+}
+
+function requestHydrateBoundary(state: HydrateSlot): void {
+	if (state.hydrated || state.activationRequested || state.block.disposed) return;
+	// A direct strategy prop can become never() after an earlier installer was
+	// registered. Its cleanup should cancel normal callbacks, but guard here too:
+	// a queued/custom callback that escaped cleanup must not bypass never's
+	// intentionally-static contract.
+	if (resolveHydrateStrategy(state)._t === 'never') return;
+	const activationGeneration = ++state.activationGeneration;
+	state.activationRequested = true;
+	resolveHydrateWaiters(state, 'hydrate');
+
+	const waits: Promise<void>[] = [];
+	const prefetch = beginProceduralHydratePrefetch(state);
+	if (prefetch !== null) waits.push(prefetch);
+	const preload = beginHydratePreload(state);
+	if (preload !== null) waits.push(preload);
+	if (waits.length === 0) {
+		state.activationReady = true;
+		if (state.gate !== null) state.gate.resolved = true;
+		if (CURRENT_BLOCK !== state.parentBlock) scheduleRender(state.parentBlock);
+		return;
+	}
+
+	void Promise.all(waits).then(
+		() => {
+			if (
+				state.block.disposed ||
+				!state.activationRequested ||
+				state.activationGeneration !== activationGeneration
+			)
+				return;
+			state.activationReady = true;
+			if (state.gate !== null) state.gate.resolved = true;
+			scheduleRender(state.parentBlock);
+		},
+		(error) => {
+			if (
+				state.block.disposed ||
+				!state.activationRequested ||
+				state.activationGeneration !== activationGeneration
+			)
+				return;
+			failHydrateBoundary(state, error);
+		},
+	);
+}
+
+function installHydrateBoundary(state: HydrateSlot): () => void {
+	if (!state.serverPreserved || state.hydrated) return () => undefined;
+	const strategy = resolveHydrateStrategy(state);
+	if (strategy._t === 'never') {
+		state.strategyCleanup = null;
+	} else {
+		const gate = {
+			id: state.boundaryId,
+			when: strategy._t,
+			resolved: false,
+			resolve: () => requestHydrateBoundary(state),
+		};
+		state.gate = gate;
+		const strategyCleanup = strategy._s?.({ element: state.wrapper, gate });
+		const interactionCleanup = installHydrateInteraction(state, strategy);
+		state.strategyCleanup = () => {
+			strategyCleanup?.();
+			interactionCleanup();
+		};
+	}
+
+	const prefetch = state.props.prefetch;
+	if (typeof prefetch === 'function') {
+		beginProceduralHydratePrefetch(state);
+	} else if (prefetch !== undefined) {
+		state.prefetchCleanup =
+			prefetch._s?.({
+				element: state.wrapper,
+				prefetch: () => {
+					const promise = beginHydratePreload(state);
+					if (promise !== null) void promise.catch(() => undefined);
+				},
+			}) ?? null;
+	}
+
+	return () => teardownHydrateBoundary(state);
+}
+
+function findHydrateSeedSidecar(wrapper: Element): HTMLScriptElement | null {
+	for (let node = wrapper.firstElementChild; node !== null; node = node.nextElementSibling) {
+		if (node.localName === 'script' && node.hasAttribute(HYDRATE_SEED_ATTR)) {
+			return node as HTMLScriptElement;
+		}
+	}
+	return null;
+}
+
+function createHydrateSlot(
+	props: InternalHydrateProps,
+	scope: Scope,
+	boundaryId: string,
+): HydrateSlot {
+	const parentBlock = scope.block;
+	const parentNode = parentBlock.parentNode;
+	const hydration = activeHydration();
+	const expected = document.createElement('div');
+	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
+	ensureEarlyHydrationIntentCapture(wrapper.ownerDocument);
+	let serverPreserved =
+		hydration !== null && !hydration.isFresh(wrapper) && wrapper.parentNode === parentNode;
+	if (wrapper.parentNode !== parentNode) parentNode.insertBefore(wrapper, parentBlock.endMarker);
+	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
+	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
+		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
+
+	let start: Comment;
+	let end: Comment;
+	let seedRaw: string | null = null;
+	let idState = parentBlock.idState;
+	if (serverPreserved && hydration!.isOpen(wrapper.firstChild)) {
+		start = wrapper.firstChild as Comment;
+		end = hydration!.close(start);
+		const rawCount = wrapper.getAttribute(HYDRATE_ID_COUNT_ATTR);
+		const parsedCount = rawCount === null ? 0 : Number(rawCount);
+		const idCount = Number.isSafeInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+		const rootIds = parentBlock.idState;
+		const childStart = rootIds.next;
+		rootIds.next += idCount;
+		idState = {
+			prefix: rootIds.prefix,
+			next: childStart,
+			limit: childStart + idCount,
+			overflow: rootIds,
+		};
+		wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
+		const seed = findHydrateSeedSidecar(wrapper);
+		if (seed !== null) {
+			seedRaw = seed.textContent || '[]';
+			seed.remove();
+		}
+	} else {
+		// An adopted wrapper without the boundary's own marker range is not safe to
+		// hydrate: stale server children would otherwise remain beside the fresh
+		// client range. Recover as a client-only mount inside the persistent wrapper.
+		if (serverPreserved) {
+			serverPreserved = false;
+			wrapper.replaceChildren();
+		}
+		start = document.createComment('hydrate');
+		end = document.createComment('/hydrate');
+		wrapper.append(start, end);
+	}
+
+	const block = createBlock(
+		'control-flow',
+		parentBlock,
+		wrapper,
+		start,
+		end,
+		() => undefined,
+		undefined,
+	);
+	block.idState = idState;
+	const state: HydrateSlot = {
+		__kind: 'hydrateBlockSlot',
+		block,
+		wrapper,
+		start,
+		end,
+		parentBlock,
+		props,
+		boundaryId: wrapper.getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
+		delegatedDynamicIntent: HYDRATE_DELEGATED_DYNAMIC_MARKERS.delete(wrapper),
+		serverPreserved,
+		preservedFallbackNodes: null,
+		seedRaw,
+		idState,
+		dynamicStrategy: null,
+		strategy: null,
+		gate: null,
+		strategyCleanup: null,
+		prefetchCleanup: null,
+		prefetchAbort: null,
+		prefetchStarted: false,
+		prefetchPromise: null,
+		preloadPromise: null,
+		loadedBody: null,
+		hydrationWaiters: new Set(),
+		activationGeneration: 0,
+		activationRequested: !serverPreserved,
+		activationReady: !serverPreserved,
+		serverActivationStarted: false,
+		hydrated: false,
+		didNotify: false,
+		hasError: false,
+		error: undefined,
+		replays: [],
+	};
+	scope.slots[0] = state;
+	registerSlot(scope, state);
+	HYDRATE_SLOTS_BY_MARKER.set(wrapper, state);
+	block.body = hydrateBoundaryBody(state);
+	const initialStrategy = resolveHydrateStrategy(state);
+	const pendingIntents = HYDRATE_PENDING_INTENTS.get(wrapper);
+	HYDRATE_PENDING_INTENTS.delete(wrapper);
+	if (serverPreserved && pendingIntents !== undefined && initialStrategy._t !== 'never') {
+		state.replays.push(...pendingIntents);
+		requestHydrateBoundary(state);
+	} else if (serverPreserved) {
+		const shouldDefer = initialStrategy._d ? initialStrategy._d() : initialStrategy._t !== 'load';
+		if (!shouldDefer && initialStrategy._t !== 'never') requestHydrateBoundary(state);
+	}
+	return state;
+}
+
+function activateHydrateBoundary(state: HydrateSlot): void {
+	const block = state.block;
+	const activationSlot = block.slots[0] as TrySlot | undefined;
+	if (!state.serverPreserved || activationSlot?.__kind === 'trySlotSlot') {
+		// The original server arm can be adopted only once. A cancelled suspended
+		// attempt leaves its internal try slot and preserved snapshot mounted; a
+		// later strategy resumes that slot as client work instead of treating its
+		// synthetic pending markers as untouched server HTML.
+		renderBlock(block);
+		return;
+	}
+	if (state.preservedFallbackNodes === null) {
+		const snapshot: Node[] = [];
+		for (let node = state.start.nextSibling; node !== null && node !== state.end; ) {
+			snapshot.push(node.cloneNode(true));
+			node = node.nextSibling;
+		}
+		state.preservedFallbackNodes = snapshot;
+	}
+
+	const hydration = new HydrationCapability(block, state.start.nextSibling, null);
+	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
+	hydration.protectRootAnchor(state.end);
+	const previousHydration = currentHydration;
+	currentHydration = hydration;
+	let completed = false;
+	try {
+		renderBlock(block);
+		drainHydrationRenderPhaseUpdates(block);
+		hydration.flushClassWrites();
+		hydration.flushTextWarnings();
+		// A first-attempt suspension deliberately leaves the internal try slot's
+		// pending block live until its thenable resumes. Its cursor is parked on
+		// that slot's close marker, so a normal root-remainder sweep would mistake
+		// the still-owned close marker for stale server DOM and detach the anchor
+		// the async retry needs. The pending path has already removed the abandoned
+		// adopted arm; finish/coalesce only after this boundary actually commits.
+		if (state.hydrated) {
+			hydration.finishRoot();
+			completed = true;
+		}
+	} finally {
+		currentHydration = previousHydration;
+	}
+	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
+}
+
+function notifyHydrateBoundary(state: HydrateSlot): void {
+	if (state.didNotify || !state.hydrated) return;
+	state.didNotify = true;
+	// Keep intent capture alive while an asynchronously split child loads. A
+	// pointerdown commonly requests hydration before the browser dispatches the
+	// corresponding click; removing listeners at request time would lose that
+	// click instead of replaying the complete interaction once hydration commits.
+	cleanupHydrateInstallers(state);
+	state.props.onHydrated?.();
+	state.wrapper.removeAttribute(HYDRATE_WHEN_ATTR);
+	state.strategy?._o?.(state.boundaryId);
+	const replays = state.replays;
+	state.replays = [];
+	for (let i = 0; i < replays.length; i++) {
+		const replay = replays[i];
+		const target = resolveEventPath(state.wrapper, replay.path);
+		if (target !== null) {
+			const event = replay.event;
+			// `click` is the platform exception among untrusted events: dispatching
+			// the clone still runs its native activation behavior, so links navigate
+			// and submit controls submit unless a hydrated handler prevents default.
+			// Keep dispatchEvent here to preserve the original mouse-event metadata.
+			target.dispatchEvent(
+				typeof MouseEvent !== 'undefined' && event instanceof MouseEvent
+					? new MouseEvent(event.type, event)
+					: typeof FocusEvent !== 'undefined' && event instanceof FocusEvent
+						? new FocusEvent(event.type, event)
+						: new Event(event.type, event),
+			);
+		}
+	}
+}
+
+/**
+ * Defer the initial hydration of server-rendered children until `when` resolves.
+ * A boundary first mounted on the client renders immediately; only existing SSR
+ * HTML can be left dormant.
+ */
+export const Hydrate: ComponentBody<HydrateProps> = (rawProps, scope) => {
+	const props = rawProps as InternalHydrateProps;
+	const boundaryId = useId(HYDRATE_ID_SLOT);
+	let state = scope.slots[0] as HydrateSlot | undefined;
+	let renderedChild = false;
+	if (state === undefined) {
+		state = createHydrateSlot(props, scope, boundaryId);
+	} else {
+		state.props = props;
+		// A surrounding update makes preserved server HTML potentially stale. Match
+		// the correctness-first contract by opening the boundary, except for never().
+		if (!state.hydrated) {
+			const strategy = resolveHydrateStrategy(state);
+			if (strategy._t === 'never') {
+				// Only the hydration trigger changes here. Preparation has an independent
+				// lifecycle, so do not abort procedural prefetch or resolve waitFor() as
+				// though the still-mounted boundary had unmounted.
+				cleanupHydrateStrategy(state);
+				invalidateHydrateActivation(state);
+			} else if (!state.activationRequested) {
+				requestHydrateBoundary(state);
+			}
+		}
+	}
+
+	if (state.hasError) throw state.error;
+	if (
+		!state.hydrated &&
+		state.activationReady &&
+		(!state.serverPreserved || !state.serverActivationStarted)
+	) {
+		// A first attempt can suspend after replacing the adopted arm with its
+		// preserved-server pending block. From that point the internal try slot owns
+		// the thenable and resume path; re-entering here on a parent update would
+		// remount that pending block and abandon the in-flight attempt. Client-only
+		// boundaries keep re-entering so new props can supersede suspended data.
+		if (state.serverPreserved) state.serverActivationStarted = true;
+		try {
+			activateHydrateBoundary(state);
+		} catch (error) {
+			// A synchronous render error did not leave a resumable try path behind.
+			// Let an enclosing error boundary retry this activation after reset.
+			if (state.serverPreserved) state.serverActivationStarted = false;
+			throw error;
+		}
+		renderedChild = true;
+	} else if (state.hydrated && !renderedChild) {
+		renderBlock(state.block);
+	}
+
+	useEffect(() => installHydrateBoundary(state!), [state], HYDRATE_SETUP_SLOT);
+};
+
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
  * `@try { … } @pending { fallback }`, for authors writing JSX rather than the
@@ -4760,14 +5740,54 @@ export const ErrorBoundary: ComponentBody<{
  * Per-block `thenableState[]` keyed by call index lets the body replay
  * synchronously after the promise resolves.
  */
-export function use<T>(usable: Context<T> | PromiseLike<T> | TrackedThenable<T>): T {
+/**
+ * Structural view of a foreign host-renderer context (a real `React.Context<T>`
+ * inside an `octane/react` island). Deliberately matches React 19's Consumer
+ * shape WITHOUT importing React types — core stays host-agnostic; only hosted
+ * roots can actually resolve one (§6.2).
+ */
+export interface ForeignHostContext<T> {
+	readonly Consumer: (props: { children: (value: T) => any }) => any;
+}
+
+export function use<T>(
+	usable: Context<T> | PromiseLike<T> | TrackedThenable<T> | ForeignHostContext<T>,
+): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
 		return useContextInternal(usable as Context<T>);
 	}
 	if (usable == null || typeof (usable as any).then !== 'function') {
-		throw new Error('use(): argument is not a Context nor a thenable');
+		// Cold path: not an Octane context, not a thenable. Under a hosted root
+		// this may be a FOREIGN host-renderer context (a real React context
+		// inside an octane/react island) — the owner bridge resolves it to a
+		// root-local mirror. Normal roots fall through to the diagnostic.
+		return useForeignContext(usable, 'use');
 	}
 	return useThenable(usable as TrackedThenable<T>);
+}
+
+// React 19 context objects carry $$typeof: Symbol.for('react.context') — used
+// ONLY to sharpen the out-of-hosted-root diagnostic, never as a read strategy.
+const REACT_FOREIGN_CONTEXT_TAG = /* @__PURE__ */ Symbol.for('react.context');
+
+/**
+ * Resolve a non-Octane usable through the enclosing renderer-region owner
+ * (docs/react-hosted-octane-compat-plan.md §6.2). Kept out of `use()` so the
+ * hot paths carry no extra code; only already-failing calls reach here.
+ */
+function useForeignContext<T>(usable: unknown, api: string): T {
+	if (usable !== null && typeof usable === 'object') {
+		const bridge = rendererRegionOwnerForBlock(CURRENT_BLOCK);
+		const mirror = bridge?.resolveForeignContext?.(usable as object);
+		if (mirror != null) return useContextInternal(mirror as Context<T>);
+		if ((usable as { $$typeof?: unknown }).$$typeof === REACT_FOREIGN_CONTEXT_TAG) {
+			throw new Error(
+				`${api}(): a React context can only be read inside a React-hosted Octane ` +
+					'island (see octane/react); this component is not rendered under one.',
+			);
+		}
+	}
+	throw new Error(`${api}(): argument is not a Context nor a thenable`);
 }
 
 /**
@@ -4788,8 +5808,14 @@ export function useRendererThenable<T>(thenable: PromiseLike<T>): T {
  * needs no rewrite. Provided for React familiarity; `use(Context)` is the
  * React-19 idiom and remains the primary form.
  */
-export function useContext<T>(context: Context<T>): T {
-	return useContextInternal(context);
+export function useContext<T>(context: Context<T> | ForeignHostContext<T>): T {
+	if (context && (context as any).$$kind === CONTEXT_TAG) {
+		return useContextInternal(context as Context<T>);
+	}
+	// Same cold foreign-context path as `use()` — a real React context resolves
+	// through the hosted owner; anything else gets the targeted diagnostic
+	// (previously a non-context read silently produced `undefined`).
+	return useForeignContext(context, 'useContext');
 }
 
 // Sentinel cached in a consumer's resolved-provider slots to mean "no provider —
@@ -4848,15 +5874,18 @@ export function bindRendererRegionOwner(props: unknown): void {
 		);
 	}
 	const root = CURRENT_BLOCK;
-	const disposeRoot = DOM_ROOT_DISPOSERS.get(root);
-	if (disposeRoot === undefined) {
+	// hydrateRoot() runs its adoption pass BEFORE the Root object (and its
+	// disposer) exists, so a hydrating owned root is bound with a LAZY disposer
+	// lookup; every other caller must already have a live root.
+	if (DOM_ROOT_DISPOSERS.get(root) === undefined && currentHydration?.rootBlock !== root) {
 		throw new Error('A renderer-owned DOM region requires a live DOM root.');
 	}
 	const previous = RENDERER_REGION_DOM_BINDINGS.get(root);
 	if (previous?.bridge === bridge) return;
 	// A distinct callback avoids deleting a newly-registered disposer when two
-	// successive descriptor bridges share one committed lifecycle cell.
-	const dispose = () => disposeRoot();
+	// successive descriptor bridges share one committed lifecycle cell. The
+	// lookup is lazy so a disposer registered after a hydration pass is honored.
+	const dispose = () => DOM_ROOT_DISPOSERS.get(root)?.();
 	const release = bridge.registerDispose(dispose);
 	previous?.release();
 	const binding = { bridge, release };
@@ -4872,6 +5901,40 @@ export function bindRendererRegionOwner(props: unknown): void {
 			RENDERER_REGION_DOM_OWNERS.delete(root);
 		});
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Hosted-root control signal (§6.3 HostContextRequest): thrown by an owner
+// bridge's readContext when a foreign-context read cannot be satisfied
+// synchronously. handleRenderError recognizes it BEFORE local boundary
+// routing, so island @catch/@pending arms never observe it; the owner
+// receives the carried thenable through routeSuspense and settles it once
+// the authoritative host value has committed.
+// ---------------------------------------------------------------------------
+
+const HOST_CONTEXT_REQUEST_TAG = Symbol.for('octane.host-context-request');
+
+interface HostContextRequestSignal {
+	$$kind: typeof HOST_CONTEXT_REQUEST_TAG;
+	thenable: PromiseLike<unknown>;
+}
+
+/**
+ * Build the §6.3 control signal for an owner bridge to THROW from
+ * `readContext`. The thenable must settle when the owner has committed the
+ * requested foreign value; the owner then retries the owned root.
+ * @internal owner-bridge ABI (octane/react and future hosts).
+ */
+export function createHostContextRequest(thenable: PromiseLike<unknown>): HostContextRequestSignal {
+	return { $$kind: HOST_CONTEXT_REQUEST_TAG, thenable };
+}
+
+function isHostContextRequest(err: unknown): err is HostContextRequestSignal {
+	return (
+		err !== null &&
+		typeof err === 'object' &&
+		(err as { $$kind?: unknown }).$$kind === HOST_CONTEXT_REQUEST_TAG
+	);
 }
 
 function recordContextDependency(block: Block | null, context: Context<any>): void {
@@ -5165,8 +6228,8 @@ function trackThenable(thenable: TrackedThenable<any>): void {
 
 // ---------------------------------------------------------------------------
 // Parallel use() — batched unwrap + fetch-tree warming.
-// (docs/suspense-parallel-use-plan.md; emitted by the compiler's parallelUse
-// pipeline as _$useBatch / _$warmMemo / _$warmChild.)
+// (docs/suspense-parallel-use-plan.md; emitted by the compiler as _$useBatch /
+// _$warmMemo / _$warmChild.)
 // ---------------------------------------------------------------------------
 
 /**
@@ -5192,8 +6255,8 @@ function warnUncachedUsePromise(block: Block): void {
 		'A component was suspended by an uncached promise: a replay created a fresh ' +
 			'promise for a use() slot that already had one, so the stored promise was ' +
 			'reused and the fresh request was wasted. Create the promise outside the ' +
-			'component, cache it, or enable the compiler`s parallelUse transform ' +
-			'(which memoizes use() arguments per call site).',
+			'component or cache it. The compiler automatically memoizes analyzable ' +
+			'component-local use() arguments per call site.',
 	);
 }
 const warnedWaterfall = new WeakSet<Block>();
@@ -5205,8 +6268,8 @@ function warnUseWaterfall(block: Block, idx: number): void {
 		`use() waterfall: a replay discovered a new pending promise at call index ${idx} ` +
 			'that only starts after the earlier use() resolved. If it does not depend on ' +
 			'the earlier value, restructure so both promises are created before the first ' +
-			'use() (the parallelUse compiler transform does this automatically for ' +
-			'independent arguments).',
+			'use(). The compiler does this automatically for analyzable independent ' +
+			'component-local arguments.',
 	);
 }
 
@@ -5219,12 +6282,19 @@ function warnUseWaterfall(block: Block, idx: number): void {
  * promise; the unwraps then read settled values from the thenable expandos in
  * their original (hydration-seed-preserving) order.
  *
- * `warm` is the compiler-built fetch-tree thunk: invoked only on the throwing
- * path (a resolved batch costs nothing), it prefetches provably-independent
- * descendant fetches via warmChild/warmMemo so the whole tree loads in
- * max(depth-of-true-dependencies) rounds instead of one round per component.
+ * `warm` is the compiler-built fetch-tree thunk. On an empty compiler batch it
+ * registers lazily for the active component frame; on a throwing data batch,
+ * it joins every registered ancestor plan and prefetches provably-independent
+ * descendants via warmChild/warmMemo. A resolved batch costs no warm work.
  */
 export function useBatch(items: any[], warm?: () => void): void {
+	// Compiler registration form: publish the component's child-only plan on
+	// the active render stack. It is intentionally lazy — a fully synchronous
+	// tree neither walks its children nor allocates a warm cache.
+	if (items.length === 0) {
+		if (warm !== undefined) ACTIVE_WARM_PLANS.push({ block: CURRENT_BLOCK!, fn: warm });
+		return;
+	}
 	// Hydrating: every use() adopts a server seed synchronously — nothing to
 	// batch, and warming would duplicate fetches the server already resolved.
 	const hydration = activeHydration();
@@ -5242,7 +6312,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 		if (it.status === 'pending') (pending ??= []).push(it);
 	}
 	if (pending === null) return;
-	if (warm !== undefined) runWarm(warm);
+	runActiveWarmPlans(warm);
 	// Single pending member: suspend on it DIRECTLY — semantics (and microtask
 	// hop count) identical to a plain use() suspension, and attachResume's
 	// pendingThenable dedup keeps working on the stable promise identity.
@@ -5261,44 +6331,89 @@ export function useBatch(items: any[], warm?: () => void): void {
 
 // ── Fetch-tree warming ──────────────────────────────────────────────────────
 //
-// A warm cache is a per-block Map<slot, Array<{deps, value}>> populated by
-// warmMemo during a suspended body's warm walk and consumed by useMemo when
-// the real descendant mounts (adoption = transfer, so entries don't outlive
-// their one use). The cache lives on the block that ran the batch — every
-// descendant mounts inside it, so adoption walks parentBlock links. Orphans
-// (warmed but never adopted, e.g. a guard flipped) are bounded by the
-// per-slot FIFO cap and die with the block.
+// A warm cache is a per-block Map<slot, Array<{deps, value, available}>>
+// populated by warmMemo during a suspended body's warm walk and consumed once
+// by useMemo when the real descendant mounts. Equal-dependency occurrences get
+// separate entries. A consumed entry remains as a tombstone so a later pending
+// stratum cannot restart that speculative creation. The cache lives on the
+// outermost active plan's block, making it visible to adjacent descendants
+// through their parentBlock chains. Its episode tag makes every entry
+// unreachable on the next ordinary render, while preserving it across retries
+// and dependency strata of the current suspend.
 
 interface WarmEntry {
 	deps: any[];
 	value: any;
+	/** Real memo cell represented by an unavailable entry, when applicable. */
+	source?: object;
+	/** A warmed value may be adopted once; the retained tombstone still prevents
+	 * a later dependency stratum from speculatively creating it again. */
+	available: boolean;
 }
 let CURRENT_WARM: Map<HookSlot, WarmEntry[]> | null = null;
+let CURRENT_WARM_CLAIMS: Set<object> | null = null;
 /** Flips true forever on first warm — gates useMemo's ancestor walk so apps
  * that never warm never pay for it. */
 let WARM_EVER = false;
 let WARM_DEPTH = 0;
 const WARM_DEPTH_CAP = 64;
-const WARM_SLOT_CAP = 64;
+// Do not cap per-slot occurrence queues: dropping their FIFO head would map a
+// repeated component instance to a later instance's value. The whole cache is
+// invalidated when the next ordinary render starts a new suspend episode.
 const WARM_MISS = Symbol('octane.warm.miss');
 
-function runWarm(fn: () => void): void {
-	// Reuse the nearest ancestor's cache when one exists: a descendant that
+function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
+	for (let block: Block | null = owner; block !== null; block = block.parentBlock) {
+		if ((block as any).__warmCacheEpisode !== CURRENT_WARM_EPISODE) continue;
+		const existing = (block as any).__warmCache as Map<HookSlot, WarmEntry[]> | undefined;
+		if (existing !== undefined) return existing;
+	}
+	const cache = new Map<HookSlot, WarmEntry[]>();
+	(owner as any).__warmCache = cache;
+	(owner as any).__warmCacheEpisode = CURRENT_WARM_EPISODE;
+	return cache;
+}
+
+// A real memo that executes while an ancestor warm plan is live represents one
+// concrete component occurrence. Retain an unavailable entry for this episode
+// so a later sibling's suspension does not speculatively refetch it. Repeated
+// same-site instances intentionally append repeated entries; a warm walk claims
+// them in traversal order.
+function recordRealWarmMemo(slot: HookSlot, deps: any[], source: object): boolean {
+	const block = CURRENT_BLOCK;
+	if (block === null) return false;
+	let owner: Block | null = null;
+	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i++) {
+		const plan = ACTIVE_WARM_PLANS[i];
+		if (!blockIsAncestor(plan.block, block)) continue;
+		owner = plan.block;
+		break;
+	}
+	if (owner === null) return false;
+	const cache = warmCacheForOwner(owner);
+	let list = cache.get(slot);
+	if (list === undefined) {
+		list = [];
+		cache.set(slot, list);
+	}
+	list.push({ deps, value: undefined, available: false, source });
+	WARM_EVER = true;
+	return true;
+}
+
+function runWarm(fn: () => void, owner: Block = CURRENT_BLOCK!): void {
+	// Reuse the nearest OWNER ancestor's cache when one exists: a descendant that
 	// suspends mid-cascade re-warms its own subtree, and its entries must
 	// dedup against what the ancestor's walk already started (one cache per
-	// warming subtree, not per suspending block).
-	let cache: Map<HookSlot, WarmEntry[]> | undefined;
-	for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-		cache = (b as any).__warmCache;
-		if (cache !== undefined) break;
-	}
-	if (cache === undefined) {
-		cache = new Map();
-		(CURRENT_BLOCK! as any).__warmCache = cache;
-	}
+	// warming subtree, not per suspending block). Starting at owner is important:
+	// a stale source-child cache is not visible to adjacent siblings warmed by an
+	// enclosing plan.
+	const cache = warmCacheForOwner(owner);
 	WARM_EVER = true;
 	const prev = CURRENT_WARM;
+	const prevClaims = CURRENT_WARM_CLAIMS;
 	CURRENT_WARM = cache;
+	CURRENT_WARM_CLAIMS = new Set();
 	try {
 		fn();
 	} catch {
@@ -5306,13 +6421,75 @@ function runWarm(fn: () => void): void {
 		// triggered it. A throwing warm plan just means fewer prefetches.
 	} finally {
 		CURRENT_WARM = prev;
+		CURRENT_WARM_CLAIMS = prevClaims;
 	}
 }
 
+function blockIsAncestor(ancestor: Block, block: Block): boolean {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if (current === ancestor) return true;
+	}
+	return false;
+}
+
+/** Activate every registered plan that encloses the throwing batch. The cache
+ * lives on the outermost participating block, making warmed entries visible to
+ * adjacent descendants as well as the source branch. */
+function runActiveWarmPlans(local?: () => void): void {
+	const block = CURRENT_BLOCK!;
+	let plans: ActiveWarmPlan[] | null = null;
+	let owner = block;
+	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i++) {
+		const plan = ACTIVE_WARM_PLANS[i];
+		if (!blockIsAncestor(plan.block, block)) continue;
+		(plans ??= []).push(plan);
+		if (plans.length === 1) owner = plan.block;
+	}
+	if (plans === null && local === undefined) return;
+	runWarm(() => {
+		if (plans !== null) {
+			for (let i = 0; i < plans.length; i++) {
+				CURRENT_WARM_CLAIMS = new Set();
+				try {
+					plans[i].fn();
+				} catch {
+					// Each speculative plan is independent. One throwing getter or
+					// creation must not prevent adjacent plans from warming.
+				}
+			}
+		}
+		if (local !== undefined) {
+			CURRENT_WARM_CLAIMS = new Set();
+			try {
+				local();
+			} catch {
+				// Speculative and independent from the registered ancestor plans.
+			}
+		}
+	}, owner);
+}
+
+function activeMemoMatch(slot: HookSlot, deps: any[]): object | null {
+	for (let block: Block | null = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
+		const entry = block.hooks?.get(slot) as { deps?: any[] } | undefined;
+		if (
+			entry !== undefined &&
+			entry.deps !== undefined &&
+			!depsChanged(entry.deps, deps) &&
+			!CURRENT_WARM_CLAIMS?.has(entry)
+		) {
+			return entry;
+		}
+	}
+	return null;
+}
+
 /**
- * Start (and cache) one prefetched creation. Dedups on (slot, deps) so
- * re-warming during a second attempt never double-starts a fetch. The value
- * is status-tagged immediately so the real use() unwrap reads it directly.
+ * Start (and cache) one prefetched creation. Each warm-plan occurrence claims
+ * one matching (slot, deps) entry, so retries reuse the same concrete work while
+ * repeated equal-dependency component instances still get separate entries.
+ * The value is status-tagged immediately so the real use() unwrap reads it
+ * directly.
  */
 export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void {
 	const cache = CURRENT_WARM;
@@ -5320,8 +6497,28 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 	let list = cache.get(slot);
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
-			if (!depsChanged(list[i].deps, deps)) return; // already warmed
+			const entry = list[i];
+			if (depsChanged(entry.deps, deps) || CURRENT_WARM_CLAIMS?.has(entry)) continue;
+			CURRENT_WARM_CLAIMS?.add(entry);
+			if (entry.source !== undefined) CURRENT_WARM_CLAIMS?.add(entry.source);
+			return; // this concrete occurrence already ran or warmed
 		}
+	}
+	// An ancestor plan can recurse through the component whose real memo already
+	// created this value before its batch discovered suspension. Record a consumed
+	// tombstone instead of duplicating that creation; later strata then remain
+	// deduped even after the active component has returned.
+	const activeMemo = activeMemoMatch(slot, deps);
+	if (activeMemo !== null) {
+		CURRENT_WARM_CLAIMS?.add(activeMemo);
+		if (list === undefined) {
+			list = [];
+			cache.set(slot, list);
+		}
+		const entry = { deps, value: undefined, available: false, source: activeMemo };
+		list.push(entry);
+		CURRENT_WARM_CLAIMS?.add(entry);
+		return;
 	}
 	let value: any;
 	try {
@@ -5334,8 +6531,9 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 		list = [];
 		cache.set(slot, list);
 	}
-	list.push({ deps, value });
-	if (list.length > WARM_SLOT_CAP) list.shift();
+	const entry = { deps, value, available: true };
+	list.push(entry);
+	CURRENT_WARM_CLAIMS?.add(entry);
 }
 
 /**
@@ -5370,19 +6568,20 @@ export function warmChild(comp: any, props: any): void {
 }
 
 /** Adoption lookup for useMemo: nearest ancestor warm cache entry for this
- * slot with matching deps. Transfer semantics — the entry is removed. */
+ * slot with matching deps. The value is consumed once; its tombstone remains
+ * to dedup later warm passes without being adoptable by another instance. */
 function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 	let b: Block | null = CURRENT_BLOCK;
 	while (b !== null) {
 		const cache: Map<HookSlot, WarmEntry[]> | undefined = (b as any).__warmCache;
-		if (cache !== undefined) {
+		if ((b as any).__warmCacheEpisode === CURRENT_WARM_EPISODE && cache !== undefined) {
 			const list = cache.get(slot);
 			if (list !== undefined) {
 				for (let i = 0; i < list.length; i++) {
 					if (!depsChanged(list[i].deps, deps)) {
-						const value = list[i].value;
-						list.splice(i, 1);
-						return value;
+						if (!list[i].available) continue;
+						list[i].available = false;
+						return list[i].value;
 					}
 				}
 			}
@@ -5556,7 +6755,11 @@ export function useId(slot?: HookSlot): string {
 	let s = scope.hooks?.get(slot) as { id: string } | undefined;
 	if (s === undefined) {
 		const ids = scope.block.idState;
-		s = { id: ':' + ids.prefix + 'in-' + (ids.next++).toString(36) + ':' };
+		let owner = ids;
+		while (owner.limit !== undefined && owner.next >= owner.limit && owner.overflow !== undefined) {
+			owner = owner.overflow;
+		}
+		s = { id: ':' + owner.prefix + 'in-' + (owner.next++).toString(36) + ':' };
 		ensureHooks(scope).set(slot, s);
 	}
 	return s.id;
@@ -5727,9 +6930,10 @@ class HydrationCapability {
 	}
 
 	owns(block: Block): boolean {
-		let root = block;
-		while (root.parentBlock !== null) root = root.parentBlock;
-		return root === this.rootBlock;
+		for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+			if (current === this.rootBlock) return true;
+		}
+		return false;
 	}
 
 	suspend<T>(fn: () => T): T {
@@ -8370,10 +9574,16 @@ export function namespaceHeadElement(
 export function injectStyle(id: string, css: string): void {
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-octane="hash">`). On a hydrated page
-	// the per-runtime Set is empty, so also check the DOM before re-injecting —
-	// otherwise hydration would append a duplicate <style>.
-	if (typeof document !== 'undefined' && document.querySelector(`style[data-octane="${id}"]`)) {
+	// the RenderResult, a `<style data-octane="hash">` — or, for a React-hosted
+	// island, a React 19 style RESOURCE whose href React serializes as
+	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
+	// resources). On a hydrated page the per-runtime Set is empty, so also
+	// check the DOM before re-injecting — otherwise hydration would append a
+	// duplicate <style>.
+	if (
+		typeof document !== 'undefined' &&
+		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
+	) {
 		_injectedStyles.add(id);
 		return;
 	}
@@ -10920,7 +12130,7 @@ function componentSlotImpl(
 		// pair exactly where this falls through to the adoption regimes below.
 		if (
 			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
+			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition || comp === Hydrate)
 		)
 			inherit = false;
 		if (inherit === true && parentBlock !== null) {
@@ -14165,6 +15375,10 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
+			// §6.3 control signal — never an application failure: pass it through
+			// so the renderer-region owner (handleRenderError) receives it; a
+			// local catch arm must not render a hosted context handshake.
+			if (isHostContextRequest(err)) throw err;
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
 				handleSuspense(s, err.thenable, s.tryBlock);
@@ -14300,6 +15514,9 @@ function mountTry(state: TrySlot): void {
 		renderBlock(b);
 		state.hasResolved = true;
 	} catch (err) {
+		// §6.3 control signal — bypass the local boundary (see the try-body
+		// re-render catch above); the renderer-region owner handles it.
+		if (isHostContextRequest(err)) throw err;
 		if (isSuspenseException(err)) {
 			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
@@ -15869,6 +17086,19 @@ function findTryHandler(block: Block | null): ((err: any) => void) | null {
  * which surfaces to the scheduler's caller (matches the prior behavior).
  */
 function handleRenderError(block: Block, err: any): void {
+	// §6.3 HostContextRequest: a foreign-context read the owner could not
+	// satisfy synchronously. This is a hosted-root control signal, NOT an
+	// application failure — it must bypass the island's own @catch/@pending
+	// arms and reach the owner, which settles the carried thenable once the
+	// authoritative host value has committed and then retries the root.
+	if (isHostContextRequest(err)) {
+		const bridge = rendererRegionOwnerForBlock(block);
+		if (bridge !== null && bridge.routeSuspense(err.thenable)) return;
+		err = new Error(
+			'A hosted foreign-context request escaped its renderer-region owner; ' +
+				'the owning bridge is gone or declined it.',
+		);
+	}
 	if (isSuspenseException(err)) {
 		let b: Block | null = block;
 		while (b) {
@@ -18150,7 +19380,8 @@ function coalesceHydratedRanges(
 		return (
 			owner.currentComp === Suspense ||
 			owner.currentComp === ErrorBoundary ||
-			owner.currentComp === ViewTransition
+			owner.currentComp === ViewTransition ||
+			owner.currentComp === Hydrate
 		);
 	}
 
@@ -18175,6 +19406,7 @@ function coalesceHydratedRanges(
 				owner.currentComp !== Suspense &&
 				owner.currentComp !== ErrorBoundary &&
 				owner.currentComp !== ViewTransition &&
+				owner.currentComp !== Hydrate &&
 				!scopeHasFragmentRef(owner.block)
 			);
 		}
@@ -18830,6 +20062,32 @@ export function hydrateRoot(
 		// anything left at the root cursor instead of leaving visible unmanaged DOM.
 		hydration.finishRoot();
 		hydrationCompleted = true;
+	} catch (error) {
+		// An OWNED hydrating root (a renderer-region bridge bound during this
+		// pass — e.g. an octane/react island) mirrors createRoot's initial-render
+		// contract: route the escape (error, suspension, or host context request)
+		// to the owner, unmount the failed root, and release the container so a
+		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
+		// retry client-remounts). Unowned hydration failures keep their existing
+		// behavior and rethrow untouched.
+		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
+		try {
+			handleRenderError(rootBlock, error);
+		} finally {
+			DOM_ROOT_DISPOSERS.delete(rootBlock);
+			unmountBlock(rootBlock, false);
+			drainRefDetaches();
+			container.textContent = '';
+			// Mirror root.unmount()'s full release: this pass registered the
+			// container as a delegation target, and the retry's fresh root
+			// re-registers — a leftover refcount would strand the map entry and
+			// its listeners past the island's final teardown.
+			unregisterDelegationTarget(container);
+			releaseRootContainer(container, ownerToken);
+		}
+		// Routed: hand back an empty lazy root owning NO claim or delegation
+		// registration (both released above); the owner's retry recreates.
+		return makeRoot(container, null, null, null, idState, renderReturnedValue, null);
 	} finally {
 		currentHydration = previousHydration;
 	}

@@ -6,6 +6,7 @@ import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { makeRouter } from '../src/app/router.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
+import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
 import {
 	FRAMEWORK_CARDS,
 	HOME_SUMMARY,
@@ -114,6 +115,12 @@ describe('website routes', () => {
 			expect(stat.querySelector('.proven-number')?.textContent?.trim()).toBeTruthy();
 			expect(stat.querySelector('.proven-label')?.textContent?.trim()).toBeTruthy();
 		}
+		const ecosystemStat = provenStats.at(-1)!;
+		expect(ecosystemStat.querySelector('.proven-number')?.textContent).toBe(String(BINDING_COUNT));
+		expect(ecosystemStat.querySelector('.proven-label')?.textContent).toContain(
+			'first-party ecosystem bindings',
+		);
+		expect(findLink(ecosystemStat, '/docs/bindings')).toBeTruthy();
 
 		// The decision section frames the evidence below with two questions and a coda
 		// that links out to what TSRX adds.
@@ -256,44 +263,20 @@ describe('website routes', () => {
 
 	it('/docs/bindings links every first-party binding', async () => {
 		const { container } = await renderRoute('/docs/bindings');
-		const packages = [
-			'zustand',
-			'jotai',
-			'redux',
-			'redux-toolkit',
-			'apollo-client',
-			'tanstack-query',
-			'tanstack-router',
-			'remix-router',
-			'radix',
-			'base-ui',
-			'floating-ui',
-			'motion',
-			'dnd-kit',
-			'sonner',
-			'lucide',
-			'hook-form',
-			'lexical',
-			'mdx',
-			'i18next',
-			'tanstack-table',
-			'tanstack-virtual',
-			'recharts',
-			'visx',
-			'three',
-			'stylex',
-			'testing-library',
-		];
+		const packages = BINDING_CATEGORIES.flatMap((category) => category.packages);
 
 		const packageLinks = Array.from(
-			container.querySelectorAll<HTMLAnchorElement>('.doc-card a[href*="/packages/"]'),
+			container.querySelectorAll<HTMLAnchorElement>('.binding-directory a[href*="/packages/"]'),
 		);
-		expect(packageLinks).toHaveLength(packages.length);
+		expect(packageLinks).toHaveLength(BINDING_COUNT);
+		expect(container.querySelector('.doc-eyebrow')?.textContent).toBe(
+			`${BINDING_COUNT} first-party bindings`,
+		);
 		for (const packageName of packages) {
-			const link = packageLinks.find((candidate) =>
-				candidate.getAttribute('href')?.endsWith(`/packages/${packageName}`),
-			);
-			expect(link?.textContent).toBe(`@octanejs/${packageName}`);
+			const directory = packageName.slice('@octanejs/'.length);
+			const href = `https://github.com/octanejs/octane/tree/main/packages/${directory}`;
+			const link = packageLinks.find((candidate) => candidate.getAttribute('href') === href);
+			expect(link?.textContent).toBe(packageName);
 		}
 	});
 

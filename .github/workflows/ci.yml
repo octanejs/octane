@@ -226,6 +226,62 @@ jobs:
           test "$TYPECHECK_RESULT" = success
           test "$EXAMPLES_RESULT" = success
 
+  three_compat:
+    name: Three compatibility (${{ matrix.lane }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: minimum r156
+            version: 0.156.0
+          - lane: current
+            version: latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install pinned repository dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Keep the r172 differential oracle immutable. These lanes replace only
+      # the Three runtime/type pair, then select the Octane-owned compatibility
+      # suite so current/minimum support cannot be faked by the pinned oracle.
+      - name: Install Three ${{ matrix.version }} compatibility pair
+        run: |
+          THREE_VERSION="$(pnpm view three@${{ matrix.version }} version)"
+          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
+          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@${THREE_RELEASE_LINE}.x"
+          echo "OCTANE_THREE_COMPAT_VERSION=$THREE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Verify resolved Three compatibility pair
+        run: |
+          THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
+          TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
+          TYPES_RELEASE_LINE="${TYPES_VERSION%.*}"
+          echo "three=$THREE_VERSION @types/three=$TYPES_VERSION"
+          test "$THREE_RELEASE_LINE" = "$TYPES_RELEASE_LINE"
+
+      - name: Typecheck Three source and public API
+        run: |
+          pnpm exec tsgo --noEmit -p packages/three/tsconfig.json
+          pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
+
+      - name: Run Three compatibility behavior tests
+        run: pnpm --dir packages/three test:compat
+
   package:
     name: validate publishable packages
     runs-on: ubuntu-latest

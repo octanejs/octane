@@ -49,6 +49,11 @@ import {
 	prepareRendererBoundaryRegions,
 	prepareServerRendererBoundaryRegions,
 } from './compile-renderer-boundaries.js';
+import {
+	hydrateBoundaryPathFromId,
+	prepareHydrateBoundaries,
+	prepareServerHydrateBoundaries,
+} from './hydrate-boundaries.js';
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -589,7 +594,7 @@ function collectOctaneImportBindings(astBody) {
 // compile modes (client stamp ↔ server pair-skip ↔ hydration adopt-nothing
 // agree by construction). Exclusions:
 //   - `key=` (key-driven identity forces the slot to own its range),
-//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity —
+//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity / Hydrate —
 //     their pairs are load-bearing for streaming). Direct imported names are
 //     excluded here (collectOctaneBoundaryNames); member/dynamic/aliased tags
 //     that RESOLVE to a boundary builtin are declined at RUNTIME by identity —
@@ -633,6 +638,7 @@ function collectOctaneBoundaryNames(astBody) {
 				(imported === 'Suspense' ||
 					imported === 'ErrorBoundary' ||
 					imported === 'Activity' ||
+					imported === 'Hydrate' ||
 					imported === 'ViewTransition' ||
 					imported === 'unstable_ViewTransition') &&
 				sp.local?.name
@@ -3646,7 +3652,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, parallelUse?: boolean, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -3671,6 +3677,35 @@ export function compile(source, filename, options) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
+	}
+	if (!options?.__hydratePrepared) {
+		const query = filename.indexOf('?');
+		const hash = filename.indexOf('#');
+		let filenameEnd = filename.length;
+		if (query !== -1) filenameEnd = query;
+		if (hash !== -1 && hash < filenameEnd) filenameEnd = hash;
+		const cleanFilename = filename.slice(0, filenameEnd);
+		const hydratePreparation =
+			mode === 'client'
+				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
+				: prepareServerHydrateBoundaries(source, cleanFilename);
+		if (hydratePreparation !== null) {
+			const compiled = compile(hydratePreparation.source, cleanFilename, {
+				...options,
+				__hydratePrepared: true,
+				__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
+			});
+			if (hydratePreparation.map && compiled.map) {
+				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
+				compiled.map = addSourceMapNeedles(
+					compiled.map,
+					compiled.code,
+					authoredSource,
+					hydratePreparation.mappingNeedles,
+				);
+			}
+			return compiled;
+		}
 	}
 	if (mode === 'server') {
 		if (options?.renderer?.target === 'universal') {
@@ -3804,14 +3839,6 @@ export function compile(source, filename, options) {
 	// a stale-UI report can be bisected memoizer-vs-elsewhere in one line.
 	const autoMemoEnabled =
 		options?.autoMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
-	// parallelUse: the parallel-`use()` transform pipeline (auto-memoized
-	// creations → hoisted parallel starts → batched unwrap → __warm fetch
-	// plans; docs/suspense-parallel-use-plan.md). ON by default — pass
-	// `parallelUse: false` to opt out (React-timing waterfall semantics).
-	// Output is byte-identical with the flag off, and the pipeline is a no-op
-	// for use()-free modules either way.
-	const parallelUseEnabled = !(options && options.parallelUse === false);
-
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -3820,7 +3847,10 @@ export function compile(source, filename, options) {
 		dev: devEnabled,
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
-		parallelUse: parallelUseEnabled,
+		// A split Hydrate query module is invoked as the existing server-rendered
+		// boundary body. Its sole component child must therefore keep the server's
+		// own component marker pair instead of borrowing the Hydrate block range.
+		hydrateBoundaryModule: options?.__hydrateBoundaryModule === true,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
@@ -4660,8 +4690,7 @@ function compileServer(source, filename, options) {
 		// transforms run on server bodies, emitting `_$puMemo`/`_$puBatch` — the
 		// server-runtime twins with cross-pass creation identity — so independent
 		// fetches REGISTER before the first suspend and a body stratum costs ONE
-		// network round instead of one per use(). Same opt-out flag as the client.
-		parallelUse: !(options && options.parallelUse === false),
+		// network round instead of one per use().
 		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
 		_pendingWarm: null, // `X.__warm = …` source, set by ssrCompileBody, drained by compileServerComponent
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
@@ -4805,7 +4834,7 @@ function compileServerComponent(node, ctx) {
 	}
 
 	// SSR parallel-use mirror: attach the compiled fetch plan so a PARENT's warm
-	// walk (`_$warmChild(Comp, props)` from its first suspending batch) can start
+	// walk (`_$warmChild(Comp, props)` activated by a suspending descendant batch) can start
 	// this component's independent creations before its body ever runs.
 	const warmSrc = ctx._pendingWarm;
 	ctx._pendingWarm = null;
@@ -4889,24 +4918,22 @@ function ssrCompileBody(
 	// (directive-arm statements memoize HERE; the transformed nodes flow into
 	// ssrEmitNodes below, so ssrCompileSub receives arms PRE-memoized and runs
 	// Pass B only) + the warm artifacts (`Comp.__warm` fetch plan + the first
-	// batch's warm thunk — see runtime.server.ts warmMemo/warmChild); synthetic
+	// active-stack warm registration — see runtime.server.ts warmMemo/warmChild); synthetic
 	// subs (statement arrays) run Pass B only. Loops/functions are excluded by
 	// the passes themselves (same rules as the client).
 	let workingStatements = statements;
-	if (ctx.parallelUse) {
-		let warmThunk = null;
-		const isTopBody = !Array.isArray(node.body);
-		if (isTopBody) {
-			const creations = [];
-			const warmChildren = [];
-			workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
-			jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
-			const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
-			warmThunk = warm.thunk;
-			ctx._pendingWarm = warm.warmSrc;
-		}
-		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
+	let warmThunk = null;
+	const isTopBody = !Array.isArray(node.body);
+	if (isTopBody) {
+		const creations = [];
+		const warmChildren = [];
+		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
+		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
+		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
+		warmThunk = warm.thunk;
+		ctx._pendingWarm = warm.warmSrc;
 	}
+	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	const rewritten = workingStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
@@ -6483,7 +6510,7 @@ function compileComponent(node, ctx, options) {
 		ctx.currentProfileComponentId = prevProfileComponentId;
 	}
 
-	// parallelUse warm plan: attached to the INNER function object (not the
+	// Parallel-use warm plan: attached to the INNER function object (not the
 	// module const) so the component's own body — where the function-
 	// expression name shadows the const — resolves `_$warmChild(Self, …)` to
 	// an object that carries the plan. hmr() forwards `__warm` from the
@@ -6591,7 +6618,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		);
 	}
 
-	// parallelUse: the parallel-`use()` pipeline (docs/suspense-parallel-use-plan.md)
+	// The parallel-`use()` pipeline (docs/suspense-parallel-use-plan.md)
 	// slots in HERE — after autoCallback (so memoized creations aren't re-wrapped),
 	// before rewriteHookCalls (so the _$useMemo/_$useBatch calls it emits are
 	// compiler-aliased, not user identifiers). Top-level component bodies run the
@@ -6600,19 +6627,17 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// transformed), the warm plan is derived from that same analysis, and Pass B
 	// hoists+batches. Sub-bodies (hoisted @try/@if arms via hoistBodyHelper's
 	// legacy path) arrive pre-memoized and run Pass B only.
-	if (ctx.parallelUse) {
-		let warmThunk = null;
-		if (options && options.autoCallback) {
-			const creations = [];
-			const warmChildren = [];
-			workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
-			jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
-			const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
-			warmThunk = warm.thunk;
-			ctx._pendingWarm = warm.warmSrc;
-		}
-		workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
+	let warmThunk = null;
+	if (options && options.autoCallback) {
+		const creations = [];
+		const warmChildren = [];
+		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
+		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
+		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
+		warmThunk = warm.thunk;
+		ctx._pendingWarm = warm.warmSrc;
 	}
+	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
@@ -6685,7 +6710,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// children render-fns) pass statement arrays and stay unflagged. planJsx
 	// consumes the flag once (nested planJsx calls see it cleared).
 	const prevInheritBody = ctx._inheritBody;
-	ctx._inheritBody = !!(node.body && node.body.type === 'JSXCodeBlock');
+	ctx._inheritBody =
+		!ctx.hydrateBoundaryModule && !!(node.body && node.body.type === 'JSXCodeBlock');
 	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
@@ -6795,7 +6821,7 @@ function universalRuntimeUnitForTopLevelNode(node, ctx) {
 }
 
 function transformUniversalParallelUse(ast, ctx, metadata) {
-	if ((!ctx.parallelUse && !ctx.profile) || !metadata?.componentHelper) return;
+	if (!metadata?.componentHelper) return;
 	const previousUseAliases = ctx._parallelUseAliases;
 	const previousUniversalUnit = ctx._universalRuntimeUnit;
 	ctx._universalRuntimeUnit = metadata;
@@ -6985,10 +7011,6 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 		if (!isFunction(fn) || transformed.has(fn)) return fn;
 		transformed.add(fn);
 		annotateAuthoredHooks(fn, component, name);
-		if (!ctx.parallelUse) {
-			scan(fn.body, name);
-			return fn;
-		}
 		if (fn.body?.type !== 'BlockStatement') {
 			scan(fn.body, name);
 			return fn;
@@ -7092,7 +7114,7 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 // Parallel use() — docs/suspense-parallel-use-plan.md
 // ===========================================================================
 
-// The parallel-`use()` pipeline (gated on ctx.parallelUse). Three cooperating
+// The parallel-`use()` pipeline. Three cooperating
 // transforms reconstruct Solid/Ripple's "fetch starts at creation, suspension
 // happens at read" property for React-shaped `use()` code:
 //
@@ -7114,15 +7136,12 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 //
 //   Warm plan (top-level bodies): from the SAME analysis, child component
 //     slots whose reachability guards and props are provably independent of
-//     every non-param local become `_$warmChild` calls in the first batch's
-//     warm thunk, and the component gets a compiled `Comp.__warm` fetch plan
+//     every non-param local become an empty-batch warm registration, and the
+//     component gets a compiled `Comp.__warm` fetch plan
 //     (its own warm-safe creations + guarded child warm calls) so warming
 //     recurses down the tree — the whole descendant fetch tree starts in the
 //     first attempt.
 //
-// With the flag off, the parallel-use rewrite is skipped; the server and
-// Suspense suites cover the resulting behavior through compiled fixtures.
-
 // Names bound by a binding pattern (params, declarator ids). Mirrors the
 // pattern handling of collectFreeIdentifiers' collectBindings.
 function collectPatternNames(pat, into) {
@@ -7376,12 +7395,21 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 	function rewriteUseCall(call) {
 		const arg = unwrapTsExpr(call.arguments[0]);
 		if (isTrivialUseArg(arg)) return call;
-		const symVar = allocHookSymbol(ctx, `${componentName}.use.memo#${ctx.nextHookSymId}`, {
-			componentName,
-			name: 'use() memo',
-			kind: 'useMemo',
-			node: call,
-		});
+		const symVar = allocHookSymbol(
+			ctx,
+			`${componentName}.use.memo#${ctx.nextHookSymId}`,
+			{
+				componentName,
+				name: 'use() memo',
+				kind: 'useMemo',
+				node: call,
+			},
+			// Warm caches span component scopes. A scope-local numeric slot can
+			// therefore alias an adjacent component's equally-numbered use() memo
+			// when a parent warms both children into one cache. Reserve a globally
+			// composable Symbol for every warmable creation site.
+			true,
+		);
 		const deps = collectDepPaths(arg);
 		// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 		// SSRScope per pass makes client useMemo semantics useless there).
@@ -7544,6 +7572,39 @@ function containsJsxNode(n) {
 	return false;
 }
 
+function containsReturnOutsideNestedFunction(node, root = true) {
+	if (!node || typeof node !== 'object') return false;
+	if (Array.isArray(node))
+		return node.some((child) => containsReturnOutsideNestedFunction(child, false));
+	if (!root && isFunctionNode(node)) return false;
+	if (node.type === 'ReturnStatement') return true;
+	for (const key in node) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+		if (containsReturnOutsideNestedFunction(node[key], false)) return true;
+	}
+	return false;
+}
+
+// A warm plan must describe the subtree that this invocation actually reaches.
+// Until warm artifacts carry branch guards for arbitrary setup returns, decline
+// to publish a plan for multi-exit bodies rather than speculating the final
+// template while an earlier return rendered a different tree.
+function hasSetupEarlyReturn(node) {
+	const body = node.body;
+	if (!body) return false;
+	if (body.type === 'JSXCodeBlock') {
+		return (body.body || []).some((statement) => containsReturnOutsideNestedFunction(statement));
+	}
+	if (body.type !== 'BlockStatement') return false;
+	const statements = body.body || [];
+	for (let index = 0; index < statements.length; index++) {
+		const statement = statements[index];
+		if (index === statements.length - 1 && statement.type === 'ReturnStatement') continue;
+		if (containsReturnOutsideNestedFunction(statement)) return true;
+	}
+	return false;
+}
+
 // Warm-safety: every free identifier of the expression is a component param
 // or module-scope (NOT a non-param local — component-body OR directive-arm
 // scoped; those may not exist or may be suspended-data-derived at warm time),
@@ -7562,7 +7623,32 @@ function isWarmSafeExpr(expr, paramNames, componentLocals, armLocals) {
 // ── Pass B: run detection + hoist + batch ───────────────────────────────────
 function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 	let firstBatch = true;
-	return transformList(statements);
+	const output = transformList(statements);
+	if (warmThunk) {
+		// Register the child-only plan after setup executes. A pending batch in
+		// any descendant activates the plans on its active ancestor stack and
+		// anchors their shared cache above adjacent siblings. Keeping this after
+		// setup preserves early-return reachability: an alternate returned tree must
+		// not activate the final template's plan. The first direct batch receives the
+		// same thunk below so it can still warm before setup reaches this registration.
+		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
+		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
+		const registration = {
+			type: 'ExpressionStatement',
+			expression: {
+				type: 'CallExpression',
+				callee: { type: 'Identifier', name: batchAlias },
+				arguments: [{ type: 'ArrayExpression', elements: [] }, warmThunk],
+				optional: false,
+			},
+		};
+		const finalIndex =
+			output.length > 0 && output[output.length - 1].type === 'ReturnStatement'
+				? output.length - 1
+				: output.length;
+		output.splice(finalIndex, 0, registration);
+	}
+	return output;
 
 	function transformList(stmts) {
 		const out = [];
@@ -7704,9 +7790,11 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 	}
 }
 
-// Build the warm thunk AST (child warm calls for the first in-body batch) +
-// the `Comp.__warm` source (creations + child calls) for a top-level body.
+// Build the warm thunk AST (child calls registered after reachable setup, and
+// also attached to the first direct batch) + the `Comp.__warm` source
+// (creations + child calls) for a top-level body.
 function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
+	if (hasSetupEarlyReturn(node)) return { thunk: null, warmSrc: null };
 	const paramNames = new Set();
 	for (const p of node.params || []) collectPatternNames(p, paramNames);
 	const locals = ctx.currentComponentLocals;
@@ -7734,6 +7822,18 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 			w.props.every((p) => isWarmSafeExpr(p.value, paramNames, locals, w.locals)),
 	);
 	if (warmKids.length === 0 && warmMemos.length === 0) return { thunk: null, warmSrc: null };
+	// A component whose only warm edge is recursion back to itself and which has
+	// no creation of its own can never discover async work through that plan: each
+	// recursive instance has the same empty creation set. Omitting the no-op plan
+	// also keeps very deep synchronous recursive trees on their established stack
+	// footprint instead of adding one empty-batch registration per level.
+	if (
+		warmMemos.length === 0 &&
+		warmKids.length > 0 &&
+		warmKids.every((child) => child.compName === componentName)
+	) {
+		return { thunk: null, warmSrc: null };
+	}
 
 	const stmtFor = (guards, callExpr) => {
 		const g = andChain(guards);

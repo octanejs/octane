@@ -26,22 +26,39 @@ export {
 export type {
 	Args,
 	Attach,
+	AttachFnType,
+	AttachType,
 	Catalogue,
+	Color,
 	ConstructorRepresentation,
+	Disposable,
+	ElementProps,
+	Euler,
 	EventProps,
 	Instance,
 	InstanceProps,
+	Layers,
 	MathRepresentation,
+	MathProps,
 	MathType,
 	MathTypes,
+	Matrix3,
+	Matrix4,
 	PrimitiveProps,
+	Quaternion,
 	RaycastableRepresentation,
+	ReactProps,
+	ReconcilerRoot,
 	ThreeElement,
 	ThreeElements,
 	ThreeInstanceProps,
 	ThreeKey,
 	ThreeRef,
 	ThreeToJSXElements,
+	Vector2,
+	Vector3,
+	Vector4,
+	VectorRepresentation,
 } from './core/index.js';
 export type {
 	Camera,
@@ -81,6 +98,14 @@ export type {
 	Viewport,
 	XRManager,
 } from './core/index.js';
+export { act, flushSync } from './scheduling.js';
+export type { Act } from './scheduling.js';
 export { Canvas } from './web/Canvas.tsrx';
 export type { CanvasProps, CanvasRef, CanvasStyle } from './web/Canvas.tsrx';
+export { DOMRegion } from './web/DOMRegion.js';
+export type { DOMRegionProps, DOMRegionTarget } from './web/DOMRegion.js';
 export { createPointerEvents as events } from './web/events.js';
+/** Canonical namespace for renderer-local Three element and math types. */
+export * as OctaneThree from './intrinsics.js';
+/** R3F's historical namespace name retained for source compatibility. */
+export * as ReactThreeFiber from './intrinsics.js';

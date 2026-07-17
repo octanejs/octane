@@ -228,6 +228,28 @@ The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, a root-loca
 [docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense on the server,
 head hoisting, `module server` RPC) and the SSR roadmap.
 
+### Deferred hydration
+
+Use `<Hydrate>` for server-rendered content that should stay visible but does
+not need to become interactive immediately. `when` chooses the activation
+strategy, `split` controls compiler extraction (on by default), and `prefetch`
+can prepare the generated child chunk or other resources ahead of activation.
+
+```tsrx
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+export function ProductPage() @{
+	<Hydrate when={visible({ rootMargin: '400px' })}>
+		<Reviews />
+	</Hydrate>
+}
+```
+
+The initial server DOM is adopted in place and remains inert until the strategy
+opens the boundary. See [docs/deferred-hydration.md](./docs/deferred-hydration.md)
+for strategies, code splitting, prefetching, fallbacks, and nesting behavior.
+
 ### Streaming SSR
 
 This is the fast-first-paint story, and it works the way React's does.
@@ -504,12 +526,15 @@ generated from the workspace manifests in
   held-out material stays outside the repository.
 - The `@octanejs/*` framework bindings — each an octane port of a React library:
   [`zustand`](./packages/zustand), [`jotai`](./packages/jotai),
-  [`query`](./packages/tanstack-query), [`apollo-client`](./packages/apollo-client),
+  [`ai`](./packages/tanstack-ai), [`query`](./packages/tanstack-query),
+  [`store`](./packages/tanstack-store),
+  [`form`](./packages/tanstack-form), [`apollo-client`](./packages/apollo-client),
   [`motion`](./packages/motion),
   [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
   [`remix-router`](./packages/remix-router),
   [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
-  [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
+  [`lexical`](./packages/lexical), [`tiptap`](./packages/tiptap),
+  [`floating-ui`](./packages/floating-ui),
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
   [`recharts`](./packages/recharts), [`visx`](./packages/visx),

@@ -250,6 +250,17 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only structural baseline for React-hosted Octane compat islands
+		// (docs/react-hosted-octane-compat-plan.md Phase 0): deterministic
+		// listener/root/bridge-binding COUNTS at 1/100/1000 islands in jsdom.
+		// Counts are exact, so the iteration knob is unused.
+		name: 'react-hosted-islands',
+		cwd: 'react-hosted-islands',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Node-only (no servers, no browser). Time-budgeted: the iteration knob is a
 		// per-config SECONDS budget; --quick passes the harness's own --quick flag.
 		name: 'ssr-throughput',
@@ -325,7 +336,7 @@ const SUITES = [
 		// Async data-loading model (10 nested async levels, 16ms simulated latency
 		// per level): React's nested `use()` serializes the fetches (the suspense
 		// waterfall, ≈10-19× the latency floor). Octane compiles the SAME idiomatic
-		// nested-use code with the parallelUse pipeline (memoized creations +
+		// nested-use code with the compiler pipeline (memoized creations +
 		// batched unwrap + fetch-tree warming — docs/suspense-parallel-use-plan.md)
 		// and lands at the parallel floor alongside Solid 2.0 / ripple (≈1.2×).
 		// Guarded both ways: ≤0.25× React, ≤1.5× solid/ripple.
@@ -338,6 +349,19 @@ const SUITES = [
 			{ filter: 'ripple-async-bench', port: 5219 },
 			{ filter: 'preact-async-bench', port: 5269 },
 			{ filter: 'svelte-async-bench', port: 5280 },
+		],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Realistic async composition: adjacent panels under one route boundary,
+		// nested async children, an imported custom hook with independent use()
+		// reads, and one true data dependency.
+		name: 'async-composition',
+		cwd: 'async-composition',
+		servers: [
+			{ filter: 'octane-tsrx-async-composition-bench', port: 5282 },
+			{ filter: 'react-async-composition-bench', port: 5284 },
 		],
 		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -362,6 +386,27 @@ const SUITES = [
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Three host lifecycle work in a production browser: Octane Three against
+		// R3F 9.6.1 and a direct plain-Three lower bound. The injected renderer
+		// deliberately excludes GPU/driver time while retaining real Three objects,
+		// native pointer dispatch, and raycasting.
+		name: 'three-renderer',
+		cwd: 'three',
+		servers: [{ filter: 'octane-three-bench', port: 5291 }],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Deterministic production bundle bytes for minimal and full-catalogue
+		// Octane Three, R3F, and plain Three entries. The harness loads every built
+		// entry in Chromium and rejects it unless the scene checksum is valid.
+		name: 'three-bundle-size',
+		cwd: 'three',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run-size.mjs', args: () => [] }],
 	},
 ];
 

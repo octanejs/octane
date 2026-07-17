@@ -1,0 +1,309 @@
+{
+  "suite": "async-composition",
+  "iterations": 10,
+  "targets": [
+    {
+      "name": "octane-tsrx",
+      "ops": {
+        "init": {
+          "score": 105.44999999403953,
+          "median": 105.5,
+          "min": 103.89999997615814,
+          "mean": 105.44999999403953,
+          "p95": 106.19999998807907,
+          "sd": 0.6311365481991298,
+          "rme": 0.42812377561223985,
+          "scoreRme": 0.42812377561223985,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update": {
+          "score": 103.49000000357628,
+          "median": 103.60000002384186,
+          "min": 102.89999997615814,
+          "mean": 103.49000000357628,
+          "p95": 104.10000002384186,
+          "sd": 0.4433458687568456,
+          "rme": 0.30643395012544605,
+          "scoreRme": 0.30643395012544605,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_waves": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_waves": {
+          "score": 2,
+          "median": 2,
+          "min": 2,
+          "mean": 2,
+          "p95": 2,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_calls": {
+          "score": 8,
+          "median": 8,
+          "min": 8,
+          "mean": 8,
+          "p95": 8,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_calls": {
+          "score": 8,
+          "median": 8,
+          "min": 8,
+          "mean": 8,
+          "p95": 8,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_mixed_states": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "mean": 1,
+          "p95": 1,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_start_span": {
+          "score": 0.1599999964237213,
+          "median": 0.19999998807907104,
+          "min": 0.09999996423721313,
+          "mean": 0.1599999964237213,
+          "p95": 0.20000004768371582,
+          "sd": 0.051639792826298186,
+          "rme": 23.086447992709676,
+          "scoreRme": 23.086447992709676,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_start_span": {
+          "score": 0.040000003576278684,
+          "median": 0,
+          "min": 0,
+          "mean": 0.040000003576278684,
+          "p95": 0.10000002384185791,
+          "sd": 0.05163978256639102,
+          "rme": 92.34576330293093,
+          "scoreRme": 92.34576330293093,
+          "warmupRatio": 1,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "delayMs": 50,
+        "resources": 8,
+        "independentResources": 7,
+        "idealRounds": 2,
+        "idealFloorMs": 100,
+        "units": {
+          "init_waves": "waves",
+          "update_waves": "waves",
+          "init_calls": "calls",
+          "update_calls": "calls",
+          "update_mixed_states": "states"
+        },
+        "init": {
+          "waveCounts": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+          "firstWaveCounts": [7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "wavePatterns": [
+            "project+viewer+badge+activity+activity-summary+insights+insights-chart -> owner"
+          ],
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
+        },
+        "update": {
+          "waveCounts": [2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+          "firstWaveCounts": [7, 7, 7, 7, 7, 7, 7, 7, 7, 7],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "wavePatterns": [
+            "project+viewer+badge+activity+activity-summary+insights+insights-chart -> owner"
+          ],
+          "mixedStateCounts": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "mixedStateSignatures": [
+            "project=project:v1|viewer=viewer:v1|badge=badge:v1|owner=owner:v0:owner-0|activity=activity:v0|activity-summary=activity-summary:v0|insights=insights:v0|insights-chart=insights-chart:v0"
+          ]
+        }
+      }
+    },
+    {
+      "name": "react",
+      "ops": {
+        "init": {
+          "score": 310.73000000715257,
+          "median": 310.2000000476837,
+          "min": 309.5,
+          "mean": 310.73000000715257,
+          "p95": 313.10000002384186,
+          "sd": 1.1681419315724604,
+          "rme": 0.2689088089718249,
+          "scoreRme": 0.2689088089718249,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update": {
+          "score": 154.55,
+          "median": 154.5999999642372,
+          "min": 153.5,
+          "mean": 154.55,
+          "p95": 155.5999999642372,
+          "sd": 0.7153087802040496,
+          "rme": 0.3310679556889451,
+          "scoreRme": 0.3310679556889451,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_waves": {
+          "score": 6,
+          "median": 6,
+          "min": 6,
+          "mean": 6,
+          "p95": 6,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_waves": {
+          "score": 3,
+          "median": 3,
+          "min": 3,
+          "mean": 3,
+          "p95": 3,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_calls": {
+          "score": 35,
+          "median": 35,
+          "min": 35,
+          "mean": 35,
+          "p95": 35,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_calls": {
+          "score": 25,
+          "median": 25,
+          "min": 25,
+          "mean": 25,
+          "p95": 25,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_mixed_states": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "init_start_span": {
+          "score": 257.3,
+          "median": 257.10000002384186,
+          "min": 256,
+          "mean": 257.3,
+          "p95": 259,
+          "sd": 0.956846676144342,
+          "rme": 0.2660082872840178,
+          "scoreRme": 0.2660082872840178,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "update_start_span": {
+          "score": 102.35,
+          "median": 102.60000002384186,
+          "min": 101.39999997615814,
+          "mean": 102.35,
+          "p95": 103.19999998807907,
+          "sd": 0.5582711505424208,
+          "rme": 0.3901664653566108,
+          "scoreRme": 0.3901664653566108,
+          "warmupRatio": 1,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "delayMs": 50,
+        "resources": 8,
+        "independentResources": 7,
+        "idealRounds": 2,
+        "idealFloorMs": 100,
+        "units": {
+          "init_waves": "waves",
+          "update_waves": "waves",
+          "init_calls": "calls",
+          "update_calls": "calls",
+          "update_mixed_states": "states"
+        },
+        "init": {
+          "waveCounts": [6, 6, 6, 6, 6, 6, 6, 6, 6, 6],
+          "firstWaveCounts": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [35, 35, 35, 35, 35, 35, 35, 35, 35, 35],
+          "wavePatterns": [
+            "project+activity+insights -> viewer -> badge -> owner -> activity-summary -> insights-chart"
+          ],
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
+        },
+        "update": {
+          "waveCounts": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "firstWaveCounts": [3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
+          "requestCounts": [8, 8, 8, 8, 8, 8, 8, 8, 8, 8],
+          "callCounts": [25, 25, 25, 25, 25, 25, 25, 25, 25, 25],
+          "wavePatterns": [
+            "project+activity+insights -> viewer+activity-summary+insights-chart -> badge+owner"
+          ],
+          "mixedStateCounts": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "mixedStateSignatures": []
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}

@@ -1,33 +1,83 @@
 import type { UniversalComponent } from 'octane/universal';
 import type * as THREE from 'three';
 import {
+	act,
 	createEvents,
 	createPortal,
 	createRoot,
 	events,
+	flushSync,
+	OctaneThree,
+	ReactThreeFiber,
+	unmountComponentAtNode,
 	useFrame,
 	useStore,
 	useThree,
+	type Act,
+	type Args,
+	type AttachFnType,
+	type AttachType,
+	type Camera,
+	type CameraProps,
 	type CanvasProps,
+	type Catalogue,
+	type Color,
 	type ComputeFunction,
+	type ConstructorRepresentation,
+	type Disposable,
+	type DOMRegionProps,
+	type DOMRegionTarget,
 	type DomEvent,
+	type Dpr,
+	type ElementProps,
+	type Euler,
 	type EventHandlers,
 	type EventManager,
 	type EventProps,
 	type Events,
 	type FilterFunction,
+	type Frameloop,
+	type GlobalEffectType,
+	type GlobalRenderCallback,
+	type GLProps,
+	type Instance,
+	type InstanceProps,
 	type Intersection,
 	type IntersectionEvent,
 	type InjectState,
+	type Layers,
+	type MathProps,
+	type MathRepresentation,
+	type MathType,
+	type MathTypes,
+	type Matrix3,
+	type Matrix4,
+	type ObjectMap,
+	type Performance,
 	type PointerCaptureTarget,
 	type PrimitiveProps,
+	type Quaternion,
 	type RaycastableRepresentation,
+	type ReactProps,
+	type ReconcilerRoot,
+	type RenderCallback,
 	type Renderer,
+	type RenderProps,
 	type RootState,
+	type RootStore,
+	type Size,
+	type Subscription,
 	type ThreeElement,
 	type ThreeElements,
 	type ThreeEvent,
 	type ThreeRoot,
+	type ThreeToJSXElements,
+	type Vector2,
+	type Vector3,
+	type Vector4,
+	type VectorRepresentation,
+	type Viewport,
+	type XRManager,
 } from '@octanejs/three';
 import {
 	createThreeTestRenderer,
@@ -36,6 +86,7 @@ import {
 } from '@octanejs/three/testing';
 
 declare const canvas: HTMLCanvasElement;
+declare const offscreenCanvas: OffscreenCanvas;
 declare const renderer: Renderer;
 declare const Scene: UniversalComponent<{ name: string }>;
 declare const portalTarget: THREE.Group;
@@ -60,6 +111,14 @@ const invalidPortalState: InjectState = { events: { enabled: 'yes' } };
 void invalidPortalState;
 
 const root: ThreeRoot<HTMLCanvasElement> = createRoot(canvas);
+const reconcilerRoot: ReconcilerRoot<HTMLCanvasElement> = root;
+const canonicalNamespaceElements: OctaneThree.ThreeElements['mesh'] = {};
+const namespaceElements: ReactThreeFiber.ThreeElements['mesh'] = {};
+const canonicalNamespaceValue: object = OctaneThree;
+const namespaceValue: object = ReactThreeFiber;
+const typedAct: Act = act;
+const acted: Promise<number> = typedAct(async () => 42);
+const flushed: number = flushSync(() => 42);
 const configured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({
 	gl: renderer,
 	size: { width: 640, height: 360 },
@@ -74,6 +133,26 @@ const asyncConfigured: Promise<ThreeRoot<HTMLCanvasElement>> = root.configure({
 	},
 });
 root.render(Scene, { name: 'typed-scene' });
+unmountComponentAtNode(canvas, (unmountedCanvas) => {
+	const typedCanvas: HTMLCanvasElement = unmountedCanvas;
+	void typedCanvas;
+});
+
+const offscreenRoot: ThreeRoot<OffscreenCanvas> = createRoot(offscreenCanvas);
+const configuredOffscreen: Promise<ThreeRoot<OffscreenCanvas>> = offscreenRoot.configure({
+	gl: async (defaults) => {
+		const configuredCanvas: OffscreenCanvas = defaults.canvas;
+		void configuredCanvas;
+		return renderer;
+	},
+});
+unmountComponentAtNode(offscreenCanvas, (unmountedCanvas) => {
+	const typedCanvas: OffscreenCanvas = unmountedCanvas;
+	void typedCanvas;
+});
+
+const domRegionTarget: DOMRegionTarget = { current: document.body };
+const domRegionProps: DOMRegionProps = { target: domRegionTarget };
 
 const canvasProps: CanvasProps = {
 	gl: () => renderer,
@@ -180,7 +259,16 @@ root.configure({ gl: renderer, frameloop: 'sometimes' });
 root.configure({ gl: renderer, dpr: ['low', 'high'] });
 
 void configured;
+void reconcilerRoot;
+void canonicalNamespaceElements;
+void canonicalNamespaceValue;
+void namespaceElements;
+void namespaceValue;
 void asyncConfigured;
+void acted;
+void flushed;
+void configuredOffscreen;
+void domRegionProps;
 void canvasProps;
 void coreEvents;
 void coreEventHandler;

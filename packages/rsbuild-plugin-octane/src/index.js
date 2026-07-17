@@ -228,8 +228,8 @@ function assertRootPublicPaths(config, clientEnvironment) {
  * @param {{
  *   hmr?: boolean,
  *   profile?: boolean,
- *   parallelUse?: boolean,
  *   exclude?: string[],
+ *   requireDirective?: boolean,
  *   clientEnvironment?: string,
  *   serverEnvironment?: string,
  * }} [inlineOptions]
@@ -412,6 +412,23 @@ export function pluginOctane(inlineOptions = {}) {
 				});
 			});
 
+			api.modifyEnvironmentConfig((config, { mergeEnvironmentConfig }) => {
+				// Octane and several framework bindings use this conventional guard for
+				// diagnostics and production-only branches. Rsbuild does not define it
+				// when a programmatic build inherits mode "none", so scope the define to
+				// browser environments where the Node `process` global is unavailable.
+				if (config.output.target === 'node') return config;
+				return mergeEnvironmentConfig(config, {
+					source: {
+						define: {
+							'process.env.NODE_ENV': JSON.stringify(
+								isProductionBuild() ? 'production' : 'development',
+							),
+						},
+					},
+				});
+			});
+
 			if (appEnabled) {
 				api.transform(
 					{
@@ -501,10 +518,10 @@ export function pluginOctane(inlineOptions = {}) {
 						...(inlineOptions.profile === undefined
 							? null
 							: { profile: environment === 'client' && inlineOptions.profile }),
-						...(inlineOptions.parallelUse === undefined
-							? null
-							: { parallelUse: inlineOptions.parallelUse }),
 						...(inlineOptions.exclude === undefined ? null : { exclude: inlineOptions.exclude }),
+						...(inlineOptions.requireDirective === undefined
+							? null
+							: { requireDirective: inlineOptions.requireDirective }),
 						renderers: initialConfig?.compiler.renderers,
 					}),
 				);

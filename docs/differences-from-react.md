@@ -160,12 +160,12 @@ time-slicing, expiration, or selective hydration. Consequences:
   unchanged values (the concurrent-interleaving window it guards doesn't exist
   here).
 
-## Parallel `use()`: no suspense waterfalls (default; opt out with `parallelUse: false`)
+## Parallel `use()`: no suspense waterfalls
 
-The compiler's parallel-`use()` pipeline is ON by default
-(docs/suspense-parallel-use-plan.md; pass `parallelUse: false` to compile/the
-vite plugin for React-timing waterfall semantics). Idiomatic sequential
-`use()` code stops waterfalling — React runs the same code serially:
+The compiler always applies its parallel-`use()` transform
+(docs/suspense-parallel-use-plan.md). When it can prove requests independent,
+idiomatic sequential `use()` code avoids the waterfall that React incurs for
+the same code:
 
 - **Creations are memoized per call site**: `use(fetchA(id))` compiles to a
   slot-keyed memo with member-path deps (`[fetchA, id]`), so replays never mint
@@ -181,10 +181,20 @@ vite plugin for React-timing waterfall semantics). Idiomatic sequential
   `benchmarks/async-waterfall`: 20.1ms vs React's 307.3ms on a 10-level chain.
 - Unwrap order, hydration-seed order, rejection routing (`@catch` receives the
   first-in-order reason), and `@pending`/transition semantics are unchanged.
-- Runtime safety nets (React parity, always on, flag or no flag): a replay that
+- Runtime safety nets (React parity): a replay that
   creates a fresh promise for a slot that already holds one reuses the stored
   thenable ("uncached promise" dev warning), and a replay that discovers a new
   pending `use()` behind a data dependency gets a dev waterfall diagnostic.
+- **Known gaps (regression-pinned in `benchmarks/async-composition`):** the
+  independence analysis stops at module boundaries, so two independent `use()`
+  reads inside an imported custom hook still serialize; a parent with no
+  `use()` of its own never triggers its warm plan, so adjacent async siblings
+  are discovered serially; and a transition-wrapped update currently reveals
+  newly-resolved content progressively — monotonic, never rolling back, and a
+  dependent value never renders against stale input — where React holds the
+  previous screen until the whole boundary completes (a runtime gap independent
+  of this transform). The benchmark enforces one-way ceilings on all three so
+  they can only improve.
 
 ## Root component entry points and container ownership
 

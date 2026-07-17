@@ -218,10 +218,6 @@ export default defineConfig({
 					globals: false,
 				},
 				plugins: [
-					// The parallel-use pipeline (memoized creations, batched unwrap,
-					// fetch-tree warming) runs at its DEFAULT (on). Tests that pin
-					// the opt-out output call compile() with `parallelUse: false`.
-					//
 					// Bindings whose `.ts` sources hand-forward hook slots do not need
 					// package-specific exclusions: they declare
 					// `"octane": { "hookSlots": { "manual": ["src"] } }` in their own package.json and
@@ -557,6 +553,156 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-store$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-store/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-form',
+					include: [
+						'packages/tanstack-form/tests/conformance/**/*.test.ts',
+						'packages/tanstack-form/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-form/tests/differential/_setup.ts'],
+					setupFiles: ['packages/tanstack-form/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-form-ssr',
+					include: ['packages/tanstack-form/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-form$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-form/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-ai',
+					include: [
+						'packages/tanstack-ai/tests/conformance/**/*.test.ts',
+						'packages/tanstack-ai/tests/conformance/**/*.test.tsx',
+						'packages/tanstack-ai/tests/differential/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tanstack-ai/tests/differential/_setup.ts'],
+					setupFiles: ['packages/tanstack-ai/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-ai$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-ai/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-ai-ssr',
+					include: ['packages/tanstack-ai/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-ai$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-ai/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-devtools',
+					include: ['packages/tanstack-devtools/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/tanstack-devtools/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-devtools-ssr',
+					include: ['packages/tanstack-devtools/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
 						},
 					],
 				},
@@ -1252,6 +1398,58 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tiptap',
+					include: [
+						'packages/tiptap/tests/unit/**/*.test.ts',
+						'packages/tiptap/tests/unit/**/*.test.tsx',
+						'packages/tiptap/tests/differential/**/*.test.ts',
+						'packages/tiptap/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tiptap/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tiptap-ssr',
+					include: ['packages/tiptap/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -1589,6 +1787,23 @@ export default defineConfig({
 				// octane, …) resolve through website/node_modules workspace links — no
 				// aliases needed.
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
+			},
+			{
+				test: {
+					name: 'website-mcp',
+					include: ['website-mcp/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					// built-handler.e2e runs a REAL production `vite build` into
+					// website-mcp/dist and website-mcp/.vercel/output and then imports the emitted
+					// server entry; file-serial so parallel test files can't clobber
+					// the artifacts another file is building or importing.
+					fileParallelism: false,
+				},
+				// No app plugins: the website-mcp tests exercise plain .ts modules (the
+				// content snapshot uses only Vite built-ins — ?raw and
+				// import.meta.glob) plus the production build driven through the
+				// vite JS API, which loads the app's own config and plugins itself.
 			},
 		],
 	},

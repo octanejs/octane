@@ -43,10 +43,10 @@ locals, early returns) stays above it.
 | Error boundary class | `<ErrorBoundary>` or `@try { } @catch (e) { }` |
 | `forwardRef((props, ref) => ...)` | plain function; `ref` arrives as a prop |
 | `<input onChange={...}>` | `<input onInput={...}>` (native event) |
-| controlled `value={state}` | uncontrolled; `value` is a plain attribute, read the DOM in handlers |
+| controlled `value={state}` | keep it — React's controlled semantics apply; pair with `onInput` |
 | `className={clsx(...)}` | `class={[...]}` composes clsx-style natively |
-| `useDebugValue(x)` | delete it |
-| `React.lazy(() => import(...))` | dynamic `import()` + `use()` under Suspense |
+| `useDebugValue(x)` | keep or delete — present as an accepted no-op |
+| `React.lazy(() => import(...))` | `lazy()` works as-is (and also accepts a bare component from the loader) |
 | `defaultProps` | parameter defaults / destructuring defaults |
 
 ## Text holes
@@ -64,8 +64,12 @@ treated as a renderable (component, element, coerced primitive).
 ## Hooks
 
 The hook API matches React, and there are no rules of hooks: a hook may sit
-behind a condition, after an early return, or in a loop, because identity comes
-from the call site, not call order.
+behind a condition or after an early return, because identity comes from the
+call site, not call order. The one exception is a plain JS loop — a slot-keyed
+hook there is a compile error (every iteration would share one call-site slot);
+use the keyed `@for` directive or extract a child component. Dependency arrays
+may be omitted: the compiler infers them from lexical captures (explicit arrays
+keep React's exact behavior; `null` means every render).
 
 ```tsx
 export function Panel(props) @{

@@ -42,7 +42,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news** vite-builds and times each target
 itself (the runner loops its per-target invocations and merges them),
 **ssr-throughput** and **streaming-ssr** are Node-only, and **codegen-size** /
-**bundle-size** are deterministic build/byte checks.
+**bundle-size** / **three-bundle-size** are deterministic build/byte checks.
 
 ## Regression modes
 
@@ -160,10 +160,13 @@ internally, get their own baseline and guard namespace.
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
+| `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production build of each js-framework app, normalized minify, raw/gzip/brotli |
+| `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
+| `three-bundle-size` | three | none (builds, then checks in Chromium) | minimal/full-catalogue shipped JS bytes for Octane Three, R3F, and plain Three |
 
-The two size suites measure **bytes, not milliseconds** (deterministic —
+The size suites measure **bytes, not milliseconds** (deterministic —
 `median === min`, and ratio guards on them are exact, hardware-independent
 numbers). They are the regression gates for
 `docs/compiled-output-optimization-plan.md`: `codegen-size` is the seconds-fast

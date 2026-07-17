@@ -1,0 +1,202 @@
+{
+  "suite": "react-hosted-islands",
+  "iterations": 1,
+  "targets": [
+    {
+      "name": "islands-1",
+      "ops": {
+        "empty_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "react_root_listeners": {
+          "score": 138,
+          "median": 138,
+          "min": 138,
+          "samples": 1
+        },
+        "bridge_bindings_per_island": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "octane_roots": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "leaked_listeners_after_unmount": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "one_click_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "all_click_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "late_delegate_backattach_total": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "context_fiber_walks_at_mount_per_island": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "context_fiber_walks_per_update": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      }
+    },
+    {
+      "name": "islands-100",
+      "ops": {
+        "empty_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "react_root_listeners": {
+          "score": 138,
+          "median": 138,
+          "min": 138,
+          "samples": 1
+        },
+        "bridge_bindings_per_island": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "octane_roots": {
+          "score": 100,
+          "median": 100,
+          "min": 100,
+          "samples": 1
+        },
+        "leaked_listeners_after_unmount": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "one_click_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "all_click_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "late_delegate_backattach_total": {
+          "score": 100,
+          "median": 100,
+          "min": 100,
+          "samples": 1
+        },
+        "context_fiber_walks_at_mount_per_island": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "context_fiber_walks_per_update": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      }
+    },
+    {
+      "name": "islands-1000",
+      "ops": {
+        "empty_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "react_root_listeners": {
+          "score": 138,
+          "median": 138,
+          "min": 138,
+          "samples": 1
+        },
+        "bridge_bindings_per_island": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "octane_roots": {
+          "score": 1000,
+          "median": 1000,
+          "min": 1000,
+          "samples": 1
+        },
+        "leaked_listeners_after_unmount": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        },
+        "one_click_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "all_click_listeners_per_island": {
+          "score": 5,
+          "median": 5,
+          "min": 5,
+          "samples": 1
+        },
+        "late_delegate_backattach_total": {
+          "score": 1000,
+          "median": 1000,
+          "min": 1000,
+          "samples": 1
+        },
+        "context_fiber_walks_at_mount_per_island": {
+          "score": 1,
+          "median": 1,
+          "min": 1,
+          "samples": 1
+        },
+        "context_fiber_walks_per_update": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "samples": 1
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}

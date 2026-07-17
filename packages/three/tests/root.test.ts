@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import {
 	createRoot,
 	getRootState,
+	unmountComponentAtNode,
 	type DefaultGLProps,
 	type Events,
 	type Renderer,
@@ -20,7 +21,7 @@ interface RendererHarness extends Renderer {
 	renderLists: { dispose: ReturnType<typeof vi.fn> };
 }
 
-function createRenderer(canvas: HTMLCanvasElement): RendererHarness {
+function createRenderer(canvas: unknown): RendererHarness {
 	return {
 		domElement: canvas,
 		render: vi.fn(),
@@ -51,7 +52,7 @@ function createEventHandlers(): Events {
 	};
 }
 
-const mountedRoots: ThreeRoot<HTMLCanvasElement>[] = [];
+const mountedRoots: ThreeRoot<any>[] = [];
 
 function testRoot(canvas = document.createElement('canvas')): ThreeRoot<HTMLCanvasElement> {
 	const root = createRoot(canvas);
@@ -67,6 +68,85 @@ afterEach(() => {
 });
 
 describe('Three root configuration', () => {
+	it('configures and tears down a structurally typed offscreen canvas', async () => {
+		const canvas = { width: 256, height: 144 };
+		const renderer = createRenderer(canvas);
+		const root = createRoot(canvas);
+		mountedRoots.push(root);
+		await root.configure({ gl: renderer, dpr: 1, frameloop: 'never' });
+		root.render(RootScene, { name: 'offscreen-root', groupRef: () => {} });
+
+		expect(root.store.getState().size).toEqual({
+			width: 256,
+			height: 144,
+			top: 0,
+			left: 0,
+		});
+		expect(renderer.setSize).toHaveBeenLastCalledWith(256, 144, false);
+		expect(root.store.getState().scene.children.map((child) => child.name)).toEqual([
+			'offscreen-root',
+		]);
+
+		root.unmount();
+		expect(renderer.renderLists.dispose).toHaveBeenCalledOnce();
+		expect(renderer.forceContextLoss).toHaveBeenCalledOnce();
+		expect(renderer.dispose).toHaveBeenCalledOnce();
+	});
+
+	it('unmounts a registered canvas synchronously and notifies only that removal', async () => {
+		const canvas = document.createElement('canvas');
+		const renderer = createRenderer(canvas);
+		const root = testRoot(canvas);
+		await root.configure({
+			gl: renderer,
+			size: { width: 32, height: 32 },
+			frameloop: 'never',
+		});
+		root.render(RootScene, { name: 'legacy-unmount', groupRef: () => {} });
+		const callback = vi.fn();
+
+		unmountComponentAtNode(canvas, callback);
+		expect(callback).toHaveBeenCalledOnce();
+		expect(callback).toHaveBeenCalledWith(canvas);
+		expect(root.store.getState().scene.children).toEqual([]);
+		expect(renderer.dispose).toHaveBeenCalledOnce();
+
+		unmountComponentAtNode(canvas, callback);
+		unmountComponentAtNode(document.createElement('canvas'), callback);
+		expect(callback).toHaveBeenCalledOnce();
+	});
+
+	it('does not report a successful removal when teardown fails', async () => {
+		const canvas = document.createElement('canvas');
+		const renderer = createRenderer(canvas);
+		const root = testRoot(canvas);
+		let failDisconnect = false;
+		const manager = {
+			priority: 1,
+			enabled: true,
+			disconnect: vi.fn(() => {
+				if (failDisconnect) throw new Error('event disconnect failed');
+			}),
+		};
+		await root.configure({
+			gl: renderer,
+			size: { width: 32, height: 32 },
+			frameloop: 'never',
+			events: () => manager,
+		});
+		root.render(RootScene, { name: 'failing-unmount', groupRef: () => {} });
+		const callback = vi.fn();
+		failDisconnect = true;
+
+		expect(() => unmountComponentAtNode(canvas, callback)).toThrow('event disconnect failed');
+		expect(callback).not.toHaveBeenCalled();
+		expect(root.store.getState().scene.children).toEqual([]);
+		expect(renderer.dispose).toHaveBeenCalledOnce();
+
+		unmountComponentAtNode(canvas, callback);
+		expect(callback).not.toHaveBeenCalled();
+	});
+
 	it('configures public defaults and activates only after the scene commits', async () => {
 		const canvas = document.createElement('canvas');
 		const renderer = createRenderer(canvas);

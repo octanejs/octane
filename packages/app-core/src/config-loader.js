@@ -237,7 +237,9 @@ async function evaluateConfigModule(root, configPath, configuredCacheDir) {
 	const contentHash = createHash('sha256').update(output).digest('hex').slice(0, 16);
 	let configModule;
 	try {
-		configModule = await import(`${pathToFileURL(outputPath).href}?v=${contentHash}`);
+		configModule = await import(
+			/* @vite-ignore */ `${pathToFileURL(outputPath).href}?v=${contentHash}`
+		);
 	} catch (error) {
 		attachDependencyMetadata(error, dependencies, missingDependencies);
 		throw error;

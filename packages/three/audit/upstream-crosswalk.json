@@ -135,7 +135,7 @@
       },
       "classification": "behavioral",
       "reason": "Public runtime export \"applyProps\" has an observable Octane equivalent that requires direct behavioral coverage.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "export:Args",
@@ -183,7 +183,7 @@
       },
       "classification": "behavioral",
       "reason": "Public runtime export \"buildGraph\" has an observable Octane equivalent that requires direct behavioral coverage.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
     },
     {
       "id": "export:Camera",
@@ -351,7 +351,7 @@
       },
       "classification": "behavioral",
       "reason": "Public runtime export \"dispose\" has an observable Octane equivalent that requires direct behavioral coverage.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "export:DomEvent",
@@ -543,7 +543,7 @@
       },
       "classification": "behavioral",
       "reason": "Public runtime export \"getRootState\" has an observable Octane equivalent that requires direct behavioral coverage.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/hooks.test.ts"
     },
     {
       "id": "export:GlobalEffectType",
@@ -1815,9 +1815,9 @@
         "path": "packages/fiber/tests/renderer.test.tsx",
         "line": 47
       },
-      "classification": "differential",
-      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "classification": "behavioral",
+      "reason": "A public deterministic root proves that a component with no host output leaves the Three scene empty and tears down cleanly.",
+      "evidenceTarget": "packages/three/tests/testing.test.ts"
     },
     {
       "id": "test:fiber:renderer:54",
@@ -1829,7 +1829,7 @@
       },
       "classification": "differential",
       "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "evidenceTarget": "packages/three/tests/differential.test.ts"
     },
     {
       "id": "test:fiber:renderer:63",
@@ -1839,9 +1839,9 @@
         "path": "packages/fiber/tests/renderer.test.tsx",
         "line": 63
       },
-      "classification": "differential",
-      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "classification": "behavioral",
+      "reason": "Both catalogue and constructor forms of extend create observable Three objects through the public package API.",
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:renderer:78",
@@ -1851,9 +1851,9 @@
         "path": "packages/fiber/tests/renderer.test.tsx",
         "line": 78
       },
-      "classification": "differential",
-      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "classification": "behavioral",
+      "reason": "Primitive construction preserves the supplied public Object3D identity and marks it as externally owned.",
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:renderer:89",
@@ -1913,7 +1913,7 @@
       },
       "classification": "differential",
       "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "evidenceTarget": "packages/three/tests/differential.test.ts"
     },
     {
       "id": "test:fiber:renderer:220",
@@ -1937,7 +1937,7 @@
       },
       "classification": "differential",
       "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "evidenceTarget": "packages/three/tests/differential.test.ts"
     },
     {
       "id": "test:fiber:renderer:273",
@@ -1995,9 +1995,9 @@
         "path": "packages/fiber/tests/renderer.test.tsx",
         "line": 478
       },
-      "classification": "differential",
-      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "classification": "behavioral",
+      "reason": "Indexed attachment evidence swaps externally owned values while preserving the authored parent array.",
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:renderer:513",
@@ -2007,9 +2007,9 @@
         "path": "packages/fiber/tests/renderer.test.tsx",
         "line": 513
       },
-      "classification": "differential",
-      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "classification": "behavioral",
+      "reason": "Explicit indexed attachment evidence swaps externally owned values and restores the prior parent slots on detach.",
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:renderer:549",
@@ -2091,9 +2091,9 @@
         "path": "packages/fiber/tests/renderer.test.tsx",
         "line": 765
       },
-      "classification": "differential",
-      "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "classification": "behavioral",
+      "reason": "The public catalogue resolves the DOM-conflicting prefixed host name to the matching Three constructor.",
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:renderer:784",
@@ -2105,7 +2105,7 @@
       },
       "classification": "differential",
       "reason": "The resulting Three graph is serializable and should be compared against the pinned R3F oracle using matched fixtures.",
-      "evidenceTarget": "packages/three/tests/differential/scene-graph.test.ts"
+      "evidenceTarget": "packages/three/tests/differential.test.ts"
     },
     {
       "id": "test:fiber:renderer:842",
@@ -2129,7 +2129,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:48",
@@ -2141,7 +2141,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:58",
@@ -2153,7 +2153,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:68",
@@ -2165,7 +2165,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:78",
@@ -2177,7 +2177,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:88",
@@ -2189,7 +2189,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:97",
@@ -2201,7 +2201,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:137",
@@ -2237,7 +2237,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:178",
@@ -2273,7 +2273,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:209",
@@ -2285,7 +2285,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:221",
@@ -2297,7 +2297,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:230",
@@ -2309,7 +2309,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:239",
@@ -2321,7 +2321,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:248",
@@ -2333,7 +2333,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:257",
@@ -2345,7 +2345,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:268",
@@ -2393,7 +2393,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:323",
@@ -2405,7 +2405,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:335",
@@ -2417,7 +2417,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/hmr.test.ts"
     },
     {
       "id": "test:fiber:utils:343",
@@ -2429,7 +2429,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/hmr.test.ts"
     },
     {
       "id": "test:fiber:utils:349",
@@ -2441,7 +2441,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:366",
@@ -2453,7 +2453,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:371",
@@ -2465,7 +2465,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:378",
@@ -2477,7 +2477,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:384",
@@ -2489,7 +2489,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:400",
@@ -2501,7 +2501,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:409",
@@ -2513,7 +2513,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:433",
@@ -2525,7 +2525,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:447",
@@ -2537,7 +2537,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:458",
@@ -2549,7 +2549,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:484",
@@ -2561,7 +2561,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:491",
@@ -2573,7 +2573,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:512",
@@ -2585,7 +2585,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:519",
@@ -2597,7 +2597,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:526",
@@ -2609,7 +2609,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:534",
@@ -2621,7 +2621,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/catalogue-props.test.ts"
     },
     {
       "id": "test:fiber:utils:559",

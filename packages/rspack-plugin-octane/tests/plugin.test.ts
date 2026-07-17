@@ -118,7 +118,6 @@ describe('OctaneRspackPlugin', () => {
 			environment: 'client',
 			hmr: false,
 			dev: true,
-			parallelUse: false,
 			exclude: ['generated'],
 			renderers: {
 				registry: {
@@ -154,7 +153,6 @@ describe('OctaneRspackPlugin', () => {
 			environment: 'client',
 			hmr: false,
 			dev: true,
-			parallelUse: false,
 			exclude: ['generated'],
 			renderers: expect.objectContaining({
 				default: 'dom',
@@ -224,6 +222,13 @@ describe('OctaneRspackPlugin', () => {
 		expect((boundedObject.options as any).cache.version).not.toBe(
 			(object.options as any).cache.version,
 		);
+
+		// requireDirective flips which modules compile vs pass through, so a
+		// toggle must never reuse cached transform results.
+		const directive = createCachedCompiler();
+		new OctaneRspackPlugin({ requireDirective: true }).apply(directive as any);
+		expect((directive.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
+		expect((directive.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 	});
 
 	it('resolves a relative root from the Rspack context', () => {
@@ -234,7 +239,10 @@ describe('OctaneRspackPlugin', () => {
 		);
 	});
 
-	it('rejects a non-boolean profile option at the public constructor', () => {
+	it('rejects invalid options at the public constructor', () => {
 		expect(() => new OctaneRspackPlugin({ profile: 'yes' } as any)).toThrow(/profile/);
+		expect(() => new OctaneRspackPlugin({ parallelUse: false } as any)).toThrow(
+			/unknown option `parallelUse`/,
+		);
 	});
 });

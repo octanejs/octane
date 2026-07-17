@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**35 publishable package(s), including 28 framework binding(s).**
+**39 publishable package(s), including 32 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -24,7 +24,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.4` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.6` | 42 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.2` | 4 |
-| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.3` | 1 |
+| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.3` | 2 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.4` | 4 |
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.6` | 1 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.6` | 1 |
@@ -36,6 +36,9 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/rspack-plugin` | [`packages/rspack-plugin-octane`](../packages/rspack-plugin-octane) | compiler integration | `0.1.2` | 2 |
 | `@octanejs/sonner` | [`packages/sonner`](../packages/sonner) | framework binding | `0.1.2` | 2 |
 | `@octanejs/stylex` | [`packages/stylex`](../packages/stylex) | framework binding | `0.1.6` | 2 |
+| `@octanejs/tanstack-ai` | [`packages/tanstack-ai`](../packages/tanstack-ai) | framework binding | `0.0.1` | 1 |
+| `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.1` | 1 |
+| `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.1` | 1 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.6` | 1 |
 | `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.6` | 2 |
 | `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.1` | 1 |
@@ -43,10 +46,11 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.4` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.4` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.0` | 7 |
+| `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.1` | 2 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.1` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.7` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.6` | 5 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.7` | 11 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.7` | 14 |
 
 ## Private packages
 

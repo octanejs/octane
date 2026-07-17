@@ -8,25 +8,29 @@
 > drift; function names are the stable anchors.
 >
 > **Status: EXECUTED 2026-07-09 (Phases 0–4 + Phase 5 minus the SSR mirror),
-> and the pipeline is ON BY DEFAULT (same day) — `parallelUse: false` opts out
-> (Decision point 1 resolved: the flag-on soak was the whole octane suite; the
-> homepage "Compiled templates" copy shipped with the flip).** See the
+> and the pipeline is always enabled. The temporary rollout gate was removed
+> 2026-07-16; serial React-style start timing is not a compiler mode.** See the
 > execution record below for where the implementation deviated from this plan.
 > Result on `benchmarks/async-waterfall`: octane 174.8ms → **20.1ms init /
 > 19.1ms update (1.2–1.3× the 16ms parallel floor, Solid 2.0/Ripple
 > territory)** vs React 307.3/190.1ms, ratio-guarded both ways (≤0.25× React,
 > ≤1.5× solid/ripple).
+>
+> **Composition follow-up LANDED 2026-07-17.**
+> `benchmarks/async-composition` now covers imported plain-TypeScript custom
+> hooks, adjacent async siblings, nested async children, and one true data
+> dependency. Octane reaches the honest **2-wave / 8-call** floor (about 105ms
+> at 50ms simulated latency), versus the original 6 waves / 23 calls.
 
 ## Execution record (2026-07-09)
 
 What shipped, and where it deviates from the phases as written:
 
 - **Pipeline** in `compile.js` (`parallelUseMemoizePass` → `parallelUseWalkJsx`
-  → `buildWarmArtifacts` → `rewriteParallelUse`), gated on `parallelUse`
-  (compile option + `octane()` vite-plugin option). Flag-off output is inert
-  (pinned). The whole octane test suite (both vitest projects, 3,871 tests)
-  runs flag-ON as the pre-default-flip soak; the async-waterfall bench app
-  opts in.
+  → `buildWarmArtifacts` → `rewriteParallelUse`) runs for every client and
+  server compile. The whole octane test suite (both vitest projects, 3,871
+  tests) was the initial rollout soak; the async-waterfall bench pins the
+  resulting behavior.
 - **Phase 1 deviation — none.** Memoized creations emit `_$useMemo(() =>
   expr, [member-path deps], _h$N)`; trivial args (identifiers/member reads)
   pass through; loops/nested functions never entered.
@@ -55,7 +59,7 @@ What shipped, and where it deviates from the phases as written:
   thenableState-cleared-by-finishRenderingHooks). Without (b), a resume replay
   re-rendering a child whose entries date from a previously COMMITTED episode
   reused the stale promise and froze the child on old data. This hardening is
-  always-on (not flag-gated), as are the replay-reuse leniency + "uncached
+  unconditional, as are the replay-reuse leniency + "uncached
   promise" dev warning and the replay-discovered-waterfall dev warning (both
   gated on dev-compiled output via `__s.locs`/`locFile`).
 - **Phase 5 partial.** Dev diagnostics, docs (`differences-from-react.md`),
@@ -69,7 +73,7 @@ What shipped, and where it deviates from the phases as written:
   (hoist/batch) run in `ssrCompileBody` — top bodies AND every synthetic sub
   (@try/@if arms), before `rewriteHookCalls` so the rewritten `use(__pu$N)`
   unwraps get their server site keys like hand-written calls — emitting the
-  server twins `_$puMemo`/`_$puBatch` (same `parallelUse: false` opt-out):
+  server twins `_$puMemo`/`_$puBatch`:
   - `puMemo`: keyed CROSS-PASS creation cache (frame path + site + per-frame
     occurrence, hung off the render-local ResolvedMap as `resolved.pu` so
     every existing threading path carries it) — re-runs and the final
@@ -111,15 +115,29 @@ What shipped, and where it deviates from the phases as written:
   deliberately: warm thunks fire on TOP-BODY batches only; a component whose
   only use() lives inside its own @try arm warms its descendants only via
   its parent's plan (same as the client).
-- **Default flipped 2026-07-09** (same day, after the full-suite soak):
-  `parallelUse` defaults to true in `compile()` and the vite plugin;
-  `parallelUse: false` opts out (covered behaviorally by the server and
-  Suspense suites). The homepage "Compiled templates"
-  copy and the RuleSync intentional-divergence entry (AGENTS/CLAUDE/etc.)
-  shipped with the flip.
-- **Decision points resolved:** (1) DEFAULT-ON, opt-out via
-  `parallelUse: false`; (2) loops excluded — mandatory (Phase 0); (3)
-  member-path deps; (4) AbortSignal not shipped; (5)
+- **Enabled by default 2026-07-09** (same day, after the full-suite soak), then
+  made unconditional 2026-07-16 by removing the rollout gate and inactive
+  compiler/plugin branches. The homepage "Compiled templates" copy and the
+  RuleSync intentional-divergence entry (AGENTS/CLAUDE/etc.) shipped with the
+  original default flip.
+- **Real-world composition follow-up LANDED 2026-07-17.** Plain `.ts`/`.js`
+  modules now apply the same memoize/stratify/batch transform to lexically
+  imported `use()` calls (including aliases), with client `useMemo`/`useBatch`
+  and server `puMemo`/`puBatch` twins. The first direct batch carries its warm
+  thunk; once setup reaches the final output, child-only plans register through
+  an empty compiler batch and stay lazy until a descendant batch actually
+  suspends. Components with setup early returns conservatively publish no
+  descendant plan. Every live ancestor plan warms into an episode-scoped cache
+  owned above adjacent siblings. Warmable creation slots use globally
+  composable Symbols (scope-local integers collide across sibling components),
+  while occurrence-aware claims give repeated instances with equal dependencies
+  separate entries. Consumed entries and real-memo tombstones prevent later
+  true-dependency strata or siblings from refetching prior work. Client, SSR,
+  production, and universal-renderer regressions pin distinct and repeated
+  same-dependency siblings plus exactly-once creation.
+- **Decision points resolved:** (1) unconditional, with no serial-timing mode;
+  (2) loops excluded — mandatory (Phase 0); (3) member-path deps; (4)
+  AbortSignal not shipped; (5)
   `useBatch`/`warmMemo`/`warmChild` exported tier 2; (6) depth cap 64; (7)
   ghost-hook scope v1 = none (params+module only).
 >
@@ -288,12 +306,12 @@ assumption React already bakes into `use()` replay.
 
 ### Phase 0 — Groundwork (EXECUTED 2026-07-09)
 
-- **`parallelUse` compile option** plumbed end-to-end: `compile(src, file,
-  { parallelUse: true })` → `ctx.parallelUse` → `rewriteParallelUse()` at the
-  agreed insertion point in `compileFunctionBody` (after autoCallback, before
+- **Compiler pass plumbing** calls `rewriteParallelUse()` at the agreed
+  insertion point in `compileFunctionBody` (after autoCallback, before
   `rewriteHookCalls`; runs on every function body including hoisted `@try`
-  sub-bodies, where `use()` actually lives). Identity pass until Phase 1;
-  the opt-out behavior is covered by executing compiled Suspense fixtures.
+  sub-bodies, where `use()` actually lives). The original rollout gate was
+  useful while the later phases soaked, but has since been removed; compiled
+  Suspense fixtures cover the transform as the only supported behavior.
 - **Replay-churn pin** (`ReplayChurnBody` fixture + "replay churn" test in
   `tests/suspense.test.ts`): two pre-existing promises cost three body
   attempts on mount and three more on a promise-swapping update (one attempt
@@ -338,8 +356,7 @@ block as replaying during `commitResume` → `renderBlock`; in `useThenable`, if
 replay presents a *fresh* thenable at a slot with a stored one, reuse the stored
 thenable, drop the fresh one, and emit React's "suspended by an uncached
 promise" warning in dev. Closes the refetch-storm hazard for un-memoized code
-(hand-written `use(fetch(...))` in bindings, pre-transform output, opted-out
-files).
+(hand-written `use(fetch(...))` in bindings or pre-transform output).
 
 ### Phase 2 — Parallel-start transform (the waterfall killer)
 
@@ -516,7 +533,7 @@ proportional to actual async surface.
   parallelizes independent `use()` calls").
 - **Website:** update the homepage "Compiled templates" feature block
   (`website/src/pages/Home.tsrx`) to call out waterfall removal, once the
-  transform is on by default (do not advertise before it ships). Draft copy,
+  transform is unconditional (do not advertise before it ships). Draft copy,
   replacing the current body:
 
   > Components compile ahead of time to template clones and direct DOM
@@ -560,7 +577,7 @@ is that Phase 4's coverage makes this unnecessary.
 | Rejection while batch partially pending | Wake on first rejection; replay unwraps in textual order; earlier-pending members re-enroll. |
 | Differential suite (`tests/differential/`) | Compares final `innerHTML` only — unaffected by fetch-start timing. Do NOT add a differential fixture that asserts fetch counts against React; that comparison now intentionally diverges. |
 | Conformance suite | Any port covering React's waterfall timing is a plain passing test of Octane's deliberate parallel behavior, annotated as an intentional divergence rather than a gap. |
-| `WaterfallBody` pin (`tests/suspense.test.ts`) | Flips by design: with the transform on, `bStarts === 1` at mount. Rewrite as the positive assertion of parallel starts; keep an opted-out variant pinning the sequential behavior so the flag's off-state stays tested. |
+| `WaterfallBody` pin (`tests/suspense.test.ts`) | Flips by design: `bStarts === 1` at mount. Rewrite as the positive assertion of parallel starts; true data dependencies retain a separate sequential-behavior pin. |
 
 ## Test plan
 
@@ -606,9 +623,10 @@ Gates per phase: full `pnpm test`, `pnpm typecheck`, `pnpm format:check`;
 
 ## Decision points (maintainer input wanted before executing)
 
-1. **Flag vs default-on.** Recommendation: ship behind a compiler option
-   (`parallelUse`, autoCallback-style) through the test cycle, then flip the
-   default while still 0.x. The off-state keeps the sequential pin test.
+1. **Unconditional semantics — RESOLVED (2026-07-16).** The temporary rollout
+   gate used during the test cycle was removed. The transform is part of every
+   compile; tests pin parallel starts and use true data dependencies to cover
+   intentional sequencing.
 2. **Loop slots — RESOLVED (Phase 0, 2026-07-09).** Symbol-keyed hooks in a
    loop share one slot across iterations (no compiler rejection exists,
    contrary to the `withSlot` comment in runtime.ts). Phases 1–2 exclude

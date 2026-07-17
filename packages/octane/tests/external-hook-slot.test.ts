@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
 	mkdtempSync,
 	mkdirSync,
@@ -128,6 +128,31 @@ describe('slotHooks surgical pass', () => {
 		expect(
 			slotHooks(`import { useState } from 'octane';\nexport const ZERO = 0;`, 'c.ts'),
 		).toBeNull(); // imported but never called
+	});
+
+	it('keeps nested hooks on the render path instead of memoizing around them', () => {
+		const sources = [
+			`import { use } from 'octane';
+			 export function useData(load, promise) {
+			   const value = use(load(use(promise)));
+			   return value;
+			 }`,
+			`import { use, useContext } from 'octane';
+			 export function useData(load, Context) {
+			   const value = use(load(useContext(Context)));
+			   return value;
+			 }`,
+			`import { use } from 'octane';
+			 function useResourceKey() { return 'key'; }
+			 export function useData(load) {
+			   const value = use(load(useResourceKey()));
+			   return value;
+			 }`,
+		];
+
+		// A memo hit must never skip a nested built-in or custom hook. These
+		// arguments remain unchanged until they can be analyzed as hook-free.
+		for (const source of sources) expect(slotHooks(source, 'nested-hook.ts')).toBeNull();
 	});
 });
 
@@ -411,6 +436,20 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 		).toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
 	});
 
+	it('warns that the removed parallelUse option is ignored', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			octane({ parallelUse: false } as any);
+			expect(warn).toHaveBeenCalledTimes(1);
+			expect(warn.mock.calls[0][0]).toMatch(/`parallelUse` option was removed/);
+			warn.mockClear();
+			octane();
+			expect(warn).not.toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
+	});
+
 	it('recursively discovers raw Octane bindings behind another binding', () => {
 		const fixtureRoot = mkdtempSync(join(tmpdir(), 'octane-source-discovery-'));
 		try {
@@ -626,6 +665,7 @@ describe('manifest-declared manual hook slots', () => {
 			'tanstack-virtual',
 			'testing-library',
 			'three',
+			'tiptap',
 			'zustand',
 		]);
 	});

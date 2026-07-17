@@ -1,4 +1,6 @@
 // The four feature cards — a title over a plain-text blurb.
+import { BINDING_COUNT } from '../../../content/bindings.ts';
+
 const FEATURES = [
 	{
 		title: 'No rules of hooks',
@@ -19,8 +21,9 @@ const FEATURES = [
 	{
 		title: 'Familiar model',
 		body: 'Hooks, memo, context, portals, transitions, actions, controlled forms and Suspense all ' +
-			'behave the way you expect. Events are native, refs are just props, and 25 first-party ' +
-			'bindings cover the libraries you already use.',
+			'behave the way you expect. Events are native, refs are just props, and ' +
+			BINDING_COUNT +
+			' first-party bindings cover the libraries you already use.',
 	},
 ];
 

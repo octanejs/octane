@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta
+			name="description"
+			content="The remote Octane MCP server — docs search, .tsrx compilation, and bindings knowledge for AI agents over Streamable HTTP."
+		/>
+		<title>Octane MCP — mcp.octanejs.dev</title>
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="theme-color" content="#23272f" />
+		<style>
+			/* Document-level reset/palette only (inline so the SSR first paint is
+			   styled with no external request); everything component-scoped lives in
+			   scoped <style> blocks. Matches the octanejs.dev palette. */
+			:root {
+				--bg: #23272f;
+				--panel: #2b3138;
+				--code-bg: #16181d;
+				--text: #f4eee8;
+				--text-secondary: #99a1b3;
+				--accent: #ff415a;
+				--accent-hover: #ff5d72;
+				--accent-text: #ff5d72;
+				--border: rgba(255, 255, 255, 0.1);
+				color-scheme: dark;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--text);
+				font-family:
+					Inter,
+					system-ui,
+					-apple-system,
+					'Segoe UI',
+					Roboto,
+					Helvetica,
+					Arial,
+					sans-serif;
+				line-height: 1.6;
+				font-size: 16px;
+			}
+			code,
+			pre,
+			kbd,
+			samp {
+				font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+			}
+			a {
+				color: var(--accent-text);
+				text-decoration: none;
+			}
+			a:hover {
+				color: var(--accent-hover);
+			}
+			::selection {
+				background: rgba(255, 65, 90, 0.45);
+			}
+		</style>
+		<!--ssr-head-->
+	</head>
+	<body>
+		<div id="root"><!--ssr-body--></div>
+	</body>
+</html>

@@ -144,6 +144,14 @@ function assertProfilingDefineAvailable(definitions, enabled) {
 }
 
 export function octane(options = {}) {
+	if (options.parallelUse !== undefined) {
+		// Removed 2026-07-16: the parallel-use() pipeline is unconditional compiled
+		// semantics (docs/suspense-parallel-use-plan.md). Warn instead of throwing
+		// so existing configs keep building, but the timing change is not silent.
+		console.warn(
+			'octane/compiler/vite: the `parallelUse` option was removed — the parallel use() transform is always on and this option is ignored. Delete it from octane().',
+		);
+	}
 	let hmrEnabled = options.hmr;
 	let specializeProductionRoots = false;
 	let emitClientReferenceManifest = options.ssr !== true;
@@ -151,12 +159,20 @@ export function octane(options = {}) {
 	// adapter's explicit server-only override, where client profiling must stay off.
 	const profileEnabled = options.profile === true && options.ssr !== true;
 	let projectRoot = resolve(process.cwd());
+	// The mixed-toolchain ownership gate: with `requireDirective: true`, Octane
+	// compiles only modules that declare `'use octane'` (project `.tsx`/`.ts`
+	// without it belong to the host framework's own pipeline — e.g. React's JSX
+	// transform). Diagnostics route to Vite's logger once it exists.
+	const requireDirective = options.requireDirective === true;
+	let logger = null;
+	const warn = (message) => (logger ?? console).warn(message);
 	let compiler = createOctaneCompiler({
 		root: projectRoot,
 		exclude: options.exclude,
 		profile: profileEnabled,
-		parallelUse: options.parallelUse,
 		renderers: options.renderers,
+		requireDirective,
+		warn,
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
 	const forceSsr = options.ssr;
@@ -167,8 +183,9 @@ export function octane(options = {}) {
 			root: projectRoot,
 			exclude: options.exclude,
 			profile: profileEnabled,
-			parallelUse: options.parallelUse,
 			renderers: options.renderers,
+			requireDirective,
+			warn,
 		});
 	};
 
@@ -201,6 +218,7 @@ export function octane(options = {}) {
 			};
 		},
 		configResolved(config) {
+			logger = config.logger ?? null;
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);
@@ -247,7 +265,6 @@ export function octane(options = {}) {
 					// on the production compiler path.
 					dev: !!hmrEnabled,
 					profile: !server && profileEnabled,
-					parallelUse: options.parallelUse,
 					collectVoidComponentExports:
 						specializeProductionRoots && !server && !hmrEnabled && !profileEnabled,
 					...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),

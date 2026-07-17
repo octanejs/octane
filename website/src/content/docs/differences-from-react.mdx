@@ -108,15 +108,20 @@ The useful transition behavior remains: when a slower replacement suspends, the
 current screen can stay visible and `isPending` can explain the wait. `flushSync`
 drains the full update queue, while passive effects still run after paint.
 
-Octane also removes avoidable `use()` waterfalls by default. Independent requests can
-start together; a request that needs an earlier result remains sequential:
+Octane always applies its compiler transform for avoidable `use()` waterfalls.
+Requests it can prove independent can start together; a request that needs an
+earlier result remains sequential:
 
 ```tsrx
 const user = use(fetchUser(id));
 const teams = use(fetchTeams(id)); // starts alongside fetchUser
 ```
 
-Set `parallelUse: false` when you specifically need React's serial start timing.
+Two known gaps are tracked while this area is under active work: independence
+analysis stops at module boundaries (independent `use()` reads inside an
+imported custom hook still serialize), and a transition-wrapped update
+currently reveals newly-loaded content progressively — never rolling back —
+where React holds the previous screen until the whole update completes.
 
 <h2 id="errors-and-server">Errors and server rendering</h2>
 

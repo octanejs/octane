@@ -340,9 +340,12 @@ async function validatePackedConsumer(tempRoot, archives) {
 					'@apollo/client': '4.2.6',
 					'@octanejs/apollo-client': `file:${requireArchive(archives, '@octanejs/apollo-client')}`,
 					'@octanejs/hook-form': `file:${requireArchive(archives, '@octanejs/hook-form')}`,
+					'@octanejs/three': `file:${requireArchive(archives, '@octanejs/three')}`,
+					'@types/three': '0.172.0',
 					graphql: '^16.11.0',
 					octane: `file:${requireArchive(archives, 'octane')}`,
 					rxjs: '^7.8.2',
+					three: '0.172.0',
 				},
 			},
 			null,
@@ -354,6 +357,8 @@ async function validatePackedConsumer(tempRoot, archives) {
 		`import { ApolloClient, InMemoryCache } from '@octanejs/apollo-client';
 import { ApolloProvider, useApolloClient } from '@octanejs/apollo-client/react';
 import { useForm } from '@octanejs/hook-form';
+import { Canvas } from '@octanejs/three';
+import { ThreeScene } from './ThreeScene.three.tsrx';
 
 const client = new ApolloClient({ cache: new InMemoryCache() });
 
@@ -371,7 +376,56 @@ export function App() @{
 		<ApolloProvider client={client}>
 			<ApolloProbe />
 		</ApolloProvider>
+		<Canvas frameloop="never" style={{ width: 64, height: 64 }}>
+			<ThreeScene />
+		</Canvas>
 	</div>
+}
+`,
+	);
+	writeFileSync(
+		path.join(sourceDirectory, 'ThreeScene.three.tsrx'),
+		`import { useFrame } from '@octanejs/three';
+
+export function ThreeScene() @{
+	useFrame(() => {});
+	<mesh name="packed-three-scene">
+		<boxGeometry args={[1, 1, 1]} />
+		<meshBasicMaterial color="hotpink" />
+	</mesh>
+}
+`,
+	);
+	writeFileSync(
+		path.join(sourceDirectory, 'package-surface.ts'),
+		`import * as publicApi from '@octanejs/three';
+import * as coreApi from '@octanejs/three/core';
+import * as rendererApi from '@octanejs/three/renderer';
+import config, { threeRenderers } from '@octanejs/three/config';
+import testing, { create, fireEvent } from '@octanejs/three/testing';
+import type { JSX as IntrinsicJSX } from '@octanejs/three/intrinsics';
+import type { JSX as RuntimeJSX } from '@octanejs/three/intrinsics/jsx-runtime';
+import type { ReconcilerRoot, ThreeElements } from '@octanejs/three';
+
+type IntrinsicMesh = IntrinsicJSX.IntrinsicElements['mesh'];
+type RuntimeMesh = RuntimeJSX.IntrinsicElements['mesh'];
+type RootMesh = ThreeElements['mesh'];
+
+const intrinsicMesh: IntrinsicMesh = { position: [1, 2, 3] };
+const runtimeMesh: RuntimeMesh = intrinsicMesh;
+const rootMesh: RootMesh = runtimeMesh;
+const reconcilerRoot: ReconcilerRoot<HTMLCanvasElement> | undefined = undefined;
+
+export function packageSurfaceProbe() {
+	void rootMesh;
+	void reconcilerRoot;
+	return {
+		config: config === threeRenderers,
+		core: typeof coreApi.createRoot === 'function',
+		publicApi: typeof publicApi.Canvas === 'function',
+		renderer: typeof rendererApi.createUniversalRoot === 'function',
+		testing: testing.create === create && typeof fireEvent === 'function',
+	};
 }
 `,
 	);
@@ -388,11 +442,31 @@ if (target) createRoot(target).render(App);
 		path.join(sourceDirectory, 'entry-server.ts'),
 		`import { renderToString } from 'octane/server';
 import { App } from './App.tsrx';
+import { packageSurfaceProbe } from './package-surface.ts';
 
 export function renderProbe() {
-	return renderToString(App).html;
+	return { html: renderToString(App).html, surface: packageSurfaceProbe() };
 }
 `,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'tsconfig.json'),
+		JSON.stringify(
+			{
+				compilerOptions: {
+					lib: ['dom', 'dom.iterable', 'esnext'],
+					module: 'esnext',
+					moduleResolution: 'bundler',
+					noEmit: true,
+					skipLibCheck: false,
+					strict: true,
+					target: 'esnext',
+				},
+				include: ['src/package-surface.ts'],
+			},
+			null,
+			2,
+		) + '\n',
 	);
 	writeFileSync(
 		path.join(consumerDirectory, 'index.html'),
@@ -424,6 +498,21 @@ export function renderProbe() {
 			`binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${peerRuntime}`,
 		);
 	}
+	const threeEntry = consumerRequire.resolve('@octanejs/three');
+	const threeRequire = createRequire(threeEntry);
+	const threePeerRuntime = realpathSync(threeRequire.resolve('octane'));
+	if (threePeerRuntime !== directRuntime) {
+		throw new Error(
+			`Three binding resolved a second Octane runtime:\n  app: ${directRuntime}\n  binding: ${threePeerRuntime}`,
+		);
+	}
+	const directThree = realpathSync(consumerRequire.resolve('three'));
+	const peerThree = realpathSync(threeRequire.resolve('three'));
+	if (peerThree !== directThree) {
+		throw new Error(
+			`Three binding resolved a second Three runtime:\n  app: ${directThree}\n  binding: ${peerThree}`,
+		);
+	}
 	const virtualStoreEntries = readdirSync(path.join(consumerDirectory, 'node_modules/.pnpm'));
 	const installedRuntimes = virtualStoreEntries.filter((entry) => /^octane@/.test(entry));
 	if (installedRuntimes.length !== 1) {
@@ -434,12 +523,40 @@ export function renderProbe() {
 
 	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
 	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
+	const threeConfigEntry = consumerRequire.resolve('@octanejs/three/config');
+	const repositoryRequire = createRequire(path.join(REPO_ROOT, 'package.json'));
+	const threeConfigBundle = path.join(consumerDirectory, 'three-config.mjs');
+	execFileSync(
+		repositoryRequire.resolve('esbuild/bin/esbuild'),
+		[
+			threeConfigEntry,
+			'--bundle',
+			'--platform=node',
+			'--format=esm',
+			`--outfile=${threeConfigBundle}`,
+		],
+		{
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+	const { threeRenderers } = await import(pathToFileURL(threeConfigBundle).href);
+	execFileSync(
+		process.execPath,
+		[repositoryRequire.resolve('typescript/bin/tsc'), '--noEmit', '-p', 'tsconfig.json'],
+		{
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
 	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);
 	await viteBuild({
 		root: consumerDirectory,
 		configFile: false,
 		logLevel: 'silent',
-		plugins: [octane({ hmr: false })],
+		plugins: [octane({ hmr: false, renderers: threeRenderers })],
 		build: {
 			emptyOutDir: true,
 			outDir: 'dist/client',
@@ -454,7 +571,7 @@ export function renderProbe() {
 		root: consumerDirectory,
 		configFile: false,
 		logLevel: 'silent',
-		plugins: [octane({ hmr: false })],
+		plugins: [octane({ hmr: false, renderers: threeRenderers })],
 		build: {
 			emptyOutDir: true,
 			outDir: 'dist/server',
@@ -465,18 +582,42 @@ export function renderProbe() {
 	});
 
 	const serverBundle = path.join(consumerDirectory, 'dist/server/entry.mjs');
-	const { renderProbe } = await import(pathToFileURL(serverBundle).href);
-	const html = renderProbe();
+	const probeRunner = path.join(consumerDirectory, 'probe-runner.mjs');
+	writeFileSync(
+		probeRunner,
+		`import { renderProbe } from ${JSON.stringify(pathToFileURL(serverBundle).href)};
+
+const output = 'OCTANE_PACK_PROBE:' + JSON.stringify(renderProbe()) + '\\n';
+process.stdout.write(output, () => process.exit(0));
+`,
+	);
+	// Packed browser bindings can retain scheduler handles in Node. Execute the
+	// SSR probe in a disposable process and explicitly finish after stdout flushes.
+	const probeOutput = execFileSync(process.execPath, [probeRunner], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 30_000,
+	});
+	const probeLine = probeOutput.split('\n').find((line) => line.startsWith('OCTANE_PACK_PROBE:'));
+	if (probeLine === undefined) {
+		throw new Error(`executed packed consumer probe returned no result: ${probeOutput}`);
+	}
+	const { html, surface } = JSON.parse(probeLine.slice('OCTANE_PACK_PROBE:'.length));
 	if (
 		!html.includes('data-probe="bindings-ran"') ||
 		!html.includes('name="name"') ||
-		!html.includes('data-apollo="connected"')
+		!html.includes('data-apollo="connected"') ||
+		!html.includes('<canvas')
 	) {
-		throw new Error(`executed Hook Form probe returned unexpected HTML: ${html}`);
+		throw new Error(`executed packed consumer probe returned unexpected HTML: ${html}`);
+	}
+	if (Object.values(surface).some((value) => value !== true)) {
+		throw new Error(`packed Three subpath probe failed: ${JSON.stringify(surface)}`);
 	}
 
 	console.log(
-		'installed packed octane + Hook Form + Apollo Client without React; Vite client/server builds and executed binding SSR passed',
+		'installed packed octane + Hook Form + Apollo Client + Three without React; typecheck, Vite client/server builds, subpaths, and executed binding SSR passed',
 	);
 }
 

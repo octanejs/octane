@@ -198,7 +198,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.25,
-    "note": "10-level nested-use() init vs React 19. Compiler-parallelized use (parallelUse pipeline, docs/suspense-parallel-use-plan.md, recorded 2026-07-09) collapses the waterfall to the parallel floor: measured 0.065x (20.1ms vs 307.3ms). Guard at 0.25x so a regression back toward per-level rounds fails loudly."
+    "note": "10-level nested-use() init vs React 19. Compiler-parallelized use (docs/suspense-parallel-use-plan.md, recorded 2026-07-09) collapses the waterfall to the parallel floor: measured 0.065x (20.1ms vs 307.3ms). Guard at 0.25x so a regression back toward per-level rounds fails loudly."
   },
   {
     "suite": "async-waterfall",
@@ -214,7 +214,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 1.5,
-    "note": "init vs Solid 2.0 (parallel by model): measured 1.06x on record 2026-07-09 (20.1ms vs 19.0ms). The win the parallelUse pipeline earned - must not regress."
+    "note": "init vs Solid 2.0 (parallel by model): measured 1.06x on record 2026-07-09 (20.1ms vs 19.0ms). The compiler's waterfall-elimination win must not regress."
   },
   {
     "suite": "async-waterfall",
@@ -239,6 +239,22 @@
     "reference": "ripple",
     "maxRatio": 1.5,
     "note": "update vs ripple: measured 1.09x on record 2026-07-09."
+  },
+  {
+    "suite": "async-composition",
+    "op": "init_waves",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.5,
+    "note": "Cross-framework cold-mount topology guard: Octane reaches the honest 2-wave dependency floor vs React's 6 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
+  },
+  {
+    "suite": "async-composition",
+    "op": "update_waves",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.0,
+    "note": "Cross-framework transition topology guard: Octane reaches the honest 2-wave dependency floor vs React's 3 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
     "suite": "js-framework",
@@ -387,5 +403,93 @@
     "minRatio": 1.0,
     "maxRatio": 1.0,
     "note": "Semantic control: open portal fixtures render exactly 1805 text nodes across main and foreign targets."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "mount_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 1.6,
+    "note": "Production-browser mount of 1,000 real Three meshes. The refreshed 10-sample record is 2.64 / 2.52 = 1.05x; a 100-sample stability run recorded 2.612 / 2.655 = 0.98x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "update_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 1.8,
+    "note": "In-place position update of 1,000 retained meshes. The refreshed 10-sample record is 0.68 / 0.58 = 1.17x; a 100-sample stability run recorded 0.525 / 0.510 = 1.03x on 2026-07-17, within the sub-millisecond timer noise floor."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "reorder_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 2.5,
+    "note": "Keyed reverse with survivor identity retained. The refreshed observable-commit baseline recorded 3.30 / 2.02 = 1.63x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "unmount_tree_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 1.4,
+    "note": "Removal of the rendered 1,000-mesh tree, excluding delayed root-registry teardown. The refreshed observable-commit baseline recorded 1.84 / 2.12 = 0.87x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "reconstruct_dispose_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 7.0,
+    "note": "Constructor reconstruction plus observed disposal for 1,000 objects. The refreshed observable-commit baseline recorded 9.28 / 2.00 = 4.64x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "frame_1k_subscribers",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 2.8,
+    "note": "Per-frame cost for 1,000 useFrame subscribers, averaged over 20 manual frames. The refreshed observable-commit baseline recorded 0.059 / 0.032 = 1.84x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "raycast_event",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 1.6,
+    "note": "Native pointer dispatch and deduplicated Three raycast delivery to 40 overlapping targets. The refreshed observable-commit baseline recorded 0.348 / 0.327 = 1.06x on 2026-07-17."
+  },
+  {
+    "suite": "three-bundle-size",
+    "op": "js_gzip",
+    "target": "octane-min",
+    "reference": "r3f-min",
+    "maxRatio": 2.4,
+    "note": "Minimal direct-root production gzip, with built bundles executed and scene-checked in Chromium. The refreshed observable-scene baseline recorded 305165 / 188008 = 1.62x on 2026-07-17."
+  },
+  {
+    "suite": "three-bundle-size",
+    "op": "js_gzip",
+    "target": "octane-full",
+    "reference": "r3f-full",
+    "maxRatio": 1.8,
+    "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. The refreshed observable-scene baseline recorded 304757 / 250306 = 1.22x on 2026-07-17."
+  },
+  {
+    "suite": "react-hosted-islands",
+    "op": "empty_listeners_per_island",
+    "target": "islands-1000",
+    "reference": "islands-1",
+    "maxRatio": 1.05,
+    "note": "Per-island delegated-listener cost must stay flat as island count scales (currently exactly 1.0x at 5 listeners/island). Growth here means a super-linear structural regression in delegation-target registration; Phase 5's selective hosted delegation may only LOWER the empty-island cost."
+  },
+  {
+    "suite": "react-hosted-islands",
+    "op": "bridge_bindings_per_island",
+    "target": "islands-1000",
+    "reference": "islands-1",
+    "maxRatio": 1.05,
+    "note": "Exactly one owner-bridge binding per hosted root regardless of island count (currently 1.0x). Growth means duplicated bindings or a leaked rebind per render."
   }
 ]

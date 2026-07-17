@@ -26,6 +26,15 @@ benchmarks/news/*/src/data.js
 # Prettier's multi-line attribute/child wrap would reintroduce. Keep it as-is.
 benchmarks/js-framework/octane-jsx/src/Main.tsx
 
+# TanStack Form's renderer modules and upstream conformance tests preserve deeply
+# generic inline component signatures. The TSRX Prettier plugin currently strips
+# required parentheses from typed arrow expressions, duplicates nested JSDoc, and
+# cannot parse some valid compiled fixtures; keep the clean source stable until
+# that formatter bug is fixed.
+packages/tanstack-form/src/*.tsrx
+packages/tanstack-form/src/*.tsrx.d.ts
+packages/tanstack-form/tests/_fixtures/upstream/*.tsrx
+
 # Dependencies
 **/node_modules/
 
@@ -50,3 +59,17 @@ benchmarks/js-framework/octane-jsx/src/Main.tsx
 # RuleSync generated files (source lives in .rulesync/; run `pnpm rules:generate`).
 # The .md outputs are already covered above; .cursor/ holds a .mdc with no Prettier parser.
 .cursor/
+
+# TanStack AI's TSRX hook modules and their declaration companions preserve
+# deeply generic inline signatures the TSRX Prettier plugin currently mangles;
+# keep the clean source stable until that formatter bug is fixed.
+packages/tanstack-ai/src/*.tsrx
+packages/tanstack-ai/src/*.tsrx.d.ts
+packages/tanstack-ai/tests/_fixtures/*.tsrx
+
+# TanStack Devtools' TSRX component module and its declaration companion: the
+# TSRX Prettier plugin currently duplicates JSDoc blocks on round-trip. Keep the
+# clean source stable until that formatter bug is fixed.
+packages/tanstack-devtools/src/*.tsrx
+packages/tanstack-devtools/src/*.tsrx.d.ts
+packages/tanstack-devtools/tests/_fixtures/*.tsrx

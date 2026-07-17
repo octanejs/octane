@@ -10,9 +10,10 @@ than the compatibility baseline.
 The strategy is not to port React Reconciler. Octane already owns component
 execution, hooks, context, errors, Suspense, logical ranges, refs, and effects.
 This package supplies the Three-specific host driver, root state, frame loop,
-events, assets, types, and DOM `Canvas` boundary. The implementation should
-reuse R3F's framework-neutral algorithms under its MIT license while replacing
-every React/Fiber ownership mechanism.
+events, assets, types, the DOM `Canvas` boundary, and the low-level reverse-DOM
+`DOMRegion` proof. The implementation should reuse R3F's framework-neutral
+algorithms under its MIT license while replacing every React/Fiber ownership
+mechanism.
 
 ## Decision summary
 
@@ -23,9 +24,10 @@ every React/Fiber ownership mechanism.
 - Compile scene modules with the existing universal target. Keep DOM as the
   application default and select Three lexically, conventionally with
   `*.three.tsrx`.
-- Use the compiler-owned `Canvas.children` region for DOM -> Three composition.
-  Do not copy R3F's second-Reconciler context bridge, `its-fine`, error boundary,
-  or Suspense blocking machinery.
+- Use compiler-owned `Canvas.children` and `DOMRegion.children` regions for
+  explicit DOM -> Three and Three -> DOM composition. Do not copy R3F's
+  second-Reconciler context bridge, `its-fine`, error boundary, or Suspense
+  blocking machinery.
 - Keep the universal core renderer-agnostic. The first work closes a small set
   of general ABI gaps exposed by Three: public-instance replacement, host
   lifecycle delivery, visibility, client-only server boundaries, and portals.
@@ -41,44 +43,24 @@ Three scene:
 ```ts
 // octane.config.ts
 import { defineConfig } from '@octanejs/vite-plugin';
+import { threeRenderers } from '@octanejs/three/config';
 
 export default defineConfig({
 	compiler: {
-		renderers: {
-			registry: {
-				three: {
-					module: '@octanejs/three/renderer',
-					target: 'universal',
-					server: 'client-only',
-					intrinsics: '@octanejs/three/intrinsics',
-					text: 'ignore',
-					capabilities: ['visibility'],
-				},
-			},
-			rules: [{ include: 'src/**/*.three.tsrx', renderer: 'three' }],
-			boundaries: {
-				'@octanejs/three': {
-					Canvas: {
-						ownerRenderer: 'dom',
-						childRenderer: 'three',
-						prop: 'children',
-						server: 'omit-child',
-					},
-				},
-			},
-		},
+		renderers: threeRenderers,
 	},
 });
 ```
 
 `server`, `intrinsics`, `text`, and `capabilities` are normalized renderer
-descriptor fields supplied by the Milestone 1 SDK. The eventual
-`@octanejs/three/config` export supplies this serializable descriptor/boundary
-data. A Vite app installs
-`octane()` separately in `vite.config.ts`; an Rsbuild app imports `defineConfig`
-from `@octanejs/rsbuild-plugin` instead. The low-level Rspack plugin receives the
-same renderer data through its `renderers` option, but it owns compilation/HMR
-only—not the app SSR/hydration lifecycle supplied by Vite and Rsbuild.
+descriptor fields supplied by the Milestone 1 SDK. The
+`@octanejs/three/config` export supplies the serializable descriptor, filename
+rule, `Canvas` DOM-to-Three boundary, and `DOMRegion` Three-to-DOM boundary. A
+Vite app installs `octane()` separately in `vite.config.ts`; an Rsbuild app
+imports `defineConfig` from `@octanejs/rsbuild-plugin` instead. The low-level
+Rspack plugin receives the same renderer data through its `renderers` option,
+but it owns compilation/HMR only—not the app SSR/hydration lifecycle supplied by
+Vite and Rsbuild.
 
 ```tsx
 // App.tsrx — DOM renderer
@@ -161,9 +143,9 @@ The v9.6.1 web/core is about 3.4k source lines. The boundary is favorable:
 
 Do not depend on React, ReactDOM, React Reconciler, `scheduler`, `its-fine`,
 `react-use-measure`, `use-sync-external-store`, or `suspend-react`. Keep `three`
-as a peer dependency. Start with a pinned Three 0.172.x oracle—the version used
-by the v9.6.1 repository—and a current-version CI lane. Advertise R3F's broad
-`three >=0.156` range only after a minimum-version lane passes.
+as a peer dependency. Preserve Three 0.172.x as the immutable differential
+oracle used by the v9.6.1 repository, while separate minimum (`0.156.0`) and
+current-version CI lanes validate the advertised `three >=0.156` range.
 
 Internally call the active rendering object `renderer`, retain `state.gl` for
 v9 compatibility, and consider a `state.renderer` alias. This avoids baking a
@@ -446,7 +428,8 @@ decision and tests.
 - Same-renderer Three portals with state/event overrides.
 - Canvas DOM-shell SSR and hydration, HMR reconstruction, basic XR frame-loop
   integration, direct-root `OffscreenCanvas`, `unmountComponentAtNode`,
-  `flushSync`/`act` mapped to Octane semantics, and testing utilities.
+  `flushSync`/`act` mapped to Octane semantics, context-restore invalidation,
+  the low-level reverse-DOM `DOMRegion` proof, and testing utilities.
 - An explicit map for every upstream public export and applicable test.
 
 ### Intentional exclusions or adaptations
@@ -468,8 +451,9 @@ decision and tests.
 - R3F 10 alpha's WebGPU/TSL hooks and new external scheduler are not in the v9
   parity claim.
 - Drei, including public `Html`, controls, loaders/components, and helpers, is
-  a follow-on port. A minimal reverse-DOM host can prove the boundary without
-  being advertised as complete Drei `Html`.
+  a follow-on port. `DOMRegion` proves the reverse-DOM boundary with an explicit
+  target, but it is not Drei `Html`, is not the WebXR DOM Overlay API, and has no
+  positioning, occlusion, styling, or layout contract.
 
 ## Delivery phases and exit gates
 
@@ -628,6 +612,14 @@ root.
 
 ### Milestone 7 — client-only Canvas SSR and hydration (2–3 engineer-weeks)
 
+Status: implemented. The concrete Three boundary now streams its DOM shell and
+native canvas fallback while the server compiler omits scene execution.
+Production Vite and Rsbuild builds retain stable client-reference identity,
+adopt the server shell, and create one client Three root; raw Rspack proves the
+same client/server graph classification without claiming an application SSR
+lifecycle. Browser evidence covers pending/error projection and deterministic
+teardown after hydration.
+
 - Implement the concrete Three `Canvas` server shell and omitted child region,
   client chunk linkage, hydration adoption, streaming fallback, error/pending
   projection, and teardown.
@@ -642,18 +634,37 @@ or duplicate resource allocation; raw Rspack emits the same graph split.
 
 ### Milestone 8 — XR, HMR, and root lifecycle (2–3 engineer-weeks)
 
+Status: implemented. `HTMLCanvasElement` and `OffscreenCanvas` direct roots
+share the same configuration and deterministic registry teardown, including an
+optional `unmountComponentAtNode` callback and Octane `act`/`flushSync`
+scheduling.
+Context restoration invalidates a live root. A controlled browser WebXR lane
+proves session-loop handoff, `frameloop="never"`, configured-loop restoration,
+listener cleanup, and inert stale callbacks. Universal HMR retains compatible
+objects and reconstructs `args` changes with correct ref, handler, and resource
+cleanup. The explicit-target `DOMRegion` proves the reverse renderer boundary
+and stable DOM ownership without claiming Drei or WebXR overlay behavior.
+
 - Add compatible/incompatible HMR behavior, direct-root ergonomics,
   `OffscreenCanvas`, `unmountComponentAtNode`, context-loss recovery, basic XR
-  integration, and the minimal reverse-DOM boundary proof needed to validate
-  future Drei-style composition.
+  integration, and the explicit-target `DOMRegion` proof needed to validate the
+  underlying boundary for future Drei-style composition.
 
 Exit: HMR retains or reconstructs precisely and leaves no stale refs, handlers,
 or resources. A fake/controlled WebXR session start switches to the XR animation
 loop, session end restores the configured frameloop, and root teardown
-disconnects the loop without duplicate callbacks. Direct DOM and
-`OffscreenCanvas` roots clean up deterministically.
+disconnects the loop without duplicate callbacks. Direct `HTMLCanvasElement`
+and `OffscreenCanvas` roots clean up deterministically.
 
 ### Milestone 9 — transported SDK proof (2–3 engineer-weeks)
+
+Status: implemented. A versioned asynchronous transport now carries immutable
+host batches through a real `MessageChannel` to an independent remote object
+driver. The acknowledgement point gates logical publication, lifecycle/ref/
+layout delivery, event versioning, and teardown. Executable development and
+production-mode evidence covers structured-cloned values, resource and portal
+handles, listener IDs, pre-ack rejection and retry, post-ack faults, version
+gaps and stale messages, and one-batch scheduling after a transported event.
 
 - Add a minimal loopback/worker-style proving driver that serializes batches,
   encoded props, listener/lifecycle IDs, and root-scoped resource/portal
@@ -663,11 +674,19 @@ disconnects the loop without duplicate callbacks. Direct DOM and
   which refs/layout reads may become visible.
 
 Exit: the new renderer SDK vocabulary works without shared objects or function
-props. Until this gate passes, `octane/universal`, renderer config extensions,
-and the Three renderer ABI remain explicitly experimental even if the local
-Three package reaches web behavior parity.
+props. This gate is complete. `octane/universal` remains explicitly experimental
+while the protocol has only the loopback proving host rather than a production
+native/worker adapter; the Three web package no longer depends on an unproven
+transport vocabulary.
 
 ### Milestone 10 — API and release hardening (1–2 engineer-weeks)
+
+Status: implemented. The package now has a checked public export/subpath type
+matrix, minimum and current Three compatibility lanes, a packed external
+consumer, existence-checked upstream evidence, real-browser WebGL creation-
+failure and context-loss/recovery tests, and semantic-checksummed renderer and
+bundle-size benchmarks with committed ratio guards. Status/docs generation and
+a patch changeset complete the release gate.
 
 - Export/type matrix, current/minimum Three lanes, pack checks, docs, browser
   failures/context loss, performance baselines, status generation, and a patch
@@ -750,8 +769,10 @@ Compare Octane, R3F 9.6.1, and plain Three for:
 - representative raycast/event delivery;
 - minimal and full-catalogue bundle size.
 
-Every benchmark carries a semantic checksum so a no-op cannot win. Record the
-first baseline before choosing regression thresholds.
+Every benchmark carries a semantic checksum so a no-op cannot win. The first
+local baseline and conservative cross-framework ratio guards establish the
+initial regression thresholds; tighten them only from repeated comparable
+records.
 
 ## Effort and critical path
 
@@ -789,7 +810,7 @@ client-only graph rule -> equivalent raw Rspack server/client compilation
 prepare/accept + codecs -> transported acknowledgement and native events
 ```
 
-The first implementation worktree should therefore be the renderer-SDK slice,
-not the full Three package. It gives the driver a sound contract and prevents
-ref, lifecycle, suspension, and SSR compromises from becoming package-local
-behavior.
+The implementation followed this dependency order: the renderer-SDK slice
+landed before the full Three package, giving the driver a sound contract and
+preventing ref, lifecycle, suspension, and SSR compromises from becoming
+package-local behavior.

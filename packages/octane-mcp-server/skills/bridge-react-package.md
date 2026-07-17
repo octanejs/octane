@@ -12,8 +12,11 @@ of bridging by hand:
 | `zustand` | `@octanejs/zustand` |
 | `jotai` | `@octanejs/jotai` |
 | `@apollo/client` | `@octanejs/apollo-client` |
+| `@tanstack/ai-react` | `@octanejs/tanstack-ai` |
+| `@tanstack/react-form` | `@octanejs/tanstack-form` |
 | `@tanstack/react-query` | `@octanejs/tanstack-query` |
 | `@tanstack/react-router` | `@octanejs/tanstack-router` |
+| `@tanstack/react-store` | `@octanejs/tanstack-store` |
 | `@tanstack/react-table` | `@octanejs/tanstack-table` |
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
@@ -24,8 +27,20 @@ of bridging by hand:
 | `@floating-ui/react` | `@octanejs/floating-ui` |
 | `radix-ui` | `@octanejs/radix` |
 | `react-i18next` | `@octanejs/i18next` |
+| `react-hook-form` | `@octanejs/hook-form` |
+| `@base-ui-components/react` | `@octanejs/base-ui` |
+| `@dnd-kit/react` | `@octanejs/dnd-kit` |
+| `sonner` | `@octanejs/sonner` |
+| `recharts` | `@octanejs/recharts` |
+| `@react-three/fiber` | `@octanejs/three` |
+| `@visx/*` | `@octanejs/visx` |
+| `react-redux` | `@octanejs/redux` |
+| `@reduxjs/toolkit` | `@octanejs/redux-toolkit` |
+| `@testing-library/react` | `@octanejs/testing-library` |
+| `@mdx-js/react` | `@octanejs/mdx` |
 
-For anything else, run the `octane_bridge_react_package` tool to get a scan of the
+The `octane_bindings` tool returns the same map machine-readably. For anything
+else, run the `octane_bridge_react_package` tool to get a scan of the
 package's React API usage and a tailored plan, then follow the workflow below.
 
 ## Mental model
@@ -60,23 +75,22 @@ So a bridge never means "run the React package unchanged". It means:
    `useCallback`, `useRef`, `useContext`, `useId`, `useImperativeHandle`,
    `useSyncExternalStore` (full React 19 shape, including `getServerSnapshot`),
    `useTransition`, `useDeferredValue`, `useActionState`, `useOptimistic`,
-   `useEffectEvent`, `use`, `startTransition`, `memo`, `createContext`,
-   `Suspense`, `createPortal`, `flushSync`, `createRoot`, `hydrateRoot`.
-   Everything imports from `octane` (no separate `react-dom`).
+   `useEffectEvent`, `useDebugValue` (accepted no-op), `use`, `startTransition`,
+   `memo`, `lazy` (also accepts a bare component from the loader),
+   `createContext`, `Suspense`, `createPortal`, `flushSync`, `createRoot`,
+   `hydrateRoot`. Everything imports from `octane` (no separate `react-dom`);
+   server rendering imports from `octane/server`, including the streaming
+   `renderToPipeableStream`/`renderToReadableStream`.
 
 3. **Handle the gaps:**
    - `forwardRef`: does not exist. Accept `ref` as a normal prop (React 19
      style) and drop the wrapper.
-   - `useDebugValue`: shim as a no-op.
-   - `lazy`: use dynamic `import()` plus `use()` inside a `Suspense` boundary.
    - Class components: rewrite as function components. Error boundary classes
      become `<ErrorBoundary>` or the `@try { } @catch (e) { }` directive.
    - Synthetic `onChange` on text inputs: use native `onInput`. Octane events
-     are native and delegated.
-   - Controlled inputs: Octane inputs are uncontrolled and native; `value` and
-     `checked` are plain attributes. Port controlled-input logic to
-     read-from-DOM plus explicit writes, or keep state in the store and write
-     the attribute on change.
+     are native and delegated. Controlled `value`/`checked` follow React's
+     semantics (the prop drives the DOM property and reasserts on commits), so
+     controlled-input logic ports unchanged apart from the event name.
    - StrictMode double-invoke: does not exist; delete test expectations that
      count double renders.
 
@@ -118,7 +132,7 @@ So a bridge never means "run the React package unchanged". It means:
 
 - `bridgeable`: only same-name hooks used; a mechanical rename of imports to
   `octane` plus a `.tsrx` re-author of components is enough.
-- `bridgeable-with-rewrites`: needs the `forwardRef` / `useDebugValue` / `lazy` /
-  event rewrites above, but no architectural blockers.
-- `needs-rework`: class components, `renderToPipeableStream`, `findDOMNode`, or
-  React internals. Bridge the core, redesign the binding.
+- `bridgeable-with-rewrites`: needs the `forwardRef` / event / `react-dom/server`
+  import rewrites above, but no architectural blockers.
+- `needs-rework`: class components, `findDOMNode`, or React internals. Bridge
+  the core, redesign the binding.

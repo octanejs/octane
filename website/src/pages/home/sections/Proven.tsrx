@@ -1,5 +1,6 @@
 // The "proven" stat strip: three numbers that back the claims above.
 import { Link } from '@octanejs/tanstack-router';
+import { BINDING_COUNT } from '../../../content/bindings.ts';
 
 export function Proven() @{
 	<section class="proven">
@@ -22,10 +23,12 @@ export function Proven() @{
 			</span>
 		</div>
 		<div class="proven-stat">
-			<span class="proven-number">25</span>
+			<span class="proven-number">
+				{BINDING_COUNT + ''}
+			</span>
 			<span class="proven-label">
-				{'ecosystem ports — Zustand, TanStack Query & Router, Radix, Lucide, '}
-				<Link to="/docs/bindings">Recharts and more</Link>
+				{'first-party ecosystem bindings for state, data, routing, UI, forms, charts, 3D, '}
+				<Link to="/docs/bindings">and more</Link>
 			</span>
 		</div>
 

@@ -8,6 +8,9 @@ export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	jotai: '@octanejs/jotai',
 	'@apollo/client': '@octanejs/apollo-client',
+	'@tanstack/ai-react': '@octanejs/tanstack-ai',
+	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
+	'@tanstack/react-form': '@octanejs/tanstack-form',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
 	'@tanstack/react-store': '@octanejs/tanstack-store',
@@ -19,6 +22,7 @@ export const KNOWN_BINDINGS = {
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	'@lexical/react': '@octanejs/lexical',
+	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'radix-ui': '@octanejs/radix',
@@ -109,6 +113,7 @@ export const KNOWN_VANILLA_CORES = {
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',
 	'@lexical/react': 'lexical',
+	'@tiptap/react': '@tiptap/core',
 };
 
 export const REACT_API_MAP = {
@@ -169,8 +174,14 @@ export const REACT_API_MAP = {
 		status: 'rewrite',
 		note: 'No forwardRef. Rewrite to React 19 refs-as-props: accept ref as a normal prop.',
 	},
-	useDebugValue: { status: 'rewrite', note: 'Not present. Shim as a no-op.' },
-	lazy: { status: 'rewrite', note: 'Not present. Use dynamic import plus use()/Suspense.' },
+	useDebugValue: {
+		status: 'same',
+		note: 'Supported as an accepted no-op (devtools-only label; there is no DevTools integration).',
+	},
+	lazy: {
+		status: 'same',
+		note: "Supported. Accepts React's { default } module shape and additionally a bare component from the loader; wrapping Suspense or ViewTransition in lazy() is valid (nested lazy wrappers are not).",
+	},
 	Component: {
 		status: 'unsupported',
 		note: 'No class components. Rewrite as a function component.',
@@ -190,13 +201,17 @@ export const REACT_API_MAP = {
 		status: 'rewrite',
 		note: 'Use renderToString() from octane/server (sync) or prerender() from octane/static (async, awaits Suspense); both return { html, css }.',
 	},
+	renderToStaticMarkup: {
+		status: 'rewrite',
+		note: 'Use renderToStaticMarkup() from octane/server (clean, non-hydratable HTML; returns { html, css }).',
+	},
 	renderToPipeableStream: {
-		status: 'unsupported',
-		note: 'No streaming SSR yet. Use render() from octane/server.',
+		status: 'rewrite',
+		note: 'Supported natively: import renderToPipeableStream from octane/server (Octane argument convention: component, props?, options?; returns { pipe, abort } with onShellReady/onShellError/onAllReady StreamOptions).',
 	},
 	renderToReadableStream: {
-		status: 'unsupported',
-		note: 'No streaming SSR yet. Use render() from octane/server.',
+		status: 'rewrite',
+		note: 'Supported natively: import renderToReadableStream from octane/server (Octane argument convention; resolves with a ReadableStream once the shell is ready, same StreamOptions).',
 	},
 	onChange: {
 		status: 'rewrite',
@@ -354,6 +369,28 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 	report.classComponents = scan.classComponents;
 	report.apis = rows;
 	report.verdict = verdictFor(rows, scan.classComponents);
+	report.plan = planFor(report);
+	return report;
+}
+
+// Filesystem-free variant of bridgeReport for hosted/remote use: the caller
+// pastes source text instead of pointing at an installed package, so there is
+// no node_modules resolution, no version, and no file counting. Everything
+// else (API rows, verdict, plan) matches bridgeReport.
+export function bridgeReportFromSource(source, { packageName } = {}) {
+	const report = {
+		target: packageName ?? 'pasted-source',
+		existingBinding: packageName ? (KNOWN_BINDINGS[packageName] ?? null) : null,
+	};
+	if (packageName) {
+		report.vanillaCore = detectVanillaCore(packageName, null);
+	}
+	const scan = scanSource(source);
+	const rows = apiRows(scan.apis);
+	report.reactImports = [...scan.imports];
+	report.classComponents = scan.classComponent;
+	report.apis = rows;
+	report.verdict = verdictFor(rows, scan.classComponent);
 	report.plan = planFor(report);
 	return report;
 }

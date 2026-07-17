@@ -80,12 +80,25 @@ function writeRoutedApp(root: string, render: 'buffered' | 'streaming' = 'buffer
 		`import { vendorLabel } from './vendor.js';
 import './page.css';
 
+(globalThis as typeof globalThis & {
+	__loadRsbuildDeferredHydrationAsset?: () => Promise<unknown>;
+}).__loadRsbuildDeferredHydrationAsset = () => import('./deferred-hydration.js?octane-hydrate=0');
+
 export function Page() @{
 	<main class="route vendor" data-rsbuild-ssr="ready">Rsbuild route{vendorLabel as string}</main>
 }
 `,
 	);
 	write(root, 'src/page.css', '.route { color: rebeccapurple; }\n');
+	write(
+		root,
+		'src/deferred-hydration.js',
+		`import './deferred-hydration.css';
+
+export const deferredHydrationProof = 'rsbuild-deferred-hydration-chunk-proof';
+`,
+	);
+	write(root, 'src/deferred-hydration.css', '.rsbuild-deferred-hydration-proof { color: teal; }\n');
 	write(
 		root,
 		'src/vendor.js',
@@ -407,10 +420,14 @@ export function App() @{
 
 		const clientRoot = join(root, 'build/client');
 		const serverRoot = join(root, 'build/server');
+		const clientCode = readJavaScript(clientRoot);
 		expect(existsSync(join(clientRoot, 'index.html'))).toBe(false);
 		expect(existsSync(join(serverRoot, 'entry.js'))).toBe(true);
 		expect(existsSync(join(serverRoot, 'index.html'))).toBe(true);
 		expect(existsSync(join(serverRoot, 'octane-client-assets.json'))).toBe(true);
+		// Production browser output must not depend on Node's absent `process`
+		// global when Octane selects its production runtime branches.
+		expect(clientCode).not.toContain('process.env.NODE_ENV');
 
 		const html = readFileSync(join(serverRoot, 'index.html'), 'utf8');
 		expect(html).toContain('data-octane-hydrate');
@@ -422,7 +439,11 @@ export function App() @{
 		);
 		expect(assetMap['/src/Page.tsrx']).toEqual({
 			js: expect.stringMatching(/\.js$/),
-			css: [expect.stringMatching(/\.css$/), expect.stringMatching(/\.css$/)],
+			css: [
+				expect.stringMatching(/\.css$/),
+				expect.stringMatching(/\.css$/),
+				expect.stringMatching(/\.css$/),
+			],
 		});
 		expect(assetMap['/src/Page.tsrx'].js).not.toContain('0-vendor');
 		expect(assetMap['/src/Page.tsrx'].css.some((file: string) => file.includes('0-vendor'))).toBe(
@@ -432,6 +453,22 @@ export function App() @{
 		for (const cssFile of assetMap['/src/Page.tsrx'].css) {
 			expect(existsSync(join(clientRoot, cssFile))).toBe(true);
 		}
+		const deferredCss = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.css') &&
+				readFileSync(join(clientRoot, file), 'utf8').includes('.rsbuild-deferred-hydration-proof'),
+		);
+		const deferredJavaScript = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.js') &&
+				readFileSync(join(clientRoot, file), 'utf8').includes(
+					'rsbuild-deferred-hydration-chunk-proof',
+				),
+		);
+		expect(deferredCss).toBeTruthy();
+		expect(deferredJavaScript).toBeTruthy();
+		expect(assetMap['/src/Page.tsrx'].css).toContain(deferredCss);
+		expect(assetMap['/src/Page.tsrx'].js).not.toBe(deferredJavaScript);
 
 		const entry = pathToFileURL(join(serverRoot, 'entry.js'));
 		entry.searchParams.set('test', String(Date.now()));
@@ -447,6 +484,7 @@ export function App() @{
 		expect(body).toContain('Rsbuild route');
 		for (const cssFile of assetMap['/src/Page.tsrx'].css) expect(body).toContain(cssFile);
 		expect(body).toContain(`<link rel="modulepreload" href="/${assetMap['/src/Page.tsrx'].js}">`);
+		expect(body).not.toContain(`<link rel="modulepreload" href="/${deferredJavaScript}">`);
 		expect(body).toContain('id="__octane_data"');
 		expect(body).not.toContain('<!--ssr-body-->');
 
