@@ -114,5 +114,6 @@ describe('@octanejs/tanstack-router — same-route search-param navigation (conc
 		// Server integrations can follow canonical redirects through the public
 		// RouterState snapshot rather than reaching into the reactive store graph.
 		expect(router.state.redirect?.options.href).toBe('/?page=1');
+		expect(router.state.statusCode).toBe(307);
 	});
 });

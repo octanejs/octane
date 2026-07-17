@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
-import { RouterProvider } from '@octanejs/tanstack-router';
+import {
+	RouterProvider,
+	createMemoryHistory,
+	createRootRoute,
+	createRoute,
+	createRouter,
+} from '@octanejs/tanstack-router';
 import { makeRouter } from '../_fixtures/basic.tsrx';
 
 // router-core resolves matches asynchronously (load/navigate return promises) and
@@ -42,6 +48,64 @@ function deferViewTransitionCommit() {
 			} else {
 				(document as any).startViewTransition = originalStartViewTransition;
 			}
+		},
+	};
+}
+
+function queueViewTransitionCommits() {
+	const originalStartViewTransition = (document as any).startViewTransition;
+	const updates: Array<() => Promise<void>> = [];
+	const waiters = new Set<() => void>();
+
+	(document as any).startViewTransition = (update: () => void | Promise<void>) => {
+		updates.push(async () => {
+			await update();
+		});
+		for (const resolve of waiters) resolve();
+		waiters.clear();
+		return {
+			finished: Promise.resolve(),
+			ready: Promise.resolve(),
+			updateCallbackDone: Promise.resolve(),
+		};
+	};
+
+	return {
+		async waitForCount(count: number) {
+			while (updates.length < count) {
+				await new Promise<void>((resolve) => waiters.add(resolve));
+			}
+		},
+		runUpdate(index: number) {
+			return updates[index]!();
+		},
+		restore() {
+			if (originalStartViewTransition === undefined) {
+				delete (document as any).startViewTransition;
+			} else {
+				(document as any).startViewTransition = originalStartViewTransition;
+			}
+		},
+	};
+}
+
+function makeRecoverableStatusRouter() {
+	let shouldFail = true;
+	const rootRoute = createRootRoute();
+	const indexRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: '/',
+		loader: () => {
+			if (shouldFail) throw new Error('recoverable load failed');
+		},
+	});
+	return {
+		router: createRouter({
+			routeTree: rootRoute.addChildren([indexRoute]),
+			history: createMemoryHistory({ initialEntries: ['/'] }),
+		}),
+		recover: () => {
+			shouldFail = false;
 		},
 	};
 }
@@ -111,6 +175,101 @@ describe('@octanejs/tanstack-router core seam', () => {
 			expect(router.state.statusCode).toBe(expectedStatus);
 		} finally {
 			transition.restore();
+		}
+	});
+
+	it('resets a stale failure status after a deferred successful reload', async () => {
+		const { router, recover } = makeRecoverableStatusRouter();
+		router.options.defaultViewTransition = true;
+		const failedTransition = deferViewTransitionCommit();
+
+		try {
+			const failedLoad = router.load();
+			await failedTransition.updateQueued;
+			await failedTransition.runUpdate();
+			await failedLoad;
+			expect(router.state.statusCode).toBe(500);
+		} finally {
+			failedTransition.restore();
+		}
+
+		recover();
+		const successfulTransition = deferViewTransitionCommit();
+		try {
+			const successfulLoad = router.load();
+			await successfulTransition.updateQueued;
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			// RouterCore has finalized against the still-active failed tree while
+			// the platform holds the successful commit for a later task.
+			expect(router.state.statusCode).toBe(500);
+			await successfulTransition.runUpdate();
+			await successfulLoad;
+
+			expect(router.state.matches.some((match: any) => match.status === 'error')).toBe(false);
+			expect(router.state.statusCode).toBe(200);
+		} finally {
+			successfulTransition.restore();
+		}
+	});
+
+	it('does not carry a failed commit into the next load when its core load rejects', async () => {
+		const router = makeRouter('/');
+		const originalStartTransition = router.startTransition;
+		let rejectCoreLoad = true;
+		router.startTransition = (fn: () => void) => {
+			if (rejectCoreLoad) {
+				rejectCoreLoad = false;
+				router.startViewTransition(async () => {
+					throw new Error('orphaned commit failure');
+				});
+				throw new Error('core load failure');
+			}
+			return originalStartTransition(fn);
+		};
+
+		try {
+			await expect(router.load()).rejects.toThrow('core load failure');
+		} finally {
+			router.startTransition = originalStartTransition;
+		}
+
+		await expect(router.load()).resolves.toBeUndefined();
+		expect(router.state.statusCode).toBe(200);
+	});
+
+	it('waits for a prior platform commit without inheriting its failure', async () => {
+		const router = makeRouter('/');
+		router.options.defaultViewTransition = true;
+		const transitions = queueViewTransitionCommits();
+
+		try {
+			// A platform callback can still be pending when a later load begins.
+			// The later readiness boundary must wait for that mutation, but the
+			// earlier callback's error still belongs only to its own lifecycle.
+			router.startViewTransition(async () => {
+				throw new Error('prior commit failure');
+			});
+			await transitions.waitForCount(1);
+
+			let loadSettled = false;
+			const load = router.load().then(() => {
+				loadSettled = true;
+			});
+			await transitions.waitForCount(2);
+
+			// Run the current load's callback first. It cannot report readiness while
+			// the older platform callback could still mutate router-observable state.
+			await transitions.runUpdate(1);
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			expect(loadSettled).toBe(false);
+
+			await transitions.runUpdate(0);
+			await load;
+			expect(loadSettled).toBe(true);
+			expect(router.state.statusCode).toBe(200);
+		} finally {
+			transitions.restore();
 		}
 	});
 
