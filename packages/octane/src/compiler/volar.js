@@ -29,7 +29,8 @@ import {
 	dedupeMappings,
 	parseModule,
 } from '@tsrx/core';
-import { resolveRendererForFile } from './renderers.js';
+import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
 
 /**
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
@@ -104,7 +105,7 @@ function shiftGeneratedOffsets(mappings, offset) {
  * element types cannot leak into files owned by another renderer.
  *
  * @param {{ loose?: boolean, renderers?: unknown }} [options]
- * @returns {import('@tsrx/core/types').VolarMappingsResult}
+ * @returns {import('@tsrx/core/types').VolarMappingsResult & { diagnostics: readonly unknown[] }}
  */
 export function compileToVolarMappings(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */
@@ -117,6 +118,14 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
+	const rendererConfig = normalizeRendererConfig(options?.renderers);
+	const renderer = resolveRendererForFile(rendererConfig, filename ?? 'untitled.tsrx');
+	const diagnostics = analyzeNativeChangeDiagnostics(ast, source, filename, {
+		dom: renderer.target === 'dom',
+		renderer,
+		rendererBoundaries: rendererConfig.boundaries,
+		rendererRegistry: rendererConfig.registry,
+	}).diagnostics;
 	const transformed = octaneTransform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
@@ -124,7 +133,6 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
-	const renderer = resolveRendererForFile(options?.renderers, filename ?? 'untitled.tsrx');
 	const prelude = createRendererTypePrelude(renderer);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
@@ -139,5 +147,6 @@ export function compileToVolarMappings(source, filename, options) {
 		...result,
 		code: prelude + result.code,
 		mappings: shiftGeneratedOffsets(mappings, prelude.length),
+		diagnostics,
 	};
 }

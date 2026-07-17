@@ -2,10 +2,10 @@
   "upstream": { "package": "@base-ui/react", "version": "1.6.0" },
   "surface": "Alpha, in progress: the foundation + overlay infrastructure and the first component set (Dialog, AlertDialog, Popover open-path) landed, ported at full fidelity and differential-verified against the real `@base-ui/react`.",
   "divergences": [
-    "Handlers receive native DOM events (no synthetic layer).",
+    "Handlers receive native DOM events (no synthetic layer): visible text controls use per-edit `input`, while the NumberField form-facing number input intentionally observes native `change` commits.",
     "`forwardRef` becomes ref-as-prop; `className` composes via octane's `normalizeClass` (the render-prop string merge matches Base UI exactly)."
   ],
   "ssr": "No dedicated SSR/hydration tests yet.",
-  "verified": "2026-07-08",
+  "verified": "2026-07-17",
   "docs": ["docs/base-ui-migration-plan.md"]
 }

@@ -47,6 +47,9 @@ const CORPUS = [
 	'packages/octane/tests/_fixtures/controlled-forms-diff.tsrx',
 ];
 
+const NATIVE_CHANGE_SENTINEL =
+	'packages/octane/tests/_fixtures/native-change-diagnostic-ambiguous.tsrx';
+
 const gz = (text) => gzipSync(Buffer.from(text), { level: zc.Z_BEST_COMPRESSION }).length;
 
 let srcRaw = 0;
@@ -72,6 +75,40 @@ for (const rel of CORPUS) {
 }
 
 const val = (bytes) => ({ median: bytes, min: bytes, samples: 1 });
+
+function compiledSize(source, filename, options = {}) {
+	const { code } = compile(source, filename, {
+		mode: 'client',
+		hmr: false,
+		dev: false,
+		...options,
+	});
+	const min = transformSync(code, { loader: 'js', minify: true }).code;
+	return {
+		raw: val(code.length),
+		minified: val(min.length),
+		gzip: val(gz(min)),
+	};
+}
+
+// Keep the diagnostic sentinel OUT of the long-lived source/compiled aggregate:
+// its deliberately tiny, de-opt-heavy shape would change that corpus ratio even
+// when the compiler output is byte-identical. Instead compare the production
+// compile with normal analysis against the same compile with the internal
+// classification result empty. All three ops must remain exactly 1.0x.
+const sentinelFile = path.join(REPO, NATIVE_CHANGE_SENTINEL);
+const sentinelSource = fs.readFileSync(sentinelFile, 'utf8');
+const diagnosticControl = compiledSize(sentinelSource, sentinelFile, {
+	__nativeChangeAnalysis: { diagnostics: [], classifications: new Map() },
+});
+const diagnostic = compiledSize(sentinelSource, sentinelFile);
+for (const op of ['raw', 'minified', 'gzip']) {
+	if (diagnostic[op].median !== diagnosticControl[op].median) {
+		throw new Error(
+			`native-change production sentinel retained diagnostic ${op} cost: ${diagnostic[op].median} vs control ${diagnosticControl[op].median}`,
+		);
+	}
+}
 const payload = {
 	suite: 'codegen-size',
 	iterations: 1,
@@ -82,6 +119,8 @@ const payload = {
 			ops: { raw: val(outRaw), minified: val(outMin), gzip: val(outGz) },
 			meta: { files: perFile },
 		},
+		{ name: 'native-change-control', ops: diagnosticControl },
+		{ name: 'native-change-diagnostic', ops: diagnostic },
 	],
 };
 
@@ -89,6 +128,9 @@ console.log(`corpus: ${CORPUS.length} files`);
 console.log(`source    raw ${srcRaw}  gz ${srcGz}`);
 console.log(
 	`compiled  raw ${outRaw}  min ${outMin}  gz(min) ${outGz}  (${(outGz / srcGz).toFixed(2)}x source gz)`,
+);
+console.log(
+	`native-change production sentinel  raw ${diagnostic.raw.median}  min ${diagnostic.minified.median}  gz ${diagnostic.gzip.median}`,
 );
 
 if (process.env.BENCH_JSON) {

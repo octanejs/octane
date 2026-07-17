@@ -28,6 +28,24 @@ declare module '@octanejs/mcp-server/bridge' {
 // a minimal ambient surface for the options the octane_compile tool exposes
 // (mirrors website/env.d.ts, which declares the same module for its config).
 declare module 'octane/compiler' {
+	export interface CompileDiagnosticPosition {
+		offset: number;
+		line: number;
+		column: number;
+	}
+	export interface CompileDiagnostic {
+		code: string;
+		severity: 'warning';
+		message: string;
+		filename: string;
+		start: CompileDiagnosticPosition;
+		end: CompileDiagnosticPosition;
+		suggestions: Array<{
+			start: CompileDiagnosticPosition;
+			end: CompileDiagnosticPosition;
+			attribute: 'onInput' | 'onInputCapture';
+		}>;
+	}
 	export function compile(
 		source: string,
 		id: string,
@@ -38,5 +56,5 @@ declare module 'octane/compiler' {
 			autoMemo?: boolean;
 			parallelUse?: boolean;
 		},
-	): { code: string; map: unknown };
+	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 }

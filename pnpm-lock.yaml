@@ -3225,6 +3225,9 @@ importers:
       '@jridgewell/remapping':
         specifier: catalog:default
         version: 2.3.5
+      '@jridgewell/trace-mapping':
+        specifier: catalog:default
+        version: 0.3.31
       '@mdx-js/mdx':
         specifier: catalog:default
         version: 3.1.1
@@ -3241,9 +3244,6 @@ importers:
         specifier: catalog:default
         version: 0.7.6
     devDependencies:
-      '@jridgewell/trace-mapping':
-        specifier: catalog:default
-        version: 0.3.31
       '@octanejs/testing-library':
         specifier: workspace:*
         version: link:../testing-library
@@ -3297,6 +3297,9 @@ importers:
       happy-dom:
         specifier: catalog:default
         version: 20.10.6
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
       react:
         specifier: catalog:default
         version: 19.2.7

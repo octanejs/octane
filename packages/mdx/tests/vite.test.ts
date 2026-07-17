@@ -6,7 +6,7 @@
  * untouched — vite's asset plugin owns those (its load step already produced
  * `export default "<file text>"`; re-compiling that JS would mangle it).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { octaneMdx } from '@octanejs/mdx/vite';
 
 function plugin(options?: Parameters<typeof octaneMdx>[0]) {
@@ -46,5 +46,29 @@ describe('octaneMdx() id claiming', () => {
 		const p = plugin();
 		expect(await transform(p, '# hi\n', '/docs/doc.md?v=abc123')).not.toBeNull();
 		expect(await transform(p, '# hi\n', '/docs/doc.mdx?import&v=abc123')).not.toBeNull();
+	});
+
+	it('publishes one authored-range warning per module generation', async () => {
+		const p = plugin();
+		const warn = vi.fn();
+		const source = '# Form\n\n<input onChange={() => {}} />\n';
+		const context = { warn };
+		const first = await p.transform.call(context, source, '/docs/form.mdx');
+		expect(first?.diagnostics).toHaveLength(1);
+		expect(warn).toHaveBeenCalledTimes(1);
+		expect(warn).toHaveBeenCalledWith(
+			expect.objectContaining({
+				code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
+				id: '/docs/form.mdx',
+				loc: { file: '/docs/form.mdx', line: 3, column: 7 },
+			}),
+		);
+
+		await p.transform.call(context, source, '/docs/form.mdx', { ssr: true });
+		expect(warn).toHaveBeenCalledTimes(1);
+
+		p.watchChange('/docs/form.mdx');
+		await p.transform.call(context, source, '/docs/form.mdx');
+		expect(warn).toHaveBeenCalledTimes(2);
 	});
 });

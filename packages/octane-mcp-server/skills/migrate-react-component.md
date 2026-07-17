@@ -42,7 +42,7 @@ locals, early returns) stays above it.
 | `<Suspense fallback={...}>` | `<Suspense>` or `@try { } @pending { }` |
 | Error boundary class | `<ErrorBoundary>` or `@try { } @catch (e) { }` |
 | `forwardRef((props, ref) => ...)` | plain function; `ref` arrives as a prop |
-| `<input onChange={...}>` | `<input onInput={...}>` (native event) |
+| text `<input onChange={...}>` meaning every edit | `<input onInput={...}>` (native event) |
 | controlled `value={state}` | keep it — React's controlled semantics apply; pair with `onInput` |
 | `className={clsx(...)}` | `class={[...]}` composes clsx-style natively |
 | `useDebugValue(x)` | keep or delete — present as an accepted no-op |
@@ -95,6 +95,20 @@ export function Panel(props) @{
 Events are native, delegated DOM events. `onClick`, `onInput`, `onSubmit`,
 `onKeyDown` behave exactly like the platform. `onChange` on a text input fires
 on commit (native change), not per keystroke.
+
+`OCTANE_NATIVE_TEXT_ONCHANGE` reports likely React-style text-host wiring. Its
+phase-preserving fixes are `onInput` and `onInputCapture`; it does not rewrite the
+event. Keep component/library callbacks named `onChange`, and keep native change on
+select and checkbox/radio hosts. If an uncontrolled text field intentionally saves
+only on commit/blur, keep `onChange` and add the non-serialized host hint:
+
+```tsx
+<input
+	defaultValue={draft}
+	onChange={(event) => save(event.currentTarget.value)}
+	suppressNativeChangeWarning
+/>
+```
 
 ## Refs
 

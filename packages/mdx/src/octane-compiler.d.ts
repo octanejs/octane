@@ -1,6 +1,24 @@
 // `octane/compiler` is authored in JSDoc'd JS with no shipped declarations —
 // a minimal ambient surface for the one entry point this package consumes.
 declare module 'octane/compiler' {
+	export interface CompileDiagnosticPosition {
+		offset: number;
+		line: number;
+		column: number;
+	}
+	export interface CompileDiagnostic {
+		code: string;
+		severity: 'warning';
+		message: string;
+		filename: string;
+		start: CompileDiagnosticPosition;
+		end: CompileDiagnosticPosition;
+		suggestions: Array<{
+			start: CompileDiagnosticPosition;
+			end: CompileDiagnosticPosition;
+			attribute: 'onInput' | 'onInputCapture';
+		}>;
+	}
 	export function compile(
 		source: string,
 		id: string,
@@ -10,5 +28,5 @@ declare module 'octane/compiler' {
 			dev?: boolean;
 			profile?: boolean;
 		},
-	): { code: string; map: unknown };
+	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 }

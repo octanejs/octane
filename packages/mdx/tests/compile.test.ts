@@ -78,6 +78,31 @@ describe('compileMdxSync', () => {
 	it('exposes the default remark plugin set for extension', () => {
 		expect(defaultRemarkPlugins).toHaveLength(3);
 	});
+
+	it('returns native-event warnings at the authored MDX JSX range', () => {
+		const source = '# Form\n\n<input onChangeCapture={() => {}} />\n';
+		const result = compileMdxSync(source, '/docs/form.mdx');
+		expect(result.diagnostics).toHaveLength(1);
+		expect(result.diagnostics[0]).toMatchObject({
+			code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
+			severity: 'warning',
+			filename: '/docs/form.mdx',
+			start: {
+				offset: source.indexOf('onChangeCapture'),
+				line: 3,
+				column: 7,
+			},
+			suggestions: [
+				{
+					attribute: 'onInputCapture',
+					start: { offset: source.indexOf('onChangeCapture'), line: 3, column: 7 },
+				},
+			],
+		});
+		expect(result.diagnostics[0].end.offset).toBe(
+			source.indexOf('onChangeCapture') + 'onChangeCapture'.length,
+		);
+	});
 });
 
 describe('compileMdx (async)', () => {

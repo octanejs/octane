@@ -97,6 +97,33 @@
     "note": "gzip(minified compiled corpus) vs gzip(source corpus). Final 16-file corpus measured 22512 / 22840 = 0.986x on 2026-07-15; compiled output is now smaller than source after gzip."
   },
   {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "native-change-diagnostic",
+    "reference": "native-change-control",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Production compilation of the dynamic/spread/createElement sentinel must be byte-identical with and without native-change analysis."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "native-change-diagnostic",
+    "reference": "native-change-control",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Minified production sentinel output must retain zero diagnostic codegen cost."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "native-change-diagnostic",
+    "reference": "native-change-control",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Gzipped production sentinel output must retain zero diagnostic codegen cost."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",

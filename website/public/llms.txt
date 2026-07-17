@@ -10,13 +10,36 @@ Key facts for answering questions about Octane:
 - Dependency arrays are compiler-inferred when omitted from `useEffect`, `useLayoutEffect`, `useInsertionEffect`, `useMemo`, `useCallback`, and `useImperativeHandle`. Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules also qualify when they transparently forward a callback and final dependency parameter to one of those hooks; plain `.ts`/`.js`, imported/method, or transforming wrappers require an explicit list. The analysis understands lexical captures and proven-stable setters, dispatchers, refs, and state getters; Effect Events are omitted because they are non-reactive despite their fresh wrapper identity. Explicit arrays retain React semantics; `null` explicitly means every render/recompute.
 - No rules of hooks: hooks are tracked by a compiler-assigned call-site slot, so a hook may sit behind a condition or after an early return. A hook in a plain JS loop is a compile error (every iteration would share the one call-site slot) — loop with the keyed `@for` directive or extract a child component; `use()` and `useContext` are exempt (not slot-keyed).
 - `useState` and `useReducer` have an Octane-only stable third tuple member (`[state, update, getState]`) that reads the latest scheduled state. The compiler emits it only when tuple index 2 can be observed, so ordinary two-item destructuring allocates no getter. Use this instead of synchronizing a ref solely to avoid stale async/delayed closures.
-- Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-keystroke handler for text inputs (the native `change` event fires on blur).
-- Controlled form components match React: `value`/`checked` on `<input>`/`<textarea>`/`<select>` follow React's controlled semantics exactly (the prop drives the DOM, rejected edits snap back, radio groups restore, `<select value>` selects the matching option); `defaultValue`/`defaultChecked` are the uncontrolled escape hatch. Handle text input with native `onInput`, not React's synthetic `onChange`.
+- Native, delegated DOM events (`onClick`, `onInput`, `onSubmit`) instead of a synthetic event layer — behavior matches the platform. There is no synthetic `onChange`: `onInput` is the per-edit handler for text inputs; native `change` fires when the browser commits an edit, usually on blur.
+- `OCTANE_NATIVE_TEXT_ONCHANGE` is a nonfatal authoring warning, not an event rewrite. The compiler reports direct `onChange`/`onChangeCapture` on a statically known text-entry `<input>` or `<textarea>` without a usable input handler; development runtime checks cover unresolved spreads/dynamic types/final props and report through `console.error` once per broken episode. Statically true `readOnly`/`disabled` controls are excluded. Use the phase-preserving `onInput`/`onInputCapture` fix for per-edit intent.
+- Deliberate native commit-on-blur is supported: keep `onChange` and add the JS-only, non-serialized `suppressNativeChangeWarning` host hint. Do not add a noop `onInput`. Selects, checkbox/radio/file and other non-text inputs, custom elements, and component/library callbacks named `onChange` are outside this warning and should not be blanket-renamed.
+- Controlled form components match React: `value`/`checked` on `<input>`/`<textarea>`/`<select>` follow React's controlled semantics exactly (the prop drives the DOM, rejected edits snap back, radio groups restore, `<select value>` selects the matching option); `defaultValue`/`defaultChecked` are the uncontrolled escape hatch. Handle per-edit text state with native `onInput`, not React's synthetic `onChange` convention.
+- Checkbox/radio activation follows the browser's native `click` → `input` → non-cancelable `change` order. Calling `preventDefault()` from native `onChange` cannot undo activation; cancel in `onClick` when rollback is intended. React's click-backed synthetic `onChange` can roll activation back, so this cancellation timing is an intentional event-layer divergence even though controlled state restoration remains React-compatible.
 - Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref `ref={[a, b]}`. There is no `forwardRef`.
 - `class`/`className` compose clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out).
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
 - No class components, no Server Components, no StrictMode double-invoke.
 - Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,500+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
+
+## Text input events: per-edit versus commit
+
+Per-edit state uses the native `input` event:
+
+```tsx
+<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+```
+
+An uncontrolled field that intentionally saves only when the browser commits the edit keeps native `change` and marks that intent locally:
+
+```tsx
+<input
+  defaultValue={savedDraft}
+  onChange={(event) => save(event.currentTarget.value)}
+  suppressNativeChangeWarning
+/>
+```
+
+`suppressNativeChangeWarning` only suppresses `OCTANE_NATIVE_TEXT_ONCHANGE`; it does not serialize or alter event delivery. Never add it to hide a per-edit migration bug.
 
 ## Docs
 
