@@ -403,5 +403,21 @@
     "minRatio": 1.0,
     "maxRatio": 1.0,
     "note": "Semantic control: open portal fixtures render exactly 1805 text nodes across main and foreign targets."
+  },
+  {
+    "suite": "react-hosted-islands",
+    "op": "empty_listeners_per_island",
+    "target": "islands-1000",
+    "reference": "islands-1",
+    "maxRatio": 1.05,
+    "note": "Per-island delegated-listener cost must stay flat as island count scales (currently exactly 1.0x at 5 listeners/island). Growth here means a super-linear structural regression in delegation-target registration; Phase 5's selective hosted delegation may only LOWER the empty-island cost."
+  },
+  {
+    "suite": "react-hosted-islands",
+    "op": "bridge_bindings_per_island",
+    "target": "islands-1000",
+    "reference": "islands-1",
+    "maxRatio": 1.05,
+    "note": "Exactly one owner-bridge binding per hosted root regardless of island count (currently 1.0x). Growth means duplicated bindings or a leaked rebind per render."
   }
 ]

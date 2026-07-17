@@ -48,6 +48,7 @@ export const BENCHMARK_SUITES = [
 	'effectful-list',
 	'memo-wall',
 	'portal-swarm',
+	'react-hosted-islands',
 	'ssr-throughput',
 	'streaming-ssr',
 	'dbmon-deopt',
