@@ -48,12 +48,21 @@ their renderer declarations while their components move to Octane. Despite the
 compatibility names, the implementation does not install or render through
 React.
 
+For the pinned 3.28.0 release, the root and `./menus` runtime export surfaces
+match `@tiptap/react`. Package-boundary tests lock those exports and the client
+module directives, while shared-fixture differential tests exercise the same
+editor and custom-view components through both bindings.
+
 On the server, editor construction is suppressed, hook snapshots use a `null`
 editor, and menu portals emit no detached target. Set `immediatelyRender: false`
 when the editor should remain nullable through the initial client render as
 well. The binding's SSR and hydration suite verifies deferred server output,
 adoption of the existing host DOM, and creation of the live editor after
 hydration.
+
+Real-browser coverage complements the jsdom suite for contracts that require a
+layout engine: caret-preserving input, text selection, NodeView dragging, and
+BubbleMenu/FloatingMenu visibility and positioning.
 
 ## Status
 
