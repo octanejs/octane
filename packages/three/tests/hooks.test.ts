@@ -6,6 +6,7 @@ import {
 	buildGraph,
 	getRootState,
 	useStore,
+	type Instance,
 	type ObjectMap,
 	type RefObject,
 	type RootState,
@@ -26,8 +27,8 @@ interface LayoutObservation {
 	readonly selection: Selection;
 	readonly graph: ObjectMap;
 	readonly object: THREE.Group;
-	readonly instance: { readonly object: THREE.Group };
-	readonly instanceHandle: RefObject<{ readonly object: THREE.Group }>;
+	readonly instance: Instance<THREE.Group>;
+	readonly instanceHandle: RefObject<Instance<THREE.Group>>;
 }
 
 interface FrameObservation {
@@ -114,6 +115,7 @@ describe('Three hooks and graph helpers', () => {
 			expect(initial.object).toBeInstanceOf(THREE.Group);
 			expect(initial.instance.object).toBe(initial.object);
 			expect(initial.instanceHandle.current).toBe(initial.instance);
+			expect(initial.instance.root.commits.length).toBeGreaterThan(0);
 			expect(initial.graph.nodes['fixture-mesh']).toBe(graphMesh);
 			expect(initial.graph.meshes['fixture-mesh']).toBe(graphMesh);
 			expect(initial.graph.materials['fixture-material']).toBe(material);

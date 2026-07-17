@@ -392,9 +392,12 @@ function applyRaycasterOptions(
 			...raycaster.params,
 			...params,
 			Mesh: { ...raycaster.params.Mesh, ...params.Mesh },
-			Line: { ...raycaster.params.Line, ...params.Line },
+			Line: { ...raycaster.params.Line, ...params.Line } as THREE.Raycaster['params']['Line'],
 			LOD: { ...raycaster.params.LOD, ...params.LOD },
-			Points: { ...raycaster.params.Points, ...params.Points },
+			Points: {
+				...raycaster.params.Points,
+				...params.Points,
+			} as THREE.Raycaster['params']['Points'],
 			Sprite: { ...raycaster.params.Sprite, ...params.Sprite },
 		};
 	}
