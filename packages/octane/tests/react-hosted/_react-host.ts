@@ -198,7 +198,10 @@ export class IslandController {
 		this.rootLive = true;
 		return () => {
 			this.disposers.delete(dispose);
-			this.rootLive = false;
+			// A rebind registers the successor before releasing the predecessor
+			// (bindRendererRegionOwner) — the root is only dead when no disposer
+			// remains. Mirrors the production octane/react controller.
+			this.rootLive = this.disposers.size > 0;
 		};
 	}
 

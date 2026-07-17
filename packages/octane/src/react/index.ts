@@ -173,7 +173,14 @@ class HostedIslandController {
 		this.attemptErrored = true;
 		this.status = 2;
 		this.payload = error;
+		// An error supersedes any pending episode (§7): invalidate it so a later
+		// settlement's retry cannot clobber the staged error with a "ready"
+		// status, and resolve the relay so the suspended wrapper wakes and
+		// throws into the nearest React error boundary.
+		const episode = this.episode;
+		this.episode = null;
 		this.notify();
+		episode?.resolve();
 		return true;
 	}
 
@@ -189,8 +196,11 @@ class HostedIslandController {
 				resolve = done;
 			});
 			episode = this.episode = { relay, resolve };
-			this.status = 1;
-			this.payload = relay;
+			// A staged error outranks a pending episode — never downgrade it.
+			if (this.status !== 2) {
+				this.status = 1;
+				this.payload = relay;
+			}
 			this.notify();
 		}
 		const current = episode;
@@ -342,21 +352,22 @@ class HostedIslandController {
 	}
 
 	private retryAfterSettle(episode: PendingEpisode): void {
-		// A settlement from a superseded episode or an unmounted island is a no-op.
+		// A settlement from a superseded episode or an unmounted island is a
+		// no-op. routeError supersedes the episode when a fault is staged, so a
+		// stale settlement can never clobber an error with a "ready" status.
 		if (this.disposed || this.episode !== episode) return;
 		// Retry Octane FIRST; React learns about readiness only after the hosted
 		// tree has committed (§7 — the Ripple lesson).
 		const result = this.attachAndFlush();
-		if (result.suspended) return; // same episode remains pending
+		// Re-suspended: the same episode remains pending. Errored: routeError
+		// already superseded the episode, staged status 2, and resolved the relay
+		// so the wrapper wakes and throws into the nearest React error boundary.
+		if (result.suspended || result.errored) return;
 		this.episode = null;
-		if (!result.errored) {
-			this.status = 0;
-			this.payload = null;
-			// Post-flush work completes before React reveals the island.
-			drainPassiveEffects();
-		}
-		// On error, routeError already staged status 2 — waking the wrapper makes
-		// it throw the original error into the nearest React error boundary.
+		this.status = 0;
+		this.payload = null;
+		// Post-flush work completes before React reveals the island.
+		drainPassiveEffects();
 		episode.resolve();
 	}
 }

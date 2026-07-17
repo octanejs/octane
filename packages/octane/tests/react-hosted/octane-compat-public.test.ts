@@ -24,6 +24,7 @@ import {
 	NotifyIsland,
 	RefIsland,
 	RenderLogIsland,
+	PendingFaultIsland,
 	SuspendingIsland,
 	ThrowingIsland,
 	UseIdIsland,
@@ -326,6 +327,71 @@ describe('octane/react — suspension and error escape to React boundaries', () 
 			await reactAct(async () => boundaryRef.current!.reset());
 			expect(mounted.container.querySelector('.react-caught')).toBeNull();
 			expect(mounted.host().querySelector('.ok')?.textContent).toBe('ok');
+			await mounted.unmount();
+		} finally {
+			quiet.mockRestore();
+		}
+	});
+
+	it('keeps a fault staged during a pending episode: the later settlement cannot reveal the island', async () => {
+		// An island error routed while a suspension episode is pending supersedes
+		// the episode (§7: errors outrank pending). Without that, the original
+		// resource settling would retry, succeed, reset status to ready, and
+		// resolve the relay — silently dropping the staged error and revealing
+		// the island instead of surfacing it to the React error boundary.
+		const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const ready = { status: 'fulfilled' as const, value: 'first', then() {} };
+			const late = deferred<string>();
+			let trigger!: () => void;
+			const faults: string[] = [];
+			function App(props: { resource: unknown }) {
+				return h(
+					SpikeErrorBoundary,
+					{
+						fallback: (error: unknown) =>
+							h('p', { className: 'react-caught' }, `caught:${(error as Error).message}`),
+					} as any,
+					h(
+						React.Suspense,
+						{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+						h(
+							OctaneCompat,
+							null,
+							h(PendingFaultIsland as any, {
+								resource: props.resource,
+								faults,
+								arm: (fire: () => void) => {
+									trigger = fire;
+								},
+							}),
+						),
+					),
+				);
+			}
+			const mounted = await mountReactHost(h(App, { resource: ready }));
+			expect(mounted.host().querySelector('.pf-resolved')?.textContent).toBe('value:first');
+
+			// An update suspends: the committed root is retained, episode pending.
+			await mounted.render(h(App, { resource: late.promise }));
+			expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+
+			// An island-internal update faults while the episode is pending, and
+			// the original resource settles in the SAME flush window — the retry
+			// microtask runs before React processes the staged error. The retry
+			// would succeed (the fault queue is empty by then), so without
+			// error-supersedes-episode it resets the controller to ready and the
+			// island reveals with 'value:too-good' instead of the error surfacing.
+			faults.push('mid-episode fault');
+			await reactAct(async () => {
+				trigger();
+				late.resolve('too-good');
+				await late.promise;
+			});
+			expect(mounted.container.querySelector('.react-caught')?.textContent).toBe(
+				'caught:mid-episode fault',
+			);
+			expect(document.querySelector('.pf-resolved')).toBeNull();
 			await mounted.unmount();
 		} finally {
 			quiet.mockRestore();

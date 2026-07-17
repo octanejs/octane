@@ -83,6 +83,24 @@ export function SuspendingIsland(props) @{
 	</p>
 }
 
+/**
+ * Suspends on props.resource once committed, and can be told to fault from an
+ * island-internal update: `props.arm` receives a trigger that schedules an
+ * Octane re-render whose render throws exactly the faults queued in the
+ * mutable `props.faults` array — the mid-pending-episode error interleaving.
+ */
+export function PendingFaultIsland(props) @{
+	const [, setEpoch] = useState(0);
+	useLayoutEffect(() => {
+		props.arm(() => setEpoch((epoch) => epoch + 1));
+	}, []);
+	if (props.faults.length > 0) throw new Error(props.faults.shift());
+	const value = use(props.resource);
+	<p class="pf-resolved">
+		{'value:' + value as string}
+	</p>
+}
+
 /** Discovers the mirror context AND suspends in the same initial attempt (§6.2 step 7 / OQ15). */
 export function ThemedSuspendingIsland(props) @{
 	const theme = use(MirrorTheme);
