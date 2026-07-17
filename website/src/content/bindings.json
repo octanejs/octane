@@ -42,6 +42,7 @@
       "@octanejs/hook-form",
       "@octanejs/tanstack-form",
       "@octanejs/lexical",
+      "@octanejs/tiptap",
       "@octanejs/mdx",
       "@octanejs/i18next"
     ]

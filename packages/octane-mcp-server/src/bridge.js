@@ -21,6 +21,7 @@ export const KNOWN_BINDINGS = {
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	'@lexical/react': '@octanejs/lexical',
+	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
 	'@floating-ui/react': '@octanejs/floating-ui',
 	'radix-ui': '@octanejs/radix',
@@ -111,6 +112,7 @@ export const KNOWN_VANILLA_CORES = {
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',
 	'@lexical/react': 'lexical',
+	'@tiptap/react': '@tiptap/core',
 };
 
 export const REACT_API_MAP = {
