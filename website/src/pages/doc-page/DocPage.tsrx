@@ -66,13 +66,28 @@ export function DocPage() @{
 	const tocTrack = useRef<HTMLDivElement | null>(null);
 	// A TOC click claims its target here so the scroll-spy can hold that row lit
 	// through the smooth scroll instead of walking the highlight through every
-	// section the animation sweeps past. The timer is the release fallback, and
-	// the spy publishes its measure() through measureRef so that fallback can
-	// re-run live tracking the moment it releases the lock — without it the
-	// clicked row would stay lit until the next scroll or resize event.
+	// section the animation sweeps past. The lock is released when the target
+	// reaches the activation line, or — for targets that can never reach it —
+	// once scrolling SETTLES: every locked scroll tick re-arms the release
+	// timer, so a fixed deadline can't expire mid-flight on a long smooth
+	// scroll and let the highlight walk after all. The spy publishes measure()
+	// through measureRef so releasing resumes live tracking immediately.
 	const clickLock = useRef<string | null>(null);
 	const clickTimer = useRef(0);
 	const measureRef = useRef<(() => void) | null>(null);
+	// Long enough to bridge the gap between smooth-scroll frames (and the delay
+	// before the first one); short enough that tracking resumes promptly.
+	const CLICK_SETTLE_MS = 250;
+	const armClickRelease = () => {
+		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
+		clickTimer.current = window.setTimeout(() => {
+			clickLock.current = null;
+			clickTimer.current = 0;
+			// Resume live tracking right away: with no fresh measure the clicked
+			// row would stay lit until the next scroll or resize event.
+			measureRef.current?.();
+		}, CLICK_SETTLE_MS);
+	};
 
 	// Scroll-spy: the active section is the last heading whose top has crossed a
 	// line just below the sticky header. Reads are coalesced into one rAF so
@@ -106,10 +121,20 @@ export function DocPage() @{
 			if (atBottom) current = headings[headings.length - 1].id;
 
 			// While a TOC click is smooth-scrolling to its target, keep that target
-			// lit and ignore the sections the animation passes through; resume live
-			// tracking once the target settles at (or past) the activation line.
+			// lit and ignore the sections the animation passes through. The lock
+			// releases when the target reaches the activation line; until then each
+			// tick pushes the settle timer out, so the lock outlives the whole
+			// animation however long the scroll is.
 			if (clickLock.current !== null) {
-				if (current === clickLock.current) clickLock.current = null;
+				if (current === clickLock.current) {
+					clickLock.current = null;
+					if (clickTimer.current !== 0) {
+						clearTimeout(clickTimer.current);
+						clickTimer.current = 0;
+					}
+				} else {
+					armClickRelease();
+				}
 				return;
 			}
 			setActiveId(current);
@@ -218,18 +243,13 @@ export function DocPage() @{
 		event.preventDefault();
 		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		// Claim the target before scrolling so the spy holds it through the smooth
-		// animation. The fallback timer releases the lock in case the target never
-		// reaches the activation line — e.g. a heading near the page bottom that
-		// can't scroll all the way up — so live tracking always resumes.
+		// animation. The settle timer covers targets that never reach the
+		// activation line (e.g. a heading near the page bottom): scroll ticks keep
+		// re-arming it, so it fires only once scrolling has actually stopped —
+		// then live tracking resumes. This initial arm covers the no-scroll case
+		// where the target is already in position and no tick ever fires.
 		clickLock.current = id;
-		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
-		clickTimer.current = window.setTimeout(() => {
-			clickLock.current = null;
-			clickTimer.current = 0;
-			// Resume live tracking right away: with no fresh measure the clicked
-			// row would stay lit until the next scroll or resize event.
-			measureRef.current?.();
-		}, 700);
+		armClickRelease();
 		heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
 		heading.setAttribute('tabindex', '-1');
 		heading.focus({ preventScroll: true });
