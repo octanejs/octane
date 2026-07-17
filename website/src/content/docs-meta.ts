@@ -52,7 +52,7 @@ export const docsMeta: DocMeta[] = [
 		slug: 'core-apis',
 		title: 'Core APIs',
 		description:
-			'Learn how components, state, events, context, effects, async UI, and rendering fit together.',
+			'Learn how components, state, events, context, effects, async UI, deferred hydration, and rendering fit together.',
 		group: 'Learn Octane',
 		sections: [
 			{ id: 'mental-model', title: 'The mental model' },
@@ -62,6 +62,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'context', title: 'Sharing data' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
 			{ id: 'async-ui', title: 'Loading data and code' },
+			{ id: 'deferred-hydration', title: 'Deferred hydration' },
 			{ id: 'responsive-updates', title: 'Responsive updates' },
 			{ id: 'roots-and-rendering', title: 'Roots and rendering' },
 			{ id: 'server-rendering', title: 'Server rendering' },
