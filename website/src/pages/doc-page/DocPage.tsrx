@@ -117,15 +117,27 @@ export function DocPage() @{
 	// Slide the accent indicator onto the active row: measure its real position
 	// within the track and hand the numbers to CSS, which animates the transform
 	// and height. Measuring the rendered link (not an assumed row height) keeps it
-	// exact when titles wrap or nest.
+	// exact when titles wrap or nest. Geometry can also shift with NO activeId
+	// change — the desktop rail is display:none under 1180px (measuring 0×0), so
+	// widening the viewport back must remeasure, as must title rewraps and font
+	// swaps — hence the ResizeObserver on both the track (overall layout) and the
+	// link (its own box). doc?.slug is a dependency so a route change re-targets
+	// the new track/link nodes even when the new doc's active id is identical.
 	useEffect(() => {
 		const track = tocTrack.current;
 		if (!track || activeId === '') return;
 		const link = track.querySelector<HTMLElement>('[data-id="' + activeId + '"]');
 		if (!link) return;
-		track.style.setProperty('--indicator-y', link.offsetTop + 'px');
-		track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
-	}, [activeId]);
+		const place = () => {
+			track.style.setProperty('--indicator-y', link.offsetTop + 'px');
+			track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
+		};
+		place();
+		const observer = new ResizeObserver(place);
+		observer.observe(track);
+		observer.observe(link);
+		return () => observer.disconnect();
+	}, [activeId, doc?.slug]);
 
 	// Smooth-scroll to a heading, honoring reduced-motion, and move focus there
 	// (without a second scroll jump) so keyboard and screen-reader users land in
