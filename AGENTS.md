@@ -150,6 +150,11 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   captures and omits stable hook results (state setters/dispatchers, refs, and
   state getters). It also omits `useEffectEvent` results because Effect Events
   are non-reactive captures, despite their intentionally fresh wrapper identity.
+  Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules also
+  qualify when they transparently forward a callback parameter and their final
+  dependency parameter to one of these hooks. Plain `.ts`/`.js` modules,
+  imported/method hooks, and wrappers that transform or inspect those parameters
+  require an explicit dependency argument.
   Explicit arrays retain React's exact behavior and are never rewritten; `null`
   explicitly means run or recompute after every render.
 - **State hooks expose a compiler-driven current-state getter.** `useState` and

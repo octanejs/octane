@@ -44,6 +44,9 @@ Octane is the day-to-day feel:
   effect events. It is the no-bookkeeping dependency DX associated with signal
   frameworks, while keeping the hooks model you already know. Explicit arrays
   remain authoritative; pass `null` when you intentionally want every render.
+  Locally declared custom hooks in a full-compiled `.tsrx`/`.tsx` module get
+  the same inference when they transparently forward a callback and final
+  dependency parameter to one of these hooks.
 - **No rules of hooks.** Hooks are tracked by call site, not call order, so a
   hook can live inside an `if` or after an early return — the usual React
   footguns simply aren't there. The one rule that remains is enforced for you:
@@ -372,6 +375,22 @@ useEffect(() => initialize(), []); // explicitly mount/reconnect only
 useEffect(() => sync(room.id), [room.id]); // explicit dependencies
 useEffect(() => measure(), null); // explicitly after every commit
 ```
+
+The same inference applies to a locally declared custom hook in a full-compiled
+`.tsrx`/`.tsx` module when its implementation transparently forwards a callback
+and final dependency parameter:
+
+```jsx
+function useTrackedEffect(callback, dependencies) {
+  useEffect(callback, dependencies);
+}
+
+useTrackedEffect(() => sync(room.id)); // inferred from the closure
+```
+
+This proof is deliberately local and conservative. Plain `.ts`/`.js` modules,
+imported custom hooks, and wrappers that transform or otherwise inspect those
+parameters still require an explicit dependency argument.
 
 `useState` and `useReducer` also expose an optional third tuple member: a stable getter for
 the hook's latest state. It is useful in async callbacks and other long-lived

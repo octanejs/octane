@@ -988,6 +988,18 @@ export const HOOK_NAMES = new Set([
 	'useOptimistic',
 ]);
 
+function hookRuntimeModulesForCompile(options, universalUnits = []) {
+	const modules = new Set(options?.__hookRuntimeModules || []);
+	if (typeof options?.renderer?.module === 'string') modules.add(options.renderer.module);
+	for (const unit of options?.__universalUnits || []) {
+		if (typeof unit?.renderer?.module === 'string') modules.add(unit.renderer.module);
+	}
+	for (const unit of universalUnits || []) {
+		if (typeof unit?.renderer?.module === 'string') modules.add(unit.renderer.module);
+	}
+	return [...modules];
+}
+
 // Namespace inheritance — mirrors HTML5 foreign-content rules. The element
 // itself and its children may have *different* namespaces: <foreignObject>
 // inside SVG is still an SVG element, but its children switch back to HTML.
@@ -1357,13 +1369,13 @@ function computeEventInvariantLocals(statements, identityInvariant) {
 }
 
 // Resolve only hook identities whose lexical provenance is trustworthy for
-// stability analysis. `applyHookDependencies` annotates real Octane imports
-// (including named aliases and namespace members) and genuinely unbound bare
-// calls. A same-spelled local/parameter/module binding has neither annotation,
-// so a factory named `useState` or `useEffectEvent` cannot make its fresh return
-// value look lifetime-stable.
+// stability analysis. `applyHookDependencies` annotates real Octane and
+// configured renderer-runtime imports (including named aliases and namespace
+// members), plus genuinely unbound bare calls. A same-spelled local/parameter/
+// module binding has neither annotation, so a factory named `useState` or
+// `useEffectEvent` cannot make its fresh return value look lifetime-stable.
 function stableHookCallName(call) {
-	const imported = call?._octaneImportedHook;
+	const imported = call?._octaneImportedHook ?? call?._octaneHookRuntimeImportedHook;
 	if (imported !== undefined && HOOK_NAMES.has(imported)) return imported;
 	if (
 		call?._octaneUnboundCallee === true &&
@@ -2044,7 +2056,10 @@ function containsAutoMemoContextRead(root, ctx) {
 			return;
 		}
 		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
-			const name = node._octaneImportedHook ?? ctx.octaneImportLocals?.get(node.callee.name);
+			const name =
+				node._octaneImportedHook ??
+				node._octaneHookRuntimeImportedHook ??
+				ctx.octaneImportLocals?.get(node.callee.name);
 			if (
 				name === 'useContext' ||
 				name === 'use' ||
@@ -3789,6 +3804,7 @@ export function compile(source, filename, options) {
 					renderer: undefined,
 					rendererBoundaries: undefined,
 					rendererRegistry: undefined,
+					__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
 					__rendererBoundariesLowered: true,
 					__universal: universal,
 					__universalUnits: rendererBoundaryPreparation?.universalUnits,
@@ -3828,7 +3844,13 @@ export function compile(source, filename, options) {
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
 	// through untouched.
-	applyHookDependencies(ast, { filename });
+	applyHookDependencies(ast, {
+		filename,
+		hookRuntimeModules: hookRuntimeModulesForCompile(
+			options,
+			rendererBoundaryPreparation?.universalUnits,
+		),
+	});
 	const hmrOption = options && options.hmr;
 	const hmrDialect = hmrOption === true ? 'vite' : hmrOption || false;
 	if (hmrDialect !== false && hmrDialect !== 'vite' && hmrDialect !== 'webpack') {
@@ -4694,7 +4716,10 @@ function compileServer(source, filename, options) {
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
-	applyHookDependencies(ast, { filename });
+	applyHookDependencies(ast, {
+		filename,
+		hookRuntimeModules: hookRuntimeModulesForCompile(options),
+	});
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -7956,7 +7981,7 @@ function slotKeyedHookName(n, ctx) {
 	if (n.type !== 'CallExpression') return null;
 	if (n.callee.type === 'Identifier') {
 		const local = n.callee.name;
-		const imported = n._octaneImportedHook;
+		const imported = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
 		// A name bound by a non-octane import is that library's hook, never the
 		// builtin — it still slot-keys through the custom `use[A-Z]` branch below.
 		const shadowsImport =
@@ -7967,8 +7992,9 @@ function slotKeyedHookName(n, ctx) {
 		if (/^use[A-Z]/.test(local) && local !== 'useContext') return local;
 		return null;
 	}
-	if (n._octaneImportedHook !== undefined && HOOK_NAMES.has(n._octaneImportedHook)) {
-		return n._octaneImportedHook;
+	const imported = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
+	if (imported !== undefined && HOOK_NAMES.has(imported)) {
+		return imported;
 	}
 	if (
 		!n.optional &&
@@ -8159,7 +8185,7 @@ function isTransparentStateTupleWrapper(node, child) {
 // Escaping or ambiguous tuples conservatively receive the full shape.
 function stateTupleHookName(call, ctx) {
 	const callee = call?.callee;
-	const imported = call?._octaneImportedHook;
+	const imported = call?._octaneImportedHook ?? call?._octaneHookRuntimeImportedHook;
 	if (imported !== undefined) return STATE_GETTER_HELPERS[imported] ? imported : null;
 	if (callee?.type === 'Identifier') {
 		// Preserve the historical auto-import shorthand for an unbound bare base
@@ -8274,14 +8300,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
 			const profileOwner = annotatedOwner?.name || componentName;
 			const importedName = n._octaneImportedHook;
-			// A non-octane import binding also shadows the builtin spelling: the call
-			// is that library's custom hook (slotted + withSlot-wrapped below), and
-			// claiming it as builtin would inject a colliding octane runtime import.
-			const shadowsImport =
-				!generated &&
-				((ctx.octaneImportLocals?.has(localName) && importedName === undefined) ||
-					ctx.foreignImportLocals?.has(localName) === true);
-			const name = importedName ?? localName;
+			const hookRuntimeImportedName = n._octaneHookRuntimeImportedHook;
+			const name = importedName ?? hookRuntimeImportedName ?? localName;
 			// Three kinds of call get a trailing per-call-site hook slot:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
 			//  - a custom / library hook by React's `use[A-Z]` convention — e.g. a
@@ -8296,12 +8316,13 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			// NB: a `use*` NAME is reserved for hooks (React's convention) — a non-hook
 			// function named like one gets a harmless extra trailing argument (though
 			// inside a plain JS loop the convention is enforced: rejectHookInJsLoop).
-			const isBuiltin = (generated || !shadowsImport) && HOOK_NAMES.has(name);
-			const isCustom =
-				!generated &&
-				importedName === undefined &&
-				/^use[A-Z]/.test(localName) &&
-				localName !== 'useContext';
+			const isBuiltin =
+				HOOK_NAMES.has(name) &&
+				(generated ||
+					importedName !== undefined ||
+					hookRuntimeImportedName !== undefined ||
+					n._octaneUnboundCallee === true);
+			const isCustom = !generated && !isBuiltin && /^use[A-Z]/.test(name) && name !== 'useContext';
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isCustom || isServerUse) {
 				// Keep a Symbol at custom-hook call boundaries: published bindings split
@@ -8323,7 +8344,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				// user binding of the same name can't shadow it.
 				if (isBuiltin) {
 					if (n.callee._octaneGenerated) requireRuntimeForContext(ctx, name);
-					else ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
+					else if (hookRuntimeImportedName === undefined) {
+						ctx.userRuntimeNames.add(localName === name ? name : `${name} as ${localName}`);
+					}
 					if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
 				}
 				if (isServerUse)
@@ -8402,9 +8425,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			!n.callee.computed &&
 			n.callee.object.type === 'Identifier' &&
 			n.callee.property.type === 'Identifier' &&
-			n._octaneImportedHook !== undefined
+			(n._octaneImportedHook !== undefined || n._octaneHookRuntimeImportedHook !== undefined)
 		) {
-			const name = n._octaneImportedHook;
+			const name = n._octaneImportedHook ?? n._octaneHookRuntimeImportedHook;
 			const isBuiltin = HOOK_NAMES.has(name);
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isServerUse) {

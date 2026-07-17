@@ -19,8 +19,12 @@ Omitting the array on `useEffect`, `useLayoutEffect`, `useInsertionEffect`,
 `useMemo`, `useCallback`, or `useImperativeHandle` does not mean "every render"
 — the compiler derives dependencies from lexical captures, omitting stable hook
 results (state setters/dispatchers, refs, state getters, `useEffectEvent`
-results). Explicit arrays keep React's exact behavior and are never rewritten;
-`null` explicitly means run or recompute after every render.
+results). Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules
+also qualify when they transparently forward a callback and final dependency
+parameter to one of those hooks; plain `.ts`/`.js`, imported/method, or
+transforming wrappers require an explicit list. Explicit arrays keep React's
+exact behavior and are never rewritten; `null` explicitly means run or
+recompute after every render.
 
 ## State hooks expose a current-state getter
 
