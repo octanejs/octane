@@ -1,0 +1,25 @@
+{
+  "name": "website-mcp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The remote Octane MCP server (mcp.octanejs.dev)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "octane-preview",
+    "test": "cd ../.. && vitest run --project website-mcp"
+  },
+  "dependencies": {
+    "octane": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.21.0",
+    "@octanejs/adapter-vercel": "workspace:*",
+    "@octanejs/mcp-server": "workspace:*",
+    "@octanejs/vite-plugin": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
 	bridgeReport,
+	bridgeReportFromSource,
 	detectVanillaCore,
 	scanSource,
 	KNOWN_BINDINGS,
@@ -168,6 +169,53 @@ describe('bridgeReport', () => {
 		);
 		const report = await bridgeReport({ path: root });
 		expect(report.filesScanned).toBe(1);
+		expect(report.verdict).toBe('bridgeable');
+	});
+});
+
+describe('bridgeReportFromSource', () => {
+	it('produces the same verdict and plan as bridgeReport without touching the filesystem', () => {
+		const report = bridgeReportFromSource(`
+			import { forwardRef, useState } from 'react';
+			export const Thing = forwardRef((props, ref) => {
+				const [n] = useState(0);
+				return n;
+			});
+		`);
+		expect(report.target).toBe('pasted-source');
+		expect(report.reactImports).toContain('react');
+		expect(report.verdict).toBe('bridgeable-with-rewrites');
+		expect(report.apis.find((row) => row.name === 'forwardRef').status).toBe('rewrite');
+		expect(report.plan.join('\n')).toContain('forwardRef');
+	});
+
+	it('reports class components as needs-rework', () => {
+		const report = bridgeReportFromSource(`
+			import React from 'react';
+			export class Panel extends React.Component { render() { return null; } }
+		`);
+		expect(report.classComponents).toBe(true);
+		expect(report.verdict).toBe('needs-rework');
+		expect(report.plan.join('\n')).toContain('function component');
+	});
+
+	it('surfaces the official binding and vanilla core when a package name is given', () => {
+		const report = bridgeReportFromSource(`export {};`, {
+			packageName: '@tanstack/react-query',
+		});
+		expect(report.target).toBe('@tanstack/react-query');
+		expect(report.existingBinding).toBe('@octanejs/tanstack-query');
+		expect(report.vanillaCore).toBe('@tanstack/query-core');
+		expect(report.plan[0]).toContain('@octanejs/tanstack-query');
+	});
+
+	it('same-name hook usage stays bridgeable', () => {
+		const report = bridgeReportFromSource(`
+			import { useSyncExternalStore } from 'react';
+			export function useStore(api, selector) {
+				return useSyncExternalStore(api.subscribe, () => selector(api.getState()));
+			}
+		`);
 		expect(report.verdict).toBe('bridgeable');
 	});
 });

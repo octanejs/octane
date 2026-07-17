@@ -28,7 +28,8 @@
     "octane-mcp-server": "src/index.js"
   },
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./bridge": "./src/bridge.js"
   },
   "scripts": {
     "start": "node src/index.js",

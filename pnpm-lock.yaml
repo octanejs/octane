@@ -4107,6 +4107,34 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
 
+  website-mcp:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.21.0
+        version: 1.29.0(zod@4.4.3)
+      '@octanejs/adapter-vercel':
+        specifier: workspace:*
+        version: link:../packages/adapter-vercel
+      '@octanejs/mcp-server':
+        specifier: workspace:*
+        version: link:../packages/octane-mcp-server
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../packages/vite-plugin-octane
+      octane:
+        specifier: workspace:*
+        version: link:../packages/octane
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: catalog:default
+        version: 5.9.3
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
 packages:
 
   '@adobe/css-tools@4.5.0':
