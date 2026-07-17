@@ -154,12 +154,17 @@ export function PackageInstall(props: PackageInstallProps) @{
 				overflow: hidden;
 			}
 			/* Header strip: tabs on the left, copy on the right, divided from the
-			   command by a hairline — reads as one terminal panel. */
+			   command by a hairline — reads as one terminal panel. The 2rem min-height
+			   is the shared invariant with .codeblock-bar, so the two panel headers
+			   stay the same height; the tabs stretch to fill it (rather than the tab
+			   padding + font setting the height), so bumping the tab font can't drift
+			   this out of step with the doc code-block header. */
 			.pkg-head {
 				display: flex;
 				align-items: stretch;
 				justify-content: space-between;
 				gap: 0.5rem;
+				min-height: 2rem;
 				padding: 0 0.4rem 0 0.35rem;
 				border-bottom: 1px solid var(--border);
 				background: rgba(255, 255, 255, 0.02);
@@ -172,7 +177,10 @@ export function PackageInstall(props: PackageInstallProps) @{
 			   text, the rest sit quiet until hover. */
 			.pkg-tab {
 				position: relative;
-				padding: 0.6rem 0.75rem;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				padding: 0.5rem 0.75rem;
 				border: none;
 				background: transparent;
 				color: var(--text-secondary);

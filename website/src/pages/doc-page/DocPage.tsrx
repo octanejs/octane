@@ -305,7 +305,6 @@ export function DocPage() @{
 				top: 0;
 				width: 2px;
 				height: var(--indicator-h, 1.6rem);
-				border-radius: 2px;
 				background: var(--accent);
 				transform: translateY(var(--indicator-y, 0));
 				opacity: 0;

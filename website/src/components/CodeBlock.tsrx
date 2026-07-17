@@ -118,8 +118,9 @@ export function CodeBlock(props: CodeBlockProps) @{
 			}
 			/* A tinted strip divided from the code by a hairline — the same header
 			   treatment as the package-install panel, so the two read as siblings.
-			   The 2rem height matches .pkg-head (there set by its 0.6rem tab padding
-			   over 0.8rem/line-height-1 text); keep the two in step. */
+			   Both headers are pinned to the same min-height: 2rem (see .pkg-head,
+			   whose tabs stretch to fill it), so they stay the same height regardless
+			   of tab font size; keep the two values in step. */
 			.codeblock-bar {
 				display: flex;
 				align-items: center;
