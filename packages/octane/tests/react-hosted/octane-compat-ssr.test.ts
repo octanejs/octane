@@ -310,6 +310,58 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		}
 	});
 
+	it('client-remounts an island whose UNSEEDED suspension escapes adoption (§5 rule 9)', async () => {
+		// The seeded case above never escapes: the server completed the use()
+		// and its serialized seed satisfies the client read synchronously. An
+		// UNSEEDED bare suspension — the client suspends where the server has
+		// no seed, necessarily a server/client divergence — is the path that
+		// actually escapes hydrateRoot into the owned-root routing. Adoption is
+		// abandoned: React (whose hydration commit already adopted the host)
+		// swaps the boundary to its fallback and hides the host, the runtime
+		// batch-clears the abandoned server nodes (the root.unmount() teardown
+		// sequence — never user-visible, the host is display:none), and the
+		// settle retry binds a FRESH root so the island client-remounts with
+		// live client data.
+		const clientResource = deferred<string>();
+		const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const serverPage = h(
+				'main',
+				null,
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompatServer, null, h(server.SsrGreeting, { name: 'diverged' })),
+				),
+			);
+			const clientPage = h(
+				'main',
+				null,
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompat, null, h(ClientSsrAsync as any, { resource: clientResource.promise })),
+				),
+			);
+			const mounted = await hydratePage(serverPage, clientPage);
+			// Escaped: the boundary shows its fallback and the host is hidden
+			// while the episode is pending — no crash, no visible stale markup.
+			expect(mounted.container.querySelector('.react-fallback')).not.toBeNull();
+			expect(mounted.host().style.display).toBe('none');
+
+			await reactAct(async () => {
+				clientResource.resolve('client-data');
+				await clientResource.promise;
+			});
+			// The retry bound a fresh root: revealed with live client content.
+			expect(mounted.container.querySelector('.react-fallback')).toBeNull();
+			expect(mounted.container.querySelector('.ssr-async')?.textContent).toBe('value:client-data');
+			await mounted.unmount();
+		} finally {
+			quiet.mockRestore();
+		}
+	});
+
 	it('hydrates a CSS-producing island without mismatch alongside hoisted style resources', async () => {
 		const errors = vi.spyOn(console, 'error');
 		const serverPage = h(
