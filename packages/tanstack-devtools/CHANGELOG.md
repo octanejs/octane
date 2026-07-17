@@ -1,10 +1,18 @@
-# @octanejs/dnd-kit
+# @octanejs/tanstack-devtools
 
-## 0.1.3
+## 0.0.2
 
 ### Patch Changes
 
-- 6ccdbce: Keep default sortable keyboard moves inside Octane-owned keyed DOM ranges while preserving explicitly configured plugin arrays.
+- 84a402d: Add the Octane binding for TanStack Devtools (`@tanstack/react-devtools` 0.10.7),
+  porting the `TanStackDevtools` component and its plugin/init types while reusing
+  the framework-agnostic `@tanstack/devtools` core unchanged. Plugin, title, and
+  custom-trigger content authored as Octane elements is portaled into the containers
+  the core creates. Public adapter types are Octane-prefixed
+  (`TanStackDevtoolsOctanePlugin`, `TanStackDevtoolsOctaneInit`), `ref` is the normal
+  React-19-style ref prop, and events are native. The main entry also re-exports the
+  `@tanstack/devtools` core surface so consumers can type plugins without a direct
+  dependency on it. Includes behavioral, SSR, and type tests.
 - Updated dependencies [156f213]
 - Updated dependencies [2a5f44f]
 - Updated dependencies [f8e94f2]
@@ -38,30 +46,3 @@
 - Updated dependencies [dbbcee1]
 - Updated dependencies [5287eac]
   - octane@0.1.8
-
-## 0.1.2
-
-### Patch Changes
-
-- Updated dependencies [eaacd17]
-- Updated dependencies [93dcb81]
-- Updated dependencies [6852df7]
-- Updated dependencies [b00cd74]
-- Updated dependencies [e9852d4]
-  - octane@0.1.7
-
-## 0.1.1
-
-### Patch Changes
-
-- e55f6ed: Add complete modern dnd-kit bindings with sortable, sensor, overlay, SSR, hydration,
-  and React differential coverage. Preserve nested empty component ranges during
-  hydration so later updates can fill and clear them without mutating server markup.
-- Updated dependencies [d173805]
-- Updated dependencies [85e589e]
-- Updated dependencies [2979f42]
-- Updated dependencies [b41a91a]
-- Updated dependencies [e55f6ed]
-- Updated dependencies [d173805]
-- Updated dependencies [813fd50]
-  - octane@0.1.6
