@@ -53,6 +53,9 @@ const NO_CHILDREN = Symbol('octane.universal.no-children');
 const NO_KEY = Symbol('octane.universal.no-key');
 const NO_PENDING_PASSIVE_ERROR = Symbol('octane.universal.no-pending-passive-error');
 
+/** Structured-clone protocol version used by experimental transported roots. */
+export const UNIVERSAL_TRANSPORT_PROTOCOL_VERSION = 1 as const;
+
 export type UniversalKey = string | number | symbol | bigint;
 
 export interface UniversalRendererMetadata {
@@ -442,6 +445,67 @@ export interface UniversalHostBatch {
 	readonly commands: readonly UniversalHostCommand[];
 }
 
+export interface UniversalTransportIdentity {
+	readonly protocol: typeof UNIVERSAL_TRANSPORT_PROTOCOL_VERSION;
+	readonly renderer: string;
+	readonly root: number;
+	readonly version: number;
+}
+
+export interface UniversalTransportCommitMessage extends UniversalTransportIdentity {
+	readonly type: 'commit';
+	readonly batch: UniversalHostBatch;
+}
+
+export interface UniversalTransportAbortMessage extends UniversalTransportIdentity {
+	readonly type: 'abort';
+}
+
+export interface UniversalTransportAcknowledgement extends UniversalTransportIdentity {
+	readonly type: 'ack';
+}
+
+export interface UniversalTransportCompleteMessage extends UniversalTransportIdentity {
+	readonly type: 'complete';
+}
+
+export interface UniversalTransportError {
+	readonly name: string;
+	readonly message: string;
+}
+
+export interface UniversalTransportRejectMessage extends UniversalTransportIdentity {
+	readonly type: 'reject';
+	readonly error: UniversalTransportError;
+}
+
+export interface UniversalTransportFaultMessage extends UniversalTransportIdentity {
+	readonly type: 'fault';
+	readonly error: UniversalTransportError;
+}
+
+export interface UniversalTransportEventDelivery {
+	readonly listener: number;
+	readonly payload: unknown;
+}
+
+export interface UniversalTransportEventMessage extends UniversalTransportIdentity {
+	readonly type: 'event';
+	readonly priority: UniversalEventPriority;
+	readonly deliveries: readonly UniversalTransportEventDelivery[];
+}
+
+export type UniversalTransportOutboundMessage =
+	| UniversalTransportCommitMessage
+	| UniversalTransportAbortMessage;
+
+export type UniversalTransportInboundMessage =
+	| UniversalTransportAcknowledgement
+	| UniversalTransportCompleteMessage
+	| UniversalTransportRejectMessage
+	| UniversalTransportFaultMessage
+	| UniversalTransportEventMessage;
+
 export interface UniversalHostCommitContext {
 	/** Invoke a renderer-local callback after its owner table has been accepted. */
 	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown;
@@ -453,6 +517,18 @@ export interface UniversalPreparedHostBatch {
 	/** Run renderer-local callbacks after logical owner/listener publication. */
 	afterAccept?(): void;
 	/** Release every unpublished resource staged by preparation exactly once. */
+	abort(): void;
+}
+
+/**
+ * A transported batch starts asynchronously. Calling `acknowledge` is the
+ * irreversible host-acceptance point. Rejection before that call is a rejected
+ * preparation; rejection afterwards is an accepted commit fault.
+ */
+export interface UniversalAsyncPreparedHostBatch {
+	apply(acknowledge: (message: UniversalTransportAcknowledgement) => void): Promise<void>;
+	/** Run adapter-local work after logical owner/listener publication. */
+	afterAccept?(): void;
 	abort(): void;
 }
 
@@ -475,6 +551,7 @@ export interface UniversalHostDriver<Container = unknown, PublicInstance = unkno
 }
 
 export interface UniversalCommitTransport<Container = unknown> {
+	readonly mode?: 'sync';
 	prepareBatch(
 		container: Container,
 		batch: UniversalHostBatch,
@@ -482,14 +559,24 @@ export interface UniversalCommitTransport<Container = unknown> {
 	): UniversalPreparedHostBatch;
 }
 
+export interface UniversalAsyncCommitTransport<Container = unknown> {
+	readonly mode: 'async';
+	prepareBatch(
+		container: Container,
+		batch: UniversalHostBatch,
+		identity: UniversalTransportIdentity,
+	): UniversalAsyncPreparedHostBatch;
+}
+
 export interface UniversalRootOptions<Container> {
-	transport?: UniversalCommitTransport<Container>;
+	transport?: UniversalCommitTransport<Container> | UniversalAsyncCommitTransport<Container>;
 }
 
 export interface UniversalTransaction {
 	readonly status: 'prepared' | 'committed' | 'aborted';
 	readonly batch: UniversalHostBatch;
 	commit(): void;
+	commitAsync(): Promise<void>;
 	abort(): void;
 }
 
@@ -505,9 +592,14 @@ export interface UniversalRoot<P = any> {
 	readonly renderer: string;
 	prepare(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
 	render(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
+	renderAsync(component: UniversalComponent<P>, props: P): Promise<UniversalPreparedAttempt>;
 	eventScope<T>(priority: UniversalEventPriority, run: () => T): T;
 	dispatchEvent(listener: number, payload: unknown): unknown;
+	dispatchTransportEvent(message: UniversalTransportEventMessage): readonly unknown[];
+	/** Wait for event/suspense work queued onto an asynchronous transport. */
+	flushTransport(): Promise<void>;
 	unmount(): void;
+	unmountAsync(): Promise<void>;
 }
 
 interface BlueprintRange {
@@ -737,6 +829,7 @@ interface SuspendedMemoReplay {
 	readonly component: UniversalComponent<any>;
 	readonly props: any;
 	active: boolean;
+	asyncWorkQueued: boolean;
 }
 
 let CURRENT_ATTEMPT: RenderAttempt | null = null;
@@ -752,6 +845,7 @@ let NEXT_UNIVERSAL_ID_ROOT = 1;
 let NEXT_EVENT_ROOT = 1;
 let NEXT_RESOURCE_ROOT = 1;
 let NEXT_PORTAL_ROOT = 1;
+let NEXT_TRANSPORT_ROOT = 1;
 const EVENT_DISPATCHERS = new Map<number, (payload: unknown) => unknown>();
 const UNIVERSAL_SLOT_STACK: unknown[] = [];
 
@@ -3261,14 +3355,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private readonly universalIdRoot = NEXT_UNIVERSAL_ID_ROOT++;
 	private readonly resourceRoot = NEXT_RESOURCE_ROOT++;
 	private readonly portalRoot = NEXT_PORTAL_ROOT++;
+	private readonly transportRoot = NEXT_TRANSPORT_ROOT++;
 	private readonly portalHandles = new Map<string | number, UniversalPortalTargetHandle>();
 	private owner: UniversalOwnerRecord | null = null;
 	private bridge: BoundaryOwner | null = null;
 	private unmounted = false;
+	private unmounting = false;
+	private unmountPromise: Promise<void> | null = null;
+	private asyncWork: Promise<void> = Promise.resolve();
+	private asyncWorkError: unknown = NO_PENDING_PASSIVE_ERROR;
 	private nextId = 1;
 	private nextUniversalId = 1;
 	private nextListener = NEXT_EVENT_ROOT++ * 1_000_000;
 	private nextBatchVersion = 1;
+	private acceptedBatchVersion = 0;
 	private handlers = new Map<number, CommittedEvent>();
 	private localCallbacks = new Map<number, CommittedHostCallback>();
 	private readonly publishedListeners = new Set<number>();
@@ -3289,9 +3389,17 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	constructor(
 		private readonly container: Container,
 		private readonly driver: UniversalHostDriver<Container, PublicInstance>,
-		private readonly transport: UniversalCommitTransport<Container> | null,
+		private readonly transport:
+			| UniversalCommitTransport<Container>
+			| UniversalAsyncCommitTransport<Container>
+			| null,
 	) {
 		assertRendererId(driver.id, 'Universal driver id');
+		if (transport?.mode === 'async' && driver.capabilities?.localHostCallbacks === true) {
+			throw new Error(
+				'Universal async transports do not support the local host callback capability.',
+			);
+		}
 		this.renderer = driver.id;
 		this.rootRecord = {
 			id: 0,
@@ -3311,6 +3419,113 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			parent: null,
 			children: [],
 		};
+	}
+
+	private hasAsyncTransport(): boolean {
+		return this.transport?.mode === 'async';
+	}
+
+	private enqueueAsyncWork(work: () => Promise<void>): void {
+		const run = async () => {
+			try {
+				await work();
+			} catch (error) {
+				if (this.asyncWorkError === NO_PENDING_PASSIVE_ERROR) this.asyncWorkError = error;
+			}
+		};
+		this.asyncWork = this.asyncWork.then(run, run);
+	}
+
+	private flushQueuedTransportWork(): void {
+		if (this.unmounted || this.unmounting) return;
+		if (this.scheduled) this.flushScheduledWork();
+		const replay = this.queuedReplay;
+		if (this.bridge === null && replay !== null && replay.active) this.runReplay(replay);
+	}
+
+	async flushTransport(): Promise<void> {
+		while (true) {
+			const unmount = this.unmountPromise;
+			if (unmount !== null) {
+				try {
+					await unmount;
+				} catch {
+					// The direct unmountAsync() caller owns teardown completion errors.
+					// A pre-ACK rejection may have resumed scheduler/replay work that this
+					// flush must still drain.
+				}
+			}
+			this.flushQueuedTransportWork();
+			const pending = this.asyncWork;
+			await pending;
+			if (this.unmountPromise !== null || (this.unmounting && !this.unmounted)) continue;
+			if (
+				pending === this.asyncWork &&
+				(this.unmounted ||
+					(!this.scheduled &&
+						(this.bridge !== null || this.queuedReplay === null || !this.queuedReplay.active)))
+			) {
+				break;
+			}
+		}
+		if (this.asyncWorkError !== NO_PENDING_PASSIVE_ERROR) {
+			const error = this.asyncWorkError;
+			this.asyncWorkError = NO_PENDING_PASSIVE_ERROR;
+			throw error;
+		}
+	}
+
+	private transportIdentity(version: number): UniversalTransportIdentity {
+		return Object.freeze({
+			protocol: UNIVERSAL_TRANSPORT_PROTOCOL_VERSION,
+			renderer: this.renderer,
+			root: this.transportRoot,
+			version,
+		});
+	}
+
+	validateTransportAcknowledgement(
+		message: UniversalTransportAcknowledgement,
+		version: number,
+	): void {
+		this.validateTransportIdentity(message, version, 'acknowledgement');
+		if (message.type !== 'ack') {
+			throw new Error(`Universal transport expected an acknowledgement for batch ${version}.`);
+		}
+	}
+
+	private validateTransportIdentity(
+		message: UniversalTransportIdentity,
+		version: number,
+		label: string,
+	): void {
+		if (message.protocol !== UNIVERSAL_TRANSPORT_PROTOCOL_VERSION) {
+			throw new Error(
+				`Universal transport ${label} uses protocol ${String(message.protocol)}; expected ${UNIVERSAL_TRANSPORT_PROTOCOL_VERSION}.`,
+			);
+		}
+		if (message.renderer !== this.renderer) {
+			throw new Error(
+				`Universal transport ${label} renderer ${JSON.stringify(message.renderer)} does not match ${JSON.stringify(this.renderer)}.`,
+			);
+		}
+		if (message.root !== this.transportRoot) {
+			throw new Error(`Universal transport ${label} belongs to a stale or foreign root.`);
+		}
+		if (message.version !== version) {
+			throw new Error(
+				`Universal transport ${label} version ${message.version} does not match batch ${version}.`,
+			);
+		}
+	}
+
+	markBatchAccepted(version: number): void {
+		if (version <= this.acceptedBatchVersion) {
+			throw new Error(
+				`Universal transport rejected stale accepted batch version ${version}; current version is ${this.acceptedBatchVersion}.`,
+			);
+		}
+		this.acceptedBatchVersion = version;
 	}
 
 	setBridge(bridge: BoundaryOwner): void {
@@ -3439,7 +3654,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	encodeHostProp(hostType: string, name: string, value: unknown): unknown {
 		const codec = this.driver.props;
-		if (codec === undefined) return value;
+		if (codec === undefined) {
+			// A local driver may intentionally accept renderer-owned objects. Once a
+			// transport is present, however, every ordinary prop must satisfy the wire
+			// value contract even when the renderer did not install a custom codec.
+			return this.transport === null ? value : cloneSerializableValue(value);
+		}
 		const result = codec.encode({
 			container: this.container,
 			renderer: this.renderer,
@@ -3545,6 +3765,26 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return result;
 	}
 
+	dispatchTransportEvent(message: UniversalTransportEventMessage): readonly unknown[] {
+		if (this.unmounted) {
+			throw new Error('Cannot dispatch a transported event to an unmounted universal root.');
+		}
+		this.validateTransportIdentity(message, this.acceptedBatchVersion, 'event');
+		if (message.type !== 'event') {
+			throw new Error('Universal transport expected an event message.');
+		}
+		if (
+			message.priority !== 'discrete' &&
+			message.priority !== 'continuous' &&
+			message.priority !== 'default'
+		) {
+			throw new TypeError(`Unknown universal event priority ${JSON.stringify(message.priority)}.`);
+		}
+		return this.eventScope(message.priority, () =>
+			message.deliveries.map(({ listener, payload }) => this.dispatchEvent(listener, payload)),
+		);
+	}
+
 	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown {
 		const callback = this.localCallbacks.get(listener);
 		if (callback === undefined || callback.owner.disposed) {
@@ -3561,15 +3801,43 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	flushScheduledWork(): void {
 		if (!this.scheduled) return;
+		// A transported teardown is provisional until acknowledgement. Keep work
+		// raised by the still-accepted listener table queued so rejection can resume
+		// it against the accepted tree.
+		if (this.unmounting) return;
 		this.scheduled = false;
 		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) return;
-		if (this.bridge !== null) this.bridge.invalidate();
-		else this.render(this.lastComponent, this.lastProps);
+		if (this.bridge !== null) {
+			this.bridge.invalidate();
+		} else if (this.hasAsyncTransport()) {
+			this.enqueueAsyncWork(async () => {
+				// A direct renderAsync() does not run on the scheduler's asyncWork chain.
+				// Wait for its transaction to settle before preparing the event update;
+				// otherwise prepare() would try to abort a batch already awaiting ACK.
+				while (this.pending?.isAwaitingTransportAcknowledgement()) {
+					const pending = this.pending;
+					try {
+						await pending.commitAsync();
+					} catch {
+						// The direct caller owns its completion error. A pre-ACK rejection
+						// still leaves this accepted state update eligible for retry.
+					}
+				}
+				if (this.unmounting) await this.waitForProvisionalUnmount();
+				if (this.unmounted) return;
+				const component = this.lastComponent;
+				if (component === null) return;
+				await this.renderAsync(component, this.lastProps);
+			});
+		} else {
+			this.render(this.lastComponent, this.lastProps);
+		}
 	}
 
 	queueScheduledWork(): void {
 		if (!this.scheduled) return;
+		if (this.unmounting) return;
 		if (UNIVERSAL_SYNC_DEPTH > 0) return;
 		if (this.bridge !== null) {
 			this.scheduled = false;
@@ -3597,7 +3865,30 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	private runReplay(replay: SuspendedMemoReplay): void {
-		if (!replay.active || this.queuedReplay !== replay || this.unmounted) return;
+		if (!replay.active || this.queuedReplay !== replay || this.unmounted || this.unmounting) return;
+		if (this.hasAsyncTransport()) {
+			if (replay.asyncWorkQueued) return;
+			replay.asyncWorkQueued = true;
+			this.enqueueAsyncWork(async () => {
+				try {
+					// Keep the replay published until its serialized transport turn starts. A
+					// teardown can otherwise abort the prepared replay before commitAsync(),
+					// leaving no replay state to restore when that teardown is rejected.
+					if (this.unmounting) await this.waitForProvisionalUnmount();
+					if (!replay.active || this.queuedReplay !== replay || this.unmounted || this.unmounting) {
+						return;
+					}
+					this.queuedReplay = null;
+					replay.active = false;
+					this.rootRetryAttempt = null;
+					const attempt = this.prepareWithReplay(replay.component, replay.props, replay.entries);
+					if (attempt.status === 'prepared') await attempt.commitAsync();
+				} finally {
+					replay.asyncWorkQueued = false;
+				}
+			});
+			return;
+		}
 		this.queuedReplay = null;
 		replay.active = false;
 		this.rootRetryAttempt = null;
@@ -3620,6 +3911,34 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		queueMicrotask(() => this.runReplay(replay));
 	}
 
+	private resumeAfterRejectedUnmount(): void {
+		this.unmounting = false;
+		if (this.scheduled) this.queueScheduledWork();
+		const replay = this.queuedReplay;
+		if (replay === null || !replay.active) return;
+		if (this.bridge !== null) this.bridge.invalidate();
+		else queueMicrotask(() => this.runReplay(replay));
+	}
+
+	private async waitForProvisionalUnmount(): Promise<void> {
+		while (this.unmounting && !this.unmounted) {
+			const unmount = this.unmountPromise;
+			if (unmount === null) {
+				// unmountAsync() installs its public promise after preparing and starting
+				// the token. Yield through that synchronous setup window rather than
+				// treating queued accepted work as canceled.
+				await Promise.resolve();
+				continue;
+			}
+			try {
+				await unmount;
+			} catch {
+				// The unmountAsync() caller owns teardown errors. Rejection before ACK
+				// reopens this root, so the queued accepted work continues below.
+			}
+		}
+	}
+
 	private publishLocalReplay(
 		thenables: readonly PromiseLike<unknown>[],
 		entries: readonly SuspendedMemoEntry[],
@@ -3627,7 +3946,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		props: any,
 	): void {
 		if (this.awaitingReplay !== null) this.awaitingReplay.active = false;
-		const replay: SuspendedMemoReplay = { entries, component, props, active: true };
+		const replay: SuspendedMemoReplay = {
+			entries,
+			component,
+			props,
+			active: true,
+			asyncWorkQueued: false,
+		};
 		this.awaitingReplay = replay;
 		for (const thenable of thenables) {
 			thenable.then(
@@ -3671,6 +3996,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			component: attempt.component,
 			props: attempt.props,
 			active: true,
+			asyncWorkQueued: false,
 		});
 	}
 
@@ -3731,7 +4057,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		props: any,
 		replayEntries: readonly SuspendedMemoEntry[],
 	): UniversalPreparedAttempt {
-		if (this.unmounted) throw new Error('Cannot render an unmounted universal root.');
+		if (this.unmounted || this.unmounting) {
+			throw new Error('Cannot render an unmounted universal root.');
+		}
 		// Match Octane's DOM runtime: a previous commit's passive work becomes
 		// observable before the next render attempt starts. This also prevents two
 		// synchronous universal commits from collapsing the first commit's effects.
@@ -3798,8 +4126,20 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	render(component: UniversalComponent<any>, props: any): UniversalPreparedAttempt {
+		if (this.hasAsyncTransport()) {
+			throw new Error('A transported universal root must use renderAsync().');
+		}
 		const attempt = this.prepare(component, props);
 		if (attempt.status === 'prepared') attempt.commit();
+		return attempt;
+	}
+
+	async renderAsync(
+		component: UniversalComponent<any>,
+		props: any,
+	): Promise<UniversalPreparedAttempt> {
+		const attempt = this.prepare(component, props);
+		if (attempt.status === 'prepared') await attempt.commitAsync();
 		return attempt;
 	}
 
@@ -4447,24 +4787,45 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			this.driver.prepareBatch(this.container, value, {
 				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
 			});
-		const preparedHost =
-			this.transport === null
-				? prepareHost(batch)
-				: this.transport.prepareBatch(this.container, batch, prepareHost);
-		if (
-			preparedHost === null ||
-			typeof preparedHost !== 'object' ||
-			typeof preparedHost.apply !== 'function' ||
-			typeof preparedHost.abort !== 'function' ||
-			(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
-		) {
-			throw new TypeError('A universal host driver must return a valid prepared batch token.');
+		const identity = this.transportIdentity(batch.version);
+		let preparedHost: UniversalPreparedHostBatch | null = null;
+		let preparedAsyncHost: UniversalAsyncPreparedHostBatch | null = null;
+		if (this.transport?.mode === 'async') {
+			preparedAsyncHost = this.transport.prepareBatch(this.container, batch, identity);
+			if (
+				preparedAsyncHost === null ||
+				typeof preparedAsyncHost !== 'object' ||
+				typeof preparedAsyncHost.apply !== 'function' ||
+				typeof preparedAsyncHost.abort !== 'function' ||
+				(preparedAsyncHost.afterAccept !== undefined &&
+					typeof preparedAsyncHost.afterAccept !== 'function')
+			) {
+				throw new TypeError(
+					'A universal async transport must return a valid prepared batch token.',
+				);
+			}
+		} else {
+			preparedHost =
+				this.transport === null
+					? prepareHost(batch)
+					: this.transport.prepareBatch(this.container, batch, prepareHost);
+			if (
+				preparedHost === null ||
+				typeof preparedHost !== 'object' ||
+				typeof preparedHost.apply !== 'function' ||
+				typeof preparedHost.abort !== 'function' ||
+				(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
+			) {
+				throw new TypeError('A universal host driver must return a valid prepared batch token.');
+			}
 		}
 
 		const transaction = new UniversalTransactionImpl(
 			this,
 			batch,
-			() => preparedHost.apply(),
+			preparedHost === null ? null : () => preparedHost!.apply(),
+			preparedAsyncHost === null ? null : (acknowledge) => preparedAsyncHost!.apply(acknowledge),
+			identity,
 			() => {
 				applyLogicalTopology();
 				for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
@@ -4545,7 +4906,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) throw portalReleaseError;
 			},
-			() => preparedHost.afterAccept?.(),
+			() => (preparedHost ?? preparedAsyncHost)?.afterAccept?.(),
 			() => {
 				const tasks: (() => void)[] = [];
 				for (const cleanup of orderedEffectCleanups) {
@@ -4625,7 +4986,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					deactivateEffectEventCells(removedEffectEventCells);
 				}
 			},
-			() => preparedHost.abort(),
+			() => (preparedHost === null ? preparedAsyncHost!.abort() : preparedHost.abort()),
 			() => {
 				const tasks = [...stagedPortalRegistrations].map(
 					(registration) => () => registration.release(),
@@ -4643,17 +5004,177 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	unmount(): void {
+		if (this.hasAsyncTransport()) {
+			throw new Error('A transported universal root must use unmountAsync().');
+		}
 		if (this.unmounted) return;
-		this.scheduled = false;
-		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+		const work = this.stageUnmount();
+		let acceptedHostError: unknown = NO_PENDING_PASSIVE_ERROR;
+		if (work.batch !== null) {
+			const prepare = (value: UniversalHostBatch) =>
+				this.driver.prepareBatch(this.container, value, {
+					invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
+				});
+			const prepared =
+				this.transport === null
+					? prepare(work.batch)
+					: (this.transport as UniversalCommitTransport<Container>).prepareBatch(
+							this.container,
+							work.batch,
+							prepare,
+						);
+			try {
+				runCommitTasks([
+					() => prepared.apply(),
+					() => this.markBatchAccepted(work.batch!.version),
+					() => prepared.afterAccept?.(),
+				]);
+			} catch (error) {
+				acceptedHostError = error;
+			}
+		}
+		work.finalize(acceptedHostError);
+	}
+
+	unmountAsync(): Promise<void> {
+		const transport = this.transport;
+		if (transport?.mode !== 'async') {
+			try {
+				this.unmount();
+				return Promise.resolve();
+			} catch (error) {
+				return Promise.reject(error);
+			}
+		}
+		if (this.unmountPromise !== null) return this.unmountPromise;
+		if (this.unmounted) return Promise.resolve();
+		if (this.pending?.isAwaitingTransportAcknowledgement()) {
+			return Promise.reject(
+				new Error('Cannot unmount a universal root while a batch awaits acknowledgement.'),
+			);
+		}
+		this.unmounting = true;
+		let work: ReturnType<UniversalRootImpl<Container, PublicInstance>['stageUnmount']>;
+		try {
+			work = this.stageUnmount();
+		} catch (error) {
+			this.resumeAfterRejectedUnmount();
+			return Promise.reject(error);
+		}
+		if (work.batch === null) {
+			try {
+				work.finalize(NO_PENDING_PASSIVE_ERROR);
+				return Promise.resolve();
+			} catch (error) {
+				return Promise.reject(error);
+			}
+		}
+
+		const batch = work.batch;
+		const identity = this.transportIdentity(batch.version);
+		let prepared: UniversalAsyncPreparedHostBatch;
+		try {
+			prepared = transport.prepareBatch(this.container, batch, identity);
+		} catch (error) {
+			this.resumeAfterRejectedUnmount();
+			return Promise.reject(error);
+		}
+		if (
+			prepared === null ||
+			typeof prepared !== 'object' ||
+			typeof prepared.apply !== 'function' ||
+			typeof prepared.abort !== 'function' ||
+			(prepared.afterAccept !== undefined && typeof prepared.afterAccept !== 'function')
+		) {
+			this.resumeAfterRejectedUnmount();
+			return Promise.reject(
+				new TypeError('A universal async transport must return a valid prepared batch token.'),
+			);
+		}
+
+		let acknowledged = false;
+		let closed = false;
+		let finalizeError: unknown = NO_PENDING_PASSIVE_ERROR;
+		const rejectBeforeAcknowledgement = (error: unknown): never => {
+			closed = true;
+			runCommitTasks([
+				() => {
+					throw error;
+				},
+				() => prepared.abort(),
+				() => this.resumeAfterRejectedUnmount(),
+			]);
+			throw error;
+		};
+		const acknowledge = (message: UniversalTransportAcknowledgement) => {
+			if (closed || acknowledged || this.unmounted) {
+				throw new Error(
+					`Universal transport received a stale or duplicate acknowledgement for batch ${batch.version}.`,
+				);
+			}
+			this.validateTransportAcknowledgement(message, batch.version);
+			acknowledged = true;
+			this.markBatchAccepted(batch.version);
+			try {
+				runCommitTasks([
+					() => prepared.afterAccept?.(),
+					() => work.finalize(NO_PENDING_PASSIVE_ERROR),
+				]);
+			} catch (error) {
+				finalizeError = error;
+			}
+		};
+
+		let applying: Promise<void>;
+		try {
+			const result = prepared.apply(acknowledge);
+			if (result === null || typeof result !== 'object' || typeof result.then !== 'function') {
+				throw new TypeError('A universal async transport apply() method must return a Promise.');
+			}
+			applying = Promise.resolve(result);
+		} catch (error) {
+			closed = true;
+			applying = Promise.reject(error);
+		}
+
+		this.unmountPromise = applying
+			.then(
+				() => {
+					closed = true;
+					if (!acknowledged) {
+						return rejectBeforeAcknowledgement(
+							new Error(
+								`Universal transport completed teardown batch ${batch.version} without acknowledgement.`,
+							),
+						);
+					}
+					if (finalizeError !== NO_PENDING_PASSIVE_ERROR) throw finalizeError;
+				},
+				(error) => {
+					closed = true;
+					if (!acknowledged) {
+						return rejectBeforeAcknowledgement(error);
+					}
+					if (finalizeError !== NO_PENDING_PASSIVE_ERROR) throw finalizeError;
+					throw error;
+				},
+			)
+			.finally(() => {
+				this.unmountPromise = null;
+			});
+		return this.unmountPromise;
+	}
+
+	private stageUnmount(): {
+		batch: UniversalHostBatch | null;
+		finalize: (acceptedHostError: unknown) => void;
+	} {
 		let pendingAbortError: unknown = NO_PENDING_PASSIVE_ERROR;
 		try {
 			this.pending?.abort();
 		} catch (error) {
 			pendingAbortError = error;
 		}
-		this.suspended?.abort();
-		this.cancelSuspendedReplays();
 		const owners: UniversalOwnerRecord[] = [];
 		const collectOwners = (owner: UniversalOwnerRecord | null) => {
 			if (owner === null) return;
@@ -4692,163 +5213,169 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}
 		const removedHosts: LogicalRecord[] = [];
 		for (const child of this.rootRecord.children) collectRemovedPostOrder(child, removedHosts);
-		let acceptedHostError: unknown = NO_PENDING_PASSIVE_ERROR;
-		if (removedHosts.length > 0) {
-			const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, [
-				...removedHosts.flatMap((record) =>
-					[...record.events.keys()].map(
-						(type): UniversalHostCommand => ({
-							op: 'event',
+		const batch =
+			removedHosts.length === 0
+				? null
+				: freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, [
+						...removedHosts.flatMap((record) =>
+							[...record.events.keys()].map(
+								(type): UniversalHostCommand => ({
+									op: 'event',
+									id: record.id,
+									type,
+									listener: null,
+								}),
+							),
+						),
+						...removedHosts.flatMap((record) =>
+							[...record.lifecycles.keys()].map(
+								(type): UniversalHostCommand => ({
+									op: 'lifecycle',
+									id: record.id,
+									type,
+									listener: null,
+								}),
+							),
+						),
+						...removedHosts.flatMap((record) =>
+							[...record.localCallbacks.keys()].map(
+								(type): UniversalHostCommand => ({
+									op: 'local-callback',
+									id: record.id,
+									type,
+									listener: null,
+								}),
+							),
+						),
+						...physical.map((record) => ({
+							op: 'remove' as const,
+							parent: null,
 							id: record.id,
-							type,
-							listener: null,
-						}),
-					),
-				),
-				...removedHosts.flatMap((record) =>
-					[...record.lifecycles.keys()].map(
-						(type): UniversalHostCommand => ({
-							op: 'lifecycle',
-							id: record.id,
-							type,
-							listener: null,
-						}),
-					),
-				),
-				...removedHosts.flatMap((record) =>
-					[...record.localCallbacks.keys()].map(
-						(type): UniversalHostCommand => ({
-							op: 'local-callback',
-							id: record.id,
-							type,
-							listener: null,
-						}),
-					),
-				),
-				...physical.map((record) => ({ op: 'remove' as const, parent: null, id: record.id })),
-				...portalRemoves,
-				...removedHosts.map((record) => ({ op: 'destroy' as const, id: record.id })),
-			]);
-			const prepare = (value: UniversalHostBatch) =>
-				this.driver.prepareBatch(this.container, value, {
-					invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
-				});
-			const prepared =
-				this.transport === null
-					? prepare(batch)
-					: this.transport.prepareBatch(this.container, batch, prepare);
-			try {
-				runCommitTasks([() => prepared.apply(), () => prepared.afterAccept?.()]);
-			} catch (error) {
-				acceptedHostError = error;
-			}
-		}
-		this.rootRecord.children = [];
-		let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
-		for (const registration of portalRegistrations) {
-			try {
-				registration.release();
-			} catch (error) {
-				if (portalReleaseError === NO_PENDING_PASSIVE_ERROR) portalReleaseError = error;
-			}
-		}
-		for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
-		this.publishedListeners.clear();
-		this.handlers = new Map();
-		this.localCallbacks = new Map();
-		for (const owner of owners) {
-			owner.disposed = true;
-			owner.mounted = false;
-		}
-		const deactivatedRegionCells = new Set<RendererRegionBridgeCell>();
-		for (const bridge of regionBridges) {
-			const cell = bridge.lifecycle();
-			if (cell === null || deactivatedRegionCells.has(cell)) continue;
-			deactivatedRegionCells.add(cell);
-			bridge.deactivate();
-		}
-		this.owner = null;
-		this.unmounted = true;
-		this.lastComponent = null;
-		// Pending transaction callbacks observe `unmounted` and run only their
-		// already-mounted deletion cleanups. This keeps Effect Events live for those
-		// cleanups without mounting passive bodies from the now-deleted tree.
-		let pendingPassiveError: unknown = NO_PENDING_PASSIVE_ERROR;
-		try {
-			this.flushPassiveTasks();
-		} catch (error) {
-			pendingPassiveError = error;
-		}
-		const insertionTasks: (() => void)[] = [];
-		const layoutTasks: (() => void)[] = [];
-		const refTasks: (() => void)[] = [];
-		const passiveTasks: (() => void)[] = [];
-		for (const hook of effects) {
-			if (!hook.mounted) continue;
-			if (hook.phase === 'passive') passiveTasks.push(() => runOwnedEffectCleanup(hook));
-			else if (hook.phase === 'insertion') {
-				insertionTasks.push(() => runOwnedEffectCleanup(hook));
-			} else {
-				layoutTasks.push(() => runOwnedEffectCleanup(hook));
-			}
-		}
-		for (const child of children) {
-			walkLogical(child, (record) => {
-				if (record.refAttached) {
-					refTasks.push(() => runOwnedCommit(record.owner, () => detachRef(record)));
+						})),
+						...portalRemoves,
+						...removedHosts.map((record) => ({ op: 'destroy' as const, id: record.id })),
+					]);
+
+		return {
+			batch,
+			finalize: (acceptedHostError) => {
+				this.scheduled = false;
+				SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+				this.suspended?.abort();
+				this.cancelSuspendedReplays();
+				this.rootRecord.children = [];
+				let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
+				for (const registration of portalRegistrations) {
+					try {
+						registration.release();
+					} catch (error) {
+						if (portalReleaseError === NO_PENDING_PASSIVE_ERROR) portalReleaseError = error;
+					}
 				}
-			});
-		}
-		const syncTasks = [...insertionTasks, ...layoutTasks, ...refTasks];
-		if (acceptedHostError !== NO_PENDING_PASSIVE_ERROR) {
-			syncTasks.unshift(() => {
-				throw acceptedHostError;
-			});
-		}
-		if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) {
-			syncTasks.unshift(() => {
-				throw portalReleaseError;
-			});
-		}
-		if (pendingPassiveError !== NO_PENDING_PASSIVE_ERROR) {
-			syncTasks.unshift(() => {
-				throw pendingPassiveError;
-			});
-		}
-		if (pendingAbortError !== NO_PENDING_PASSIVE_ERROR) {
-			syncTasks.unshift(() => {
-				throw pendingAbortError;
-			});
-		}
-		if (passiveTasks.length > 0) {
-			this.enqueuePassive(() => {
+				for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
+				this.publishedListeners.clear();
+				this.handlers = new Map();
+				this.localCallbacks = new Map();
+				for (const owner of owners) {
+					owner.disposed = true;
+					owner.mounted = false;
+				}
+				const deactivatedRegionCells = new Set<RendererRegionBridgeCell>();
+				for (const bridge of regionBridges) {
+					const cell = bridge.lifecycle();
+					if (cell === null || deactivatedRegionCells.has(cell)) continue;
+					deactivatedRegionCells.add(cell);
+					bridge.deactivate();
+				}
+				this.owner = null;
+				this.unmounted = true;
+				this.unmounting = false;
+				this.lastComponent = null;
+				let pendingPassiveError: unknown = NO_PENDING_PASSIVE_ERROR;
 				try {
-					runCommitTasks(passiveTasks);
-				} finally {
-					deactivateEffectEventCells(effectEventCells);
+					this.flushPassiveTasks();
+				} catch (error) {
+					pendingPassiveError = error;
 				}
-			});
-			runCommitTasks(syncTasks);
-		} else {
-			try {
-				runCommitTasks(syncTasks);
-			} finally {
-				deactivateEffectEventCells(effectEventCells);
-			}
-		}
+				const insertionTasks: (() => void)[] = [];
+				const layoutTasks: (() => void)[] = [];
+				const refTasks: (() => void)[] = [];
+				const passiveTasks: (() => void)[] = [];
+				for (const hook of effects) {
+					if (!hook.mounted) continue;
+					if (hook.phase === 'passive') passiveTasks.push(() => runOwnedEffectCleanup(hook));
+					else if (hook.phase === 'insertion') {
+						insertionTasks.push(() => runOwnedEffectCleanup(hook));
+					} else {
+						layoutTasks.push(() => runOwnedEffectCleanup(hook));
+					}
+				}
+				for (const child of children) {
+					walkLogical(child, (record) => {
+						if (record.refAttached) {
+							refTasks.push(() => runOwnedCommit(record.owner, () => detachRef(record)));
+						}
+					});
+				}
+				const syncTasks = [...insertionTasks, ...layoutTasks, ...refTasks];
+				if (acceptedHostError !== NO_PENDING_PASSIVE_ERROR) {
+					syncTasks.unshift(() => {
+						throw acceptedHostError;
+					});
+				}
+				if (portalReleaseError !== NO_PENDING_PASSIVE_ERROR) {
+					syncTasks.unshift(() => {
+						throw portalReleaseError;
+					});
+				}
+				if (pendingPassiveError !== NO_PENDING_PASSIVE_ERROR) {
+					syncTasks.unshift(() => {
+						throw pendingPassiveError;
+					});
+				}
+				if (pendingAbortError !== NO_PENDING_PASSIVE_ERROR) {
+					syncTasks.unshift(() => {
+						throw pendingAbortError;
+					});
+				}
+				if (passiveTasks.length > 0) {
+					this.enqueuePassive(() => {
+						try {
+							runCommitTasks(passiveTasks);
+						} finally {
+							deactivateEffectEventCells(effectEventCells);
+						}
+					});
+					runCommitTasks(syncTasks);
+				} else {
+					try {
+						runCommitTasks(syncTasks);
+					} finally {
+						deactivateEffectEventCells(effectEventCells);
+					}
+				}
+			},
+		};
 	}
 }
 
 class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTransaction {
 	private state: 'prepared' | 'committed' | 'aborted' = 'prepared';
 	private hostAccepted = false;
+	private commitStarted = false;
+	private completion: Promise<void> | null = null;
+	private acceptedCommitError: unknown = NO_PENDING_PASSIVE_ERROR;
 	private passiveScheduled = false;
 	private passiveRan = false;
 
 	constructor(
 		private readonly root: UniversalRootImpl<Container, PublicInstance>,
 		readonly batch: UniversalHostBatch,
-		private readonly applyHost: () => void,
+		private readonly applyHost: (() => void) | null,
+		private readonly applyHostAsync:
+			| ((acknowledge: (message: UniversalTransportAcknowledgement) => void) => Promise<void>)
+			| null,
+		private readonly transportIdentity: UniversalTransportIdentity,
 		private readonly publishHost: () => void,
 		private readonly afterHostAccept: () => void,
 		private readonly afterMutation: () => void,
@@ -4863,11 +5390,20 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 		return this.state;
 	}
 
+	isAwaitingTransportAcknowledgement(): boolean {
+		return this.applyHostAsync !== null && this.commitStarted && !this.hostAccepted;
+	}
+
 	commitMutation(): void {
 		if (this.state !== 'prepared' || this.hostAccepted) return;
+		if (this.applyHost === null) {
+			throw new Error('A transported universal transaction must use commitAsync().');
+		}
+		this.commitStarted = true;
 		this.hostAccepted = true;
 		runCommitTasks([
 			this.applyHost,
+			() => this.root.markBatchAccepted(this.batch.version),
 			this.publishHost,
 			this.afterHostAccept,
 			this.afterMutation,
@@ -4896,6 +5432,9 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 
 	commit(): void {
 		if (this.state !== 'prepared') return;
+		if (this.applyHostAsync !== null) {
+			throw new Error('A transported universal transaction must use commitAsync().');
+		}
 		let hasError = false;
 		let firstError: unknown;
 		try {
@@ -4920,6 +5459,100 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 		if (hasError) throw firstError;
 	}
 
+	commitAsync(): Promise<void> {
+		if (this.applyHostAsync === null) {
+			try {
+				this.commit();
+				return Promise.resolve();
+			} catch (error) {
+				return Promise.reject(error);
+			}
+		}
+		if (this.completion !== null) return this.completion;
+		if (this.state !== 'prepared') return Promise.resolve();
+		this.commitStarted = true;
+
+		const acknowledge = (message: UniversalTransportAcknowledgement) => {
+			if (this.state !== 'prepared' || this.hostAccepted) {
+				throw new Error(
+					`Universal transport received a stale or duplicate acknowledgement for batch ${this.batch.version}.`,
+				);
+			}
+			this.root.validateTransportAcknowledgement(message, this.transportIdentity.version);
+			this.hostAccepted = true;
+			let hasError = false;
+			let firstError: unknown;
+			try {
+				runCommitTasks([
+					() => this.root.markBatchAccepted(this.batch.version),
+					this.publishHost,
+					this.afterHostAccept,
+					this.afterMutation,
+					this.lifecycle,
+				]);
+			} catch (error) {
+				hasError = true;
+				firstError = error;
+			}
+			try {
+				this.commitLayout();
+			} catch (error) {
+				if (!hasError) {
+					hasError = true;
+					firstError = error;
+				}
+			}
+			if (hasError) this.acceptedCommitError = firstError;
+		};
+
+		let applying: Promise<void>;
+		try {
+			const result = this.applyHostAsync(acknowledge);
+			if (result === null || typeof result !== 'object' || typeof result.then !== 'function') {
+				throw new TypeError('A universal async transport apply() method must return a Promise.');
+			}
+			applying = Promise.resolve(result);
+		} catch (error) {
+			applying = Promise.reject(error);
+		}
+
+		this.completion = applying.then(
+			() => {
+				if (!this.hostAccepted) {
+					const error = new Error(
+						`Universal transport completed batch ${this.batch.version} without acknowledgement.`,
+					);
+					this.rejectBeforeAcknowledgement();
+					throw error;
+				}
+				if (this.acceptedCommitError !== NO_PENDING_PASSIVE_ERROR) {
+					throw this.acceptedCommitError;
+				}
+			},
+			(error) => {
+				if (!this.hostAccepted) {
+					this.rejectBeforeAcknowledgement();
+					throw error;
+				}
+				if (this.acceptedCommitError !== NO_PENDING_PASSIVE_ERROR) {
+					throw this.acceptedCommitError;
+				}
+				throw error;
+			},
+		);
+		return this.completion;
+	}
+
+	private rejectBeforeAcknowledgement(): void {
+		if (this.state !== 'prepared' || this.hostAccepted) return;
+		this.state = 'aborted';
+		try {
+			runCommitTasks([this.abortHost, this.onAbort]);
+		} finally {
+			this.root.finish(this);
+		}
+	}
+
 	private schedulePassive(): void {
 		if (this.passiveScheduled) return;
 		this.passiveScheduled = true;
@@ -4934,6 +5567,11 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 		if (this.state !== 'prepared') return;
 		if (this.hostAccepted) {
 			throw new Error('A universal transaction cannot be aborted after its host batch committed.');
+		}
+		if (this.commitStarted) {
+			throw new Error(
+				'A universal transaction cannot be aborted while awaiting transport acknowledgement.',
+			);
 		}
 		this.state = 'aborted';
 		try {

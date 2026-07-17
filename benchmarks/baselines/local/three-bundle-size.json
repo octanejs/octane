@@ -1,0 +1,199 @@
+{
+  "suite": "three-bundle-size",
+  "iterations": 1,
+  "targets": [
+    {
+      "name": "octane-min",
+      "ops": {
+        "js_raw": {
+          "score": 1291339,
+          "median": 1291339,
+          "min": 1291339,
+          "samples": 1
+        },
+        "js_gzip": {
+          "score": 298622,
+          "median": 298622,
+          "min": 298622,
+          "samples": 1
+        },
+        "js_brotli": {
+          "score": 242309,
+          "median": 242309,
+          "min": 242309,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "file": "bundle.js",
+        "semanticChecksum": {
+          "childCount": 1,
+          "first": "size-mesh",
+          "type": "Mesh",
+          "catalogueSize": null
+        }
+      }
+    },
+    {
+      "name": "octane-full",
+      "ops": {
+        "js_raw": {
+          "score": 1291017,
+          "median": 1291017,
+          "min": 1291017,
+          "samples": 1
+        },
+        "js_gzip": {
+          "score": 298489,
+          "median": 298489,
+          "min": 298489,
+          "samples": 1
+        },
+        "js_brotli": {
+          "score": 242205,
+          "median": 242205,
+          "min": 242205,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "file": "bundle.js",
+        "semanticChecksum": {
+          "childCount": 1,
+          "first": "size-mesh",
+          "type": "Mesh",
+          "catalogueSize": 416
+        }
+      }
+    },
+    {
+      "name": "r3f-min",
+      "ops": {
+        "js_raw": {
+          "score": 842727,
+          "median": 842727,
+          "min": 842727,
+          "samples": 1
+        },
+        "js_gzip": {
+          "score": 188008,
+          "median": 188008,
+          "min": 188008,
+          "samples": 1
+        },
+        "js_brotli": {
+          "score": 154904,
+          "median": 154904,
+          "min": 154904,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "file": "bundle.js",
+        "semanticChecksum": {
+          "childCount": 1,
+          "first": "size-mesh",
+          "type": "Mesh",
+          "catalogueSize": null
+        }
+      }
+    },
+    {
+      "name": "r3f-full",
+      "ops": {
+        "js_raw": {
+          "score": 1124263,
+          "median": 1124263,
+          "min": 1124263,
+          "samples": 1
+        },
+        "js_gzip": {
+          "score": 250306,
+          "median": 250306,
+          "min": 250306,
+          "samples": 1
+        },
+        "js_brotli": {
+          "score": 203045,
+          "median": 203045,
+          "min": 203045,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "file": "bundle.js",
+        "semanticChecksum": {
+          "childCount": 1,
+          "first": "size-mesh",
+          "type": "Mesh",
+          "catalogueSize": 416
+        }
+      }
+    },
+    {
+      "name": "plain-min",
+      "ops": {
+        "js_raw": {
+          "score": 171347,
+          "median": 171347,
+          "min": 171347,
+          "samples": 1
+        },
+        "js_gzip": {
+          "score": 38929,
+          "median": 38929,
+          "min": 38929,
+          "samples": 1
+        },
+        "js_brotli": {
+          "score": 31806,
+          "median": 31806,
+          "min": 31806,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "file": "bundle.js",
+        "semanticChecksum": {
+          "childCount": 1,
+          "first": "size-mesh",
+          "type": "Mesh",
+          "catalogueSize": null
+        }
+      }
+    },
+    {
+      "name": "plain-full",
+      "ops": {
+        "js_raw": {
+          "score": 866390,
+          "median": 866390,
+          "min": 866390,
+          "samples": 1
+        },
+        "js_gzip": {
+          "score": 190619,
+          "median": 190619,
+          "min": 190619,
+          "samples": 1
+        },
+        "js_brotli": {
+          "score": 152621,
+          "median": 152621,
+          "min": 152621,
+          "samples": 1
+        }
+      },
+      "meta": {
+        "file": "bundle.js",
+        "semanticChecksum": {
+          "childCount": 1,
+          "first": "size-mesh",
+          "type": "Mesh",
+          "catalogueSize": 416
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}

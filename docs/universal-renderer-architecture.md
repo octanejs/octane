@@ -42,7 +42,8 @@ The universal client target establishes and proves these seams:
 - core-owned logical host records and marker-free ranges;
 - a per-root staged transaction that produces one ordered host batch per
   successful commit;
-- an optional transport boundary around that batch;
+- optional synchronous and asynchronously acknowledged transport boundaries
+  around that batch, with a structured-clone loopback proof;
 - a non-DOM object driver that proves create, update, insert, move, remove,
   public refs, identity preservation, teardown, commit, and abort;
 - renderer-classified event listeners whose committed batch representation is
@@ -64,8 +65,8 @@ The current implementation does **not**:
 - embed React Reconciler or claim complete React Three Fiber, Drei, native, or
   WebGPU parity;
 - replace or generalize the DOM compiler/runtime;
-- implement a Lynx runtime, Rspeedy integration, or cross-thread commit
-  acknowledgement;
+- implement a Lynx runtime, Rspeedy integration, or a production worker/native
+  host adapter beyond the proving message channel;
 - define renderer-neutral style sheets, assets, layout measurement, live host
   serialization/adoption, or cross-renderer portal targets;
 - project a universal child suspension or DOM-owner Activity state across a
@@ -651,6 +652,14 @@ interface UniversalPreparedHostBatch {
 	abort(): void;
 }
 
+interface UniversalAsyncPreparedHostBatch {
+	apply(
+		acknowledge: (message: UniversalTransportAcknowledgement) => void,
+	): Promise<void>;
+	afterAccept?(): void;
+	abort(): void;
+}
+
 interface UniversalHostCommitContext {
 	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown;
 }
@@ -688,8 +697,13 @@ their increasing values and must not interpret a gap as a missing commit.
 public host. It returns an abortable token. `apply()` is the acceptance point;
 after it begins, a thrown error is an accepted commit fault rather than a
 rejected preparation. `abort()` releases unpublished staged ownership exactly
-once. `afterAccept()` is the only phase in which a local driver may invoke
-classified function-valued callbacks through the core-owned listener table.
+once. Both synchronous and asynchronous prepared tokens may expose
+`afterAccept()`, which the core calls after publishing listener ownership and
+before lifecycle, ref, and layout delivery. A synchronous driver's
+`afterAccept()` is the only phase that may invoke classified local host callbacks
+through its commit context. An asynchronous token receives no such context, so
+its `afterAccept()` is adapter-local work only and never enters a transport
+message.
 
 Events are an explicit optional driver capability. `classify()` decides which
 prop names are renderer events, supplies the renderer-facing type and priority,
@@ -705,7 +719,9 @@ synthetic-event layer.
 One platform event may call `root.eventScope(priority, fn)` to pin the accepted
 listener table while it delivers target, ancestor, hover, or missed listener
 IDs. Nested scopes must keep the same priority, and scheduled work flushes once
-when the outer scope closes.
+when the outer scope closes. A transported event message carries one priority
+and an ordered delivery list; `dispatchTransportEvent()` validates its root and
+accepted batch version before expanding the whole message inside one such scope.
 
 Host props pass through a codec as serializable values, root-scoped resource
 handles, or explicit unsupported results. Event, lifecycle, and local-callback
@@ -720,15 +736,20 @@ interface UniversalRoot<P> {
 	readonly renderer: string;
 	prepare(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
 	render(component: UniversalComponent<P>, props: P): UniversalPreparedAttempt;
+	renderAsync(component: UniversalComponent<P>, props: P): Promise<UniversalPreparedAttempt>;
 	eventScope<T>(priority: UniversalEventPriority, run: () => T): T;
 	dispatchEvent(listener: number, payload: unknown): unknown;
+	dispatchTransportEvent(message: UniversalTransportEventMessage): readonly unknown[];
+	flushTransport(): Promise<void>;
 	unmount(): void;
+	unmountAsync(): Promise<void>;
 }
 
 interface UniversalTransaction {
 	readonly status: 'prepared' | 'committed' | 'aborted';
 	readonly batch: UniversalHostBatch;
 	commit(): void;
+	commitAsync(): Promise<void>;
 	abort(): void;
 }
 ```
@@ -791,22 +812,84 @@ passive cleanups, and disposes the root owner.
 
 ```ts
 interface UniversalCommitTransport<Container> {
+	readonly mode?: 'sync';
 	prepareBatch(
 		container: Container,
 		batch: UniversalHostBatch,
 		prepareLocally: (batch: UniversalHostBatch) => UniversalPreparedHostBatch,
 	): UniversalPreparedHostBatch;
 }
+
+interface UniversalAsyncCommitTransport<Container> {
+	readonly mode: 'async';
+	prepareBatch(
+		container: Container,
+		batch: UniversalHostBatch,
+		identity: {
+			protocol: 1;
+			renderer: string;
+			root: number;
+			version: number;
+		},
+	): UniversalAsyncPreparedHostBatch;
+}
 ```
 
 Three can omit a transport and mutate its scene graph synchronously. A future
 Lynx driver may serialize the ordered batch, coalesce platform messages, or
-hand it to another thread. The proving transport must preserve the same
-prepare/apply/abort token. The current interface is still synchronous from the
-core's perspective: it has no asynchronous acknowledgement or layout-read
-protocol. A cross-thread renderer must map remote validation and acknowledgement
-to this acceptance boundary before it can claim layout effects or commit-
-failure recovery.
+hand it to another thread. Legacy transports preserve the synchronous prepared
+token. An asynchronous transport instead returns a token whose `apply()` takes
+an acknowledgement callback and returns a completion promise. It deliberately
+does not receive the synchronous `prepareLocally` closure: a local token would
+introduce a second, conflicting acceptance point beside the remote
+acknowledgement. For the same reason, creating an async-transport root with a
+driver that declares `localHostCallbacks` is rejected; async `afterAccept()` has
+no core callback-invocation capability.
+
+The callback is the irreversible acceptance point. Promise rejection before it
+is a rejected preparation: the accepted host tree, listener table, refs, and
+effects remain unchanged and staged ownership aborts. Scheduled event work,
+including a render already placed on the async chain, and suspended replay state
+remain paused while teardown awaits acknowledgement and resume if teardown is
+rejected. Rejection after acknowledgement is a commit
+fault: accepted topology remains public, the async token's local
+`afterAccept()` runs, lifecycle/ref/layout delivery finishes, and the completion
+promise rejects without rollback. During accepted teardown `afterAccept()` runs
+before logical disposal, effect cleanup, and ref detachment. Resolution without
+acknowledgement is a protocol error.
+
+The proving adapter uses a real asynchronous `MessageChannel`. Every commit,
+acknowledgement, completion, rejection, fault, and event message carries protocol,
+renderer, root, and batch version identity. The host accepts strictly increasing
+versions but permits gaps from abandoned preparations. The client accepts an
+acknowledgement only for its pending root/version and accepts an event only for
+the currently accepted version. Wrong protocol, renderer, root, duplicate, and
+stale messages cannot publish work.
+
+Messages use the structured-clone value domain rather than JSON. When a root has
+any transport, an ordinary prop without a renderer codec is cloned through the
+same strict serializable-value validator; functions, symbols, cycles, and class
+instances fail before the message is sent. Renderer event and lifecycle functions
+stay in the core-owned table and cross only as listener IDs. Resource and portal
+targets cross only as validated root-scoped handles.
+
+`commitAsync()`, `renderAsync()`, and `unmountAsync()` are the acknowledged direct-
+root entry points. Refs, lifecycle callbacks, layout effects, and teardown
+cleanups become visible only in the acknowledgement callback, after the adapter
+has installed its cloned public-instance/layout snapshot. `flushTransport()`
+waits for state work scheduled by transported events and settled Suspense
+replays. If teardown is provisional, a flush first waits for its completion
+without consuming the direct caller's error, then drains any work resumed by a
+pre-acknowledgement rejection or stops after accepted teardown. Such work waits
+behind a direct transaction already awaiting acknowledgement, then renders
+against the latest accepted component and props.
+Repeated `unmountAsync()` calls share the in-flight teardown promise through
+remote completion, including any post-acknowledgement fault. The existing
+synchronous methods and transports retain their behavior; a root configured
+with an async transport fails clearly if a synchronous commit/render/unmount
+entry point is used. Async mixed DOM-boundary ownership remains a later
+scheduler integration gate rather than pretending a DOM layout effect can await
+a remote host.
 
 ## 6. Nested owners and renderer identity
 
@@ -1076,6 +1159,18 @@ The object driver and executable fixtures demonstrate:
   rejection, and aborted/rejected transactions;
 - one recorded batch for each successful root commit and one teardown batch.
 
+The asynchronous loopback proof adds a separate client/public snapshot around
+the object host. A real `MessageChannel` structured-clones batches and replies,
+so the receiving host cannot observe source object identity or callback
+functions. Its executable cases cover delayed acknowledgement, pre-ack
+rejection, post-ack fault, acknowledged teardown, native event scopes,
+root/version rejection, and ref/layout visibility.
+
+The portal half of the wire claim remains covered by
+`universal-portals.test.ts`: that focused driver structured-clones every batch
+and proves that only the opaque root-scoped portal handle, never its raw target
+object, reaches placement commands.
+
 A focused portal-capable proof driver separately demonstrates physical target
 isolation, logical context and host identity, retargeting, retained Suspense,
 opaque transported handles, foreign-handle rejection, and exact registration
@@ -1102,7 +1197,7 @@ declare, implement, or reject these independently.
 | Visibility / `Activity` | Core-owned Activity and retained Suspense issue capability-gated visibility commands, retain identity/resources/insertion effects, disconnect events and layout/passive effects, and apply their distinct ref contracts. Three maps that state onto `Object3D.visible`, and its client pending/error projection is implemented. | Cross-boundary DOM-owner Activity propagation remains separate from local Three visibility. |
 | Portal | `createPortal` creates a logical range whose hosts are placed under an opaque, root-scoped driver target handle. Registration, stable reuse, retarget, retained Suspense, abort, rejected preparation, removal, and teardown are transactional. Three Milestone 6 supplies borrowed `Object3D` targets, R3F-style state/event enclaves, nested context, shared frame/interaction state, and physical Three event bubbling. | Transported renderers must resolve serializable target tokens without sharing local objects; cross-renderer portals remain unsupported. |
 | Hydration / serialization | Client-only renderers preserve server exports, omit declared regions, and expose stable manifest identity for one client mount without serializing the host tree. | A live renderer serializer/adopter must define seed identity and mismatch behavior separately; absence remains valid. |
-| Layout measurement | Public instances are available after commit; there is no neutral measure call. | Define synchronous-local versus transport-acknowledged layout and the point at which layout effects may run. |
+| Layout measurement | Local public instances are available after commit. A transported adapter installs a cloned public/layout snapshot before acknowledgement; refs and layout effects run only after that acknowledgement. There is no neutral live measure call. | A native renderer may add an explicitly asynchronous measure capability; it must not imply synchronous access to a remote live object. |
 | Specialized collections | Not forced into generic child insertion. | Add renderer-namespaced commands/capabilities for Three `attach`, render lists, native collections, or other ownership models. |
 
 The serializable descriptor capabilities are compiler/tooling metadata; driver
@@ -1149,6 +1244,15 @@ The architecture is acceptable only while these invariants hold:
 16. A client-only module's authored server setup never executes; its stable
     client reference matches across adapters, and only an explicitly omitted
     boundary region may consume its exports in a server owner.
+17. A transported batch and every reply agree on protocol, renderer, root, and
+    version. Versions increase across accepted batches, while abandoned-version
+    gaps are valid.
+18. No transported message contains a shared object or function. Ordinary props
+    are structured-clone values, and renderer-owned objects cross only as
+    validated resource/portal handles.
+19. A pre-ack transport rejection publishes nothing. Once acknowledged, the
+    accepted host topology, listener table, refs, and layout work finish even if
+    the host subsequently reports a commit fault.
 
 ## 11. Validation gates
 
@@ -1176,6 +1280,7 @@ observation boundaries:
 | Compiler facilities | Universal maps point to authored TSRX; HMR, profiling, and parallel-`use()` plans remain executable; Volar chooses file-local intrinsics without global merging; the DOM golden stays byte-identical. |
 | Capability gates | Text and Activity/visibility compile only under explicit policies. Portal descriptors materialize normally, renderer metadata may advertise them for tooling, and preparation requires an active driver target capability. Missing capabilities and every unsupported renderer concept fail clearly. |
 | Portals | Public target placement, stable identity, logical context, retained Suspense, retargeting, invalid/foreign scope diagnostics, registration release, and Three state/event behavior are covered without exposing raw targets in transported batches. |
+| Asynchronous transport | A real `MessageChannel` proves structured-cloned values/handles/listener IDs, delayed acknowledgement, pre-ack rejection, post-ack fault, teardown, scoped native-event delivery, stale protocol/root/version rejection, version gaps, and acknowledgement-gated ref/layout visibility. |
 
 Repository-wide typechecking and formatting remain required after the focused
 compiler/runtime/adapter suites. A user-facing experimental config or package
@@ -1201,8 +1306,8 @@ target and boundary decisions.
 The remaining foundation limitations are capability/scheduler boundaries:
 
 - live universal host serialization/adoption, cross-renderer portals, async
-  template collections, scoped styles, neutral layout measurement, and
-  asynchronous transport acknowledgement are not implemented;
+  template collections, scoped styles, and neutral live layout measurement are
+  not implemented;
 - mixed-boundary suspension retains committed external content but does not yet
   drive the parent renderer's fallback or transition-hold timing, and a DOM
   Activity does not yet propagate offscreen state into an external root;
@@ -1239,18 +1344,20 @@ validation matrix are tracked in [`three-port-plan.md`](./three-port-plan.md).
   into an owned container below an explicit target, preserves it across target
   moves, and tears it down deterministically.
 
-This local proof is necessary but not sufficient for a stable public renderer
-SDK. The transported proof must still validate serialized target/resource
-handles, acknowledgement, event delivery, and layout timing before helper names
-or driver extensions become compatibility promises.
+This local proof and the asynchronous loopback transport jointly validate the
+minimum renderer SDK vocabulary. They still do not stabilize the ABI for third-
+party authors; a real native implementation must validate platform collections,
+resource lifetime, scheduling, and delivery behavior first.
 
 ### Phase 3: transport and Lynx/native proof
 
 Use Rsbuild/Rspeedy as the bundler path but preserve the same renderer resolver.
-Add a serializable command schema, transport sequencing, acknowledgement,
-commit failure behavior, native event delivery, layout-read timing, visibility,
-and native collection capabilities. Decide which native roots support
-serialization or hydration; absence remains a valid declared capability.
+The structured-clone command schema, root/version sequencing, acknowledgement,
+pre-/post-accept failure split, native-style event delivery, and layout
+visibility point now have an executable loopback proof. A Lynx/native package
+must apply that contract to platform visibility and collection capabilities and
+decide which roots support serialization or hydration; absence remains a valid
+declared capability.
 
 This phase must prove renderer/root identity across the thread boundary. A
 message may carry IDs and versions, but receiving it must never consult a

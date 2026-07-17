@@ -376,6 +376,27 @@ const SUITES = [
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run.mjs', args: () => [] }],
 	},
+	{
+		// Three host lifecycle work in a production browser: Octane Three against
+		// R3F 9.6.1 and a direct plain-Three lower bound. The injected renderer
+		// deliberately excludes GPU/driver time while retaining real Three objects,
+		// native pointer dispatch, and raycasting.
+		name: 'three-renderer',
+		cwd: 'three',
+		servers: [{ filter: 'octane-three-bench', port: 5291 }],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Deterministic production bundle bytes for minimal and full-catalogue
+		// Octane Three, R3F, and plain Three entries. The harness loads every built
+		// entry in Chromium and rejects it unless the scene checksum is valid.
+		name: 'three-bundle-size',
+		cwd: 'three',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run-size.mjs', args: () => [] }],
+	},
 ];
 
 const SUITE_BY_NAME = new Map(SUITES.map((s) => [s.name, s]));

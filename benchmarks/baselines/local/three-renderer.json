@@ -1,0 +1,706 @@
+{
+  "suite": "three-renderer",
+  "iterations": 10,
+  "targets": [
+    {
+      "name": "octane",
+      "ops": {
+        "mount_1k": {
+          "score": 9.539999997615814,
+          "median": 9.699999988079071,
+          "min": 8.900000035762787,
+          "mean": 9.64000000357628,
+          "p95": 10.199999988079071,
+          "sd": 0.3747591670196512,
+          "rme": 2.780787685247637,
+          "scoreRme": 5.642414459304684,
+          "warmupRatio": 1.0209643618418147,
+          "samples": 10
+        },
+        "update_1k": {
+          "score": 10.239999997615815,
+          "median": 10.199999988079071,
+          "min": 9.800000011920929,
+          "mean": 10.239999997615815,
+          "p95": 10.899999976158142,
+          "sd": 0.2951459067813034,
+          "rme": 2.0617186934248837,
+          "scoreRme": 1.8386472311720397,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "reorder_1k": {
+          "score": 11.779999995231629,
+          "median": 11.899999976158142,
+          "min": 11.300000011920929,
+          "mean": 11.760000008344651,
+          "p95": 12.300000011920929,
+          "sd": 0.3272783388159531,
+          "rme": 1.9906849846563508,
+          "scoreRme": 2.2847470038740476,
+          "warmupRatio": 0.9966044164864051,
+          "samples": 10
+        },
+        "unmount_tree_1k": {
+          "score": 2.5799999952316286,
+          "median": 2.599999964237213,
+          "min": 2.399999976158142,
+          "mean": 2.569999998807907,
+          "p95": 3,
+          "sd": 0.19465068339080516,
+          "rme": 5.417705707741771,
+          "scoreRme": 6.273924171651882,
+          "warmupRatio": 0.9922480647734857,
+          "samples": 10
+        },
+        "reconstruct_dispose_1k": {
+          "score": 16.69999998807907,
+          "median": 17.599999964237213,
+          "min": 15.399999976158142,
+          "mean": 17.23999999165535,
+          "p95": 19.5,
+          "sd": 1.3793718436440827,
+          "rme": 5.723170655433632,
+          "scoreRme": 12.135749335525627,
+          "warmupRatio": 1.0646706591570951,
+          "samples": 10
+        },
+        "frame_1k_subscribers": {
+          "score": 0.06999999999999999,
+          "median": 0.075,
+          "min": 0.06500000059604645,
+          "mean": 0.07300000041723251,
+          "p95": 0.08500000238418579,
+          "sd": 0.00537483891780511,
+          "rme": 5.266658891705653,
+          "scoreRme": 6.270344472421153,
+          "warmupRatio": 1.085714297635215,
+          "samples": 10
+        },
+        "raycast_event": {
+          "score": 0.37800000071525575,
+          "median": 0.39000000059604645,
+          "min": 0.3549999982118607,
+          "mean": 0.39350000023841863,
+          "p95": 0.48499999940395355,
+          "sd": 0.03808251265296116,
+          "rme": 6.922667276886386,
+          "scoreRme": 3.7805117459589574,
+          "warmupRatio": 1.0820105793324528,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "semanticChecksums": {
+          "mount_1k": {
+            "childCount": 1000,
+            "first": "mesh-0",
+            "last": "mesh-999",
+            "positionSum": 49500,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "update_1k": {
+            "childCount": 1000,
+            "first": "mesh-0",
+            "last": "mesh-999",
+            "positionSum": 50500,
+            "versionSum": 0,
+            "retained": 1000,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "reorder_1k": {
+            "childCount": 1000,
+            "first": "mesh-999",
+            "last": "mesh-0",
+            "positionSum": 50500,
+            "versionSum": 0,
+            "retained": 1000,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "unmount_tree_1k": {
+            "childCount": 0,
+            "first": null,
+            "last": null,
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "reconstruct_dispose_1k": {
+            "childCount": 1000,
+            "first": "disposable-0",
+            "last": "disposable-999",
+            "positionSum": 0,
+            "versionSum": 1000,
+            "retained": 0,
+            "disposals": 1000,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 1000,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "frame_1k_subscribers": {
+            "childCount": 1000,
+            "first": "frame-0",
+            "last": "frame-999",
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 20000,
+            "frameChecksum": 10010000,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "raycast_event": {
+            "childCount": 40,
+            "first": "event-0",
+            "last": "event-39",
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 800,
+            "eventChecksum": 16400,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "r3f-9.6.1",
+      "ops": {
+        "mount_1k": {
+          "score": 2.799999988079071,
+          "median": 2.699999988079071,
+          "min": 2.5,
+          "mean": 2.7499999940395354,
+          "p95": 3.399999976158142,
+          "sd": 0.2549509650292689,
+          "rme": 6.6315732015817845,
+          "scoreRme": 15.675861621533208,
+          "warmupRatio": 0.9642857183911363,
+          "samples": 10
+        },
+        "update_1k": {
+          "score": 0.699999988079071,
+          "median": 0.699999988079071,
+          "min": 0.5999999642372131,
+          "mean": 0.6899999916553498,
+          "p95": 0.800000011920929,
+          "sd": 0.05676462425318139,
+          "rme": 5.8846587400986,
+          "scoreRme": 0,
+          "warmupRatio": 0.9428571452899855,
+          "samples": 10
+        },
+        "reorder_1k": {
+          "score": 2.2200000047683717,
+          "median": 2.200000047683716,
+          "min": 2.099999964237213,
+          "mean": 2.2200000107288362,
+          "p95": 2.300000011920929,
+          "sd": 0.0788810691480117,
+          "rme": 2.541630493849538,
+          "scoreRme": 4.678758070979123,
+          "warmupRatio": 1.0000000053697877,
+          "samples": 10
+        },
+        "unmount_tree_1k": {
+          "score": 2.2199999928474425,
+          "median": 2.199999988079071,
+          "min": 2,
+          "mean": 2.209999990463257,
+          "p95": 2.5,
+          "sd": 0.12866839871204375,
+          "rme": 4.164589740919068,
+          "scoreRme": 10.003603691733439,
+          "warmupRatio": 0.99099098881405,
+          "samples": 10
+        },
+        "reconstruct_dispose_1k": {
+          "score": 2.300000023841858,
+          "median": 2.399999976158142,
+          "min": 2.100000023841858,
+          "mean": 2.3400000035762787,
+          "p95": 2.5,
+          "sd": 0.12649109572584002,
+          "rme": 3.8666663342562373,
+          "scoreRme": 8.534470814028046,
+          "warmupRatio": 1.034782590712852,
+          "samples": 10
+        },
+        "frame_1k_subscribers": {
+          "score": 0.03600000023841858,
+          "median": 0.03500000238418579,
+          "min": 0.034999999403953555,
+          "mean": 0.03699999988079071,
+          "p95": 0.04000000059604645,
+          "sd": 0.0025819888718221578,
+          "rme": 4.991662847734603,
+          "scoreRme": 7.711111749470777,
+          "warmupRatio": 1.0555555353194108,
+          "samples": 10
+        },
+        "raycast_event": {
+          "score": 0.3819999998807907,
+          "median": 0.3849999994039536,
+          "min": 0.34500000178813933,
+          "mean": 0.3824999997019768,
+          "p95": 0.43499999940395356,
+          "sd": 0.024295632520378006,
+          "rme": 4.543487855538016,
+          "scoreRme": 4.681447264467225,
+          "warmupRatio": 1.002617800111739,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "semanticChecksums": {
+          "mount_1k": {
+            "childCount": 1000,
+            "first": "mesh-0",
+            "last": "mesh-999",
+            "positionSum": 49500,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "update_1k": {
+            "childCount": 1000,
+            "first": "mesh-0",
+            "last": "mesh-999",
+            "positionSum": 50500,
+            "versionSum": 0,
+            "retained": 1000,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "reorder_1k": {
+            "childCount": 1000,
+            "first": "mesh-999",
+            "last": "mesh-0",
+            "positionSum": 50500,
+            "versionSum": 0,
+            "retained": 1000,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "unmount_tree_1k": {
+            "childCount": 0,
+            "first": null,
+            "last": null,
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "reconstruct_dispose_1k": {
+            "childCount": 1000,
+            "first": "disposable-0",
+            "last": "disposable-999",
+            "positionSum": 0,
+            "versionSum": 1000,
+            "retained": 0,
+            "disposals": 1000,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 1000,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "frame_1k_subscribers": {
+            "childCount": 1000,
+            "first": "frame-0",
+            "last": "frame-999",
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 20000,
+            "frameChecksum": 10010000,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "raycast_event": {
+            "childCount": 40,
+            "first": "event-0",
+            "last": "event-39",
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 800,
+            "eventChecksum": 16400,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "plain-three",
+      "ops": {
+        "mount_1k": {
+          "score": 1.100000011920929,
+          "median": 1.100000023841858,
+          "min": 1,
+          "mean": 1.1100000143051147,
+          "p95": 1.300000011920929,
+          "sd": 0.08755951083824601,
+          "rme": 5.6425178660531445,
+          "scoreRme": 7.980440711315608,
+          "warmupRatio": 1.0181818223196613,
+          "samples": 10
+        },
+        "update_1k": {
+          "score": 0.05999999046325684,
+          "median": 0.10000002384185791,
+          "min": 0,
+          "mean": 0.1199999988079071,
+          "p95": 0.30000001192092896,
+          "sd": 0.09189365863554932,
+          "rme": 54.7768307731614,
+          "scoreRme": 113.32972543277953,
+          "warmupRatio": 3.0000005960465423,
+          "samples": 10
+        },
+        "reorder_1k": {
+          "score": 0.6399999976158142,
+          "median": 0.5999999642372131,
+          "min": 0.5,
+          "mean": 0.6199999988079071,
+          "p95": 0.800000011920929,
+          "sd": 0.11352925200646673,
+          "rme": 13.098111659845731,
+          "scoreRme": 22.117000467588245,
+          "warmupRatio": 0.9375000034924597,
+          "samples": 10
+        },
+        "unmount_tree_1k": {
+          "score": 0.4399999976158142,
+          "median": 0.5,
+          "min": 0.30000001192092896,
+          "mean": 0.4399999976158142,
+          "p95": 0.5,
+          "sd": 0.06992058949914055,
+          "rme": 11.366977690582084,
+          "scoreRme": 15.454054165934613,
+          "warmupRatio": 1,
+          "samples": 10
+        },
+        "reconstruct_dispose_1k": {
+          "score": 1.0600000143051147,
+          "median": 1.100000023841858,
+          "min": 0.8999999761581421,
+          "mean": 1.119999998807907,
+          "p95": 1.4000000357627869,
+          "sd": 0.14757296124425578,
+          "rme": 9.425000250792035,
+          "scoreRme": 6.4148915616934605,
+          "warmupRatio": 1.1132075164020172,
+          "samples": 10
+        },
+        "frame_1k_subscribers": {
+          "score": 0.0039999991655349735,
+          "median": 0.004999998211860657,
+          "min": 0,
+          "mean": 0.005499999225139619,
+          "p95": 0.009999999403953552,
+          "sd": 0.00437797497463472,
+          "rme": 56.93813620784083,
+          "scoreRme": 129.83552514034585,
+          "warmupRatio": 1.5000002235174643,
+          "samples": 10
+        },
+        "raycast_event": {
+          "score": 0.06800000011920929,
+          "median": 0.07000000178813934,
+          "min": 0.0550000011920929,
+          "mean": 0.06850000023841858,
+          "p95": 0.08499999940395356,
+          "sd": 0.010013879296881264,
+          "rme": 10.456934311610384,
+          "scoreRme": 21.984142492075886,
+          "warmupRatio": 1.0147058858333164,
+          "samples": 10
+        }
+      },
+      "meta": {
+        "semanticChecksums": {
+          "mount_1k": {
+            "childCount": 1000,
+            "first": "mesh-0",
+            "last": "mesh-999",
+            "positionSum": 49500,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "update_1k": {
+            "childCount": 1000,
+            "first": "mesh-0",
+            "last": "mesh-999",
+            "positionSum": 50500,
+            "versionSum": 0,
+            "retained": 1000,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "reorder_1k": {
+            "childCount": 1000,
+            "first": "mesh-999",
+            "last": "mesh-0",
+            "positionSum": 50500,
+            "versionSum": 0,
+            "retained": 1000,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "unmount_tree_1k": {
+            "childCount": 0,
+            "first": null,
+            "last": null,
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "reconstruct_dispose_1k": {
+            "childCount": 1000,
+            "first": "disposable-0",
+            "last": "disposable-999",
+            "positionSum": 0,
+            "versionSum": 1000,
+            "retained": 0,
+            "disposals": 1000,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 1000,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "frame_1k_subscribers": {
+            "childCount": 1000,
+            "first": "frame-0",
+            "last": "frame-999",
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 20000,
+            "frameChecksum": 10010000,
+            "eventCalls": 0,
+            "eventChecksum": 0,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          },
+          "raycast_event": {
+            "childCount": 40,
+            "first": "event-0",
+            "last": "event-39",
+            "positionSum": 0,
+            "versionSum": 0,
+            "retained": 0,
+            "disposals": 0,
+            "frameCalls": 0,
+            "frameChecksum": 0,
+            "eventCalls": 800,
+            "eventChecksum": 16400,
+            "disposalCount": 0,
+            "constants": {
+              "EVENT_COUNT": 40,
+              "EVENT_REPS": 20,
+              "FRAME_COUNT": 1000,
+              "FRAME_REPS": 20
+            }
+          }
+        }
+      }
+    }
+  ],
+  "harnessExit": 0
+}

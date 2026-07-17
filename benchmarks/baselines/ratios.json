@@ -403,5 +403,77 @@
     "minRatio": 1.0,
     "maxRatio": 1.0,
     "note": "Semantic control: open portal fixtures render exactly 1805 text nodes across main and foreign targets."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "mount_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 5.8,
+    "note": "Production-browser mount of 1,000 real Three meshes. Observable layout-effect commit baseline recorded 9.54 / 2.80 = 3.41x on 2026-07-17; the existing 5.8x ceiling retains conservative headroom."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "update_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 24.1,
+    "note": "In-place position update of 1,000 retained meshes. Observable layout-effect commit baseline recorded 10.24 / 0.70 = 14.63x on 2026-07-17; the large honest gap remains visible while the 24.1x ceiling catches further regression."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "reorder_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 7.4,
+    "note": "Keyed reverse with survivor identity retained. Observable layout-effect commit baseline recorded 11.78 / 2.22 = 5.31x on 2026-07-17; the existing 7.4x ceiling retains conservative headroom."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "unmount_tree_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 1.9,
+    "note": "Removal of the rendered 1,000-mesh tree, excluding delayed root-registry teardown. Observable layout-effect commit baseline recorded 2.58 / 2.22 = 1.16x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "reconstruct_dispose_1k",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 9.8,
+    "note": "Constructor reconstruction plus observed disposal for 1,000 objects. Observable layout-effect commit baseline recorded 16.70 / 2.30 = 7.26x on 2026-07-17; the existing 9.8x ceiling retains conservative headroom."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "frame_1k_subscribers",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 3.8,
+    "note": "Per-frame cost for 1,000 useFrame subscribers, averaged over 20 manual frames. Observable-commit baseline recorded 0.070 / 0.036 = 1.94x on 2026-07-17."
+  },
+  {
+    "suite": "three-renderer",
+    "op": "raycast_event",
+    "target": "octane",
+    "reference": "r3f-9.6.1",
+    "maxRatio": 1.7,
+    "note": "Native pointer dispatch and deduplicated Three raycast delivery to 40 overlapping targets. Observable-commit baseline recorded 0.378 / 0.382 = 0.99x on 2026-07-17."
+  },
+  {
+    "suite": "three-bundle-size",
+    "op": "js_gzip",
+    "target": "octane-min",
+    "reference": "r3f-min",
+    "maxRatio": 2.4,
+    "note": "Minimal direct-root production gzip, with built bundles executed and scene-checked in Chromium. Observable-scene baseline recorded 298622 / 188008 = 1.59x on 2026-07-17."
+  },
+  {
+    "suite": "three-bundle-size",
+    "op": "js_gzip",
+    "target": "octane-full",
+    "reference": "r3f-full",
+    "maxRatio": 1.8,
+    "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. Observable-scene baseline recorded 298489 / 250306 = 1.19x on 2026-07-17."
   }
 ]
