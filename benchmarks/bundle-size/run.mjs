@@ -12,8 +12,8 @@
 // suite's programmatic builds.
 //
 // Only .js assets are summed; index.html and CSS are excluded. Weather's CSS is
-// shared byte-for-byte by both ports, so including it would add the same constant
-// to both columns rather than measure framework output. Bytes are deterministic
+// shared byte-for-byte by every port, so including it would add the same constant
+// to every column rather than measure framework output. Bytes are deterministic
 // per build, so median === min.
 //
 // Each build is split into two chunks via rolldown codeSplitting — `app`
@@ -63,7 +63,7 @@ const SETS = [
 	{
 		root: WEATHER_APP,
 		prefix: 'weather_',
-		targets: ['octane-tsrx', 'react'],
+		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue'],
 	},
 ];
 

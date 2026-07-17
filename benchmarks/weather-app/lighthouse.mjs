@@ -32,6 +32,10 @@ const TARGETS = process.env.TARGETS
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5292/' },
 			{ name: 'react', url: 'http://localhost:5293/' },
+			{ name: 'preact', url: 'http://localhost:5294/' },
+			{ name: 'solid', url: 'http://localhost:5295/' },
+			{ name: 'svelte', url: 'http://localhost:5296/' },
+			{ name: 'vue', url: 'http://localhost:5297/' },
 		];
 
 function assert(condition, message) {

@@ -121,6 +121,10 @@ const SUITES = [
 		servers: [
 			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
 			{ filter: 'react-weather-app-bench', port: 5293 },
+			{ filter: 'preact-weather-app-bench', port: 5294 },
+			{ filter: 'solid-weather-app-bench', port: 5295 },
+			{ filter: 'svelte-weather-app-bench', port: 5296 },
+			{ filter: 'vue-weather-app-bench', port: 5297 },
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
@@ -131,6 +135,10 @@ const SUITES = [
 		servers: [
 			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
 			{ filter: 'react-weather-app-bench', port: 5293 },
+			{ filter: 'preact-weather-app-bench', port: 5294 },
+			{ filter: 'solid-weather-app-bench', port: 5295 },
+			{ filter: 'svelte-weather-app-bench', port: 5296 },
+			{ filter: 'vue-weather-app-bench', port: 5297 },
 		],
 		iter: { normal: 5, quick: 3 },
 		runs: [{ script: 'lighthouse.mjs', args: (n) => [String(n)] }],

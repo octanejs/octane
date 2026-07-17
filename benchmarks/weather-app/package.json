@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "App-shaped weather benchmark for native Octane TSRX and React implementations.",
+  "description": "App-shaped weather benchmark across Octane TSRX and five reference frameworks.",
   "scripts": {
     "bench": "node run.mjs",
     "bench:lighthouse": "node lighthouse.mjs",

@@ -1,10 +1,11 @@
 # Weather app benchmark
 
-An app-shaped comparison of the same responsive weather UI in native Octane TSRX
-and React. It is ported from Alicia Sykes's React weather app in
-[`lissy93/framework-benchmarks`](https://github.com/lissy93/framework-benchmarks/tree/d3f0dcd07c9223c4847baddf9bfa49f060adf24a/apps/react).
+An app-shaped comparison of the same responsive weather UI in native Octane TSRX,
+React, Preact, Solid, Svelte, and Vue. It is ported from Alicia Sykes's framework
+implementations in
+[`lissy93/framework-benchmarks`](https://github.com/lissy93/framework-benchmarks/tree/d3f0dcd07c9223c4847baddf9bfa49f060adf24a/apps).
 The original UI, styles, deterministic mock data, service behavior, accessibility
-contract, and test IDs are retained; the benchmark harness drives both ports through
+contract, and test IDs are retained; the benchmark harness drives every port through
 the same observable browser interactions.
 
 ## Columns
@@ -13,14 +14,18 @@ the same observable browser interactions.
 | --- | ---: | --- |
 | `octane-tsrx` | 5292 | `.tsrx` components, keyed `@for`, `@if`, native events, Octane error boundary, and compiler-inferred dependencies for every effect/memo/callback hook |
 | `react` | 5293 | React 19 reference with functional components, explicit hook dependency arrays, `memo`, and a class error boundary |
+| `preact` | 5294 | Preact functional components and hooks, preserving the upstream React-compatible architecture |
+| `solid` | 5295 | Solid signals, effects, and keyed `<For>` control flow |
+| `svelte` | 5296 | Svelte 5 components with runes and keyed `{#each}` control flow |
+| `vue` | 5297 | Vue 3 single-file components with refs, computed values, watchers, and keyed `v-for` |
 
-Both fixtures import the exact same weather service, utilities, styles, and mock JSON
+All fixtures import the exact same weather service, utilities, styles, and mock JSON
 from `shared/`. Live Open-Meteo calls remain available for manual use, but the harness
 always uses local mock mode so network conditions cannot affect the result.
 
 ## Port adaptations
 
-The following small fixes are applied equally to both versions:
+The following small fixes are applied equally to all six versions:
 
 - requests use `AbortController`, so a stale search cannot overwrite a newer city and
   unmounting cannot commit an abandoned response;
@@ -29,7 +34,7 @@ The following small fixes are applied equally to both versions:
   component reads absent `pressure_msl` and renders `NaN hPa` in mock mode);
 - the upstream 200 ms test-only headless delay is disabled by the harness's
   `benchmark=true` query;
-- both documents include a shared description, favicon, and valid `robots.txt`,
+- all documents include a shared description, favicon, and valid `robots.txt`,
   fixing the upstream fixture's incomplete Lighthouse metadata;
 - the footer includes the attribution required when the live Open-Meteo API is used.
 
@@ -57,7 +62,7 @@ measurements beside these semantic controls.
 
 ## Lighthouse and shipped bytes
 
-`weather-app-lighthouse` runs the production apps through Lighthouse's desktop Dense 4G
+`weather-app-lighthouse` runs all six production apps through Lighthouse's desktop Dense 4G
 simulation with a fresh Chromium profile for every sample. It records performance,
 accessibility, best-practices, and SEO scores together with first and largest contentful
 paint, Speed Index, total blocking time, and cumulative layout shift. The upstream
@@ -66,7 +71,7 @@ accessibility, best-practices, and SEO thresholds are gates, while the noisier
 performance threshold remains diagnostic. A browser preflight verifies visible London
 weather, and every audit must load the local mock without making external requests.
 
-The repository-wide `bundle-size` suite also builds both weather targets with the same
+The repository-wide `bundle-size` suite also builds all six weather targets with the same
 normalized production minifier used for its other app comparisons. Its `weather_*`
 operations report raw, gzip, and Brotli bytes for the total JavaScript, authored app
 chunk, and framework chunk.

@@ -214,7 +214,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.5,
-    "note": "Paired desktop Lighthouse FCP under simulated Dense 4G. The final five-sample record measured 362.51 / 362.53 = 1.000x on 2026-07-17; the broad ceiling catches structural load regressions without treating shared-runner noise as signal."
+    "note": "Paired desktop Lighthouse FCP under simulated Dense 4G. The six-target five-sample record measured 362.47 / 362.37 = 1.000x on 2026-07-17; the broad ceiling catches structural load regressions without treating shared-runner noise as signal."
   },
   {
     "suite": "weather-app-lighthouse",
@@ -222,7 +222,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.5,
-    "note": "Paired desktop Lighthouse LCP under simulated Dense 4G. The final five-sample record measured 403.77 / 403.79 = 1.000x on 2026-07-17; the broad ceiling catches structural load regressions without treating shared-runner noise as signal."
+    "note": "Paired desktop Lighthouse LCP under simulated Dense 4G. The six-target five-sample record measured 403.71 / 403.55 = 1.000x on 2026-07-17; the broad ceiling catches structural load regressions without treating shared-runner noise as signal."
   },
   {
     "suite": "weather-app-lighthouse",
@@ -230,7 +230,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.5,
-    "note": "Paired desktop Lighthouse Speed Index under simulated Dense 4G. The final five-sample record measured 362.51 / 362.53 = 1.000x on 2026-07-17; TBT and CLS are intentionally unguarded because either reference can legitimately be zero."
+    "note": "Paired desktop Lighthouse Speed Index under simulated Dense 4G. The six-target five-sample record measured 362.47 / 362.37 = 1.000x on 2026-07-17; TBT and CLS are intentionally unguarded because either reference can legitimately be zero."
   },
   {
     "suite": "async-waterfall",

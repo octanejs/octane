@@ -6,38 +6,38 @@
       "name": "octane-tsrx",
       "ops": {
         "first_contentful_paint": {
-          "score": 362.51122,
-          "median": 362.4013,
-          "min": 362.0931,
-          "mean": 362.51122,
-          "p95": 362.8524,
-          "sd": 0.32149416324406493,
-          "rme": 0.11009969082841663,
-          "scoreRme": 0.11009969082841663,
+          "score": 362.47356,
+          "median": 362.3885,
+          "min": 362.134,
+          "mean": 362.47356,
+          "p95": 362.9241,
+          "sd": 0.35486085019342634,
+          "rme": 0.12153915570748812,
+          "scoreRme": 0.12153915570748812,
           "warmupRatio": 1,
           "samples": 5
         },
         "largest_contentful_paint": {
-          "score": 403.7668299999999,
-          "median": 403.60195,
-          "min": 403.13964999999996,
-          "mean": 403.7668299999999,
-          "p95": 404.2786,
-          "sd": 0.4822412448660998,
-          "rme": 0.1482750820956454,
-          "scoreRme": 0.1482750820956454,
+          "score": 403.71034000000003,
+          "median": 403.58275000000003,
+          "min": 403.201,
+          "mean": 403.71034000000003,
+          "p95": 404.38615000000004,
+          "sd": 0.5322912752901365,
+          "rme": 0.16368690401397923,
+          "scoreRme": 0.16368690401397923,
           "warmupRatio": 1,
           "samples": 5
         },
         "speed_index": {
-          "score": 362.51122,
-          "median": 362.4013,
-          "min": 362.0931,
-          "mean": 362.51122,
-          "p95": 362.8524,
-          "sd": 0.32149416324406493,
-          "rme": 0.11009969082841663,
-          "scoreRme": 0.11009969082841663,
+          "score": 362.47356,
+          "median": 362.3885,
+          "min": 362.134,
+          "mean": 362.47356,
+          "p95": 362.9241,
+          "sd": 0.35486085019342634,
+          "rme": 0.12153915570748812,
+          "scoreRme": 0.12153915570748812,
           "warmupRatio": 1,
           "samples": 5
         },
@@ -121,38 +121,153 @@
       "name": "react",
       "ops": {
         "first_contentful_paint": {
-          "score": 362.5285400000001,
-          "median": 362.4384,
-          "min": 361.9825,
-          "mean": 362.5285400000001,
-          "p95": 363.2377,
-          "sd": 0.5085847943067162,
-          "rme": 0.17416289258560225,
-          "scoreRme": 0.17416289258560225,
+          "score": 362.36742,
+          "median": 362.282,
+          "min": 361.7719,
+          "mean": 362.36742,
+          "p95": 362.8386,
+          "sd": 0.41678056216670617,
+          "rme": 0.14278834892640194,
+          "scoreRme": 0.14278834892640194,
           "warmupRatio": 1,
           "samples": 5
         },
         "largest_contentful_paint": {
-          "score": 403.79281000000003,
-          "median": 403.6576,
-          "min": 402.97375,
-          "mean": 403.79281000000003,
-          "p95": 404.85655,
-          "sd": 0.7628771914600829,
-          "rme": 0.23454733816794282,
-          "scoreRme": 0.23454733816794282,
+          "score": 403.55113,
+          "median": 403.423,
+          "min": 402.65785,
+          "mean": 403.55113,
+          "p95": 404.2579,
+          "sd": 0.6251708432500724,
+          "rme": 0.1923244977898629,
+          "scoreRme": 0.1923244977898629,
           "warmupRatio": 1,
           "samples": 5
         },
         "speed_index": {
-          "score": 362.5285400000001,
-          "median": 362.4384,
-          "min": 361.9825,
-          "mean": 362.5285400000001,
-          "p95": 363.2377,
-          "sd": 0.5085847943067162,
-          "rme": 0.17416289258560225,
-          "scoreRme": 0.17416289258560225,
+          "score": 362.36742,
+          "median": 362.282,
+          "min": 361.7719,
+          "mean": 362.36742,
+          "p95": 362.8386,
+          "sd": 0.41678056216670617,
+          "rme": 0.14278834892640194,
+          "scoreRme": 0.14278834892640194,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "total_blocking_time": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "cumulative_layout_shift": {
+          "score": 0.000039631073159506855,
+          "median": 0,
+          "min": 0,
+          "mean": 0.000039631073159506855,
+          "p95": 0.0001981553657975343,
+          "sd": 0.00008861777360592469,
+          "rme": 277.59999999999997,
+          "scoreRme": 277.59999999999997,
+          "warmupRatio": 1,
+          "samples": 5
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "categories": {
+          "performance": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "accessibility": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "best-practices": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "seo": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          }
+        },
+        "suboptimalAudits": {
+          "performance": [],
+          "accessibility": [],
+          "best-practices": [],
+          "seo": []
+        },
+        "lighthouseVersion": "13.4.0",
+        "chromeUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+        "runWarnings": [],
+        "networkRequestCount": 8,
+        "formFactor": "desktop",
+        "throttlingMethod": "simulate",
+        "mockMode": true
+      }
+    },
+    {
+      "name": "preact",
+      "ops": {
+        "first_contentful_paint": {
+          "score": 286.46180000000004,
+          "median": 288.4697,
+          "min": 282.5269,
+          "mean": 286.46180000000004,
+          "p95": 288.9701,
+          "sd": 3.1373408230538153,
+          "rme": 1.3596572527743183,
+          "scoreRme": 1.3596572527743183,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "largest_contentful_paint": {
+          "score": 327.8927,
+          "median": 329.70455,
+          "min": 323.79035,
+          "mean": 327.8927,
+          "p95": 330.45515,
+          "sd": 3.08479200919609,
+          "rme": 1.1679616929644034,
+          "scoreRme": 1.1679616929644034,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "speed_index": {
+          "score": 286.46180000000004,
+          "median": 288.4697,
+          "min": 282.5269,
+          "mean": 286.46180000000004,
+          "p95": 288.9701,
+          "sd": 3.1373408230538153,
+          "rme": 1.3596572527743183,
+          "scoreRme": 1.3596572527743183,
           "warmupRatio": 1,
           "samples": 5
         },
@@ -177,6 +292,351 @@
           "sd": 0,
           "rme": 0,
           "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 5
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "categories": {
+          "performance": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "accessibility": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "best-practices": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "seo": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          }
+        },
+        "suboptimalAudits": {
+          "performance": [],
+          "accessibility": [],
+          "best-practices": [],
+          "seo": []
+        },
+        "lighthouseVersion": "13.4.0",
+        "chromeUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+        "runWarnings": [],
+        "networkRequestCount": 8,
+        "formFactor": "desktop",
+        "throttlingMethod": "simulate",
+        "mockMode": true
+      }
+    },
+    {
+      "name": "solid",
+      "ops": {
+        "first_contentful_paint": {
+          "score": 286.6741,
+          "median": 287.5395,
+          "min": 282.1475,
+          "mean": 286.6741,
+          "p95": 288.4794,
+          "sd": 2.595544866689848,
+          "rme": 1.1240213033085236,
+          "scoreRme": 1.1240213033085236,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "largest_contentful_paint": {
+          "score": 369.01115,
+          "median": 368.80924999999996,
+          "min": 367.99865,
+          "mean": 369.01115,
+          "p95": 370.2191,
+          "sd": 0.9725197163811247,
+          "rme": 0.3271850003511677,
+          "scoreRme": 0.3271850003511677,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "speed_index": {
+          "score": 286.6741,
+          "median": 287.5395,
+          "min": 282.1475,
+          "mean": 286.6741,
+          "p95": 288.4794,
+          "sd": 2.595544866689848,
+          "rme": 1.1240213033085236,
+          "scoreRme": 1.1240213033085236,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "total_blocking_time": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "cumulative_layout_shift": {
+          "score": 0.00016282634992178976,
+          "median": 0.0002035329374022372,
+          "min": 0,
+          "mean": 0.00016282634992178976,
+          "p95": 0.0002035329374022372,
+          "sd": 0.00009102269673832236,
+          "rme": 69.39999999999998,
+          "scoreRme": 69.39999999999998,
+          "warmupRatio": 1,
+          "samples": 5
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "categories": {
+          "performance": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "accessibility": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "best-practices": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "seo": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          }
+        },
+        "suboptimalAudits": {
+          "performance": [],
+          "accessibility": [],
+          "best-practices": [],
+          "seo": []
+        },
+        "lighthouseVersion": "13.4.0",
+        "chromeUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+        "runWarnings": [],
+        "networkRequestCount": 8,
+        "formFactor": "desktop",
+        "throttlingMethod": "simulate",
+        "mockMode": true
+      }
+    },
+    {
+      "name": "svelte",
+      "ops": {
+        "first_contentful_paint": {
+          "score": 283.87654,
+          "median": 282.5675,
+          "min": 282.476,
+          "mean": 283.87654,
+          "p95": 289.1416,
+          "sd": 2.943853813965629,
+          "rme": 1.2874228006953505,
+          "scoreRme": 1.2874228006953505,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "largest_contentful_paint": {
+          "score": 369.81480999999997,
+          "median": 369.8319,
+          "min": 368.85125,
+          "mean": 369.81480999999997,
+          "p95": 370.7124,
+          "sd": 0.6646385299544434,
+          "rme": 0.22311854775311002,
+          "scoreRme": 0.22311854775311002,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "speed_index": {
+          "score": 283.87654,
+          "median": 282.5675,
+          "min": 282.476,
+          "mean": 283.87654,
+          "p95": 289.1416,
+          "sd": 2.943853813965629,
+          "rme": 1.2874228006953505,
+          "scoreRme": 1.2874228006953505,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "total_blocking_time": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "cumulative_layout_shift": {
+          "score": 0.00004070658748044744,
+          "median": 0,
+          "min": 0,
+          "mean": 0.00004070658748044744,
+          "p95": 0.0002035329374022372,
+          "sd": 0.00009102269673832236,
+          "rme": 277.5999999999999,
+          "scoreRme": 277.5999999999999,
+          "warmupRatio": 1,
+          "samples": 5
+        }
+      },
+      "meta": {
+        "gate": "passed",
+        "categories": {
+          "performance": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "accessibility": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "best-practices": {
+            "threshold": 80,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          },
+          "seo": {
+            "threshold": 90,
+            "score": 100,
+            "median": 100,
+            "min": 100,
+            "samples": [100, 100, 100, 100, 100],
+            "meetsThreshold": true
+          }
+        },
+        "suboptimalAudits": {
+          "performance": [],
+          "accessibility": [],
+          "best-practices": [],
+          "seo": []
+        },
+        "lighthouseVersion": "13.4.0",
+        "chromeUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/149.0.0.0 Safari/537.36",
+        "runWarnings": [],
+        "networkRequestCount": 8,
+        "formFactor": "desktop",
+        "throttlingMethod": "simulate",
+        "mockMode": true
+      }
+    },
+    {
+      "name": "vue",
+      "ops": {
+        "first_contentful_paint": {
+          "score": 322.8125,
+          "median": 322.518,
+          "min": 322.3408,
+          "mean": 322.8125,
+          "p95": 323.4467,
+          "sd": 0.5587835135363287,
+          "rme": 0.2148956876590697,
+          "scoreRme": 0.2148956876590697,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "largest_contentful_paint": {
+          "score": 370.21875000000006,
+          "median": 369.777,
+          "min": 369.51120000000003,
+          "mean": 370.21875000000006,
+          "p95": 371.17005,
+          "sd": 0.8381752703044811,
+          "rme": 0.2810676694755834,
+          "scoreRme": 0.2810676694755834,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "speed_index": {
+          "score": 322.8125,
+          "median": 322.518,
+          "min": 322.3408,
+          "mean": 322.8125,
+          "p95": 323.4467,
+          "sd": 0.5587835135363287,
+          "rme": 0.2148956876590697,
+          "scoreRme": 0.2148956876590697,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "total_blocking_time": {
+          "score": 0,
+          "median": 0,
+          "min": 0,
+          "mean": 0,
+          "p95": 0,
+          "sd": 0,
+          "rme": 0,
+          "scoreRme": 0,
+          "warmupRatio": 1,
+          "samples": 5
+        },
+        "cumulative_layout_shift": {
+          "score": 0.0001221197624413423,
+          "median": 0.0002035329374022372,
+          "min": 0,
+          "mean": 0.0001221197624413423,
+          "p95": 0.0002035329374022372,
+          "sd": 0.00011147958101049222,
+          "rme": 113.32972543276836,
+          "scoreRme": 113.32972543276836,
           "warmupRatio": 1,
           "samples": 5
         }

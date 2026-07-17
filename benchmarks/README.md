@@ -147,8 +147,8 @@ internally, get their own baseline and guard namespace.
 | `js-framework` | js-framework | Octane + reference frameworks | krausest ops incl. `add` |
 | `js-framework-reorder` | js-framework | same fixtures | keyed reorder matrix (LIS vs lastPlacedIndex) |
 | `todomvc` | todomvc | Octane + reference frameworks | Speedometer-style TodoMVC interactions |
-| `weather-app` | weather-app | octane-tsrx, react | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
-| `weather-app-lighthouse` | weather-app | octane-tsrx, react | desktop Lighthouse categories plus FCP/LCP/Speed Index/TBT/CLS |
+| `weather-app` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
+| `weather-app-lighthouse` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | desktop Lighthouse categories plus FCP/LCP/Speed Index/TBT/CLS |
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |

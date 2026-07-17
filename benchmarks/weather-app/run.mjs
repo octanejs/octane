@@ -1,5 +1,5 @@
-// Weather Front benchmark — a production-browser port of the React weather app
-// from lissy93/framework-benchmarks, paired with an idiomatic Octane TSRX twin.
+// Weather Front benchmark — production-browser ports from
+// lissy93/framework-benchmarks, including an idiomatic Octane TSRX implementation.
 // Every timed operation is driven through the public DOM and verified afterward.
 
 import fs from 'node:fs';
@@ -16,6 +16,10 @@ const TARGETS = process.env.TARGETS
 	: [
 			{ name: 'octane-tsrx', url: 'http://localhost:5292/' },
 			{ name: 'react', url: 'http://localhost:5293/' },
+			{ name: 'preact', url: 'http://localhost:5294/' },
+			{ name: 'solid', url: 'http://localhost:5295/' },
+			{ name: 'svelte', url: 'http://localhost:5296/' },
+			{ name: 'vue', url: 'http://localhost:5297/' },
 		];
 
 function assert(condition, message) {
@@ -576,31 +580,33 @@ for (const target of TARGETS) {
 	}
 }
 
-const octaneResult = targetResults.find((target) => target.name === 'octane-tsrx');
-const reactResult = targetResults.find((target) => target.name === 'react');
-if (octaneResult?.meta.gate === 'passed' && reactResult?.meta.gate === 'passed') {
-	for (const operation of [
-		'elements_loaded',
-		'elements_expanded',
-		'visible_chars_loaded',
-		'visible_chars_expanded',
-		'forecast_items',
-		'weather_details',
-		'forecast_details_expanded',
-	]) {
-		const octaneValue = octaneResult.ops[operation].median;
-		const reactValue = reactResult.ops[operation].median;
-		if (octaneValue !== reactValue) {
-			failures.push(
-				`semantic parity: ${operation} differs (${octaneValue} Octane vs ${reactValue} React)`,
-			);
+const referenceResult = targetResults.find((target) => target.name === 'react');
+if (referenceResult?.meta.gate === 'passed') {
+	for (const target of targetResults) {
+		if (target.name === referenceResult.name || target.meta.gate !== 'passed') continue;
+		for (const operation of [
+			'elements_loaded',
+			'elements_expanded',
+			'visible_chars_loaded',
+			'visible_chars_expanded',
+			'forecast_items',
+			'weather_details',
+			'forecast_details_expanded',
+		]) {
+			const targetValue = target.ops[operation].median;
+			const referenceValue = referenceResult.ops[operation].median;
+			if (targetValue !== referenceValue) {
+				failures.push(
+					`semantic parity: ${target.name} ${operation} differs (${targetValue} vs ${referenceValue} React)`,
+				);
+			}
 		}
-	}
-	for (const state of ['collapsed', 'expanded']) {
-		const octaneSnapshot = octaneResult.meta.dom[state].semantic.observable;
-		const reactSnapshot = reactResult.meta.dom[state].semantic.observable;
-		if (JSON.stringify(octaneSnapshot) !== JSON.stringify(reactSnapshot)) {
-			failures.push(`semantic parity: ${state} observable snapshot differs`);
+		for (const state of ['collapsed', 'expanded']) {
+			const targetSnapshot = target.meta.dom[state].semantic.observable;
+			const referenceSnapshot = referenceResult.meta.dom[state].semantic.observable;
+			if (JSON.stringify(targetSnapshot) !== JSON.stringify(referenceSnapshot)) {
+				failures.push(`semantic parity: ${target.name} ${state} observable snapshot differs`);
+			}
 		}
 	}
 }

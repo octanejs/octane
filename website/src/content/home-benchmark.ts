@@ -152,12 +152,12 @@ export const HOME_SUMMARY: BenchCard = {
 		{
 			op: 'bundle-size',
 			'octane-tsrx': 1,
-			react: 0.9852078422399765,
-			preact: 0.596995840973518,
-			solid: 0.7280215010683541,
-			svelte: 0.8453116527579267,
-			ripple: 0.8020073078434931,
-			'vue-vapor': 0.7353935815388369,
+			react: 0.9852897798001261,
+			preact: 0.5970454917989901,
+			solid: 0.7280820490085718,
+			svelte: 0.8453819554609946,
+			ripple: 0.8020740090198433,
+			'vue-vapor': 0.7355733623950954,
 		},
 		{
 			op: 'ssr-throughput',
