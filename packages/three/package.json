@@ -46,15 +46,21 @@
   },
   "scripts": {
     "test": "pnpm upstream:check && vitest run --root ../.. --project three",
+    "test:compat": "pnpm upstream:check && vitest run --root ../.. --project three --exclude 'packages/three/tests/**/*differential.test.ts' --exclude 'packages/three/tests/browser/**/*.test.ts'",
     "upstream:check": "node scripts/check-upstream-crosswalk.mjs"
   },
   "dependencies": {
-    "@types/three": "catalog:default",
     "zustand": "catalog:default"
   },
   "peerDependencies": {
+    "@types/three": ">=0.156.0",
     "octane": "workspace:*",
-    "three": ">=0.172.0 <0.173.0"
+    "three": ">=0.156.0"
+  },
+  "peerDependenciesMeta": {
+    "@types/three": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@octanejs/rsbuild-plugin": "workspace:*",
@@ -64,6 +70,7 @@
     "@rsbuild/core": "catalog:default",
     "@rspack/core": "catalog:default",
     "@tsrx/react": "catalog:default",
+    "@types/three": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
     "playwright": "catalog:default",

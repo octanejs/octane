@@ -57,6 +57,8 @@ export const BENCHMARK_SUITES = [
 	'async-composition',
 	'codegen-size',
 	'bundle-size',
+	'three-renderer',
+	'three-bundle-size',
 ];
 
 const DEFAULT_TIMEOUT_MS = 120_000;

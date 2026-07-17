@@ -8,9 +8,15 @@ This port targets the immutable React Three Fiber release `v9.6.1`:
 - exact Three behavior and type oracle: `three@0.172.0` and
   `@types/three@0.172.0`.
 
-The upstream package accepts `three >=0.156`, but this port initially supports
-only the pinned r172 lane. The broader peer range is gated on a real
-minimum-version validation lane.
+The port advertises the upstream `three >=0.156` range. Its immutable
+differential oracle stays on r172, while separate CI jobs typecheck and run the
+Octane-owned compatibility suite against the minimum r156 pair and the current
+registry release. This prevents either a moving latest dependency or the pinned
+oracle from standing in for the other compatibility claim. `@types/three` is an
+optional peer that TypeScript consumers install from the same Three release line;
+its patch revision may differ from the runtime. Making it optional prevents
+package-manager peer auto-install from silently pairing current declarations with
+an older supported runtime.
 
 ## Source boundary
 
@@ -69,6 +75,24 @@ reconstruct them with ref, handler, and owned-resource cleanup. A controlled Web
 loop on session end, and disconnects without leaving a live callback. WebGL
 context restoration invalidates the live root before teardown removes its
 listeners.
+
+Milestone 9 validates the renderer vocabulary independently of an in-process
+Three host. A real asynchronous `MessageChannel` carries structured-cloned host
+batches to a separate object driver and returns versioned acknowledgement,
+completion, rejection, fault, and event messages. Logical topology, lifecycle,
+refs, layout effects, and teardown publish only after acknowledgement; pre-ack
+rejection remains retryable, while post-ack faults retain the accepted commit.
+The existing portal proof separately verifies that only a root-scoped portal
+handle, never the raw target, enters a cloned batch.
+
+Milestone 10 hardens the release claim with an existence-checked 90-export/
+157-test crosswalk, public export and package-subpath type matrices, r156 and
+current Three compatibility lanes, and an external packed consumer that builds
+and executes the published package without React. Chromium coverage exercises
+real WebGL construction failure and `WEBGL_lose_context` loss/restoration.
+Renderer lifecycle/event benchmarks and minimal/full-catalogue shipped-size
+benchmarks compare Octane Three, R3F 9.6.1, and direct Three behind semantic
+checksums and committed ratio guards.
 
 `DOMRegion` is an Octane-specific proof of the already-compiled Three-to-DOM
 renderer boundary, so it is not part of the pinned R3F public-export inventory.

@@ -23,6 +23,7 @@ packages:
   - benchmarks/streaming-ssr/*
   - benchmarks/codegen-size
   - benchmarks/bundle-size
+  - benchmarks/three
   - benchmarks/async-waterfall
   - benchmarks/async-waterfall/*
   - benchmarks/async-composition
@@ -110,6 +111,8 @@ catalogs:
     '@lexical/utils': 0.46.0
     '@lexical/yjs': 0.46.0
     '@tiptap/core': 3.28.0
+    '@tiptap/extension-bubble-menu': 3.28.0
+    '@tiptap/extension-floating-menu': 3.28.0
     '@tiptap/pm': 3.28.0
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0

@@ -240,6 +240,12 @@ catalogs:
     '@tiptap/core':
       specifier: 3.28.0
       version: 3.28.0
+    '@tiptap/extension-bubble-menu':
+      specifier: 3.28.0
+      version: 3.28.0
+    '@tiptap/extension-floating-menu':
+      specifier: 3.28.0
+      version: 3.28.0
     '@tiptap/pm':
       specifier: 3.28.0
       version: 3.28.0
@@ -2233,6 +2239,40 @@ importers:
         specifier: catalog:default
         version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
+  benchmarks/three:
+    dependencies:
+      '@octanejs/three':
+        specifier: workspace:*
+        version: link:../../packages/three
+      '@react-three/fiber':
+        specifier: catalog:default
+        version: 9.6.1(@types/react@19.2.17)(immer@11.1.11)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.172.0)
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      three:
+        specifier: catalog:default
+        version: 0.172.0
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: catalog:default
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      terser:
+        specifier: catalog:default
+        version: 5.48.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+
   benchmarks/todomvc:
     dependencies:
       playwright:
@@ -3795,9 +3835,6 @@ importers:
 
   packages/three:
     dependencies:
-      '@types/three':
-        specifier: catalog:default
-        version: 0.172.0
       zustand:
         specifier: catalog:default
         version: 5.0.14(@types/react@19.2.17)(immer@11.1.11)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
@@ -3823,6 +3860,9 @@ importers:
       '@tsrx/react':
         specifier: catalog:default
         version: 0.2.37(react@19.2.7)
+      '@types/three':
+        specifier: catalog:default
+        version: 0.172.0
       esbuild:
         specifier: catalog:default
         version: 0.28.1
@@ -3893,6 +3933,13 @@ importers:
       vitest:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+    optionalDependencies:
+      '@tiptap/extension-bubble-menu':
+        specifier: catalog:default
+        version: 3.28.0(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
+      '@tiptap/extension-floating-menu':
+        specifier: catalog:default
+        version: 3.28.0(@floating-ui/dom@1.7.6)(@tiptap/core@3.28.0(@tiptap/pm@3.28.0))(@tiptap/pm@3.28.0)
 
   packages/visx:
     dependencies:

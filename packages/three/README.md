@@ -4,8 +4,8 @@ An experimental React Three Fiber 9-compatible web renderer for Octane. Octane
 keeps ownership of component execution, hooks, context, Suspense, refs, and
 effects; this package supplies the Three-specific host layer.
 
-Milestones 0 and 2–8 are implemented on top of Octane's renderer SDK foundation.
-The current technical preview includes:
+Milestones 0–10 are implemented across this package and Octane's renderer SDK
+foundation. The current technical preview includes:
 
 - the serializable compiler preset, renderer entry point, renderer-local Three
   intrinsic types, and pinned upstream export/test crosswalk;
@@ -43,10 +43,15 @@ The current technical preview includes:
 - the low-level `DOMRegion` Three-to-DOM boundary with an explicit target and
   deterministic DOM ownership; and
 - public behavior, prepared-driver, and same-source compiled scene evidence
-  against R3F 9.6.1 with the exact Three r172 oracle.
-
-Milestone 9 is the transported renderer-SDK proof. Milestone 10 is API and
-release hardening.
+  against R3F 9.6.1 with the exact Three r172 oracle;
+- a real asynchronous `MessageChannel` renderer proof with structured-cloned
+  batches and values, root-scoped resource/portal handles, listener IDs,
+  acknowledgement-gated refs/layout, rejection/fault semantics, teardown, and
+  native-event delivery; and
+- a checked public export/subpath type matrix, Three r156/current compatibility
+  lanes, a packed external consumer, real WebGL creation-failure and context-
+  recovery coverage, and semantic-checksummed renderer and shipped-size
+  benchmarks.
 
 Three deliberate correctness fixes differ from R3F 9.6.1:
 
@@ -274,8 +279,21 @@ fresh Three root on the client.
 
 The compatibility baseline is `@react-three/fiber@9.6.1` at commit
 `2a528745e9aa7c9e6cca41e404b59d45cf0d0cc7`, with `three@0.172.0` as the exact
-behavioral oracle. React Native/Expo, R3F 10's WebGPU/TSL APIs, and Drei are
-separate follow-on efforts.
+behavioral and differential oracle. The published peer range is
+`three >=0.156.0`, guarded by minimum-r156 and current-release CI lanes; the
+r172 lane remains immutable so a moving current dependency cannot change the
+parity oracle. TypeScript consumers must install `@types/three` from the same
+Three release line explicitly; its patch revision may differ from the runtime.
+It is an optional peer so a package manager cannot silently auto-install current
+declarations beside an older supported runtime:
+
+```bash
+pnpm add three@0.156.0
+pnpm add -D @types/three@0.156.0
+```
+
+React Native/Expo, R3F 10's WebGPU/TSL APIs, and Drei are separate follow-on
+efforts.
 
 See [`docs/three-port-plan.md`](../../docs/three-port-plan.md) for the delivery
 phases and [`UPSTREAM.md`](./UPSTREAM.md) for source and license provenance.
