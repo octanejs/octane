@@ -46,7 +46,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.4` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.4` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.0` | 7 |
-| `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.1` | 1 |
+| `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.1` | 2 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.1` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.7` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.6` | 5 |

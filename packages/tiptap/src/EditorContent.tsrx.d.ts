@@ -1,5 +1,7 @@
 import type { Editor } from '@tiptap/core';
 
+import type { ContentComponent } from './Editor';
+
 export type EditorContentRef<T> =
 	| { current: T | null }
 	| ((value: T | null) => void | (() => void))
@@ -17,5 +19,6 @@ export interface EditorContentProps {
 	[key: string]: unknown;
 }
 
+export declare function createContentComponent(): ContentComponent;
 export declare function PureEditorContent(props: EditorContentProps): unknown;
 export declare const EditorContent: (props: EditorContentProps) => unknown;
