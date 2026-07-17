@@ -7,7 +7,7 @@ import { parStep, PAR_LATENCY_MS } from './parallel-data';
 // the SSR parallel-use mirror targets: the compiler hoists the K creations and
 // registers them in one batch, so the render suspends ONCE and awaits all K
 // together — total wall time ≈ 1×latency + pass cost. Serial per-use()
-// registration (the pre-mirror behavior, or `parallelUse: false`) discovers
+// registration (the pre-mirror behavior) discovers
 // one fetch per round: ≈ K×latency. The harness's analytic gate checks the
 // summed value; the headline metric is p50 latency vs K (flat = parallel,
 // linear = serial). Contrast with Waterfall.tsrx, whose levels are TRUE data

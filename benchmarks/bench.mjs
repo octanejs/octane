@@ -325,7 +325,7 @@ const SUITES = [
 		// Async data-loading model (10 nested async levels, 16ms simulated latency
 		// per level): React's nested `use()` serializes the fetches (the suspense
 		// waterfall, ≈10-19× the latency floor). Octane compiles the SAME idiomatic
-		// nested-use code with the parallelUse pipeline (memoized creations +
+		// nested-use code with the compiler pipeline (memoized creations +
 		// batched unwrap + fetch-tree warming — docs/suspense-parallel-use-plan.md)
 		// and lands at the parallel floor alongside Solid 2.0 / ripple (≈1.2×).
 		// Guarded both ways: ≤0.25× React, ≤1.5× solid/ripple.
@@ -338,6 +338,19 @@ const SUITES = [
 			{ filter: 'ripple-async-bench', port: 5219 },
 			{ filter: 'preact-async-bench', port: 5269 },
 			{ filter: 'svelte-async-bench', port: 5280 },
+		],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Realistic async composition: adjacent panels under one route boundary,
+		// nested async children, an imported custom hook with independent use()
+		// reads, and one true data dependency.
+		name: 'async-composition',
+		cwd: 'async-composition',
+		servers: [
+			{ filter: 'octane-tsrx-async-composition-bench', port: 5282 },
+			{ filter: 'react-async-composition-bench', port: 5284 },
 		],
 		iter: { normal: 10, quick: 2 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],

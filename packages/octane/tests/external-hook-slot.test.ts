@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
 	mkdtempSync,
 	mkdirSync,
@@ -409,6 +409,20 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 				define: { __OCTANE_PROFILE_ENABLED__: 'false' },
 			}),
 		).toThrow(/__OCTANE_PROFILE_ENABLED__.*reserved/);
+	});
+
+	it('warns that the removed parallelUse option is ignored', () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			octane({ parallelUse: false } as any);
+			expect(warn).toHaveBeenCalledTimes(1);
+			expect(warn.mock.calls[0][0]).toMatch(/`parallelUse` option was removed/);
+			warn.mockClear();
+			octane();
+			expect(warn).not.toHaveBeenCalled();
+		} finally {
+			warn.mockRestore();
+		}
 	});
 
 	it('recursively discovers raw Octane bindings behind another binding', () => {

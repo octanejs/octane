@@ -235,7 +235,6 @@ export class OctaneRspackPlugin {
 			hmr,
 			dev,
 			profile,
-			parallelUse: this.options.parallelUse !== false,
 			exclude: this.options.exclude ?? [],
 			renderers: this.options.renderers?.signature,
 			transpile: this.options.transpile !== false,
@@ -245,9 +244,6 @@ export class OctaneRspackPlugin {
 			root,
 			profile,
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
-			...(this.options.parallelUse === undefined
-				? null
-				: { parallelUse: this.options.parallelUse }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
 		});
 		const runtimeRequest = neutralCompiler.resolveRuntimeRequest('octane', environment);
@@ -265,9 +261,6 @@ export class OctaneRspackPlugin {
 			profile,
 			...(this.options.hmr === undefined ? null : { hmr: this.options.hmr }),
 			...(this.options.dev === undefined ? null : { dev: this.options.dev }),
-			...(this.options.parallelUse === undefined
-				? null
-				: { parallelUse: this.options.parallelUse }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
 		};

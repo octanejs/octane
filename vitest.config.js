@@ -218,10 +218,6 @@ export default defineConfig({
 					globals: false,
 				},
 				plugins: [
-					// The parallel-use pipeline (memoized creations, batched unwrap,
-					// fetch-tree warming) runs at its DEFAULT (on). Tests that pin
-					// the opt-out output call compile() with `parallelUse: false`.
-					//
 					// Bindings whose `.ts` sources hand-forward hook slots do not need
 					// package-specific exclusions: they declare
 					// `"octane": { "hookSlots": { "manual": ["src"] } }` in their own package.json and

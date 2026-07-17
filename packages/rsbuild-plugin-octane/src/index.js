@@ -228,7 +228,6 @@ function assertRootPublicPaths(config, clientEnvironment) {
  * @param {{
  *   hmr?: boolean,
  *   profile?: boolean,
- *   parallelUse?: boolean,
  *   exclude?: string[],
  *   clientEnvironment?: string,
  *   serverEnvironment?: string,
@@ -518,9 +517,6 @@ export function pluginOctane(inlineOptions = {}) {
 						...(inlineOptions.profile === undefined
 							? null
 							: { profile: environment === 'client' && inlineOptions.profile }),
-						...(inlineOptions.parallelUse === undefined
-							? null
-							: { parallelUse: inlineOptions.parallelUse }),
 						...(inlineOptions.exclude === undefined ? null : { exclude: inlineOptions.exclude }),
 						renderers: initialConfig?.compiler.renderers,
 					}),

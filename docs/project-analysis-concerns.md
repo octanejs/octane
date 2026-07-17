@@ -236,19 +236,21 @@ panel target is not a reason to remove an ownership boundary.
 
 ## 8. Parallel `use()` evaluation timing
 
-Status: **intentional divergence with a tested opt-out**.
+Status: **intentional divergence**.
 
-The default pipeline memoizes promise creation, starts proven-independent work
-together, batches a stratum, and warms independent descendant plans. This
-avoids React's serial Suspense waterfall, but it can start expressions earlier
-than source-order React and can begin speculative work for a subtree that never
+The compiler always runs its waterfall-elimination analysis. For eligible
+patterns it memoizes promise creation, starts proven-independent work together,
+batches a stratum, and warms independent descendant plans. This avoids React's
+serial Suspense waterfall, but it can start expressions earlier than
+source-order React and can begin speculative work for a subtree that never
 commits.
 
-`parallelUse: false` must remain a stable escape hatch. Proof should stay
-conservative: a false negative costs performance, while a false positive can
-change externally observable behavior. Renderer aborts stop Octane's work, but
-there is still no general way to cancel arbitrary user-created promises, so do
-not imply that speculative fetches are automatically aborted.
+Because this evaluation timing is part of Octane's compiled semantics, proof
+must stay conservative: a false negative costs performance, while a false
+positive can change externally observable behavior. Renderer aborts stop
+Octane's work, but there is still no general way to cancel arbitrary
+user-created promises, so do not imply that speculative fetches are
+automatically aborted.
 
 ## 9. Scheduler and process-wide client coordination
 
@@ -389,6 +391,6 @@ compiler requirements change.
 
 - pursue remaining marker elision only where profiling justifies the ownership
   complexity;
-- preserve the `parallelUse` opt-out and conservative dependency proof;
+- preserve unconditional parallel `use()` and its conservative dependency proof;
 - move playground compilation/highlighting to a worker only if measurements
   show the bounded main-thread work is user-visible.
