@@ -15,6 +15,7 @@ Key facts for answering questions about Octane:
 - Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref `ref={[a, b]}`. There is no `forwardRef`.
 - `class`/`className` compose clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out).
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
+- `<Hydrate>` can leave initial server HTML visible but inert until `load()`, idle time, visibility, a media query, interaction, an application condition, or never. Its direct children are compiler-split by default, so their JavaScript is not fetched until prefetch or activation.
 - No class components, no Server Components, no StrictMode double-invoke.
 - Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,500+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
@@ -23,7 +24,7 @@ Key facts for answering questions about Octane:
 - [Quick start](https://octanejs.dev/docs/quick-start): Install Octane, mount a component, and learn the `.tsrx` essentials (components, state/effects, conditional hooks, control flow, SSR/hydrate).
 - [Build tools](https://octanejs.dev/docs/build-tools): Configure the recommended Vite integration or the matching Rspack and Rsbuild plugins, including routing, SSR, hydration, production, and preview.
 - [Profiling](https://octanejs.dev/docs/profiling): Enable `profile: true` with Vite, Rspack, or Rsbuild to inspect component render/DOM time, self time, render counts, causes, bails, scheduling delay, and Chrome trace data.
-- [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, transitions, actions, events, and SSR/static rendering.
+- [Core APIs](https://octanejs.dev/docs/core-apis): Roots, components, state and effect hooks, current-state getters, context, Suspense, deferred hydration and code splitting, transitions, actions, events, and SSR/static rendering.
 - [TSRX vs TSX/JSX](https://octanejs.dev/docs/tsrx-vs-tsx): When to author in `.tsrx` versus standard `.tsx`/`.jsx`, and what each dialect unlocks (compiled collections, template control flow, the `@{ … }` shorthand, text holes).
 - [Differences from React](https://octanejs.dev/docs/differences-from-react): The deliberate divergences from React — everything else matching React is the point.
 - [Bindings](https://octanejs.dev/docs/bindings): The `@octanejs/*` ports of the React ecosystem.
@@ -36,6 +37,64 @@ Key facts for answering questions about Octane:
 - Dynamic text holes use a cast: `{expr as string}`. The cast is optional when the expression is provably a string (a string/template literal, a `+`-concatenation involving a string, or a local tracked back to a string); required otherwise. A bare `{expr}` that isn't provably a string is a renderable hole.
 - Template control flow uses directive blocks: `@if (c) { } @else { }`, `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`, and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
 - `.tsrx`'s `@for` compiles a rendered list to a keyed fast path (a compiled per-item body + the raw array) instead of allocating a descriptor per row — the main reason to prefer `.tsrx` for collection-heavy UI.
+
+## Deferred hydration
+
+`Hydrate` is an experimental core API for initial server-rendered content. It preserves visible server HTML while postponing component execution, refs, effects, and events. A boundary first mounted after the app is already running renders normally on the client.
+
+Import the component from `octane` and strategies from `octane/hydration`:
+
+```tsrx
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+export function ProductPage() @{
+	<Hydrate when={visible({ rootMargin: '400px' })}>
+		<Reviews />
+	</Hydrate>
+}
+```
+
+Every boundary makes three performance decisions:
+
+- `when` (required) controls when preserved server HTML becomes interactive. Available strategies are `load()`, `idle({ timeout? })`, `visible({ rootMargin?, threshold? })`, `media(query)`, `interaction({ events? })`, `condition(booleanOrGetter)`, and `never()`. `interaction()` replays the triggering event. A function form such as `when={() => window.matchMedia('(pointer: coarse)').matches ? interaction() : visible()}` may choose a strategy from client-only information; it is not called on the server and must return synchronously.
+- `split` defaults to `true`. The compiler extracts direct children into a generated chunk, and Vite/Rsbuild do not eagerly module-preload that JavaScript. Use the literal `split={false}` when the code is already required elsewhere or a separate request is not worthwhile:
+
+```tsrx
+import { idle } from 'octane/hydration';
+
+<Hydrate when={idle()} split={false}>
+	<SmallBadge />
+</Hydrate>
+```
+
+- `prefetch` starts the split chunk or custom preparation before `when` activates the boundary. Strategy prefetching accepts `load()`, `idle()`, `visible()`, `media()`, or `interaction()`; `condition()`, `never()`, and function-form strategies are activation-only. A strategy prefetch loads code but leaves the DOM inert:
+
+```tsrx
+import { idle, interaction } from 'octane/hydration';
+
+<Hydrate when={interaction()} prefetch={idle()}>
+	<RecommendationEditor />
+</Hydrate>
+```
+
+A procedural prefetch can prepare code and data. Awaited work blocks activation if `when` resolves first; `signal` aborts when the boundary is removed:
+
+```tsrx
+<Hydrate
+	when={visible()}
+	prefetch={async ({ preload, signal }) => {
+		await preload();
+		await warmReviews({ signal });
+	}}
+>
+	<Reviews />
+</Hydrate>
+```
+
+The procedural context also exposes `waitFor(strategy)` for the same five prefetch strategies and the persistent boundary `element`. Procedural prefetch works with either split mode; strategy prefetch requires splitting.
+
+The remaining public props are `fallback`, client-only loading UI for a later client mount or suspension, and `onHydrated`, called once after the child successfully commits on the client, including a client-only mount. Initial server HTML remains visible while its strategy or first activation suspension waits; `fallback` does not replace it. `children` is the server-rendered subtree. See the [Core APIs guide](https://octanejs.dev/docs/core-apis#deferred-hydration) and [complete deferred hydration reference](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md).
 
 ## Core state APIs
 

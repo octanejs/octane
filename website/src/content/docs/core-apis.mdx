@@ -94,8 +94,13 @@ attach event handlers such as `onClick`, and let Octane keep the page in sync.
 		<strong>Wait for data</strong>
 		<span>Boundaries make loading and errors visible.</span>
 	</a>
-	<a href="#roots-and-rendering">
+	<a href="#deferred-hydration">
 		<span className="topic-number">06</span>
+		<strong>Defer startup work</strong>
+		<span>Server HTML can become interactive later.</span>
+	</a>
+	<a href="#roots-and-rendering">
+		<span className="topic-number">07</span>
 		<strong>Start the app</strong>
 		<span>A root connects Octane to your HTML.</span>
 	</a>
@@ -573,6 +578,197 @@ component's code only when it is needed.
 	</div>
 </details>
 
+<h2 id="deferred-hydration">Deferred hydration</h2>
+
+`Hydrate` keeps useful server-rendered HTML visible while delaying the component work,
+effects, and events that make that subtree interactive. By default, the compiler also
+moves the direct children into a separate JavaScript chunk, so the browser does not
+fetch that code until the boundary is prefetched or activated.
+
+```tsrx
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+export function ProductPage() @{
+	<main>
+		<ProductHero />
+		<Hydrate when={visible({ rootMargin: '400px' })}>
+			<Reviews />
+		</Hydrate>
+	</main>
+}
+```
+
+The server still renders `Reviews`. During initial hydration its HTML stays visible but
+dormant. When the boundary approaches the viewport, Octane loads the generated child
+chunk, adopts the same DOM in place, then enables refs, effects, and events.
+
+`Hydrate` is experimental and applies only to matching server HTML in the initial
+document. A boundary first mounted after the app is already running renders normally on
+the client.
+
+### The three performance decisions
+
+| Prop       | Default  | Decision                                                     |
+| ---------- | -------- | ------------------------------------------------------------ |
+| `when`     | required | When the preserved server HTML becomes interactive.          |
+| `split`    | `true`   | Whether the compiler creates a deferred child chunk.         |
+| `prefetch` | none     | Whether code or data preparation starts before `when` fires. |
+
+<h3 id="hydrate-when">
+	Choose the trigger with <code>when</code>
+</h3>
+
+Import hydration strategies from `octane/hydration`. Use the trigger that matches how
+soon the content needs to respond:
+
+| Strategy                               | Example use                                            |
+| -------------------------------------- | ------------------------------------------------------ |
+| `load()`                               | Hydrate with the initial app hydration.                |
+| `idle({ timeout? })`                   | Hydrate when the browser is idle.                      |
+| `visible({ rootMargin?, threshold? })` | Hydrate near or inside the viewport.                   |
+| `media(query)`                         | Hydrate when a media query matches.                    |
+| `interaction({ events? })`             | Hydrate on intent and replay the triggering event.     |
+| `condition(booleanOrGetter)`           | Hydrate after an application condition becomes truthy. |
+| `never()`                              | Keep the initial server HTML permanently static.       |
+
+```tsrx
+import { Hydrate } from 'octane';
+import { condition, idle, interaction, load, media, never, visible } from 'octane/hydration';
+
+export function StrategyExamples(props: { hasConsent: boolean }) @{
+	<>
+		<Hydrate when={load()}>
+			<SiteHeader />
+		</Hydrate>
+		<Hydrate when={idle()}>
+			<RelatedArticles />
+		</Hydrate>
+		<Hydrate when={visible()}>
+			<Reviews />
+		</Hydrate>
+		<Hydrate when={media('(min-width: 64rem)')}>
+			<DesktopChart />
+		</Hydrate>
+		<Hydrate when={interaction({ events: ['focusin', 'click'] })}>
+			<Editor />
+		</Hydrate>
+		<Hydrate when={condition(props.hasConsent)}>
+			<PersonalizedOffers />
+		</Hydrate>
+		<Hydrate when={never()}>
+			<LegalArchive />
+		</Hydrate>
+	</>
+}
+```
+
+The function form chooses a strategy from browser-only information. Octane never calls
+it on the server, and it must return a strategy synchronously:
+
+```tsrx
+import { interaction, visible } from 'octane/hydration';
+
+<Hydrate when={() => window.matchMedia('(pointer: coarse)').matches ? interaction() : visible()}>
+	<Recommendations />
+</Hydrate>
+```
+
+<h3 id="hydrate-split">
+	Control the child chunk with <code>split</code>
+</h3>
+
+Splitting is on by default; this boundary defers both component execution and the
+`HeavyReviewsWidget` JavaScript:
+
+```tsrx
+<Hydrate when={visible()}>
+	<HeavyReviewsWidget />
+</Hydrate>
+```
+
+Use the literal `split={false}` when that code is already needed elsewhere or a separate
+chunk would cost more than it saves. Hydration still waits for `when`:
+
+```tsrx
+<Hydrate when={idle()} split={false}>
+	<SmallBadge />
+</Hydrate>
+```
+
+The compiler can split direct JSX children and capture ordinary lexical values. Move
+hooks and other setup into a child component, or opt out of splitting.
+
+<h3 id="hydrate-prefetch">
+	Prepare before activation with <code>prefetch</code>
+</h3>
+
+A strategy-form prefetch downloads the generated child chunk early without making the
+server HTML interactive. Here the browser may fetch the editor while idle, but the
+editor still activates only after interaction:
+
+```tsrx
+import { idle, interaction } from 'octane/hydration';
+
+<Hydrate when={interaction()} prefetch={idle()}>
+	<RecommendationEditor />
+</Hydrate>
+```
+
+Strategy prefetching accepts `load()`, `idle()`, `visible()`, `media()`, or
+`interaction()`. Conditions, `never()`, and the function form are activation-only
+strategies.
+
+A procedural prefetch can warm data as well as code. Awaited work blocks activation if
+`when` fires first; the `signal` is aborted if the boundary goes away:
+
+```tsrx
+<Hydrate
+	when={visible()}
+	prefetch={async ({ preload, signal }) => {
+		await preload();
+		await warmReviews({ signal });
+	}}
+>
+	<Reviews />
+</Hydrate>
+```
+
+Procedural prefetch also works with `split={false}`; in that mode `preload()` resolves
+immediately. Its `waitFor(strategy)` helper accepts the same five prefetch strategies.
+Strategy-form prefetch requires splitting because its job is to fetch the generated
+child chunk.
+
+### Fallbacks, completion, and the complete prop surface
+
+`fallback` is client-only loading UI for a boundary mounted later on the client whose
+child suspends. It does not replace the preserved server HTML while an initial boundary
+waits. `onHydrated` runs once after the child successfully commits on the client,
+whether the boundary adopts preserved server DOM or mounts client-only:
+
+```tsrx
+<Hydrate
+	when={visible()}
+	fallback={<ReviewsSkeleton />}
+	onHydrated={() => markReviewsInteractive()}
+>
+	<Reviews />
+</Hydrate>
+```
+
+| Prop         | Type                                                  | Purpose                                                 |
+| ------------ | ----------------------------------------------------- | ------------------------------------------------------- |
+| `when`       | `HydrationStrategy \| (() => HydrationStrategy)`      | Required activation trigger.                            |
+| `split`      | `boolean`                                             | Generate a deferred child chunk; defaults to `true`.    |
+| `prefetch`   | strategy or `({ preload, waitFor, signal, element })` | Prepare the split chunk or application resources early. |
+| `fallback`   | renderable                                            | Loading UI for a later client-only mount or suspension. |
+| `onHydrated` | `() => void`                                          | Called once after the child successfully commits.       |
+| `children`   | renderable                                            | The subtree rendered on the server and deferred.        |
+
+For compiler constraints, nesting behavior, event details, and the full procedural
+context, read the
+[deferred hydration guide](https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md).
+
 <h2 id="responsive-updates">Responsive updates and actions</h2>
 
 Some updates should feel immediate, such as typing. Others may reveal UI that needs to
@@ -944,6 +1140,10 @@ handlers; return here when you have a specific problem to solve.
 	<section className="api-index-card">
 		<h3>Load and reveal UI</h3>
 		<ul>
+			<li>
+				<code>Hydrate</code>
+				<span>Keep server HTML dormant and load its behavior on demand.</span>
+			</li>
 			<li>
 				<code>Suspense</code>
 				<span>Show a fallback while descendants wait.</span>
