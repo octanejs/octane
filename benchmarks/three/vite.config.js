@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { octane } from 'octane/compiler/vite';
@@ -17,9 +18,9 @@ export default defineConfig({
 		},
 		rollupOptions: {
 			input: {
-				octane: new URL('./octane.html', import.meta.url).pathname,
-				r3f: new URL('./r3f.html', import.meta.url).pathname,
-				plain: new URL('./plain.html', import.meta.url).pathname,
+				octane: fileURLToPath(new URL('./octane.html', import.meta.url)),
+				r3f: fileURLToPath(new URL('./r3f.html', import.meta.url)),
+				plain: fileURLToPath(new URL('./plain.html', import.meta.url)),
 			},
 		},
 	},
