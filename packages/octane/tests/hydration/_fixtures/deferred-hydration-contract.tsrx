@@ -20,7 +20,7 @@ export function ProceduralPrefetchHydration(props) @{
 
 function ActivationSuspendingChild(props) @{
 	if (props.suspend) use(props.promise);
-	<button id="activation-content">{'Server reviews'}</button>
+	<button id="activation-content" onClick={props.onClick}>{'Server reviews'}</button>
 }
 
 export function ActivationSuspendingHydration(props) @{
@@ -34,7 +34,11 @@ export function ActivationSuspendingHydration(props) @{
 			fallback={<span id="activation-fallback">{'Client fallback'}</span>}
 			onHydrated={props.onHydrated}
 		>
-			<ActivationSuspendingChild suspend={props.suspend} promise={props.promise} />
+			<ActivationSuspendingChild
+				suspend={props.suspend}
+				promise={props.promise}
+				onClick={props.onClick}
+			/>
 		</Hydrate>
 	</>
 }

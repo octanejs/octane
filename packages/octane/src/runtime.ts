@@ -4834,7 +4834,7 @@ interface HydrateSlot {
 	activationGeneration: number;
 	activationRequested: boolean;
 	activationReady: boolean;
-	/** Initial SSR activation began; its try slot owns any suspended retry. */
+	/** An SSR activation attempt currently owns the try slot's suspended retry. */
 	serverActivationStarted: boolean;
 	hydrated: boolean;
 	didNotify: boolean;
@@ -5052,6 +5052,15 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 	state.activationGeneration++;
 	state.activationRequested = false;
 	state.activationReady = false;
+	if (state.serverPreserved) {
+		// Once server activation enters the internal try slot, its Suspense resume
+		// listener is independent of the request generation above. Supersede that
+		// listener without removing the visible preserved-server pending block, and
+		// let a later non-never strategy start a fresh activation attempt.
+		const activationSlot = state.block.slots[0] as TrySlot | undefined;
+		if (activationSlot?.__kind === 'trySlotSlot') activationSlot.pendingThenable = null;
+		state.serverActivationStarted = false;
+	}
 	// An interaction that requested the cancelled activation must not replay if
 	// the boundary is changed away from never() again at some later point.
 	state.replays = [];
@@ -5496,7 +5505,12 @@ function createHydrateSlot(
 
 function activateHydrateBoundary(state: HydrateSlot): void {
 	const block = state.block;
-	if (!state.serverPreserved) {
+	const activationSlot = block.slots[0] as TrySlot | undefined;
+	if (!state.serverPreserved || activationSlot?.__kind === 'trySlotSlot') {
+		// The original server arm can be adopted only once. A cancelled suspended
+		// attempt leaves its internal try slot and preserved snapshot mounted; a
+		// later strategy resumes that slot as client work instead of treating its
+		// synthetic pending markers as untouched server HTML.
 		renderBlock(block);
 		return;
 	}

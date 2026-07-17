@@ -450,6 +450,94 @@ describe('deferred hydration contract edges', () => {
 		expect(onHydrated).toHaveBeenCalledOnce();
 	});
 
+	it('cancels a suspended activation on never and can activate again later', async () => {
+		const stale = deferred<void>();
+		const fresh = deferred<void>();
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const blocked = condition(false);
+		const ready = condition(true);
+		const serverProps = {
+			when: blocked,
+			suspend: false,
+			promise: stale.promise,
+			onClick,
+			onHydrated,
+			shellLabel: 'Initial shell',
+		};
+		container.innerHTML = renderToString(server.ActivationSuspendingHydration, serverProps).html;
+
+		root = hydrateRoot(container, client.ActivationSuspendingHydration, {
+			...serverProps,
+			suspend: true,
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		root.render(client.ActivationSuspendingHydration, {
+			...serverProps,
+			when: ready,
+			suspend: true,
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		const pendingContent = container.querySelector('#activation-content') as HTMLButtonElement;
+		pendingContent.focus();
+		expect(document.activeElement).toBe(pendingContent);
+		expect(container.querySelector('#activation-fallback')).toBeNull();
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		root.render(client.ActivationSuspendingHydration, {
+			...serverProps,
+			when: never(),
+			suspend: true,
+			shellLabel: 'Never shell',
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		await act(() => stale.resolve());
+
+		expect(container.querySelector('#activation-shell')?.textContent).toBe('Never shell');
+		expect(container.querySelector('#activation-content')).toBe(pendingContent);
+		expect(document.activeElement).toBe(pendingContent);
+		expect(container.querySelector('#activation-fallback')).toBeNull();
+		expect(onHydrated).not.toHaveBeenCalled();
+		await act(() => pendingContent.click());
+		expect(onClick).not.toHaveBeenCalled();
+
+		await act(() =>
+			root!.render(client.ActivationSuspendingHydration, {
+				...serverProps,
+				when: ready,
+				suspend: true,
+				promise: fresh.promise,
+				shellLabel: 'Reactivated shell',
+			}),
+		);
+
+		expect(container.querySelector('#activation-shell')?.textContent).toBe('Reactivated shell');
+		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
+		expect(container.querySelector('#activation-fallback')).toBeNull();
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(() => fresh.resolve());
+
+		expect(container.querySelector('#activation-fallback')).toBeNull();
+		expect(onHydrated).toHaveBeenCalledOnce();
+		const activeContent = container.querySelector('#activation-content') as HTMLButtonElement;
+		await act(() => activeContent.click());
+		expect(onClick).toHaveBeenCalledOnce();
+		expect(onHydrated).toHaveBeenCalledOnce();
+		const hydrationMismatches = diagnostic.mock.calls
+			.map((call) => String(call[0]))
+			.filter((message) => message.includes('hydration mismatch'));
+		diagnostic.mockRestore();
+		expect(hydrationMismatches).toEqual([]);
+	});
+
 	it('preserves pending server content across a parent update during activation', async () => {
 		const pending = deferred<void>();
 		const onHydrated = vi.fn();
