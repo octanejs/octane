@@ -150,6 +150,9 @@ catalogs:
     '@react-three/fiber':
       specifier: 9.6.1
       version: 9.6.1
+    '@react-types/shared':
+      specifier: ^3.36.0
+      version: 3.36.0
     '@reduxjs/toolkit':
       specifier: ^2.9.0
       version: 2.12.0
@@ -543,6 +546,9 @@ catalogs:
     react:
       specifier: ^19.2.0
       version: 19.2.7
+    react-aria:
+      specifier: 3.50.0
+      version: 3.50.0
     react-dom:
       specifier: ^19.2.0
       version: 19.2.7
@@ -558,6 +564,9 @@ catalogs:
     react-router:
       specifier: 8.2.0
       version: 8.2.0
+    react-stately:
+      specifier: 3.48.0
+      version: 3.48.0
     recharts:
       specifier: 3.9.2
       version: 3.9.2
@@ -2824,6 +2833,40 @@ importers:
         specifier: workspace:*
         version: link:../octane
 
+  packages/aria:
+    dependencies:
+      '@react-types/shared':
+        specifier: catalog:default
+        version: 3.36.0(react@19.2.7)
+      clsx:
+        specifier: catalog:default
+        version: 2.1.1
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.37(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-aria:
+        specifier: catalog:default
+        version: 3.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      react-stately:
+        specifier: catalog:default
+        version: 3.48.0(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
   packages/base-ui:
     dependencies:
       '@floating-ui/utils':
@@ -4833,6 +4876,15 @@ packages:
       '@types/node':
         optional: true
 
+  '@internationalized/date@3.12.2':
+    resolution: {integrity: sha512-FY1Y+H64NDs+HAF6omlnWxm3mEpfgaCSWtL5l551ZZfImA+kGjPFgrnJrGjH6lfmLL0g8Z/mBu1R3kufeCp6Jw==}
+
+  '@internationalized/number@3.6.7':
+    resolution: {integrity: sha512-3ji1fcrT+FPAK86UqEhB/psHixYo6niWPJtt7+qRaYFynt/BaJG8GhAPimtWUpEiVSTq8ZM8L5psMxGquiB/Vg==}
+
+  '@internationalized/string@3.2.9':
+    resolution: {integrity: sha512-kzP/M/mbQxODlmOt4bIQZ2SBVUWUSqMLXooXixnX7noche8WHaQcA+nwFN1K2KCF/cp+LDUhcJsCicwkvhD1pg==}
+
   '@istanbuljs/schema@0.1.6':
     resolution: {integrity: sha512-+Sg6GCR/wy1oSmQDFq4LQDAhm3ETKnorxN+y5nbLULOR3P0c14f2Wurzj3/xqPXtasLFfHd5iRFQ7AJt4KH2cw==}
     engines: {node: '>=8'}
@@ -5942,6 +5994,11 @@ packages:
         optional: true
       react-native:
         optional: true
+
+  '@react-types/shared@3.36.0':
+    resolution: {integrity: sha512-DkP/H0C2YjjS7gZWKNqOmU8a16qHPjQNdzMwmTq9SzplM6Iw0kVMTZ0OIoe6FOgGqa+FwMsE2QbPjh/n3g/jXQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
   '@reduxjs/toolkit@2.12.0':
     resolution: {integrity: sha512-KiT+RzZbp6mQET+Mg+h2c97+9j1sNflUxQkIHI7Yuzf6Peu+OYpmkn6nbHWmLLWj+1ZODUJFwGZ7gx3L9R9EOw==}
@@ -9236,6 +9293,12 @@ packages:
     resolution: {integrity: sha512-K5zQjDllxWkf7Z5xJdV0/B0WTNqx6vxG70zJE4N0kBs4LovmEYWJzQGxC9bS9RAKu3bgM40lrd5zoLJ12MQ5BA==}
     engines: {node: '>= 0.10'}
 
+  react-aria@3.50.0:
+    resolution: {integrity: sha512-S0Os6QZk33fzUAKu1QLT9afoUaCBt1ZNdoiq0n2YMVgKIdNIQS8zxiZ8O9hYE6QyDkHKjD6q39LQZ+qaSAIgjw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
+      react-dom: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
+
   react-dom@19.2.7:
     resolution: {integrity: sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==}
     peerDependencies:
@@ -9307,6 +9370,11 @@ packages:
     peerDependenciesMeta:
       react-dom:
         optional: true
+
+  react-stately@3.48.0:
+    resolution: {integrity: sha512-ImicSAG+lTotAe5izcs1fz49Zk48w7pDusqYg04WaPhCoej8BJ24soMu3iLXIrsi273s4P1gZrYGrqReMfgEEA==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0-rc.1 || ^18.0.0 || ^19.0.0-rc.1
 
   react-style-singleton@2.2.3:
     resolution: {integrity: sha512-b6jSvxvVnyptAiLjbkWLE/lOnR4lfTtDAl+eUC7RZy+QQWc6wRzIV2CE6xBuMmDxc2qIihtDCZD5NPOFl7fRBQ==}
@@ -10796,6 +10864,18 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.13.2
 
+  '@internationalized/date@3.12.2':
+    dependencies:
+      '@swc/helpers': 0.5.23
+
+  '@internationalized/number@3.6.7':
+    dependencies:
+      '@swc/helpers': 0.5.23
+
+  '@internationalized/string@3.2.9':
+    dependencies:
+      '@swc/helpers': 0.5.23
+
   '@istanbuljs/schema@0.1.6': {}
 
   '@jridgewell/gen-mapping@0.3.13':
@@ -12079,6 +12159,10 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
       - immer
+
+  '@react-types/shared@3.36.0(react@19.2.7)':
+    dependencies:
+      react: 19.2.7
 
   '@reduxjs/toolkit@2.12.0(react-redux@9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1))(react@19.2.7)':
     dependencies:
@@ -15836,6 +15920,20 @@ snapshots:
       iconv-lite: 0.7.2
       unpipe: 1.0.0
 
+  react-aria@3.50.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      '@internationalized/date': 3.12.2
+      '@internationalized/number': 3.6.7
+      '@internationalized/string': 3.2.9
+      '@react-types/shared': 3.36.0(react@19.2.7)
+      '@swc/helpers': 0.5.23
+      aria-hidden: 1.2.6
+      clsx: 2.1.1
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      react-stately: 3.48.0(react@19.2.7)
+      use-sync-external-store: 1.6.0(react@19.2.7)
+
   react-dom@19.2.7(react@19.2.7):
     dependencies:
       react: 19.2.7
@@ -15892,6 +15990,16 @@ snapshots:
       react: 19.2.7
     optionalDependencies:
       react-dom: 19.2.7(react@19.2.7)
+
+  react-stately@3.48.0(react@19.2.7):
+    dependencies:
+      '@internationalized/date': 3.12.2
+      '@internationalized/number': 3.6.7
+      '@internationalized/string': 3.2.9
+      '@react-types/shared': 3.36.0(react@19.2.7)
+      '@swc/helpers': 0.5.23
+      react: 19.2.7
+      use-sync-external-store: 1.6.0(react@19.2.7)
 
   react-style-singleton@2.2.3(@types/react@19.2.17)(react@19.2.7):
     dependencies:

@@ -1545,6 +1545,35 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'aria',
+					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					// Differential precompile for aria fixtures: rewrites `@octanejs/aria` →
+					// `react-aria` (and `/stately` → `react-stately`, `/components` →
+					// `react-aria-components`) so the React side runs the real React Aria.
+					globalSetup: ['packages/aria/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				// aria's `.ts` hooks forward the caller's slot via subSlot — the package
+				// declares manual hook slots in its package.json, so the auto-slotting pass
+				// skips them (the `.tsx`/`.tsrx` fixtures that call them are full-compiled
+				// and inject the trailing slot).
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/aria$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src') + '/$1/index.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'base-ui',
 					include: ['packages/base-ui/tests/**/*.test.ts', 'packages/base-ui/tests/**/*.test.tsx'],
 					environment: 'jsdom',
