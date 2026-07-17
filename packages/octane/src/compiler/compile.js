@@ -4795,7 +4795,7 @@ function compileServerComponent(node, ctx) {
 	}
 
 	// SSR parallel-use mirror: attach the compiled fetch plan so a PARENT's warm
-	// walk (`_$warmChild(Comp, props)` from its first suspending batch) can start
+	// walk (`_$warmChild(Comp, props)` activated by a suspending descendant batch) can start
 	// this component's independent creations before its body ever runs.
 	const warmSrc = ctx._pendingWarm;
 	ctx._pendingWarm = null;
@@ -4879,7 +4879,7 @@ function ssrCompileBody(
 	// (directive-arm statements memoize HERE; the transformed nodes flow into
 	// ssrEmitNodes below, so ssrCompileSub receives arms PRE-memoized and runs
 	// Pass B only) + the warm artifacts (`Comp.__warm` fetch plan + the first
-	// batch's warm thunk — see runtime.server.ts warmMemo/warmChild); synthetic
+	// active-stack warm registration — see runtime.server.ts warmMemo/warmChild); synthetic
 	// subs (statement arrays) run Pass B only. Loops/functions are excluded by
 	// the passes themselves (same rules as the client).
 	let workingStatements = statements;
@@ -7096,8 +7096,8 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 //
 //   Warm plan (top-level bodies): from the SAME analysis, child component
 //     slots whose reachability guards and props are provably independent of
-//     every non-param local become `_$warmChild` calls in the first batch's
-//     warm thunk, and the component gets a compiled `Comp.__warm` fetch plan
+//     every non-param local become an empty-batch warm registration, and the
+//     component gets a compiled `Comp.__warm` fetch plan
 //     (its own warm-safe creations + guarded child warm calls) so warming
 //     recurses down the tree — the whole descendant fetch tree starts in the
 //     first attempt.
@@ -7355,12 +7355,21 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 	function rewriteUseCall(call) {
 		const arg = unwrapTsExpr(call.arguments[0]);
 		if (isTrivialUseArg(arg)) return call;
-		const symVar = allocHookSymbol(ctx, `${componentName}.use.memo#${ctx.nextHookSymId}`, {
-			componentName,
-			name: 'use() memo',
-			kind: 'useMemo',
-			node: call,
-		});
+		const symVar = allocHookSymbol(
+			ctx,
+			`${componentName}.use.memo#${ctx.nextHookSymId}`,
+			{
+				componentName,
+				name: 'use() memo',
+				kind: 'useMemo',
+				node: call,
+			},
+			// Warm caches span component scopes. A scope-local numeric slot can
+			// therefore alias an adjacent component's equally-numbered use() memo
+			// when a parent warms both children into one cache. Reserve a globally
+			// composable Symbol for every warmable creation site.
+			true,
+		);
 		const deps = collectDepPaths(arg);
 		// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
 		// SSRScope per pass makes client useMemo semantics useless there).
@@ -7523,6 +7532,39 @@ function containsJsxNode(n) {
 	return false;
 }
 
+function containsReturnOutsideNestedFunction(node, root = true) {
+	if (!node || typeof node !== 'object') return false;
+	if (Array.isArray(node))
+		return node.some((child) => containsReturnOutsideNestedFunction(child, false));
+	if (!root && isFunctionNode(node)) return false;
+	if (node.type === 'ReturnStatement') return true;
+	for (const key in node) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+		if (containsReturnOutsideNestedFunction(node[key], false)) return true;
+	}
+	return false;
+}
+
+// A warm plan must describe the subtree that this invocation actually reaches.
+// Until warm artifacts carry branch guards for arbitrary setup returns, decline
+// to publish a plan for multi-exit bodies rather than speculating the final
+// template while an earlier return rendered a different tree.
+function hasSetupEarlyReturn(node) {
+	const body = node.body;
+	if (!body) return false;
+	if (body.type === 'JSXCodeBlock') {
+		return (body.body || []).some((statement) => containsReturnOutsideNestedFunction(statement));
+	}
+	if (body.type !== 'BlockStatement') return false;
+	const statements = body.body || [];
+	for (let index = 0; index < statements.length; index++) {
+		const statement = statements[index];
+		if (index === statements.length - 1 && statement.type === 'ReturnStatement') continue;
+		if (containsReturnOutsideNestedFunction(statement)) return true;
+	}
+	return false;
+}
+
 // Warm-safety: every free identifier of the expression is a component param
 // or module-scope (NOT a non-param local — component-body OR directive-arm
 // scoped; those may not exist or may be suspended-data-derived at warm time),
@@ -7541,7 +7583,32 @@ function isWarmSafeExpr(expr, paramNames, componentLocals, armLocals) {
 // ── Pass B: run detection + hoist + batch ───────────────────────────────────
 function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 	let firstBatch = true;
-	return transformList(statements);
+	const output = transformList(statements);
+	if (warmThunk) {
+		// Register the child-only plan after setup executes. A pending batch in
+		// any descendant activates the plans on its active ancestor stack and
+		// anchors their shared cache above adjacent siblings. Keeping this after
+		// setup preserves early-return reachability: an alternate returned tree must
+		// not activate the final template's plan. The first direct batch receives the
+		// same thunk below so it can still warm before setup reaches this registration.
+		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
+		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
+		const registration = {
+			type: 'ExpressionStatement',
+			expression: {
+				type: 'CallExpression',
+				callee: { type: 'Identifier', name: batchAlias },
+				arguments: [{ type: 'ArrayExpression', elements: [] }, warmThunk],
+				optional: false,
+			},
+		};
+		const finalIndex =
+			output.length > 0 && output[output.length - 1].type === 'ReturnStatement'
+				? output.length - 1
+				: output.length;
+		output.splice(finalIndex, 0, registration);
+	}
+	return output;
 
 	function transformList(stmts) {
 		const out = [];
@@ -7683,9 +7750,11 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 	}
 }
 
-// Build the warm thunk AST (child warm calls for the first in-body batch) +
-// the `Comp.__warm` source (creations + child calls) for a top-level body.
+// Build the warm thunk AST (child calls registered after reachable setup, and
+// also attached to the first direct batch) + the `Comp.__warm` source
+// (creations + child calls) for a top-level body.
 function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
+	if (hasSetupEarlyReturn(node)) return { thunk: null, warmSrc: null };
 	const paramNames = new Set();
 	for (const p of node.params || []) collectPatternNames(p, paramNames);
 	const locals = ctx.currentComponentLocals;
@@ -7713,6 +7782,18 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 			w.props.every((p) => isWarmSafeExpr(p.value, paramNames, locals, w.locals)),
 	);
 	if (warmKids.length === 0 && warmMemos.length === 0) return { thunk: null, warmSrc: null };
+	// A component whose only warm edge is recursion back to itself and which has
+	// no creation of its own can never discover async work through that plan: each
+	// recursive instance has the same empty creation set. Omitting the no-op plan
+	// also keeps very deep synchronous recursive trees on their established stack
+	// footprint instead of adding one empty-batch registration per level.
+	if (
+		warmMemos.length === 0 &&
+		warmKids.length > 0 &&
+		warmKids.every((child) => child.compName === componentName)
+	) {
+		return { thunk: null, warmSrc: null };
+	}
 
 	const stmtFor = (guards, callExpr) => {
 		const g = andChain(guards);

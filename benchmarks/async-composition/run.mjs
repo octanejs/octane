@@ -25,8 +25,8 @@ const expectedSignature = (version) =>
 // They keep known gaps visible without allowing them to silently worsen.
 const OBSERVATION_CEILINGS = {
 	'octane-tsrx': {
-		init: { waves: 6, calls: 23, mixedStates: 0 },
-		update: { waves: 6, calls: 23, mixedStates: 6 },
+		init: { waves: 2, calls: 8, mixedStates: 0 },
+		update: { waves: 2, calls: 8, mixedStates: 1 },
 	},
 	react: {
 		init: { mixedStates: 0 },
@@ -124,6 +124,12 @@ function validateObservation(target, operation, version, result) {
 	}
 	if (calls.length < starts.length) {
 		throw new Error(`${prefix}: trace lost resource-call observations`);
+	}
+	if (target === 'octane-tsrx') {
+		const firstWave = result.trace.waves[0]?.resources?.toSorted() || [];
+		if (JSON.stringify(firstWave) !== JSON.stringify(INDEPENDENT_RESOURCES.toSorted())) {
+			throw new Error(`${prefix}: first wave missed independent work: ${firstWave.join(', ')}`);
+		}
 	}
 
 	const projectSettle = settles.find((entry) => entry.resource === 'project');

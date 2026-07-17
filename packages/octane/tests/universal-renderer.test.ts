@@ -190,6 +190,246 @@ describe('universal compiler target', () => {
 		expect(output).toContain('"line":4,"column":14');
 	});
 
+	it('warms adjacent universal component trees from a parent with no use()', async () => {
+		const source = `
+			import { use } from 'octane';
+			function LeftLeaf({load, token}) @{
+				const value = use(load('left-leaf', token));
+				<leaf value={value} />
+			}
+			function Left({load, token}) @{
+				const value = use(load('left', token));
+				<left value={value}><LeftLeaf load={load} token={token} /></left>
+			}
+			function RightLeaf({load, token}) @{
+				const value = use(load('right-leaf', token));
+				<leaf value={value} />
+			}
+			function Right({load, token}) @{
+				const value = use(load('right', token));
+				<right value={value}><RightLeaf load={load} token={token} /></right>
+			}
+			export function Scene({load, token}) @{
+				<scene><Left load={load} token={token} /><Right load={load} token={token} /></scene>
+			}
+		`;
+		let output = compile(source, '/src/Async.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const Scene = new Function('__universal', `${output}\nreturn Scene;`)(UniversalRuntime) as (
+			props: unknown,
+		) => unknown;
+
+		const calls: string[] = [];
+		const jobs = new Map<string, { promise: Promise<string>; resolve: (value: string) => void }>();
+		const load = (resource: string, token: number) => {
+			const key = `${resource}:${token}`;
+			calls.push(key);
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			jobs.set(key, { promise, resolve });
+			return promise;
+		};
+		const expected = ['left-leaf:0', 'left:0', 'right-leaf:0', 'right:0'];
+		const { container, root } = objectRoot();
+		const settleRound = async (keys: string[]) => {
+			for (const key of keys) jobs.get(key)!.resolve(key);
+			await Promise.all(keys.map((key) => jobs.get(key)!.promise));
+			await Promise.resolve();
+			await Promise.resolve();
+		};
+
+		const suspended = root.render(Scene as any, { load, token: 0 });
+		expect(suspended.status).toBe('suspended');
+		expect([...calls].sort()).toEqual(expected);
+
+		await settleRound(expected);
+
+		const scene = container.children[0];
+		expect(scene.children.map((child) => [child.type, child.props.value])).toEqual([
+			['left', 'left:0'],
+			['right', 'right:0'],
+		]);
+		expect(scene.children.map((child) => child.children[0].props.value)).toEqual([
+			'left-leaf:0',
+			'right-leaf:0',
+		]);
+		expect([...calls].sort()).toEqual(expected);
+
+		const tokenOne = ['left-leaf:1', 'left:1', 'right-leaf:1', 'right:1'];
+		expect(root.render(Scene as any, { load, token: 1 }).status).toBe('suspended');
+		expect(calls.slice(4).sort()).toEqual(tokenOne);
+		await settleRound(tokenOne);
+
+		expect(root.render(Scene as any, { load, token: 0 }).status).toBe('suspended');
+		// A fresh render may return to old dependency values, but the previous
+		// episode's consumed tombstones must not suppress adjacent warming.
+		expect(calls.slice(8).sort()).toEqual(expected);
+		await settleRound(expected);
+		expect(calls).toHaveLength(12);
+		root.unmount();
+	});
+
+	it('skips fulfilled siblings and warms repeated component occurrences independently', async () => {
+		const source = `
+			import { use } from 'octane';
+			function Item({load, name, token}) @{
+				const value = use(load(name, token));
+				<item value={value} />
+			}
+			export function Scene({load, first, second, token}) @{
+				<scene>
+					<Item load={load} name={first} token={token} />
+					<Item load={load} name={second} token={token} />
+				</scene>
+			}
+		`;
+		let output = compile(source, '/src/RepeatedAsync.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const Scene = new Function('__universal', `${output}\nreturn Scene;`)(UniversalRuntime) as (
+			props: unknown,
+		) => unknown;
+
+		const calls: string[] = [];
+		const jobs = new Map<
+			string,
+			Array<{ promise: Promise<string>; resolve: (v: string) => void }>
+		>();
+		const load = (name: string, token: number) => {
+			const key = `${name}:${token}`;
+			calls.push(key);
+			if (key === 'stable:0') {
+				return { status: 'fulfilled', value: 'STABLE', then() {} };
+			}
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const list = jobs.get(key);
+			const job = { promise, resolve };
+			if (list === undefined) jobs.set(key, [job]);
+			else list.push(job);
+			return promise;
+		};
+		const settle = async (key: string) => {
+			const list = jobs.get(key)!;
+			for (const job of list) job.resolve(key);
+			await Promise.all(list.map((job) => job.promise));
+			await Promise.resolve();
+			await Promise.resolve();
+		};
+		const { container, root } = objectRoot();
+
+		expect(
+			root.render(Scene as any, {
+				load,
+				first: 'stable',
+				second: 'changing',
+				token: 0,
+			}).status,
+		).toBe('suspended');
+		// The second item suspended after the stable item completed. Its ancestor
+		// plan must not invoke the stable loader a second time.
+		expect(calls).toEqual(['stable:0', 'changing:0']);
+		await settle('changing:0');
+
+		expect(
+			root.render(Scene as any, {
+				load,
+				first: 'same',
+				second: 'same',
+				token: 1,
+			}).status,
+		).toBe('suspended');
+		expect(calls.slice(2)).toEqual(['same:1', 'same:1']);
+		await settle('same:1');
+		expect(container.children[0].children.map((child) => child.props.value)).toEqual([
+			'same:1',
+			'same:1',
+		]);
+		expect(calls).toHaveLength(4);
+		root.unmount();
+	});
+
+	it('preserves distinct results across more than 64 same-dependency component occurrences', async () => {
+		const occurrenceCount = 65;
+		const items = Array.from({ length: occurrenceCount }, () => '<Item load={load} />').join('');
+		const source = `
+			import { use } from 'octane';
+			function Item({load}) @{
+				const value = use(load('same'));
+				<item value={value} />
+			}
+			export function Scene({load}) @{
+				<scene>${items}</scene>
+			}
+		`;
+		let output = compile(source, '/src/ManyRepeatedAsync.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const Scene = new Function('__universal', `${output}\nreturn Scene;`)(UniversalRuntime) as (
+			props: unknown,
+		) => unknown;
+
+		const calls: string[] = [];
+		const jobs: Array<{ promise: Promise<string>; resolve: (value: string) => void }> = [];
+		const load = (key: string) => {
+			calls.push(key);
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			jobs.push({ promise, resolve });
+			return promise;
+		};
+		const expected = Array.from(
+			{ length: occurrenceCount },
+			(_, index) => `VALUE-${index.toString().padStart(3, '0')}`,
+		);
+		const { container, root } = objectRoot();
+
+		expect(root.render(Scene as any, { load }).status).toBe('suspended');
+		// All occurrences start in the first attempt, before any promise settles.
+		expect(calls).toHaveLength(occurrenceCount);
+		expect(calls.every((key) => key === 'same')).toBe(true);
+		expect(jobs).toHaveLength(occurrenceCount);
+
+		for (let index = occurrenceCount - 1; index >= 0; index--) {
+			jobs[index].resolve(expected[index]);
+		}
+		await Promise.all(jobs.map((job) => job.promise));
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(container.children[0].children.map((child) => child.props.value)).toEqual(expected);
+		expect(calls).toHaveLength(occurrenceCount);
+		root.unmount();
+	});
+
 	it('preserves nested function hoisting and executes supported universal useId hooks', () => {
 		const source = `import { useId } from 'octane';
 			export function Parent({show}) {
