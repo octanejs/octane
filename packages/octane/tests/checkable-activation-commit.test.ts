@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { act, mount } from './_helpers';
 import {
 	ActivationCommitCheckbox,
+	ActivationCommitRadioGroup,
 	ActivationCommitRejectedCheckbox,
 } from './_fixtures/checkable-activation.tsx';
 
@@ -19,6 +20,24 @@ describe('controlled checkable with a mid-activation commit', () => {
 		});
 		expect(cb.getAttribute('data-pressed')).toBe('true'); // the mid-click commit happened
 		expect(cb.checked).toBe(true); // and the user's toggle survived it
+		r.unmount();
+	});
+
+	it('a mid-click commit does not reassert a radio-group cousin over the toggle', async () => {
+		const r = mount(ActivationCommitRadioGroup);
+		const b = r.container.querySelector<HTMLInputElement>('[data-value="b"]')!;
+		const a = r.container.querySelector<HTMLInputElement>('[data-value="a"]')!;
+		const wrap = r.container.querySelector('div')!;
+		await act(() => {
+			b.click();
+		});
+		expect(wrap.getAttribute('data-pressed')).toBe('true'); // the mid-click commit happened
+		// The platform unchecked `a` as part of checking `b`; re-checking `a` in the
+		// mid-click commit would have made the browser uncheck `b` again, so the
+		// input handler would see e.target.checked === false and never commit.
+		expect(wrap.getAttribute('data-seen')).toBe('b:true');
+		expect(b.checked).toBe(true);
+		expect(a.checked).toBe(false);
 		r.unmount();
 	});
 

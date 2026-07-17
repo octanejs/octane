@@ -10,5 +10,9 @@ after it; reasserting in between reverted the toggle before any native handler
 could read it. During that activation window the `checked` binding now uses
 React's prop-diff semantics (an unchanged prop leaves the DOM drift for the
 event-side restore; a prop that actually changed still writes), matching
-React's observable behavior. The rejection contract is unchanged: an unheard
-or rejected toggle still snaps back after the follow-up events.
+React's observable behavior. The window covers the activated element and its
+radio-group cousins: the platform unchecked the cousin as part of the same
+toggle, and re-checking it mid-window would make the browser uncheck the
+activated radio before its follow-up events fire. The rejection contract is
+unchanged: an unheard or rejected toggle still snaps back after the follow-up
+events.

@@ -10785,14 +10785,35 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
-	// While this element's click activation is in flight (platform toggled the
-	// DOM; input/change not yet dispatched), an UNCHANGED prop must not clobber
-	// the user's toggle — React's update path diffs prev props, not the DOM, so
-	// a mid-dispatch flushSync commit leaves the drift for the event-side
-	// restore. A prop that actually CHANGED in this window still writes.
+	// While a click activation is in flight (platform toggled the DOM;
+	// input/change not yet dispatched), an UNCHANGED prop must not clobber the
+	// user's toggle — React's update path diffs prev props, not the DOM, so a
+	// mid-dispatch flushSync commit leaves the drift for the event-side restore.
+	// This covers the activated element AND its radio-group cousins: the platform
+	// unchecked the cousin as part of the same toggle, and re-checking it would
+	// make the browser uncheck the activation target before its follow-up events
+	// fire. A prop that actually CHANGED in this window still writes.
 	const changed = b !== ctrl.c;
 	ctrl.c = b;
-	if ((changed || input !== activationCheckable) && input.checked !== b) input.checked = b;
+	if ((changed || !inActivationWindow(input)) && input.checked !== b) input.checked = b;
+}
+
+/**
+ * True while `input` is the checkable whose click activation is in flight, or
+ * a same-group radio cousin of it (group scope mirrors restoreRadioCousins:
+ * same non-empty name, same form owner).
+ */
+function inActivationWindow(input: HTMLInputElement): boolean {
+	const target = activationCheckable as HTMLInputElement | null;
+	if (target === null) return false;
+	if (input === target) return true;
+	return (
+		input.type === 'radio' &&
+		target.type === 'radio' &&
+		input.name !== '' &&
+		input.name === target.name &&
+		input.form === target.form
+	);
 }
 
 export function setChecked(el: Element, value: unknown): void {
