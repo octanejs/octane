@@ -23,6 +23,7 @@ import {
 	SsrAsync as ClientSsrAsync,
 	SsrGreeting as ClientSsrGreeting,
 	SsrIdIsland as ClientSsrIdIsland,
+	SsrLayout as ClientSsrLayout,
 	SsrLocallyGuarded as ClientSsrLocallyGuarded,
 	SsrStyled as ClientSsrStyled,
 	SsrThemed as ClientSsrThemed,
@@ -357,6 +358,90 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 			expect(mounted.container.querySelector('.react-fallback')).toBeNull();
 			expect(mounted.container.querySelector('.ssr-async')?.textContent).toBe('value:client-data');
 			await mounted.unmount();
+		} finally {
+			quiet.mockRestore();
+		}
+	});
+
+	it('flushes island layout effects inside the React layout commit on the hydration attach', async () => {
+		// The client attach path wraps root.render in octaneFlushSync so island
+		// layout effects and refs complete before the wrapper's layout effect
+		// returns. The hydration attach must honor the same contract: an
+		// ANCESTOR React layout effect (running after the wrapper's in the same
+		// commit) observes the island's layout-effect DOM writes.
+		const observed: Array<string | null> = [];
+		function Recorder(props: { children: React.ReactNode }) {
+			const hostRef = React.useRef<HTMLDivElement>(null);
+			React.useLayoutEffect(() => {
+				observed.push(
+					hostRef.current?.querySelector('.ssr-layout')?.getAttribute('data-laid-out') ?? null,
+				);
+			});
+			return h('div', { ref: hostRef }, props.children);
+		}
+		const serverPage = h(
+			'main',
+			null,
+			h(Recorder, null, h(OctaneCompatServer, null, h(server.SsrLayout, null))),
+		);
+		const clientPage = h(
+			'main',
+			null,
+			h(Recorder, null, h(OctaneCompat, null, h(ClientSsrLayout as any, null))),
+		);
+		const mounted = await hydratePage(serverPage, clientPage);
+		expect(observed[0]).toBe('yes');
+		await mounted.unmount();
+	});
+
+	it('releases host event delegation when a hydration escape client-remounts', async () => {
+		// The owned-escape teardown must mirror root.unmount(): hydrateRoot
+		// registered the host as a delegation target, so abandoning adoption
+		// unregisters it — otherwise the retry's fresh root double-counts the
+		// host and island teardown strands the map entry + listeners forever.
+		// Balanced add/remove listener calls on the host are the observable.
+		const clientResource = deferred<string>();
+		const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const serverPage = h(
+				'main',
+				null,
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompatServer, null, h(server.SsrGreeting, { name: 'leak' })),
+				),
+			);
+			const clientPage = h(
+				'main',
+				null,
+				h(
+					React.Suspense,
+					{ fallback: h('p', { className: 'react-fallback' }, 'react pending') },
+					h(OctaneCompat, null, h(ClientSsrAsync as any, { resource: clientResource.promise })),
+				),
+			);
+			const serverHtml = reactRenderToString(serverPage as any);
+			const container = document.createElement('div');
+			container.innerHTML = serverHtml;
+			document.body.appendChild(container);
+			const host = container.querySelector('[data-octane-compat]') as HTMLElement;
+			const added = vi.spyOn(host, 'addEventListener');
+			const removed = vi.spyOn(host, 'removeEventListener');
+			const { hydrateRoot } = await import('react-dom/client');
+			let reactRoot!: ReturnType<typeof hydrateRoot>;
+			await reactAct(async () => {
+				reactRoot = hydrateRoot(container, clientPage as any);
+			});
+			await reactAct(async () => {
+				clientResource.resolve('client-data');
+				await clientResource.promise;
+			});
+			expect(container.querySelector('.ssr-async')?.textContent).toBe('value:client-data');
+			await reactAct(async () => reactRoot.unmount());
+			container.remove();
+			expect(added.mock.calls.length).toBeGreaterThan(0);
+			expect(removed.mock.calls.length).toBe(added.mock.calls.length);
 		} finally {
 			quiet.mockRestore();
 		}

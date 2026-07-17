@@ -19149,9 +19149,15 @@ export function hydrateRoot(
 			unmountBlock(rootBlock, false);
 			drainRefDetaches();
 			container.textContent = '';
+			// Mirror root.unmount()'s full release: this pass registered the
+			// container as a delegation target, and the retry's fresh root
+			// re-registers — a leftover refcount would strand the map entry and
+			// its listeners past the island's final teardown.
+			unregisterDelegationTarget(container);
 			releaseRootContainer(container, ownerToken);
 		}
-		// Routed: hand back an empty lazy root; the owner's retry recreates.
+		// Routed: hand back an empty lazy root owning NO claim or delegation
+		// registration (both released above); the owner's retry recreates.
 		return makeRoot(container, null, null, null, idState, renderReturnedValue, null);
 	} finally {
 		currentHydration = previousHydration;

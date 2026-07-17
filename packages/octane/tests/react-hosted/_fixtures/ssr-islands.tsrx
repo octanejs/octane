@@ -1,4 +1,4 @@
-import { use, useId, useState } from 'octane';
+import { use, useId, useLayoutEffect, useRef, useState } from 'octane';
 
 /**
  * Phase 4 islands, compiled BOTH ways: the client project imports this module
@@ -86,6 +86,16 @@ function SsrInner(props) @{
 	<p class="ssr-inner">
 		{'value:' + value as string}
 	</p>
+}
+
+/** Stamps its DOM from a layout effect — observable only if island layout
+ *  effects complete inside the React layout commit that attached the island. */
+export function SsrLayout() @{
+	const ref = useRef(null);
+	useLayoutEffect(() => {
+		ref.current?.setAttribute('data-laid-out', 'yes');
+	});
+	<p class="ssr-layout" ref={ref}>{'layout'}</p>
 }
 
 /** Scoped style — exercises the §9.2 style-resource channel. */

@@ -500,14 +500,20 @@ class HostedIslandController {
 			// React hydrated around it without touching descendants — §9.3):
 			// adopt the exact server node identities. The prefix is passed
 			// VERBATIM so Octane ids hydrate byte-identically (§5 rule 2).
+			// Same flushSync contract as the render path below: island layout
+			// effects and refs commit before this layout effect returns, so
+			// ancestor React layout effects observe the settled island DOM.
+			const host = this.host;
 			this.hydrating = true;
 			try {
-				this.root = hydrateOctaneRoot(
-					this.host,
-					hostedRootEnvelope as unknown as ComponentBody,
-					this.envelopeProps(),
-					{ identifierPrefix: this.identifierPrefix },
-				);
+				octaneFlushSync(() => {
+					this.root = hydrateOctaneRoot(
+						host,
+						hostedRootEnvelope as unknown as ComponentBody,
+						this.envelopeProps(),
+						{ identifierPrefix: this.identifierPrefix },
+					);
+				});
 			} finally {
 				this.hydrating = false;
 			}
