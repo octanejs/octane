@@ -118,6 +118,24 @@ describe('differential: @octanejs/aria vs real react-aria on React', () => {
 		d.unmount();
 	});
 
+	it('useKeyboard: continuePropagation latch across dispatches of one wrapper matches React', async () => {
+		const d = await mountDifferential(FIXTURE, 'KeyLatch', undefined, CACHE);
+		await d.step('mount', () => {});
+		// Two keydowns with NO re-render in between (handlers only log to module state),
+		// so the SAME wrapper instance handles both — pinning upstream's cross-dispatch
+		// flag semantics after continuePropagation(). The flush click then renders the
+		// per-side log for the byte comparison.
+		await d.step('c then x, flush', async (i, r) => {
+			await i.keydown('#latch-input', 'c');
+			await r.keydown('#latch-input', 'c');
+			await i.keydown('#latch-input', 'x');
+			await r.keydown('#latch-input', 'x');
+			await i.click('#latch-flush');
+			await r.click('#latch-flush');
+		});
+		d.unmount();
+	});
+
 	it('useId + mergeProps: merged ids converge with consistent references', async () => {
 		const d = await mountDifferential(FIXTURE, 'MergedIdsLabel', undefined, CACHE);
 		await d.step('mount', () => {});

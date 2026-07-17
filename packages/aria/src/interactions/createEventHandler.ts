@@ -35,6 +35,12 @@ export function createEventHandler<T extends Event>(
 		return undefined;
 	}
 
+	// NB: the flag deliberately lives on the WRAPPER closure, not per dispatch — after a
+	// handler calls continuePropagation(), a later event on the same wrapper instance does
+	// not re-arm stop-by-default. That is upstream's exact (and admittedly surprising)
+	// contract at the pinned version; the differential KeyLatch fixture pins octane to
+	// React's observable behavior across consecutive dispatches, so an upstream semantics
+	// change will surface at the next pin bump rather than silently diverging here.
 	let shouldStopPropagation = true;
 	return (e: T) => {
 		const overrides: Record<PropertyKey, any> = {

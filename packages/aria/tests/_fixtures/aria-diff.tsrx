@@ -79,3 +79,28 @@ export function MergedIdsLabel() {
 		<span {...props} />
 	</div>;
 }
+
+// Pins upstream's createEventHandler flag semantics ACROSS dispatches of one wrapper
+// instance: handlers log to module state (no re-render between keydowns, so useKeyboard's
+// wrapper is not recreated), and a flush click renders the log. After a handler calls
+// continuePropagation() for one event, upstream's wrapper does not re-arm stop-by-default
+// for the next event — whatever the exact semantics, octane must match React byte-for-byte.
+const keyLatchLog: string[] = [];
+export function KeyLatch() {
+	const [, force] = useState(0);
+	const { keyboardProps } = useKeyboard({
+		onKeyDown: (e: any) => {
+			keyLatchLog.push('child:' + e.key);
+			if (e.key === 'c') {
+				e.continuePropagation();
+			}
+		},
+	});
+	return <div onKeyDown={(e: any) => keyLatchLog.push('parent:' + e.key)}>
+		<input id="latch-input" {...keyboardProps} />
+		<button id="latch-flush" onClick={() => force((n: number) => n + 1)}>
+			flush
+		</button>
+		<output>{keyLatchLog.join(',')}</output>
+	</div>;
+}
