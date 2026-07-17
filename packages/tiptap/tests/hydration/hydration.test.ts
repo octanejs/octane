@@ -20,10 +20,11 @@ describe('@octanejs/tiptap hydration', () => {
 		vi.useFakeTimers();
 		const container = document.createElement('div');
 		container.innerHTML =
-			'<main id="deferred-editor"><output id="deferred-status">deferred</output></main>';
+			'<main id="deferred-editor"><output id="deferred-status">deferred</output><output id="deferred-selection">deferred</output></main>';
 		document.body.appendChild(container);
 		const serverMain = container.querySelector('main');
-		const serverStatus = container.querySelector('output');
+		const serverStatus = container.querySelector('#deferred-status');
+		const serverSelection = container.querySelector('#deferred-selection');
 		let editor: Editor | undefined;
 		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -33,13 +34,17 @@ describe('@octanejs/tiptap hydration', () => {
 			},
 		});
 		expect(container.querySelector('main')).toBe(serverMain);
-		expect(container.querySelector('output')).toBe(serverStatus);
+		expect(container.querySelector('#deferred-status')).toBe(serverStatus);
+		expect(container.querySelector('#deferred-selection')).toBe(serverSelection);
 		expect(serverStatus?.textContent).toBe('deferred');
+		expect(serverSelection?.textContent).toBe('deferred');
 
 		settle();
 		expect(container.querySelector('main')).toBe(serverMain);
-		expect(container.querySelector('output')).toBe(serverStatus);
+		expect(container.querySelector('#deferred-status')).toBe(serverStatus);
+		expect(container.querySelector('#deferred-selection')).toBe(serverSelection);
 		expect(serverStatus?.textContent).toBe('ready');
+		expect(serverSelection?.textContent).toBe('Hydrated editor');
 		expect(container.querySelector('[data-editor-host="deferred"] .ProseMirror')?.textContent).toBe(
 			'Hydrated editor',
 		);

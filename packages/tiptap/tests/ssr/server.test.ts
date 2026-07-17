@@ -15,7 +15,7 @@ describe('@octanejs/tiptap SSR', () => {
 		const visibleHtml = stripMarkers(html);
 
 		expect(visibleHtml).toBe(
-			'<main id="deferred-editor"><output id="deferred-status">deferred</output></main>',
+			'<main id="deferred-editor"><output id="deferred-status">deferred</output><output id="deferred-selection">deferred</output></main>',
 		);
 		expect(visibleHtml).not.toContain('ProseMirror');
 		expect(css).toBe('');

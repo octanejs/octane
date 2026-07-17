@@ -71,7 +71,15 @@ class EditorStateManager<TEditor extends Editor | null = Editor | null> {
 	}
 
 	watch(nextEditor: Editor | null): undefined | (() => void) {
-		this.editor = nextEditor as TEditor;
+		if (this.editor !== nextEditor) {
+			this.editor = nextEditor as TEditor;
+			this.lastTransactionNumber = this.transactionNumber;
+			this.lastSnapshot = {
+				editor: this.editor,
+				transactionNumber: this.transactionNumber,
+			};
+			this.subscribers.forEach((callback) => callback());
+		}
 
 		if (!this.editor) {
 			return undefined;

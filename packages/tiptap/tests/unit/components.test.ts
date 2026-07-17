@@ -20,16 +20,21 @@ afterEach(() => {
 });
 
 describe('@octanejs/tiptap components', () => {
-	it('provides modern and legacy context while useTiptapState follows transactions', () => {
+	it('provides modern and legacy context while useTiptapState follows editor changes and transactions', () => {
 		const editor = new Editor({ extensions, content: '<p>Initial context</p>' });
+		const replacementEditor = new Editor({
+			extensions,
+			content: '<p>Replacement context</p>',
+		});
 		let modernEditor: EditorType | undefined;
 		let legacyEditor: EditorType | null | undefined;
+		const onContexts = (modern: EditorType, legacy: EditorType | null) => {
+			modernEditor = modern;
+			legacyEditor = legacy;
+		};
 		const result = mount(ContextEditor as any, {
 			editor,
-			onContexts: (modern: EditorType, legacy: EditorType | null) => {
-				modernEditor = modern;
-				legacyEditor = legacy;
-			},
+			onContexts,
 		});
 		settle();
 
@@ -42,10 +47,21 @@ describe('@octanejs/tiptap components', () => {
 		settle();
 		expect(result.find('[data-context-text]').textContent).toBe('Context update');
 
+		result.update(ContextEditor as any, { editor: replacementEditor, onContexts });
+		settle();
+		expect(modernEditor).toBe(replacementEditor);
+		expect(legacyEditor).toBe(replacementEditor);
+		expect(result.find('[data-context-text]').textContent).toBe('Replacement context');
+		expect(result.find('[data-editor-host="context"] .ProseMirror')).toBe(
+			replacementEditor.view.dom,
+		);
+
 		result.unmount();
 		flushEffects();
 		expect(editor.isDestroyed).toBe(false);
+		expect(replacementEditor.isDestroyed).toBe(false);
 		editor.destroy();
+		replacementEditor.destroy();
 	});
 
 	it('keeps a live editor reusable as EditorContent switches instances', () => {
