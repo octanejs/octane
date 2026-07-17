@@ -129,6 +129,31 @@ describe('slotHooks surgical pass', () => {
 			slotHooks(`import { useState } from 'octane';\nexport const ZERO = 0;`, 'c.ts'),
 		).toBeNull(); // imported but never called
 	});
+
+	it('keeps nested hooks on the render path instead of memoizing around them', () => {
+		const sources = [
+			`import { use } from 'octane';
+			 export function useData(load, promise) {
+			   const value = use(load(use(promise)));
+			   return value;
+			 }`,
+			`import { use, useContext } from 'octane';
+			 export function useData(load, Context) {
+			   const value = use(load(useContext(Context)));
+			   return value;
+			 }`,
+			`import { use } from 'octane';
+			 function useResourceKey() { return 'key'; }
+			 export function useData(load) {
+			   const value = use(load(useResourceKey()));
+			   return value;
+			 }`,
+		];
+
+		// A memo hit must never skip a nested built-in or custom hook. These
+		// arguments remain unchanged until they can be analyzed as hook-free.
+		for (const source of sources) expect(slotHooks(source, 'nested-hook.ts')).toBeNull();
+	});
 });
 
 describe('vite plugin gate routing', () => {

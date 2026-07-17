@@ -1,6 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { mount, act } from './_helpers';
-import { ChainHost, DependentChain, BatchCatch, GatedHost } from './_fixtures/parallel-use.tsrx';
+import {
+	ChainHost,
+	DependentChain,
+	BatchCatch,
+	GatedHost,
+	ImportedHookHost,
+	ImportedHookTwiceHost,
+	ImportedCapturedHookHost,
+	ImportedDependentHookHost,
+	AdjacentPanelsHost,
+	EarlyReturnPanelsHost,
+	VersionedSiblingsHost,
+	RepeatedPanelsHost,
+	ManyRepeatedPanelsHost,
+} from './_fixtures/parallel-use.tsrx';
 
 // Runtime behavior of the compiler's unconditional parallel-use pipeline.
 
@@ -36,6 +50,47 @@ function chainFetcher() {
 	const settle = (level: number, version: number) =>
 		jobs.get(`${level}:${version}`)!.resolve(`v${version}-L${level}`);
 	return { calls, fetch, settle };
+}
+
+function resourceFetcher() {
+	const calls: string[] = [];
+	const jobs = new Map<string, Deferred<string>>();
+	const load = (resource: string, version: number): Promise<string> => {
+		const key = `${resource}:${version}`;
+		calls.push(key);
+		let job = jobs.get(key);
+		if (job === undefined) {
+			job = deferred<string>();
+			jobs.set(key, job);
+		}
+		return job.promise;
+	};
+	const settle = (resource: string, version: number) =>
+		jobs.get(`${resource}:${version}`)!.resolve(`${resource}-v${version}`);
+	return { calls, load, settle };
+}
+
+function freshResourceFetcher() {
+	const calls: string[] = [];
+	const jobs = new Map<string, Deferred<string>[]>();
+	const load = (resource: string, version: number): Promise<string> => {
+		const key = `${resource}:${version}`;
+		calls.push(key);
+		const job = deferred<string>();
+		const list = jobs.get(key);
+		if (list === undefined) jobs.set(key, [job]);
+		else list.push(job);
+		return job.promise;
+	};
+	const settleRound = async (version: number) => {
+		await act(() => {
+			for (const resource of ['activity', 'activity-summary', 'insights', 'insights-chart']) {
+				const list = jobs.get(`${resource}:${version}`)!;
+				list[list.length - 1].resolve(`${resource}-v${version}`);
+			}
+		});
+	};
+	return { calls, load, settleRound };
 }
 
 describe('parallel use() — fetch-tree warming (nested chain)', () => {
@@ -160,6 +215,236 @@ describe('parallel use() — warm exclusion for suspended-data props', () => {
 
 		await act(() => dLeaf.resolve('leaf!'));
 		expect(r.find('.leaf').textContent).toBe('leaf!');
+		r.unmount();
+	});
+});
+
+describe('parallel use() — imported data hooks', () => {
+	it('starts independent reads in a custom hook before either one settles', async () => {
+		const resources = resourceFetcher();
+		const r = mount(ImportedHookHost, { load: resources.load, version: 0 });
+
+		expect([...resources.calls].sort()).toEqual(['project:0', 'viewer:0']);
+		expect(r.find('.fallback').textContent).toBe('pair-loading');
+
+		await act(() => resources.settle('project', 0));
+		expect(r.find('.fallback').textContent).toBe('pair-loading');
+		await act(() => resources.settle('viewer', 0));
+
+		expect(r.find('.project').textContent).toBe('project-v0');
+		expect(r.find('.viewer').textContent).toBe('viewer-v0');
+		expect([...resources.calls].sort()).toEqual(['project:0', 'viewer:0']);
+		r.unmount();
+	});
+
+	it('keeps two calls to the same imported hook in disjoint memo slots', async () => {
+		const resources = resourceFetcher();
+		const r = mount(ImportedHookTwiceHost, { load: resources.load, version: 0 });
+
+		// Each hook call batches its own pair. The first call suspends before the
+		// second is reached, but replay must give the second call distinct memo cells.
+		expect([...resources.calls].sort()).toEqual(['project:0', 'viewer:0']);
+		await act(() => resources.settle('project', 0));
+		await act(() => resources.settle('viewer', 0));
+		expect(r.find('.imported-pair-twice').textContent).toBe(
+			'project-v0|viewer-v0|project-v0|viewer-v0',
+		);
+		expect([...resources.calls].sort()).toEqual(['project:0', 'project:0', 'viewer:0', 'viewer:0']);
+		r.unmount();
+	});
+
+	it('keeps a true dependency inside an imported custom hook sequential', async () => {
+		const project = deferred<{ ownerId: string }>();
+		const owner = deferred<string>();
+		let projectCalls = 0;
+		const ownerArgs: string[] = [];
+		const r = mount(ImportedDependentHookHost, {
+			loadProject: () => {
+				projectCalls++;
+				return project.promise;
+			},
+			loadOwner: (ownerId: string) => {
+				ownerArgs.push(ownerId);
+				return owner.promise;
+			},
+		});
+
+		expect(projectCalls).toBe(1);
+		expect(ownerArgs).toEqual([]);
+		expect(r.find('.fallback').textContent).toBe('dependent-loading');
+
+		await act(() => project.resolve({ ownerId: 'owner-7' }));
+		expect(projectCalls).toBe(1);
+		expect(ownerArgs).toEqual(['owner-7']);
+		expect(r.find('.fallback').textContent).toBe('dependent-loading');
+
+		await act(() => owner.resolve('Ada'));
+		expect(r.find('.imported-dependent').textContent).toBe('owner-7/Ada');
+		expect(projectCalls).toBe(1);
+		expect(ownerArgs).toEqual(['owner-7']);
+		r.unmount();
+	});
+
+	it('tracks an outer callback capture across a block-local shadow and label', async () => {
+		const resources = resourceFetcher();
+		const r = mount(ImportedCapturedHookHost, { load: resources.load, version: 0 });
+
+		expect(resources.calls).toContain('captured:0');
+		await act(() => resources.settle('captured', 0));
+		expect(r.find('.imported-captured').textContent).toBe('captured-v0');
+
+		r.update(ImportedCapturedHookHost, { load: resources.load, version: 1 });
+		expect(resources.calls).toContain('captured:1');
+		await act(() => resources.settle('captured', 1));
+		expect(r.find('.imported-captured').textContent).toBe('captured-v1');
+		r.unmount();
+	});
+});
+
+describe('parallel use() — adjacent async component trees', () => {
+	it('does not warm the final template after setup returns an alternate subtree', async () => {
+		const resources = resourceFetcher();
+		const r = mount(EarlyReturnPanelsHost, {
+			load: resources.load,
+			version: 0,
+			alternate: true,
+		});
+
+		expect(resources.calls).toEqual(['alternate:0']);
+		await act(() => resources.settle('alternate', 0));
+		expect(r.find('.alternate-panel').textContent).toBe('alternate-v0');
+		expect(resources.calls).toEqual(['alternate:0']);
+		r.unmount();
+	});
+
+	it('does not refetch an earlier fulfilled sibling when only the later sibling suspends', async () => {
+		const resources = resourceFetcher();
+		const r = mount(VersionedSiblingsHost, {
+			load: resources.load,
+			stableVersion: 0,
+			changingVersion: 0,
+		});
+		await act(() => resources.settle('stable', 0));
+		await act(() => resources.settle('changing', 0));
+		expect([...resources.calls].sort()).toEqual(['changing:0', 'stable:0']);
+
+		r.update(VersionedSiblingsHost, {
+			load: resources.load,
+			stableVersion: 0,
+			changingVersion: 1,
+		});
+		expect(resources.calls).toEqual(['stable:0', 'changing:0', 'changing:1']);
+		await act(() => resources.settle('changing', 1));
+		expect(r.find('.stable').textContent).toBe('stable-v0');
+		expect(r.find('.changing').textContent).toBe('changing-v1');
+		expect(resources.calls).toHaveLength(3);
+		r.unmount();
+	});
+
+	it('warms repeated instances of the same component and dependency values', async () => {
+		const resources = resourceFetcher();
+		const r = mount(RepeatedPanelsHost, { load: resources.load, version: 0 });
+
+		// One call per concrete component instance, both before either settles.
+		expect(resources.calls).toEqual(['repeated:0', 'repeated:0']);
+		await act(() => resources.settle('repeated', 0));
+		expect(r.findAll('.repeated-panel').map((node: Element) => node.textContent)).toEqual([
+			'repeated-v0',
+			'repeated-v0',
+		]);
+		expect(resources.calls).toHaveLength(2);
+		r.unmount();
+	});
+
+	it('preserves distinct results across more than 64 same-dependency component occurrences', async () => {
+		const occurrenceCount = 65;
+		const calls: string[] = [];
+		const jobs: Deferred<string>[] = [];
+		const load = (resource: string, version: number) => {
+			calls.push(`${resource}:${version}`);
+			const job = deferred<string>();
+			jobs.push(job);
+			return job.promise;
+		};
+		const expected = Array.from(
+			{ length: occurrenceCount },
+			(_, index) => `value-${index.toString().padStart(3, '0')}`,
+		);
+		const r = mount(ManyRepeatedPanelsHost, { load, version: 0 });
+
+		// Every adjacent occurrence starts before any promise settles, even though
+		// the component, call site, and dependency values are identical.
+		expect(jobs).toHaveLength(occurrenceCount);
+		expect(calls).toHaveLength(occurrenceCount);
+		expect(calls.every((call) => call === 'repeated:0')).toBe(true);
+
+		await act(() => {
+			for (let index = occurrenceCount - 1; index >= 0; index--) {
+				jobs[index].resolve(expected[index]);
+			}
+		});
+
+		expect(r.findAll('.repeated-panel').map((node: Element) => node.textContent)).toEqual(expected);
+		expect(calls).toHaveLength(occurrenceCount);
+		r.unmount();
+	});
+
+	it('starts distinct sibling panels and nested children in the first attempt', async () => {
+		const resources = resourceFetcher();
+		const r = mount(AdjacentPanelsHost, { load: resources.load, version: 0 });
+		const expected = ['activity-summary:0', 'activity:0', 'insights-chart:0', 'insights:0'];
+
+		expect([...resources.calls].sort()).toEqual(expected);
+		expect(r.find('.fallback').textContent).toBe('panels-loading');
+
+		await act(() => resources.settle('activity', 0));
+		await act(() => resources.settle('activity-summary', 0));
+		await act(() => resources.settle('insights', 0));
+		await act(() => resources.settle('insights-chart', 0));
+
+		expect(r.find('.activity-value').textContent).toBe('activity-v0');
+		expect(r.find('.activity-summary').textContent).toBe('activity-summary-v0');
+		expect(r.find('.insights-value').textContent).toBe('insights-v0');
+		expect(r.find('.insights-chart').textContent).toBe('insights-chart-v0');
+		expect([...resources.calls].sort()).toEqual(expected);
+		r.unmount();
+	});
+
+	it('warms again when an update returns to previously consumed dependency values', async () => {
+		const resources = freshResourceFetcher();
+		const expectedRound = (version: number) =>
+			['activity', 'activity-summary', 'insights', 'insights-chart']
+				.map((resource) => `${resource}:${version}`)
+				.sort();
+		const r = mount(AdjacentPanelsHost, { load: resources.load, version: 0 });
+		expect([...resources.calls].sort()).toEqual(expectedRound(0));
+		await resources.settleRound(0);
+
+		r.update(AdjacentPanelsHost, { load: resources.load, version: 1 });
+		expect(resources.calls.slice(4).sort()).toEqual(expectedRound(1));
+		await resources.settleRound(1);
+
+		r.update(AdjacentPanelsHost, { load: resources.load, version: 0 });
+		// Returning to 0 is a fresh suspension episode. Consumed warm entries from
+		// the initial mount must not serialize the sibling/nested fetch starts.
+		expect(resources.calls.slice(8).sort()).toEqual(expectedRound(0));
+		await resources.settleRound(0);
+		expect(resources.calls).toHaveLength(12);
+		r.unmount();
+	});
+
+	it('warms all adjacent resources after a same-deps hide and remount', async () => {
+		const resources = freshResourceFetcher();
+		const expected = ['activity-summary:0', 'activity:0', 'insights-chart:0', 'insights:0'];
+		const r = mount(AdjacentPanelsHost, { load: resources.load, version: 0, show: true });
+		expect([...resources.calls].sort()).toEqual(expected);
+		await resources.settleRound(0);
+
+		r.update(AdjacentPanelsHost, { load: resources.load, version: 0, show: false });
+		r.update(AdjacentPanelsHost, { load: resources.load, version: 0, show: true });
+		expect(resources.calls.slice(4).sort()).toEqual(expected);
+		await resources.settleRound(0);
+		expect(resources.calls).toHaveLength(8);
 		r.unmount();
 	});
 });
