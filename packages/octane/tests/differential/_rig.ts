@@ -426,7 +426,20 @@ export async function mountDifferential(
 				}
 			},
 			find(selector) {
-				const el = container.querySelector(selector);
+				// Same jsdom quirk as `click` above: querySelector('#x') can miss
+				// freshly-React-rendered subtrees — fall back to a tree walk for id
+				// selectors.
+				let el: Element | null = container.querySelector(selector);
+				if (!el && selector.startsWith('#')) {
+					const id = selector.slice(1);
+					const all = container.getElementsByTagName('*');
+					for (let i = 0; i < all.length; i++) {
+						if (all[i].id === id) {
+							el = all[i];
+							break;
+						}
+					}
+				}
 				if (!el)
 					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'octane'})`);
 				return el;

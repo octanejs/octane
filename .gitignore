@@ -32,3 +32,7 @@ benchmarks/baselines/ratios.suggested.json
 # Pinned mui/base-ui checkout — the porting source-of-truth for @octanejs/base-ui
 # (see docs/base-ui-migration-plan.md; clone is re-created on demand, never committed).
 .base-ui/
+
+# Pinned adobe/react-spectrum checkout — the porting source-of-truth for @octanejs/aria
+# (see docs/aria-migration-plan.md; clone is re-created on demand, never committed).
+.react-spectrum/
