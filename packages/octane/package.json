@@ -42,7 +42,10 @@
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
-    "./compiler/vite": "./src/compiler/vite.js",
+    "./compiler/vite": {
+      "types": "./src/compiler/vite.d.ts",
+      "default": "./src/compiler/vite.js"
+    },
     "./compiler/volar": "./src/compiler/volar.js"
   },
   "publishConfig": {
@@ -90,7 +93,10 @@
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
-      "./compiler/vite": "./dist/compiler/vite.js",
+      "./compiler/vite": {
+        "types": "./dist/compiler/vite.d.ts",
+        "default": "./dist/compiler/vite.js"
+      },
       "./compiler/volar": "./dist/compiler/volar.js"
     }
   },
@@ -107,13 +113,17 @@
   },
   "peerDependencies": {
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "vite": "^8.0.16"
   },
   "peerDependenciesMeta": {
     "react": {
       "optional": true
     },
     "react-dom": {
+      "optional": true
+    },
+    "vite": {
       "optional": true
     }
   },
@@ -124,6 +134,7 @@
     "happy-dom": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default"
   }
 }

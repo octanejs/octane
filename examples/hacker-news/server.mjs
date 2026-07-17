@@ -34,6 +34,11 @@ function serializeState(state) {
 const vite = await createViteServer({
 	configFile: path.join(APP_DIR, 'vite.config.ts'),
 	root: APP_DIR,
+	// Playwright can run this SSR graph beside a source-serving client graph for
+	// the same dialect. Vite's dependency optimizer mutates its cache during a
+	// cold crawl, so separate the two long-lived processes instead of letting
+	// either replace metadata the other is actively reading.
+	cacheDir: path.join(__dirname, 'node_modules', `.vite-${app}-ssr`),
 	appType: 'custom',
 	// Derive the HMR WebSocket port from PORT so the jsx + tsrx SSR servers (and the
 	// e2e harness, which boots both) can run concurrently without colliding on

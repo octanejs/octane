@@ -19822,7 +19822,16 @@ function makeRoot(
 			try {
 				renderBlock(mountedRoot);
 			} catch (error) {
-				handleRenderError(mountedRoot, error);
+				try {
+					handleRenderError(mountedRoot, error);
+				} catch (unhandled) {
+					// Match the scheduled-render failure path: discard the failed tree
+					// before surfacing the error, but keep the public root reusable for a
+					// later recovery render. In particular, effects registered before the
+					// throw belong to an aborted render and must never reach a later flush.
+					if (!mountedRoot.disposed) unmountBlock(mountedRoot);
+					throw unhandled;
+				}
 				root.unmount();
 				return;
 			}

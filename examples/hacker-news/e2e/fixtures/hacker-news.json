@@ -191,7 +191,7 @@
       "id": "alice",
       "created": 1500000000,
       "karma": 4242,
-      "about": "Maintainer of nothing in particular."
+      "about": "Maintainer of <strong>nothing</strong> in particular."
     },
     "dan": {
       "id": "dan",

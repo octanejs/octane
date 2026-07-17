@@ -3,7 +3,7 @@
 // option forwarding to the bundled compiler, the appType default, and the
 // config resolution of `router.preHydrate` / RenderRoute `status`.
 import { fileURLToPath } from 'node:url';
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
@@ -21,6 +21,7 @@ function url(u: string): URL {
 // Use this package as the fake Vite root: '/src/index.js' and '/types/index.d.ts'
 // are real files under it, '/docs/v2.0' etc. are not.
 const PKG_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+const REPO_ROOT = dirname(dirname(PKG_ROOT));
 const APP_FIXTURE_ROOT = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
 
 describe('production client assets', () => {
@@ -366,6 +367,64 @@ export default { compiler: { renderers } };
 			expect(await response.text()).toContain('Octane SPA shell');
 		} finally {
 			await server.close();
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
+	it('SSR-loads a manifest-discovered raw binding without app build shims', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-raw-binding-'));
+		let server: Awaited<ReturnType<typeof createServer>> | null = null;
+		const dependencyRoot = join(root, 'node_modules/raw-octane-source');
+		try {
+			await mkdir(join(dependencyRoot, 'src'), { recursive: true });
+			await writeFile(
+				join(root, 'package.json'),
+				JSON.stringify({
+					name: 'zero-shim-metaframework-consumer',
+					private: true,
+					type: 'module',
+					dependencies: { octane: '0.0.0', 'raw-octane-source': '0.0.0' },
+				}),
+			);
+			await writeFile(
+				join(dependencyRoot, 'package.json'),
+				JSON.stringify({
+					name: 'raw-octane-source',
+					version: '0.0.0',
+					type: 'module',
+					exports: './src/index.ts',
+					peerDependencies: { octane: '*' },
+					octane: { hookSlots: { manual: ['src'] } },
+				}),
+			);
+			await writeFile(
+				join(dependencyRoot, 'src/index.ts'),
+				"import { renderToStaticMarkup } from 'octane';\n" +
+					"import View from './View.tsrx';\n" +
+					'export function render() { return renderToStaticMarkup(View).html; }\n',
+			);
+			await writeFile(
+				join(dependencyRoot, 'src/View.tsrx'),
+				"export default function View() @{ <p>{'metaframework zero shim'}</p> }\n",
+			);
+			await writeFile(join(root, 'entry.ts'), "export { render } from 'raw-octane-source';\n");
+			await symlink(join(REPO_ROOT, 'packages/octane'), join(root, 'node_modules/octane'), 'dir');
+
+			server = await createServer({
+				root,
+				configFile: false,
+				logLevel: 'silent',
+				appType: 'custom',
+				plugins: [octane({ hmr: false })],
+				server: { middlewareMode: true },
+			});
+
+			expect(server.config.optimizeDeps.exclude).toContain('raw-octane-source');
+			expect(server.config.ssr.noExternal).toContain('raw-octane-source');
+			const loaded = await server.ssrLoadModule('/entry.ts');
+			expect(loaded.render()).toBe('<p>metaframework zero shim</p>');
+		} finally {
+			await server?.close();
 			await rm(root, { recursive: true, force: true });
 		}
 	});

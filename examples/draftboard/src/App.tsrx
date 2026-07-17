@@ -1252,11 +1252,14 @@ function BoardCanvas(props) @{
 					shape={shape}
 					selected={props.selectedIds.includes(shape.id)}
 					focusable={shape.id === keyboardShapeId}
-					onRegister={(element, previous) => {
-						if (element !== null) shapeElementsRef.current.set(shape.id, element);
-						else if (previous !== null && shapeElementsRef.current.get(shape.id) === previous) {
-							shapeElementsRef.current.delete(shape.id);
-						}
+					onRegister={(element) => {
+						if (element === null) return;
+						shapeElementsRef.current.set(shape.id, element);
+						return () => {
+							if (shapeElementsRef.current.get(shape.id) === element) {
+								shapeElementsRef.current.delete(shape.id);
+							}
+						};
 					}}
 					onKeyboardFocus={() => {
 						if (pointerFocusRef.current) return;

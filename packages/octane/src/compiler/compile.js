@@ -10012,6 +10012,13 @@ function normalizeChildren(nodes, inSvg = false) {
 			// via the @tsrx/core scoping pipeline (applyCssScoping / applyStyleMap);
 			// it contributes no DOM here.
 			continue;
+		} else if (isWrappedJsxDirective(n)) {
+			// Deeper directive nesting can surface a JSX directive as an
+			// ExpressionStatement (for example `@if` -> `@for` -> `@try`). It is
+			// still template output, not setup JavaScript. Unwrap it before lowering
+			// so both client and server compilation route it through their construct
+			// emitters rather than asking esrap to print a TSRX-only expression.
+			out.push(...normalizeChildren([n.expression], inSvg));
 		} else if (n.type === 'JSXIfExpression') {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
@@ -14416,6 +14423,7 @@ function rewriteEarlyExits(body) {
 
 function isJsxNode(node) {
 	if (!node) return false;
+	if (isWrappedJsxDirective(node)) return true;
 	if (node.type === 'Element' || node.type === 'Text') return true;
 	if (node.type === 'FoldedDirective') return true;
 	if (node.type === 'Tsx' || node.type === 'Tsrx') return true;
@@ -14445,6 +14453,17 @@ function isJsxNode(node) {
 		return bodyContainsJsx(node.block) || (!!node.handler && bodyContainsJsx(node.handler.body));
 	}
 	return false;
+}
+
+function isWrappedJsxDirective(node) {
+	if (node?.type !== 'ExpressionStatement') return false;
+	const type = node.expression?.type;
+	return (
+		type === 'JSXIfExpression' ||
+		type === 'JSXForExpression' ||
+		type === 'JSXTryExpression' ||
+		type === 'JSXSwitchExpression'
+	);
 }
 
 function bodyContainsJsx(node) {

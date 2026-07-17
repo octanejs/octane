@@ -232,7 +232,7 @@ export async function loadServerRouter(
 		// `router.load()` prefetches this route's data into it before render().
 		router = makeRouter({ history, isServer: true, queryClient });
 		await router.load();
-		const redirect = router.stores.redirect.get?.() ?? router.stores.redirect.value;
+		const redirect = router.state.redirect;
 		const href = redirect?.options?.href ?? redirect?.href;
 		if (!redirect || !href || href === target) return router;
 		target = href; // follow the server redirect (e.g. `/` → `/?page=1`)

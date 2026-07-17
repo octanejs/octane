@@ -8,7 +8,6 @@ export default defineConfig({
 	// plugin skips them automatically. The package's `.tsrx` components still
 	// compile.
 	plugins: [octane()],
-	optimizeDeps: { exclude: ['octane', 'octane/compiler', '@octanejs/lexical'] },
 	resolve: {
 		// Resolve @octanejs/lexical's per-subpath `.tsrx`/`.ts` modules (mirrors the
 		// vitest alias) so the workspace source is used directly.

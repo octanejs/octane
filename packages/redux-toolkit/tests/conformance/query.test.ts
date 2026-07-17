@@ -9,6 +9,14 @@ import {
 	CustomContextApp,
 } from '../_fixtures/rtk-query.tsrx';
 
+async function unmountAndSettle(result: { unmount(): void }): Promise<void> {
+	result.unmount();
+	// RTK Query releases its subscriptions through passive cleanup. Keep that
+	// post-paint work inside the fixture's jsdom lifetime instead of letting a
+	// queued animation frame race environment teardown under a loaded CI shard.
+	await settle();
+}
+
 describe('RTK Query generated hooks', () => {
 	it('keeps two calls to the same endpoint isolated and updates their data', async () => {
 		const result = mount(QueryApp, {});
@@ -24,7 +32,7 @@ describe('RTK Query generated hooks', () => {
 		await settle();
 		expect(result.find('#first').textContent).toBe('first=value-c:fulfilled');
 		expect(result.find('#second').textContent).toBe('second=value-b:fulfilled');
-		result.unmount();
+		await unmountAndSettle(result);
 	});
 
 	it('supports lazy queries and mutations, including reset', async () => {
@@ -43,7 +51,7 @@ describe('RTK Query generated hooks', () => {
 		await settle(5);
 		expect(result.find('#lazy').textContent).toContain('uninitialized');
 		expect(result.find('#mutation').textContent).toContain('uninitialized');
-		result.unmount();
+		await unmountAndSettle(result);
 	});
 
 	it('supports infinite-query pagination', async () => {
@@ -54,7 +62,7 @@ describe('RTK Query generated hooks', () => {
 		result.find('#next').dispatchEvent(new MouseEvent('click', { bubbles: true }));
 		await settle();
 		expect(result.find('#pages').textContent).toBe('pages=page-0|page-1:fulfilled');
-		result.unmount();
+		await unmountAndSettle(result);
 	});
 
 	it('supports skip, skipToken, query-state-only, and prefetch hooks', async () => {
@@ -70,7 +78,7 @@ describe('RTK Query generated hooks', () => {
 		expect(result.find('#conditional').textContent).toBe('conditional=value-conditional:fulfilled');
 		expect(result.find('#skip-token').textContent).toBe('token=uninitialized');
 		expect(result.find('#prefetched').textContent).toBe('prefetched=value-prefetched:fulfilled');
-		result.unmount();
+		await unmountAndSettle(result);
 	});
 
 	it('supports reactHooksModule and ApiProvider with a custom Redux context', async () => {
@@ -78,7 +86,7 @@ describe('RTK Query generated hooks', () => {
 		expect(result.find('#custom-context').textContent).toContain('pending');
 		await settle();
 		expect(result.find('#custom-context').textContent).toBe('custom=custom-value:fulfilled');
-		result.unmount();
+		await unmountAndSettle(result);
 	});
 
 	it('rejects ApiProvider nesting inside an existing Redux context', () => {

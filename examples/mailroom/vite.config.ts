@@ -3,9 +3,6 @@ import { octane } from 'octane/compiler/vite';
 
 export default defineConfig({
 	plugins: [octane()],
-	optimizeDeps: {
-		exclude: ['octane', 'octane/compiler', '@octanejs/remix-router'],
-	},
 	resolve: {
 		extensions: ['.tsrx', '.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
 	},

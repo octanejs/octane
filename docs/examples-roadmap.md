@@ -92,7 +92,17 @@ When a product journey exposes a framework bug:
 3. reduce the failure to the smallest realistic behavioral test in the owning
    runtime, compiler, integration, or binding package;
 4. fix the owning package instead of adding an application compatibility shim;
-5. keep both layers when they protect different observation boundaries.
+5. keep both layers when they protect different observation boundaries;
+6. add a stable entry to the
+   [product example regression ledger](product-example-regressions.md), linking the
+   consumer symptom, owning regression, retained journey, and fixing change.
+
+Application and fixture defects belong in the ledger too, classified to their
+actual owner; discovering a problem while exercising Octane does not by itself
+make it an Octane bug. If an external block makes a temporary compatibility shim
+unavoidable, the ledger entry must name its owner, upstream issue or blocked
+layer, exact removal condition, and post-removal journey. An undocumented or
+open-ended workaround does not satisfy the graduation contract.
 
 The application history, acceptance journeys, deterministic seeds, and focused
 fix commits can later form public training material. Held-out evaluation tasks
