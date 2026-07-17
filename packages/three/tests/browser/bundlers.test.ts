@@ -345,6 +345,237 @@ describe('Three Canvas bundler and browser integration', () => {
 		}
 	}, 60_000);
 
+	it('projects a real WebGL context-creation failure without starting the scene', async () => {
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({ headless: true });
+		} catch (error) {
+			throw new Error(
+				'[@octanejs/three browser] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
+		const consoleErrors: string[] = [];
+		const pageErrors: string[] = [];
+		const assetResponses: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') consoleErrors.push(message.text());
+		});
+		page.on('pageerror', (error) => pageErrors.push(String(error)));
+		page.on('response', (response) => {
+			if (response.url().endsWith('/three-loader-proof.txt')) assetResponses.push(response.url());
+		});
+		await page.addInitScript(() => {
+			const original = HTMLCanvasElement.prototype.getContext;
+			Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+				configurable: true,
+				value(this: HTMLCanvasElement, type: string, ...args: unknown[]) {
+					if (type === 'webgl' || type === 'webgl2') return null;
+					return Reflect.apply(original, this, [type, ...args]);
+				},
+			});
+		});
+
+		try {
+			await page.goto(`${viteOrigin}?mode=webgl-failure`, { waitUntil: 'load' });
+			await expect
+				.poll(() => page.locator('[data-three-webgl-error]').textContent())
+				.toBe('Error creating WebGL context.');
+			const proof = await page.evaluate(() => {
+				const fixture = globalThis as typeof globalThis & {
+					__octaneThreeAsset?: string;
+					__octaneThreeSceneReady?: boolean;
+					__octaneThreeState?: unknown;
+				};
+				return {
+					asset: fixture.__octaneThreeAsset,
+					canvasCount: document.querySelectorAll('canvas').length,
+					sceneReady: fixture.__octaneThreeSceneReady,
+					stateCreated: fixture.__octaneThreeState !== undefined,
+				};
+			});
+
+			expect(proof).toEqual({
+				asset: undefined,
+				canvasCount: 0,
+				sceneReady: undefined,
+				stateCreated: false,
+			});
+			expect(assetResponses).toEqual([]);
+			expect(pageErrors).toEqual([]);
+			expect(consoleErrors.length).toBeGreaterThan(0);
+			expect(
+				consoleErrors.filter(
+					(message) => message !== 'THREE.WebGLRenderer: Error creating WebGL context.',
+				),
+			).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+		}
+	}, 60_000);
+
+	it('restores a real lost WebGL context and renders the retained demand scene', async () => {
+		let browser: import('playwright').Browser | undefined;
+		try {
+			const { chromium } = await import('playwright');
+			browser = await chromium.launch({
+				headless: true,
+				args: ['--enable-webgl', '--ignore-gpu-blocklist', '--use-angle=swiftshader'],
+			});
+		} catch (error) {
+			throw new Error(
+				'[@octanejs/three browser] Chromium is required ' +
+					'(run `pnpm exec playwright install chromium`): ' +
+					(error instanceof Error ? error.message.split('\n')[0] : String(error)),
+			);
+		}
+
+		const page = await browser.newPage({ viewport: { width: 128, height: 128 } });
+		const errors: string[] = [];
+		page.on('console', (message) => {
+			if (message.type() === 'error') errors.push(message.text());
+		});
+		page.on('pageerror', (error) => errors.push(`pageerror: ${String(error)}`));
+		try {
+			await page.goto(viteOrigin, { waitUntil: 'load' });
+			await page.waitForFunction(
+				() =>
+					(globalThis as typeof globalThis & { __octaneThreeSceneReady?: boolean })
+						.__octaneThreeSceneReady === true,
+			);
+
+			const proof = await page.evaluate(async () => {
+				const within = <T>(promise: Promise<T>, label: string): Promise<T> =>
+					Promise.race([
+						promise,
+						new Promise<T>((_, reject) =>
+							setTimeout(() => reject(new Error(`Timed out waiting for ${label}.`)), 5_000),
+						),
+					]);
+				type RestorableRenderer = {
+					forceContextLoss(): void;
+					forceContextRestore(): void;
+					getContext(): WebGLRenderingContext | WebGL2RenderingContext;
+				};
+				const fixture = globalThis as typeof globalThis & {
+					__octaneThreeFrameCount?: number;
+					__octaneThreeState?: {
+						frameloop: string;
+						gl: RestorableRenderer;
+						scene: { getObjectByName(name: string): unknown };
+						setFrameloop(value: 'demand'): void;
+					};
+				};
+				const state = fixture.__octaneThreeState;
+				const canvas = document.querySelector('canvas');
+				if (state === undefined || canvas === null) {
+					throw new Error('The Three Canvas did not expose its real renderer.');
+				}
+				const renderer = state.gl;
+				const context = renderer.getContext();
+				if (context.getExtension('WEBGL_lose_context') === null) {
+					throw new Error('Chromium did not expose WEBGL_lose_context.');
+				}
+				const mesh = state.scene.getObjectByName('bundler-proof-cube');
+				if (mesh === undefined) throw new Error('The retained mesh was not mounted.');
+				state.setFrameloop('demand');
+				await new Promise<void>((resolveFrame) =>
+					requestAnimationFrame(() => requestAnimationFrame(() => resolveFrame())),
+				);
+				const beforeFrames = fixture.__octaneThreeFrameCount ?? 0;
+				let lossPrevented = false;
+				const lost = new Promise<void>((resolveLost) => {
+					canvas.addEventListener(
+						'webglcontextlost',
+						(event) => {
+							lossPrevented = event.defaultPrevented;
+							resolveLost();
+						},
+						{ once: true },
+					);
+				});
+				renderer.forceContextLoss();
+				await within(lost, 'webglcontextlost');
+				const contextWasLost = context.isContextLost();
+				// Chromium only accepts restoreContext after the loss event's task has
+				// completed; restoring from the event-resolution microtask is ignored.
+				await new Promise<void>((resolveTask) => setTimeout(resolveTask, 0));
+				const restored = new Promise<void>((resolveRestored) => {
+					canvas.addEventListener('webglcontextrestored', () => resolveRestored(), { once: true });
+				});
+				renderer.forceContextRestore();
+				await within(restored, 'webglcontextrestored');
+				for (let frame = 0; frame < 120; frame++) {
+					if ((fixture.__octaneThreeFrameCount ?? 0) > beforeFrames) break;
+					await new Promise<void>((resolveFrame) => requestAnimationFrame(() => resolveFrame()));
+				}
+
+				context.finish();
+				const pixels = new Uint8Array(context.drawingBufferWidth * context.drawingBufferHeight * 4);
+				context.readPixels(
+					0,
+					0,
+					context.drawingBufferWidth,
+					context.drawingBufferHeight,
+					context.RGBA,
+					context.UNSIGNED_BYTE,
+					pixels,
+				);
+				const center =
+					4 *
+					(Math.floor(context.drawingBufferHeight / 2) * context.drawingBufferWidth +
+						Math.floor(context.drawingBufferWidth / 2));
+				return {
+					center: [...pixels.slice(center, center + 4)],
+					contextRestored: !context.isContextLost(),
+					contextWasLost,
+					frameAdvanced: (fixture.__octaneThreeFrameCount ?? 0) > beforeFrames,
+					glError: context.getError(),
+					lossPrevented,
+					meshRetained: state.scene.getObjectByName('bundler-proof-cube') === mesh,
+				};
+			});
+
+			expect(proof).toEqual({
+				center: [255, 0, 0, 255],
+				contextRestored: true,
+				contextWasLost: true,
+				frameAdvanced: true,
+				glError: 0,
+				lossPrevented: true,
+				meshRetained: true,
+			});
+
+			await page.evaluate(() => {
+				const fixture = globalThis as typeof globalThis & {
+					__octaneThreeEventLog?: Array<Record<string, unknown>>;
+				};
+				fixture.__octaneThreeEventLog = [];
+			});
+			const bounds = await page.locator('canvas').boundingBox();
+			if (bounds === null) throw new Error('Restored Canvas had no browser bounds.');
+			await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+			const delivered = await page.evaluate(
+				() =>
+					(
+						globalThis as typeof globalThis & {
+							__octaneThreeEventLog?: Array<Record<string, unknown>>;
+						}
+					).__octaneThreeEventLog?.some((entry) => entry.type === 'click') ?? false,
+			);
+			expect(delivered).toBe(true);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+			await browser.close();
+		}
+	}, 60_000);
+
 	it('delivers real offset pointer events and native capture through Canvas', async () => {
 		let browser: import('playwright').Browser | undefined;
 		try {

@@ -11,9 +11,11 @@ import type {
 	UniversalEventListenerDescriptor,
 	UniversalEventPriority,
 	UniversalHostBatch,
+	UniversalHostCommand,
 	UniversalHostDriver,
 	UniversalListenerDescriptor,
 	UniversalPortalTargetHandle,
+	UniversalPreparedHostBatch,
 } from 'octane/universal';
 import {
 	getInitialRootStore,
@@ -22,7 +24,12 @@ import {
 	swapInteractivity,
 	type RootStore,
 } from './store.js';
-import { createThreeObject, registerThreeNamespace, THREE_RENDERER_ID } from './catalogue.js';
+import {
+	createThreeObject,
+	registerThreeNamespace,
+	resolveThreeConstructor,
+	THREE_RENDERER_ID,
+} from './catalogue.js';
 import {
 	attachString,
 	detachAttachment,
@@ -39,6 +46,9 @@ const STORE_CONTAINERS = new WeakMap<RootStore, ThreeHostContainer>();
 const ACTIVE_EVENT_SCOPES = new WeakSet<RootStore>();
 const THREE_PORTAL_TARGET = Symbol('octane.three.portal-target');
 const EXTERNAL_PORTAL_TARGET_LEASES = new WeakMap<THREE.Object3D, ExternalTargetLease>();
+const EMPTY_THREE_EVENTS = new Map<string, UniversalEventListenerDescriptor>();
+const EMPTY_THREE_CALLBACKS = new Map<string, UniversalListenerDescriptor>();
+const THREE_VECTOR3_FROM_ARRAY = THREE.Vector3.prototype.fromArray;
 
 const THREE_EVENT_PRIORITIES: Readonly<Record<string, UniversalEventPriority>> = Object.freeze({
 	onClick: 'discrete',
@@ -126,12 +136,13 @@ interface ThreeHostInstance {
 	readonly children: number[];
 	owned: boolean;
 	visible: boolean;
-	readonly events: Map<string, UniversalEventListenerDescriptor>;
-	readonly lifecycles: Map<string, UniversalListenerDescriptor>;
-	readonly localCallbacks: Map<string, UniversalListenerDescriptor>;
+	events: Map<string, UniversalEventListenerDescriptor>;
+	lifecycles: Map<string, UniversalListenerDescriptor>;
+	localCallbacks: Map<string, UniversalListenerDescriptor>;
 	readonly localCleanups: Map<string, () => void>;
 	store: RootStore | undefined;
 	physical: PhysicalPlacement | null;
+	directLeaf: boolean;
 }
 
 interface SimulatedInstance {
@@ -155,6 +166,7 @@ interface StagedObject {
 interface ThreeDriverState {
 	readonly instances: Map<number, ThreeHostInstance>;
 	readonly rootChildren: number[];
+	directInstances: readonly ThreeHostInstance[] | null;
 	readonly portalChildren: Map<string | number, number[]>;
 	readonly portalTargets: Map<string | number, ThreePortalTargetDomain>;
 	readonly portalTargetCache: WeakMap<RootStore, WeakMap<THREE.Object3D, ThreePortalTargetDomain>>;
@@ -192,6 +204,8 @@ export function createThreePortalTarget(
 export interface ThreeHostEnvironment {
 	/** Called once after an accepted host batch, without requiring WebGL. */
 	invalidate?(): void;
+	/** Set false to omit accepted batches from the public diagnostic history. */
+	recordCommits?: boolean;
 	/** Root state associated with a configured managed scene. */
 	readonly store?: RootStore;
 	/** Run all Three handlers from one platform event in one universal scope. */
@@ -257,6 +271,7 @@ export function createThreeContainer(
 	const state: ThreeDriverState = {
 		instances: new Map(),
 		rootChildren: [],
+		directInstances: null,
 		portalChildren: new Map(),
 		portalTargets: new Map(),
 		portalTargetCache: new WeakMap(),
@@ -308,6 +323,254 @@ function cloneSimulation(state: ThreeDriverState): Map<number, SimulatedInstance
 		});
 	}
 	return simulation;
+}
+
+/**
+ * Retained prop patches do not change the logical or physical Three graph. Keep
+ * them transactional by validating every target up front, but avoid cloning and
+ * republishing the entire scene merely to apply ordinary object properties.
+ *
+ * String attachments are deliberately excluded: a parent prop patch can replace
+ * any segment of an attached child's path, which requires the general shadow
+ * validation and physical synchronization below. Interactive targets are also
+ * excluded because changing `raycast` can alter their root-store membership.
+ */
+interface DirectMeshProps extends Readonly<Record<string, unknown>> {
+	readonly name: string;
+	readonly position: readonly [number, number, number];
+}
+
+function isDirectMeshProps(props: Readonly<Record<string, unknown>>): props is DirectMeshProps {
+	let nextName = 'name';
+	for (const name in props) {
+		if (!Object.prototype.hasOwnProperty.call(props, name)) continue;
+		if (name !== nextName) return false;
+		nextName = name === 'name' ? 'position' : '';
+	}
+	const position = props.position;
+	// Eligibility must not read authored array indices: the general driver does
+	// not observe those values until an accepted batch is applied.
+	return nextName === '' && typeof props.name === 'string' && Array.isArray(position);
+}
+
+function prepareDirectLeafMountBatch(
+	container: ThreeHostContainer,
+	batch: UniversalHostBatch,
+): UniversalPreparedHostBatch | null {
+	const state = container[THREE_DRIVER_STATE];
+	if (
+		state.instances.size !== 0 ||
+		state.rootChildren.length !== 0 ||
+		state.portalTargets.size !== 0 ||
+		state.portalChildren.size !== 0 ||
+		container.scene.parent !== null ||
+		container.scene.children.length !== 0 ||
+		resolveThreeConstructor('mesh') !== THREE.Mesh
+	) {
+		return null;
+	}
+
+	let createCount = 0;
+	while (batch.commands[createCount]?.op === 'create') createCount++;
+	if (createCount === 0 || batch.commands.length !== createCount * 2) return null;
+	const ids = new Set<number>();
+	for (let index = 0; index < createCount; index++) {
+		const create = batch.commands[index];
+		const placement = batch.commands[createCount + index];
+		if (
+			create.op !== 'create' ||
+			create.type !== 'mesh' ||
+			ids.has(create.id) ||
+			!isDirectMeshProps(create.props) ||
+			placement.op !== 'insert' ||
+			placement.id !== create.id ||
+			placement.parent !== null ||
+			placement.before !== null
+		) {
+			return null;
+		}
+		ids.add(create.id);
+	}
+
+	const staged: ThreeHostInstance[] = [];
+	try {
+		for (let index = 0; index < createCount; index++) {
+			const command = batch.commands[index] as Extract<
+				UniversalHostCommand,
+				{ readonly op: 'create' }
+			>;
+			const object = new THREE.Mesh();
+			staged.push(
+				createHostInstance(
+					container,
+					command.id,
+					{ object, owned: true, type: 'mesh', propsApplied: true },
+					command.props,
+					true,
+				),
+			);
+			applyThreeProps(object, command.props, undefined, {
+				colorSpace: container.environment.linear !== true,
+			});
+		}
+	} catch (error) {
+		for (const instance of staged) disposeOwnedNow(instance.object);
+		throw error;
+	}
+
+	let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
+	return {
+		apply() {
+			if (status !== 'prepared') return;
+			status = 'applied';
+			state.directInstances = staged;
+			let failed = false;
+			let firstError: unknown;
+			for (const instance of staged) {
+				instance.directLeaf = true;
+				state.instances.set(instance.id, instance);
+				state.rootChildren.push(instance.id);
+				instance.parent = null;
+				OBJECT_INSTANCES.set(instance.object, instance);
+				try {
+					container.scene.add(instance.object);
+					instance.physical = {
+						kind: 'object3d',
+						object: instance.object,
+						parent: container.scene,
+					};
+				} catch (error) {
+					if (!failed) {
+						failed = true;
+						firstError = error;
+					}
+				}
+			}
+			if (container.environment.recordCommits !== false) {
+				try {
+					container.commits.push(batch);
+				} catch (error) {
+					if (!failed) {
+						failed = true;
+						firstError = error;
+					}
+				}
+			}
+			try {
+				container.environment.invalidate?.();
+			} catch (error) {
+				if (!failed) {
+					failed = true;
+					firstError = error;
+				}
+			}
+			if (failed) throw firstError;
+		},
+		abort() {
+			if (status !== 'prepared') return;
+			status = 'aborted';
+			for (const instance of staged) disposeOwnedNow(instance.object);
+		},
+	};
+}
+
+function prepareUpdateOnlyBatch(
+	container: ThreeHostContainer,
+	batch: UniversalHostBatch,
+): UniversalPreparedHostBatch | null {
+	if (batch.commands.length === 0) return null;
+
+	const state = container[THREE_DRIVER_STATE];
+	const instances = state.directInstances;
+	if (
+		instances === null ||
+		batch.commands.length !== state.rootChildren.length ||
+		batch.commands.length !== instances.length ||
+		state.rootChildren.length !== state.instances.size ||
+		container.scene.children.length !== state.rootChildren.length ||
+		container.scene.parent !== null
+	) {
+		return null;
+	}
+	for (let index = 0; index < batch.commands.length; index++) {
+		const command = batch.commands[index];
+		if (command.op !== 'update') return null;
+		const instance = instances[index];
+		if (command.id !== instance.id) return null;
+		const nameDescriptor = Object.getOwnPropertyDescriptor(instance.object, 'name');
+		if (
+			!instance.directLeaf ||
+			instance.physical?.kind !== 'object3d' ||
+			instance.physical.parent !== container.scene ||
+			instance.object.parent !== container.scene ||
+			container.scene.children[index] !== instance.object ||
+			instance.object.visible !== true ||
+			nameDescriptor === undefined ||
+			!('value' in nameDescriptor) ||
+			nameDescriptor.writable !== true ||
+			instance.object.position.fromArray !== THREE_VECTOR3_FROM_ARRAY
+		) {
+			return null;
+		}
+		if (!isDirectMeshProps(command.props)) return null;
+	}
+
+	let status: 'prepared' | 'applied' | 'aborted' = 'prepared';
+	return {
+		apply() {
+			if (status !== 'prepared') return;
+			status = 'applied';
+			let failed = false;
+			let firstError: unknown;
+			for (let index = 0; index < instances.length; index++) {
+				try {
+					const instance = instances[index];
+					const previous = instance.props as DirectMeshProps;
+					const next = (
+						batch.commands[index] as Extract<UniversalHostCommand, { readonly op: 'update' }>
+					).props as DirectMeshProps;
+					instance.props = next;
+					if (previous.name !== next.name) instance.object.name = next.name;
+					const previousPosition = previous.position;
+					const nextPosition = next.position;
+					if (
+						previousPosition[0] !== nextPosition[0] ||
+						previousPosition[1] !== nextPosition[1] ||
+						previousPosition[2] !== nextPosition[2]
+					) {
+						instance.object.position.fromArray(nextPosition);
+					}
+				} catch (error) {
+					if (!failed) {
+						failed = true;
+						firstError = error;
+					}
+				}
+			}
+			if (container.environment.recordCommits !== false) {
+				try {
+					container.commits.push(batch);
+				} catch (error) {
+					if (!failed) {
+						failed = true;
+						firstError = error;
+					}
+				}
+			}
+			try {
+				container.environment.invalidate?.();
+			} catch (error) {
+				if (!failed) {
+					failed = true;
+					firstError = error;
+				}
+			}
+			if (failed) throw firstError;
+		},
+		abort() {
+			if (status === 'prepared') status = 'aborted';
+		},
+	};
 }
 
 function isPortalParent(parent: ParentId): parent is UniversalPortalTargetHandle {
@@ -774,6 +1037,7 @@ function createHostInstance(
 	id: number,
 	staged: StagedObject,
 	props: Readonly<Record<string, unknown>>,
+	directLeaf = false,
 ): ThreeHostInstance {
 	return {
 		id,
@@ -785,12 +1049,13 @@ function createHostInstance(
 		children: [],
 		owned: staged.owned,
 		visible: true,
-		events: new Map(),
-		lifecycles: new Map(),
-		localCallbacks: new Map(),
+		events: directLeaf ? EMPTY_THREE_EVENTS : new Map(),
+		lifecycles: directLeaf ? EMPTY_THREE_CALLBACKS : new Map(),
+		localCallbacks: directLeaf ? EMPTY_THREE_CALLBACKS : new Map(),
 		localCleanups: new Map(),
 		store: container.environment.store,
 		physical: null,
+		directLeaf,
 	};
 }
 
@@ -947,7 +1212,12 @@ export function createThreeDriver(
 	registerThreeNamespace();
 	return {
 		id: renderer,
-		capabilities: { text: 'ignore', localHostCallbacks: true, visibility: true },
+		capabilities: {
+			text: 'ignore',
+			localHostCallbacks: true,
+			visibility: true,
+			compilerLeafProps: true,
+		},
 		events: {
 			classify(name) {
 				const priority = getThreeHostEventPriority(name);
@@ -1121,6 +1391,10 @@ export function createThreeDriver(
 				);
 			}
 			const state = container[THREE_DRIVER_STATE];
+			const directLeafMount = prepareDirectLeafMountBatch(container, batch);
+			if (directLeafMount !== null) return directLeafMount;
+			const updateOnly = prepareUpdateOnlyBatch(container, batch);
+			if (updateOnly !== null) return updateOnly;
 			const simulation = cloneSimulation(state);
 			const rootChildren = [...state.rootChildren];
 			const portalChildren = clonePortalChildren(state);
@@ -1487,6 +1761,7 @@ export function createThreeDriver(
 					}
 
 					tasks.push(() => {
+						state.directInstances = null;
 						state.rootChildren.splice(0, state.rootChildren.length, ...rootChildren);
 						state.portalChildren.clear();
 						for (const [target, children] of portalChildren) {
@@ -1499,12 +1774,19 @@ export function createThreeDriver(
 							instance.parent = simulated.parent;
 							instance.children.splice(0, instance.children.length, ...simulated.children);
 							instance.visible = simulated.visible;
-							instance.events.clear();
-							for (const entry of simulated.events) instance.events.set(...entry);
-							instance.lifecycles.clear();
-							for (const entry of simulated.lifecycles) instance.lifecycles.set(...entry);
-							instance.localCallbacks.clear();
-							for (const entry of simulated.localCallbacks) instance.localCallbacks.set(...entry);
+							if (instance.directLeaf) {
+								instance.events = new Map(simulated.events);
+								instance.lifecycles = new Map(simulated.lifecycles);
+								instance.localCallbacks = new Map(simulated.localCallbacks);
+							} else {
+								instance.events.clear();
+								for (const entry of simulated.events) instance.events.set(...entry);
+								instance.lifecycles.clear();
+								for (const entry of simulated.lifecycles) instance.lifecycles.set(...entry);
+								instance.localCallbacks.clear();
+								for (const entry of simulated.localCallbacks) instance.localCallbacks.set(...entry);
+							}
+							instance.directLeaf = false;
 							instance.store = storeForInstance(
 								id,
 								simulation,
@@ -1560,7 +1842,9 @@ export function createThreeDriver(
 						});
 					}
 
-					tasks.push(() => container.commits.push(batch));
+					if (container.environment.recordCommits !== false) {
+						tasks.push(() => container.commits.push(batch));
+					}
 					tasks.push(() => container.environment.invalidate?.());
 					runAll(tasks);
 				},

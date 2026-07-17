@@ -7,33 +7,77 @@ import {
 	createRoot,
 	events,
 	flushSync,
+	OctaneThree,
+	ReactThreeFiber,
 	unmountComponentAtNode,
 	useFrame,
 	useStore,
 	useThree,
 	type Act,
+	type Args,
+	type AttachFnType,
+	type AttachType,
+	type Camera,
+	type CameraProps,
 	type CanvasProps,
+	type Catalogue,
+	type Color,
 	type ComputeFunction,
+	type ConstructorRepresentation,
+	type Disposable,
 	type DOMRegionProps,
 	type DOMRegionTarget,
 	type DomEvent,
+	type Dpr,
+	type ElementProps,
+	type Euler,
 	type EventHandlers,
 	type EventManager,
 	type EventProps,
 	type Events,
 	type FilterFunction,
+	type Frameloop,
+	type GlobalEffectType,
+	type GlobalRenderCallback,
+	type GLProps,
+	type Instance,
+	type InstanceProps,
 	type Intersection,
 	type IntersectionEvent,
 	type InjectState,
+	type Layers,
+	type MathProps,
+	type MathRepresentation,
+	type MathType,
+	type MathTypes,
+	type Matrix3,
+	type Matrix4,
+	type ObjectMap,
+	type Performance,
 	type PointerCaptureTarget,
 	type PrimitiveProps,
+	type Quaternion,
 	type RaycastableRepresentation,
+	type ReactProps,
+	type ReconcilerRoot,
+	type RenderCallback,
 	type Renderer,
+	type RenderProps,
 	type RootState,
+	type RootStore,
+	type Size,
+	type Subscription,
 	type ThreeElement,
 	type ThreeElements,
 	type ThreeEvent,
 	type ThreeRoot,
+	type ThreeToJSXElements,
+	type Vector2,
+	type Vector3,
+	type Vector4,
+	type VectorRepresentation,
+	type Viewport,
+	type XRManager,
 } from '@octanejs/three';
 import {
 	createThreeTestRenderer,
@@ -67,6 +111,11 @@ const invalidPortalState: InjectState = { events: { enabled: 'yes' } };
 void invalidPortalState;
 
 const root: ThreeRoot<HTMLCanvasElement> = createRoot(canvas);
+const reconcilerRoot: ReconcilerRoot<HTMLCanvasElement> = root;
+const canonicalNamespaceElements: OctaneThree.ThreeElements['mesh'] = {};
+const namespaceElements: ReactThreeFiber.ThreeElements['mesh'] = {};
+const canonicalNamespaceValue: object = OctaneThree;
+const namespaceValue: object = ReactThreeFiber;
 const typedAct: Act = act;
 const acted: Promise<number> = typedAct(async () => 42);
 const flushed: number = flushSync(() => 42);
@@ -210,6 +259,11 @@ root.configure({ gl: renderer, frameloop: 'sometimes' });
 root.configure({ gl: renderer, dpr: ['low', 'high'] });
 
 void configured;
+void reconcilerRoot;
+void canonicalNamespaceElements;
+void canonicalNamespaceValue;
+void namespaceElements;
+void namespaceValue;
 void asyncConfigured;
 void acted;
 void flushed;

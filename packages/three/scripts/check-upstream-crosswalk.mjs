@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { basename } from 'node:path';
 
 const CROSSWALK_URL = new URL('../audit/upstream-crosswalk.json', import.meta.url);
+const REPOSITORY_URL = new URL('../../../', import.meta.url);
 
 const EXPECTED_UPSTREAM = Object.freeze({
 	repository: 'https://github.com/pmndrs/react-three-fiber',
@@ -145,6 +146,15 @@ function assertUnique(value, set, label) {
 	set.add(value);
 }
 
+function markdownHeadingAnchor(heading) {
+	return heading
+		.trim()
+		.toLowerCase()
+		.replace(/[`*_~]/g, '')
+		.replace(/[^\p{L}\p{N}\s-]/gu, '')
+		.replace(/\s+/g, '-');
+}
+
 const crosswalk = JSON.parse(await readFile(CROSSWALK_URL, 'utf8'));
 
 assertExactKeys(
@@ -269,8 +279,38 @@ if (testDigest !== EXPECTED_TEST_INVENTORY_SHA256) {
 }
 
 const classifications = {};
+const evidenceEntries = new Map();
 for (const entry of [...crosswalk.exports, ...crosswalk.tests]) {
 	classifications[entry.classification] = (classifications[entry.classification] ?? 0) + 1;
+	const entries = evidenceEntries.get(entry.evidenceTarget) ?? [];
+	entries.push(entry.id);
+	evidenceEntries.set(entry.evidenceTarget, entries);
+}
+
+for (const [target, entries] of evidenceEntries) {
+	const [file, anchor] = target.split('#', 2);
+	const evidenceUrl = new URL(file, REPOSITORY_URL);
+	try {
+		const evidence = await stat(evidenceUrl);
+		if (!evidence.isFile()) throw new Error('not a file');
+	} catch {
+		fail(
+			`evidence target ${JSON.stringify(target)} does not exist ` +
+				`(referenced by ${entries.join(', ')}).`,
+		);
+	}
+	if (anchor !== undefined) {
+		const markdown = await readFile(evidenceUrl, 'utf8');
+		const anchors = new Set(
+			[...markdown.matchAll(/^#{1,6}\s+(.+)$/gm)].map((match) => markdownHeadingAnchor(match[1])),
+		);
+		if (!anchors.has(anchor)) {
+			fail(
+				`evidence target ${JSON.stringify(target)} has no matching Markdown heading ` +
+					`(referenced by ${entries.join(', ')}).`,
+			);
+		}
+	}
 }
 
 console.log(

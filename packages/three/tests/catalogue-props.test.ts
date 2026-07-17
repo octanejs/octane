@@ -33,6 +33,9 @@ describe('@octanejs/three catalogue', () => {
 		expect(primitive.object).toBe(object);
 		expect(primitive.owned).toBe(false);
 		expect(primitive.type).toBe('primitive');
+
+		const prefixedLine = createThreeObject('threeLine', {});
+		expect(prefixedLine.object).toBeInstanceOf(THREE.Line);
 	});
 
 	it('supports catalogue and constructor forms of extend', () => {
@@ -121,6 +124,71 @@ describe('@octanejs/three host observations', () => {
 		expect(parent.material?.[0]).toBe(material);
 		detachAttachment(indexedAttachment);
 		expect(parent.material?.[0]).toBeUndefined();
+
+		const authored = Array.from({ length: 4 }, () => new THREE.MeshBasicMaterial());
+		const replacements = Array.from({ length: 4 }, () => new THREE.MeshBasicMaterial());
+		const arrayParent = { material: [...authored] };
+		const attachments = replacements.map((replacement, index) =>
+			attachString(arrayParent, replacement, `material-${index}`),
+		);
+		expect(arrayParent.material).toEqual(replacements);
+		for (const attachment of attachments.toReversed()) detachAttachment(attachment);
+		expect(arrayParent.material).toEqual(authored);
+	});
+
+	it('preserves shader uniform and math identities while filtering renderer-only props', () => {
+		const shader = new THREE.ShaderMaterial({
+			uniforms: {
+				time: { value: 1 },
+				tint: { value: new THREE.Color('red') },
+			},
+		});
+		const uniforms = shader.uniforms;
+		const time = uniforms.time;
+		const tint = uniforms.tint;
+		const nextTint = new THREE.Color('blue');
+
+		applyProps(shader, {
+			uniforms: {
+				time: { value: 2 },
+				tint: { value: nextTint },
+				gain: { value: 3 },
+			},
+		});
+		expect(shader.uniforms).toBe(uniforms);
+		expect(shader.uniforms.time).toBe(time);
+		expect(shader.uniforms.tint).toBe(tint);
+		expect(shader.uniforms).toMatchObject({
+			time: { value: 2 },
+			tint: { value: nextTint },
+			gain: { value: 3 },
+		});
+
+		applyProps(shader, { 'uniforms-time-value': 4 });
+		expect(time.value).toBe(4);
+
+		const mesh = new THREE.Mesh();
+		const position = mesh.position;
+		applyProps(mesh, { position: new THREE.Vector3(1, 2, 3), scale: [2, 3, 4] });
+		expect(mesh.position).toBe(position);
+		expect(mesh.position.toArray()).toEqual([1, 2, 3]);
+		expect(mesh.scale.toArray()).toEqual([2, 3, 4]);
+
+		const reserved = Object.defineProperties(
+			{},
+			{
+				args: { enumerable: true, get: () => expect.fail('args getter was read') },
+				onPointerDown: {
+					enumerable: true,
+					get: () => expect.fail('event getter was read'),
+				},
+			},
+		);
+		expect(() => applyProps(mesh, reserved)).not.toThrow();
+		mesh.name = 'retained';
+		applyProps(mesh, { name: undefined, customValue: 42 });
+		expect(mesh.name).toBe('retained');
+		expect((mesh as THREE.Mesh & { customValue?: number }).customValue).toBe(42);
 	});
 
 	it('disposes owned resources while preserving Scene-owned lifetimes', () => {

@@ -1,0 +1,27 @@
+{
+  "name": "octane-three-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Comparative Octane Three, R3F 9.6.1, and plain Three renderer benchmarks.",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview --port 5291 --strictPort",
+    "bench": "node run.mjs",
+    "bench:size": "node run-size.mjs"
+  },
+  "dependencies": {
+    "@octanejs/three": "workspace:*",
+    "@react-three/fiber": "catalog:default",
+    "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "three": "catalog:default"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "catalog:default",
+    "terser": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

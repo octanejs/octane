@@ -97,6 +97,8 @@ jobs:
             );
             const requiredJobs = new Set([
               "lint",
+              "Three compatibility (current)",
+              "Three compatibility (minimum r156)",
               "typecheck",
               "validate publishable packages",
               "test (22)",
