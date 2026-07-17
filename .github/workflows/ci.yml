@@ -253,15 +253,18 @@ jobs:
       - name: Install Three ${{ matrix.version }} compatibility pair
         run: |
           THREE_VERSION="$(pnpm view three@${{ matrix.version }} version)"
-          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@$THREE_VERSION"
+          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
+          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@${THREE_RELEASE_LINE}.x"
           echo "OCTANE_THREE_COMPAT_VERSION=$THREE_VERSION" >> "$GITHUB_ENV"
 
       - name: Verify resolved Three compatibility pair
         run: |
           THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
           TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          THREE_RELEASE_LINE="${THREE_VERSION%.*}"
+          TYPES_RELEASE_LINE="${TYPES_VERSION%.*}"
           echo "three=$THREE_VERSION @types/three=$TYPES_VERSION"
-          test "$THREE_VERSION" = "$TYPES_VERSION"
+          test "$THREE_RELEASE_LINE" = "$TYPES_RELEASE_LINE"
 
       - name: Typecheck Three source and public API
         run: |

@@ -565,7 +565,7 @@ SSR / hydration: Three scene modules are client-only and Canvas.children is omit
 
 Scope/evidence last checked: 2026-07-17.
 
-- The exact behavioral/differential oracle remains three@0.172.0; separate minimum-r156 and current-release lanes validate the advertised three >=0.156.0 peer range with an explicitly matched optional @types/three pair.
+- The exact behavioral/differential oracle remains three@0.172.0; separate minimum-r156 and current-release lanes validate the advertised three >=0.156.0 peer range with an optional @types/three pair from the matching Three release line.
 - The checked-in crosswalk classifies 90 upstream public exports and 157 executable upstream tests with zero unclassified or missing evidence paths; the public export/subpath type matrix and packed external consumer validate the published surface.
 - Milestone 9 proves asynchronous acknowledgement, cloned values and handles, rejection/fault semantics, teardown, event scopes, and stale message rejection through a real MessageChannel without sharing a host driver or function props.
 - Milestone 10 adds real WebGL creation-failure and context-loss/restoration evidence plus semantic-checksummed Octane/R3F/plain-Three renderer and bundle-size baselines with committed ratio guards; the 100-sample production stability run measures 1,000-mesh mount at 0.98x and retained updates at 1.03x R3F after compiler-leaf and direct-host transaction specialization.

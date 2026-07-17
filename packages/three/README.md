@@ -282,9 +282,10 @@ The compatibility baseline is `@react-three/fiber@9.6.1` at commit
 behavioral and differential oracle. The published peer range is
 `three >=0.156.0`, guarded by minimum-r156 and current-release CI lanes; the
 r172 lane remains immutable so a moving current dependency cannot change the
-parity oracle. TypeScript consumers must install the same-version
-`@types/three` pair explicitly—it is an optional peer so a package manager cannot
-silently auto-install current declarations beside an older supported runtime:
+parity oracle. TypeScript consumers must install `@types/three` from the same
+Three release line explicitly; its patch revision may differ from the runtime.
+It is an optional peer so a package manager cannot silently auto-install current
+declarations beside an older supported runtime:
 
 ```bash
 pnpm add three@0.156.0

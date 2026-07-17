@@ -13,9 +13,10 @@ differential oracle stays on r172, while separate CI jobs typecheck and run the
 Octane-owned compatibility suite against the minimum r156 pair and the current
 registry release. This prevents either a moving latest dependency or the pinned
 oracle from standing in for the other compatibility claim. `@types/three` is an
-optional peer that TypeScript consumers install at the same version as `three`;
-making it optional prevents package-manager peer auto-install from silently
-pairing current declarations with an older supported runtime.
+optional peer that TypeScript consumers install from the same Three release line;
+its patch revision may differ from the runtime. Making it optional prevents
+package-manager peer auto-install from silently pairing current declarations with
+an older supported runtime.
 
 ## Source boundary
 
