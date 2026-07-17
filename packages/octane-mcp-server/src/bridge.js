@@ -19,6 +19,7 @@ export const KNOWN_BINDINGS = {
 	'framer-motion': '@octanejs/motion',
 	motion: '@octanejs/motion',
 	'@stylexjs/stylex': '@octanejs/stylex',
+	'styled-components': '@octanejs/styled-components',
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	'@lexical/react': '@octanejs/lexical',

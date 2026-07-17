@@ -658,6 +658,7 @@ describe('manifest-declared manual hook slots', () => {
 			'motion',
 			'radix',
 			'remix-router',
+			'styled-components',
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',

@@ -1654,6 +1654,50 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'styled-components',
+					include: [
+						'packages/styled-components/tests/**/*.test.ts',
+						'!packages/styled-components/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// Differential precompile for styled-components fixtures: rewrites
+					// `@octanejs/styled-components` → the real published styled-components.
+					globalSetup: ['packages/styled-components/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/styled-components$/,
+							replacement: resolve(import.meta.dirname, 'packages/styled-components/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'styled-components-ssr',
+					include: ['packages/styled-components/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/styled-components$/,
+							replacement: resolve(import.meta.dirname, 'packages/styled-components/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'testing-library',
 					include: ['packages/testing-library/tests/**/*.test.ts'],
 					environment: 'jsdom',

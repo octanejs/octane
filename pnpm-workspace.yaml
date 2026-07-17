@@ -273,6 +273,11 @@ catalogs:
     rulesync: ^8.17.0
     solid-js: '2.0.0-beta.14'
     sonner: 2.0.7
+    styled-components: 6.4.3
+    stylis: ^4.3.2
+    '@types/stylis': ^4.2.5
+    '@emotion/is-prop-valid': 1.4.0
+    csstype: 3.2.3
     svelte: ^5.56.4
     svelte-check: ^4.7.2
     terser: ^5.31.0

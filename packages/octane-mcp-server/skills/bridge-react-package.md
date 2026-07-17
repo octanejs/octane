@@ -21,6 +21,7 @@ of bridging by hand:
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
+| `styled-components` | `@octanejs/styled-components` |
 | `react-router` / `react-router-dom` | `@octanejs/remix-router` |
 | `@lexical/react` | `@octanejs/lexical` |
 | `lucide-react` | `@octanejs/lucide` |
