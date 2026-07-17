@@ -214,9 +214,10 @@ is exercised, then asserts the same things in both apps:
   title, an external story link with the fixture `href`);
 - the pending skeleton (`[data-testid="pending"]`) shows, then resolves to rows;
 - clicking a story's comments link navigates to `/item/<id>`, the header renders,
-  the comments render **including their `innerHTML` bodies** (the body text and
+  the comments render **including their HTML bodies** (the body text and
   inline `<i>` markup), and browser Back returns to the list;
-- clicking an author navigates to `/user/<id>` and the karma renders;
+- clicking an author navigates to `/user/<id>` and the complete profile, including
+  its raw-HTML `about` field, renders;
 - the header nav links are present, and the feed links (new / ask / show / jobs)
   swap the feed, its content, and the active-link highlight;
 - each feed endpoint has a distinct fixture id list, so clicking a feed link
@@ -258,6 +259,7 @@ they likewise render plain `<a href>` (and drop `data-testid`); the spec address
 them by `href` (`a[href="/newest"]`) and reads the active state from the
 `aria-current="page"` / `data-status="active"` attributes the `Link` sets.
 
-Comment bodies, a story's `text`, and a user's `about` are bound with
-`innerHTML={…}` and render as real inner HTML — the spec asserts on a comment's
-body text and its inline `<i>` markup, identically in both apps.
+Comment bodies, a story's `text`, and a user's `about` use
+`dangerouslySetInnerHTML={{ __html: … }}` and render as real inner HTML. The spec
+asserts the comment body and inline `<i>` markup plus the user biography and its
+inline `<strong>` markup, identically in both apps.

@@ -106,4 +106,13 @@ describe('@octanejs/tanstack-router — same-route search-param navigation (conc
 
 		r.unmount();
 	});
+
+	it('exposes a canonical server redirect after the load settles', async () => {
+		const router = makeSameRouteSearchRouter('/', { isServer: true });
+		await router.load();
+
+		// Server integrations can follow canonical redirects through the public
+		// RouterState snapshot rather than reaching into the reactive store graph.
+		expect(router.state.redirect?.options.href).toBe('/?page=1');
+	});
 });

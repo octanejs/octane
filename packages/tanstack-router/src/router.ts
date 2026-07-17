@@ -55,6 +55,72 @@ const octaneStoreFactory = (opts: { isServer?: boolean }) => {
 export class Router extends (RouterCore as any) {
 	constructor(options: any) {
 		super(options, octaneStoreFactory);
+
+		// router-core starts the resolved-match commit through startViewTransition,
+		// whose browser callback may run after router-core's load promise resolves.
+		// Track those callbacks so `await router.load()` is a real render-readiness
+		// boundary: the active match tree is committed before a consumer's first
+		// render or hydration pass.
+		const coreLoad = this.load.bind(this);
+		const coreStartViewTransition = this.startViewTransition.bind(this);
+		const pendingViewCommits = new Set<Promise<void>>();
+
+		this.startViewTransition = (fn: () => Promise<void>) => {
+			let resolveCommit!: () => void;
+			let rejectCommit!: (error: unknown) => void;
+			const commit = new Promise<void>((resolve, reject) => {
+				resolveCommit = resolve;
+				rejectCommit = reject;
+			});
+			pendingViewCommits.add(commit);
+			// Observe rejection immediately, but keep the original promise until
+			// load() drains it. Removing a fast-settling promise here would let a
+			// commit error disappear before coreLoad reaches its final await.
+			void commit.catch(() => {});
+
+			const runCommit = async () => {
+				try {
+					await fn();
+					resolveCommit();
+				} catch (error) {
+					rejectCommit(error);
+				}
+			};
+
+			try {
+				coreStartViewTransition(runCommit);
+			} catch (error) {
+				rejectCommit(error);
+				throw error;
+			}
+		};
+
+		this.load = async (...args: any[]) => {
+			const result = await coreLoad(...args);
+			let hasCommitError = false;
+			let commitError: unknown;
+			while (pendingViewCommits.size > 0) {
+				const commits = [...pendingViewCommits];
+				const outcomes = await Promise.allSettled(commits);
+				for (const commit of commits) pendingViewCommits.delete(commit);
+				const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+				if (!hasCommitError && rejected?.status === 'rejected') {
+					hasCommitError = true;
+					commitError = rejected.reason;
+				}
+			}
+			if (hasCommitError) throw commitError;
+
+			// RouterCore derives the final HTTP status immediately after its internal
+			// load promise resolves. A platform-deferred View Transition can commit the
+			// error/not-found matches only after that point, so repeat the same public
+			// finalization once the render-ready match tree is actually present.
+			let statusCode: number | undefined;
+			if (this.hasNotFoundMatch()) statusCode = 404;
+			else if (this.state.matches.some((match: any) => match.status === 'error')) statusCode = 500;
+			if (statusCode !== undefined) this.stores.statusCode.set(statusCode);
+			return result;
+		};
 	}
 }
 

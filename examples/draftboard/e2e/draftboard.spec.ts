@@ -299,12 +299,29 @@ test('focuses the canvas imperatively, runs keyboard history, and restores focus
 	const prototype = page.locator('[data-shape-id="prototype"]');
 	await expect(prototype).toBeFocused();
 	await expect(prototype).toHaveAttribute('data-selected', 'true');
+	await prototype.evaluate((element) => {
+		const probe = globalThis as typeof globalThis & {
+			e2eRetiredPrototype?: WeakRef<Element>;
+		};
+		probe.e2eRetiredPrototype = new WeakRef(element);
+	});
 	const start = await shapePosition(prototype);
 	await page.keyboard.press('Shift+ArrowRight');
 	await expect(prototype).toHaveAttribute('data-x', String(start.x + 10));
 	await page.keyboard.press('Delete');
 	await expect(prototype).toHaveCount(0);
 	await expect(page.locator('[data-shape-id="launch-plan"]')).toBeFocused();
+	await expect
+		.poll(async () => {
+			await page.requestGC();
+			return page.evaluate(() => {
+				const probe = globalThis as typeof globalThis & {
+					e2eRetiredPrototype?: WeakRef<Element>;
+				};
+				return probe.e2eRetiredPrototype?.deref() === undefined;
+			});
+		})
+		.toBe(true);
 
 	await page.keyboard.press('Control+z');
 	await expect(page.locator('[data-shape-id="prototype"]')).toHaveAttribute(

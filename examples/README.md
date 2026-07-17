@@ -83,4 +83,13 @@ names, hydration marker spelling, or other private implementation details.
 When an example uncovers an Octane or binding bug, retain the meaningful app
 journey and add the smallest realistic behavioral regression to the owning
 package. Fix the owning package rather than hiding the failure behind an
-example-only workaround.
+example-only workaround. Record the provenance in the
+[product example regression ledger](../docs/product-example-regressions.md),
+including the consumer symptom, classification, package regression, retained
+journey, fixing change, and status.
+
+The same ledger requirement applies when investigation shows that the defect is
+application-owned. A temporary compatibility workaround is acceptable only when
+its entry names an owner, the upstream issue or blocked layer, an exact removal
+condition, and the journey that must still pass after removal. Undocumented or
+open-ended compatibility code is not a completed example fix.

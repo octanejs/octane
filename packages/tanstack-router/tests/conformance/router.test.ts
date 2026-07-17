@@ -13,6 +13,39 @@ async function flush() {
 	}
 }
 
+function deferViewTransitionCommit() {
+	const originalStartViewTransition = (document as any).startViewTransition;
+	let runUpdate: (() => Promise<void>) | undefined;
+	let signalUpdateQueued: (() => void) | undefined;
+	const updateQueued = new Promise<void>((resolve) => {
+		signalUpdateQueued = resolve;
+	});
+
+	(document as any).startViewTransition = (update: () => void | Promise<void>) => {
+		runUpdate = async () => {
+			await update();
+		};
+		signalUpdateQueued!();
+		return {
+			finished: Promise.resolve(),
+			ready: Promise.resolve(),
+			updateCallbackDone: Promise.resolve(),
+		};
+	};
+
+	return {
+		updateQueued,
+		runUpdate: () => runUpdate!(),
+		restore() {
+			if (originalStartViewTransition === undefined) {
+				delete (document as any).startViewTransition;
+			} else {
+				(document as any).startViewTransition = originalStartViewTransition;
+			}
+		},
+	};
+}
+
 describe('@octanejs/tanstack-router core seam', () => {
 	it('renders the matched route through the layout Outlet', async () => {
 		const router = makeRouter('/');
@@ -25,6 +58,65 @@ describe('@octanejs/tanstack-router core seam', () => {
 		expect(r.find('.index').textContent).toBe('Index');
 		expect(router.state.location.pathname).toBe('/');
 		r.unmount();
+	});
+
+	it('await router.load leaves the initial route ready for the first render', async () => {
+		const router = makeRouter('/');
+		router.options.defaultViewTransition = true;
+		const transition = deferViewTransitionCommit();
+
+		try {
+			let loadSettled = false;
+			const load = router.load().then(() => {
+				loadSettled = true;
+			});
+			await transition.updateQueued;
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
+			// A platform View Transition may defer its update callback. The public
+			// load promise must stay pending until that callback commits the matches.
+			expect(loadSettled).toBe(false);
+			await transition.runUpdate();
+			await load;
+
+			// No timer/store polling or post-mount flush is needed: consumers can
+			// render or hydrate immediately after awaiting the initial load.
+			const r = mount(RouterProvider as any, { router });
+			expect(r.findAll('.root').length).toBe(1);
+			expect(r.findAll('.index').length).toBe(1);
+			r.unmount();
+		} finally {
+			transition.restore();
+		}
+	});
+
+	it.each([
+		['/load-failure', 500],
+		['/load-not-found', 404],
+	])('finalizes the %s status after a deferred match commit', async (path, expectedStatus) => {
+		const router = makeRouter(path);
+		router.options.defaultViewTransition = true;
+		const transition = deferViewTransitionCommit();
+
+		try {
+			const load = router.load();
+			await transition.updateQueued;
+			expect(router.state.matches).toHaveLength(0);
+			expect(router.state.statusCode).toBe(200);
+
+			await transition.runUpdate();
+			await load;
+
+			expect(router.state.matches).not.toHaveLength(0);
+			expect(router.state.statusCode).toBe(expectedStatus);
+		} finally {
+			transition.restore();
+		}
+	});
+
+	it('rejects load when a synchronous view-transition commit throws', async () => {
+		const router = makeRouter('/enter-failure');
+		await expect(router.load()).rejects.toThrow('enter failed');
 	});
 
 	it('navigation swaps the Outlet content + updates location', async () => {

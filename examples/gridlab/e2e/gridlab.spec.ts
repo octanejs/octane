@@ -107,6 +107,10 @@ test('virtualizes both axes while the focused selection survives distant scrolli
 	await openGrid(page);
 	await cell(page, 'A1').click();
 	await expect(cell(page, 'A1')).toBeFocused();
+	await cell(page, 'B1').evaluate((element) => {
+		const probe = globalThis as typeof globalThis & { e2eRetiredB1?: WeakRef<Element> };
+		probe.e2eRetiredB1 = new WeakRef(element);
+	});
 	const grid = page.getByRole('grid', { name: 'Atlas forecast spreadsheet' });
 	await grid.evaluate((element) => {
 		element.scrollTop = 400 * 34;
@@ -118,6 +122,15 @@ test('virtualizes both axes while the focused selection survives distant scrolli
 	await expect(cell(page, 'B1')).toHaveCount(0);
 	await expect(cell(page, 'A2')).toHaveCount(0);
 	await expect(cell(page, 'A1')).toBeFocused();
+	await expect
+		.poll(async () => {
+			await page.requestGC();
+			return page.evaluate(() => {
+				const probe = globalThis as typeof globalThis & { e2eRetiredB1?: WeakRef<Element> };
+				return probe.e2eRetiredB1?.deref() === undefined;
+			});
+		})
+		.toBe(true);
 	expect(await grid.evaluate((element) => element.scrollTop)).toBeGreaterThan(10_000);
 	expect(await grid.evaluate((element) => element.scrollLeft)).toBeGreaterThan(5_000);
 
@@ -128,6 +141,14 @@ test('virtualizes both axes while the focused selection survives distant scrolli
 	await page.keyboard.press('PageDown');
 	await expect(cell(page, 'AZ764')).toBeFocused();
 	await expect(cell(page, 'AZ764')).toBeInViewport();
+
+	// B1 was mounted in the initial window and explicitly unmounted above. Return
+	// to it through the imperative address path and prove focus lands on the newly
+	// mounted, connected cell rather than a stale callback-ref registry entry.
+	await jumpTo(page, 'B1');
+	await expect(cell(page, 'B1')).toBeInViewport();
+	await expect(cell(page, 'B1')).toBeFocused();
+	expect(await cell(page, 'B1').evaluate((element) => element.isConnected)).toBe(true);
 });
 
 test('copies a native range and pastes a tabular selection without losing cell focus', async ({
