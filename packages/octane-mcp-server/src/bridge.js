@@ -9,6 +9,7 @@ export const KNOWN_BINDINGS = {
 	jotai: '@octanejs/jotai',
 	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
+	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
