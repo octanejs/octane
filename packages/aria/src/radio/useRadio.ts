@@ -13,6 +13,7 @@ import { useMemo } from 'octane';
 import type { FocusableProps } from '../interactions/useFocusable';
 import { S, splitSlot, subSlot } from '../internal';
 import { filterDOMProps } from '../utils/filterDOMProps';
+import { getEventTarget } from '../utils/shadowdom/DOMFunctions';
 import { mergeProps } from '../utils/mergeProps';
 import { radioGroupData } from './utils';
 import type { RadioGroupState } from '../stately/radio/useRadioGroupState';
@@ -168,7 +169,19 @@ export function useRadio(...args: any[]): RadioAria {
 			labelProps,
 			useMemo(
 				() => ({
-					onClick: (e: MouseEvent) => e.preventDefault(),
+					// octane adaptation: upstream preventDefaults ALL label clicks to stop the
+					// label's built-in click-forwarding (a doubled activation). Input-targeted
+					// clicks normally never get here — the input-level press stops their
+					// propagation — but press handlers are public props, so a consumer calling
+					// continuePropagation() lets them through. React's synthetic onChange fires
+					// regardless; with native events an unconditional preventDefault would cancel
+					// the input's own activation (no `input` event), so scope it to clicks that
+					// do NOT target the input. Same adaptation as useToggle's labelProps.
+					onClick: (e: MouseEvent) => {
+						if (getEventTarget(e) !== ref.current) {
+							e.preventDefault();
+						}
+					},
 					// Prevent label from being focused when mouse down on it.
 					// Note, this does not prevent the input from being focused in the `click` event.
 					onMouseDown: (e: MouseEvent) => e.preventDefault(),

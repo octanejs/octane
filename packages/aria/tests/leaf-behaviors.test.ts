@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { act, mount, nextPaint } from '../../octane/tests/_helpers';
 import {
 	DisclosureHarness,
+	RadioLabelHarness,
 	SearchFieldHarness,
 	ToolbarHarness,
 	VisuallyHiddenHarness,
@@ -36,6 +37,45 @@ describe('@octanejs/aria — useSearchField', () => {
 			);
 		});
 		expect(input.value).toBe('');
+		r.unmount();
+	});
+});
+
+describe('@octanejs/aria — useRadio', () => {
+	// element.click() is a click whose target IS the input: the platform checks the radio
+	// before dispatching click, then fires input/change — unless a bubbling handler cancels
+	// the click, which reverts the toggle and suppresses the native input event a consumer's
+	// own onInput (merged into inputProps) relies on.
+	it('a click targeting the radio input activates it natively', async () => {
+		const r = mount(RadioLabelHarness, {});
+		const b = r.container.querySelector<HTMLInputElement>('[data-testid="radio-b"]')!;
+		const output = r.container.querySelector('output')!;
+		expect(output.getAttribute('data-selected')).toBe('a');
+
+		await act(() => b.click());
+		expect(b.checked).toBe(true);
+		expect(output.getAttribute('data-selected')).toBe('b');
+		expect(output.getAttribute('data-native-inputs')).toBe('1');
+		r.unmount();
+	});
+
+	it('native activation survives the label handlers when press handlers continue propagation', async () => {
+		// Press handlers are public props; continuePropagation() lets the input-targeted
+		// click through to the label, whose forward-suppressing preventDefault must then
+		// spare clicks targeting the input itself.
+		const continueAll = {
+			onPressStart: (e: any) => e.continuePropagation(),
+			onPressUp: (e: any) => e.continuePropagation(),
+			onPressEnd: (e: any) => e.continuePropagation(),
+		};
+		const r = mount(RadioLabelHarness, { pressProps: continueAll });
+		const b = r.container.querySelector<HTMLInputElement>('[data-testid="radio-b"]')!;
+		const output = r.container.querySelector('output')!;
+
+		await act(() => b.click());
+		expect(b.checked).toBe(true);
+		expect(output.getAttribute('data-selected')).toBe('b');
+		expect(output.getAttribute('data-native-inputs')).toBe('1');
 		r.unmount();
 	});
 });
