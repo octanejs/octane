@@ -63,8 +63,8 @@
     "packages": ["@octanejs/three"]
   },
   {
-    "title": "Styling and tests",
-    "description": "Compiled StyleX and DOM-first component tests.",
-    "packages": ["@octanejs/stylex", "@octanejs/testing-library"]
+    "title": "Styling, tests, and devtools",
+    "description": "Compiled StyleX, DOM-first component tests, and the TanStack Devtools panel.",
+    "packages": ["@octanejs/stylex", "@octanejs/testing-library", "@octanejs/tanstack-devtools"]
   }
 ]

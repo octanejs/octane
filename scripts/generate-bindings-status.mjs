@@ -198,7 +198,7 @@ for (const { dir, pkg, status } of rows) {
 		for (const n of status.notes) md += `- ${n}\n`;
 	}
 	if (status.docs?.length) {
-		md += `\nSee also: ${status.docs.map((d) => `[\`${d}\`](${path.relative('docs', d)})`).join(', ')}\n`;
+		md += `\nSee also: ${status.docs.map((d) => `[\`${d}\`](${path.relative('docs', d).split(path.sep).join('/')})`).join(', ')}\n`;
 	}
 }
 

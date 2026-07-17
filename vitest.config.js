@@ -662,6 +662,53 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-devtools',
+					include: ['packages/tanstack-devtools/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/tanstack-devtools/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-devtools-ssr',
+					include: ['packages/tanstack-devtools/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',

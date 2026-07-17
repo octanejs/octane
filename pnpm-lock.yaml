@@ -189,6 +189,9 @@ catalogs:
     '@tanstack/ai-react':
       specifier: 0.17.0
       version: 0.17.0
+    '@tanstack/devtools':
+      specifier: 0.12.5
+      version: 0.12.5
     '@tanstack/form-core':
       specifier: 1.33.2
       version: 1.33.2
@@ -3569,6 +3572,25 @@ importers:
         specifier: catalog:default
         version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
 
+  packages/tanstack-devtools:
+    dependencies:
+      '@tanstack/devtools':
+        specifier: catalog:default
+        version: 0.12.5(csstype@3.2.3)(solid-js@2.0.0-beta.14)
+    devDependencies:
+      '@octanejs/testing-library':
+        specifier: workspace:*
+        version: link:../testing-library
+      '@testing-library/jest-dom':
+        specifier: catalog:default
+        version: 6.9.1
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+
   packages/tanstack-form:
     dependencies:
       '@octanejs/tanstack-store':
@@ -6135,6 +6157,36 @@ packages:
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
 
+  '@solid-primitives/event-listener@2.4.6':
+    resolution: {integrity: sha512-5I0YJcTVYIWoMmgBSROBZGcz+ymhew/pGTg2dHW74BUjFKsV8Li4bOZYl0YAGP4mHw5o4UBd9/BEesqBci3wxw==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
+  '@solid-primitives/keyboard@1.3.7':
+    resolution: {integrity: sha512-558RPNYnXx4nGh537DSqAn4xMrC8iFipl/5+xzgzWoTNFst4RnUN3BOLmtDjJ0UGGoQXVMALYR3bNOHM0xnt1Q==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
+  '@solid-primitives/resize-observer@2.2.0':
+    resolution: {integrity: sha512-9Fuu/EWBeGj+atGHRJp70HKhdfalmpjwxY8a32NZixdLNmfCJ45AfhLQNr6uOzETbbiMx4iCKlTrJ8KZCHC2Ww==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
+  '@solid-primitives/rootless@1.5.4':
+    resolution: {integrity: sha512-TOIZa1VUfVJ+9nkCcRajw3U4t9vBOP1HxX1WHNTbXq32mXwlqTvUnC4CRIilohcryBkT9u2ZkhUDSHRTaGp55g==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
+  '@solid-primitives/static-store@0.1.4':
+    resolution: {integrity: sha512-LgtVaVBtB7EbmS4+M0b8xY5Iq6pUWXBsIC4VgtrFKDGDdyCaDt88sHk0fUlx1Enxm/XZnZyLXJABRoa39RjJqA==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
+  '@solid-primitives/utils@6.4.1':
+    resolution: {integrity: sha512-ISSB5QX1qP2ynrheIpYwc4oKR5Ny4siNuUyf1qZniy+Il+p/PtDB0QK1Dnle8noiHpwRD3gpPdubOC3qI/Zamg==}
+    peerDependencies:
+      solid-js: ^1.6.12
+
   '@solidjs/signals@2.0.0-beta.14':
     resolution: {integrity: sha512-y72nYtD7ogwX/UR5g2Y+meyeO6Q/xbQGtmvVTQX6USkMwEGOMnytqDnHj5amUzD7Fzqg32svwtCSx/q8hsOXAA==}
 
@@ -6206,10 +6258,36 @@ packages:
       '@opentelemetry/api':
         optional: true
 
+  '@tanstack/devtools-client@0.0.8':
+    resolution: {integrity: sha512-cG3iZkGWCwN330bLBKa8+9r4Of2AXNoz2zUqcsy/4XsD3105ghVBx78cGyvJj9fSclNomPxoqAnDGXXhg1WLvA==}
+    engines: {node: '>=18'}
+
+  '@tanstack/devtools-event-bus@0.4.2':
+    resolution: {integrity: sha512-2LHzhwBFlKHCcklsQrGe8TeyjHd4XAF8nuCO6wHmva5fePUkJUULbu6CsCNAlGlCi0KkEsMXZSvRdR4HgMq4yA==}
+    engines: {node: '>=18'}
+
   '@tanstack/devtools-event-client@0.4.4':
     resolution: {integrity: sha512-6T5Yop/793YI+H+5J8Hsyj4kCih9sl4t3ElLgKioW5hk3ocn+ZdSJ94tT7vL7uabxSugWYBZlOTMPzEw2puvQw==}
     engines: {node: '>=18'}
     hasBin: true
+
+  '@tanstack/devtools-event-client@0.5.0':
+    resolution: {integrity: sha512-H+OH3zC6Vhu/K0NaVfQKknEKawc/+2PT+D3SB3Ox0V8SiMlTo0abbmH2rH0721R2aNYbjdMXA1oENOd8E2UVoA==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  '@tanstack/devtools-ui@0.6.0':
+    resolution: {integrity: sha512-CVaM6rT6Nl5ijo83vJYFa2SjofvpuOl/uOvbYGhBrRgUhhelNHhx8zZX+hnZCHmIr0/lzM65hsocnZ72592Rvg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      solid-js: '>=1.9.7'
+
+  '@tanstack/devtools@0.12.5':
+    resolution: {integrity: sha512-JdxTSeVdjJheycgz4c7qbldNKDCEDWlWr1l9dZBhd9sOmRBT5Z70ka9Eb8mb+FUnalcOIB62IDSR/iSxAIUD8Q==}
+    engines: {node: '>=18'}
+    hasBin: true
+    peerDependencies:
+      solid-js: '>=1.9.7'
 
   '@tanstack/form-core@1.33.2':
     resolution: {integrity: sha512-F60zJd15bGrXKonc1kpRYnNRNfiES7F+hgvrPMrsZznPLqZtO2DIg76OU6R25kCYkqYQY5xvuKteuWcUsc587A==}
@@ -7597,6 +7675,9 @@ packages:
   dataloader@1.4.0:
     resolution: {integrity: sha512-68s5jYdlvasItOJnCuI2Q9s4q98g0pCyL3HrcKJu8KNugUl8ahgmZYg38ysLTgQjjXX3H8CJLkAvWrclWfcalw==}
 
+  dayjs@1.11.21:
+    resolution: {integrity: sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==}
+
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
     engines: {node: '>=6.0'}
@@ -8053,6 +8134,11 @@ packages:
   globby@16.2.0:
     resolution: {integrity: sha512-QrJia2qDf5BB/V6HYlDTs0I0lBahyjLzpGQg3KT7FnCdTonAyPy2RtY802m2k4ALx6Dp752f82WsOczEVr3l6Q==}
     engines: {node: '>=20'}
+
+  goober@2.1.19:
+    resolution: {integrity: sha512-U7veizMqxyKlM58+Z5j2ngJBH/r9siDmxpvNxSw0PylF6WQvrASJEZrxh1hidRBJc2jqoBVSyOban5u8m+6Rxg==}
+    peerDependencies:
+      csstype: ^3.0.10
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -12147,6 +12233,40 @@ snapshots:
 
   '@sindresorhus/merge-streams@4.0.0': {}
 
+  '@solid-primitives/event-listener@2.4.6(solid-js@2.0.0-beta.14)':
+    dependencies:
+      '@solid-primitives/utils': 6.4.1(solid-js@2.0.0-beta.14)
+      solid-js: 2.0.0-beta.14
+
+  '@solid-primitives/keyboard@1.3.7(solid-js@2.0.0-beta.14)':
+    dependencies:
+      '@solid-primitives/event-listener': 2.4.6(solid-js@2.0.0-beta.14)
+      '@solid-primitives/rootless': 1.5.4(solid-js@2.0.0-beta.14)
+      '@solid-primitives/utils': 6.4.1(solid-js@2.0.0-beta.14)
+      solid-js: 2.0.0-beta.14
+
+  '@solid-primitives/resize-observer@2.2.0(solid-js@2.0.0-beta.14)':
+    dependencies:
+      '@solid-primitives/event-listener': 2.4.6(solid-js@2.0.0-beta.14)
+      '@solid-primitives/rootless': 1.5.4(solid-js@2.0.0-beta.14)
+      '@solid-primitives/static-store': 0.1.4(solid-js@2.0.0-beta.14)
+      '@solid-primitives/utils': 6.4.1(solid-js@2.0.0-beta.14)
+      solid-js: 2.0.0-beta.14
+
+  '@solid-primitives/rootless@1.5.4(solid-js@2.0.0-beta.14)':
+    dependencies:
+      '@solid-primitives/utils': 6.4.1(solid-js@2.0.0-beta.14)
+      solid-js: 2.0.0-beta.14
+
+  '@solid-primitives/static-store@0.1.4(solid-js@2.0.0-beta.14)':
+    dependencies:
+      '@solid-primitives/utils': 6.4.1(solid-js@2.0.0-beta.14)
+      solid-js: 2.0.0-beta.14
+
+  '@solid-primitives/utils@6.4.1(solid-js@2.0.0-beta.14)':
+    dependencies:
+      solid-js: 2.0.0-beta.14
+
   '@solidjs/signals@2.0.0-beta.14': {}
 
   '@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14)':
@@ -12230,7 +12350,45 @@ snapshots:
       '@tanstack/ai-utils': 0.3.1
       partial-json: 0.1.7
 
+  '@tanstack/devtools-client@0.0.8':
+    dependencies:
+      '@tanstack/devtools-event-client': 0.5.0
+
+  '@tanstack/devtools-event-bus@0.4.2':
+    dependencies:
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@tanstack/devtools-event-client@0.4.4': {}
+
+  '@tanstack/devtools-event-client@0.5.0': {}
+
+  '@tanstack/devtools-ui@0.6.0(csstype@3.2.3)(solid-js@2.0.0-beta.14)':
+    dependencies:
+      clsx: 2.1.1
+      dayjs: 1.11.21
+      goober: 2.1.19(csstype@3.2.3)
+      solid-js: 2.0.0-beta.14
+    transitivePeerDependencies:
+      - csstype
+
+  '@tanstack/devtools@0.12.5(csstype@3.2.3)(solid-js@2.0.0-beta.14)':
+    dependencies:
+      '@solid-primitives/event-listener': 2.4.6(solid-js@2.0.0-beta.14)
+      '@solid-primitives/keyboard': 1.3.7(solid-js@2.0.0-beta.14)
+      '@solid-primitives/resize-observer': 2.2.0(solid-js@2.0.0-beta.14)
+      '@tanstack/devtools-client': 0.0.8
+      '@tanstack/devtools-event-bus': 0.4.2
+      '@tanstack/devtools-ui': 0.6.0(csstype@3.2.3)(solid-js@2.0.0-beta.14)
+      clsx: 2.1.1
+      goober: 2.1.19(csstype@3.2.3)
+      solid-js: 2.0.0-beta.14
+    transitivePeerDependencies:
+      - bufferutil
+      - csstype
+      - utf-8-validate
 
   '@tanstack/form-core@1.33.2':
     dependencies:
@@ -13778,6 +13936,8 @@ snapshots:
 
   dataloader@1.4.0: {}
 
+  dayjs@1.11.21: {}
+
   debug@4.4.3:
     dependencies:
       ms: 2.1.3
@@ -14277,6 +14437,10 @@ snapshots:
       is-path-inside: 4.0.0
       slash: 5.1.0
       unicorn-magic: 0.4.0
+
+  goober@2.1.19(csstype@3.2.3):
+    dependencies:
+      csstype: 3.2.3
 
   gopd@1.2.0: {}
 
