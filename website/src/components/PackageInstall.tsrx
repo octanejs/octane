@@ -5,7 +5,8 @@
 // fences (pnpm rsbuild dev, vite build …) stay ordinary code blocks. It owns
 // its own frame + copy button (rather than wrapping CodeBlock) so the tab bar
 // attaches seamlessly to the code as one panel.
-import { useEffect, useId, useRef, useState } from 'octane';
+import { useId, useRef, useState } from 'octane';
+import { useCopyToClipboard } from '../hooks/use-copy.ts';
 import copyUrl from '../assets/copy.svg';
 import checkUrl from '../assets/check.svg';
 
@@ -58,7 +59,7 @@ function toTokens(lines: string[]): Token[] {
 
 export function PackageInstall(props: PackageInstallProps) @{
 	const [manager, setManager] = useState<PackageManager>('pnpm');
-	const [copied, setCopied] = useState(false);
+	const { copied, copy } = useCopyToClipboard();
 	const codeEl = useRef<HTMLElement | null>(null);
 	// Unique per instance — build-tools renders three of these on one page, so
 	// the tab/panel ids must not collide.
@@ -69,26 +70,10 @@ export function PackageInstall(props: PackageInstallProps) @{
 	if (props.dev) lines.push(INSTALL[manager].dev + ' ' + props.dev);
 	const tokens = toTokens(lines);
 
-	// One pending reset at a time: a re-copy restarts the 1.5s window instead of
-	// letting the previous click's timer clear the new "Copied" early, and the
-	// unmount cleanup keeps the timer from firing into a torn-down scope.
-	const copyResetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	useEffect(() => () => clearTimeout(copyResetTimer.current), []);
-
-	const copyCommand = () => {
-		// textContent, not innerText: the element holds only our own token spans
-		// and a literal newline text node, so textContent IS the exact command —
-		// with no dependence on layout (and it works in jsdom, so it's testable).
-		const text = codeEl.current?.textContent ?? '';
-		if (!text) return;
-		navigator.clipboard?.writeText(text).then(() => {
-			setCopied(true);
-			clearTimeout(copyResetTimer.current);
-			copyResetTimer.current = setTimeout(() => setCopied(false), 1500);
-		}).catch(() => {
-			// Clipboard permission denied — the button simply stays "Copy".
-		});
-	};
+	// textContent, not innerText: the element holds only our own token spans and a
+	// literal newline text node, so textContent IS the exact command — with no
+	// dependence on layout (and it works in jsdom, so it's testable).
+	const copyCommand = () => copy(codeEl.current?.textContent ?? '');
 
 	// The WAI-ARIA tabs pattern: arrow keys move selection (focus follows),
 	// Home/End jump to the ends, and only the active tab is in the tab order.

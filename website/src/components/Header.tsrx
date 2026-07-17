@@ -6,6 +6,7 @@
 import { useState } from 'octane';
 import { Link } from '@octanejs/tanstack-router';
 import { DocsSearch } from './DocsSearch.tsrx';
+import { SOCIAL } from '../constants/site.ts';
 import logoUrl from '../assets/octane-logo.svg';
 import xUrl from '../assets/x.svg';
 import discordUrl from '../assets/discord.svg';
@@ -65,7 +66,7 @@ export function Header() @{
 				<span class="nav-sep" aria-hidden="true"></span>
 				<a
 					class="nav-icon"
-					href="https://x.com/octanejs"
+					href={SOCIAL.x}
 					target="_blank"
 					rel="noreferrer"
 					title="X"
@@ -79,7 +80,7 @@ export function Header() @{
 				</a>
 				<a
 					class="nav-icon"
-					href="https://discord.gg/8puY9fFqd9"
+					href={SOCIAL.discord}
 					target="_blank"
 					rel="noreferrer"
 					title="Discord"
@@ -93,7 +94,7 @@ export function Header() @{
 				</a>
 				<a
 					class="nav-icon"
-					href="https://github.com/octanejs/octane"
+					href={SOCIAL.github}
 					target="_blank"
 					rel="noreferrer"
 					title="GitHub"

@@ -9,6 +9,10 @@ import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
 export interface DocSection {
 	id: string;
 	title: string;
+	// Heading depth for the "On this page" tree: 2 for a top-level `<h2>` section
+	// (the default), 3 for an `<h2>` subsection anchored by an `<h3>`. Only the
+	// table of contents reads this; the search index is built from `<h2>` anchors.
+	level?: 2 | 3;
 }
 
 export interface DocMeta {
@@ -61,9 +65,14 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
 			{ id: 'context', title: 'Sharing data' },
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
+			{ id: 'use-sync-external-store', title: 'useSyncExternalStore', level: 3 },
 			{ id: 'async-ui', title: 'Loading data and code' },
 			{ id: 'responsive-updates', title: 'Responsive updates' },
+			{ id: 'use-transition', title: 'useTransition', level: 3 },
+			{ id: 'use-deferred-value', title: 'useDeferredValue', level: 3 },
+			{ id: 'view-transitions', title: 'ViewTransition', level: 3 },
 			{ id: 'roots-and-rendering', title: 'Roots and rendering' },
+			{ id: 'create-portal', title: 'createPortal', level: 3 },
 			{ id: 'server-rendering', title: 'Server rendering' },
 			{ id: 'api-index', title: 'API index' },
 			{ id: 'practice', title: 'Practice' },

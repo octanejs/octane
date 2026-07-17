@@ -3,6 +3,7 @@
 // right, tinted through the same mask technique the header's nav icons use so
 // they follow currentColor on hover. Layout decides whether it renders at all —
 // the playground fills the viewport below the nav and has no footer under it.
+import { SOCIAL } from '../constants/site.ts';
 import xUrl from '../assets/x.svg';
 import discordUrl from '../assets/discord.svg';
 import githubUrl from '../assets/github.svg';
@@ -16,7 +17,7 @@ export function Footer() @{
 					<li>
 						<a
 							class="footer-icon"
-							href="https://x.com/octanejs"
+							href={SOCIAL.x}
 							target="_blank"
 							rel="noreferrer"
 							title="X"
@@ -32,7 +33,7 @@ export function Footer() @{
 					<li>
 						<a
 							class="footer-icon"
-							href="https://discord.gg/8puY9fFqd9"
+							href={SOCIAL.discord}
 							target="_blank"
 							rel="noreferrer"
 							title="Discord"
@@ -48,7 +49,7 @@ export function Footer() @{
 					<li>
 						<a
 							class="footer-icon"
-							href="https://github.com/octanejs/octane"
+							href={SOCIAL.github}
 							target="_blank"
 							rel="noreferrer"
 							title="GitHub"

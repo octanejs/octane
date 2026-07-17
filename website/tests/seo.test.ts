@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { docs } from '../src/content/docs.ts';
+import { SITE_TITLE } from '../src/constants/site.ts';
 
 const publicDir = fileURLToPath(new URL('../public', import.meta.url));
 const read = (name: string) => fs.readFileSync(`${publicDir}/${name}`, 'utf-8');
@@ -55,6 +56,14 @@ describe('seo artifacts', () => {
 		expect(png.readUInt32BE(16)).toBe(Number(meta('property', 'og:image:width') ?? 1200));
 		expect(png.readUInt32BE(20)).toBe(Number(meta('property', 'og:image:height') ?? 630));
 		expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
+	});
+
+	it('template <title> matches the SITE_TITLE constant restored after navigation', () => {
+		// useTitle resets document.title to SITE_TITLE on unmount; if that drifts
+		// from the served <title>, leaving a doc page would flicker a different tab
+		// title. Keep the two byte-identical.
+		const html = fs.readFileSync(fileURLToPath(new URL('../index.html', import.meta.url)), 'utf-8');
+		expect(html).toContain(`<title>${SITE_TITLE}</title>`);
 	});
 
 	it('ships every icon the head tags and manifest reference', () => {

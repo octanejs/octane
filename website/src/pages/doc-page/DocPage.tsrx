@@ -1,6 +1,7 @@
 // One documentation page: render compiled MDX in a readable article, add the
 // navigation supplied by the registry, and keep a local table of contents
 // beside longer guides.
+import { useEffect, useRef, useState } from 'octane';
 import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
@@ -15,14 +16,16 @@ function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 }
 
 // Every fenced code block (the Shiki `<pre>`) is wrapped in the shared CodeBlock
-// so doc snippets get a one-click copy button. `bare` keeps it chrome-free — just
-// the floating button over the code. Inline `code` is untouched; only block
-// `pre` maps here. The children are static Shiki markup, so there is no prop-slot
-// component to break SSR/hydration.
+// so doc snippets get a labelled header (language tag + one-click copy). The
+// language is stamped onto the `<pre>` as `data-language` by the shiki
+// transformer in mdx-options.ts (hast may expose it camelCased, so read both).
+// Inline `code` is untouched; only block `pre` maps here. The children are static
+// Shiki markup, so there is no prop-slot component to break SSR/hydration.
 function DocPre(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...preProps } = props;
+	const language = preProps['data-language'] ?? preProps.dataLanguage ?? '' as string;
 
-	<CodeBlock variant="bare">
+	<CodeBlock variant="plain" language={language}>
 		<pre {...preProps}>{children}</pre>
 	</CodeBlock>
 }
@@ -44,6 +47,78 @@ export function DocPage() @{
 	const closeMobileToc = (event: Event) => {
 		const link = event.currentTarget as HTMLAnchorElement;
 		link.closest('details')?.removeAttribute('open');
+	};
+
+	const [activeId, setActiveId] = useState('');
+	const tocTrack = useRef<HTMLDivElement | null>(null);
+
+	// Scroll-spy: the active section is the last heading whose top has crossed a
+	// line just below the sticky header. Reads are coalesced into one rAF so
+	// scrolling stays cheap, and the final section is forced active at the very
+	// bottom so a short trailing heading still lights up. There is always exactly
+	// one active id, so the highlight never flickers through an empty gap.
+	useEffect(() => {
+		if (sections.length === 0) return;
+		const headings = sections.map((section) => document.getElementById(section.id)).filter(
+			(el) => el !== null,
+		) as HTMLElement[];
+		if (headings.length === 0) return;
+
+		const ACTIVATION_LINE = 100; // sticky header (~60px) + a little breathing room
+		let frame = 0;
+		const measure = () => {
+			frame = 0;
+			let current = headings[0].id;
+			for (const heading of headings) {
+				if (heading.getBoundingClientRect().top <= ACTIVATION_LINE) current = heading.id;
+				else break;
+			}
+			const atBottom =
+				window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+			if (atBottom) current = headings[headings.length - 1].id;
+			setActiveId(current);
+		};
+		const onScroll = () => {
+			if (frame === 0) frame = requestAnimationFrame(measure);
+		};
+
+		measure();
+		window.addEventListener('scroll', onScroll, { passive: true });
+		window.addEventListener('resize', onScroll, { passive: true });
+		return () => {
+			window.removeEventListener('scroll', onScroll);
+			window.removeEventListener('resize', onScroll);
+			if (frame !== 0) cancelAnimationFrame(frame);
+		};
+	}, [doc?.slug]);
+
+	// Slide the accent indicator onto the active row: measure its real position
+	// within the track and hand the numbers to CSS, which animates the transform
+	// and height. Measuring the rendered link (not an assumed row height) keeps it
+	// exact when titles wrap or nest.
+	useEffect(() => {
+		const track = tocTrack.current;
+		if (!track || activeId === '') return;
+		const link = track.querySelector<HTMLElement>('[data-id="' + activeId + '"]');
+		if (!link) return;
+		track.style.setProperty('--indicator-y', link.offsetTop + 'px');
+		track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
+	}, [activeId]);
+
+	// Smooth-scroll to a heading, honoring reduced-motion, and move focus there
+	// (without a second scroll jump) so keyboard and screen-reader users land in
+	// the section. replaceState syncs the URL hash without pushing history or
+	// tripping the router.
+	const scrollToSection = (event: MouseEvent, id: string) => {
+		const heading = document.getElementById(id);
+		if (!heading) return;
+		event.preventDefault();
+		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+		heading.setAttribute('tabindex', '-1');
+		heading.focus({ preventScroll: true });
+		history.replaceState(null, '', '#' + id);
+		setActiveId(id);
 	};
 
 	<>
@@ -90,23 +165,38 @@ export function DocPage() @{
 				<aside class="on-this-page">
 					<nav class="toc-desktop" aria-label="On this page">
 						<p class="toc-heading">On this page</p>
-						<ul class="toc-list">
-							@for (const section of sections; key section.id) {
-								<li>
-									<a href={'#' + section.id}>
-										{section.title as string}
-									</a>
-								</li>
-							}
-						</ul>
+						<div class={['toc-track', activeId !== '' && 'is-active']} ref={tocTrack}>
+							<span class="toc-indicator" aria-hidden="true"></span>
+							<ul class="toc-list">
+								@for (const section of sections; key section.id) {
+									<li class="toc-item" data-level={section.level === 3 ? '3' : '2'}>
+										<a
+											href={'#' + section.id}
+											class="toc-link"
+											data-id={section.id}
+											aria-current={activeId === section.id ? 'true' : undefined}
+											onClick={(event: MouseEvent) => scrollToSection(event, section.id)}
+										>
+											<span class="toc-link-text">
+												{section.title as string}
+											</span>
+										</a>
+									</li>
+								}
+							</ul>
+						</div>
 					</nav>
 					<details class="toc-mobile">
 						<summary>On this page</summary>
 						<nav aria-label="On this page mobile">
-							<ul class="toc-list">
+							<ul class="toc-list-mobile">
 								@for (const section of sections; key section.id) {
-									<li>
-										<a href={'#' + section.id} onClick={closeMobileToc}>
+									<li data-level={section.level === 3 ? '3' : '2'}>
+										<a
+											href={'#' + section.id}
+											aria-current={activeId === section.id ? 'true' : undefined}
+											onClick={closeMobileToc}
+										>
 											{section.title as string}
 										</a>
 									</li>
@@ -126,7 +216,7 @@ export function DocPage() @{
 				justify-content: start;
 			}
 			.doc-frame.has-toc {
-				grid-template-columns: minmax(0, 48rem) minmax(10rem, 11rem);
+				grid-template-columns: minmax(0, 48rem) minmax(14rem, 15.5rem);
 				gap: clamp(2rem, 4vw, 3.5rem);
 			}
 			.prose {
@@ -139,38 +229,116 @@ export function DocPage() @{
 				align-self: start;
 				max-height: calc(100vh - 108px);
 				overflow-y: auto;
-				padding-left: 1rem;
-				border-left: 1px solid var(--border);
+				overflow-x: hidden;
 				scrollbar-width: thin;
+				/* Settle in just after the article on first paint. */
+				animation: toc-enter 0.5s 0.05s ease both;
+			}
+			@keyframes toc-enter {
+				from {
+					opacity: 0;
+					transform: translateY(6px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
 			}
 			.toc-heading {
-				margin: 0 0 0.75rem;
-				color: var(--text);
-				font-size: 0.78rem;
-				font-weight: 750;
+				margin: 0 0 0.85rem;
+				padding-left: 1.15rem;
+				color: var(--text-secondary);
+				font-size: 0.7rem;
+				font-weight: 700;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+			}
+			/* The rail is a timeline: a hairline guide runs its full height, and both
+			   the sliding accent indicator and the links sit against it. */
+			.toc-track {
+				position: relative;
+			}
+			.toc-track::before {
+				content: '';
+				position: absolute;
+				top: 0.2rem;
+				bottom: 0.2rem;
+				left: 0;
+				width: 1px;
+				background: var(--border);
+			}
+			.toc-indicator {
+				position: absolute;
+				left: 0;
+				top: 0;
+				width: 2px;
+				height: var(--indicator-h, 1.6rem);
+				border-radius: 2px;
+				background: var(--accent);
+				transform: translateY(var(--indicator-y, 0));
+				opacity: 0;
+				transition:
+					transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1),
+					height 0.32s cubic-bezier(0.22, 0.61, 0.36, 1),
+					opacity 0.2s ease;
+			}
+			/* The travelling dot, centred on the active row. */
+			.toc-indicator::after {
+				content: '';
+				position: absolute;
+				left: 1px;
+				top: 50%;
+				width: 6px;
+				height: 6px;
+				border-radius: 50%;
+				background: var(--accent);
+				transform: translate(-50%, -50%);
+				box-shadow: 0 0 0 4px rgba(255, 65, 90, 0.15);
+			}
+			/* Shown only once JS has measured a target, so SSR / no-JS shows no stray
+			   accent bar pinned at the top. */
+			.toc-track.is-active .toc-indicator {
+				opacity: 1;
 			}
 			.toc-list {
 				list-style: none;
 				margin: 0;
 				padding: 0;
 			}
-			.toc-list li {
+			.toc-item {
 				margin: 0;
 			}
-			.toc-list a {
+			.toc-link {
 				display: block;
-				padding: 0.28rem 0;
+				padding: 0.34rem 0 0.34rem 1.15rem;
 				color: var(--text-secondary);
-				font-size: 0.8rem;
-				line-height: 1.35;
-				transition: color 0.15s;
+				font-size: 0.82rem;
+				line-height: 1.4;
+				transition: color 0.18s ease;
 			}
-			.toc-list a:hover {
-				color: var(--accent-text);
+			/* Nested (h3) rows indent further from the guide and sit a touch quieter. */
+			.toc-item[data-level='3'] .toc-link {
+				padding-left: 2.1rem;
+				font-size: 0.78rem;
+			}
+			.toc-link:hover {
+				color: var(--text);
 				text-decoration: none;
+			}
+			.toc-link[aria-current='true'] {
+				color: var(--text);
 			}
 			.toc-mobile {
 				display: none;
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.on-this-page {
+					animation: none;
+				}
+				.toc-indicator,
+				.toc-link {
+					transition: none;
+				}
 			}
 			@media (max-width: 1180px) {
 				.doc-frame.has-toc {
@@ -221,14 +389,40 @@ export function DocPage() @{
 					padding-top: 0.65rem;
 					border-top: 1px solid var(--border);
 				}
-				.toc-list {
+				.toc-list-mobile {
 					display: grid;
 					grid-template-columns: repeat(2, minmax(0, 1fr));
 					gap: 0 1rem;
+					list-style: none;
+					margin: 0;
+					padding: 0;
+				}
+				.toc-list-mobile li {
+					margin: 0;
+				}
+				/* Nested rows read as children of the heading above them. */
+				.toc-list-mobile li[data-level='3'] a {
+					padding-left: 1rem;
+					font-size: 0.78rem;
+				}
+				.toc-list-mobile a {
+					display: block;
+					padding: 0.28rem 0;
+					color: var(--text-secondary);
+					font-size: 0.8rem;
+					line-height: 1.35;
+					transition: color 0.15s;
+				}
+				.toc-list-mobile a:hover {
+					color: var(--accent-text);
+					text-decoration: none;
+				}
+				.toc-list-mobile a[aria-current='true'] {
+					color: var(--accent-text);
 				}
 			}
 			@media (max-width: 560px) {
-				.toc-list {
+				.toc-list-mobile {
 					grid-template-columns: 1fr;
 				}
 			}
