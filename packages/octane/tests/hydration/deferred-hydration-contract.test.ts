@@ -364,6 +364,7 @@ describe('deferred hydration contract edges', () => {
 			suspend: false,
 			promise: pending.promise,
 			onHydrated,
+			shellLabel: 'Initial shell',
 		};
 		const { html } = renderToString(server.ActivationSuspendingHydration, serverProps);
 		container.innerHTML = html;
@@ -392,6 +393,58 @@ describe('deferred hydration contract edges', () => {
 
 		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
 		expect(container.querySelector('#activation-fallback')).toBeNull();
+		expect(onHydrated).toHaveBeenCalledOnce();
+	});
+
+	it('preserves pending server content across a parent update during activation', async () => {
+		const pending = deferred<void>();
+		const onHydrated = vi.fn();
+		const blocked = condition(false);
+		const ready = condition(true);
+		const serverProps = {
+			when: blocked,
+			suspend: false,
+			promise: pending.promise,
+			onHydrated,
+			shellLabel: 'Initial shell',
+		};
+		container.innerHTML = renderToString(server.ActivationSuspendingHydration, serverProps).html;
+		root = hydrateRoot(container, client.ActivationSuspendingHydration, {
+			...serverProps,
+			suspend: true,
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		root.render(client.ActivationSuspendingHydration, {
+			...serverProps,
+			when: ready,
+			suspend: true,
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		const pendingContent = container.querySelector('#activation-content') as HTMLButtonElement;
+		pendingContent.focus();
+		expect(document.activeElement).toBe(pendingContent);
+
+		root.render(client.ActivationSuspendingHydration, {
+			...serverProps,
+			when: ready,
+			suspend: true,
+			shellLabel: 'Updated shell',
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		expect(container.querySelector('#activation-shell')?.textContent).toBe('Updated shell');
+		expect(container.querySelector('#activation-content')).toBe(pendingContent);
+		expect(document.activeElement).toBe(pendingContent);
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(() => pending.resolve());
+
+		expect(container.querySelector('#activation-content')?.textContent).toBe('Server reviews');
 		expect(onHydrated).toHaveBeenCalledOnce();
 	});
 });

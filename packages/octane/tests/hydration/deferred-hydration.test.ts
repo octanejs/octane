@@ -290,6 +290,7 @@ describe('deferred hydration', () => {
 
 	it('uses fallback only for a later client-only mount that suspends', async () => {
 		const value = deferred<string>();
+		const replacement = deferred<string>();
 		const onClick = vi.fn();
 		const onHydrated = vi.fn();
 		const when = never();
@@ -313,7 +314,18 @@ describe('deferred hydration', () => {
 		expect(container.querySelector('#client-only-content')).toBeNull();
 		expect(onHydrated).not.toHaveBeenCalled();
 
-		await act(() => value.resolve('Client ready'));
+		await act(() =>
+			root!.render(client.ClientOnlyHydrate, {
+				...props,
+				show: true,
+				promise: replacement.promise,
+			}),
+		);
+		await act(() => value.resolve('Stale client value'));
+		expect(container.querySelector('#client-only-content')).toBeNull();
+		expect(onHydrated).not.toHaveBeenCalled();
+
+		await act(() => replacement.resolve('Client ready'));
 
 		const content = container.querySelector('#client-only-content') as HTMLButtonElement;
 		expect(container.querySelector('#client-only-fallback')).toBeNull();
@@ -324,7 +336,13 @@ describe('deferred hydration', () => {
 		expect(onClick).toHaveBeenCalledOnce();
 		expect(onClick).toHaveBeenCalledWith('Client ready');
 
-		await act(() => root!.render(client.ClientOnlyHydrate, { ...props, show: true }));
+		await act(() =>
+			root!.render(client.ClientOnlyHydrate, {
+				...props,
+				show: true,
+				promise: replacement.promise,
+			}),
+		);
 		expect(container.querySelector('#client-only-content')).toBe(content);
 		expect(onHydrated).toHaveBeenCalledOnce();
 	});

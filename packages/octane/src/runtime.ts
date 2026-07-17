@@ -4825,6 +4825,8 @@ interface HydrateSlot {
 	activationGeneration: number;
 	activationRequested: boolean;
 	activationReady: boolean;
+	/** Initial SSR activation began; its try slot owns any suspended retry. */
+	serverActivationStarted: boolean;
 	hydrated: boolean;
 	didNotify: boolean;
 	hasError: boolean;
@@ -5448,6 +5450,7 @@ function createHydrateSlot(
 		activationGeneration: 0,
 		activationRequested: !serverPreserved,
 		activationReady: !serverPreserved,
+		serverActivationStarted: false,
 		hydrated: false,
 		didNotify: false,
 		hasError: false,
@@ -5573,8 +5576,25 @@ export const Hydrate: ComponentBody<HydrateProps> = (rawProps, scope) => {
 	}
 
 	if (state.hasError) throw state.error;
-	if (!state.hydrated && state.activationReady) {
-		activateHydrateBoundary(state);
+	if (
+		!state.hydrated &&
+		state.activationReady &&
+		(!state.serverPreserved || !state.serverActivationStarted)
+	) {
+		// A first attempt can suspend after replacing the adopted arm with its
+		// preserved-server pending block. From that point the internal try slot owns
+		// the thenable and resume path; re-entering here on a parent update would
+		// remount that pending block and abandon the in-flight attempt. Client-only
+		// boundaries keep re-entering so new props can supersede suspended data.
+		if (state.serverPreserved) state.serverActivationStarted = true;
+		try {
+			activateHydrateBoundary(state);
+		} catch (error) {
+			// A synchronous render error did not leave a resumable try path behind.
+			// Let an enclosing error boundary retry this activation after reset.
+			if (state.serverPreserved) state.serverActivationStarted = false;
+			throw error;
+		}
 		renderedChild = true;
 	} else if (state.hydrated && !renderedChild) {
 		renderBlock(state.block);

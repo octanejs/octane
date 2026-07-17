@@ -24,12 +24,17 @@ function ActivationSuspendingChild(props) @{
 }
 
 export function ActivationSuspendingHydration(props) @{
-	<Hydrate
-		when={props.when}
-		split={false}
-		fallback={<span id="activation-fallback">{'Client fallback'}</span>}
-		onHydrated={props.onHydrated}
-	>
-		<ActivationSuspendingChild suspend={props.suspend} promise={props.promise} />
-	</Hydrate>
+	<>
+		<span id="activation-shell">
+			{props.shellLabel as string}
+		</span>
+		<Hydrate
+			when={props.when}
+			split={false}
+			fallback={<span id="activation-fallback">{'Client fallback'}</span>}
+			onHydrated={props.onHydrated}
+		>
+			<ActivationSuspendingChild suspend={props.suspend} promise={props.promise} />
+		</Hydrate>
+	</>
 }
