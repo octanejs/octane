@@ -319,17 +319,18 @@ export function DocPage() @{
 				overflow-y: auto;
 				overflow-x: hidden;
 				scrollbar-width: thin;
-				/* Settle in just after the article on first paint. */
-				animation: toc-enter 0.5s 0.05s ease both;
+				/* Settle in just after the article on first paint. `backwards` fills
+				   only the 0.05s delay (start hidden) and releases every animated
+				   property once done — a retained transform (fill `both`/`forwards`)
+				   would make this sticky element its own containing block and can
+				   break position: sticky while scrolling, notably in Firefox. The
+				   base style already IS the end state, so nothing needs retaining. */
+				animation: toc-enter 0.5s 0.05s ease backwards;
 			}
 			@keyframes toc-enter {
 				from {
 					opacity: 0;
 					transform: translateY(6px);
-				}
-				to {
-					opacity: 1;
-					transform: translateY(0);
 				}
 			}
 			.toc-heading {
