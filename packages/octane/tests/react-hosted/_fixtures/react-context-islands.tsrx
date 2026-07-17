@@ -81,3 +81,30 @@ export function ThemeAndResourceIsland(props) @{
 		{theme + ':' + value as string}
 	</p>
 }
+
+function GuardedReader(props) @{
+	const theme =
+		props.read === false ? '(off)' : use(HostTheme);
+	<p class="guard-theme">
+		{'theme:' + theme as string}
+	</p>
+}
+
+/**
+ * Foreign read INSIDE a local Octane boundary: the §6.3 control signal must
+ * bypass the island's own @pending/@catch arms on BOTH try paths (initial
+ * mount and try-body re-render — `props.read` flips the read on after commit).
+ */
+export function GuardedHostThemeIsland(props) @{
+	<div class="guarded-host">
+		@try {
+			<GuardedReader read={props.read} />
+		} @pending {
+			<p class="guard-pending">{'guard pending'}</p>
+		} @catch (error) {
+			<p class="guard-caught">
+				{'caught:' + String(error)}
+			</p>
+		}
+	</div>
+}
