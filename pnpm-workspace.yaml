@@ -16,6 +16,7 @@ packages:
   - benchmarks/memo-wall/*
   - benchmarks/portal-swarm
   - benchmarks/portal-swarm/*
+  - benchmarks/react-hosted-islands
   - benchmarks/ssr-throughput
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr

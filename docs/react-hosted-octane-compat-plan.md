@@ -1,6 +1,13 @@
 # React-hosted Octane compatibility plan
 
-Status: **proposed architecture — not implemented** (2026-07-16)
+Status: **Phases 0–1 landed** (2026-07-17). Phase 0's committed evidence lives
+in `packages/octane/tests/react-hosted/`, `packages/octane/typetests/`
+(react-hosted-jsx.test-d.tsx), and `benchmarks/react-hosted-islands/`; measured
+findings are folded into §3, §5, §6.2, §8, §9 and §15 below and summarized
+under §14 Phase 0. Phase 1 ships the experimental `octane/react` client shell
+(`OctaneCompat`, including the client half of the Phase 3 escape protocol) with
+zero core-runtime changes — see §14 Phase 1. Transparent context (Phase 2),
+server/hydration (Phase 4), and selective events (Phase 5) remain open.
 
 > Goal: allow a compiled Octane tree to live inside an existing React 19 tree
 > through one compatibility component, while preserving React context, native
@@ -146,11 +153,18 @@ reconciliation.
 
 The compiler/type surface must make a compiled Octane component valid at this JSX
 site without `defineOctaneCompatComponent()`, `asReactComponent()`, or a user cast.
-This requires an explicit typing spike: the current `ComponentBody` call signature
-returns `void`, which React's JSX types do not accept as a component return. The
-compat declaration package may supply a branded JSX-facing view and augment the
-Octane `use()`/`useContext()` overloads with `React.Context<T>` while keeping React
-types out of the core package.
+The current `ComponentBody` call signature returns `void`, which React's JSX types
+do not accept as a component return. The compat declaration package may supply a
+branded JSX-facing view and augment the Octane `use()`/`useContext()` overloads
+with `React.Context<T>` while keeping React types out of the core package.
+The Phase 0 typing spike (`packages/octane/typetests/react-hosted-jsx.test-d.tsx`,
+gated by `pnpm typecheck`) proved the shape: raw `ComponentBody` is rejected by
+React 19 JSX (arity + void return); a branded facade
+`(props: P) => OctaneRenderedNode` is accepted zero-cast with exact prop checking
+and intersects cleanly with `ComponentBody` so one declaration serves both hosts;
+and the `children` prop CANNOT statically reject an ordinary React component
+(every JSX expression types as `ReactElement<any, any>`), so that rejection is
+necessarily the runtime development validation below.
 
 React 19 places `ref` in element props, but React never invokes the child element.
 V1 must decide and test whether that ref is deliberately passed through as an
@@ -294,19 +308,34 @@ Lifecycle rules:
 7. Dispose on a real unmount. React StrictMode's development setup/cleanup probe
    requires idempotent setup and a cancelable deferred final-dispose check rather
    than blindly destroying the root in every layout cleanup. The same deferred
-   check is the candidate hide/probe/unmount discriminator: React's deletion
-   removes the host from the document within the same commit, while StrictMode
-   probes and Suspense hiding leave it connected (hidden content keeps its DOM
-   under `display: none`). A post-commit connectivity check on the host —
-   canceled by a new attachment generation — can therefore separate all three
-   without a private signal. Phase 0 must prove this against React 19 commit
-   ordering before it becomes the mechanism, and reconcile it with the external
-   DOM-removal guarantee (a disposed-by-removal island must tolerate a later
-   React commit that still believes the Fiber is alive).
+   check is the hide/probe/unmount discriminator: React's deletion removes the
+   host from the document within the same commit, while StrictMode probes and
+   Suspense hiding leave it connected (hidden content keeps its DOM under
+   `display: none`). A post-commit connectivity check on the host — canceled by
+   a new attachment generation — separates all three without a private signal.
+   **Phase 0 proved this against React 19.2 with one hard constraint on the
+   check's TRIGGER**: hiding Suspense content destroys layout effects AND
+   detaches refs, but leaves PASSIVE effects connected; deleting an
+   already-hidden tree then fires only the passive cleanup. The check must
+   therefore be scheduled from BOTH the host ref detach (prompt visible
+   deletion + hide detection) and the wrapper's passive cleanup
+   (deletion-while-hidden) — a layout-cleanup-only or ref-only trigger leaks
+   the hosted root when React deletes a hidden island
+   (`tests/react-hosted/lifecycle-discriminator.test.ts`). The external
+   DOM-removal reconciliation also holds: with the host externally removed,
+   React gives no signal, a later commit republishes into the detached host
+   without faulting, and Octane's safe-cleanup guarantee covers the eventual
+   teardown.
 8. Keep the bridge active until Octane teardown finishes. During actual React
    deletion, an Octane cleanup error cannot be surfaced by scheduling state on the
-   deleting controller; `routeError()` should decline it so the synchronous throw
-   enters React's commit-error path.
+   deleting controller; `routeError()` should decline it so the throw re-enters
+   the disposal frame synchronously. **Phase 0 refinement:** because rule 7's
+   discriminator defers disposal past React's commit, that frame is a
+   post-commit microtask, NOT React's commit-error path — the fault can no
+   longer reach React's own error handling. The decline behavior is proven
+   (the fault is not swallowed and the dead wrapper is never scheduled), but a
+   reporting channel must be chosen before Phase 1; the candidate is
+   `reportError`, matching React 19's default `onUncaughtError`.
 9. Account for existing initial-root failure behavior: an initial error/suspension
    routed through the owner currently unmounts that failed DOM root. A later React
    retry must safely create/bind a fresh hosted root.
@@ -389,13 +418,18 @@ Each island that reads a provider is intentionally one real React consumer. That
 cost is inherent to preserving nearest-provider semantics; a global collector
 cannot deduplicate it correctly across nested provider positions.
 
-Phase 0 must establish whether React commits a newly-recorded `React.use(context)`
-dependency when the same wrapper attempt immediately suspends on the relay. Do not
-assume it does. If provider updates do not reach that suspended attempt, use a rare
-two-commit handshake: first call `React.use(context)` and commit the subscription
-without throwing status, then trigger the relay/error render from that commit's
-layout phase. This extra commit applies only when first context discovery and an
-escape coincide and should complete before paint.
+**Phase 0 answer (React 19.2.7): the dependency IS retained.** A
+`React.use(context)` dependency recorded in an immediately-suspended attempt
+stays live in both shapes that matter — an initial mount attempt, and an update
+attempt on a committed wrapper whose FIRST read of the context happens in the
+suspending attempt. Provider-only updates issued while the attempt stays
+suspended re-render it with the fresh value each time, and the dependency
+remains live after recovery. The rare two-commit handshake (first commit the
+subscription without throwing status, then trigger the relay/error render from
+that commit's layout phase) is therefore NOT required on React 19.2.x.
+`tests/react-hosted/use-context-retention.test.ts` pins the retention behavior
+directly against React — if a future minor drops it, those tests fail and the
+handshake becomes mandatory.
 
 The first implementation may let the existing owner fallback return the mirror's
 live snapshot. If repeated reads show meaningful ancestry/owner lookup cost, stamp
@@ -474,9 +508,9 @@ the underlying wakeable. For each pending episode:
 2. Trigger one React invalidation.
 3. During React render, `OctaneCompat` first performs every registered
    `React.use(context)` read, then throws/uses the stable relay, allowing the nearest
-   React Suspense boundary to handle it. If this episode also introduced a context
-   and Phase 0 shows that an immediately suspended dependency is not retained,
-   commit the subscription handshake described in §6.2 before this throw.
+   React Suspense boundary to handle it. (Phase 0 measured that an immediately
+   suspended dependency IS retained on React 19.2 — see §6.2 — so no
+   subscription handshake precedes this throw.)
 4. When the underlying data settles, retry Octane first.
 5. Resolve the relay only after the Octane retry has successfully committed and
    all relevant post-flush work has completed.
@@ -494,7 +528,14 @@ throwing so the snapshot commits (transition-like reveal of the prior Octane
 DOM, with a fresh episode if the retry re-suspends), or an out-of-band
 generation-guarded publish that keeps the fallback up while Octane retries. The
 wrapper must never throw a stale relay while holding a newer snapshot without
-one of these paths recorded.
+one of these paths recorded. Phase 0 evidence: dependency retention (§6.2)
+means the suspended wrapper does re-render with the fresh snapshot on every
+provider change, and the reveal-time layout publish supersedes the
+episode-start snapshot before paint — the island reveals with the LATEST
+provider value even when the change landed mid-episode
+(`tests/react-hosted/use-context-retention.test.ts`). Whether a mid-episode
+publish is also needed (so a new value can stop the suspension itself) remains
+open question 16.
 
 Every relay/retry callback carries the controller generation and pending-episode
 token. A settlement from a superseded attempt or unmounted island must become a
@@ -640,16 +681,39 @@ choose one request-safe mechanism:
   dispatcher is active, combined with persistent Octane call-site memo state; or
 - an equivalent request-local replay record.
 
-The `React.use(thenable)` delegation is the leading candidate: Fizz replay state
-is positional (the nth `use()` call in a retried component reuses the nth tracked
-thenable's settled result regardless of the new thenable's identity), so it
-tolerates a fresh Octane pass per replay provided Octane's unwrap order is
-deterministic across replays — which the strata design already requires. The
-hosted-session variant needs real per-request storage (`AsyncLocalStorage` on
-Node) and an explicit answer for edge runtimes without it. A Fizz-provided
-request cache is not an option: in React 19.2.7, `React.cache` outside Flight is
-a non-memoizing passthrough and Fizz's async dispatcher `getCacheForType` throws
-(see the internals inventory in §17).
+The `React.use(thenable)` delegation is the chosen candidate, with two hard
+qualifications Phase 0 measured against real Fizz
+(`tests/react-hosted/fizz-retry.test.ts`):
+
+- Fizz replay state is positional (the nth `use()` call in a retried task is
+  served from the nth TRACKED thenable's settled result regardless of the new
+  thenable's identity), so a fresh Octane pass per replay cannot loop a
+  position a prior attempt already reached — sequential chains complete in one
+  replay per stratum even when every replay creates fresh, never-settling
+  thenables. The positional match also makes deterministic unwrap order a hard
+  correctness requirement: a replay that unwraps in a different order is
+  silently served MISALIGNED values (demonstrated, no error anywhere). Octane's
+  strata design already guarantees the order.
+- **Tracking covers only positions actually REACHED.** A parallel stratum
+  creates K thenables and throws on the first pending unwrap, so positions
+  1..K-1 are never tracked; each replay's fresh pass then re-tracks its own
+  fresh replacements — the original in-flight results are discarded, fetch
+  starts multiply, and every stratum member costs an extra replay. Persistent
+  per-island memo state is therefore MANDATORY for the parallel-`use()`
+  contract, not an optimization. Measured mechanism: Fizz replays a task with
+  the IDENTICAL props object, so a `WeakMap` keyed on the island's transported
+  props is request-local, replay-persistent storage — no module-global request
+  state and no `AsyncLocalStorage`, which also answers the edge-runtime
+  concern. The memoized thenables must carry Octane's in-place
+  `status`/`value` stamps (they already do) so an already-settled dependency
+  unwraps synchronously on replay instead of costing another round.
+
+Rejections route through the tracked state to the Fizz boundary error path
+exactly once, and overlapping requests with interleaved settlements never
+observe each other's state. A Fizz-provided request cache is not an option: in
+React 19.2.7, `React.cache` outside Flight is a non-memoizing passthrough and
+Fizz's async dispatcher `getCacheForType` throws (see the internals inventory
+in §17).
 
 Module-global mutable request state is forbidden. The chosen mechanism must retain
 Octane's parallel-`use()` strata, stable call-site identity, rejection routing, and
@@ -701,12 +765,17 @@ as React children. The candidate contract is:
 - In the layout commit, Octane calls its hosted `hydrateRoot()` with the same body,
   props, context snapshot, and `identifierPrefix`.
 
-This must be proven against React 19 development and production hydration rather
-than assumed. Tests must observe that React performs no descendant insert/remove/
-text writes before Octane adoption and emits no hydration mismatch. If the opaque
-sentinel is not robust across supported React minors, serialize enough island
-metadata for the client to present exact HTML or use another React-supported opaque
-ownership primitive.
+**Phase 0 proved this contract against React 19.2.7 development AND production
+hydration** (`tests/react-hosted/opaque-hydration.test.ts`): with the frozen
+sentinel plus `suppressHydrationWarning`, React hydrates a page with several
+sibling islands with zero descendant inserts/removes/text writes (mutation
+observers on each host record nothing), no recoverable error, and no console
+diagnostics; Octane's `hydrateRoot()` then adopts the exact server node
+identities with live events and state; and a later React re-render with the
+stable sentinel leaves the hosts untouched. If the opaque sentinel stops being
+robust on a future React minor, serialize enough island metadata for the client
+to present exact HTML or use another React-supported opaque ownership
+primitive.
 
 ## 10. Lifecycle, concurrency, and ownership edge cases
 
@@ -964,6 +1033,50 @@ Exit gate: context bootstrap + real React subscription, event order, and hydrati
 DOM ownership are demonstrated with executable tests; Fizz retry cannot loop on a
 fresh Octane server pass.
 
+**Executed 2026-07-17 — exit gate met.** Artifacts:
+
+- `packages/octane/tests/react-hosted/` — the internal React 19 fixture
+  (`_react-host.ts`: an `IslandController` implementing the existing
+  `RendererRegionOwnerBridge` around an unmodified compiled Octane root, with
+  a spike `OctaneCompatSpike` wrapper) plus the isolated Fiber adapter
+  (`_fiber-adapter.ts`, the only Fiber-touching module) and suites for
+  host/bridge lifecycle, §3 child/ref validation, §8 event propagation, §6.1
+  Fiber bootstrap, OQ15 retention, §5 rule 7 discrimination, §9.3 opaque
+  hydration (dev + prod React), and §9.1 Fizz retry. All suites run under both
+  the dev and prod Octane compile projects;
+  `universal-renderer-boundaries.test.ts` stays green and no Octane hot path
+  changed.
+- `packages/octane/typetests/react-hosted-jsx.test-d.tsx` — the §3 typing
+  spike (checked by `pnpm typecheck`): raw `ComponentBody` is rejected by
+  React JSX; a branded facade type is accepted zero-cast with exact prop
+  checking and stays valid as an Octane body; children typing cannot
+  statically discriminate octane vs React elements (JSX.Element erasure), so
+  rejection is the runtime dev validation; child `ref` types as an ordinary
+  prop.
+- `benchmarks/react-hosted-islands/` — the 1/100/1000-island structural
+  baseline (recorded in `benchmarks/baselines/local/react-hosted-islands.json`,
+  linearity guarded in `baselines/ratios.json`): 5 delegated listeners per
+  island regardless of whether ANY island binds events (the §8.1
+  O(islands × loaded types) baseline Phase 5 must beat), 138 React
+  root-container listeners per React root, 1 hosted root + 1 bridge binding
+  per island, O(islands) late `delegateEvents` back-attach, zero listener
+  leaks after teardown.
+
+Findings that refined the plan: the rule 7 discriminator's trigger matrix and
+rule 8's deferred-disposal error channel (§5), OQ15 answered as "retained"
+(§6.2), reached-positions-only Fizz tracking making persistent memo mandatory
+with props-identity WeakMap storage (§9.1), and the React-state round-trip
+batching contract for events (§8: an island handler's React setState is
+batched exactly like a nested React tree — React's own bubble listener for the
+same event sees pre-update DOM — while Octane-local discrete updates commit
+before the React bubble handler runs).
+
+Deferred to browser E2E (jsdom cannot prove them; Phase 4/5 scope): paint-level
+hide/reveal behavior, focus/enter-leave/scroll event families and real user
+activation, streamed-Fizz `completeBoundary` segment relocation before Octane
+adoption, CSS/head resource hoisting (§9.2 — untouched by Phase 0 along with
+the structured head channel decision), and retained-heap measurements.
+
 ### Phase 1 — existing owner bridge and public client shell
 
 - Reuse `bindRendererRegionOwner()` through a private compiled root envelope and
@@ -977,6 +1090,44 @@ fresh Octane server pass.
 
 Exit gate: ready client islands work with no context/suspension requirements and
 normal Octane roots show no behavior/performance regression.
+
+**Executed 2026-07-17 — exit gate met, with zero core-runtime changes** (the
+spike proved no renderer-neutral protocol generalization was necessary; normal
+Octane roots are untouched by construction). Shipped as
+`packages/octane/src/react/index.ts` behind the `octane/react` export
+(`'use client'`, react/react-dom as optional peers, dist entry verified by the
+publish build), exercised consumer-shaped by
+`tests/react-hosted/octane-compat-public.test.ts` and type-pinned by
+`typetests/react-hosted-jsx.test-d.tsx` against the exported
+`OctaneReactComponent`/`OctaneRenderedNode` facade types. Notes:
+
+- The private root envelope is a PLAIN function body (bind the owner, return a
+  value-position element for the transported child) — no compiled `.tsrx`
+  ships in the package.
+- The §10 unchanged-parent-rerender bail (shallow `{ type, props, key }`
+  compare) is implemented and tested — a key-only change replaces the island
+  with fresh state through octane's keyed identity semantics; scale-testing
+  the bail under hundreds of islands remains Phase 5 work.
+- The client half of Phase 3 (lazy relay episodes, post-Octane-commit
+  resolution, rejection routing, supersession/no-op guards, local-boundary
+  priority) was pulled forward — the Phase 0 spike had already validated it.
+  Phase 3 retains the failure-matrix breadth (§13) and transition-originated
+  episodes.
+- Deferred-disposal cleanup faults route through `reportError` (falling back
+  to `console.error`), resolving the reporting-channel decision from §5
+  rule 8.
+- Strict rejection of an UNBRANDED plain-function React component is not
+  implementable yet: `__oct_loc` is dev-only and plain-`.ts` Octane components
+  carry no marker, so validation rejects host elements, Fragments, exotic
+  element types (memo/forwardRef/lazy), plain renderables, multiple children,
+  and class components — a compiler-emitted component brand (measured against
+  codegen-size) remains future work tied to the declaration tooling.
+- Under React SSR the client shell renders an empty host and mounts on the
+  client; Phase 4 replaces this with the hosted server renderer via
+  conditional exports.
+- The `react-hosted-islands` benchmark keeps its inline owner so bridge-binding
+  counts stay observable; `OctaneCompat` adds no listeners beyond the
+  `createRoot` delegation cost the baseline already pins.
 
 ### Phase 2 — transparent context
 
@@ -1070,18 +1221,35 @@ not `O(islands × global event types)`.
    not how.
 10. Whether a future React Fragment-ref/range API can remove the host element
     without compromising ownership and events.
-11. Durable server-session/replay storage across Fizz retries.
+11. Durable server-session/replay storage across Fizz retries. *Phase 0 pinned
+    the mechanism candidate:* Fizz replays a task with the identical props
+    object, so a `WeakMap` keyed on the island's transported props is
+    request-local, replay-persistent storage with no `AsyncLocalStorage`
+    dependency (§9.1). Open is only the final shape of the stored session.
 12. Child `ref` behavior and whether any React-authored nested children are
-    accepted.
+    accepted. *Phase 0 decision, tested:* the child `ref` passes through as an
+    ordinary Octane ref prop and attaches to the Octane-owned element — never
+    claimed by React (`tests/react-hosted/child-validation.test.ts`); nested
+    React-authored children remain rejected.
 13. Exact Offscreen hide/reveal behavior for Octane effects, refs, events, and
-    measurements.
+    measurements. *Phase 0 evidence:* the hosted root, DOM, state, and events
+    survive hide/reveal untouched, but Octane's own effects/refs are NOT
+    disconnected while hidden — whether an explicit disconnect/reconnect
+    (Activity reuse) is required is still open.
 14. Translation or rejection policy for Octane head resources in hosted SSR,
     including CSP.
-15. Whether React retains a newly discovered context dependency in an immediately
-    suspended wrapper render or the rare two-commit handshake is mandatory.
+15. ~~Whether React retains a newly discovered context dependency in an
+    immediately suspended wrapper render or the rare two-commit handshake is
+    mandatory.~~ **Answered by Phase 0 (React 19.2.7): retained, in both
+    initial-mount and update-attempt suspension; the handshake is not needed.
+    `tests/react-hosted/use-context-retention.test.ts` guards the behavior
+    against future React minors (§6.2).**
 16. The supersession path for context snapshots that change during a pending
     episode: complete the wrapper without throwing so the snapshot commits, or
-    an out-of-band generation-guarded publish (§7).
+    an out-of-band generation-guarded publish (§7). Phase 0 pinned that the
+    reveal-time publish already closes the stale-snapshot window before paint;
+    open is whether a mid-episode publish is needed so a new value can stop
+    the suspension itself.
 
 ## 16. Rejected alternatives
 
@@ -1184,8 +1352,12 @@ Prototypes against the repository's React/ReactDOM 19 toolchain established:
 - server execution inside a React component can call `React.use(context)` and read
   the nearest provider.
 
-These prototypes are evidence, not the implementation. Phase 0 converts each one
-into committed behavioral coverage before core changes begin.
+These prototypes are evidence, not the implementation. Phase 0 converted each
+one into committed behavioral coverage (`packages/octane/tests/react-hosted/`)
+before core changes begin — see §14 Phase 0 for the artifact list and the
+findings the conversion surfaced. (The server `React.use(context)` read is the
+one item still covered only by the prototype: exercising it end-to-end needs
+the Phase 4 hosted server entry.)
 
 ### React 19.2.7 internals inventory
 

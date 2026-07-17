@@ -1,0 +1,17 @@
+{
+  "name": "octane-react-hosted-islands-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Structural baseline for React-hosted Octane compat islands (react-hosted-octane-compat-plan.md Phase 0): deterministic listener / root / bridge-binding counts for 1/100/1000 islands under one React 19 root, measured in jsdom. No browser, no servers.",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "jsdom": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

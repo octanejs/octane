@@ -31,6 +31,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
     "./server": "./src/server/index.ts",
     "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
@@ -51,6 +52,10 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./react": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
       },
       "./server": {
         "types": "./dist/server/index.d.ts",
@@ -90,8 +95,21 @@
     "devalue": "catalog:default",
     "esrap": "catalog:default"
   },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
     "react": "catalog:default",
