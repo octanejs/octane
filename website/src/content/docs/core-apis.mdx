@@ -434,7 +434,10 @@ The only component value this effect captures is a stable ref, so it connects on
 disconnects on unmount. If an effect reads changing props or state, those values are
 inferred as dependencies. You can still pass an explicit dependency array when you need
 exact control; `[]` means mount and unmount only, while `null` deliberately means every
-render.
+render. Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules receive
+the same inference when they transparently forward their callback and final dependency
+parameter to a supported hook; plain `.ts`/`.js`, imported, or transforming wrappers
+require an explicit list.
 
 <aside className="doc-callout tip">
 	<p className="doc-callout-title">You might not need an effect</p>

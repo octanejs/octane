@@ -261,6 +261,23 @@ export function App() @{ <Canvas><Scene /></Canvas> }
 		expect(result.code).toContain('__octaneRendererRegion0WithSlot');
 	});
 
+	it('infers omitted dependencies in a cloned local custom hook', () => {
+		const result = compileDomBoundary(`
+import { useMemo as useRendererMemo } from 'octane/universal';
+import { Canvas } from '${CANVAS_MODULE}';
+function useComputed(factory, dependencies) {
+  return useRendererMemo(factory, dependencies);
+}
+function Scene(props) @{
+  const value = useComputed(() => props.value);
+  <mesh value={value} />
+}
+export function App(props) @{ <Canvas><Scene value={props.value} /></Canvas> }
+`);
+
+		expect(result.code).toContain('() => props.value, [props.value]');
+	});
+
 	it('merges every boundary and main universal Webpack handoff in execution order', () => {
 		const source = `
 import { Canvas } from '${CANVAS_MODULE}';

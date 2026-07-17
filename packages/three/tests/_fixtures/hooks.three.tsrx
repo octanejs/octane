@@ -1,5 +1,5 @@
-import { useFrame, useGraph, useInstanceHandle, useStore, useThree } from '@octanejs/three';
-import { useLayoutEffect, useRef } from '@octanejs/three/renderer';
+import { useGraph, useInstanceHandle, useStore, useThree } from '@octanejs/three';
+import { useFrame, useLayoutEffect, useRef } from '@octanejs/three/renderer';
 
 export function HookScene(props) @{
 	const objectRef = useRef(null);

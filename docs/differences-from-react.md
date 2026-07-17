@@ -33,6 +33,13 @@ refs, and state getters. It also omits `useEffectEvent` results because Effect
 Events are non-reactive captures, despite their intentionally fresh wrapper
 identity.
 
+The full `.tsrx`/`.tsx` compiler also recognizes locally declared custom hooks
+that transparently forward a callback parameter and their final dependency
+parameter to one of those hooks. Nested transparent wrappers are followed
+within the module. This does not guess from a `use*` name alone: plain
+`.ts`/`.js` modules, imported custom hooks, method hooks, and wrappers that
+transform or inspect those parameters require an explicit dependency argument.
+
 An explicit array is authoritative and retains React's exact behavior. Pass
 `null` to opt out of tracking and run an effect—or recompute a memo—after every
 render. Opaque callback creation such as `useEffect(makeEffect())` requires an

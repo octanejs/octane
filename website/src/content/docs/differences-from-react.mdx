@@ -50,6 +50,12 @@ useEffect(() => {
 }); // inferred from syncRoom and room.id
 ```
 
+Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules participate when
+they transparently forward their callback and final dependency parameter to one of
+those hooks. The compiler follows nested transparent wrappers, but it does not guess
+from a `use*` name alone. Plain `.ts`/`.js` modules, imported custom hooks, and wrappers
+that transform or inspect those parameters need an explicit list.
+
 An explicit array keeps its exact React meaning. Pass `null` when you intentionally
 want the effect or computation to run after every render.
 

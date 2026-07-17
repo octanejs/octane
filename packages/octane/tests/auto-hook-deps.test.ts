@@ -229,6 +229,23 @@ describe('automatic hook dependencies — full compiler', () => {
 		expect(code).toMatch(/useMemo\(\(\) => props\.value \* 2, \[props\.value\], \d+\)/);
 	});
 
+	it('applies local custom-hook inference during server compilation', () => {
+		const code = c(
+			`
+        import { useMemo } from 'octane';
+        function useComputed(factory, dependencies) {
+          return useMemo(factory, dependencies);
+        }
+        export function App(props) @{
+          const value = useComputed(() => props.value * 2);
+          <div>{value as string}</div>
+        }
+      `,
+			{ mode: 'server' },
+		);
+		expect(code).toContain('() => props.value * 2, [props.value]');
+	});
+
 	it('infers dependencies for namespace imports without crossing lexical shadows', () => {
 		const code = c(`
       import * as Octane from 'octane';
@@ -245,6 +262,94 @@ describe('automatic hook dependencies — full compiler', () => {
 			/Octane\.useEffect\(\(\) => console\.log\(props\.value\), \[props\.value\], \d+\)/,
 		);
 		expect(code).not.toContain('[props.shadowed]');
+	});
+
+	it('does not infer dependencies for a lexically bound built-in lookalike', () => {
+		const code = c(`
+      import { useEffect as effect } from 'octane';
+      function useEffect(callback, options) {
+        return Array.isArray(options) ? 'unexpected dependencies' : callback();
+      }
+      export function App(props) @{
+        const value = useEffect(() => props.value);
+        effect(() => props.observe(value), []);
+        <div>{value as string}</div>
+      }
+    `);
+
+		expect(code).not.toContain('() => props.value, [props.value]');
+	});
+
+	it('infers only statically proven local custom dependency hooks', () => {
+		const code = c(`
+			import { useEffect as effect, useImperativeHandle, useMemo as baseMemo } from 'octane';
+      function useOuter(callback, dependencies) {
+        useInner(callback, dependencies);
+      }
+      function useInner(callback, dependencies) {
+        effect(callback, dependencies);
+      }
+      const useArrowEffect = (callback, dependencies) => effect(callback, dependencies);
+      function useHandle(ref, create, dependencies) {
+        useImperativeHandle(ref, create, dependencies);
+      }
+      function useSelector(selector) {
+        return selector({ value: 'selected' });
+      }
+      function runEffect(callback, dependencies) {
+        return callback(dependencies);
+      }
+      function useFakeEffect(callback, dependencies) {
+        runEffect(callback, dependencies);
+      }
+		function useTransformedEffect(callback, dependencies) {
+			effect(callback, dependencies ?? []);
+		}
+		function useWrappedBuiltin(callback, dependencies) {
+			effect!(callback, dependencies);
+		}
+		function useReassigned(callback, dependencies) {
+			effect(callback, dependencies);
+			useReassigned = runEffect;
+		}
+		function useMemo(factory, dependencies) {
+			return baseMemo(factory, dependencies);
+		}
+      export function App(props) @{
+        useOuter(() => props.log(props.value));
+        useOuter(() => props.log(props.always), null);
+        useOuter(() => props.log(props.explicit), [props.explicit]);
+        useOuter(() => props.log(props.undefined), undefined);
+        useArrowEffect(() => props.log(props.arrow));
+        useHandle(props.ref, () => ({ value: props.value }));
+        useFakeEffect(() => props.log(props.fake));
+			useTransformedEffect(() => props.log(props.transformed));
+			useWrappedBuiltin(() => props.log(props.wrapped));
+			useReassigned(() => props.log(props.reassigned));
+			const sameName = useMemo(() => props.sameName);
+        useSelector((state) => state.value);
+			<div>{sameName as string}</div>
+      }
+    `);
+
+		expect(code).toMatch(
+			/useOuter, \(\) => props\.log\(props\.value\), \[props\.log, props\.value\]/,
+		);
+		expect(code).toContain('useOuter, () => props.log(props.always), null');
+		expect(code).toContain('useOuter, () => props.log(props.explicit), [props.explicit]');
+		expect(code).toContain('useOuter, () => props.log(props.undefined), undefined');
+		expect(code).toContain(
+			'useArrowEffect, () => props.log(props.arrow), [props.log, props.arrow]',
+		);
+		expect(code).toMatch(
+			/useHandle, props\.ref, \(\) => \(\{ value: props\.value \}\), \[props\.value\]/,
+		);
+		expect(code).not.toContain('props.fake), [');
+		expect(code).not.toContain('props.transformed), [');
+		expect(code).not.toContain('props.wrapped), [');
+		expect(code).not.toContain('props.reassigned), [');
+		expect(code).toContain('useMemo, () => props.sameName, [props.sameName]');
+		expect(code).not.toContain('state.value, [');
 	});
 });
 
@@ -301,6 +406,24 @@ export function useThing(value: string) {
 		const code = slotHooks(source, 'namespace-hooks.ts')!.code;
 		expect(code).toMatch(/Octane\.useEffect\([^;]+, \[value\], _h\$\d+\)/);
 		expect(code).toMatch(/Octane\.useMemo\([^;]+, \[value\], _h\$\d+\)/);
+	});
+
+	it('leaves local custom dependency calls unchanged without a custom-call slot boundary', () => {
+		const source = `
+import { useMemo } from 'octane';
+function useComputed(factory, dependencies) {
+  return useMemo(factory, dependencies);
+}
+export function usePair(props) {
+  const first = useComputed(() => 'A' + props.value);
+  const second = useComputed(() => 'B' + props.value);
+  return [first, second];
+}
+`;
+		const code = slotHooks(source, 'custom-dependencies.ts')!.code;
+		expect(code).toContain("useComputed(() => 'A' + props.value)");
+		expect(code).toContain("useComputed(() => 'B' + props.value)");
+		expect(code).not.toContain('[props.value]');
 	});
 
 	it('does not infer or slot a lexically shadowed Octane namespace', () => {
