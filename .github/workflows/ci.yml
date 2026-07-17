@@ -172,9 +172,20 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      - name: Validate example catalog and orchestration
+        run: pnpm examples:static:check
+
   examples:
-    name: example apps
+    name: example apps (${{ matrix.shard }})
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep every app internally serial while spreading complete app
+        # lifecycles across runners. The planner weights declared journeys and
+        # repeated execution modes, then assigns each app to exactly one shard.
+        shard: ["1/3", "2/3", "3/3"]
 
     steps:
       - name: Checkout code
@@ -195,11 +206,8 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter hacker-news-example exec playwright install --with-deps chromium
 
-      - name: Validate example catalog, helpers, types, and production builds
-        run: pnpm examples:check
-
       - name: Run example browser journeys
-        run: pnpm examples:e2e
+        run: pnpm examples:e2e -- --shard=${{ matrix.shard }}
 
   # Keep the existing protected `typecheck` context stable while the actual
   # typecheck and browser-heavy example gate run in parallel. `always()` turns

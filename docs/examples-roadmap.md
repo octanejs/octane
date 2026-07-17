@@ -7,9 +7,11 @@ focus and selection, live form and media state, scroll position, portal events,
 SSR adoption, and behavior while asynchronous work overlaps.
 
 The examples remain in this monorepo while Octane is alpha so an application
-failure, its minimized package regression, and the fix can land atomically. A
-packed-package validation mode can be added later to catch issues hidden by
-workspace linking without splitting the source of truth across repositories.
+failure, its minimized package regression, and the fix can land atomically.
+Selected real applications are also copied into temporary consumers and built
+against packed Octane and binding tarballs, catching package-boundary failures
+that workspace linking can hide without splitting the source of truth across
+repositories.
 
 ## Delivery waves
 
@@ -45,6 +47,14 @@ or assets to copy.
 Waves 0–4 are implemented as release-gated fixtures. Each product name reserves
 a distinct regression responsibility rather than prescribing a specific visual
 design.
+
+Wave 5P is the Phase II infrastructure foundation rather than another product:
+it assigns complete applications to three deterministic browser shards, keeps
+each application's journeys serial, reports per-app timing, removes duplicate
+CI builds and typechecks, and adds packed Pulseboard and Wayfinder production
+canaries. Later Phase II applications can therefore land as independent,
+reviewable increments without making the browser critical path or package seam
+implicit.
 
 Hacker News remains the dedicated `.tsx` and `.tsrx` parity application.
 Duplicating every new application in both dialects would double maintenance
