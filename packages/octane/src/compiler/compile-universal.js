@@ -818,6 +818,87 @@ function rewriteSetupStatement(statement, state) {
 	return rewriteSourceNode(statement, state);
 }
 
+// This proof deliberately covers data expressions, not arbitrary authored calls.
+// Property reads can still reach getters or proxies, so the universal runtime
+// lazily claims the keyed item owner if one invokes a hook or renderer region.
+function isOwnerFreeForExpression(node) {
+	if (!node || typeof node !== 'object') return false;
+	if (node.type === 'Literal' || node.type === 'Identifier') return true;
+	if (node.type === 'ArrayExpression') {
+		return (node.elements ?? []).every(
+			(element) =>
+				element !== null && element.type !== 'SpreadElement' && isOwnerFreeForExpression(element),
+		);
+	}
+	if (node.type === 'MemberExpression') {
+		return (
+			isOwnerFreeForExpression(node.object) &&
+			(!node.computed || isOwnerFreeForExpression(node.property))
+		);
+	}
+	if (
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression' ||
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'TypeCastExpression'
+	) {
+		return isOwnerFreeForExpression(node.expression);
+	}
+	return false;
+}
+
+function isOwnerFreeForAttribute(attribute) {
+	if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') return false;
+	const name = attributeName(attribute);
+	if (
+		name === null ||
+		name === 'key' ||
+		name === 'ref' ||
+		name === 'children' ||
+		name === 'attach' ||
+		name === 'onUpdate' ||
+		name.startsWith('on')
+	) {
+		return false;
+	}
+	const value = attribute.value;
+	if (value === null || value?.type === 'Literal') return true;
+	return (
+		value?.type === 'JSXExpressionContainer' &&
+		value.expression?.type !== 'JSXEmptyExpression' &&
+		isOwnerFreeForExpression(value.expression)
+	);
+}
+
+function ownerFreeForHost(node) {
+	if (node.empty != null) return null;
+	if (!isOwnerFreeForExpression(node.right) || !isOwnerFreeForExpression(node.key)) return null;
+	const body = (node.body?.body ?? []).filter(
+		(statement) => statement.type !== 'JSXText' || normalizeJsxText(statement.value ?? '') !== '',
+	);
+	if (body.length !== 1) return null;
+	const host = body[0];
+	if (
+		(host.type !== 'JSXElement' && host.type !== 'Element') ||
+		isComponentElement(host) ||
+		jsxName(host) === 'Activity'
+	) {
+		return null;
+	}
+	const type = jsxName(host);
+	if (type === null || !/^[a-z]/.test(type)) return null;
+	if (
+		(host.children ?? []).some(
+			(child) => child.type !== 'JSXText' || normalizeJsxText(child.value ?? '') !== '',
+		)
+	) {
+		return null;
+	}
+	const attributes = host.openingElement?.attributes ?? host.attributes ?? [];
+	return attributes.every(isOwnerFreeForAttribute) ? host : null;
+}
+
 function compileFor(node, context, state) {
 	if (node.await) {
 		throw universalError(
@@ -839,6 +920,13 @@ function compileFor(node, context, state) {
 	assertNoResidualTemplate(node.key, state, '@for key');
 	const source = printExpression(node.right);
 	const key = printExpression(node.key);
+	if (!state.hmr && ownerFreeForHost(node) !== null) {
+		const body = compileBlockValue(node.body?.body ?? [], state, `${itemBinding}, ${indexBinding}`);
+		return addDynamic(
+			context,
+			`${state.helpers.for}(${source}, (${itemBinding}, ${indexBinding}) => (${key}), ${body}, null, true, true)`,
+		);
+	}
 	const body = compileBlockValue(node.body?.body ?? [], state, `${itemBinding}, ${indexBinding}`);
 	const empty = node.empty ? compileBlockValue(node.empty?.body ?? [], state) : null;
 	const expression = `${state.helpers.for}(${source}, (${itemBinding}, ${indexBinding}) => (${key}), ${body}${

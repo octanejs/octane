@@ -231,6 +231,8 @@ export interface UniversalForValue {
 	readonly key: (item: any, index: number) => UniversalKey;
 	readonly render: (item: any, index: number) => UniversalRenderable;
 	readonly empty: (() => UniversalRenderable) | null;
+	readonly ownerless: boolean;
+	readonly compact: boolean;
 }
 
 export interface UniversalTryValue {
@@ -290,6 +292,12 @@ export interface UniversalHostCapabilities {
 	readonly localHostCallbacks?: boolean;
 	/** Allows core-owned retained trees to change physical host visibility. */
 	readonly visibility?: boolean;
+	/**
+	 * Opts into owner elision for compiler-proven leaves whose attributes are
+	 * ordinary props rather than callback/event channels. Codec-free local roots
+	 * may additionally compact these leaves.
+	 */
+	readonly compilerLeafProps?: boolean;
 }
 
 export interface UniversalResourceHandle {
@@ -602,10 +610,22 @@ export interface UniversalRoot<P = any> {
 	unmountAsync(): Promise<void>;
 }
 
+interface BlueprintCompactLeafList {
+	host: UniversalHostPlan | null;
+	keys: UniversalKey[];
+	values: (readonly unknown[])[];
+	owner: UniversalOwnerRecord;
+	owners: Array<UniversalOwnerRecord | undefined> | null;
+	visibility: UniversalVisibility;
+	props: Array<Record<string, unknown> | undefined>;
+	propCount: number;
+}
+
 interface BlueprintRange {
 	kind: 'range';
 	key: UniversalKey | null;
 	children: BlueprintNode[];
+	compactLeafList?: BlueprintCompactLeafList;
 }
 
 interface BlueprintHost {
@@ -673,6 +693,11 @@ interface CommittedEvent extends BlueprintEvent {
 interface CommittedHostCallback extends BlueprintHostCallback {
 	readonly listener: number;
 }
+
+const EMPTY_BLUEPRINT_EVENTS = new Map<string, BlueprintEvent>();
+const EMPTY_BLUEPRINT_HOST_CALLBACKS = new Map<string, BlueprintHostCallback>();
+const EMPTY_COMMITTED_EVENTS = new Map<string, CommittedEvent>();
+const EMPTY_COMMITTED_HOST_CALLBACKS = new Map<string, CommittedHostCallback>();
 
 interface DraftRecord {
 	record: LogicalRecord;
@@ -783,11 +808,20 @@ interface RenderAttempt {
 	root: UniversalRootImpl<any, any>;
 	owner: DraftOwner;
 	owners: DraftOwner[];
+	treeFeatures: number;
 	replayEntries: readonly SuspendedMemoEntry[];
 	retryThenables: Set<PromiseLike<unknown>>;
 	nextUniversalId: number;
 	implicitSlot: number;
 }
+
+const UNIVERSAL_TREE_PORTAL = 1 << 0;
+const UNIVERSAL_TREE_REGION = 1 << 1;
+const UNIVERSAL_TREE_EVENT = 1 << 2;
+const UNIVERSAL_TREE_LIFECYCLE = 1 << 3;
+const UNIVERSAL_TREE_LOCAL_CALLBACK = 1 << 4;
+const UNIVERSAL_TREE_REF = 1 << 5;
+const UNIVERSAL_TREE_HIDDEN = 1 << 6;
 
 interface DraftOwner {
 	record: UniversalOwnerRecord;
@@ -798,6 +832,9 @@ interface DraftOwner {
 	seenEffects: EffectHook[];
 	children: DraftOwner[];
 	claimedChildren: Set<UniversalOwnerRecord>;
+	childOwnerBuckets: OwnerIdentityIndex<UniversalOwnerRecord[]> | null;
+	childClaimCursors: OwnerIdentityIndex<number> | null;
+	childReplayOrdinals: OwnerIdentityIndex<number> | null;
 	contextValues: Map<Context<any>, unknown> | null;
 	appliedUpdates: Map<unknown, number>;
 	needsRender: boolean;
@@ -808,6 +845,14 @@ interface DraftOwner {
 	isBoundary: boolean;
 	canHandleSuspense: boolean;
 	visibility: UniversalVisibility;
+}
+
+interface LazyLeafOwnerScope {
+	readonly attempt: RenderAttempt;
+	readonly parent: DraftOwner;
+	readonly identityPath: readonly unknown[];
+	key: UniversalKey;
+	owner: DraftOwner | null;
 }
 
 interface SuspendedOwnerSegment {
@@ -832,8 +877,18 @@ interface SuspendedMemoReplay {
 	asyncWorkQueued: boolean;
 }
 
+interface OwnerIdentityPathNode<T> {
+	readonly children: Map<unknown, OwnerIdentityPathNode<T>>;
+	values: Map<unknown, T> | null;
+}
+
+interface OwnerIdentityIndex<T> {
+	readonly components: Map<UniversalComponent<any> | null, OwnerIdentityPathNode<T>>;
+}
+
 let CURRENT_ATTEMPT: RenderAttempt | null = null;
 let CURRENT_OWNER: DraftOwner | null = null;
+let CURRENT_LAZY_LEAF_OWNER: LazyLeafOwnerScope | null = null;
 const SCHEDULED_UNIVERSAL_ROOTS = new Set<UniversalRootImpl<any, any>>();
 const PENDING_UNIVERSAL_PASSIVE_ROOTS = new Set<UniversalRootImpl<any, any>>();
 let UNIVERSAL_SYNC_DEPTH = 0;
@@ -1211,8 +1266,10 @@ export function universalFor<T>(
 	key: (item: T, index: number) => UniversalKey,
 	render: (item: T, index: number) => UniversalRenderable,
 	empty: (() => UniversalRenderable) | null = null,
+	ownerless = false,
+	compact = false,
 ): UniversalForValue {
-	return { $$kind: UNIVERSAL_FOR, items, key, render, empty };
+	return { $$kind: UNIVERSAL_FOR, items, key, render, empty, ownerless, compact };
 }
 
 export function universalTry(
@@ -1261,10 +1318,11 @@ export function rendererRegion<P>(
 		throw new TypeError('rendererRegion expected a child component function.');
 	}
 	let regionProps = props;
-	if (CURRENT_OWNER !== null) {
-		if (ownerRenderer !== CURRENT_OWNER.record.renderer) {
+	const owner = activateLazyLeafOwner();
+	if (owner !== null) {
+		if (ownerRenderer !== owner.record.renderer) {
 			throw new Error(
-				`rendererRegion owner ${JSON.stringify(ownerRenderer)} does not match the active universal renderer ${JSON.stringify(CURRENT_OWNER.record.renderer)}.`,
+				`rendererRegion owner ${JSON.stringify(ownerRenderer)} does not match the active universal renderer ${JSON.stringify(owner.record.renderer)}.`,
 			);
 		}
 		if ((typeof props !== 'object' && typeof props !== 'function') || props === null) {
@@ -1273,7 +1331,7 @@ export function rendererRegion<P>(
 			);
 		}
 		const bridge = new UniversalRendererRegionOwnerBridge(
-			CURRENT_OWNER.record,
+			owner.record,
 			ownerRenderer,
 			childRenderer,
 			component,
@@ -1375,7 +1433,8 @@ export function hmrUniversalComponent<P>(
 	const wrapper = defineUniversalComponent<P>(
 		renderer,
 		(props, context) => {
-			if (CURRENT_OWNER !== null) owners.add(CURRENT_OWNER.record);
+			const owner = activateLazyLeafOwner();
+			if (owner !== null) owners.add(owner.record);
 			return meta.component(props, context);
 		},
 		{ module: metadata.module },
@@ -1400,6 +1459,59 @@ function identityPathEqual(left: readonly unknown[], right: readonly unknown[]):
 		if (!Object.is(left[index], right[index])) return false;
 	}
 	return true;
+}
+
+const OWNER_IDENTITY_NEGATIVE_ZERO = Symbol('octane.universal.owner-identity.-0');
+
+function ownerIdentityMapKey(value: unknown): unknown {
+	return typeof value === 'number' && Object.is(value, -0) ? OWNER_IDENTITY_NEGATIVE_ZERO : value;
+}
+
+function createOwnerIdentityIndex<T>(): OwnerIdentityIndex<T> {
+	return { components: new Map() };
+}
+
+function readOwnerIdentity<T>(
+	index: OwnerIdentityIndex<T>,
+	component: UniversalComponent<any> | null,
+	identityPath: readonly unknown[],
+	key: unknown,
+): T | undefined {
+	let node = index.components.get(component);
+	if (node === undefined) return undefined;
+	for (const segment of identityPath) {
+		node = node.children.get(ownerIdentityMapKey(segment));
+		if (node === undefined) return undefined;
+	}
+	return node.values?.get(ownerIdentityMapKey(key));
+}
+
+function writeOwnerIdentity<T>(
+	index: OwnerIdentityIndex<T>,
+	component: UniversalComponent<any> | null,
+	identityPath: readonly unknown[],
+	key: unknown,
+	value: T,
+): void {
+	const existing = index.components.get(component);
+	let node: OwnerIdentityPathNode<T>;
+	if (existing === undefined) {
+		node = { children: new Map(), values: null };
+		index.components.set(component, node);
+	} else {
+		node = existing;
+	}
+	for (const segment of identityPath) {
+		const segmentKey = ownerIdentityMapKey(segment);
+		let child: OwnerIdentityPathNode<T> | undefined = node.children.get(segmentKey);
+		if (child === undefined) {
+			child = { children: new Map(), values: null };
+			node.children.set(segmentKey, child);
+		}
+		node = child;
+	}
+	node.values ??= new Map();
+	node.values.set(ownerIdentityMapKey(key), value);
 }
 
 function createOwnerRecord(
@@ -1448,6 +1560,9 @@ function draftOwner(
 		seenEffects: [],
 		children: [],
 		claimedChildren: new Set(),
+		childOwnerBuckets: null,
+		childClaimCursors: null,
+		childReplayOrdinals: null,
 		contextValues: record.contextValues === null ? null : new Map(record.contextValues),
 		appliedUpdates: new Map(),
 		needsRender: false,
@@ -1467,18 +1582,32 @@ function childReplayPath(
 	identityPath: readonly unknown[],
 	key: unknown,
 ): readonly SuspendedOwnerSegment[] {
-	let ordinal = 0;
-	for (const child of parent.children) {
-		const segment = child.replayPath[child.replayPath.length - 1];
-		if (
-			segment.component === component &&
-			Object.is(segment.key, key) &&
-			identityPathEqual(segment.identityPath, identityPath)
-		) {
-			ordinal++;
-		}
-	}
+	const ordinals = (parent.childReplayOrdinals ??= createOwnerIdentityIndex());
+	const ordinal = readOwnerIdentity(ordinals, component, identityPath, key) ?? 0;
+	writeOwnerIdentity(ordinals, component, identityPath, key, ordinal + 1);
 	return [...parent.replayPath, { component, identityPath, key, ordinal }];
+}
+
+function childOwnerBucket(
+	parent: DraftOwner,
+	component: UniversalComponent<any> | null,
+	identityPath: readonly unknown[],
+	key: unknown,
+): UniversalOwnerRecord[] | undefined {
+	let buckets = parent.childOwnerBuckets;
+	if (buckets === null) {
+		buckets = createOwnerIdentityIndex();
+		for (const child of parent.record.children) {
+			let bucket = readOwnerIdentity(buckets, child.component, child.identityPath, child.key);
+			if (bucket === undefined) {
+				bucket = [];
+				writeOwnerIdentity(buckets, child.component, child.identityPath, child.key, bucket);
+			}
+			bucket.push(child);
+		}
+		parent.childOwnerBuckets = buckets;
+	}
+	return readOwnerIdentity(buckets, component, identityPath, key);
 }
 
 function claimChildOwner(
@@ -1489,16 +1618,19 @@ function claimChildOwner(
 ): DraftOwner {
 	const attempt = currentAttempt();
 	let record: UniversalOwnerRecord | undefined;
-	for (const candidate of parent.record.children) {
-		if (parent.claimedChildren.has(candidate)) continue;
-		if (
-			candidate.component === component &&
-			Object.is(candidate.key, key) &&
-			identityPathEqual(candidate.identityPath, identityPath)
-		) {
-			record = candidate;
-			break;
-		}
+	const bucket = childOwnerBucket(parent, component, identityPath, key);
+	if (bucket !== undefined) {
+		const cursors = (parent.childClaimCursors ??= createOwnerIdentityIndex());
+		let cursor = readOwnerIdentity(cursors, component, identityPath, key) ?? 0;
+		while (cursor < bucket.length && parent.claimedChildren.has(bucket[cursor])) cursor++;
+		record = bucket[cursor];
+		writeOwnerIdentity(
+			cursors,
+			component,
+			identityPath,
+			key,
+			cursor + (record === undefined ? 0 : 1),
+		);
 	}
 	record ??= createOwnerRecord(attempt.root, component, parent.record, identityPath, key);
 	parent.claimedChildren.add(record);
@@ -1508,6 +1640,28 @@ function claimChildOwner(
 	return draft;
 }
 
+function activateLazyLeafOwner(): DraftOwner | null {
+	const scope = CURRENT_LAZY_LEAF_OWNER;
+	const attempt = CURRENT_ATTEMPT;
+	if (
+		scope === null ||
+		attempt !== scope.attempt ||
+		(CURRENT_OWNER !== scope.parent && CURRENT_OWNER !== scope.owner)
+	) {
+		return CURRENT_OWNER;
+	}
+	const owner = (scope.owner ??= claimChildOwner(
+		scope.parent,
+		null,
+		scope.identityPath,
+		scope.key,
+	));
+	owner.contextValues = null;
+	CURRENT_OWNER = owner;
+	attempt.owner = owner;
+	return owner;
+}
+
 function readOwnerContext<T>(owner: DraftOwner | null, context: Context<T>): T {
 	for (let current = owner; current !== null; current = current.parent) {
 		if (current.contextValues?.has(context)) return current.contextValues.get(context) as T;
@@ -1515,17 +1669,23 @@ function readOwnerContext<T>(owner: DraftOwner | null, context: Context<T>): T {
 	return currentAttempt().root.readBridgeContext(context);
 }
 
-function executeOwner(owner: DraftOwner, build: () => BlueprintNode[]): BlueprintNode[] {
+function executeOwner(
+	owner: DraftOwner,
+	build: () => BlueprintNode[],
+	initialRenderCount = 0,
+): BlueprintNode[] {
 	const attempt = currentAttempt();
 	const warmPlanCheckpoint = ACTIVE_UNIVERSAL_WARM_PLANS.length;
 	let output: BlueprintNode[] = [];
-	for (let renderCount = 0; ; renderCount++) {
+	for (let renderCount = initialRenderCount; ; renderCount++) {
 		ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
 		if (renderCount === 25) throw new Error('Too many universal render-phase updates.');
 		if (renderCount > 0) resetDraftChildren(owner);
 		owner.seenEffects = [];
 		owner.children = [];
 		owner.claimedChildren = new Set();
+		owner.childClaimCursors = null;
+		owner.childReplayOrdinals = null;
 		owner.needsRender = false;
 		owner.implicitSlot = 0;
 		const previousOwner = CURRENT_OWNER;
@@ -1556,6 +1716,44 @@ function executeOwner(owner: DraftOwner, build: () => BlueprintNode[]): Blueprin
 	}
 }
 
+function renderLazyLeafItem(
+	scope: LazyLeafOwnerScope,
+	render: (item: any, index: number) => UniversalRenderable,
+	item: unknown,
+	index: number,
+	key: UniversalKey,
+): UniversalRenderable {
+	const previousScope = CURRENT_LAZY_LEAF_OWNER;
+	const previousOwner = CURRENT_OWNER;
+	const previousAttemptOwner = scope.attempt.owner;
+	const warmPlanCheckpoint = ACTIVE_UNIVERSAL_WARM_PLANS.length;
+	scope.key = key;
+	scope.owner = null;
+	CURRENT_LAZY_LEAF_OWNER = scope;
+	let rendered: UniversalRenderable;
+	try {
+		rendered = render(item, index);
+		const owner = scope.owner as DraftOwner | null;
+		if (owner?.needsRender) {
+			ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
+			executeOwner(
+				owner,
+				() => {
+					rendered = render(item, index);
+					return [];
+				},
+				1,
+			);
+		}
+		return rendered;
+	} finally {
+		ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
+		CURRENT_LAZY_LEAF_OWNER = previousScope;
+		CURRENT_OWNER = previousOwner;
+		scope.attempt.owner = previousAttemptOwner;
+	}
+}
+
 function ownerRange(owner: DraftOwner, children: BlueprintNode[]): BlueprintNode[] {
 	return [{ kind: 'range', key: owner.record.rangeKey, children }];
 }
@@ -1563,7 +1761,7 @@ function ownerRange(owner: DraftOwner, children: BlueprintNode[]): BlueprintNode
 function componentContext(renderer: string): UniversalRenderContext {
 	return {
 		renderer,
-		readContext: (context) => readOwnerContext(CURRENT_OWNER, context),
+		readContext: (context) => readOwnerContext(activateLazyLeafOwner(), context),
 		insertionEffect: (create, deps) => enqueueUniversalEffect('insertion', create, deps),
 		layoutEffect: (create, deps) => enqueueUniversalEffect('layout', create, deps),
 		effect: (create, deps) => enqueueUniversalEffect('passive', create, deps),
@@ -1637,6 +1835,8 @@ function resetDraftChildren(owner: DraftOwner): void {
 	for (const child of owner.children) disposeUncommittedDraft(child);
 	owner.children = [];
 	owner.claimedChildren = new Set();
+	owner.childClaimCursors = null;
+	owner.childReplayOrdinals = null;
 }
 
 function retainCommittedOwnerTree(owner: DraftOwner): void {
@@ -1646,6 +1846,8 @@ function retainCommittedOwnerTree(owner: DraftOwner): void {
 		owner.record.contextValues === null ? null : new Map(owner.record.contextValues);
 	owner.children = [];
 	owner.claimedChildren = new Set(owner.record.children);
+	owner.childClaimCursors = null;
+	owner.childReplayOrdinals = null;
 	for (const childRecord of owner.record.children) {
 		const child = draftOwner(
 			childRecord,
@@ -1676,6 +1878,7 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 		};
 	}
 	if (record.kind === 'portal') {
+		markUniversalTreeFeature(UNIVERSAL_TREE_PORTAL);
 		return {
 			kind: 'portal',
 			key: record.key,
@@ -1683,6 +1886,16 @@ function blueprintFromLogical(record: LogicalRecord): BlueprintNode {
 			registration: record.portalRegistration,
 			children: record.children.map(blueprintFromLogical),
 		};
+	}
+	if (record.events.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
+	if (record.lifecycles.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_LIFECYCLE);
+	if (record.localCallbacks.size !== 0) {
+		markUniversalTreeFeature(UNIVERSAL_TREE_LOCAL_CALLBACK);
+	}
+	if (record.ref != null) markUniversalTreeFeature(UNIVERSAL_TREE_REF);
+	if (record.visibility !== 'visible') markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
+	for (const value of Object.values(record.props)) {
+		if (isRendererRegion(value)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 	}
 	return {
 		kind: 'host',
@@ -1706,7 +1919,10 @@ function markDraftOwnerSuspenseHidden(owner: DraftOwner): void {
 
 function markBlueprintSuspenseHidden(nodes: readonly BlueprintNode[]): void {
 	for (const node of nodes) {
-		if (node.kind === 'host') node.visibility = 'suspense-hidden';
+		if (node.kind === 'host') {
+			node.visibility = 'suspense-hidden';
+			markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
+		}
 		markBlueprintSuspenseHidden(node.children);
 	}
 }
@@ -1731,6 +1947,142 @@ function retainCommittedTryArm(owner: DraftOwner): BlueprintNode[] | null {
 	const nodes = ownerRange(child, range.children.map(blueprintFromLogical));
 	markBlueprintSuspenseHidden(nodes);
 	return nodes;
+}
+
+const OWNERLESS_LEAF_PLAN_CACHE = new WeakMap<UniversalPlan, UniversalHostPlan | null>();
+
+function ownerlessLeafHostPlan(plan: UniversalPlan): UniversalHostPlan | null {
+	const cached = OWNERLESS_LEAF_PLAN_CACHE.get(plan);
+	if (cached !== undefined) return cached;
+	const root = plan.root;
+	let host: UniversalHostPlan | null = null;
+	if (
+		root.kind === 'host' &&
+		root.type !== '#text' &&
+		root.propsSlot === undefined &&
+		(root.children?.length ?? 0) === 0
+	) {
+		const names = [
+			...Object.keys(root.props ?? {}),
+			...(root.bindings ?? []).map(([name]) => name),
+		];
+		if (!names.some((name) => name === 'key' || name === 'ref' || name === 'children')) {
+			host = root;
+		}
+	}
+	OWNERLESS_LEAF_PLAN_CACHE.set(plan, host);
+	return host;
+}
+
+function materializeOwnerlessLeafValue(
+	value: unknown,
+	expectedRenderer: string,
+	compilerLeafProps: boolean,
+	owner: DraftOwner = CURRENT_OWNER!,
+): BlueprintHost | null {
+	if ((value as UniversalPlanValue)?.$$kind !== UNIVERSAL_VALUE) return null;
+	const planValue = value as UniversalPlanValue;
+	if (planValue.plan.renderer !== expectedRenderer) {
+		throw new Error(
+			`Universal renderer mismatch: root expects ${JSON.stringify(expectedRenderer)} but the plan targets ${JSON.stringify(planValue.plan.renderer)}.`,
+		);
+	}
+	if (planValue.key !== null) return null;
+	const node = ownerlessLeafHostPlan(planValue.plan);
+	if (node === null) return null;
+
+	const props: Record<string, unknown> = { ...(node.props ?? {}) };
+	for (const [name, slot] of node.bindings ?? []) props[name] = planValue.values[slot];
+	let events: Map<string, BlueprintEvent> | null = null;
+	let lifecycles: Map<string, BlueprintHostCallback> | null = null;
+	let localCallbacks: Map<string, BlueprintHostCallback> | null = null;
+	const attempt = currentAttempt();
+	for (const name of Object.keys(props)) {
+		const handler = props[name];
+		if (compilerLeafProps) {
+			if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
+			props[name] = attempt.root.encodeHostProp(node.type, name, handler);
+			continue;
+		}
+		const lifecycle = attempt.root.classifyLifecycle(name, handler);
+		if (lifecycle !== null) {
+			delete props[name];
+			if (handler == null) continue;
+			if (typeof handler !== 'function') {
+				throw new TypeError(
+					`Universal lifecycle prop ${JSON.stringify(name)} for renderer ${JSON.stringify(expectedRenderer)} must be a function, null, or undefined.`,
+				);
+			}
+			(lifecycles ??= new Map()).set(lifecycle.type, {
+				prop: name,
+				type: lifecycle.type,
+				handler: handler as (...args: any[]) => any,
+				owner: owner.record,
+			});
+			continue;
+		}
+		const local = attempt.root.classifyLocalCallback(name, handler);
+		if (local !== null) {
+			delete props[name];
+			if (attempt.root.driverCapabilities().localHostCallbacks !== true) {
+				throw new Error(
+					`Universal renderer ${JSON.stringify(expectedRenderer)} does not declare the local-host-callback capability.`,
+				);
+			}
+			if (handler == null) continue;
+			if (typeof handler !== 'function') {
+				throw new TypeError(
+					`Universal local callback prop ${JSON.stringify(name)} for renderer ${JSON.stringify(expectedRenderer)} must be a function, null, or undefined.`,
+				);
+			}
+			(localCallbacks ??= new Map()).set(local.type, {
+				prop: name,
+				type: local.type,
+				handler: handler as (...args: any[]) => any,
+				owner: owner.record,
+			});
+			continue;
+		}
+		const definition = attempt.root.classifyEvent(name);
+		if (definition !== null) {
+			delete props[name];
+			if (handler == null) continue;
+			if (typeof handler !== 'function') {
+				throw new TypeError(
+					`Universal event prop ${JSON.stringify(name)} for renderer ${JSON.stringify(expectedRenderer)} must be a function, null, or undefined.`,
+				);
+			}
+			(events ??= new Map()).set(definition.type, {
+				prop: name,
+				type: definition.type,
+				priority: definition.priority ?? 'default',
+				handler: handler as (...args: any[]) => any,
+				owner: owner.record,
+			});
+			continue;
+		}
+		if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
+		props[name] = attempt.root.encodeHostProp(node.type, name, handler);
+	}
+	if (events !== null && events.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
+	if (lifecycles !== null && lifecycles.size !== 0)
+		markUniversalTreeFeature(UNIVERSAL_TREE_LIFECYCLE);
+	if (localCallbacks !== null && localCallbacks.size !== 0)
+		markUniversalTreeFeature(UNIVERSAL_TREE_LOCAL_CALLBACK);
+	if (owner.visibility !== 'visible') markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
+	return {
+		kind: 'host',
+		key: null,
+		type: node.type,
+		props,
+		ref: null,
+		owner: owner.record,
+		events: events ?? EMPTY_BLUEPRINT_EVENTS,
+		lifecycles: lifecycles ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
+		localCallbacks: localCallbacks ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
+		visibility: owner.visibility,
+		children: [],
+	};
 }
 
 function materializeValue(
@@ -1788,6 +2140,7 @@ function materializeValue(
 	}
 	if ((value as UniversalPortalValue)?.$$kind === UNIVERSAL_PORTAL) {
 		const portal = value as UniversalPortalValue;
+		markUniversalTreeFeature(UNIVERSAL_TREE_PORTAL);
 		return [
 			{
 				kind: 'portal',
@@ -1844,17 +2197,164 @@ function materializeValue(
 		const list = value as UniversalForValue;
 		const output: BlueprintNode[] = [];
 		const keys = new Set<UniversalKey>();
+		const compilerLeafProps =
+			list.ownerless && currentAttempt().root.driverCapabilities().compilerLeafProps === true;
+		if (list.ownerless && list.compact && currentAttempt().root.canCompactCompilerLeafProps()) {
+			const attempt = currentAttempt();
+			const parent = CURRENT_OWNER!;
+			const lazyOwnerScope: LazyLeafOwnerScope = {
+				attempt,
+				parent,
+				identityPath: [...path, 'for'],
+				key: 0,
+				owner: null,
+			};
+			const compactKeys: UniversalKey[] = [];
+			const compactValues: (readonly unknown[])[] = [];
+			let compactOwners: Array<UniversalOwnerRecord | undefined> | null = null;
+			let compactPlan: UniversalPlan | null = null;
+			let compactHost: UniversalHostPlan | null = null;
+			let compactIndex = 0;
+			for (const item of list.items) {
+				const itemIndex = compactIndex++;
+				const itemKey = list.key(item, itemIndex);
+				if (keys.has(itemKey)) {
+					throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
+				}
+				keys.add(itemKey);
+				const rendered = renderLazyLeafItem(lazyOwnerScope, list.render, item, itemIndex, itemKey);
+				if (lazyOwnerScope.owner !== null) {
+					(compactOwners ??= [])[itemIndex] = lazyOwnerScope.owner.record;
+				}
+				if ((rendered as UniversalPlanValue)?.$$kind !== UNIVERSAL_VALUE) {
+					throw new Error(
+						'Compact universal lists require one compiler-proven intrinsic leaf host per item.',
+					);
+				}
+				const planValue = rendered as UniversalPlanValue;
+				if (planValue.plan.renderer !== expectedRenderer) {
+					throw new Error(
+						`Universal renderer mismatch: root expects ${JSON.stringify(expectedRenderer)} but the plan targets ${JSON.stringify(planValue.plan.renderer)}.`,
+					);
+				}
+				if (compactPlan !== null && compactPlan !== planValue.plan) {
+					throw new Error(
+						'Compact universal lists require one stable intrinsic leaf plan per item.',
+					);
+				}
+				const host: UniversalHostPlan | null =
+					compactPlan === null ? ownerlessLeafHostPlan(planValue.plan) : compactHost;
+				if (planValue.key !== null || host === null) {
+					throw new Error(
+						'Compact universal lists require one stable intrinsic leaf plan per item.',
+					);
+				}
+				if (compactPlan === null) {
+					compactPlan = planValue.plan;
+					compactHost = host;
+					if (host.props !== undefined) {
+						for (const name of Object.keys(host.props)) {
+							if (isRendererRegion(host.props[name])) {
+								markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
+							}
+						}
+					}
+				}
+				for (const [, slot] of host.bindings ?? []) {
+					const binding = planValue.values[slot];
+					if (typeof binding === 'object' && binding !== null && isRendererRegion(binding)) {
+						markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
+					}
+				}
+				compactKeys.push(itemKey);
+				compactValues.push(planValue.values);
+			}
+			if (compactIndex === 0 && list.empty !== null) {
+				return materializeScoped(CURRENT_OWNER!, [...path, 'for-empty'], null, list.empty);
+			}
+			const owner = parent;
+			if (compactIndex !== 0 && owner.visibility !== 'visible') {
+				markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
+			}
+			return [
+				{
+					kind: 'range',
+					key: null,
+					children: [],
+					compactLeafList: {
+						host: compactHost,
+						keys: compactKeys,
+						values: compactValues,
+						owner: owner.record,
+						owners: compactOwners,
+						visibility: owner.visibility,
+						props: [],
+						propCount: -1,
+					},
+				},
+			];
+		}
+		const parent = CURRENT_OWNER!;
+		const attempt = currentAttempt();
+		const lazyOwnerScope: LazyLeafOwnerScope | null = compilerLeafProps
+			? {
+					attempt,
+					parent,
+					identityPath: [...path, 'for'],
+					key: 0,
+					owner: null,
+				}
+			: null;
 		let index = 0;
 		for (const item of list.items) {
 			const itemIndex = index++;
 			const itemKey = list.key(item, itemIndex);
 			if (keys.has(itemKey)) throw new Error(`Duplicate universal list key ${String(itemKey)}.`);
 			keys.add(itemKey);
-			output.push(
-				...materializeScoped(CURRENT_OWNER!, [...path, 'for'], itemKey, () =>
-					list.render(item, itemIndex),
-				),
-			);
+			if (compilerLeafProps) {
+				const rendered = renderLazyLeafItem(lazyOwnerScope!, list.render, item, itemIndex, itemKey);
+				const itemOwner = lazyOwnerScope!.owner ?? parent;
+				const leaf = materializeOwnerlessLeafValue(
+					rendered,
+					expectedRenderer,
+					compilerLeafProps,
+					itemOwner,
+				);
+				if (leaf !== null) {
+					leaf.key = itemKey;
+					output.push(leaf);
+					continue;
+				}
+				const previousOwner = CURRENT_OWNER;
+				const previousAttemptOwner = attempt.owner;
+				CURRENT_OWNER = itemOwner;
+				attempt.owner = itemOwner;
+				let nodes: BlueprintNode[];
+				try {
+					nodes = materializeValue(rendered, expectedRenderer, null, [...path, 'for', itemKey]);
+				} finally {
+					CURRENT_OWNER = previousOwner;
+					attempt.owner = previousAttemptOwner;
+				}
+				if (
+					nodes.length !== 1 ||
+					nodes[0].kind !== 'host' ||
+					nodes[0].key !== null ||
+					nodes[0].children.length !== 0
+				) {
+					throw new Error(
+						'Ownerless universal lists require exactly one intrinsic leaf host per item.',
+					);
+				}
+				nodes[0].key = itemKey;
+				output.push(nodes[0]);
+			} else {
+				output.push(
+					...materializeScoped(parent, [...path, 'for'], itemKey, () =>
+						list.render(item, itemIndex),
+					),
+				);
+			}
 		}
 		if (index === 0 && list.empty !== null) {
 			return materializeScoped(CURRENT_OWNER!, [...path, 'for-empty'], null, list.empty);
@@ -2107,9 +2607,9 @@ function materializeNode(
 	delete props.ref;
 	delete props.key;
 	delete props.children;
-	const events = new Map<string, BlueprintEvent>();
-	const lifecycles = new Map<string, BlueprintHostCallback>();
-	const localCallbacks = new Map<string, BlueprintHostCallback>();
+	let events: Map<string, BlueprintEvent> | null = null;
+	let lifecycles: Map<string, BlueprintHostCallback> | null = null;
+	let localCallbacks: Map<string, BlueprintHostCallback> | null = null;
 	for (const name of Object.keys(props)) {
 		const handler = props[name];
 		const lifecycle = currentAttempt().root.classifyLifecycle(name, handler);
@@ -2121,7 +2621,7 @@ function materializeNode(
 					`Universal lifecycle prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
 				);
 			}
-			lifecycles.set(lifecycle.type, {
+			(lifecycles ??= new Map()).set(lifecycle.type, {
 				prop: name,
 				type: lifecycle.type,
 				handler: handler as (...args: any[]) => any,
@@ -2143,7 +2643,7 @@ function materializeNode(
 					`Universal local callback prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
 				);
 			}
-			localCallbacks.set(local.type, {
+			(localCallbacks ??= new Map()).set(local.type, {
 				prop: name,
 				type: local.type,
 				handler: handler as (...args: any[]) => any,
@@ -2160,7 +2660,7 @@ function materializeNode(
 					`Universal event prop ${JSON.stringify(name)} for renderer ${JSON.stringify(renderer)} must be a function, null, or undefined.`,
 				);
 			}
-			events.set(definition.type, {
+			(events ??= new Map()).set(definition.type, {
 				prop: name,
 				type: definition.type,
 				priority: definition.priority ?? 'default',
@@ -2169,8 +2669,16 @@ function materializeNode(
 			});
 			continue;
 		}
+		if (isRendererRegion(handler)) markUniversalTreeFeature(UNIVERSAL_TREE_REGION);
 		props[name] = currentAttempt().root.encodeHostProp(node.type, name, handler);
 	}
+	if (events !== null && events.size !== 0) markUniversalTreeFeature(UNIVERSAL_TREE_EVENT);
+	if (lifecycles !== null && lifecycles.size !== 0)
+		markUniversalTreeFeature(UNIVERSAL_TREE_LIFECYCLE);
+	if (localCallbacks !== null && localCallbacks.size !== 0)
+		markUniversalTreeFeature(UNIVERSAL_TREE_LOCAL_CALLBACK);
+	if (ref != null) markUniversalTreeFeature(UNIVERSAL_TREE_REF);
+	if (CURRENT_OWNER!.visibility !== 'visible') markUniversalTreeFeature(UNIVERSAL_TREE_HIDDEN);
 	const children: BlueprintNode[] = [];
 	if ((node.children?.length ?? 0) > 0) {
 		for (let index = 0; index < node.children!.length; index++) {
@@ -2189,9 +2697,9 @@ function materializeNode(
 			props,
 			ref,
 			owner: CURRENT_OWNER!.record,
-			events,
-			lifecycles,
-			localCallbacks,
+			events: events ?? EMPTY_BLUEPRINT_EVENTS,
+			lifecycles: lifecycles ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
+			localCallbacks: localCallbacks ?? EMPTY_BLUEPRINT_HOST_CALLBACKS,
 			visibility: CURRENT_OWNER!.visibility,
 			children,
 		},
@@ -2236,9 +2744,9 @@ function createLogicalRecord(id: number, blueprint: BlueprintNode): LogicalRecor
 		refCleanup: null,
 		refAttached: false,
 		owner: null,
-		events: new Map(),
-		lifecycles: new Map(),
-		localCallbacks: new Map(),
+		events: EMPTY_COMMITTED_EVENTS,
+		lifecycles: EMPTY_COMMITTED_HOST_CALLBACKS,
+		localCallbacks: EMPTY_COMMITTED_HOST_CALLBACKS,
 		visibility: blueprint.kind === 'host' ? blueprint.visibility : 'visible',
 		portalRegistration: null,
 		parent: null,
@@ -2249,16 +2757,22 @@ function createLogicalRecord(id: number, blueprint: BlueprintNode): LogicalRecor
 function shallowPropsEqual(
 	left: Readonly<Record<string, unknown>>,
 	right: Readonly<Record<string, unknown>>,
+	rightCountHint = -1,
 ): boolean {
-	const leftKeys = Object.keys(left);
-	const rightKeys = Object.keys(right);
-	if (leftKeys.length !== rightKeys.length) return false;
-	for (const key of leftKeys) {
+	let leftCount = 0;
+	for (const key in left) {
+		if (!Object.prototype.hasOwnProperty.call(left, key)) continue;
+		leftCount++;
 		if (!Object.prototype.hasOwnProperty.call(right, key) || !Object.is(left[key], right[key])) {
 			return false;
 		}
 	}
-	return true;
+	if (rightCountHint >= 0) return leftCount === rightCountHint;
+	let rightCount = 0;
+	for (const key in right) {
+		if (Object.prototype.hasOwnProperty.call(right, key)) rightCount++;
+	}
+	return leftCount === rightCount;
 }
 
 function physicalRecords(records: readonly LogicalRecord[]): LogicalRecord[] {
@@ -2471,9 +2985,13 @@ function currentAttempt(): RenderAttempt {
 	return CURRENT_ATTEMPT;
 }
 
+function markUniversalTreeFeature(feature: number): void {
+	currentAttempt().treeFeatures |= feature;
+}
+
 function resolveHookSlot(slot: unknown): unknown {
 	currentAttempt();
-	const owner = CURRENT_OWNER;
+	const owner = activateLazyLeafOwner();
 	if (owner === null) {
 		throw new Error('Universal hooks require an active component owner.');
 	}
@@ -2517,10 +3035,11 @@ function scheduleOwner(owner: UniversalOwnerRecord, slot?: unknown): void {
 
 function currentDraftOwner(): DraftOwner {
 	currentAttempt();
-	if (CURRENT_OWNER === null) {
+	const owner = activateLazyLeafOwner();
+	if (owner === null) {
 		throw new Error('Universal hooks require an active component owner.');
 	}
-	return CURRENT_OWNER;
+	return owner;
 }
 
 function findDraftOwner(record: UniversalOwnerRecord): DraftOwner | null {
@@ -3183,6 +3702,7 @@ export function warmChild(component: any, props: any): void {
 }
 
 export function use<T>(usable: Context<T> | PromiseLike<T>): T {
+	currentDraftOwner();
 	if ((usable as Context<T>)?.$$kind === Symbol.for('octane.context')) {
 		return useContext(usable as Context<T>);
 	}
@@ -3382,19 +3902,19 @@ function freezeUniversalHostBatch(
 	version: number,
 	commands: readonly UniversalHostCommand[],
 ): UniversalHostBatch {
-	const frozenCommands = commands.map((command) => {
+	for (const command of commands) {
 		if (
 			(command.op === 'event' || command.op === 'lifecycle' || command.op === 'local-callback') &&
 			command.listener !== null
 		) {
 			Object.freeze(command.listener);
 		}
-		return Object.freeze(command);
-	});
+		Object.freeze(command);
+	}
 	return Object.freeze({
 		renderer,
 		version,
-		commands: Object.freeze(frozenCommands),
+		commands: Object.freeze(commands),
 	});
 }
 
@@ -3432,6 +3952,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private nextListener = NEXT_EVENT_ROOT++ * 1_000_000;
 	private nextBatchVersion = 1;
 	private acceptedBatchVersion = 0;
+	private treeFeatures = 0;
 	private handlers = new Map<number, CommittedEvent>();
 	private localCallbacks = new Map<number, CommittedHostCallback>();
 	private readonly publishedListeners = new Set<number>();
@@ -3638,6 +4159,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	driverCapabilities(): UniversalHostCapabilities {
 		return this.driver.capabilities ?? {};
+	}
+
+	canCompactCompilerLeafProps(): boolean {
+		return (
+			this.transport === null &&
+			this.driver.props === undefined &&
+			this.driver.capabilities?.compilerLeafProps === true
+		);
 	}
 
 	private createPortalTargetHandle(id: string | number): UniversalPortalTargetHandle {
@@ -4156,6 +4685,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			root: this,
 			owner,
 			owners: [owner],
+			treeFeatures: 0,
 			replayEntries,
 			retryThenables: new Set(),
 			nextUniversalId: this.nextUniversalId,
@@ -4223,13 +4753,448 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return attempt;
 	}
 
+	private stableAttemptOwnersEqual(attempt: RenderAttempt): boolean {
+		const contextValuesEqual = (
+			previous: Map<Context<any>, unknown> | null,
+			next: Map<Context<any>, unknown> | null,
+		) => {
+			if (previous === null || next === null) return previous === next;
+			if (previous.size !== next.size) return false;
+			for (const [context, value] of next) {
+				if (!previous.has(context) || !Object.is(previous.get(context), value)) return false;
+			}
+			return true;
+		};
+		let ownerCount = 0;
+		const validateOwner = (draft: DraftOwner, parent: DraftOwner | null): boolean => {
+			ownerCount++;
+			const record = draft.record;
+			if (
+				!record.mounted ||
+				record.disposed ||
+				record.parent !== (parent?.record ?? null) ||
+				record.visibility !== draft.visibility ||
+				record.isBoundary !== draft.isBoundary ||
+				record.canHandleSuspense !== draft.canHandleSuspense ||
+				record.hasBoundaryError !== draft.hasBoundaryError ||
+				!Object.is(record.boundaryError, draft.boundaryError) ||
+				record.boundaryThenable !== draft.boundaryThenable ||
+				!contextValuesEqual(record.contextValues, draft.contextValues) ||
+				draft.appliedUpdates.size !== 0 ||
+				record.updates.size !== 0 ||
+				record.children.length !== draft.children.length ||
+				record.effectOrder.length !== draft.seenEffects.length ||
+				record.hooks.size !== draft.hooks.size
+			) {
+				return false;
+			}
+			for (let index = 0; index < draft.children.length; index++) {
+				if (record.children[index] !== draft.children[index].record) return false;
+			}
+			for (let index = 0; index < draft.seenEffects.length; index++) {
+				const next = draft.seenEffects[index];
+				const previous = record.effectOrder[index];
+				if (
+					previous.kind !== 'effect' ||
+					next.previous !== previous ||
+					next.phase !== previous.phase ||
+					!previous.mounted ||
+					!depsEqual(previous.deps, next.deps)
+				) {
+					return false;
+				}
+			}
+			for (const hook of draft.hooks.values()) if (hook.kind !== 'effect') return false;
+			for (const child of draft.children) if (!validateOwner(child, draft)) return false;
+			return true;
+		};
+		return validateOwner(attempt.owner, null) && ownerCount === attempt.owners.length;
+	}
+
+	private compactLeafProps(list: BlueprintCompactLeafList, index: number): Record<string, unknown> {
+		const cached = list.props[index];
+		if (cached !== undefined) return cached;
+		if (list.host === null) {
+			throw new Error('A compact universal leaf list has no host plan.');
+		}
+		const host = list.host;
+		const props: Record<string, unknown> = host.props === undefined ? {} : { ...host.props };
+		const values = list.values[index];
+		const bindings = host.bindings;
+		if (bindings !== undefined) {
+			for (let bindingIndex = 0; bindingIndex < bindings.length; bindingIndex++) {
+				const binding = bindings[bindingIndex];
+				props[binding[0]] = values[binding[1]];
+			}
+		}
+		if (this.driver.props !== undefined || this.transport !== null) {
+			for (const name of Object.keys(props)) {
+				props[name] = this.encodeHostProp(host.type, name, props[name]);
+			}
+		}
+		if (list.propCount < 0) list.propCount = Object.keys(props).length;
+		list.props[index] = props;
+		return props;
+	}
+
+	private expandCompactLeafLists(node: BlueprintNode): void {
+		let expanded: BlueprintNode[] | null = null;
+		for (let index = 0; index < node.children.length; index++) {
+			const child = node.children[index];
+			const list = child.kind === 'range' ? child.compactLeafList : undefined;
+			if (list === undefined) {
+				this.expandCompactLeafLists(child);
+				if (expanded !== null) expanded.push(child);
+				continue;
+			}
+
+			expanded ??= node.children.slice(0, index);
+			const hosts: BlueprintHost[] = [];
+			if (list.host !== null) {
+				const host = list.host;
+				for (let leafIndex = 0; leafIndex < list.keys.length; leafIndex++) {
+					hosts.push({
+						kind: 'host',
+						key: list.keys[leafIndex],
+						type: host.type,
+						props: this.compactLeafProps(list, leafIndex),
+						ref: null,
+						owner: list.owners?.[leafIndex] ?? list.owner,
+						events: EMPTY_BLUEPRINT_EVENTS,
+						lifecycles: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+						localCallbacks: EMPTY_BLUEPRINT_HOST_CALLBACKS,
+						visibility: list.visibility,
+						children: [],
+					});
+				}
+			}
+			if (child.key === null) expanded.push(...hosts);
+			else expanded.push({ kind: 'range', key: child.key, children: hosts });
+		}
+		if (expanded !== null) node.children = expanded;
+	}
+
+	private tryCreateCompactLeafUpdateTransaction(
+		blueprint: BlueprintRange,
+		attempt: RenderAttempt,
+		component: UniversalComponent<any>,
+		props: any,
+	): UniversalTransactionImpl<Container, PublicInstance> | null {
+		if (
+			this.transport !== null ||
+			this.owner === null ||
+			attempt.owner.record !== this.owner ||
+			this.treeFeatures !== 0 ||
+			attempt.treeFeatures !== 0 ||
+			attempt.retryThenables.size !== 0 ||
+			!this.stableAttemptOwnersEqual(attempt)
+		) {
+			return null;
+		}
+
+		const matches: {
+			list: BlueprintCompactLeafList;
+			records: readonly LogicalRecord[];
+			start: number;
+		}[] = [];
+		let sawCompactList = false;
+		const pairChildren = (
+			records: readonly LogicalRecord[],
+			blueprints: readonly BlueprintNode[],
+		): boolean => {
+			let recordIndex = 0;
+			for (const next of blueprints) {
+				const list = next.kind === 'range' ? next.compactLeafList : undefined;
+				if (list !== undefined) {
+					sawCompactList = true;
+					if (next.key !== null || list.owners !== null) return false;
+					if (list.host === null) continue;
+					const host = list.host;
+					if (list.keys.length !== list.values.length) return false;
+					const start = recordIndex;
+					for (let leafIndex = 0; leafIndex < list.keys.length; leafIndex++) {
+						const record = records[recordIndex++];
+						if (
+							record === undefined ||
+							record.kind !== 'host' ||
+							!Object.is(record.key, list.keys[leafIndex]) ||
+							record.type !== host.type ||
+							record.children.length !== 0 ||
+							record.owner !== list.owner
+						) {
+							return false;
+						}
+					}
+					matches.push({ list, records, start });
+					continue;
+				}
+
+				const record = records[recordIndex++];
+				if (
+					record === undefined ||
+					record.kind !== 'range' ||
+					next.kind !== 'range' ||
+					!sameRecordShape(record, next) ||
+					!pairChildren(record.children, next.children)
+				) {
+					return false;
+				}
+			}
+			return recordIndex === records.length;
+		};
+		if (!pairChildren(this.rootRecord.children, blueprint.children) || !sawCompactList) {
+			return null;
+		}
+
+		for (const { list } of matches) {
+			for (let index = 0; index < list.keys.length; index++) this.compactLeafProps(list, index);
+		}
+		const commands: UniversalHostCommand[] = [];
+		for (const { list, records, start } of matches) {
+			const host = list.host!;
+			for (let index = 0; index < list.keys.length; index++) {
+				const record = records[start + index];
+				const hostProps = list.props[index]!;
+				if (shallowPropsEqual(record.props, hostProps, list.propCount)) continue;
+				const kind = this.driver.updates?.classify(host.type, record.props, hostProps) ?? 'update';
+				const frozenProps = Object.freeze(hostProps);
+				if (kind === 'update') {
+					commands.push({ op: 'update', id: record.id, props: frozenProps });
+				} else if (kind === 'recreate') {
+					commands.push({
+						op: 'recreate',
+						id: record.id,
+						type: host.type,
+						props: frozenProps,
+					});
+				} else {
+					throw new TypeError(
+						`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
+					);
+				}
+			}
+		}
+		if (commands.length === 0) return null;
+
+		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
+		const preparedHost = this.driver.prepareBatch(this.container, batch, {
+			invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
+		});
+		if (
+			preparedHost === null ||
+			typeof preparedHost !== 'object' ||
+			typeof preparedHost.apply !== 'function' ||
+			typeof preparedHost.abort !== 'function' ||
+			(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
+		) {
+			throw new TypeError('A universal host driver must return a valid prepared batch token.');
+		}
+		return new UniversalTransactionImpl(
+			this,
+			batch,
+			() => preparedHost.apply(),
+			null,
+			this.transportIdentity(batch.version),
+			() => {
+				for (const { list, records, start } of matches) {
+					for (let index = 0; index < list.keys.length; index++) {
+						records[start + index].props = list.props[index]!;
+					}
+				}
+				for (const draft of attempt.owners) {
+					const record = draft.record;
+					record.parent = draft.parent?.record ?? null;
+					record.hooks = draft.hooks;
+					record.effectOrder = [...draft.seenEffects];
+					record.children = draft.children.map((child) => child.record);
+					record.contextValues = draft.contextValues;
+					record.isBoundary = draft.isBoundary;
+					record.canHandleSuspense = draft.canHandleSuspense;
+					record.boundaryError = draft.boundaryError;
+					record.hasBoundaryError = draft.hasBoundaryError;
+					record.boundaryThenable = draft.boundaryThenable;
+					record.visibility = draft.visibility;
+					record.mounted = true;
+					record.disposed = false;
+				}
+				this.owner = attempt.owner.record;
+				this.lastComponent = component;
+				this.lastProps = props;
+				this.nextUniversalId = attempt.nextUniversalId;
+				this.treeFeatures = 0;
+			},
+			() => preparedHost.afterAccept?.(),
+			() => {},
+			() => {},
+			() => {},
+			null,
+			() => preparedHost.abort(),
+			() => this.discardDraftOwners(attempt.owners),
+		);
+	}
+
+	private tryCreateStableLeafUpdateTransaction(
+		blueprint: BlueprintRange,
+		attempt: RenderAttempt,
+		component: UniversalComponent<any>,
+		props: any,
+	): UniversalTransactionImpl<Container, PublicInstance> | null {
+		if (
+			this.transport !== null ||
+			this.owner === null ||
+			attempt.owner.record !== this.owner ||
+			this.treeFeatures !== 0 ||
+			attempt.treeFeatures !== 0 ||
+			attempt.retryThenables.size !== 0
+		) {
+			return null;
+		}
+
+		if (!this.stableAttemptOwnersEqual(attempt)) return null;
+
+		const hostRecords: LogicalRecord[] = [];
+		const hostBlueprints: BlueprintHost[] = [];
+		const commands: UniversalHostCommand[] = [];
+		const pairChildren = (
+			records: readonly LogicalRecord[],
+			blueprints: readonly BlueprintNode[],
+		): boolean => {
+			if (records.length !== blueprints.length) return false;
+			for (let index = 0; index < records.length; index++) {
+				const record = records[index];
+				const next = blueprints[index];
+				if (!sameRecordShape(record, next) || record.kind === 'portal') return false;
+				if (record.kind === 'host') {
+					if (next.kind !== 'host') return false;
+					if (
+						record.children.length !== 0 ||
+						next.children.length !== 0 ||
+						record.owner !== next.owner
+					) {
+						return false;
+					}
+					hostRecords.push(record);
+					hostBlueprints.push(next);
+				} else if (!pairChildren(record.children, next.children)) {
+					return false;
+				}
+			}
+			return true;
+		};
+		if (!pairChildren(this.rootRecord.children, blueprint.children)) return null;
+		for (let index = 0; index < hostRecords.length; index++) {
+			const record = hostRecords[index];
+			const host = hostBlueprints[index];
+			if (shallowPropsEqual(record.props, host.props)) continue;
+			const kind = this.driver.updates?.classify(host.type, record.props, host.props) ?? 'update';
+			const frozenProps = Object.freeze(host.props);
+			if (kind === 'update') {
+				commands.push({ op: 'update', id: record.id, props: frozenProps });
+			} else if (kind === 'recreate') {
+				commands.push({
+					op: 'recreate',
+					id: record.id,
+					type: host.type,
+					props: frozenProps,
+				});
+			} else {
+				throw new TypeError(
+					`Universal update classifier returned invalid kind ${JSON.stringify(kind)}.`,
+				);
+			}
+		}
+		if (commands.length === 0) return null;
+
+		const batch = freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, commands);
+		const preparedHost = this.driver.prepareBatch(this.container, batch, {
+			invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
+		});
+		if (
+			preparedHost === null ||
+			typeof preparedHost !== 'object' ||
+			typeof preparedHost.apply !== 'function' ||
+			typeof preparedHost.abort !== 'function' ||
+			(preparedHost.afterAccept !== undefined && typeof preparedHost.afterAccept !== 'function')
+		) {
+			throw new TypeError('A universal host driver must return a valid prepared batch token.');
+		}
+		const transaction = new UniversalTransactionImpl(
+			this,
+			batch,
+			() => preparedHost.apply(),
+			null,
+			this.transportIdentity(batch.version),
+			() => {
+				for (let index = 0; index < hostRecords.length; index++) {
+					const record = hostRecords[index];
+					const host = hostBlueprints[index];
+					record.props = host.props;
+					record.owner = host.owner;
+				}
+				for (const draft of attempt.owners) {
+					const record = draft.record;
+					record.parent = draft.parent?.record ?? null;
+					record.hooks = draft.hooks;
+					record.effectOrder = [...draft.seenEffects];
+					record.children = draft.children.map((child) => child.record);
+					record.contextValues = draft.contextValues;
+					record.isBoundary = draft.isBoundary;
+					record.canHandleSuspense = draft.canHandleSuspense;
+					record.boundaryError = draft.boundaryError;
+					record.hasBoundaryError = draft.hasBoundaryError;
+					record.boundaryThenable = draft.boundaryThenable;
+					record.visibility = draft.visibility;
+					record.mounted = true;
+					record.disposed = false;
+				}
+				this.owner = attempt.owner.record;
+				this.lastComponent = component;
+				this.lastProps = props;
+				this.nextUniversalId = attempt.nextUniversalId;
+				this.treeFeatures = 0;
+			},
+			() => preparedHost.afterAccept?.(),
+			() => {},
+			() => {},
+			() => {},
+			null,
+			() => preparedHost.abort(),
+			() => this.discardDraftOwners(attempt.owners),
+		);
+		return transaction;
+	}
+
 	private createTransaction(
 		blueprint: BlueprintRange,
 		attempt: RenderAttempt,
 		component: UniversalComponent<any>,
 		props: any,
 	): UniversalTransactionImpl<Container, PublicInstance> {
+		const compactLeafUpdate = this.tryCreateCompactLeafUpdateTransaction(
+			blueprint,
+			attempt,
+			component,
+			props,
+		);
+		if (compactLeafUpdate !== null) return compactLeafUpdate;
+		this.expandCompactLeafLists(blueprint);
+		const stableLeafUpdate = this.tryCreateStableLeafUpdateTransaction(
+			blueprint,
+			attempt,
+			component,
+			props,
+		);
+		if (stableLeafUpdate !== null) return stableLeafUpdate;
 		const stagedPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		if (((this.treeFeatures | attempt.treeFeatures) & UNIVERSAL_TREE_PORTAL) === 0) {
+			return this.createPreparedTransaction(
+				blueprint,
+				attempt,
+				component,
+				props,
+				stagedPortalRegistrations,
+			);
+		}
 		const preparePortals = (node: BlueprintNode) => {
 			if (node.kind === 'portal' && node.registration === null) {
 				node.registration = this.preparePortalTarget(node.target);
@@ -4266,11 +5231,30 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		stagedPortalRegistrations: Set<UniversalPortalTargetRegistration>,
 	): UniversalTransactionImpl<Container, PublicInstance> {
 		let nextId = this.nextId;
+		const treeFeatures = this.treeFeatures | attempt.treeFeatures;
 		const used = new Set<LogicalRecord>([this.rootRecord]);
+		let topologyChanged = false;
 		const reconcileChildren = (
 			oldChildren: readonly LogicalRecord[],
 			blueprints: readonly BlueprintNode[],
 		): DraftRecord[] => {
+			if (
+				(treeFeatures & UNIVERSAL_TREE_PORTAL) === 0 &&
+				oldChildren.length === blueprints.length &&
+				oldChildren.every((record, index) => sameRecordShape(record, blueprints[index]))
+			) {
+				return oldChildren.map((record, index) => {
+					used.add(record);
+					const blueprint = blueprints[index];
+					return {
+						record,
+						blueprint,
+						children: reconcileChildren(record.children, blueprint.children),
+						isNew: false,
+						hostUpdate: null,
+					};
+				});
+			}
 			const keyed = new Map<UniversalKey, LogicalRecord>();
 			for (const old of oldChildren) if (old.key !== null) keyed.set(old.key, old);
 			const claimed = new Set<LogicalRecord>();
@@ -4315,6 +5299,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						stagedPortalRegistrations.delete(nextRegistration);
 						nextRegistration.release();
 						child.registration = previousRegistration;
+					} else if (
+						previousRegistration !== null &&
+						nextRegistration !== null &&
+						!Object.is(previousRegistration.handle, nextRegistration.handle)
+					) {
+						topologyChanged = true;
 					}
 				}
 				const isNew = record === undefined;
@@ -4328,6 +5318,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					isNew,
 					hostUpdate: null,
 				});
+			}
+			if (
+				oldChildren.length !== output.length ||
+				output.some((draft, index) => draft.record !== oldChildren[index])
+			) {
+				topologyChanged = true;
 			}
 			return output;
 		};
@@ -4346,77 +5342,83 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				else findRemoved(child);
 			}
 		};
-		findRemoved(this.rootRecord);
+		if (topologyChanged) findRemoved(this.rootRecord);
 		const previousPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
-		for (const child of this.rootRecord.children) {
-			walkLogical(child, (record) => {
-				if (record.kind === 'portal' && record.portalRegistration !== null) {
-					previousPortalRegistrations.add(record.portalRegistration);
+		const nextPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		if ((treeFeatures & UNIVERSAL_TREE_PORTAL) !== 0) {
+			for (const child of this.rootRecord.children) {
+				walkLogical(child, (record) => {
+					if (record.kind === 'portal' && record.portalRegistration !== null) {
+						previousPortalRegistrations.add(record.portalRegistration);
+					}
+				});
+			}
+			walkDraft(draftRoot, (draft) => {
+				if (draft.blueprint.kind !== 'portal') return;
+				const registration = draft.blueprint.registration;
+				if (registration === null) {
+					throw new Error('A universal portal target was not prepared before reconciliation.');
 				}
+				nextPortalRegistrations.add(registration);
 			});
 		}
-		const nextPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
-		walkDraft(draftRoot, (draft) => {
-			if (draft.blueprint.kind !== 'portal') return;
-			const registration = draft.blueprint.registration;
-			if (registration === null) {
-				throw new Error('A universal portal target was not prepared before reconciliation.');
-			}
-			nextPortalRegistrations.add(registration);
-		});
 
 		const previousRegionBridges = new Set<UniversalRendererRegionOwnerBridge>();
-		for (const child of this.rootRecord.children) {
-			walkLogical(child, (record) => {
-				if (record.kind !== 'host') return;
-				for (const value of Object.values(record.props)) {
-					const bridge = rendererRegionOwnerBridge(value);
-					if (bridge !== null) previousRegionBridges.add(bridge);
-				}
-			});
-		}
-		const attemptedOwnerRecords = new Set(attempt.owners.map((owner) => owner.record));
 		const stagedRegionBridges: {
 			next: UniversalRendererRegionOwnerBridge;
 			previous: UniversalRendererRegionOwnerBridge | null;
 		}[] = [];
 		const nextRegionBridges = new Set<UniversalRendererRegionOwnerBridge>();
-		walkDraft(draftRoot, (draft) => {
-			if (draft.record.kind !== 'host') return;
-			const props = (draft.blueprint as BlueprintHost).props;
-			for (const name of Object.keys(props)) {
-				const value = props[name];
-				if (!isRendererRegion(value)) continue;
-				if (value.ownerRenderer !== this.renderer) {
-					throw new Error(
-						`Universal renderer region owner mismatch: region owner ${JSON.stringify(value.ownerRenderer)} cannot be committed by root ${JSON.stringify(this.renderer)}.`,
-					);
-				}
-				const next = rendererRegionOwnerBridge(value);
-				if (next === null) {
-					throw new Error(
-						'A universal renderer region must be created while its owning component renders.',
-					);
-				}
-				if (!attemptedOwnerRecords.has(next.owner)) {
-					throw new Error(
-						'A renderer region cannot escape the universal owner attempt that created it.',
-					);
-				}
-				if (nextRegionBridges.has(next)) {
-					throw new Error('One renderer-region descriptor cannot own more than one host region.');
-				}
-				nextRegionBridges.add(next);
-				const previous = rendererRegionOwnerBridge(draft.record.props[name]);
-				stagedRegionBridges.push({ next, previous });
+		if ((treeFeatures & UNIVERSAL_TREE_REGION) !== 0) {
+			for (const child of this.rootRecord.children) {
+				walkLogical(child, (record) => {
+					if (record.kind !== 'host') return;
+					for (const value of Object.values(record.props)) {
+						const bridge = rendererRegionOwnerBridge(value);
+						if (bridge !== null) previousRegionBridges.add(bridge);
+					}
+				});
 			}
-		});
+			const attemptedOwnerRecords = new Set(attempt.owners.map((owner) => owner.record));
+			walkDraft(draftRoot, (draft) => {
+				if (draft.record.kind !== 'host') return;
+				const props = (draft.blueprint as BlueprintHost).props;
+				for (const name of Object.keys(props)) {
+					const value = props[name];
+					if (!isRendererRegion(value)) continue;
+					if (value.ownerRenderer !== this.renderer) {
+						throw new Error(
+							`Universal renderer region owner mismatch: region owner ${JSON.stringify(value.ownerRenderer)} cannot be committed by root ${JSON.stringify(this.renderer)}.`,
+						);
+					}
+					const next = rendererRegionOwnerBridge(value);
+					if (next === null) {
+						throw new Error(
+							'A universal renderer region must be created while its owning component renders.',
+						);
+					}
+					if (!attemptedOwnerRecords.has(next.owner)) {
+						throw new Error(
+							'A renderer region cannot escape the universal owner attempt that created it.',
+						);
+					}
+					if (nextRegionBridges.has(next)) {
+						throw new Error('One renderer-region descriptor cannot own more than one host region.');
+					}
+					nextRegionBridges.add(next);
+					const previous = rendererRegionOwnerBridge(draft.record.props[name]);
+					stagedRegionBridges.push({ next, previous });
+				}
+			});
+		}
 
 		const creates: UniversalHostCommand[] = [];
 		const updates: UniversalHostCommand[] = [];
 		const recreated = new Set<LogicalRecord>();
+		const hostDrafts: DraftRecord[] = [];
 		walkDraft(draftRoot, (draft) => {
 			if (draft.record.kind !== 'host') return;
+			hostDrafts.push(draft);
 			const blueprintHost = draft.blueprint as BlueprintHost;
 			const props = Object.freeze({ ...blueprintHost.props });
 			if (draft.isNew) {
@@ -4494,26 +5496,28 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				current.splice(index, 0, id);
 			}
 		};
-		walkDraftPostOrder(draftRoot, (draft) => {
-			if (draft.record === this.rootRecord) {
-				planPlacements(null, this.rootRecord.children, draft.children);
-			} else if (draft.record.kind === 'host') {
-				planPlacements(draft.record.id, draft.record.children, draft.children);
-			} else if (draft.record.kind === 'portal') {
-				const nextRegistration = (draft.blueprint as BlueprintPortal).registration!;
-				const previousRegistration = draft.record.portalRegistration;
-				const retainedTarget =
-					previousRegistration !== null &&
-					Object.is(previousRegistration.handle, nextRegistration.handle);
-				planPlacements(
-					nextRegistration.handle,
-					draft.record.children,
-					draft.children,
-					previousRegistration?.handle ?? nextRegistration.handle,
-					previousRegistration !== null && !retainedTarget,
-				);
-			}
-		});
+		if (topologyChanged) {
+			walkDraftPostOrder(draftRoot, (draft) => {
+				if (draft.record === this.rootRecord) {
+					planPlacements(null, this.rootRecord.children, draft.children);
+				} else if (draft.record.kind === 'host') {
+					planPlacements(draft.record.id, draft.record.children, draft.children);
+				} else if (draft.record.kind === 'portal') {
+					const nextRegistration = (draft.blueprint as BlueprintPortal).registration!;
+					const previousRegistration = draft.record.portalRegistration;
+					const retainedTarget =
+						previousRegistration !== null &&
+						Object.is(previousRegistration.handle, nextRegistration.handle);
+					planPlacements(
+						nextRegistration.handle,
+						draft.record.children,
+						draft.children,
+						previousRegistration?.handle ?? nextRegistration.handle,
+						previousRegistration !== null && !retainedTarget,
+					);
+				}
+			});
+		}
 		for (const removed of removedRoots) {
 			walkLogical(removed, (record) => {
 				if (record.kind !== 'portal' || record.portalRegistration === null) return;
@@ -4554,8 +5558,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		};
 		// Hide descendants before ancestors so attached resources can detach from
 		// their live parent; reveal parents before descendants for the inverse path.
-		walkDraftPostOrder(draftRoot, stageHiddenVisibility);
-		walkDraft(draftRoot, stageVisibleVisibility);
+		if ((treeFeatures & UNIVERSAL_TREE_HIDDEN) !== 0) {
+			walkDraftPostOrder(draftRoot, stageHiddenVisibility);
+			walkDraft(draftRoot, stageVisibleVisibility);
+		}
 		const visibilityCommands = [...hiddenVisibilityCommands, ...visibleVisibilityCommands];
 
 		const removedHosts: LogicalRecord[] = [];
@@ -4564,44 +5570,46 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const eventCommands: UniversalHostCommand[] = [];
 		const stagedEvents = new Map<LogicalRecord, Map<string, CommittedEvent>>();
 		const stagedVisibleEventRecords = new Set<LogicalRecord>();
-		walkDraft(draftRoot, (draft) => {
-			if (draft.record.kind !== 'host') return;
-			const blueprintHost = draft.blueprint as BlueprintHost;
-			const blueprintEvents = blueprintHost.events;
-			const wasVisible = draft.record.visibility === 'visible';
-			const isVisible = blueprintHost.visibility === 'visible';
-			if (isVisible) stagedVisibleEventRecords.add(draft.record);
-			const nextEvents = new Map<string, CommittedEvent>();
-			for (const [type, event] of blueprintEvents) {
-				const previous = draft.record.events.get(type);
-				const listener = previous?.listener ?? nextListener++;
-				const committed = { ...event, listener };
-				nextEvents.set(type, committed);
-				const changed =
-					previous === undefined ||
-					previous.handler !== event.handler ||
-					previous.priority !== event.priority ||
-					previous.owner !== event.owner;
-				if (isVisible && (!wasVisible || changed)) {
-					eventCommands.push({
-						op: 'event',
-						id: draft.record.id,
-						type,
-						listener: { id: listener, priority: event.priority },
-					});
+		if ((treeFeatures & UNIVERSAL_TREE_EVENT) !== 0) {
+			walkDraft(draftRoot, (draft) => {
+				if (draft.record.kind !== 'host') return;
+				const blueprintHost = draft.blueprint as BlueprintHost;
+				const blueprintEvents = blueprintHost.events;
+				const wasVisible = draft.record.visibility === 'visible';
+				const isVisible = blueprintHost.visibility === 'visible';
+				if (isVisible) stagedVisibleEventRecords.add(draft.record);
+				const nextEvents = new Map<string, CommittedEvent>();
+				for (const [type, event] of blueprintEvents) {
+					const previous = draft.record.events.get(type);
+					const listener = previous?.listener ?? nextListener++;
+					const committed = { ...event, listener };
+					nextEvents.set(type, committed);
+					const changed =
+						previous === undefined ||
+						previous.handler !== event.handler ||
+						previous.priority !== event.priority ||
+						previous.owner !== event.owner;
+					if (isVisible && (!wasVisible || changed)) {
+						eventCommands.push({
+							op: 'event',
+							id: draft.record.id,
+							type,
+							listener: { id: listener, priority: event.priority },
+						});
+					}
 				}
-			}
-			for (const [type] of draft.record.events) {
-				if (wasVisible && (!isVisible || !nextEvents.has(type))) {
-					eventCommands.push({ op: 'event', id: draft.record.id, type, listener: null });
+				for (const [type] of draft.record.events) {
+					if (wasVisible && (!isVisible || !nextEvents.has(type))) {
+						eventCommands.push({ op: 'event', id: draft.record.id, type, listener: null });
+					}
 				}
-			}
-			stagedEvents.set(draft.record, nextEvents);
-		});
-		for (const record of removedHosts) {
-			if (record.visibility !== 'visible') continue;
-			for (const [type] of record.events) {
-				eventCommands.push({ op: 'event', id: record.id, type, listener: null });
+				stagedEvents.set(draft.record, nextEvents);
+			});
+			for (const record of removedHosts) {
+				if (record.visibility !== 'visible') continue;
+				for (const [type] of record.events) {
+					eventCommands.push({ op: 'event', id: record.id, type, listener: null });
+				}
 			}
 		}
 		const stageHostCallbacks = (
@@ -4611,6 +5619,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		) => {
 			const commands: UniversalHostCommand[] = [];
 			const staged = new Map<LogicalRecord, Map<string, CommittedHostCallback>>();
+			const feature = op === 'lifecycle' ? UNIVERSAL_TREE_LIFECYCLE : UNIVERSAL_TREE_LOCAL_CALLBACK;
+			if ((treeFeatures & feature) === 0) return { commands, staged };
 			walkDraft(draftRoot, (draft) => {
 				if (draft.record.kind !== 'host') return;
 				const blueprintCallbacks = readBlueprint(draft.blueprint as BlueprintHost);
@@ -4679,56 +5689,60 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const refAttaches: DraftRecord[] = [];
 		const hostDraftsById = new Map<number, DraftRecord>();
 		const lifecycleDrafts = new Set<DraftRecord>();
-		walkDraft(draftRoot, (draft) => {
-			if (draft.record.kind !== 'host') return;
-			hostDraftsById.set(draft.record.id, draft);
-			if (draft.isNew || draft.hostUpdate !== null) lifecycleDrafts.add(draft);
-		});
-		for (const placement of placements) {
-			if (placement.op !== 'move') continue;
-			const draft = hostDraftsById.get(placement.id);
-			if (draft !== undefined) lifecycleDrafts.add(draft);
+		if ((treeFeatures & UNIVERSAL_TREE_LIFECYCLE) !== 0) {
+			walkDraft(draftRoot, (draft) => {
+				if (draft.record.kind !== 'host') return;
+				hostDraftsById.set(draft.record.id, draft);
+				if (draft.isNew || draft.hostUpdate !== null) lifecycleDrafts.add(draft);
+			});
+			for (const placement of placements) {
+				if (placement.op !== 'move') continue;
+				const draft = hostDraftsById.get(placement.id);
+				if (draft !== undefined) lifecycleDrafts.add(draft);
+			}
 		}
-		for (const removed of removedRoots) {
-			walkLogical(removed, (record) => {
-				if (record.kind === 'host' && record.refAttached) {
-					refDetaches.push({ record, ref: record.ref, cleanup: record.refCleanup });
+		if ((treeFeatures & UNIVERSAL_TREE_REF) !== 0) {
+			for (const removed of removedRoots) {
+				walkLogical(removed, (record) => {
+					if (record.kind === 'host' && record.refAttached) {
+						refDetaches.push({ record, ref: record.ref, cleanup: record.refCleanup });
+					}
+				});
+			}
+			walkDraftPostOrder(draftRoot, (draft) => {
+				if (draft.record.kind !== 'host') return;
+				const blueprintHost = draft.blueprint as BlueprintHost;
+				const nextRef = blueprintHost.ref;
+				const suspenseHide =
+					draft.record.visibility !== 'suspense-hidden' &&
+					blueprintHost.visibility === 'suspense-hidden';
+				const suspenseReveal =
+					draft.record.visibility === 'suspense-hidden' &&
+					blueprintHost.visibility !== 'suspense-hidden';
+				if (
+					!draft.isNew &&
+					draft.record.refAttached &&
+					(recreated.has(draft.record) || suspenseHide || !Object.is(draft.record.ref, nextRef))
+				) {
+					refDetaches.push({
+						record: draft.record,
+						ref: draft.record.ref,
+						cleanup: draft.record.refCleanup,
+					});
+				}
+				if (
+					nextRef != null &&
+					blueprintHost.visibility !== 'suspense-hidden' &&
+					(draft.isNew ||
+						recreated.has(draft.record) ||
+						suspenseReveal ||
+						!draft.record.refAttached ||
+						!Object.is(draft.record.ref, nextRef))
+				) {
+					refAttaches.push(draft);
 				}
 			});
 		}
-		walkDraftPostOrder(draftRoot, (draft) => {
-			if (draft.record.kind !== 'host') return;
-			const blueprintHost = draft.blueprint as BlueprintHost;
-			const nextRef = blueprintHost.ref;
-			const suspenseHide =
-				draft.record.visibility !== 'suspense-hidden' &&
-				blueprintHost.visibility === 'suspense-hidden';
-			const suspenseReveal =
-				draft.record.visibility === 'suspense-hidden' &&
-				blueprintHost.visibility !== 'suspense-hidden';
-			if (
-				!draft.isNew &&
-				draft.record.refAttached &&
-				(recreated.has(draft.record) || suspenseHide || !Object.is(draft.record.ref, nextRef))
-			) {
-				refDetaches.push({
-					record: draft.record,
-					ref: draft.record.ref,
-					cleanup: draft.record.refCleanup,
-				});
-			}
-			if (
-				nextRef != null &&
-				blueprintHost.visibility !== 'suspense-hidden' &&
-				(draft.isNew ||
-					recreated.has(draft.record) ||
-					suspenseReveal ||
-					!draft.record.refAttached ||
-					!Object.is(draft.record.ref, nextRef))
-			) {
-				refAttaches.push(draft);
-			}
-		});
 
 		const draftOwnersParentFirst: DraftOwner[] = [];
 		const draftOwnersPostOrder: DraftOwner[] = [];
@@ -4828,27 +5842,32 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 		let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
 		const applyLogicalTopology = () => {
+			const applyHost = (draft: DraftRecord) => {
+				const record = draft.record;
+				const host = draft.blueprint as BlueprintHost;
+				record.type = host.type;
+				record.props = host.props;
+				record.ref = host.ref;
+				record.owner = host.owner;
+				record.events = stagedEvents.get(record) ?? record.events;
+				record.lifecycles = lifecycleStage.staged.get(record) ?? record.lifecycles;
+				record.localCallbacks = localCallbackStage.staged.get(record) ?? record.localCallbacks;
+				record.visibility = host.visibility;
+			};
 			const apply = (draft: DraftRecord, parent: LogicalRecord | null) => {
 				const record = draft.record;
 				record.parent = parent;
 				record.key = draft.blueprint.key;
 				if (record.kind === 'host') {
-					const host = draft.blueprint as BlueprintHost;
-					record.type = host.type;
-					record.props = host.props;
-					record.ref = host.ref;
-					record.owner = host.owner;
-					record.events = stagedEvents.get(record) ?? new Map();
-					record.lifecycles = lifecycleStage.staged.get(record) ?? new Map();
-					record.localCallbacks = localCallbackStage.staged.get(record) ?? new Map();
-					record.visibility = host.visibility;
+					applyHost(draft);
 				} else if (record.kind === 'portal') {
 					record.portalRegistration = (draft.blueprint as BlueprintPortal).registration;
 				}
 				record.children = draft.children.map((child) => child.record);
 				for (const child of draft.children) apply(child, record);
 			};
-			apply(draftRoot, null);
+			if (topologyChanged) apply(draftRoot, null);
+			else for (const draft of hostDrafts) applyHost(draft);
 			stagedPortalRegistrations.clear();
 			for (const registration of previousPortalRegistrations) {
 				if (nextPortalRegistrations.has(registration)) continue;
@@ -4860,9 +5879,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 		};
 		const lifecycleOrder: DraftRecord[] = [];
-		walkDraftPostOrder(draftRoot, (draft) => {
-			if (lifecycleDrafts.has(draft)) lifecycleOrder.push(draft);
-		});
+		if (lifecycleDrafts.size !== 0) {
+			walkDraftPostOrder(draftRoot, (draft) => {
+				if (lifecycleDrafts.has(draft)) lifecycleOrder.push(draft);
+			});
+		}
+		const hasPassiveWork =
+			removedEffectEventCells.length !== 0 ||
+			orderedEffectCleanups.some((cleanup) => cleanup.phase === 'passive') ||
+			effectChanges.some(({ next, changed }) => changed && next.phase === 'passive');
 		const prepareHost = (value: UniversalHostBatch) =>
 			this.driver.prepareBatch(this.container, value, {
 				invokeLocalCallback: (listener, args) => this.invokeLocalCallback(listener, args),
@@ -4908,27 +5933,31 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			identity,
 			() => {
 				applyLogicalTopology();
-				for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
-				this.publishedListeners.clear();
-				const handlers = new Map<number, CommittedEvent>();
-				for (const [record, events] of stagedEvents) {
-					if (!stagedVisibleEventRecords.has(record)) continue;
-					for (const event of events.values()) {
-						handlers.set(event.listener, event);
-						this.publishedListeners.add(event.listener);
-						EVENT_DISPATCHERS.set(event.listener, (payload) =>
-							this.dispatchEvent(event.listener, payload),
-						);
+				if ((treeFeatures & UNIVERSAL_TREE_EVENT) !== 0) {
+					for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
+					this.publishedListeners.clear();
+					const handlers = new Map<number, CommittedEvent>();
+					for (const [record, events] of stagedEvents) {
+						if (!stagedVisibleEventRecords.has(record)) continue;
+						for (const event of events.values()) {
+							handlers.set(event.listener, event);
+							this.publishedListeners.add(event.listener);
+							EVENT_DISPATCHERS.set(event.listener, (payload) =>
+								this.dispatchEvent(event.listener, payload),
+							);
+						}
 					}
+					this.handlers = handlers;
 				}
-				this.handlers = handlers;
-				const localCallbacks = new Map<number, CommittedHostCallback>();
-				for (const callbacks of localCallbackStage.staged.values()) {
-					for (const callback of callbacks.values()) {
-						localCallbacks.set(callback.listener, callback);
+				if ((treeFeatures & UNIVERSAL_TREE_LOCAL_CALLBACK) !== 0) {
+					const localCallbacks = new Map<number, CommittedHostCallback>();
+					for (const callbacks of localCallbackStage.staged.values()) {
+						for (const callback of callbacks.values()) {
+							localCallbacks.set(callback.listener, callback);
+						}
 					}
+					this.localCallbacks = localCallbacks;
 				}
-				this.localCallbacks = localCallbacks;
 				for (const owner of removedOwners) {
 					owner.disposed = true;
 					owner.mounted = false;
@@ -4970,6 +5999,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.nextId = nextId;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.nextListener = nextListener;
+				this.treeFeatures = attempt.treeFeatures;
 				for (const context of changedContexts) context.$$version++;
 				const retainedRegionCells = new Set<RendererRegionBridgeCell>();
 				for (const { next, previous } of stagedRegionBridges) {
@@ -5038,34 +6068,36 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				runCommitTasks(tasks);
 			},
-			() => {
-				const tasks: (() => void)[] = [];
-				try {
-					for (const cleanup of orderedEffectCleanups) {
-						if (cleanup.phase === 'passive') {
-							tasks.push(() => runOwnedEffectCleanup(cleanup.hook));
+			hasPassiveWork
+				? () => {
+						const tasks: (() => void)[] = [];
+						try {
+							for (const cleanup of orderedEffectCleanups) {
+								if (cleanup.phase === 'passive') {
+									tasks.push(() => runOwnedEffectCleanup(cleanup.hook));
+								}
+							}
+							if (this.unmounted || this.owner === null || this.owner.disposed) {
+								runCommitTasks(tasks);
+								return;
+							}
+							for (const { owner, next, changed } of effectChanges) {
+								if (!changed || next.phase !== 'passive') continue;
+								if (
+									owner.record.hooks.get(next.slot) !== next ||
+									owner.record.disposed ||
+									owner.record.visibility !== 'visible'
+								) {
+									continue;
+								}
+								tasks.push(() => runOwnedEffectCreate(next));
+							}
+							runCommitTasks(tasks);
+						} finally {
+							deactivateEffectEventCells(removedEffectEventCells);
 						}
 					}
-					if (this.unmounted || this.owner === null || this.owner.disposed) {
-						runCommitTasks(tasks);
-						return;
-					}
-					for (const { owner, next, changed } of effectChanges) {
-						if (!changed || next.phase !== 'passive') continue;
-						if (
-							owner.record.hooks.get(next.slot) !== next ||
-							owner.record.disposed ||
-							owner.record.visibility !== 'visible'
-						) {
-							continue;
-						}
-						tasks.push(() => runOwnedEffectCreate(next));
-					}
-					runCommitTasks(tasks);
-				} finally {
-					deactivateEffectEventCells(removedEffectEventCells);
-				}
-			},
+				: null,
 			() => (preparedHost === null ? preparedAsyncHost!.abort() : preparedHost.abort()),
 			() => {
 				const tasks = [...stagedPortalRegistrations].map(
@@ -5368,6 +6400,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					bridge.deactivate();
 				}
 				this.owner = null;
+				this.treeFeatures = 0;
 				this.unmounted = true;
 				this.unmounting = false;
 				this.lastComponent = null;
@@ -5461,7 +6494,7 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 		private readonly afterMutation: () => void,
 		private readonly lifecycle: () => void,
 		private readonly layout: () => void,
-		private readonly passive: () => void,
+		private readonly passive: (() => void) | null,
 		private readonly abortHost: () => void,
 		private readonly onAbort: () => void,
 	) {}
@@ -5634,12 +6667,13 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 	}
 
 	private schedulePassive(): void {
-		if (this.passiveScheduled) return;
+		const passive = this.passive;
+		if (passive === null || this.passiveScheduled) return;
 		this.passiveScheduled = true;
 		this.root.enqueuePassive(() => {
 			if (this.passiveRan) return;
 			this.passiveRan = true;
-			this.passive();
+			passive();
 		});
 	}
 

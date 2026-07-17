@@ -251,12 +251,17 @@ jobs:
       # the Three runtime/type pair, then select the Octane-owned compatibility
       # suite so current/minimum support cannot be faked by the pinned oracle.
       - name: Install Three ${{ matrix.version }} compatibility pair
-        run: pnpm --filter @octanejs/three add --save-dev --lockfile=false three@${{ matrix.version }} @types/three@${{ matrix.version }}
-
-      - name: Report resolved Three compatibility pair
         run: |
-          node -e "console.log(require('./packages/three/node_modules/three/package.json').version)"
-          node -e "console.log(require('./packages/three/node_modules/@types/three/package.json').version)"
+          THREE_VERSION="$(pnpm view three@${{ matrix.version }} version)"
+          pnpm --filter @octanejs/three add --save-dev --lockfile=false "three@$THREE_VERSION" "@types/three@$THREE_VERSION"
+          echo "OCTANE_THREE_COMPAT_VERSION=$THREE_VERSION" >> "$GITHUB_ENV"
+
+      - name: Verify resolved Three compatibility pair
+        run: |
+          THREE_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/three/package.json').version)")"
+          TYPES_VERSION="$(node -e "process.stdout.write(require('./packages/three/node_modules/@types/three/package.json').version)")"
+          echo "three=$THREE_VERSION @types/three=$TYPES_VERSION"
+          test "$THREE_VERSION" = "$TYPES_VERSION"
 
       - name: Typecheck Three source and public API
         run: |
@@ -264,8 +269,6 @@ jobs:
           pnpm exec tsc --noEmit -p packages/three/typetests/tsconfig.json
 
       - name: Run Three compatibility behavior tests
-        env:
-          OCTANE_THREE_COMPAT_VERSION: ${{ matrix.version }}
         run: pnpm --dir packages/three test:compat
 
   package:
