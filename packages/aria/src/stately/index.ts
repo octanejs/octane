@@ -33,5 +33,13 @@ export type {
 	DisclosureGroupState,
 } from './disclosure/useDisclosureGroupState';
 
-// form
-export { FormValidationContext } from './form/useFormValidationState';
+// form — mirrors the @react-stately/form shim surface.
+export {
+	FormValidationContext,
+	useFormValidationState,
+	DEFAULT_VALIDATION_RESULT,
+	VALID_VALIDITY_STATE,
+	privateValidationStateProp,
+	mergeValidation,
+} from './form/useFormValidationState';
+export type { FormValidationState } from './form/useFormValidationState';

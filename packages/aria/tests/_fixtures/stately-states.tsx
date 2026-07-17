@@ -1,15 +1,15 @@
 import { useRef, useState } from 'octane';
-// Direct source imports: the Phase-1 exports are not wired into the package index files
-// yet (owned by the integrating session); behavior is identical either way.
-import { useToggleState } from '../../src/stately/toggle/useToggleState';
+import { I18nProvider, useLocale } from '@octanejs/aria';
+// useToggle mirrors the upstream monopackage root: private (only the scoped
+// @react-aria/toggle shim re-exports it), so it is not on our public entry.
 import { useToggle } from '../../src/toggle/useToggle';
-import { useCheckboxGroupState } from '../../src/stately/checkbox/useCheckboxGroupState';
-import { useRadioGroupState } from '../../src/stately/radio/useRadioGroupState';
 import {
 	FormValidationContext,
+	useCheckboxGroupState,
 	useFormValidationState,
-} from '../../src/stately/form/useFormValidationState';
-import { I18nProvider, useLocale } from '../../src/i18n/I18nProvider';
+	useRadioGroupState,
+	useToggleState,
+} from '@octanejs/aria/stately';
 import { useNumberFormatter } from '../../src/i18n/useNumberFormatter';
 import { useFilter } from '../../src/i18n/useFilter';
 

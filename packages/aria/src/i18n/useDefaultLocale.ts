@@ -80,9 +80,12 @@ export function useDefaultLocale(...args: any[]): Locale {
 	// en-US. This will be updated after hydration on the client to the correct value.
 	if (isSSR) {
 		let locale = typeof window !== 'undefined' && (window as any)[localeSymbol];
+		// octane adaptation (upstream bug): upstream hardcodes 'ltr' here even when
+		// the server-injected locale is RTL, disagreeing with getDefaultLocale's
+		// isRTL derivation for the very same value — derive it from what we return.
 		return {
 			locale: locale || 'en-US',
-			direction: 'ltr',
+			direction: locale && isRTL(locale) ? 'rtl' : 'ltr',
 		};
 	}
 

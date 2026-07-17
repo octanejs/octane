@@ -53,6 +53,18 @@ export function getPackageLocalizationScript(
 
 const cache = new WeakMap<PackageLocalizedStrings, string>();
 
+// octane adaptation (upstream bug): upstream names hoisted strings with
+// `String.fromCharCode(common.size > 25 ? common.size + 97 : common.size + 65)`,
+// which is 'A'-'Z' for the first 26 but char codes 123+ ('{', '|', …) from the
+// 27th on — the emitted script is a SyntaxError. A-Z matches upstream's valid
+// range byte-for-byte; a-z and then _N continue with valid identifiers ('_N'
+// rather than two-letter names, which could collide with reserved words).
+function commonName(i: number): string {
+	if (i < 26) return String.fromCharCode(i + 65);
+	if (i < 52) return String.fromCharCode(i + 71);
+	return '_' + (i - 52);
+}
+
 function serialize(strings: PackageLocalizedStrings): string {
 	let cached = cache.get(strings);
 	if (cached) {
@@ -67,8 +79,7 @@ function serialize(strings: PackageLocalizedStrings): string {
 			let v = strings[pkg][key];
 			let s = typeof v === 'string' ? JSON.stringify(v) : v.toString();
 			if (seen.has(s) && !common.has(s)) {
-				let name = String.fromCharCode(common.size > 25 ? common.size + 97 : common.size + 65);
-				common.set(s, name);
+				common.set(s, commonName(common.size));
 			}
 			seen.add(s);
 		}
