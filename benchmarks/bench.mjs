@@ -116,6 +116,26 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		name: 'weather-app',
+		cwd: 'weather-app',
+		servers: [
+			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
+			{ filter: 'react-weather-app-bench', port: 5293 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'weather-app-lighthouse',
+		cwd: 'weather-app',
+		servers: [
+			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
+			{ filter: 'react-weather-app-bench', port: 5293 },
+		],
+		iter: { normal: 5, quick: 3 },
+		runs: [{ script: 'lighthouse.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		name: 'chat-stream',
 		cwd: 'chat-stream',
 		servers: [

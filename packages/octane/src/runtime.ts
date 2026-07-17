@@ -1542,6 +1542,8 @@ interface OffscreenWip {
 	end: Comment;
 	capture: OffscreenCapture;
 	domParent: Node;
+	/** Discarded WIPs must not publish detaches for refs whose attach never committed. */
+	refDetachCheckpoint: number;
 }
 
 // FragmentInstances that currently hold event listeners and/or observers. After
@@ -3284,6 +3286,22 @@ function renderBlockInner(block: Block): void {
 // may return a renderable. Compiled-void Blocks carry a null handler, allowing
 // production bundles containing only `@{}` output to tree-shake this whole
 // return/descriptor/childSlot path.
+function returnSlotTail(block: Block, state: any): Node | null {
+	const candidates = [
+		state?.end,
+		state?.block?.endMarker,
+		state?.hostNode,
+		state?.text,
+		block.endMarker,
+		block.parentNode.lastChild,
+	];
+	for (let i = 0; i < candidates.length; i++) {
+		const node = candidates[i] as Node | null | undefined;
+		if (node !== null && node !== undefined && node.parentNode === block.parentNode) return node;
+	}
+	return null;
+}
+
 function renderReturnedValue(block: Block, out: unknown): void {
 	// A single-root fragment descriptor (its renderer is `$$singleRoot`) mounts
 	// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
@@ -3307,6 +3325,26 @@ function renderReturnedValue(block: Block, out: unknown): void {
 		existingRet !== undefined &&
 		existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
 	) {
+		// A transition can cross the markerless-single-root optimization boundary
+		// (text/list → compiled host fragment, or the reverse). Probe the incoming
+		// returned value off-screen before disposing the committed slot; a suspend or
+		// error then leaves the old DOM/state intact for the enclosing @try hold.
+		if (activeHydration() === null && block.currentRenderMode === 'transition') {
+			const tail = returnSlotTail(block, existingRet);
+			if (tail !== null) {
+				const probe = renderOffscreen(
+					block,
+					block.parentNode,
+					tail,
+					ROOT_RENDERABLE_BODY,
+					out,
+					renderReturnedValue,
+				);
+				disposeWip(probe.wip);
+				if (probe.error) throw probe.error;
+				if (probe.suspended) throw new SuspenseException(probe.suspended);
+			}
+		}
 		disposeReturnSlot(block, existingRet);
 	}
 	if (useSingleRoot) {
@@ -12108,6 +12146,7 @@ function componentSlotImpl(
 		} satisfies ElementDescriptor;
 	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
+	let hydrationCursor: Node | null = null;
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Comment | null = null;
@@ -12152,7 +12191,6 @@ function componentSlotImpl(
 		// by consulting the parked cursor (host.firstChild for the first appended
 		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
-		let hydrationCursor: Node | null = null;
 		if (!inherited && hydration !== null && hydration.isOpen(anchor ?? null)) {
 			open = anchor as Node;
 			hydrationCursor = open;
@@ -12377,10 +12415,23 @@ function componentSlotImpl(
 			try {
 				renderBlock(b);
 			} finally {
-				const last = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
-				if (last !== null && last !== before) {
-					b.startMarker = last;
-					b.endMarker = last;
+				if (
+					hydration !== null &&
+					hydrationCursor !== null &&
+					hydrationCursor.parentNode === domParent
+				) {
+					// An unframed single-root return adopts the element that was already
+					// present, so the client-mount before/after probe cannot observe an
+					// insertion. Stamp the adopted cursor itself as the block boundary;
+					// a later return-shape switch can then unmount that host normally.
+					b.startMarker = hydrationCursor;
+					b.endMarker = hydrationCursor;
+				} else {
+					const last = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
+					if (last !== null && last !== before) {
+						b.startMarker = last;
+						b.endMarker = last;
+					}
 				}
 			}
 		} else {
@@ -12559,6 +12610,7 @@ function renderOffscreen(
 	domParent.insertBefore(start, ref);
 	domParent.insertBefore(end, ref);
 	const capture = createOffscreenCapture();
+	const refDetachCheckpoint = refDetachQueue.length;
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
 	const block = createBlock(
@@ -12590,7 +12642,11 @@ function renderOffscreen(
 	} finally {
 		WIP_CAPTURE = prev;
 	}
-	return { wip: { block, start, end, capture, domParent }, suspended, error };
+	return {
+		wip: { block, start, end, capture, domParent, refDetachCheckpoint },
+		suspended,
+		error,
+	};
 }
 
 // Splice a COMPLETED off-screen WIP's captured effects/refs/store-syncs back into the
@@ -12650,7 +12706,15 @@ function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
 // Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
 // partial cleanups. Captured effects/refs are dropped (they never ran).
 function disposeWip(wip: OffscreenWip): void {
-	unmountBlock(wip.block, true);
+	try {
+		unmountBlock(wip.block, true);
+	} finally {
+		// A completed descendant in an ultimately discarded WIP is marked mounted,
+		// so its teardown can enqueue ref(null). Its attach is still only in the
+		// discarded capture and never became observable; drop the matching detach.
+		refDetachQueue.splice(wip.refDetachCheckpoint);
+		discardOffscreenCapture(wip.capture);
+	}
 }
 
 // Remove the slot's current content (Block, Text, or pure-host node) while
@@ -15096,7 +15160,7 @@ export const HMR: unique symbol = Symbol.for('octane.hmr');
 interface HmrMeta {
 	fn: ComponentBody<any>;
 	liveBlocks: Set<Block>;
-	update(incoming: ComponentBody<any>): void;
+	update(incoming: ComponentBody<any>): boolean;
 }
 
 type HmrWrapper = ComponentBody<any> & { [HMR]: HmrMeta };
@@ -15105,7 +15169,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 	const meta: HmrMeta = {
 		fn,
 		liveBlocks: new Set(),
-		update(incoming: ComponentBody<any>): void {
+		update(incoming: ComponentBody<any>): boolean {
 			// The incoming function is the freshly-recompiled component body. If
 			// the incoming function is itself an HMR wrapper (which it will be when
 			// the new module re-runs `Comp = hmr(Comp)`), unwrap it down to the
@@ -15113,7 +15177,13 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileComponentSource(wrapper, incoming);
 			const incomingMeta = (incoming as any)[HMR] as HmrMeta | undefined;
-			meta.fn = incomingMeta ? incomingMeta.fn : incoming;
+			const nextFn = incomingMeta ? incomingMeta.fn : incoming;
+			// Direct-template shorthand bodies and returned-output shorthand bodies
+			// use different slot-0 ABIs. Let the bundler invalidate/full-reload this
+			// module instead of reusing a live scope with the incompatible layout.
+			if ((meta.fn as any).__octaneReturnedOutput !== (nextFn as any).__octaneReturnedOutput)
+				return false;
+			meta.fn = nextFn;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileComponentSource(wrapper, meta.fn);
 			// Keep the forwarded fetch plan in sync with the swapped body.
@@ -15133,6 +15203,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 					__profileSchedule(b, 'hmr');
 				scheduleRender(b);
 			}
+			return true;
 		},
 	};
 	function wrapper(props: P, scope: Scope, extra: any): unknown {

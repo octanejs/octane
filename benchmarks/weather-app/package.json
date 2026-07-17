@@ -1,0 +1,17 @@
+{
+  "name": "octane-weather-app-benchmarks",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "App-shaped weather benchmark for native Octane TSRX and React implementations.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:lighthouse": "node lighthouse.mjs",
+    "bench:long": "node run.mjs 16"
+  },
+  "dependencies": {
+    "chrome-launcher": "catalog:default",
+    "lighthouse": "catalog:default",
+    "playwright": "catalog:default"
+  }
+}

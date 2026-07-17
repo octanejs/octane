@@ -11,17 +11,19 @@
 // NODE_ENV) still comes from each app's own config, exactly like the news
 // suite's programmatic builds.
 //
-// Only .js assets are summed (the apps have no meaningful CSS); index.html is
-// excluded. Bytes are deterministic per build, so median === min.
+// Only .js assets are summed; index.html and CSS are excluded. Weather's CSS is
+// shared byte-for-byte by both ports, so including it would add the same constant
+// to both columns rather than measure framework output. Bytes are deterministic
+// per build, so median === min.
 //
-// Each build is split into two chunks via rolldown codeSplitting — `app` (under
-// the app's own src/) and `framework` (everything else: node_modules AND the
-// octane workspace runtime, which pnpm resolves to packages/octane/src, never
-// node_modules). The app-only ops (`app_*`) are the numbers that scale with
-// app size — in real apps user code eclipses the framework runtime, so the
-// per-component codegen share is what the compiled-output plan must ratchet;
-// the runtime is a one-time cost tracked by the `fw_*` ops. `js_*` totals stay
-// for the whole-page view.
+// Each build is split into two chunks via rolldown codeSplitting — `app`
+// (authored app modules, including weather's shared sources) and `framework`
+// (node_modules, virtual helpers, AND the octane workspace runtime, which pnpm
+// resolves to packages/octane/src, never node_modules). The app-only ops
+// (`app_*`) are the numbers that scale with app size — in real apps user code
+// eclipses the framework runtime, so the per-component codegen share is what
+// the compiled-output plan must ratchet; the runtime is a one-time cost tracked
+// by the `fw_*` ops. `js_*` totals stay for the whole-page view.
 //
 // Run:  node benchmarks/bundle-size/run.mjs
 process.env.NODE_ENV = 'production';
@@ -36,11 +38,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JS_FRAMEWORK = path.resolve(__dirname, '../js-framework');
 const TODOMVC = path.resolve(__dirname, '../todomvc');
 const CHAT_STREAM = path.resolve(__dirname, '../chat-stream');
+const WEATHER_APP = path.resolve(__dirname, '../weather-app');
 const OUT_ROOT = path.join(__dirname, 'dist'); // gitignored (root .gitignore: dist)
 
-// Three app sets: js-framework rows, TodoMVC, and chat-stream. The latter two
-// are app-shaped size comparisons; their ops use `todo_` / `chat_` prefixes so
-// all sets ride one suite with one baseline file.
+// Four app sets: js-framework rows, TodoMVC, chat-stream, and weather-app. The
+// latter three are app-shaped size comparisons; their ops use distinct prefixes
+// so every set rides one suite with one baseline file.
 const SETS = [
 	{
 		root: JS_FRAMEWORK,
@@ -56,6 +59,11 @@ const SETS = [
 		root: CHAT_STREAM,
 		prefix: 'chat_',
 		targets: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'ripple', 'vue-vapor'],
+	},
+	{
+		root: WEATHER_APP,
+		prefix: 'weather_',
+		targets: ['octane-tsrx', 'react'],
 	},
 ];
 
@@ -75,12 +83,11 @@ function* walk(dir) {
 
 const val = (bytes) => ({ median: bytes, min: bytes, samples: 1 });
 const targets = [];
-const byName = new Map(); // merge js-framework + todomvc ops per framework name
+const byName = new Map(); // merge every app set's ops per framework name
 
 for (const set of SETS)
 	for (const name of set.targets) {
 		const appRoot = path.join(set.root, name);
-		const appSrc = path.join(appRoot, 'src') + path.sep;
 		const outDir = path.join(OUT_ROOT, set.prefix + name);
 		const setLabel = set.prefix ? path.basename(set.root) + '/' : '';
 		console.log(`building ${setLabel}${name} (production, normalized minify)…`);
@@ -94,9 +101,10 @@ for (const set of SETS)
 				target: 'esnext',
 				rollupOptions: {
 					output: {
-						// App modules stay in the entry chunk; the runtime + virtual helpers
-						// (modulepreload polyfill etc.) are forced into a chunk literally
-						// named "framework" — the file-name test below keys off it. Vite 8
+						// App modules stay in the entry chunk; the framework runtime + virtual
+						// helpers are forced into a chunk named "framework". Rolldown may emit
+						// its own virtual runtime as a sibling `rolldown-runtime` asset; the
+						// file-name classifier below charges both to framework overhead. Vite 8
 						// is rolldown-based: `manualChunks` is ignored, `codeSplitting` is
 						// the supported API. Framework is matched POSITIVELY (node_modules,
 						// the octane workspace runtime — pnpm resolves it to packages/octane,
@@ -130,7 +138,9 @@ for (const set of SETS)
 		for (const file of walk(outDir)) {
 			if (!file.endsWith('.js') && !file.endsWith('.mjs')) continue;
 			const buf = fs.readFileSync(file);
-			const bucket = /(^|[\\/])framework-[^\\/]+\.js$/.test(file) ? 'fw' : 'app';
+			const bucket = /^(framework|rolldown-runtime)-.+\.m?js$/.test(path.basename(file))
+				? 'fw'
+				: 'app';
 			sums[bucket].raw += buf.length;
 			sums[bucket].gzip += gz(buf);
 			sums[bucket].brotli += br(buf);

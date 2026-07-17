@@ -147,6 +147,8 @@ internally, get their own baseline and guard namespace.
 | `js-framework` | js-framework | Octane + reference frameworks | krausest ops incl. `add` |
 | `js-framework-reorder` | js-framework | same fixtures | keyed reorder matrix (LIS vs lastPlacedIndex) |
 | `todomvc` | todomvc | Octane + reference frameworks | Speedometer-style TodoMVC interactions |
+| `weather-app` | weather-app | octane-tsrx, react | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
+| `weather-app-lighthouse` | weather-app | octane-tsrx, react | desktop Lighthouse categories plus FCP/LCP/Speed Index/TBT/CLS |
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
@@ -162,7 +164,7 @@ internally, get their own baseline and guard namespace.
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
-| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production build of each js-framework app, normalized minify, raw/gzip/brotli |
+| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
 | `three-bundle-size` | three | none (builds, then checks in Chromium) | minimal/full-catalogue shipped JS bytes for Octane Three, R3F, and plain Three |
 
@@ -180,7 +182,9 @@ own src/) and a `framework` chunk (node_modules + the octane workspace runtime
 + virtual helpers) and reports both, plus totals: `app_*` / `fw_*` / `js_*` ×
 raw/gzip/brotli. The `app_*` ops are the primary ratchet — in real apps user
 code eclipses the framework runtime, so the per-component codegen share is
-what must scale; `fw_*` tracks the one-time runtime cost separately.
+what must scale; `fw_*` tracks the one-time runtime cost separately. App-shaped
+sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
+service and formatting modules count as app code in both framework builds.
 
 ## Adding a suite
 

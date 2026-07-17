@@ -193,6 +193,46 @@
     "note": "chat-stream APP-CODE production gzip vs Svelte 5, normalized minify. Final pass measured 2523 / 2279 = 1.107x on 2026-07-15; ceiling ratcheted 1.18 -> 1.15."
   },
   {
+    "suite": "bundle-size",
+    "op": "weather_js_gzip",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.9,
+    "note": "Weather app TOTAL production gzip vs React 19, normalized minify. The initial record measured 50721 / 65725 = 0.772x on 2026-07-17; the 0.9x ceiling preserves Octane's shipped-byte advantage with deterministic headroom."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "weather_app_gzip",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.6,
+    "note": "Weather app APP-CODE production gzip vs React 19, including each port's shared weather service and formatting modules. The initial record measured 7802 / 5291 = 1.475x on 2026-07-17; the 1.6x ceiling bounds compiled app growth separately from framework runtime."
+  },
+  {
+    "suite": "weather-app-lighthouse",
+    "op": "first_contentful_paint",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Paired desktop Lighthouse FCP under simulated Dense 4G. The final five-sample record measured 362.51 / 362.53 = 1.000x on 2026-07-17; the broad ceiling catches structural load regressions without treating shared-runner noise as signal."
+  },
+  {
+    "suite": "weather-app-lighthouse",
+    "op": "largest_contentful_paint",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Paired desktop Lighthouse LCP under simulated Dense 4G. The final five-sample record measured 403.77 / 403.79 = 1.000x on 2026-07-17; the broad ceiling catches structural load regressions without treating shared-runner noise as signal."
+  },
+  {
+    "suite": "weather-app-lighthouse",
+    "op": "speed_index",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Paired desktop Lighthouse Speed Index under simulated Dense 4G. The final five-sample record measured 362.51 / 362.53 = 1.000x on 2026-07-17; TBT and CLS are intentionally unguarded because either reference can legitimately be zero."
+  },
+  {
     "suite": "async-waterfall",
     "op": "init",
     "target": "octane-tsrx",
@@ -325,6 +365,30 @@
     "minRatio": 1.0,
     "maxRatio": 1.0,
     "note": "Semantic control: equivalent TodoMVC states render exactly 106 text nodes."
+  },
+  {
+    "suite": "weather-app",
+    "op": "initial_ready",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Cold-context navigation through the mount effect and mock fetch. The 1.5x ceiling leaves broad browser/network noise headroom while catching a material Octane boot regression."
+  },
+  {
+    "suite": "weather-app",
+    "op": "forecast_cycle",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Thirty-six native click-driven keyed forecast updates. The pre-guard quick run recorded 3.50 / 5.60 = 0.63x on 2026-07-17; the 1.5x ceiling tolerates sub-millisecond commit noise while catching a reconciler or hook-update regression."
+  },
+  {
+    "suite": "weather-app",
+    "op": "nodes_loaded",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.4,
+    "note": "Collapsed weather-app DOM census: the pre-guard run recorded Octane 237 vs React 184 nodes (1.288x) on 2026-07-17. The 1.4x ceiling bounds compiler-anchor overhead beside the exact observable snapshot gate."
   },
   {
     "suite": "chat-stream",
