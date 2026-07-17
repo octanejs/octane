@@ -1,3 +1,5 @@
+import { Hydrate } from 'octane';
+
 export function Valid() @{
 	<main>
 		<p>valid</p>
@@ -14,6 +16,14 @@ export function Valid() @{
 export function Direct() @{
 	<p>
 		<div>direct</div>
+	</p>
+}
+
+export function HydrateWrapper(props) @{
+	<p>
+		<Hydrate when={props.when} split={false}>
+			<span>deferred</span>
+		</Hydrate>
 	</p>
 }
 

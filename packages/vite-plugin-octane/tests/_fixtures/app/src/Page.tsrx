@@ -1,7 +1,9 @@
-import { use, useState } from 'octane';
+import { Hydrate, use, useState } from 'octane';
+import { interaction } from 'octane/hydration';
 import { RpcProbe } from './Rpc.tsx';
 import { Canvas } from '@fixture/object-canvas';
 import { Scene } from './Scene.object.tsrx';
+import { DeferredHydrationProof } from './deferred-hydration.tsrx';
 
 export const fixturePageModuleState = { rendered: false };
 
@@ -44,5 +46,8 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 		<Canvas>
 			<Scene />
 		</Canvas>
+		<Hydrate when={interaction({ events: 'click' })}>
+			<DeferredHydrationProof />
+		</Hydrate>
 	</main>
 }

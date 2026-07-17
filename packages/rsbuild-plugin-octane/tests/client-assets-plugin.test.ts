@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { OctaneClientAssetsPlugin } from '../src/client-assets-plugin.js';
 
 describe('OctaneClientAssetsPlugin', () => {
-	it('selects the route entry JavaScript instead of an earlier-sorting associated chunk', () => {
+	it('selects route JavaScript while linking CSS from deferred hydration descendants', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-rsbuild-client-assets-'));
 		try {
 			const clientEntry = join(root, 'node_modules/.cache/octane/rsbuild-client-entry.js');
@@ -21,10 +21,45 @@ describe('OctaneClientAssetsPlugin', () => {
 				auxiliaryFiles: new Set(['static/js/z-route.js.map']),
 				groupsIterable: new Set(),
 			};
+			const deferredChunk = {
+				files: new Set(['static/js/reviews.js']),
+				auxiliaryFiles: new Set(['static/css/reviews.css']),
+				groupsIterable: new Set(),
+			};
+			const nestedDeferredChunk = {
+				files: new Set(['static/js/nested.js', 'static/css/nested.css']),
+				auxiliaryFiles: new Set(),
+				groupsIterable: new Set(),
+			};
+			const unrelatedChunk = {
+				files: new Set(['static/js/unrelated.js', 'static/css/unrelated.css']),
+				auxiliaryFiles: new Set(),
+				groupsIterable: new Set(),
+			};
+			const nestedDeferredGroup = {
+				origins: [{ request: join(root, 'src/Nested.tsrx') }],
+				isInitial: () => false,
+				chunks: [nestedDeferredChunk],
+				childrenIterable: [],
+			};
+			const deferredGroup = {
+				origins: [{ request: `${join(root, 'src/Reviews.tsrx')}?octane-hydrate=0` }],
+				isInitial: () => false,
+				chunks: [deferredChunk],
+				childrenIterable: [nestedDeferredGroup],
+			};
+			const unrelatedGroup = {
+				origins: [{ request: join(root, 'src/Unrelated.tsrx') }],
+				isInitial: () => false,
+				chunks: [unrelatedChunk],
+				// Shared async groups may have both deferred and ordinary parents.
+				childrenIterable: [nestedDeferredGroup],
+			};
 			const routeGroup = {
 				origins: [{ module: clientEntryModule, request: routeModule.resource }],
 				isInitial: () => false,
 				chunks: [vendorChunk, routeChunk],
+				childrenIterable: [unrelatedGroup, deferredGroup],
 			};
 
 			let thisCompilationHook: ((compilation: any) => void) | undefined;
@@ -68,7 +103,12 @@ describe('OctaneClientAssetsPlugin', () => {
 			expect(JSON.parse(emittedSource)).toEqual({
 				'/src/Page.tsrx': {
 					js: 'static/js/z-route.js',
-					css: ['static/css/route.css', 'static/css/vendor.css'],
+					css: [
+						'static/css/nested.css',
+						'static/css/reviews.css',
+						'static/css/route.css',
+						'static/css/vendor.css',
+					],
 				},
 			});
 		} finally {

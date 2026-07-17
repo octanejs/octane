@@ -7,8 +7,8 @@ export { version } from './version.js';
 
 // The export surface has exactly three tiers — keep new exports in the right one:
 //
-//  1. PUBLIC API — mirrors React's API, no octane-invented surface. If React
-//     doesn't ship it, it doesn't belong here.
+//  1. PUBLIC API — React parity plus deliberately documented Octane extensions
+//     such as compiler-backed deferred hydration.
 //  2. SEMI-PUBLIC compiler/binding helpers — the contract between the compiler's
 //     emitted code (and the @octanejs/* bindings) and the runtime. Not for app
 //     code; may change with the compiler in lockstep.
@@ -60,6 +60,7 @@ export {
 	// Components
 	Suspense,
 	ErrorBoundary,
+	Hydrate,
 	Activity,
 	ViewTransition,
 	addTransitionType,
@@ -207,6 +208,20 @@ export {
 	setTransitionFallbackTimeout,
 	getTransitionFallbackTimeout,
 } from './runtime.js';
+
+export type {
+	HydrateOptions,
+	HydrateProps,
+	HydrateWhen,
+	HydrationInteractionEvent,
+	HydrationInteractionEvents,
+	HydrationPrefetchContext,
+	HydrationPrefetchFunction,
+	HydrationPrefetchStrategy,
+	HydrationPrefetchWaitReason,
+	HydrationStrategy,
+	HydrationWhen,
+} from './hydration/types.js';
 
 // Semi-public compiler target for `module server` browser stubs.
 export { __serverRpc } from './server-rpc-client.js';

@@ -79,6 +79,7 @@ export {
 	// Suspense / error boundaries as JSX components (alongside the @try directive)
 	Suspense,
 	ErrorBoundary,
+	Hydrate,
 	Fragment,
 	Activity,
 	// Transparent server twin of the client ViewTransition boundary (client-only
