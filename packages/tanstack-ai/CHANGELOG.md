@@ -1,10 +1,19 @@
-# @octanejs/dnd-kit
+# @octanejs/tanstack-ai
 
-## 0.1.3
+## 0.0.2
 
 ### Patch Changes
 
-- 6ccdbce: Keep default sortable keyboard moves inside Octane-owned keyed DOM ranges while preserving explicitly configured plugin arrays.
+- 2367bd5: Add the Octane binding for TanStack AI (`@tanstack/ai-react` 0.17.0), porting the
+  hook surface — `useChat`, `useRealtimeChat`, `useGeneration`, the media generation
+  hooks, `useTranscription`, `useSummarize`, `useAudioRecorder`, and
+  `useMcpAppBridge` — while reusing `@tanstack/ai` and `@tanstack/ai-client`
+  unchanged. Includes ported behavioral tests, differential React parity coverage,
+  SSR support, and type tests. The `./mcp-apps` `MCPAppResource` component is not
+  ported (it renders the React-only `@mcp-ui/client` `AppRenderer`); the
+  framework-agnostic `useMcpAppBridge` hook is available on the main entry. Realtime
+  sessions support live configuration updates and use current authentication and
+  adapter callbacks across reconnects and token refreshes.
 - Updated dependencies [156f213]
 - Updated dependencies [2a5f44f]
 - Updated dependencies [f8e94f2]
@@ -38,30 +47,3 @@
 - Updated dependencies [dbbcee1]
 - Updated dependencies [5287eac]
   - octane@0.1.8
-
-## 0.1.2
-
-### Patch Changes
-
-- Updated dependencies [eaacd17]
-- Updated dependencies [93dcb81]
-- Updated dependencies [6852df7]
-- Updated dependencies [b00cd74]
-- Updated dependencies [e9852d4]
-  - octane@0.1.7
-
-## 0.1.1
-
-### Patch Changes
-
-- e55f6ed: Add complete modern dnd-kit bindings with sortable, sensor, overlay, SSR, hydration,
-  and React differential coverage. Preserve nested empty component ranges during
-  hydration so later updates can fill and clear them without mutating server markup.
-- Updated dependencies [d173805]
-- Updated dependencies [85e589e]
-- Updated dependencies [2979f42]
-- Updated dependencies [b41a91a]
-- Updated dependencies [e55f6ed]
-- Updated dependencies [d173805]
-- Updated dependencies [813fd50]
-  - octane@0.1.6

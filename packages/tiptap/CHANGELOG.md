@@ -1,10 +1,13 @@
-# @octanejs/dnd-kit
+# @octanejs/tiptap
 
-## 0.1.3
+## 0.0.2
 
 ### Patch Changes
 
-- 6ccdbce: Keep default sortable keyboard moves inside Octane-owned keyed DOM ranges while preserving explicitly configured plugin arrays.
+- bf141bf: Add the initial TipTap binding with editor lifecycle and state hooks, context providers, and the basic editor content surface.
+- 16adc1e: Complete the TipTap 3.28 binding surface with the EditorContent-owned portal
+  bridge, ReactRenderer-compatible NodeView and MarkView integrations, and the
+  BubbleMenu and FloatingMenu subpath.
 - Updated dependencies [156f213]
 - Updated dependencies [2a5f44f]
 - Updated dependencies [f8e94f2]
@@ -38,30 +41,3 @@
 - Updated dependencies [dbbcee1]
 - Updated dependencies [5287eac]
   - octane@0.1.8
-
-## 0.1.2
-
-### Patch Changes
-
-- Updated dependencies [eaacd17]
-- Updated dependencies [93dcb81]
-- Updated dependencies [6852df7]
-- Updated dependencies [b00cd74]
-- Updated dependencies [e9852d4]
-  - octane@0.1.7
-
-## 0.1.1
-
-### Patch Changes
-
-- e55f6ed: Add complete modern dnd-kit bindings with sortable, sensor, overlay, SSR, hydration,
-  and React differential coverage. Preserve nested empty component ranges during
-  hydration so later updates can fill and clear them without mutating server markup.
-- Updated dependencies [d173805]
-- Updated dependencies [85e589e]
-- Updated dependencies [2979f42]
-- Updated dependencies [b41a91a]
-- Updated dependencies [e55f6ed]
-- Updated dependencies [d173805]
-- Updated dependencies [813fd50]
-  - octane@0.1.6
