@@ -90,6 +90,8 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'on-this-page')).toBeGreaterThan(0);
 		expect(classCount(html, 'demo')).toBeGreaterThan(0);
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
+		expect(html).toContain('id="deferred-hydration"');
+		expect(html).toContain('Deferred hydration');
 	});
 
 	// This route deliberately renders every chart and accessible data table; give

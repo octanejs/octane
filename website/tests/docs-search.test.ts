@@ -80,6 +80,15 @@ describe('docs search ranking', () => {
 		expect(top.lines.some((line) => line.code)).toBe(true);
 	});
 
+	it('deep links deferred hydration searches to the Hydrate guide', async () => {
+		const index = await loadSearchIndex();
+		const [top] = searchDocs(index, 'deferred hydration');
+
+		expect(top).toBeDefined();
+		expect(top.slug).toBe('core-apis');
+		expect(top.id).toBe('deferred-hydration');
+	});
+
 	it('ranks a heading match above an incidental prose mention', async () => {
 		const index = await loadSearchIndex();
 		const [top] = searchDocs(index, 'install');

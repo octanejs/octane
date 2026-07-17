@@ -56,7 +56,7 @@ export const docsMeta: DocMeta[] = [
 		slug: 'core-apis',
 		title: 'Core APIs',
 		description:
-			'Learn how components, state, events, context, effects, async UI, and rendering fit together.',
+			'Learn how components, state, events, context, effects, async UI, deferred hydration, and rendering fit together.',
 		group: 'Learn Octane',
 		sections: [
 			{ id: 'mental-model', title: 'The mental model' },
@@ -67,6 +67,7 @@ export const docsMeta: DocMeta[] = [
 			{ id: 'refs-and-effects', title: 'Refs and effects' },
 			{ id: 'use-sync-external-store', title: 'useSyncExternalStore', level: 3 },
 			{ id: 'async-ui', title: 'Loading data and code' },
+			{ id: 'deferred-hydration', title: 'Deferred hydration' },
 			{ id: 'responsive-updates', title: 'Responsive updates' },
 			{ id: 'use-transition', title: 'useTransition', level: 3 },
 			{ id: 'use-deferred-value', title: 'useDeferredValue', level: 3 },

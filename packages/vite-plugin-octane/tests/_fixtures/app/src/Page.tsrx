@@ -1,9 +1,10 @@
-import { Hydrate, use, useState } from 'octane';
-import { interaction } from 'octane/hydration';
+import { Hydrate, use, useEffect, useState } from 'octane';
+import { interaction, load, media } from 'octane/hydration';
 import { RpcProbe } from './Rpc.tsx';
 import { Canvas } from '@fixture/object-canvas';
 import { Scene } from './Scene.object.tsrx';
 import { DeferredHydrationProof } from './deferred-hydration.tsrx';
+import { PrefetchedHydrationProof } from './prefetched-hydration.tsrx';
 
 export const fixturePageModuleState = { rendered: false };
 
@@ -18,6 +19,22 @@ import { fixtureRpc } from 'server';
 let pendingFixture: Promise<string> | undefined;
 function loadPendingFixture() {
 	return pendingFixture ??= new Promise((resolve) => setTimeout(() => resolve('ready'), 10));
+}
+
+function UnsplitHydrationProof() @{
+	const [active, setActive] = useState(false);
+	const [clicks, setClicks] = useState(0);
+	useEffect(() => {
+		setActive(true);
+	}, []);
+	<button
+		class="vite-unsplit-hydration-proof"
+		data-active={active ? 'true' : 'false'}
+		data-clicks={String(clicks)}
+		onClick={() => setClicks((count) => count + 1)}
+	>
+		vite-unsplit-hydration-proof
+	</button>
 }
 
 // A page with a dynamic text hole, a param read, and an event handler — enough
@@ -48,6 +65,12 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 		</Canvas>
 		<Hydrate when={interaction({ events: 'click' })}>
 			<DeferredHydrationProof />
+		</Hydrate>
+		<Hydrate when={media('(min-width: 2000px)')} prefetch={load()}>
+			<PrefetchedHydrationProof />
+		</Hydrate>
+		<Hydrate when={media('(min-width: 2100px)')} split={false}>
+			<UnsplitHydrationProof />
 		</Hydrate>
 	</main>
 }

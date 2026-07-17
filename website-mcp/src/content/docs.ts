@@ -9,6 +9,7 @@
 import { docsMeta } from '../../../website/src/content/docs-meta.ts';
 import ssrMd from '../../../docs/ssr.md?raw';
 import reactDifferencesMd from '../../../docs/differences-from-react.md?raw';
+import deferredHydrationMd from '../../../docs/deferred-hydration.md?raw';
 
 export interface McpDocSection {
 	id: string;
@@ -99,10 +100,20 @@ const websiteDocs: McpDoc[] = docsMeta.map((meta) => {
 	}
 }
 
-// Deep-dive documents that only exist in the repository. The divergence
-// reference gets a '-reference' suffix so it never collides with the website's
-// reader-friendly differences-from-react page.
+// Deep-dive documents that only exist in the repository use a '-reference'
+// suffix when their subject also appears in a reader-friendly website guide.
 const repoDocs: McpDoc[] = [
+	{
+		slug: 'deferred-hydration-reference',
+		title: 'Deferred hydration (full reference)',
+		description:
+			'The complete Hydrate reference: activation strategies, compiler splitting, prefetching, fallbacks, and nesting behavior.',
+		group: 'Explore',
+		source: 'repo',
+		url: 'https://github.com/octanejs/octane/blob/main/docs/deferred-hydration.md',
+		sections: markdownSections(deferredHydrationMd),
+		markdown: deferredHydrationMd,
+	},
 	{
 		slug: 'ssr',
 		title: 'Server-side rendering (deep dive)',
