@@ -1,4 +1,12 @@
-import { bindRendererRegionOwner, memo, use, useId, useLayoutEffect, useState } from 'octane';
+import {
+	bindRendererRegionOwner,
+	memo,
+	use,
+	useEffect,
+	useId,
+	useLayoutEffect,
+	useState,
+} from 'octane';
 import { MirrorLocale, MirrorTheme } from './mirror-context.js';
 
 /**
@@ -181,4 +189,31 @@ export function RenderLogIsland(props) @{
 export function UseIdIsland() @{
 	const id = useId();
 	<p class="use-id" data-oid={id}>{'id island'}</p>
+}
+
+/** Effect faults on demand: layout setup and passive setup, keyed by props. */
+export function EffectFaultIsland(props) @{
+	useLayoutEffect(() => {
+		if (props.layoutBoom) throw new Error('island layout setup exploded');
+	}, [props.layoutBoom]);
+	useEffect(() => {
+		if (props.passiveBoom) throw new Error('island passive setup exploded');
+	}, [props.passiveBoom]);
+	<p class="effect-fault">
+		{'armed:' + props.label}
+	</p>
+}
+
+/** Octane-local state PLUS a root-escaping suspension — prior-content episodes. */
+export function StatefulSuspendingIsland(props) @{
+	const [count, setCount] = useState(0);
+	const value = use(props.resource);
+	<div class="ss-island">
+		<button class="ss-count" onClick={() => setCount(count + 1)}>
+			{'count:' + count}
+		</button>
+		<p class="ss-value">
+			{'value:' + value as string}
+		</p>
+	</div>
 }
