@@ -242,7 +242,8 @@ describe('website routes', () => {
 		const toc = container.querySelector('nav[aria-label="On this page"]')!;
 		for (const section of doc.sections ?? []) {
 			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
-			expect(container.querySelector(`h2#${section.id}`)).toBeTruthy();
+			const tag = section.level === 3 ? 'h3' : 'h2';
+			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
 		const sidebar = container.querySelector('.sidebar-nav')!;
 		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
