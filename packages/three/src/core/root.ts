@@ -784,11 +784,8 @@ export function unmountComponentAtNode<TCanvas extends CanvasLike>(
 ): void {
 	const record = roots.get(canvas);
 	if (record === undefined) return;
-	try {
-		record.root.unmount();
-	} finally {
-		callback?.(canvas);
-	}
+	record.root.unmount();
+	callback?.(canvas);
 }
 
 export interface ThreeBoundaryMount {

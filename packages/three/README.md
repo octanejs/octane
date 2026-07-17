@@ -135,8 +135,9 @@ root.store.getState().advance(1 / 60);
 Direct-root scheduling uses Octane's public `act` and `flushSync` semantics.
 Call `root.unmount()` directly, or use
 `unmountComponentAtNode(canvas, optionalCallback)` to remove the root registered
-for either canvas kind. Teardown synchronously disconnects events and XR,
-clears the animation loop, releases scene resources, and disposes the renderer.
+for either canvas kind. The optional callback runs synchronously only after
+teardown completes successfully. Teardown disconnects events and XR, clears the
+animation loop, releases scene resources, and disposes the renderer.
 
 Tests can inject the WebGL-free deterministic harness from
 `@octanejs/three/testing`; it drives the same root, host commits, hooks, and
