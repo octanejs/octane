@@ -18,7 +18,9 @@ const observerRegistry = /* @__PURE__ */ new Map<string, VisibleObserverEntry>()
 function cleanupObserverEntry(entry: VisibleObserverEntry): void {
 	if (entry.elements.size > 0) return;
 	entry.observer.disconnect();
-	observerRegistry.delete(entry.key);
+	if (observerRegistry.get(entry.key) === entry) {
+		observerRegistry.delete(entry.key);
+	}
 }
 
 /* @__NO_SIDE_EFFECTS__ */

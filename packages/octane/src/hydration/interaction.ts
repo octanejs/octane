@@ -1,9 +1,10 @@
 import type { HydrationInteractionEvents, HydrationPrefetchStrategy } from './types.js';
+import {
+	HYDRATE_DEFAULT_INTERACTION_EVENTS,
+	HYDRATE_INTERACTION_EVENTS_ATTR,
+} from './interaction-config.js';
 
 const interactionType = 'interaction';
-const interactionEventsAttribute = 'data-octane-hydrate-interaction-events';
-
-const defaultInteractionEvents = ['pointerenter', 'focusin', 'pointerdown', 'click'] as const;
 
 export type InteractionHydrationOptions = {
 	events?: HydrationInteractionEvents;
@@ -13,7 +14,7 @@ export type InteractionHydrationOptions = {
 export function interaction(
 	options: InteractionHydrationOptions = {},
 ): HydrationPrefetchStrategy<typeof interactionType> {
-	let events: ReadonlyArray<string> = defaultInteractionEvents;
+	let events: ReadonlyArray<string> = HYDRATE_DEFAULT_INTERACTION_EVENTS;
 	if (options.events !== undefined) {
 		const input = typeof options.events === 'string' ? [options.events] : options.events;
 		events = [...new Set(input.filter(Boolean))];
@@ -39,6 +40,6 @@ export function interaction(
 			};
 		},
 		_a: () =>
-			options.events === undefined ? undefined : { [interactionEventsAttribute]: eventKey },
+			options.events === undefined ? undefined : { [HYDRATE_INTERACTION_EVENTS_ATTR]: eventKey },
 	};
 }

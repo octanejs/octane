@@ -59,6 +59,10 @@ import type {
 	HydrationStrategy,
 	HydrationWhen,
 } from './hydration/types.js';
+import {
+	HYDRATE_DEFAULT_INTERACTION_EVENTS,
+	HYDRATE_INTERACTION_EVENTS_ATTR,
+} from './hydration/interaction-config.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
@@ -4747,13 +4751,6 @@ function childrenAsBody(children: unknown): ComponentBody {
 const HYDRATE_ID_SLOT = Symbol('octane.hydrate.id');
 const HYDRATE_SETUP_SLOT = Symbol('octane.hydrate.setup');
 const HYDRATE_NOTIFY_SLOT = Symbol('octane.hydrate.notify');
-const HYDRATE_INTERACTION_EVENTS_ATTR = 'data-octane-hydrate-interaction-events';
-const HYDRATE_DEFAULT_INTERACTION_EVENTS = [
-	'pointerenter',
-	'focusin',
-	'pointerdown',
-	'click',
-] as const;
 const HYDRATE_SUPPORTED_INTERACTION_EVENTS = [
 	'auxclick',
 	'click',
@@ -5568,6 +5565,10 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
 		const target = resolveEventPath(state.wrapper, replay.path);
 		if (target !== null) {
 			const event = replay.event;
+			// `click` is the platform exception among untrusted events: dispatching
+			// the clone still runs its native activation behavior, so links navigate
+			// and submit controls submit unless a hydrated handler prevents default.
+			// Keep dispatchEvent here to preserve the original mouse-event metadata.
 			target.dispatchEvent(
 				typeof MouseEvent !== 'undefined' && event instanceof MouseEvent
 					? new MouseEvent(event.type, event)
