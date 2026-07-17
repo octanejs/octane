@@ -12,18 +12,16 @@ export function useCopyToClipboard(): { copied: boolean; copy: (text: string) =>
 	const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	useEffect(() => () => clearTimeout(resetTimer.current), []);
 
-	const copy = (text: string) => {
+	const copy = async (text: string) => {
 		if (!text) return;
-		navigator.clipboard
-			?.writeText(text)
-			.then(() => {
-				setCopied(true);
-				clearTimeout(resetTimer.current);
-				resetTimer.current = setTimeout(() => setCopied(false), COPY_RESET_MS);
-			})
-			.catch(() => {
-				// Clipboard permission denied — the button simply stays "Copy".
-			});
+		try {
+			await navigator.clipboard.writeText(text);
+			setCopied(true);
+			clearTimeout(resetTimer.current);
+			resetTimer.current = setTimeout(() => setCopied(false), COPY_RESET_MS);
+		} catch {
+			// Nothing happens here...
+		}
 	};
 
 	return { copied, copy };

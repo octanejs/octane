@@ -51,12 +51,18 @@ export function DocPage() @{
 
 	const [activeId, setActiveId] = useState('');
 	const tocTrack = useRef<HTMLDivElement | null>(null);
+	// A TOC click claims its target here so the scroll-spy can hold that row lit
+	// through the smooth scroll instead of walking the highlight through every
+	// section the animation sweeps past. The timer is the release fallback.
+	const clickLock = useRef<string | null>(null);
+	const clickTimer = useRef(0);
 
 	// Scroll-spy: the active section is the last heading whose top has crossed a
 	// line just below the sticky header. Reads are coalesced into one rAF so
-	// scrolling stays cheap, and the final section is forced active at the very
-	// bottom so a short trailing heading still lights up. There is always exactly
-	// one active id, so the highlight never flickers through an empty gap.
+	// scrolling stays cheap, and on a scrollable page the final section is forced
+	// active at the very bottom so a short trailing heading still lights up. There
+	// is always exactly one active id, so the highlight never flickers through an
+	// empty gap.
 	useEffect(() => {
 		if (sections.length === 0) return;
 		const headings = sections.map((section) => document.getElementById(section.id)).filter(
@@ -73,9 +79,23 @@ export function DocPage() @{
 				if (heading.getBoundingClientRect().top <= ACTIVATION_LINE) current = heading.id;
 				else break;
 			}
+			// Only snap to the final heading when the page can actually scroll and is
+			// parked at the bottom. On a short doc whose content fits the viewport the
+			// bottom test is satisfied from the very top, which would otherwise light
+			// the last row while the reader is still at the first section.
+			const scrollable = document.documentElement.scrollHeight - window.innerHeight > 1;
 			const atBottom =
-				window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+				scrollable &&
+					window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
 			if (atBottom) current = headings[headings.length - 1].id;
+
+			// While a TOC click is smooth-scrolling to its target, keep that target
+			// lit and ignore the sections the animation passes through; resume live
+			// tracking once the target settles at (or past) the activation line.
+			if (clickLock.current !== null) {
+				if (current === clickLock.current) clickLock.current = null;
+				return;
+			}
 			setActiveId(current);
 		};
 		const onScroll = () => {
@@ -89,6 +109,8 @@ export function DocPage() @{
 			window.removeEventListener('scroll', onScroll);
 			window.removeEventListener('resize', onScroll);
 			if (frame !== 0) cancelAnimationFrame(frame);
+			if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
+			clickLock.current = null;
 		};
 	}, [doc?.slug]);
 
@@ -114,6 +136,16 @@ export function DocPage() @{
 		if (!heading) return;
 		event.preventDefault();
 		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		// Claim the target before scrolling so the spy holds it through the smooth
+		// animation. The fallback timer releases the lock in case the target never
+		// reaches the activation line — e.g. a heading near the page bottom that
+		// can't scroll all the way up — so live tracking always resumes.
+		clickLock.current = id;
+		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
+		clickTimer.current = window.setTimeout(() => {
+			clickLock.current = null;
+			clickTimer.current = 0;
+		}, 700);
 		heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
 		heading.setAttribute('tabindex', '-1');
 		heading.focus({ preventScroll: true });
@@ -502,16 +534,14 @@ export function DocPage() @{
 				padding: 0;
 				font-size: inherit;
 			}
-			.prose :global(pre) {
-				margin: 0 0 1.4rem;
-			}
-			/* Fenced code blocks are wrapped in CodeBlock (the copy-button panel), so
-			   the block spacing moves to the wrapper and the inner pre sits flush. */
+			/* Every fenced block in the docs is wrapped in CodeBlock (the copy-button
+			   panel) or PackageInstall, each of which owns its own margin and zeroes
+			   its inner <pre>. So the block spacing lives on the wrapper — there is
+			   deliberately no `.prose pre` margin: it would leak past the wrappers
+			   (higher specificity than their scoped `margin: 0`) and, inside their
+			   overflow-hidden frames, show as stray space under the code. */
 			.prose :global(.codeblock) {
 				margin: 0 0 1.4rem;
-			}
-			.prose :global(.codeblock pre) {
-				margin: 0;
 			}
 			.prose :global(blockquote) {
 				border-left: 3px solid var(--accent);

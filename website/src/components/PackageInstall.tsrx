@@ -147,7 +147,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 
 		<style>
 			.pkg {
-				margin: 1.25rem 0;
+				margin: 1.4rem 0;
 				border: 1px solid var(--border);
 				border-radius: 0.75rem;
 				background: var(--code-bg);
@@ -177,7 +177,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 				background: transparent;
 				color: var(--text-secondary);
 				font: inherit;
-				font-size: 0.8rem;
+				font-size: 0.875rem;
 				font-weight: 500;
 				line-height: 1;
 				cursor: pointer;
