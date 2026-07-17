@@ -1,5 +1,171 @@
 # octane
 
+## 0.1.8
+
+### Patch Changes
+
+- 156f213: Preserve explicit/spread class precedence across SSR and hydration, and keep generated keyed-list helpers outside destructured component parameters.
+- 2a5f44f: Add compiler-backed deferred hydration with the `Hydrate` component, hydration
+  strategies, split-child loading and prefetching, SSR adoption, nested interaction
+  replay, and eager CSS retention for deferred chunks in the Vite and Rsbuild app
+  integrations.
+- f8e94f2: Improve server streaming and hydration conformance for Suspense errors, aborts,
+  synchronous iterables and thenables, raw HTML/style safety, controlled fields,
+  and mismatch recovery.
+
+  Compose configured app root catch boundaries inside pending boundaries so route
+  errors render the catch UI while suspensions continue to render the pending UI
+  on both the server and client.
+
+- a12a3d9: Add the experimental universal renderer foundation: a bundler-neutral registry and filename resolver, static host-plan compiler target, core-owned logical topology and staged transactions, object test driver, and explicit DOM-to-universal boundary.
+- 1b21731: Refresh suspended boundaries when newer props supersede their pending promise,
+  while keeping fallback-visible, fully staged transition groups together through
+  their DOM, ref, and layout-effect commit.
+- 7a123d2: Preserve Lexical node identity during cold Vite dependency discovery by expanding raw binding package prebundle family rules across the binding and app dependency manifests, including the complete declared `@lexical/*` module family.
+- 95b3081: Complete the experimental universal client renderer's core composition
+  semantics: nested component owners, template directives and spreads,
+  transactional renderer events, and statically declared renderer-owned child
+  regions in both DOM-to-universal and universal-to-DOM directions. Normalize
+  and forward boundary metadata consistently across direct compilation, Vite,
+  Rspack, and Rsbuild while preserving authored source maps and normal universal
+  HMR, profiling, and parallel-use planning. Add the experimental boundary
+  configuration schema and the reverse DOM owner bridge used by compiled child
+  regions.
+- 38d95eb: The compiler no longer claims a call as an octane builtin hook when its name is
+  bound by an import from another module. A library hook whose name collides with
+  a base hook (`useId` from a React-parity binding like `@octanejs/aria`,
+  `useState`-alikes, …) previously had the octane builtin's runtime import
+  injected over it — a duplicate-identifier parse error in the compiled module,
+  and the wrong function at the call site. Non-octane import bindings now shadow
+  the builtin spelling everywhere the bare-name classification applies (hook
+  slotting, the JS-loop guard, and the `useState` third-tuple getter analysis);
+  such calls take the custom-hook path with the standard trailing call-site slot.
+- ba36091: Match React's `useEffectEvent` semantics with fresh per-render wrappers and
+  commit-time, abort-safe callback publication. Block untrusted `javascript:` URL
+  attributes consistently across client rendering, hydration, SSR, streaming, and
+  resource hints.
+- 6ccdbce: Let controlled selects preserve a browser choice across the native input/change event pair so `onChange` observes the selected value, and keep capture/bubble handlers in one discrete update window so capture work cannot restore the old choice before bubbling.
+- d1bb5c3: Align root lifecycle, Fragment and iterable reconciliation, element and Children APIs, and lazy function-component resolution with the pinned React 19 conformance cases. Class components, legacy roots, `forwardRef`, and other unsupported React-only surfaces remain explicit non-goals.
+- 9c21887: Add `octane/react` (experimental): host a compiled Octane subtree inside a real
+  React 19 tree through one component — `<OctaneCompat><Island …/></OctaneCompat>`.
+  React owns the wrapper and one host element; a private hosted Octane root owns
+  every descendant through the existing renderer-region owner bridge. Local Octane
+  `@try`/Suspense/error boundaries win first; only an unhandled island suspension
+  or error escapes to the nearest React Suspense/error boundary (React reveals
+  only after the Octane retry has committed). Events stay native and delegated at
+  the island host, the child `ref` passes through as an ordinary Octane ref prop,
+  unchanged parent re-renders skip the island update, and StrictMode probes and
+  Suspense hide/reveal preserve the hosted root while real unmounts dispose it
+  exactly once. React and ReactDOM 19 are optional peer dependencies; the entry
+  carries `'use client'`. Not yet included (see
+  docs/react-hosted-octane-compat-plan.md): transparent React context, island
+  SSR/hydration, and selective per-island event delegation.
+- 674f1a4: `octane/react` islands now server-render and hydrate. The new
+  `octane/react/server` entry runs one synchronous hosted Octane pass per React
+  server render (Fizz streaming or `renderToString`) against a request-local
+  session, so Fizz retries replay settled work instead of re-fetching — one
+  replay per suspension stratum, parallel `use()` fetches started once, and
+  rejections routed to Fizz exactly once. Island React-context reads call
+  `React.use` directly on the server; locally-guarded suspensions ship their
+  `@pending` arms in the shell for the client to complete; scoped island CSS
+  hoists as deduplicated React 19 style resources that client hydration
+  recognizes; and hoisted `<title>/<meta>/<link>` from islands is rejected with
+  a targeted diagnostic. On the client, `OctaneCompat` hydrates a
+  server-rendered host in place: Octane adopts the exact server node identities
+  (byte-identical `useId` values, preserved state, live events) while React
+  never touches the island's descendants. Also closes the escape-protocol
+  matrix: island layout/passive/ref faults surface in the nearest React error
+  boundary, and update suspensions over committed content preserve hidden
+  island DOM and state (transition-originated episodes refallback in v1 — a
+  documented divergence).
+- 6ceab55: `octane/react` islands now read REAL React 19 contexts transparently: an
+  island's ordinary `use()`/`useContext()` accepts a `React.Context<T>` object
+  (typed via a structural overload that keeps React types out of the core
+  package), resolves it through the owner bridge to a root-local mirror,
+  bootstraps the committed nearest-provider value from the host Fiber once, and
+  stays live by subscribing through real `React.use(context)` reads in the
+  wrapper — provider-only updates flow through memoized parents with zero
+  post-subscription Fiber walks, `memo()` consumers inside the island are
+  invalidated correctly, and islands never observe each other's providers. When
+  Fiber inspection is unavailable (or a providerless read needs the context
+  default), a request handshake retries with the authoritative React value
+  before paint. Reading a React context outside a hosted island now throws a
+  targeted diagnostic, and `useContext()` rejects non-context arguments instead
+  of silently returning `undefined`.
+- 3445fa6: Add a `requireDirective` option to every bundler integration for mixed-toolchain
+  codebases (for example a React app hosting Octane islands via `octane/react`).
+  When enabled, Octane compiles only project modules that open with a
+  `'use octane'` directive: undirected project `.tsx`/`.ts`/`.js` pass through to
+  the host framework's own pipeline (with a warning when they import from
+  `octane`), an undirected project `.tsrx` is a build error, and installed or
+  linked packages keep their Octane package-manifest decision. Paths routed
+  through a different tsrx compiler (for example `@tsrx/react`) can be carved out
+  with the integration's `exclude` option — excluded paths are never Octane's in
+  this mode, even when a file declares the directive. The directive is purely an
+  Octane-compilation ownership marker (not part of the tsrx language), composes
+  with `'use client'`, is stripped from compiled output, and is tolerated even
+  when the option is off. Client-only classification (`clientReferenceForFile`)
+  applies the same ownership gate, so importers never hold a client reference
+  for a module whose own transform passes through to the host toolchain.
+- 6cfb63d: Report browser-repaired HTML nesting with authored locations during development SSR, and collect module style-map CSS while rendering so server and hydrated layouts use the same styles.
+
+  Negotiate streaming gzip in the built-in Node HTTP transport for eligible SSR and static text responses, including the `octane-preview` path.
+
+- c68562b: Error boundaries no longer corrupt the DOM when a @catch arm rethrows mid-render: the rethrown error now unwinds the live render stack before the outer boundary switches arms (previously the outer switch swept insertion anchors out from under still-mounting frames, producing an insertBefore NotFoundError that replaced the original error and could blank the page). During hydration, a client-built @catch arm also discards the slot's leftover server DOM, parks the adoption cursor past the slot, and renders with adoption suspended, so sibling content keeps hydrating cleanly instead of mis-adopting.
+- 4de2b4f: Automatically reuse conservative pure TSRX component regions and keyed lists by inferred dependencies in production client builds, preserving context propagation and child-owned state. Always on in production compilation; dev/HMR/profiling/server builds keep normal reconciliation.
+- 6868005: Add a renderer-infrastructure synchronous drain for universal hook and HMR
+  updates. Add direct `HTMLCanvasElement` and `OffscreenCanvas` lifecycle support,
+  composed Octane `act` and `flushSync` exports, callback-aware root unmounting,
+  WebGL context recovery, controlled WebXR animation-loop ownership, precise
+  universal HMR reconstruction, and the explicit-target low-level `DOMRegion`
+  boundary.
+- 1b21731: Render and hydrate template-only constructs nested in React-style returned JSX, including directives, Activity, Fragment refs, head singletons, and child code blocks. Preserve ordinary keyed Fragment descriptor boundaries across server rendering and hydration.
+
+  Keep document-head hoisting namespace-aware across opaque component children so SVG titles remain inside the SVG selected by the component.
+
+- 1b21731: Observe client-created thenables adopted from SSR suspense seeds so a later
+  rejection cannot escape as an unhandled browser error during hydration.
+- 1b21731: Apply component-scoped style blocks to React-style returned JSX, and keep
+  multiple style blocks under one canonical scope across client rendering, SSR,
+  and hydration.
+- 7efdbdd: Harden server rendering and hydration parity for React-style Usable nodes, parser-sensitive streamed Suspense content, readiness callbacks, safe dynamic inline scripts, deep component trees, render-phase hook replay reached through user getters, root structural mismatch recovery and later updates, controlled form properties rebuilt during hydration, and suspended streamed boundaries that converge to one client arm without retaining abandoned registrations.
+- 314b38d: Complete the React server-integration conformance matrix. Align client, SSR,
+  streaming, hydration, and production compilation for attribute coercion,
+  parser-normalized content, raw HTML, invalid children and element types,
+  controlled native form fields, render-phase reducers, stable server hook replay,
+  and React 19 callable Context providers. Resolve direct and spread host props
+  from their final JSX source order, including aliases, duplicate writers,
+  prop-driven children, void-element validation, and single-evaluation getters.
+- dcd2707: Bound recursive effect setup/cleanup, ref, root-render, and external-store update chains with recoverable maximum-depth errors while preserving finite chains and wide independent batches. Keep `act()` scopes balanced when a synchronous drain rejects, report cross-component render updates in development, and preserve the implicit bailout when a compiled component returns unchanged `children`.
+- d63b0d0: Extend the experimental universal renderer SDK with prepared host acceptance,
+  stable-ID recreation, lifecycle and local callbacks, scoped events, prop
+  codecs/resource handles, typed text and intrinsic metadata, and retained
+  Activity/Suspense visibility. Add client-only renderer server stubs, omitted
+  boundary regions, live-use diagnostics, and stable cross-adapter client
+  reference manifests for DOM-shell hydration.
+- 39e779c: Parallelize independent `use()` reads inside imported plain-TypeScript custom hooks and activate compiled warm plans across adjacent async component branches. Warm-cache entries now keep repeated component occurrences distinct and prevent speculative requests from restarting after adoption on later dependency waves.
+- 1b21731: Preserve SVG, MathML, and foreignObject child namespaces across component templates, de-opt descriptor reconciliation, server rendering, hydration, and streamed reveals.
+- f07c628: Add the R3F-compatible `useLoader` cache, preload/clear helpers, retained Three
+  Suspense and Activity behavior, real browser asset loading, and client
+  pending/error projection through `Canvas`. Preserve universal host roots while
+  their DOM owner is hidden and allow updated hidden Suspense content to retry
+  without waiting for an obsolete promise.
+- fac1c66: Add asynchronous acknowledgement semantics to the experimental universal
+  renderer transport and complete the Three technical preview with verified
+  package exports, supported Three-version lanes, real WebGL failure recovery,
+  and renderer performance baselines. Compiler-proven keyed intrinsic leaf loops
+  now use an opt-in compact universal transaction, while the Three driver stages
+  and applies canonical retained mesh batches without cloning the full host tree.
+  The production-browser 1,000-mesh stability run now measures mount at 0.98x and
+  retained updates at 1.03x R3F, replacing the previous 3.66x and 15.55x gaps.
+- dbbcee1: Make Suspense waterfall elimination unconditional across the compiler and its
+  bundler integrations. Remove the `parallelUse` configuration flag so compiled
+  builds always run the conservative memoization, batched-unwrap, and eligible
+  descendant-warming analysis. The rspack plugin rejects the removed option
+  loudly; the vite plugin warns once that a passed `parallelUse` is ignored, so
+  the timing change is never silent on upgrade.
+- 5287eac: Add transactional universal portal target handles and R3F-compatible Three portals with state enclaves, shared frame and event integration, physical Object3D bubbling, validation, and ownership-safe teardown.
+
 ## 0.1.7
 
 ### Patch Changes
