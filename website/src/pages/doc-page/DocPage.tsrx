@@ -66,9 +66,13 @@ export function DocPage() @{
 	const tocTrack = useRef<HTMLDivElement | null>(null);
 	// A TOC click claims its target here so the scroll-spy can hold that row lit
 	// through the smooth scroll instead of walking the highlight through every
-	// section the animation sweeps past. The timer is the release fallback.
+	// section the animation sweeps past. The timer is the release fallback, and
+	// the spy publishes its measure() through measureRef so that fallback can
+	// re-run live tracking the moment it releases the lock — without it the
+	// clicked row would stay lit until the next scroll or resize event.
 	const clickLock = useRef<string | null>(null);
 	const clickTimer = useRef(0);
+	const measureRef = useRef<(() => void) | null>(null);
 
 	// Scroll-spy: the active section is the last heading whose top has crossed a
 	// line just below the sticky header. Reads are coalesced into one rAF so
@@ -86,7 +90,6 @@ export function DocPage() @{
 		const ACTIVATION_LINE = 100; // sticky header (~60px) + a little breathing room
 		let frame = 0;
 		const measure = () => {
-			frame = 0;
 			let current = headings[0].id;
 			for (const heading of headings) {
 				if (heading.getBoundingClientRect().top <= ACTIVATION_LINE) current = heading.id;
@@ -111,14 +114,25 @@ export function DocPage() @{
 			}
 			setActiveId(current);
 		};
+		// The rAF wrapper owns the frame bookkeeping — measure() itself must not
+		// touch it, because the click-lock fallback also calls measure() directly
+		// and must not orphan a pending frame id (cleanup could then no longer
+		// cancel it).
 		const onScroll = () => {
-			if (frame === 0) frame = requestAnimationFrame(measure);
+			if (frame === 0) {
+				frame = requestAnimationFrame(() => {
+					frame = 0;
+					measure();
+				});
+			}
 		};
 
 		measure();
+		measureRef.current = measure;
 		window.addEventListener('scroll', onScroll, { passive: true });
 		window.addEventListener('resize', onScroll, { passive: true });
 		return () => {
+			measureRef.current = null;
 			window.removeEventListener('scroll', onScroll);
 			window.removeEventListener('resize', onScroll);
 			if (frame !== 0) cancelAnimationFrame(frame);
@@ -153,27 +167,38 @@ export function DocPage() @{
 		}
 		const link = track.querySelector<HTMLElement>('[data-id="' + activeId + '"]');
 		if (!link) return;
-		const place = () => {
+		const placeVars = () => {
 			track.style.setProperty('--indicator-y', link.offsetTop + 'px');
 			track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
 		};
-		if (track.dataset.placed === undefined) {
-			const indicator = track.querySelector<HTMLElement>('.toc-indicator');
-			if (indicator) {
-				// Keep only the opacity transition for this placement: position and
-				// size snap, then the full transition list is restored after a forced
-				// style flush so later moves animate again.
-				indicator.style.transitionProperty = 'opacity';
-				place();
-				void indicator.offsetWidth;
-				indicator.style.transitionProperty = '';
+		const place = () => {
+			// While the desktop rail is display:none (≤1180px) every offset reads
+			// 0×0 — writing those would make the indicator slide down from the top
+			// when the rail re-appears. Skip; the ResizeObserver fires again with
+			// real numbers the moment the rail becomes visible.
+			if (link.offsetHeight === 0) return;
+			if (track.dataset.placed === undefined) {
+				// First successful placement for this track: keep only the opacity
+				// transition so position and size snap (the bar fades in already on
+				// its row); the full transition list is restored after a forced style
+				// flush so later moves animate again. Marking placed only here — not
+				// on a skipped hidden pass — means a page opened narrow still snaps
+				// on its eventual first reveal.
+				const indicator = track.querySelector<HTMLElement>('.toc-indicator');
+				if (indicator) {
+					indicator.style.transitionProperty = 'opacity';
+					placeVars();
+					void indicator.offsetWidth;
+					indicator.style.transitionProperty = '';
+				} else {
+					placeVars();
+				}
+				track.dataset.placed = '';
 			} else {
-				place();
+				placeVars();
 			}
-			track.dataset.placed = '';
-		} else {
-			place();
-		}
+		};
+		place();
 		// The observer is a browser-only enhancement over the essential place()
 		// above — jsdom (the website unit tests) doesn't implement it.
 		if (typeof ResizeObserver === 'undefined') return;
@@ -201,6 +226,9 @@ export function DocPage() @{
 		clickTimer.current = window.setTimeout(() => {
 			clickLock.current = null;
 			clickTimer.current = 0;
+			// Resume live tracking right away: with no fresh measure the clicked
+			// row would stay lit until the next scroll or resize event.
+			measureRef.current?.();
 		}, 700);
 		heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
 		heading.setAttribute('tabindex', '-1');

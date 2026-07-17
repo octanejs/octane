@@ -45,7 +45,7 @@ export function Header() @{
 					</svg>
 				</button>
 				<Link to="/" class="wordmark" aria-label="Octane home">
-					<img src={logoUrl} alt="Octane" class="wordmark-img" width="123" height="30" />
+					<img src={logoUrl} alt="Octane" class="wordmark-img" width="122" height="32" />
 				</Link>
 				<nav
 					id="site-nav"
@@ -158,8 +158,11 @@ export function Header() @{
 			.topnav-inner :global(a.wordmark:hover) {
 				text-decoration: none;
 			}
+			/* 32px, not 30: the logo viewBox carries 8 units of optical headroom at
+			   the bottom (see octane-logo.svg), so the taller box keeps the glyphs
+			   at their original rendered size. */
 			.topnav-inner :global(img.wordmark-img) {
-				height: 30px;
+				height: 32px;
 				width: auto;
 				display: block;
 			}
