@@ -1450,6 +1450,16 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tiptap-browser',
+					include: ['packages/tiptap/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',
