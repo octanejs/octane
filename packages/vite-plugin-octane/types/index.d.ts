@@ -17,8 +17,22 @@ export interface OctanePluginOptions {
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
+	 * With `requireDirective`, excluded paths are exempt from Octane ownership
+	 * entirely — including `.tsrx`/`.tsx` — for projects routing those paths
+	 * through a different tsrx compiler (e.g. `@tsrx/react`).
 	 */
 	exclude?: string[];
+	/**
+	 * Mixed-toolchain ownership gate: when `true`, Octane compiles only
+	 * project modules that declare `'use octane'` in their directive prologue.
+	 * Undirected project `.tsx`/`.ts`/`.js` pass through to the host
+	 * framework's own pipeline (e.g. React's JSX transform); an undirected
+	 * project `.tsrx` is a build error. Installed and linked packages keep
+	 * their Octane package-manifest decision. The directive is always
+	 * tolerated and stripped from compiled output, even when this is off.
+	 * @default false
+	 */
+	requireDirective?: boolean;
 	/**
 	 * @experimental Full renderer-config override. When omitted, the compiler
 	 * reads `compiler.renderers` from `octane.config.ts` before transforming modules.
