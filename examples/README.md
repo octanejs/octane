@@ -35,10 +35,13 @@ the delivery waves and the distinct regression responsibility of each app.
 pnpm examples:catalog        # regenerate examples/catalog.json
 pnpm examples:catalog:check  # validate manifests and catalog freshness
 pnpm examples:catalog:test   # exercise invalid manifest contracts
+pnpm examples:runner:test    # exercise sharding, timing, and failure propagation
 pnpm examples:typecheck      # run every example's strict TypeScript gate
 pnpm examples:shared:test    # exercise shared process lifecycle helpers
 pnpm examples:build          # build every example for production
-pnpm examples:e2e            # run every Playwright journey, serially by app
+pnpm examples:e2e            # run every Playwright journey with per-app timing
+pnpm examples:e2e -- --shard=1/3 # run one deterministic CI shard
+pnpm examples:static:check   # catalog + orchestration + shared-helper tests
 pnpm examples:check          # catalog + types + helper tests + production builds
 ```
 
@@ -46,10 +49,19 @@ The browser-launch scripts currently target a POSIX shell, matching the Ubuntu
 CI gate and local macOS/Linux workflows. The ordinary application `dev`,
 `typecheck`, and `build` commands do not depend on those launch scripts.
 
-Browser journeys run in their own CI job rather than inside the sharded Vitest
-command. This prevents each Playwright suite from running once per Vitest shard;
-the existing protected `typecheck` context aggregates the job result so the
-examples remain a merge gate.
+Browser journeys run in three app-level CI shards rather than inside the Vitest
+matrix. The planner keeps each application internally serial, weights its
+declared journeys and repeated execution modes, and assigns every catalog app
+to exactly one shard. Each application reports its duration to the log and the
+GitHub step summary. The protected `typecheck` context aggregates the workspace
+typecheck, static example checks, and all browser shards so the examples remain
+a single merge gate.
+
+The package validation job also builds Pulseboard and Wayfinder from packed
+Octane and binding tarballs in temporary consumers outside the workspace. These
+canaries catch export, peer-layout, raw-source compiler, and metaframework SSR
+build failures that workspace links can hide; the full browser journeys remain
+on the ordinary source checkout.
 
 ## Adding an application
 
