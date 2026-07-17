@@ -1,4 +1,5 @@
-import { bindRendererRegionOwner } from 'octane';
+import { bindRendererRegionOwner, use } from 'octane';
+import { BenchTheme } from './host-context.js';
 
 /**
  * Root envelope for one hosted island — the same shape the Phase 0 test spike
@@ -26,4 +27,12 @@ export function ClickIsland(props) @{
 			{'go ' + props.index}
 		</button>
 	</section>
+}
+
+/** Reads a REAL React context through the transparent Phase 2 path. */
+export function ContextIsland() @{
+	const theme = use(BenchTheme);
+	<p class="ctx-island">
+		{'theme:' + theme}
+	</p>
 }

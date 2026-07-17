@@ -205,6 +205,30 @@ async function main() {
 		page.unmount();
 	}
 
+	// ── Phase 2 structural gate: transparent-context Fiber walks happen only
+	// at discovery — a provider update must never walk (§13 / Phase 2 exit
+	// gate). Runs through the PUBLIC OctaneCompat surface. ──────────────────
+	const CONTEXT_UPDATES = 5;
+	for (const count of COUNTS) {
+		const target = targets.get(count);
+		const walksBefore = entry.__hostContextFiberWalks();
+		const page = entry.mountContextIslandPage(count);
+		const walksAtMount = entry.__hostContextFiberWalks() - walksBefore;
+		for (let update = 1; update <= CONTEXT_UPDATES; update++) page.setTheme(`t${update}`);
+		const walkDelta = entry.__hostContextFiberWalks() - walksBefore - walksAtMount;
+		target.ops.context_fiber_walks_at_mount_per_island = val(walksAtMount / count);
+		target.ops.context_fiber_walks_per_update = val(walkDelta / CONTEXT_UPDATES);
+		if (walkDelta !== 0) {
+			gates.push(
+				`post-subscription fiber walks: ${walkDelta} across ${CONTEXT_UPDATES} provider updates (n=${count})`,
+			);
+		}
+		page.unmount();
+		// Island disposal is deferred to microtasks (the §5 rule 7 discriminator);
+		// drain before the next scenario mounts.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+	}
+
 	// ── report ──────────────────────────────────────────────────────────────
 	const rows = [...targets.values()];
 	console.log('react-hosted-islands — structural counts (deterministic)');
@@ -216,7 +240,8 @@ async function main() {
 				` | all-click ${ops.all_click_listeners_per_island.score}` +
 				` | react-root ${ops.react_root_listeners.score}` +
 				` | late back-attach ${ops.late_delegate_backattach_total.score}` +
-				` | leak ${ops.leaked_listeners_after_unmount.score}`,
+				` | leak ${ops.leaked_listeners_after_unmount.score}` +
+				` | ctx walks mount/update ${ops.context_fiber_walks_at_mount_per_island.score}/${ops.context_fiber_walks_per_update.score}`,
 		);
 	}
 
