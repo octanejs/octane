@@ -193,9 +193,13 @@ The rules with `requireDirective` enabled:
 - A project `.tsx`/`.ts`/`.js` without the directive passes through untouched
   for the host toolchain. If such a module imports from `octane`, the build
   emits a warning naming the file, since that is usually a forgotten directive.
-- A project `.tsrx` without the directive is a build error — no other compiler
-  understands the syntax, so a silent pass-through would only surface as a
-  confusing parse error downstream.
+- A project `.tsrx` without the directive is a build error — in an Octane-only
+  pipeline nothing else understands the syntax, so a silent pass-through would
+  only surface as a confusing parse error downstream. If part of the project
+  routes `.tsrx` through a different tsrx compiler (for example `@tsrx/react`),
+  list those paths in the integration's `exclude` option: excluded paths are
+  never Octane's — no error, no compilation, even if a file declares the
+  directive (the exclusion wins, with a warning naming the conflict).
 - Installed and linked packages are exempt: their package manifest's Octane
   declaration remains the per-package decision, so bindings need no directives.
 

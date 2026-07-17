@@ -883,4 +883,30 @@ describe('requireDirective ownership gate', () => {
 		expect(out?.kind).toBe('compile');
 		expect(out?.code).not.toContain('use octane');
 	});
+
+	it('lets exclude route .tsrx paths to another tsrx compiler', () => {
+		// tsrx syntax can target other renderers (@tsrx/react); a project
+		// routing part of its .tsrx through a different tsrx compiler lists
+		// those paths in `exclude`, and Octane never claims them — no error,
+		// no compile, no directive requirement.
+		const warnings: string[] = [];
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+			exclude: ['src/react-app/'],
+			warn: (message: string) => warnings.push(message),
+		});
+		expect(compiler.transform(COMPONENT, '/project/src/react-app/View.tsrx')).toBeNull();
+		// The exclusion wins even over a directive, with a diagnostic naming
+		// the conflict instead of a silent no-op.
+		expect(
+			compiler.transform(DIRECTIVE_COMPONENT, '/project/src/react-app/Island.tsrx'),
+		).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/Island.tsrx'))).toBe(true);
+		expect(warnings.some((message) => message.includes('exclu'))).toBe(true);
+		// Outside the excluded paths the gate is unchanged.
+		expect(() => compiler.transform(COMPONENT, '/project/src/islands/Bad.tsrx')).toThrow(
+			/has no 'use octane' module directive/,
+		);
+	});
 });

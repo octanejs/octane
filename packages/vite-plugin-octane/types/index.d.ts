@@ -17,6 +17,9 @@ export interface OctanePluginOptions {
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
+	 * With `requireDirective`, excluded paths are exempt from Octane ownership
+	 * entirely — including `.tsrx`/`.tsx` — for projects routing those paths
+	 * through a different tsrx compiler (e.g. `@tsrx/react`).
 	 */
 	exclude?: string[];
 	/**

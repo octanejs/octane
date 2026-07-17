@@ -913,7 +913,11 @@ directive.
 - Undirected project `.tsx`/`.ts`/`.js`: untouched for the host toolchain, with
   a once-per-file warning when the module imports from `octane` (usually a
   forgotten directive).
-- Undirected project `.tsrx`: hard error — nothing else can compile the syntax.
+- Undirected project `.tsrx`: hard error — in an Octane-only pipeline nothing
+  else compiles the syntax. A project routing part of its `.tsrx` through a
+  different tsrx compiler (`@tsrx/react`) lists those paths in `exclude`:
+  excluded paths are never Octane's, and the exclusion wins even over a
+  directive (with a conflict warning).
 - Installed/linked packages: exempt; the package-manifest `usesOctane` rule
   stays the per-package decision, so bindings need no directives.
 

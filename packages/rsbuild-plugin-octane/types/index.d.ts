@@ -13,7 +13,13 @@ export interface OctaneRsbuildPluginOptions {
 	hmr?: boolean;
 	/** Enable component profiling in the browser environment. */
 	profile?: boolean;
-	/** Ad-hoc path fragments skipped by the plain TypeScript/JavaScript hook-slot pass. */
+	/**
+	 * Ad-hoc path fragments skipped by the plain TypeScript/JavaScript
+	 * hook-slot pass. With `requireDirective`, excluded paths are exempt from
+	 * Octane ownership entirely — including `.tsrx`/`.tsx` — for projects
+	 * routing those paths through a different tsrx compiler (e.g.
+	 * `@tsrx/react`).
+	 */
 	exclude?: string[];
 	/**
 	 * Mixed-toolchain ownership gate: compile only project modules declaring

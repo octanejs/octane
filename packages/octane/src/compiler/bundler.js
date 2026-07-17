@@ -434,18 +434,32 @@ class OctaneBundlerCompiler {
 	/**
 	 * The requireDirective ownership gate for one project-owned module.
 	 * Returns whether Octane owns the module; throws for an undirected
-	 * project-owned `.tsrx` (nothing else can compile the syntax, so a silent
-	 * pass-through is a guaranteed confusing downstream parse error).
-	 * Installed and linked packages are exempt: their manifest `usesOctane`
-	 * rule is already the explicit per-package decision.
+	 * project-owned `.tsrx` (in an Octane-only pipeline nothing else compiles
+	 * the syntax, so a silent pass-through is a guaranteed confusing
+	 * downstream parse error). Two carve-outs: installed and linked packages
+	 * are exempt (their manifest `usesOctane` rule is already the explicit
+	 * per-package decision), and `exclude` path fragments are never Octane's —
+	 * tsrx syntax can target other renderers (e.g. `@tsrx/react`), so a
+	 * project routing part of its `.tsrx` through a different tsrx compiler
+	 * lists those paths in `exclude`, and the exclusion wins even over a
+	 * directive.
 	 */
 	_passesDirectiveGate(file, filename, directive) {
 		if (!this.requireDirective) return true;
-		if (directive !== null) return true;
 		if (!this._isProjectOwnedSource(file)) return true;
+		if (this.exclude.some((path) => file.includes(path))) {
+			if (directive !== null && this.warn !== null && !this.warnedUndirected.has(filename)) {
+				this.warnedUndirected.add(filename);
+				this.warn(
+					`${filename} declares 'use octane' but matches an excluded path — the exclusion wins and Octane will not compile it.`,
+				);
+			}
+			return false;
+		}
+		if (directive !== null) return true;
 		if (file.endsWith('.tsrx')) {
 			const error = new Error(
-				`${filename} is Octane source (.tsrx) but has no 'use octane' module directive, and this build enables requireDirective. Add 'use octane' at the top of the module (alongside any other directives, before imports), or disable requireDirective.`,
+				`${filename} is Octane source (.tsrx) but has no 'use octane' module directive, and this build enables requireDirective. Add 'use octane' at the top of the module (alongside any other directives, before imports), route the file to its owning tsrx compiler with the integration's \`exclude\` option, or disable requireDirective.`,
 			);
 			error.code = 'OCTANE_DIRECTIVE_REQUIRED';
 			error.filename = filename;

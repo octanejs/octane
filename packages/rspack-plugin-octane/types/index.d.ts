@@ -77,7 +77,12 @@ export interface OctaneRspackLoaderOptions {
 	dev?: boolean;
 	/** Emit client profiling metadata and enable the profiling runtime. Default `false`. */
 	profile?: boolean;
-	/** Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. */
+	/**
+	 * Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. With
+	 * `requireDirective`, excluded paths are exempt from Octane ownership
+	 * entirely — including `.tsrx`/`.tsx` — for projects routing those paths
+	 * through a different tsrx compiler (e.g. `@tsrx/react`).
+	 */
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */
 	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
