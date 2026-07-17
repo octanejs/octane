@@ -735,7 +735,16 @@ class OctaneBundlerCompiler {
 		const fullCompile =
 			this._isFullCompileSource(file, collected) &&
 			this._passesDirectiveGate(file, filename, directive);
-		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
+		// The narrow-the-rule config error concerns modules Octane owns. Under
+		// the directive gate a host-owned project module (undirected, or in an
+		// excluded path) may legitimately sit inside a client-only include in a
+		// mixed repo — it passes through here, and clientReferenceForFile
+		// returns no reference for it, so classification and transform agree.
+		const hostOwned =
+			this.requireDirective &&
+			this._isProjectOwnedSource(file) &&
+			(directive === null || this.exclude.some((path) => file.includes(path)));
+		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		// The directive is a build-time ownership signal only — never ship it.
 		// Blanking (not deleting) keeps positions stable for source maps.
 		const source = directive === null ? code : stripDirective(code, directive);

@@ -963,6 +963,15 @@ describe('requireDirective and client-only classification', () => {
 			expect(reference).toMatchObject({ renderer: 'object' });
 			const stub = compiler.transform(octaneScene, octaneFile, { environment: 'server' });
 			expect(stub).toMatchObject({ kind: 'client-only-stub', clientReference: reference });
+			// A host-owned .ts under the client-only include is not Octane's
+			// either: classification and transform BOTH pass it through instead
+			// of one throwing the narrow-the-rule config error.
+			const hostUtil = 'export const scale = (value: number) => value * 2;\n';
+			const hostUtilFile = join(root, 'src/scenes/util.ts');
+			writeFileSync(hostUtilFile, hostUtil);
+			expect(compiler.clientReferenceForFile(hostUtilFile)).toBeNull();
+			expect(compiler.transform(hostUtil, hostUtilFile, { environment: 'server' })).toBeNull();
+			expect(compiler.transform(hostUtil, hostUtilFile, { environment: 'client' })).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
