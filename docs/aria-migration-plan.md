@@ -1,5 +1,42 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-17): Phase 0 COMPLETE.** Utils foundation + the FULL interactions
+> area landed (usePress at token-level fidelity incl. pointer capture, virtual
+> clicks, keyboard/link paths, meta-key replay, iOS fallbacks; useHover,
+> useFocus/-Within/-Visible, useKeyboard with the Proxy-based `BaseEvent` wrapper
+> over native events, useLongPress, useMove, useInteractOutside, useScrollWheel,
+> useFocusable/Focusable, Pressable/PressResponder), plus `useControlledState`
+> under `/stately`. **Differential parity GREEN (5 fixtures)**: press sequence,
+> hover, focus-within, keyboard stop-by-default/continuePropagation, and
+> mergeIds convergence run byte-identical vs real react-aria. Two rig lessons for
+> later phases: the two live copies share ONE document, so (a) press gestures need
+> distinct pointerIds per side (usePress's document-global listeners filter on
+> it), (b) hover fixtures must dispatch each renderer's own native delivery form
+> in cross-safe order (a hovered useHover attaches a document-capture pointerover
+> listener that ends hover on outside pointerovers), and (c) focus fixtures
+> dispatch synthetic focus/focusin pairs — real `.focus()` fights over the single
+> document's focus. 69 tests green in the aria project.
+> (`packages/aria`, vitest `aria` project, pinned `.react-spectrum/` checkout at
+> `1c84a49a`). Foundation utils ported (chain/mergeProps/mergeRefs/useId+mergeIds/
+> useObjectRef/useSyncRef/useGlobalListeners/useEvent/useEffectEvent/useValueEffect/
+> SSRProvider) with the subSlot manual-slot convention; public hooks keep upstream
+> typing via overload declarations over a `(...args)`+`splitSlot` implementation.
+> **First octane bug found + fixed (the point of the exercise):** the compiler
+> claimed any call spelled like a builtin hook as octane's builtin even when the
+> name was bound by an import from another module — `import { useId } from
+> '@octanejs/aria'` got a colliding octane `useId` runtime import injected
+> (duplicate-identifier parse error; wrong callee). Non-octane import bindings now
+> shadow the builtin spelling in hook slotting, the JS-loop guard, and the
+> `useState` third-tuple getter analysis (regression: octane
+> `foreign-hook-names.test.ts`, changeset added).
+> **Both §2(a) collection-engine spikes PASSED with no octane changes** (pinned in
+> `packages/aria/tests/collection-host-spikes.test.ts`): (1) the same children
+> render function mounts at two positions with independent DOM + shared reactive
+> updates — including the exact hidden-detached-copy + live-copy shape; (2)
+> `createPortal` into a detached, never-attached container renders, updates,
+> preserves keyed node identity across reorder, and tears down cleanly. The
+> Phase-4 detached-real-DOM collection host is GO as designed.
+
 Faithful port of **React Aria** (Adobe's accessibility-first behavior library, from
 the `adobe/react-spectrum` monorepo) to the octane renderer, mirroring the
 `@octanejs/radix` / `@octanejs/base-ui` methodology: port from pinned upstream

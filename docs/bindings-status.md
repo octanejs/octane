@@ -3,7 +3,7 @@
 <!-- GENERATED FILE — do not edit. Edit packages/<name>/status.json and
      regenerate with `pnpm bindings:status`. -->
 
-The central status table for the 32 `@octanejs/*` framework bindings.
+The central status table for the 33 `@octanejs/*` framework bindings.
 Each row is sourced from that package's `packages/<name>/status.json` — the
 machine-readable status block maintained next to the code it describes — merged
 with the version in its `package.json`. CI runs `pnpm bindings:status:check`,
@@ -19,6 +19,7 @@ supported surface and known test coverage described for that package.
 | Package | Ports | Supported surface | Known divergences | SSR / hydration | Last checked |
 | --- | --- | --- | --- | --- | --- |
 | [`@octanejs/apollo-client`](#octanejsapollo-client) | `@apollo/client@4.2.6` | Complete published client adapter surface: all 18 @apollo/client/react runtime exports and their Apollo 4.2.6 TypeScript declarations, plus the framework-neutral root/testing exports and an Octane MockedProvider. | Suspense unwraps stable Apollo promises through Octane use() instead of React's use() or a thrown-promise fallback; The React class-based MockedProvider is an equivalent Octane function component; React Server Components and Apollo's React Compiler-generated entry are intentionally not exposed | Core hooks use Octane's server hook implementations, but Apollo's multi-pass non-Suspense query prepass, cache extraction/restore integration, and dedicated SSR/hydration tests remain open. | 2026-07-14 |
+| [`@octanejs/aria`](#octanejsaria) | `react-aria@3.50.0` | Phase 0 complete: the utils foundation (mergeProps, chain, mergeRefs, useId/mergeIds, useObjectRef, RouterProvider, SSRProvider/useIsSSR) and the complete interactions area (usePress, useHover, useFocus, useFocusWithin, useFocusVisible, useKeyboard, useLongPress, useMove, useInteractOutside, useFocusable/Focusable, Pressable/PressResponder) from the react-aria 3.50.0 monopackage, plus useControlledState from react-stately 3.48.0 under `@octanejs/aria/stately`. Differential-verified byte-identical against the real react-aria (press/hover/focus-within/keyboard/mergeIds fixtures). Later-phase areas (focus scope, leaf hooks, collections, overlays, react-aria-components) are not started — see the migration plan. | Text-input DOM wiring uses octane's native `onInput` (per keystroke) instead of React's synthetic `onChange`; React Aria's public value-level `onChange(value)` callbacks are unchanged; `forwardRef` becomes octane's ref-as-prop | Not yet covered (planned for Phase 8; see the migration plan). | 2026-07-17 |
 | [`@octanejs/base-ui`](#octanejsbase-ui) | `@base-ui/react@1.6.0` | Alpha, in progress: the foundation + overlay infrastructure and the first component set (Dialog, AlertDialog, Popover open-path) landed, ported at full fidelity and differential-verified against the real `@base-ui/react`. | Handlers receive native DOM events (no synthetic layer); `forwardRef` becomes ref-as-prop; `className` composes via octane's `normalizeClass` (the render-prop string merge matches Base UI exactly) | No dedicated SSR/hydration tests yet. | 2026-07-08 |
 | [`@octanejs/dexie`](#octanejsdexie) | `dexie-react-hooks@4.4.0` | Port of the public dexie-react-hooks surface: useObservable, useLiveQuery, useSuspendingObservable, useSuspendingLiveQuery, usePermissions, and useDocument, with Dexie's framework-neutral API re-exported from the package root. | Suspending hooks integrate with Octane's use() rather than React's use() or thrown-promise implementation details; Hook call-site slots are forwarded through Octane's compiler binding ABI; useDocument requires consumers to install and import y-dexie and yjs before using the hook; those integrations remain optional | Supported for non-suspending live queries: SSR returns the configured default without opening IndexedDB, and hydration adopts the server host before replacing the default with live data. Suspending live queries remain client-oriented and do not claim server data loading. | 2026-07-16 |
 | [`@octanejs/dnd-kit`](#octanejsdnd-kit) | `@dnd-kit/react@0.5.0` | Complete modern dnd-kit React-adapter surface: DragDropProvider, DragOverlay, useDraggable/useDroppable, manager/monitor/operation hooks, PointerSensor/KeyboardSensor re-exports, the public signal-hook utilities, useSortable, and all four upstream entry points. | DragOverlay distinguishes octane compiled children blocks from function render props; ordinary typed usage is behaviorally equivalent; useSortable retains the upstream keyboard plugin by default but omits OptimisticSortingPlugin because moving one host element before application state commits can split an Octane keyed DOM range; explicit plugin arrays remain authoritative | Static SSR and hydration are covered; DOM plugins initialize only after client refs register. | 2026-07-15 |
@@ -68,6 +69,23 @@ SSR / hydration: Core hooks use Octane's server hook implementations, but Apollo
 Scope/evidence last checked: 2026-07-14.
 
 See also: [`docs/apollo-client-port-plan.md`](apollo-client-port-plan.md)
+
+## @octanejs/aria
+
+[`packages/aria`](../packages/aria) `0.0.1` — ports `react-aria@3.50.0`. Status data: [`packages/aria/status.json`](../packages/aria/status.json).
+
+Phase 0 complete: the utils foundation (mergeProps, chain, mergeRefs, useId/mergeIds, useObjectRef, RouterProvider, SSRProvider/useIsSSR) and the complete interactions area (usePress, useHover, useFocus, useFocusWithin, useFocusVisible, useKeyboard, useLongPress, useMove, useInteractOutside, useFocusable/Focusable, Pressable/PressResponder) from the react-aria 3.50.0 monopackage, plus useControlledState from react-stately 3.48.0 under `@octanejs/aria/stately`. Differential-verified byte-identical against the real react-aria (press/hover/focus-within/keyboard/mergeIds fixtures). Later-phase areas (focus scope, leaf hooks, collections, overlays, react-aria-components) are not started — see the migration plan.
+
+Known divergences:
+
+- Text-input DOM wiring uses octane's native `onInput` (per keystroke) instead of React's synthetic `onChange`; React Aria's public value-level `onChange(value)` callbacks are unchanged.
+- `forwardRef` becomes octane's ref-as-prop.
+
+SSR / hydration: Not yet covered (planned for Phase 8; see the migration plan).
+
+Scope/evidence last checked: 2026-07-17.
+
+See also: [`docs/aria-migration-plan.md`](aria-migration-plan.md)
 
 ## @octanejs/base-ui
 

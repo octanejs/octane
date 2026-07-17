@@ -572,8 +572,23 @@ function addUserImportSpecifiers(ctx, node) {
 function collectOctaneImportBindings(astBody) {
 	const locals = new Map();
 	const namespaces = new Set();
+	// Local names bound by VALUE imports from any module OTHER than 'octane'. A
+	// library may export a hook whose name collides with a base hook (`useId`
+	// from a React-parity binding) — such a call site is that library's CUSTOM
+	// hook, never the octane builtin, so the bare-name builtin classification in
+	// rewriteHookCalls/slotKeyedHookName must not claim it (claiming it injects a
+	// duplicate `useId` runtime import and calls the wrong function).
+	const foreignLocals = new Set();
 	for (const node of astBody) {
-		if (node.type !== 'ImportDeclaration' || node.source.value !== 'octane') continue;
+		if (node.type !== 'ImportDeclaration') continue;
+		if (node.source.value !== 'octane') {
+			if (node.importKind === 'type') continue;
+			for (const sp of node.specifiers || []) {
+				if (sp.importKind === 'type') continue;
+				if (sp.local?.name) foreignLocals.add(sp.local.name);
+			}
+			continue;
+		}
 		for (const sp of node.specifiers || []) {
 			if (sp.type === 'ImportSpecifier' && sp.local?.name && sp.imported?.name) {
 				locals.set(sp.local.name, sp.imported.name);
@@ -582,7 +597,7 @@ function collectOctaneImportBindings(astBody) {
 			}
 		}
 	}
-	return { locals, namespaces };
+	return { locals, namespaces, foreignLocals };
 }
 
 // M3 marker elision (docs/comment-marker-elision-plan.md): a component body
@@ -3901,6 +3916,7 @@ export function compile(source, filename, options) {
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.foreignImportLocals = imports.foreignLocals;
 	}
 	if (ctx.dev) {
 		for (const node of ast.body) {
@@ -4714,6 +4730,7 @@ function compileServer(source, filename, options) {
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
 		ctx.octaneImportNamespaces = imports.namespaces;
+		ctx.foreignImportLocals = imports.foreignLocals;
 	}
 	// M3 inherit-range exclusion set — must match the client compile's
 	// (see inheritSoleCompRoot; both modes read the same import declarations).
@@ -7940,7 +7957,11 @@ function slotKeyedHookName(n, ctx) {
 	if (n.callee.type === 'Identifier') {
 		const local = n.callee.name;
 		const imported = n._octaneImportedHook;
-		const shadowsImport = ctx.octaneImportLocals?.has(local) && imported === undefined;
+		// A name bound by a non-octane import is that library's hook, never the
+		// builtin — it still slot-keys through the custom `use[A-Z]` branch below.
+		const shadowsImport =
+			(ctx.octaneImportLocals?.has(local) && imported === undefined) ||
+			ctx.foreignImportLocals?.has(local) === true;
 		if (imported !== undefined && HOOK_NAMES.has(imported)) return imported;
 		if (!shadowsImport && HOOK_NAMES.has(local)) return local;
 		if (/^use[A-Z]/.test(local) && local !== 'useContext') return local;
@@ -8142,8 +8163,10 @@ function stateTupleHookName(call, ctx) {
 	if (imported !== undefined) return STATE_GETTER_HELPERS[imported] ? imported : null;
 	if (callee?.type === 'Identifier') {
 		// Preserve the historical auto-import shorthand for an unbound bare base
-		// hook, but never mistake a lexically shadowed import alias for that hook.
+		// hook, but never mistake a lexically shadowed import alias — octane or
+		// foreign — for that hook.
 		if (ctx.octaneImportLocals?.has(callee.name)) return null;
+		if (ctx.foreignImportLocals?.has(callee.name)) return null;
 		return STATE_GETTER_HELPERS[callee.name] ? callee.name : null;
 	}
 	return null;
@@ -8251,8 +8274,13 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
 			const profileOwner = annotatedOwner?.name || componentName;
 			const importedName = n._octaneImportedHook;
+			// A non-octane import binding also shadows the builtin spelling: the call
+			// is that library's custom hook (slotted + withSlot-wrapped below), and
+			// claiming it as builtin would inject a colliding octane runtime import.
 			const shadowsImport =
-				!generated && ctx.octaneImportLocals?.has(localName) && importedName === undefined;
+				!generated &&
+				((ctx.octaneImportLocals?.has(localName) && importedName === undefined) ||
+					ctx.foreignImportLocals?.has(localName) === true);
 			const name = importedName ?? localName;
 			// Three kinds of call get a trailing per-call-site hook slot:
 			//  - a built-in base hook (HOOK_NAMES) — also needs its runtime import;
