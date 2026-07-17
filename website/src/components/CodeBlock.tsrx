@@ -13,13 +13,17 @@
 //
 // `footer` is an optional slot rendered inside the frame below the code (the hero
 // passes its live demo there so it shares the panel's border and radius).
-import { useRef, useState } from 'octane';
+import { useRef } from 'octane';
+import { useCopyToClipboard } from '../hooks/use-copy.ts';
 import copyUrl from '../assets/copy.svg';
 import checkUrl from '../assets/check.svg';
 
 interface CodeBlockProps {
 	children: unknown;
 	filename?: string;
+	// A short language tag (ts, tsx, bash …) shown in the header when there's no
+	// filename — docs pass the fence language so each panel is labelled.
+	language?: string;
 	variant?: 'window' | 'plain' | 'bare';
 	copy?: boolean;
 	footer?: unknown;
@@ -31,21 +35,17 @@ export function CodeBlock(props: CodeBlockProps) @{
 	const showBar = variant !== 'bare';
 	const showBarCopy = showCopy && showBar;
 	const showFloatCopy = showCopy && variant === 'bare';
+	// A filename wins over the language tag; either is shown in the header's
+	// left slot (the language reads lowercased, like the fence that produced it).
+	const label = props.filename ?? props.language;
 
 	// Copy pulls the visible text off the rendered code element, so it always
 	// matches what the reader sees regardless of what produced the markup. The
 	// ref sits on the inner code wrapper — NOT the outer body — so the floating
 	// button's own "Copy"/"Copied" label never leaks into the copied text.
 	const codeEl = useRef<HTMLDivElement | null>(null);
-	const [copied, setCopied] = useState(false);
-	const copyCode = () => {
-		const text = codeEl.current?.innerText ?? '';
-		if (!text) return;
-		navigator.clipboard?.writeText(text).then(() => {
-			setCopied(true);
-			setTimeout(() => setCopied(false), 1500);
-		});
-	};
+	const { copied, copy } = useCopyToClipboard();
+	const copyCode = () => copy(codeEl.current?.innerText ?? '');
 
 	<div class={['codeblock', 'codeblock-' + variant]}>
 		@if (showBar) {
@@ -57,9 +57,9 @@ export function CodeBlock(props: CodeBlockProps) @{
 						<span class="codeblock-dot codeblock-dot-g"></span>
 					</>
 				}
-				@if (props.filename) {
+				@if (label) {
 					<span class="codeblock-name">
-						{props.filename as string}
+						{label as string}
 					</span>
 				}
 				@if (showBarCopy) {
@@ -116,12 +116,19 @@ export function CodeBlock(props: CodeBlockProps) @{
 			.codeblock-window {
 				box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
 			}
+			/* A tinted strip divided from the code by a hairline — the same header
+			   treatment as the package-install panel, so the two read as siblings.
+			   Both headers are pinned to the same min-height: 2rem (see .pkg-head,
+			   whose tabs stretch to fill it), so they stay the same height regardless
+			   of tab font size; keep the two values in step. */
 			.codeblock-bar {
 				display: flex;
 				align-items: center;
 				gap: 0.4rem;
-				padding: 0.6rem 1rem;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+				min-height: 2rem;
+				padding: 0 0.5rem;
+				border-bottom: 1px solid var(--border);
+				background: rgba(255, 255, 255, 0.02);
 			}
 			.codeblock-dot {
 				width: 10px;

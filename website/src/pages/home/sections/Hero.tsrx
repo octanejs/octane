@@ -1,10 +1,11 @@
 // Hero: the pitch, the two calls to action, and the Counter.tsrx sample — with
 // the live twin of that sample (HeroDemo) running underneath it. The sample is
 // an .mdx module so it rides the same Shiki pipeline as the docs.
-import { useRef, useState } from 'octane';
+import { useRef } from 'octane';
 import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../../../content/home-sample.mdx';
 import { HeroDemo } from '../../../components/HeroDemo.tsrx';
+import { useCopyToClipboard } from '../../../hooks/use-copy.ts';
 import copyUrl from '../../../assets/copy.svg';
 import checkUrl from '../../../assets/check.svg';
 
@@ -12,15 +13,8 @@ export function Hero() @{
 	// Copy the sample straight off the rendered Shiki block — no second copy of
 	// the source to drift out of sync with content/home-sample.mdx.
 	const sampleEl = useRef<HTMLDivElement | null>(null);
-	const [copied, setCopied] = useState(false);
-	const copySample = () => {
-		const text = sampleEl.current?.innerText ?? '';
-		if (!text) return;
-		navigator.clipboard?.writeText(text).then(() => {
-			setCopied(true);
-			setTimeout(() => setCopied(false), 1500);
-		});
-	};
+	const { copied, copy } = useCopyToClipboard();
+	const copySample = () => copy(sampleEl.current?.innerText ?? '');
 
 	<section class="hero">
 		<div class="hero-copy">

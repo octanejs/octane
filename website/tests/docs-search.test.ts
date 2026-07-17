@@ -28,7 +28,10 @@ describe('docs search index', () => {
 			expect(sections.length, doc.slug).toBeGreaterThan(0);
 
 			// Each `<h2 id>` in the .mdx must show up as its own linkable record.
+			// Nested (level-3) entries are TOC-only — the index is built from h2
+			// anchors, so they aren't expected to have their own record.
 			for (const section of doc.sections ?? []) {
+				if (section.level === 3) continue;
 				const record = sections.find((s) => s.id === section.id);
 				expect(record, doc.slug + '#' + section.id).toBeDefined();
 				expect(record!.text.length).toBeGreaterThan(0);

@@ -40,7 +40,10 @@ describe('Core APIs documentation', () => {
 		for (const [index, section] of sections.entries()) {
 			expect(tocLinks[index]?.getAttribute('href')).toBe(`#${section.id}`);
 			expect(tocLinks[index]?.textContent).toContain(section.title);
-			expect(container.querySelector(`h2#${section.id}`)).toBeTruthy();
+			// Each TOC entry anchors a real heading at its declared level (h2 by
+			// default, h3 for nested subsections).
+			const tag = section.level === 3 ? 'h3' : 'h2';
+			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
 
 		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(6);

@@ -4,10 +4,11 @@
 // template's static <title>. Effects never run during SSR, so crawlers see the
 // template title in the served HTML and this only refines it after hydration.
 import { useEffect } from 'octane';
+import { SITE_TITLE } from '../constants/site.ts';
 
 // Byte-identical to the template <title> in index.html, so restoring it after
 // a page unmount cannot flicker a different default.
-export const DEFAULT_TITLE = "Octane — React's programming model, compiled";
+export const DEFAULT_TITLE = SITE_TITLE;
 
 export function useTitle(title: string) {
 	useEffect(() => {
