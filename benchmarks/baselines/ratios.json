@@ -466,7 +466,7 @@
     "target": "octane-min",
     "reference": "r3f-min",
     "maxRatio": 2.4,
-    "note": "Minimal direct-root production gzip, with built bundles executed and scene-checked in Chromium. Observable-scene baseline recorded 299738 / 188008 = 1.59x on 2026-07-17."
+    "note": "Minimal direct-root production gzip, with built bundles executed and scene-checked in Chromium. Observable-scene baseline recorded 300074 / 188008 = 1.60x on 2026-07-17."
   },
   {
     "suite": "three-bundle-size",
@@ -474,7 +474,7 @@
     "target": "octane-full",
     "reference": "r3f-full",
     "maxRatio": 1.8,
-    "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. Observable-scene baseline recorded 299389 / 250306 = 1.20x on 2026-07-17."
+    "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. Observable-scene baseline recorded 299727 / 250306 = 1.20x on 2026-07-17."
   },
   {
     "suite": "react-hosted-islands",
