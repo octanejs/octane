@@ -12,6 +12,12 @@ import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
 import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { addSourceMapNeedles, composeSourceMaps } from './compile-universal.js';
+import {
+	hydrateBoundaryPathFromId,
+	prepareHydrateBoundaries,
+	prepareServerHydrateBoundaries,
+} from './hydrate-boundaries.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
 import { findVoidRootImports, slotHooks } from './slot-hooks.js';
 import {
@@ -22,6 +28,7 @@ import {
 } from './client-only-server.js';
 
 export { findVoidRootImports };
+export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	CLIENT_REFERENCE_MANIFEST_VERSION,
@@ -532,6 +539,7 @@ class OctaneBundlerCompiler {
 
 	transform(code, id, options = {}) {
 		const file = cleanModuleId(id);
+		const hydrateBoundaryPath = hydrateBoundaryPathFromId(id);
 		const collected = {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
@@ -578,7 +586,14 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
-			const out = compile(code, filename, {
+			const hydratePreparation =
+				environment === 'client'
+					? prepareHydrateBoundaries(code, filename, hydrateBoundaryPath)
+					: prepareServerHydrateBoundaries(code, filename);
+			const compileSource = hydratePreparation?.source ?? code;
+			const out = compile(compileSource, filename, {
+				__hydratePrepared: true,
+				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
 				hmr,
 				mode: environment,
 				dev,
@@ -596,6 +611,10 @@ class OctaneBundlerCompiler {
 				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
 				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
 			});
+			if (hydratePreparation?.map && out.map) {
+				out.map = composeSourceMaps(out.map, hydratePreparation.map);
+				out.map = addSourceMapNeedles(out.map, out.code, code, hydratePreparation.mappingNeedles);
+			}
 			return {
 				code: out.code,
 				map: out.map,
@@ -603,7 +622,7 @@ class OctaneBundlerCompiler {
 				renderer,
 				...(clientReference === null ? null : { clientReference }),
 				...(environment === 'client' && options.collectVoidComponentExports === true
-					? { voidComponentExports: findVoidComponentExports(code, filename) }
+					? { voidComponentExports: findVoidComponentExports(compileSource, filename) }
 					: {}),
 				...finishMetadata(collected),
 			};

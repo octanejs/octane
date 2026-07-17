@@ -33,6 +33,10 @@ import {
 	SUSPENSE_SCRIPT_ATTR,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
+	HYDRATE_ID_ATTR,
+	HYDRATE_WHEN_ATTR,
+	HYDRATE_ID_COUNT_ATTR,
+	HYDRATE_SEED_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
@@ -50,6 +54,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
@@ -94,6 +99,10 @@ let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
 let CSS: Map<string, string> | null = null;
+// Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
+// during the active pass. Saved/restored with every other ambient so nested or
+// concurrent server renders cannot leak a CSP nonce across requests.
+let NONCE_ATTR = '';
 // Emit hydration block markers (`<!--[-->…<!--]-->`) and head-adoption markers?
 // True for hydratable output (renderToString / prerender / streaming); flipped
 // false for the whole of a `renderToStaticMarkup` render, which produces clean,
@@ -286,16 +295,18 @@ function reportInvalidHtmlNesting(message: string): void {
 	console.error(warning);
 }
 
-/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
-export function ssrElement(
+/** Scope one native element, optionally forcing its DOM/parser namespace. */
+function withSsrElementContext(
 	tag: string,
 	location: string | undefined,
 	render: () => string,
+	forcedNamespace?: ParserNamespace,
 ): string {
-	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
-
 	const parent = CURRENT_SSR_ELEMENT;
-	const { namespace, childrenNamespace } = ssrElementNamespaces(tag, parent);
+	const { namespace, childrenNamespace } =
+		forcedNamespace === undefined
+			? ssrElementNamespaces(tag, parent)
+			: { namespace: forcedNamespace, childrenNamespace: forcedNamespace };
 	const semanticTag = tag.toLowerCase();
 	const element: SsrElementContext = {
 		tag: semanticTag,
@@ -307,7 +318,12 @@ export function ssrElement(
 
 	// Foreign-content parsing is independent of the HTML repair rules. Stop at
 	// that boundary; <foreignObject> children naturally start a fresh HTML chain.
-	if (namespace === 'html' && parent?.namespace === 'html') {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		SSR_NESTING_WARNINGS !== null &&
+		namespace === 'html' &&
+		parent?.namespace === 'html'
+	) {
 		const parentMessage = invalidHtmlNestingWithParent(
 			semanticTag,
 			parent.tag,
@@ -337,6 +353,16 @@ export function ssrElement(
 	} finally {
 		CURRENT_SSR_ELEMENT = parent;
 	}
+}
+
+/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
+export function ssrElement(
+	tag: string,
+	location: string | undefined,
+	render: () => string,
+): string {
+	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
+	return withSsrElementContext(tag, location, render);
 }
 
 const NOOP = (): void => {};
@@ -2628,11 +2654,11 @@ export function ssrComponent(
 		NEXT_COMPONENT_NAMESPACE = null;
 		// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
-		// Suspense/ErrorBoundary/ViewTransition keep their pair; both sides agree
+		// Suspense/ErrorBoundary/ViewTransition/Hydrate keep their pair; both sides agree
 		// by identity).
 		if (
 			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
+			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition || comp === Hydrate)
 		)
 			inherit = false;
 		// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
@@ -2754,6 +2780,99 @@ export function ssrInNamespace(namespace: 'html' | 'svg' | 'mathml', render: () 
 function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
 	if (typeof children === 'function') return (children as any)(undefined, scope) ?? '';
 	return ssrChild(children, scope);
+}
+
+/** Serialize runtime-owned and strategy-supplied attributes for `<Hydrate>`. */
+function ssrHydrateAttrs(
+	id: string,
+	when: HydrationStrategy | (() => HydrationStrategy),
+	idCount: number,
+): string {
+	const direct = typeof when !== 'function' && when !== null ? when : null;
+	let attrs =
+		ssrAttr(HYDRATE_ID_ATTR, id, 'div') +
+		ssrAttr(HYDRATE_WHEN_ATTR, direct?._t ?? 'dynamic', 'div') +
+		ssrAttr(HYDRATE_ID_COUNT_ATTR, idCount, 'div');
+	const strategyAttrs = direct?._a?.();
+	if (strategyAttrs === undefined) return attrs;
+
+	for (const name of Object.keys(strategyAttrs)) {
+		// Protocol attributes are renderer-owned even for a structurally-created
+		// custom strategy descriptor. Do not permit it to shadow boundary state.
+		if (
+			name === HYDRATE_ID_ATTR ||
+			name === HYDRATE_WHEN_ATTR ||
+			name === HYDRATE_ID_COUNT_ATTR ||
+			name === HYDRATE_SEED_ATTR ||
+			!VALID_ATTR_NAME.test(name)
+		)
+			continue;
+		attrs += ssrAttr(name, strategyAttrs[name], 'div');
+	}
+	return attrs;
+}
+
+/**
+ * `<Hydrate when={...}>...</Hydrate>` server boundary.
+ *
+ * The real children always render, preserving useful first-paint HTML. A
+ * hydratable render surrounds them with one inner block range that the client
+ * can adopt later. Child `use()` values move out of the root seed stream into a
+ * direct-child data script, while their consumed `useId()` count remains in the
+ * root sequence and is recorded so the eager hydration cursor can reserve it.
+ * Function-form `when` is deliberately opaque on the server: evaluating it may
+ * read browser state, so only a direct strategy descriptor contributes `_a()`
+ * attributes and its concrete strategy kind.
+ */
+export function Hydrate(props: HydrateProps, scope: SSRScope): string {
+	const id = useId();
+
+	// The client always creates an HTMLDivElement. Force the same namespace for
+	// SSR children and attribute semantics instead of inheriting SVG/MathML from
+	// the call site. Direct placement in foreign content remains unsupported: an
+	// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
+	return withSsrElementContext(
+		'div',
+		undefined,
+		() =>
+			ssrInNamespace('html', () => {
+				if (!MARKERS) {
+					return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+				}
+
+				const childIdStart = ID_COUNTER;
+				const serialStart = SERIAL?.length ?? 0;
+				// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+				// Suspense slot/content ranges and makes a suspending child a real stream
+				// boundary. `fallback` remains client-only, so the server pending arm is
+				// intentionally empty.
+				const children = ssrBlock(
+					ssrTry(
+						scope,
+						'jsx-hydrate',
+						(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+						null,
+						null,
+						'html',
+					),
+				);
+				const idCount = ID_COUNTER - childIdStart;
+				const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+				const attrs = ssrHydrateAttrs(id, props.when, idCount);
+				const seedSidecar =
+					childSeeds.length === 0
+						? ''
+						: '<script type="application/json" ' +
+							HYDRATE_SEED_ATTR +
+							NONCE_ATTR +
+							'>' +
+							serializeSuspenseSeedJson(childSeeds) +
+							'</script>';
+
+				return '<div' + attrs + '>' + children + seedSidecar + '</div>';
+			}),
+		'html',
+	);
 }
 
 /**
@@ -4459,6 +4578,7 @@ interface Ambient {
 	id: number;
 	idPrefix: string;
 	css: Map<string, string> | null;
+	nonceAttr: string;
 	markers: boolean;
 	head: HeadBuffer | null;
 	susp: SuspendedList | null;
@@ -4484,6 +4604,7 @@ function saveAmbient(): Ambient {
 		id: ID_COUNTER,
 		idPrefix: ID_PREFIX,
 		css: CSS,
+		nonceAttr: NONCE_ATTR,
 		markers: MARKERS,
 		head: HEAD,
 		susp: SUSPENDED,
@@ -4510,6 +4631,7 @@ function restoreAmbient(a: Ambient): void {
 	ID_COUNTER = a.id;
 	ID_PREFIX = a.idPrefix;
 	CSS = a.css;
+	NONCE_ATTR = a.nonceAttr;
 	MARKERS = a.markers;
 	HEAD = a.head;
 	SUSPENDED = a.susp;
@@ -4554,6 +4676,7 @@ function runFullFramedPass(
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
 	VT_SSR_TRY_SEQ = 0;
@@ -4644,6 +4767,7 @@ function runDiscoveryRound(
 	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
 	VT_SSR_TRY_SEQ = 0;

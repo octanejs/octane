@@ -228,6 +228,28 @@ The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, a root-loca
 [docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense on the server,
 head hoisting, `module server` RPC) and the SSR roadmap.
 
+### Deferred hydration
+
+Use `<Hydrate>` for server-rendered content that should stay visible but does
+not need to become interactive immediately. `when` chooses the activation
+strategy, `split` controls compiler extraction (on by default), and `prefetch`
+can prepare the generated child chunk or other resources ahead of activation.
+
+```tsrx
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+export function ProductPage() @{
+	<Hydrate when={visible({ rootMargin: '400px' })}>
+		<Reviews />
+	</Hydrate>
+}
+```
+
+The initial server DOM is adopted in place and remains inert until the strategy
+opens the boundary. See [docs/deferred-hydration.md](./docs/deferred-hydration.md)
+for strategies, code splitting, prefetching, fallbacks, and nesting behavior.
+
 ### Streaming SSR
 
 This is the fast-first-paint story, and it works the way React's does.

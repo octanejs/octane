@@ -6,9 +6,11 @@ import { compile } from 'octane/compiler';
 import { hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import { prerender } from 'octane/static';
+import { interaction } from 'octane/hydration';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
+	DeferredAsyncLeaf,
 	IdBoundary,
 	LateStyledBoundary,
 	NestedStreamSeedScopes,
@@ -99,6 +101,42 @@ afterEach(() => {
 });
 
 describe('renderToPipeableStream — chunk protocol', () => {
+	it('streams a deferred Hydrate child and later adopts its revealed DOM and seed', async () => {
+		const serverValue = deferred<string>();
+		const c = collector();
+		const when = interaction({ events: 'click' });
+		ServerRT.renderToPipeableStream(server.DeferredAsyncLeaf, {
+			promise: serverValue.promise,
+			when,
+		}).pipe(c.dest);
+
+		const shell = c.chunks[0];
+		expect(shell).toContain('data-octane-hydrate-id');
+		expect(shell).not.toContain('id="leaf"');
+
+		serverValue.resolve('streamed deferred value');
+		await c.ended;
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+
+		const serverLeaf = container.querySelector('#leaf');
+		expect(serverLeaf?.textContent).toBe('streamed deferred value');
+		const clientValue: any = new Promise<string>(() => {});
+		const root = hydrateRoot(container, DeferredAsyncLeaf as any, {
+			promise: clientValue,
+			when,
+		});
+		flushSync(() => {});
+
+		// Interaction opens the dormant boundary. The nested stream seed lets its
+		// unresolved client promise adopt the revealed server result synchronously.
+		serverLeaf!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		await vi.waitFor(() => expect(clientValue.status).toBe('fulfilled'));
+		expect(clientValue.value).toBe('streamed deferred value');
+		expect(container.querySelector('#leaf')).toBe(serverLeaf);
+		root.unmount();
+	});
+
 	it('flushes the shell with the fallback + template sentinel, then the segment', async () => {
 		const d = deferred<string>();
 		const c = collector();

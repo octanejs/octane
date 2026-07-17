@@ -49,6 +49,11 @@ import {
 	prepareRendererBoundaryRegions,
 	prepareServerRendererBoundaryRegions,
 } from './compile-renderer-boundaries.js';
+import {
+	hydrateBoundaryPathFromId,
+	prepareHydrateBoundaries,
+	prepareServerHydrateBoundaries,
+} from './hydrate-boundaries.js';
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
@@ -589,7 +594,7 @@ function collectOctaneImportBindings(astBody) {
 // compile modes (client stamp ↔ server pair-skip ↔ hydration adopt-nothing
 // agree by construction). Exclusions:
 //   - `key=` (key-driven identity forces the slot to own its range),
-//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity —
+//   - the octane boundary builtins (Suspense / ErrorBoundary / Activity / Hydrate —
 //     their pairs are load-bearing for streaming). Direct imported names are
 //     excluded here (collectOctaneBoundaryNames); member/dynamic/aliased tags
 //     that RESOLVE to a boundary builtin are declined at RUNTIME by identity —
@@ -633,6 +638,7 @@ function collectOctaneBoundaryNames(astBody) {
 				(imported === 'Suspense' ||
 					imported === 'ErrorBoundary' ||
 					imported === 'Activity' ||
+					imported === 'Hydrate' ||
 					imported === 'ViewTransition' ||
 					imported === 'unstable_ViewTransition') &&
 				sp.local?.name
@@ -3646,7 +3652,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[] }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -3671,6 +3677,35 @@ export function compile(source, filename, options) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
+	}
+	if (!options?.__hydratePrepared) {
+		const query = filename.indexOf('?');
+		const hash = filename.indexOf('#');
+		let filenameEnd = filename.length;
+		if (query !== -1) filenameEnd = query;
+		if (hash !== -1 && hash < filenameEnd) filenameEnd = hash;
+		const cleanFilename = filename.slice(0, filenameEnd);
+		const hydratePreparation =
+			mode === 'client'
+				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
+				: prepareServerHydrateBoundaries(source, cleanFilename);
+		if (hydratePreparation !== null) {
+			const compiled = compile(hydratePreparation.source, cleanFilename, {
+				...options,
+				__hydratePrepared: true,
+				__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
+			});
+			if (hydratePreparation.map && compiled.map) {
+				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
+				compiled.map = addSourceMapNeedles(
+					compiled.map,
+					compiled.code,
+					authoredSource,
+					hydratePreparation.mappingNeedles,
+				);
+			}
+			return compiled;
+		}
 	}
 	if (mode === 'server') {
 		if (options?.renderer?.target === 'universal') {
@@ -3812,6 +3847,10 @@ export function compile(source, filename, options) {
 		dev: devEnabled,
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
+		// A split Hydrate query module is invoked as the existing server-rendered
+		// boundary body. Its sole component child must therefore keep the server's
+		// own component marker pair instead of borrowing the Hydrate block range.
+		hydrateBoundaryModule: options?.__hydrateBoundaryModule === true,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
@@ -6671,7 +6710,8 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// children render-fns) pass statement arrays and stay unflagged. planJsx
 	// consumes the flag once (nested planJsx calls see it cleared).
 	const prevInheritBody = ctx._inheritBody;
-	ctx._inheritBody = !!(node.body && node.body.type === 'JSXCodeBlock');
+	ctx._inheritBody =
+		!ctx.hydrateBoundaryModule && !!(node.body && node.body.type === 'JSXCodeBlock');
 	const plan = planJsx(jsxNodes, ctx, name, inlinedSubs, parentNs, cssHash, mountCallbackSinks);
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
