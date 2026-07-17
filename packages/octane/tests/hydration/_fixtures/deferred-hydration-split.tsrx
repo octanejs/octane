@@ -1,15 +1,22 @@
 import { Hydrate, useEffect, useLayoutEffect, useState } from 'octane';
 
+const splitReviewPrefix = 'captured:';
+
+function formatSplitReview(label) {
+	return splitReviewPrefix + label;
+}
+
 function SplitReviews(props) @{
+	const label = formatSplitReview(props.label);
 	useEffect(() => {
-		props.onEffect?.(props.label);
+		props.onEffect?.(label);
 	}, []);
 	<button
 		id="split-review-action"
-		data-captured-label={props.label}
-		onClick={() => props.onClick?.(props.label)}
+		data-captured-label={label}
+		onClick={() => props.onClick?.(label)}
 	>
-		{props.label as string}
+		{label as string}
 	</button>
 }
 
@@ -18,14 +25,10 @@ function LastSplitReviews() @{
 }
 
 export function SplitHydration(props) @{
-	const capturedLabel = 'captured:' + props.label;
 	<main id="split-hydration-host">
+		<span id="split-eager-prefix">{splitReviewPrefix}</span>
 		<Hydrate when={props.when} prefetch={props.prefetch} onHydrated={props.onHydrated}>
-			<SplitReviews
-				label={capturedLabel}
-				onEffect={props.onEffect}
-				onClick={props.onDeferredClick}
-			/>
+			<SplitReviews label={props.label} onEffect={props.onEffect} onClick={props.onDeferredClick} />
 		</Hydrate>
 		<button id="split-eager-action" onClick={props.onEagerClick}>{'Eager'}</button>
 	</main>

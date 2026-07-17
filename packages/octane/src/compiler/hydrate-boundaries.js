@@ -835,6 +835,7 @@ function declarationBindingSet(node) {
 
 function movableModuleDeclarations(analysis) {
 	const records = [];
+	const moduleBindings = topLevelBindingNames(analysis.ast);
 	for (const node of analysis.ast.body ?? []) {
 		if (
 			node.type !== 'VariableDeclaration' &&
@@ -861,6 +862,7 @@ function movableModuleDeclarations(analysis) {
 		records.push({
 			bindings,
 			dependencies: new Set(),
+			retainedDependencies: new Set(),
 			node,
 		});
 	}
@@ -870,7 +872,11 @@ function movableModuleDeclarations(analysis) {
 	}
 	for (const record of records) {
 		for (const dependency of collectCaptures([record.node], analysis.imports.importBindings)) {
-			if (byBinding.has(dependency)) record.dependencies.add(dependency);
+			if (byBinding.has(dependency)) {
+				record.dependencies.add(dependency);
+			} else if (moduleBindings.has(dependency)) {
+				record.retainedDependencies.add(dependency);
+			}
 		}
 	}
 	return { byBinding, records };
@@ -905,23 +911,46 @@ function createModuleMovePlan(source, filename, analysis, request) {
 		),
 	);
 	const eagerRecords = new Set();
-	const eagerQueue = [];
-	for (const name of eagerReferences) {
-		const record = candidates.byBinding.get(name);
-		if (record !== undefined && !eagerRecords.has(record)) {
-			eagerRecords.add(record);
-			eagerQueue.push(record);
+	// Moved declarations stay at module scope in the queried child, while boundary
+	// captures are unpacked inside its generated component. A declaration graph
+	// therefore cannot straddle that lexical boundary: retaining either endpoint
+	// of a dependency edge must retain the whole connected component.
+	const dependents = new Map();
+	for (const record of candidates.records) {
+		for (const dependency of record.dependencies) {
+			const dependencyRecord = candidates.byBinding.get(dependency);
+			if (dependencyRecord === undefined || dependencyRecord === record) continue;
+			let records = dependents.get(dependencyRecord);
+			if (records === undefined) dependents.set(dependencyRecord, (records = new Set()));
+			records.add(record);
 		}
 	}
-	for (let index = 0; index < eagerQueue.length; index++) {
-		for (const dependency of eagerQueue[index].dependencies) {
-			const record = candidates.byBinding.get(dependency);
-			if (record !== undefined && !eagerRecords.has(record)) {
-				eagerRecords.add(record);
-				eagerQueue.push(record);
+	const markEager = (seeds) => {
+		const queue = [];
+		const enqueue = (record) => {
+			if (record === undefined || eagerRecords.has(record)) return;
+			eagerRecords.add(record);
+			queue.push(record);
+		};
+		for (const record of seeds) {
+			enqueue(record);
+		}
+		for (let index = 0; index < queue.length; index++) {
+			const record = queue[index];
+			for (const dependency of record.dependencies) {
+				enqueue(candidates.byBinding.get(dependency));
+			}
+			for (const dependent of dependents.get(record) ?? []) {
+				enqueue(dependent);
 			}
 		}
+	};
+	const eagerSeeds = candidates.records.filter((record) => record.retainedDependencies.size > 0);
+	for (const name of eagerReferences) {
+		const record = candidates.byBinding.get(name);
+		if (record !== undefined) eagerSeeds.push(record);
 	}
+	markEager(eagerSeeds);
 
 	const allBindingsByPath = new Map();
 	for (const boundary of analysis.boundaries) {
@@ -977,22 +1006,11 @@ function createModuleMovePlan(source, filename, analysis, request) {
 			preliminaryCounts.set(record, (preliminaryCounts.get(record) ?? 0) + 1);
 		}
 	}
-	const sharedQueue = [];
+	const sharedSeeds = [];
 	for (const [record, count] of preliminaryCounts) {
-		if (count > 1 && !eagerRecords.has(record)) {
-			eagerRecords.add(record);
-			sharedQueue.push(record);
-		}
+		if (count > 1) sharedSeeds.push(record);
 	}
-	for (let index = 0; index < sharedQueue.length; index++) {
-		for (const dependency of sharedQueue[index].dependencies) {
-			const record = candidates.byBinding.get(dependency);
-			if (record !== undefined && !eagerRecords.has(record)) {
-				eagerRecords.add(record);
-				sharedQueue.push(record);
-			}
-		}
-	}
+	markEager(sharedSeeds);
 
 	const bindingsByPath = new Map();
 	const declarationsByPath = new Map();

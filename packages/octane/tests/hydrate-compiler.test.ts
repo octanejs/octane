@@ -265,6 +265,37 @@ export function App(props) @{
 		expect(identifierArrays(root.code)).toContainEqual(['Reviews', 'props']);
 	});
 
+	it('keeps dependent declarations eager when their module state is retained', () => {
+		const source = `
+import { Hydrate } from 'octane';
+const reviewPrefix = 'review:';
+const formatReview = (label) => reviewPrefix + label;
+function Reviews(props) @{ <button>{formatReview(props.label) as string}</button> }
+export function App(props) @{
+  <><p>{reviewPrefix}</p><Hydrate when={gate}><Reviews label={props.label} /></Hydrate></>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(identifierArrays(root.code)).toContainEqual(['Reviews', 'props']);
+	});
+
+	it('keeps declarations eager when they depend on a retained public export', () => {
+		const source = `
+import { Hydrate } from 'octane';
+export const reviewPrefix = 'review:';
+const formatReview = (label) => reviewPrefix + label;
+function Reviews(props) @{ <button>{formatReview(props.label) as string}</button> }
+export function App(props) @{
+  <Hydrate when={gate}><Reviews label={props.label} /></Hydrate>
+}
+`;
+		const instance = compiler();
+		const root = instance.transform(source, FILE, { environment: 'client' })!;
+		expect(runtimeExports(root.code)).toEqual(new Set(['reviewPrefix', 'App']));
+		expect(identifierArrays(root.code)).toContainEqual(['Reviews', 'props']);
+	});
+
 	it('keeps one module identity for declarations shared by sibling split children', () => {
 		const source = `
 import { Hydrate } from 'octane';

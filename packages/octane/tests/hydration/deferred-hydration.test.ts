@@ -187,7 +187,7 @@ describe('deferred hydration', () => {
 		await expect(outcome.promise).resolves.toEqual({ aborted: true, reason: 'abort' });
 	});
 
-	it('adopts a prefetched split child with current captures and keeps later updates live', async () => {
+	it('adopts a split child whose component graph shares eager module state', async () => {
 		const onEffect = vi.fn();
 		const onActivatedEffect = vi.fn();
 		const onDeferredClick = vi.fn();
@@ -210,10 +210,13 @@ describe('deferred hydration', () => {
 		container.innerHTML = html;
 		const deferredButton = container.querySelector('#split-review-action') as HTMLButtonElement;
 		const eagerButton = container.querySelector('#split-eager-action') as HTMLButtonElement;
+		const eagerPrefix = container.querySelector('#split-eager-prefix');
 
 		root = hydrateRoot(container, splitClient.SplitHydration, props);
 		await act(() => {});
 		expect(container.querySelector('#split-review-action')).toBe(deferredButton);
+		expect(container.querySelector('#split-eager-prefix')).toBe(eagerPrefix);
+		expect(eagerPrefix?.textContent).toBe('captured:');
 		expect(onEffect).not.toHaveBeenCalled();
 		expect(onHydrated).not.toHaveBeenCalled();
 
@@ -239,6 +242,7 @@ describe('deferred hydration', () => {
 		});
 
 		expect(container.querySelector('#split-review-action')).toBe(deferredButton);
+		expect(container.querySelector('#split-eager-prefix')).toBe(eagerPrefix);
 		expect(deferredButton.dataset.capturedLabel).toBe('captured:reviews');
 		expect(deferredButton.textContent).toBe('captured:reviews');
 		expect(onEffect).not.toHaveBeenCalled();
