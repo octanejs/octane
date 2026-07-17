@@ -116,6 +116,37 @@ describe('Three root configuration', () => {
 		expect(callback).toHaveBeenCalledOnce();
 	});
 
+	it('does not report a successful removal when teardown fails', async () => {
+		const canvas = document.createElement('canvas');
+		const renderer = createRenderer(canvas);
+		const root = testRoot(canvas);
+		let failDisconnect = false;
+		const manager = {
+			priority: 1,
+			enabled: true,
+			disconnect: vi.fn(() => {
+				if (failDisconnect) throw new Error('event disconnect failed');
+			}),
+		};
+		await root.configure({
+			gl: renderer,
+			size: { width: 32, height: 32 },
+			frameloop: 'never',
+			events: () => manager,
+		});
+		root.render(RootScene, { name: 'failing-unmount', groupRef: () => {} });
+		const callback = vi.fn();
+		failDisconnect = true;
+
+		expect(() => unmountComponentAtNode(canvas, callback)).toThrow('event disconnect failed');
+		expect(callback).not.toHaveBeenCalled();
+		expect(root.store.getState().scene.children).toEqual([]);
+		expect(renderer.dispose).toHaveBeenCalledOnce();
+
+		unmountComponentAtNode(canvas, callback);
+		expect(callback).not.toHaveBeenCalled();
+	});
+
 	it('configures public defaults and activates only after the scene commits', async () => {
 		const canvas = document.createElement('canvas');
 		const renderer = createRenderer(canvas);
