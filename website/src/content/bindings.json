@@ -28,6 +28,7 @@
     "packages": [
       "@octanejs/radix",
       "@octanejs/base-ui",
+      "@octanejs/aria",
       "@octanejs/floating-ui",
       "@octanejs/motion",
       "@octanejs/dnd-kit",
