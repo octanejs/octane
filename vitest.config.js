@@ -1693,6 +1693,23 @@ export default defineConfig({
 				// aliases needed.
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
 			},
+			{
+				test: {
+					name: 'mcp',
+					include: ['mcp/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					// built-handler.e2e runs a REAL production `vite build` into
+					// mcp/dist and mcp/.vercel/output and then imports the emitted
+					// server entry; file-serial so parallel test files can't clobber
+					// the artifacts another file is building or importing.
+					fileParallelism: false,
+				},
+				// No app plugins: the mcp tests exercise plain .ts modules (the
+				// content snapshot uses only Vite built-ins — ?raw and
+				// import.meta.glob) plus the production build driven through the
+				// vite JS API, which loads the app's own config and plugins itself.
+			},
 		],
 	},
 });

@@ -31,6 +31,7 @@ packages:
   - playground/*
   - examples/*
   - website
+  - mcp
 
 allowBuilds:
   esbuild: true

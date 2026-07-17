@@ -24,7 +24,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/jotai` | [`packages/jotai`](../packages/jotai) | framework binding | `0.1.4` | 7 |
 | `@octanejs/lexical` | [`packages/lexical`](../packages/lexical) | framework binding | `0.1.6` | 42 |
 | `@octanejs/lucide` | [`packages/lucide`](../packages/lucide) | framework binding | `0.1.2` | 4 |
-| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.3` | 1 |
+| `@octanejs/mcp-server` | [`packages/octane-mcp-server`](../packages/octane-mcp-server) | agent tooling | `0.2.3` | 2 |
 | `@octanejs/mdx` | [`packages/mdx`](../packages/mdx) | framework binding | `0.1.4` | 4 |
 | `@octanejs/motion` | [`packages/motion`](../packages/motion) | framework binding | `0.1.6` | 1 |
 | `@octanejs/radix` | [`packages/radix`](../packages/radix) | framework binding | `0.1.6` | 1 |
