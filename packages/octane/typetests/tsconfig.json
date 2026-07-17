@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "skipLibCheck": true,
+    "types": ["node"],
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "allowSyntheticDefaultImports": true
+  },
+  "include": ["./**/*.test-d.ts", "./**/*.test-d.tsx"]
+}

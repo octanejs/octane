@@ -250,6 +250,17 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only structural baseline for React-hosted Octane compat islands
+		// (docs/react-hosted-octane-compat-plan.md Phase 0): deterministic
+		// listener/root/bridge-binding COUNTS at 1/100/1000 islands in jsdom.
+		// Counts are exact, so the iteration knob is unused.
+		name: 'react-hosted-islands',
+		cwd: 'react-hosted-islands',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Node-only (no servers, no browser). Time-budgeted: the iteration knob is a
 		// per-config SECONDS budget; --quick passes the harness's own --quick flag.
 		name: 'ssr-throughput',

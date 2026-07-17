@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**37 publishable package(s), including 30 framework binding(s).**
+**38 publishable package(s), including 31 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -45,10 +45,11 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.4` | 1 |
 | `@octanejs/testing-library` | [`packages/testing-library`](../packages/testing-library) | framework binding | `0.1.4` | 2 |
 | `@octanejs/three` | [`packages/three`](../packages/three) | framework binding | `0.1.0` | 7 |
+| `@octanejs/tiptap` | [`packages/tiptap`](../packages/tiptap) | framework binding | `0.0.1` | 1 |
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.1` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.7` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.6` | 5 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.7` | 11 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.7` | 12 |
 
 ## Private packages
 

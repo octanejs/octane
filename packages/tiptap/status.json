@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@tiptap/react",
+    "version": "3.28.0"
+  },
+  "surface": "Stage 1–2 port of @tiptap/react: the root entry re-exports @tiptap/core and provides useEditor/useEditorState, editor contexts and provider/consumer APIs, EditorContent DOM adoption, and the compound Tiptap/Tiptap.Content API. ReactRenderer, NodeView/MarkView integration, useReactNodeView, and the ./menus entry remain deferred.",
+  "divergences": [
+    "Subscriptions use Octane's native useSyncExternalStore implementation, so the published binding does not depend on React or use-sync-external-store.",
+    "EditorConsumer is a render-prop compatibility component because Octane contexts do not expose React's .Consumer property.",
+    "Portal-backed custom NodeViews and MarkViews are not supported in this stage; EditorContent currently adopts and resets a normal @tiptap/core Editor DOM only.",
+    "The upstream ./menus entry is intentionally not exported until BubbleMenu and FloatingMenu are implemented."
+  ],
+  "ssr": "Covered for the current surface: hooks use null server snapshots and suppress editor construction without a DOM; hydration adopts deferred server output before mounting the live editor.",
+  "notes": [
+    "Pinned to the @tiptap/react, @tiptap/core, and @tiptap/pm 3.28.0 release family.",
+    "Behavioral tests use a real StarterKit editor, and a shared-fixture differential test compares the supported surface with @tiptap/react.",
+    "The next implementation stage is the EditorContent-owned portal registry plus ReactRenderer, NodeView, and MarkView integration; menus follow after that bridge is proven."
+  ],
+  "verified": "2026-07-17"
+}

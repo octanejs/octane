@@ -16,6 +16,7 @@ packages:
   - benchmarks/memo-wall/*
   - benchmarks/portal-swarm
   - benchmarks/portal-swarm/*
+  - benchmarks/react-hosted-islands
   - benchmarks/ssr-throughput
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr
@@ -109,6 +110,10 @@ catalogs:
     '@lexical/text': 0.46.0
     '@lexical/utils': 0.46.0
     '@lexical/yjs': 0.46.0
+    '@tiptap/core': 3.28.0
+    '@tiptap/pm': 3.28.0
+    '@tiptap/react': 3.28.0
+    '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.0
     '@ripple-ts/adapter': ^0.3.86
     '@ripple-ts/vite-plugin': ^0.3.86
@@ -235,6 +240,7 @@ catalogs:
     'decimal.js-light': ^2.5.1
     'es-toolkit': ^1.39.3
     eventemitter3: ^5.0.1
+    fast-equals: ^5.3.3
     immer: ^11.1.8
     internmap: 2.0.3
     mitt: ^2.1.0

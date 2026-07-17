@@ -1517,8 +1517,10 @@ function readOwnerContext<T>(owner: DraftOwner | null, context: Context<T>): T {
 
 function executeOwner(owner: DraftOwner, build: () => BlueprintNode[]): BlueprintNode[] {
 	const attempt = currentAttempt();
+	const warmPlanCheckpoint = ACTIVE_UNIVERSAL_WARM_PLANS.length;
 	let output: BlueprintNode[] = [];
 	for (let renderCount = 0; ; renderCount++) {
+		ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
 		if (renderCount === 25) throw new Error('Too many universal render-phase updates.');
 		if (renderCount > 0) resetDraftChildren(owner);
 		owner.seenEffects = [];
@@ -1546,6 +1548,7 @@ function executeOwner(owner: DraftOwner, build: () => BlueprintNode[]): Blueprin
 			throw error;
 		} finally {
 			__profileEndRender(profileFrame, didThrow, thrown);
+			ACTIVE_UNIVERSAL_WARM_PLANS.length = warmPlanCheckpoint;
 			CURRENT_OWNER = previousOwner;
 			attempt.owner = previousAttemptOwner;
 		}
@@ -3012,6 +3015,7 @@ function trackUniversalThenable<T>(thenable: UniversalTrackedThenable<T>): void 
 interface UniversalWarmEntry {
 	readonly deps: readonly unknown[];
 	readonly value: unknown;
+	available: boolean;
 }
 
 const UNIVERSAL_WARM_CACHES = new WeakMap<
@@ -3019,8 +3023,12 @@ const UNIVERSAL_WARM_CACHES = new WeakMap<
 	Map<unknown, UniversalWarmEntry[]>
 >();
 let CURRENT_UNIVERSAL_WARM: Map<unknown, UniversalWarmEntry[]> | null = null;
+let CURRENT_UNIVERSAL_WARM_CLAIMS: Set<object> | null = null;
+const ACTIVE_UNIVERSAL_WARM_PLANS: Array<() => void> = [];
 let UNIVERSAL_WARM_DEPTH = 0;
 const UNIVERSAL_WARM_DEPTH_CAP = 64;
+// Per-slot occurrence queues live only for this render attempt and stay uncapped
+// so repeated instances preserve their FIFO value mapping.
 const NO_WARM_VALUE = Symbol('octane.universal.no-warm-value');
 
 function takeUniversalWarmValue(
@@ -3034,15 +3042,19 @@ function takeUniversalWarmValue(
 	if (entries === undefined) return NO_WARM_VALUE;
 	for (let index = 0; index < entries.length; index++) {
 		if (!depsEqual(entries[index].deps, deps)) continue;
-		const [entry] = entries.splice(index, 1);
-		if (entries.length === 0) cache!.delete(slot);
-		return entry.value;
+		if (!entries[index].available) continue;
+		entries[index].available = false;
+		return entries[index].value;
 	}
 	return NO_WARM_VALUE;
 }
 
 /** Compiler ABI: suspend once for all pending promises in one independent stratum. */
 export function useBatch(items: any[], warm?: () => void): void {
+	if (items.length === 0) {
+		if (warm !== undefined) ACTIVE_UNIVERSAL_WARM_PLANS.push(warm);
+		return;
+	}
 	let pending: UniversalTrackedThenable[] | null = null;
 	for (const item of items) {
 		if (item == null || typeof item.then !== 'function') continue;
@@ -3052,7 +3064,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 		if (thenable.status === 'pending') (pending ??= []).push(thenable);
 	}
 	if (pending === null) return;
-	if (warm !== undefined) {
+	if (ACTIVE_UNIVERSAL_WARM_PLANS.length !== 0 || warm !== undefined) {
 		const root = currentAttempt().root;
 		let cache = UNIVERSAL_WARM_CACHES.get(root);
 		if (cache === undefined) {
@@ -3060,13 +3072,29 @@ export function useBatch(items: any[], warm?: () => void): void {
 			UNIVERSAL_WARM_CACHES.set(root, cache);
 		}
 		const previous = CURRENT_UNIVERSAL_WARM;
+		const previousClaims = CURRENT_UNIVERSAL_WARM_CLAIMS;
 		CURRENT_UNIVERSAL_WARM = cache;
+		CURRENT_UNIVERSAL_WARM_CLAIMS = new Set();
 		try {
-			warm();
-		} catch {
-			// Fetch warming is speculative and cannot fail the render.
+			for (let i = 0; i < ACTIVE_UNIVERSAL_WARM_PLANS.length; i++) {
+				CURRENT_UNIVERSAL_WARM_CLAIMS = new Set();
+				try {
+					ACTIVE_UNIVERSAL_WARM_PLANS[i]();
+				} catch {
+					// Independent speculative plans cannot block adjacent warming.
+				}
+			}
+			if (warm !== undefined) {
+				CURRENT_UNIVERSAL_WARM_CLAIMS = new Set();
+				try {
+					warm();
+				} catch {
+					// Speculative and independent from registered ancestor plans.
+				}
+			}
 		} finally {
 			CURRENT_UNIVERSAL_WARM = previous;
+			CURRENT_UNIVERSAL_WARM_CLAIMS = previousClaims;
 		}
 	}
 	if (pending.length === 1) throw new UniversalSuspense(pending[0]);
@@ -3081,12 +3109,46 @@ export function useBatch(items: any[], warm?: () => void): void {
 	throw new UniversalSuspense(combined);
 }
 
-/** Compiler ABI: cache one speculative promise/value creation by hook slot and deps. */
+/** Compiler ABI: cache one speculative creation per plan occurrence, slot, and deps. */
 export function warmMemo(compute: () => any, deps: readonly any[], slot: unknown): void {
 	const cache = CURRENT_UNIVERSAL_WARM;
 	if (cache === null) return;
 	let entries = cache.get(slot);
-	if (entries?.some((entry) => depsEqual(entry.deps, deps))) return;
+	if (entries !== undefined) {
+		for (const entry of entries) {
+			if (!depsEqual(entry.deps, deps) || CURRENT_UNIVERSAL_WARM_CLAIMS?.has(entry)) {
+				continue;
+			}
+			CURRENT_UNIVERSAL_WARM_CLAIMS?.add(entry);
+			return;
+		}
+	}
+	// Parent plans recurse through the currently-rendering source owner. Mark an
+	// already-created real memo anywhere in this attempt as consumed so a later
+	// sibling's suspension cannot call its factory again.
+	let activeCreation: MemoHook | undefined;
+	for (const owner of currentAttempt().owners) {
+		const hook = owner.hooks.get(slot) as MemoHook | undefined;
+		if (
+			hook?.kind === 'memo' &&
+			depsEqual(hook.deps, deps) &&
+			!CURRENT_UNIVERSAL_WARM_CLAIMS?.has(hook)
+		) {
+			activeCreation = hook;
+			break;
+		}
+	}
+	if (activeCreation !== undefined) {
+		CURRENT_UNIVERSAL_WARM_CLAIMS?.add(activeCreation);
+		if (entries === undefined) {
+			entries = [];
+			cache.set(slot, entries);
+		}
+		const entry = { deps: [...deps], value: undefined, available: false };
+		entries.push(entry);
+		CURRENT_UNIVERSAL_WARM_CLAIMS?.add(entry);
+		return;
+	}
 	let value: unknown;
 	try {
 		value = compute();
@@ -3100,8 +3162,9 @@ export function warmMemo(compute: () => any, deps: readonly any[], slot: unknown
 		entries = [];
 		cache.set(slot, entries);
 	}
-	entries.push({ deps: [...deps], value });
-	if (entries.length > 64) entries.shift();
+	const entry = { deps: [...deps], value, available: true };
+	entries.push(entry);
+	CURRENT_UNIVERSAL_WARM_CLAIMS?.add(entry);
 }
 
 /** Compiler ABI: recurse into a compiled child's statically attached warm plan. */
@@ -4049,6 +4112,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		}
 		this.suspended?.abort();
 		this.cancelSuspendedReplays();
+		// A fresh render is a new suspension episode. Keep consumed warm entries
+		// across automatic retries, but never let their tombstones suppress a later
+		// update or remount that returns to the same dependency values.
+		UNIVERSAL_WARM_CACHES.delete(this);
 		return this.prepareWithReplay(component, props, []);
 	}
 
@@ -4082,6 +4149,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		const owner = draftOwner(ownerRecord, null, rootPath);
 		const previousAttempt = CURRENT_ATTEMPT;
 		const previousOwner = CURRENT_OWNER;
+		const previousWarm = CURRENT_UNIVERSAL_WARM;
+		const previousWarmClaims = CURRENT_UNIVERSAL_WARM_CLAIMS;
+		const previousWarmPlans = ACTIVE_UNIVERSAL_WARM_PLANS.slice();
 		const attempt: RenderAttempt = {
 			root: this,
 			owner,
@@ -4091,6 +4161,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			nextUniversalId: this.nextUniversalId,
 			implicitSlot: 0,
 		};
+		// A nested universal root is a separate render attempt. Do not let the
+		// caller's active component plans or speculative cache leak into it; child
+		// owners inside this attempt still inherit plans through executeOwner.
+		ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
+		CURRENT_UNIVERSAL_WARM = null;
+		CURRENT_UNIVERSAL_WARM_CLAIMS = null;
 		CURRENT_ATTEMPT = attempt;
 		CURRENT_OWNER = owner;
 		let nodes: BlueprintNode[];
@@ -4107,6 +4183,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			}
 			throw error;
 		} finally {
+			ACTIVE_UNIVERSAL_WARM_PLANS.length = 0;
+			ACTIVE_UNIVERSAL_WARM_PLANS.push(...previousWarmPlans);
+			CURRENT_UNIVERSAL_WARM = previousWarm;
+			CURRENT_UNIVERSAL_WARM_CLAIMS = previousWarmClaims;
 			CURRENT_ATTEMPT = previousAttempt;
 			CURRENT_OWNER = previousOwner;
 		}

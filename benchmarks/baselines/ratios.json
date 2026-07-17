@@ -245,16 +245,16 @@
     "op": "init_waves",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 1.0,
-    "note": "Cross-framework cold-mount topology guard: Octane and React both take 6 waves in the initial 2026-07-16 record. The suite separately enforces Octane's absolute six-wave ceiling; tighten this ratio toward the honest two-wave floor after composition gaps close."
+    "maxRatio": 0.5,
+    "note": "Cross-framework cold-mount topology guard: Octane reaches the honest 2-wave dependency floor vs React's 6 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
     "suite": "async-composition",
     "op": "update_waves",
     "target": "octane-tsrx",
     "reference": "react",
-    "maxRatio": 2.0,
-    "note": "Cross-framework transition topology guard: Octane takes 6 waves vs React's 3 on the initial 2026-07-16 record. The suite separately enforces Octane's absolute six-wave ceiling; tighten this ratio toward 1.0 as composition warming improves."
+    "maxRatio": 1.0,
+    "note": "Cross-framework transition topology guard: Octane reaches the honest 2-wave dependency floor vs React's 3 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
   },
   {
     "suite": "js-framework",
@@ -475,5 +475,21 @@
     "reference": "r3f-full",
     "maxRatio": 1.8,
     "note": "Full-catalogue production gzip, with namespace retention and a real Mesh checked in Chromium. Observable-scene baseline recorded 298489 / 250306 = 1.19x on 2026-07-17."
+  },
+  {
+    "suite": "react-hosted-islands",
+    "op": "empty_listeners_per_island",
+    "target": "islands-1000",
+    "reference": "islands-1",
+    "maxRatio": 1.05,
+    "note": "Per-island delegated-listener cost must stay flat as island count scales (currently exactly 1.0x at 5 listeners/island). Growth here means a super-linear structural regression in delegation-target registration; Phase 5's selective hosted delegation may only LOWER the empty-island cost."
+  },
+  {
+    "suite": "react-hosted-islands",
+    "op": "bridge_bindings_per_island",
+    "target": "islands-1000",
+    "reference": "islands-1",
+    "maxRatio": 1.05,
+    "note": "Exactly one owner-bridge binding per hosted root regardless of island count (currently 1.0x). Growth means duplicated bindings or a leaked rebind per render."
   }
 ]

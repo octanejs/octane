@@ -52,13 +52,14 @@ workers. The exact topology is diagnostic telemetry and fewer waves are an
 optimization improvement. The hard gate requires all eight versioned resources
 exactly once, the complete rendered signature, initial resource-value retention,
 and owner-after-project dependency ordering. It also enforces one-way Octane
-ceilings of six waves and 23 resource calls for each operation, plus no more than
-six monotonic mixed-version update states. A new owner may never render against
-the previous project, and React must retain its zero-mixed-state control. After
-first reaching the final signature, each target must remain stable for one
-network-latency window plus two animation frames. The transition must never
-expose the initial fallback. A fast or transient result produced by missing work
-fails the harness.
+ceilings of two waves and eight resource calls for each operation, requires all
+seven independent resources in Octane's first wave, and allows no more than one
+monotonic mixed-version update state. A new owner may never render against the
+previous project, and React must retain its zero-mixed-state control. After first
+reaching the final signature, each target must remain stable for one network-
+latency window plus two animation frames. The transition must never expose the
+initial fallback. A fast or transient result produced by missing work fails the
+harness.
 
 ## Running
 
@@ -102,3 +103,27 @@ recorded zero and held v0 intact until its final state. The benchmark rejects
 any increase, invalid intermediate structure, or value rollback while allowing
 that known ceiling to improve toward zero. It also publishes the signatures
 under `meta.update` so a future transition fix has a direct before/after oracle.
+
+## Optimized result (2026-07-17)
+
+The compiler/runtime follow-up closes both composition gaps. Plain TypeScript
+custom hooks now receive the same memoize-and-batch treatment as component-local
+`use()` calls, and child warm plans register with active ancestors so the first
+suspending descendant can start adjacent branches from a shared, collision-safe
+cache.
+
+The recorded production run reaches the workload's true dependency floor:
+
+| target | init | update | waves (init / update) | calls (init / update) | observed mixed update states |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| octane-tsrx | 105.4ms | 103.5ms | 2 / 2 | 8 / 8 | 1 |
+| React | 310.7ms | 154.6ms | 6 / 3 | 35 / 25 | 0 |
+
+```text
+project+viewer+badge+activity+activity-summary+insights+insights-chart → owner
+```
+
+Every independent request starts before the first 50ms network wave settles;
+`owner` alone waits for `project.ownerId`. The remaining single mixed update
+signature is transition atomicity work rather than an async-discovery waterfall,
+and stays visible under its tightened one-state ceiling.
