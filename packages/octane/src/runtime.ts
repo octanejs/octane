@@ -621,6 +621,21 @@ interface PendingEffect {
 
 let CURRENT_SCOPE: Scope | null = null;
 let CURRENT_BLOCK: Block | null = null;
+interface ActiveWarmPlan {
+	block: Block;
+	fn: () => void;
+}
+// Compiler-emitted empty useBatch calls register child-only warm plans on the
+// synchronous component render stack. A descendant's first pending batch runs
+// the active plans while every ancestor frame (and its current props closure)
+// is still live; render entry/exit checkpoints below provide stack discipline.
+const ACTIVE_WARM_PLANS: ActiveWarmPlan[] = [];
+// Warm entries live for exactly one outer render/suspension episode. A retry
+// re-enters with the episode recorded on its block; an ordinary update starts
+// a new one so consumed entries cannot suppress warming after prop changes or
+// a remount that happens to reuse the same dependency values.
+let NEXT_WARM_EPISODE = 1;
+let CURRENT_WARM_EPISODE = 0;
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
 const RENDERER_REGION_DOM_OWNERS = new WeakMap<Block, RendererRegionOwnerBridge>();
 const RENDERER_REGION_DOM_BINDINGS = new WeakMap<
@@ -3109,6 +3124,8 @@ function enqueueEffectEventCommitAction(action: () => void): void {
 function renderBlockInner(block: Block): void {
 	const prevScope = CURRENT_SCOPE;
 	const prevBlock = CURRENT_BLOCK;
+	const prevWarmEpisode = CURRENT_WARM_EPISODE;
+	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	const prevEffectEventTarget = EFFECT_EVENT_RENDER_TARGET;
 	const prevEffectEventActionTarget = EFFECT_EVENT_ACTION_TARGET;
 	const effectEventTarget = WIP_CAPTURE?.events ?? prevEffectEventTarget;
@@ -3117,6 +3134,19 @@ function renderBlockInner(block: Block): void {
 	const effectEventActionCheckpoint = effectEventActionTarget.length;
 	CURRENT_SCOPE = block;
 	CURRENT_BLOCK = block;
+	const continuesParentTree = prevBlock !== null && blockIsAncestor(prevBlock, block);
+	if (!continuesParentTree) {
+		// A true Suspense retry enters from no ambient block and resumes its saved
+		// episode. A synchronously nested independent root has an ambient block but
+		// no ancestry relationship, so it starts its own episode even while the
+		// caller happens to be replaying.
+		const replayEpisode =
+			prevBlock === null && RESUME_REPLAY ? (block as any).__warmEpisode : undefined;
+		CURRENT_WARM_EPISODE = typeof replayEpisode === 'number' ? replayEpisode : NEXT_WARM_EPISODE++;
+	} else if (CURRENT_WARM_EPISODE === 0) {
+		CURRENT_WARM_EPISODE = NEXT_WARM_EPISODE++;
+	}
+	(block as any).__warmEpisode = CURRENT_WARM_EPISODE;
 	EFFECT_EVENT_RENDER_TARGET = effectEventTarget;
 	EFFECT_EVENT_ACTION_TARGET = effectEventActionTarget;
 	// Invalidate any Effect Event payload queued by an earlier render in this
@@ -3213,6 +3243,8 @@ function renderBlockInner(block: Block): void {
 		}
 		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
 		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
+		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		CURRENT_WARM_EPISODE = prevWarmEpisode;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
 	}
@@ -3474,6 +3506,7 @@ export function componentSlotLite<P>(
 		// need to rebuild the LiteBlockImpl. Skip the allocation on warm path.
 	}
 	const prevScope = CURRENT_SCOPE;
+	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	CURRENT_SCOPE = scope;
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(scope, comp);
@@ -3493,6 +3526,7 @@ export function componentSlotLite<P>(
 	} finally {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
+		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_SCOPE = prevScope;
 	}
 	// Hydration: advance the cursor PAST this component's adopted range so the
@@ -4167,10 +4201,17 @@ export function useMemo<T>(
 ): T {
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
-	const prev = scope.hooks?.get(s) as { deps: any[] | undefined; value: T } | undefined;
+	const prev = scope.hooks?.get(s) as
+		| { deps: any[] | undefined; value: T; warmEpisode?: number }
+		| undefined;
 	// deps === undefined → recompute every render (`null` at the public API;
 	// direct/uncompiled omitted calls also retain this runtime fallback).
-	if (prev && d !== undefined && !depsChanged(prev.deps, d)) return prev.value;
+	if (prev && d !== undefined && !depsChanged(prev.deps, d)) {
+		if (prev.warmEpisode !== CURRENT_WARM_EPISODE && recordRealWarmMemo(s, d, prev)) {
+			prev.warmEpisode = CURRENT_WARM_EPISODE;
+		}
+		return prev.value;
+	}
 	// Parallel-use warming: before recomputing, adopt a prefetched creation for
 	// this slot (started by warmMemo during a suspended ancestor's warm walk) —
 	// the fetch is already in flight. Only compiler-warmed slots can hit;
@@ -4178,7 +4219,11 @@ export function useMemo<T>(
 	if (WARM_EVER && d !== undefined) {
 		const adopted = adoptWarmValue(s, d);
 		if (adopted !== WARM_MISS) {
-			ensureHooks(scope).set(s, { deps: d, value: adopted });
+			ensureHooks(scope).set(s, {
+				deps: d,
+				value: adopted,
+				warmEpisode: CURRENT_WARM_EPISODE,
+			});
 			return adopted as T;
 		}
 	}
@@ -4187,7 +4232,11 @@ export function useMemo<T>(
 	// React-style factories ignore the extra args.
 	// eslint-disable-next-line prefer-spread
 	const value = compute.apply(null, (d ?? []) as []);
-	ensureHooks(scope).set(s, { deps: d, value });
+	const entry: { deps: any[] | undefined; value: T; warmEpisode?: number } = { deps: d, value };
+	ensureHooks(scope).set(s, entry);
+	if (d !== undefined && recordRealWarmMemo(s, d, entry)) {
+		entry.warmEpisode = CURRENT_WARM_EPISODE;
+	}
 	return value;
 }
 
@@ -5219,12 +5268,19 @@ function warnUseWaterfall(block: Block, idx: number): void {
  * promise; the unwraps then read settled values from the thenable expandos in
  * their original (hydration-seed-preserving) order.
  *
- * `warm` is the compiler-built fetch-tree thunk: invoked only on the throwing
- * path (a resolved batch costs nothing), it prefetches provably-independent
- * descendant fetches via warmChild/warmMemo so the whole tree loads in
- * max(depth-of-true-dependencies) rounds instead of one round per component.
+ * `warm` is the compiler-built fetch-tree thunk. On an empty compiler batch it
+ * registers lazily for the active component frame; on a throwing data batch,
+ * it joins every registered ancestor plan and prefetches provably-independent
+ * descendants via warmChild/warmMemo. A resolved batch costs no warm work.
  */
 export function useBatch(items: any[], warm?: () => void): void {
+	// Compiler registration form: publish the component's child-only plan on
+	// the active render stack. It is intentionally lazy — a fully synchronous
+	// tree neither walks its children nor allocates a warm cache.
+	if (items.length === 0) {
+		if (warm !== undefined) ACTIVE_WARM_PLANS.push({ block: CURRENT_BLOCK!, fn: warm });
+		return;
+	}
 	// Hydrating: every use() adopts a server seed synchronously — nothing to
 	// batch, and warming would duplicate fetches the server already resolved.
 	const hydration = activeHydration();
@@ -5242,7 +5298,7 @@ export function useBatch(items: any[], warm?: () => void): void {
 		if (it.status === 'pending') (pending ??= []).push(it);
 	}
 	if (pending === null) return;
-	if (warm !== undefined) runWarm(warm);
+	runActiveWarmPlans(warm);
 	// Single pending member: suspend on it DIRECTLY — semantics (and microtask
 	// hop count) identical to a plain use() suspension, and attachResume's
 	// pendingThenable dedup keeps working on the stable promise identity.
@@ -5261,44 +5317,89 @@ export function useBatch(items: any[], warm?: () => void): void {
 
 // ── Fetch-tree warming ──────────────────────────────────────────────────────
 //
-// A warm cache is a per-block Map<slot, Array<{deps, value}>> populated by
-// warmMemo during a suspended body's warm walk and consumed by useMemo when
-// the real descendant mounts (adoption = transfer, so entries don't outlive
-// their one use). The cache lives on the block that ran the batch — every
-// descendant mounts inside it, so adoption walks parentBlock links. Orphans
-// (warmed but never adopted, e.g. a guard flipped) are bounded by the
-// per-slot FIFO cap and die with the block.
+// A warm cache is a per-block Map<slot, Array<{deps, value, available}>>
+// populated by warmMemo during a suspended body's warm walk and consumed once
+// by useMemo when the real descendant mounts. Equal-dependency occurrences get
+// separate entries. A consumed entry remains as a tombstone so a later pending
+// stratum cannot restart that speculative creation. The cache lives on the
+// outermost active plan's block, making it visible to adjacent descendants
+// through their parentBlock chains. Its episode tag makes every entry
+// unreachable on the next ordinary render, while preserving it across retries
+// and dependency strata of the current suspend.
 
 interface WarmEntry {
 	deps: any[];
 	value: any;
+	/** Real memo cell represented by an unavailable entry, when applicable. */
+	source?: object;
+	/** A warmed value may be adopted once; the retained tombstone still prevents
+	 * a later dependency stratum from speculatively creating it again. */
+	available: boolean;
 }
 let CURRENT_WARM: Map<HookSlot, WarmEntry[]> | null = null;
+let CURRENT_WARM_CLAIMS: Set<object> | null = null;
 /** Flips true forever on first warm — gates useMemo's ancestor walk so apps
  * that never warm never pay for it. */
 let WARM_EVER = false;
 let WARM_DEPTH = 0;
 const WARM_DEPTH_CAP = 64;
-const WARM_SLOT_CAP = 64;
+// Do not cap per-slot occurrence queues: dropping their FIFO head would map a
+// repeated component instance to a later instance's value. The whole cache is
+// invalidated when the next ordinary render starts a new suspend episode.
 const WARM_MISS = Symbol('octane.warm.miss');
 
-function runWarm(fn: () => void): void {
-	// Reuse the nearest ancestor's cache when one exists: a descendant that
+function warmCacheForOwner(owner: Block): Map<HookSlot, WarmEntry[]> {
+	for (let block: Block | null = owner; block !== null; block = block.parentBlock) {
+		if ((block as any).__warmCacheEpisode !== CURRENT_WARM_EPISODE) continue;
+		const existing = (block as any).__warmCache as Map<HookSlot, WarmEntry[]> | undefined;
+		if (existing !== undefined) return existing;
+	}
+	const cache = new Map<HookSlot, WarmEntry[]>();
+	(owner as any).__warmCache = cache;
+	(owner as any).__warmCacheEpisode = CURRENT_WARM_EPISODE;
+	return cache;
+}
+
+// A real memo that executes while an ancestor warm plan is live represents one
+// concrete component occurrence. Retain an unavailable entry for this episode
+// so a later sibling's suspension does not speculatively refetch it. Repeated
+// same-site instances intentionally append repeated entries; a warm walk claims
+// them in traversal order.
+function recordRealWarmMemo(slot: HookSlot, deps: any[], source: object): boolean {
+	const block = CURRENT_BLOCK;
+	if (block === null) return false;
+	let owner: Block | null = null;
+	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i++) {
+		const plan = ACTIVE_WARM_PLANS[i];
+		if (!blockIsAncestor(plan.block, block)) continue;
+		owner = plan.block;
+		break;
+	}
+	if (owner === null) return false;
+	const cache = warmCacheForOwner(owner);
+	let list = cache.get(slot);
+	if (list === undefined) {
+		list = [];
+		cache.set(slot, list);
+	}
+	list.push({ deps, value: undefined, available: false, source });
+	WARM_EVER = true;
+	return true;
+}
+
+function runWarm(fn: () => void, owner: Block = CURRENT_BLOCK!): void {
+	// Reuse the nearest OWNER ancestor's cache when one exists: a descendant that
 	// suspends mid-cascade re-warms its own subtree, and its entries must
 	// dedup against what the ancestor's walk already started (one cache per
-	// warming subtree, not per suspending block).
-	let cache: Map<HookSlot, WarmEntry[]> | undefined;
-	for (let b: Block | null = CURRENT_BLOCK; b !== null; b = b.parentBlock) {
-		cache = (b as any).__warmCache;
-		if (cache !== undefined) break;
-	}
-	if (cache === undefined) {
-		cache = new Map();
-		(CURRENT_BLOCK! as any).__warmCache = cache;
-	}
+	// warming subtree, not per suspending block). Starting at owner is important:
+	// a stale source-child cache is not visible to adjacent siblings warmed by an
+	// enclosing plan.
+	const cache = warmCacheForOwner(owner);
 	WARM_EVER = true;
 	const prev = CURRENT_WARM;
+	const prevClaims = CURRENT_WARM_CLAIMS;
 	CURRENT_WARM = cache;
+	CURRENT_WARM_CLAIMS = new Set();
 	try {
 		fn();
 	} catch {
@@ -5306,13 +5407,75 @@ function runWarm(fn: () => void): void {
 		// triggered it. A throwing warm plan just means fewer prefetches.
 	} finally {
 		CURRENT_WARM = prev;
+		CURRENT_WARM_CLAIMS = prevClaims;
 	}
 }
 
+function blockIsAncestor(ancestor: Block, block: Block): boolean {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		if (current === ancestor) return true;
+	}
+	return false;
+}
+
+/** Activate every registered plan that encloses the throwing batch. The cache
+ * lives on the outermost participating block, making warmed entries visible to
+ * adjacent descendants as well as the source branch. */
+function runActiveWarmPlans(local?: () => void): void {
+	const block = CURRENT_BLOCK!;
+	let plans: ActiveWarmPlan[] | null = null;
+	let owner = block;
+	for (let i = 0; i < ACTIVE_WARM_PLANS.length; i++) {
+		const plan = ACTIVE_WARM_PLANS[i];
+		if (!blockIsAncestor(plan.block, block)) continue;
+		(plans ??= []).push(plan);
+		if (plans.length === 1) owner = plan.block;
+	}
+	if (plans === null && local === undefined) return;
+	runWarm(() => {
+		if (plans !== null) {
+			for (let i = 0; i < plans.length; i++) {
+				CURRENT_WARM_CLAIMS = new Set();
+				try {
+					plans[i].fn();
+				} catch {
+					// Each speculative plan is independent. One throwing getter or
+					// creation must not prevent adjacent plans from warming.
+				}
+			}
+		}
+		if (local !== undefined) {
+			CURRENT_WARM_CLAIMS = new Set();
+			try {
+				local();
+			} catch {
+				// Speculative and independent from the registered ancestor plans.
+			}
+		}
+	}, owner);
+}
+
+function activeMemoMatch(slot: HookSlot, deps: any[]): object | null {
+	for (let block: Block | null = CURRENT_BLOCK; block !== null; block = block.parentBlock) {
+		const entry = block.hooks?.get(slot) as { deps?: any[] } | undefined;
+		if (
+			entry !== undefined &&
+			entry.deps !== undefined &&
+			!depsChanged(entry.deps, deps) &&
+			!CURRENT_WARM_CLAIMS?.has(entry)
+		) {
+			return entry;
+		}
+	}
+	return null;
+}
+
 /**
- * Start (and cache) one prefetched creation. Dedups on (slot, deps) so
- * re-warming during a second attempt never double-starts a fetch. The value
- * is status-tagged immediately so the real use() unwrap reads it directly.
+ * Start (and cache) one prefetched creation. Each warm-plan occurrence claims
+ * one matching (slot, deps) entry, so retries reuse the same concrete work while
+ * repeated equal-dependency component instances still get separate entries.
+ * The value is status-tagged immediately so the real use() unwrap reads it
+ * directly.
  */
 export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void {
 	const cache = CURRENT_WARM;
@@ -5320,8 +5483,28 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 	let list = cache.get(slot);
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
-			if (!depsChanged(list[i].deps, deps)) return; // already warmed
+			const entry = list[i];
+			if (depsChanged(entry.deps, deps) || CURRENT_WARM_CLAIMS?.has(entry)) continue;
+			CURRENT_WARM_CLAIMS?.add(entry);
+			if (entry.source !== undefined) CURRENT_WARM_CLAIMS?.add(entry.source);
+			return; // this concrete occurrence already ran or warmed
 		}
+	}
+	// An ancestor plan can recurse through the component whose real memo already
+	// created this value before its batch discovered suspension. Record a consumed
+	// tombstone instead of duplicating that creation; later strata then remain
+	// deduped even after the active component has returned.
+	const activeMemo = activeMemoMatch(slot, deps);
+	if (activeMemo !== null) {
+		CURRENT_WARM_CLAIMS?.add(activeMemo);
+		if (list === undefined) {
+			list = [];
+			cache.set(slot, list);
+		}
+		const entry = { deps, value: undefined, available: false, source: activeMemo };
+		list.push(entry);
+		CURRENT_WARM_CLAIMS?.add(entry);
+		return;
 	}
 	let value: any;
 	try {
@@ -5334,8 +5517,9 @@ export function warmMemo(compute: () => any, deps: any[], slot: HookSlot): void 
 		list = [];
 		cache.set(slot, list);
 	}
-	list.push({ deps, value });
-	if (list.length > WARM_SLOT_CAP) list.shift();
+	const entry = { deps, value, available: true };
+	list.push(entry);
+	CURRENT_WARM_CLAIMS?.add(entry);
 }
 
 /**
@@ -5370,19 +5554,20 @@ export function warmChild(comp: any, props: any): void {
 }
 
 /** Adoption lookup for useMemo: nearest ancestor warm cache entry for this
- * slot with matching deps. Transfer semantics — the entry is removed. */
+ * slot with matching deps. The value is consumed once; its tombstone remains
+ * to dedup later warm passes without being adoptable by another instance. */
 function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 	let b: Block | null = CURRENT_BLOCK;
 	while (b !== null) {
 		const cache: Map<HookSlot, WarmEntry[]> | undefined = (b as any).__warmCache;
-		if (cache !== undefined) {
+		if ((b as any).__warmCacheEpisode === CURRENT_WARM_EPISODE && cache !== undefined) {
 			const list = cache.get(slot);
 			if (list !== undefined) {
 				for (let i = 0; i < list.length; i++) {
 					if (!depsChanged(list[i].deps, deps)) {
-						const value = list[i].value;
-						list.splice(i, 1);
-						return value;
+						if (!list[i].available) continue;
+						list[i].available = false;
+						return list[i].value;
 					}
 				}
 			}

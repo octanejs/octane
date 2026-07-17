@@ -703,6 +703,9 @@ importers:
 
   benchmarks/async-composition:
     dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../packages/octane
       playwright:
         specifier: catalog:default
         version: 1.61.0
