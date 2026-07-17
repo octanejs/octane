@@ -24,7 +24,7 @@ import {
 	useReactNodeView,
 	useTiptap,
 	useTiptapState,
-} from '../src/index';
+} from '@octanejs/tiptap';
 import type {
 	EditorContainerProps,
 	EditorContentProps,
@@ -46,7 +46,7 @@ import type {
 	TiptapContentProps,
 	TiptapWrapperProps,
 	UseEditorOptions,
-} from '../src/index';
+} from '@octanejs/tiptap';
 
 interface DirectRendererProps {
 	label: string;
@@ -134,6 +134,11 @@ const checkPublicTypes = () => {
 		className: 'typed-node-view',
 		attrs: ({ node }) => ({ 'data-node-type': node.type.name }),
 		trackNodeViewPosition: true,
+		update({ oldNode, newNode, updateProps }) {
+			expectTypeOf(oldNode).toEqualTypeOf(newNode);
+			updateProps();
+			return oldNode.type === newNode.type;
+		},
 	};
 	const nodeViewRenderer = ReactNodeViewRenderer<HTMLDivElement>(
 		nodeViewComponent,
