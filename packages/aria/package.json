@@ -41,6 +41,9 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@internationalized/date": "catalog:default",
+    "@internationalized/number": "catalog:default",
+    "@internationalized/string": "catalog:default",
     "@react-types/shared": "catalog:default",
     "clsx": "catalog:default"
   },
