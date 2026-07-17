@@ -11,6 +11,7 @@ import { createServer } from 'vite';
 import type { RenderBuiltAssetUrl, UserConfig } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
+import { createClientAssetMap } from '../src/client-assets.js';
 import type { Component } from '@octanejs/vite-plugin';
 
 function url(u: string): URL {
@@ -21,6 +22,55 @@ function url(u: string): URL {
 // are real files under it, '/docs/v2.0' etc. are not.
 const PKG_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const APP_FIXTURE_ROOT = fileURLToPath(new URL('./_fixtures/app', import.meta.url));
+
+describe('production client assets', () => {
+	it('links CSS from deferred hydration branches without promoting their JavaScript', () => {
+		const assets = createClientAssetMap(
+			{
+				'src/Page.tsrx': {
+					file: 'assets/Page.js',
+					css: ['assets/page.css'],
+					imports: ['_shared.js'],
+					dynamicImports: ['src/Page.tsrx?octane-hydrate=0', 'src/Unrelated.tsrx'],
+				},
+				'_shared.js': { file: 'assets/shared.js', css: ['assets/shared.css'] },
+				'src/Page.tsrx?octane-hydrate=0': {
+					file: 'assets/Page-hydrate.js',
+					src: 'src/Page.tsrx?octane-hydrate=0',
+					css: ['assets/reviews.css'],
+					imports: ['_hydrate-shared.js'],
+					dynamicImports: ['src/Nested.tsrx'],
+				},
+				'_hydrate-shared.js': {
+					file: 'assets/hydrate-shared.js',
+					css: ['assets/hydrate-shared.css'],
+				},
+				'src/Nested.tsrx': {
+					file: 'assets/Nested.js',
+					css: ['assets/nested.css'],
+				},
+				'src/Unrelated.tsrx': {
+					file: 'assets/Unrelated.js',
+					css: ['assets/unrelated.css'],
+				},
+			},
+			['/src/Page.tsrx'],
+		);
+
+		expect(assets).toEqual({
+			'/src/Page.tsrx': {
+				js: 'assets/Page.js',
+				css: [
+					'assets/page.css',
+					'assets/shared.css',
+					'assets/reviews.css',
+					'assets/hydrate-shared.css',
+					'assets/nested.css',
+				],
+			},
+		});
+	});
+});
 
 describe('isViteOwnedUrl', () => {
 	it('skips Vite-internal namespaces and module/asset requests', () => {

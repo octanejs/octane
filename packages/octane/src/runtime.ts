@@ -15,6 +15,10 @@
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	HYDRATE_ID_ATTR,
+	HYDRATE_WHEN_ATTR,
+	HYDRATE_ID_COUNT_ATTR,
+	HYDRATE_SEED_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SCRIPT_ATTR,
 	STREAM_SEED_COMMENT,
@@ -46,6 +50,15 @@ import {
 	__profileTrackComponent,
 	type ProfileFrame,
 } from './profiling.js';
+import type {
+	HydrateProps,
+	HydrationPrefetchFunction,
+	HydrationPrefetchStrategy,
+	HydrationPrefetchWaitReason,
+	HydrationRuntimeGate,
+	HydrationStrategy,
+	HydrationWhen,
+} from './hydration/types.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
@@ -431,6 +444,10 @@ type OutputHandler = (block: Block, value: unknown) => void;
 interface RootIdState {
 	prefix: string;
 	next: number;
+	/** Exclusive end of an SSR-reserved deferred-boundary range. */
+	limit?: number;
+	/** Root allocator used if a hydration mismatch consumes beyond that range. */
+	overflow?: RootIdState;
 }
 
 // Client-only roots need a namespace beyond their root-local useId counter: two
@@ -3721,6 +3738,13 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 					unmountBlock(b, detachDom);
 				// An @empty branch (if any) hangs off the same slot.
 				if (val.emptyBlock) unmountBlock(val.emptyBlock, detachDom);
+			} else if (k === 'hydrateBlockSlot') {
+				// A load() strategy can begin procedural prefetch during the initial
+				// hydration render, before this slot's passive installer ever runs.
+				// Tear down the slot lifecycle directly so an immediate root unmount
+				// still aborts that work and resolves any pending waitFor subscribers.
+				teardownHydrateBoundary(val);
+				if (val.block) unmountBlock(val.block, detachDom);
 			} else if (k === 'childSlot') {
 				// A `{expr}` value slot holds EITHER a component Block (a component /
 				// host-with-components value) OR a `forSlot` keyed list (an array value,
@@ -4706,6 +4730,858 @@ function childrenAsBody(children: unknown): ComponentBody {
 		childSlot(s, 0, s.block.parentNode, children, s.block.endMarker);
 	};
 }
+
+// ---------------------------------------------------------------------------
+// Deferred hydration — `<Hydrate when={...}>`
+// ---------------------------------------------------------------------------
+
+const HYDRATE_ID_SLOT = Symbol('octane.hydrate.id');
+const HYDRATE_SETUP_SLOT = Symbol('octane.hydrate.setup');
+const HYDRATE_NOTIFY_SLOT = Symbol('octane.hydrate.notify');
+const HYDRATE_INTERACTION_EVENTS_ATTR = 'data-octane-hydrate-interaction-events';
+const HYDRATE_DEFAULT_INTERACTION_EVENTS = [
+	'pointerenter',
+	'focusin',
+	'pointerdown',
+	'click',
+] as const;
+const HYDRATE_SUPPORTED_INTERACTION_EVENTS = [
+	'auxclick',
+	'click',
+	'contextmenu',
+	'dblclick',
+	'focusin',
+	'keydown',
+	'keyup',
+	'mousedown',
+	'mouseenter',
+	'mouseover',
+	'mouseup',
+	'pointerdown',
+	'pointerenter',
+	'pointerover',
+	'pointerup',
+] as const;
+const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
+	'load',
+	'idle',
+	'visible',
+	'media',
+	'interaction',
+	'condition',
+	'never',
+	'dynamic',
+]);
+const HYDRATE_MARKER_SELECTOR = `[${HYDRATE_ID_ATTR}]`;
+const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>();
+const HYDRATE_SLOTS_BY_MARKER = /* @__PURE__ */ new WeakMap<Element, HydrateSlot>();
+const HYDRATE_PENDING_INTENTS = /* @__PURE__ */ new WeakMap<Element, HydrationReplayIntent[]>();
+const HYDRATE_HANDLED_INTENT_EVENTS = /* @__PURE__ */ new WeakSet<Event>();
+const HYDRATE_INTENT_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
+
+type HydrateLoadResult = ComponentBody | { default: ComponentBody };
+
+type InternalHydrateProps = HydrateProps & {
+	/** Compiler-injected split-child loader. */
+	__load?: () => Promise<HydrateLoadResult>;
+	/** Latest lexical values consumed by the compiler-generated split child. */
+	__data?: unknown[];
+};
+
+interface HydrationReplayIntent {
+	event: Event;
+	path: number[];
+}
+
+interface HydrateSlot {
+	__kind: 'hydrateBlockSlot';
+	block: Block;
+	wrapper: HTMLDivElement;
+	start: Comment;
+	end: Comment;
+	parentBlock: Block;
+	props: InternalHydrateProps;
+	boundaryId: string;
+	delegatedDynamicIntent: boolean;
+	serverPreserved: boolean;
+	/** Snapshot used instead of authored fallback for an initial SSR boundary. */
+	preservedFallbackNodes: Node[] | null;
+	seedRaw: string | null;
+	idState: RootIdState;
+	/** One-shot result of the client-only function form of `when`. */
+	dynamicStrategy: HydrationStrategy | null;
+	/** Most recently observed effective strategy, used for post-hydration notification. */
+	strategy: HydrationStrategy | null;
+	gate: HydrationRuntimeGate | null;
+	strategyCleanup: (() => void) | null;
+	prefetchCleanup: (() => void) | null;
+	prefetchAbort: AbortController | null;
+	prefetchStarted: boolean;
+	prefetchPromise: Promise<void> | null;
+	preloadPromise: Promise<void> | null;
+	loadedBody: ComponentBody | null;
+	hydrationWaiters: Set<(reason: HydrationPrefetchWaitReason) => void>;
+	/** Invalidates async completions from an earlier hydration request. */
+	activationGeneration: number;
+	activationRequested: boolean;
+	activationReady: boolean;
+	hydrated: boolean;
+	didNotify: boolean;
+	hasError: boolean;
+	error: unknown;
+	replays: HydrationReplayIntent[];
+}
+
+function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
+	return typeof when === 'function' ? 'dynamic' : (when?._t ?? 'dynamic');
+}
+
+function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
+	const raw = state.props.when;
+	let strategy: HydrationStrategy;
+	if (typeof raw === 'function') {
+		strategy = state.dynamicStrategy ?? raw();
+	} else {
+		strategy = raw;
+	}
+	if (
+		strategy === null ||
+		typeof strategy !== 'object' ||
+		!HYDRATE_STRATEGY_TYPES.has((strategy as HydrationStrategy)._t)
+	) {
+		throw new Error(
+			'Hydrate: `when` must synchronously return a hydration strategy with a valid type.',
+		);
+	}
+	if (typeof raw === 'function') state.dynamicStrategy = strategy;
+	state.strategy = strategy;
+	return strategy;
+}
+
+function resolveHydrateLoadResult(value: HydrateLoadResult): ComponentBody {
+	const body =
+		value !== null && typeof value === 'object' && 'default' in value ? value.default : value;
+	if (typeof body !== 'function') {
+		throw new Error('Hydrate: the compiler-generated child loader did not resolve to a component.');
+	}
+	return body;
+}
+
+function renderHydrateChild(state: HydrateSlot, scope: Scope, extra: unknown): void {
+	if (state.loadedBody !== null) {
+		// The module is cached, but its captures are render data. Read the latest
+		// array from props on every pass so prefetching and later parent updates do
+		// not freeze the values that happened to exist when the chunk first loaded.
+		state.loadedBody(state.props.__data, scope, extra);
+		return;
+	}
+	childrenAsBody(state.props.children)(undefined, scope, extra);
+}
+
+function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
+	const contentBody: ComponentBody = (_props, scope, extra) => {
+		if (state.loadedBody === null) {
+			const preload = beginHydratePreload(state);
+			if (preload !== null) {
+				// This internal code-chunk thenable is not application `use()` data and
+				// must never consume a server seed. Track/throw it directly through the
+				// enclosing tryBlock; the stable cached promise makes retries safe.
+				const thenable = preload as TrackedThenable<void>;
+				trackThenable(thenable);
+				if (thenable.status === 'rejected') throw thenable.reason;
+				if (thenable.status !== 'fulfilled') throw new SuspenseException(thenable);
+			}
+		}
+		renderHydrateChild(state, scope, extra);
+		state.hydrated = true;
+		useEffect(() => notifyHydrateBoundary(state), [state], HYDRATE_NOTIFY_SLOT);
+	};
+	const pendingBody: ComponentBody = (_props, scope) => {
+		if (state.serverPreserved && state.preservedFallbackNodes !== null) {
+			// Initial-document boundaries keep showing their server result if their
+			// first client attempt suspends. The authored fallback is exclusively for
+			// a later/client-only mount. A slot sentinel prevents a pending-body
+			// refresh from appending the snapshot twice; the pending Block's own range
+			// removes these raw cloned nodes when the child is ready.
+			if (scope.slots[0] === undefined) {
+				for (let i = 0; i < state.preservedFallbackNodes.length; i++) {
+					scope.block.parentNode.insertBefore(
+						state.preservedFallbackNodes[i].cloneNode(true),
+						scope.block.endMarker,
+					);
+				}
+				scope.slots[0] = { __kind: 'hydratePreservedFallback' };
+			}
+			return;
+		}
+		childSlot(scope, 0, scope.block.parentNode, state.props.fallback, scope.block.endMarker);
+	};
+	return (_props, scope) => {
+		tryBlock(
+			scope,
+			0,
+			scope.block.parentNode,
+			contentBody,
+			null,
+			pendingBody,
+			scope.block.endMarker,
+		);
+	};
+}
+
+function failHydrateBoundary(state: HydrateSlot, error: unknown): void {
+	if (state.hasError || state.block.disposed) return;
+	state.hasError = true;
+	state.error = error;
+	scheduleRender(state.parentBlock);
+}
+
+function beginHydratePreload(state: HydrateSlot): Promise<void> | null {
+	const load = state.props.__load;
+	if (load === undefined) return null;
+	if (state.preloadPromise !== null) return state.preloadPromise;
+	let pending: Promise<HydrateLoadResult>;
+	try {
+		pending = load();
+	} catch (error) {
+		pending = Promise.reject(error);
+	}
+	const promise = Promise.resolve(pending).then((result) => {
+		state.loadedBody = resolveHydrateLoadResult(result);
+	});
+	state.preloadPromise = promise;
+	// Prefetch can start without a later hydration request. Keep a rejection from
+	// becoming unhandled and route it through the boundary's normal render path.
+	void promise.catch((error) => failHydrateBoundary(state, error));
+	return promise;
+}
+
+function resolveHydrateWaiters(state: HydrateSlot, reason: HydrationPrefetchWaitReason): void {
+	if (state.hydrationWaiters.size === 0) return;
+	const waiters = [...state.hydrationWaiters];
+	state.hydrationWaiters.clear();
+	for (let i = 0; i < waiters.length; i++) waiters[i](reason);
+}
+
+function waitForHydratePrefetchStrategy(
+	state: HydrateSlot,
+	strategy: HydrationPrefetchStrategy,
+): Promise<HydrationPrefetchWaitReason> {
+	const controller = state.prefetchAbort;
+	if (controller === null || controller.signal.aborted) return Promise.resolve('abort');
+	// A procedural prefetch may begin in the same turn that `when` requests
+	// hydration (load() is the common case). Preserve that already-fired signal
+	// for late waitFor() subscribers instead of installing a strategy that can
+	// now win only after the hydration request it was meant to race.
+	if (state.activationRequested) return Promise.resolve('hydrate');
+	return new Promise((resolve) => {
+		const signal = controller.signal;
+		let settled = false;
+		let cleanup: (() => void) | void;
+		const finish = (reason: HydrationPrefetchWaitReason) => {
+			if (settled) return;
+			settled = true;
+			cleanup?.();
+			state.hydrationWaiters.delete(onHydrate);
+			signal.removeEventListener('abort', onAbort);
+			resolve(reason);
+		};
+		const onHydrate = () => finish('hydrate');
+		const onAbort = () => finish('abort');
+		state.hydrationWaiters.add(onHydrate);
+		signal.addEventListener('abort', onAbort, { once: true });
+		cleanup = strategy._s?.({
+			element: state.wrapper,
+			prefetch: () => finish('prefetch'),
+		});
+		if (settled) cleanup?.();
+	});
+}
+
+function beginProceduralHydratePrefetch(state: HydrateSlot): Promise<void> | null {
+	const prefetch = state.props.prefetch;
+	if (typeof prefetch !== 'function') return null;
+	if (state.prefetchStarted) return state.prefetchPromise;
+	state.prefetchStarted = true;
+	const controller = (state.prefetchAbort = new AbortController());
+	let result: ReturnType<HydrationPrefetchFunction>;
+	try {
+		result = prefetch({
+			element: state.wrapper,
+			signal: controller.signal,
+			preload: () => beginHydratePreload(state) ?? Promise.resolve(),
+			waitFor: (strategy) => waitForHydratePrefetchStrategy(state, strategy),
+		});
+	} catch (error) {
+		failHydrateBoundary(state, error);
+		return null;
+	}
+	if (result === undefined || result === null || typeof (result as any).then !== 'function') {
+		return null;
+	}
+	const promise = Promise.resolve(result).then(() => undefined);
+	state.prefetchPromise = promise;
+	void promise.catch((error) => failHydrateBoundary(state, error));
+	return promise;
+}
+
+function cleanupHydrateStrategy(state: HydrateSlot): void {
+	state.strategyCleanup?.();
+	state.strategyCleanup = null;
+	state.gate = null;
+}
+
+function cleanupHydrateInstallers(state: HydrateSlot): void {
+	cleanupHydrateStrategy(state);
+	state.prefetchCleanup?.();
+	state.prefetchCleanup = null;
+}
+
+function invalidateHydrateActivation(state: HydrateSlot): void {
+	state.activationGeneration++;
+	state.activationRequested = false;
+	state.activationReady = false;
+	// An interaction that requested the cancelled activation must not replay if
+	// the boundary is changed away from never() again at some later point.
+	state.replays = [];
+}
+
+function teardownHydrateBoundary(state: HydrateSlot): void {
+	cleanupHydrateInstallers(state);
+	state.prefetchAbort?.abort();
+	resolveHydrateWaiters(state, 'abort');
+	HYDRATE_SLOTS_BY_MARKER.delete(state.wrapper);
+}
+
+function eventPathWithin(root: Element, target: EventTarget | null): number[] | null {
+	if (!(target instanceof Node)) return null;
+	const path: number[] = [];
+	let node: Element | null = target instanceof Element ? target : target.parentElement;
+	while (node !== root) {
+		const parent: Element | null = node?.parentElement ?? null;
+		if (parent === null) return null;
+		const index = Array.prototype.indexOf.call(parent.children, node) as number;
+		if (index < 0) return null;
+		path.push(index);
+		node = parent;
+	}
+	path.reverse();
+	return path;
+}
+
+function resolveEventPath(root: Element, path: number[]): Element | null {
+	let node: Element = root;
+	for (let i = 0; i < path.length; i++) {
+		const next = node.children[path[i]];
+		if (next === undefined) return null;
+		node = next;
+	}
+	return node;
+}
+
+function hydrateMarkerInteractionEvents(marker: Element): ReadonlyArray<string> | null {
+	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
+	if (when === 'dynamic') return HYDRATE_SUPPORTED_INTERACTION_EVENTS;
+	if (when !== 'interaction') return null;
+	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
+	return custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
+}
+
+function markerHandlesEarlyHydrationIntent(marker: Element, eventType: string): boolean {
+	const state = HYDRATE_SLOTS_BY_MARKER.get(marker);
+	if (state !== undefined) {
+		const strategy = resolveHydrateStrategy(state);
+		if (strategy._t !== 'interaction') return false;
+		const custom = strategy._a?.()?.[HYDRATE_INTERACTION_EVENTS_ATTR];
+		const events: ReadonlyArray<string> =
+			custom === undefined
+				? HYDRATE_DEFAULT_INTERACTION_EVENTS
+				: custom.split(/\s+/).filter(Boolean);
+		return events.includes(eventType);
+	}
+
+	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
+	// Before a function-form strategy has run, its server marker can only promise
+	// the same conservative click intent TanStack exposes. Once the component has
+	// registered its slot, the branch above consults the concrete strategy instead.
+	if (when === 'dynamic') return eventType === 'click';
+	if (when !== 'interaction') return false;
+	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
+	const events: ReadonlyArray<string> =
+		custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
+	return events.includes(eventType);
+}
+
+function queueHydrateIntent(state: HydrateSlot, intent: HydrationReplayIntent): void {
+	if (state.hydrated || resolveHydrateStrategy(state)._t === 'never') return;
+	state.replays.push(intent);
+	requestHydrateBoundary(state);
+}
+
+/**
+ * Capture intent as soon as the client runtime module is evaluated. This is
+ * deliberately document-level: an interaction may happen before hydrateRoot
+ * creates a boundary slot, before its passive setup effect, or after streaming
+ * inserts a nested marker that an ancestor could not have observed earlier.
+ */
+function handleEarlyHydrationIntent(event: Event): void {
+	const target = event.target;
+	if (!(target instanceof Element)) return;
+
+	const markers: Element[] = [];
+	let marker: Element | null = target.closest(HYDRATE_MARKER_SELECTOR);
+	let matches = false;
+	while (marker !== null) {
+		markers.push(marker);
+		matches ||= markerHandlesEarlyHydrationIntent(marker, event.type);
+		marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
+	}
+	if (!matches || markers.length === 0) return;
+
+	// Parent-first: queue only the outermost still-dormant marker. Its replay is
+	// captured again for the next nested marker after the parent has hydrated.
+	markers.reverse();
+	let candidate: Element | null = null;
+	let candidateState: HydrateSlot | undefined;
+	for (let i = 0; i < markers.length; i++) {
+		const current = markers[i];
+		const when = current.getAttribute(HYDRATE_WHEN_ATTR);
+		if (when === null) continue;
+		const state = HYDRATE_SLOTS_BY_MARKER.get(current);
+		if (state?.hydrated) continue;
+		if (when === 'never' || (state !== undefined && resolveHydrateStrategy(state)._t === 'never')) {
+			return;
+		}
+		candidate = current;
+		candidateState = state;
+		break;
+	}
+	if (candidate === null) return;
+
+	const path = eventPathWithin(candidate, event.target);
+	if (path === null) return;
+	const intent = { event, path };
+	HYDRATE_HANDLED_INTENT_EVENTS.add(event);
+	if (event.bubbles) {
+		event.preventDefault();
+		event.stopPropagation();
+		event.stopImmediatePropagation();
+	}
+
+	if (candidateState !== undefined) {
+		queueHydrateIntent(candidateState, intent);
+	} else {
+		const pending = HYDRATE_PENDING_INTENTS.get(candidate) ?? [];
+		pending.push(intent);
+		HYDRATE_PENDING_INTENTS.set(candidate, pending);
+	}
+}
+
+function ensureEarlyHydrationIntentCapture(ownerDocument: Document): void {
+	if (HYDRATE_INTENT_DOCUMENTS.has(ownerDocument)) return;
+	HYDRATE_INTENT_DOCUMENTS.add(ownerDocument);
+	for (let i = 0; i < HYDRATE_SUPPORTED_INTERACTION_EVENTS.length; i++) {
+		ownerDocument.addEventListener(
+			HYDRATE_SUPPORTED_INTERACTION_EVENTS[i],
+			handleEarlyHydrationIntent,
+			true,
+		);
+	}
+}
+
+if (typeof document !== 'undefined') ensureEarlyHydrationIntentCapture(document);
+
+function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrategy): () => void {
+	const attrs = strategy._a?.();
+	const custom = attrs?.[HYDRATE_INTERACTION_EVENTS_ATTR];
+	const ownEvents: ReadonlyArray<string> =
+		strategy._t === 'interaction'
+			? custom === undefined
+				? HYDRATE_DEFAULT_INTERACTION_EVENTS
+				: custom.split(/\s+/).filter(Boolean)
+			: state.wrapper.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic'
+				? state.delegatedDynamicIntent
+					? HYDRATE_SUPPORTED_INTERACTION_EVENTS
+					: ['click']
+				: [];
+	const events = new Set<string>(ownEvents);
+	const descendants = state.wrapper.querySelectorAll(HYDRATE_MARKER_SELECTOR);
+	for (let i = 0; i < descendants.length; i++) {
+		const nestedEvents = hydrateMarkerInteractionEvents(descendants[i]);
+		if (nestedEvents !== null) {
+			for (let j = 0; j < nestedEvents.length; j++) events.add(nestedEvents[j]);
+		}
+	}
+	if (events.size === 0) return () => undefined;
+
+	const onIntent = (event: Event) => {
+		if (HYDRATE_HANDLED_INTENT_EVENTS.has(event)) return;
+		if (state.hydrated) return;
+		const rawTarget = event.target;
+		let target =
+			rawTarget instanceof Element
+				? rawTarget
+				: rawTarget instanceof Node
+					? rawTarget.parentElement
+					: null;
+		let marker: Element | null = target?.closest(HYDRATE_MARKER_SELECTOR) ?? state.wrapper;
+		let matches = ownEvents.includes(event.type);
+		const delegatedDynamicMarkers: Element[] = [];
+		while (marker !== null && state.wrapper.contains(marker)) {
+			if (marker !== state.wrapper) {
+				const nestedEvents = hydrateMarkerInteractionEvents(marker);
+				if (nestedEvents?.includes(event.type)) {
+					matches = true;
+					if (marker.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic') {
+						delegatedDynamicMarkers.push(marker);
+					}
+				}
+			}
+			if (marker === state.wrapper) break;
+			marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
+		}
+		if (!matches) return;
+		for (let i = 0; i < delegatedDynamicMarkers.length; i++) {
+			HYDRATE_DELEGATED_DYNAMIC_MARKERS.add(delegatedDynamicMarkers[i]);
+		}
+		const path = eventPathWithin(state.wrapper, event.target);
+		if (path === null) return;
+		state.replays.push({ event, path });
+		if (event.bubbles) {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+		}
+		requestHydrateBoundary(state);
+	};
+	for (const eventName of events) state.wrapper.addEventListener(eventName, onIntent, true);
+	return () => {
+		for (const eventName of events) state.wrapper.removeEventListener(eventName, onIntent, true);
+	};
+}
+
+function requestHydrateBoundary(state: HydrateSlot): void {
+	if (state.hydrated || state.activationRequested || state.block.disposed) return;
+	// A direct strategy prop can become never() after an earlier installer was
+	// registered. Its cleanup should cancel normal callbacks, but guard here too:
+	// a queued/custom callback that escaped cleanup must not bypass never's
+	// intentionally-static contract.
+	if (resolveHydrateStrategy(state)._t === 'never') return;
+	const activationGeneration = ++state.activationGeneration;
+	state.activationRequested = true;
+	resolveHydrateWaiters(state, 'hydrate');
+
+	const waits: Promise<void>[] = [];
+	const prefetch = beginProceduralHydratePrefetch(state);
+	if (prefetch !== null) waits.push(prefetch);
+	const preload = beginHydratePreload(state);
+	if (preload !== null) waits.push(preload);
+	if (waits.length === 0) {
+		state.activationReady = true;
+		if (state.gate !== null) state.gate.resolved = true;
+		if (CURRENT_BLOCK !== state.parentBlock) scheduleRender(state.parentBlock);
+		return;
+	}
+
+	void Promise.all(waits).then(
+		() => {
+			if (
+				state.block.disposed ||
+				!state.activationRequested ||
+				state.activationGeneration !== activationGeneration
+			)
+				return;
+			state.activationReady = true;
+			if (state.gate !== null) state.gate.resolved = true;
+			scheduleRender(state.parentBlock);
+		},
+		(error) => {
+			if (
+				state.block.disposed ||
+				!state.activationRequested ||
+				state.activationGeneration !== activationGeneration
+			)
+				return;
+			failHydrateBoundary(state, error);
+		},
+	);
+}
+
+function installHydrateBoundary(state: HydrateSlot): () => void {
+	if (!state.serverPreserved || state.hydrated) return () => undefined;
+	const strategy = resolveHydrateStrategy(state);
+	if (strategy._t === 'never') {
+		state.strategyCleanup = null;
+	} else {
+		const gate = {
+			id: state.boundaryId,
+			when: strategy._t,
+			resolved: false,
+			resolve: () => requestHydrateBoundary(state),
+		};
+		state.gate = gate;
+		const strategyCleanup = strategy._s?.({ element: state.wrapper, gate });
+		const interactionCleanup = installHydrateInteraction(state, strategy);
+		state.strategyCleanup = () => {
+			strategyCleanup?.();
+			interactionCleanup();
+		};
+	}
+
+	const prefetch = state.props.prefetch;
+	if (typeof prefetch === 'function') {
+		beginProceduralHydratePrefetch(state);
+	} else if (prefetch !== undefined) {
+		state.prefetchCleanup =
+			prefetch._s?.({
+				element: state.wrapper,
+				prefetch: () => {
+					const promise = beginHydratePreload(state);
+					if (promise !== null) void promise.catch(() => undefined);
+				},
+			}) ?? null;
+	}
+
+	return () => teardownHydrateBoundary(state);
+}
+
+function findHydrateSeedSidecar(wrapper: Element): HTMLScriptElement | null {
+	for (let node = wrapper.firstElementChild; node !== null; node = node.nextElementSibling) {
+		if (node.localName === 'script' && node.hasAttribute(HYDRATE_SEED_ATTR)) {
+			return node as HTMLScriptElement;
+		}
+	}
+	return null;
+}
+
+function createHydrateSlot(
+	props: InternalHydrateProps,
+	scope: Scope,
+	boundaryId: string,
+): HydrateSlot {
+	const parentBlock = scope.block;
+	const parentNode = parentBlock.parentNode;
+	const hydration = activeHydration();
+	const expected = document.createElement('div');
+	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
+	ensureEarlyHydrationIntentCapture(wrapper.ownerDocument);
+	let serverPreserved =
+		hydration !== null && !hydration.isFresh(wrapper) && wrapper.parentNode === parentNode;
+	if (wrapper.parentNode !== parentNode) parentNode.insertBefore(wrapper, parentBlock.endMarker);
+	if (!wrapper.hasAttribute(HYDRATE_ID_ATTR)) wrapper.setAttribute(HYDRATE_ID_ATTR, boundaryId);
+	if (!wrapper.hasAttribute(HYDRATE_WHEN_ATTR))
+		wrapper.setAttribute(HYDRATE_WHEN_ATTR, hydrateStrategyType(props.when));
+
+	let start: Comment;
+	let end: Comment;
+	let seedRaw: string | null = null;
+	let idState = parentBlock.idState;
+	if (serverPreserved && hydration!.isOpen(wrapper.firstChild)) {
+		start = wrapper.firstChild as Comment;
+		end = hydration!.close(start);
+		const rawCount = wrapper.getAttribute(HYDRATE_ID_COUNT_ATTR);
+		const parsedCount = rawCount === null ? 0 : Number(rawCount);
+		const idCount = Number.isSafeInteger(parsedCount) && parsedCount >= 0 ? parsedCount : 0;
+		const rootIds = parentBlock.idState;
+		const childStart = rootIds.next;
+		rootIds.next += idCount;
+		idState = {
+			prefix: rootIds.prefix,
+			next: childStart,
+			limit: childStart + idCount,
+			overflow: rootIds,
+		};
+		wrapper.removeAttribute(HYDRATE_ID_COUNT_ATTR);
+		const seed = findHydrateSeedSidecar(wrapper);
+		if (seed !== null) {
+			seedRaw = seed.textContent || '[]';
+			seed.remove();
+		}
+	} else {
+		// An adopted wrapper without the boundary's own marker range is not safe to
+		// hydrate: stale server children would otherwise remain beside the fresh
+		// client range. Recover as a client-only mount inside the persistent wrapper.
+		if (serverPreserved) {
+			serverPreserved = false;
+			wrapper.replaceChildren();
+		}
+		start = document.createComment('hydrate');
+		end = document.createComment('/hydrate');
+		wrapper.append(start, end);
+	}
+
+	const block = createBlock(
+		'control-flow',
+		parentBlock,
+		wrapper,
+		start,
+		end,
+		() => undefined,
+		undefined,
+	);
+	block.idState = idState;
+	const state: HydrateSlot = {
+		__kind: 'hydrateBlockSlot',
+		block,
+		wrapper,
+		start,
+		end,
+		parentBlock,
+		props,
+		boundaryId: wrapper.getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
+		delegatedDynamicIntent: HYDRATE_DELEGATED_DYNAMIC_MARKERS.delete(wrapper),
+		serverPreserved,
+		preservedFallbackNodes: null,
+		seedRaw,
+		idState,
+		dynamicStrategy: null,
+		strategy: null,
+		gate: null,
+		strategyCleanup: null,
+		prefetchCleanup: null,
+		prefetchAbort: null,
+		prefetchStarted: false,
+		prefetchPromise: null,
+		preloadPromise: null,
+		loadedBody: null,
+		hydrationWaiters: new Set(),
+		activationGeneration: 0,
+		activationRequested: !serverPreserved,
+		activationReady: !serverPreserved,
+		hydrated: false,
+		didNotify: false,
+		hasError: false,
+		error: undefined,
+		replays: [],
+	};
+	scope.slots[0] = state;
+	registerSlot(scope, state);
+	HYDRATE_SLOTS_BY_MARKER.set(wrapper, state);
+	block.body = hydrateBoundaryBody(state);
+	const initialStrategy = resolveHydrateStrategy(state);
+	const pendingIntents = HYDRATE_PENDING_INTENTS.get(wrapper);
+	HYDRATE_PENDING_INTENTS.delete(wrapper);
+	if (serverPreserved && pendingIntents !== undefined && initialStrategy._t !== 'never') {
+		state.replays.push(...pendingIntents);
+		requestHydrateBoundary(state);
+	} else if (serverPreserved) {
+		const shouldDefer = initialStrategy._d ? initialStrategy._d() : initialStrategy._t !== 'load';
+		if (!shouldDefer && initialStrategy._t !== 'never') requestHydrateBoundary(state);
+	}
+	return state;
+}
+
+function activateHydrateBoundary(state: HydrateSlot): void {
+	const block = state.block;
+	if (!state.serverPreserved) {
+		renderBlock(block);
+		return;
+	}
+	if (state.preservedFallbackNodes === null) {
+		const snapshot: Node[] = [];
+		for (let node = state.start.nextSibling; node !== null && node !== state.end; ) {
+			snapshot.push(node.cloneNode(true));
+			node = node.nextSibling;
+		}
+		state.preservedFallbackNodes = snapshot;
+	}
+
+	const hydration = new HydrationCapability(block, state.start.nextSibling, null);
+	if (state.seedRaw !== null) hydration.seeds = hydration.parseSeeds(state.seedRaw);
+	hydration.protectRootAnchor(state.end);
+	const previousHydration = currentHydration;
+	currentHydration = hydration;
+	let completed = false;
+	try {
+		renderBlock(block);
+		drainHydrationRenderPhaseUpdates(block);
+		hydration.flushClassWrites();
+		hydration.flushTextWarnings();
+		// A first-attempt suspension deliberately leaves the internal try slot's
+		// pending block live until its thenable resumes. Its cursor is parked on
+		// that slot's close marker, so a normal root-remainder sweep would mistake
+		// the still-owned close marker for stale server DOM and detach the anchor
+		// the async retry needs. The pending path has already removed the abandoned
+		// adopted arm; finish/coalesce only after this boundary actually commits.
+		if (state.hydrated) {
+			hydration.finishRoot();
+			completed = true;
+		}
+	} finally {
+		currentHydration = previousHydration;
+	}
+	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
+}
+
+function notifyHydrateBoundary(state: HydrateSlot): void {
+	if (state.didNotify || !state.hydrated) return;
+	state.didNotify = true;
+	// Keep intent capture alive while an asynchronously split child loads. A
+	// pointerdown commonly requests hydration before the browser dispatches the
+	// corresponding click; removing listeners at request time would lose that
+	// click instead of replaying the complete interaction once hydration commits.
+	cleanupHydrateInstallers(state);
+	state.props.onHydrated?.();
+	state.wrapper.removeAttribute(HYDRATE_WHEN_ATTR);
+	state.strategy?._o?.(state.boundaryId);
+	const replays = state.replays;
+	state.replays = [];
+	for (let i = 0; i < replays.length; i++) {
+		const replay = replays[i];
+		const target = resolveEventPath(state.wrapper, replay.path);
+		if (target !== null) {
+			const event = replay.event;
+			target.dispatchEvent(
+				typeof MouseEvent !== 'undefined' && event instanceof MouseEvent
+					? new MouseEvent(event.type, event)
+					: typeof FocusEvent !== 'undefined' && event instanceof FocusEvent
+						? new FocusEvent(event.type, event)
+						: new Event(event.type, event),
+			);
+		}
+	}
+}
+
+/**
+ * Defer the initial hydration of server-rendered children until `when` resolves.
+ * A boundary first mounted on the client renders immediately; only existing SSR
+ * HTML can be left dormant.
+ */
+export const Hydrate: ComponentBody<HydrateProps> = (rawProps, scope) => {
+	const props = rawProps as InternalHydrateProps;
+	const boundaryId = useId(HYDRATE_ID_SLOT);
+	let state = scope.slots[0] as HydrateSlot | undefined;
+	let renderedChild = false;
+	if (state === undefined) {
+		state = createHydrateSlot(props, scope, boundaryId);
+	} else {
+		state.props = props;
+		// A surrounding update makes preserved server HTML potentially stale. Match
+		// the correctness-first contract by opening the boundary, except for never().
+		if (!state.hydrated) {
+			const strategy = resolveHydrateStrategy(state);
+			if (strategy._t === 'never') {
+				// Only the hydration trigger changes here. Preparation has an independent
+				// lifecycle, so do not abort procedural prefetch or resolve waitFor() as
+				// though the still-mounted boundary had unmounted.
+				cleanupHydrateStrategy(state);
+				invalidateHydrateActivation(state);
+			} else if (!state.activationRequested) {
+				requestHydrateBoundary(state);
+			}
+		}
+	}
+
+	if (state.hasError) throw state.error;
+	if (!state.hydrated && state.activationReady) {
+		activateHydrateBoundary(state);
+		renderedChild = true;
+	} else if (state.hydrated && !renderedChild) {
+		renderBlock(state.block);
+	}
+
+	useEffect(() => installHydrateBoundary(state!), [state], HYDRATE_SETUP_SLOT);
+};
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
@@ -5741,7 +6617,11 @@ export function useId(slot?: HookSlot): string {
 	let s = scope.hooks?.get(slot) as { id: string } | undefined;
 	if (s === undefined) {
 		const ids = scope.block.idState;
-		s = { id: ':' + ids.prefix + 'in-' + (ids.next++).toString(36) + ':' };
+		let owner = ids;
+		while (owner.limit !== undefined && owner.next >= owner.limit && owner.overflow !== undefined) {
+			owner = owner.overflow;
+		}
+		s = { id: ':' + owner.prefix + 'in-' + (owner.next++).toString(36) + ':' };
 		ensureHooks(scope).set(slot, s);
 	}
 	return s.id;
@@ -5912,9 +6792,10 @@ class HydrationCapability {
 	}
 
 	owns(block: Block): boolean {
-		let root = block;
-		while (root.parentBlock !== null) root = root.parentBlock;
-		return root === this.rootBlock;
+		for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+			if (current === this.rootBlock) return true;
+		}
+		return false;
 	}
 
 	suspend<T>(fn: () => T): T {
@@ -11105,7 +11986,7 @@ function componentSlotImpl(
 		// pair exactly where this falls through to the adoption regimes below.
 		if (
 			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
+			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition || comp === Hydrate)
 		)
 			inherit = false;
 		if (inherit === true && parentBlock !== null) {
@@ -18335,7 +19216,8 @@ function coalesceHydratedRanges(
 		return (
 			owner.currentComp === Suspense ||
 			owner.currentComp === ErrorBoundary ||
-			owner.currentComp === ViewTransition
+			owner.currentComp === ViewTransition ||
+			owner.currentComp === Hydrate
 		);
 	}
 
@@ -18360,6 +19242,7 @@ function coalesceHydratedRanges(
 				owner.currentComp !== Suspense &&
 				owner.currentComp !== ErrorBoundary &&
 				owner.currentComp !== ViewTransition &&
+				owner.currentComp !== Hydrate &&
 				!scopeHasFragmentRef(owner.block)
 			);
 		}

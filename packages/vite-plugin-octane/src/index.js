@@ -33,6 +33,7 @@ import {
 	to_vite_root_import,
 	write_project_generated_file,
 } from './project-codegen.js';
+import { createClientAssetMap } from './client-assets.js';
 
 import { patch_global_fetch, is_rpc_request, handle_rpc_request } from '@ripple-ts/adapter/rpc';
 
@@ -681,7 +682,7 @@ export function octane(inlineOptions = {}) {
 			// tags the production server emits for the matched route).
 			// ------------------------------------------------------------------
 			const manifestPath = path.join(clientOutDir, '.vite', 'manifest.json');
-			/** @type {Record<string, { file: string, css?: string[], imports?: string[] }>} */
+			/** @type {Record<string, { file: string, src?: string, css?: string[], imports?: string[], dynamicImports?: string[] }>} */
 			let clientManifest = {};
 			if (fs.existsSync(manifestPath)) {
 				clientManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
@@ -691,35 +692,7 @@ export function octane(inlineOptions = {}) {
 				);
 			}
 
-			/**
-			 * All CSS a manifest entry needs, transitively (cycle-safe).
-			 * @param {string} key
-			 * @param {Set<string>} [visited]
-			 * @returns {string[]}
-			 */
-			const collectCss = (key, visited = new Set()) => {
-				if (visited.has(key)) return [];
-				visited.add(key);
-				const entry = clientManifest[key];
-				if (!entry) return [];
-				const css = [...(entry.css || [])];
-				for (const imp of entry.imports || []) css.push(...collectCss(imp, visited));
-				return css;
-			};
-
-			/** @type {Record<string, { js: string, css: string[] }>} */
-			const clientAssetMap = {};
-			for (const moduleId of staticEntries) {
-				// Manifest keys are root-relative without the leading slash.
-				const manifestKey = moduleId.startsWith('/') ? moduleId.slice(1) : moduleId;
-				const manifestEntry = clientManifest[manifestKey];
-				if (manifestEntry) {
-					clientAssetMap[moduleId] = {
-						js: manifestEntry.file,
-						css: [...new Set(collectCss(manifestKey))],
-					};
-				}
-			}
+			const clientAssetMap = createClientAssetMap(clientManifest, staticEntries);
 
 			// The manifest was only needed here; leaving .vite/ in dist/client would
 			// publish source file paths through the static server.

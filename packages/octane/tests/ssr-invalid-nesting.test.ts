@@ -46,6 +46,19 @@ describe('DEV SSR invalid HTML nesting', () => {
 		expect(warning.match(/ssr-invalid-nesting\.tsrx:\d+:\d+/g)).toHaveLength(2);
 	});
 
+	it('treats a deferred hydration wrapper as a real HTML parent', () => {
+		const spy = errors();
+		const { html } = renderToString(dev.HydrateWrapper, {
+			when: { _t: 'never' },
+		});
+
+		expect(html).toContain('<span>deferred</span>');
+		expect(spy).toHaveBeenCalledTimes(1);
+		const warning = messageAt(spy);
+		expect(warning).toContain('`<div>`');
+		expect(warning).toContain('cannot be a child of `<p>`');
+	});
+
 	it('tracks transparent component boundaries when checking ancestors', () => {
 		const spy = errors();
 		renderToString(dev.CrossComponent);
