@@ -1351,6 +1351,50 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tiptap',
+					include: [
+						'packages/tiptap/tests/unit/**/*.test.ts',
+						'packages/tiptap/tests/unit/**/*.test.tsx',
+						'packages/tiptap/tests/differential/**/*.test.ts',
+						'packages/tiptap/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tiptap/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tiptap-ssr',
+					include: ['packages/tiptap/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',
