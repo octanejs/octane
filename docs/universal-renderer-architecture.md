@@ -838,6 +838,12 @@ unchanged.
 
 The universal runtime preserves Octane's compiler-assigned slot model,
 dependency inference, current-state getter, and parallel-`use()` behavior.
+Hook and HMR updates batch through the universal root's microtask scheduler;
+`flushUniversalSync` lets a renderer package drain direct roots inside its own
+host scheduler boundary. The Three package composes that drain with Octane's
+DOM `flushSync`/`act`, so direct Three roots and DOM-owned `Canvas` boundaries
+settle under one public scheduling call without making DOM scheduling part of
+the universal ABI.
 Transition/deferred/action/form compatibility APIs currently execute without a
 separate lane scheduler, and `memo` does not yet provide a render bailout;
 those timing/optimization gaps do not weaken transactional ownership.
@@ -883,28 +889,34 @@ renderer package. The implemented package-facing authoring form is:
 
 ```tsx
 <Canvas>
-	<Scene />
-	<mesh />
-	<Html>
-		<button>DOM overlay</button>
-	</Html>
+	<Scene overlayTarget={overlayRoot} />
 </Canvas>
+
+// Inside Scene.three.tsrx:
+<group>
+	<mesh />
+	<DOMRegion target={overlayTarget}>
+		<button>DOM overlay</button>
+	</DOMRegion>
+</group>
 ```
 
-Here `Canvas.children` is declared as `dom -> three`, and `Html.children` is a
-separate `three -> dom` boundary. The declarations live in normalized compiler
-configuration under stable module/export identities. The static analyzer
-resolves default, named, aliased, and namespace imports, respects lexical
-shadowing and type-only imports, and lowers only the declared prop. This is
-package/module metadata, not ancestry guessing, bundler-private metadata, or a
-mutable runtime renderer switch.
+Here `Canvas.children` is declared as `dom -> three`, and
+`DOMRegion.children` is a separate `three -> dom` boundary. The declarations
+live in normalized compiler configuration under stable module/export
+identities. The static analyzer resolves default, named, aliased, and namespace
+imports, respects lexical shadowing and type-only imports, and lowers only the
+declared prop. This is package/module metadata, not ancestry guessing,
+bundler-private metadata, or a mutable runtime renderer switch.
 
 A concrete `Canvas` component owns and creates its renderer root, so application
 authors do not pass a low-level root prop in this form. The executable object
 proof uses exactly this wrapper shape. `createUniversalHostBoundary(renderer)`
 is the lower-level primitive used inside that wrapper and deliberately accepts
 an already-created root so a real renderer package controls its container,
-driver, and resource lifetime.
+driver, and resource lifetime. In the reverse direction, `DOMRegion` receives
+an explicit `HTMLElement` or ref target and owns one child container plus one
+ordinary DOM root below it.
 
 For example:
 
@@ -919,7 +931,11 @@ compiler: {
 					prop: 'children',
 					server: 'omit-child',
 				},
-				Html: { ownerRenderer: 'three', childRenderer: 'dom', prop: 'children' },
+				DOMRegion: {
+					ownerRenderer: 'three',
+					childRenderer: 'dom',
+					prop: 'children',
+				},
 			},
 		},
 	},
@@ -950,8 +966,9 @@ does not reset the child tree. For DOM-to-universal regions it emits a
 universal plan/component directly. For universal-to-DOM regions it reserves
 the explicit region during universal lowering, then runs that region alone
 through the normal DOM compiler. This shared descriptor is the mechanism from
-which both `Canvas` and a future concrete `Html` host follow; no tag name is
-hard-coded.
+which both `Canvas` and the low-level `DOMRegion` host follow; no tag name is
+hard-coded. A future Drei `Html` port can build positioning and occlusion policy
+on this seam without changing the descriptor.
 
 `createUniversalHostBoundary(renderer)` exposes runtime metadata with this
 shape:
@@ -1005,9 +1022,14 @@ remain attached to the component owners on both sides. A universal root under
 the DOM boundary reads an enclosing DOM Provider and routes synchronous render
 errors to its enclosing DOM owner; nested universal Providers and
 `@try`/`@pending` owners operate inside the region. The reverse descriptor
-contains a normally compiled DOM component that a renderer-owned `Html`
-implementation can mount into its concrete DOM container while preserving the
-universal owner that supplied it.
+contains a normally compiled DOM component. Three's `DOMRegion` mounts it into
+one owned child container below the explicit target while preserving the
+universal owner that supplied it. Moving the target preserves that container,
+DOM root, local state, and node identity; deletion unmounts and removes it.
+
+`DOMRegion` is not Drei `Html` and is not the WebXR DOM Overlay API. It defines
+no positioning, occlusion, transforms, styling, or layout contract; those are
+higher-level renderer-package concerns.
 
 Live universal host serialization and adoption remain unsupported. A renderer
 with `server: "unsupported"` still fails rather than compiling as DOM. A
@@ -1147,7 +1169,7 @@ observation boundaries:
 | Mutation vocabulary | Create/update/recreate/insert/move/visibility/remove/destroy plus listener/lifecycle/local-callback descriptors are exercised through the object driver's public tree. |
 | Identity diagnostics | Component/plan/root/boundary/container/driver mismatches fail with both expected and received renderer IDs in development. |
 | Mixed ownership | A DOM parent provides context to an object child; child render errors reach the DOM error owner; ref and effect ordering straddle the single object commit correctly; DOM unmount tears the external root down. |
-| Renderer regions | Imported aliases and stable module/export metadata lower `Canvas`-shaped DOM-to-universal children and `Html`-shaped universal-to-DOM children through the same descriptor mechanism. |
+| Renderer regions | Imported aliases and stable module/export metadata lower `Canvas`-shaped DOM-to-universal children and explicit-target `DOMRegion` universal-to-DOM children through the same descriptor mechanism. |
 | Events | Registration, replacement, removal, scoped multi-listener dispatch, priority, teardown, and abandoned work are observable on the object driver's public surface. |
 | Retained ownership | Activity and Suspense prove host/state/resource identity, visibility, distinct ref semantics, insertion retention, layout/passive disconnection, event suppression, fallback coexistence, reveal/reject, and capability failure. |
 | Client-only graph | Neutral, Vite, Rspack, and Rsbuild builds remove server imports/regions, preserve exports without authored execution, reject live use, and agree on client-reference/manifest identity; raw Rspack proves graph split and Vite/Rsbuild prove one client mount over an adopted DOM shell. |
@@ -1166,10 +1188,10 @@ export receives a patch changeset even though the ABI is not stable.
 The shared resolver, compile-option plumbing, nested universal owner graph,
 static-plan and directive lowering, transactional root, event descriptor
 protocol, prepared host acceptance, object driver, and renderer-region lowering
-are implemented. Normal
-componentized client authoring—including `Canvas`-shaped DOM-to-universal and
-`Html`-shaped reverse child regions—is executable rather than an RFC-only
-design. Stable-ID recreation, host lifecycle/local callbacks, prop codecs,
+are implemented. Normal componentized client authoring—including
+`Canvas`-shaped DOM-to-universal and `DOMRegion` reverse child regions—is
+executable rather than an RFC-only design. Stable-ID recreation, host
+lifecycle/local callbacks, prop codecs,
 event scopes, retained visibility, transactional portal target handles,
 client-only server graphs/manifests, and file-local intrinsic catalogues are
 executable. Universal maps compose to TSRX, the high-level Vite plugin loads the
@@ -1186,14 +1208,14 @@ The remaining foundation limitations are capability/scheduler boundaries:
   Activity does not yet propagate offscreen state into an external root;
 - transition/deferred/action/form compatibility behavior has no universal lane
   scheduler, and `memo` has no universal bailout optimization;
-- a reverse renderer region contains executable normally compiled DOM content,
-  but a real `Html` package still owns its physical DOM container and mounting
-  lifecycle;
+- `DOMRegion` proves physical reverse-DOM mounting and target moves, but it has
+  no positioning, occlusion, styling, or layout contract; a future Drei `Html`
+  port owns those policies;
 - the driver/plan/helper/event/boundary ABI remains experimental until real
   renderer and transport implementations validate disposal, attachment, frame
   scheduling, and delivery semantics.
 
-### Implemented: `@octanejs/three` proving renderer through Milestone 6
+### Implemented: `@octanejs/three` proving renderer through Milestone 8
 
 The real Three package now exercises the implemented seam locally:
 
@@ -1210,9 +1232,12 @@ validation matrix are tracked in [`three-port-plan.md`](./three-port-plan.md).
   event capability;
 - asset/Suspense ownership plus same-renderer portals with local state/event
   enclaves and ownership-safe teardown;
-- a concrete `Html` host that mounts the compiled reverse DOM region into its
-  owned DOM container and tears it down deterministically remains a later
-  milestone.
+- client-only Canvas streaming/hydration, direct `HTMLCanvasElement` and
+  `OffscreenCanvas` roots, context-recovery invalidation, controlled XR loop
+  ownership, and compatible/reconstructing universal HMR; and
+- the low-level `DOMRegion` host, which mounts a compiled reverse DOM region
+  into an owned container below an explicit target, preserves it across target
+  moves, and tears it down deterministically.
 
 This local proof is necessary but not sufficient for a stable public renderer
 SDK. The transported proof must still validate serialized target/resource
@@ -1299,8 +1324,8 @@ evidence:
 - Three validates host creation, disposal, special attachment, events, layout,
   assets, and renderer-owned children without fake nodes;
 - a transported renderer validates batch serialization and acknowledgement;
-- concrete Three `Canvas` and `Html` packages validate physical container and
-  resource ownership on both already-compiled boundary directions;
+- concrete Three `Canvas` and `DOMRegion` components validate physical container
+  and resource ownership on both already-compiled boundary directions;
 - transition and Suspense semantics are specified across a boundary;
 - capability diagnostics are usable from the compiler and language tooling;
 - DOM byte size and performance remain unaffected;

@@ -81,6 +81,10 @@ export type {
 	Viewport,
 	XRManager,
 } from './core/index.js';
+export { act, flushSync } from './scheduling.js';
+export type { Act } from './scheduling.js';
 export { Canvas } from './web/Canvas.tsrx';
 export type { CanvasProps, CanvasRef, CanvasStyle } from './web/Canvas.tsrx';
+export { DOMRegion } from './web/DOMRegion.js';
+export type { DOMRegionProps, DOMRegionTarget } from './web/DOMRegion.js';
 export { createPointerEvents as events } from './web/events.js';
