@@ -4952,15 +4952,18 @@ export function bindRendererRegionOwner(props: unknown): void {
 		);
 	}
 	const root = CURRENT_BLOCK;
-	const disposeRoot = DOM_ROOT_DISPOSERS.get(root);
-	if (disposeRoot === undefined) {
+	// hydrateRoot() runs its adoption pass BEFORE the Root object (and its
+	// disposer) exists, so a hydrating owned root is bound with a LAZY disposer
+	// lookup; every other caller must already have a live root.
+	if (DOM_ROOT_DISPOSERS.get(root) === undefined && currentHydration?.rootBlock !== root) {
 		throw new Error('A renderer-owned DOM region requires a live DOM root.');
 	}
 	const previous = RENDERER_REGION_DOM_BINDINGS.get(root);
 	if (previous?.bridge === bridge) return;
 	// A distinct callback avoids deleting a newly-registered disposer when two
-	// successive descriptor bridges share one committed lifecycle cell.
-	const dispose = () => disposeRoot();
+	// successive descriptor bridges share one committed lifecycle cell. The
+	// lookup is lazy so a disposer registered after a hydration pass is honored.
+	const dispose = () => DOM_ROOT_DISPOSERS.get(root)?.();
 	const release = bridge.registerDispose(dispose);
 	previous?.release();
 	const binding = { bridge, release };
@@ -8644,10 +8647,16 @@ export function namespaceHeadElement(
 export function injectStyle(id: string, css: string): void {
 	if (_injectedStyles.has(id)) return;
 	// SSR de-dup: the server already emitted this scoped stylesheet (the css of
-	// the RenderResult, a `<style data-octane="hash">`). On a hydrated page
-	// the per-runtime Set is empty, so also check the DOM before re-injecting —
-	// otherwise hydration would append a duplicate <style>.
-	if (typeof document !== 'undefined' && document.querySelector(`style[data-octane="${id}"]`)) {
+	// the RenderResult, a `<style data-octane="hash">` — or, for a React-hosted
+	// island, a React 19 style RESOURCE whose href React serializes as
+	// `data-href="octane-<hash>"`; React drops other attributes from hoisted
+	// resources). On a hydrated page the per-runtime Set is empty, so also
+	// check the DOM before re-injecting — otherwise hydration would append a
+	// duplicate <style>.
+	if (
+		typeof document !== 'undefined' &&
+		document.querySelector(`style[data-octane="${id}"], style[data-href="octane-${id}"]`)
+	) {
 		_injectedStyles.add(id);
 		return;
 	}
@@ -14439,6 +14448,10 @@ export function tryBlock(
 			releaseHeldTransition(s);
 			s.pendingThenable = null;
 		} catch (err) {
+			// §6.3 control signal — never an application failure: pass it through
+			// so the renderer-region owner (handleRenderError) receives it; a
+			// local catch arm must not render a hosted context handshake.
+			if (isHostContextRequest(err)) throw err;
 			if (isSuspenseException(err)) {
 				if (s.propagateSuspense) throw err;
 				handleSuspense(s, err.thenable, s.tryBlock);
@@ -14574,6 +14587,9 @@ function mountTry(state: TrySlot): void {
 		renderBlock(b);
 		state.hasResolved = true;
 	} catch (err) {
+		// §6.3 control signal — bypass the local boundary (see the try-body
+		// re-render catch above); the renderer-region owner handles it.
+		if (isHostContextRequest(err)) throw err;
 		if (isSuspenseException(err)) {
 			if (state.propagateSuspense) throw err;
 			handleSuspense(state, err.thenable, b);
@@ -19117,6 +19133,32 @@ export function hydrateRoot(
 		// anything left at the root cursor instead of leaving visible unmanaged DOM.
 		hydration.finishRoot();
 		hydrationCompleted = true;
+	} catch (error) {
+		// An OWNED hydrating root (a renderer-region bridge bound during this
+		// pass — e.g. an octane/react island) mirrors createRoot's initial-render
+		// contract: route the escape (error, suspension, or host context request)
+		// to the owner, unmount the failed root, and release the container so a
+		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
+		// retry client-remounts). Unowned hydration failures keep their existing
+		// behavior and rethrow untouched.
+		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
+		try {
+			handleRenderError(rootBlock, error);
+		} finally {
+			DOM_ROOT_DISPOSERS.delete(rootBlock);
+			unmountBlock(rootBlock, false);
+			drainRefDetaches();
+			container.textContent = '';
+			// Mirror root.unmount()'s full release: this pass registered the
+			// container as a delegation target, and the retry's fresh root
+			// re-registers — a leftover refcount would strand the map entry and
+			// its listeners past the island's final teardown.
+			unregisterDelegationTarget(container);
+			releaseRootContainer(container, ownerToken);
+		}
+		// Routed: hand back an empty lazy root owning NO claim or delegation
+		// registration (both released above); the owner's retry recreates.
+		return makeRoot(container, null, null, null, idState, renderReturnedValue, null);
 	} finally {
 		currentHydration = previousHydration;
 	}
