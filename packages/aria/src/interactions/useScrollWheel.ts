@@ -14,6 +14,10 @@ export interface ScrollWheelProps extends ScrollEvents {
 }
 
 // scroll wheel needs to be added not passively so it's cancelable, small helper hook to remember that
+// (that means bypassing framework-delegated wheel handling with a direct element listener —
+// which useEvent is. Element-target wheel listeners are cancelable by default; the browser's
+// passive-by-default intervention only covers window/document/body. Upstream likewise passes
+// no explicit `passive: false` — see the pinned source.)
 export function useScrollWheel(props: ScrollWheelProps, ref: RefObject<HTMLElement | null>): void;
 // Slot-threading form: sibling ported hooks pass their derived sub-slot as the trailing arg.
 export function useScrollWheel(
