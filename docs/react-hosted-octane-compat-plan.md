@@ -1,13 +1,15 @@
 # React-hosted Octane compatibility plan
 
-Status: **Phases 0–1 landed** (2026-07-17). Phase 0's committed evidence lives
+Status: **Phases 0–2 landed** (2026-07-17). Phase 0's committed evidence lives
 in `packages/octane/tests/react-hosted/`, `packages/octane/typetests/`
 (react-hosted-jsx.test-d.tsx), and `benchmarks/react-hosted-islands/`; measured
 findings are folded into §3, §5, §6.2, §8, §9 and §15 below and summarized
 under §14 Phase 0. Phase 1 ships the experimental `octane/react` client shell
 (`OctaneCompat`, including the client half of the Phase 3 escape protocol) with
-zero core-runtime changes — see §14 Phase 1. Transparent context (Phase 2),
-server/hydration (Phase 4), and selective events (Phase 5) remain open.
+zero core-runtime changes; Phase 2 adds transparent React context (foreign
+`use()`/`useContext()` resolution, the production Fiber adapter, and the §6.3
+handshake) behind a cold-path-only core seam — see §14. Server/hydration
+(Phase 4) and selective events (Phase 5) remain open.
 
 > Goal: allow a compiled Octane tree to live inside an existing React 19 tree
 > through one compatibility component, while preserving React context, native
@@ -1138,6 +1140,38 @@ publish build), exercised consumer-shaped by
 
 Exit gate: the full context matrix passes and provider updates perform no
 post-subscription Fiber walks.
+
+**Executed 2026-07-17 — exit gate met.** The client context matrix passes
+through the public surface (`tests/react-hosted/octane-compat-context.test.ts`:
+nearest nested providers, explicit `undefined`, provider-only updates across
+memoized parents and repeated alternate flips, island-internal `memo()`
+invalidation via mirror version bumps, several/duplicate/conditional reads,
+provider insertion/removal around a retained island, cross-island isolation
+through root-local mirrors, discovery-in-a-suspending-attempt, child-identity
+registry reset, and the out-of-hosted-root diagnostic), and the
+`react-hosted-islands` harness gates the walk criterion structurally: exactly
+one Fiber walk per island at discovery and ZERO per provider update at
+1/100/1000 islands, failing the run otherwise. Implementation notes:
+
+- Core gained only the cold-path seam: `use()`/`useContext()` route an unknown
+  usable through the optional owner capability `resolveForeignContext` (normal
+  roots and hot paths untouched), a structural `ForeignHostContext<T>` overload
+  keeps React types out of core while `use(React.Context<T>)` infers `T`
+  (pinned in typetests), and `handleRenderError` recognizes the §6.3
+  `createHostContextRequest` control signal BEFORE local boundary routing so
+  island `@catch`/`@pending` arms never observe it — the owner receives the
+  carried thenable via `routeSuspense`.
+- The §6.3 handshake is one wrapper pass, not a two-boundary protocol: the
+  discovery notification re-renders the wrapper, whose layout commit publishes
+  the authoritative `React.use` snapshot, settles the request thenables, and
+  retries the root — before paint, including the providerless-default case
+  (never `_currentValue`) and with the Fiber adapter hard-disabled.
+- The production adapter (`src/react/fiber-adapter.ts`) is feature-detected
+  and fail-soft: every internal failure degrades to the handshake. Its walk
+  counter (`__hostContextFiberWalks`) is the bench instrumentation.
+- Hydration rollback/remount handling moves to Phase 4 with the rest of the
+  island hydration path — there is nothing to hydrate until the hosted server
+  renderer exists.
 
 ### Phase 3 — root suspension/error escape
 

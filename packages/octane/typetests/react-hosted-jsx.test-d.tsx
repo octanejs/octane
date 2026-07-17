@@ -82,3 +82,19 @@ export const withChildRef = (
 
 // The scope parameter stays out of the React-facing surface entirely.
 export type ScopeStaysInternal = Scope;
+
+// ── 5. Phase 2: real React contexts type through use()/useContext ───────────
+// The core overload is STRUCTURAL (ForeignHostContext<T> — no React types in
+// core); inference must recover T from a genuine React.Context<T>.
+import { use, useContext } from '../src/index.js';
+
+declare const HostTheme: React.Context<string>;
+declare const HostFlags: React.Context<{ beta: boolean } | undefined>;
+
+export const inferredTheme: string = use(HostTheme);
+export const inferredThemeAlias: string = useContext(HostTheme);
+export const inferredFlags: { beta: boolean } | undefined = use(HostFlags);
+// @ts-expect-error — inference is real: string is not assignable to number
+export const misTyped: number = use(HostTheme);
+// @ts-expect-error — an arbitrary object is still rejected by the overloads
+export const rejectedUsable = use({ anything: true });

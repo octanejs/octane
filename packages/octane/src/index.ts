@@ -56,6 +56,7 @@ export {
 	use,
 	useContext,
 	type Context,
+	type ForeignHostContext,
 	// Components
 	Suspense,
 	ErrorBoundary,
@@ -87,6 +88,7 @@ export {
 	__useReducerWithGetter,
 	__createVoidRoot,
 	bindRendererRegionOwner,
+	createHostContextRequest,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
 	__vtSeen,
 	template,

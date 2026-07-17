@@ -21,6 +21,8 @@ isolate per-island structural cost at N ∈ {1, 100, 1000}.
 | `bridge_bindings_per_island` | owner-bridge registrations per hosted root | 1 |
 | `late_delegate_backattach_total` | listener adds when `delegateEvents()` learns a new type with N live roots | N (O(islands) back-attach) |
 | `leaked_listeners_after_unmount` | island listener adds − removes after full teardown | 0 (gate: run fails if not) |
+| `context_fiber_walks_at_mount_per_island` | Fiber provider walks during first discovery of one React context per island (public `OctaneCompat` path) | 1 |
+| `context_fiber_walks_per_update` | Fiber walks per provider-only update after subscription | 0 (gate: run fails if not — the Phase 2 exit criterion) |
 
 The empty/one-click/all-click **equality** is the point of the baseline:
 Phase 5's selective hosted delegation must drop the empty/unused cost toward
