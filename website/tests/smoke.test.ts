@@ -23,12 +23,23 @@ function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined
 	);
 }
 
+// A card opens on its "overall" view: one bar per series with a computable
+// geomean vs the reference series (rows where either side is missing or zero
+// drop out). Single-series cards chart every operation as its own bar instead.
 function expectedBarCount(card: BenchCard): number {
-	return card.rows.reduce(
-		(count, row) =>
-			count + card.series.filter((series) => typeof row[series.key] === 'number').length,
-		0,
-	);
+	if (card.series.length === 1) {
+		return card.rows.filter((row) => typeof row[card.series[0].key] === 'number').length;
+	}
+	const reference = card.series[0];
+	return card.series.filter((series) =>
+		card.rows.some(
+			(row) =>
+				typeof row[reference.key] === 'number' &&
+				(row[reference.key] as number) > 0 &&
+				typeof row[series.key] === 'number' &&
+				(row[series.key] as number) > 0,
+		),
+	).length;
 }
 
 // Build a fresh router at `url` so tests do not share jsdom location state.
@@ -212,14 +223,13 @@ describe('website routes', () => {
 				const figure = figures[index];
 				const card = cards[index];
 				expect(figure.querySelector('figcaption')).toBeTruthy();
-				expect(figure.querySelector('svg.bench-chart')).toBeTruthy();
-				expect(figure.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(card));
-				if (card.series.length <= 2) {
-					expect(figure.querySelectorAll('.value-label')).toHaveLength(expectedBarCount(card));
-					expect(figure.querySelector('.visx-axis-bottom')).toBeNull();
-				} else {
-					expect(figure.querySelector('.visx-axis-bottom')).toBeTruthy();
-				}
+				// One bar per framework for the default "overall" view; multi-series
+				// cards expose "overall" plus every operation as picker buttons,
+				// single-series cards chart their operations directly with no picker.
+				expect(figure.querySelectorAll('.bench-fill')).toHaveLength(expectedBarCount(card));
+				expect(figure.querySelectorAll('.bench-op')).toHaveLength(
+					card.series.length > 1 ? card.rows.length + 1 : 0,
+				);
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
 			}
 		}
