@@ -1413,6 +1413,10 @@ export default defineConfig({
 				resolve: {
 					alias: [
 						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
 							find: /^@octanejs\/tiptap$/,
 							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
 						},
@@ -1429,6 +1433,10 @@ export default defineConfig({
 				plugins: [octane({ ssr: true })],
 				resolve: {
 					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
 						{
 							find: /^octane$/,
 							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),

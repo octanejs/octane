@@ -21,7 +21,7 @@
       }
     }
   },
-  "description": "TipTap bindings for the Octane renderer — reuses @tiptap/core and @tiptap/pm and ports the React editor lifecycle, state subscriptions, contexts, content surface, and compound TipTap API onto Octane.",
+  "description": "TipTap bindings for Octane, including editor hooks and contexts, EditorContent, custom node and mark views, and floating menus without a React runtime dependency.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -42,7 +42,8 @@
     "README.md"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./menus": "./src/menus/index.ts"
   },
   "scripts": {
     "test": "vitest run"
@@ -51,6 +52,10 @@
     "@tiptap/core": "catalog:default",
     "@tiptap/pm": "catalog:default",
     "fast-equals": "catalog:default"
+  },
+  "optionalDependencies": {
+    "@tiptap/extension-bubble-menu": "catalog:default",
+    "@tiptap/extension-floating-menu": "catalog:default"
   },
   "peerDependencies": {
     "octane": "workspace:*"

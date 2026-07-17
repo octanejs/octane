@@ -28,7 +28,7 @@ export function RichTextEditor() @{
 
 ## Current scope
 
-The initial binding includes:
+The binding includes:
 
 - `useEditor`, including create/update/recreate and deferred-destroy lifecycle
   behavior;
@@ -36,21 +36,24 @@ The initial binding includes:
   bailout behavior;
 - `EditorContext`, `EditorProvider`, `EditorConsumer`, and `useCurrentEditor`;
 - `EditorContent` / `PureEditorContent` for adopting, switching, resetting, and
-  exposing the DOM of a normal `@tiptap/core` editor; and
-- `Tiptap`, `Tiptap.Content`, `useTiptap`, and `useTiptapState`.
+  exposing an editor DOM while owning its portal registry;
+- `Tiptap`, `Tiptap.Content`, `useTiptap`, and `useTiptapState`;
+- `ReactRenderer`, `ReactNodeViewRenderer`, `ReactMarkViewRenderer`,
+  `useReactNodeView`, and the NodeView/MarkView wrapper and content components
+  for custom Octane editor views; and
+- `BubbleMenu` and `FloatingMenu` from the `@octanejs/tiptap/menus` subpath.
 
-The portal bridge required by custom Octane NodeViews and MarkViews is the next
-stage. `ReactRenderer`, `ReactNodeViewRenderer`, `ReactMarkViewRenderer`,
-`useReactNodeView`, the NodeView wrapper/content components, and the `./menus`
-entry are therefore not part of this release yet. In particular, importing
-`@octanejs/tiptap/menus` is intentionally unsupported until `BubbleMenu` and
-`FloatingMenu` have working Octane implementations.
+The public names follow `@tiptap/react` so existing TipTap extensions can keep
+their renderer declarations while their components move to Octane. Despite the
+compatibility names, the implementation does not install or render through
+React.
 
-On the server, editor construction is suppressed and hook snapshots use a `null`
-editor. Set `immediatelyRender: false` when the editor should remain nullable
-through the initial client render as well. The binding's SSR and hydration suite
-verifies deferred server output, adoption of the existing host DOM, and creation
-of the live editor after hydration.
+On the server, editor construction is suppressed, hook snapshots use a `null`
+editor, and menu portals emit no detached target. Set `immediatelyRender: false`
+when the editor should remain nullable through the initial client render as
+well. The binding's SSR and hydration suite verifies deferred server output,
+adoption of the existing host DOM, and creation of the live editor after
+hydration.
 
 ## Status
 
