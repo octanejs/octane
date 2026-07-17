@@ -35,6 +35,11 @@ export const threeRendererBoundaries = {
 			prop: 'children',
 			server: 'omit-child',
 		},
+		DOMRegion: {
+			ownerRenderer: THREE_RENDERER_ID,
+			childRenderer: 'dom',
+			prop: 'children',
+		},
 	},
 } as const;
 

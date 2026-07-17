@@ -2417,7 +2417,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/hmr.test.ts"
     },
     {
       "id": "test:fiber:utils:343",
@@ -2429,7 +2429,7 @@
       },
       "classification": "behavioral",
       "reason": "The private upstream helper backs an observable prop, attachment, disposal, camera, or portal contract in the Octane driver.",
-      "evidenceTarget": "packages/three/tests/props.test.ts"
+      "evidenceTarget": "packages/three/tests/hmr.test.ts"
     },
     {
       "id": "test:fiber:utils:349",

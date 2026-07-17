@@ -4,6 +4,7 @@ import {
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	flushUniversalSync,
 	universalPlan,
 	universalProps,
 	universalValue,
@@ -21,6 +22,34 @@ const eventPlan = universalPlan('object', {
 });
 
 describe('universal event scopes', () => {
+	it('publishes scheduled direct-root work before a synchronous host boundary returns', () => {
+		const container = createObjectContainer();
+		const root = createUniversalRoot(container, createObjectDriver());
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'scene',
+			bindings: [['count', 0]],
+		});
+		let setCount!: (value: number) => void;
+		const Scene = defineUniversalComponent('object', () => {
+			const [count, updateCount] = useState(0, 'count');
+			setCount = updateCount;
+			return universalValue(plan, [count]);
+		});
+
+		root.render(Scene, undefined);
+		expect(container.children[0].props.count).toBe(0);
+
+		const result = flushUniversalSync(() => {
+			setCount(1);
+			return 'committed';
+		});
+
+		expect(result).toBe('committed');
+		expect(container.children[0].props.count).toBe(1);
+		root.unmount();
+	});
+
 	it('pins one accepted listener table across nested delivery and flushes discrete work once', () => {
 		const container = createObjectContainer();
 		const root = createUniversalRoot(container, createObjectDriver());

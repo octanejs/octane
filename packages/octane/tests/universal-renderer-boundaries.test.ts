@@ -1,16 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRoot, type ComponentBody } from '../src/index.js';
+import { createRoot, flushSync, type ComponentBody } from '../src/index.js';
 import {
 	createObjectContainer,
 	createObjectDriver,
 	createUniversalRoot,
 	defineUniversalComponent,
+	flushUniversalSync,
 	isRendererRegion,
 	rendererRegion,
 	universalContext,
 	universalPlan,
 	universalTry,
 	universalValue,
+	useLayoutEffect,
+	useState,
 	type RendererRegion,
 } from '../src/universal.js';
 import { mount } from './_helpers.js';
@@ -29,7 +32,7 @@ import {
 	SequentialProjectedBoundaryApp,
 } from './_fixtures/universal-projected-boundary.tsrx';
 import { Canvas } from './_fixtures/universal-renderer-boundaries.tsrx';
-import { UniversalTheme } from './_fixtures/universal-boundary.tsrx';
+import { UniversalSchedulerBridgeApp, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 
 function objectRoot() {
 	const container = createObjectContainer();
@@ -115,6 +118,70 @@ async function flushBridgeWork(): Promise<void> {
 }
 
 describe('compiler-owned renderer child regions', () => {
+	it('settles direct and DOM-owned universal cascades in one host scheduler boundary', () => {
+		const direct = objectRoot();
+		const bridged = objectRoot();
+		const directPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'direct',
+			bindings: [['value', 0]],
+		});
+		const bridgedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'bridged',
+			bindings: [['version', 0]],
+		});
+		let setDirect!: (value: number) => void;
+		let setDomVersion!: (value: number) => void;
+		const DirectScene = defineUniversalComponent('object', () => {
+			const [value, updateValue] = useState(0, 'direct-state');
+			setDirect = updateValue;
+			useLayoutEffect(
+				() => {
+					if (value === 1) setDomVersion(1);
+				},
+				[value],
+				'direct-layout',
+			);
+			return universalValue(directPlan, [value]);
+		});
+		const BridgedScene = defineUniversalComponent<{
+			version: number;
+			onLayout: (version: number) => void;
+		}>('object', (props) => {
+			useLayoutEffect(
+				() => props.onLayout(props.version),
+				[props.onLayout, props.version],
+				'bridged-layout',
+			);
+			return universalValue(bridgedPlan, [props.version]);
+		});
+
+		direct.root.render(DirectScene, undefined);
+		const mounted = mount(UniversalSchedulerBridgeApp, {
+			root: bridged.root,
+			component: BridgedScene,
+			captureUpdate(update: (value: number) => void) {
+				setDomVersion = update;
+			},
+			onUniversalLayout(version: number) {
+				if (version === 1) setDirect(2);
+			},
+		});
+
+		const result = flushUniversalSync(() => {
+			setDirect(1);
+			return 'settled';
+		}, flushSync);
+
+		expect(result).toBe('settled');
+		expect(direct.container.children[0].props.value).toBe(2);
+		expect(bridged.container.children[0].props.version).toBe(1);
+
+		mounted.unmount();
+		direct.root.unmount();
+	});
+
 	it('projects an initial host suspension and clears its abandoned owner bridge', async () => {
 		const { container, root } = objectRoot();
 		const never = new Promise<string>(() => {});

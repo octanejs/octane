@@ -1,4 +1,4 @@
-import { createContext, useLayoutEffect } from 'octane';
+import { createContext, useLayoutEffect, useState } from 'octane';
 import { createUniversalHostBoundary } from '../../src/universal.js';
 
 export const UniversalTheme = createContext('default');
@@ -28,4 +28,15 @@ export function UniversalBoundaryFixture(props) @{
 			}
 		</UniversalTheme.Provider>
 	</>
+}
+
+export function UniversalSchedulerBridgeApp(props) @{
+	const [version, setVersion] = useState(0);
+	useLayoutEffect(() => props.captureUpdate(setVersion), [props.captureUpdate, setVersion]);
+
+	<ObjectBoundary
+		root={props.root}
+		component={props.component}
+		props={{ version, onLayout: props.onUniversalLayout }}
+	/>
 }

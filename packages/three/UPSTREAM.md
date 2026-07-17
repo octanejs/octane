@@ -58,6 +58,24 @@ fresh Three root. Scene setup, constructors, and loaders remain outside the
 server execution path; client Three suspension and errors project through the
 owning DOM boundary, and deleting the Canvas tears down the nested root.
 
+Milestone 8 follows the pinned direct-root, HMR, and XR lifecycle contracts while
+keeping scheduling under Octane. Direct roots accept `HTMLCanvasElement` and
+`OffscreenCanvas`, expose Octane's `act` and `flushSync`, and support
+callback-aware `unmountComponentAtNode`. Octane completes that teardown and
+callback synchronously instead of retaining R3F's 500-millisecond delay.
+Compatible universal HMR edits retain Three objects; constructor `args` edits
+reconstruct them with ref, handler, and owned-resource cleanup. A controlled WebXR session hands rendering to
+`setAnimationLoop`, respects manual `frameloop="never"`, restores the configured
+loop on session end, and disconnects without leaving a live callback. WebGL
+context restoration invalidates the live root before teardown removes its
+listeners.
+
+`DOMRegion` is an Octane-specific proof of the already-compiled Three-to-DOM
+renderer boundary, so it is not part of the pinned R3F public-export inventory.
+It mounts one DOM root under an explicit target and preserves that root while
+the target moves. It is not Drei `Html`, is not the WebXR DOM Overlay API, and
+defines no positioning, occlusion, styling, or layout behavior.
+
 ## License provenance
 
 React Three Fiber is MIT-licensed, Copyright 2019–2025 Poimandres. Adapted

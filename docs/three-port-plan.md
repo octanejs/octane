@@ -10,9 +10,10 @@ than the compatibility baseline.
 The strategy is not to port React Reconciler. Octane already owns component
 execution, hooks, context, errors, Suspense, logical ranges, refs, and effects.
 This package supplies the Three-specific host driver, root state, frame loop,
-events, assets, types, and DOM `Canvas` boundary. The implementation should
-reuse R3F's framework-neutral algorithms under its MIT license while replacing
-every React/Fiber ownership mechanism.
+events, assets, types, the DOM `Canvas` boundary, and the low-level reverse-DOM
+`DOMRegion` proof. The implementation should reuse R3F's framework-neutral
+algorithms under its MIT license while replacing every React/Fiber ownership
+mechanism.
 
 ## Decision summary
 
@@ -23,9 +24,10 @@ every React/Fiber ownership mechanism.
 - Compile scene modules with the existing universal target. Keep DOM as the
   application default and select Three lexically, conventionally with
   `*.three.tsrx`.
-- Use the compiler-owned `Canvas.children` region for DOM -> Three composition.
-  Do not copy R3F's second-Reconciler context bridge, `its-fine`, error boundary,
-  or Suspense blocking machinery.
+- Use compiler-owned `Canvas.children` and `DOMRegion.children` regions for
+  explicit DOM -> Three and Three -> DOM composition. Do not copy R3F's
+  second-Reconciler context bridge, `its-fine`, error boundary, or Suspense
+  blocking machinery.
 - Keep the universal core renderer-agnostic. The first work closes a small set
   of general ABI gaps exposed by Three: public-instance replacement, host
   lifecycle delivery, visibility, client-only server boundaries, and portals.
@@ -41,44 +43,24 @@ Three scene:
 ```ts
 // octane.config.ts
 import { defineConfig } from '@octanejs/vite-plugin';
+import { threeRenderers } from '@octanejs/three/config';
 
 export default defineConfig({
 	compiler: {
-		renderers: {
-			registry: {
-				three: {
-					module: '@octanejs/three/renderer',
-					target: 'universal',
-					server: 'client-only',
-					intrinsics: '@octanejs/three/intrinsics',
-					text: 'ignore',
-					capabilities: ['visibility'],
-				},
-			},
-			rules: [{ include: 'src/**/*.three.tsrx', renderer: 'three' }],
-			boundaries: {
-				'@octanejs/three': {
-					Canvas: {
-						ownerRenderer: 'dom',
-						childRenderer: 'three',
-						prop: 'children',
-						server: 'omit-child',
-					},
-				},
-			},
-		},
+		renderers: threeRenderers,
 	},
 });
 ```
 
 `server`, `intrinsics`, `text`, and `capabilities` are normalized renderer
-descriptor fields supplied by the Milestone 1 SDK. The eventual
-`@octanejs/three/config` export supplies this serializable descriptor/boundary
-data. A Vite app installs
-`octane()` separately in `vite.config.ts`; an Rsbuild app imports `defineConfig`
-from `@octanejs/rsbuild-plugin` instead. The low-level Rspack plugin receives the
-same renderer data through its `renderers` option, but it owns compilation/HMR
-only—not the app SSR/hydration lifecycle supplied by Vite and Rsbuild.
+descriptor fields supplied by the Milestone 1 SDK. The
+`@octanejs/three/config` export supplies the serializable descriptor, filename
+rule, `Canvas` DOM-to-Three boundary, and `DOMRegion` Three-to-DOM boundary. A
+Vite app installs `octane()` separately in `vite.config.ts`; an Rsbuild app
+imports `defineConfig` from `@octanejs/rsbuild-plugin` instead. The low-level
+Rspack plugin receives the same renderer data through its `renderers` option,
+but it owns compilation/HMR only—not the app SSR/hydration lifecycle supplied by
+Vite and Rsbuild.
 
 ```tsx
 // App.tsrx — DOM renderer
@@ -446,7 +428,8 @@ decision and tests.
 - Same-renderer Three portals with state/event overrides.
 - Canvas DOM-shell SSR and hydration, HMR reconstruction, basic XR frame-loop
   integration, direct-root `OffscreenCanvas`, `unmountComponentAtNode`,
-  `flushSync`/`act` mapped to Octane semantics, and testing utilities.
+  `flushSync`/`act` mapped to Octane semantics, context-restore invalidation,
+  the low-level reverse-DOM `DOMRegion` proof, and testing utilities.
 - An explicit map for every upstream public export and applicable test.
 
 ### Intentional exclusions or adaptations
@@ -468,8 +451,9 @@ decision and tests.
 - R3F 10 alpha's WebGPU/TSL hooks and new external scheduler are not in the v9
   parity claim.
 - Drei, including public `Html`, controls, loaders/components, and helpers, is
-  a follow-on port. A minimal reverse-DOM host can prove the boundary without
-  being advertised as complete Drei `Html`.
+  a follow-on port. `DOMRegion` proves the reverse-DOM boundary with an explicit
+  target, but it is not Drei `Html`, is not the WebXR DOM Overlay API, and has no
+  positioning, occlusion, styling, or layout contract.
 
 ## Delivery phases and exit gates
 
@@ -650,16 +634,27 @@ or duplicate resource allocation; raw Rspack emits the same graph split.
 
 ### Milestone 8 — XR, HMR, and root lifecycle (2–3 engineer-weeks)
 
+Status: implemented. `HTMLCanvasElement` and `OffscreenCanvas` direct roots
+share the same configuration and deterministic registry teardown, including an
+optional `unmountComponentAtNode` callback and Octane `act`/`flushSync`
+scheduling.
+Context restoration invalidates a live root. A controlled browser WebXR lane
+proves session-loop handoff, `frameloop="never"`, configured-loop restoration,
+listener cleanup, and inert stale callbacks. Universal HMR retains compatible
+objects and reconstructs `args` changes with correct ref, handler, and resource
+cleanup. The explicit-target `DOMRegion` proves the reverse renderer boundary
+and stable DOM ownership without claiming Drei or WebXR overlay behavior.
+
 - Add compatible/incompatible HMR behavior, direct-root ergonomics,
   `OffscreenCanvas`, `unmountComponentAtNode`, context-loss recovery, basic XR
-  integration, and the minimal reverse-DOM boundary proof needed to validate
-  future Drei-style composition.
+  integration, and the explicit-target `DOMRegion` proof needed to validate the
+  underlying boundary for future Drei-style composition.
 
 Exit: HMR retains or reconstructs precisely and leaves no stale refs, handlers,
 or resources. A fake/controlled WebXR session start switches to the XR animation
 loop, session end restores the configured frameloop, and root teardown
-disconnects the loop without duplicate callbacks. Direct DOM and
-`OffscreenCanvas` roots clean up deterministically.
+disconnects the loop without duplicate callbacks. Direct `HTMLCanvasElement`
+and `OffscreenCanvas` roots clean up deterministically.
 
 ### Milestone 9 — transported SDK proof (2–3 engineer-weeks)
 

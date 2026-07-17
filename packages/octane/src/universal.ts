@@ -741,6 +741,11 @@ interface SuspendedMemoReplay {
 
 let CURRENT_ATTEMPT: RenderAttempt | null = null;
 let CURRENT_OWNER: DraftOwner | null = null;
+const SCHEDULED_UNIVERSAL_ROOTS = new Set<UniversalRootImpl<any, any>>();
+const PENDING_UNIVERSAL_PASSIVE_ROOTS = new Set<UniversalRootImpl<any, any>>();
+let UNIVERSAL_SYNC_DEPTH = 0;
+let UNIVERSAL_COMMIT_TASK_DEPTH = 0;
+const UNIVERSAL_SYNC_DRAIN_LIMIT = 100;
 let NEXT_HOOK_SLOT = 0;
 let NEXT_OWNER_ID = 1;
 let NEXT_UNIVERSAL_ID_ROOT = 1;
@@ -2258,15 +2263,20 @@ function attachRef(record: LogicalRecord, value: unknown): void {
 function runCommitTasks(tasks: readonly (() => void)[]): void {
 	let hasError = false;
 	let firstError: unknown;
-	for (const task of tasks) {
-		try {
-			task();
-		} catch (error) {
-			if (!hasError) {
-				hasError = true;
-				firstError = error;
+	UNIVERSAL_COMMIT_TASK_DEPTH++;
+	try {
+		for (const task of tasks) {
+			try {
+				task();
+			} catch (error) {
+				if (!hasError) {
+					hasError = true;
+					firstError = error;
+				}
 			}
 		}
+	} finally {
+		UNIVERSAL_COMMIT_TASK_DEPTH--;
 	}
 	if (hasError) throw firstError;
 }
@@ -3549,18 +3559,21 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return () => runOwnedCommit(callback.owner, cleanup);
 	}
 
-	private flushScheduledWork(): void {
+	flushScheduledWork(): void {
 		if (!this.scheduled) return;
 		this.scheduled = false;
+		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) return;
 		if (this.bridge !== null) this.bridge.invalidate();
 		else this.render(this.lastComponent, this.lastProps);
 	}
 
-	private queueScheduledWork(): void {
+	queueScheduledWork(): void {
 		if (!this.scheduled) return;
+		if (UNIVERSAL_SYNC_DEPTH > 0) return;
 		if (this.bridge !== null) {
 			this.scheduled = false;
+			SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 			this.bridge.invalidate();
 			return;
 		}
@@ -3571,7 +3584,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		if (this.unmounted || this.owner?.disposed || this.lastComponent === null || this.scheduled)
 			return;
 		this.scheduled = true;
-		if (this.eventScopeDepth === 0) this.queueScheduledWork();
+		SCHEDULED_UNIVERSAL_ROOTS.add(this);
+		if (this.eventScopeDepth === 0 && UNIVERSAL_SYNC_DEPTH === 0) this.queueScheduledWork();
 	}
 
 	private cancelSuspendedReplays(): void {
@@ -3660,7 +3674,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		});
 	}
 
-	private flushPassiveTasks(): void {
+	flushPassiveTasks(): void {
+		PENDING_UNIVERSAL_PASSIVE_ROOTS.delete(this);
+		this.passiveScheduled = false;
 		if (this.passiveTasks.length === 0) return;
 		const tasks = this.passiveTasks.splice(0);
 		runCommitTasks(tasks);
@@ -3668,10 +3684,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	enqueuePassive(task: () => void): void {
 		this.passiveTasks.push(task);
+		PENDING_UNIVERSAL_PASSIVE_ROOTS.add(this);
 		if (this.passiveScheduled) return;
 		this.passiveScheduled = true;
 		queueMicrotask(() => {
-			this.passiveScheduled = false;
 			this.flushPassiveTasks();
 		});
 	}
@@ -4628,6 +4644,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	unmount(): void {
 		if (this.unmounted) return;
+		this.scheduled = false;
+		SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 		let pendingAbortError: unknown = NO_PENDING_PASSIVE_ERROR;
 		try {
 			this.pending?.abort();
@@ -4924,6 +4942,94 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 			this.root.finish(this);
 		}
 	}
+}
+
+function queuePendingUniversalWork(): void {
+	for (const root of [...SCHEDULED_UNIVERSAL_ROOTS]) root.queueScheduledWork();
+}
+
+function flushScheduledUniversalWave(): void {
+	for (const root of [...SCHEDULED_UNIVERSAL_ROOTS]) root.flushScheduledWork();
+}
+
+function flushUniversalPassiveWave(): void {
+	for (const root of [...PENDING_UNIVERSAL_PASSIVE_ROOTS]) root.flushPassiveTasks();
+}
+
+export type UniversalSyncFlusher = <T>(run: () => T) => T;
+
+const INLINE_UNIVERSAL_FLUSHER: UniversalSyncFlusher = (run) => run();
+
+function runUniversalSyncBoundary<T>(
+	run: () => T,
+	flushOwner: UniversalSyncFlusher,
+	includePassives: boolean,
+	label: string,
+): T {
+	const canDrain =
+		UNIVERSAL_SYNC_DEPTH === 0 && CURRENT_ATTEMPT === null && UNIVERSAL_COMMIT_TASK_DEPTH === 0;
+	UNIVERSAL_SYNC_DEPTH++;
+	if (!canDrain) {
+		try {
+			return run();
+		} finally {
+			UNIVERSAL_SYNC_DEPTH--;
+			if (UNIVERSAL_SYNC_DEPTH === 0) queuePendingUniversalWork();
+		}
+	}
+
+	let completed = false;
+	let invoked = false;
+	let result!: T;
+	try {
+		for (let pass = 0; pass < UNIVERSAL_SYNC_DRAIN_LIMIT; pass++) {
+			flushOwner(() => {
+				if (!invoked) {
+					invoked = true;
+					result = run();
+				}
+				flushScheduledUniversalWave();
+				if (includePassives) flushUniversalPassiveWave();
+			});
+			if (
+				SCHEDULED_UNIVERSAL_ROOTS.size === 0 &&
+				(!includePassives || PENDING_UNIVERSAL_PASSIVE_ROOTS.size === 0)
+			) {
+				completed = true;
+				return result;
+			}
+		}
+		throw new Error(
+			`${label}(): scheduler did not stabilize after ${UNIVERSAL_SYNC_DRAIN_LIMIT} iterations — likely an infinite render loop`,
+		);
+	} finally {
+		UNIVERSAL_SYNC_DEPTH--;
+		// A callback/commit failure or a re-entrant call must not strand work that
+		// was deliberately kept off the microtask queue while this scope was open.
+		if (UNIVERSAL_SYNC_DEPTH === 0 && !completed) queuePendingUniversalWork();
+	}
+}
+
+/**
+ * Renderer-infrastructure companion to a host runtime's `flushSync`.
+ *
+ * Universal roots normally batch hook and HMR updates in a microtask. A host
+ * package supplies its owner flusher so direct and bridged roots alternate to
+ * quiescence before the public scheduler boundary returns.
+ */
+export function flushUniversalSync<T>(
+	run: () => T,
+	flushOwner: UniversalSyncFlusher = INLINE_UNIVERSAL_FLUSHER,
+): T {
+	return runUniversalSyncBoundary(run, flushOwner, false, 'flushUniversalSync');
+}
+
+/** Universal renderer companion used by host packages to implement sync `act`. */
+export function flushUniversalAct<T>(
+	run: () => T,
+	flushOwner: UniversalSyncFlusher = INLINE_UNIVERSAL_FLUSHER,
+): T {
+	return runUniversalSyncBoundary(run, flushOwner, true, 'flushUniversalAct');
 }
 
 export function createUniversalRoot<Container, PublicInstance>(
