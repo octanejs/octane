@@ -3,10 +3,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { rspack } from '@rsbuild/core';
+import { HYDRATE_QUERY_PARAM } from 'octane/compiler/bundler';
 
 import { resolveProjectModule } from './project.js';
 
 const PLUGIN_NAME = 'OctaneClientAssetsPlugin';
+
+/** @param {unknown} request */
+function isDeferredHydrationRequest(request) {
+	if (typeof request !== 'string' || request.length === 0) return false;
+	const resource = request.slice(request.lastIndexOf('!') + 1);
+	const queryStart = resource.indexOf('?');
+	if (queryStart === -1) return false;
+	const hashStart = resource.indexOf('#', queryStart);
+	const query = resource.slice(queryStart + 1, hashStart === -1 ? undefined : hashStart);
+	return new URLSearchParams(query).has(HYDRATE_QUERY_PARAM);
+}
 
 /** @param {string} file */
 function canonicalResource(file) {
@@ -73,6 +85,37 @@ function collectCss(files, chunk) {
 	for (const file of iterable(chunk?.auxiliaryFiles)) {
 		const filename = String(file);
 		if (isCss(filename)) files.add(filename);
+	}
+}
+
+/**
+ * Collect CSS from compiler-generated deferred hydration groups and every
+ * async descendant below them. Their JavaScript deliberately stays out of the
+ * route asset entry so the production server does not modulepreload it.
+ *
+ * @param {Set<string>} files
+ * @param {any} group
+ * @param {boolean} [insideDeferredHydration]
+ * @param {{ eager: Set<any>, deferred: Set<any> }} [seen]
+ */
+function collectDeferredHydrationCss(
+	files,
+	group,
+	insideDeferredHydration = false,
+	seen = { eager: new Set(), deferred: new Set() },
+) {
+	if (!group) return;
+	const deferredHydration =
+		insideDeferredHydration ||
+		[...iterable(group.origins)].some((origin) => isDeferredHydrationRequest(origin?.request));
+	const visited = deferredHydration ? seen.deferred : seen.eager;
+	if (visited.has(group)) return;
+	visited.add(group);
+	if (deferredHydration) {
+		for (const chunk of iterable(group.chunks)) collectCss(files, chunk);
+	}
+	for (const child of iterable(group.childrenIterable)) {
+		collectDeferredHydrationCss(files, child, deferredHydration, seen);
 	}
 }
 
@@ -172,6 +215,7 @@ export class OctaneClientAssetsPlugin {
 						for (const group of routeGroups.get(id) ?? []) {
 							const chunks = [...iterable(group?.chunks)];
 							for (const chunk of chunks) collectCss(css, chunk);
+							collectDeferredHydrationCss(css, group);
 							// SplitChunks inserts shared chunks before the original async chunk,
 							// so scan from the end for the route script. Do not call
 							// getEntrypointChunk(): normal Rspack async groups are not entrypoints.

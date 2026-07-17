@@ -41,6 +41,19 @@ describe('RenderOptions — nonce', () => {
 		);
 	});
 
+	it('stamps the nonce on a deferred hydration seed script', async () => {
+		const out = await prerender(
+			suspense.DeferredAsyncLeaf,
+			{ promise: Promise.resolve('hello'), when: { _t: 'never' } },
+			{ nonce: 'abc123' },
+		);
+
+		expect(out.html).toContain(
+			'<script type="application/json" data-octane-hydrate-seed nonce="abc123">',
+		);
+		expect(out.html).not.toContain('data-octane-suspense');
+	});
+
 	it('stamps the nonce on scoped style tags (renderToString)', () => {
 		const out = RT.renderToString(ssr.Scoped, undefined, { nonce: 'abc123' });
 		expect(out.css).toMatch(/^<style data-octane="tsrx-[0-9a-f]+" nonce="abc123">/);
