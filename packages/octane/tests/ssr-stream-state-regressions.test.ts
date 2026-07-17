@@ -11,7 +11,7 @@ function evalServer(source: string, filename: string): Record<string, any> {
 		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = $1; function $1');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
 }
 
@@ -60,7 +60,21 @@ function activateChunks(chunks: string[]): HTMLElement {
 
 const mod = evalServer(
 	`
-    import { use, useId, useState } from 'octane';
+		import { createElement, use, useId, useState } from 'octane';
+
+		function DescriptorHost(props) {
+			return createElement('main', null, props.children);
+		}
+		export function DescriptorChildrenBoundary(props) @{
+			<DescriptorHost>
+				@try {
+					const value = use(props.promise);
+					<span class="descriptor-value">{value as string}</span>
+				} @pending {
+					<i class="descriptor-pending">{'waiting'}</i>
+				}
+			</DescriptorHost>
+		}
 
     export function DiscardedBoundary(props) @{
       const [settled, setSettled] = useState(false);
@@ -270,6 +284,27 @@ const mod = evalServer(
 );
 
 describe('SSR stream state regressions', () => {
+	it('reveals a boundary passed through a descriptor host wrapper', async () => {
+		const data = deferred<string>();
+		const output = collector();
+		const onError = vi.fn();
+		ServerRuntime.renderToPipeableStream(
+			mod.DescriptorChildrenBoundary,
+			{ promise: data.promise },
+			{ onError },
+		).pipe(output.destination);
+
+		expect(output.chunks[0]).toContain('class="descriptor-pending"');
+		data.resolve('ready');
+		await output.ended;
+
+		expect(onError).not.toHaveBeenCalled();
+		const container = activateChunks(output.chunks);
+		expect(container.querySelector('.descriptor-value')?.textContent).toBe('ready');
+		container.remove();
+		resetStreamRuntimeGlobals();
+	});
+
 	it('does not retain a boundary registered by a discarded render-phase pass', async () => {
 		const data = deferred<string>();
 		const output = collector();

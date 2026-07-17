@@ -17,6 +17,7 @@ function evalServer(source: string, file: string): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
+	code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
 	return fn(RT, {});
@@ -124,6 +125,27 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 			})
 		).html;
 		expect(caught).toBe(`<div>${OPEN}${OPEN}<span class="error">boom</span>${CLOSE}${CLOSE}</div>`);
+	});
+
+	it('@catch exposes a callable server reset function', async () => {
+		const boundary = evalServer(
+			`
+				export function Boundary() @{
+					@try {
+						throw new Error('boom');
+						<span>{'unreachable'}</span>
+					} @catch (error, reset) {
+						reset();
+						<span data-reset={typeof reset}>{error.message as string}</span>
+					}
+				}
+			`,
+			'ssr-catch-reset.tsrx',
+		);
+
+		expect((await RT.renderToString(boundary.Boundary)).html).toBe(
+			`${OPEN}${OPEN}<span data-reset="function">boom</span>${CLOSE}${CLOSE}`,
+		);
 	});
 });
 

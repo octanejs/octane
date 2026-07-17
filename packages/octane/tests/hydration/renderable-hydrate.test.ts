@@ -27,6 +27,7 @@ function serverModule(): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
+	code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
 	return fn(ServerRT, {});

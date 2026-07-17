@@ -355,6 +355,26 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 		});
 	});
 
+	it('accepts package-import aliases while classifying a server module graph', async () => {
+		const plugin = octane();
+		(plugin.config as any)({ root: appRoot });
+		const source = `
+import '#nitro/virtual/polyfills';
+import { useNitroApp } from 'nitro/app';
+export const nitroApp = useNitroApp();
+`;
+		const transformed = await (plugin.transform as any).call(
+			{
+				resolve: async (request: string) => ({ id: request }),
+			},
+			source,
+			join(appRoot, 'node-server.mjs'),
+			{ ssr: true },
+		);
+
+		expect(transformed).toBeNull();
+	});
+
 	it('canonicalizes client-reference identity through a symlinked Vite root', async () => {
 		const parent = mkdtempSync(join(tmpdir(), 'octane-vite-renderer-root-'));
 		try {

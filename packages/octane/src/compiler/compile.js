@@ -2658,7 +2658,7 @@ function singleHostComponentRoot(node) {
 	return returns === 1;
 }
 
-// Arrow-function component shape: `const X = (props) => @{…}` (and the `export`
+// Variable component shape: `const X = (props) => @{…}` (and the `export`
 // variant). @tsrx/core parses the `@{…}` arrow body as a JSXCodeBlock, but the
 // rest of the compiler keys on FunctionDeclaration. Convert a single-declarator
 // `const X = (…) => @{…}` / `= function (…) @{…}` into an equivalent synthetic
@@ -2691,6 +2691,9 @@ function arrowComponentToFunctionDecl(varDecl) {
 		start: varDecl.start,
 		end: varDecl.end,
 		loc: varDecl.loc,
+		// Downstream component analysis uses FunctionDeclaration shape, but emit
+		// must retain the authored variable binding's TDZ/initialization semantics.
+		__octaneBindingKind: varDecl.kind,
 	};
 }
 
@@ -4800,10 +4803,20 @@ function compileServerComponent(node, ctx) {
 	const warmSrc = ctx._pendingWarm;
 	ctx._pendingWarm = null;
 	const warmTail = warmSrc ? `\n${name}.__warm = ${warmSrc};` : '';
+	const bindingKind = node.__octaneBindingKind;
+	if (bindingKind) {
+		const exportPrefix = isExported ? 'export ' : '';
+		return `${exportPrefix}${bindingKind} ${name} = ${fn};${warmTail}`;
+	}
 
-	if (isDefault) return `const ${name} = ${fn};${warmTail}\nexport default ${name};`;
-	if (isExported) return `export const ${name} = ${fn};${warmTail}`;
-	return `const ${name} = ${fn};${warmTail}`;
+	// An authored FunctionDeclaration is instantiated before module evaluation.
+	// Keep that contract in the server output: route/config objects commonly
+	// capture a component declared later in the file. Lowering the declaration to
+	// `const Name = function Name` puts it in the TDZ and records `undefined` (or
+	// throws) at the earlier initializer.
+	if (isDefault) return `${fn};${warmTail}\nexport default ${name};`;
+	if (isExported) return `export ${fn};${warmTail}`;
+	return `${fn};${warmTail}`;
 }
 
 function ssrCompileBody(
@@ -6050,7 +6063,9 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	}
 	let catchFnName = 'null'; // no @catch → ssrTry rethrows non-suspense errors
 	if (node.handler) {
-		const params = node.handler.param ? [node.handler.param] : [];
+		const params = [];
+		if (node.handler.param) params.push(node.handler.param);
+		if (node.handler.resetParam) params.push(node.handler.resetParam);
 		const catchSub = ssrCompileSub(
 			node.handler.body.body,
 			ctx,
@@ -6062,7 +6077,12 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		);
 		inlinedSubs.push(catchSub.fn + ';');
 		// A no-param @catch simply ignores the error argument ssrTry passes.
-		catchFnName = catchSub.fnName;
+		// ssrTry's established callback ABI keeps the SSR scope second. Adapt the
+		// optional authored reset parameter around that ABI instead of shifting the
+		// scope for existing one- and zero-parameter catch helpers.
+		catchFnName = node.handler.resetParam
+			? `(__error, __scope, __reset) => ${catchSub.fnName}(__error, __reset, __scope)`
+			: catchSub.fnName;
 	}
 	ctx.runtimeNeeded.add('ssrTry');
 	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
@@ -6471,33 +6491,79 @@ function compileComponent(node, ctx, options) {
 		ctx.currentProfileComponentId = prevProfileComponentId;
 	}
 
-	// Parallel-use warm plan: attached to the INNER function object (not the
-	// module const) so the component's own body — where the function-
-	// expression name shadows the const — resolves `_$warmChild(Self, …)` to
-	// an object that carries the plan. hmr() forwards `__warm` from the
-	// wrapped fn onto its wrapper for cross-module references.
-	const warmedFn = ctx._pendingWarm ? `Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })` : fn;
+	const warmSrc = ctx._pendingWarm;
 	ctx._pendingWarm = null;
+	const bindingKind = node.__octaneBindingKind;
+	if (bindingKind) {
+		// `const X = () => @{}` and `const X = function () @{}` are normalized to
+		// FunctionDeclaration shape for analysis only. Keep their authored TDZ and
+		// initialization timing instead of accidentally promoting them to hoisted
+		// declarations.
+		const warmedFn = warmSrc ? `Object.assign(${fn}, { __warm: ${warmSrc} })` : fn;
+		const valueExpr = hmrWrap && isExported ? `_$hmr(${warmedFn})` : warmedFn;
+		const emittedKind = options && options.hmrMutable && isExported ? 'let' : bindingKind;
+		const exportPrefix = isExported ? 'export ' : '';
+		return `${exportPrefix}${emittedKind} ${name} = ${valueExpr};`;
+	}
 
-	// HMR-wrap exported components inline so the binding stays a `const` (no
-	// reassignment dance needed in Vite). Webpack/Rspack HMR instead uses a `let`
-	// binding so a re-evaluated module can hand its export back to the previous
-	// canonical wrapper stored in hot dispose data. The wrapper preserves the user-facing
-	// function-name identity by NAMING the inner FunctionExpression — `hmr`
-	// returns a wrapper that delegates to whatever fn is currently committed,
-	// and `module.Foo[HMR].update(...)` swaps it on each accept.
-	const valueExpr = hmrWrap && isExported ? `_$hmr(${warmedFn})` : warmedFn;
-	const declaration = options && options.hmrMutable ? 'let' : 'const';
-	if (isDefault) {
-		if (options && options.hmrMutable) {
-			return `let ${name} = ${valueExpr};\nexport { ${name} as default };`;
-		}
-		return `const ${name} = ${valueExpr};\nexport default ${name};`;
+	// Preserve FunctionDeclaration instantiation in every client mode. Besides
+	// ordinary JavaScript semantics, TanStack file routes intentionally create
+	// their Route object before declaring local component bodies.
+	if (!hmrWrap || !isExported) {
+		const warmTail = warmSrc ? `\n${name}.__warm = ${warmSrc};` : '';
+		if (isDefault) return `${fn};${warmTail}\nexport default ${name};`;
+		if (isExported) return `export ${fn};${warmTail}`;
+		return `${fn};${warmTail}`;
 	}
-	if (isExported) {
-		return `export ${declaration} ${name} = ${valueExpr};`;
+
+	// Exported HMR components need both declaration hoisting and the identity-
+	// stable runtime wrapper. The public binding stays a real (hoisted) function
+	// and delegates to a private hmr() wrapper after module initialization. A
+	// second hoisted implementation function preserves the rarer case where user
+	// module code calls the component before reaching its textual declaration.
+	// The public binding shares the wrapper's HMR metadata, so Vite's update path
+	// and webpack's previous-wrapper handoff continue to target the same live
+	// blocks even when an earlier config object captured the public function.
+	ctx.runtimeNeeded.add('hmr');
+	ctx.runtimeNeeded.add('HMR');
+	const implementationName = allocCompilerName(ctx, `__${name}Implementation`);
+	const wrapperName = allocCompilerName(ctx, `__${name}Hmr`);
+	const implementation = renameCompiledFunction(fn, name, implementationName);
+	const exportPrefix = isDefault ? '' : 'export ';
+	const publicDeclaration =
+		`${exportPrefix}function ${name}(__props, __s, __extra) {\n` +
+		`  return ${name}[_$HMR] === undefined\n` +
+		`    ? ${implementationName}(__props, __s, __extra)\n` +
+		`    : ${wrapperName}(__props, __s, __extra);\n` +
+		`}`;
+	const implementationWarmTail = warmSrc ? `\n${implementationName}.__warm = ${warmSrc};` : '';
+	const publicWarmForward = warmSrc
+		? `\nObject.defineProperty(${name}, '__warm', { configurable: true, get: () => ${wrapperName}.__warm });`
+		: '';
+	const defaultExport = isDefault ? `\nexport { ${name} as default };` : '';
+	const beforeImplementation = publicDeclaration + '\n';
+	if (ctx._setupMaps) {
+		const lineOffset = countNewlines(beforeImplementation);
+		for (const entry of ctx._setupMaps) entry.fnRelLine += lineOffset;
 	}
-	return `const ${name} = ${valueExpr};`;
+	return (
+		beforeImplementation +
+		implementation +
+		implementationWarmTail +
+		`\n${implementationName}.displayName = ${JSON.stringify(name)};` +
+		`\nconst ${wrapperName} = _$hmr(${implementationName});` +
+		`\n${name}[_$HMR] = ${wrapperName}[_$HMR];` +
+		publicWarmForward +
+		defaultExport
+	);
+}
+
+function renameCompiledFunction(fn, from, to) {
+	const prefix = `function ${from}`;
+	if (!fn.startsWith(prefix)) {
+		throw new Error(`Unable to preserve declaration hoisting for component \`${from}\`.`);
+	}
+	return `function ${to}${fn.slice(prefix.length)}`;
 }
 
 /**
@@ -8436,13 +8502,32 @@ function compileReturnJsxFunction(node, ctx, options) {
 				]
 			: [{ fnRelLine: 0, colShift: 0, mappings }];
 	if (options && options.hmrWrap) {
-		code += `\n${name} = _$hmr(${name});`;
-		if (options.default) {
-			return options.hmrMutable
-				? `${code}\nexport { ${name} as default };`
-				: `${code}\nexport default ${name};`;
+		ctx.runtimeNeeded.add('hmr');
+		ctx.runtimeNeeded.add('HMR');
+		const implementationName = allocCompilerName(ctx, `__${name}Implementation`);
+		const wrapperName = allocCompilerName(ctx, `__${name}Hmr`);
+		const implementation = renameCompiledFunction(code, name, implementationName);
+		const params = (node.params || []).map((param) => printNode(param)).join(', ');
+		const exportPrefix = options.default ? '' : 'export ';
+		const publicDeclaration =
+			`${exportPrefix}function ${name}(${params}) {\n` +
+			`  return ${name}[_$HMR] === undefined\n` +
+			`    ? ${implementationName}.apply(this, arguments)\n` +
+			`    : ${wrapperName}.apply(this, arguments);\n` +
+			`}`;
+		const beforeImplementation = publicDeclaration + '\n';
+		if (ctx._setupMaps) {
+			const lineOffset = countNewlines(beforeImplementation);
+			for (const entry of ctx._setupMaps) entry.fnRelLine += lineOffset;
 		}
-		if (options.export) return `${code}\nexport { ${name} };`;
+		return (
+			beforeImplementation +
+			implementation +
+			`\n${implementationName}.displayName = ${JSON.stringify(name)};` +
+			`\nconst ${wrapperName} = _$hmr(${implementationName});` +
+			`\n${name}[_$HMR] = ${wrapperName}[_$HMR];` +
+			(options.default ? `\nexport { ${name} as default };` : '')
+		);
 	}
 	if (options && options.default) return `${code}\nexport default ${name};`;
 	if (options && options.export) return `export ${code}`;

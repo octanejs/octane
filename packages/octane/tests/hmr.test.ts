@@ -147,8 +147,10 @@ describe('hmr — runtime wrapper', () => {
 		const { code } = compile(src, 'file.tsrx', { hmr: true });
 		// Stable Symbol.for-based hook slot (so re-imports get the same identity).
 		expect(code).toMatch(/Symbol\.for\("octane:file\.tsrx:Foo\.useState#0"\)/);
-		// Inline HMR wrapping on the exported component (shadow-proof `_$` alias).
-		expect(code).toMatch(/export const Foo = _\$hmr\(function Foo/);
+		// The public HMR binding remains a hoisted function declaration and shares
+		// metadata with the private identity-stable wrapper.
+		expect(code).toMatch(/export function Foo/);
+		expect(code).toMatch(/const __FooHmr = _\$hmr\(__FooImplementation\)/);
 		// Vite-shaped accept block.
 		expect(code).toMatch(/if \(import\.meta\.hot\)/);
 		expect(code).toMatch(/Foo\[_\$HMR\]\.update\(module\.Foo\)/);
@@ -181,6 +183,7 @@ describe('hmr — runtime wrapper', () => {
 							.join(', ');
 						return `const { ${properties} } = runtime;`;
 					})
+					.replace(/^export function /gm, 'function ')
 					.replace(/\bexport let /g, 'let ')
 					.replace(/export \{ Default as default \};/g, '')
 					.replaceAll('import.meta.webpackHot', 'hot') + '\nreturn { Named, default: Default };';
@@ -235,12 +238,14 @@ describe('hmr — runtime wrapper', () => {
 			`export function Named() { return <span>{'named'}</span>; }\n` +
 			`export default function Default() { return <b>{'default'}</b>; }\n`;
 		const vite = compile(source, 'file.tsx', { hmr: 'vite' }).code;
-		expect(vite).toContain('Named = _$hmr(Named);');
-		expect(vite).toContain('Default = _$hmr(Default);');
+		expect(vite).toContain('export function Named(');
+		expect(vite).toContain('const __NamedHmr = _$hmr(__NamedImplementation);');
+		expect(vite).toContain('function Default(');
+		expect(vite).toContain('const __DefaultHmr = _$hmr(__DefaultImplementation);');
 		expect(vite).toContain('import.meta.hot.accept');
 
 		const webpack = compile(source, 'file.tsx', { hmr: 'webpack' }).code;
-		expect(webpack).toContain('export { Named };');
+		expect(webpack).toContain('export function Named(');
 		expect(webpack).toContain('export { Default as default };');
 		expect(webpack).toContain('import.meta.webpackHot.dispose');
 	});

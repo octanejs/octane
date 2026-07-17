@@ -87,6 +87,7 @@ describe('bundler-neutral compiler integration', () => {
 		expect(canonicalModuleId(String.raw`C:\external\App.tsrx`, String.raw`C:\project`)).toBe(
 			'C:/external/App.tsrx',
 		);
+		expect(canonicalModuleId('#nitro/virtual/polyfills', root)).toBe('#nitro/virtual/polyfills');
 	});
 
 	it('compiles the same source for client and server with maps', () => {

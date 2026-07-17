@@ -1,0 +1,40 @@
+name: Package Preview
+
+on:
+  pull_request:
+    paths:
+      - "packages/octane/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/package-preview.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish octane preview
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter octane build
+      - name: Set the preview package to the changeset's next patch version
+        run: pnpm --dir packages/octane version 0.1.8 --no-git-tag-version
+      - name: Publish package preview
+        run: >-
+          pnpm dlx pkg-pr-new publish ./packages/octane
+          --pnpm
+          --compact
+          --comment=off
+          --json=package-preview.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-preview
+          path: package-preview.json

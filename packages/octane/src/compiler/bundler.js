@@ -50,7 +50,9 @@ export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 /** Strip bundler query/hash suffixes without changing the underlying path. */
 export function cleanModuleId(id) {
 	const query = id.indexOf('?');
-	const hash = id.indexOf('#');
+	// A leading `#` is a Node package-import alias, not a URL fragment. Nitro and
+	// other server runtimes expose virtual modules through these specifiers.
+	const hash = id.indexOf('#', id.startsWith('#') ? 1 : 0);
 	let end = id.length;
 	if (query !== -1) end = query;
 	if (hash !== -1 && hash < end) end = hash;

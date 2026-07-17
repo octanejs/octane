@@ -77,6 +77,31 @@ export const SUSPENSE_SEED_WIRE_PREFIX = '\0octane:ssr-seed:';
  */
 export const REJECTION_SENTINEL_KEY = '__octane_new_rejection__';
 
+/**
+ * Marks a thenable whose hydration state is owned by an external serializer.
+ * Octane still tracks, suspends on, and unwraps the thenable normally, but it
+ * neither writes an SSR JSON seed for it nor consumes one during hydration.
+ *
+ * The global registry keeps the contract stable across duplicate Octane module
+ * instances. Prefer marking a mutable wrapper instead of a user-owned promise,
+ * which may be frozen or shared with code that does not opt into this contract.
+ */
+export const EXTERNAL_HYDRATION_PROMISE: unique symbol = Symbol.for(
+	'octane.external-hydration-promise',
+);
+
+/**
+ * Defines a client hydration root whose component ranges start inside an SSR
+ * ancestor, such as a document shell that places its live application inside
+ * `<body>`. Mark the root body `passthrough` and the first component that owns
+ * nodes in the hydration container `owner`. Octane keeps the intervening
+ * component lifecycles but does not claim server ranges that live outside the
+ * selected container.
+ */
+export const HYDRATION_RANGE_BOUNDARY: unique symbol = Symbol.for(
+	'octane.hydration-range-boundary',
+);
+
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
 // A boundary that is still PENDING when the shell flushes emits its fallback
 // with a leading `<template data-oct-b="N">` sentinel. When the boundary's data

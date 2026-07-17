@@ -29,6 +29,8 @@ import {
 	isEnumeratedBooleanAttr,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 	cssStyleValue,
 	ATTRIBUTE_ALIASES,
 	SVG_ONLY_TAGS,
@@ -47,6 +49,8 @@ import {
 	type ProfileFrame,
 } from './profiling.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
+
+export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -1072,7 +1076,7 @@ function vtMarkDirtyFromCurrentBlock(): void {
 function vtRangeElements(block: Block): Element[] {
 	const els: Element[] = [];
 	if (block.startMarker !== null && block.endMarker !== null) {
-		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker; ) {
+		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker;) {
 			if (n.nodeType === 1) els.push(n as Element);
 			n = n.nextSibling;
 		}
@@ -3227,12 +3231,14 @@ function renderReturnedValue(block: Block, out: unknown): void {
 	// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
 	// so the DOM is byte-identical to `@{}`'s inline render (no extra markers).
 	// Anything else (multi-root, arrays, strings, conditionals) → childSlot.
-	const useSingleRoot =
+	const isComponentDescriptor =
 		out !== null &&
 		(out as any).$$kind === ELEMENT_TAG &&
 		(out as any).key == null &&
-		typeof (out as any).type === 'function' &&
-		(out as any).type.$$singleRoot === true;
+		typeof (out as any).type === 'function';
+	const useSingleRoot =
+		isComponentDescriptor &&
+		((out as any).type.$$singleRoot === true || activeHydration()?.passthroughRanges === true);
 	// The private return slot holds EITHER a componentSlotSlot (singleRoot
 	// path) or a childSlot. A re-render can flip which applies: a body that
 	// returns `<SingleRootComp/>` one render and `null` / a portal / an array
@@ -3864,8 +3870,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 				if (stageTransitionValue(s!, block, operation, computed)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
-							| TransitionActionUpdate<T>
-							| undefined;
+							TransitionActionUpdate<T> | undefined;
 						if (update !== undefined) {
 							update.profileType = 'state';
 							update.profileSlot = slot;
@@ -4003,8 +4008,7 @@ export function useReducer<S, A, I = S>(
 				if (stageTransitionValue(s!, block, operation, computed, true)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
-							| TransitionActionUpdate<S>
-							| undefined;
+							TransitionActionUpdate<S> | undefined;
 						if (update !== undefined) {
 							update.profileType = 'reducer';
 							update.profileSlot = slot;
@@ -5068,6 +5072,14 @@ function observeHydrationSeedThenable(thenable: TrackedThenable<unknown>): void 
 	);
 }
 
+function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
+	try {
+		return (thenable as any)[EXTERNAL_HYDRATION_PROMISE] === true;
+	} catch {
+		return false;
+	}
+}
+
 function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): T {
 	const block = CURRENT_BLOCK!;
 	const state: TrackedThenable<any>[] = ((block as any).__thenables ??= []);
@@ -5081,6 +5093,7 @@ function useThenable<T>(thenable: TrackedThenable<T>, replaceOnResume = false): 
 	// re-suspend, no client re-fetch. Folds out for client-only builds.
 	const hydration = activeHydration();
 	if (
+		!hasExternalHydrationOwner(thenable) &&
 		hydration !== null &&
 		hydration.seeds !== null &&
 		hydration.seedCursor < hydration.seeds.length
@@ -5475,8 +5488,7 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 				(lazyWrapper as any).__compare = (prev: any, next: any): boolean => {
 					const current = resolveLazyModule(result);
 					const compare = (current as any).__compare as
-						| ((previous: any, incoming: any) => boolean)
-						| undefined;
+						((previous: any, incoming: any) => boolean) | undefined;
 					const previous = lazyResolvedProps(current, prev);
 					const incoming = lazyResolvedProps(current, next);
 					return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
@@ -5715,6 +5727,8 @@ class HydrationCapability {
 	readonly liteRanges = new WeakMap<Scope, HydratedLiteRange>();
 	readonly classWrites = new Map<Element, PendingHydrationClassWrite>();
 	private readonly textWarnings = new Map<Text, PendingHydrationTextWarning>();
+	/** Skip component-frame adoption until the declared container owner. */
+	passthroughRanges = false;
 
 	constructor(
 		readonly rootBlock: Block,
@@ -8906,7 +8920,7 @@ function dispatchDelegatedCapture(event: Event): void {
 	maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const path: any[] = [];
-	for (let node = event.target as any; node !== null && node !== undefined; ) {
+	for (let node = event.target as any; node !== null && node !== undefined;) {
 		path.push(node);
 		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
 	}
@@ -10138,6 +10152,12 @@ function renderPortalState(
 	host: Node,
 	env?: any[],
 ): PortalSlot {
+	const hydration = activeHydration();
+	if (hydration !== null) {
+		return hydration.suspend(() =>
+			renderPortalState(prev, parentBlock, target, rawBody, rawProps, host, env),
+		);
+	}
 	const norm = normalizePortalBody(rawBody, rawProps);
 	let state = prev;
 	if (state === null || state.target !== target) {
@@ -10902,6 +10922,19 @@ function componentSlotImpl(
 		let start: Comment | null = null;
 		let end: Comment | null = null;
 		let inherited = false;
+		const rangeBoundary =
+			hydration !== null
+				? (
+						comp as ComponentBody & {
+							[HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner';
+						}
+					)[HYDRATION_RANGE_BOUNDARY]
+				: undefined;
+		const hydrationPassthrough = hydration?.passthroughRanges === true;
+		const hydrationTransparent = hydrationPassthrough && rangeBoundary !== 'owner';
+		if (hydrationPassthrough && rangeBoundary === 'owner') {
+			hydration.passthroughRanges = false;
+		}
 		// M3 inherit-range: borrow the parent block's range — this site is the
 		// sole root of its body, so the body block's range IS the slot's range.
 		// Resolved BEFORE the hydration probes: the server emitted NO frame pair
@@ -10919,11 +10952,14 @@ function componentSlotImpl(
 		// ssrComponent declines on the same identities, so the server emitted a
 		// pair exactly where this falls through to the adoption regimes below.
 		if (
+			!hydrationTransparent &&
 			inherit === true &&
 			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
 		)
 			inherit = false;
-		if (inherit === true && parentBlock !== null) {
+		if (hydrationTransparent) {
+			inherited = true;
+		} else if (inherit === true && parentBlock !== null) {
 			const ps = (parentBlock as { startMarker?: Node | null }).startMarker;
 			const pe = (parentBlock as { endMarker?: Node | null }).endMarker;
 			if (ps != null && pe != null && ps !== pe && ps.nodeType === 8 && pe.nodeType === 8) {
@@ -12819,6 +12855,21 @@ export function childSlot(
 		}
 		break;
 	}
+	const valueComponent =
+		typeof value === 'function'
+			? (value as ComponentBody)
+			: isElementDescriptor(value) && typeof value.type === 'function'
+				? (value.type as ComponentBody)
+				: null;
+	const hydrationTransparent =
+		hydration?.passthroughRanges === true &&
+		(
+			valueComponent as
+				| (ComponentBody & {
+						[HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner';
+				  })
+				| null
+		)?.[HYDRATION_RANGE_BOUNDARY] !== 'owner';
 	const iterable = iterableChildArray(value);
 	if (iterable !== null) value = iterable;
 	const preparedList = prepareDeoptList(value, false, includeKeyedSingle);
@@ -12842,6 +12893,7 @@ export function childSlot(
 	if (
 		state === undefined &&
 		hydration !== null &&
+		!hydrationTransparent &&
 		parentBlock === hydration.rootBlock &&
 		!hydration.isOpen(anchor ?? null) &&
 		!hydration.isOpen(hydration.node)
@@ -12877,7 +12929,13 @@ export function childSlot(
 	if (state === undefined) {
 		let start: Comment | null;
 		let end: Comment | null;
-		if (unframedComponentRoot) {
+		if (hydrationTransparent) {
+			// The selected hydration container begins below this logical return
+			// slot. Keep its lifecycle/block, but leave the server cursor and ranges
+			// untouched until the declared owner component is reached.
+			start = null;
+			end = null;
+		} else if (unframedComponentRoot) {
 			[start, end] = hydration!.wrapUnframedRoot(hydration!.node!);
 		} else if (hydration !== null && hydration.isOpen(anchor ?? null)) {
 			// Hydration (nested hole): the anchor resolved via child/sibling to the
@@ -12935,7 +12993,7 @@ export function childSlot(
 			start,
 			end,
 			ownerHost: (hydration === null ? (ownsHost ?? null) : null) as Element | null,
-			borrowed: false,
+			borrowed: hydrationTransparent,
 			compactable: compactable === true,
 			block: null,
 			text: null,
@@ -12971,7 +13029,7 @@ export function childSlot(
 	// pair on demand around the current host node, so every path below sees the
 	// normal marked regime — the childSlot analogue of the singleRoot shape-flip
 	// handling in disposeReturnSlot. One-way: once marked, the slot stays marked.
-	if (state.end === null && !pureHost && state.ownerHost === null) {
+	if (state.end === null && !pureHost && state.ownerHost === null && !state.borrowed) {
 		const start = document.createComment('');
 		const end = document.createComment('');
 		const host = state.hostNode;
@@ -13345,7 +13403,7 @@ export function childSlot(
 		if (hydration === null) clearChildContent(state);
 		state.currentComp = comp;
 		state.currentIsBodyFn = isBodyFn;
-		if (state.start === null && state.ownerHost === null) {
+		if (state.start === null && state.ownerHost === null && !state.borrowed) {
 			// First component in this slot — mint the lower-bound marker now so
 			// clearChildContent can sweep a (possibly multi-node) component body.
 			// (An OWNS-PARENT slot needs neither bound: clears sweep the element.)
@@ -13387,7 +13445,9 @@ export function childSlot(
 		// Advance the cursor past this child's adopted range so a following sibling
 		// hole adopts the right node (mirrors componentSlot's post-render advance).
 		// (Hydration always adopts a marker pair, so `state.end` is non-null here.)
-		if (hydration !== null) hydration.node = state.end!.nextSibling;
+		if (hydration !== null && !state.borrowed && state.end !== null) {
+			hydration.node = state.end.nextSibling;
+		}
 		return;
 	}
 
@@ -14051,6 +14111,127 @@ interface TrySlot {
 	 * root state with an opaque boundary namespace during hydration.
 	 */
 	idState: RootIdState;
+	/** Logical boundary above a selected hydration-container owner. */
+	passthrough: boolean;
+}
+
+function clearPassthroughTry(state: TrySlot): void {
+	const visible = state.block;
+	const persistent = state.tryBlock;
+	if (visible !== null) unmountBlock(visible);
+	if (persistent !== null && persistent !== visible) unmountBlock(persistent);
+	state.block = null;
+	state.tryBlock = null;
+}
+
+function mountPassthroughCatch(state: TrySlot, error: unknown): void {
+	clearPassthroughTry(state);
+	state.pendingThenable = null;
+	state.branch = 0;
+	state.err = error;
+	if (state.catchBody === null) throw error;
+	const block = createBlock(
+		'control-flow',
+		state.parentBlock,
+		state.domParent,
+		null,
+		null,
+		state.catchBody,
+		{ err: error, reset: () => requestReset(state) },
+		state.env,
+	);
+	state.block = block;
+	renderBlock(block);
+}
+
+function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unknown>): void {
+	clearPassthroughTry(state);
+	state.branch = 2;
+	state.pendingThenable = thenable;
+	if (state.pendingBody !== null) {
+		const block = createBlock(
+			'control-flow',
+			state.parentBlock,
+			state.domParent,
+			null,
+			null,
+			state.pendingBody,
+			undefined,
+			state.env,
+		);
+		state.block = block;
+		renderBlock(block);
+	}
+	const retry = () => {
+		if (state.pendingThenable !== thenable || state.parentBlock.disposed) return;
+		state.pendingThenable = null;
+		state.branch = -1;
+		scheduleRender(state.parentBlock);
+	};
+	thenable.then(retry, retry);
+}
+
+function renderPassthroughTry(state: TrySlot): void {
+	if (state.branch === 0 && state.block !== null) {
+		state.block.body = state.catchBody!;
+		state.block.props = { err: state.err, reset: () => requestReset(state) };
+		state.block.extra = state.env;
+		renderBlock(state.block);
+		return;
+	}
+	if (state.branch === 2) {
+		if (state.block !== null && state.pendingBody !== null) {
+			state.block.body = state.pendingBody;
+			state.block.extra = state.env;
+			renderBlock(state.block);
+		}
+		return;
+	}
+	let block = state.tryBlock;
+	if (block === null || block.disposed) {
+		if (state.block !== null) unmountBlock(state.block);
+		block = createBlock(
+			'control-flow',
+			state.parentBlock,
+			state.domParent,
+			null,
+			null,
+			state.tryBody,
+			undefined,
+			state.env,
+		);
+		state.tryBlock = block;
+		state.block = block;
+		state.branch = 1;
+		(block as any).$$tryHandler = (error: unknown) => {
+			try {
+				mountPassthroughCatch(state, error);
+			} catch (propagated) {
+				const parent = findTryHandler(state.parentBlock);
+				if (parent !== null) parent(propagated);
+				else console.error(propagated);
+			}
+		};
+		if (!state.propagateSuspense) {
+			(block as any).__suspenseHandler = (thenable: TrackedThenable<unknown>) => {
+				mountPassthroughPending(state, thenable);
+			};
+		}
+	} else {
+		block.body = state.tryBody;
+		block.extra = state.env;
+	}
+	try {
+		renderBlock(block);
+		state.hasResolved = true;
+	} catch (error) {
+		if (isSuspenseException(error)) {
+			if (state.propagateSuspense) throw error;
+			mountPassthroughPending(state, error.thenable);
+		} else {
+			mountPassthroughCatch(state, error);
+		}
+	}
 }
 
 export function tryBlock(
@@ -14072,6 +14253,7 @@ export function tryBlock(
 	if (state === undefined) {
 		let start: Comment;
 		let end: Comment;
+		const passthrough = hydration?.passthroughRanges === true;
 		// Hydration: the server (Phase 4) awaited use() and wrapped the resolved
 		// SUCCESS arm (or @catch arm) in a `<!--[-->…<!--]-->` range. Adopt it as the
 		// slot; mountTry brackets the content and the seeded use() values let the try
@@ -14079,8 +14261,11 @@ export function tryBlock(
 		// the SOLE-hole case (a @try that is the only thing a component/arm renders —
 		// the router `Match` shape `<ctx.Provider> @try {…}`), where the anchor is the
 		// enclosing scope's end marker and the cursor is parked on the @try's open.
-		const open = hydration?.resolveOpen(anchor ?? null, domParent) ?? null;
-		if (open !== null) {
+		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		if (passthrough) {
+			start = document.createComment('passthrough-try');
+			end = document.createComment('/passthrough-try');
+		} else if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
 		} else {
@@ -14116,6 +14301,7 @@ export function tryBlock(
 			domParent,
 			parentBlock,
 			idState: parentBlock.idState,
+			passthrough,
 		};
 		parentScope.slots[slotKey] = newState;
 		registerSlot(parentScope, newState);
@@ -14128,6 +14314,10 @@ export function tryBlock(
 		state.env = env;
 	}
 	const s = state;
+	if (s.passthrough) {
+		renderPassthroughTry(s);
+		return;
+	}
 	if (s.branch === 0) {
 		// Already showing catch — re-render with current err (props identity unchanged).
 		s.block!.body = s.catchBody!;
@@ -15226,8 +15416,7 @@ export function useTransition(
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as
-		| { isPending: boolean; start: (fn: () => void | Promise<unknown>) => void }
-		| undefined;
+		{ isPending: boolean; start: (fn: () => void | Promise<unknown>) => void } | undefined;
 	if (s === undefined) {
 		const slotRef = { isPending: false, start: startTransition };
 		s = slotRef;
@@ -16151,6 +16340,11 @@ function renderBranchSlot(
 			);
 			state.block = b;
 			renderBlock(b);
+			if (state.borrowed && state.start === null) {
+				// A hydration-range passthrough branch is a logical wrapper above the
+				// selected container owner. Its descendant owns the real DOM boundary.
+				return;
+			}
 			const first = before ? before.nextSibling : domParent.firstChild;
 			const last = after ? after.previousSibling : domParent.lastChild;
 			if (last !== null && first === last && (first as Node).nodeType === 1) {
@@ -16236,12 +16430,13 @@ export function ifBlock(
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Node | null = null;
+		const passthrough = hydration?.passthroughRanges === true;
 		// Hydration: adopt the server's `<!--[-->…<!--]-->` slot range (client mounts
 		// defer marker creation entirely). `resolveHydrationOpen` also covers the
 		// SOLE-hole case — a @if that is the only thing an enclosing arm/component
 		// renders (e.g. `@try { @if (…) {…} }`, the router Match shape) — where the
 		// anchor is the arm's END marker and the cursor is parked on the @if's open.
-		const open = hydration?.resolveOpen(anchor ?? null, domParent) ?? null;
+		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
 		if (open !== null) {
 			start = open;
 			end = hydration!.close(open);
@@ -16251,7 +16446,7 @@ export function ifBlock(
 			anchor: anchor ?? null,
 			start,
 			end,
-			borrowed: false,
+			borrowed: passthrough,
 			branch: -1,
 			block: null,
 		};
@@ -18787,7 +18982,7 @@ export function hydrateRoot(
 	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
 	// are protocol sidecars rather than authored component output, so remove only
 	// direct children carrying the renderer-owned marker before root adoption.
-	for (let child = container.firstElementChild; child !== null; ) {
+	for (let child = container.firstElementChild; child !== null;) {
 		const next = child.nextElementSibling;
 		if (child.localName === 'script' && child.hasAttribute(STREAM_SCRIPT_ATTR)) child.remove();
 		child = next;
@@ -18803,6 +18998,12 @@ export function hydrateRoot(
 		firstNode = firstNode.nextSibling;
 	}
 	const hydration = new HydrationCapability(rootBlock, firstNode, seeds);
+	hydration.passthroughRanges =
+		(
+			body as ComponentBody & {
+				[HYDRATION_RANGE_BOUNDARY]?: 'passthrough' | 'owner';
+			}
+		)[HYDRATION_RANGE_BOUNDARY] === 'passthrough';
 	const previousHydration = currentHydration;
 	currentHydration = hydration;
 	try {

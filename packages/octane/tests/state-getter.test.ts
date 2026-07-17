@@ -14,6 +14,7 @@ function evalServer(source: string, filename: string): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 		(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
+	code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
 }
@@ -85,6 +86,7 @@ describe('state getter runtime semantics', () => {
 			/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 			(_match, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 		);
+		code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
 		code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 		const mod = new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRuntime, {});
 		expect(ServerRuntime.renderToString(mod.App).html).toContain('Count: 2');
