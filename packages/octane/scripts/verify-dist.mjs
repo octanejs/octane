@@ -72,16 +72,13 @@ export function smokeDist(pkgDir) {
 	const entries = publishedExportTargets(pkgDir).filter((p) => p.endsWith('.js'));
 	for (const entry of entries) {
 		const url = pathToFileURL(join(pkgDir, entry)).href;
-		// Explicit exit(0): the client runtime's module init keeps the event loop
-		// alive (scheduler channel), so a bare top-level import would hang forever.
+		// Let Node exit naturally. This is also the published-runtime regression
+		// guard: importing an entry must not allocate a channel, timer, listener, or
+		// other host resource that keeps an otherwise-idle consumer alive.
 		execFileSync(
 			process.execPath,
-			[
-				'--input-type=module',
-				'-e',
-				`import(${JSON.stringify(url)}).then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });`,
-			],
-			{ stdio: ['ignore', 'ignore', 'inherit'], cwd: pkgDir },
+			['--input-type=module', '-e', `await import(${JSON.stringify(url)});`],
+			{ stdio: ['ignore', 'ignore', 'inherit'], cwd: pkgDir, timeout: 10_000 },
 		);
 	}
 	return entries;

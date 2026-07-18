@@ -446,6 +446,6 @@ export function useThing(args: [] | [number]) {
 `;
 		const code = slotHooks(source, 'spread-hook.ts')!.code;
 		expect(code).toMatch(/(?:useState|_\$__useStateWithGetter)\(\.\.\.args, _h\$0\)/);
-		expect(code).toContain('const _h$0 = Symbol(_hs$);');
+		expect(code).toContain('const _h$0 = /* @__PURE__ */ Symbol(_hs$);');
 	});
 });

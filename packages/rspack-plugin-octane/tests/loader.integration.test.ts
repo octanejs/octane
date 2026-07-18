@@ -279,7 +279,7 @@ describe('loader with the neutral compiler', () => {
 		writeFileSync(manifest, '{"name":"nested","octane":{"hookSlots":{"manual":[]}}}\n');
 		const compiled = transform({ root, resourcePath, source });
 		expect(String(compiled.content)).toContain('useState(1, _h$0)');
-		expect(String(compiled.content)).toContain('const _h$0 = Symbol(');
+		expect(String(compiled.content)).toContain('const _h$0 = /* @__PURE__ */ Symbol(');
 		expect(compiled.dependencies).toContain(realpathSync(manifest));
 		expect(compiled.module.buildInfo.octane).toMatchObject({ transformKind: 'slots' });
 	});

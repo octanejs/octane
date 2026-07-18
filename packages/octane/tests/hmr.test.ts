@@ -348,7 +348,7 @@ describe('hmr — runtime wrapper', () => {
 		expect(dev?.code).toMatch(/Symbol\.for\("octane:\/abs\/custom\.ts:useCounter\.useState#0"\)/);
 		const prod = slotHooks(src, '/abs/custom.ts');
 		expect(prod?.code).toMatch(/_\$hookSlots\(1\)/);
-		expect(prod?.code).toMatch(/const _h\$0 = Symbol\(_hs\$\);/);
+		expect(prod?.code).toMatch(/const _h\$0 = \/\* @__PURE__ \*\/ Symbol\(_hs\$\);/);
 		expect(prod?.code).not.toMatch(/Symbol\.for|abs\/custom/);
 	});
 
@@ -366,7 +366,7 @@ describe('hmr — runtime wrapper', () => {
 		const call = code.match(/useState\(1, ([^)]+)\)/);
 		expect(call?.[1]).toMatch(/^_h\$\d+$/);
 		expect(code).not.toMatch(/useState\(1, _h\$\d+, _h\$\d+\)/);
-		expect(code).toMatch(/const _h\$\d+ = Symbol\(_hs\$(?: \+ \d+)?\);/);
+		expect(code).toMatch(/const _h\$\d+ = \/\* @__PURE__ \*\/ Symbol\(_hs\$(?: \+ \d+)?\);/);
 	});
 
 	it('avoids user bindings when naming full-compiler and surgical slot declarations', async () => {
@@ -378,14 +378,14 @@ describe('hmr — runtime wrapper', () => {
 		const full = compile(source, 'slot-names.tsrx', { hmr: false }).code;
 		expect(full).toContain('hookSlots as _$hookSlots$');
 		expect(full).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
-		expect(full).toMatch(/const _h\$0\$ = Symbol\(_hs\$\$\);/);
+		expect(full).toMatch(/const _h\$0\$ = \/\* @__PURE__ \*\/ Symbol\(_hs\$\$\);/);
 		expect(full).toContain('useStateWithGetter(1, _h$0$)');
 
 		const { slotHooks } = await import('../src/compiler/slot-hooks.js');
 		const surgical = slotHooks(source, 'slot-names.ts')!.code;
 		expect(surgical).toContain('hookSlots as _$hookSlots$');
 		expect(surgical).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
-		expect(surgical).toMatch(/const _h\$0\$ = Symbol\(_hs\$\$\);/);
+		expect(surgical).toMatch(/const _h\$0\$ = \/\* @__PURE__ \*\/ Symbol\(_hs\$\$\);/);
 		expect(surgical).toContain('useStateWithGetter(1, _h$0$)');
 	});
 

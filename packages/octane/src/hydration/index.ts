@@ -1,5 +1,6 @@
 export { condition } from './condition.js';
 export type { HydrationCondition } from './condition.js';
+export { initializeHydrationEventCapture } from './event-capture.js';
 export { idle } from './idle.js';
 export type { IdleHydrationOptions } from './idle.js';
 export { interaction } from './interaction.js';

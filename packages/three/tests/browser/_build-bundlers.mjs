@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
 import rspack from '@rspack/core';
@@ -53,13 +53,28 @@ for (const output of [viteOutput, rsbuildOutput, rspackOutput]) {
 linkPackage('@octanejs/three', packageRoot);
 linkPackage('octane', resolve(repositoryRoot, 'packages/octane'));
 
-await viteBuild({
+const viteResult = await viteBuild({
 	root: fixtureRoot,
 	configFile: false,
 	logLevel: 'silent',
 	plugins: [octane({ hmr: false })],
 	build: { outDir: viteOutput, emptyOutDir: true, minify: false },
 });
+const viteResults = Array.isArray(viteResult) ? viteResult : [viteResult];
+const viteRenderedThreeModules = [
+	...new Set(
+		viteResults.flatMap((result) =>
+			result.output.flatMap((output) => {
+				if (output.type !== 'chunk') return [];
+				return Object.entries(output.modules)
+					.filter(([, module]) => module.renderedLength > 0)
+					.map(([moduleId]) => moduleId.split('?')[0])
+					.filter((moduleId) => moduleId.startsWith(resolve(packageRoot, 'src')))
+					.map((moduleId) => relative(packageRoot, moduleId).replaceAll('\\', '/'));
+			}),
+		),
+	),
+].sort();
 
 const rsbuild = await createRsbuild({
 	cwd: fixtureRoot,
@@ -97,5 +112,6 @@ console.log(
 			buildInfo,
 			hmrSelfAccept: source.includes('import.meta.webpackHot.accept()'),
 			rspackBundleHasScene: bundle.includes('bundler-proof-cube'),
+			viteRenderedThreeModules,
 		}),
 );

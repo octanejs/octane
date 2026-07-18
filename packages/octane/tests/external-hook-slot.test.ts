@@ -110,7 +110,7 @@ describe('slotHooks surgical pass', () => {
 		const stripped = code
 			.replace(/^import \{ hookSlots as _\$hookSlots \} from 'octane';\n/gm, '')
 			.replace(/^const _hs\$ = \/\* @__PURE__ \*\/ _\$hookSlots\(\d+\);\n/gm, '')
-			.replace(/^const _h\$\d+ = Symbol\(_hs\$(?: \+ \d+)?\);\n/gm, '')
+			.replace(/^const _h\$\d+ = \/\* @__PURE__ \*\/ Symbol\(_hs\$(?: \+ \d+)?\);\n/gm, '')
 			.replace(/, _h\$\d+(?=[),])/g, '');
 		expect(stripped).toBe(
 			SRC.replace("useCallback(() => 'nd:' + label)", "useCallback(() => 'nd:' + label, [label])"),
