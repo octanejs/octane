@@ -23,36 +23,32 @@ export function Why() @{
 			<div class="why-main">
 				<div class="why-grid">
 					<div class="why-row">
-						<h3 class="why-question">Why should someone adopt Octane today?</h3>
+						<h3 class="why-question">Why would I move my app to Octane?</h3>
 						<div class="why-answers">
 							<p class="why-answer">
-								{'Because adoption should build on what you already know. Octane keeps the ' +
-									'component-and-hooks mental model familiar, so developers carry over their ' +
-									'hard-won intuition.'}
+								{'Octane components are the components you already write. They are plain ' +
+									'functions with hooks, props, and context. If you know React, you know ' +
+									'Octane. Your instincts about where state lives and how data flows carry ' +
+									'over on day one.'}
 							</p>
 							<p class="why-answer">
-								{'For the large proportion of React codebases centered on function components ' +
-									'and hooks, that continuity also makes migration especially straightforward for ' +
-									'AI agents: they can preserve the app’s component boundaries and reasoning instead ' +
-									'of redesigning it around a new reactive model. Begin with standard TSX, then opt ' +
-									'into TSRX one component at a time; fewer rules and dependency lists let related ' +
-									'code stay together. Octane changes the machinery beneath your app without asking ' +
-									'everyone who works on it to start over.'}
+								{'You don’t have to rewrite your app to adopt it. Keep your existing TSX, ' +
+									'move components to TSRX one at a time, and ship the whole way. Components ' +
+									'keep their shape along the way, so AI agents can migrate an app too, ' +
+									'without redesigning it around a new reactive model.'}
 							</p>
 						</div>
 					</div>
 
 					<div class="why-row">
-						<h3 class="why-question">Why isn't Octane's rendering powered by signals?</h3>
+						<h3 class="why-question">Why isn't Octane built on signals?</h3>
 						<div class="why-answers">
 							<p class="why-answer">
-								{'Signals are good. They make updates wonderfully precise, and you can still use ' +
-									'them in an Octane app when that model fits the problem. But powering the framework ' +
-									'with signals would make them more than an optional tool; they would become part of ' +
-									'how every application represents and reads state. Octane makes a different trade: ' +
-									'components stay as familiar functions you can read from top to bottom, while the ' +
-									'compiler and runtime carry the complexity instead of spreading it through the ' +
-									'application.'}
+								{'Signals are a good tool, and you can still use them in an Octane app when ' +
+									'they fit. But a framework built on signals makes every app represent and ' +
+									'read state the signals way. Octane keeps components as plain functions ' +
+									'that read from top to bottom. The compiler does the extra work, so your ' +
+									'code doesn’t have to.'}
 							</p>
 						</div>
 					</div>
@@ -60,9 +56,9 @@ export function Why() @{
 
 				<blockquote class="why-coda">
 					<strong>The trade holds up.</strong>
-					{' Signals still win the workloads built for them, but across the checked-in ' +
-						'suites below, Octane’s tightly tuned compiler and runtime largely keep pace — ' +
-						'without asking you to rewire how you think. '}
+					{' Signals still win the workloads built for them. Across the checked-in ' +
+						'suites below, Octane keeps pace without asking you to rewire how you ' +
+						'think. '}
 					<Link to="/docs/tsrx-vs-tsx">See what TSRX adds →</Link>
 				</blockquote>
 			</div>
