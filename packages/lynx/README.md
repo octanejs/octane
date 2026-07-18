@@ -27,10 +27,11 @@ teardown also depend on injection-specific callbacks.
 
 The production Web control and transport bundles currently fail before
 rendering under `@lynx-js/web-core@0.22.2` with a `MutationObserver` target type
-error. Explorer, Android, and iOS execution are unavailable on the capture host.
-These are explicit gates, not skipped tests. Do not begin the production
-renderer port until the public-hook blockers are resolved and the exact bundle
-passes the required engine matrix.
+error; the transported path additionally reports that Web `postMessage` is not
+implemented. Explorer, Android, and iOS execution are unavailable on the
+capture host. These are explicit gates, not skipped tests. Do not begin the
+production renderer port until the public-hook blockers are resolved and the
+exact bundle passes the required engine matrix.
 
 See:
 

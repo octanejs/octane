@@ -70,7 +70,9 @@ assert.equal(
 
 for (const source of [
 	'./src/bundle-entry.mjs',
+	'./src/empty-background.mjs',
 	'./src/imperative-baseline.mjs',
+	'./src/main-thread-entry.mjs',
 	'./src/papi.mjs',
 	'./src/protocol.mjs',
 	'./src/runtime-bridge.mjs',

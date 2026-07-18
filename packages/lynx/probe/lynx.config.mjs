@@ -22,10 +22,17 @@ export default defineConfig({
 	},
 	source: {
 		entry: {
-			imperative: './src/imperative-baseline.mjs',
+			imperative: './src/empty-background.mjs',
 			main: './src/bundle-entry.mjs',
 		},
 	},
 	splitChunks: false,
-	plugins: [pluginOctaneLynxPhase0()],
+	plugins: [
+		pluginOctaneLynxPhase0({
+			mainThreadEntries: {
+				imperative: './src/imperative-baseline.mjs',
+				main: './src/main-thread-entry.mjs',
+			},
+		}),
+	],
 });

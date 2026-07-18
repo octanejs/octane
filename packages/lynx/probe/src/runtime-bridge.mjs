@@ -7,6 +7,8 @@ import {
 
 const BATCH_MESSAGE = 'octane-lynx-phase-0:batch';
 const ACK_MESSAGE = 'octane-lynx-phase-0:ack';
+const MAIN_READY_MESSAGE = 'octane-lynx-phase-0:main-ready';
+const MAIN_READY_REQUEST_MESSAGE = 'octane-lynx-phase-0:main-ready-request';
 
 function sendContextMessage(context, data) {
 	if (typeof context.postMessage === 'function') {
@@ -38,6 +40,10 @@ export function installPhase0MainThread(target = globalThis) {
 	const receiver = createPhase0MainThreadReceiver(papi);
 	const removeMessageListener = addContextListener(context, (event) => {
 		const message = event?.data;
+		if (message?.type === MAIN_READY_REQUEST_MESSAGE) {
+			sendContextMessage(context, { type: MAIN_READY_MESSAGE });
+			return;
+		}
 		if (message?.type !== BATCH_MESSAGE) return;
 
 		try {
@@ -58,6 +64,7 @@ export function installPhase0MainThread(target = globalThis) {
 			});
 		}
 	});
+	sendContextMessage(context, { type: MAIN_READY_MESSAGE });
 
 	return Object.freeze({
 		papi,
@@ -75,8 +82,31 @@ export function installPhase0Background(target = globalThis) {
 	}
 
 	const pending = new Map();
+	let resolveMainReady;
+	let rejectMainReady;
+	const mainReady = new Promise((resolve, reject) => {
+		resolveMainReady = resolve;
+		rejectMainReady = reject;
+	});
+	let mainReadySettled = false;
+	function markMainReady() {
+		if (mainReadySettled) return;
+		mainReadySettled = true;
+		resolveMainReady();
+	}
+	function cancelMainReady() {
+		if (mainReadySettled) return;
+		mainReadySettled = true;
+		rejectMainReady(
+			new Error('Octane Lynx Phase 0 background transport was destroyed before main ready.'),
+		);
+	}
 	const removeMessageListener = addContextListener(context, (event) => {
 		const message = event?.data;
+		if (message?.type === MAIN_READY_MESSAGE) {
+			markMainReady();
+			return;
+		}
 		if (message?.type !== ACK_MESSAGE) return;
 
 		const version = message.acknowledgement?.acceptedVersion ?? message.rejection?.version;
@@ -89,8 +119,10 @@ export function installPhase0Background(target = globalThis) {
 			deferred.resolve(message.acknowledgement);
 		}
 	});
+	sendContextMessage(context, { type: MAIN_READY_REQUEST_MESSAGE });
 
-	const probe = createPhase0BackgroundProbe((batch) => {
+	const probe = createPhase0BackgroundProbe(async (batch) => {
+		await mainReady;
 		return new Promise((resolve, reject) => {
 			pending.set(batch.version, { resolve, reject });
 			sendContextMessage(context, {
@@ -117,6 +149,7 @@ export function installPhase0Background(target = globalThis) {
 		},
 		destroy() {
 			if (destroyOperation !== undefined) return destroyOperation;
+			cancelMainReady();
 			destroyOperation = probe.destroy().finally(() => {
 				removeMessageListener();
 				for (const deferred of pending.values()) {

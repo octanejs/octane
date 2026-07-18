@@ -46,7 +46,7 @@ function entryImports(values) {
 	return imports;
 }
 
-export function pluginOctaneLynxPhase0() {
+export function pluginOctaneLynxPhase0({ mainThreadEntries } = {}) {
 	return {
 		name: 'octane:lynx-phase-0',
 		setup(api) {
@@ -71,7 +71,12 @@ export function pluginOctaneLynxPhase0() {
 
 				chain.entryPoints.clear();
 				for (const [entryName, entryPoint] of Object.entries(entries)) {
-					const imports = entryImports(entryPoint.values());
+					const backgroundImports = entryImports(entryPoint.values());
+					const configuredMainThreadEntry = mainThreadEntries?.[entryName];
+					if (configuredMainThreadEntry === undefined) {
+						throw new Error(`Octane Lynx Phase 0 requires a main-thread entry for ${entryName}.`);
+					}
+					const mainThreadImports = entryImports([configuredMainThreadEntry]);
 					const mainThreadEntry = `${entryName}__main-thread`;
 					const mainThreadFilename = isLynx
 						? `.rspeedy/${entryName}/main-thread.js`
@@ -82,12 +87,12 @@ export function pluginOctaneLynxPhase0() {
 
 					chain.entry(mainThreadEntry).add({
 						filename: mainThreadFilename,
-						import: imports,
+						import: mainThreadImports,
 						layer: 'octane:main-thread',
 					});
 					chain.entry(entryName).add({
 						filename: backgroundFilename,
-						import: imports,
+						import: backgroundImports,
 						layer: 'octane:background',
 					});
 

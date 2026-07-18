@@ -17,6 +17,20 @@ const expectedBundles = [
 	'main.lynx.bundle',
 	'main.web.bundle',
 ];
+
+function scriptText(script) {
+	if (typeof script === 'string') return script;
+	if (Array.isArray(script?.lepus_code)) {
+		return Buffer.from(script.lepus_code).toString('latin1');
+	}
+	if (script && typeof script === 'object') {
+		return Object.values(script)
+			.map((entry) => (typeof entry?.content === 'string' ? entry.content : scriptText(entry)))
+			.join('\n');
+	}
+	return '';
+}
+
 const summary = {};
 for (const filename of expectedBundles) {
 	const file = new URL(filename, DIST);
@@ -31,12 +45,30 @@ for (const filename of expectedBundles) {
 			? decodeNativeBundleWithNapi(content)
 			: await decodeNativeBundleWithWasm(content);
 		assert.equal(decoded['engine-version'], '3.9');
-		assert.ok(decoded['main-thread-script']);
-		assert.ok(decoded['background-thread-script']);
+		const mainThreadScript = scriptText(decoded['main-thread-script']);
+		const backgroundThreadScript = scriptText(decoded['background-thread-script']);
+		assert.ok(mainThreadScript);
+		assert.ok(backgroundThreadScript);
+		assert.doesNotMatch(mainThreadScript, /__MAIN_THREAD__|__BACKGROUND__/);
+		assert.doesNotMatch(backgroundThreadScript, /__MAIN_THREAD__|__BACKGROUND__/);
+		if (filename === 'main.lynx.bundle') {
+			assert.match(mainThreadScript, /getJSContext/);
+			assert.doesNotMatch(mainThreadScript, /getCoreContext/);
+			assert.match(backgroundThreadScript, /getCoreContext/);
+			assert.doesNotMatch(backgroundThreadScript, /getJSContext|renderPage/);
+		} else {
+			assert.match(mainThreadScript, /phase-0-imperative/);
+			assert.match(mainThreadScript, /renderPage/);
+			assert.doesNotMatch(
+				backgroundThreadScript,
+				/phase-0-imperative|renderPage|__CreatePage|getCoreContext|octane-lynx-phase-0:batch/,
+			);
+		}
 		assert.doesNotMatch(JSON.stringify(decoded), /@lynx-js\/react|ReactLynx|preact/i);
 	} else {
 		assert.match(text, /main-thread\.js/);
-		assert.match(text, /background\.js/);
+		if (filename !== 'imperative.web.bundle') assert.match(text, /background\.js/);
+		assert.doesNotMatch(text, /__MAIN_THREAD__|__BACKGROUND__/);
 	}
 	summary[filename] = metadata.size;
 }

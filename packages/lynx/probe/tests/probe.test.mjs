@@ -59,3 +59,45 @@ test('the React-free dual-thread probe renders, handles a native tap, and tears 
 	assert.equal(page.childElementCount, 0);
 	mainThread.destroy();
 });
+
+test(
+	'the dual-thread probe renders when the background runtime starts first',
+	{ timeout: 1_000 },
+	async () => {
+		const environment = createEnvironment();
+		environment.switchToBackgroundThread();
+		const background = installPhase0Background(globalThis);
+
+		// Model independently evaluated runtimes by letting background startup reach
+		// the unbuffered transport before the main runtime begins.
+		await new Promise(setImmediate);
+
+		environment.switchToMainThread();
+		const mainThread = installPhase0MainThread(globalThis);
+		await background.ready;
+
+		const counter = mainThread.papi.page.querySelector('[data-testid="phase-0-counter"]');
+		assert.ok(counter, 'startup ordering must not drop the initial native tree');
+		assert.equal(counter.textContent, 'Count: 0');
+
+		await background.destroy();
+		assert.equal(mainThread.papi.page.childElementCount, 0);
+		mainThread.destroy();
+	},
+);
+
+test(
+	'background startup can be destroyed before the main runtime begins',
+	{ timeout: 1_000 },
+	async () => {
+		const environment = createEnvironment();
+		environment.switchToBackgroundThread();
+		const background = installPhase0Background(globalThis);
+
+		const destroy = background.destroy();
+		await assert.rejects(background.ready, /destroyed before main ready/);
+		await destroy;
+
+		assert.equal(background.probe.destroyed, true);
+	},
+);
