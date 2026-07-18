@@ -150,8 +150,8 @@ describe('website routes', () => {
 			question.textContent?.trim(),
 		);
 		expect(whyQuestions).toEqual([
-			'Why should someone adopt Octane today?',
-			"Why isn't Octane's rendering powered by signals?",
+			'Why would I move my app to Octane?',
+			"Why isn't Octane built on signals?",
 		]);
 		expect(why.querySelector('.why-coda')?.textContent?.trim()).toBeTruthy();
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
