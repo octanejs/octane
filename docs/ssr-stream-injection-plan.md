@@ -1,15 +1,24 @@
 # SSR stream injection — native external-HTML merging for streamed renders
 
-Status: CORE API IMPLEMENTED (2026-07-18) — `StreamOptions.injection`
-(`StreamInjectionSource`) landed in `runtime.server.ts` with contract tests in
-`packages/octane/tests/streaming-ssr-injection.test.ts` (both compile modes)
-and a flat streaming-ssr benchmark for the no-injection path; user docs in
-`docs/ssr.md`. Open question 2 resolved as proposed: the tail is held ONLY
-when `injection` is present. Remaining phases: the styles-in-head + auto-
-doctype adjacent gaps below, and switching `@octanejs/tanstack-start`'s
-vendored stream path onto the native API (which also restores out-of-order
-streaming for document renders — the current upstream transform buffers every
-post-shell chunk into its 64 KiB-capped tail until both streams end).
+Status: ALL PHASES IMPLEMENTED (2026-07-19) — `StreamOptions.injection`
+(`StreamInjectionSource`, incl. the `renderComplete()` completion hook) landed
+in `runtime.server.ts` (#169), followed by DOCUMENT MODE (auto
+`<!DOCTYPE html>`, leading styles + hoisted head folded into `<head>`, held
+tail) and the switch of `@octanejs/tanstack-start`'s vendored
+`renderRouterToStream` onto the native API — deleting its
+`transformStreamWithRouter` / `relocateLeadingOctaneStylesToHead` /
+`prependDoctype` usage and restoring out-of-order streaming for document
+renders (the upstream transform buffered every post-shell chunk into its
+64 KiB-capped tail until both streams ended). Contract tests in
+`packages/octane/tests/streaming-ssr-injection.test.ts` (both compile modes),
+website ssr-hydration e2e green on the native path (cold cache, dev +
+production preview), streaming-ssr benchmark flat for the no-injection path;
+user docs in `docs/ssr.md`. Open questions resolved: the tail is held (and
+document mode engages) ONLY when `injection` is present; `onAllReady`/close
+both gate on `done`; the script-barrier lift maps to octane's post-shell
+subscribe. Remaining follow-up: auto-doctype for document renders WITHOUT
+injection is a candidate React-parity change, measured separately; upstream
+the native-path `renderRouterToStream` to TanStack.
 Requested by: TanStack team feedback via the `@tanstack/octane-start` integration
 (2026-07-18).
 

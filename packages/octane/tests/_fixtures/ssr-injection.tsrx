@@ -33,3 +33,31 @@ export function DocumentApp(props) {
 		createElement('body', null, createElement(FragmentApp, { promise: props.promise })),
 	);
 }
+
+// Document-mode head folding: a scoped <style> (renderer-owned, normally
+// emitted ahead of the markup) must land inside the authored <head> when the
+// render is a document under injection.
+export function StyledFragment(props) @{
+	<div id="styled-app">
+		<p class="styled-shell">shell</p>
+		@try {
+			<Inner promise={props.promise} />
+		} @pending {
+			<p id="pending">loading</p>
+		}
+		<style>
+			.styled-shell {
+				color: rgb(9, 9, 9);
+			}
+		</style>
+	</div>
+}
+
+export function StyledDocumentApp(props) {
+	return createElement(
+		'html',
+		{ lang: 'en' },
+		createElement('head', null, createElement('title', null, 'injection')),
+		createElement('body', null, createElement(StyledFragment, { promise: props.promise })),
+	);
+}

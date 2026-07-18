@@ -57,3 +57,4 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 ## Private packages
 
 - `@octanejs/evals` ([`packages/octane-evals`](../packages/octane-evals))
+- `@octanejs/tanstack-start` ([`packages/tanstack-start`](../packages/tanstack-start))
