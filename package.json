@@ -64,6 +64,7 @@
     "@changesets/changelog-git": "catalog:default",
     "@changesets/cli": "catalog:default",
     "@tsrx/prettier-plugin": "catalog:default",
+    "@tsrx/typescript-plugin": "catalog:default",
     "@types/node": "catalog:default",
     "@typescript/native-preview": "7.0.0-dev.20260616.1",
     "prettier": "catalog:default",

@@ -10,8 +10,17 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "preserve",
-    "types": ["node"]
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": [
+      "node"
+    ]
   },
-  "include": ["shared/**/*", "jsx/**/*", "tsrx/**/*", "e2e/**/*", "env.d.ts"]
+  "include": [
+    "shared/**/*",
+    "jsx/**/*",
+    "tsrx/**/*",
+    "e2e/**/*",
+    "env.d.ts"
+  ]
 }

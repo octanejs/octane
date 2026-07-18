@@ -5646,7 +5646,11 @@ export const Hydrate: ComponentBody<HydrateProps> = (rawProps, scope) => {
  * render as the try body, and `fallback` renders as the pending body whenever a
  * descendant suspends (via `use(thenable)`).
  */
-export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> = (
+// `children` is typed as a renderable (`unknown`), not `ComponentBody`: the
+// compiler lowers directive/JSX children to a body, but JSX-form usage types
+// children as element values (`Octane.JSX.Element`), and the de-opt path
+// renders element descriptors directly.
+export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> = (
 	props,
 	scope,
 ) => {
@@ -5699,7 +5703,8 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> = (props, scope)
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-	children: ComponentBody;
+	// Renderable, not ComponentBody — same reasoning as Suspense above.
+	children: unknown;
 }> = (props, scope) => {
 	const block = scope.block;
 	const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
@@ -8033,7 +8038,22 @@ export function attachRef(
 // resolution later.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const Fragment: unique symbol = Symbol.for('octane.Fragment');
+/** Fragment ref forms (fragment-refs parity): callback, object, or arrays. */
+type FragmentRefValue =
+	| ((instance: unknown) => void | (() => void))
+	| { current: unknown }
+	| readonly FragmentRefValue[]
+	| null;
+
+// The VALUE stays the sentinel symbol (the compiler matches `Fragment` by
+// name and the runtime compares descriptor types by identity); the declared
+// TYPE is component-shaped so long-form `<Fragment key ref>` JSX type-checks —
+// which is the export's entire purpose (see above).
+export const Fragment = Symbol.for('octane.Fragment') as unknown as (props: {
+	children?: unknown;
+	key?: string | number | bigint | null | undefined;
+	ref?: FragmentRefValue;
+}) => unknown;
 
 /**
  * React-19 `<Activity mode="hidden"|"visible">` sentinel. The compiler matches

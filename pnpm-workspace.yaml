@@ -50,6 +50,9 @@ esrap_common: &esrap_common ^2.2.9
 
 overrides:
   esrap: *esrap_common
+  # TESTING the ripple `parens` branch: volar mapping crash fixes + esrap 2.2.13.
+  # Remove when @tsrx/core publishes with these changes.
+  '@tsrx/core': 'link:../ripple/packages/tsrx'
   # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls
   # babel-preset-solid@2.0.0-beta.7 transitively (→ babel-plugin-jsx-dom-expressions
   # 0.41, which still EMITS the `ssrRunInScope` SSR helper), but @solidjs/web@2.0.0-beta.14
@@ -143,6 +146,7 @@ catalogs:
     '@vitest/coverage-v8': 4.1.9
     '@tsrx/core': ^0.1.40
     '@tsrx/prettier-plugin': ^0.3.97
+    '@tsrx/typescript-plugin': ^0.3.98
     '@tsrx/ripple': ^0.1.38
     '@tsrx/react': ^0.2.37
     '@tsrx/solid': ^0.1.37
@@ -290,8 +294,8 @@ catalogs:
     yjs: ^13.6.0
     zustand: ^5.0.0
 
-patchedDependencies:
-  '@tsrx/core@0.1.37': patches/@tsrx__core@0.1.37.patch
+# patchedDependencies: the @tsrx/core@0.1.37 JSX parse patch is superseded —
+# the '@tsrx/core' override (ripple `parens` branch link) carries the fix.
 
 minimumReleaseAgeExclude:
   - '@tanstack/ai-client@0.21.0'

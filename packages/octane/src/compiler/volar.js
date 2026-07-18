@@ -61,7 +61,7 @@ const OCTANE_PLATFORM = {
 		suspense: 'octane',
 		dynamic: 'octane',
 		errorBoundary: 'octane',
-		forOfIterableHelper: '@tsrx/core/runtime/iterable',
+		forOfIterableHelper: 'octane/tsrx-iterable',
 	},
 	jsx: {
 		rewriteClassAttr: false,
@@ -114,6 +114,7 @@ export function compileToVolarMappings(source, filename, options) {
 	const ast = parseModule(source, filename, {
 		collect: true,
 		loose: !!options?.loose,
+		preserveParens: true,
 		errors,
 		comments,
 	});
