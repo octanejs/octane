@@ -576,6 +576,14 @@ export function __profileInstallNodeResolver(resolver: (subject: object) => Elem
 	nodeResolver = resolver;
 }
 
+/**
+ * Devtools ABI: the stable componentId events carry for a (possibly wrapped)
+ * component function — the same resolution `why()` applies to its argument.
+ */
+export function __profileComponentId(component: Function): string {
+	return metadataFor(component).id;
+}
+
 export interface OctaneProfiler {
 	start(options?: ProfilerStartOptions): void;
 	stop(): void;

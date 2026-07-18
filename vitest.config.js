@@ -369,6 +369,19 @@ export default defineConfig({
 				plugins: [octane({ hmr: false, profile: true })],
 			},
 			{
+				// @octanejs/scan consumes the profile-build inspection channel, so its
+				// tests compile with the same production-semantics profile build as
+				// the octane-profile project above.
+				test: {
+					name: 'scan',
+					include: ['packages/scan/tests/**/*.test.tsrx'],
+					environment: 'jsdom',
+					globals: false,
+					env: { OCTANE_TEST_COMPILE_MODE: 'profile' },
+				},
+				plugins: [octane({ hmr: false, profile: true })],
+			},
+			{
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],
