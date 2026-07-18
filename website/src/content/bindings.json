@@ -65,7 +65,12 @@
   },
   {
     "title": "Styling, tests, and devtools",
-    "description": "Compiled StyleX, DOM-first component tests, and the TanStack Devtools panel.",
-    "packages": ["@octanejs/stylex", "@octanejs/testing-library", "@octanejs/tanstack-devtools"]
+    "description": "Compiled StyleX, runtime styled-components, DOM-first component tests, and the TanStack Devtools panel.",
+    "packages": [
+      "@octanejs/stylex",
+      "@octanejs/styled-components",
+      "@octanejs/testing-library",
+      "@octanejs/tanstack-devtools"
+    ]
   }
 ]

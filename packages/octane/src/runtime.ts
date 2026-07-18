@@ -14333,7 +14333,19 @@ function hostElementBody(d: ElementDescriptor, block: Block): void {
 	}
 	if (el === null || el.localName !== d.type || (elNs !== undefined && el.namespaceURI !== elNs)) {
 		// First render, or the host tag changed at this slot — (re)create the element.
-		if (el !== null) (el as ChildNode).remove();
+		if (el !== null) {
+			(el as ChildNode).remove();
+			// The children slot's live content — markers included — sat inside the
+			// removed element, so a preserved slot would keep rendering into the
+			// detached node. Run the subtree's cleanups and drop the slot state so
+			// the children REMOUNT into the fresh element: React parity, where a
+			// host tag change remounts the entire subtree.
+			const childState = block.slots[0] as ChildSlot | undefined;
+			if (childState !== undefined) {
+				clearChildContent(childState);
+				block.slots[0] = undefined as any;
+			}
+		}
 		el =
 			elNs !== undefined
 				? document.createElementNS(elNs, d.type as string)
