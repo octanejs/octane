@@ -683,6 +683,7 @@ overrides:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': 0b7535578a1327e33019974cc015cbaafbd88bc4a1f60997c23bfb979cd7a081
+  '@tsrx/core@0.1.40': 2644b011bdd62e2cff980c50c018b7a52dabd59786cb29e971fbb0394fa07bb0
 
 importers:
 
@@ -3394,7 +3395,7 @@ importers:
     dependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.1.40
+        version: 0.1.40(patch_hash=2644b011bdd62e2cff980c50c018b7a52dabd59786cb29e971fbb0394fa07bb0)
       devalue:
         specifier: catalog:default
         version: 5.8.1
@@ -3434,7 +3435,7 @@ importers:
     devDependencies:
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.1.40
+        version: 0.1.40(patch_hash=2644b011bdd62e2cff980c50c018b7a52dabd59786cb29e971fbb0394fa07bb0)
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
@@ -4419,7 +4420,7 @@ importers:
         version: 3.23.0
       '@tsrx/core':
         specifier: catalog:default
-        version: 0.1.40
+        version: 0.1.40(patch_hash=2644b011bdd62e2cff980c50c018b7a52dabd59786cb29e971fbb0394fa07bb0)
       '@types/three':
         specifier: catalog:default
         version: 0.172.0
@@ -14488,7 +14489,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/core@0.1.40':
+  '@tsrx/core@0.1.40(patch_hash=2644b011bdd62e2cff980c50c018b7a52dabd59786cb29e971fbb0394fa07bb0)':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
       '@noble/hashes': 2.2.0
@@ -14505,7 +14506,7 @@ snapshots:
 
   '@tsrx/prettier-plugin@0.3.97(prettier@3.8.4)':
     dependencies:
-      '@tsrx/core': 0.1.40
+      '@tsrx/core': 0.1.40(patch_hash=2644b011bdd62e2cff980c50c018b7a52dabd59786cb29e971fbb0394fa07bb0)
       prettier: 3.8.4
     transitivePeerDependencies:
       - '@typescript-eslint/types'
