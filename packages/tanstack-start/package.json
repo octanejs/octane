@@ -1,0 +1,66 @@
+{
+  "name": "@octanejs/tanstack-start",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TanStack Start for Octane — first-party binding that fronts the vendored @tanstack/octane-start PR-branch packages",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./client": {
+      "types": "./src/client.d.ts",
+      "default": "./src/client.js"
+    },
+    "./server": {
+      "types": "./src/server.d.ts",
+      "default": "./src/server.js"
+    },
+    "./client-rpc": {
+      "types": "./src/client-rpc.d.ts",
+      "default": "./src/client-rpc.js"
+    },
+    "./server-rpc": {
+      "types": "./src/server-rpc.d.ts",
+      "default": "./src/server-rpc.js"
+    },
+    "./ssr-rpc": {
+      "types": "./src/ssr-rpc.d.ts",
+      "default": "./src/ssr-rpc.js"
+    },
+    "./server-only": {
+      "types": "./src/server-only.d.ts",
+      "default": "./src/server-only.js"
+    },
+    "./client-only": {
+      "types": "./src/client-only.d.ts",
+      "default": "./src/client-only.js"
+    },
+    "./plugin/vite": {
+      "types": "./src/plugin-vite.d.ts",
+      "default": "./src/plugin-vite.js"
+    },
+    "./server-entry": {
+      "types": "./src/server-entry.d.ts",
+      "default": "./src/server-entry.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@tanstack/octane-start": "workspace:*"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "vite": ">=7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "octane": "workspace:*"
+  }
+}
