@@ -55,6 +55,101 @@ const octaneStoreFactory = (opts: { isServer?: boolean }) => {
 export class Router extends (RouterCore as any) {
 	constructor(options: any) {
 		super(options, octaneStoreFactory);
+
+		// router-core starts the resolved-match commit through startViewTransition,
+		// whose browser callback may run after router-core's load promise resolves.
+		// Track those callbacks so `await router.load()` is a real render-readiness
+		// boundary: the active match tree is committed before a consumer's first
+		// render or hydration pass.
+		const coreLoad = this.load.bind(this);
+		const coreStartViewTransition = this.startViewTransition.bind(this);
+		const pendingViewCommits = new Set<Promise<void>>();
+		const activeLoadScopes = new Set<Set<Promise<void>>>();
+
+		this.startViewTransition = (fn: () => Promise<void>) => {
+			let resolveCommit!: () => void;
+			let rejectCommit!: (error: unknown) => void;
+			const commit = new Promise<void>((resolve, reject) => {
+				resolveCommit = resolve;
+				rejectCommit = reject;
+			});
+			pendingViewCommits.add(commit);
+			for (const scope of activeLoadScopes) scope.add(commit);
+			// Keep only unsettled callbacks globally. A later load waits for a prior
+			// callback so no mutation can land after its readiness boundary, but only
+			// the active scopes above own (and therefore propagate) this failure.
+			void commit.then(
+				() => pendingViewCommits.delete(commit),
+				() => pendingViewCommits.delete(commit),
+			);
+
+			const runCommit = async () => {
+				try {
+					await fn();
+					resolveCommit();
+				} catch (error) {
+					rejectCommit(error);
+				}
+			};
+
+			try {
+				coreStartViewTransition(runCommit);
+			} catch (error) {
+				rejectCommit(error);
+				throw error;
+			}
+		};
+
+		this.load = async (...args: any[]) => {
+			const prerequisiteCommits = new Set(pendingViewCommits);
+			const viewCommits = new Set<Promise<void>>();
+			activeLoadScopes.add(viewCommits);
+			let hasLoadError = false;
+			let loadError: unknown;
+			let result: unknown;
+			try {
+				result = await coreLoad(...args);
+			} catch (error) {
+				hasLoadError = true;
+				loadError = error;
+			} finally {
+				// All commits started by this core load are now registered. Stop
+				// accepting commits from later navigations before awaiting this scope.
+				activeLoadScopes.delete(viewCommits);
+			}
+
+			let hasCommitError = false;
+			let commitError: unknown;
+			const [, outcomes] = await Promise.all([
+				Promise.allSettled(prerequisiteCommits),
+				Promise.allSettled(viewCommits),
+			]);
+			const rejected = outcomes.find((outcome) => outcome.status === 'rejected');
+			if (rejected?.status === 'rejected') {
+				hasCommitError = true;
+				commitError = rejected.reason;
+			}
+			if (hasLoadError) throw loadError;
+			if (hasCommitError) throw commitError;
+
+			// RouterCore derives the final HTTP status immediately after its internal
+			// load promise resolves. A platform-deferred View Transition can commit the
+			// new tree only after that point, so finalize every branch once the
+			// render-ready tree is present. RouterCore has already committed a
+			// redirect and its HTTP status together, so preserve that authoritative
+			// status; otherwise a successful tree must also clear a stale 404/500.
+			const state = this.state;
+			const statusCode =
+				state.redirect != null
+					? state.statusCode
+					: this.hasNotFoundMatch()
+						? 404
+						: state.matches.some((match: any) => match.status === 'error')
+							? 500
+							: 200;
+			this.stores.statusCode.set(statusCode);
+			return result;
+		};
 	}
 }
 

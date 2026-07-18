@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tiptap",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,
@@ -68,8 +68,10 @@
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "octane": "workspace:*",
+    "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default"
   }
 }

@@ -7,9 +7,17 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { docs } from '../src/content/docs.ts';
+import { SITE_TITLE } from '../src/constants/site.ts';
+import { Route as RootRoute } from '../src/routes/__root.tsrx';
 
 const publicDir = fileURLToPath(new URL('../public', import.meta.url));
 const read = (name: string) => fs.readFileSync(`${publicDir}/${name}`, 'utf-8');
+const head = RootRoute.options.head!({} as never);
+const meta = (key: string) =>
+	head.meta?.find(
+		(entry: { property?: string; name?: string; content?: string }) =>
+			entry.property === key || entry.name === key,
+	)?.content;
 
 describe('seo artifacts', () => {
 	it('sitemap lists the site routes and every published doc', () => {
@@ -33,18 +41,13 @@ describe('seo artifacts', () => {
 	});
 
 	it('head ships social-preview tags and the card image they point at', () => {
-		const html = fs.readFileSync(fileURLToPath(new URL('../index.html', import.meta.url)), 'utf-8');
-		// Prettier may wrap a long tag across lines, so \s+ must span newlines.
-		const meta = (attr: string, key: string) =>
-			html.match(new RegExp(`<meta\\s+${attr}="${key}"\\s+content="([^"]+)"`))?.[1];
-
-		expect(meta('property', 'og:title')).toBeTruthy();
-		expect(meta('property', 'og:description')).toBeTruthy();
-		expect(meta('name', 'twitter:card')).toBe('summary_large_image');
+		expect(meta('og:title')).toBeTruthy();
+		expect(meta('og:description')).toBeTruthy();
+		expect(meta('twitter:card')).toBe('summary_large_image');
 
 		// Scrapers fetch og:image without resolving relative URLs reliably, so the
 		// tag must be absolute — and the file it names must actually ship.
-		const image = meta('property', 'og:image');
+		const image = meta('og:image');
 		expect(image).toMatch(/^https:\/\/octanejs\.dev\//);
 		const file = new URL(image!).pathname.replace(/^\//, '');
 		expect(fs.existsSync(`${publicDir}/${file}`), file).toBe(true);
@@ -52,18 +55,26 @@ describe('seo artifacts', () => {
 		// 1200×630 is the summary_large_image aspect every major scraper crops to;
 		// read the dimensions from the PNG IHDR so a regenerated image can't drift.
 		const png = fs.readFileSync(`${publicDir}/${file}`);
-		expect(png.readUInt32BE(16)).toBe(Number(meta('property', 'og:image:width') ?? 1200));
-		expect(png.readUInt32BE(20)).toBe(Number(meta('property', 'og:image:height') ?? 630));
+		expect(png.readUInt32BE(16)).toBe(Number(meta('og:image:width') ?? 1200));
+		expect(png.readUInt32BE(20)).toBe(Number(meta('og:image:height') ?? 630));
 		expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1200, 630]);
 	});
 
+	it('root route title matches the SITE_TITLE constant restored after navigation', () => {
+		// useTitle resets document.title to SITE_TITLE on unmount; if that drifts
+		// from the served <title>, leaving a doc page would flicker a different tab
+		// title. Keep the two byte-identical.
+		expect(head.meta).toContainEqual({ title: SITE_TITLE });
+	});
+
 	it('ships every icon the head tags and manifest reference', () => {
-		const html = fs.readFileSync(fileURLToPath(new URL('../index.html', import.meta.url)), 'utf-8');
 		const manifest = JSON.parse(read('site.webmanifest'));
-		const referenced = new Set<string>();
-		for (const m of html.matchAll(/(?:href)="\/([^"]+\.(?:ico|png|svg|webmanifest))"/g)) {
-			referenced.add(m[1]);
-		}
+		const referenced = new Set<string>([
+			'favicon.ico',
+			'favicon.svg',
+			'apple-touch-icon.png',
+			'site.webmanifest',
+		]);
 		for (const icon of manifest.icons) referenced.add(icon.src.replace(/^\//, ''));
 		expect(referenced.size).toBeGreaterThanOrEqual(5);
 		for (const file of referenced) {

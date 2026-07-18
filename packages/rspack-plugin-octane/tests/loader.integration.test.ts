@@ -37,6 +37,7 @@ function transform({
 }) {
 	const dependencies: string[] = [];
 	const missingDependencies: string[] = [];
+	const warnings: Error[] = [];
 	const module = { buildInfo: {} as Record<string, unknown> };
 	let output: LoaderOutput | undefined;
 	octaneLoader.call(
@@ -53,6 +54,7 @@ function transform({
 			getOptions: () => options,
 			addDependency: (dependency: string) => dependencies.push(dependency),
 			addMissingDependency: (dependency: string) => missingDependencies.push(dependency),
+			emitWarning: (warning: Error) => warnings.push(warning),
 			callback: (error: Error | null, content?: string | Buffer, map?: unknown) => {
 				output = { error, content, map };
 			},
@@ -61,7 +63,7 @@ function transform({
 	);
 	if (!output) throw new Error('Octane loader did not invoke its callback.');
 	if (output.error) throw output.error;
-	return { ...output, dependencies, missingDependencies, module };
+	return { ...output, dependencies, missingDependencies, warnings, module };
 }
 
 describe('loader with the neutral compiler', () => {
@@ -153,6 +155,70 @@ describe('loader with the neutral compiler', () => {
 
 		expect(String(result.content)).toContain('export const _$_server_$_');
 		expect(result.module.buildInfo.octane).toMatchObject({ serverRpc: true });
+	});
+
+	it('gates ownership behind requireDirective and reports forgotten directives', () => {
+		const options = { requireDirective: true };
+		// Fixtures exist on disk, as in a real build: the loader realpaths the
+		// resource, so project ownership resolves against the realpathed root.
+		const reactSource = "import * as React from 'react';\nexport const Host = () => <p/>;\n";
+		const islandSource = "'use octane';\nexport function Island() @{ <p>{'island'}</p> }";
+		const badSource = 'export function Bad() @{ <p/> }';
+		const hookSource =
+			"import { useState } from 'octane';\nexport function useCount() { return useState(0); }\n";
+
+		// An undirected project .tsx belongs to the host toolchain: untouched,
+		// no Octane build metadata.
+		const host = transform({
+			root,
+			resourcePath: write(root, 'src/Host.tsx', reactSource),
+			source: reactSource,
+			options,
+		});
+		expect(host.content).toBe(reactSource);
+		expect(getOctaneRspackBuildInfo(host.module)).toBeNull();
+
+		// The directive claims a module for Octane and never ships.
+		const island = transform({
+			root,
+			resourcePath: write(root, 'src/Island.tsrx', islandSource),
+			source: islandSource,
+			options,
+		});
+		expect(String(island.content)).not.toContain('use octane');
+		expect(getOctaneRspackBuildInfo(island.module)?.transformKind).toBe('compile');
+
+		// An undirected .tsrx has no other compiler — surfaced as a build error.
+		expect(() =>
+			transform({
+				root,
+				resourcePath: write(root, 'src/Bad.tsrx', badSource),
+				source: badSource,
+				options,
+			}),
+		).toThrow(/has no 'use octane' module directive/);
+
+		// An undirected octane-importing .ts skips slotting and warns through
+		// Rspack's module-warning channel.
+		const hook = transform({
+			root,
+			resourcePath: write(root, 'src/useCount.ts', hookSource),
+			source: hookSource,
+			options,
+		});
+		expect(String(hook.content)).toContain('useCount');
+		expect(getOctaneRspackBuildInfo(hook.module)).toBeNull();
+		expect(hook.warnings.some((warning) => warning.message.includes("'use octane'"))).toBe(true);
+	});
+
+	it('delivers native text onChange diagnostics as Rspack module warnings', () => {
+		const source = `export function App() @{ <input onChange={() => {}} /> }\n`;
+		const resourcePath = write(root, 'src/App.tsrx', source);
+		const result = transform({ root, resourcePath, source });
+
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0].message).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+		expect(result.warnings[0].message).toContain('/src/App.tsrx:1:');
 	});
 
 	it('compiles eligible raw dependency TSX', () => {

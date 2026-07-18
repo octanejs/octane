@@ -50,3 +50,17 @@ export function EffectUnmountRoot(props) @{
 	}, [props.step]);
 	<span id="effect-root">{'Hi'}</span>
 }
+
+function ThrowingChild() {
+	throw new Error('failed initial render');
+}
+
+export function EffectThenThrowRoot(props) @{
+	useEffect(() => {
+		props.log('effect');
+		return () => props.log('cleanup');
+	}, []);
+	<section id="partial-root">
+		<ThrowingChild />
+	</section>
+}

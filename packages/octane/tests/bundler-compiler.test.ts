@@ -10,6 +10,7 @@ import {
 	canonicalModuleId,
 	createClientReferenceManifest,
 	createOctaneCompiler,
+	findVoidComponentImports,
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
 import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
@@ -87,6 +88,7 @@ describe('bundler-neutral compiler integration', () => {
 		expect(canonicalModuleId(String.raw`C:\external\App.tsrx`, String.raw`C:\project`)).toBe(
 			'C:/external/App.tsrx',
 		);
+		expect(canonicalModuleId('#nitro/virtual/polyfills', root)).toBe('#nitro/virtual/polyfills');
 	});
 
 	it('compiles the same source for client and server with maps', () => {
@@ -434,6 +436,35 @@ export default interface ErasedShape { value: string }
 				collectVoidComponentExports: true,
 			});
 			expect(compiledDefault?.voidComponentExports).toEqual(['default']);
+			const memoComponent =
+				"import { memo as cache } from 'octane';\n" +
+				'function MainImpl(p) @{ if (!p.ready) return null; <main>ready</main> }\n' +
+				'export const Main = cache(MainImpl);\n';
+			const compiledMemo = compiler.transform(memoComponent, component, {
+				hmr: false,
+				dev: false,
+				collectVoidComponentExports: true,
+			});
+			expect(compiledMemo?.voidComponentExports).toEqual(['Main']);
+			expect(compiledMemo?.code).toContain('_$ifBlock');
+			expect(compiledMemo?.code).not.toContain('componentSlot');
+			const constComponent =
+				"export const fixtureKind = 'guarded',\n" +
+				'  Main = function (p) @{ if (!p.ready) return null; <main>ready</main> },\n' +
+				'  fixtureAfter = fixtureKind;\n';
+			const compiledConst = compiler.transform(constComponent, component, {
+				hmr: false,
+				dev: false,
+				collectVoidComponentExports: true,
+			});
+			expect(compiledConst?.voidComponentExports).toEqual(['Main']);
+			expect(
+				compiler.transform(constComponent, component, {
+					environment: 'server',
+					hmr: false,
+					dev: false,
+				}),
+			).toMatchObject({ kind: 'compile' });
 			const proveDefault = (request: string, imported: string) =>
 				request === './Main.tsrx' && imported === 'default';
 			const specialized = compiler.transform(defaultEntry, entry, {
@@ -467,8 +498,9 @@ export default interface ErasedShape { value: string }
 				}),
 			).toMatchObject({ kind: 'none', code: defaultEntry });
 
-			// A component-owned value return makes both default and named exports
-			// ineligible. Nested function returns are a separate scope and stay safe.
+			// A renderable component-owned return stays ineligible. Null-only guards
+			// lower to template control flow above; nested function returns remain a
+			// separate scope and stay safe.
 			writeFileSync(
 				component,
 				"export default function Main(p) @{ if (p.early) return 'early'; <main>ready</main> }\n",
@@ -479,6 +511,34 @@ export default interface ErasedShape { value: string }
 				{ collectVoidComponentExports: true },
 			);
 			expect(valueReturning?.voidComponentExports).toEqual([]);
+
+			const modularSource =
+				"import { Main as Child } from './Main.tsrx';\n" +
+				'export function Parent(p) @{ <section><Child ready={p.ready} /></section> }\n';
+			expect(findVoidComponentImports(modularSource, join(src, 'Parent.tsrx'))).toEqual([
+				{ request: './Main.tsrx', imported: 'Main' },
+			]);
+			const modular = compiler.transform(modularSource, join(src, 'Parent.tsrx'), {
+				hmr: false,
+				dev: false,
+				isVoidComponentImport: (request, imported) =>
+					request === './Main.tsrx' && imported === 'Main',
+			});
+			expect(modular?.code).toContain('_$componentSlotVoid(');
+			expect(modular?.code).not.toContain('_$componentSlot(');
+
+			const shadowed = compiler.transform(
+				"import { Main as Child } from './Main.tsrx';\n" +
+					'export function Parent(Child) @{ <section><Child /></section> }\n',
+				join(src, 'Shadowed.tsrx'),
+				{
+					hmr: false,
+					dev: false,
+					isVoidComponentImport: () => true,
+				},
+			);
+			expect(shadowed?.code).toContain('_$componentSlot(');
+			expect(shadowed?.code).not.toContain('_$componentSlotVoid(');
 
 			const namedEntry =
 				"import { createRoot as root } from 'octane';\n" +
@@ -518,6 +578,72 @@ export default interface ErasedShape { value: string }
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it('lowers statically compilable ErrorBoundary JSX without retaining the builtin', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const source = `
+import { ErrorBoundary as Boundary } from 'octane';
+function Thrower(p) @{ if (p.fail) throw new Error('boom'); <span>ok</span> }
+export function App(p) @{
+  <Boundary fallback={(error, reset) => <button onClick={reset}>{(error as Error).message}</button>}>
+    <Thrower fail={p.fail} />
+  </Boundary>
+}`;
+		const client = compiler.transform(source, '/project/src/App.tsrx', {
+			hmr: false,
+			dev: false,
+		});
+		expect(client?.code).toContain('_$tryBlock(');
+		expect(client?.code).toContain(', true);');
+		expect(client?.code).not.toContain('ErrorBoundary');
+
+		const server = compiler.transform(source, '/project/src/App.tsrx', {
+			environment: 'server',
+			dev: false,
+		});
+		expect(server?.code).toContain('_$ssrTry(');
+		expect(server?.code).toContain('(__error, __scope, __reset) =>');
+		expect(server?.code).toContain(', undefined, true)');
+		expect(server?.code).not.toContain('ErrorBoundary');
+
+		const dynamic = compiler.transform(
+			`import { ErrorBoundary as Boundary } from 'octane';
+export function App(p) @{ <Boundary fallback={p.fallback}><span>ok</span></Boundary> }`,
+			'/project/src/Dynamic.tsrx',
+			{ hmr: false, dev: false },
+		);
+		expect(dynamic?.code).toContain('ErrorBoundary as Boundary');
+		expect(dynamic?.code).toContain('_$componentSlot(');
+		expect(dynamic?.code).not.toContain('_$tryBlock(');
+
+		const mixedSource = `import { ErrorBoundary as Boundary } from 'octane';
+export function App(p) @{ <><Boundary fallback={<span>static</span>}><span>ok</span></Boundary><Boundary fallback={p.fallback}><span>dynamic</span></Boundary></> }`;
+		const mixed = compiler.transform(mixedSource, '/project/src/MixedBoundary.tsrx', {
+			hmr: false,
+			dev: false,
+		});
+		expect(mixed?.code).toContain('ErrorBoundary as Boundary');
+		expect(mixed?.code).toContain('_$tryBlock(');
+		expect(mixed?.code).toContain('_$componentSlot(');
+
+		const mixedServer = compiler.transform(mixedSource, '/project/src/MixedBoundary.tsrx', {
+			environment: 'server',
+			dev: false,
+		});
+		expect(mixedServer?.code).toContain('ErrorBoundary as Boundary');
+		expect(mixedServer?.code).toContain('_$ssrTry(');
+		expect(mixedServer?.code).toContain('_$ssrComponent(');
+
+		const asyncFallback = compiler.transform(
+			`import { ErrorBoundary as Boundary } from 'octane';
+export function App() @{ <Boundary fallback={async (error) => String(error)}><span>ok</span></Boundary> }`,
+			'/project/src/AsyncFallback.tsrx',
+			{ hmr: false, dev: false },
+		);
+		expect(asyncFallback?.code).toContain('ErrorBoundary as Boundary');
+		expect(asyncFallback?.code).toContain('_$componentSlot(');
+		expect(asyncFallback?.code).not.toContain('_$tryBlock(');
 	});
 
 	it('applies profiling metadata only to client transforms', () => {
@@ -783,6 +909,195 @@ export default interface ErasedShape { value: string }
 			expect(discovered.missingDependencies).toContain(
 				join(realpathSync(root), 'node_modules/missing-child/package.json'),
 			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('requireDirective ownership gate', () => {
+	const DIRECTIVE_COMPONENT = "'use octane';\n" + COMPONENT;
+	const REACT_TSX =
+		"import * as React from 'react';\n" +
+		'export function Host() {\n' +
+		'  return <p className="host">{\'react\'}</p>;\n' +
+		'}\n';
+
+	it('compiles only directive-carrying project modules when enabled', () => {
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+		});
+		// Directive-carrying .tsrx compiles; the directive never ships.
+		const island = compiler.transform(DIRECTIVE_COMPONENT, '/project/src/Island.tsrx');
+		expect(island?.kind).toBe('compile');
+		expect(island?.code).not.toContain('use octane');
+		// Octane-in-.tsx authoring survives behind the directive.
+		const octaneTsx = compiler.transform(
+			"'use octane';\nexport function App() @{\n  <p>{'oct'}</p>\n}\n",
+			'/project/src/App.tsx',
+		);
+		expect(octaneTsx?.kind).toBe('compile');
+		// An undirected project .tsx belongs to the host toolchain, untouched.
+		expect(compiler.transform(REACT_TSX, '/project/src/Host.tsx')).toBeNull();
+		// An undirected project .tsrx has no other compiler — hard error.
+		expect(() => compiler.transform(COMPONENT, '/project/src/Bad.tsrx')).toThrow(
+			/has no 'use octane' module directive/,
+		);
+	});
+
+	it('gates hook slotting and reports likely-forgotten directives once', () => {
+		const warnings: string[] = [];
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+			warn: (message: string) => warnings.push(message),
+		});
+		// Undirected octane-importing .ts: untouched, one diagnostic.
+		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
+		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
+		expect(warnings).toHaveLength(1);
+		expect(warnings[0]).toContain('/src/useCount.ts');
+		expect(warnings[0]).toContain("'use octane'");
+		// The directive turns slotting back on, and is stripped from output.
+		const directed = compiler.transform("'use octane';\n" + HOOK, '/project/src/useDirected.ts');
+		expect(directed?.kind).toBe('slots');
+		expect(directed?.code).not.toContain('use octane');
+	});
+
+	it('keeps manifest-declared packages exempt from the directive gate', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-directive-manifest-'));
+		try {
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			const packageRoot = join(root, 'node_modules/raw-octane');
+			mkdirSync(join(packageRoot, 'src'), { recursive: true });
+			writeFileSync(
+				join(packageRoot, 'package.json'),
+				JSON.stringify({ name: 'raw-octane', peerDependencies: { octane: '*' } }),
+			);
+			const compiler = createOctaneCompiler({ root, requireDirective: true });
+			// Installed packages made their Octane decision in their manifest —
+			// no directive required, exactly as without the gate.
+			expect(
+				compiler.transform(
+					`export function App() { return <p>{'raw'}</p>; }`,
+					join(packageRoot, 'src/App.tsx'),
+				)?.kind,
+			).toBe('compile');
+			expect(compiler.transform(COMPONENT, join(packageRoot, 'src/Island.tsrx'))?.kind).toBe(
+				'compile',
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('tolerates and strips the directive when the gate is off', () => {
+		const compiler = createOctaneCompiler({ root: resolve('/project') });
+		const island = compiler.transform(DIRECTIVE_COMPONENT, '/project/src/Island.tsrx');
+		expect(island?.kind).toBe('compile');
+		expect(island?.code).not.toContain('use octane');
+		const slotted = compiler.transform("'use octane';\n" + HOOK, '/project/src/useCount.ts');
+		expect(slotted?.kind).toBe('slots');
+		expect(slotted?.code).not.toContain('use octane');
+	});
+
+	it('keeps the directive out of Octane-owned pass-through results', () => {
+		// A directed module with nothing to rewrite (no hooks to slot) is still
+		// Octane output: whatever code the result carries omits the build-time
+		// directive, matching compiled and slotted modules.
+		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
+		const untouched = compiler.transform(
+			"'use octane';\nimport { createRoot } from 'octane';\nexport const boot = createRoot;\n",
+			'/project/src/boot.ts',
+		);
+		expect(untouched?.code ?? '').not.toContain('use octane');
+	});
+
+	it('recognizes the directive after comments and other directives', () => {
+		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
+		const source = '// island\n/* mixed */\n"use client";\n\'use octane\';\n' + COMPONENT;
+		const out = compiler.transform(source, '/project/src/Island.tsrx');
+		expect(out?.kind).toBe('compile');
+		expect(out?.code).not.toContain('use octane');
+	});
+
+	it('lets exclude route .tsrx paths to another tsrx compiler', () => {
+		// tsrx syntax can target other renderers (@tsrx/react); a project
+		// routing part of its .tsrx through a different tsrx compiler lists
+		// those paths in `exclude`, and Octane never claims them — no error,
+		// no compile, no directive requirement.
+		const warnings: string[] = [];
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+			exclude: ['src/react-app/'],
+			warn: (message: string) => warnings.push(message),
+		});
+		expect(compiler.transform(COMPONENT, '/project/src/react-app/View.tsrx')).toBeNull();
+		// The exclusion wins even over a directive, with a diagnostic naming
+		// the conflict instead of a silent no-op.
+		expect(
+			compiler.transform(DIRECTIVE_COMPONENT, '/project/src/react-app/Island.tsrx'),
+		).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/Island.tsrx'))).toBe(true);
+		expect(warnings.some((message) => message.includes('exclu'))).toBe(true);
+		// The same conflict diagnostic covers the .ts/.js hook-slot exclusion.
+		expect(
+			compiler.transform("'use octane';\n" + HOOK, '/project/src/react-app/util.ts'),
+		).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/util.ts'))).toBe(true);
+		// Outside the excluded paths the gate is unchanged.
+		expect(() => compiler.transform(COMPONENT, '/project/src/islands/Bad.tsrx')).toThrow(
+			/has no 'use octane' module directive/,
+		);
+	});
+});
+
+describe('requireDirective and client-only classification', () => {
+	it('classifies client references with the same ownership gate as transforms', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-directive-client-only-'));
+		try {
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			mkdirSync(join(root, 'src/scenes'), { recursive: true });
+			const reactScene =
+				"import * as React from 'react';\nexport function Scene() { return <p/>; }\n";
+			const octaneScene = "'use octane';\nexport function Scene() @{ <node /> }\n";
+			const reactFile = join(root, 'src/scenes/ReactScene.tsx');
+			const octaneFile = join(root, 'src/scenes/OctaneScene.tsx');
+			writeFileSync(reactFile, reactScene);
+			writeFileSync(octaneFile, octaneScene);
+			const compiler = createOctaneCompiler({
+				root,
+				requireDirective: true,
+				renderers: {
+					registry: { object: { module: '/src/object-renderer.js', server: 'client-only' } },
+					rules: [{ include: 'src/scenes/**', renderer: 'object' }],
+				},
+			});
+			// An undirected project module matched by a client-only renderer rule
+			// is NOT Octane's: importers must not receive a client reference for
+			// a module whose own transform passes through to the host toolchain.
+			expect(compiler.clientReferenceForFile(reactFile)).toBeNull();
+			const serverTransform = compiler.transform(reactScene, reactFile, {
+				environment: 'server',
+			});
+			expect(serverTransform).toBeNull();
+			// The directed module keeps full client-only behavior: reference and
+			// server stub agree on identity.
+			const reference = compiler.clientReferenceForFile(octaneFile);
+			expect(reference).toMatchObject({ renderer: 'object' });
+			const stub = compiler.transform(octaneScene, octaneFile, { environment: 'server' });
+			expect(stub).toMatchObject({ kind: 'client-only-stub', clientReference: reference });
+			// A host-owned .ts under the client-only include is not Octane's
+			// either: classification and transform BOTH pass it through instead
+			// of one throwing the narrow-the-rule config error.
+			const hostUtil = 'export const scale = (value: number) => value * 2;\n';
+			const hostUtilFile = join(root, 'src/scenes/util.ts');
+			writeFileSync(hostUtilFile, hostUtil);
+			expect(compiler.clientReferenceForFile(hostUtilFile)).toBeNull();
+			expect(compiler.transform(hostUtil, hostUtilFile, { environment: 'server' })).toBeNull();
+			expect(compiler.transform(hostUtil, hostUtilFile, { environment: 'client' })).toBeNull();
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}

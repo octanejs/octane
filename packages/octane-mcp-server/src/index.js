@@ -41,6 +41,8 @@ export const BENCHMARK_SUITES = [
 	'js-framework',
 	'js-framework-reorder',
 	'todomvc',
+	'weather-app',
+	'weather-app-lighthouse',
 	'chat-stream',
 	'dbmon',
 	'recursive-context',
@@ -418,7 +420,7 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'Bridge a React package to Octane',
 			description:
-				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, class components, synthetic onChange, react-dom/server imports), whether a framework-agnostic core can be reused verbatim, whether an official @octanejs binding already exists, and a step-by-step bridge plan. Follow up with the bridge-react-package skill for the full workflow.',
+				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, class components, React-style text-host onChange, react-dom/server imports), whether a framework-agnostic core can be reused verbatim, whether an official @octanejs binding already exists, and a step-by-step bridge plan. Follow up with the bridge-react-package skill for the full workflow.',
 			inputSchema: {
 				package: z
 					.string()

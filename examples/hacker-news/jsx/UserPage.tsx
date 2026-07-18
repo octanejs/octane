@@ -27,7 +27,10 @@ export function UserPage() {
 			{data.about && (
 				<div {...stylex.props(styles.userRow)}>
 					<span {...stylex.props(styles.label)}>about:</span>
-					<span {...stylex.props(styles.commentText)} innerHTML={data.about} />
+					<span
+						{...stylex.props(styles.commentText)}
+						dangerouslySetInnerHTML={{ __html: data.about }}
+					/>
 				</div>
 			)}
 		</div>

@@ -8,7 +8,7 @@
 // Each installStaleChunkReload() call below models one page lifetime sharing
 // the tab's sessionStorage — what a real reload produces.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { installStaleChunkReload } from '../src/app/router-client.ts';
+import { installStaleChunkReload } from '../src/app/stale-chunk-reload.ts';
 
 beforeEach(() => {
 	vi.useFakeTimers();

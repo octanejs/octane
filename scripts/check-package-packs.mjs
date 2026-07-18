@@ -1,5 +1,15 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	cpSync,
+	existsSync,
+	mkdtempSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +19,11 @@ import {
 	REPO_ROOT,
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
+import {
+	createPackedExampleManifest,
+	isWithinDirectory,
+	renderPackedExampleWorkspace,
+} from './package-pack-canaries.mjs';
 
 const packages = getPublishablePackages();
 const packageVersions = new Map(packages.map((pkg) => [pkg.name, pkg.version]));
@@ -18,6 +33,33 @@ const octaneSingletonConsumers = new Set([
 	'@octanejs/rsbuild-plugin',
 	'@octanejs/vite-plugin',
 ]);
+const viteToolRequire = createRequire(
+	path.join(REPO_ROOT, 'packages/vite-plugin-octane/package.json'),
+);
+const viteVersion = viteToolRequire('vite/package.json').version;
+const nodeTypesVersion = viteToolRequire('@types/node/package.json').version;
+const packedExampleCanaries = [
+	{
+		artifacts: ['dist/index.html'],
+		dependencyEdges: [['@octanejs/visx', '@octanejs/floating-ui']],
+		directory: 'pulseboard',
+		label: 'Pulseboard client example',
+		packages: [
+			'octane',
+			'@octanejs/tanstack-table',
+			'@octanejs/tanstack-virtual',
+			'@octanejs/visx',
+			'@octanejs/floating-ui',
+		],
+	},
+	{
+		artifacts: ['dist/client', 'dist/server/entry.js', 'dist/server/index.html'],
+		dependencyEdges: [['@octanejs/vite-plugin', '@octanejs/app-core']],
+		directory: 'wayfinder',
+		label: 'Wayfinder SSR example',
+		packages: ['octane', '@octanejs/vite-plugin', '@octanejs/app-core'],
+	},
+];
 const inventoryErrors = validateWorkspacePackages(packages);
 if (inventoryErrors.length) {
 	console.error(`cannot pack an invalid package inventory:\n  - ${inventoryErrors.join('\n  - ')}`);
@@ -139,6 +181,144 @@ function requireArchive(archives, packageName) {
 	return archive;
 }
 
+function fileArchiveSpec(archives, packageName) {
+	return `file:${requireArchive(archives, packageName)}`;
+}
+
+function preparePackedExample(tempRoot, archives, canary) {
+	const sourceDirectory = path.join(REPO_ROOT, 'examples', canary.directory);
+	const consumerDirectory = path.join(tempRoot, `example-${canary.directory}`);
+	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
+		throw new Error(`${canary.label} consumer must be created outside the workspace`);
+	}
+	cpSync(sourceDirectory, consumerDirectory, {
+		filter(source) {
+			const relative = path.relative(sourceDirectory, source);
+			const topLevel = relative.split(path.sep)[0];
+			return !['dist', 'node_modules', 'playwright-report', 'test-results'].includes(topLevel);
+		},
+		recursive: true,
+	});
+
+	const manifestPath = path.join(consumerDirectory, 'package.json');
+	const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+	const archiveSpecs = Object.fromEntries(
+		canary.packages.map((packageName) => [packageName, fileArchiveSpec(archives, packageName)]),
+	);
+	const packedManifest = createPackedExampleManifest(
+		manifest,
+		archiveSpecs,
+		viteVersion,
+		canary.label,
+	);
+	writeFileSync(manifestPath, `${JSON.stringify(packedManifest, null, 2)}\n`);
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		renderPackedExampleWorkspace(archiveSpecs),
+	);
+	return consumerDirectory;
+}
+
+function assertPackedExampleInstall(consumerDirectory, canary) {
+	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
+	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
+	const resolvedPackages = new Map();
+
+	for (const packageName of canary.packages) {
+		const entry = realpathSync(consumerRequire.resolve(packageName));
+		resolvedPackages.set(packageName, entry);
+		if (isWithinDirectory(REPO_ROOT, entry)) {
+			throw new Error(`${packageName} resolved back into the workspace: ${entry}`);
+		}
+		if (packageName !== 'octane') {
+			const peerRuntime = realpathSync(createRequire(entry).resolve('octane'));
+			if (peerRuntime !== directRuntime) {
+				throw new Error(
+					`${packageName} resolved a second Octane runtime:\n  app: ${directRuntime}\n  package: ${peerRuntime}`,
+				);
+			}
+		}
+	}
+	for (const [consumerName, dependencyName] of canary.dependencyEdges) {
+		const consumerEntry = resolvedPackages.get(consumerName);
+		const directDependency = resolvedPackages.get(dependencyName);
+		const nestedDependency = realpathSync(createRequire(consumerEntry).resolve(dependencyName));
+		if (nestedDependency !== directDependency) {
+			throw new Error(
+				`${consumerName} resolved a second ${dependencyName} install:\n  app: ${directDependency}\n  package: ${nestedDependency}`,
+			);
+		}
+	}
+	for (const reactRuntime of ['react', 'react-dom']) {
+		try {
+			const entry = consumerRequire.resolve(reactRuntime);
+			throw new Error(`${canary.label} unexpectedly installed ${reactRuntime}: ${entry}`);
+		} catch (error) {
+			if (error.code !== 'MODULE_NOT_FOUND') throw error;
+		}
+	}
+
+	const virtualStore = path.join(consumerDirectory, 'node_modules/.pnpm');
+	const installedRuntimeRoots = new Set();
+	const installedReactRuntimes = [];
+	for (const entry of readdirSync(virtualStore, { withFileTypes: true })) {
+		if (!entry.isDirectory()) continue;
+		if (/^(?:react|react-dom)@/.test(entry.name)) installedReactRuntimes.push(entry.name);
+		const runtimeRoot = path.join(virtualStore, entry.name, 'node_modules/octane');
+		if (existsSync(runtimeRoot)) installedRuntimeRoots.add(realpathSync(runtimeRoot));
+	}
+	if (installedRuntimeRoots.size !== 1) {
+		throw new Error(
+			`expected one physical Octane install, found ${installedRuntimeRoots.size}: ${[
+				...installedRuntimeRoots,
+			].join(', ')}`,
+		);
+	}
+	if (installedReactRuntimes.length) {
+		throw new Error(
+			`${canary.label} installed React runtime packages: ${installedReactRuntimes.join(', ')}`,
+		);
+	}
+
+	const lockfile = readFileSync(path.join(consumerDirectory, 'pnpm-lock.yaml'), 'utf8');
+	if (/\b(?:workspace|link):/.test(lockfile) || lockfile.includes(`${REPO_ROOT}${path.sep}`)) {
+		throw new Error('external example lockfile contains a workspace or link dependency');
+	}
+}
+
+function validatePackedExample(tempRoot, archives, canary) {
+	const consumerDirectory = preparePackedExample(tempRoot, archives, canary);
+	execFileSync(
+		'pnpm',
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=false',
+		],
+		{
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+	assertPackedExampleInstall(consumerDirectory, canary);
+	execFileSync('pnpm', ['run', 'build'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
+	for (const artifact of canary.artifacts) {
+		if (!existsSync(path.join(consumerDirectory, artifact))) {
+			throw new Error(`${canary.label} production build omitted ${artifact}`);
+		}
+	}
+	console.log(
+		`built ${canary.label} outside the workspace from ${canary.packages.length} packed package(s)`,
+	);
+}
+
 /**
  * Install a real consumer outside the workspace, then compile one application
  * against the packed core and a raw-source binding in both client and server
@@ -167,6 +347,10 @@ async function validatePackedConsumer(tempRoot, archives) {
 					octane: `file:${requireArchive(archives, 'octane')}`,
 					rxjs: '^7.8.2',
 					three: '0.172.0',
+				},
+				devDependencies: {
+					'@types/node': nodeTypesVersion,
+					vite: viteVersion,
 				},
 			},
 			null,
@@ -251,6 +435,25 @@ export function packageSurfaceProbe() {
 `,
 	);
 	writeFileSync(
+		path.join(sourceDirectory, 'compiler-plugin.ts'),
+		`import type { Plugin } from 'vite';
+import {
+	discoverOctaneSourceDependencies,
+	octane,
+	type OctaneVitePluginOptions,
+} from 'octane/compiler/vite';
+
+const options = {
+	hmr: false,
+	profile: false,
+	requireDirective: true,
+} satisfies OctaneVitePluginOptions;
+
+export const compilerPlugin: Plugin = octane(options);
+export const sourceDependencies: string[] = discoverOctaneSourceDependencies(process.cwd());
+`,
+	);
+	writeFileSync(
 		path.join(sourceDirectory, 'main.tsrx'),
 		`import { createRoot } from 'octane';
 import { App } from './App.tsrx';
@@ -282,8 +485,9 @@ export function renderProbe() {
 					skipLibCheck: false,
 					strict: true,
 					target: 'esnext',
+					types: ['node'],
 				},
-				include: ['src/package-surface.ts'],
+				include: ['src/compiler-plugin.ts', 'src/package-surface.ts'],
 			},
 			null,
 			2,
@@ -296,7 +500,13 @@ export function renderProbe() {
 
 	execFileSync(
 		'pnpm',
-		['install', '--prefer-offline', '--ignore-scripts', '--config.auto-install-peers=false'],
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=false',
+		],
 		{
 			cwd: consumerDirectory,
 			encoding: 'utf8',
@@ -339,9 +549,6 @@ export function renderProbe() {
 	const compilerPluginEntry = consumerRequire.resolve('octane/compiler/vite');
 	const { octane } = await import(pathToFileURL(compilerPluginEntry).href);
 	const threeConfigEntry = consumerRequire.resolve('@octanejs/three/config');
-	const toolRequire = createRequire(
-		path.join(REPO_ROOT, 'packages/vite-plugin-octane/package.json'),
-	);
 	const repositoryRequire = createRequire(path.join(REPO_ROOT, 'package.json'));
 	const threeConfigBundle = path.join(consumerDirectory, 'three-config.mjs');
 	execFileSync(
@@ -369,7 +576,7 @@ export function renderProbe() {
 			stdio: ['ignore', 'pipe', 'pipe'],
 		},
 	);
-	const { build: viteBuild } = await import(pathToFileURL(toolRequire.resolve('vite')).href);
+	const { build: viteBuild } = await import(pathToFileURL(viteToolRequire.resolve('vite')).href);
 	await viteBuild({
 		root: consumerDirectory,
 		configFile: false,
@@ -477,11 +684,23 @@ try {
 		}
 	}
 	if (!failures.length) {
-		try {
-			await validatePackedConsumer(tempRoot, packedArchives);
-		} catch (error) {
-			const detail = [error.message, error.stdout, error.stderr].filter(Boolean).join('\n');
-			failures.push(`external packed consumer: validation failed\n${detail}`);
+		const consumerValidations = [
+			{
+				label: 'external packed consumer',
+				run: () => validatePackedConsumer(tempRoot, packedArchives),
+			},
+			...packedExampleCanaries.map((canary) => ({
+				label: canary.label,
+				run: () => validatePackedExample(tempRoot, packedArchives, canary),
+			})),
+		];
+		for (const validation of consumerValidations) {
+			try {
+				await validation.run();
+			} catch (error) {
+				const detail = [error.message, error.stdout, error.stderr].filter(Boolean).join('\n');
+				failures.push(`${validation.label}: validation failed\n${detail}`);
+			}
 		}
 	}
 } finally {

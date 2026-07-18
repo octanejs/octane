@@ -272,6 +272,12 @@ export interface DiffPair {
 	 * easy diffing.
 	 */
 	step(name: string, fn: (i: DiffMount, r: DiffMount) => void | Promise<void>): Promise<void>;
+	/**
+	 * Drive and settle a step whose documented public result intentionally
+	 * differs between runtimes. The callback must make explicit per-runtime
+	 * assertions; unlike `step`, this does not require equal HTML.
+	 */
+	observe(name: string, fn: (i: DiffMount, r: DiffMount) => void | Promise<void>): Promise<void>;
 	/** Tear down both. */
 	unmount(): void;
 }
@@ -426,7 +432,20 @@ export async function mountDifferential(
 				}
 			},
 			find(selector) {
-				const el = container.querySelector(selector);
+				// Same jsdom quirk as `click` above: querySelector('#x') can miss
+				// freshly-React-rendered subtrees — fall back to a tree walk for id
+				// selectors.
+				let el: Element | null = container.querySelector(selector);
+				if (!el && selector.startsWith('#')) {
+					const id = selector.slice(1);
+					const all = container.getElementsByTagName('*');
+					for (let i = 0; i < all.length; i++) {
+						if (all[i].id === id) {
+							el = all[i];
+							break;
+						}
+					}
+				}
 				if (!el)
 					throw new Error(`no element matching ${selector} (${isReact ? 'react' : 'octane'})`);
 				return el;
@@ -440,11 +459,7 @@ export async function mountDifferential(
 	const octane = mkMount(octaneContainer, false);
 	const react = mkMount(reactContainer, true);
 
-	async function step(
-		name: string,
-		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
-	): Promise<void> {
-		await fn(octane, react);
+	async function settle(): Promise<void> {
 		// Settle octane's async work too: a store notify (useSyncExternalStore),
 		// transition, or deferred value schedules its re-render as a passive effect
 		// that flushSync (used inside `click`) doesn't drain. Without this the rig
@@ -458,6 +473,14 @@ export async function mountDifferential(
 		await reactAct(async () => {
 			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 		});
+	}
+
+	async function step(
+		name: string,
+		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
+	): Promise<void> {
+		await fn(octane, react);
+		await settle();
 		const i = normaliseHtml(octaneContainer.innerHTML);
 		const r = normaliseHtml(reactContainer.innerHTML);
 		if (i !== r) {
@@ -470,6 +493,14 @@ export async function mountDifferential(
 		// Verbose-pass on equality — using expect so the runner counts an
 		// assertion (helps with vitest's "asserted nothing" warnings).
 		expect(i).toBe(r);
+	}
+
+	async function observe(
+		_name: string,
+		fn: (i: DiffMount, r: DiffMount) => void | Promise<void>,
+	): Promise<void> {
+		await fn(octane, react);
+		await settle();
 	}
 
 	function unmount(): void {
@@ -487,5 +518,5 @@ export async function mountDifferential(
 		reactContainer.remove();
 	}
 
-	return { octane, react, step, unmount };
+	return { octane, react, step, observe, unmount };
 }

@@ -550,6 +550,33 @@ export function App() @{
 		expect(nodeTypeCount(child.code, 'Super')).toBeGreaterThan(0);
 	});
 
+	it('keeps scoped-style hashes identical across client and server compiles of a split module', () => {
+		// Scope hashes are position-derived, and the client extraction and server
+		// fallback strip shift a trailing <style> differently. The compiles must
+		// agree on the emitted hash classes or every server-rendered scope class
+		// hydration-mismatches.
+		const source = `
+import { Hydrate } from 'octane';
+import { Reviews } from './Reviews.tsrx';
+export function App() @{
+  <section class="host">
+    <Hydrate when={gate} fallback={<p>Loading</p>}>
+      <Reviews />
+    </Hydrate>
+    <style>
+      .host { color: red; }
+    </style>
+  </section>
+}
+`;
+		const instance = compiler();
+		const hashes = (code: string) => new Set(code.match(/tsrx-[0-9a-z]+/g) ?? []);
+		const client = hashes(instance.transform(source, FILE, { environment: 'client' })!.code);
+		const server = hashes(instance.transform(source, FILE, { environment: 'server' })!.code);
+		expect(client.size).toBeGreaterThan(0);
+		expect(client).toEqual(server);
+	});
+
 	it.each([
 		{
 			code: 'OCTANE_HYDRATE_FUNCTION_CHILD',
@@ -570,6 +597,10 @@ export function App() @{
 		{
 			code: 'OCTANE_HYDRATE_DIRECT_CHILDREN',
 			source: `import { Hydrate } from 'octane'; export function App(child) @{ <Hydrate when={gate} children={child}></Hydrate> }`,
+		},
+		{
+			code: 'OCTANE_HYDRATE_SPLIT_STYLE',
+			source: `import { Hydrate } from 'octane'; export function App() @{ <Hydrate when={gate}><div class="x"><style>.x { color: red; }</style></div></Hydrate> }`,
 		},
 	])('reports unsupported extraction as $code', ({ source, code }) => {
 		let thrown: any = null;
@@ -610,6 +641,16 @@ export function App() @{
 }
 `;
 		expect(() => compiler().transform(source, FILE, { environment: 'client' })).not.toThrow();
+	});
+
+	it('permits scoped styles under split={false} and inside nested split-child functions', () => {
+		// split={false} keeps children in the owning component, so its style
+		// scope stays whole; a style nested in a function never joined that
+		// scope, so extraction may move it freely.
+		const optedOut = `import { Hydrate } from 'octane'; export function App() @{ <Hydrate when={gate} split={false}><div class="x"><style>.x { color: red; }</style></div></Hydrate> }`;
+		expect(() => compiler().transform(optedOut, FILE, { environment: 'client' })).not.toThrow();
+		const nested = `import { Hydrate } from 'octane'; import { Renderer } from './Renderer.tsrx'; export function App() @{ <Hydrate when={gate}><Renderer component={function Inline() @{ <div class="x"><style>.x { color: red; }</style></div> }} /></Hydrate> }`;
+		expect(() => compiler().transform(nested, FILE, { environment: 'client' })).not.toThrow();
 	});
 
 	it('omits fallback work from safe server-only object spreads', () => {

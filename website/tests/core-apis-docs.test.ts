@@ -1,16 +1,17 @@
-// Focused contract for the newcomer-oriented Core APIs guide. The generic
-// smoke suite checks every route; this file protects the learning structure,
-// local navigation, and the real interactive example embedded in the MDX.
+// Focused contract for the newcomer-oriented Core APIs guide. This file owns
+// the route's learning structure, local navigation, and real interactive
+// examples so the unusually large page does not need duplicate generic smoke
+// coverage.
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 
 afterEach(cleanup);
 
 async function renderCoreApis() {
-	const router = makeRouter({
+	const router = getRouter({
 		history: createMemoryHistory({ initialEntries: ['/docs/core-apis'] }),
 	});
 	await router.load();
@@ -23,7 +24,10 @@ async function renderCoreApis() {
 	return utils;
 }
 
-describe('Core APIs documentation', () => {
+// Each case mounts the real docs route so it covers the router, MDX document,
+// and embedded demo together. Keep the interaction waits narrowly bounded below,
+// while allowing the full document render to finish on shared CI runners.
+describe('Core APIs documentation', { timeout: 15_000 }, () => {
 	it('presents a concept-first guide with complete local navigation', async () => {
 		const { container } = await renderCoreApis();
 		const coreDoc = docs.find((doc) => doc.slug === 'core-apis')!;
@@ -40,10 +44,13 @@ describe('Core APIs documentation', () => {
 		for (const [index, section] of sections.entries()) {
 			expect(tocLinks[index]?.getAttribute('href')).toBe(`#${section.id}`);
 			expect(tocLinks[index]?.textContent).toContain(section.title);
-			expect(container.querySelector(`h2#${section.id}`)).toBeTruthy();
+			// Each TOC entry anchors a real heading at its declared level (h2 by
+			// default, h3 for nested subsections).
+			const tag = section.level === 3 ? 'h3' : 'h2';
+			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
 
-		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(6);
+		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(7);
 		expect(container.querySelectorAll('[data-demo]')).toHaveLength(9);
 		for (const id of [
 			'state',
@@ -60,6 +67,9 @@ describe('Core APIs documentation', () => {
 		}
 		for (const id of [
 			'use-sync-external-store',
+			'hydrate-when',
+			'hydrate-split',
+			'hydrate-prefetch',
 			'use-transition',
 			'use-deferred-value',
 			'view-transitions',
@@ -91,6 +101,9 @@ describe('Core APIs documentation', () => {
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
 		for (const sourceMarker of [
 			'export function NetworkStatus()',
+			'<Hydrate when={visible({ rootMargin:',
+			'<Hydrate when={idle()} split={false}>',
+			'<Hydrate when={interaction()} prefetch={idle()}>',
 			'const [isPending, startTransition] = useTransition();',
 			'const deferredQuery = useDeferredValue(query);',
 			'<ViewTransition enter="notice-in" exit="notice-out">',
@@ -112,6 +125,9 @@ describe('Core APIs documentation', () => {
 		expect(groupedApiCodeCount('useContext')).toBe(2);
 		expect(groupedApiCodeCount('addTransitionType')).toBe(2);
 		expect(groupedApiCodeCount('isChildrenBlock')).toBe(3);
+		expect(
+			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'Hydrate'),
+		).toBe(true);
 
 		const active = container.querySelector(
 			'a.sidebar-link[href="/docs/core-apis"][data-status="active"]',

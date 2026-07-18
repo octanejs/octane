@@ -48,14 +48,19 @@ function declareName(scope, name, details = null) {
 			scope,
 			imported: false,
 			dependencyInvariant: false,
+			reassigned: false,
 			octaneImport: null,
 			octaneNamespace: false,
+			hookRuntimeImport: null,
+			hookRuntimeNamespace: false,
 		};
 		scope.bindings.set(name, binding);
 	}
 	if (details?.imported) binding.imported = true;
 	if (details?.octaneImport) binding.octaneImport = details.octaneImport;
 	if (details?.octaneNamespace) binding.octaneNamespace = true;
+	if (details?.hookRuntimeImport) binding.hookRuntimeImport = details.hookRuntimeImport;
+	if (details?.hookRuntimeNamespace) binding.hookRuntimeNamespace = true;
 	return binding;
 }
 
@@ -108,16 +113,19 @@ function unwrapExport(node) {
 	return node;
 }
 
-function predeclareDirect(statements, scope) {
+function predeclareDirect(statements, scope, hookRuntimeModules) {
 	for (const original of statements || []) {
 		if (original.type === 'ImportDeclaration') {
+			const isHookRuntime = hookRuntimeModules.has(original.source?.value);
+			const isOctane = original.source?.value === 'octane';
 			for (const specifier of original.specifiers || []) {
 				const imported = specifier.imported?.name;
 				declareName(scope, specifier.local.name, {
 					imported: true,
-					octaneImport: original.source?.value === 'octane' ? imported : null,
-					octaneNamespace:
-						original.source?.value === 'octane' && specifier.type === 'ImportNamespaceSpecifier',
+					octaneImport: isOctane ? imported : null,
+					octaneNamespace: isOctane && specifier.type === 'ImportNamespaceSpecifier',
+					hookRuntimeImport: isHookRuntime ? imported : null,
+					hookRuntimeNamespace: isHookRuntime && specifier.type === 'ImportNamespaceSpecifier',
 				});
 			}
 			continue;
@@ -178,7 +186,7 @@ function canonicalHookName(call, scope, onlyImported) {
 	if (!callee) return null;
 	if (callee.type === 'Identifier') {
 		const binding = resolveBinding(scope, callee.name);
-		if (binding?.octaneImport) return binding.octaneImport;
+		if (binding?.hookRuntimeImport) return binding.hookRuntimeImport;
 		if (onlyImported) return null;
 		return callee.name;
 	}
@@ -189,19 +197,86 @@ function canonicalHookName(call, scope, onlyImported) {
 		callee.property?.type === 'Identifier'
 	) {
 		const binding = resolveBinding(scope, callee.object.name);
-		if (binding?.octaneNamespace) return callee.property.name;
+		if (binding?.hookRuntimeNamespace) return callee.property.name;
 	}
 	return null;
 }
 
-function buildScopes(ast, onlyImported) {
+function canonicalOctaneHookName(call, scope) {
+	const callee = unwrapValue(call?.callee);
+	if (callee?.type === 'Identifier') {
+		return resolveBinding(scope, callee.name)?.octaneImport ?? null;
+	}
+	if (
+		callee?.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.object?.type === 'Identifier' &&
+		callee.property?.type === 'Identifier' &&
+		resolveBinding(scope, callee.object.name)?.octaneNamespace
+	) {
+		return callee.property.name;
+	}
+	return null;
+}
+
+function directCallBinding(call, scope) {
+	const callee = call?.callee;
+	return callee?.type === 'Identifier' ? resolveBinding(scope, callee.name) : null;
+}
+
+function directParameterBinding(parameter, scope) {
+	const value = unwrapValue(parameter);
+	return value?.type === 'Identifier' ? resolveBinding(scope, value.name) : null;
+}
+
+function hasFullCompilerHookBoundary(call, importedName) {
+	if (call?.optional === true) return false;
+	if (call?.callee?.type === 'Identifier') return true;
+	return (
+		importedName !== null &&
+		call?.callee?.type === 'MemberExpression' &&
+		!call.callee.computed &&
+		call.callee.object?.type === 'Identifier' &&
+		call.callee.property?.type === 'Identifier'
+	);
+}
+
+function markReassignedPattern(pattern, scope) {
+	const value = unwrapValue(pattern);
+	if (!value) return;
+	if (value.type === 'Identifier') {
+		const binding = resolveBinding(scope, value.name);
+		if (binding !== null) binding.reassigned = true;
+		return;
+	}
+	if (value.type === 'AssignmentPattern') {
+		markReassignedPattern(value.left, scope);
+	} else if (value.type === 'RestElement') {
+		markReassignedPattern(value.argument, scope);
+	} else if (value.type === 'ArrayPattern') {
+		for (const element of value.elements || []) markReassignedPattern(element, scope);
+	} else if (value.type === 'ObjectPattern') {
+		for (const property of value.properties || []) {
+			markReassignedPattern(
+				property.type === 'RestElement' ? property.argument : property.value,
+				scope,
+			);
+		}
+	}
+}
+
+function buildScopes(ast, onlyImported, hookRuntimeModules) {
 	nextBindingId = 0;
 	const moduleScope = createScope(null, 'module');
 	const nodeScopes = new WeakMap();
 	const functionScopes = new WeakMap();
 	const declarators = [];
 	const candidates = [];
-	predeclareDirect(ast.body, moduleScope);
+	const calls = [];
+	const functions = [];
+	const functionRecords = new WeakMap();
+	const trustedHookNames = new WeakMap();
+	predeclareDirect(ast.body, moduleScope, hookRuntimeModules);
 	collectHoistedVars(ast, moduleScope);
 
 	function walk(node, scope) {
@@ -215,11 +290,26 @@ function buildScopes(ast, onlyImported) {
 		if (isFunction(node)) {
 			const fnScope = createScope(scope, 'function');
 			functionScopes.set(node, fnScope);
-			if (node.type !== 'ArrowFunctionExpression' && node.id) {
+			const record = {
+				node,
+				scope: fnScope,
+				binding:
+					node.type === 'FunctionDeclaration' && node.id
+						? resolveBinding(scope, node.id.name)
+						: null,
+				parameters: null,
+				stableDefinition: node.type === 'FunctionDeclaration',
+			};
+			functions.push(record);
+			functionRecords.set(node, record);
+			if (node.type === 'FunctionExpression' && node.id) {
 				declareName(fnScope, node.id.name);
 			}
 			if (node.type !== 'ArrowFunctionExpression') declareName(fnScope, 'arguments');
 			for (const param of node.params || []) declarePattern(param, fnScope);
+			record.parameters = (node.params || []).map((param) =>
+				directParameterBinding(param, fnScope),
+			);
 			collectHoistedVars(node.body, fnScope);
 			for (const param of node.params || []) walkPatternDefaults(param, fnScope);
 			walk(node.body, fnScope);
@@ -232,7 +322,7 @@ function buildScopes(ast, onlyImported) {
 			node.type === 'JSXCodeBlock'
 		) {
 			const blockScope = createScope(scope, 'block');
-			predeclareDirect(node.body, blockScope);
+			predeclareDirect(node.body, blockScope, hookRuntimeModules);
 			for (const statement of node.body || []) walk(statement, blockScope);
 			// TSRX's final render node lives beside the setup-statement list.
 			if (node.type === 'JSXCodeBlock') walk(node.render, blockScope);
@@ -257,7 +347,7 @@ function buildScopes(ast, onlyImported) {
 			for (const switchCase of node.cases || []) {
 				statements.push(...(switchCase.consequent || []));
 			}
-			predeclareDirect(statements, switchScope);
+			predeclareDirect(statements, switchScope, hookRuntimeModules);
 			walk(node.discriminant, scope);
 			for (const switchCase of node.cases || []) {
 				nodeScopes.set(switchCase, switchScope);
@@ -283,6 +373,7 @@ function buildScopes(ast, onlyImported) {
 				walk(node.update, loopScope);
 			} else {
 				walk(node.left, loopScope);
+				if (node.left?.type !== 'VariableDeclaration') markReassignedPattern(node.left, loopScope);
 				walk(node.right, loopScope);
 			}
 			walk(node.body, loopScope);
@@ -301,13 +392,19 @@ function buildScopes(ast, onlyImported) {
 			return;
 		}
 
+		if (node.type === 'AssignmentExpression') {
+			markReassignedPattern(node.left, scope);
+		} else if (node.type === 'UpdateExpression') {
+			markReassignedPattern(node.argument, scope);
+		}
+
 		if (node.type === 'CallExpression') {
 			// Preserve lexical import identity for the later slotting pass. A module-
 			// level name map is insufficient: a component can shadow either a named
 			// alias or an Octane namespace inside any nested scope. The annotation is
 			// copied with the call AST when the full compiler lowers setup statements.
-			const importedName = canonicalHookName(node, scope, true);
-			if (importedName !== null) node._octaneImportedHook = importedName;
+			const octaneImportedName = canonicalOctaneHookName(node, scope);
+			if (octaneImportedName !== null) node._octaneImportedHook = octaneImportedName;
 			// The auto-callback stability pass also preserves Octane's historical
 			// unbound-hook shorthand (`useState(...)` without an import). Record that
 			// fact from this lexical scope walk so it can distinguish a genuinely
@@ -321,8 +418,26 @@ function buildScopes(ast, onlyImported) {
 			}
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
-			if (config && node.arguments.length === config.deps) {
-				candidates.push({ call: node, scope, name, config });
+			const hookRuntimeImportedName = canonicalHookName(node, scope, true);
+			if (octaneImportedName === null && hookRuntimeImportedName !== null) {
+				node._octaneHookRuntimeImportedHook = hookRuntimeImportedName;
+			}
+			const trustedName =
+				hasFullCompilerHookBoundary(node, hookRuntimeImportedName) &&
+				(hookRuntimeImportedName !== null || node._octaneUnboundCallee === true)
+					? (hookRuntimeImportedName ?? name)
+					: null;
+			const trustedConfig = DEPENDENCY_HOOKS.get(trustedName);
+			if (trustedName !== null) trustedHookNames.set(node, trustedName);
+			calls.push({
+				call: node,
+				scope,
+				name,
+				config,
+				trustedConfig,
+			});
+			if (trustedConfig && node.arguments.length === trustedConfig.deps) {
+				candidates.push({ call: node, scope, name: trustedName, config: trustedConfig });
 			}
 		}
 
@@ -354,7 +469,42 @@ function buildScopes(ast, onlyImported) {
 	}
 
 	walk(ast.body, moduleScope);
-	return { nodeScopes, functionScopes, declarators, candidates };
+	for (const { decl, bindings, kind } of declarators) {
+		const init = unwrapValue(decl.init);
+		const record = functionRecords.get(init);
+		if (record === undefined || decl.id.type !== 'Identifier') continue;
+		record.binding = bindings[0]?.binding ?? null;
+		record.stableDefinition = kind === 'const';
+	}
+	const analysis = {
+		nodeScopes,
+		functionScopes,
+		declarators,
+		candidates,
+		calls,
+		functions,
+		trustedHookNames,
+	};
+	// The surgical plain-TS pass slots base hooks only; without a custom-hook
+	// withSlot boundary, two local wrapper calls would share their inner slots.
+	// Restrict custom-call inference to the full TSRX/TSX compiler, which emits
+	// that boundary for every plain-identifier custom hook call.
+	const customHooks = onlyImported ? new Map() : discoverCustomDependencyHooks(analysis);
+	for (const record of calls) {
+		if (record.trustedConfig !== undefined) continue;
+		if (
+			record.call.optional === true ||
+			record.call.arguments.some((argument) => argument.type === 'SpreadElement')
+		) {
+			continue;
+		}
+		const binding = directCallBinding(record.call, record.scope);
+		const config = binding === null ? undefined : customHooks.get(binding);
+		if (config && record.call.arguments.length === config.deps) {
+			candidates.push({ call: record.call, scope: record.scope, name: binding.name, config });
+		}
+	}
+	return analysis;
 }
 
 function collectPatternBindings(pattern, scope, into) {
@@ -377,7 +527,150 @@ function collectPatternBindings(pattern, scope, into) {
 	}
 }
 
-function markDependencyInvariantBindings(analysis, onlyImported) {
+function customHookConfigEqual(left, right) {
+	return left.callback === right.callback && left.deps === right.deps;
+}
+
+function forwardedParameterIndex(argument, record, analysis) {
+	const value = unwrapValue(argument);
+	if (value?.type !== 'Identifier') return -1;
+	const scope = analysis.nodeScopes.get(value);
+	const binding = scope ? resolveBinding(scope, value.name) : null;
+	return binding === null ? -1 : record.parameters.indexOf(binding);
+}
+
+function onlyReadsForwardedParameters(record, config, allowed, analysis) {
+	const callbackBinding = record.parameters[config.callback];
+	const dependencyBinding = record.parameters[config.deps];
+	const argumentsBinding =
+		record.node.type === 'ArrowFunctionExpression'
+			? null
+			: (record.scope.bindings.get('arguments') ?? null);
+	let safe = true;
+
+	function walk(node) {
+		if (!safe || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (node.type === 'Identifier') {
+			const scope = analysis.nodeScopes.get(node);
+			const binding = scope ? resolveBinding(scope, node.name) : null;
+			if (argumentsBinding !== null && binding === argumentsBinding) {
+				safe = false;
+				return;
+			}
+			if ((binding === callbackBinding || binding === dependencyBinding) && !allowed.has(node)) {
+				safe = false;
+			}
+			return;
+		}
+		if (node.type?.startsWith('TS') && !TS_VALUE_WRAPPERS.has(node.type)) return;
+		for (const key in node) {
+			if (
+				AST_META_KEYS.has(key) ||
+				key === 'typeAnnotation' ||
+				key === 'returnType' ||
+				key === 'typeParameters'
+			) {
+				continue;
+			}
+			walk(node[key]);
+		}
+	}
+
+	walk(record.node.body);
+	return safe;
+}
+
+// A custom hook is dependency-bearing only when its local definition proves
+// that contract by transparently forwarding two plain parameters to a known
+// dependency hook. This deliberately excludes imported/method hooks and
+// selector-shaped hooks: adding an array to an arbitrary `useSomething(fn)`
+// call could occupy a completely unrelated optional argument.
+function discoverCustomDependencyHooks(analysis) {
+	const configs = new Map();
+	const callsByFunctionScope = new Map();
+	for (const callRecord of analysis.calls) {
+		const owner = nearestFunctionScope(callRecord.scope);
+		let calls = callsByFunctionScope.get(owner);
+		if (calls === undefined) callsByFunctionScope.set(owner, (calls = []));
+		calls.push(callRecord);
+	}
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const record of analysis.functions) {
+			const binding = record.binding;
+			if (
+				binding === null ||
+				configs.has(binding) ||
+				!record.stableDefinition ||
+				binding.reassigned ||
+				!/^use[A-Z]/.test(binding.name)
+			) {
+				continue;
+			}
+			let inferred = null;
+			let ambiguous = false;
+			const allowed = new Set();
+			for (const callRecord of callsByFunctionScope.get(record.scope) || []) {
+				if (
+					callRecord.call.start < record.node.body.start ||
+					callRecord.call.end > record.node.body.end
+				) {
+					continue;
+				}
+				let targetConfig = callRecord.trustedConfig;
+				if (targetConfig === undefined) {
+					const targetBinding = directCallBinding(callRecord.call, callRecord.scope);
+					targetConfig = targetBinding === null ? undefined : configs.get(targetBinding);
+				}
+				if (
+					targetConfig === undefined ||
+					callRecord.call.optional === true ||
+					callRecord.call.arguments.length !== targetConfig.deps + 1 ||
+					callRecord.call.arguments.some((argument) => argument.type === 'SpreadElement')
+				) {
+					continue;
+				}
+				const callback = forwardedParameterIndex(
+					callRecord.call.arguments[targetConfig.callback],
+					record,
+					analysis,
+				);
+				const deps = forwardedParameterIndex(
+					callRecord.call.arguments[targetConfig.deps],
+					record,
+					analysis,
+				);
+				if (callback < 0 || deps < 0 || callback >= deps || deps !== record.parameters.length - 1) {
+					continue;
+				}
+				const config = { callback, deps };
+				if (inferred !== null && !customHookConfigEqual(inferred, config)) {
+					ambiguous = true;
+					break;
+				}
+				inferred = config;
+				allowed.add(unwrapValue(callRecord.call.arguments[targetConfig.callback]));
+				allowed.add(unwrapValue(callRecord.call.arguments[targetConfig.deps]));
+			}
+			if (
+				!ambiguous &&
+				inferred !== null &&
+				onlyReadsForwardedParameters(record, inferred, allowed, analysis)
+			) {
+				configs.set(binding, inferred);
+				changed = true;
+			}
+		}
+	}
+	return configs;
+}
+
+function markDependencyInvariantBindings(analysis) {
 	let changed = true;
 	while (changed) {
 		changed = false;
@@ -386,7 +679,7 @@ function markDependencyInvariantBindings(analysis, onlyImported) {
 			const init = unwrapValue(decl.init);
 			const scope = analysis.nodeScopes.get(decl);
 			const callName =
-				init?.type === 'CallExpression' ? canonicalHookName(init, scope, onlyImported) : null;
+				init?.type === 'CallExpression' ? (analysis.trustedHookNames.get(init) ?? null) : null;
 
 			if (decl.id.type === 'Identifier') {
 				let dependencyInvariant =
@@ -717,8 +1010,9 @@ function cloneDependency(node) {
  */
 export function analyzeHookDependencies(ast, options = {}) {
 	const onlyImported = options.onlyImported === true;
-	const analysis = buildScopes(ast, onlyImported);
-	markDependencyInvariantBindings(analysis, onlyImported);
+	const hookRuntimeModules = new Set(['octane', ...(options.hookRuntimeModules || [])]);
+	const analysis = buildScopes(ast, onlyImported, hookRuntimeModules);
+	markDependencyInvariantBindings(analysis);
 	const inferred = new Map();
 
 	for (const candidate of analysis.candidates) {

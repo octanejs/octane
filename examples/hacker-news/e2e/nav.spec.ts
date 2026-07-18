@@ -126,8 +126,8 @@ test('clicking a story comments link navigates to /item/:id and Back returns', a
 	await expect(firstComment.locator('a[href="/user/dan"]')).toHaveText('dan');
 
 	// Comment BODY renders. The body is HTML (`This is the <i>first</i> comment
-	// about octane.`) bound via `innerHTML`; that binding now works, so the text
-	// appears AND the inline <i> markup is set as real inner HTML (not escaped).
+	// about octane.`) bound through the public `dangerouslySetInnerHTML` prop, so
+	// the text appears AND the inline <i> markup is real HTML (not escaped).
 	await expect(firstComment).toContainText('first comment about octane');
 	await expect(firstComment.locator('i')).toHaveText('first');
 	// The second comment's plain-text body renders too.
@@ -139,7 +139,7 @@ test('clicking a story comments link navigates to /item/:id and Back returns', a
 	await expect(page.getByTestId('story-row')).toHaveCount(TOP_IDS.length);
 });
 
-test('clicking an author navigates to /user/:id and the karma renders', async ({ page }) => {
+test('clicking an author renders the complete user profile', async ({ page }) => {
 	await page.goto('/');
 	await expect(page.getByTestId('story-row').first()).toBeVisible();
 
@@ -153,6 +153,9 @@ test('clicking an author navigates to /user/:id and the karma renders', async ({
 	// Karma is rendered (alice -> 4242).
 	await expect(page.getByText('karma:')).toBeVisible();
 	await expect(page.getByText('4242')).toBeVisible();
+	await expect(page.getByText('about:')).toBeVisible();
+	await expect(page.getByText('Maintainer of nothing in particular.')).toBeVisible();
+	await expect(page.getByTestId('user-page').locator('strong')).toHaveText('nothing');
 });
 
 test('the header nav links are present', async ({ page }) => {

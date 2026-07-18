@@ -1,9 +1,10 @@
 // One documentation page: render compiled MDX in a readable article, add the
 // navigation supplied by the registry, and keep a local table of contents
 // beside longer guides.
-import { Link, useParams } from '@octanejs/tanstack-router';
+import { Link, useParams } from '@tanstack/octane-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
+import { OnThisPage } from '../../components/OnThisPage.tsrx';
 import { useTitle } from '../../hooks/use-title.ts';
 
 function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
@@ -15,14 +16,16 @@ function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 }
 
 // Every fenced code block (the Shiki `<pre>`) is wrapped in the shared CodeBlock
-// so doc snippets get a one-click copy button. `bare` keeps it chrome-free — just
-// the floating button over the code. Inline `code` is untouched; only block
-// `pre` maps here. The children are static Shiki markup, so there is no prop-slot
-// component to break SSR/hydration.
+// so doc snippets get a labelled header (language tag + one-click copy). The
+// language is stamped onto the `<pre>` as `data-language` by the shiki
+// transformer in mdx-options.ts (hast may expose it camelCased, so read both).
+// Inline `code` is untouched; only block `pre` maps here. The children are static
+// Shiki markup, so there is no prop-slot component to break SSR/hydration.
 function DocPre(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...preProps } = props;
+	const language = preProps['data-language'] ?? preProps.dataLanguage ?? '' as string;
 
-	<CodeBlock variant="bare">
+	<CodeBlock variant="plain" language={language}>
 		<pre {...preProps}>{children}</pre>
 	</CodeBlock>
 }
@@ -41,11 +44,6 @@ export function DocPage() @{
 		currentIndex > 0 ? docs[currentIndex - 1] : null;
 	const next =
 		currentIndex >= 0 && currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null;
-	const closeMobileToc = (event: Event) => {
-		const link = event.currentTarget as HTMLAnchorElement;
-		link.closest('details')?.removeAttribute('open');
-	};
-
 	<>
 		<div class={['doc-frame', sections.length > 0 && 'has-toc']}>
 			<article class="prose">
@@ -87,34 +85,7 @@ export function DocPage() @{
 				}
 			</article>
 			@if (sections.length > 0) {
-				<aside class="on-this-page">
-					<nav class="toc-desktop" aria-label="On this page">
-						<p class="toc-heading">On this page</p>
-						<ul class="toc-list">
-							@for (const section of sections; key section.id) {
-								<li>
-									<a href={'#' + section.id}>
-										{section.title as string}
-									</a>
-								</li>
-							}
-						</ul>
-					</nav>
-					<details class="toc-mobile">
-						<summary>On this page</summary>
-						<nav aria-label="On this page mobile">
-							<ul class="toc-list">
-								@for (const section of sections; key section.id) {
-									<li>
-										<a href={'#' + section.id} onClick={closeMobileToc}>
-											{section.title as string}
-										</a>
-									</li>
-								}
-							</ul>
-						</nav>
-					</details>
-				</aside>
+				<OnThisPage sections={sections} resetKey={doc?.slug ?? ''} />
 			}
 		</div>
 		<style>
@@ -126,110 +97,17 @@ export function DocPage() @{
 				justify-content: start;
 			}
 			.doc-frame.has-toc {
-				grid-template-columns: minmax(0, 48rem) minmax(10rem, 11rem);
+				grid-template-columns: minmax(0, 48rem) minmax(14rem, 15.5rem);
 				gap: clamp(2rem, 4vw, 3.5rem);
 			}
 			.prose {
 				min-width: 0;
 				max-width: 48rem;
 			}
-			.on-this-page {
-				position: sticky;
-				top: 88px;
-				align-self: start;
-				max-height: calc(100vh - 108px);
-				overflow-y: auto;
-				padding-left: 1rem;
-				border-left: 1px solid var(--border);
-				scrollbar-width: thin;
-			}
-			.toc-heading {
-				margin: 0 0 0.75rem;
-				color: var(--text);
-				font-size: 0.78rem;
-				font-weight: 750;
-			}
-			.toc-list {
-				list-style: none;
-				margin: 0;
-				padding: 0;
-			}
-			.toc-list li {
-				margin: 0;
-			}
-			.toc-list a {
-				display: block;
-				padding: 0.28rem 0;
-				color: var(--text-secondary);
-				font-size: 0.8rem;
-				line-height: 1.35;
-				transition: color 0.15s;
-			}
-			.toc-list a:hover {
-				color: var(--accent-text);
-				text-decoration: none;
-			}
-			.toc-mobile {
-				display: none;
-			}
 			@media (max-width: 1180px) {
 				.doc-frame.has-toc {
 					grid-template-columns: minmax(0, 48rem);
 					gap: 1.5rem;
-				}
-				.on-this-page {
-					position: static;
-					grid-row: 1;
-					max-height: none;
-					padding: 1rem 1.1rem;
-					border: 1px solid var(--border);
-					border-radius: 0.875rem;
-					background: rgba(255, 255, 255, 0.025);
-				}
-				.toc-desktop {
-					display: none;
-				}
-				.toc-mobile {
-					display: block;
-				}
-				.toc-mobile summary {
-					position: relative;
-					padding-right: 1.5rem;
-					color: var(--text);
-					font-size: 0.82rem;
-					font-weight: 750;
-					cursor: pointer;
-					list-style: none;
-				}
-				.toc-mobile summary::-webkit-details-marker {
-					display: none;
-				}
-				.toc-mobile summary::after {
-					content: '+';
-					position: absolute;
-					right: 0;
-					top: 50%;
-					color: var(--accent-text);
-					font-size: 1rem;
-					transform: translateY(-50%);
-				}
-				.toc-mobile[open] summary::after {
-					content: '−';
-				}
-				.toc-mobile nav {
-					margin-top: 0.75rem;
-					padding-top: 0.65rem;
-					border-top: 1px solid var(--border);
-				}
-				.toc-list {
-					display: grid;
-					grid-template-columns: repeat(2, minmax(0, 1fr));
-					gap: 0 1rem;
-				}
-			}
-			@media (max-width: 560px) {
-				.toc-list {
-					grid-template-columns: 1fr;
 				}
 			}
 			.prose :global(.doc-hero) {
@@ -308,16 +186,14 @@ export function DocPage() @{
 				padding: 0;
 				font-size: inherit;
 			}
-			.prose :global(pre) {
-				margin: 0 0 1.4rem;
-			}
-			/* Fenced code blocks are wrapped in CodeBlock (the copy-button panel), so
-			   the block spacing moves to the wrapper and the inner pre sits flush. */
+			/* Every fenced block in the docs is wrapped in CodeBlock (the copy-button
+			   panel) or PackageInstall, each of which owns its own margin and zeroes
+			   its inner <pre>. So the block spacing lives on the wrapper — there is
+			   deliberately no `.prose pre` margin: it would leak past the wrappers
+			   (higher specificity than their scoped `margin: 0`) and, inside their
+			   overflow-hidden frames, show as stray space under the code. */
 			.prose :global(.codeblock) {
 				margin: 0 0 1.4rem;
-			}
-			.prose :global(.codeblock pre) {
-				margin: 0;
 			}
 			.prose :global(blockquote) {
 				border-left: 3px solid var(--accent);

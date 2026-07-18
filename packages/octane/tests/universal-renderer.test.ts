@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
 import * as UniversalRuntime from '../src/universal.js';
 import {
@@ -105,6 +106,27 @@ describe('universal compiler target', () => {
 		expect(output).toContain('"kind": "range"');
 		expect(output).toContain('"bindings": [["tone", 0]]');
 		expect(output).not.toContain('<scene');
+	});
+
+	it('infers omitted dependencies for hooks imported from the renderer runtime', () => {
+		const source = `
+			import { useMemo as memo } from 'octane/universal';
+			function useComputed(factory, dependencies) {
+				return memo(factory, dependencies);
+			}
+			export function Scene(props) @{
+				const value = useComputed(() => props.value);
+				<node value={value} />
+			}
+		`;
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+
+		expect(() => parseModule(output, '/dist/Scene.object.js')).not.toThrow();
+		expect(output).toMatch(/memo\(factory, dependencies, [^)]+\)/);
+		expect(output).toContain('() => props.value, [props.value]');
 	});
 
 	it('renders pure keyed host loops without per-item owners while preserving host identity', () => {

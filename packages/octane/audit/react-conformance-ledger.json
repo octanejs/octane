@@ -21266,7 +21266,13 @@
       "classification": "non_goal",
       "owner": "events",
       "workstream": "React synthetic event system",
-      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; native observable outcomes are covered separately."
+      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; the same-source matrix records the wrapped-write outcome and the later explicit native commit separately.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/native-change-matrix.test.ts",
+          "testName": "a wrapped programmatic value write emits input but no React synthetic change"
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:470ba60bb848c2066aa7",
@@ -33307,7 +33313,13 @@
       "classification": "non_goal",
       "owner": "events",
       "workstream": "React synthetic event system",
-      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; native observable outcomes are covered separately."
+      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; trusted Chromium evidence pins native click → input → change order and React's click-derived change timing.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/browser/native-change/native-change.test.ts",
+          "testName": "orders controlled checkbox click, input, and change without hiding the fresh value"
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:707c1558f808da0cc98b",
@@ -60698,7 +60710,13 @@
       "classification": "non_goal",
       "owner": "events",
       "workstream": "React synthetic event system",
-      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; native observable outcomes are covered separately."
+      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; the same-source matrix separately asserts native input and change capture/bubble boundaries.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/differential/native-change-matrix.test.ts",
+          "testName": "text input distinguishes per-edit input from committed change"
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:ce0c54ebeba6d3643a1b",
@@ -65406,7 +65424,17 @@
       "classification": "non_goal",
       "owner": "events",
       "workstream": "React synthetic event system",
-      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; native observable outcomes are covered separately."
+      "rationale": "Octane uses delegated native DOM events and deliberately has no SyntheticEvent classes, event plugins, pooling, synthetic onChange normalization, or plugin dispatch queues; trusted Chromium evidence covers accepted and rejected controlled radio cousin state at every native boundary.",
+      "evidence": [
+        {
+          "file": "packages/octane/tests/browser/native-change/native-change.test.ts",
+          "testName": "accepts a controlled radio through native change and preserves cousin state"
+        },
+        {
+          "file": "packages/octane/tests/browser/native-change/native-change.test.ts",
+          "testName": "restores a rejected radio only after native change observes the activated option"
+        }
+      ]
     },
     {
       "caseId": "react-case-v1:dd5ebad96675699756ef",

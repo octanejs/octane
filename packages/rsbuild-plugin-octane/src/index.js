@@ -229,6 +229,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *   hmr?: boolean,
  *   profile?: boolean,
  *   exclude?: string[],
+ *   requireDirective?: boolean,
  *   clientEnvironment?: string,
  *   serverEnvironment?: string,
  * }} [inlineOptions]
@@ -518,6 +519,9 @@ export function pluginOctane(inlineOptions = {}) {
 							? null
 							: { profile: environment === 'client' && inlineOptions.profile }),
 						...(inlineOptions.exclude === undefined ? null : { exclude: inlineOptions.exclude }),
+						...(inlineOptions.requireDirective === undefined
+							? null
+							: { requireDirective: inlineOptions.requireDirective }),
 						renderers: initialConfig?.compiler.renderers,
 					}),
 				);

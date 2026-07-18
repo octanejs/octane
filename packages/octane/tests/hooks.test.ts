@@ -5,10 +5,17 @@ import {
 	TwoStates,
 	Tally,
 	MemoTest,
+	CustomMemoDeps,
+	CustomMemoPair,
+	CastCustomMemoPair,
+	BuiltinLookalike,
+	StableResultLookalikes,
+	CustomSelectorCallback,
 	CbTest,
 	RefTest,
 	EffectMount,
 	EffectDeps,
+	CustomEffectDeps,
 	EffectAlways,
 	LayoutVsEffect,
 } from './_fixtures/hooks.tsrx';
@@ -59,6 +66,58 @@ describe('useMemo', () => {
 		r.update(MemoTest, { n: 5 });
 		expect(r.find('.val').textContent).toBe('10');
 		expect(r.find('.count').textContent).toBe('2');
+		r.unmount();
+	});
+
+	it('infers dependencies for a local custom memo hook', () => {
+		const compute = vi.fn((value: string) => value.toUpperCase());
+		const r = mount(CustomMemoDeps, { compute, value: 'a', noise: 0 });
+		expect(r.find('.value').textContent).toBe('A');
+		expect(compute).toHaveBeenCalledTimes(1);
+
+		r.update(CustomMemoDeps, { compute, value: 'a', noise: 1 });
+		expect(r.find('.value').textContent).toBe('A');
+		expect(compute).toHaveBeenCalledTimes(1);
+
+		r.update(CustomMemoDeps, { compute, value: 'b', noise: 2 });
+		expect(r.find('.value').textContent).toBe('B');
+		expect(compute).toHaveBeenCalledTimes(2);
+		r.unmount();
+	});
+
+	it('keeps repeated local custom memo calls independent', () => {
+		const r = mount(CustomMemoPair, { value: '1' });
+		expect(r.find('span').textContent).toBe('A1/B1');
+		r.update(CustomMemoPair, { value: '2' });
+		expect(r.find('span').textContent).toBe('A2/B2');
+		r.unmount();
+	});
+
+	it('does not infer a custom memo call without a custom-hook slot boundary', () => {
+		const r = mount(CastCustomMemoPair, { value: '1' });
+		expect(r.find('span').textContent).toBe('A1/B1');
+		r.update(CastCustomMemoPair, { value: '2' });
+		expect(r.find('span').textContent).toBe('A2/B2');
+		r.unmount();
+	});
+
+	it('does not infer dependencies for a lexically bound built-in lookalike', () => {
+		const r = mount(BuiltinLookalike, { value: 'selected' });
+		expect(r.find('span').textContent).toBe('selected');
+		r.unmount();
+	});
+
+	it('keeps fresh results from built-in lookalikes reactive', () => {
+		const r = mount(StableResultLookalikes, { value: 'a' });
+		expect(r.find('span').textContent).toBe('a/a');
+		r.update(StableResultLookalikes, { value: 'b' });
+		expect(r.find('span').textContent).toBe('b/b');
+		r.unmount();
+	});
+
+	it('does not infer dependencies for arbitrary custom-hook callbacks', () => {
+		const r = mount(CustomSelectorCallback, { value: 'selected' });
+		expect(r.find('span').textContent).toBe('selected');
 		r.unmount();
 	});
 });
@@ -117,6 +176,24 @@ describe('useEffect', () => {
 		await nextPaint();
 		expect(cb).toHaveBeenCalledTimes(2);
 		expect(cb).toHaveBeenLastCalledWith(2);
+		r.unmount();
+	});
+
+	it('infers dependencies for a local custom effect hook', async () => {
+		const cb = vi.fn();
+		const r = mount(CustomEffectDeps, { cb, value: 'a', noise: 0 });
+		await nextPaint();
+		expect(cb).toHaveBeenLastCalledWith('a');
+		expect(cb).toHaveBeenCalledTimes(1);
+
+		r.update(CustomEffectDeps, { cb, value: 'a', noise: 1 });
+		await nextPaint();
+		expect(cb).toHaveBeenCalledTimes(1);
+
+		r.update(CustomEffectDeps, { cb, value: 'b', noise: 2 });
+		await nextPaint();
+		expect(cb).toHaveBeenLastCalledWith('b');
+		expect(cb).toHaveBeenCalledTimes(2);
 		r.unmount();
 	});
 

@@ -89,6 +89,8 @@ export {
 	__useReducerWithGetter,
 	__createVoidRoot,
 	bindRendererRegionOwner,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 	createHostContextRequest,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
 	__vtSeen,
@@ -137,6 +139,8 @@ export {
 	markDangerouslySetInnerHTMLChildren,
 	setAttribute,
 	setStringData,
+	setBooleanAttribute,
+	setAriaAttribute,
 	setClassName,
 	setClassAttr,
 	normalizeClass,
@@ -144,6 +148,8 @@ export {
 	setSpread,
 	snapshotSpread,
 	setHostPropSources,
+	queueNativeChangeDiagnostic,
+	markNativeChangeDiagnosticStatic,
 	setFormAction,
 	// Controlled form components (value/checked/defaultValue/defaultChecked
 	// property bindings on input/textarea/select — React-parity semantics on

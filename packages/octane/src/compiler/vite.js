@@ -16,7 +16,7 @@ import {
 	createClientReferenceManifest,
 	createOctaneCompiler,
 	discoverOctaneSourceDependencies,
-	findVoidRootImports,
+	findVoidComponentImports,
 } from './bundler.js';
 
 export { discoverOctaneSourceDependencies };
@@ -159,11 +159,20 @@ export function octane(options = {}) {
 	// adapter's explicit server-only override, where client profiling must stay off.
 	const profileEnabled = options.profile === true && options.ssr !== true;
 	let projectRoot = resolve(process.cwd());
+	// The mixed-toolchain ownership gate: with `requireDirective: true`, Octane
+	// compiles only modules that declare `'use octane'` (project `.tsx`/`.ts`
+	// without it belong to the host framework's own pipeline — e.g. React's JSX
+	// transform). Diagnostics route to Vite's logger once it exists.
+	const requireDirective = options.requireDirective === true;
+	let logger = null;
+	const warn = (message) => (logger ?? console).warn(message);
 	let compiler = createOctaneCompiler({
 		root: projectRoot,
 		exclude: options.exclude,
 		profile: profileEnabled,
 		renderers: options.renderers,
+		requireDirective,
+		warn,
 	});
 	// An explicit override of Vite's per-module SSR auto-detection.
 	const forceSsr = options.ssr;
@@ -175,6 +184,8 @@ export function octane(options = {}) {
 			exclude: options.exclude,
 			profile: profileEnabled,
 			renderers: options.renderers,
+			requireDirective,
+			warn,
 		});
 	};
 
@@ -207,6 +218,7 @@ export function octane(options = {}) {
 			};
 		},
 		configResolved(config) {
+			logger = config.logger ?? null;
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);
@@ -291,7 +303,7 @@ export function octane(options = {}) {
 
 			const voidImports =
 				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
-					? findVoidRootImports(code, id)
+					? findVoidComponentImports(code, id)
 					: [];
 			if (voidImports.length === 0) return transformWithProof(null);
 			return loadVoidComponentImports(this, voidImports, id).then(transformWithProof);

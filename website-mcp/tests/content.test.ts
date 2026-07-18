@@ -22,6 +22,7 @@ describe('docs snapshot', () => {
 			(doc) => doc.slug,
 		);
 		expect(new Set(snapshotWebsiteSlugs)).toEqual(new Set(websiteDocs));
+		expect(DOC_SLUGS).toContain('deferred-hydration-reference');
 		expect(DOC_SLUGS).toContain('ssr');
 		expect(DOC_SLUGS).toContain('differences-from-react-reference');
 	});
@@ -35,11 +36,13 @@ describe('docs snapshot', () => {
 	});
 
 	it('sections the repo markdown docs by their ## headings', () => {
+		const deferredHydration = docBySlug('deferred-hydration-reference')!;
 		const ssr = docBySlug('ssr')!;
 		const reference = docBySlug('differences-from-react-reference')!;
+		expect(deferredHydration.sections.length).toBeGreaterThanOrEqual(3);
 		expect(ssr.sections.length).toBeGreaterThanOrEqual(5);
 		expect(reference.sections.length).toBeGreaterThanOrEqual(15);
-		for (const section of [...ssr.sections, ...reference.sections]) {
+		for (const section of [...deferredHydration.sections, ...ssr.sections, ...reference.sections]) {
 			expect(section.id).toMatch(/^[a-z0-9][a-z0-9-]*$/);
 		}
 	});
@@ -89,6 +92,15 @@ describe('skills snapshot', () => {
 describe('llms text', () => {
 	it('serves the website llms.txt verbatim', async () => {
 		expect(LLMS_TXT).toBe(await readFile(join(repoRoot, 'website/public/llms.txt'), 'utf8'));
+		for (const marker of [
+			'## Deferred hydration',
+			'<Hydrate when={visible',
+			'split={false}',
+			'prefetch={idle()}',
+			'onHydrated',
+		]) {
+			expect(LLMS_TXT).toContain(marker);
+		}
 	});
 
 	it('llms-full.txt extends llms.txt with the whole docs corpus', () => {

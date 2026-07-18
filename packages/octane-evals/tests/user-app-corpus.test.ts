@@ -37,6 +37,7 @@ const REQUIRED_COVERAGE = {
 		'conditional-hooks',
 		'inferred-hook-dependencies',
 		'current-state-getter',
+		'native-change-intent',
 		'native-controlled-events',
 		'class-composition',
 		'refs-as-props',

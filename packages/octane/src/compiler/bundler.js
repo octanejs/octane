@@ -11,7 +11,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
-import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { compile, hasOnlyLowerableNullishExits, isVoidJsxCodeBlockFunction } from './compile.js';
 import { addSourceMapNeedles, composeSourceMaps } from './compile-universal.js';
 import {
 	hydrateBoundaryPathFromId,
@@ -19,7 +19,11 @@ import {
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
-import { findVoidRootImports, slotHooks } from './slot-hooks.js';
+import {
+	analyzeNativeChangeDiagnostics,
+	formatCompileDiagnostic,
+} from './native-change-diagnostics.js';
+import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -27,7 +31,7 @@ import {
 	findStaticRuntimeImportRequests,
 } from './client-only-server.js';
 
-export { findVoidRootImports };
+export { findVoidComponentImports, findVoidRootImports };
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -57,7 +61,8 @@ export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 /** Strip bundler query/hash suffixes without changing the underlying path. */
 export function cleanModuleId(id) {
 	const query = id.indexOf('?');
-	const hash = id.indexOf('#');
+	// A leading `#` is a Node package-import alias, not a URL fragment.
+	const hash = id.indexOf('#', id.startsWith('#') ? 1 : 0);
 	let end = id.length;
 	if (query !== -1) end = query;
 	if (hash !== -1 && hash < end) end = hash;
@@ -168,10 +173,12 @@ function normalizeHmrDialect(value) {
 }
 
 /**
- * Classify only direct function exports whose TSRX body never returns a value.
- * This fact is attached to the module by bundler adapters after compiling the
- * exact source those adapters loaded. Re-exports and indirect bindings remain
- * deliberately unknown.
+ * Classify direct function exports whose production TSRX body has no renderable
+ * JavaScript return. A direct `memo(LocalComponent)` export preserves that
+ * contract, as do null-only early-return guards that compile to template
+ * control flow. Bundler adapters attach this fact after compiling the exact
+ * source they loaded. Re-exports and indirect bindings remain deliberately
+ * unknown.
  */
 export function findVoidComponentExports(source, id) {
 	let ast;
@@ -180,6 +187,74 @@ export function findVoidComponentExports(source, id) {
 	} catch {
 		return [];
 	}
+	const memoLocals = new Set();
+	const declarations = [];
+	for (const node of ast.body || []) {
+		if (node.type === 'ImportDeclaration' && node.source?.value === 'octane') {
+			for (const specifier of node.specifiers || []) {
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					(specifier.imported?.name ?? specifier.imported?.value) === 'memo' &&
+					specifier.local?.name
+				) {
+					memoLocals.add(specifier.local.name);
+				}
+			}
+		}
+		const declaration =
+			node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+				? node.declaration
+				: node;
+		if (declaration) declarations.push(declaration);
+	}
+
+	const voidBindings = new Set();
+	const isVoidFunction = (node) =>
+		isVoidJsxCodeBlockFunction(node) || hasOnlyLowerableNullishExits(node);
+	for (const declaration of declarations) {
+		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
+			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);
+			continue;
+		}
+		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			if (
+				item.id?.type === 'Identifier' &&
+				(item.init?.type === 'FunctionExpression' ||
+					item.init?.type === 'ArrowFunctionExpression') &&
+				isVoidFunction(item.init)
+			) {
+				voidBindings.add(item.id.name);
+			}
+		}
+	}
+	// Resolve only the exact, immutable `const Export = memo(Local)` form. The
+	// imported memo identity is lexical proof; method calls, comparators, and
+	// arbitrary wrappers stay unknown.
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of declarations) {
+			if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+			for (const item of declaration.declarations || []) {
+				const init = item.init;
+				if (
+					item.id?.type !== 'Identifier' ||
+					voidBindings.has(item.id.name) ||
+					init?.type !== 'CallExpression' ||
+					init.callee?.type !== 'Identifier' ||
+					!memoLocals.has(init.callee.name) ||
+					init.arguments?.length !== 1 ||
+					init.arguments[0]?.type !== 'Identifier' ||
+					!voidBindings.has(init.arguments[0].name)
+				)
+					continue;
+				voidBindings.add(item.id.name);
+				changed = true;
+			}
+		}
+	}
+
 	const exports = [];
 	for (const node of ast.body || []) {
 		if (node.type === 'ExportDefaultDeclaration') {
@@ -188,7 +263,7 @@ export function findVoidComponentExports(source, id) {
 				(declaration?.type === 'FunctionDeclaration' ||
 					declaration?.type === 'FunctionExpression' ||
 					declaration?.type === 'ArrowFunctionExpression') &&
-				isVoidJsxCodeBlockFunction(declaration)
+				isVoidFunction(declaration)
 			) {
 				exports.push('default');
 			}
@@ -199,24 +274,86 @@ export function findVoidComponentExports(source, id) {
 		if (
 			declaration?.type === 'FunctionDeclaration' &&
 			declaration.id?.name &&
-			isVoidJsxCodeBlockFunction(declaration)
+			voidBindings.has(declaration.id.name)
 		) {
 			exports.push(declaration.id.name);
 			continue;
 		}
 		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
 		for (const item of declaration.declarations || []) {
-			if (
-				item.id?.type === 'Identifier' &&
-				(item.init?.type === 'FunctionExpression' ||
-					item.init?.type === 'ArrowFunctionExpression') &&
-				isVoidJsxCodeBlockFunction(item.init)
-			) {
+			if (item.id?.type === 'Identifier' && voidBindings.has(item.id.name)) {
 				exports.push(item.id.name);
 			}
 		}
 	}
 	return exports;
+}
+
+const USE_OCTANE_DIRECTIVE = 'use octane';
+
+/**
+ * Locate a `'use octane'` directive in the module's directive prologue.
+ *
+ * Directives are string-literal expression statements before any other
+ * statement; comments, a BOM, and other directives (`'use client'`,
+ * `'use strict'`, …) may precede it, in any order. Returns the directive's
+ * `[start, end)` source span — including a same-line trailing semicolon — or
+ * `null`. A string containing escape sequences is not a directive (spec
+ * semantics) but still ends the candidate only if unterminated.
+ */
+export function findUseOctaneDirective(code) {
+	const length = code.length;
+	let i = code.charCodeAt(0) === 0xfeff ? 1 : 0;
+	for (;;) {
+		while (i < length && /\s/.test(code[i])) i++;
+		if (code.startsWith('//', i)) {
+			const newline = code.indexOf('\n', i);
+			if (newline === -1) return null;
+			i = newline + 1;
+			continue;
+		}
+		if (code.startsWith('/*', i)) {
+			const close = code.indexOf('*/', i + 2);
+			if (close === -1) return null;
+			i = close + 2;
+			continue;
+		}
+		const quote = code[i];
+		if (quote !== '"' && quote !== "'") return null;
+		const start = i;
+		let value = '';
+		let escaped = false;
+		let closed = false;
+		for (i++; i < length; i++) {
+			const ch = code[i];
+			if (ch === '\\') {
+				escaped = true;
+				i++;
+				continue;
+			}
+			if (ch === quote) {
+				closed = true;
+				i++;
+				break;
+			}
+			if (ch === '\n' || ch === '\r') break;
+			value += ch;
+		}
+		if (!closed) return null;
+		let end = i;
+		while (end < length && (code[end] === ' ' || code[end] === '\t')) end++;
+		if (code[end] === ';') end++;
+		if (!escaped && value === USE_OCTANE_DIRECTIVE) return { start, end };
+		i = end;
+	}
+}
+
+/**
+ * Blank a directive span with equal-length whitespace so every later source
+ * position — and therefore every source map — survives unchanged.
+ */
+function stripDirective(code, span) {
+	return code.slice(0, span.start) + ' '.repeat(span.end - span.start) + code.slice(span.end);
 }
 
 class OctaneBundlerCompiler {
@@ -235,6 +372,17 @@ class OctaneBundlerCompiler {
 			profile: options.profile === true,
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
+		// Ownership gate for mixed-toolchain projects (e.g. a React app hosting
+		// Octane islands): when enabled, a project-owned module is Octane's only
+		// if it declares `'use octane'` in its directive prologue. Undirected
+		// project `.tsx`/`.ts`/`.js` pass through to the host toolchain; an
+		// undirected project `.tsrx` is a hard error. Installed/linked packages
+		// keep their manifest `usesOctane` decision. The directive itself is
+		// tolerated (and stripped from compiled output) in every mode.
+		this.requireDirective = options.requireDirective === true;
+		this.warn = typeof options.warn === 'function' ? options.warn : null;
+		this.warnedUndirected = new Set();
+		this.warnedCompileDiagnostics = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
@@ -243,6 +391,10 @@ class OctaneBundlerCompiler {
 
 	/** Clear cached manifest/discovery decisions after a watched path changes. */
 	invalidate(path) {
+		// Invalidation starts a new watch generation. Diagnostics are deduped
+		// across client/server and hydrate-query transforms within one generation,
+		// but a fixed and later reintroduced warning must be visible again.
+		this.warnedCompileDiagnostics.clear();
 		if (path == null) {
 			this.manifestRuleCache.clear();
 			this.discoveryCache = null;
@@ -329,19 +481,19 @@ class OctaneBundlerCompiler {
 		});
 	}
 
-	_isInstalledOctaneSource(file, collected) {
+	_isProjectOwnedSource(file) {
 		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
-		const isInstalledPath = /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile);
+		if (/(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile)) return false;
+		return isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile);
+	}
+
+	_isInstalledOctaneSource(file, collected) {
 		// Project-owned TS/JS/TSX is always eligible. A linked package is commonly
 		// handed to bundlers as its real path, without a node_modules segment, so
 		// external files must make the same manifest-declared Octane decision as an
 		// installed package instead of being mistaken for application source.
-		if (
-			!isInstalledPath &&
-			(isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile))
-		) {
-			return true;
-		}
+		if (this._isProjectOwnedSource(file)) return true;
+		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
 		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		return lookup.rule?.usesOctane === true;
@@ -352,6 +504,78 @@ class OctaneBundlerCompiler {
 			file.endsWith('.tsrx') ||
 			(file.endsWith('.tsx') && this._isInstalledOctaneSource(file, collected))
 		);
+	}
+
+	/**
+	 * The requireDirective ownership gate for one project-owned module.
+	 * Returns whether Octane owns the module; throws for an undirected
+	 * project-owned `.tsrx` (in an Octane-only pipeline nothing else compiles
+	 * the syntax, so a silent pass-through is a guaranteed confusing
+	 * downstream parse error). Two carve-outs: installed and linked packages
+	 * are exempt (their manifest `usesOctane` rule is already the explicit
+	 * per-package decision), and `exclude` path fragments are never Octane's —
+	 * tsrx syntax can target other renderers (e.g. `@tsrx/react`), so a
+	 * project routing part of its `.tsrx` through a different tsrx compiler
+	 * lists those paths in `exclude`, and the exclusion wins even over a
+	 * directive.
+	 */
+	_passesDirectiveGate(file, filename, directive) {
+		if (!this.requireDirective) return true;
+		if (!this._isProjectOwnedSource(file)) return true;
+		if (this.exclude.some((path) => file.includes(path))) {
+			this._warnExcludedDirectiveConflict(file, filename, directive);
+			return false;
+		}
+		if (directive !== null) return true;
+		if (file.endsWith('.tsrx')) {
+			const error = new Error(
+				`${filename} is Octane source (.tsrx) but has no 'use octane' module directive, and this build enables requireDirective. Add 'use octane' at the top of the module (alongside any other directives, before imports), route the file to its owning tsrx compiler with the integration's \`exclude\` option, or disable requireDirective.`,
+			);
+			error.code = 'OCTANE_DIRECTIVE_REQUIRED';
+			error.filename = filename;
+			throw error;
+		}
+		return false;
+	}
+
+	/**
+	 * requireDirective diagnostic: an exclusion beats a `'use octane'`
+	 * directive, and the module stays with its excluded-path owner. Warn once
+	 * so the conflicting signals never resolve as a silent no-op. Shared by
+	 * the full-compile gate and the `.ts`/`.js` hook-slot exclusion.
+	 */
+	_warnExcludedDirectiveConflict(file, filename, directive) {
+		if (directive === null || this.warn === null) return;
+		if (!this._isProjectOwnedSource(file) || this.warnedUndirected.has(filename)) return;
+		this.warnedUndirected.add(filename);
+		this.warn(
+			`${filename} declares 'use octane' but matches an excluded path — the exclusion wins and Octane will not compile it.`,
+		);
+	}
+
+	/**
+	 * requireDirective diagnostic: a project-owned module imports from
+	 * 'octane' but declared no ownership, so Octane leaves it to the host
+	 * toolchain untouched. Usually a forgotten directive; occasionally an
+	 * intentional type-only import — hence a warning, never an error.
+	 */
+	_warnUndirectedOctaneImport(code, filename) {
+		if (this.warn === null || this.warnedUndirected.has(filename)) return;
+		if (!/from\s*['"]octane['"]/.test(code)) return;
+		this.warnedUndirected.add(filename);
+		this.warn(
+			`${filename} imports from 'octane' but has no 'use octane' module directive — with requireDirective enabled, Octane will not compile or transform it. Add 'use octane' at the top of the module if Octane should own it.`,
+		);
+	}
+
+	_forwardCompileDiagnostics(diagnostics) {
+		if (this.warn === null) return;
+		for (const diagnostic of diagnostics ?? []) {
+			const key = `${diagnostic.code}\0${diagnostic.filename}\0${diagnostic.start.offset}\0${diagnostic.end.offset}`;
+			if (this.warnedCompileDiagnostics.has(key)) continue;
+			this.warnedCompileDiagnostics.add(key);
+			this.warn(formatCompileDiagnostic(diagnostic));
+		}
 	}
 
 	_assertClientOnlySourceSupported(file, filename, renderer, collected) {
@@ -419,14 +643,35 @@ class OctaneBundlerCompiler {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
 		};
-		const projectManifestPath = join(this.root, 'package.json');
-		let projectManifest;
-		try {
-			projectManifest = JSON.parse(readFileSync(projectManifestPath, 'utf8'));
-			collected.dependencies.add(projectManifestPath);
-		} catch {
-			if (existsSync(projectManifestPath)) collected.dependencies.add(projectManifestPath);
-			else collected.missingDependencies.add(projectManifestPath);
+		// Vite's root is the directory containing index.html, not necessarily the
+		// package root. Multi-entry examples commonly keep one package.json above
+		// sibling roots (for example `jsx/` and `tsrx/`). Walk upward to the nearest
+		// owning manifest while watching every missing nearer path: creating a new
+		// nested package boundary must invalidate discovery on the next rebuild.
+		let projectManifestPath = null;
+		let projectManifestRoot = null;
+		let projectManifest = null;
+		let candidateRoot = this.root;
+		for (;;) {
+			const candidate = join(candidateRoot, 'package.json');
+			if (existsSync(candidate)) {
+				collected.dependencies.add(candidate);
+				projectManifestPath = candidate;
+				projectManifestRoot = candidateRoot;
+				try {
+					projectManifest = JSON.parse(readFileSync(candidate, 'utf8'));
+				} catch {
+					// The nearest manifest owns this root even when it is temporarily
+					// unreadable or invalid. Do not silently inherit a parent package.
+				}
+				break;
+			}
+			collected.missingDependencies.add(candidate);
+			const parent = dirname(candidateRoot);
+			if (parent === candidateRoot) break;
+			candidateRoot = parent;
+		}
+		if (projectManifestPath === null || projectManifestRoot === null || projectManifest === null) {
 			this.discoveryCache = {
 				packages: [],
 				viteOptimizeDepsExclusions: [],
@@ -484,7 +729,7 @@ class OctaneBundlerCompiler {
 				}
 			}
 		};
-		for (const name of dependencyNames) visit(name, this.root);
+		for (const name of dependencyNames) visit(name, projectManifestRoot);
 		const viteOptimizeDepsExclusions = expandViteOptimizeDepsExclusions(
 			viteOptimizeDepsExclusionRules,
 			viteOptimizeDepsCandidates,
@@ -515,11 +760,36 @@ class OctaneBundlerCompiler {
 		return findStaticRuntimeImportRequests(code, this._canonicalModuleId(id));
 	}
 
+	/**
+	 * requireDirective ownership for code-less classification: read the module
+	 * prologue from disk. The transform (which receives real code) remains the
+	 * authoritative gate; an unreadable file is conservatively not Octane's, so
+	 * importers can never hold a client reference for a module whose own
+	 * transform passes through to the host toolchain.
+	 */
+	_directiveOwnershipForFile(file) {
+		if (!this.requireDirective) return true;
+		if (!this._isProjectOwnedSource(file)) return true;
+		if (this.exclude.some((path) => file.includes(path))) return false;
+		let code;
+		try {
+			code = readFileSync(isAbsolute(file) ? resolve(file) : resolve(this.root, file), 'utf8');
+		} catch {
+			return false;
+		}
+		return findUseOctaneDirective(code) !== null;
+	}
+
 	/** Classify a bundler-resolved module without loading or evaluating it. */
 	clientReferenceForFile(id) {
 		const file = cleanModuleId(id);
 		const filename = this._canonicalModuleId(file);
 		const renderer = resolveRendererForFile(this.renderers, filename);
+		// A renderer rule can only claim modules Octane owns. Under the
+		// requireDirective gate an undirected project module belongs to the
+		// host toolchain: no client reference, matching its pass-through
+		// transform (server-graph identity must not split from output).
+		if (renderer.server === 'client-only' && !this._directiveOwnershipForFile(file)) return null;
 		const collected = { dependencies: new Set(), missingDependencies: new Set() };
 		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		return renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
@@ -567,8 +837,23 @@ class OctaneBundlerCompiler {
 				: [];
 
 		const renderer = resolveRendererForFile(this.renderers, filename);
-		const fullCompile = this._isFullCompileSource(file, collected);
-		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
+		const directive = findUseOctaneDirective(code);
+		const fullCompile =
+			this._isFullCompileSource(file, collected) &&
+			this._passesDirectiveGate(file, filename, directive);
+		// The narrow-the-rule config error concerns modules Octane owns. Under
+		// the directive gate a host-owned project module (undirected, or in an
+		// excluded path) may legitimately sit inside a client-only include in a
+		// mixed repo — it passes through here, and clientReferenceForFile
+		// returns no reference for it, so classification and transform agree.
+		const hostOwned =
+			this.requireDirective &&
+			this._isProjectOwnedSource(file) &&
+			(directive === null || this.exclude.some((path) => file.includes(path)));
+		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
+		// The directive is a build-time ownership signal only — never ship it.
+		// Blanking (not deleting) keeps positions stable for source maps.
+		const source = directive === null ? code : stripDirective(code, directive);
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const clientReference =
@@ -586,14 +871,38 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(
+				parseModule(source, filename),
+				source,
+				filename,
+				{
+					dom: renderer.target === 'dom',
+					renderer,
+					rendererBoundaries: this.renderers.boundaries,
+					rendererRegistry: this.renderers.registry,
+				},
+			);
+			const nativeChangeDiagnostics = nativeChangeAnalysis.diagnostics;
+			// Hydrate-boundary preparation consumes the directive-stripped source;
+			// blanking preserved every position, so its maps stay consistent.
 			const hydratePreparation =
 				environment === 'client'
-					? prepareHydrateBoundaries(code, filename, hydrateBoundaryPath)
-					: prepareServerHydrateBoundaries(code, filename);
-			const compileSource = hydratePreparation?.source ?? code;
+					? prepareHydrateBoundaries(source, filename, hydrateBoundaryPath)
+					: prepareServerHydrateBoundaries(source, filename);
+			const compileSource = hydratePreparation?.source ?? source;
 			const out = compile(compileSource, filename, {
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
+				__nativeChangeDiagnostics: nativeChangeDiagnostics,
+				...(hydratePreparation === null && !hasRendererBoundaries
+					? { __nativeChangeAnalysis: nativeChangeAnalysis }
+					: null),
+				// Scoped-style hashes are position-derived; after the extraction
+				// rewrite the compiler restamps them from these authored
+				// coordinates so client and server compiles agree (compile.js).
+				...(hydratePreparation?.origins != null
+					? { __styleRemap: { authored: source, origins: hydratePreparation.origins } }
+					: null),
 				hmr,
 				mode: environment,
 				dev,
@@ -610,14 +919,19 @@ class OctaneBundlerCompiler {
 				...(hasRendererBoundaries ? { rendererBoundaries: this.renderers.boundaries } : null),
 				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
 				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
+					? { isVoidComponentImport: options.isVoidComponentImport }
+					: null),
 			});
 			if (hydratePreparation?.map && out.map) {
 				out.map = composeSourceMaps(out.map, hydratePreparation.map);
-				out.map = addSourceMapNeedles(out.map, out.code, code, hydratePreparation.mappingNeedles);
+				out.map = addSourceMapNeedles(out.map, out.code, source, hydratePreparation.mappingNeedles);
 			}
+			this._forwardCompileDiagnostics(out.diagnostics);
 			return {
 				code: out.code,
 				map: out.map,
+				diagnostics: out.diagnostics,
 				kind: 'compile',
 				renderer,
 				...(clientReference === null ? null : { clientReference }),
@@ -630,22 +944,45 @@ class OctaneBundlerCompiler {
 		if (clientOnlyImports.length > 0) {
 			assertNoLiveClientOnlyImports(code, filename, clientOnlyImports);
 		}
-		if (file.endsWith('.tsx')) return this._passThrough(code, collected);
+		if (file.endsWith('.tsx')) {
+			// Either not Octane-eligible, or an undirected project module in a
+			// requireDirective build — the host toolchain's JSX pipeline owns it.
+			if (this.requireDirective && directive === null && this._isProjectOwnedSource(file)) {
+				this._warnUndirectedOctaneImport(code, filename);
+			}
+			return this._passThrough(code, collected);
+		}
 
 		if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
 			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
-			if (this.exclude.some((path) => file.includes(path))) return null;
+			if (this.exclude.some((path) => file.includes(path))) {
+				// Same conflict diagnostic as the full-compile gate: a directive
+				// inside an excluded path must not fail silent.
+				if (this.requireDirective) {
+					this._warnExcludedDirectiveConflict(file, filename, directive);
+				}
+				return null;
+			}
 			if (!/from\s*['"]octane['"]/.test(code)) return null;
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return this._passThrough(code, collected);
 			}
-			if (this._hasManualHookSlots(file, collected)) {
+			// Hook slotting is an Octane-ownership rewrite, so the directive gate
+			// applies to it exactly as to full compilation.
+			if (this.requireDirective && directive === null && this._isProjectOwnedSource(file)) {
+				this._warnUndirectedOctaneImport(code, filename);
 				return this._passThrough(code, collected);
+			}
+			// From here the module is Octane-owned even when nothing gets
+			// rewritten (manual slots, or no hooks to slot) — the returned code
+			// is Octane output, so the build-time directive never appears in it.
+			if (this._hasManualHookSlots(file, collected)) {
+				return this._passThrough(source, collected);
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
 				environment === 'client' && hmr === false && dev === false && profile === false;
-			const out = slotHooks(code, filename, {
+			const out = slotHooks(source, filename, {
 				environment,
 				hmr: !!hmr,
 				profile,
@@ -656,7 +993,7 @@ class OctaneBundlerCompiler {
 						}
 					: {}),
 			});
-			if (out === null) return this._passThrough(code, collected);
+			if (out === null) return this._passThrough(source, collected);
 			return {
 				code: out.code,
 				map: out.map,

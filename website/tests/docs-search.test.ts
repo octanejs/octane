@@ -2,15 +2,15 @@
 // and the ⌘K dialog wired through the real router.
 import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 import { loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
 
 afterEach(cleanup);
 
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {
@@ -28,7 +28,10 @@ describe('docs search index', () => {
 			expect(sections.length, doc.slug).toBeGreaterThan(0);
 
 			// Each `<h2 id>` in the .mdx must show up as its own linkable record.
+			// Nested (level-3) entries are TOC-only — the index is built from h2
+			// anchors, so they aren't expected to have their own record.
 			for (const section of doc.sections ?? []) {
+				if (section.level === 3) continue;
 				const record = sections.find((s) => s.id === section.id);
 				expect(record, doc.slug + '#' + section.id).toBeDefined();
 				expect(record!.text.length).toBeGreaterThan(0);
@@ -75,6 +78,15 @@ describe('docs search ranking', () => {
 		expect(top.lines.every((line) => line.parts.some((part) => part.hit))).toBe(true);
 		// Code lines are indexed too, and flagged so the dialog renders them mono.
 		expect(top.lines.some((line) => line.code)).toBe(true);
+	});
+
+	it('deep links deferred hydration searches to the Hydrate guide', async () => {
+		const index = await loadSearchIndex();
+		const [top] = searchDocs(index, 'deferred hydration');
+
+		expect(top).toBeDefined();
+		expect(top.slug).toBe('core-apis');
+		expect(top.id).toBe('deferred-hydration');
 	});
 
 	it('ranks a heading match above an incidental prose mention', async () => {

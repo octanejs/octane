@@ -50,6 +50,12 @@ useEffect(() => {
 }); // inferred from syncRoom and room.id
 ```
 
+Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules participate when
+they transparently forward their callback and final dependency parameter to one of
+those hooks. The compiler follows nested transparent wrappers, but it does not guess
+from a `use*` name alone. Plain `.ts`/`.js` modules, imported custom hooks, and wrappers
+that transform or inspect those parameters need an explicit list.
+
 An explicit array keeps its exact React meaning. Pass `null` when you intentionally
 want the effect or computation to run after every render.
 
@@ -72,7 +78,8 @@ Handlers receive the browser's real `Event` object, not a synthetic wrapper. Bub
 capture, `stopPropagation()`, and logical bubbling through portals still work. The
 practical differences are:
 
-- Use `onInput` for every text edit. Native `change` usually fires on blur.
+- Use `onInput` for every text edit. Native `change` fires when the browser commits
+  the edit, usually on blur.
 - There are no synthetic `onChange`, `onBeforeInput`, or `onSelect` polyfills.
 - Mouse and pointer enter/leave handlers use the platform's native events.
 
@@ -87,6 +94,48 @@ one-word change:
 // Octane
 <input value={text} onInput={(event) => setText(event.currentTarget.value)} />
 ```
+
+<aside className="doc-callout important">
+	<p className="doc-callout-title">A warning, not an event rewrite</p>
+	<p>
+		<code>OCTANE_NATIVE_TEXT_ONCHANGE</code>
+		{
+			' reports onChange or onChangeCapture on a text-entry input or textarea when no per-edit input handler is present. Statically known JSX is reported by the compiler; development builds check final props when a spread, dynamic type, or de-optimized host prevents a static answer. The code still runs, and onChange remains native.'
+		}
+	</p>
+</aside>
+
+The warning covers `<textarea>` and text-entry input types: a missing or invalid
+type, plus `text`, `search`, `url`, `tel`, `password`, `email`, and `number`. It does
+not apply to selects, checkbox/radio/file and other non-text input types, custom
+elements, statically read-only/disabled controls, or component callbacks that happen
+to be named `onChange`. The compiler surface uses warning severity; unresolved
+final-prop violations report through `console.error` in development, once per broken
+episode. An
+`onChangeCapture` fix preserves the phase by using `onInputCapture`.
+
+Native commit-on-blur behavior is valid. Mark it explicitly instead of adding a
+noop input handler:
+
+```tsrx
+<input
+	defaultValue={savedDraft}
+	onChange={(event) => save(event.currentTarget.value)}
+	suppressNativeChangeWarning
+/>
+```
+
+`suppressNativeChangeWarning` is a JS-only host hint. It suppresses only this
+diagnostic, never appears in client or server HTML, and changes neither event
+delivery nor controlled-state restoration.
+
+Checkboxes and radios keep the browser's activation timeline: `click`, then
+`input`, then non-cancelable `change`. Consequently, `preventDefault()` in native
+`onChange` cannot roll the toggle back. Cancel the earlier `onClick` when rollback
+is the intended behavior. React's synthetic checkable `onChange` is backed by the
+cancelable click, so cancellation at that callback is an intentional timing
+divergence even though Octane still restores rejected controlled state and radio
+cousins after native `change`.
 
 `class` and `className` compose clsx-style, so arrays, objects, and nested values work
 without another helper:
