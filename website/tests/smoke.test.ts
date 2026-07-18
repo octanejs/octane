@@ -17,6 +17,11 @@ import { createHomeSummary } from '../src/content/home-benchmark.ts';
 
 afterEach(cleanup);
 
+// Core APIs is owned by core-apis-docs.test.ts: its large interactive guide
+// needs focused assertions and a wider execution budget than generic route
+// smoke coverage. The real-browser hydration suite also visits this route.
+const smoke = docs.filter((doc) => doc.slug !== 'core-apis');
+
 function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined {
 	return Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(
 		(link) => link.getAttribute('href') === href,
@@ -242,7 +247,7 @@ describe('website routes', () => {
 		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 	});
 
-	it.each(docs)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
+	it.each(smoke)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
 		const { container } = await renderRoute(`/docs/${doc.slug}`);
 
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(doc.title);

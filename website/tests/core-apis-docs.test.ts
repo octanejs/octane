@@ -1,6 +1,7 @@
-// Focused contract for the newcomer-oriented Core APIs guide. The generic
-// smoke suite checks every route; this file protects the learning structure,
-// local navigation, and the real interactive example embedded in the MDX.
+// Focused contract for the newcomer-oriented Core APIs guide. This file owns
+// the route's learning structure, local navigation, and real interactive
+// examples so the unusually large page does not need duplicate generic smoke
+// coverage.
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
