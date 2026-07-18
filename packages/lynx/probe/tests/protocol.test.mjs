@@ -164,10 +164,7 @@ test('append validation rejects conflicting staged and committed parents before 
 				...PHASE_0_PROTOCOL,
 				type: 'commit',
 				version: 1,
-				commands: [
-					...createTree,
-					{ type: 'append', parentId: 'second', childId: 'child' },
-				],
+				commands: [...createTree, { type: 'append', parentId: 'second', childId: 'child' }],
 			}),
 		/host "child" is already attached to "first"/,
 	);
