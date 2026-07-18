@@ -448,6 +448,23 @@ export default interface ErasedShape { value: string }
 			expect(compiledMemo?.voidComponentExports).toEqual(['Main']);
 			expect(compiledMemo?.code).toContain('_$ifBlock');
 			expect(compiledMemo?.code).not.toContain('componentSlot');
+			const constComponent =
+				"export const fixtureKind = 'guarded',\n" +
+				'  Main = function (p) @{ if (!p.ready) return null; <main>ready</main> },\n' +
+				'  fixtureAfter = fixtureKind;\n';
+			const compiledConst = compiler.transform(constComponent, component, {
+				hmr: false,
+				dev: false,
+				collectVoidComponentExports: true,
+			});
+			expect(compiledConst?.voidComponentExports).toEqual(['Main']);
+			expect(
+				compiler.transform(constComponent, component, {
+					environment: 'server',
+					hmr: false,
+					dev: false,
+				}),
+			).toMatchObject({ kind: 'compile' });
 			const proveDefault = (request: string, imported: string) =>
 				request === './Main.tsrx' && imported === 'default';
 			const specialized = compiler.transform(defaultEntry, entry, {

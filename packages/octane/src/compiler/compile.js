@@ -3001,22 +3001,77 @@ function arrowComponentToFunctionDecl(varDecl) {
 	};
 }
 
-// Rewrite top-level arrow-function components (`const X = () => @{…}`, incl.
-// `export const X = …`) to FunctionDeclaration form in place, so the rest of the
-// pipeline sees the canonical component shape. Mutates `ast.body`.
+// Split a multi-declarator statement only when it contains a component. Keeping
+// each declarator in source order preserves initializer evaluation while letting
+// the component pipeline see the same canonical FunctionDeclaration shape as a
+// standalone `const X = () => @{…}` declaration.
+/** @param {any} varDecl @returns {any[]|null} */
+function splitArrowComponentDeclaration(varDecl) {
+	if (
+		!varDecl ||
+		varDecl.type !== 'VariableDeclaration' ||
+		varDecl.kind !== 'const' ||
+		!Array.isArray(varDecl.declarations) ||
+		varDecl.declarations.length < 2
+	)
+		return null;
+	let found = false;
+	const declarations = varDecl.declarations.map((declarator) => {
+		const single = {
+			...varDecl,
+			declarations: [declarator],
+			start: declarator.start ?? varDecl.start,
+			end: declarator.end ?? varDecl.end,
+			loc: declarator.loc ?? varDecl.loc,
+		};
+		const component = arrowComponentToFunctionDecl(single);
+		if (component !== null) {
+			found = true;
+			return component;
+		}
+		return single;
+	});
+	return found ? declarations : null;
+}
+
+function normalizeArrowComponentDeclaration(declaration) {
+	const component = arrowComponentToFunctionDecl(declaration);
+	if (component !== null) return [component];
+	return splitArrowComponentDeclaration(declaration) ?? [declaration];
+}
+
+// Rewrite top-level arrow/function-expression components (`const X = () =>
+// @{…}`, incl. `export const X = …`) to FunctionDeclaration form, so the rest
+// of the pipeline sees the canonical component shape. Multi-declarator
+// statements are split in source order when one declarator is a component.
+// Mutates `ast.body`.
 /** @param {any} ast @returns {void} */
 function normalizeArrowComponents(ast) {
 	if (!ast || !Array.isArray(ast.body)) return;
-	for (let i = 0; i < ast.body.length; i++) {
-		const node = ast.body[i];
+	const body = [];
+	for (const node of ast.body) {
 		if (node.type === 'VariableDeclaration') {
-			const fn = arrowComponentToFunctionDecl(node);
-			if (fn) ast.body[i] = fn;
+			body.push(...normalizeArrowComponentDeclaration(node));
 		} else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-			const fn = arrowComponentToFunctionDecl(node.declaration);
-			if (fn) node.declaration = fn;
+			const declarations = normalizeArrowComponentDeclaration(node.declaration);
+			if (declarations.length === 1 && declarations[0] === node.declaration) {
+				body.push(node);
+			} else {
+				for (const declaration of declarations) {
+					body.push({
+						...node,
+						declaration,
+						start: declaration.start ?? node.start,
+						end: declaration.end ?? node.end,
+						loc: declaration.loc ?? node.loc,
+					});
+				}
+			}
+		} else {
+			body.push(node);
 		}
 	}
+	ast.body = body;
 }
 
 // A top-level statement that carries NO runtime value — pure TypeScript type
