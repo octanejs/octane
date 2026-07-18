@@ -1,5 +1,19 @@
 # @octanejs/mcp-server
 
+## 0.2.5
+
+### Patch Changes
+
+- 07511e4: Keep `onChange` native while adding compile-time and development-runtime text-host
+  diagnostics, explicit commit intent, and correct controlled checkbox/radio
+  restoration through native change. Use native `input` events for Base UI text
+  controls while preserving the number field's form-facing native change commit,
+  propagate authored-source diagnostics through MDX compilation and Vite, and make
+  Octane's bridge tooling target React-style text-host event wiring without rewriting
+  component callbacks or non-text controls.
+- 693bc7b: Add always-on engineering guidance, a production-grade Octane software skill, and
+  structured performance and self-review gates for coding agents.
+
 ## 0.2.4
 
 ### Patch Changes

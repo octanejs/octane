@@ -1,5 +1,35 @@
 # @octanejs/aria
 
+## 0.0.3
+
+### Patch Changes
+
+- c704664: Phase 1: the focus area (`FocusScope` with containment/restore/focus managers,
+  `FocusRing`, `useFocusRing`), the i18n area (`I18nProvider`, `useLocale`,
+  collator/date/number/list formatters, `useFilter`,
+  `useLocalizedStringFormatter` over verbatim `@internationalized/*`), form
+  validation, and the leaf hooks: `useButton`/`useToggleButton`(+Group),
+  `useLabel`/`useField`, `useCheckbox`(+Group/+Item), `useRadio`/`useRadioGroup`,
+  `useSwitch`, `useTextField`, `useSearchField`, `useProgressBar`, `useMeter`,
+  `useSeparator`, `useLink`, `useDisclosure`, `useToolbar`, `VisuallyHidden` —
+  plus the matching react-stately state hooks under `@octanejs/aria/stately`.
+  Text-input and checkable DOM wiring rides octane's native `input` event; public
+  value-level `onChange(value)` APIs are unchanged. Differential-verified
+  byte-identical against the real react-aria.
+- Updated dependencies [c704664]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [91b5f45]
+- Updated dependencies [c16778a]
+- Updated dependencies [39f2c00]
+- Updated dependencies [aabf79c]
+- Updated dependencies [07511e4]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [0d2e265]
+- Updated dependencies [3168360]
+- Updated dependencies [81c8842]
+  - octane@0.1.9
+
 ## 0.0.2
 
 ### Patch Changes
