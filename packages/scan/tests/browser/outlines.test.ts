@@ -119,4 +119,30 @@ describe('render outlines browser evidence', () => {
 			return false;
 		});
 	});
+
+	it('pauses outlines from the toolbar toggle and resumes', async () => {
+		// Wait for the fade from the previous test so a stale flash cannot leak in.
+		await page.waitForFunction(() => {
+			const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-octane-scan]');
+			const data = canvas!.getContext('2d')!.getImageData(0, 0, canvas!.width, canvas!.height).data;
+			for (let index = 3; index < data.length; index += 4) if (data[index] > 0) return false;
+			return true;
+		});
+		await page.locator('[data-octane-scan-toolbar] [data-action="toggle"]').click();
+		await page.locator('#inc').click();
+		await page.waitForFunction(() => document.querySelector('#value')?.textContent === 'count: 5');
+		await page.evaluate(
+			() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+		);
+		expect(await overlayInk(page)).toBe(0);
+
+		await page.locator('[data-octane-scan-toolbar] [data-action="toggle"]').click();
+		await page.locator('#inc').click();
+		await page.waitForFunction(() => {
+			const canvas = document.querySelector<HTMLCanvasElement>('canvas[data-octane-scan]');
+			const data = canvas!.getContext('2d')!.getImageData(0, 0, canvas!.width, canvas!.height).data;
+			for (let index = 3; index < data.length; index += 4) if (data[index] > 0) return true;
+			return false;
+		});
+	});
 });

@@ -85,12 +85,23 @@ const report = new Map<string, ComponentReport>();
 const componentListeners = new Map<string, Set<(info: OctaneRenderInfo) => void>>();
 /** Per-batch render tally, flushed to the console on commit-finish when logging. */
 let pendingLog = new Map<string, number>();
-let renderSink: RenderSink | null = null;
+const renderSinks = new Set<RenderSink>();
 let pendingBatch: OctaneRenderInfo[] = [];
+const optionsListeners = new Set<() => void>();
 
-export function __setRenderSink(sink: RenderSink | null): void {
-	renderSink = sink;
-	pendingBatch = [];
+export function __addRenderSink(sink: RenderSink): () => void {
+	renderSinks.add(sink);
+	return () => {
+		renderSinks.delete(sink);
+	};
+}
+
+/** Internal: notified after every option merge (toolbar state mirroring). */
+export function __onOptionsChanged(listener: () => void): () => void {
+	optionsListeners.add(listener);
+	return () => {
+		optionsListeners.delete(listener);
+	};
 }
 
 function toInfo(event: ProfileEvent): OctaneRenderInfo {
@@ -137,12 +148,12 @@ function record(event: ProfileEvent): void {
 
 	const listeners = componentListeners.get(event.componentId);
 	const wantsInfo =
-		renderSink !== null ||
+		renderSinks.size > 0 ||
 		options.onRender !== undefined ||
 		(listeners !== undefined && listeners.size > 0);
 	if (wantsInfo) {
 		const info = toInfo(event);
-		if (renderSink !== null) pendingBatch.push(info);
+		if (renderSinks.size > 0) pendingBatch.push(info);
 		try {
 			options.onRender?.(info);
 		} catch {
@@ -173,13 +184,15 @@ const subscriber: ProfileSubscriber = {
 		}
 	},
 	commitFinish() {
-		if (renderSink !== null && pendingBatch.length > 0) {
+		if (pendingBatch.length > 0) {
 			const batch = pendingBatch;
 			pendingBatch = [];
-			try {
-				renderSink.batch(batch, options);
-			} catch {
-				// The overlay must never break the app being scanned.
+			for (const sink of renderSinks) {
+				try {
+					sink.batch(batch, options);
+				} catch {
+					// Overlay/toolbar consumers must never break the app being scanned.
+				}
 			}
 		}
 		try {
@@ -222,6 +235,13 @@ export function scan(next: Options = {}): void {
 export function setOptions(next: Partial<Options>): void {
 	options = { ...options, ...next };
 	applyEnabled();
+	for (const listener of optionsListeners) {
+		try {
+			listener();
+		} catch {
+			// Internal UI listeners must never break the app being scanned.
+		}
+	}
 }
 
 export function getOptions(): Options {

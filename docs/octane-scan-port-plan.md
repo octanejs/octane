@@ -58,8 +58,12 @@ packages/scan (@octanejs/scan)
                  aggregation, report store, options store (framework-free TS)
   src/outlines/  outline canvas renderer — ported from upstream mostly
                  verbatim (it is already framework-agnostic canvas code)
-  src/toolbar/   toolbar + inspector as OCTANE components (upstream uses
-                 Preact; we dogfood), rendered into an isolated shadow root
+  src/toolbar.ts toolbar in plain DOM inside an isolated shadow root.
+                 Upstream deliberately renders its UI in Preact — NOT React —
+                 so the tool never instruments itself; the faithful port of
+                 that rationale is DOM, not Octane components (an
+                 Octane-rendered toolbar would profile-instrument its own
+                 re-renders and feed back into the overlay)
   src/index.ts   scan(), useScan(), setOptions(), getOptions(), getReport(),
                  onRender() — upstream API shape
   src/auto.ts    side-effectful auto-start entry (script-tag equivalent)
