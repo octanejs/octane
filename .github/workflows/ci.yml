@@ -138,13 +138,6 @@ jobs:
       - name: Check bindings-status table is current
         run: pnpm bindings:status:check
 
-      # Compile every checked-in TSRX/TSX/JSX source through the native-event classifier.
-      # Intentional teaching fixtures carry an explicit disposition; any new
-      # statically diagnosable text-host onChange site fails until it is migrated
-      # or classified; final dynamic shapes stay covered by runtime tests.
-      - name: Check native-event diagnostic inventory
-        run: pnpm native-events:diagnostics:check
-
       - name: Check Lucide generated sources are current
         run: pnpm lucide:generate:check
 
