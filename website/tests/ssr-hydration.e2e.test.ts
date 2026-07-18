@@ -290,41 +290,56 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
-	it('the benchmark Visx charts preserve their server geometry through hydration', async () => {
+	it('the benchmark bar charts preserve their server geometry through hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
 		try {
-			const charts = page.locator('svg.bench-chart');
-			expect(await charts.count()).toBe(18);
-			const firstChart = charts.first();
-			const serverChart = await firstChart.elementHandle();
-			expect(serverChart).toBeTruthy();
-			const geometry = await firstChart.evaluate((svg) => ({
-				width: svg.getAttribute('width'),
-				height: svg.getAttribute('height'),
-				viewBox: svg.getAttribute('viewBox'),
-				bars: svg.querySelectorAll('.visx-bar').length,
+			const plots = page.locator('.bench-card .bench-plot');
+			expect(await plots.count()).toBe(18);
+			const firstPlot = plots.first();
+			const serverPlot = await firstPlot.elementHandle();
+			expect(serverPlot).toBeTruthy();
+			const geometry = await firstPlot.evaluate((plot) => ({
+				bars: plot.querySelectorAll('.bench-fill').length,
+				widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
+					bar.getAttribute('style'),
+				),
 			}));
 
 			await page.waitForTimeout(750);
 
 			expect(await page.locator('.recharts-wrapper').count()).toBe(0);
 			expect(await page.locator('.bench-plot-shell').count()).toBe(0);
-			expect(await charts.count()).toBe(18);
+			expect(await plots.count()).toBe(18);
+			// Hydration adopts the server-rendered chart node instead of replacing it.
 			expect(
 				await page.evaluate(
-					(original) => document.querySelector('svg.bench-chart') === original,
-					serverChart,
+					(original) => document.querySelector('.bench-card .bench-plot') === original,
+					serverPlot,
 				),
 			).toBe(true);
 			expect(
-				await firstChart.evaluate((svg) => ({
-					width: svg.getAttribute('width'),
-					height: svg.getAttribute('height'),
-					viewBox: svg.getAttribute('viewBox'),
-					bars: svg.querySelectorAll('.visx-bar').length,
+				await firstPlot.evaluate((plot) => ({
+					bars: plot.querySelectorAll('.bench-fill').length,
+					widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
+						bar.getAttribute('style'),
+					),
 				})),
 			).toEqual(geometry);
 			expect(geometry.bars).toBeGreaterThan(0);
+
+			// The adopted card is live: picking another operation flips the pressed
+			// state of the picker it hydrated.
+			const firstOps = page.locator('.bench-card').first().locator('.bench-op');
+			await firstOps.nth(1).click();
+			await page.waitForFunction(
+				() =>
+					document
+						.querySelector('.bench-card .bench-op:nth-child(2)')
+						?.getAttribute('aria-pressed') === 'true',
+				null,
+				{ timeout: 5_000 },
+			);
+
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));
 			expect(real).toEqual([]);
 		} finally {
