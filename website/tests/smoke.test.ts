@@ -251,6 +251,10 @@ describe('website routes', () => {
 			expect(target, section.id).toBeTruthy();
 			if (section.level === 3) {
 				expect(target.querySelector('figure.bench-card'), section.id).toBeTruthy();
+				// The rail click moves focus onto this wrapper, so it must expose an
+				// accessible name announcing which chart the reader landed on.
+				expect(target.getAttribute('role'), section.id).toBe('group');
+				expect(target.getAttribute('aria-label'), section.id).toBe(section.title);
 			} else {
 				expect(target.tagName).toBe('H2');
 			}

@@ -19,7 +19,10 @@ const OVERVIEW = createHomeSummary(FRAMEWORK_CARDS);
 // with a nested level-3 row for every benchmark card, derived from the same
 // card arrays the sections chart so the rail can never drift from the page.
 // Level-2 ids match the `<h2 id>`s; card ids match the anchored card wrappers
-// (both carry the scroll-margin-top clearing the sticky header).
+// (both carry the scroll-margin-top clearing the sticky header). A rail click
+// moves focus onto its target, so the card wrappers — unlike the self-naming
+// h2s — need role="group" with the card title as their accessible name, or
+// screen-reader users land in the section without hearing which chart it is.
 const cardAnchor = (card: { id: string }) => 'bench-' + card.id;
 export const BENCH_SECTIONS: readonly { id: string; title: string; level?: 2 | 3 }[] = [
 	{ id: 'bench-overview', title: 'Every suite at a glance' },
@@ -76,7 +79,12 @@ export function Benchmarks() @{
 					</p>
 					<div class="benchpage-grid">
 						@for (const card of FRAMEWORK_CARDS; key card.id) {
-							<div class="benchpage-anchor" id={cardAnchor(card)}>
+							<div
+								class="benchpage-anchor"
+								id={cardAnchor(card)}
+								role="group"
+								aria-label={card.title}
+							>
 								<BenchBars card={card} />
 							</div>
 						}
@@ -92,7 +100,12 @@ export function Benchmarks() @{
 					</p>
 					<div class="benchpage-grid">
 						@for (const card of OCTANE_CARDS; key card.id) {
-							<div class="benchpage-anchor" id={cardAnchor(card)}>
+							<div
+								class="benchpage-anchor"
+								id={cardAnchor(card)}
+								role="group"
+								aria-label={card.title}
+							>
 								<BenchBars card={card} />
 							</div>
 						}
