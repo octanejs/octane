@@ -146,6 +146,8 @@ export {
 	setSpread,
 	snapshotSpread,
 	setHostPropSources,
+	queueNativeChangeDiagnostic,
+	markNativeChangeDiagnosticStatic,
 	setFormAction,
 	// Controlled form components (value/checked/defaultValue/defaultChecked
 	// property bindings on input/textarea/select — React-parity semantics on

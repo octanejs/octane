@@ -206,7 +206,11 @@ export default defineConfig({
 				test: {
 					name: 'octane',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
-					exclude: [...configDefaults.exclude, 'packages/octane/tests/profiling-runtime.test.tsrx'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// Precompiles every fixture through @tsrx/react + esbuild before any
 					// test loads — runs in pure Node so esbuild's TextEncoder requirements
@@ -279,7 +283,11 @@ export default defineConfig({
 				test: {
 					name: 'octane-prod',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
-					exclude: [...configDefaults.exclude, 'packages/octane/tests/profiling-runtime.test.tsrx'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
 					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
@@ -334,6 +342,16 @@ export default defineConfig({
 						},
 					}),
 				],
+			},
+			{
+				test: {
+					name: 'octane-events-browser',
+					include: ['packages/octane/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
 			},
 			{
 				// Focused production-semantics profiling build. Keeping this to the

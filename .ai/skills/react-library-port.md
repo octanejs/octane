@@ -24,7 +24,7 @@ Read first:
 1. **Classify the target library**
    - Find its vanilla/core package or pure internal layer.
    - Identify the React binding surface: hooks, components, providers, portals, refs, event handling.
-   - Note unsupported React assumptions: class components, `forwardRef`, synthetic events, controlled inputs, StrictMode-only behavior, React internals.
+   - Note unsupported React assumptions: class components, `forwardRef`, synthetic events, React-style text `onChange`, StrictMode-only behavior, React internals. Controlled `value`/`checked` itself is supported.
 
 2. **Create or update package shape**
    - New ports belong under `packages/<name>/` with `package.json`, `src/`, `tests/`, `tsconfig.json`, and README.
@@ -53,6 +53,10 @@ Read first:
      - Environment/jsdom artifact
      - Porting/test harness issue
    - Record genuine gaps in docs or tests before changing runtime/compiler.
+   - Preserve public/library callbacks named `onChange`. Rewrite only standard
+     text-host wiring that means “every edit” to `onInput`; keep select and
+     checkbox/radio native change handlers. A real text commit may use
+     `suppressNativeChangeWarning` with a behavioral test.
 
 6. **Validate**
    - Run package-specific tests first.

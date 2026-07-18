@@ -1501,7 +1501,13 @@ export function ssrAttr(
 		return ' ' + name + '="' + escapeAttr(String(v)) + '"';
 	}
 	// React-only warning-suppression hints never serialize (client parity).
-	if (name === 'suppressContentEditableWarning' || name === 'suppressHydrationWarning') return '';
+	if (
+		name === 'suppressContentEditableWarning' ||
+		name === 'suppressHydrationWarning' ||
+		name === 'suppressNativeChangeWarning' ||
+		name === '__octaneNativeChangeDiagnostic'
+	)
+		return '';
 	const t = typeof v;
 	// spellcheck / contenteditable / draggable are ENUMERATED — a boolean
 	// stringifies ("false" is a real state; absent means inherit). Global
@@ -1615,7 +1621,13 @@ function ssrAttrEntry(
 ): string {
 	namespace = resolveAttributeNamespace(namespace);
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
-	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
+	if (
+		k === 'suppressHydrationWarning' ||
+		k === 'suppressContentEditableWarning' ||
+		k === 'suppressNativeChangeWarning' ||
+		k === '__octaneNativeChangeDiagnostic'
+	)
+		return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
 	// `autoFocus` never serializes (client focuses at its mount commit).
 	if (k === 'autoFocus' && (namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1))
@@ -1713,7 +1725,9 @@ export function ssrAttrs(
 			rawName === 'children' ||
 			rawName === 'dangerouslySetInnerHTML' ||
 			rawName === 'suppressHydrationWarning' ||
-			rawName === 'suppressContentEditableWarning'
+			rawName === 'suppressContentEditableWarning' ||
+			rawName === 'suppressNativeChangeWarning' ||
+			rawName === '__octaneNativeChangeDiagnostic'
 		)
 			continue;
 		if (skipFormControls && isAggregatedFormAttribute(tag, rawName)) continue;

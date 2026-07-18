@@ -132,6 +132,7 @@
     "@types/react": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
+    "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "vite": "catalog:default",

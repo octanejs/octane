@@ -461,6 +461,9 @@ function NumberFieldRoot(props: any): any {
 
 	const hiddenInput = createElement('input', {
 		...hiddenInputProps,
+		// This form-facing control intentionally observes the native commit event;
+		// the visible text input above owns per-edit handling.
+		suppressNativeChangeWarning: true,
 		ref: hiddenInputRef,
 		type: 'number',
 		form,
@@ -648,7 +651,7 @@ function NumberFieldInput(props: any): any {
 			const canonicalText = formatNumber(committedValue, locale, formatOptions);
 			if (inputValue !== canonicalText) setInputValue(canonicalText);
 		},
-		onChange(event: any) {
+		onInput(event: any) {
 			if (event.defaultPrevented) return;
 			allowInputSyncRef.current = false;
 			const targetValue = event.currentTarget.value;

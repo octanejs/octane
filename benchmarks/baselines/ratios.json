@@ -97,6 +97,33 @@
     "note": "gzip(minified compiled corpus) vs gzip(source corpus). The committed 2026-07-15 record was stale: a clean base build measured 24526 compiled bytes, while the current compiler reduces that to 24397. The resulting 24397 / 23519 = 1.037x record is guarded at 1.04x."
   },
   {
+    "suite": "codegen-size",
+    "op": "raw",
+    "target": "native-change-diagnostic",
+    "reference": "native-change-control",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Production compilation of the dynamic/spread/createElement sentinel must be byte-identical with and without native-change analysis."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "minified",
+    "target": "native-change-diagnostic",
+    "reference": "native-change-control",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Minified production sentinel output must retain zero diagnostic codegen cost."
+  },
+  {
+    "suite": "codegen-size",
+    "op": "gzip",
+    "target": "native-change-diagnostic",
+    "reference": "native-change-control",
+    "minRatio": 1.0,
+    "maxRatio": 1.0,
+    "note": "Gzipped production sentinel output must retain zero diagnostic codegen cost."
+  },
+  {
     "suite": "bundle-size",
     "op": "app_gzip",
     "target": "octane-tsrx",

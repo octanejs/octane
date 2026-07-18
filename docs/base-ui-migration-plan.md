@@ -234,7 +234,7 @@ work around it in the binding.**
 > `useControlled` value, `useForcedRerendering`, `setValue`/`incrementValue`/`getStepAmount`/
 > `getAllowedNonNumericKeys` via `useStableCallback`, `formatNumber`-based `inputValue` state,
 > and a hidden `<input type="number">` for form submission), `NumberField.Group` (`role="group"`),
-> `NumberField.Input` (`<input type="text">` with the full onChange/onKeyDown/onBlur/onFocus/onPaste
+> `NumberField.Input` (`<input type="text">` with the full onInput/onKeyDown/onBlur/onFocus/onPaste
 > handler set: locale-aware numeral filtering, arrow/Home/End stepping, blur re-format, paste
 > parse), and `NumberField.Increment`/`Decrement` (`useNumberFieldStepperButton` + `useButton`,
 > `focusableWhenDisabled`, boundary-disabled at min/max). New utils: `utils/number/{parse,validate,
@@ -242,7 +242,11 @@ work around it in the binding.**
 > `platform`, and `REASONS` gained the number-field reason strings. **octane adaptations:** native
 > events (no `.nativeEvent`); the text-input value adaptation applied to BOTH the visible input and
 > the hidden number input (initial value → the `value` ATTRIBUTE; live value driven via the `.value`
-> PROPERTY in a layout effect). **Deferred (stubbed):** `usePressAndHold` auto-repeat (single-click
+> PROPERTY in a layout effect). The visible Field and NumberField text controls consume native
+> `input` per edit. The visually hidden, form-facing number host deliberately retains native
+> `change`: an explicit change commit updates the root and visible formatted field, pinned by
+> `number-field.test.ts`. Its non-serialized `suppressNativeChangeWarning` hint records that local
+> intent without changing event delivery. **Deferred (stubbed):** `usePressAndHold` auto-repeat (single-click
 > stepping works; hold-to-repeat inert) + the ScrubArea. Increment/decrement value changes are
 > invisible in `innerHTML` (React drives the value via the property too), so the differential gates
 > the formatted-value render + the boundary-disabled state; value-change behavior is covered by the

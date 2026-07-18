@@ -37,6 +37,36 @@ describe('scanSource', () => {
 		expect(scanSource('class Boundary extends React.Component {}').classComponent).toBe(true);
 		expect(scanSource('class Memoish extends PureComponent {}').classComponent).toBe(true);
 	});
+
+	it('targets only React-style text-host onChange wiring', () => {
+		const source = `
+			function Demo(props) {
+				return <>
+					<input onChange={(event) => props.edit(event.currentTarget.value)} />
+					<textarea onChangeCapture={props.capture} />
+					<input type="checkbox" onChange={props.toggle} />
+					<input type={props.type} onChange={props.dynamic} />
+					<input {...props.field} onChange={props.dynamic} />
+					<input onInput={props.input} onChange={props.commit} />
+					<input onInput={null} onChange={props.edit} />
+					<input onChange={null} />
+					<input onChange={props.commit} suppressNativeChangeWarning />
+					<input onChange={props.commit} suppressNativeChangeWarning={true} />
+					<input onChange={props.edit} suppressNativeChangeWarning={false} />
+					<input onChange={props.edit} suppressNativeChangeWarning="false" />
+					<input onChange={props.edit} suppressNativeChangeWarning="true" />
+					<textarea onChange={props.commit} readOnly />
+					<textarea onChange={props.commit} disabled="disabled" />
+					<select onChange={props.select}><option>one</option></select>
+					<Input onChange={props.value} />
+					<Field onChange={props.value} />
+				</>;
+			}
+		`;
+		expect(scanSource(source).apis.get('onChange')).toBe(6);
+		const report = bridgeReportFromSource(source);
+		expect(report.plan.join('\n')).toContain('standard text host');
+	});
 });
 
 describe('detectVanillaCore', () => {

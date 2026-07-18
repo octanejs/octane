@@ -148,6 +148,14 @@ move set not — `innerHTML` can't see it).
 Every failure is triaged as **bug vs intentional-divergence vs environment-artifact**
 before it counts against parity.
 
+For event ports, preserve public component/library callbacks named `onChange`.
+Only rewrite a callback when it is wired to a standard text-entry DOM host and is
+meant to observe every edit; that host uses `onInput`. Native commit-on-blur text
+behavior may keep `onChange` with `suppressNativeChangeWarning`, while selects and
+checkbox/radio hosts keep native `onChange` without suppression. The compiler's
+`OCTANE_NATIVE_TEXT_ONCHANGE` warning and the development final-props fallback are
+the migration audit, not permission for a blanket source-text replacement.
+
 ## 7. Key risks
 
 - **Partly circular:** Octane already ships uSES + ported React's `useSyncExternalStore-test.js`,
