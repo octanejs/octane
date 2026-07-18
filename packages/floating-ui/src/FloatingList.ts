@@ -10,9 +10,11 @@ import {
 	useRef,
 	useState,
 } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { S, splitSlot, subSlot } from './internal';
 import { useModernLayoutEffect } from './utils';
+import type { MutableRefObject } from './types';
 
 function sortByDocumentPosition(a: Node, b: Node): number {
 	const position = a.compareDocumentPosition(b);
@@ -28,29 +30,55 @@ function sortByDocumentPosition(a: Node, b: Node): number {
 	return 0;
 }
 
-export const FloatingListContext = createContext<any>({
+interface FloatingListContextValue {
+	register: (node: Node) => void;
+	unregister: (node: Node) => void;
+	map: Map<Node, number | null>;
+	elementsRef: MutableRefObject<Array<HTMLElement | null>>;
+	labelsRef?: MutableRefObject<Array<string | null>>;
+}
+
+export const FloatingListContext = createContext<FloatingListContextValue>({
 	register: () => {},
 	unregister: () => {},
 	map: new Map(),
 	elementsRef: { current: [] },
 });
 
-export function FloatingList(props: any): any {
+export interface FloatingListProps {
+	children: OctaneNode;
+	/**
+	 * A ref to the list of HTML elements, ordered by their index.
+	 * `useListNavigation`'s `listRef` prop.
+	 */
+	elementsRef: MutableRefObject<Array<HTMLElement | null>>;
+	/**
+	 * A ref to the list of element labels, ordered by their index.
+	 * `useTypeahead`'s `listRef` prop.
+	 */
+	labelsRef?: MutableRefObject<Array<string | null>>;
+}
+
+/**
+ * Provides context for a list of items within the floating element.
+ * @see https://floating-ui.com/docs/FloatingList
+ */
+export function FloatingList(props: FloatingListProps): OctaneNode {
 	const children = props.children;
 	const elementsRef = props.elementsRef;
 	const labelsRef = props.labelsRef;
 
-	const [nodes, setNodes] = useState(() => new Set<any>(), S('FloatingList:nodes'));
+	const [nodes, setNodes] = useState(() => new Set<Node>(), S('FloatingList:nodes'));
 	const register = useCallback(
-		(node: any) => {
-			setNodes((prevSet: Set<any>) => new Set(prevSet).add(node));
+		(node: Node) => {
+			setNodes((prevSet) => new Set(prevSet).add(node));
 		},
 		[],
 		S('FloatingList:register'),
 	);
 	const unregister = useCallback(
-		(node: any) => {
-			setNodes((prevSet: Set<any>) => {
+		(node: Node) => {
+			setNodes((prevSet) => {
 				const set = new Set(prevSet);
 				set.delete(node);
 				return set;
@@ -61,7 +89,7 @@ export function FloatingList(props: any): any {
 	);
 	const map = useMemo(
 		() => {
-			const newMap = new Map();
+			const newMap = new Map<Node, number | null>();
 			const sortedNodes = Array.from(nodes.keys()).sort(sortByDocumentPosition);
 			sortedNodes.forEach((node, index) => {
 				newMap.set(node, index);
@@ -71,7 +99,7 @@ export function FloatingList(props: any): any {
 		[nodes],
 		S('FloatingList:map'),
 	);
-	const value = useMemo(
+	const value = useMemo<FloatingListContextValue>(
 		() => ({ register, unregister, map, elementsRef, labelsRef }),
 		[register, unregister, map, elementsRef, labelsRef],
 		S('FloatingList:value'),
@@ -79,18 +107,35 @@ export function FloatingList(props: any): any {
 	return createElement(FloatingListContext.Provider, { value, children });
 }
 
+export interface UseListItemProps {
+	label?: string | null;
+}
+
+/**
+ * Used to register a list item and its index (DOM position) in the
+ * `FloatingList`.
+ * @see https://floating-ui.com/docs/FloatingList#uselistitem
+ */
+export function useListItem(
+	props?: UseListItemProps,
+	slot?: symbol,
+): { ref: (node: HTMLElement | null) => void; index: number };
+export function useListItem(slot?: symbol): {
+	ref: (node: HTMLElement | null) => void;
+	index: number;
+};
 export function useListItem(...args: any[]): any {
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useListItem');
-	const props = (user[0] as any) ?? {};
+	const props = (user[0] as UseListItemProps) ?? {};
 	const label = props.label;
 
 	const { register, unregister, map, elementsRef, labelsRef } = useContext(FloatingListContext);
-	const [index, setIndex] = useState<any>(null, subSlot(slot, 'index'));
-	const componentRef = useRef<any>(null, subSlot(slot, 'ref'));
+	const [index, setIndex] = useState<number | null>(null, subSlot(slot, 'index'));
+	const componentRef = useRef<HTMLElement | null>(null, subSlot(slot, 'ref'));
 
 	const ref = useCallback(
-		(node: any) => {
+		(node: HTMLElement | null) => {
 			componentRef.current = node;
 			if (index !== null) {
 				elementsRef.current[index] = node;

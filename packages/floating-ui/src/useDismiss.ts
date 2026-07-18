@@ -28,27 +28,101 @@ import {
 	isRootElement,
 	useEffectEvent,
 } from './utils';
+import type { ElementProps, FloatingRootContext } from './types';
 
-const bubbleHandlerKeys: any = {
+export interface UseDismissProps {
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * Whether to dismiss the floating element upon pressing the `esc` key.
+	 * @default true
+	 */
+	escapeKey?: boolean;
+	/**
+	 * Whether to dismiss the floating element upon pressing the reference
+	 * element. You likely want to ensure the `move` option in the `useHover()`
+	 * Hook has been disabled when this is in use.
+	 * @default false
+	 */
+	referencePress?: boolean;
+	/**
+	 * The type of event to use to determine a “press”.
+	 * - `pointerdown` is eager on both mouse + touch input.
+	 * - `mousedown` is eager on mouse input, but lazy on touch input.
+	 * - `click` is lazy on both mouse + touch input.
+	 * @default 'pointerdown'
+	 */
+	referencePressEvent?: 'pointerdown' | 'mousedown' | 'click';
+	/**
+	 * Whether to dismiss the floating element upon pressing outside of the
+	 * floating element. Accepts a guard function to filter which presses count
+	 * as outside (native `MouseEvent`).
+	 * @default true
+	 */
+	outsidePress?: boolean | ((event: MouseEvent) => boolean);
+	/**
+	 * The type of event to use to determine an outside “press”.
+	 * - `pointerdown` is eager on both mouse + touch input.
+	 * - `mousedown` is eager on mouse input, but lazy on touch input.
+	 * - `click` is lazy on both mouse + touch input.
+	 * @default 'pointerdown'
+	 */
+	outsidePressEvent?: 'pointerdown' | 'mousedown' | 'click';
+	/**
+	 * Whether to dismiss the floating element upon scrolling an overflow
+	 * ancestor.
+	 * @default false
+	 */
+	ancestorScroll?: boolean;
+	/**
+	 * Determines whether event listeners bubble upwards through a tree of
+	 * floating elements.
+	 */
+	bubbles?: boolean | { escapeKey?: boolean; outsidePress?: boolean };
+	/**
+	 * Determines whether to use capture phase event listeners.
+	 */
+	capture?: boolean | { escapeKey?: boolean; outsidePress?: boolean };
+}
+
+type PressHandlerKey = 'pointerdown' | 'mousedown' | 'click';
+
+const bubbleHandlerKeys: Record<PressHandlerKey, string> = {
 	pointerdown: 'onPointerDown',
 	mousedown: 'onMouseDown',
 	click: 'onClick',
 };
-const captureHandlerKeys: any = {
+const captureHandlerKeys: Record<PressHandlerKey, string> = {
 	pointerdown: 'onPointerDownCapture',
 	mousedown: 'onMouseDownCapture',
 	click: 'onClickCapture',
 };
-const normalizeProp = (normalizable: any) => ({
+const normalizeProp = (
+	normalizable?: boolean | { escapeKey?: boolean; outsidePress?: boolean },
+) => ({
 	escapeKey: typeof normalizable === 'boolean' ? normalizable : (normalizable?.escapeKey ?? false),
 	outsidePress:
 		typeof normalizable === 'boolean' ? normalizable : (normalizable?.outsidePress ?? true),
 });
 
-export function useDismiss(...args: any[]): any {
+/**
+ * Closes the floating element when a dismissal is requested — by default, when
+ * the user presses the `escape` key or outside of the floating element.
+ * @see https://floating-ui.com/docs/useDismiss
+ */
+export function useDismiss(
+	context: FloatingRootContext,
+	props?: UseDismissProps,
+	slot?: symbol,
+): ElementProps;
+export function useDismiss(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseDismissProps) ?? {};
 
 	const open = context.open;
 	const onOpenChange = context.onOpenChange;
@@ -78,7 +152,7 @@ export function useDismiss(...args: any[]): any {
 	const isComposingRef = useRef(false, subSlot(slot, 'comp'));
 
 	const closeOnEscapeKeyDown = useEffectEvent(
-		(event: any) => {
+		(event: KeyboardEvent) => {
 			if (!open || !enabled || !escapeKey || event.key !== 'Escape') {
 				return;
 			}
@@ -102,13 +176,13 @@ export function useDismiss(...args: any[]): any {
 					}
 				}
 			}
-			onOpenChange(false, isReactEvent(event) ? event.nativeEvent : event, 'escape-key');
+			onOpenChange(false, isReactEvent(event) ? (event as any).nativeEvent : event, 'escape-key');
 		},
 		subSlot(slot, 'esc'),
 	);
 
 	const closeOnEscapeKeyDownCapture = useEffectEvent(
-		(event: any) => {
+		(event: KeyboardEvent) => {
 			const callback = () => {
 				closeOnEscapeKeyDown(event);
 				getTarget(event)?.removeEventListener('keydown', callback);
@@ -119,7 +193,7 @@ export function useDismiss(...args: any[]): any {
 	);
 
 	const closeOnPressOutside = useEffectEvent(
-		(event: any) => {
+		(event: MouseEvent) => {
 			const insideReactTree = dataRef.current.insideReactTree;
 			dataRef.current.insideReactTree = false;
 
@@ -211,7 +285,7 @@ export function useDismiss(...args: any[]): any {
 	);
 
 	const closeOnPressOutsideCapture = useEffectEvent(
-		(event: any) => {
+		(event: MouseEvent) => {
 			const callback = () => {
 				closeOnPressOutside(event);
 				getTarget(event)?.removeEventListener(outsidePressEvent, callback);
@@ -371,7 +445,7 @@ export function useDismiss(...args: any[]): any {
 		subSlot(slot, 'm:flo'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference, floating } : {}),
 		[enabled, reference, floating],
 		subSlot(slot, 'm:ret'),

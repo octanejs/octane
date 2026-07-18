@@ -1,5 +1,6 @@
 import { useMemo } from 'octane';
-import type { ReactNode, SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
+import type { OctaneNode } from 'octane';
 import type { GetLineSegmentsConfig } from '../util/getSplitLineSegments';
 import getSplitLineSegments from '../util/getSplitLineSegments';
 import { line } from '../util/D3ShapeFactories';
@@ -14,17 +15,27 @@ interface Point {
 const getX = (d: Point) => d.x || 0;
 const getY = (d: Point) => d.y || 0;
 
+/**
+ * Per-segment path styles. Octane's `className` composes clsx-style
+ * (`ClassValue`), but segment styles are forwarded to `LinePath`'s plain
+ * `className?: string` prop, so it stays a string here (matching upstream).
+ */
+type SplitLinePathSegmentStyles = Omit<
+	Octane.SVGProps<SVGPathElement>,
+	'x' | 'y' | 'children' | 'className'
+> & { className?: string };
+
 export type SplitLinePathRenderer = (renderProps: {
 		index: number;
 		segment: { x: number; y: number }[];
-		styles?: Omit<SVGProps<SVGPathElement>, 'x' | 'y' | 'children'>;
-	}) => ReactNode;
+		styles?: SplitLinePathSegmentStyles;
+	}) => OctaneNode;
 
 export type SplitLinePathProps<Datum> = {
 		/** Array of data segments, where each segment will be a separate path in the rendered line. */
 		segments: Datum[][];
 		/** Styles to apply to each segment. If fewer styles are specified than the number of segments, they will be re-used. */
-		styles: Omit<SVGProps<SVGPathElement>, 'x' | 'y' | 'children'>[];
+		styles: SplitLinePathSegmentStyles[];
 		/** Override render function which is passed the configured path generator as input. */
 		children?: SplitLinePathRenderer;
 		/** className applied to path element. */

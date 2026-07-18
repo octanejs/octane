@@ -2,9 +2,11 @@
 // optional body scroll-lock. A `.ts` component (createElement, ref-as-prop). React
 // forwardRef → `props.ref`.
 import { createElement } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { S } from './internal';
-import { getPlatform, useModernLayoutEffect } from './utils';
+import { getPlatform, useModernLayoutEffect, type CSSProperties } from './utils';
+import type { HTMLProps, MutableRefObject, RefCallback } from './types';
 
 const scrollbarProperty = '--floating-ui-scrollbar-width';
 let lockCount = 0;
@@ -48,7 +50,28 @@ function enableScrollLock() {
 	};
 }
 
-export function FloatingOverlay(props: any): any {
+export interface FloatingOverlayProps {
+	/**
+	 * Whether the overlay should lock scrolling on the document body.
+	 * @default false
+	 */
+	lockScroll?: boolean;
+}
+
+/**
+ * Provides base styling for a fixed overlay element to dim content or block
+ * pointer events behind a floating element.
+ * @see https://floating-ui.com/docs/FloatingOverlay
+ */
+export function FloatingOverlay(
+	props: FloatingOverlayProps &
+		HTMLProps<HTMLDivElement> & {
+			// Ref-as-prop (octane has no forwardRef); the overlay's own styles merge
+			// over the OBJECT form of `style`.
+			ref?: MutableRefObject<HTMLDivElement | null> | RefCallback<HTMLDivElement> | null;
+			style?: CSSProperties;
+		},
+): OctaneNode {
 	const { lockScroll = false, ref, ...rest } = props;
 
 	useModernLayoutEffect(
@@ -79,7 +102,7 @@ export function FloatingOverlay(props: any): any {
 			right: 0,
 			bottom: 0,
 			left: 0,
-			...rest.style,
+			...(rest.style as CSSProperties | undefined),
 		},
 	});
 }

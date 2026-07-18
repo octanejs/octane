@@ -1,4 +1,5 @@
-import type { ReactNode, Ref } from 'react';
+import type { Ref } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { degreesToRadians } from '../util/trigonometry';
 import type { AddSVGProps } from '../types';
@@ -42,7 +43,7 @@ export type PolygonProps = {
 	/** Rotation transform to apply to polygon. */
 	rotate?: number;
 	/** Render function override which is passed the generated polygon points. */
-	children?: (args: { points: [number, number][] }) => ReactNode;
+	children?: (args: { points: [number, number][] }) => OctaneNode;
 	/** Reference to polygon element. */
 	innerRef?: Ref<SVGPolygonElement>;
 	/** Polygon center position. */

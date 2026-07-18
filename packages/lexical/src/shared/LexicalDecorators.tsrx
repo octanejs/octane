@@ -8,6 +8,8 @@
 // element (a createPortal VALUE is inert), so each portal lives inside its own
 // `DecoratorPortal` (a display:contents wrapper — the content escapes into the
 // node's element).
+import type { LexicalEditor } from 'lexical';
+import type { OctaneNode } from 'octane';
 import {
 	useState,
 	useEffect,
@@ -19,18 +21,39 @@ import {
 	Suspense,
 } from 'octane';
 
-function DecoratorPortalBody(props) {
+type ErrorBoundaryType = (props: {
+		children: OctaneNode;
+		onError: (error: Error) => void;
+	}) => OctaneNode;
+
+type DecoratorPortalBodyProps = {
+	ErrorBoundary: ErrorBoundaryType;
+	onError: (error: Error) => void;
+	decorator: OctaneNode;
+};
+
+function DecoratorPortalBody(props: DecoratorPortalBodyProps) {
 	return createElement(props.ErrorBoundary, {
 		onError: props.onError,
 		children: createElement(Suspense, { fallback: null, children: props.decorator }),
 	});
 }
 
-function DecoratorPortal(props) {
+type DecoratorPortalProps = {
+	element: HTMLElement;
+	bodyProps: DecoratorPortalBodyProps;
+};
+
+function DecoratorPortal(props: DecoratorPortalProps) {
 	return createPortal(DecoratorPortalBody, props.element, props.bodyProps);
 }
 
-export function Decorators(props) {
+type DecoratorsProps = {
+	editor: LexicalEditor;
+	ErrorBoundary: ErrorBoundaryType;
+};
+
+export function Decorators(props: DecoratorsProps) {
 	const editor = props.editor;
 	const ErrorBoundary = props.ErrorBoundary;
 
@@ -38,7 +61,7 @@ export function Decorators(props) {
 
 	// Subscribe to decorator changes.
 	useLayoutEffect(() => {
-		return editor.registerDecoratorListener((nextDecorators) => {
+		return editor.registerDecoratorListener((nextDecorators: Record<string, OctaneNode>) => {
 			flushSync(() => {
 				setDecorators(nextDecorators);
 			});
@@ -79,7 +102,7 @@ export function Decorators(props) {
 				element={entry.element}
 				bodyProps={{
 					ErrorBoundary,
-					onError: (e) => editor._onError(e),
+					onError: (e: Error) => editor._onError(e),
 					decorator: entry.decorator,
 				}}
 			/>,

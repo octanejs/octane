@@ -6,6 +6,7 @@
 // compiler slots the hook calls (and withSlot-disambiguates useHydrated's
 // call sites).
 import { useSyncExternalStore } from 'octane';
+import type { OctaneNode } from 'octane';
 
 const subscribe = () => () => {};
 
@@ -13,7 +14,7 @@ export function useHydrated() {
 	return useSyncExternalStore(subscribe, () => true, () => false);
 }
 
-export function ClientOnly(props) @{
+export function ClientOnly(props: { children?: OctaneNode; fallback?: OctaneNode }) @{
 	const hydrated = useHydrated();
 	<>
 		{hydrated ? props.children : props.fallback ?? null}

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import BaseBrush from './BaseBrush.tsrx';
 import type { BaseBrushProps, BaseBrushState } from './BaseBrush.tsrx';
 import type { BrushHandleRenderProps } from './BrushHandle.tsrx';
@@ -72,7 +73,7 @@ export type BrushProps = {
 	/** Prevent drag end on mouse leaving from brush stage. */
 	useWindowMoveEvents?: boolean;
 	/** Render function for custom brush handles. */
-	renderBrushHandle?: (props: BrushHandleRenderProps) => ReactNode;
+	renderBrushHandle?: (props: BrushHandleRenderProps) => OctaneNode;
 };
 
 export default function Brush({

@@ -1,5 +1,5 @@
 import { Children } from 'octane';
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import type { AxisScale } from '@octanejs/visx/axis';
 import type { DataRegistryEntry } from '../types';
 
@@ -18,7 +18,7 @@ export default function collectDataRegistryEntries<
 	XScale extends AxisScale,
 	YScale extends AxisScale,
 	Datum extends object,
->(children: ReactNode): DataRegistryEntry<XScale, YScale, Datum>[] {
+>(children: OctaneNode): DataRegistryEntry<XScale, YScale, Datum>[] {
 	const entries = new Map<string, DataRegistryEntry<XScale, YScale, Datum>>();
 
 	function visit(value: unknown): void {

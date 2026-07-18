@@ -12,15 +12,7 @@
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",
-    "types": [
-      "node"
-    ]
+    "types": ["node"]
   },
-  "include": [
-    "shared/**/*",
-    "jsx/**/*",
-    "tsrx/**/*",
-    "e2e/**/*",
-    "env.d.ts"
-  ]
+  "include": ["shared/**/*", "jsx/**/*", "tsrx/**/*", "e2e/**/*", "env.d.ts"]
 }

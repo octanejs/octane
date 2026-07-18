@@ -11,13 +11,16 @@ import { useStore } from './useStore.ts';
 export function useMatchRoute() {
 	const router = useRouter();
 	useStore(router.stores.matchRouteDeps, (d) => d);
-	return useCallback((opts) => {
+	return useCallback((opts: Record<string, any>) => {
 		const { pending, caseSensitive, fuzzy, includeSearch, ...rest } = opts;
-		return router.matchRoute(rest, { pending, caseSensitive, fuzzy, includeSearch });
+		return router.matchRoute(rest as any, { pending, caseSensitive, fuzzy, includeSearch });
 	}, [router]);
 }
 
-export function MatchRoute(props) @{
+// Props are permissive (`Record<string, any>` + optional render-prop children) —
+// upstream's MakeMatchRouteOptions generics are the type-safe facade; the octane
+// binding keeps the loose v1 surface (see Link).
+export function MatchRoute(props: Record<string, any>) @{
 	const matchRoute = useMatchRoute();
 	const params = matchRoute(props);
 	const out =

@@ -15,11 +15,37 @@ import {
 	isTypeableElement,
 	matchesFocusVisible,
 } from './utils';
+import type { ElementProps, FloatingRootContext, OpenChangeReason } from './types';
 
-export function useFocus(...args: any[]): any {
+export interface UseFocusProps {
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * Whether the open state only changes if the focus event is considered
+	 * visible (`:focus-visible` CSS selector).
+	 * @default true
+	 */
+	visibleOnly?: boolean;
+}
+
+/**
+ * Opens the floating element while the reference element has focus, like CSS
+ * `:focus`.
+ * @see https://floating-ui.com/docs/useFocus
+ */
+export function useFocus(
+	context: FloatingRootContext,
+	props?: UseFocusProps,
+	slot?: symbol,
+): ElementProps;
+export function useFocus(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseFocusProps) ?? {};
 
 	const open = context.open;
 	const onOpenChange = context.onOpenChange;
@@ -73,7 +99,7 @@ export function useFocus(...args: any[]): any {
 	useEffect(
 		() => {
 			if (!enabled) return;
-			function onOpenChangeLocal(_ref: any) {
+			function onOpenChangeLocal(_ref: { reason?: OpenChangeReason }) {
 				const { reason } = _ref;
 				if (reason === 'reference-press' || reason === 'escape-key') {
 					blockFocusRef.current = true;
@@ -103,7 +129,7 @@ export function useFocus(...args: any[]): any {
 			onMouseLeave() {
 				blockFocusRef.current = false;
 			},
-			onFocus(event: any) {
+			onFocus(event: FocusEvent) {
 				if (blockFocusRef.current) return;
 				const target = getTarget(event);
 				if (visibleOnly && isElement(target)) {
@@ -117,7 +143,7 @@ export function useFocus(...args: any[]): any {
 				}
 				onOpenChange(true, event, 'focus');
 			},
-			onBlur(event: any) {
+			onBlur(event: FocusEvent) {
 				blockFocusRef.current = false;
 				const relatedTarget = event.relatedTarget;
 
@@ -146,7 +172,7 @@ export function useFocus(...args: any[]): any {
 		subSlot(slot, 'm:ref'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference } : {}),
 		[enabled, reference],
 		subSlot(slot, 'm:ret'),

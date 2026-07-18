@@ -11,7 +11,9 @@ import {
 	tryToPositionRange,
 } from './typeaheadShared';
 import { $getSelection, $isRangeSelection, COMMAND_PRIORITY_LOW } from 'lexical';
+import type { CommandListenerPriority, TextNode } from 'lexical';
 import { startTransition, useCallback, useEffect, useState } from 'octane';
+import type { MenuOption, MenuRenderFn, MenuResolution, TriggerFn } from './shared/menuShared';
 
 export { useBasicTypeaheadTriggerMatch, PUNCTUATION } from './typeaheadShared';
 export { MenuOption, SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND } from './shared/menuShared';
@@ -19,7 +21,26 @@ export { useDynamicPositioning } from './shared/useDynamicPositioning';
 // Upstream re-exports @lexical/utils' getScrollParent from this module.
 export { getScrollParent } from '@lexical/utils';
 
-export function LexicalTypeaheadMenuPlugin(props) {
+/**
+ * Props for the {@link LexicalTypeaheadMenuPlugin} component.
+ */
+export type TypeaheadMenuPluginProps<TOption extends MenuOption> = {
+	onQueryChange: (matchingString: string | null) => void;
+	onSelectOption: (option: TOption, textNodeContainingQuery: | TextNode
+	| null, closeMenu: () => void, matchingString: string) => void;
+	options: TOption[];
+	triggerFn: TriggerFn;
+	menuRenderFn?: MenuRenderFn<TOption>;
+	onOpen?: (resolution: MenuResolution) => void;
+	onClose?: () => void | PromiseLike<void>;
+	anchorClassName?: string;
+	commandPriority?: CommandListenerPriority;
+	parent?: HTMLElement;
+	preselectFirstItem?: boolean;
+	ignoreEntityBoundary?: boolean;
+};
+
+export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(props: TypeaheadMenuPluginProps<TOption>) {
 	const options = props.options;
 	const onQueryChange = props.onQueryChange;
 	const onSelectOption = props.onSelectOption;
@@ -35,7 +56,7 @@ export function LexicalTypeaheadMenuPlugin(props) {
 	const ignoreEntityBoundary = props.ignoreEntityBoundary === true;
 
 	const [editor] = useLexicalComposerContext();
-	const [resolution, setResolution] = useState(null);
+	const [resolution, setResolution] = useState<MenuResolution | null>(null);
 	const anchorElementRef = useMenuAnchorRef(resolution, setResolution, anchorClassName, parent);
 
 	const closeTypeahead = useCallback(() => {
@@ -55,7 +76,7 @@ export function LexicalTypeaheadMenuPlugin(props) {
 		}
 	}, [onClose, resolution]);
 
-	const openTypeahead = useCallback((res) => {
+	const openTypeahead = useCallback((res: MenuResolution) => {
 		setResolution(res);
 		if (onOpen != null && resolution === null) {
 			onOpen(res);

@@ -82,6 +82,7 @@ export {
 	Children,
 	type ElementDescriptor,
 	type ComponentBody,
+	type OctaneNode,
 
 	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)

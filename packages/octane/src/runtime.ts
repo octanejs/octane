@@ -11536,6 +11536,16 @@ export interface ElementDescriptor<P = any> {
 	children: any;
 }
 
+// Octane's analog of React's `ReactNode`: the type of a renderable prop or
+// child. Octane renders element descriptors, primitives (coerced to text),
+// nullish values, and arbitrarily nested arrays of these, and the compiler —
+// not the type system — decides how a hole is rendered, so the type is
+// deliberately `unknown` rather than a closed union (see the jsx-runtime
+// `children` contract). Bindings ported from React should use this alias for
+// props upstream typed as `ReactNode`; a structural union or React's own
+// `ReactNode` would reject octane's nominal elements.
+export type OctaneNode = unknown;
+
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
 	const own = Object.getOwnPropertyDescriptor(config, 'key');

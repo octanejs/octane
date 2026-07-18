@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Arc } from '@octanejs/visx/shape';
 import type { ArcProps } from '@octanejs/visx/shape';
@@ -43,11 +44,11 @@ export type GridRadialProps<Scale extends GridScale> = CommonGridProps & {
 		/**
  * Child components to the Arc.
  */
-		children?: () => ReactNode;
+		children?: () => OctaneNode;
 	};
 
 export type AllGridRadialProps<Scale extends GridScale, Datum> =
-	GridRadialProps<Scale> & Omit<ArcProps<Datum> & Omit<SVGProps<SVGPathElement>, keyof ArcProps<Datum>>, keyof GridRadialProps<Scale>>;
+	GridRadialProps<Scale> & Omit<ArcProps<Datum> & Omit<Octane.SVGProps<SVGPathElement>, keyof ArcProps<Datum>>, keyof GridRadialProps<Scale>>;
 
 export default function GridRadial<Scale extends GridScale, Datum>({
 	arcThickness,

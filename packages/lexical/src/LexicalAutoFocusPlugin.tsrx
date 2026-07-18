@@ -3,7 +3,11 @@ import { useLexicalComposerContext } from './LexicalComposerContext';
 import { getActiveElement } from 'lexical';
 import { useEffect } from 'octane';
 
-export function AutoFocusPlugin(props) {
+type Props = {
+	defaultSelection?: 'rootStart' | 'rootEnd';
+};
+
+export function AutoFocusPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const defaultSelection = props.defaultSelection;
 

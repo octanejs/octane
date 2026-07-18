@@ -56,3 +56,38 @@ describe('compile — nested type-only statements', () => {
 		expect(code).not.toMatch(/type P/);
 	});
 });
+
+// Inline `type` specifiers (`import { a, type B }`, `export { type C, d }`)
+// must be elided exactly like tsc elides them: the emitted JS neither carries
+// the invalid `type` keyword nor imports/re-exports a binding that only exists
+// as a type. A declaration left with no specifiers disappears entirely.
+describe('compile — inline type-only import/export specifiers', () => {
+	const src = `
+    import { useState, type Dispatch } from 'octane';
+    export { type OnlyAType } from './types.js';
+    export { type AlsoAType, realValue } from './mixed.js';
+
+    export function App() {
+      const [n] = useState(0);
+      return <b>{'n: ' + n}</b>;
+    }
+  `;
+
+	for (const mode of ['client', 'server'] as const) {
+		it(`${mode} emit elides inline type specifiers and keeps value specifiers`, () => {
+			const { code } = compile(
+				src,
+				'inline-type-specifiers.test.tsx',
+				mode === 'server' ? { mode: 'server' } : undefined,
+			);
+			// No TS `type` modifier may survive into the emitted JS.
+			expect(code).not.toMatch(/\btype [A-Z]/);
+			// The type-only named import must not become a runtime import.
+			expect(code).not.toMatch(/\bDispatch\b/);
+			// An all-type re-export disappears entirely; a mixed one keeps values.
+			expect(code).not.toMatch(/types\.js/);
+			expect(code).not.toMatch(/AlsoAType/);
+			expect(code).toMatch(/realValue/);
+		});
+	}
+});

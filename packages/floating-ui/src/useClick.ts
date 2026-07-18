@@ -5,21 +5,71 @@ import { useMemo, useRef } from 'octane';
 
 import { splitSlot, subSlot } from './internal';
 import { isMouseLikePointerType, isTypeableElement } from './utils';
+import type { ElementProps, FloatingRootContext } from './types';
 
-function isButtonTarget(event: any): boolean {
+export interface UseClickProps {
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * The type of event to use to determine a “click” with mouse input.
+	 * Keyboard clicks work as normal.
+	 * @default 'click'
+	 */
+	event?: 'click' | 'mousedown';
+	/**
+	 * Whether to toggle the open state with repeated clicks.
+	 * @default true
+	 */
+	toggle?: boolean;
+	/**
+	 * Whether to ignore the logic for mouse input (for example, if `useHover()`
+	 * is also being used).
+	 * @default false
+	 */
+	ignoreMouse?: boolean;
+	/**
+	 * Whether to add keyboard handlers (Enter and Space key functionality) for
+	 * non-button elements (to open/close the floating element via keyboard
+	 * “click”).
+	 * @default true
+	 */
+	keyboardHandlers?: boolean;
+	/**
+	 * If already open from another event such as the `useHover()` Hook,
+	 * determines whether to keep the floating element open when clicking the
+	 * reference element for the first time.
+	 * @default true
+	 */
+	stickIfOpen?: boolean;
+}
+
+function isButtonTarget(event: Event): boolean {
 	return isHTMLElement(event.target) && event.target.tagName === 'BUTTON';
 }
-function isAnchorTarget(event: any): boolean {
+function isAnchorTarget(event: Event): boolean {
 	return isHTMLElement(event.target) && event.target.tagName === 'A';
 }
-function isSpaceIgnored(element: any): boolean {
+function isSpaceIgnored(element: Element | null): boolean {
 	return isTypeableElement(element);
 }
 
-export function useClick(...args: any[]): any {
+/**
+ * Opens or closes the floating element when clicking the reference element.
+ * @see https://floating-ui.com/docs/useClick
+ */
+export function useClick(
+	context: FloatingRootContext,
+	props?: UseClickProps,
+	slot?: symbol,
+): ElementProps;
+export function useClick(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseClickProps) ?? {};
 
 	const open = context.open;
 	const onOpenChange = context.onOpenChange;
@@ -33,15 +83,15 @@ export function useClick(...args: any[]): any {
 	const keyboardHandlers = props.keyboardHandlers ?? true;
 	const stickIfOpen = props.stickIfOpen ?? true;
 
-	const pointerTypeRef = useRef<any>(undefined, subSlot(slot, 'ptype'));
+	const pointerTypeRef = useRef<string | undefined>(undefined, subSlot(slot, 'ptype'));
 	const didKeyDownRef = useRef(false, subSlot(slot, 'kd'));
 
 	const reference = useMemo(
 		() => ({
-			onPointerDown(event: any) {
+			onPointerDown(event: PointerEvent) {
 				pointerTypeRef.current = event.pointerType;
 			},
-			onMouseDown(event: any) {
+			onMouseDown(event: MouseEvent) {
 				const pointerType = pointerTypeRef.current;
 				if (event.button !== 0) return;
 				if (eventOption === 'click') return;
@@ -59,7 +109,7 @@ export function useClick(...args: any[]): any {
 					onOpenChange(true, event, 'click');
 				}
 			},
-			onClick(event: any) {
+			onClick(event: MouseEvent) {
 				const pointerType = pointerTypeRef.current;
 				if (eventOption === 'mousedown' && pointerTypeRef.current) {
 					pointerTypeRef.current = undefined;
@@ -78,7 +128,7 @@ export function useClick(...args: any[]): any {
 					onOpenChange(true, event, 'click');
 				}
 			},
-			onKeyDown(event: any) {
+			onKeyDown(event: KeyboardEvent) {
 				pointerTypeRef.current = undefined;
 				if (event.defaultPrevented || !keyboardHandlers || isButtonTarget(event)) {
 					return;
@@ -98,7 +148,7 @@ export function useClick(...args: any[]): any {
 					}
 				}
 			},
-			onKeyUp(event: any) {
+			onKeyUp(event: KeyboardEvent) {
 				if (
 					event.defaultPrevented ||
 					!keyboardHandlers ||
@@ -131,7 +181,7 @@ export function useClick(...args: any[]): any {
 		subSlot(slot, 'm:ref'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference } : {}),
 		[enabled, reference],
 		subSlot(slot, 'm:ret'),

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import classnames from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { PickD3Scale, ContinuousDomainScaleType } from '@octanejs/visx/scale';
@@ -57,7 +58,7 @@ export type BoxPlotProps = SharedProps & {
 		/** Props to pass to the container glyph rect if rendered. */
 		containerProps?: SVGProps<SVGRectElement>;
 		/** Override render function to fully control the rendering of the BoxPlot glyph. */
-		children?: (childRenderProps: ChildRenderProps) => ReactNode;
+		children?: (childRenderProps: ChildRenderProps) => OctaneNode;
 	};
 
 export default function BoxPlot({

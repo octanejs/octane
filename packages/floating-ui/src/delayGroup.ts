@@ -10,12 +10,36 @@ import {
 	useReducer,
 	useRef,
 } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { S, splitSlot, subSlot } from './internal';
 import { getDelay, useModernLayoutEffect } from './utils';
+import type { Delay, FloatingRootContext } from './types';
+
+export interface GroupState {
+	delay: Delay;
+	initialDelay: Delay;
+	currentId: any;
+	timeoutMs: number;
+	isInstantPhase: boolean;
+}
+
+export interface GroupContext extends GroupState {
+	setCurrentId: (currentId: any) => void;
+	setState: (state: Partial<GroupState>) => void;
+}
+
+export interface UseGroupOptions {
+	/**
+	 * Whether delay grouping should be enabled.
+	 * @default true
+	 */
+	enabled?: boolean;
+	id?: any;
+}
 
 const NOOP = () => {};
-export const FloatingDelayGroupContext = createContext<any>({
+export const FloatingDelayGroupContext = createContext<GroupContext>({
 	delay: 0,
 	initialDelay: 0,
 	timeoutMs: 0,
@@ -25,15 +49,39 @@ export const FloatingDelayGroupContext = createContext<any>({
 	isInstantPhase: false,
 });
 
-export const useDelayGroupContext = () => useContext(FloatingDelayGroupContext);
+/**
+ * @deprecated
+ * Use the return value of `useDelayGroup()` instead.
+ */
+export const useDelayGroupContext = (): GroupContext => useContext(FloatingDelayGroupContext);
 
-export function FloatingDelayGroup(props: any): any {
+export interface FloatingDelayGroupProps {
+	children?: OctaneNode;
+	/**
+	 * The delay to use for the group.
+	 */
+	delay: Delay;
+	/**
+	 * An optional explicit timeout to use for the group, which represents when
+	 * grouping logic will no longer be active after the close delay completes.
+	 * This is useful if you want grouping to “last” longer than the close delay,
+	 * for example if there is no close delay at all.
+	 */
+	timeoutMs?: number;
+}
+
+/**
+ * Provides context for a group of floating elements that should share a
+ * `delay`.
+ * @see https://floating-ui.com/docs/FloatingDelayGroup
+ */
+export function FloatingDelayGroup(props: FloatingDelayGroupProps): OctaneNode {
 	const children = props.children;
 	const delay = props.delay;
 	const timeoutMs = props.timeoutMs ?? 0;
 
 	const [state, setState] = useReducer(
-		(prev: any, next: any) => ({ ...prev, ...next }),
+		(prev: GroupState, next: Partial<GroupState>): GroupState => ({ ...prev, ...next }),
 		{
 			delay,
 			timeoutMs,
@@ -69,7 +117,7 @@ export function FloatingDelayGroup(props: any): any {
 		[state.currentId, state.isInstantPhase],
 		S('FloatingDelayGroup:eff'),
 	);
-	const value = useMemo(
+	const value = useMemo<GroupContext>(
 		() => ({ ...state, setState, setCurrentId }),
 		[state, setCurrentId],
 		S('FloatingDelayGroup:value'),
@@ -77,10 +125,20 @@ export function FloatingDelayGroup(props: any): any {
 	return createElement(FloatingDelayGroupContext.Provider, { value, children });
 }
 
-export function useDelayGroup(...args: any[]): any {
+/**
+ * Enables grouping when called inside a component that's a child of a
+ * `FloatingDelayGroup`.
+ * @see https://floating-ui.com/docs/FloatingDelayGroup
+ */
+export function useDelayGroup(
+	context: FloatingRootContext,
+	options?: UseGroupOptions,
+	slot?: symbol,
+): GroupContext;
+export function useDelayGroup(...args: any[]): GroupContext {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const options = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const options = (user[1] as UseGroupOptions) ?? {};
 
 	const open = context.open;
 	const onOpenChange = context.onOpenChange;

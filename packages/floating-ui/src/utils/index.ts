@@ -1,13 +1,31 @@
 // Ported from @floating-ui/react/utils. The DOM/grid/tabbable helpers are
-// framework-agnostic and copied ~verbatim; the three React hooks (useLatestRef,
-// useEffectEvent, useModernLayoutEffect) become octane hooks that take an explicit
-// slot (forwarded by their callers via subSlot — see ../internal).
+// framework-agnostic and copied ~verbatim (signatures mirror upstream's
+// `@floating-ui/react/utils` typings, with React event/ref types replaced by the
+// native-DOM/octane analogs); the three React hooks (useLatestRef, useEffectEvent,
+// useModernLayoutEffect) become octane hooks that take an explicit slot (forwarded
+// by their callers via subSlot — see ../internal).
 import { isShadowRoot, isHTMLElement } from '@floating-ui/utils/dom';
 import { floor } from '@floating-ui/utils';
-import { tabbable } from 'tabbable';
+import { tabbable, type FocusableElement } from 'tabbable';
 import { useCallback, useLayoutEffect, useRef } from 'octane';
+import type { Octane } from 'octane/jsx-runtime';
+import type { Dimensions } from '@floating-ui/dom';
 
 import { subSlot } from '../internal';
+import type { Delay, FloatingNodeType, MutableRefObject, ReferenceType } from '../types';
+
+/**
+ * The OBJECT form of octane's `style` prop — the port's analog of
+ * `React.CSSProperties` (octane's `style` additionally accepts a plain string;
+ * helpers that merge/inspect style objects require this form).
+ */
+export type CSSProperties = Exclude<
+	Octane.HTMLAttributes<HTMLElement>['style'],
+	string | undefined
+>;
+
+/** Which list items are disabled (mirrors upstream's unexported `DisabledIndices`). */
+export type DisabledIndices = Array<number> | ((index: number) => boolean);
 
 export function getPlatform(): string {
 	const uaData = (navigator as any).userAgentData;
@@ -43,7 +61,7 @@ export function isMacSafari(): boolean {
 export function createAttribute(name: string): string {
 	return 'data-floating-ui-' + name;
 }
-export function clearTimeoutIfSet(timeoutRef: { current: number }): void {
+export function clearTimeoutIfSet(timeoutRef: MutableRefObject<number>): void {
 	if (timeoutRef.current !== -1) {
 		clearTimeout(timeoutRef.current);
 		timeoutRef.current = -1;
@@ -85,36 +103,39 @@ export function contains(parent?: Element | null, child?: Element | null): boole
 	}
 	return false;
 }
-export function getTarget(event: any): EventTarget | null {
+export function getTarget(event: Event): EventTarget | null {
 	if ('composedPath' in event) {
 		return event.composedPath()[0];
 	}
-	return event.target;
+	// Old-browser fallback: `lib.dom` types every Event with `composedPath`, so
+	// the false branch narrows `event` to `never` — widen for the legacy read.
+	return (event as Event).target;
 }
-export function isEventTargetWithin(event: any, node: any): boolean {
+export function isEventTargetWithin(event: Event, node: Node | null | undefined): boolean {
 	if (node == null) {
 		return false;
 	}
 	if ('composedPath' in event) {
 		return event.composedPath().includes(node);
 	}
-	const e = event;
-	return e.target != null && node.contains(e.target);
+	// Old-browser fallback (see getTarget).
+	const e = event as Event;
+	return e.target != null && node.contains(e.target as Node);
 }
 export function isRootElement(element: Element): boolean {
 	return element.matches('html,body');
 }
-export function getDocument(node: any): Document {
+export function getDocument(node?: Element | null): Document {
 	return node?.ownerDocument || document;
 }
-export function isTypeableElement(element: any): boolean {
+export function isTypeableElement(element: unknown): boolean {
 	return isHTMLElement(element) && element.matches(TYPEABLE_SELECTOR);
 }
-export function isTypeableCombobox(element: any): boolean {
+export function isTypeableCombobox(element: Element | null): boolean {
 	if (!element) return false;
 	return element.getAttribute('role') === 'combobox' && isTypeableElement(element);
 }
-export function matchesFocusVisible(element: any): boolean {
+export function matchesFocusVisible(element: Element | null): boolean {
 	if (!element || isJSDOM()) return true;
 	try {
 		return element.matches(':focus-visible');
@@ -122,16 +143,23 @@ export function matchesFocusVisible(element: any): boolean {
 		return true;
 	}
 }
-export function getFloatingFocusElement(floatingElement: any): any {
+export function getFloatingFocusElement(
+	floatingElement: HTMLElement | null | undefined,
+): HTMLElement | null {
 	if (!floatingElement) {
 		return null;
 	}
 	return floatingElement.hasAttribute(FOCUSABLE_ATTRIBUTE)
 		? floatingElement
-		: floatingElement.querySelector('[' + FOCUSABLE_ATTRIBUTE + ']') || floatingElement;
+		: floatingElement.querySelector<HTMLElement>('[' + FOCUSABLE_ATTRIBUTE + ']') ||
+				floatingElement;
 }
 
-export function getNodeChildren(nodes: any[], id: any, onlyOpenChildren = true): any[] {
+export function getNodeChildren<RT extends ReferenceType = ReferenceType>(
+	nodes: Array<FloatingNodeType<RT>>,
+	id: string | undefined,
+	onlyOpenChildren = true,
+): Array<FloatingNodeType<RT>> {
 	const directChildren = nodes.filter(
 		(node) => node.parentId === id && (!onlyOpenChildren || node.context?.open),
 	);
@@ -140,10 +168,13 @@ export function getNodeChildren(nodes: any[], id: any, onlyOpenChildren = true):
 		...getNodeChildren(nodes, child.id, onlyOpenChildren),
 	]);
 }
-export function getDeepestNode(nodes: any[], id: any): any {
-	let deepestNodeId: any;
+export function getDeepestNode<RT extends ReferenceType = ReferenceType>(
+	nodes: Array<FloatingNodeType<RT>>,
+	id: string | undefined,
+): FloatingNodeType<RT> | undefined {
+	let deepestNodeId: string | undefined;
 	let maxDepth = -1;
-	function findDeepest(nodeId: any, depth: number) {
+	function findDeepest(nodeId: string | undefined, depth: number) {
 		if (depth > maxDepth) {
 			deepestNodeId = nodeId;
 			maxDepth = depth;
@@ -156,8 +187,11 @@ export function getDeepestNode(nodes: any[], id: any): any {
 	findDeepest(id, 0);
 	return nodes.find((node) => node.id === deepestNodeId);
 }
-export function getNodeAncestors(nodes: any[], id: any): any[] {
-	let allAncestors: any[] = [];
+export function getNodeAncestors<RT extends ReferenceType = ReferenceType>(
+	nodes: Array<FloatingNodeType<RT>>,
+	id: string | undefined,
+): Array<FloatingNodeType<RT>> {
+	let allAncestors: Array<FloatingNodeType<RT>> = [];
 	let currentParentId = nodes.find((node) => node.id === id)?.parentId;
 	while (currentParentId) {
 		const currentNode = nodes.find((node) => node.id === currentParentId);
@@ -169,7 +203,7 @@ export function getNodeAncestors(nodes: any[], id: any): any[] {
 	return allAncestors;
 }
 
-export function stopEvent(event: any): void {
+export function stopEvent(event: Event): void {
 	event.preventDefault();
 	event.stopPropagation();
 }
@@ -177,16 +211,16 @@ export function isReactEvent(event: any): boolean {
 	return 'nativeEvent' in event;
 }
 
-export function isVirtualClick(event: any): boolean {
-	if (event.mozInputSource === 0 && event.isTrusted) {
+export function isVirtualClick(event: MouseEvent | PointerEvent): boolean {
+	if ((event as any).mozInputSource === 0 && event.isTrusted) {
 		return true;
 	}
-	if (isAndroid() && event.pointerType) {
+	if (isAndroid() && (event as PointerEvent).pointerType) {
 		return event.type === 'click' && event.buttons === 1;
 	}
-	return event.detail === 0 && !event.pointerType;
+	return event.detail === 0 && !(event as PointerEvent).pointerType;
 }
-export function isVirtualPointerEvent(event: any): boolean {
+export function isVirtualPointerEvent(event: PointerEvent): boolean {
 	if (isJSDOM()) return false;
 	return (
 		(!isAndroid() && event.width === 0 && event.height === 0) ||
@@ -203,15 +237,19 @@ export function isVirtualPointerEvent(event: any): boolean {
 			event.pointerType === 'touch')
 	);
 }
-export function isMouseLikePointerType(pointerType: any, strict?: boolean): boolean {
-	const values: any[] = ['mouse', 'pen'];
+export function isMouseLikePointerType(pointerType: string | undefined, strict?: boolean): boolean {
+	const values: Array<string | undefined> = ['mouse', 'pen'];
 	if (!strict) {
 		values.push('', undefined);
 	}
 	return values.includes(pointerType);
 }
 
-export function getDelay(value: any, prop: string, pointerType?: any): any {
+export function getDelay(
+	value: Delay | ((...args: any[]) => Delay) | undefined,
+	prop: 'open' | 'close',
+	pointerType?: string,
+): number | undefined {
 	if (pointerType && !isMouseLikePointerType(pointerType)) {
 		return 0;
 	}
@@ -232,8 +270,13 @@ export function getDelay(value: any, prop: string, pointerType?: any): any {
 export function camelCaseToKebabCase(str: string): string {
 	return str.replace(/[A-Z]+(?![a-z])|[A-Z]/g, ($, ofs) => (ofs ? '-' : '') + $.toLowerCase());
 }
-export function execWithArgsOrReturn(valueOrFn: any, args: any): any {
-	return typeof valueOrFn === 'function' ? valueOrFn(args) : valueOrFn;
+export function execWithArgsOrReturn<Value, SidePlacement>(
+	valueOrFn: Value | ((args: SidePlacement) => Value),
+	args: SidePlacement,
+): Value {
+	return typeof valueOrFn === 'function'
+		? (valueOrFn as (args: SidePlacement) => Value)(args)
+		: valueOrFn;
 }
 
 // Fork of `fast-deep-equal` (from @floating-ui/react-dom) — compares functions by
@@ -313,7 +356,7 @@ export function useModernLayoutEffect(
 	}
 }
 
-export function useLatestRef<T>(value: T, slot: symbol | undefined): { current: T } {
+export function useLatestRef<T>(value: T, slot: symbol | undefined): MutableRefObject<T> {
 	const ref = useRef(value, subSlot(slot, 'lr:ref'));
 	useModernLayoutEffect(
 		() => {
@@ -352,20 +395,37 @@ export function useEffectEvent<T extends (...args: any[]) => any>(
 export function isDifferentGridRow(index: number, cols: number, prevRow: number): boolean {
 	return Math.floor(index / cols) !== prevRow;
 }
-export function isIndexOutOfListBounds(listRef: any, index: number): boolean {
+export function isIndexOutOfListBounds(
+	listRef: MutableRefObject<Array<HTMLElement | null>>,
+	index: number,
+): boolean {
 	return index < 0 || index >= listRef.current.length;
 }
-export function getMinListIndex(listRef: any, disabledIndices: any): number {
+export function getMinListIndex(
+	listRef: MutableRefObject<Array<HTMLElement | null>>,
+	disabledIndices: DisabledIndices | undefined,
+): number {
 	return findNonDisabledListIndex(listRef, { disabledIndices });
 }
-export function getMaxListIndex(listRef: any, disabledIndices: any): number {
+export function getMaxListIndex(
+	listRef: MutableRefObject<Array<HTMLElement | null>>,
+	disabledIndices: DisabledIndices | undefined,
+): number {
 	return findNonDisabledListIndex(listRef, {
 		decrement: true,
 		startingIndex: listRef.current.length,
 		disabledIndices,
 	});
 }
-export function findNonDisabledListIndex(listRef: any, _temp?: any): number {
+export function findNonDisabledListIndex(
+	listRef: MutableRefObject<Array<HTMLElement | null>>,
+	_temp?: {
+		startingIndex?: number;
+		decrement?: boolean;
+		disabledIndices?: DisabledIndices;
+		amount?: number;
+	},
+): number {
 	const {
 		startingIndex = -1,
 		decrement = false,
@@ -382,7 +442,21 @@ export function findNonDisabledListIndex(listRef: any, _temp?: any): number {
 	);
 	return index;
 }
-export function getGridNavigatedIndex(listRef: any, _ref: any): number {
+export function getGridNavigatedIndex(
+	listRef: MutableRefObject<Array<HTMLElement | null>>,
+	_ref: {
+		event: KeyboardEvent;
+		orientation: 'horizontal' | 'vertical' | 'both';
+		loop: boolean;
+		rtl: boolean;
+		cols: number;
+		disabledIndices: DisabledIndices | undefined;
+		minIndex: number;
+		maxIndex: number;
+		prevIndex: number;
+		stopEvent?: boolean;
+	},
+): number {
 	const {
 		event,
 		orientation,
@@ -513,8 +587,13 @@ export function getGridNavigatedIndex(listRef: any, _ref: any): number {
 	return nextIndex;
 }
 
-export function createGridCellMap(sizes: any[], cols: number, dense: boolean): any[] {
-	const cellMap: any[] = [];
+/** For each cell index, gets the item index that occupies that cell. */
+export function createGridCellMap(
+	sizes: Dimensions[],
+	cols: number,
+	dense: boolean,
+): Array<number | undefined> {
+	const cellMap: Array<number | undefined> = [];
 	let startIndex = 0;
 	sizes.forEach((_ref2, index) => {
 		const { width, height } = _ref2;
@@ -551,12 +630,13 @@ export function createGridCellMap(sizes: any[], cols: number, dense: boolean): a
 	});
 	return [...cellMap];
 }
+/** Gets cell index of an item's corner or -1 when index is -1. */
 export function getGridCellIndexOfCorner(
 	index: number,
-	sizes: any[],
-	cellMap: any[],
+	sizes: Dimensions[],
+	cellMap: Array<number | undefined>,
 	cols: number,
-	corner: string,
+	corner: 'tl' | 'tr' | 'bl' | 'br',
 ): number {
 	if (index === -1) return -1;
 	const firstCellIndex = cellMap.indexOf(index);
@@ -579,10 +659,18 @@ export function getGridCellIndexOfCorner(
 	}
 	return -1;
 }
-export function getGridCellIndices(indices: any[], cellMap: any[]): number[] {
+/** Gets all cell indices that correspond to the specified indices. */
+export function getGridCellIndices(
+	indices: Array<number | undefined>,
+	cellMap: Array<number | undefined>,
+): number[] {
 	return cellMap.flatMap((index, cellIndex) => (indices.includes(index) ? [cellIndex] : []));
 }
-export function isListIndexDisabled(listRef: any, index: number, disabledIndices?: any): boolean {
+export function isListIndexDisabled(
+	listRef: MutableRefObject<Array<HTMLElement | null>>,
+	index: number,
+	disabledIndices?: DisabledIndices,
+): boolean {
 	if (typeof disabledIndices === 'function') {
 		return disabledIndices(index);
 	} else if (disabledIndices) {
@@ -596,14 +684,14 @@ export function isListIndexDisabled(listRef: any, index: number, disabledIndices
 	);
 }
 
-export const getTabbableOptions = (): any => ({
+export const getTabbableOptions = (): { getShadowRoot: true; displayCheck: 'full' | 'none' } => ({
 	getShadowRoot: true,
 	displayCheck:
 		typeof ResizeObserver === 'function' && ResizeObserver.toString().includes('[native code]')
 			? 'full'
 			: 'none',
 });
-function getTabbableIn(container: any, dir: number): any {
+function getTabbableIn(container: HTMLElement, dir: 1 | -1): FocusableElement | undefined {
 	const list = tabbable(container, getTabbableOptions());
 	const len = list.length;
 	if (len === 0) return;
@@ -612,17 +700,26 @@ function getTabbableIn(container: any, dir: number): any {
 	const nextIndex = index === -1 ? (dir === 1 ? 0 : len - 1) : index + dir;
 	return list[nextIndex];
 }
-export function getNextTabbable(referenceElement: any): any {
-	return getTabbableIn(getDocument(referenceElement).body, 1) || referenceElement;
+export function getNextTabbable(referenceElement: Element | null): FocusableElement | null {
+	return (
+		getTabbableIn(getDocument(referenceElement).body, 1) ||
+		(referenceElement as FocusableElement | null)
+	);
 }
-export function getPreviousTabbable(referenceElement: any): any {
-	return getTabbableIn(getDocument(referenceElement).body, -1) || referenceElement;
+export function getPreviousTabbable(referenceElement: Element | null): FocusableElement | null {
+	return (
+		getTabbableIn(getDocument(referenceElement).body, -1) ||
+		(referenceElement as FocusableElement | null)
+	);
 }
 let rafId = 0;
-export function enqueueFocus(el: any, options: any = {}): void {
+export function enqueueFocus(
+	el: Element | FocusableElement | null | undefined,
+	options: { preventScroll?: boolean; cancelPrevious?: boolean; sync?: boolean } = {},
+): void {
 	const { preventScroll = false, cancelPrevious = true, sync = false } = options;
 	cancelPrevious && cancelAnimationFrame(rafId);
-	const exec = () => el?.focus({ preventScroll });
+	const exec = () => (el as FocusableElement | null | undefined)?.focus({ preventScroll });
 	if (sync) {
 		exec();
 	} else {
@@ -630,21 +727,21 @@ export function enqueueFocus(el: any, options: any = {}): void {
 	}
 }
 
-export function isOutsideEvent(event: any, container?: any): boolean {
-	const containerElement = container || event.currentTarget;
-	const relatedTarget = event.relatedTarget;
+export function isOutsideEvent(event: FocusEvent, container?: Element | null): boolean {
+	const containerElement = container || (event.currentTarget as Element | null);
+	const relatedTarget = event.relatedTarget as Element | null;
 	return !relatedTarget || !contains(containerElement, relatedTarget);
 }
-export function disableFocusInside(container: any): void {
+export function disableFocusInside(container: HTMLElement): void {
 	const tabbableElements = tabbable(container, getTabbableOptions());
-	tabbableElements.forEach((element: any) => {
+	tabbableElements.forEach((element) => {
 		element.dataset.tabindex = element.getAttribute('tabindex') || '';
 		element.setAttribute('tabindex', '-1');
 	});
 }
-export function enableFocusInside(container: any): void {
-	const elements = container.querySelectorAll('[data-tabindex]');
-	elements.forEach((element: any) => {
+export function enableFocusInside(container: HTMLElement): void {
+	const elements = container.querySelectorAll<HTMLElement>('[data-tabindex]');
+	elements.forEach((element) => {
 		const tabindex = element.dataset.tabindex;
 		delete element.dataset.tabindex;
 		if (tabindex) {

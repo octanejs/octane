@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { OctaneNode } from 'octane';
 import ChartTooltipContent from './ChartTooltipContent.tsrx';
 import FloatingTooltip from './FloatingTooltip.tsrx';
 import type {
@@ -27,7 +28,7 @@ export type ChartTooltipControlledProps<Datum = unknown> = {
 
 export type ChartTooltipProps<Datum = unknown> = ChartTooltipControlledProps<Datum> & {
 		config?: ChartTooltipConfig<Datum>;
-		label?: React.ReactNode;
+		label?: OctaneNode;
 		placement?: TooltipPlacement;
 		strategy?: 'absolute' | 'fixed';
 		offset?: number | FloatingTooltipOffset;
@@ -46,7 +47,7 @@ export type ChartTooltipProps<Datum = unknown> = ChartTooltipControlledProps<Dat
 			items: ChartTooltipItem<Datum>[];
 			config?: ChartTooltipConfig<Datum>;
 			state: FloatingTooltipRootState<ChartTooltipItem<Datum>[]>;
-		}) => React.ReactNode;
+		}) => OctaneNode;
 	};
 
 export default function ChartTooltip<Datum = unknown>({

@@ -115,6 +115,7 @@ export function compileToVolarMappings(source, filename, options) {
 		collect: true,
 		loose: !!options?.loose,
 		preserveParens: true,
+		keywordTokens: true,
 		errors,
 		comments,
 	});

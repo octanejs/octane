@@ -26,6 +26,8 @@ import {
 	REDO_COMMAND,
 	UNDO_COMMAND,
 } from 'lexical';
+import type { LexicalCommand, TextFormatType } from 'lexical';
+import type { HeadingTagType } from '@lexical/rich-text';
 import { useEffect, useState } from 'octane';
 
 export function ToolbarPlugin() {
@@ -85,12 +87,15 @@ export function ToolbarPlugin() {
 		);
 	}, [editor]);
 
-	const formatText = (format) => editor.dispatchCommand(FORMAT_TEXT_COMMAND, format);
+	const formatText = (format: TextFormatType) => editor.dispatchCommand(
+		FORMAT_TEXT_COMMAND,
+		format,
+	);
 	const setParagraph = () => editor.update(() => {
 		const s = $getSelection();
 		if ($isRangeSelection(s)) $setBlocksType(s, () => $createParagraphNode());
 	});
-	const setHeading = (tag) => editor.update(() => {
+	const setHeading = (tag: HeadingTagType) => editor.update(() => {
 		const s = $getSelection();
 		if ($isRangeSelection(s)) $setBlocksType(s, () => $createHeadingNode(tag));
 	});
@@ -98,13 +103,13 @@ export function ToolbarPlugin() {
 		const s = $getSelection();
 		if ($isRangeSelection(s)) $setBlocksType(s, () => $createQuoteNode());
 	});
-	const toggleList = (type, command) => editor.dispatchCommand(
+	const toggleList = (type: string, command: LexicalCommand<void>) => editor.dispatchCommand(
 		blockType === type ? REMOVE_LIST_COMMAND : command,
 		undefined,
 	);
 	const insertLink = () => editor.dispatchCommand(TOGGLE_LINK_COMMAND, 'https://lexical.dev/');
 
-	const cls = (active) => (active ? 'toolbar-item active' : 'toolbar-item');
+	const cls = (active: boolean) => (active ? 'toolbar-item active' : 'toolbar-item');
 
 	return <div class="toolbar" role="toolbar" aria-label="Editor formatting">
 		<button

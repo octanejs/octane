@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import { useContext, useEffect, useMemo } from 'octane';
 import type { SeriesPoint } from 'd3-shape';
 import { stack as d3stack } from 'd3-shape';
@@ -13,7 +13,7 @@ import combineBarStackData from '../utils/combineBarStackData';
 import getChildrenAndGrandchildrenWithProps from '../utils/getChildrenAndGrandchildrenWithProps';
 
 type UseStackedData<Datum extends object> = {
-		children: ReactNode;
+		children: OctaneNode;
 	} & Pick<StackPathConfig<Datum, string>, 'offset' | 'order'>;
 
 export default function useStackedData<XScale extends AxisScale, YScale extends AxisScale, Datum extends object, ChildrenProps extends SeriesProps<XScale, YScale, Datum>>({

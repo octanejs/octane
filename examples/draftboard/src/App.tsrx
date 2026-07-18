@@ -747,24 +747,22 @@ export function App() @{
 									<dl>
 										<div>
 											<dt>Objects</dt>
-											<dd>
-												{selectedShapes.length as string}
-											</dd>
+											<dd>{String(selectedShapes.length)}</dd>
 										</div>
 										<div>
 											<dt>X</dt>
 											<dd>
-												<output aria-label="Selected X coordinate">
-													{Math.round(selectedShapes[0].x) as string}
-												</output>
+												<output aria-label="Selected X coordinate">{String(
+													Math.round(selectedShapes[0].x),
+												)}</output>
 											</dd>
 										</div>
 										<div>
 											<dt>Y</dt>
 											<dd>
-												<output aria-label="Selected Y coordinate">
-													{Math.round(selectedShapes[0].y) as string}
-												</output>
+												<output aria-label="Selected Y coordinate">{String(
+													Math.round(selectedShapes[0].y),
+												)}</output>
 											</dd>
 										</div>
 									</dl>
@@ -807,7 +805,7 @@ function LoadingCanvas() @{
 	</section>
 }
 
-function LoadFailure(props) @{
+function LoadFailure(props: { onRetry: () => void }) @{
 	<section class="load-failure" role="alert">
 		<div class="failure-icon" aria-hidden="true">!</div>
 		<h2>We couldn’t load this board</h2>
@@ -846,7 +844,21 @@ function clamp(value: number, minimum: number, maximum: number): number {
 	return Math.min(maximum, Math.max(minimum, value));
 }
 
-function BoardCanvas(props) @{
+interface BoardCanvasProps {
+	canvasRef: { current: CanvasHandle | null };
+	document: BoardDocument;
+	selectedIds: string[];
+	tool: Tool;
+	onToolChange: (tool: Tool) => void;
+	onSelectionChange: (selectedIds: string[]) => void;
+	onPreview: (next: BoardDocument) => void;
+	onCommit: (before: BoardDocument, next: BoardDocument, message: string) => void;
+	onUndo: () => void;
+	onRedo: () => void;
+	onActivity: (message: string) => void;
+}
+
+function BoardCanvas(props: BoardCanvasProps) @{
 	const [zoom, setZoom] = useState(1);
 	const [pan, setPan] = useState<Point>({ x: 0, y: 0 });
 	const [draftShape, setDraftShape] = useState<BoardShape | null>(null);
@@ -1207,12 +1219,12 @@ function BoardCanvas(props) @{
 		ref={svgRef}
 		viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
 		preserveAspectRatio="none"
-		tabIndex="0"
+		tabIndex={0}
 		role="application"
 		aria-label="Draftboard canvas"
-		data-zoom={zoom as string}
-		data-pan-x={Math.round(pan.x) as string}
-		data-pan-y={Math.round(pan.y) as string}
+		data-zoom={String(zoom)}
+		data-pan-x={String(Math.round(pan.x))}
+		data-pan-y={String(Math.round(pan.y))}
 		onPointerDown={handlePointerDown}
 		onPointerMove={handlePointerMove}
 		onPointerUp={finishPointer}
@@ -1285,15 +1297,23 @@ function BoardCanvas(props) @{
 	</svg>
 }
 
-function CanvasShape(props) @{
+interface CanvasShapeProps {
+	shape: BoardShape;
+	selected: boolean;
+	focusable: boolean;
+	onRegister: (element: SVGGElement | null) => void | (() => void);
+	onKeyboardFocus: () => void;
+}
+
+function CanvasShape(props: CanvasShapeProps) @{
 	const centerX = props.shape.x + props.shape.width / 2;
 	const centerY = props.shape.y + props.shape.height / 2;
 	<g
 		ref={props.onRegister}
 		class={['canvas-object', props.selected && 'canvas-object--selected']}
 		data-shape-id={props.shape.id}
-		data-x={Math.round(props.shape.x) as string}
-		data-y={Math.round(props.shape.y) as string}
+		data-x={String(Math.round(props.shape.x))}
+		data-y={String(Math.round(props.shape.y))}
 		data-selected={props.selected ? 'true' : 'false'}
 		role="button"
 		aria-label={`${props.shape.label} shape`}
@@ -1335,13 +1355,13 @@ function CanvasShape(props) @{
 	</g>
 }
 
-function KeyboardHelpPortal(props) {
+function KeyboardHelpPortal(props: { onClose: () => void }) {
 	const target = document.getElementById('modal-root');
 	if (target === null) return null;
 	return createPortal(KeyboardHelpDialog, target, props);
 }
 
-function KeyboardHelpDialog(props) @{
+function KeyboardHelpDialog(props: { onClose: () => void }) @{
 	const closeRef = useRef<HTMLButtonElement | null>(null);
 	const doneRef = useRef<HTMLButtonElement | null>(null);
 	useEffect(() => {

@@ -4,7 +4,11 @@ import { useLexicalComposerContext } from './LexicalComposerContext';
 import { registerClearEditor } from '@lexical/extension';
 import { useLayoutEffect } from 'octane';
 
-export function ClearEditorPlugin(props) {
+type Props = Readonly<{
+		onClear?: () => void;
+	}>;
+
+export function ClearEditorPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const onClear = props.onClear;
 	useLayoutEffect(() => registerClearEditor(editor, onClear), [editor, onClear]);

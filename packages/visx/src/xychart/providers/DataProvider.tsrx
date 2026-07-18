@@ -2,7 +2,7 @@
 import type { ScaleConfig, ScaleConfigToD3Scale } from '@octanejs/visx/scale';
 import { scaleLinear, scaleOrdinal as createOrdinalScale } from '@octanejs/visx/scale';
 import { useContext, useMemo } from 'octane';
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import type { AxisScaleOutput } from '@octanejs/visx/axis';
 import type { ResizeObserverPolyfill } from '@octanejs/visx/responsive';
 
@@ -33,7 +33,7 @@ export type DataProviderProps<XScaleConfig extends ScaleConfig<AxisScaleOutput, 
 	/* y-scale configuration whose shape depends on scale type. */
 	yScale: YScaleConfig;
 	/* Any React children. */
-	children: ReactNode;
+	children: OctaneNode;
 	/* Determines whether Series will be plotted horizontally (e.g., horizontal bars). By default this will try to be inferred based on scale types. */
 	horizontal?: boolean | 'auto';
 	/**

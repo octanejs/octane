@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import ThemeContext from '../context/ThemeContext.tsrx';
 import type { XYChartTheme } from '../types';
 import lightTheme from '../theme/themes/light';
 
 export type ThemeProviderProps = {
 	theme?: XYChartTheme;
-	children: ReactNode;
+	children: OctaneNode;
 };
 
 export default function ThemeProvider({ theme = lightTheme, children }: ThemeProviderProps) {

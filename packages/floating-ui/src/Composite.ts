@@ -4,6 +4,9 @@
 // `render` prop (a function, an element to clone, or a default <div>); octane has no
 // cloneElement, so it's implemented locally over createElement.
 import { createContext, createElement, useContext, useMemo, useRef, useState } from 'octane';
+import type { OctaneNode } from 'octane';
+import type { OctaneElement } from 'octane/jsx-runtime';
+import type { Dimensions } from '@floating-ui/dom';
 
 import { FloatingList, useListItem } from './FloatingList';
 import { S } from './internal';
@@ -19,7 +22,9 @@ import {
 	isIndexOutOfListBounds,
 	isListIndexDisabled,
 	useEffectEvent,
+	type DisabledIndices,
 } from './utils';
+import type { HTMLProps, MutableRefObject, RefCallback } from './types';
 
 const ARROW_LEFT = 'ArrowLeft';
 const ARROW_RIGHT = 'ArrowRight';
@@ -29,13 +34,22 @@ const horizontalKeys = [ARROW_LEFT, ARROW_RIGHT];
 const verticalKeys = [ARROW_UP, ARROW_DOWN];
 const allKeys = [...horizontalKeys, ...verticalKeys];
 
-function cloneElement(el: any, props: any): any {
+// Upstream's (unexported) `RenderProp`, in octane terms: an element descriptor
+// to clone, or a factory receiving the computed HTML props.
+type RenderProp = OctaneElement | ((props: HTMLProps<HTMLElement>) => OctaneNode);
+
+type CompositeRef = MutableRefObject<HTMLElement | null> | RefCallback<HTMLElement> | null;
+
+function cloneElement(el: OctaneElement, props: Record<string, unknown>): OctaneNode {
 	return createElement(el.type, { ...el.props, ...props });
 }
 
-function renderJsx(render: any, computedProps: any): any {
+function renderJsx(
+	render: RenderProp | undefined,
+	computedProps: Record<string, unknown>,
+): OctaneNode {
 	if (typeof render === 'function') {
-		return render(computedProps);
+		return render(computedProps as HTMLProps<HTMLElement>);
 	}
 	if (render) {
 		return cloneElement(render, computedProps);
@@ -43,12 +57,79 @@ function renderJsx(render: any, computedProps: any): any {
 	return createElement('div', { ...computedProps });
 }
 
-export const CompositeContext = createContext<any>({
+interface CompositeContextValue {
+	activeIndex: number;
+	onNavigate(index: number): void;
+}
+
+export const CompositeContext = createContext<CompositeContextValue>({
 	activeIndex: 0,
 	onNavigate: () => {},
 });
 
-export function Composite(props: any): any {
+export interface CompositeProps {
+	/**
+	 * Determines the element to render.
+	 * @example
+	 * ```jsx
+	 * <Composite render={<ul />} />
+	 * <Composite render={(htmlProps) => <ul {...htmlProps} />} />
+	 * ```
+	 */
+	render?: RenderProp;
+	/**
+	 * Determines the orientation of the composite.
+	 */
+	orientation?: 'horizontal' | 'vertical' | 'both';
+	/**
+	 * Determines whether focus should loop around when navigating past the first
+	 * or last item.
+	 */
+	loop?: boolean;
+	/**
+	 * Whether the direction of the composite’s navigation is in RTL layout.
+	 */
+	rtl?: boolean;
+	/**
+	 * Determines the number of columns there are in the composite
+	 * (i.e. it’s a grid).
+	 */
+	cols?: number;
+	/**
+	 * Determines which items are disabled. The `disabled` or `aria-disabled`
+	 * attributes are used by default.
+	 */
+	disabledIndices?: DisabledIndices;
+	/**
+	 * Determines which item is active. Used to externally control the active
+	 * item.
+	 */
+	activeIndex?: number;
+	/**
+	 * Called when the user navigates to a new item. Used to externally control
+	 * the active item.
+	 */
+	onNavigate?(index: number): void;
+	/**
+	 * Only for `cols > 1`, specify sizes for grid items.
+	 * `{ width: 2, height: 2 }` means an item is 2 columns wide and 2 rows tall.
+	 */
+	itemSizes?: Dimensions[];
+	/**
+	 * Only relevant for `cols > 1` and items with different sizes, specify if
+	 * the grid is dense (as defined in the CSS spec for grid-auto-flow).
+	 */
+	dense?: boolean;
+}
+
+/**
+ * Creates a single tab stop whose items are navigated by arrow keys, which
+ * provides list navigation outside of floating element contexts.
+ * @see https://floating-ui.com/docs/Composite
+ */
+export function Composite(
+	props: CompositeProps & HTMLProps<HTMLElement> & { ref?: CompositeRef },
+): OctaneNode {
 	const render = props.render;
 	const orientation = props.orientation ?? 'both';
 	const loop = props.loop ?? true;
@@ -81,16 +162,16 @@ export function Composite(props: any): any {
 		externalSetActiveIndex != null ? externalSetActiveIndex : internalSetActiveIndex,
 		S('Composite:nav'),
 	);
-	const elementsRef = useRef<any[]>([], S('Composite:els'));
-	const renderElementProps = render && typeof render !== 'function' ? render.props : {};
-	const contextValue = useMemo(
+	const elementsRef = useRef<Array<HTMLElement | null>>([], S('Composite:els'));
+	const renderElementProps: any = render && typeof render !== 'function' ? render.props : {};
+	const contextValue = useMemo<CompositeContextValue>(
 		() => ({ activeIndex, onNavigate }),
 		[activeIndex, onNavigate],
 		S('Composite:ctx'),
 	);
 	const isGrid = cols > 1;
 
-	function handleKeyDown(event: any) {
+	function handleKeyDown(event: KeyboardEvent) {
 		if (!allKeys.includes(event.key)) return;
 		let nextIndex = activeIndex;
 		const minIndex = getMinListIndex(elementsRef, disabledIndices);
@@ -105,7 +186,7 @@ export function Composite(props: any): any {
 			const minGridIndex = cellMap.findIndex(
 				(index) => index != null && !isListIndexDisabled(elementsRef, index, disabledIndices),
 			);
-			const maxGridIndex = cellMap.reduce(
+			const maxGridIndex = cellMap.reduce<number>(
 				(foundIndex, index, cellIndex) =>
 					index != null && !isListIndexDisabled(elementsRef, index, disabledIndices)
 						? cellIndex
@@ -129,7 +210,7 @@ export function Composite(props: any): any {
 							disabledIndices: getGridCellIndices(
 								[
 									...((typeof disabledIndices !== 'function' ? disabledIndices : null) ||
-										elementsRef.current.map((_: any, index: number) =>
+										elementsRef.current.map((_, index) =>
 											isListIndexDisabled(elementsRef, index, disabledIndices) ? index : undefined,
 										)),
 									undefined,
@@ -156,19 +237,19 @@ export function Composite(props: any): any {
 			horizontal: [horizontalEndKey],
 			vertical: [ARROW_DOWN],
 			both: [horizontalEndKey, ARROW_DOWN],
-		}[orientation as 'horizontal' | 'vertical' | 'both'];
+		}[orientation];
 		const toStartKeys = {
 			horizontal: [horizontalStartKey],
 			vertical: [ARROW_UP],
 			both: [horizontalStartKey, ARROW_UP],
-		}[orientation as 'horizontal' | 'vertical' | 'both'];
+		}[orientation];
 		const preventedKeys = isGrid
 			? allKeys
 			: {
 					horizontal: horizontalKeys,
 					vertical: verticalKeys,
 					both: allKeys,
-				}[orientation as 'horizontal' | 'vertical' | 'both'];
+				}[orientation];
 		if (nextIndex === activeIndex && [...toEndKeys, ...toStartKeys].includes(event.key)) {
 			if (loop && nextIndex === maxIndex && toEndKeys.includes(event.key)) {
 				nextIndex = minIndex;
@@ -197,8 +278,8 @@ export function Composite(props: any): any {
 		...renderElementProps,
 		ref: forwardedRef,
 		'aria-orientation': orientation === 'both' ? undefined : orientation,
-		onKeyDown(e: any) {
-			domProps.onKeyDown?.(e);
+		onKeyDown(e: KeyboardEvent) {
+			domProps.onKeyDown?.(e as KeyboardEvent & { currentTarget: HTMLElement & EventTarget });
 			renderElementProps.onKeyDown?.(e);
 			handleKeyDown(e);
 		},
@@ -213,11 +294,28 @@ export function Composite(props: any): any {
 	});
 }
 
-export function CompositeItem(props: any): any {
+export interface CompositeItemProps {
+	/**
+	 * Determines the element to render.
+	 * @example
+	 * ```jsx
+	 * <CompositeItem render={<li />} />
+	 * <CompositeItem render={(htmlProps) => <li {...htmlProps} />} />
+	 * ```
+	 */
+	render?: RenderProp;
+}
+
+/**
+ * @see https://floating-ui.com/docs/Composite
+ */
+export function CompositeItem(
+	props: CompositeItemProps & HTMLProps<HTMLElement> & { ref?: CompositeRef },
+): OctaneNode {
 	const render = props.render;
 	const forwardedRef = props.ref;
 	const { render: _r, ref: _ref, ...domProps } = props;
-	const renderElementProps = render && typeof render !== 'function' ? render.props : {};
+	const renderElementProps: any = render && typeof render !== 'function' ? render.props : {};
 	const { activeIndex, onNavigate } = useContext(CompositeContext);
 	const { ref, index } = useListItem(S('CompositeItem:listItem'));
 	const mergedRef = useMergeRefs(
@@ -231,8 +329,8 @@ export function CompositeItem(props: any): any {
 		ref: mergedRef,
 		tabIndex: isActive ? 0 : -1,
 		'data-active': isActive ? '' : undefined,
-		onFocus(e: any) {
-			domProps.onFocus?.(e);
+		onFocus(e: FocusEvent) {
+			domProps.onFocus?.(e as FocusEvent & { currentTarget: HTMLElement & EventTarget });
 			renderElementProps.onFocus?.(e);
 			onNavigate(index);
 		},

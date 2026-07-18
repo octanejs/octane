@@ -18,20 +18,76 @@ import {
 	useLatestRef,
 	useModernLayoutEffect,
 } from './utils';
+import type {
+	Delay,
+	ElementProps,
+	FloatingRootContext,
+	HandleClose,
+	OpenChangeReason,
+} from './types';
+
+export interface UseHoverProps {
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * Accepts an event handler that runs on `mousemove` to control when the
+	 * floating element closes once the cursor leaves the reference element.
+	 * @default null
+	 */
+	handleClose?: HandleClose | null;
+	/**
+	 * Waits until the user’s cursor is at “rest” over the reference element
+	 * before changing the `open` state.
+	 * @default 0
+	 */
+	restMs?: number | (() => number);
+	/**
+	 * Waits for the specified time when the event listener runs before changing
+	 * the `open` state.
+	 * @default 0
+	 */
+	delay?: Delay | (() => Delay);
+	/**
+	 * Whether the logic only runs for mouse input, ignoring touch input.
+	 * Note: due to a bug with Linux Chrome, "pen" inputs are considered "mouse".
+	 * @default false
+	 */
+	mouseOnly?: boolean;
+	/**
+	 * Whether moving the cursor over the floating element will open it, without a
+	 * regular hover event required.
+	 * @default true
+	 */
+	move?: boolean;
+}
 
 const safePolygonIdentifier = createAttribute('safe-polygon');
 
-function getRestMs(value: any): any {
+function getRestMs(value: number | (() => number)): number {
 	if (typeof value === 'function') {
 		return value();
 	}
 	return value;
 }
 
-export function useHover(...args: any[]): any {
+/**
+ * Opens the floating element while hovering over the reference element, like
+ * CSS `:hover`.
+ * @see https://floating-ui.com/docs/useHover
+ */
+export function useHover(
+	context: FloatingRootContext,
+	props?: UseHoverProps,
+	slot?: symbol,
+): ElementProps;
+export function useHover(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseHoverProps) ?? {};
 
 	const open = context.open;
 	const onOpenChange = context.onOpenChange;
@@ -53,13 +109,16 @@ export function useHover(...args: any[]): any {
 	const openRef = useLatestRef(open, subSlot(slot, 'open'));
 	const restMsRef = useLatestRef(restMs, subSlot(slot, 'restms'));
 
-	const pointerTypeRef = useRef<any>(undefined, subSlot(slot, 'ptype'));
+	const pointerTypeRef = useRef<string | undefined>(undefined, subSlot(slot, 'ptype'));
 	const timeoutRef = useRef(-1, subSlot(slot, 'timeout'));
-	const handlerRef = useRef<any>(undefined, subSlot(slot, 'handler'));
+	const handlerRef = useRef<((event: MouseEvent) => void) | undefined>(
+		undefined,
+		subSlot(slot, 'handler'),
+	);
 	const restTimeoutRef = useRef(-1, subSlot(slot, 'resttimeout'));
 	const blockMouseMoveRef = useRef(true, subSlot(slot, 'block'));
 	const performedPointerEventsMutationRef = useRef(false, subSlot(slot, 'ppem'));
-	const unbindMouseMoveRef = useRef<any>(() => {}, subSlot(slot, 'unbind'));
+	const unbindMouseMoveRef = useRef<() => void>(() => {}, subSlot(slot, 'unbind'));
 	const restTimeoutPendingRef = useRef(false, subSlot(slot, 'rtp'));
 
 	const isHoverOpen = useEffectEvent(
@@ -96,7 +155,7 @@ export function useHover(...args: any[]): any {
 			if (!enabled) return;
 			if (!handleCloseRef.current) return;
 			if (!open) return;
-			function onLeave(event: any) {
+			function onLeave(event: MouseEvent) {
 				if (isHoverOpen()) {
 					onOpenChange(false, event, 'hover');
 				}
@@ -112,7 +171,7 @@ export function useHover(...args: any[]): any {
 	);
 
 	const closeWithDelay = useCallback(
-		(event: any, runElseBranch = true, reason = 'hover') => {
+		(event: Event, runElseBranch = true, reason: OpenChangeReason = 'hover') => {
 			const closeDelay = getDelay(delayRef.current, 'close', pointerTypeRef.current);
 			if (closeDelay && !handlerRef.current) {
 				clearTimeoutIfSet(timeoutRef);
@@ -161,7 +220,7 @@ export function useHover(...args: any[]): any {
 	useEffect(
 		() => {
 			if (!enabled) return;
-			function onReferenceMouseEnter(event: any) {
+			function onReferenceMouseEnter(event: MouseEvent) {
 				clearTimeoutIfSet(timeoutRef);
 				blockMouseMoveRef.current = false;
 				if (
@@ -181,7 +240,7 @@ export function useHover(...args: any[]): any {
 					onOpenChange(true, event, 'hover');
 				}
 			}
-			function onReferenceMouseLeave(event: any) {
+			function onReferenceMouseLeave(event: MouseEvent) {
 				if (isClickLikeOpenEvent()) {
 					clearPointerEvents();
 					return;
@@ -216,13 +275,13 @@ export function useHover(...args: any[]): any {
 				}
 				const shouldClose =
 					pointerTypeRef.current === 'touch'
-						? !contains(elements.floating, event.relatedTarget)
+						? !contains(elements.floating, event.relatedTarget as Element | null)
 						: true;
 				if (shouldClose) {
 					closeWithDelay(event);
 				}
 			}
-			function onScrollMouseLeave(event: any) {
+			function onScrollMouseLeave(event: MouseEvent) {
 				if (isClickLikeOpenEvent()) return;
 				if (!dataRef.current.floatingContext) return;
 				handleCloseRef.current?.({
@@ -242,13 +301,15 @@ export function useHover(...args: any[]): any {
 			function onFloatingMouseEnter() {
 				clearTimeoutIfSet(timeoutRef);
 			}
-			function onFloatingMouseLeave(event: any) {
+			function onFloatingMouseLeave(event: MouseEvent) {
 				if (!isClickLikeOpenEvent()) {
 					closeWithDelay(event, false);
 				}
 			}
 			if (isElement(elements.domReference)) {
-				const reference = elements.domReference;
+				// lib.dom's `ElementEventMap` lacks mouse events; these listeners are
+				// registered on a plain Element, so go through the generic overload.
+				const reference = elements.domReference as HTMLElement;
 				const floating = elements.floating;
 				if (open) {
 					reference.addEventListener('mouseleave', onScrollMouseLeave);
@@ -311,7 +372,7 @@ export function useHover(...args: any[]): any {
 				if (isElement(elements.domReference) && floatingEl) {
 					const body = getDocument(elements.floating).body;
 					body.setAttribute(safePolygonIdentifier, '');
-					const ref = elements.domReference;
+					const ref = elements.domReference as HTMLElement;
 					const parentFloating = tree?.nodesRef.current.find((node: any) => node.id === parentId)
 						?.context?.elements.floating;
 					if (parentFloating) {
@@ -360,13 +421,13 @@ export function useHover(...args: any[]): any {
 
 	const reference = useMemo(
 		() => {
-			function setPointerRef(event: any) {
+			function setPointerRef(event: PointerEvent) {
 				pointerTypeRef.current = event.pointerType;
 			}
 			return {
 				onPointerDown: setPointerRef,
 				onPointerEnter: setPointerRef,
-				onMouseMove(event: any) {
+				onMouseMove(event: MouseEvent) {
 					function handleMouseMove() {
 						if (!blockMouseMoveRef.current && !openRef.current) {
 							onOpenChange(true, event, 'hover');
@@ -398,7 +459,7 @@ export function useHover(...args: any[]): any {
 		subSlot(slot, 'm:ref'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference } : {}),
 		[enabled, reference],
 		subSlot(slot, 'm:ret'),

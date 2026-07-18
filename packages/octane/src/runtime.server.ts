@@ -5054,10 +5054,11 @@ function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
  * This is the buffered, await-everything behaviour of the old `render()`.
  */
 export async function prerender(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
+	const component = entryComponent as ServerComponent;
 	const nonceAttr = nonceAttrOf(options);
 	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
 }
