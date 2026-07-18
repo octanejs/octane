@@ -18,9 +18,9 @@ export function Spin() @{
 					{'Three.js, '}
 					<span class="spin-accent">on Octane.</span>
 				</h2>
-				<p class="spin-lead">
-					{'Octane supports Three.js through @octanejs/three – port of React Three Fiber.'
-				</p>
+				<p
+					class="spin-lead"
+				>{'Octane supports Three.js through @octanejs/three – port of React Three Fiber.'}</p>
 				<Link to="/docs/bindings" class="spin-link">Browse all the bindings →</Link>
 			</div>
 			<div class="spin-stage-cell" aria-hidden="true">
