@@ -122,6 +122,27 @@ Available strategies:
 `mouseenter`, `mouseover`, `mouseup`, `pointerdown`, `pointerenter`,
 `pointerover`, and `pointerup`.
 
+#### Capture interactions before `hydrateRoot()`
+
+An immediate `hydrateRoot()` call needs no extra setup: mounting the first
+`Hydrate` boundary installs interaction capture as a synchronous fallback. If
+your client entry awaits route discovery, data, or dynamic imports before it
+calls `hydrateRoot()`, install the lightweight capture queue before that work so
+an interaction during the gap can be replayed:
+
+```ts
+import { hydrateRoot } from 'octane';
+import { initializeHydrationEventCapture } from 'octane/hydration';
+
+initializeHydrationEventCapture();
+
+await prepareClient();
+hydrateRoot(document.getElementById('app')!, App);
+```
+
+Calling `initializeHydrationEventCapture()` more than once is safe; Octane
+installs the listeners only once per document.
+
 Hydration is one-way: after `condition()` becomes true and the boundary
 hydrates, making it false again does not return the subtree to a dormant state.
 

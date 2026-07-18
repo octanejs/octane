@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-18",
+  "probe": "packages/lynx/probe",
+  "executionHost": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.18.0"
+  },
+  "capturedCommands": [
+    {
+      "command": "npm test",
+      "cwd": "packages/lynx/probe",
+      "status": "passed",
+      "result": {
+        "tests": 12,
+        "passed": 12,
+        "failed": 0
+      },
+      "scope": "Runs the probe source in @lynx-js/testing-environment with jsdom. It proves a page/view/text tree after either main-first or background-first startup, cancellation before main readiness, one acknowledged tap-driven background update, teardown while a mount acknowledgement is pending, validation-before-mutation for invalid, structurally stale, and conflicting-parent batches, and that background state remains at its last acknowledged value while a commit is pending or rejected. It does not execute the encoded .lynx.bundle."
+    },
+    {
+      "command": "npm run verify:build",
+      "cwd": "packages/lynx/probe",
+      "status": "passed",
+      "result": {
+        "bundleBytes": {
+          "imperative.lynx.bundle": 3246,
+          "imperative.web.bundle": 2872,
+          "main.lynx.bundle": 14230,
+          "main.web.bundle": 13669
+        },
+        "decodedEngineVersion": "3.9",
+        "rsbuildVersions": ["2.1.4"],
+        "rspackVersions": ["2.1.3"],
+        "reactOrPreactDependencyFound": false
+      },
+      "scope": "Checks existing build outputs, decodes the native bundle, confirms distinct main/background programs without thread-global branches, checks the isolated lock graph, and searches for ReactLynx/Preact. Successful decoding is not execution by a Lynx engine."
+    },
+    {
+      "command": "Lynx Web browser smoke for / and /?imperative",
+      "cwd": "packages/lynx/probe",
+      "status": "failed",
+      "result": {
+        "transportedCountTextMatches": 0,
+        "imperativeCountTextMatches": 0,
+        "transportedConsoleError": "Uncaught TypeError: Failed to execute 'observe' on 'MutationObserver': parameter 1 is not of type 'Node'.",
+        "transportedAdditionalConsoleError": "[lynx-web] postMessage not implemented, args: Object",
+        "imperativeConsoleError": "Uncaught TypeError: Failed to execute 'observe' on 'MutationObserver': parameter 1 is not of type 'Node'."
+      },
+      "scope": "Runs the pinned @lynx-js/web-core@0.22.2 client in Chromium against fresh tabs. Both the transported probe and direct-PAPI control fail first with the same MutationObserver error before exposing Count: 0; the transported path additionally reports that the Web context does not implement postMessage. The shared bootstrap failure is not attributed to the background protocol without further engine diagnostics."
+    },
+    {
+      "command": "command -v adb; xcrun simctl list devices available; locate Lynx Explorer",
+      "cwd": "packages/lynx/probe",
+      "status": "unavailable",
+      "result": {
+        "adb": "not-installed",
+        "availableIosSimulators": 0,
+        "lynxExplorer": "not-installed"
+      },
+      "scope": "Records why native execution cannot run on the capture host. Missing device lanes remain blocking gates."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "packages/lynx/probe/dist/imperative.lynx.bundle",
+      "bytes": 3246,
+      "sha256": "2dfd8e567c5dd1c31d36ce0703a687e54edfda65b2ed691475246eadd061addc",
+      "evidence": [
+        "tasm decode succeeded",
+        "decoded engine-version is 3.9",
+        "decoded main-thread-script exists",
+        "decoded empty background-thread control exists",
+        "neither decoded program branches on thread globals",
+        "no ReactLynx or Preact marker was found"
+      ]
+    },
+    {
+      "path": "packages/lynx/probe/dist/imperative.web.bundle",
+      "bytes": 2872,
+      "sha256": "4923ac01e9a20c91770fc9765e8b7f9a71b7d630f503e6504c2c8436f5849f66",
+      "evidence": [
+        "main-thread.js reference exists",
+        "the unused imperative background program is empty",
+        "no ReactLynx or Preact marker was found"
+      ]
+    },
+    {
+      "path": "packages/lynx/probe/dist/main.lynx.bundle",
+      "bytes": 14230,
+      "sha256": "3db9e3c77bded72cddebf043373925e1656879188886086d6de602d98a6c64c6",
+      "evidence": [
+        "tasm decode succeeded",
+        "decoded engine-version is 3.9",
+        "decoded main-thread-script exists",
+        "decoded background-thread-script exists",
+        "decoded programs use only their respective JS/core context and no thread globals",
+        "no ReactLynx or Preact marker was found"
+      ]
+    },
+    {
+      "path": "packages/lynx/probe/dist/main.web.bundle",
+      "bytes": 13669,
+      "sha256": "dd0ac3b541a21d725f2ccce293d80b84941254dca8a7cb3707bc2a336efe21fa",
+      "evidence": [
+        "main-thread.js reference exists",
+        "background.js reference exists",
+        "no ReactLynx or Preact marker was found"
+      ]
+    }
+  ],
+  "baselineStatus": {
+    "transportedNativeBundleBytes": {
+      "status": "captured",
+      "value": 14230,
+      "unit": "bytes",
+      "qualification": "Single local production artifact; no regression budget is ratified."
+    },
+    "transportedWebBundleBytes": {
+      "status": "captured",
+      "value": 13669,
+      "unit": "bytes",
+      "qualification": "Single local production artifact; no regression budget is ratified."
+    },
+    "imperativeNativeBundleBytes": {
+      "status": "captured",
+      "value": 3246,
+      "unit": "bytes",
+      "qualification": "Direct-PAPI control artifact only; no runtime timing or regression budget is ratified."
+    },
+    "imperativeWebBundleBytes": {
+      "status": "captured",
+      "value": 2872,
+      "unit": "bytes",
+      "qualification": "Direct-PAPI control artifact only; no runtime timing or regression budget is ratified."
+    },
+    "firstPaint": {
+      "status": "not-measured",
+      "reason": "No official engine execution or instrumentation was performed."
+    },
+    "backgroundUpdate": {
+      "status": "behavior-only",
+      "reason": "The source-level testing environment observed Count: 0 to Count: 1 after ACK; no timing was measured."
+    },
+    "patchBytes": {
+      "status": "not-measured",
+      "reason": "The transport batch was not instrumented for serialized byte size."
+    },
+    "commitFlush": {
+      "status": "implementation-observed",
+      "reason": "The receiver has one flush boundary after applying a validated batch, and the invalid-batch test proves zero flushes. The accepted-path flush count is not yet a separately captured native benchmark."
+    },
+    "teardown": {
+      "status": "behavior-only",
+      "reason": "Source-level testing removes the page child and listeners; no engine teardown timing or lifecycle callback was captured."
+    },
+    "reactLynxComparison": {
+      "status": "not-measured",
+      "reason": "No same-host ReactLynx baseline was captured."
+    },
+    "imperativePapiComparison": {
+      "status": "bundle-bytes-only",
+      "reason": "The direct-PAPI native/Web controls are 3246/2872 bytes versus 14230/13669 bytes for the transported probe. Both Web controls fail before rendering, and no engine timing is available."
+    }
+  },
+  "gates": [
+    {
+      "id": "source-testing-environment",
+      "status": "passed",
+      "evidence": "Twelve Node tests passed using @lynx-js/testing-environment@0.3.0, including both startup orders, cancellation before main readiness, and rejection of conflicting parent links before native mutation."
+    },
+    {
+      "id": "production-bundle-encoding",
+      "status": "passed",
+      "evidence": "The existing production .lynx.bundle decodes with explicit main/background programs, no thread-global branch, and engine-version 3.9."
+    },
+    {
+      "id": "encoded-bundle-in-testing-environment",
+      "status": "not-run",
+      "reason": "The source modules ran in the official JavaScript testing environment; the encoded .lynx.bundle itself was only decoded."
+    },
+    {
+      "id": "lynx-web-runtime",
+      "status": "failed",
+      "reason": "Fresh Chromium runs of both transported and direct-PAPI Web bundles exposed no Count: 0 tree and first reported MutationObserver.observe receiving a non-Node target. The transported path also reported that Web postMessage is unimplemented."
+    },
+    {
+      "id": "lynx-explorer-3.9.0",
+      "status": "unavailable",
+      "reason": "No Lynx Explorer installation was available on the capture host."
+    },
+    {
+      "id": "android-lynx-3.9.0",
+      "status": "unavailable",
+      "reason": "adb was not installed and no Android emulator or device execution was available."
+    },
+    {
+      "id": "ios-lynx-3.9.0",
+      "status": "unavailable",
+      "reason": "xcrun was installed, but simctl reported no available simulator devices and Explorer was not installed."
+    },
+    {
+      "id": "public-background-event-receiver",
+      "status": "blocked",
+      "reason": "The working test injection uses lynxCoreInject.tt.publishEvent, which is absent from the selected public type packages."
+    },
+    {
+      "id": "public-reload-and-background-teardown",
+      "status": "blocked",
+      "reason": "ReactLynx uses injected onAppReload and callDestroyLifetimeFun hooks. A framework-neutral replacement has not been confirmed across engines."
+    },
+    {
+      "id": "runner-expanded-test-case-inventory",
+      "status": "blocked",
+      "reason": "All 213 upstream test source files are classified, but dynamic Vitest/cargo case expansion has not been captured and classified case-by-case."
+    },
+    {
+      "id": "comparable-runtime-baselines",
+      "status": "blocked",
+      "reason": "ReactLynx and imperative-PAPI first-paint/update/teardown timing, patch-byte, and flush baselines require a working real engine lane."
+    }
+  ],
+  "milestoneExit": {
+    "status": "blocked",
+    "blockingGateIds": [
+      "encoded-bundle-in-testing-environment",
+      "lynx-web-runtime",
+      "lynx-explorer-3.9.0",
+      "android-lynx-3.9.0",
+      "ios-lynx-3.9.0",
+      "public-background-event-receiver",
+      "public-reload-and-background-teardown",
+      "runner-expanded-test-case-inventory",
+      "comparable-runtime-baselines"
+    ],
+    "decision": "Do not begin the production renderer port until the public-hook blockers are resolved and the exact bundle passes the required engine matrix."
+  }
+}

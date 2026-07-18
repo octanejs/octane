@@ -1,5 +1,31 @@
 # @octanejs/base-ui
 
+## 0.1.7
+
+### Patch Changes
+
+- 07511e4: Keep `onChange` native while adding compile-time and development-runtime text-host
+  diagnostics, explicit commit intent, and correct controlled checkbox/radio
+  restoration through native change. Use native `input` events for Base UI text
+  controls while preserving the number field's form-facing native change commit,
+  propagate authored-source diagnostics through MDX compilation and Vite, and make
+  Octane's bridge tooling target React-style text-host event wiring without rewriting
+  component callbacks or non-text controls.
+- Updated dependencies [c704664]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [91b5f45]
+- Updated dependencies [c16778a]
+- Updated dependencies [39f2c00]
+- Updated dependencies [aabf79c]
+- Updated dependencies [07511e4]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [0d2e265]
+- Updated dependencies [3168360]
+- Updated dependencies [81c8842]
+  - octane@0.1.9
+  - @octanejs/floating-ui@0.1.8
+
 ## 0.1.6
 
 ### Patch Changes

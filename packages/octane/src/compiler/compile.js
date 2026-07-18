@@ -5051,7 +5051,7 @@ export function compile(source, filename, options) {
 			const args = [JSON.stringify(t.html)];
 			if (t.ns || t.frag) args.push(String(t.ns | 0));
 			if (t.frag) args.push(String(t.frag | 0));
-			return `const ${t.name} = _$template(${args.join(', ')});`;
+			return `const ${t.name} = /* @__PURE__ */ _$template(${args.join(', ')});`;
 		})
 		.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
@@ -5131,18 +5131,18 @@ export function compile(source, filename, options) {
 				.join('\n') + '\n';
 	}
 
-	// Cross-module singleRoot stamps (docs/comment-marker-elision-plan.md M1):
-	// a component whose body provably renders ONE plain element carries the
-	// marker on its BINDING, so a `componentSlot(…, 2)` call site in ANOTHER
-	// module can take the markerless singleRoot path at mount. Emitted at the
-	// module tail so it lands on the final binding (incl. the hmr() wrapper —
-	// the stamp goes on what importers see). Also feeds the runtime's existing
+	// Cross-module singleRoot fallback stamps (docs/comment-marker-elision-plan.md
+	// M1). Non-HMR initializers carry this metadata inside a tree-shakeable
+	// binding; the tail remains for HMR wrappers and declaration shapes that cannot
+	// safely move the source binding. Also feeds the runtime's existing
 	// value-position `$$singleRoot` descriptor check.
 	let stampBlock = '';
 	if (ctx.componentInfo) {
 		const stamps = [];
 		for (const [name, info] of ctx.componentInfo) {
-			if (info.singleRoot === true) stamps.push(`${name}.$$singleRoot = true;`);
+			if (info.singleRoot === true && info.singleRootInitialized !== true) {
+				stamps.push(`${name}.$$singleRoot = true;`);
+			}
 		}
 		for (const entry of ctx.devFunctionLocs) {
 			stamps.push(
@@ -7068,6 +7068,15 @@ function applyCssScoping(componentNode, ctx) {
 	return cssHash;
 }
 
+// Attach definition metadata through the component's initializer rather than a
+// free-standing module mutation. The call-site annotation is valid because every
+// caller passes a freshly-created compiler function that cannot yet be observed;
+// bundlers may therefore discard the initializer together with an unused export.
+function singleRootInitializer(ctx, component) {
+	ctx.runtimeNeeded.add('markSingleRoot');
+	return `/* @__PURE__ */ _$markSingleRoot(${component})`;
+}
+
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
@@ -7131,12 +7140,15 @@ function compileComponent(node, ctx, options) {
 	// module const) so the component's own body — where the function-
 	// expression name shadows the const — resolves `_$warmChild(Self, …)` to
 	// an object that carries the plan. hmr() forwards `__warm` from the
-	// wrapped fn onto its wrapper for cross-module references.
-	const warmedFn = ctx._pendingWarm ? `Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })` : fn;
+	// wrapped fn onto its wrapper for cross-module references. Both assignments
+	// below target this freshly-emitted function, so unused initializers may drop.
+	const warmedFn = ctx._pendingWarm
+		? `/* @__PURE__ */ Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })`
+		: fn;
 	ctx._pendingWarm = null;
 	const abiFn =
 		hmrWrap && returnedOutput
-			? `Object.assign(${warmedFn}, { __octaneReturnedOutput: true })`
+			? `/* @__PURE__ */ Object.assign(${warmedFn}, { __octaneReturnedOutput: true })`
 			: warmedFn;
 
 	// HMR-wrap exported components inline so the binding stays a `const` (no
@@ -7146,7 +7158,12 @@ function compileComponent(node, ctx, options) {
 	// function-name identity by NAMING the inner FunctionExpression — `hmr`
 	// returns a wrapper that delegates to whatever fn is currently committed,
 	// and `module.Foo[HMR].update(...)` swaps it on each accept.
-	const valueExpr = hmrWrap && isExported ? `_$hmr(${abiFn})` : abiFn;
+	let valueExpr = hmrWrap && isExported ? `_$hmr(${abiFn})` : abiFn;
+	const componentInfo = ctx.componentInfo.get(name);
+	if (!hmrWrap && componentInfo?.singleRoot === true) {
+		valueExpr = singleRootInitializer(ctx, valueExpr);
+		componentInfo.singleRootInitialized = true;
+	}
 	const declaration = options && options.hmrMutable ? 'let' : 'const';
 	if (isDefault) {
 		if (options && options.hmrMutable) {
@@ -9794,13 +9811,15 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		// compileFunctionBody → emitElementHtml (via ctx._foldedDirectiveCalls).
 		body: { type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
 	};
-	ctx.hoistedHelpers.push(compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash));
+	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
 		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
 		// comment markers), which is required for byte-equal DOM when folding `@{}`.
 		// A returned JSX fragment may have multiple roots and must retain its range.
-		ctx.hoistedHelpers.push(`${fragName}.$$singleRoot = true;`);
+		ctx.hoistedHelpers.push(`const ${fragName} = ${singleRootInitializer(ctx, renderer)};`);
+	} else {
+		ctx.hoistedHelpers.push(renderer);
 	}
 	ctx.runtimeNeeded.add('createElement');
 	return {
@@ -10123,7 +10142,7 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
 		// and custom-hook boundaries retain the trailing-Symbol ABI consumed by
 		// published bindings. Both use the short, path-free description.
 		if (ctx._hookHash === undefined) ctx._hookHash = hookSlotHash(ctx.filename);
-		symbolExpr = `Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)})`;
+		symbolExpr = `/* @__PURE__ */ Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)})`;
 	} else {
 		// Direct sites in a compiler-created render Scope only need a tiny local
 		// integer. Arbitrary callable helpers and custom-hook boundaries can share a
@@ -10132,7 +10151,7 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
 		if (forceSymbol) {
 			const { baseName } = ensureHookSlotBase(ctx);
 			const numericExpr = id === 0 ? baseName : `${baseName} + ${id}`;
-			symbolExpr = `Symbol(${numericExpr})`;
+			symbolExpr = `/* @__PURE__ */ Symbol(${numericExpr})`;
 		} else {
 			symbolExpr = String(id);
 		}
