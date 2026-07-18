@@ -1,0 +1,19 @@
+```tsx
+// App.tsx — your existing React 19 app
+import { OctaneCompat } from 'octane/react';
+import { Counter } from './islands/Counter.tsrx';
+
+export function App() {
+	return (
+		<div className="dashboard">
+			<h1>Ported one component at a time</h1>
+
+			{/* A compiled Octane island, hosted inside React.
+			    Native events, real React context, SSR + hydration. */}
+			<OctaneCompat>
+				<Counter />
+			</OctaneCompat>
+		</div>
+	);
+}
+```

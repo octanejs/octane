@@ -57,9 +57,7 @@
     "binding-parity:gaps:check": "node scripts/generate-binding-parity-gaps.mjs --check",
     "test:markers:check": "node scripts/check-test-markers.mjs",
     "bindings:status": "node scripts/generate-bindings-status.mjs",
-    "bindings:status:check": "node scripts/generate-bindings-status.mjs --check",
-    "native-events:diagnostics": "node scripts/native-event-diagnostics.mjs",
-    "native-events:diagnostics:check": "node scripts/native-event-diagnostics.mjs --check"
+    "bindings:status:check": "node scripts/generate-bindings-status.mjs --check"
   },
   "devDependencies": {
     "@changesets/changelog-github": "catalog:default",

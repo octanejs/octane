@@ -106,6 +106,21 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'react-compat',
+		title: 'React compatibility',
+		description: 'Host compiled Octane islands inside an existing React 19 app with OctaneCompat.',
+		group: 'Explore',
+		searchTerms: ['OctaneCompat', 'octane/react', 'islands', 'migrate', 'interop', 'React 19'],
+		sections: [
+			{ id: 'what-is-octanecompat', title: 'What OctaneCompat is' },
+			{ id: 'set-up', title: 'Set up the toolchain' },
+			{ id: 'render-an-island', title: 'Render an island' },
+			{ id: 'react-context', title: 'Share React context' },
+			{ id: 'server-rendering', title: 'Server rendering and hydration' },
+			{ id: 'not-supported', title: "What isn't supported" },
+		],
+	},
+	{
 		slug: 'profiling',
 		title: 'Profiling',
 		description:
