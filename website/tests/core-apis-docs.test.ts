@@ -23,7 +23,10 @@ async function renderCoreApis() {
 	return utils;
 }
 
-describe('Core APIs documentation', () => {
+// Each case mounts the real docs route so it covers the router, MDX document,
+// and embedded demo together. Keep the interaction waits narrowly bounded below,
+// while allowing the full document render to finish on shared CI runners.
+describe('Core APIs documentation', { timeout: 15_000 }, () => {
 	it('presents a concept-first guide with complete local navigation', async () => {
 		const { container } = await renderCoreApis();
 		const coreDoc = docs.find((doc) => doc.slug === 'core-apis')!;
