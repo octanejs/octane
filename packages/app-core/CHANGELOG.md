@@ -1,5 +1,16 @@
 # @octanejs/app-core
 
+## 0.0.6
+
+### Patch Changes
+
+- d426046: Initialize deferred-hydration interaction capture before generated client
+  entries begin asynchronous route loading, preserving input that arrives before
+  `hydrateRoot()`.
+- Updated dependencies [d426046]
+- Updated dependencies [f511024]
+  - octane@0.1.10
+
 ## 0.0.5
 
 ### Patch Changes

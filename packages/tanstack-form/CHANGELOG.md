@@ -1,5 +1,14 @@
 # @octanejs/tanstack-form
 
+## 0.0.4
+
+### Patch Changes
+
+- Updated dependencies [d426046]
+- Updated dependencies [f511024]
+  - octane@0.1.10
+  - @octanejs/tanstack-store@0.0.4
+
 ## 0.0.3
 
 ### Patch Changes

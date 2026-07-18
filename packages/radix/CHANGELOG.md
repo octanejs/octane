@@ -1,5 +1,14 @@
 # @octanejs/radix
 
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies [d426046]
+- Updated dependencies [f511024]
+  - octane@0.1.10
+  - @octanejs/floating-ui@0.1.9
+
 ## 0.1.8
 
 ### Patch Changes
