@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,6 +10,8 @@ import {
 	areaForPath,
 	BENCHMARK_SUITES,
 	BUNDLED_SKILLS,
+	createServer,
+	engineeringPlanFor,
 	isOctaneRepo,
 	runCommand,
 	scaffoldReactPort,
@@ -104,7 +108,84 @@ describe('@octanejs/mcp-server helpers', () => {
 			'./node_modules/.bin/vitest run packages/radix/tests --project radix',
 		);
 		expect(commands).toContain('pnpm typecheck');
+		expect(commands).toContain('node benchmarks/bench.mjs --quick --ratios');
 		expect(commands).toContain('pnpm format:check');
+	});
+
+	it('requires performance evidence and adversarial review for framework fundamentals', () => {
+		const plan = engineeringPlanFor(
+			{
+				scope: 'framework-core',
+				changeKind: 'refactor',
+				paths: ['packages/octane/src/runtime.ts'],
+			},
+			true,
+		);
+
+		expect(plan.performanceSensitive).toBe(true);
+		expect(plan.requiredSkills).toEqual([
+			'build-octane-software',
+			'octane-core-extend',
+			'performance-audit',
+		]);
+		expect(plan.gates.performance).toContain(
+			'Identify hot paths and record a relevant baseline before editing.',
+		);
+		expect(plan.gates.selfReview).toContain(
+			'Resolve findings, rerun affected checks, and repeat the review on the final diff.',
+		);
+		expect(plan.validationCommands).toContain('node benchmarks/bench.mjs --quick --ratios');
+	});
+
+	it('blocks framework-core plans when maintainer tools are unavailable', () => {
+		const plan = engineeringPlanFor({ scope: 'framework-core', changeKind: 'bug' });
+
+		expect(plan.requiredSkills).toEqual(['build-octane-software']);
+		expect(plan.blockingConditions).toContain(
+			'Framework-core work requires the MCP server to run against an Octane monorepo checkout. Set OCTANE_REPO_ROOT, reconnect, and request this plan again so maintainer skills and repository validation are available.',
+		);
+		expect(plan.gates.correctness).toContain(
+			'Reproduce the bug through a realistic public boundary and verify that the test has a credible pre-fix failure.',
+		);
+	});
+
+	it('keeps performance gates and validation commands aligned', () => {
+		const performancePlan = engineeringPlanFor(
+			{ scope: 'application', changeKind: 'performance' },
+			true,
+		);
+		const flaggedPlan = engineeringPlanFor(
+			{ scope: 'library', changeKind: 'feature', performanceSensitive: true },
+			true,
+		);
+
+		for (const plan of [performancePlan, flaggedPlan]) {
+			expect(plan.performanceSensitive).toBe(true);
+			expect(plan.gates.performance).toContain(
+				'Identify hot paths and record a relevant baseline before editing.',
+			);
+			expect(plan.validationCommands).toContain('node benchmarks/bench.mjs --quick --ratios');
+		}
+	});
+
+	it('advertises the engineering gates during MCP initialization', async () => {
+		const server = createServer({ repoRoot: resolve(PACKAGE_ROOT, '../..') });
+		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });
+		const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+
+		try {
+			await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+			expect(client.getInstructions()).toContain(
+				'Before creating or materially changing Octane software',
+			);
+			expect(client.getInstructions()).toContain('establish a relevant baseline before editing');
+
+			const tools = await client.listTools();
+			expect(tools.tools.map((tool) => tool.name)).toContain('octane_engineering_plan');
+		} finally {
+			await client.close();
+			await server.close();
+		}
 	});
 
 	it('detects the octane monorepo for repo-mode tools', async () => {

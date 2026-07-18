@@ -15,6 +15,8 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
    - Scenario: mount, update, keyed reorder, context, effects, Suspense, hydration, SSR, binding package.
    - Metric: runtime duration, allocations, DOM operations, bundle size, compiler output size, benchmark score.
    - Baseline: current `main`, previous commit, React, Solid/Ripple comparison, or documented expectation.
+   - Semantic control: the output, identity, ordering, or lifecycle result that
+     proves both candidates perform the same work.
 
 2. **Choose harness**
    - Existing benchmarks: `benchmarks/news`, `js-framework`, `recursive-context`, `signal-favoring`, `dbmon`.
@@ -27,6 +29,10 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
    - Run multiple iterations.
    - Record environment and command.
    - Avoid mixing dependency install/build changes with code changes.
+   - Use the same commit inputs, runner options, and machine state. Do not compare
+     a quick smoke result with a full result.
+   - Treat a delta inside observed variance as inconclusive. Prefer ratio guards
+     and deterministic counters when wall-clock noise is larger than the claim.
 
 4. **Diagnose**
    - Runtime hot paths: scheduler queues, effect flushing, keyed reconciliation, event delegation, context propagation, refs.
@@ -37,6 +43,15 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
    - Prefer measurable changes with a regression test/benchmark note.
    - Preserve correctness over micro-optimizations.
    - Document tradeoffs and residual risk.
+
+6. **Challenge the conclusion**
+   - Inspect whether work was shifted to startup, compilation, hydration,
+     garbage collection, or a less visible branch rather than removed.
+   - Check allocation lifetime and invalidation for new caches or memoization.
+   - Attempt a workload that should make the proposed improvement disappear; if
+     it does not, look for a harness or measurement error.
+   - Re-run the final candidate after self-review changes. Never report a stale
+     intermediate measurement as the final result.
 
 ## Report template
 
@@ -55,6 +70,11 @@ Use this to investigate performance regressions, benchmark results, scheduler/re
 
 ## Validation
 - ...
+
+## Confidence and residual risk
+- Noise/variance: ...
+- Modes not measured: ...
+- Alternative explanation considered: ...
 ```
 
 ## Common pitfalls
