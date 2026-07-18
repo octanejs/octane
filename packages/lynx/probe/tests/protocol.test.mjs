@@ -140,6 +140,66 @@ test('protocol validation rejects an ancestor cycle before exposing native mutat
 	assert.equal(papi.flushCount, 1);
 });
 
+test('append validation rejects conflicting staged and committed parents before native mutation', () => {
+	const dom = new JSDOM('<!doctype html><html><body></body></html>');
+	installLynxTestingEnv(globalThis, { window: dom.window });
+	activeEnvironment = globalThis.lynxTestingEnv;
+	activeEnvironment.switchToMainThread();
+
+	const papi = createPhase0PAPIAdapter(globalThis);
+	const receiver = createPhase0MainThreadReceiver(papi);
+	const beforeMount = papi.page.outerHTML;
+	const createTree = [
+		{ type: 'create', id: 'first', hostType: 'view', parentId: 'page' },
+		{ type: 'create', id: 'second', hostType: 'view', parentId: 'page' },
+		{ type: 'create', id: 'child', hostType: 'view', parentId: 'first' },
+		{ type: 'append', parentId: 'first', childId: 'child' },
+		{ type: 'append', parentId: 'page', childId: 'first' },
+		{ type: 'append', parentId: 'page', childId: 'second' },
+	];
+
+	assert.throws(
+		() =>
+			receiver.receive({
+				...PHASE_0_PROTOCOL,
+				type: 'commit',
+				version: 1,
+				commands: [
+					...createTree,
+					{ type: 'append', parentId: 'second', childId: 'child' },
+				],
+			}),
+		/host "child" is already attached to "first"/,
+	);
+	assert.equal(papi.page.outerHTML, beforeMount);
+	assert.equal(receiver.acceptedVersion, 0);
+	assert.equal(papi.flushCount, 0);
+
+	receiver.receive({
+		...PHASE_0_PROTOCOL,
+		type: 'commit',
+		version: 1,
+		commands: createTree,
+	});
+	const beforeReparent = papi.page.outerHTML;
+	const child = receiver.getHost('child');
+
+	assert.throws(
+		() =>
+			receiver.receive({
+				...PHASE_0_PROTOCOL,
+				type: 'commit',
+				version: 2,
+				commands: [{ type: 'append', parentId: 'second', childId: 'child' }],
+			}),
+		/host "child" is already attached to "first"/,
+	);
+	assert.equal(papi.page.outerHTML, beforeReparent);
+	assert.equal(receiver.getHost('child'), child);
+	assert.equal(receiver.acceptedVersion, 1);
+	assert.equal(papi.flushCount, 1);
+});
+
 function acknowledge(batch) {
 	return {
 		...PHASE_0_PROTOCOL,

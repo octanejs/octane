@@ -13,11 +13,11 @@
       "cwd": "packages/lynx/probe",
       "status": "passed",
       "result": {
-        "tests": 11,
-        "passed": 11,
+        "tests": 12,
+        "passed": 12,
         "failed": 0
       },
-      "scope": "Runs the probe source in @lynx-js/testing-environment with jsdom. It proves a page/view/text tree after either main-first or background-first startup, cancellation before main readiness, one acknowledged tap-driven background update, teardown while a mount acknowledgement is pending, validation-before-mutation for invalid and structurally stale batches, and that background state remains at its last acknowledged value while a commit is pending or rejected. It does not execute the encoded .lynx.bundle."
+      "scope": "Runs the probe source in @lynx-js/testing-environment with jsdom. It proves a page/view/text tree after either main-first or background-first startup, cancellation before main readiness, one acknowledged tap-driven background update, teardown while a mount acknowledgement is pending, validation-before-mutation for invalid, structurally stale, and conflicting-parent batches, and that background state remains at its last acknowledged value while a commit is pending or rejected. It does not execute the encoded .lynx.bundle."
     },
     {
       "command": "npm run verify:build",
@@ -27,8 +27,8 @@
         "bundleBytes": {
           "imperative.lynx.bundle": 3246,
           "imperative.web.bundle": 2872,
-          "main.lynx.bundle": 14106,
-          "main.web.bundle": 13535
+          "main.lynx.bundle": 14230,
+          "main.web.bundle": 13669
         },
         "decodedEngineVersion": "3.9",
         "rsbuildVersions": ["2.1.4"],
@@ -88,8 +88,8 @@
     },
     {
       "path": "packages/lynx/probe/dist/main.lynx.bundle",
-      "bytes": 14106,
-      "sha256": "ddc41f935dc6e6e0b680e480e40da4767ac85446d909c3617cb353dc65d90aaa",
+      "bytes": 14230,
+      "sha256": "3db9e3c77bded72cddebf043373925e1656879188886086d6de602d98a6c64c6",
       "evidence": [
         "tasm decode succeeded",
         "decoded engine-version is 3.9",
@@ -101,8 +101,8 @@
     },
     {
       "path": "packages/lynx/probe/dist/main.web.bundle",
-      "bytes": 13535,
-      "sha256": "22f354263acced1d5c9beb84143aadd5b538d9083426f3ba221d45d486663aaa",
+      "bytes": 13669,
+      "sha256": "dd0ac3b541a21d725f2ccce293d80b84941254dca8a7cb3707bc2a336efe21fa",
       "evidence": [
         "main-thread.js reference exists",
         "background.js reference exists",
@@ -113,13 +113,13 @@
   "baselineStatus": {
     "transportedNativeBundleBytes": {
       "status": "captured",
-      "value": 14106,
+      "value": 14230,
       "unit": "bytes",
       "qualification": "Single local production artifact; no regression budget is ratified."
     },
     "transportedWebBundleBytes": {
       "status": "captured",
-      "value": 13535,
+      "value": 13669,
       "unit": "bytes",
       "qualification": "Single local production artifact; no regression budget is ratified."
     },
@@ -161,14 +161,14 @@
     },
     "imperativePapiComparison": {
       "status": "bundle-bytes-only",
-      "reason": "The direct-PAPI native/Web controls are 3246/2872 bytes versus 14106/13535 bytes for the transported probe. Both Web controls fail before rendering, and no engine timing is available."
+      "reason": "The direct-PAPI native/Web controls are 3246/2872 bytes versus 14230/13669 bytes for the transported probe. Both Web controls fail before rendering, and no engine timing is available."
     }
   },
   "gates": [
     {
       "id": "source-testing-environment",
       "status": "passed",
-      "evidence": "Eleven Node tests passed using @lynx-js/testing-environment@0.3.0, including both startup orders and cancellation before main readiness."
+      "evidence": "Twelve Node tests passed using @lynx-js/testing-environment@0.3.0, including both startup orders, cancellation before main readiness, and rejection of conflicting parent links before native mutation."
     },
     {
       "id": "production-bundle-encoding",

@@ -281,6 +281,11 @@ function validateCommand(command, knownHosts, parents) {
 			);
 			ancestorId = parents.get(ancestorId);
 		}
+		const existingParentId = parents.get(command.childId);
+		invariant(
+			existingParentId === undefined || existingParentId === command.parentId,
+			`host ${JSON.stringify(command.childId)} is already attached to ${JSON.stringify(existingParentId)}.`,
+		);
 		parents.set(command.childId, command.parentId);
 		return;
 	}
