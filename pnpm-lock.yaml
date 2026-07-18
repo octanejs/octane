@@ -4070,11 +4070,11 @@ importers:
         specifier: workspace:*
         version: link:../packages/visx
       '@tanstack/octane-router':
-        specifier: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654
-        version: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)
+        specifier: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb
+        version: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)
       '@tanstack/octane-start':
-        specifier: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654
-        version: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(octane@packages+octane)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+        specifier: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@9e747219bb55ef4471daac5c16f09bf87efd07cb
+        version: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@9e747219bb55ef4471daac5c16f09bf87efd07cb(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(octane@packages+octane)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       octane:
         specifier: workspace:*
         version: link:../packages/octane
@@ -6128,34 +6128,34 @@ packages:
     resolution: {integrity: sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-mkKK62CCjEXt8sUpGlE+Ywx5Gs6QubJjxlnquGX0FEq8Sga5C1I0uQh+0//TkJAQymFUaWtxKHrYWkjSSTAahQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/history@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-mkKK62CCjEXt8sUpGlE+Ywx5Gs6QubJjxlnquGX0FEq8Sga5C1I0uQh+0//TkJAQymFUaWtxKHrYWkjSSTAahQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/history@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.162.0
     engines: {node: '>=20.19'}
 
-  '@tanstack/octane-router@https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-TgIT7HcMRnm8rKnJidT0pgdes+r1Xjq3H4xIlYC7zOyGVcOIKl6C+jcymOp5FmF42KQKT6qh14hy+M2Nz3P8yQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/octane-router@https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-Vbf5Z1hjAlVJGvTa8hQbcYLKSo3CkfbF3Qcx2rTPNl69BTcnKEYWMuAw/ivoubCzKDPMSlDbaq5Z6YHMkXEdjg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.170.18
     engines: {node: '>=22'}
     peerDependencies:
       octane: '>=0.1.8'
 
-  '@tanstack/octane-start-client@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-7s/NmHXqca+lQbS1fWstAgiIYrMhMp8tD/vl5knstvFlmnWrdPsafnBxvDqkLbM0wRgt37NtJe9HMWchTguo3A==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/octane-start-client@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-vaPcV+DpOGmnrJfr4dx5eVCJFBJG2RODmqXBBTUd4wvUJtHVRjjptE2Bvnpn6mOTJlqjYTTiCaGYbcFhoyrt/A==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.168.16
     engines: {node: '>=22.12.0'}
     peerDependencies:
       octane: '>=0.1.8'
 
-  '@tanstack/octane-start-server@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-XrwInh7LJHO1yrMPUL8kbc7LbhOBhytTqPfDTNNUYP8SRgpG9uHujVkzo4eDZ7BQP6cIYMlI7+/y+jJxzYTJng==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/octane-start-server@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-jluYRtmwO9VBrpHDc0Vbxl4Cc7ntGh9G+wx+fj8wdeyQo/anXHs0YexCS5fHXqsageMwQzQWYHs0BLCvk37bng==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.167.22
     engines: {node: '>=22.12.0'}
     peerDependencies:
       octane: '>=0.1.8'
 
-  '@tanstack/octane-start@https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-+8ELBjLWDuWgnwxHrELW/4gKzSd+QEpxDdsCgfw3c1mqeErOHU9L56Ib/rSJNLt1z5sZeHAeAIyUhqf/VvIePg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/octane-start@https://pkg.pr.new/TanStack/router/@tanstack/octane-start@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-DByfuwJjeuJQeanKTwzja8to6hqrNWcgepFaUxy7/obOZmjlHc1r9pAi9lodTjR/7A8bHPeFoXHUvKIg8NWDTg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.168.28
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6222,18 +6222,18 @@ packages:
     resolution: {integrity: sha512-+NOwEj1kO/6IGmpHRIZHasYxYWpyBQGNIZAST9aNrk9Q3YlU9SgqVnl1pbLa9qAKfeNdXQIRve0RQb/0kyDeDA==}
     engines: {node: '>=20.19'}
 
-  '@tanstack/router-core@https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-NZKD8DhXUwpsUZbzY2Ru1uiqEzBcC26NWcfalngKH7xWvRZcJKSIWWmbOdkh7vYTxY2HzVNxB3VymfM0FR5mPQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/router-core@https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-FqQdxs2AjUXHjuik+/vfBBC1OJKp1xfNl7XS6pPKtm456Nab0V0gKxbilq3iubfHVlK6JnksUHuu4nRNf3833g==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.171.15
     engines: {node: '>=20.19'}
 
-  '@tanstack/router-generator@https://pkg.pr.new/TanStack/router/@tanstack/router-generator@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-sDu80z9w1RRsT+uGbUSpAOUUvcAQRqSeyHs3H98vgDDQMYFx4vFTIVh+JA7fnd3C2vySrT0W5oW5hvNLvCRvEQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-generator@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/router-generator@https://pkg.pr.new/TanStack/router/@tanstack/router-generator@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-f2IpJJruvUiGLIH6B3OCiq8eQY17d2q8+sFPtZ2R3o3gNSPetnz9nt+vhqb8bUDJtXz1lMual/A0jM2p0BC9bA==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-generator@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.167.21
     engines: {node: '>=20.19'}
 
-  '@tanstack/router-plugin@https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-Senlw+yjbiQI7jXUwLoWPiSS7wuFDD7wa3Qu0yZoWMOMzF0FXM0aF+I5a9OL7X+P05nkz3aPn30m7mA2oyCdoQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/router-plugin@https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-NOc8yO4AB4wABNLZzN8fAxiE3No7UG4im2+kNWEEaZue85YJO8IYWH72Wydfj5J2YeLMB4s5oohTByevnRMDxQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.168.22
     engines: {node: '>=20.19'}
     peerDependencies:
@@ -6254,23 +6254,23 @@ packages:
       webpack:
         optional: true
 
-  '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-hTWqJtqIFFdvuCl8WXNyrodp2L9zo2G37xKRrcVmVRWpAB2h+U1LuRAfS4tsFTiWOIoE/B+WDVFB8JpoEdw6jQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-utils@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-hTWqJtqIFFdvuCl8WXNyrodp2L9zo2G37xKRrcVmVRWpAB2h+U1LuRAfS4tsFTiWOIoE/B+WDVFB8JpoEdw6jQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-utils@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.162.2
     engines: {node: '>=20.19'}
 
-  '@tanstack/start-client-core@https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-6D/4mbBDb0nL0Shc012nHviloHCOooE23wLqOHjXjHDkXql1zgc9rAT82VVtkD7sMUXbJ+ok3dqVjbVbtSOw6A==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/start-client-core@https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-CPgJv4sC8YVeeLSLfXizLd9sG2m+F7okJEJ+A8Gv+mJpXCPHGj4pFGczkM8QLtvBgEFWEwfR+6sen0z1PqS3TQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.170.14
     engines: {node: '>=22.12.0'}
 
-  '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-r4Q31CRkQEhaWJnaT+bLC417jHDahvq+j/BB8LozGzGGD5BrKdr4PArE8K5wT+U6+ekmHp2ruVmFZfFTloV2UQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-r4Q31CRkQEhaWJnaT+bLC417jHDahvq+j/BB8LozGzGGD5BrKdr4PArE8K5wT+U6+ekmHp2ruVmFZfFTloV2UQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.162.0
     engines: {node: '>=22.12.0'}
 
-  '@tanstack/start-plugin-core@https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-vSelx+TCK6fuuOOqpq9oLQBJCAtcGAwsInj+ftEeZ9oCHB/b06Rzjw3TLOGCTIO/cssGbM0EUtqOsOsoW/GtKg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/start-plugin-core@https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-DYzWXoHI0YOg5Vmc4/YxciPNxz0SAxbf+eaTlN5HQxbYc/3044/8BPrcSsJ//RvIvBeILIni+3VPnb6pszxJeQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.171.22
     engines: {node: '>=22.12.0'}
     peerDependencies:
@@ -6282,13 +6282,13 @@ packages:
       vite:
         optional: true
 
-  '@tanstack/start-server-core@https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-h+8F4hByIc79xenKA9EK3RT4xjEkFOuEZ6lJ16s2Z+VTrEfndOYnBI+uszHYLrWd1/JFRdogkq2hTBZXl++3Xg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/start-server-core@https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-YHdn33lye04AAhPi+usJ3dSRj8nHH/ZReY1n1SiK7n21MhGPSFJqmN+hqNWCJ+Z07mTEbH3naqcUuIcTskvOYQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.169.17
     engines: {node: '>=22.12.0'}
 
-  '@tanstack/start-storage-context@https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-+doQ0oL+XuYzD3A9XMByc5qqZlrHdNrCwkU8YLtk0ytv+s7nTDONUlLQ0rObaD0T2ZzNyjoZsf/O2cnNEODsTw==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/start-storage-context@https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-5YaIsraIj4bNDc/bFff3aG1JDIuya/33G1j+J3gbwLGdtXiT25dpaAy2L0C1wGUnupizma4JUvhHzbbhKIlR8w==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.167.17
     engines: {node: '>=22.12.0'}
 
@@ -6305,8 +6305,8 @@ packages:
   '@tanstack/virtual-core@3.17.3':
     resolution: {integrity: sha512-8Np/TFELpI0ySuJoVmjvOrQYXH/8sTX0Biv9szhFhY39xOdAAY+smrMxjxOum/ux3eM8MUJQsEJ0/R0UpvC8dw==}
 
-  '@tanstack/virtual-file-routes@https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@49c7ca32cf655f99b695927c0824443dfe250654':
-    resolution: {integrity: sha512-DF/OApa+kSKWYOJRfWz65v4E34Q1LFGmhs2r+oL2a6GLDXXsZmF10KOTrELHL9CY2ETP/GBWq0bGu6RDQ5eCvg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@49c7ca32cf655f99b695927c0824443dfe250654}
+  '@tanstack/virtual-file-routes@https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@9e747219bb55ef4471daac5c16f09bf87efd07cb':
+    resolution: {integrity: sha512-DF/OApa+kSKWYOJRfWz65v4E34Q1LFGmhs2r+oL2a6GLDXXsZmF10KOTrELHL9CY2ETP/GBWq0bGu6RDQ5eCvg==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@9e747219bb55ef4471daac5c16f09bf87efd07cb}
     version: 1.162.0
     engines: {node: '>=20.19'}
 
@@ -12315,40 +12315,40 @@ snapshots:
 
   '@tanstack/history@1.162.0': {}
 
-  '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@49c7ca32cf655f99b695927c0824443dfe250654': {}
+  '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@9e747219bb55ef4471daac5c16f09bf87efd07cb': {}
 
-  '@tanstack/octane-router@https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)':
+  '@tanstack/octane-router@https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)':
     dependencies:
-      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
       '@tanstack/store': 0.9.3
       isbot: 5.1.43
       octane: link:packages/octane
 
-  '@tanstack/octane-start-client@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)':
+  '@tanstack/octane-start-client@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)':
     dependencies:
-      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
       octane: link:packages/octane
 
-  '@tanstack/octane-start-server@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@49c7ca32cf655f99b695927c0824443dfe250654(crossws@0.4.10(srvx@0.11.22))(octane@packages+octane)':
+  '@tanstack/octane-start-server@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@9e747219bb55ef4471daac5c16f09bf87efd07cb(crossws@0.4.10(srvx@0.11.22))(octane@packages+octane)':
     dependencies:
-      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@49c7ca32cf655f99b695927c0824443dfe250654(crossws@0.4.10(srvx@0.11.22))
+      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@9e747219bb55ef4471daac5c16f09bf87efd07cb(crossws@0.4.10(srvx@0.11.22))
       octane: link:packages/octane
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/octane-start@https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(octane@packages+octane)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
+  '@tanstack/octane-start@https://pkg.pr.new/TanStack/router/@tanstack/octane-start@9e747219bb55ef4471daac5c16f09bf87efd07cb(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(octane@packages+octane)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
-      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)
-      '@tanstack/octane-start-client': https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@49c7ca32cf655f99b695927c0824443dfe250654(octane@packages+octane)
-      '@tanstack/octane-start-server': https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@49c7ca32cf655f99b695927c0824443dfe250654(crossws@0.4.10(srvx@0.11.22))(octane@packages+octane)
-      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-plugin-core': https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@49c7ca32cf655f99b695927c0824443dfe250654(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
-      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@49c7ca32cf655f99b695927c0824443dfe250654(crossws@0.4.10(srvx@0.11.22))
+      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)
+      '@tanstack/octane-start-client': https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@9e747219bb55ef4471daac5c16f09bf87efd07cb(octane@packages+octane)
+      '@tanstack/octane-start-server': https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@9e747219bb55ef4471daac5c16f09bf87efd07cb(crossws@0.4.10(srvx@0.11.22))(octane@packages+octane)
+      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-plugin-core': https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@9e747219bb55ef4471daac5c16f09bf87efd07cb(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@9e747219bb55ef4471daac5c16f09bf87efd07cb(crossws@0.4.10(srvx@0.11.22))
       octane: link:packages/octane
       pathe: 2.0.3
     optionalDependencies:
@@ -12427,19 +12427,19 @@ snapshots:
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
 
-  '@tanstack/router-core@https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654':
+  '@tanstack/router-core@https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb':
     dependencies:
-      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@9e747219bb55ef4471daac5c16f09bf87efd07cb
       cookie-es: 3.1.1
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
 
-  '@tanstack/router-generator@https://pkg.pr.new/TanStack/router/@tanstack/router-generator@49c7ca32cf655f99b695927c0824443dfe250654':
+  '@tanstack/router-generator@https://pkg.pr.new/TanStack/router/@tanstack/router-generator@9e747219bb55ef4471daac5c16f09bf87efd07cb':
     dependencies:
       '@babel/types': 7.29.7
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/virtual-file-routes': https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/virtual-file-routes': https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@9e747219bb55ef4471daac5c16f09bf87efd07cb
       jiti: 2.7.0
       magic-string: 0.30.21
       prettier: 3.8.4
@@ -12447,14 +12447,14 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@49c7ca32cf655f99b695927c0824443dfe250654(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
+  '@tanstack/router-plugin@https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@9e747219bb55ef4471daac5c16f09bf87efd07cb(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/template': 7.29.7
       '@babel/types': 7.29.7
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-generator': https://pkg.pr.new/TanStack/router/@tanstack/router-generator@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-generator': https://pkg.pr.new/TanStack/router/@tanstack/router-generator@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@9e747219bb55ef4471daac5c16f09bf87efd07cb
       chokidar: 5.0.0
       unplugin: 3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       zod: 4.4.3
@@ -12472,7 +12472,7 @@ snapshots:
       - supports-color
       - unloader
 
-  '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@49c7ca32cf655f99b695927c0824443dfe250654':
+  '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@9e747219bb55ef4471daac5c16f09bf87efd07cb':
     dependencies:
       '@babel/generator': 7.29.7
       '@babel/parser': 7.29.7
@@ -12485,25 +12485,25 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/start-client-core@https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@49c7ca32cf655f99b695927c0824443dfe250654':
+  '@tanstack/start-client-core@https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@9e747219bb55ef4471daac5c16f09bf87efd07cb':
     dependencies:
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-fn-stubs': https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-storage-context': https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-fn-stubs': https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-storage-context': https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@9e747219bb55ef4471daac5c16f09bf87efd07cb
       seroval: 1.5.4
 
-  '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@49c7ca32cf655f99b695927c0824443dfe250654': {}
+  '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@9e747219bb55ef4471daac5c16f09bf87efd07cb': {}
 
-  '@tanstack/start-plugin-core@https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@49c7ca32cf655f99b695927c0824443dfe250654(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
+  '@tanstack/start-plugin-core@https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@9e747219bb55ef4471daac5c16f09bf87efd07cb(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@babel/code-frame': 7.27.1
       '@babel/core': 7.29.7
       '@babel/types': 7.29.7
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-generator': https://pkg.pr.new/TanStack/router/@tanstack/router-generator@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-plugin': https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@49c7ca32cf655f99b695927c0824443dfe250654(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
-      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@49c7ca32cf655f99b695927c0824443dfe250654(crossws@0.4.10(srvx@0.11.22))
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-generator': https://pkg.pr.new/TanStack/router/@tanstack/router-generator@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-plugin': https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@9e747219bb55ef4471daac5c16f09bf87efd07cb(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@9e747219bb55ef4471daac5c16f09bf87efd07cb(crossws@0.4.10(srvx@0.11.22))
       exsolve: 1.1.0
       lightningcss: 1.32.0
       pathe: 2.0.3
@@ -12533,21 +12533,21 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/start-server-core@https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@49c7ca32cf655f99b695927c0824443dfe250654(crossws@0.4.10(srvx@0.11.22))':
+  '@tanstack/start-server-core@https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@9e747219bb55ef4471daac5c16f09bf87efd07cb(crossws@0.4.10(srvx@0.11.22))':
     dependencies:
-      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@49c7ca32cf655f99b695927c0824443dfe250654
-      '@tanstack/start-storage-context': https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
+      '@tanstack/start-storage-context': https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@9e747219bb55ef4471daac5c16f09bf87efd07cb
       fetchdts: 0.1.7
       h3-v2: h3@2.0.1-rc.20(crossws@0.4.10(srvx@0.11.22))
       seroval: 1.5.4
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/start-storage-context@https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@49c7ca32cf655f99b695927c0824443dfe250654':
+  '@tanstack/start-storage-context@https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@9e747219bb55ef4471daac5c16f09bf87efd07cb':
     dependencies:
-      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@49c7ca32cf655f99b695927c0824443dfe250654
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@9e747219bb55ef4471daac5c16f09bf87efd07cb
 
   '@tanstack/store@0.11.0': {}
 
@@ -12557,7 +12557,7 @@ snapshots:
 
   '@tanstack/virtual-core@3.17.3': {}
 
-  '@tanstack/virtual-file-routes@https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@49c7ca32cf655f99b695927c0824443dfe250654': {}
+  '@tanstack/virtual-file-routes@https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@9e747219bb55ef4471daac5c16f09bf87efd07cb': {}
 
   '@testing-library/dom@10.4.1':
     dependencies:

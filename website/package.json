@@ -17,8 +17,8 @@
     "@codemirror/view": "catalog:default",
     "@octanejs/mdx": "workspace:*",
     "@octanejs/visx": "workspace:*",
-    "@tanstack/octane-router": "https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654",
-    "@tanstack/octane-start": "https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654",
+    "@tanstack/octane-router": "https://pkg.pr.new/TanStack/router/@tanstack/octane-router@9e747219bb55ef4471daac5c16f09bf87efd07cb",
+    "@tanstack/octane-start": "https://pkg.pr.new/TanStack/router/@tanstack/octane-start@9e747219bb55ef4471daac5c16f09bf87efd07cb",
     "shiki": "catalog:default"
   },
   "devDependencies": {
