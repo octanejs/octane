@@ -4,7 +4,7 @@
 // Below 720px the left link row collapses behind a hamburger into a dropdown
 // panel, while search and the social icons stay in the bar as icons.
 import { useState } from 'octane';
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { DocsSearch } from './DocsSearch.tsrx';
 import logoUrl from '../assets/octane-logo.svg';
 import xUrl from '../assets/x.svg';

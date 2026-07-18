@@ -1076,7 +1076,7 @@ function vtMarkDirtyFromCurrentBlock(): void {
 function vtRangeElements(block: Block): Element[] {
 	const els: Element[] = [];
 	if (block.startMarker !== null && block.endMarker !== null) {
-		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker;) {
+		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker; ) {
 			if (n.nodeType === 1) els.push(n as Element);
 			n = n.nextSibling;
 		}
@@ -3870,7 +3870,8 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 				if (stageTransitionValue(s!, block, operation, computed)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
-							TransitionActionUpdate<T> | undefined;
+							| TransitionActionUpdate<T>
+							| undefined;
 						if (update !== undefined) {
 							update.profileType = 'state';
 							update.profileSlot = slot;
@@ -4008,7 +4009,8 @@ export function useReducer<S, A, I = S>(
 				if (stageTransitionValue(s!, block, operation, computed, true)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
-							TransitionActionUpdate<S> | undefined;
+							| TransitionActionUpdate<S>
+							| undefined;
 						if (update !== undefined) {
 							update.profileType = 'reducer';
 							update.profileSlot = slot;
@@ -5488,7 +5490,8 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 				(lazyWrapper as any).__compare = (prev: any, next: any): boolean => {
 					const current = resolveLazyModule(result);
 					const compare = (current as any).__compare as
-						((previous: any, incoming: any) => boolean) | undefined;
+						| ((previous: any, incoming: any) => boolean)
+						| undefined;
 					const previous = lazyResolvedProps(current, prev);
 					const incoming = lazyResolvedProps(current, next);
 					return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
@@ -8920,7 +8923,7 @@ function dispatchDelegatedCapture(event: Event): void {
 	maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const path: any[] = [];
-	for (let node = event.target as any; node !== null && node !== undefined;) {
+	for (let node = event.target as any; node !== null && node !== undefined; ) {
 		path.push(node);
 		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
 	}
@@ -15416,7 +15419,8 @@ export function useTransition(
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as
-		{ isPending: boolean; start: (fn: () => void | Promise<unknown>) => void } | undefined;
+		| { isPending: boolean; start: (fn: () => void | Promise<unknown>) => void }
+		| undefined;
 	if (s === undefined) {
 		const slotRef = { isPending: false, start: startTransition };
 		s = slotRef;
@@ -18982,7 +18986,7 @@ export function hydrateRoot(
 	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
 	// are protocol sidecars rather than authored component output, so remove only
 	// direct children carrying the renderer-owned marker before root adoption.
-	for (let child = container.firstElementChild; child !== null;) {
+	for (let child = container.firstElementChild; child !== null; ) {
 		const next = child.nextElementSibling;
 		if (child.localName === 'script' && child.hasAttribute(STREAM_SCRIPT_ATTR)) child.remove();
 		child = next;

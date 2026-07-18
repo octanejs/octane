@@ -1,7 +1,8 @@
-import { defineConfig, type Plugin, type ResolvedConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import { createRequire } from 'node:module';
-import { octane } from '@octanejs/vite-plugin';
 import { octaneMdx } from '@octanejs/mdx/vite';
+import { tanstackStart } from '@tanstack/octane-start/plugin/vite';
+import { nitro } from 'nitro/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
 
 // The playground executes user code in a sandboxed iframe with an OPAQUE
@@ -13,7 +14,6 @@ import { websiteMdxOptions } from './mdx-options.ts';
 // stable-named client asset in the production build.
 function playgroundRuntime(): Plugin {
 	const RUNTIME_PATH = '/playground-runtime.mjs'; // = RUNTIME_MODULE_PATH in playground-sandbox.ts
-	let config: ResolvedConfig;
 
 	async function bundle(): Promise<string> {
 		const esbuild = await import('esbuild');
@@ -33,9 +33,6 @@ function playgroundRuntime(): Plugin {
 
 	return {
 		name: 'octane-playground-runtime',
-		configResolved(resolved) {
-			config = resolved;
-		},
 		configureServer(server) {
 			server.middlewares.use(RUNTIME_PATH, (_req, res, next) => {
 				// Rebuilt per request — esbuild bundles the runtime in ~15ms, and
@@ -47,7 +44,7 @@ function playgroundRuntime(): Plugin {
 			});
 		},
 		async generateBundle() {
-			if (config.build.ssr) return; // client build only
+			if (this.environment.name !== 'client') return;
 			this.emitFile({
 				type: 'asset',
 				fileName: RUNTIME_PATH.slice(1),
@@ -60,9 +57,10 @@ function playgroundRuntime(): Plugin {
 export default defineConfig({
 	plugins: [
 		playgroundRuntime(),
-		// octaneMdx() owns `.mdx` (full pipeline: @mdx-js/mdx → octane compile,
-		// with Shiki highlighting via rehype); octane() owns `.tsrx`/`.ts` and the
-		// metaframework (dev SSR + routing + hydrate). The workspace bindings'
+		// octaneMdx() owns `.mdx` (full pipeline: @mdx-js/mdx → Octane compile,
+		// with Shiki highlighting via rehype). tanstackStart() supplies the Octane
+		// compiler plus file routing, SSR, hydration, and the Start runtime. The
+		// workspace bindings'
 		// hand-slot-forwarding sources (pnpm symlinks resolve them to
 		// /packages/*/src, not node_modules) declare
 		// `"octane": { "hookSlots": { "manual": ["src"] } }` in their package.json, so the
@@ -70,7 +68,28 @@ export default defineConfig({
 		// Bindings without a manual hook-slot declaration still compile through
 		// the pass (explicit subSlot tags compose with it), unlike router/mdx.
 		octaneMdx(websiteMdxOptions),
-		octane(),
+		tanstackStart(),
+		nitro({
+			// Keep production on the runtime selected by the previous Vercel
+			// adapter instead of deriving it from whichever Node version builds.
+			vercel: {
+				functions: { runtime: 'nodejs24.x' },
+				config: {
+					version: 3,
+					// Apply immutable asset headers, then resolve static files before
+					// falling through to Start's server function.
+					routes: [
+						{
+							src: '/assets/(.*)',
+							headers: { 'cache-control': 'public,max-age=31536000,immutable' },
+							continue: true,
+						},
+						{ handle: 'filesystem' },
+						{ src: '/(.*)', dest: '/__server' },
+					],
+				},
+			},
+		}),
 	],
 
 	optimizeDeps: {
@@ -90,9 +109,9 @@ export default defineConfig({
 			'esrap',
 			'esrap/languages/tsx',
 			'octane > devalue',
-			'@octanejs/tanstack-router > @tanstack/history',
-			'@octanejs/tanstack-router > @tanstack/router-core',
-			'@octanejs/tanstack-router > @tanstack/store',
+			'@tanstack/octane-router > @tanstack/history',
+			'@tanstack/octane-router > @tanstack/router-core',
+			'@tanstack/octane-router > @tanstack/store',
 			// Visx primitives are raw workspace sources; these are the runtime
 			// dependencies reached by the site's Bar/Axis/Group/Scale surface.
 			// Resolve them through their owner under pnpm's isolated layout.
@@ -109,6 +128,9 @@ export default defineConfig({
 
 	server: {
 		port: 5179,
+	},
+	preview: {
+		port: 3000,
 	},
 
 	build: {

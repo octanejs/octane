@@ -33,12 +33,13 @@ describe('seo artifacts', () => {
 	});
 
 	it('ships every icon the head tags and manifest reference', () => {
-		const html = fs.readFileSync(fileURLToPath(new URL('../index.html', import.meta.url)), 'utf-8');
 		const manifest = JSON.parse(read('site.webmanifest'));
-		const referenced = new Set<string>();
-		for (const m of html.matchAll(/(?:href)="\/([^"]+\.(?:ico|png|svg|webmanifest))"/g)) {
-			referenced.add(m[1]);
-		}
+		const referenced = new Set<string>([
+			'favicon.ico',
+			'favicon.svg',
+			'apple-touch-icon.png',
+			'site.webmanifest',
+		]);
 		for (const icon of manifest.icons) referenced.add(icon.src.replace(/^\//, ''));
 		expect(referenced.size).toBeGreaterThanOrEqual(5);
 		for (const file of referenced) {

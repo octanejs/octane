@@ -2,7 +2,7 @@
 // the live twin of that sample (HeroDemo) running underneath it. The sample is
 // an .mdx module so it rides the same Shiki pipeline as the docs.
 import { useRef, useState } from 'octane';
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import CodeSample from '../../../content/home-sample.mdx';
 import { HeroDemo } from '../../../components/HeroDemo.tsrx';
 import copyUrl from '../../../assets/copy.svg';

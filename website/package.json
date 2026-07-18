@@ -7,18 +7,18 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "octane-preview"
+    "preview": "vite preview --port 3000",
+    "start": "node .output/server/index.mjs"
   },
   "dependencies": {
     "octane": "workspace:*",
     "@codemirror/commands": "catalog:default",
     "@codemirror/state": "catalog:default",
     "@codemirror/view": "catalog:default",
-    "@octanejs/adapter-vercel": "workspace:*",
     "@octanejs/mdx": "workspace:*",
-    "@octanejs/tanstack-router": "workspace:*",
     "@octanejs/visx": "workspace:*",
-    "@octanejs/vite-plugin": "workspace:*",
+    "@tanstack/octane-router": "https://pkg.pr.new/TanStack/router/@tanstack/octane-router@49c7ca32cf655f99b695927c0824443dfe250654",
+    "@tanstack/octane-start": "https://pkg.pr.new/TanStack/router/@tanstack/octane-start@49c7ca32cf655f99b695927c0824443dfe250654",
     "shiki": "catalog:default"
   },
   "devDependencies": {
@@ -26,6 +26,7 @@
     "@shikijs/rehype": "catalog:default",
     "@tsrx/core": "catalog:default",
     "esrap": "catalog:default",
+    "nitro": "^3.0.260311-beta",
     "playwright": "catalog:default",
     "typescript": "catalog:default",
     "vite": "catalog:default"

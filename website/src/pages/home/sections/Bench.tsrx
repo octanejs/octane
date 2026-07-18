@@ -1,6 +1,6 @@
 // Benchmark teaser: @octanejs/recharts over the checked-in scores
 // (content/benchmarks.ts) — the full set lives at /benchmarks.
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { BenchBars } from '../../../components/BenchBars.tsrx';
 import { HOME_SUMMARY } from '../../../content/benchmarks.ts';
 

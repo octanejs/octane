@@ -1672,21 +1672,16 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 					// ssr-smoke and ssr-hydration.e2e both run a REAL production
-					// `vite build` into the same output roots (website/dist,
-					// website/.vercel/output) and the e2e file then serves that
-					// output with octane-preview. Running the files in parallel
+					// `vite build` into website/.output and the e2e file then serves
+					// that Nitro output. Running the files in parallel
 					// would let one build delete/rewrite artifacts the other is
 					// building or serving, so this project is file-serial by
 					// contract, not by timing.
 					fileParallelism: false,
 				},
-				// The website app stack: octaneMdx() compiles the site's .mdx documents
-				// (same shared options — Shiki + tsrx langAlias — the app itself uses);
-				// octane() compiles the .tsrx pages and slots hooks in app .ts files.
-				// The bindings' own hand-slot-forwarding `.ts` sources are skipped via
-				// their package.json declarations. Package imports (@octanejs/tanstack-router,
-				// octane, …) resolve through website/node_modules workspace links — no
-				// aliases needed.
+				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
+				// routing, and deployment are owned by @tanstack/octane-start; the
+				// official router and Octane runtime resolve through website/node_modules.
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
 			},
 		],

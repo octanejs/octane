@@ -3,14 +3,14 @@
 // local navigation, and the real interactive example embedded in the MDX.
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 
 afterEach(cleanup);
 
 async function renderCoreApis() {
-	const router = makeRouter({
+	const router = getRouter({
 		history: createMemoryHistory({ initialEntries: ['/docs/core-apis'] }),
 	});
 	await router.load();
