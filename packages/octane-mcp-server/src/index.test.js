@@ -149,6 +149,25 @@ describe('@octanejs/mcp-server helpers', () => {
 		);
 	});
 
+	it('keeps performance gates and validation commands aligned', () => {
+		const performancePlan = engineeringPlanFor(
+			{ scope: 'application', changeKind: 'performance' },
+			true,
+		);
+		const flaggedPlan = engineeringPlanFor(
+			{ scope: 'library', changeKind: 'feature', performanceSensitive: true },
+			true,
+		);
+
+		for (const plan of [performancePlan, flaggedPlan]) {
+			expect(plan.performanceSensitive).toBe(true);
+			expect(plan.gates.performance).toContain(
+				'Identify hot paths and record a relevant baseline before editing.',
+			);
+			expect(plan.validationCommands).toContain('node benchmarks/bench.mjs --quick --ratios');
+		}
+	});
+
 	it('advertises the engineering gates during MCP initialization', async () => {
 		const server = createServer({ repoRoot: resolve(PACKAGE_ROOT, '../..') });
 		const client = new Client({ name: 'octane-mcp-test', version: '1.0.0' });

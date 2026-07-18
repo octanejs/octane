@@ -191,7 +191,10 @@ export function engineeringPlanFor(input, repoMode = false) {
 	const paths = input.paths ?? [];
 	const scope = input.scope;
 	const changeKind = input.changeKind ?? 'feature';
-	const performanceSensitive = scope === 'framework-core' || input.performanceSensitive === true;
+	const performanceSensitive =
+		scope === 'framework-core' ||
+		changeKind === 'performance' ||
+		input.performanceSensitive === true;
 	const correctnessGate =
 		changeKind === 'bug'
 			? 'Reproduce the bug through a realistic public boundary and verify that the test has a credible pre-fix failure.'
@@ -244,7 +247,8 @@ export function engineeringPlanFor(input, repoMode = false) {
 		];
 	}
 	if (repoMode) {
-		const taskKind = scope === 'framework-core' ? 'core' : changeKind;
+		const taskKind =
+			scope === 'framework-core' ? 'core' : performanceSensitive ? 'performance' : changeKind;
 		plan.validationCommands = validationFor(paths, taskKind);
 	}
 
