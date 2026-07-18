@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-18",
+  "purpose": "Exact Milestone 0 Lynx toolchain and native SDK pin for the React-free Octane PAPI probe.",
+  "nativeSdk": {
+    "name": "Lynx",
+    "version": "3.9.0",
+    "targetSdkVersion": "3.9",
+    "repository": "https://github.com/lynx-family/lynx",
+    "tag": "3.9.0",
+    "commit": "d7f13487df0d69497148e93b71aded676a8fe243",
+    "releaseUrl": "https://github.com/lynx-family/lynx/releases/tag/3.9.0",
+    "publishedAt": "2026-06-25T11:58:12Z",
+    "selectedAssets": [
+      {
+        "name": "Lynx-3.9.0.zip",
+        "role": "iOS SDK",
+        "sha256": "83eaab6f21656329f13f38e5d119b0f9b0424fccc38a79a9bc4f128b1d97e652"
+      },
+      {
+        "name": "LynxExplorer-arm64.app.tar.gz",
+        "role": "iOS arm64 simulator Explorer",
+        "sha256": "7790f83f69885c5565d451c8c163b870a0b7570a9eef1e4d59ed0b22266abcfa"
+      },
+      {
+        "name": "LynxExplorer-x86_64.app.tar.gz",
+        "role": "iOS x86_64 simulator Explorer",
+        "sha256": "c04c25f265fb87d5c6abda6e4954a465c9f0c295c4183ac7625b5a028a4fae1f"
+      },
+      {
+        "name": "LynxExplorer-noasan-release.apk",
+        "role": "Android Explorer",
+        "sha256": "48a2e19c0fd370a373100b346f81e6670d73bc050f9b1722973c73f70b5bbe82"
+      }
+    ]
+  },
+  "sourceSets": {
+    "lynxStackRelease": {
+      "repository": "https://github.com/lynx-family/lynx-stack",
+      "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "commitDate": "2026-07-16T11:19:30+08:00",
+      "subject": "chore: Release 2026-07-15 14:50:29 (#2921)",
+      "evidence": "The release commit contains the selected compatibility-set manifest versions. The Rspeedy, template, and runtime-wrapper registry packages omit gitHead, so this is a release-source cross-reference rather than a claim that npm published an exact gitHead. The testing-environment package was published earlier and is tied to its package tag separately."
+    },
+    "lynxEnginePackages": {
+      "repository": "https://github.com/lynx-family/lynx",
+      "evidence": "The tasm and types registry packages publish gitHead values independently of the native SDK release tag."
+    }
+  },
+  "packages": [
+    {
+      "name": "@lynx-js/rspeedy",
+      "version": "0.16.0",
+      "role": "Lynx Rsbuild CLI and plugin host",
+      "integrity": "sha512-j9a25T3we1rtkCQtpKwjVD5Gn7E6YlILWu6xTyR0cHoG01Rmln1i2BK9SoTjtt9SKnUVB7i+eHOVRimXMpVwuw==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/rspeedy/-/rspeedy-0.16.0.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/template-webpack-plugin",
+      "version": "0.13.0",
+      "role": "Framework-neutral Lynx template assembly and encoding hooks",
+      "integrity": "sha512-x2PljSowjfdLmu06bsvaMpJ7uQ2Yo4x1+/RAqFdAvEet08VPCZQ8Vq6zMgVul4vxhHeajH6xYMpfw3HS98uLDg==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/template-webpack-plugin/-/template-webpack-plugin-0.13.0.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/runtime-wrapper-webpack-plugin",
+      "version": "0.2.2",
+      "role": "Background-thread module wrapper",
+      "integrity": "sha512-q/T89kpxkZIQgSk2yhTXFYlH1XqE2UzPr/vKhWOk4PBZ8v9gyUco80xCvn4YyA6iSYrd7bO65MBK73gkqIlsng==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/runtime-wrapper-webpack-plugin/-/runtime-wrapper-webpack-plugin-0.2.2.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/cache-events-webpack-plugin",
+      "version": "0.2.0",
+      "role": "Rspeedy lifecycle/event startup cache reference; not installed directly by the probe",
+      "integrity": "sha512-f903x00MMmWB9yIyvACAoe4im0T58JHpKnypV/ccI2gp477RJoCgXPne2x8Obgo3fTOIMHpmNMdnxFW1ej9olQ==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/cache-events-webpack-plugin/-/cache-events-webpack-plugin-0.2.0.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/chunk-loading-webpack-plugin",
+      "version": "0.4.1",
+      "role": "Rspeedy Lynx chunk loader",
+      "integrity": "sha512-vZb2HiZdkVdexs2OhRVZE3FkSUPYRvdnaAKG8y47WW2NlVFj6PHzqEhkqfO1L3dm5CIEsPgOMwzgSs3BHZZ8ig==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/chunk-loading-webpack-plugin/-/chunk-loading-webpack-plugin-0.4.1.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/webpack-runtime-globals",
+      "version": "0.0.7",
+      "role": "Shared Lynx Rspack runtime globals used by the build plugins",
+      "integrity": "sha512-HGWCIX8FMeoeCfUZpijrZO20UVp8wVHj7f+aEiMbx94H2iqIVxLzrCLZudBfvo4+WZ3kdgM8CqhU1EERKhLi0w==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/webpack-runtime-globals/-/webpack-runtime-globals-0.0.7.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/testing-environment",
+      "version": "0.3.0",
+      "role": "Published pure-JavaScript Element PAPI and dual-thread test environment",
+      "integrity": "sha512-a08y6fmEZZHNva/bCs4UT8SavTPFnH8j0wb01gnnC6RA28r0139I5ApjAzaPi+LSaj1pH+A5o41bDts2iV+ulw==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/testing-environment/-/testing-environment-0.3.0.tgz",
+      "sourceCommit": "80e29881aa4edcad1e2abb4bd1603c95404fea25",
+      "sourceCommitKind": "annotated-package-tag"
+    },
+    {
+      "name": "@lynx-js/type-element-api",
+      "version": "0.0.8",
+      "role": "Element PAPI declarations",
+      "integrity": "sha512-5ey2UXcTzC9QiG6SQ+99zEDPkl6VqKDDJ3DN/6RYQhXHYg4bchGE2NRMWj8gjVpzjb9sXp9eP/6B44uvtxUynQ==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/type-element-api/-/type-element-api-0.0.8.tgz",
+      "sourceCommit": "d2cb78e328e4ada305db19277b79dd445c17ad35",
+      "sourceCommitKind": "registry-gitHead"
+    },
+    {
+      "name": "@lynx-js/types",
+      "version": "4.0.0",
+      "role": "Lynx context, lifecycle, event, platform, and intrinsic declarations",
+      "integrity": "sha512-FBtBV8wt+9/CAUbTdZwvbhGjJEnyzKLWVpq5gaTHTbhDztbhdP0avZ0nHD6I5HSgAhzYNB9oDrqMt/r6YqBkng==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/types/-/types-4.0.0.tgz",
+      "sourceCommit": "2f20fed315aaba5f47e14e0f2b0f87c4cb1a64d6",
+      "sourceCommitKind": "registry-gitHead"
+    },
+    {
+      "name": "@lynx-js/tasm",
+      "version": "0.0.39",
+      "role": "Production bundle encoder/decoder used by the template plugin and audit verifier",
+      "integrity": "sha512-FNIV6Cc2K0wCKOHVMfpr3M6kpIZqHHNI02GpVl+h0ClyyK44jxEO+lf58gLFD5E3o0hJ1cp3H2OBIxSUJGkPDw==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/tasm/-/tasm-0.0.39.tgz",
+      "sourceCommit": "70481022a3c3170547bf2045a46ff84bb6234e5a",
+      "sourceCommitKind": "registry-gitHead"
+    },
+    {
+      "name": "@rsbuild/core",
+      "version": "2.1.4",
+      "role": "Exact Rsbuild core required by Rspeedy 0.16.0",
+      "integrity": "sha512-kdubx/qB6tXduCdqaW78OULLZJ3ludpuA4mOkDko18THsI1rUy9U34DsaDSnotE8GAvTeme+FX9MnqLEUlg8kQ==",
+      "tarball": "https://registry.npmjs.org/@rsbuild/core/-/core-2.1.4.tgz"
+    },
+    {
+      "name": "@rspack/core",
+      "version": "2.1.3",
+      "role": "Exact Rspack core selected by the Lynx-stack release override",
+      "integrity": "sha512-1iGnxLrP+iyY0ZSjLZeQTaxrISpQz4yLyqJPmaF/l4uw27/dBcrloszAeLOJQ9jiv7EJtU0T5zB+LOFPpivIxA==",
+      "tarball": "https://registry.npmjs.org/@rspack/core/-/core-2.1.3.tgz"
+    },
+    {
+      "name": "@lynx-js/web-core",
+      "version": "0.22.2",
+      "role": "Probe-only Lynx Web host",
+      "integrity": "sha512-pJY0/h/7GcP6O2NYAwpTXe8ZT5tAq91aECSvRcAyvS/7YCW/3JMYuOtZLgOfF+Nan45PjSMVLn5NmLx9cSRj7Q==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/web-core/-/web-core-0.22.2.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "npm-provenance-and-annotated-package-tag"
+    }
+  ],
+  "referenceOnlyPackages": [
+    {
+      "name": "@lynx-js/react",
+      "version": "0.123.0",
+      "role": "Behavioral oracle only; forbidden from the probe dependency graph",
+      "integrity": "sha512-w/yX20jmGMdpfuNb2w7eyXN3JktSka43QdJwICvteNBZJPkZUzauvUvQ2EOqT09RHPHzMkcnk0AlpHOh7g+VoQ==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/react/-/react-0.123.0.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    },
+    {
+      "name": "@lynx-js/react-rsbuild-plugin",
+      "version": "0.18.0",
+      "role": "Dual-layer build and lifecycle reference only; forbidden from the probe dependency graph",
+      "integrity": "sha512-xqytte0KVtCceDJR0jJwWf0rP1ASCzaXAXikUOnX7/QX8mBSXns6CD4QCiiNnR3p1zjgiY3SVT0p10nJ1q+7Gg==",
+      "tarball": "https://registry.npmjs.org/@lynx-js/react-rsbuild-plugin/-/react-rsbuild-plugin-0.18.0.tgz",
+      "sourceCommit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "sourceCommitKind": "release-manifest"
+    }
+  ],
+  "compatibility": {
+    "node": "^20.19.0 || >=22.12.0",
+    "typescript": "5.1.6 - 5.9.x",
+    "selectedTypeScript": "5.9.3",
+    "packageManager": "npm",
+    "lockfile": "packages/lynx/probe/package-lock.json",
+    "constraints": [
+      "The probe is isolated from the monorepo Rsbuild catalog to prevent duplicate or incompatible core instances.",
+      "The probe lock must contain exactly @rsbuild/core 2.1.4 and @rspack/core 2.1.3.",
+      "The probe lock and decoded bundles must contain no React, Preact, or ReactLynx runtime dependency.",
+      "tasm NAPI is available on Darwin and Linux x64; other contributor hosts must use the published WASM encoder/decoder fallback."
+    ]
+  }
+}

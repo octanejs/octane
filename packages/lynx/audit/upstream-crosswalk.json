@@ -1,0 +1,675 @@
+{
+  "$schema": "./upstream-crosswalk.schema.json",
+  "schemaVersion": 1,
+  "auditDate": "2026-07-18",
+  "status": "source-file-inventory-complete-runner-case-inventory-pending",
+  "classifications": ["port", "differential", "intentional-divergence", "deferred", "out-of-scope"],
+  "upstream": {
+    "reactLynxOracle": {
+      "package": "@lynx-js/react",
+      "version": "0.123.0",
+      "repository": "https://github.com/lynx-family/lynx-stack.git",
+      "tag": "@lynx-js/react@0.123.0",
+      "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+      "npmIntegrity": "sha512-w/yX20jmGMdpfuNb2w7eyXN3JktSka43QdJwICvteNBZJPkZUzauvUvQ2EOqT09RHPHzMkcnk0AlpHOh7g+VoQ==",
+      "npmShasum": "651cdfd843c1e9f12eab0c5fb6fc4836eaaeb360",
+      "provenanceNote": "The npm record does not contain gitHead. The official annotated package tag resolves to this commit, so both the immutable npm digest and tag commit are pinned. Tests come from the tag because the npm tarball does not ship them."
+    },
+    "releaseSet": [
+      {
+        "package": "@lynx-js/react-rsbuild-plugin",
+        "version": "0.18.0",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-xqytte0KVtCceDJR0jJwWf0rP1ASCzaXAXikUOnX7/QX8mBSXns6CD4QCiiNnR3p1zjgiY3SVT0p10nJ1q+7Gg=="
+      },
+      {
+        "package": "@lynx-js/rspeedy",
+        "version": "0.16.0",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-j9a25T3we1rtkCQtpKwjVD5Gn7E6YlILWu6xTyR0cHoG01Rmln1i2BK9SoTjtt9SKnUVB7i+eHOVRimXMpVwuw=="
+      },
+      {
+        "package": "@lynx-js/template-webpack-plugin",
+        "version": "0.13.0",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-x2PljSowjfdLmu06bsvaMpJ7uQ2Yo4x1+/RAqFdAvEet08VPCZQ8Vq6zMgVul4vxhHeajH6xYMpfw3HS98uLDg=="
+      },
+      {
+        "package": "@lynx-js/runtime-wrapper-webpack-plugin",
+        "version": "0.2.2",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-q/T89kpxkZIQgSk2yhTXFYlH1XqE2UzPr/vKhWOk4PBZ8v9gyUco80xCvn4YyA6iSYrd7bO65MBK73gkqIlsng=="
+      },
+      {
+        "package": "@lynx-js/cache-events-webpack-plugin",
+        "version": "0.2.0",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-f903x00MMmWB9yIyvACAoe4im0T58JHpKnypV/ccI2gp477RJoCgXPne2x8Obgo3fTOIMHpmNMdnxFW1ej9olQ=="
+      },
+      {
+        "package": "@lynx-js/chunk-loading-webpack-plugin",
+        "version": "0.4.1",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-vZb2HiZdkVdexs2OhRVZE3FkSUPYRvdnaAKG8y47WW2NlVFj6PHzqEhkqfO1L3dm5CIEsPgOMwzgSs3BHZZ8ig=="
+      },
+      {
+        "package": "@lynx-js/webpack-runtime-globals",
+        "version": "0.0.7",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "b6b809cdbec99d20e51aa9521257644dc9db5272",
+        "npmIntegrity": "sha512-HGWCIX8FMeoeCfUZpijrZO20UVp8wVHj7f+aEiMbx94H2iqIVxLzrCLZudBfvo4+WZ3kdgM8CqhU1EERKhLi0w=="
+      },
+      {
+        "package": "@lynx-js/testing-environment",
+        "version": "0.3.0",
+        "repository": "https://github.com/lynx-family/lynx-stack.git",
+        "commit": "80e29881aa4edcad1e2abb4bd1603c95404fea25",
+        "npmIntegrity": "sha512-a08y6fmEZZHNva/bCs4UT8SavTPFnH8j0wb01gnnC6RA28r0139I5ApjAzaPi+LSaj1pH+A5o41bDts2iV+ulw=="
+      },
+      {
+        "package": "@lynx-js/types",
+        "version": "4.0.0",
+        "repository": "https://github.com/lynx-family/lynx.git",
+        "commit": "2f20fed315aaba5f47e14e0f2b0f87c4cb1a64d6",
+        "npmIntegrity": "sha512-FBtBV8wt+9/CAUbTdZwvbhGjJEnyzKLWVpq5gaTHTbhDztbhdP0avZ0nHD6I5HSgAhzYNB9oDrqMt/r6YqBkng=="
+      },
+      {
+        "package": "@lynx-js/type-element-api",
+        "version": "0.0.8",
+        "repository": "https://github.com/lynx-family/lynx.git",
+        "commit": "d2cb78e328e4ada305db19277b79dd445c17ad35",
+        "npmIntegrity": "sha512-5ey2UXcTzC9QiG6SQ+99zEDPkl6VqKDDJ3DN/6RYQhXHYg4bchGE2NRMWj8gjVpzjb9sXp9eP/6B44uvtxUynQ=="
+      },
+      {
+        "package": "@rsbuild/core",
+        "version": "2.1.4",
+        "repository": "https://github.com/web-infra-dev/rsbuild.git",
+        "commit": null,
+        "npmIntegrity": "sha512-kdubx/qB6tXduCdqaW78OULLZJ3ludpuA4mOkDko18THsI1rUy9U34DsaDSnotE8GAvTeme+FX9MnqLEUlg8kQ=="
+      },
+      {
+        "package": "@lynx-js/tasm",
+        "version": "0.0.39",
+        "repository": "https://github.com/lynx-family/lynx.git",
+        "commit": "70481022a3c3170547bf2045a46ff84bb6234e5a",
+        "npmIntegrity": "sha512-FNIV6Cc2K0wCKOHVMfpr3M6kpIZqHHNI02GpVl+h0ClyyK44jxEO+lf58gLFD5E3o0hJ1cp3H2OBIxSUJGkPDw=="
+      }
+    ],
+    "nativeEngine": {
+      "version": "3.9.0",
+      "repository": "https://github.com/lynx-family/lynx.git",
+      "commit": "d7f13487df0d69497148e93b71aded676a8fe243"
+    }
+  },
+  "publicSurface": {
+    "manifestSource": "packages/react/package.json#exports",
+    "manifestSubpathCount": 30,
+    "lazyConditionSubpathCount": 8,
+    "requireConditionSubpathCount": 1,
+    "subpathGroups": [
+      {
+        "classification": "port",
+        "subpaths": [
+          "./runtime-components",
+          "./testing-library",
+          "./testing-library/plugins",
+          "./testing-library/pure",
+          "./testing-library/rstest-config",
+          "./testing-library/vitest-config"
+        ],
+        "reason": "Application/runtime components or testing behavior has an Octane-owned target. Exact ReactLynx implementation modules are not reused."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 6,
+        "subpaths": ["./lepus", "./lepus/hooks", "./lepus/jsx-dev-runtime", "./lepus/jsx-runtime"],
+        "reason": "Main-thread specialization is a post-preview capability."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 7,
+        "subpaths": ["./worklet-dev-runtime", "./worklet-runtime"],
+        "reason": "Main-thread worklets and cross-thread calls are a post-preview capability."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 8,
+        "subpaths": ["./experimental/lazy/import"],
+        "reason": "Lazy bundles are gated after the technical preview."
+      },
+      {
+        "classification": "out-of-scope",
+        "subpaths": [
+          "./debug",
+          "./element-template",
+          "./element-template/internal",
+          "./element-template/jsx-dev-runtime",
+          "./element-template/jsx-runtime",
+          "./internal",
+          "./internal/document",
+          "./jsx-dev-runtime",
+          "./jsx-runtime",
+          "./legacy-react-runtime",
+          "./package.json",
+          "./refresh",
+          "./transform",
+          "./worklet-runtime/bindings"
+        ],
+        "reason": "ReactLynx, Preact, compiler, debug, or backend implementation surface. Octane owns its compiler/runtime and consumes only framework-neutral Lynx APIs."
+      },
+      {
+        "classification": "port",
+        "subpaths": [".", "./compat", "./hooks"],
+        "reason": "These entrypoints have Octane migration targets. Their supported, divergent, deferred, and implementation-only symbols are classified individually below."
+      }
+    ],
+    "rootDocumentedExportCount": 50,
+    "rootExportGroups": [
+      {
+        "classification": "port",
+        "exports": [
+          "Children",
+          "DataProcessorDefinition",
+          "DataProcessors",
+          "Fragment",
+          "GlobalProps",
+          "GlobalPropsConsumer",
+          "GlobalPropsProvider",
+          "InitData",
+          "InitDataConsumer",
+          "InitDataProvider",
+          "InitDataRaw",
+          "Lynx",
+          "ReactLynxChildren",
+          "Root",
+          "cloneElement",
+          "createContext",
+          "createElement",
+          "createRef",
+          "isValidElement",
+          "memo",
+          "root",
+          "useCallback",
+          "useContext",
+          "useDebugValue",
+          "useEffect",
+          "useGlobalProps",
+          "useGlobalPropsChanged",
+          "useImperativeHandle",
+          "useInitData",
+          "useInitDataChanged",
+          "useLynxGlobalEventListener",
+          "useMemo",
+          "useReducer",
+          "useRef",
+          "useState",
+          "useSyncExternalStore"
+        ],
+        "reason": "Existing Octane component/hook semantics or a renderer-owned Lynx platform API."
+      },
+      {
+        "classification": "intentional-divergence",
+        "exports": [
+          "Component",
+          "PureComponent",
+          "forwardRef",
+          "useLayoutEffect",
+          "withInitDataInState"
+        ],
+        "reason": "Octane has no class components or forwardRef. Native layout effects are acknowledgement-ordered and cannot synchronously block native paint."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 6,
+        "exports": ["markFirstScreenSyncReady"],
+        "reason": "Manual first-screen handoff requires dual-thread adoption."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 7,
+        "exports": ["MainThreadRef", "runOnBackground", "runOnMainThread", "useMainThreadRef"],
+        "reason": "Main-thread refs and cross-thread calls are a post-preview capability."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 8,
+        "exports": ["Suspense", "createPortal", "lazy"],
+        "reason": "These core Octane semantics still require Lynx host and toolchain proof."
+      },
+      {
+        "classification": "out-of-scope",
+        "exports": ["useErrorBoundary"],
+        "reason": "Preact extension with no Octane hook counterpart; migrate to Octane ErrorBoundary."
+      }
+    ],
+    "reactTypePassthroughCount": 80,
+    "reactTypePassthroughClassification": "out-of-scope",
+    "reactTypePassthroughReason": "Exact React type identity is source compatibility, not observable Lynx behavior. Migration can map useful function/context/ref types and must reject class/legacy types.",
+    "reactTypePassthroughs": [
+      "Attributes",
+      "CElement",
+      "CFactory",
+      "ChildContextProvider",
+      "ClassAttributes",
+      "ClassType",
+      "ClassicComponent",
+      "ClassicComponentClass",
+      "ClassicElement",
+      "ClassicFactory",
+      "ComponentClass",
+      "ComponentElement",
+      "ComponentFactory",
+      "ComponentLifecycle",
+      "ComponentProps",
+      "ComponentPropsWithRef",
+      "ComponentPropsWithoutRef",
+      "ComponentRef",
+      "ComponentSpec",
+      "ComponentState",
+      "ComponentType",
+      "Consumer",
+      "ConsumerProps",
+      "Context",
+      "ContextType",
+      "CustomComponentPropsWithRef",
+      "DependencyList",
+      "DeprecatedLifecycle",
+      "Dispatch",
+      "DispatchWithoutAction",
+      "EffectCallback",
+      "ElementRef",
+      "ElementType",
+      "ExoticComponent",
+      "FC",
+      "Factory",
+      "ForwardRefExoticComponent",
+      "ForwardRefRenderFunction",
+      "ForwardedRef",
+      "FunctionComponent",
+      "FunctionComponentElement",
+      "FunctionComponentFactory",
+      "GetDerivedStateFromError",
+      "GetDerivedStateFromProps",
+      "JSXElementConstructor",
+      "Key",
+      "LazyExoticComponent",
+      "LegacyRef",
+      "MemoExoticComponent",
+      "Mixin",
+      "MutableRefObject",
+      "NamedExoticComponent",
+      "NewLifecycle",
+      "PropsWithChildren",
+      "PropsWithRef",
+      "PropsWithoutRef",
+      "Provider",
+      "ProviderExoticComponent",
+      "ProviderProps",
+      "ReactComponentElement",
+      "ReactElement",
+      "ReactInstance",
+      "ReactNode",
+      "Reducer",
+      "ReducerAction",
+      "ReducerState",
+      "ReducerStateWithoutAction",
+      "ReducerWithoutAction",
+      "Ref",
+      "RefAttributes",
+      "RefCallback",
+      "RefObject",
+      "SFCFactory",
+      "SVGFactory",
+      "SetStateAction",
+      "StaticLifecycle",
+      "TransitionFunction",
+      "TransitionStartFunction",
+      "VFC",
+      "VoidFunctionComponent"
+    ],
+    "ambientGroups": [
+      {
+        "classification": "port",
+        "milestone": 1,
+        "members": [
+          "global.__BACKGROUND__",
+          "global.__DEV__",
+          "global.__PROFILE__",
+          "JSX.IntrinsicElements",
+          "StandardProps.children",
+          "StandardProps.key",
+          "StandardProps.ref"
+        ]
+      },
+      {
+        "classification": "port",
+        "milestone": 4,
+        "members": ["ListItemProps.defer", "ListItemProps.reuse-identifier"]
+      },
+      {
+        "classification": "deferred",
+        "milestone": 6,
+        "members": ["global.__MAIN_THREAD__"]
+      },
+      {
+        "classification": "deferred",
+        "milestone": 7,
+        "members": ["Lynx.querySelector", "Lynx.querySelectorAll", "StandardProps.main-thread:ref"]
+      },
+      {
+        "classification": "deferred",
+        "milestone": 8,
+        "members": ["global.__LAZY_BUNDLE_FETCHER__"]
+      },
+      {
+        "classification": "deferred",
+        "milestone": 9,
+        "members": [
+          "FrameworkRenderingTimings.reactLynxHydrate",
+          "FrameworkRenderingTimings.reactLynxUpdate"
+        ]
+      },
+      {
+        "classification": "out-of-scope",
+        "members": ["global.__JS__", "global.__LEPUS__", "global.__REACT_DEVTOOL__"]
+      }
+    ],
+    "conditionMismatches": [
+      {
+        "specifier": "@lynx-js/react",
+        "name": "default",
+        "runtime": "present-and-marked-internal",
+        "types": "absent",
+        "classification": "out-of-scope"
+      },
+      {
+        "specifier": "@lynx-js/react",
+        "name": "useId",
+        "runtime": "present-via-hooks-wildcard",
+        "types": "absent-at-root-present-at-hooks-subpath",
+        "classification": "port"
+      }
+    ]
+  },
+  "testInventory": {
+    "sourceInventoryStatus": "complete-at-pinned-tag",
+    "matchPolicy": "Each discovered JS/TS test source file must match exactly one classification group. A future upstream file changes a group count and fails validation.",
+    "declaredTaskSourceFileCount": 212,
+    "orphanedSourceFileCount": 1,
+    "totalSourceFileCount": 213,
+    "unclassifiedSourceFileCount": 0,
+    "rustCaseCount": 65,
+    "rustSourceFileCount": 11,
+    "rustClassification": "out-of-scope",
+    "rustReason": "ReactLynx SWC/Snapshot/Element Template compiler implementation tests. Relevant authored behavior is linked to Octane compiler or bundle tests instead of porting Rust transforms.",
+    "taskCounts": [
+      {
+        "task": "@lynx-js/react-runtime#test:core",
+        "sourceFileCount": 12
+      },
+      {
+        "task": "@lynx-js/react-runtime#test:snapshot",
+        "sourceFileCount": 94
+      },
+      {
+        "task": "@lynx-js/react-runtime#test:et",
+        "sourceFileCount": 74
+      },
+      {
+        "task": "@lynx-js/reactlynx-testing-library#test",
+        "sourceFileCount": 27
+      },
+      {
+        "task": "@lynx-js/react-transform#test",
+        "sourceFileCount": 5
+      }
+    ],
+    "classificationGroups": [
+      {
+        "classification": "differential",
+        "sourceFileCount": 15,
+        "targetMilestones": [2, 3, 4],
+        "selectors": [
+          "packages/react/runtime/__test__/snapshot/basic.test.jsx",
+          "packages/react/runtime/__test__/snapshot/children.test.jsx",
+          "packages/react/runtime/__test__/snapshot/clone.test.jsx",
+          "packages/react/runtime/__test__/snapshot/createElement.test.jsx",
+          "packages/react/runtime/__test__/snapshot/css/remove-scoped-lazy-bundle.test.jsx",
+          "packages/react/runtime/__test__/snapshot/css/remove-scoped-main-bundle.test.jsx",
+          "packages/react/runtime/__test__/snapshot/css/scoped-lazy-bundle.test.jsx",
+          "packages/react/runtime/__test__/snapshot/css/scoped-main-bundle.test.jsx",
+          "packages/react/runtime/__test__/snapshot/element.test.jsx",
+          "packages/react/runtime/__test__/snapshot/event.test.jsx",
+          "packages/react/runtime/__test__/snapshot/list.test.jsx",
+          "packages/react/runtime/__test__/snapshot/page.test.jsx",
+          "packages/react/runtime/__test__/snapshot/preact.test.jsx",
+          "packages/react/runtime/__test__/snapshot/ref.test.jsx",
+          "packages/react/runtime/__test__/snapshot/spread.test.jsx"
+        ],
+        "observationBoundary": "Run the same application-shaped fixture and compare normalized public native tree, event/effect/ref logs, identity, lifecycle, or public errors. Never compare Snapshot fields or opcode order."
+      },
+      {
+        "classification": "intentional-divergence",
+        "sourceFileCount": 4,
+        "selectors": [
+          "packages/react/runtime/__test__/snapshot/compat.test.jsx",
+          "packages/react/runtime/__test__/snapshot/compat/hooks.test.jsx",
+          "packages/react/runtime/__test__/snapshot/compat/initData.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lynx/component-compat.test.ts"
+        ],
+        "reason": "Class/PureComponent, forwardRef, Preact transition behavior, or class-only init-data compatibility. Case-level extraction must reclassify ordinary init-data hook behavior as port."
+      },
+      {
+        "classification": "deferred",
+        "sourceFileCount": 64,
+        "targetMilestones": [6, 7, 8, 9],
+        "selectors": [
+          "packages/react/runtime/__test__/core/background-function.test.ts",
+          "packages/react/runtime/__test__/core/hooks/mainThread.test.tsx",
+          "packages/react/runtime/__test__/core/thread-function-call.test.ts",
+          "packages/react/runtime/__test__/snapshot/gesture.test.jsx",
+          "packages/react/runtime/__test__/snapshot/gesture/prepareGestureForCommit.test.js",
+          "packages/react/runtime/__test__/snapshot/gesture/processGesture.test.ts",
+          "packages/react/runtime/__test__/snapshot/hydrate.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lazy.test.js",
+          "packages/react/runtime/__test__/snapshot/lynx/dynamic-import.test.ts",
+          "packages/react/runtime/__test__/snapshot/lynx/injectLepusMethods.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lynx/lazy-bundle-fetchbundle.test.js",
+          "packages/react/runtime/__test__/snapshot/lynx/lazy-bundle.test.js",
+          "packages/react/runtime/__test__/snapshot/lynx/portals.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lynx/prepareLazyBundleMTS.test.js",
+          "packages/react/runtime/__test__/snapshot/lynx/processEvalResult.test.js",
+          "packages/react/runtime/__test__/snapshot/lynx/suspense.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lynx/timing.test.jsx",
+          "packages/react/runtime/__test__/snapshot/mtf-execid-churn.test.jsx",
+          "packages/react/runtime/__test__/snapshot/render.test.jsx",
+          "packages/react/runtime/__test__/snapshot/worklet/**/*.test.*",
+          "packages/react/runtime/__test__/snapshot/workletEvent.test.jsx",
+          "packages/react/runtime/__test__/snapshot/workletLifecycle.test.ts",
+          "packages/react/runtime/__test__/snapshot/workletRef.test.jsx",
+          "packages/react/runtime/__test__/worklet-runtime/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/imports/suspense-lazy.test.ts",
+          "packages/react/runtime/__test__/element-template/lynx/lazy-bundle.test.ts",
+          "packages/react/runtime/__test__/element-template/lynx/performance.test.ts",
+          "packages/react/runtime/__test__/element-template/native/init-timing-api.test.ts",
+          "packages/react/runtime/__test__/element-template/native/reload.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/hydrate/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/hydrate.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/main-thread-function/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/reload.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/suspense.test.tsx",
+          "packages/react/runtime/__test__/element-template/runtime/background/update-timing.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/hydration/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/patch/update-timing.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/prop-adapters/hydrate.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/render/fixtures.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/render/render-main-thread.contract.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/render/render-main-thread.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/render/render-opcodes-into-element-template.et.test.tsx",
+          "packages/react/runtime/__test__/element-template/runtime/template/main-thread-dynamic-attr-state.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/template/main-thread-function.test.ts",
+          "packages/react/runtime/__test__/shared/profile.test.ts",
+          "packages/react/testing-library/src/__tests__/lazy-bundle/**/*.test.*",
+          "packages/react/testing-library/src/__tests__/portals.test.jsx",
+          "packages/react/testing-library/src/__tests__/worklet.test.jsx"
+        ],
+        "caseLevelOverrides": [
+          "Ordinary background event cases in ET compiled event fixtures are port/M3; main-thread event cases are deferred/M7.",
+          "Main-thread API and root-render files mix preview lifecycle behavior with IFR/adoption behavior.",
+          "The orphan shared/profile test is deferred/M9 and is not part of the runtime package test command."
+        ]
+      },
+      {
+        "classification": "port",
+        "sourceFileCount": 71,
+        "targetMilestones": [2, 3, 4, 5],
+        "selectors": [
+          "packages/react/runtime/__test__/core/globalProps.test.ts",
+          "packages/react/runtime/__test__/core/hooks/useLynxGlobalEventListener.test.jsx",
+          "packages/react/runtime/__test__/core/lynx-data-processors.test.ts",
+          "packages/react/runtime/__test__/core/lynx-page-data.test.ts",
+          "packages/react/runtime/__test__/core/lynx-update-data.test.ts",
+          "packages/react/runtime/__test__/core/ref.test.ts",
+          "packages/react/runtime/__test__/core/reload-version.test.ts",
+          "packages/react/runtime/__test__/snapshot/delayed-lifecycle-events.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/destroy.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/reload.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/resetPageDataError.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/updateData.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/updateGlobalProps.event.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/updateGlobalProps.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lynx-data-processors.test.ts",
+          "packages/react/runtime/__test__/element-template/imports/global-props-api.test.ts",
+          "packages/react/runtime/__test__/element-template/imports/init-data-api.test.ts",
+          "packages/react/runtime/__test__/element-template/imports/register-data-processors.test.ts",
+          "packages/react/runtime/__test__/element-template/lynx/env.test.ts",
+          "packages/react/runtime/__test__/element-template/native/callDestroyLifetimeFun.test.ts",
+          "packages/react/runtime/__test__/element-template/native/index.test.ts",
+          "packages/react/runtime/__test__/element-template/native/main-thread-api.test.ts",
+          "packages/react/runtime/__test__/element-template/native/mts-destroy.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/adapter/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/commit-hook.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/event/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/global-props/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/global-props.test.tsx",
+          "packages/react/runtime/__test__/element-template/runtime/background/init-data/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/instance/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/instance.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/ref/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/render/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/root-render.test.tsx",
+          "packages/react/runtime/__test__/element-template/runtime/background/update/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/page/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/patch/compiled-fixtures.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/patch/element-template-patch.test.tsx",
+          "packages/react/runtime/__test__/element-template/runtime/patch/fixtures.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/patch/update-fixture-helper.test.tsx",
+          "packages/react/runtime/__test__/element-template/runtime/prop-adapters/event.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/prop-adapters/ref.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/prop-adapters/spread.test.ts",
+          "packages/react/testing-library/src/**/*.test.*",
+          "!packages/react/testing-library/src/__tests__/alog.test.jsx",
+          "!packages/react/testing-library/src/__tests__/lazy-bundle/**/*.test.*",
+          "!packages/react/testing-library/src/__tests__/portals.test.jsx",
+          "!packages/react/testing-library/src/__tests__/worklet.test.jsx"
+        ],
+        "caseLevelOverrides": [
+          "Class lifecycle cases in snapshot/lifecycle.test.jsx are intentional divergences; hook effect cases are ports.",
+          "Class-shaped testing-library fixtures must be rewritten to function/effect fixtures and keep only public observations.",
+          "Private Snapshot/opcode assertions in a port source are replaced by public native-tree, identity, event, ref, effect, cleanup, or error observations."
+        ]
+      },
+      {
+        "classification": "out-of-scope",
+        "sourceFileCount": 59,
+        "selectors": [
+          "packages/react/runtime/__test__/core/commit-context.test.ts",
+          "packages/react/runtime/__test__/core/forceRootRender.test.ts",
+          "packages/react/runtime/__test__/guardrails/**/*.test.*",
+          "packages/react/runtime/__test__/snapshot/alog/**/*.test.*",
+          "packages/react/runtime/__test__/snapshot/commit-context.test.ts",
+          "packages/react/runtime/__test__/snapshot/compat/export.test.jsx",
+          "packages/react/runtime/__test__/snapshot/css/compat.test.jsx",
+          "packages/react/runtime/__test__/snapshot/debug/**/*.test.*",
+          "packages/react/runtime/__test__/snapshot/dynamicPartType.test.jsx",
+          "packages/react/runtime/__test__/snapshot/jsx-runtime-lepus.test.jsx",
+          "packages/react/runtime/__test__/snapshot/legacySlot.legacy-slot.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lifecycle/isRendering.test.jsx",
+          "packages/react/runtime/__test__/snapshot/lynx/runtime-backend.test.ts",
+          "packages/react/runtime/__test__/snapshot/lynxQueueMicrotask.test.jsx",
+          "packages/react/runtime/__test__/snapshot/renderToOpcodes.test.jsx",
+          "packages/react/runtime/__test__/snapshot/snapshotPatch.test.jsx",
+          "packages/react/runtime/__test__/snapshot/ssr.test.jsx",
+          "packages/react/runtime/__test__/snapshot/utils/runtimeProxy.test.js",
+          "packages/react/runtime/__test__/element-template/debug/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/imports/jsx-runtime.test.ts",
+          "packages/react/runtime/__test__/element-template/imports/legacy-react-runtime.test.ts",
+          "packages/react/runtime/__test__/element-template/imports/no-legacy-imports.test.ts",
+          "packages/react/runtime/__test__/element-template/internal/**/*.test.*",
+          "packages/react/runtime/__test__/element-template/runtime/background/commit-context.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/background/manager.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/patch/patch-listener-alog.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/protocol/template-type.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/render/render-to-opcodes.et.test.jsx",
+          "packages/react/runtime/__test__/element-template/runtime/render/render-transform.contract.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/template/element-template-attr-slot-plan.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/template/element-template-handle.test.ts",
+          "packages/react/runtime/__test__/element-template/runtime/template/element-template-registry.test.ts",
+          "packages/react/runtime/__test__/element-template/test-utils/**/*.test.*",
+          "packages/react/testing-library/src/__tests__/alog.test.jsx",
+          "packages/react/transform/__test__/**/*.spec.js"
+        ],
+        "reason": "Private ReactLynx/Preact/Snapshot/Element Template/compiler/debug mechanism. It may be implementation reference material but is not an Octane runtime dependency or private-state test oracle."
+      }
+    ],
+    "knownNonRunnableCases": [
+      {
+        "source": "packages/react/runtime/__test__/snapshot/ref.test.jsx",
+        "state": "skip",
+        "title": "should work when using error boundary with ref"
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lynx/lazy-bundle.test.js",
+        "state": "todo",
+        "count": 4
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/snapshotPatch.test.jsx",
+        "state": "skipped-suite",
+        "title": "DEV_ONLY_RegisterWorklet"
+      },
+      {
+        "source": "packages/react/transform/__test__/css/object-lit-style.spec.js",
+        "state": "skipped-suite-with-todo"
+      }
+    ],
+    "runnerExpandedCases": {
+      "status": "unmet-gate",
+      "runnableCaseCount": null,
+      "unclassifiedRunnableCaseCount": null,
+      "reason": "Static source parsing cannot enumerate loops, test.each expansions, compiled fixture runners, or dynamically generated todo cases. Source files are fully classified, but Milestone 0 still requires a machine-readable Vitest/JUnit and cargo-nextest run at the pinned tag, followed by case-level classification with zero runnable cases unclassified.",
+      "requiredEvidence": [
+        "Expanded full test names, source paths, source lines, runner state, and task id from the pinned checkout",
+        "Case-level overrides for mixed lifecycle, init-data, event, main-thread API, and testing-library sources",
+        "A validator failure for any runnable case without exactly one classification"
+      ]
+    }
+  },
+  "gates": {
+    "publicSubpathsClassified": true,
+    "rootDocumentedExportsClassified": true,
+    "reactTypePassthroughsClassified": true,
+    "ambientSurfaceClassified": true,
+    "testSourceFilesClassified": true,
+    "runnerExpandedTestCasesClassified": false,
+    "phase0CrosswalkComplete": false,
+    "blockedBy": ["runner-expanded-test-case-inventory"]
+  }
+}
