@@ -51,6 +51,7 @@
   },
   "dependencies": {
     "@jridgewell/remapping": "catalog:default",
+    "@jridgewell/trace-mapping": "catalog:default",
     "@mdx-js/mdx": "catalog:default",
     "remark-frontmatter": "catalog:default",
     "remark-gfm": "catalog:default",
@@ -61,7 +62,6 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
-    "@jridgewell/trace-mapping": "catalog:default",
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",
     "octane": "workspace:*",

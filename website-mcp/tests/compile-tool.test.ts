@@ -24,6 +24,7 @@ describe('runCompile', () => {
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.code).toContain('Counter');
+		expect(result.warnings).toEqual([]);
 		// The directive shorthand never survives compilation.
 		expect(result.code).not.toContain('@{');
 		expect(result.octaneVersion).toMatch(/^\d+\.\d+\.\d+/);
@@ -62,5 +63,28 @@ describe('runCompile', () => {
 			filename: 'input.tsx',
 		});
 		expect(result.ok).toBe(true);
+	});
+
+	it('returns nonfatal text-event warnings alongside runnable code', () => {
+		const result = runCompile(base(`export function Field() @{ <input onChange={() => {}} /> }`));
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.code.length).toBeGreaterThan(0);
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toMatchObject({
+			code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
+			severity: 'warning',
+			filename: 'input.tsrx',
+		});
+	});
+
+	it('does not warn for an explicitly intentional native text commit', () => {
+		const result = runCompile(
+			base(
+				`export function Field() @{ <input onChange={() => {}} suppressNativeChangeWarning /> }`,
+			),
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.warnings).toEqual([]);
 	});
 });

@@ -88,7 +88,9 @@ the special `wrapper` key is the document layout.
   SSR passes call this during `renderToString`). Same observable mapping.
 - `@octanejs/mdx/compile` — `compileMdx` / `compileMdxSync` /
   `defaultRemarkPlugins`, the plugin's pipeline as a library (used by the SSR
-  tests, usable for static-site tooling).
+  tests, usable for static-site tooling). Results include nonfatal compiler
+  `diagnostics`; JSX warning ranges are mapped back to the authored `.mdx`
+  document. The Vite plugin publishes the same warnings during transforms.
 
 ## SSR + hydration
 

@@ -17,7 +17,7 @@ const OBJECT_RENDERERS = {
 
 /**
  * Volar mappings tests. We exercise the IDE-facing virtual-TSX pipeline:
- *   - Returns a `VolarMappingsResult` (code + mappings + cssMappings + errors).
+ *   - Returns a `VolarMappingsResult` plus Octane's non-fatal diagnostics.
  *   - Generates TSX (`code`) containing the user identifiers (so TypeScript's
  *     language service can see / type-check them).
  *   - Reports parse errors via `errors` array rather than throwing, so the
@@ -40,6 +40,7 @@ describe('compileToVolarMappings', () => {
 		expect(Array.isArray(result.mappings)).toBe(true);
 		expect(Array.isArray(result.cssMappings)).toBe(true);
 		expect(Array.isArray(result.errors)).toBe(true);
+		expect(Array.isArray(result.diagnostics)).toBe(true);
 		expect(result.sourceAst).toBeDefined();
 		expect(result.sourceAst.type).toBe('Program');
 	});

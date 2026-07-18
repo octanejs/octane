@@ -52,6 +52,6 @@ Use this to find, reproduce, minimize, and fix a suspected Octane bug.
 
 ## Common traps
 
-- React synthetic `onChange`, controlled inputs, StrictMode double invoke, class components, and React.Children are not bugs by default.
+- React synthetic `onChange`, StrictMode double invoke, and class components are not bugs by default. Controlled `value`/`checked` is supported, but text editing uses native `onInput`; `OCTANE_NATIVE_TEXT_ONCHANGE` warns about likely React-style host wiring without changing native behavior. Deliberate commit-on-blur uses `suppressNativeChangeWarning`.
 - Differential `innerHTML` cannot catch render counts, effect timing, refs, focus, or node move sets.
 - jsdom layout/focus limitations can masquerade as library bugs.

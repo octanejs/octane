@@ -30,6 +30,20 @@ function RejectingCheckbox() @{
 	<input type="checkbox" checked={on} onInput={() => {}} />
 }
 
+function ControlledCheckboxChange() @{
+	const [on, setOn] = useState(false);
+	<label>
+		<input
+			type="checkbox"
+			checked={on}
+			onChange={(event) => setOn((event.target as HTMLInputElement).checked)}
+		/>
+		<span>
+			{on ? 'on' : 'off'}
+		</span>
+	</label>
+}
+
 function ControlledRadios() @{
 	const [pick, setPick] = useState('a');
 	<div>
@@ -51,6 +65,45 @@ function ControlledRadios() @{
 		/>
 		<p>{pick}</p>
 	</div>
+}
+
+function ControlledRadiosChange(props) @{
+	const [pick, setPick] = useState('a');
+	<form>
+		<input
+			id="rca"
+			type="radio"
+			name="rc"
+			value="a"
+			checked={pick === 'a'}
+			onChange={(event) => {
+				props.log.push([
+					'a',
+					(event.currentTarget.form.elements.namedItem('rc')[0] as HTMLInputElement).checked,
+					(event.currentTarget.form.elements.namedItem('rc')[1] as HTMLInputElement).checked,
+				]);
+				if (props.accept) setPick('a');
+			}}
+		/>
+		<input
+			id="rcb"
+			type="radio"
+			name="rc"
+			value="b"
+			checked={pick === 'b'}
+			onChange={(event) => {
+				props.log.push([
+					'b',
+					(event.currentTarget.form.elements.namedItem('rc')[0] as HTMLInputElement).checked,
+					(event.currentTarget.form.elements.namedItem('rc')[1] as HTMLInputElement).checked,
+				]);
+				if (props.accept) setPick('b');
+			}}
+		/>
+		<output>
+			{pick as string}
+		</output>
+	</form>
 }
 
 describe('controlled checkables with native input/change handlers', () => {
@@ -92,5 +145,27 @@ describe('controlled checkables with native input/change handlers', () => {
 		expect((r.find('#ra') as HTMLInputElement).checked).toBe(false);
 		expect(r.find('p').textContent).toBe('b');
 		r.unmount();
+	});
+
+	it('native change can accept a controlled checkbox activation', async () => {
+		const r = mount(ControlledCheckboxChange);
+		const box = r.find('input') as HTMLInputElement;
+		await act(() => box.click());
+		expect(box.checked).toBe(true);
+		expect(r.container.textContent).toBe('on');
+		r.unmount();
+	});
+
+	it('native change observes fresh radio cousins before accepting or rejecting', async () => {
+		for (const accept of [true, false]) {
+			const log: Array<[string, boolean, boolean]> = [];
+			const r = mount(ControlledRadiosChange, { accept, log });
+			const a = r.find('#rca') as HTMLInputElement;
+			const b = r.find('#rcb') as HTMLInputElement;
+			await act(() => b.click());
+			expect(log).toEqual([['b', false, true]]);
+			expect([a.checked, b.checked]).toEqual(accept ? [false, true] : [true, false]);
+			r.unmount();
+		}
 	});
 });

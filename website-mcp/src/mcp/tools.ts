@@ -85,7 +85,7 @@ export function registerRemoteTools(server: McpServer): void {
 		{
 			title: 'Compile Octane source',
 			description:
-				"Compile/validate source with the real Octane compiler. Paste .tsrx (directive blocks, @{ } bodies) or standard .tsx/.jsx; returns the compiled JS targeting the octane runtime, or a precise diagnostic with line/column and a code frame. Use mode 'server' for SSR output.",
+				"Compile/validate source with the real Octane compiler. Paste .tsrx (directive blocks, @{ } bodies) or standard .tsx/.jsx; a successful result includes runnable compiled JS plus nonfatal warnings with codes and authored ranges. Fatal parse/compile failures return an error with line/column and a code frame. Use mode 'server' for SSR output.",
 			inputSchema: {
 				source: z.string().min(1).max(200_000),
 				filename: z
@@ -149,7 +149,7 @@ export function registerRemoteTools(server: McpServer): void {
 		{
 			title: 'Scan React source for Octane compatibility',
 			description:
-				'Scan pasted React source for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, class components, synthetic onChange, react-dom/server imports), whether an official @octanejs binding already exists, and a step-by-step migration plan. Paste library source or your own component code.',
+				'Scan pasted React source for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, class components, React-style text-host onChange, react-dom/server imports), whether an official @octanejs binding already exists, and a step-by-step migration plan. Text-host event scanning preserves component callbacks, selects/checkables, and deliberate native commit behavior. Paste library source or your own component code.',
 			inputSchema: {
 				source: z.string().min(1).max(500_000),
 				packageName: z

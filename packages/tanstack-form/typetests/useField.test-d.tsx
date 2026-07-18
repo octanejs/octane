@@ -97,7 +97,7 @@ it('should type array subfields', () => {
 							{(subField) => (
 								<input
 									value={subField.state.value}
-									onChange={(e: { target: { value: string } }) =>
+									onInput={(e: { target: { value: string } }) =>
 										subField.handleChange(e.target.value)
 									}
 								/>

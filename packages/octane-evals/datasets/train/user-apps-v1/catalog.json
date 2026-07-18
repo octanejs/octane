@@ -9,6 +9,7 @@
       "component-composition": [
         "octane.composed-team-board",
         "octane.native-inbox",
+        "octane.native-change-intent",
         "octane.reducer-wizard",
         "octane.ref-composition"
       ],
@@ -22,12 +23,14 @@
       "native-events": [
         "tsrx.packing-list",
         "octane.native-inbox",
+        "octane.native-change-intent",
         "octane.native-controlled-search",
         "octane.reducer-wizard"
       ],
       "state-updates": [
         "tsrx.counter",
         "octane.composed-team-board",
+        "octane.native-change-intent",
         "octane.reducer-wizard",
         "octane.state-getter"
       ],
@@ -43,6 +46,7 @@
       "conditional-hooks": ["tsrx.conditional-note"],
       "inferred-hook-dependencies": ["octane.inferred-hook-deps"],
       "current-state-getter": ["octane.state-getter"],
+      "native-change-intent": ["octane.native-change-intent"],
       "native-controlled-events": ["octane.native-controlled-search"],
       "class-composition": ["octane.theme-context"],
       "refs-as-props": ["octane.ref-composition"],
@@ -181,6 +185,26 @@
         "native-events",
         "native-controlled-events",
         "controlled-input"
+      ]
+    },
+    {
+      "taskId": "octane.native-change-intent",
+      "title": "Distinguish native text edits from commits",
+      "suite": "octane",
+      "capability": "divergence-recognition",
+      "difficulty": "standard",
+      "sourcePath": "docs/differences-from-react.md",
+      "createdAt": "2026-07-17",
+      "publishedAt": "2026-07-17",
+      "tags": [
+        "component-composition",
+        "hooks",
+        "state-updates",
+        "native-events",
+        "native-change-intent",
+        "controlled-input",
+        "uncontrolled-input",
+        "spread-props"
       ]
     },
     {

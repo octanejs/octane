@@ -12,7 +12,7 @@
 // on its own side of the boundary.
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
-import { compile } from 'octane/compiler';
+import { compile, type CompileDiagnostic } from 'octane/compiler';
 import { sandboxSrcdoc, RUNTIME_MODULE_PATH, PROTOCOL_KEY } from './playground-sandbox.ts';
 
 export type PlaygroundLang = 'tsrx' | 'tsx';
@@ -20,6 +20,7 @@ export type PlaygroundLang = 'tsrx' | 'tsx';
 export interface CompileSuccess {
 	ok: true;
 	code: string;
+	warnings: CompileDiagnostic[];
 }
 
 export interface CompileFailure {
@@ -34,7 +35,7 @@ export function compilePlayground(
 ): CompileSuccess | CompileFailure {
 	try {
 		const out = compile(source, `playground.${lang}`, { mode: 'client' });
-		return { ok: true, code: out.code };
+		return { ok: true, code: out.code, warnings: out.diagnostics };
 	} catch (error) {
 		return { ok: false, error: error instanceof Error ? error.message : String(error) };
 	}

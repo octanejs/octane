@@ -6,6 +6,27 @@ import type { CompileOptions } from '@mdx-js/mdx';
 export interface CompileMdxResult {
 	code: string;
 	map: unknown;
+	diagnostics: CompileMdxDiagnostic[];
+}
+
+export interface CompileMdxDiagnosticPosition {
+	offset: number;
+	line: number;
+	column: number;
+}
+
+export interface CompileMdxDiagnostic {
+	code: string;
+	severity: 'warning';
+	message: string;
+	filename: string;
+	start: CompileMdxDiagnosticPosition;
+	end: CompileMdxDiagnosticPosition;
+	suggestions: Array<{
+		start: CompileMdxDiagnosticPosition;
+		end: CompileMdxDiagnosticPosition;
+		attribute: 'onInput' | 'onInputCapture';
+	}>;
 }
 
 export interface CompileMdxOptions {

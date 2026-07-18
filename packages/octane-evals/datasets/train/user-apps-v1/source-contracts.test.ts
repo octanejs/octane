@@ -248,6 +248,57 @@ const contracts: Record<string, Contract> = {
 		expect(jsxAttributes(input, 'defaultValue')).toHaveLength(0);
 		expect(jsxAttributes(input, 'onChange')).toHaveLength(0);
 	},
+	'octane.native-change-intent': (ast) => {
+		expectExports(ast, ['PreferenceField', 'App']);
+		const app = functionNamed(ast, 'App');
+		const inputs = jsxElements(app, 'input');
+		const liveInput = inputs.find(
+			(input) =>
+				jsxAttributes(input, 'value').length === 1 && jsxAttributes(input, 'onInput').length === 1,
+		);
+		expect(liveInput, 'expected a controlled text input with onInput').toBeDefined();
+		expect(jsxAttributes(liveInput, 'onChange')).toHaveLength(0);
+
+		const commitInput = inputs.find((input) => jsxAttributes(input, 'defaultValue').length === 1);
+		expect(commitInput, 'expected an uncontrolled commit-on-change text input').toBeDefined();
+		expect(jsxAttributes(commitInput, 'onChange')).toHaveLength(1);
+		expect(jsxAttributes(commitInput, 'onInput')).toHaveLength(0);
+		expect(jsxAttributes(commitInput, 'value')).toHaveLength(0);
+		const suppression = jsxAttributes(commitInput, 'suppressNativeChangeWarning');
+		expect(suppression).toHaveLength(1);
+		const suppressionValue = suppression[0].value as AstNode | null | undefined;
+		const suppressionExpression = attributeExpression(suppression[0]);
+		expect(
+			suppressionValue == null ||
+				(suppressionExpression?.type === 'Literal' && suppressionExpression.value === true),
+			'expected bare suppressNativeChangeWarning or an explicit true value',
+		).toBe(true);
+
+		const checkbox = inputs.find((input) => jsxAttributes(input, 'checked').length === 1);
+		expect(checkbox, 'expected a controlled checkbox').toBeDefined();
+		expect(jsxAttributes(checkbox, 'onChange')).toHaveLength(1);
+		expect(jsxAttributes(jsxElements(app, 'select')[0], 'onChange')).toHaveLength(1);
+
+		const callback = jsxElements(app, 'PreferenceField')[0];
+		expect(callback, 'expected the component callback to remain named onChange').toBeDefined();
+		expect(jsxAttributes(callback, 'onChange')).toHaveLength(1);
+
+		const spreadInput = inputs.find((input) => nodes(input, 'JSXSpreadAttribute').length > 0);
+		expect(spreadInput, 'expected a text input receiving a spread prop bag').toBeDefined();
+		const validSpreadBag = nodes(app, 'ObjectExpression').find(
+			(object) =>
+				objectProperty(object, 'type') !== undefined &&
+				objectProperty(object, 'value') !== undefined &&
+				objectProperty(object, 'onInput') !== undefined,
+		);
+		expect(validSpreadBag, 'expected the spread bag to use onInput').toBeDefined();
+		const dynamicType = objectProperty(validSpreadBag, 'type')?.value as AstNode | undefined;
+		expect(dynamicType, 'expected a type value in the spread bag').toBeDefined();
+		expect(
+			dynamicType?.type === 'Literal' || dynamicType?.type === 'StringLiteral',
+			'expected the spread input type to be computed dynamically',
+		).toBe(false);
+	},
 	'octane.inferred-hook-deps': (ast) => {
 		expectExports(ast, ['App']);
 		const memos = calls(ast, 'useMemo');

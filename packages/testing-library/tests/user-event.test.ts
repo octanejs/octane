@@ -14,6 +14,8 @@ import {
 	InputEcho,
 	ControlledInputIgnoring,
 	ControlledInputAccepting,
+	NativeTextCommit,
+	CheckableEventLog,
 } from './_fixtures/counter.tsrx';
 
 afterEach(cleanup);
@@ -40,6 +42,28 @@ describe('@testing-library/user-event compatibility', () => {
 		// committed after each keystroke.
 		expect(input.value).toBe('abc');
 		expect(screen.getByTestId('echo').textContent).toBe('abc');
+	});
+
+	it('text onChange observes the native commit when tab() blurs the field', async () => {
+		const user = userEvent.setup();
+		const log: string[] = [];
+		render(NativeTextCommit, { props: { log: (value: string) => log.push(value) } });
+		const input = screen.getByRole('textbox') as HTMLInputElement;
+		await user.type(input, 'draft');
+		expect(input.value).toBe('draft');
+		expect(log).toEqual([]);
+		await user.tab();
+		expect(log).toEqual(['draft']);
+	});
+
+	it('clicking a checkbox follows native click then input then change ordering', async () => {
+		const user = userEvent.setup();
+		const log: string[] = [];
+		render(CheckableEventLog, { props: { log: (event: string) => log.push(event) } });
+		const checkbox = screen.getByRole('checkbox') as HTMLInputElement;
+		await user.click(checkbox);
+		expect(checkbox.checked).toBe(true);
+		expect(log).toEqual(['click', 'input', 'change']);
 	});
 
 	it('a controlled input whose handler ignores the event snaps back (React + RTL parity)', async () => {

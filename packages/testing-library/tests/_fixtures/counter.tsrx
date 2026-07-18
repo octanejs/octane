@@ -59,6 +59,25 @@ export function EventLog(props) @{
 	/>
 }
 
+export function NativeTextCommit(props) @{
+	<input
+		aria-label="draft"
+		defaultValue=""
+		onChange={(event) => props.log(event.currentTarget.value)}
+		suppressNativeChangeWarning
+	/>
+}
+
+export function CheckableEventLog(props) @{
+	<input
+		type="checkbox"
+		aria-label="enabled"
+		onClick={() => props.log('click')}
+		onInput={() => props.log('input')}
+		onChange={() => props.log('change')}
+	/>
+}
+
 // Non-bubbling native event delivered via octane's capture-phase delegation.
 export function HoverTarget(props) @{
 	<div data-testid="hover" onMouseEnter={() => props.log('enter')}>

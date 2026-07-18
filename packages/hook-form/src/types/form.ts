@@ -225,8 +225,8 @@ export type UseFormRegisterReturn<TFieldName extends InternalFieldName = Interna
  * }, [register])
  *
  * // Register without ref
- * const { onChange, onBlur, name } = register("name6")
- * <input onChange={onChange} onBlur={onBlur} name={name} />
+ * const { onInput, onBlur, name } = register("name6")
+ * <input onInput={onInput} onBlur={onBlur} name={name} />
  * ```
  */
 export type UseFormRegister<TFieldValues extends FieldValues> = <

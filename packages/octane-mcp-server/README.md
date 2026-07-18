@@ -70,6 +70,11 @@ framework-agnostic core can be reused verbatim, whether an official
 { "package": "jotai", "projectRoot": "/path/to/my-app" }
 ```
 
+The event scan is host-aware: it recommends `onInput` only for direct standard
+text-host wiring that appears to mean “every edit.” It leaves component callbacks,
+selects, checkboxes/radios, dynamic input types, and explicitly intentional native
+text commits alone.
+
 ### `octane_bindings`
 
 Returns the map of React packages with maintained `@octanejs/*` ports. The map

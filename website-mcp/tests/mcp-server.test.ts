@@ -73,7 +73,19 @@ describe('remote MCP server', () => {
 			name: 'octane_compile',
 			arguments: { source: `export function X() @{ <div>{'hi'}</div> }` },
 		});
-		expect(JSON.parse(firstText(ok)).ok).toBe(true);
+		const compiled = JSON.parse(firstText(ok));
+		expect(compiled.ok).toBe(true);
+		expect(compiled.warnings).toEqual([]);
+
+		const warned = await client.callTool({
+			name: 'octane_compile',
+			arguments: { source: `export function X() @{ <input onChange={() => {}} /> }` },
+		});
+		const warningResult = JSON.parse(firstText(warned));
+		expect(warningResult.ok).toBe(true);
+		expect(warningResult.code.length).toBeGreaterThan(0);
+		expect(warningResult.warnings).toHaveLength(1);
+		expect(warningResult.warnings[0].code).toBe('OCTANE_NATIVE_TEXT_ONCHANGE');
 
 		const bad = await client.callTool({
 			name: 'octane_compile',

@@ -4,6 +4,24 @@
 // .d.ts isn't pulled in when packages/mdx/src is type-checked transitively
 // from here, so the website program declares them itself).
 declare module 'octane/compiler' {
+	export interface CompileDiagnosticPosition {
+		offset: number;
+		line: number;
+		column: number;
+	}
+	export interface CompileDiagnostic {
+		code: string;
+		severity: 'warning';
+		message: string;
+		filename: string;
+		start: CompileDiagnosticPosition;
+		end: CompileDiagnosticPosition;
+		suggestions: Array<{
+			start: CompileDiagnosticPosition;
+			end: CompileDiagnosticPosition;
+			attribute: 'onInput' | 'onInputCapture';
+		}>;
+	}
 	export function compile(
 		source: string,
 		id: string,
@@ -12,5 +30,5 @@ declare module 'octane/compiler' {
 			hmr?: boolean;
 			dev?: boolean;
 		},
-	): { code: string; map: unknown };
+	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 }

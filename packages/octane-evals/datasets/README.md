@@ -9,9 +9,9 @@ This directory is the canonical home for versioned public task data:
   into a training release.
 
 The first concrete release is [`train/user-apps-v1`](./train/user-apps-v1). It
-contains eighteen standalone user-facing application tasks across TSRX, core Octane,
-Zustand, Hook Form, i18next, and TanStack Query. Each task ships a prompt,
-starter application, behavioral grader, and public reference answer.
+contains nineteen standalone user-facing application tasks across TSRX, core
+Octane, Zustand, Hook Form, i18next, and TanStack Query. Each task ships a
+prompt, starter application, behavioral grader, and public reference answer.
 
 Each manifest file contains exactly one benchmark version, split, context mode,
 and execution mode. Related task families never cross active candidate splits;

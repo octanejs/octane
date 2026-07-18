@@ -1,7 +1,7 @@
 // The octane_compile tool's engine: run the REAL octane compiler on pasted
 // source and fold the thrown CompileError into a JSON-safe diagnostic. Pure
 // (source in, result out) so it is unit-testable without MCP plumbing.
-import { compile } from 'octane/compiler';
+import { compile, type CompileDiagnostic as CompilerWarning } from 'octane/compiler';
 import octanePkg from '../../../packages/octane/package.json';
 
 export interface CompileToolInput {
@@ -23,7 +23,14 @@ export interface CompileDiagnostic {
 }
 
 export type CompileToolResult =
-	| { ok: true; filename: string; mode: 'client' | 'server'; octaneVersion: string; code: string }
+	| {
+			ok: true;
+			filename: string;
+			mode: 'client' | 'server';
+			octaneVersion: string;
+			code: string;
+			warnings: CompilerWarning[];
+	  }
 	| {
 			ok: false;
 			filename: string;
@@ -68,8 +75,13 @@ export function runCompile(input: CompileToolInput): CompileToolResult {
 	const { source, filename, mode, dev, autoMemo, parallelUse } = input;
 	const base = { filename, mode, octaneVersion: octanePkg.version };
 	try {
-		const { code } = compile(source, filename, { mode, dev, autoMemo, parallelUse });
-		return { ok: true, ...base, code };
+		const { code, diagnostics } = compile(source, filename, {
+			mode,
+			dev,
+			autoMemo,
+			parallelUse,
+		});
+		return { ok: true, ...base, code, warnings: diagnostics };
 	} catch (error) {
 		return { ok: false, ...base, error: toDiagnostic(error, source) };
 	}

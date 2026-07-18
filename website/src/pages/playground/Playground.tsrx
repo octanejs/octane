@@ -18,6 +18,7 @@
 // on the consent overlay. Your own edits from the default sources auto-run as
 // before.
 import { useState, useRef, useEffect } from 'octane';
+import type { CompileDiagnostic } from 'octane/compiler';
 import type { PlaygroundLang } from '../../lib/playground.ts';
 import {
 	decodePlaygroundHash,
@@ -37,6 +38,7 @@ export function Playground() @{
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
+	const [warnings, setWarnings] = useState<CompileDiagnostic[]>([]);
 	const [ready, setReady] = useState(false);
 	// True while a hash-shared payload is loaded but not yet approved to run.
 	const [gated, setGated] = useState(false);
@@ -162,14 +164,17 @@ export function Playground() @{
 			const compileAndRun = (source: string) => {
 				if (disposed) return;
 				if (source.length > MAX_PLAYGROUND_SOURCE_LENGTH) {
+					setWarnings([]);
 					setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
 					return;
 				}
 				const result = pg.compilePlayground(source, currentLang);
 				if (!result.ok) {
+					setWarnings([]);
 					setError(result.error);
 					return;
 				}
+				setWarnings(result.warnings);
 				setError('');
 				replaceDoc(outputView, result.code);
 				// While a shared payload is gated, everything except EXECUTION
@@ -326,6 +331,24 @@ export function Playground() @{
 		@if (error) {
 			<div class="pg-error" role="alert">{error}</div>
 		}
+		@if (warnings.length > 0) {
+			<section class="pg-warnings" aria-label="Compiler warnings" aria-live="polite">
+				<strong>
+					{warnings.length === 1 ? 'Compiler warning' : 'Compiler warnings'}
+				</strong>
+				<ul>
+					@for (const warning of warnings; key warning.code + ':' + warning.start.offset) {
+						<li>
+							<code>{warning.code}</code>
+							<span>{warning.message}</span>
+							<span class="pg-warning-location">
+								{warning.filename + ':' + warning.start.line + ':' + (warning.start.column + 1)}
+							</span>
+						</li>
+					}
+				</ul>
+			</section>
+		}
 
 		<div class={['pg-grid', ready && 'ready']}>
 			<section
@@ -452,6 +475,35 @@ export function Playground() @{
 				font-size: 0.85rem;
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				white-space: pre-wrap;
+			}
+			.pg-warnings {
+				display: flex;
+				align-items: baseline;
+				gap: 0.75rem;
+				padding: 0.6rem 1rem;
+				border-top: 1px solid rgba(245, 183, 65, 0.4);
+				background: rgba(245, 183, 65, 0.1);
+				color: #f6cf7a;
+				font-size: 0.82rem;
+			}
+			.pg-warnings ul {
+				display: grid;
+				gap: 0.25rem;
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			.pg-warnings li {
+				display: flex;
+				gap: 0.55rem;
+				flex-wrap: wrap;
+			}
+			.pg-warnings code,
+			.pg-warning-location {
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+			}
+			.pg-warning-location {
+				color: #b8a57c;
 			}
 			.pg-grid {
 				display: grid;

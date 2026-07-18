@@ -55,7 +55,7 @@ Octane is the day-to-day feel:
   item gets its own hook state.
 - **The platform, not a reimplementation of it.** Real delegated DOM events,
   controlled form components on native events (React's `value`/`checked`
-  semantics — `onInput` per keystroke, no synthetic `onChange`), and
+  semantics — `onInput` per edit, native `onChange` on commit), and
   refs-as-props (`ref={cb}`, `ref={obj}`, even `ref={[a, b]}`) — no synthetic
   layer second-guessing the browser.
 - **No virtual DOM.** Components re-render like React, but a compiled render path
@@ -93,11 +93,40 @@ the exact pinned snapshot and source-attributed React counts come from the
   `forwardRef`. Works with spreads, SSR, and hydration.
 - **Controlled form components on native events** — `value`/`checked` follow
   React's controlled semantics exactly; `defaultValue`/`defaultChecked` opt out.
-  The per-keystroke handler is the native `onInput` (no synthetic `onChange`).
+  The per-edit handler is the native `onInput`; `onChange` keeps its browser
+  commit meaning rather than React's synthetic text-input meaning.
 
 Octane is deliberately narrow where React has grown wide: **no class components,
 no Server Components, no synthetic event system.** Those are choices, not gaps —
 see [Differences from React](https://octanejs.dev/docs/differences-from-react).
+
+### Native text events
+
+Use `onInput` when text state should update with each edit. Octane reports
+`OCTANE_NATIVE_TEXT_ONCHANGE` when a text-entry `<input>` or `<textarea>` appears
+to use React's per-edit `onChange` convention. Statically known JSX is reported by
+the compiler; unresolved spreads and dynamic input types are checked in development
+after their final props are applied. The warning does not rewrite the event:
+`onChange` remains the native commit event.
+
+```tsx
+<input value={query} onInput={(event) => setQuery(event.currentTarget.value)} />
+```
+
+Native commit-on-blur behavior is valid. Mark that intent explicitly so tools and
+development diagnostics do not recommend a per-edit handler:
+
+```tsx
+<input
+  defaultValue={savedDraft}
+  onChange={(event) => save(event.currentTarget.value)}
+  suppressNativeChangeWarning
+/>
+```
+
+The suppression is a JS-only host hint: it is not serialized, changes no event
+behavior, and should not be used on component callbacks, selects, checkboxes, or
+radios. Those cases are already outside the text-entry warning.
 
 ## Quick start
 

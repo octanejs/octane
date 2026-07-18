@@ -49,7 +49,7 @@ import { createOctaneCompiler } from 'octane/compiler/bundler';
  *   enforce: 'pre',
  *   configResolved(config: { command: string, root?: string }): void,
  *   watchChange(id: string): void,
- *   transform(this: { addWatchFile?(id: string): void, environment?: { config?: { consumer?: string } } }, code: string, id: string, options?: { ssr?: boolean }): Promise<{ code: string, map: unknown } | null>,
+ *   transform(this: { addWatchFile?(id: string): void, warn?(warning: { code: string, message: string, id: string, loc: { file: string, line: number, column: number } }): void, environment?: { config?: { consumer?: string } } }, code: string, id: string, options?: { ssr?: boolean }): Promise<import('./compile.js').CompileMdxResult | null>,
  * }} OctaneMdxPlugin
  */
 
@@ -62,6 +62,7 @@ export function octaneMdx(options = {}) {
 	let hmrEnabled = hmr;
 	let projectRoot = process.cwd();
 	let profileIds = createOctaneCompiler({ root: projectRoot });
+	const warnedByFile = new Map();
 	const includeMd = md !== false;
 	return {
 		name: 'octane-mdx',
@@ -73,6 +74,7 @@ export function octaneMdx(options = {}) {
 		},
 		watchChange(id) {
 			profileIds.invalidate(id);
+			warnedByFile.delete(id.split('?')[0]);
 		},
 		async transform(code, id, transformOptions) {
 			const [file, query = ''] = id.split('?'); // Vite ids carry ?v=/?used/?raw/… suffixes
@@ -96,13 +98,34 @@ export function octaneMdx(options = {}) {
 				this.addWatchFile?.(dependency);
 			}
 			const compilerId = profileIdentity?.id ?? file;
-			return compileMdx(code, compilerId, {
+			const result = await compileMdx(code, compilerId, {
 				...compileOptions,
 				mode: ssr ? 'server' : 'client',
 				hmr: !ssr && !!hmrEnabled,
 				dev: !ssr && !!hmrEnabled,
 				profile: profiling,
 			});
+			let warned = warnedByFile.get(file);
+			if (warned === undefined) {
+				warned = new Set();
+				warnedByFile.set(file, warned);
+			}
+			for (const diagnostic of result.diagnostics) {
+				const key = `${diagnostic.code}:${diagnostic.start.offset}:${diagnostic.end.offset}:${diagnostic.message}`;
+				if (warned.has(key)) continue;
+				warned.add(key);
+				this.warn?.({
+					code: diagnostic.code,
+					message: diagnostic.message,
+					id: diagnostic.filename,
+					loc: {
+						file: diagnostic.filename,
+						line: diagnostic.start.line,
+						column: diagnostic.start.column,
+					},
+				});
+			}
+			return result;
 		},
 	};
 }

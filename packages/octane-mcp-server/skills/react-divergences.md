@@ -41,6 +41,13 @@ no synthetic event layer: `onInput` is the per-keystroke handler for text
 controls, and native `change` fires on blur/commit. Do not add a synthetic
 `onChange` normalization.
 
+The compiler warning `OCTANE_NATIVE_TEXT_ONCHANGE` points out a statically known
+text host with `onChange`/`onChangeCapture` but no usable input handler; development
+runtime checking covers unresolved final props on uncontrolled text controls. This
+is migration guidance only. Deliberate native text commit behavior uses the
+non-serialized `suppressNativeChangeWarning` host hint. Selects, checkables, custom
+elements, and component callbacks remain quiet.
+
 ## Native delegated events
 
 `onClick`, `onInput`, `onSubmit` etc. are real DOM events via delegation, not a

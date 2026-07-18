@@ -119,8 +119,8 @@ const manifests = orderedTasks.map((task) => {
 		...(task.portShape ? { portShape: task.portShape } : {}),
 		difficulty: task.difficulty,
 		provenance: {
-			createdAt: '2026-07-14',
-			publishedAt: '2026-07-14',
+			createdAt: task.createdAt ?? '2026-07-14',
+			publishedAt: task.publishedAt ?? '2026-07-14',
 			authors: ['Octane maintainers'],
 			reviewers: [],
 			sources: [

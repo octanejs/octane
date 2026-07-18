@@ -26,7 +26,10 @@ title: TSRX vs TSX/JSX
 Choose **TSX or JSX** when you are moving an existing React component, following a
 React example, or sharing source that must remain valid React code. It is the syntax
 you already know, compiled for Octane. React examples are not always a literal paste:
-text inputs use native `onInput`, for example. Check
+text inputs use native `onInput` for every edit, for example. In both dialects,
+`OCTANE_NATIVE_TEXT_ONCHANGE` warns when a text host appears to carry React-style
+`onChange`; native commit-on-blur can be marked with the non-serialized
+`suppressNativeChangeWarning` host hint. Check
 [Differences from React](/docs/differences-from-react) when porting a component.
 
 Choose **TSRX** for new Octane code when lists and branches are a large part of the

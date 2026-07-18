@@ -13,6 +13,7 @@ import {
 	EffectfulCounter,
 	InputEcho,
 	EventLog,
+	CheckableEventLog,
 	HoverTarget,
 } from './_fixtures/counter.tsrx';
 
@@ -70,6 +71,15 @@ describe('native event semantics (intentional divergence from React)', () => {
 		const { getByLabelText } = render(EventLog, { props: { log } });
 		fireEvent.input(getByLabelText('field'), { target: { value: 'abc' } });
 		expect(log.mock.calls).toEqual([['input']]);
+	});
+
+	it('fireEvent.change on a checkbox is an explicit change dispatch, not click activation', () => {
+		const log = vi.fn();
+		const { getByLabelText } = render(CheckableEventLog, { props: { log } });
+		const checkbox = getByLabelText('enabled') as HTMLInputElement;
+		fireEvent.change(checkbox, { target: { checked: true } });
+		expect(checkbox.checked).toBe(true);
+		expect(log.mock.calls).toEqual([['change']]);
 	});
 
 	// RTL double-dispatches mouseEnter as mouseover to feed React's plugin

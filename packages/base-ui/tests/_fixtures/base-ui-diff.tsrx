@@ -143,6 +143,16 @@ export function NumberFieldBasic() @{
 	</NumberField.Root>
 }
 
+// The visually hidden number input is the form-facing native commit path. This
+// fixture makes that host observable independently from the visible per-edit text
+// field, so changing it to input-event semantics would break a consumer-visible
+// value update.
+export function NumberFieldHiddenNativeCommit() @{
+	<NumberField.Root defaultValue={5} name="quantity">
+		<NumberField.Input className="nf-input" />
+	</NumberField.Root>
+}
+
 // Dialog (CLOSED) — Root + Trigger only. The popup/interactions are unmounted while closed, so
 // this renders just the trigger button. Proves the whole Store-based popup foundation (DialogStore
 // on ReactStore, the popups engine's trigger registration + open-change sync, useClick) produces a
