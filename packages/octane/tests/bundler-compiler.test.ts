@@ -586,6 +586,7 @@ export function App(p) @{
 			dev: false,
 		});
 		expect(server?.code).toContain('_$ssrTry(');
+		expect(server?.code).toContain('(__error, __scope, __reset) =>');
 		expect(server?.code).toContain(', undefined, true)');
 		expect(server?.code).not.toContain('ErrorBoundary');
 
@@ -598,6 +599,24 @@ export function App(p) @{ <Boundary fallback={p.fallback}><span>ok</span></Bound
 		expect(dynamic?.code).toContain('ErrorBoundary as Boundary');
 		expect(dynamic?.code).toContain('_$componentSlot(');
 		expect(dynamic?.code).not.toContain('_$tryBlock(');
+
+		const mixedSource = `import { ErrorBoundary as Boundary } from 'octane';
+export function App(p) @{ <><Boundary fallback={<span>static</span>}><span>ok</span></Boundary><Boundary fallback={p.fallback}><span>dynamic</span></Boundary></> }`;
+		const mixed = compiler.transform(mixedSource, '/project/src/MixedBoundary.tsrx', {
+			hmr: false,
+			dev: false,
+		});
+		expect(mixed?.code).toContain('ErrorBoundary as Boundary');
+		expect(mixed?.code).toContain('_$tryBlock(');
+		expect(mixed?.code).toContain('_$componentSlot(');
+
+		const mixedServer = compiler.transform(mixedSource, '/project/src/MixedBoundary.tsrx', {
+			environment: 'server',
+			dev: false,
+		});
+		expect(mixedServer?.code).toContain('ErrorBoundary as Boundary');
+		expect(mixedServer?.code).toContain('_$ssrTry(');
+		expect(mixedServer?.code).toContain('_$ssrComponent(');
 
 		const asyncFallback = compiler.transform(
 			`import { ErrorBoundary as Boundary } from 'octane';

@@ -649,7 +649,7 @@ function hasIdentifierReference(root, name) {
 		if (seen.has(value)) return;
 		seen.add(value);
 		if (value.type === 'ImportDeclaration') return;
-		if (value.type === 'Identifier' && value.name === name) {
+		if ((value.type === 'Identifier' || value.type === 'JSXIdentifier') && value.name === name) {
 			found = true;
 			return;
 		}
