@@ -1,5 +1,16 @@
 # @octanejs/three
 
+## 0.1.3
+
+### Patch Changes
+
+- d426046: Mark package modules as side-effect-free so bundlers can remove unused
+  public-root subsystems such as portals, DOM regions, and scheduling from
+  Canvas-only applications.
+- Updated dependencies [d426046]
+- Updated dependencies [f511024]
+  - octane@0.1.10
+
 ## 0.1.2
 
 ### Patch Changes

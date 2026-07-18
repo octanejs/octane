@@ -1,5 +1,16 @@
 # @octanejs/rsbuild-plugin
 
+## 0.1.5
+
+### Patch Changes
+
+- Updated dependencies [d426046]
+- Updated dependencies [d426046]
+- Updated dependencies [f511024]
+  - @octanejs/app-core@0.0.6
+  - octane@0.1.10
+  - @octanejs/rspack-plugin@0.1.5
+
 ## 0.1.4
 
 ### Patch Changes
