@@ -720,10 +720,10 @@ function allocHookSymbol(st, owner, local, imported, node) {
 		// Symbol() collapses those paths and collides state across call sites.
 		// Short filename hash + index; no module path in the output (see
 		// compile.js hookSlotHash for the full rationale).
-		symbolExpr = `Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
+		symbolExpr = `/* @__PURE__ */ Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
 	} else {
 		const numericExpr = id === 0 ? st.slotBaseName : `${st.slotBaseName} + ${id}`;
-		symbolExpr = `Symbol(${numericExpr})`;
+		symbolExpr = `/* @__PURE__ */ Symbol(${numericExpr})`;
 	}
 	if (st.profile) {
 		const componentId = `${st.profileFilename || '<anon>'}#${owner.name}@${owner.line}:${owner.column}`;

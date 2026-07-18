@@ -1,6 +1,7 @@
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
+export { initializeHydrationEventCapture } from './hydration/event-capture.js';
 
 // Profiling's application API and compiler ABI live at `octane/profiling`;
 // neither belongs on the React-shaped main namespace.
@@ -182,6 +183,7 @@ export {
 	componentSlotVoid,
 	componentSlotLite,
 	compilerCacheContext,
+	markSingleRoot,
 	markChildrenBlock,
 	childSlot,
 	positionalChildren,
