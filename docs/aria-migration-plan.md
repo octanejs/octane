@@ -1,5 +1,24 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-18, later): Phase 3 COMPLETE.** The overlays hooks tier
+> landed: stately `useTooltipTriggerState`; the full aria overlays area
+> (`usePreventScroll`, `ariaHideOutside`, `DismissButton`, `PortalProvider`,
+> `useOverlay`, `useOverlayTrigger`, `useOverlayPosition` + `calculatePosition`,
+> `Overlay`/`useOverlayFocusContain`, `useModal`/`ModalProvider`/`OverlayProvider`/
+> `OverlayContainer`, `useModalOverlay`, `usePopover`); and the consumers
+> `useDialog`, `useTooltip`/`useTooltipTrigger`, `useSelect`/`useHiddenSelect`/
+> `HiddenSelect`, `useComboBox`. 167 tests in the aria project; **Select + ComboBox
+> run byte-identical vs real react-aria** (mount + open/type/filter). The only
+> octane mapping was `ReactDOM.createPortal`→octane `createPortal` (Overlay,
+> useModal) — no octane-core changes, no octane bugs. Dialog/tooltip/overlay
+> focus-trap/dismiss/scroll-lock paths are covered by behavioral tests: the
+> differential rig shares one document, so focus/portal/positioning aren't
+> rig-driveable (same gotcha as Phase 1's focus fixtures). **Autocomplete
+> deferred** — `useComboBox` does not import `autocomplete/*` in 3.50.0.
+> Combobox/select text inputs ride octane's native `onInput` (no synthetic
+> `onChange`); the hidden `<select>`'s native `change` handler is kept as-is
+> (selects are not text inputs). Next: Phase 4 (RAC foundation).
+
 > **Progress (2026-07-18): Phase 2 COMPLETE.** The collections + selection tier
 > landed: the stately collections engine (`CollectionBuilder`/`Item`/`Section`/
 > `getChildNodes`/`useCollection`) and selection core (`Selection`/
@@ -321,7 +340,7 @@ open path isn't rig-driveable — focus can't be driven across the shared
 document — so it stays on behavioral coverage, matching the leaf-differential
 precedent.)
 
-### Phase 3 — Overlays (hooks tier)
+### Phase 3 — Overlays (hooks tier) — COMPLETE (2026-07-18)
 - Stately overlays (`useOverlayTriggerState`, `useTooltipTriggerState`) +
   the whole `@react-aria/overlays` area: `Overlay`/`PortalProvider`,
   `useOverlay`, `useOverlayTrigger`, `useOverlayPosition`

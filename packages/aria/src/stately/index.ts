@@ -93,6 +93,10 @@ export type { SubmenuTriggerState } from './menu/useSubmenuTriggerState';
 export { useOverlayTriggerState } from './overlays/useOverlayTriggerState';
 export type { OverlayTriggerProps, OverlayTriggerState } from './overlays/useOverlayTriggerState';
 
+// tooltip
+export { useTooltipTriggerState } from './tooltip/useTooltipTriggerState';
+export type { TooltipTriggerProps, TooltipTriggerState } from './tooltip/useTooltipTriggerState';
+
 // select
 export { useSelectState } from './select/useSelectState';
 export type { SelectState, SelectStateOptions } from './select/useSelectState';

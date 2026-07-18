@@ -250,3 +250,71 @@ export type { AriaSelectableCollectionOptions } from './selection/useSelectableC
 export type { SelectableItemAria, SelectableItemOptions } from './selection/useSelectableItem';
 export type { AriaSelectableListOptions } from './selection/useSelectableList';
 export type { AriaTypeSelectOptions, TypeSelectAria } from './selection/useTypeSelect';
+
+// overlays — mirrors the @react-aria/overlays shim surface.
+export { useOverlay } from './overlays/useOverlay';
+export { useOverlayPosition } from './overlays/useOverlayPosition';
+export { useOverlayTrigger } from './overlays/useOverlayTrigger';
+export { usePreventScroll } from './overlays/usePreventScroll';
+export { ariaHideOutside } from './overlays/ariaHideOutside';
+export { DismissButton } from './overlays/DismissButton';
+export { Overlay, useOverlayFocusContain } from './overlays/Overlay';
+export {
+	ModalProvider,
+	useModalProvider,
+	OverlayProvider,
+	OverlayContainer,
+	useModal,
+} from './overlays/useModal';
+export { usePopover } from './overlays/usePopover';
+export { useModalOverlay } from './overlays/useModalOverlay';
+export { UNSAFE_PortalProvider, useUNSAFE_PortalContext } from './overlays/PortalProvider';
+export type {
+	AriaPositionProps,
+	PositionAria,
+	Placement,
+	PlacementAxis,
+	PositionProps,
+	Axis,
+	SizeAxis,
+} from './overlays/useOverlayPosition';
+export type { AriaOverlayProps, OverlayAria } from './overlays/useOverlay';
+export type { OverlayTriggerAria, OverlayTriggerProps } from './overlays/useOverlayTrigger';
+export type {
+	AriaModalOptions,
+	ModalAria,
+	ModalProviderAria,
+	ModalProviderProps,
+	OverlayContainerProps,
+} from './overlays/useModal';
+export type { DismissButtonProps } from './overlays/DismissButton';
+export type { OverlayProps } from './overlays/Overlay';
+export type { AriaPopoverProps, PopoverAria } from './overlays/usePopover';
+export type { AriaModalOverlayProps, ModalOverlayAria } from './overlays/useModalOverlay';
+export type { PortalProviderProps, PortalProviderContextValue } from './overlays/PortalProvider';
+
+// dialog — mirrors the @react-aria/dialog shim surface.
+export { useDialog } from './dialog/useDialog';
+export type { AriaDialogProps, DialogAria } from './dialog/useDialog';
+
+// tooltip — mirrors the @react-aria/tooltip shim surface.
+export { useTooltip } from './tooltip/useTooltip';
+export { useTooltipTrigger } from './tooltip/useTooltipTrigger';
+export type { TooltipProps, AriaTooltipProps, TooltipAria } from './tooltip/useTooltip';
+export type { TooltipTriggerAria } from './tooltip/useTooltipTrigger';
+export type { TooltipTriggerProps } from './stately/tooltip/useTooltipTriggerState';
+
+// select — mirrors the @react-aria/select shim surface.
+export { useSelect } from './select/useSelect';
+export { useHiddenSelect, HiddenSelect } from './select/HiddenSelect';
+export type { AriaSelectProps, AriaSelectOptions, SelectAria } from './select/useSelect';
+export type {
+	AriaHiddenSelectProps,
+	AriaHiddenSelectOptions,
+	HiddenSelectProps,
+	HiddenSelectAria,
+} from './select/HiddenSelect';
+
+// combobox — mirrors the @react-aria/combobox shim surface.
+export { useComboBox } from './combobox/useComboBox';
+export type { AriaComboBoxProps, AriaComboBoxOptions, ComboBoxAria } from './combobox/useComboBox';

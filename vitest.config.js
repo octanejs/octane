@@ -1566,6 +1566,12 @@ export default defineConfig({
 					name: 'aria',
 					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
 					environment: 'jsdom',
+					// The differential fixtures import the real react-aria consumer modules
+					// (useComboBox/useSelect pull in the whole overlays/listbox/menu graph); the
+					// first mount compiles + imports that on a loaded CI shard, which overran the
+					// 5s vitest default. Match the other differential-bearing projects at 30s.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// Differential precompile for aria fixtures: rewrites `@octanejs/aria` →
 					// `react-aria` (and `/stately` → `react-stately`, `/components` →
 					// `react-aria-components`) so the React side runs the real React Aria.
