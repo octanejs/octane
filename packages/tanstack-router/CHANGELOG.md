@@ -1,5 +1,24 @@
 # @octanejs/tanstack-router
 
+## 0.1.8
+
+### Patch Changes
+
+- 5b7d9ed: Make `router.load()` wait for platform-deferred View Transition match commits so an initial route can be rendered or hydrated immediately after the promise resolves, while sequencing prior pending callbacks without leaking their failures and preserving final success, redirect, error, and not-found status codes.
+- Updated dependencies [c704664]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [91b5f45]
+- Updated dependencies [c16778a]
+- Updated dependencies [39f2c00]
+- Updated dependencies [aabf79c]
+- Updated dependencies [07511e4]
+- Updated dependencies [5b7d9ed]
+- Updated dependencies [0d2e265]
+- Updated dependencies [3168360]
+- Updated dependencies [81c8842]
+  - octane@0.1.9
+
 ## 0.1.7
 
 ### Patch Changes

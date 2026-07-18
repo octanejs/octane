@@ -1,5 +1,73 @@
 # octane
 
+## 0.1.9
+
+### Patch Changes
+
+- c704664: A synchronous commit during a controlled checkable's click dispatch (a handler
+  calling `flushSync` — press-state machinery does this) no longer reasserts the
+  stale controlled `checked` over the user's in-flight toggle. The platform
+  toggles a checkbox/radio before its click event and fires `input`/`change`
+  after it; reasserting in between reverted the toggle before any native handler
+  could read it. During that activation window the `checked` binding now uses
+  React's prop-diff semantics (an unchanged prop leaves the DOM drift for the
+  event-side restore; a prop that actually changed still writes), matching
+  React's observable behavior. The window covers the activated element and its
+  radio-group cousins: the platform unchecked the cousin as part of the same
+  toggle, and re-checking it mid-window would make the browser uncheck the
+  activated radio before its follow-up events fire. The rejection contract is
+  unchanged: an unheard or rejected toggle still snaps back after the follow-up
+  events.
+
+  Nested or canceled programmatic activations now close their window at the end
+  of their own click dispatch. Checked and radio restoration is also installed as
+  an optional runtime capability, so apps without controlled `checked` bindings
+  do not retain the radio-group restoration code.
+
+- 5b7d9ed: Discard a root's partially rendered tree when an uncaught initial render fails, preventing aborted effects from leaking into a later flush while keeping the root available for a recovery render.
+- 5b7d9ed: Make the direct Vite compiler integration discover raw Octane dependencies from the nearest parent package manifest when Vite uses a nested root, and publish first-party types for `octane/compiler/vite`.
+- 91b5f45: Infer omitted dependency arrays for locally declared custom hooks in
+  full-compiled `.tsrx`/`.tsx` modules that transparently forward their callback
+  and final dependency parameter to a supported hook.
+- c16778a: Fix children loss when a value-position host descriptor changes its tag: the
+  de-opt renderer recreated the element but preserved the children slot, whose
+  markers and content lived inside the removed element, so children-block
+  children (e.g. a styled-components-style `createElement(props.tag, { children })`)
+  kept rendering into the detached node. The recreate path now tears the slot
+  down so children remount into the fresh element, matching React's remount
+  semantics for a host tag change.
+- 39f2c00: Fix TSRX shorthand components that return before reaching their trailing
+  template. Early values, bare or undefined returns, and trailing compiled JSX now
+  reconcile through one returned-output path across client rendering and
+  hydration; folded control-flow cache dependencies stay scoped correctly, and
+  incompatible HMR edits safely invalidate the module.
+
+  Restore feature-level tree shaking for ordinary component boundaries. Built-in
+  boundary behavior now travels through component capability flags, so rendering a
+  normal component no longer retains unused Hydrate, Suspense, or ViewTransition
+  implementations through direct identity checks. Deferred-hydration setup and
+  ViewTransition scheduler integration now install through retained feature
+  capabilities, allowing their concrete runtime graphs to disappear from clients
+  that do not use those APIs.
+
+- aabf79c: Reduce production framework payloads by keeping transition swaps, generic
+  component returns, and generic attribute routing out of bundles that do not use
+  them. Production compilation now preserves void-component proofs across local
+  module imports, lowers null-only component guards and statically authored error
+  boundaries, and emits narrow boolean/ARIA attribute writers when their full
+  semantics are known at compile time.
+- 07511e4: Keep `onChange` native while adding compile-time and development-runtime text-host
+  diagnostics, explicit commit intent, and correct controlled checkbox/radio
+  restoration through native change. Use native `input` events for Base UI text
+  controls while preserving the number field's form-facing native change commit,
+  propagate authored-source diagnostics through MDX compilation and Vite, and make
+  Octane's bridge tooling target React-style text-host event wiring without rewriting
+  component callbacks or non-text controls.
+- 5b7d9ed: Compile template directives nested directly inside other directive bodies, including conditional keyed lists whose items own `@try` boundaries, in both client and server builds.
+- 0d2e265: Expose generic hydration ownership markers for externally serialized thenables and nested hydration containers, and preserve leading `#` package-import aliases in bundler module IDs.
+- 3168360: Fixed compiling TypeScript modules that place multiple paired JSX elements on the same line in an array literal, including arrays inside JSX expression children.
+- 81c8842: Keep scoped-style hashes stable across Hydrate splitting and renderer-boundary lowering: the compiler now restamps every scoped `<style>` with its authored-position hash after a source rewrite, so client and server compiles of one module always agree on the emitted scope classes instead of hydration-mismatching every element after a split boundary. A scoped `<style>` authored directly inside split Hydrate children is now a compile error (`OCTANE_HYDRATE_SPLIT_STYLE`) because extraction would tear the owning component's single style scope in half; move the style outside the boundary, into a child component, or opt out with `split={false}`.
+
 ## 0.1.8
 
 ### Patch Changes
