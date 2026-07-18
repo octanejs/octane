@@ -90,32 +90,46 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'on-this-page')).toBeGreaterThan(0);
 		expect(classCount(html, 'demo')).toBeGreaterThan(0);
 		expect(classCount(html, 'shiki')).toBeGreaterThan(0);
+		expect(html).toContain('id="deferred-hydration"');
+		expect(html).toContain('Deferred hydration');
 	});
 
 	// This route deliberately renders every chart and accessible data table; give
 	// that full integration path headroom beyond the generic unit-test timeout on
 	// slower CI runners.
-	it('server-renders /benchmarks with complete Visx charts and table data', async () => {
+	it('server-renders /benchmarks with complete bar charts and table data', async () => {
 		const { response, html } = await get('/benchmarks');
 		const cards = [...FRAMEWORK_CARDS, ...OCTANE_CARDS];
-		const expectedBars = cards.reduce(
-			(total, card) =>
+		// Each card server-renders its default "overall" view: one geomean bar per
+		// series with a computable ratio vs the reference (rows where either side
+		// is missing or zero drop out); single-series cards chart every operation.
+		const expectedBars = cards.reduce((total, card) => {
+			if (card.series.length === 1) {
+				return (
+					total + card.rows.filter((row) => typeof row[card.series[0].key] === 'number').length
+				);
+			}
+			const reference = card.series[0];
+			return (
 				total +
-				card.rows.reduce(
-					(count, row) =>
-						count + card.series.filter((series) => typeof row[series.key] === 'number').length,
-					0,
-				),
-			0,
-		);
+				card.series.filter((series) =>
+					card.rows.some(
+						(row) =>
+							typeof row[reference.key] === 'number' &&
+							(row[reference.key] as number) > 0 &&
+							typeof row[series.key] === 'number' &&
+							(row[series.key] as number) > 0,
+					),
+				).length
+			);
+		}, 0);
 		expect(response.status).toBe(200);
 		expect(classCount(html, 'benchpage')).toBeGreaterThan(0);
 		expect(html).toContain('aria-labelledby="bench-frameworks"');
 		expect(html).toContain('aria-labelledby="bench-internal"');
-		// Every no-JS benchmark card ships both the real SVG and its accessible table.
+		// Every no-JS benchmark card ships both the real chart and its accessible table.
 		expect(classCount(html, 'bench-card')).toBe(cards.length);
-		expect(classCount(html, 'bench-chart')).toBe(cards.length);
-		expect(classCount(html, 'visx-bar')).toBe(expectedBars);
+		expect(classCount(html, 'bench-fill')).toBe(expectedBars);
 		expect(html).toContain('<th scope="row"');
 		expect(classCount(html, 'bench-table')).toBe(cards.length);
 		expect(classCount(html, 'bench-plot-shell')).toBe(0);

@@ -23,6 +23,6 @@ export function hasComponentFlags(component: unknown, flags: number): boolean {
 	return (
 		typeof component === 'function' &&
 		Object.hasOwn(component, OCTANE_COMPONENT_FLAGS) &&
-		(((component as FlaggedComponent)[OCTANE_COMPONENT_FLAGS] ?? 0) & flags) === flags
+		((component as FlaggedComponent)[OCTANE_COMPONENT_FLAGS]! & flags) === flags
 	);
 }

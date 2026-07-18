@@ -214,6 +214,9 @@ catalogs:
     preact-render-to-string: ^6.7.0
     prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
+    '@internationalized/date': ^3.12.2
+    '@internationalized/number': ^3.6.7
+    '@internationalized/string': ^3.2.9
     '@dnd-kit/abstract': 0.5.0
     '@dnd-kit/collision': 0.5.0
     '@dnd-kit/dom': 0.5.0

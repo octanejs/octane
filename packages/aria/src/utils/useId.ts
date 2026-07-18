@@ -125,6 +125,11 @@ export function mergeIds(idA: string, idB: string): string {
  * @param depArray - When to recalculate if the id is in the DOM.
  */
 export function useSlotId(depArray?: ReadonlyArray<any>): string;
+// Slot-threading form: sibling ported hooks pass their derived sub-slot as the trailing arg.
+export function useSlotId(
+	depArray: ReadonlyArray<any> | undefined,
+	slot: symbol | undefined,
+): string;
 export function useSlotId(...args: any[]): string {
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useSlotId');

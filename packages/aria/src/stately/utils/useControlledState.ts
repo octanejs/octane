@@ -23,6 +23,13 @@ export function useControlledState<T, C = T>(
 	defaultValue: Exclude<T, undefined>,
 	onChange?: (v: C, ...args: any[]) => void,
 ): [T, (value: SetStateAction<T>, ...args: any[]) => void];
+// Slot-threading form: sibling ported hooks pass their derived sub-slot as the trailing arg.
+export function useControlledState<T, C = T>(
+	value: Exclude<T, undefined> | undefined,
+	defaultValue: Exclude<T, undefined> | undefined,
+	onChange: ((v: C, ...args: any[]) => void) | undefined,
+	slot: symbol | undefined,
+): [T, (value: SetStateAction<T>, ...args: any[]) => void];
 export function useControlledState(...args: any[]): any {
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useControlledState');

@@ -10135,22 +10135,26 @@ function reportListenerError(err: unknown): void {
 // inherit the outer commit window. Non-discrete events keep microtask-batched
 // semantics so they don't thrash the scheduler.
 function maybeFlushDiscrete(type: string): void {
-	if (_dispatchDepth !== 0 || !DISCRETE_EVENTS.has(type)) return;
-	// Commit handler-scheduled work first, so the controlled restore below
-	// compares the DOM against the values the handlers just rendered.
-	if (hasPendingWork()) {
-		// A transition-only queue in an app armed for ViewTransition must reach the
-		// regular flush controller. flushSync deliberately skips animations; using
-		// it here meant the canonical onClick={() => startTransition(...)} pattern
-		// could never call document.startViewTransition. flush() also knows how to
-		// leave a second transition queued while an earlier one is still in flight.
-		if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
-		else flushSync(noop);
+	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type)) {
+		// Commit handler-scheduled work first, so the controlled restore below
+		// compares the DOM against the values the handlers just rendered.
+		if (hasPendingWork()) {
+			// A transition-only queue in an app armed for ViewTransition must reach the
+			// regular flush controller. flushSync deliberately skips animations; using
+			// it here meant the canonical onClick={() => startTransition(...)} pattern
+			// could never call document.startViewTransition. flush() also knows how to
+			// leave a second transition queued while an earlier one is still in flight.
+			if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
+			else flushSync(noop);
+		}
+		// The restore runs even when NO work was scheduled — a rejected/unheard
+		// edit (no onInput, or an Object.is-equal setState) schedules nothing and
+		// is exactly the case that must snap back (React's restoreControlledState).
+		if (pendingRestores.length > 0) restoreControlledStates();
 	}
-	// The restore runs even when NO work was scheduled — a rejected/unheard
-	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
-	// is exactly the case that must snap back (React's restoreControlledState).
-	if (pendingRestores.length > 0) restoreControlledStates();
+	// Clear after the click's own handlers (and its outermost flush, when this is
+	// not a nested dispatch), including canceled/eventless activations.
+	if (type === 'click') activationCheckable = null;
 }
 
 function finishCaptureDispatch(event: Event): void {
@@ -10655,6 +10659,20 @@ const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 let pendingRestores: Element[] = [];
 let restoreMicrotaskScheduled = false;
 
+// The checkable input whose click ACTIVATION is currently in flight: the
+// platform has toggled `checked` but the activation's `input`/`change`
+// post-steps have not been dispatched yet. Commits inside this window use
+// React's prop-diff (not DOM-diff) semantics for `checked`, so a handler's
+// flushSync cannot revert the user's toggle before the native input/change
+// handlers get to read it. Set by maybeEnqueueRestore and cleared at the end
+// of that click's dispatch by maybeFlushDiscrete.
+let activationCheckable: Element | null = null;
+
+// Installed by the first retained controlled-checked binding. Generic text and
+// select restoration keep only the nullable call when checked/radio support is
+// absent, allowing the concrete checked + radio-group graph to tree-shake.
+let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) | null = null;
+
 // A native select choice emits `input` immediately followed by `change`. Octane
 // exposes native onChange, so restoring the controlled selection at the end of
 // the first dispatch would make the second handler observe the old value. Hold
@@ -10898,6 +10916,7 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		return;
 	}
 	const b = !!value;
+	CHECKED_RESTORE ??= restoreCheckedState;
 	if (first) {
 		ctrl.c = b;
 		if (process.env.NODE_ENV !== 'production') queueDevControlledCheck(input, ctrl);
@@ -10910,8 +10929,35 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
+	// While a click activation is in flight (platform toggled the DOM;
+	// input/change not yet dispatched), an UNCHANGED prop must not clobber the
+	// user's toggle — React's update path diffs prev props, not the DOM, so a
+	// mid-dispatch flushSync commit leaves the drift for the event-side restore.
+	// This covers the activated element AND its radio-group cousins: the platform
+	// unchecked the cousin as part of the same toggle, and re-checking it would
+	// make the browser uncheck the activation target before its follow-up events
+	// fire. A prop that actually CHANGED in this window still writes.
+	const changed = b !== ctrl.c;
 	ctrl.c = b;
-	if (input.checked !== b) input.checked = b;
+	if ((changed || !inActivationWindow(input)) && input.checked !== b) input.checked = b;
+}
+
+/**
+ * True while `input` is the checkable whose click activation is in flight, or
+ * a same-group radio cousin of it (group scope mirrors restoreRadioCousins:
+ * same non-empty name, same form owner).
+ */
+function inActivationWindow(input: HTMLInputElement): boolean {
+	const target = activationCheckable as HTMLInputElement | null;
+	if (target === null) return false;
+	if (input === target) return true;
+	return (
+		input.type === 'radio' &&
+		target.type === 'radio' &&
+		input.name !== '' &&
+		input.name === target.name &&
+		input.form === target.form
+	);
 }
 
 export function setChecked(el: Element, value: unknown): void {
@@ -11302,19 +11348,22 @@ function restoreControlledElement(el: Element): void {
 		if (ctrl.sv !== null) projectSelectValue(el as HTMLSelectElement, ctrl.sv, false);
 		return;
 	}
-	if (ctrl.c !== -1) {
-		const input = el as HTMLInputElement;
-		if (input.checked !== ctrl.c) input.checked = ctrl.c;
-		// A radio's drift flips its GROUP cousins too (checking one unchecks
-		// another) — restore every armed cousin to ITS rendered state
-		// (React's updateNamedCousins).
-		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
-	}
+	CHECKED_RESTORE?.(el as HTMLInputElement, ctrl);
 	if (
 		ctrl.v !== UNCONTROLLED &&
 		valueNeedsWrite(el as HTMLInputElement | HTMLTextAreaElement, ctrl.v)
 	) {
 		(el as HTMLInputElement).value = toControlledString(ctrl.v);
+	}
+}
+
+function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): void {
+	if (ctrl.c !== -1) {
+		if (input.checked !== ctrl.c) input.checked = ctrl.c;
+		// A radio's drift flips its GROUP cousins too (checking one unchecks
+		// another) — restore every armed cousin to ITS rendered state
+		// (React's updateNamedCousins).
+		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
 	}
 }
 
@@ -11384,7 +11433,20 @@ function maybeEnqueueRestore(event: Event): void {
 	// A checkable's click never arms — its `input`/`change` follow-ups do
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
-	if (event.type === 'click') return;
+	if (event.type === 'click') {
+		// Mark the checkable whose ACTIVATION is in flight: the platform toggled
+		// `checked` before this click dispatch, and its `input`/`change` post-steps
+		// have not fired yet. A commit inside this window (a handler's flushSync —
+		// press-state machinery does this) must not reassert the still-uncommitted
+		// prop over the user's toggle: the checked binding switches to React's
+		// prop-diff semantics for the marked element (see setCheckedState), and the
+		// follow-up input/change arms the ordinary restore at the right time.
+		const ctrl = t.$$ctrl as ControlledState;
+		if (ctrl.c !== -1) {
+			activationCheckable = t as Element;
+		}
+		return;
+	}
 	if (event.type === 'input' && t.localName === 'select') {
 		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
 		if (!selectInputRestoreScheduled) {

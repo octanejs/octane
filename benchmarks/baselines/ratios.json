@@ -78,7 +78,7 @@
     "target": "octane-tsrx",
     "reference": "ripple",
     "maxRatio": 1.47,
-    "note": "Rows TOTAL gzip vs ripple, same app, normalized minify. The committed 2026-07-15 record was stale: a clean base build reproduced 22391 bytes, while the optional Hydrate/ViewTransition split reduces the current runtime to 18656 bytes. The resulting 18656 / 12814 = 1.456x record is guarded at 1.47x."
+    "note": "Rows TOTAL gzip vs ripple, same app, normalized minify. Optional Hydrate/ViewTransition and checked-restoration capabilities reduce the current runtime to 18545 bytes. The resulting 18545 / 12814 = 1.447x record is guarded at 1.47x."
   },
   {
     "suite": "bundle-size",
@@ -86,7 +86,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 1.28,
-    "note": "Rows TOTAL gzip vs solid, same app, normalized minify. The current deterministic record measured 18656 / 14732 = 1.266x on 2026-07-17; the ceiling is rebaselined to 1.28x."
+    "note": "Rows TOTAL gzip vs solid, same app, normalized minify. The current deterministic record measured 18545 / 14732 = 1.259x on 2026-07-18; the ceiling remains 1.28x."
   },
   {
     "suite": "codegen-size",
@@ -118,7 +118,7 @@
     "target": "octane-tsrx",
     "reference": "solid",
     "maxRatio": 1.59,
-    "note": "TodoMVC APP-CODE gzip vs solid, normalized minify. The current deterministic record measured 2045 / 1292 = 1.583x on 2026-07-17; the ceiling is rebaselined to 1.59x."
+    "note": "TodoMVC APP-CODE gzip vs solid, normalized minify. The current deterministic record measured 2046 / 1292 = 1.584x on 2026-07-18; the ceiling remains 1.59x."
   },
   {
     "suite": "bundle-size",
@@ -126,7 +126,7 @@
     "target": "octane-tsrx",
     "reference": "ripple",
     "maxRatio": 1.21,
-    "note": "TodoMVC APP-CODE gzip vs ripple, normalized minify. The current deterministic record measured 2045 / 1696 = 1.206x on 2026-07-17; the ceiling is rebaselined to 1.21x."
+    "note": "TodoMVC APP-CODE gzip vs ripple, normalized minify. The current deterministic record measured 2046 / 1696 = 1.206x on 2026-07-18; the ceiling remains 1.21x."
   },
   {
     "suite": "bundle-size",
@@ -150,7 +150,7 @@
     "target": "octane-tsrx",
     "reference": "svelte",
     "maxRatio": 1.03,
-    "note": "Rows TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 18656 / 18281 = 1.021x on 2026-07-17; the ceiling is rebaselined to 1.03x."
+    "note": "Rows TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 18545 / 18281 = 1.014x on 2026-07-18; the ceiling remains 1.03x."
   },
   {
     "suite": "bundle-size",
@@ -166,7 +166,7 @@
     "target": "octane-tsrx",
     "reference": "svelte",
     "maxRatio": 1.07,
-    "note": "TodoMVC TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 19651 / 18481 = 1.063x on 2026-07-17; the ceiling is rebaselined to 1.07x."
+    "note": "TodoMVC TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 19744 / 18481 = 1.068x on 2026-07-18; the ceiling remains 1.07x."
   },
   {
     "suite": "bundle-size",
@@ -174,7 +174,7 @@
     "target": "octane-tsrx",
     "reference": "svelte",
     "maxRatio": 1.36,
-    "note": "TodoMVC APP-CODE production gzip vs Svelte 5, normalized minify. The current deterministic record measured 2045 / 1511 = 1.353x on 2026-07-17; the ceiling is rebaselined to 1.36x."
+    "note": "TodoMVC APP-CODE production gzip vs Svelte 5, normalized minify. The current deterministic record measured 2046 / 1511 = 1.354x on 2026-07-18; the ceiling remains 1.36x."
   },
   {
     "suite": "bundle-size",
@@ -182,7 +182,7 @@
     "target": "octane-tsrx",
     "reference": "svelte",
     "maxRatio": 1.04,
-    "note": "chat-stream TOTAL production gzip vs Svelte 5, normalized minify. The current deterministic record measured 19873 / 19123 = 1.039x on 2026-07-17; the ceiling is rebaselined to 1.04x."
+    "note": "chat-stream TOTAL production gzip vs Svelte 5, normalized minify. Optional checked/radio restoration keeps the unused graph out of this fixture; the current record is 19753 / 19123 = 1.033x on 2026-07-18, within the 1.04x ceiling."
   },
   {
     "suite": "bundle-size",
@@ -198,7 +198,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.64,
-    "note": "Weather app TOTAL production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition capabilities reduced the deterministic record from 50737 to 40886 bytes; 40886 / 65725 = 0.622x on 2026-07-17."
+    "note": "Weather app TOTAL production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition and checked-restoration capabilities reduced the deterministic record from 50737 to 40981 bytes after merging current main; 40981 / 65725 = 0.624x on 2026-07-18."
   },
   {
     "suite": "bundle-size",
@@ -206,7 +206,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 1.6,
-    "note": "Weather app APP-CODE production gzip vs React 19, including each port's shared weather service and formatting modules. The final record measured 7803 / 5291 = 1.475x on 2026-07-17; the 1.6x ceiling bounds compiled app growth separately from framework runtime."
+    "note": "Weather app APP-CODE production gzip vs React 19, including each port's shared weather service and formatting modules. The current record measured 7802 / 5291 = 1.475x on 2026-07-18; the 1.6x ceiling bounds compiled app growth separately from framework runtime."
   },
   {
     "suite": "bundle-size",
@@ -214,7 +214,7 @@
     "target": "octane-tsrx",
     "reference": "react",
     "maxRatio": 0.56,
-    "note": "Weather app FRAMEWORK production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition capabilities measured 33083 / 60434 = 0.547x on 2026-07-17; the tight deterministic ceiling catches either feature graph being retained again."
+    "note": "Weather app FRAMEWORK production gzip vs React 19, normalized minify. Component flags plus optional Hydrate/ViewTransition and checked-restoration capabilities measured 33179 / 60434 = 0.549x on 2026-07-18; the tight deterministic ceiling catches a feature graph being retained again."
   },
   {
     "suite": "weather-app-lighthouse",

@@ -40,11 +40,28 @@ export const websiteMdxOptions = {
 					'tsx',
 					'css',
 					'bash',
+					'html',
+					'json',
 					modifiedTsrxGrammar,
 					{ ...modifiedTsrxGrammar, name: 'tsrx' },
 				],
 				// Unknown fence languages render as plain text instead of throwing.
 				fallbackLanguage: 'text',
+				// Shiki writes the language nowhere on the emitted <pre>, so stamp the
+				// resolved language onto it: the CodeBlock wrapper reads this to label
+				// the panel header. Runs at compile/SSR time, so the label is in the
+				// served HTML (no client-only detection, no hydration mismatch).
+				transformers: [
+					{
+						name: 'octane:pre-language-attr',
+						pre(
+							this: { options: { lang?: string } },
+							node: { properties: Record<string, unknown> },
+						) {
+							node.properties['data-language'] = this.options.lang;
+						},
+					},
+				],
 			},
 		],
 	] as any[],
