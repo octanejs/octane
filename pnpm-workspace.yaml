@@ -299,6 +299,7 @@ catalogs:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': patches/@tsrx__core@0.1.37.patch
+  '@tsrx/core@0.1.40': patches/@tsrx__core@0.1.40.patch
 
 minimumReleaseAgeExclude:
   - '@tanstack/ai-client@0.21.0'
