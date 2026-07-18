@@ -19,6 +19,10 @@ import {
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
+import {
+	analyzeNativeChangeDiagnostics,
+	formatCompileDiagnostic,
+} from './native-change-diagnostics.js';
 import { findVoidRootImports, slotHooks } from './slot-hooks.js';
 import {
 	assertNoLiveClientOnlyImports,
@@ -312,6 +316,7 @@ class OctaneBundlerCompiler {
 		this.requireDirective = options.requireDirective === true;
 		this.warn = typeof options.warn === 'function' ? options.warn : null;
 		this.warnedUndirected = new Set();
+		this.warnedCompileDiagnostics = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
@@ -320,6 +325,10 @@ class OctaneBundlerCompiler {
 
 	/** Clear cached manifest/discovery decisions after a watched path changes. */
 	invalidate(path) {
+		// Invalidation starts a new watch generation. Diagnostics are deduped
+		// across client/server and hydrate-query transforms within one generation,
+		// but a fixed and later reintroduced warning must be visible again.
+		this.warnedCompileDiagnostics.clear();
 		if (path == null) {
 			this.manifestRuleCache.clear();
 			this.discoveryCache = null;
@@ -491,6 +500,16 @@ class OctaneBundlerCompiler {
 		this.warn(
 			`${filename} imports from 'octane' but has no 'use octane' module directive — with requireDirective enabled, Octane will not compile or transform it. Add 'use octane' at the top of the module if Octane should own it.`,
 		);
+	}
+
+	_forwardCompileDiagnostics(diagnostics) {
+		if (this.warn === null) return;
+		for (const diagnostic of diagnostics ?? []) {
+			const key = `${diagnostic.code}\0${diagnostic.filename}\0${diagnostic.start.offset}\0${diagnostic.end.offset}`;
+			if (this.warnedCompileDiagnostics.has(key)) continue;
+			this.warnedCompileDiagnostics.add(key);
+			this.warn(formatCompileDiagnostic(diagnostic));
+		}
 	}
 
 	_assertClientOnlySourceSupported(file, filename, renderer, collected) {
@@ -786,6 +805,18 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(
+				parseModule(source, filename),
+				source,
+				filename,
+				{
+					dom: renderer.target === 'dom',
+					renderer,
+					rendererBoundaries: this.renderers.boundaries,
+					rendererRegistry: this.renderers.registry,
+				},
+			);
+			const nativeChangeDiagnostics = nativeChangeAnalysis.diagnostics;
 			// Hydrate-boundary preparation consumes the directive-stripped source;
 			// blanking preserved every position, so its maps stay consistent.
 			const hydratePreparation =
@@ -796,6 +827,10 @@ class OctaneBundlerCompiler {
 			const out = compile(compileSource, filename, {
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
+				__nativeChangeDiagnostics: nativeChangeDiagnostics,
+				...(hydratePreparation === null && !hasRendererBoundaries
+					? { __nativeChangeAnalysis: nativeChangeAnalysis }
+					: null),
 				// Scoped-style hashes are position-derived; after the extraction
 				// rewrite the compiler restamps them from these authored
 				// coordinates so client and server compiles agree (compile.js).
@@ -823,9 +858,11 @@ class OctaneBundlerCompiler {
 				out.map = composeSourceMaps(out.map, hydratePreparation.map);
 				out.map = addSourceMapNeedles(out.map, out.code, source, hydratePreparation.mappingNeedles);
 			}
+			this._forwardCompileDiagnostics(out.diagnostics);
 			return {
 				code: out.code,
 				map: out.map,
+				diagnostics: out.diagnostics,
 				kind: 'compile',
 				renderer,
 				...(clientReference === null ? null : { clientReference }),

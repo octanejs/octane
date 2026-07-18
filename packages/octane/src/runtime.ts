@@ -8718,9 +8718,23 @@ export function setAttribute(el: Element, name: string, value: any): void {
 		setDangerouslySetInnerHTML(el, value);
 		return;
 	}
-	// Never a DOM attribute — a React warning-suppression hint (octane doesn't emit
-	// the warning, but the key must not land in the markup either).
+	// Never DOM attributes. The first is React's contentEditable warning hint;
+	// the latter two are Octane's native-change diagnostic intent/metadata.
+	// `suppressNativeChangeWarning` is deliberately JS-only so it works through
+	// spreads/createElement without leaking into client DOM or SSR markup.
 	if (name === 'suppressContentEditableWarning') return;
+	if (name === 'suppressNativeChangeWarning') {
+		if (process.env.NODE_ENV !== 'production') {
+			(el as any).__oct_native_change_suppressed = value === true;
+		}
+		return;
+	}
+	if (name === '__octaneNativeChangeDiagnostic') {
+		if (process.env.NODE_ENV !== 'production') {
+			setNativeChangeDiagnosticMetadata(el, value);
+		}
+		return;
+	}
 	// Controlled form props (`value`/`checked`/`defaultValue`/`defaultChecked`
 	// on <input>/<textarea>/<select>) route to the PROPERTY helpers — this arm
 	// covers spreads, de-opt descriptors, and previously-compiled output
@@ -9220,9 +9234,9 @@ function eventSlot(name: string): { type: string; key: string; capture: boolean 
 //   - `class`/`className`      → removeAttribute('class') (React parity; never `class=""`).
 //   - `style`                  → setStyle(el, null, prevValue), diff-clearing an object prev.
 //   - `dangerouslySetInnerHTML`→ clear innerHTML (the raw HTML owned the content).
-//   - `suppressHydrationWarning` → reset the `__oct_suppress` JS flag. It was never a DOM
-//     attribute (see applyDeoptProps), so a removeAttribute would silently no-op and leak
-//     the suppression onto later hydrations of a reused element.
+//   - JS-only warning hints/metadata → reset their runtime state. They were never DOM
+//     attributes, so a removeAttribute would silently no-op and leak intent onto a reused
+//     element.
 //   - `on*` handlers           → null the delegated slot key (bubble or capture phase).
 //   - everything else          → setAttribute(el, name, null), which applies the same
 //     htmlFor→for alias, aria-* semantics, and attribute-namespace routing the SET path
@@ -9241,6 +9255,12 @@ function removeHostProp(el: Element, name: string, prevValue?: unknown): void {
 		setDangerouslySetInnerHTML(el, null);
 	} else if (name === 'suppressHydrationWarning') {
 		(el as any).__oct_suppress = false;
+	} else if (name === 'suppressNativeChangeWarning') {
+		if (process.env.NODE_ENV !== 'production') {
+			(el as any).__oct_native_change_suppressed = false;
+		}
+	} else if (name === '__octaneNativeChangeDiagnostic') {
+		if (process.env.NODE_ENV !== 'production') setNativeChangeDiagnosticMetadata(el, undefined);
 	} else {
 		const actionName = formActionAttributeName(el, name);
 		if (actionName !== null) {
@@ -9292,6 +9312,8 @@ function isHostPropIdentityKey(name: string): boolean {
 		name === 'dangerouslySetInnerHTML' ||
 		name === 'suppressHydrationWarning' ||
 		name === 'suppressContentEditableWarning' ||
+		name === 'suppressNativeChangeWarning' ||
+		name === '__octaneNativeChangeDiagnostic' ||
 		name === 'autoFocus' ||
 		name === 'value' ||
 		name === 'defaultValue' ||
@@ -9430,6 +9452,20 @@ export function setSpread(
 	) {
 		(el as any).__oct_suppress = value.suppressHydrationWarning !== false;
 	}
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), 'suppressNativeChangeWarning')
+	) {
+		(el as any).__oct_native_change_suppressed = value.suppressNativeChangeWarning === true;
+	}
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		value != null &&
+		Object.prototype.propertyIsEnumerable.call(Object(value), '__octaneNativeChangeDiagnostic')
+	) {
+		setNativeChangeDiagnosticMetadata(el, value.__octaneNativeChangeDiagnostic);
+	}
 	if (!skipDangerouslySetInnerHTML) {
 		if (value != null && Object.prototype.propertyIsEnumerable.call(Object(value), 'children')) {
 			(el as any)[DANGER_HTML_SPREAD_CHILD] = value.children;
@@ -9469,7 +9505,10 @@ export function setSpread(
 			removeHostProp(el, k, prev[k]);
 		}
 	}
-	if (value == null) return;
+	if (value == null) {
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
+		return;
+	}
 	for (const k of Object.keys(Object(value))) {
 		if (k === 'key' || k === 'children') continue;
 		if (skipDangerouslySetInnerHTML && k === 'dangerouslySetInnerHTML') continue;
@@ -9489,7 +9528,12 @@ export function setSpread(
 			else attachRef(v, el);
 			continue;
 		}
-		if (k === 'suppressHydrationWarning') continue; // stamped before the loops (see above)
+		if (
+			k === 'suppressHydrationWarning' ||
+			k === 'suppressNativeChangeWarning' ||
+			k === '__octaneNativeChangeDiagnostic'
+		)
+			continue; // JS-only state stamped before the loops (see above)
 		if (k === 'class' || k === 'className') {
 			if (v === pv) continue;
 			// Hydration-aware + SVG-safe class write (suppress/warn parity with a
@@ -9539,6 +9583,7 @@ export function setSpread(
 		if (v === pv && !isControlledHostProp(el, k)) continue;
 		setAttribute(el, k, v);
 	}
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, mountScope);
 }
 
 // ---------------------------------------------------------------------------
@@ -9741,6 +9786,17 @@ interface HandlerBundle {
 	args: any[];
 }
 type EventSlot = ((event: Event) => any) | HandlerBundle | null | undefined;
+
+/** True only for a slot the delegated dispatcher can actually invoke. */
+function isUsableEventSlot(slot: EventSlot): boolean {
+	return (
+		typeof slot === 'function' ||
+		(slot !== null &&
+			typeof slot === 'object' &&
+			typeof slot.fn === 'function' &&
+			Array.isArray(slot.args))
+	);
+}
 
 // ---------------------------------------------------------------------------
 // Event bundle helpers (compiled-output plan 3b) — compiler targets for the
@@ -10047,10 +10103,10 @@ let _dispatchDepth = 0;
 
 // Capture and bubble delegation use separate native root listeners, but a
 // bubbling event is one discrete update window. When the capture listener can
-// hand off to a registered bubble listener, that listener owns the synchronous
-// flush. The microtask is an unstarvable fallback for a descendant native
-// listener stopping propagation before the event returns to the root.
-let _captureFlushFallbackScheduled = false;
+// hand off to a registered bubble listener, that listener owns controlled
+// restoration and the synchronous flush. A task fallback handles a descendant
+// native listener stopping propagation before the event returns to the root.
+const CAPTURE_FLUSH_FALLBACK = /* @__PURE__ */ Symbol('octane.capture.flushFallback');
 
 // Stamps marking a native event whose delegated walk has already run, per phase. A
 // single native event can reach more than one delegation listener when targets nest —
@@ -10160,15 +10216,32 @@ function maybeFlushDiscrete(type: string): void {
 function finishCaptureDispatch(event: Event): void {
 	const type = event.type;
 	if (!event.bubbles || event.cancelBubble || !_delegated.has(type)) {
+		if (event.bubbles && _delegated.has(type) && (event as any)[DELEGATED_DISPATCHED] !== true)
+			maybeEnqueueRestore(event);
 		maybeFlushDiscrete(type);
 		return;
 	}
-	if (!DISCRETE_EVENTS.has(type) || _captureFlushFallbackScheduled) return;
-	_captureFlushFallbackScheduled = true;
-	queueMicrotask(() => {
-		_captureFlushFallbackScheduled = false;
-		maybeFlushDiscrete(type);
-	});
+	if (!DISCRETE_EVENTS.has(type) || (event as any)[CAPTURE_FLUSH_FALLBACK] === true) return;
+	(event as any)[CAPTURE_FLUSH_FALLBACK] = true;
+	const fallback = () => {
+		// The ordinary bubble listener stamped the event and already flushed. If
+		// propagation was stopped below the root, it never ran: enqueue the edit
+		// restore now and close the capture-only discrete window.
+		if ((event as any)[DELEGATED_DISPATCHED] !== true) {
+			maybeEnqueueRestore(event);
+			maybeFlushDiscrete(type);
+		}
+	};
+	const target = event.target as HTMLInputElement | null;
+	const checkableChange =
+		type === 'change' &&
+		target?.localName === 'input' &&
+		(target.type === 'checkbox' || target.type === 'radio');
+	// Chromium may checkpoint microtasks between a checkable's root capture
+	// and bubble observations. Other discrete events retain the established
+	// microtask fallback (notably stopped controlled-select change).
+	if (checkableChange) setTimeout(fallback, 0);
+	else queueMicrotask(fallback);
 }
 
 function dispatchDelegated(event: Event): void {
@@ -10255,7 +10328,10 @@ function dispatchDelegated(event: Event): void {
 function dispatchDelegatedCapture(event: Event): void {
 	if ((event as any)[CAPTURE_DISPATCHED] === true) return;
 	(event as any)[CAPTURE_DISPATCHED] = true;
-	maybeEnqueueRestore(event);
+	// A registered bubble listener owns final restoration after bubble handlers.
+	// Enqueuing here would let the capture fallback restore a checkable before
+	// its native onChange handler can observe the activated value.
+	if (!event.bubbles || !_delegated.has(event.type)) maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const path: any[] = [];
 	for (let node = event.target as any; node !== null && node !== undefined; ) {
@@ -10624,8 +10700,6 @@ interface ControlledState {
 	composing: boolean;
 	/** Select re-projection already queued for the pending commit. */
 	queued: boolean;
-	/** Dev missing-native-handler warning already evaluated for this element. */
-	devChecked: boolean;
 	/** Whether the compiler's spread-aware form aggregation path has committed. */
 	formSeen: boolean;
 	/** Previous final default props, needed for React's removal cascades. */
@@ -10677,8 +10751,6 @@ let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) 
 // exposes native onChange, so restoring the controlled selection at the end of
 // the first dispatch would make the second handler observe the old value. Hold
 // select-input restores until the current task's native event pair completes.
-// The microtask still runs before the browser's next task, preserving the
-// controlled contract when no change event or accepting handler follows.
 let pendingSelectInputRestores: Element[] = [];
 let selectInputRestoreScheduled = false;
 
@@ -10690,12 +10762,13 @@ let selectInputRestoreScheduled = false;
 //    post-mount the same way).
 //  - select defaultValue: same ordering problem, projected with
 //    defaultSelected stamped.
-//  - dev missing-native-handler checks: evaluated only after ALL of the
-//    element's bindings mounted (an event slot may be stamped after the
-//    value/checked binding in source order).
+//  - dev native-event diagnostics: evaluated only after ALL of an element's
+//    bindings mounted (an event slot may be stamped after value/checked in
+//    source order). This queue is null in production, so an optimized build
+//    allocates no diagnostic array or per-element diagnostic record.
 let SELECT_SYNCS: HTMLSelectElement[] = [];
 let SELECT_DEFAULT_SYNCS: { el: HTMLSelectElement; value: unknown }[] = [];
-let DEV_CTRL_CHECKS: Element[] = [];
+let DEV_FORM_CHECKS: Element[] | null = process.env.NODE_ENV === 'production' ? null : [];
 let AUTOFOCUS_QUEUE: Element[] = [];
 
 /** True when controlled commit work is queued (folds into hasPendingWork). */
@@ -10703,7 +10776,7 @@ function hasControlledSyncs(): boolean {
 	return (
 		SELECT_SYNCS.length > 0 ||
 		SELECT_DEFAULT_SYNCS.length > 0 ||
-		DEV_CTRL_CHECKS.length > 0 ||
+		(DEV_FORM_CHECKS !== null && DEV_FORM_CHECKS.length > 0) ||
 		AUTOFOCUS_QUEUE.length > 0
 	);
 }
@@ -10777,7 +10850,6 @@ function armControlledBase(el: Element): ControlledState {
 			dvv: UNCONTROLLED,
 			composing: false,
 			queued: false,
-			devChecked: false,
 			formSeen: false,
 			formDefaultValue: UNCONTROLLED,
 			formDefaultChecked: UNCONTROLLED,
@@ -10842,12 +10914,100 @@ function devWarnControlledFlip(el: Element, toControlled: boolean): void {
 	);
 }
 
-// DEV: queue the missing-handler check for this commit (runs after all of the
-// element's bindings mounted — see drainControlledSyncs).
-function queueDevControlledCheck(el: Element, ctrl: ControlledState): void {
+interface DevFormDiagnosticState {
+	/** Last emitted broken-state signature; null after a valid commit. */
+	last: string | null;
+	/** The compiler already published the onChange-specific warning. */
+	staticNativeChange: boolean;
+}
+
+function getDevFormDiagnosticState(el: Element): DevFormDiagnosticState | undefined {
+	return (el as any).__oct_form_diagnostic as DevFormDiagnosticState | undefined;
+}
+
+function ensureDevFormDiagnosticState(el: Element): DevFormDiagnosticState {
+	let state = getDevFormDiagnosticState(el);
+	if (state === undefined) {
+		state = { last: null, staticNativeChange: false };
+		(el as any).__oct_form_diagnostic = state;
+	}
+	return state;
+}
+
+/**
+ * Whether this runtime host write belongs to development-compiled output.
+ * The source-location side channel is absent from prod-compiled bodies, which
+ * keeps the octane-prod project silent even though it imports the dev runtime.
+ * Walk parent blocks for runtime string hosts/de-opt descriptors whose own
+ * synthetic body has no source table.
+ */
+function hasDevFormDiagnosticContext(el: Element, scope?: Scope): boolean {
+	if ((el as any).__oct_loc !== undefined) return true;
+	let block = (scope ?? CURRENT_SCOPE)?.block ?? CURRENT_BLOCK;
+	while (block !== null) {
+		if (
+			block.locs !== undefined ||
+			block.locFile !== undefined ||
+			componentSourceLoc(block.body) !== undefined
+		)
+			return true;
+		block = block.parentBlock;
+	}
+	return false;
+}
+
+function hasPotentialFormDiagnostic(el: Element): boolean {
+	if (el.namespaceURI !== HTML_NS || isHtmlCustomElement(el)) return false;
+	if (getDevFormDiagnosticState(el) !== undefined) return true;
+	const ctrl = (el as any).$$ctrl as ControlledState | undefined;
+	if (el.localName === 'select') return ctrl !== undefined && ctrl.sv !== null;
+	if (el.localName === 'input') {
+		const input = el as HTMLInputElement;
+		if (input.type === 'checkbox' || input.type === 'radio') {
+			return ctrl !== undefined && ctrl.c !== -1;
+		}
+	}
+	if (!isTextEntry(el)) return false;
+	return (
+		(ctrl !== undefined && ctrl.v !== UNCONTROLLED) ||
+		isUsableEventSlot((el as any).$$change) ||
+		isUsableEventSlot((el as any)['$$capture:change'])
+	);
+}
+
+// Queue once per element/commit. Validation itself runs at the head of commit,
+// after final source/spread order has settled and before layout effects.
+function queueDevFormDiagnostic(el: Element, scope?: Scope, force = false): void {
 	if (process.env.NODE_ENV === 'production') return; // build-time stripped
-	if (ctrl.devChecked || (el as any).__oct_loc === undefined) return;
-	DEV_CTRL_CHECKS.push(el);
+	const q = DEV_FORM_CHECKS;
+	if (q === null || (!force && !hasDevFormDiagnosticContext(el, scope))) return;
+	if (!hasPotentialFormDiagnostic(el)) return;
+	if (q.indexOf(el) === -1) q.push(el);
+}
+
+/** @internal Compiler helper for a final-props runtime-check host. */
+export function queueNativeChangeDiagnostic(el: Element): void {
+	if (process.env.NODE_ENV !== 'production')
+		queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
+}
+
+/** @internal Compiler helper for a host whose build warning already fired. */
+export function markNativeChangeDiagnosticStatic(el: Element): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
+	ensureDevFormDiagnosticState(el).staticNativeChange = true;
+	queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
+}
+
+/** Consume compiler descriptor metadata without ever reflecting it to the DOM. */
+function setNativeChangeDiagnosticMetadata(el: Element, value: unknown): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
+	if (value === 'static') {
+		markNativeChangeDiagnosticStatic(el);
+		return;
+	}
+	const state = getDevFormDiagnosticState(el);
+	if (state !== undefined) state.staticNativeChange = false;
+	if (value === 'runtime') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined, true);
 }
 
 /**
@@ -10869,12 +11029,15 @@ export function setValue(el: Element, value: unknown): void {
 			devWarnControlledFlip(el, false);
 		// React parity: mounting/flipping to uncontrolled leaves the DOM as-is.
 		ctrl.v = UNCONTROLLED;
+		if (process.env.NODE_ENV !== 'production')
+			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 		return;
 	}
 	const s = toControlledString(value);
 	if (first) {
 		ctrl.v = value;
-		if (process.env.NODE_ENV !== 'production') queueDevControlledCheck(el, ctrl);
+		if (process.env.NODE_ENV !== 'production')
+			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 		// Hydration ADOPTS: the server already serialized this value, and
 		// pre-hydration user input survives until the element's first real
 		// commit or discrete event (React parity) — zero writes, no warnings. A
@@ -10894,6 +11057,7 @@ export function setValue(el: Element, value: unknown): void {
 		devWarnControlledFlip(el, true);
 	const prev = ctrl.v;
 	ctrl.v = value;
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 	if (input.defaultValue !== s) input.defaultValue = s;
 	// IME: an UNCHANGED rendered value must not cancel an active composition;
 	// a genuinely changed one still wins (React: setState during composition).
@@ -10913,13 +11077,16 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		if (process.env.NODE_ENV !== 'production' && !first && ctrl.c !== -1)
 			devWarnControlledFlip(input, false);
 		ctrl.c = -1;
+		if (process.env.NODE_ENV !== 'production')
+			queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
 		return;
 	}
 	const b = !!value;
 	CHECKED_RESTORE ??= restoreCheckedState;
 	if (first) {
 		ctrl.c = b;
-		if (process.env.NODE_ENV !== 'production') queueDevControlledCheck(input, ctrl);
+		if (process.env.NODE_ENV !== 'production')
+			queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
 		const hydration = activeHydration();
 		if (hydration !== null && !hydration.isFresh(input)) return;
 		// PROPERTY first (marks checkedness dirty — see setValue), then the
@@ -10939,6 +11106,8 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 	// fire. A prop that actually CHANGED in this window still writes.
 	const changed = b !== ctrl.c;
 	ctrl.c = b;
+	if (process.env.NODE_ENV !== 'production')
+		queueDevFormDiagnostic(input, CURRENT_SCOPE ?? undefined);
 	if ((changed || !inActivationWindow(input)) && input.checked !== b) input.checked = b;
 }
 
@@ -10989,11 +11158,12 @@ export function setSelectValue(el: Element, value: unknown): void {
 		if (process.env.NODE_ENV !== 'production' && !first && ctrl.sv !== null)
 			devWarnControlledFlip(el, false);
 		ctrl.sv = null;
+		if (process.env.NODE_ENV !== 'production')
+			queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && !first && ctrl.sv === null)
 		devWarnControlledFlip(el, true);
-	if (first && process.env.NODE_ENV !== 'production') queueDevControlledCheck(el, ctrl);
 	if (sel.multiple) {
 		if (!Array.isArray(value)) {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
@@ -11017,6 +11187,7 @@ export function setSelectValue(el: Element, value: unknown): void {
 		}
 		ctrl.sv = toControlledString(value);
 	}
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, CURRENT_SCOPE ?? undefined);
 	// Hydration ADOPTS the server-emitted `selected` state — and must not
 	// enqueue the commit sync either (the post-hydration microtask commit
 	// would clobber a pre-hydration user selection). A fresh replacement has no
@@ -11236,6 +11407,126 @@ export function setFormControlSources(
 	else ctrl.dvv = UNCONTROLLED;
 }
 
+interface FormDiagnosticOutcome {
+	signature: string;
+	message: string;
+}
+
+function nativeTextChangeMessage(
+	el: Element,
+	hasBubbleChange: boolean,
+	controlled: boolean,
+): string {
+	const changeProp = hasBubbleChange ? 'onChange' : 'onChangeCapture';
+	const inputProp = hasBubbleChange ? 'onInput' : 'onInputCapture';
+	const host =
+		el.localName === 'textarea' ? '<textarea>' : `<input type="${(el as HTMLInputElement).type}">`;
+	const controlledHint = controlled
+		? ' Because this field is controlled, edits are restored before the later native ' +
+			'change can run; use `defaultValue` for editable commit-only behavior.'
+		: '';
+	const loc = (el as any).__oct_loc;
+	const source = typeof loc === 'string' ? ` (${loc})` : '';
+	return (
+		`[OCTANE_NATIVE_TEXT_ONCHANGE] \`${changeProp}\` on ${host} is a native commit ` +
+		`event in Octane; it does not run for each text edit. Use \`${inputProp}\` for ` +
+		'per-edit updates. If commit/blur behavior is intentional, add ' +
+		'`suppressNativeChangeWarning`.' +
+		controlledHint +
+		source
+	);
+}
+
+/** Resolve the element's one current broken-state signature, if any. */
+function formDiagnosticOutcome(el: Element): FormDiagnosticOutcome | null {
+	if (el.namespaceURI !== HTML_NS || isHtmlCustomElement(el)) return null;
+	const host = el as any;
+	if (
+		host.readOnly === true ||
+		host.disabled === true ||
+		el.hasAttribute('readonly') ||
+		el.hasAttribute('disabled')
+	)
+		return null;
+
+	const hasInput =
+		isUsableEventSlot(host.$$input as EventSlot) ||
+		isUsableEventSlot(host['$$capture:input'] as EventSlot);
+	const hasBubbleChange = isUsableEventSlot(host.$$change as EventSlot);
+	const hasCaptureChange = isUsableEventSlot(host['$$capture:change'] as EventSlot);
+	const hasChange = hasBubbleChange || hasCaptureChange;
+	const ctrl = host.$$ctrl as ControlledState | undefined;
+
+	if (isTextEntry(el)) {
+		const controlled = ctrl !== undefined && ctrl.v !== UNCONTROLLED;
+		if (hasInput) return null;
+		if (hasChange) {
+			const dev = getDevFormDiagnosticState(el);
+			if (host.__oct_native_change_suppressed === true || dev?.staticNativeChange === true)
+				return null;
+			const phase = hasBubbleChange ? (hasCaptureChange ? 'both' : 'bubble') : 'capture';
+			return {
+				signature: `native-change:${el.localName}:${(el as HTMLInputElement).type}:${phase}:${controlled ? 'controlled' : 'uncontrolled'}`,
+				message: nativeTextChangeMessage(el, hasBubbleChange, controlled),
+			};
+		}
+		if (!controlled) return null;
+		return {
+			signature: `controlled-text-missing:${el.localName}:${(el as HTMLInputElement).type}`,
+			message:
+				'You provided a `value` prop to a form field without an `onInput` handler. This ' +
+				'will render a read-only field. If the field should be mutable use ' +
+				'`defaultValue`. Otherwise, set either `onInput` or `readOnly`.',
+		};
+	}
+
+	if (el.localName === 'select') {
+		if (ctrl === undefined || ctrl.sv === null || hasInput || hasChange) return null;
+		return {
+			signature: 'controlled-select-missing',
+			message:
+				'You provided a `value` prop to a select without an `onInput` or `onChange` ' +
+				'handler. This will render a read-only field. Set a usable native handler, ' +
+				'`readOnly`, or use `defaultValue` for an uncontrolled field.',
+		};
+	}
+
+	const input = el as HTMLInputElement;
+	const checkable =
+		input.localName === 'input' && (input.type === 'checkbox' || input.type === 'radio');
+	if (!checkable || ctrl === undefined || ctrl.c === -1) return null;
+	const hasClick =
+		isUsableEventSlot(host.$$click as EventSlot) ||
+		isUsableEventSlot(host['$$capture:click'] as EventSlot);
+	if (hasClick || hasInput || hasChange) return null;
+	return {
+		signature: `controlled-checkable-missing:${input.type}`,
+		message:
+			'You provided a `checked` prop to a checkbox or radio without an `onClick`, ' +
+			'`onInput`, or `onChange` handler. This will render a read-only field. Set a ' +
+			'usable native handler, `readOnly`, or use `defaultChecked` for an uncontrolled field.',
+	};
+}
+
+function drainDevFormDiagnostics(): void {
+	if (process.env.NODE_ENV === 'production') return; // build-time stripped
+	const q = DEV_FORM_CHECKS;
+	if (q === null || q.length === 0) return;
+	DEV_FORM_CHECKS = [];
+	for (let i = 0; i < q.length; i++) {
+		const el = q[i];
+		const outcome = formDiagnosticOutcome(el);
+		const previous = getDevFormDiagnosticState(el);
+		if (outcome === null) {
+			if (previous !== undefined) previous.last = null;
+			continue;
+		}
+		if (previous?.last === outcome.signature) continue;
+		ensureDevFormDiagnosticState(el).last = outcome.signature;
+		console.error(outcome.message);
+	}
+}
+
 /**
  * Drain the commit-deferred controlled work — called at the head of
  * commitEffects, i.e. after the render pass built/reconciled ALL DOM (so
@@ -11279,60 +11570,7 @@ function drainControlledSyncs(): void {
 			if (ctrl.sv !== null) projectSelectValue(q[i], ctrl.sv, false);
 		}
 	}
-	if (process.env.NODE_ENV !== 'production' && DEV_CTRL_CHECKS.length > 0) {
-		const q = DEV_CTRL_CHECKS;
-		DEV_CTRL_CHECKS = [];
-		for (let i = 0; i < q.length; i++) {
-			const el = q[i] as any;
-			const ctrl = el.$$ctrl as ControlledState | undefined;
-			if (ctrl === undefined || ctrl.devChecked) continue;
-			ctrl.devChecked = true;
-			if (
-				el.readOnly === true ||
-				el.disabled === true ||
-				el.hasAttribute('readonly') ||
-				el.hasAttribute('disabled')
-			)
-				continue;
-			const hasInput = el.$$input !== undefined || el['$$capture:input'] !== undefined;
-			const hasChange = el.$$change !== undefined || el['$$capture:change'] !== undefined;
-			if (isTextEntry(el)) {
-				if (ctrl.v === UNCONTROLLED || hasInput) continue;
-				console.error(
-					hasChange
-						? 'You provided a `value` prop to a form field with an `onChange` handler but no ' +
-								'`onInput`. octane events are NATIVE: `change` fires on blur/commit, not per ' +
-								'keystroke, so typing will appear to do nothing (each keystroke reverts to the ' +
-								'rendered value). Use `onInput` for per-keystroke updates, or `defaultValue` ' +
-								'for an uncontrolled field.'
-						: 'You provided a `value` prop to a form field without an `onInput` handler. This ' +
-								'will render a read-only field. If the field should be mutable use ' +
-								'`defaultValue`. Otherwise, set either `onInput` or `readOnly`.',
-				);
-				continue;
-			}
-			if (el.localName === 'select') {
-				if (ctrl.sv === null || hasInput || hasChange) continue;
-				console.error(
-					'You provided a `value` prop to a select without an `onInput` or `onChange` ' +
-						'handler. This will render a read-only field. Set a usable native handler, ' +
-						'`readOnly`, or use `defaultValue` for an uncontrolled field.',
-				);
-				continue;
-			}
-			const input = el as HTMLInputElement;
-			const checkable =
-				input.localName === 'input' && (input.type === 'checkbox' || input.type === 'radio');
-			if (!checkable || ctrl.c === -1) continue;
-			const hasClick = el.$$click !== undefined || el['$$capture:click'] !== undefined;
-			if (hasClick || hasInput || hasChange) continue;
-			console.error(
-				'You provided a `checked` prop to a checkbox or radio without an `onClick`, ' +
-					'`onInput`, or `onChange` handler. This will render a read-only field. Set a ' +
-					'usable native handler, `readOnly`, or use `defaultChecked` for an uncontrolled field.',
-			);
-		}
-	}
+	drainDevFormDiagnostics();
 }
 
 /**
@@ -11433,20 +11671,35 @@ function maybeEnqueueRestore(event: Event): void {
 	// A checkable's click never arms — its `input`/`change` follow-ups do
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
+	const checkable = t.localName === 'input' && (t.type === 'checkbox' || t.type === 'radio');
 	if (event.type === 'click') {
-		// Mark the checkable whose ACTIVATION is in flight: the platform toggled
-		// `checked` before this click dispatch, and its `input`/`change` post-steps
-		// have not fired yet. A commit inside this window (a handler's flushSync —
-		// press-state machinery does this) must not reassert the still-uncommitted
-		// prop over the user's toggle: the checked binding switches to React's
-		// prop-diff semantics for the marked element (see setCheckedState), and the
-		// follow-up input/change arms the ordinary restore at the right time.
-		const ctrl = t.$$ctrl as ControlledState;
-		if (ctrl.c !== -1) {
-			activationCheckable = t as Element;
+		if (checkable) {
+			// Mark the checkable whose ACTIVATION is in flight: the platform toggled
+			// `checked` before this click dispatch, and its `input`/`change` post-steps
+			// have not fired yet. A commit inside this window (a handler's flushSync —
+			// press-state machinery does this) must not reassert the still-uncommitted
+			// prop over the user's toggle: the checked binding switches to React's
+			// prop-diff semantics for the marked element (see setCheckedState).
+			const ctrl = t.$$ctrl as ControlledState;
+			if (ctrl.c !== -1) activationCheckable = t as Element;
+			// The platform dispatches click after pre-activation, then input/change.
+			// Remember that sequence so input does not restore before native change.
+			// The task fallback owns canceled activation and propagation starvation:
+			// after the browser finishes its post-click work, reassert the latest
+			// rendered state if delegated change did not complete the sequence.
+			t.$$checkableActivation = true;
+			setTimeout(() => {
+				if (t.$$checkableActivation === true) {
+					t.$$checkableActivation = false;
+					if (t === activationCheckable) activationCheckable = null;
+					restoreControlledElement(t);
+				}
+			}, 0);
 		}
 		return;
 	}
+	// The activation's follow-up events have arrived — the write-guard window is over.
+	if (t === activationCheckable) activationCheckable = null;
 	if (event.type === 'input' && t.localName === 'select') {
 		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
 		if (!selectInputRestoreScheduled) {
@@ -11460,6 +11713,8 @@ function maybeEnqueueRestore(event: Event): void {
 		}
 		return;
 	}
+	if (event.type === 'input' && checkable && t.$$checkableActivation === true) return;
+	if (event.type === 'change' && checkable) t.$$checkableActivation = false;
 	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
 }
 
@@ -13054,7 +13309,10 @@ function hasDangerHTML(props: any): boolean {
 
 // Route a host descriptor's props onto a FRESH element (first build).
 function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
-	if (props == null) return;
+	if (props == null) {
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
+		return;
+	}
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		// `suppressHydrationWarning`: a JS flag (read by the hydration-mismatch paths), never
@@ -13065,6 +13323,7 @@ function applyDeoptProps(el: Element, props: any, ownerBlock: Block): void {
 		}
 		applyDeoptProp(el, name, props[name], ownerBlock);
 	}
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 }
 
 // Diff prev → next props on a REUSED element (the reconcile path): remove props that
@@ -13113,6 +13372,7 @@ function patchDeoptProps(el: Element, prevProps: any, nextProps: any, ownerBlock
 			}
 		}
 	}
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, ownerBlock);
 }
 
 interface HostComponentSlot {
@@ -13204,7 +13464,10 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 		}
 	}
 	state.props = props;
-	if (props == null) return;
+	if (props == null) {
+		if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
+		return;
+	}
 	for (const name in props) {
 		if (name === 'key' || name === 'children') continue;
 		const v = props[name];
@@ -13243,6 +13506,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 			}
 		}
 	}
+	if (process.env.NODE_ENV !== 'production') queueDevFormDiagnostic(el, scope);
 }
 
 // The descriptor that last produced a de-opt host element is stashed on the element

@@ -14,4 +14,9 @@
 // input-as-change); no remapping is wanted. The commit wiring (flushSync +
 // effect drain around every dispatch) rides on dom-testing-library's
 // `eventWrapper` config hook — see pure.ts.
+//
+// In particular, `fireEvent.change(textbox)` means “dispatch an explicit native
+// commit event”; it does not simulate typing or blur. Likewise, change on a
+// checkbox does not reproduce click activation/toggling or click → input →
+// change ordering. Use user-event's type/tab/click flows for those sequences.
 export { fireEvent } from '@testing-library/dom';

@@ -109,6 +109,10 @@ bridge yet and needs one.
 - Reimplementing React SyntheticEvent, synthetic `onChange`, class components,
   legacy roots, StrictMode double-invocation inside Octane, or React private APIs
   beyond the isolated context-bootstrap adapter.
+- Suppressing Octane's native text-event guidance globally. Octane-owned text hosts
+  still use `onInput` per edit; a deliberate native commit uses the local
+  `suppressNativeChangeWarning` host hint. Component callbacks named `onChange` and
+  React-owned DOM remain outside that diagnostic.
 - Making React reconcile any DOM node created by Octane.
 - React Server Components/Flight integration.
 - Exact cross-renderer transition entanglement in the first milestone.

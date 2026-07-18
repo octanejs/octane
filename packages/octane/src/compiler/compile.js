@@ -55,6 +55,8 @@ import {
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
+import { nsForChildren, nsForSelf } from './jsx-namespace.js';
+import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -1013,21 +1015,6 @@ function hookRuntimeModulesForCompile(options, universalUnits = []) {
 // ancestor. A component whose root is `<g>`/`<path>` must not compile to an
 // HTML template: the HTMLUnknownElement it would produce inside an `<svg>`
 // paints nothing.
-
-function nsForSelf(tag, parentNs) {
-	if (tag === 'svg') return 'svg';
-	if (tag === 'math') return 'mathml';
-	if ((parentNs === 'html' || parentNs === 'opaque') && SVG_ONLY_TAGS.has(tag)) return 'svg';
-	return parentNs; // includes <foreignObject> under an svg parent — itself SVG-ns
-}
-
-function nsForChildren(tag, parentNs) {
-	if (tag === 'foreignObject') return 'html';
-	if (tag === 'svg') return 'svg';
-	if (tag === 'math') return 'mathml';
-	if ((parentNs === 'html' || parentNs === 'opaque') && SVG_ONLY_TAGS.has(tag)) return 'svg';
-	return parentNs;
-}
 
 function nsFlag(ns) {
 	return ns === 'svg' ? 1 : ns === 'mathml' ? 2 : ns === 'opaque' ? 3 : 0;
@@ -3724,7 +3711,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -3742,7 +3729,7 @@ function instrumentProfileComponents(ast, ctx) {
  *   `rendererBoundaries` and `rendererRegistry` are the normalized static
  *   boundary table and renderer registry. Pass them together when a client
  *   module may contain an explicitly renderer-owned component prop.
- * @returns {{ code: string, map: any }}
+ * @returns {{ code: string, map: any, diagnostics: readonly unknown[] }}
  */
 // --- Authored scoped-style hashes across source rewrites -------------------
 //
@@ -3850,10 +3837,19 @@ export function compile(source, filename, options) {
 				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
 				: prepareServerHydrateBoundaries(source, cleanFilename);
 		if (hydratePreparation !== null) {
+			const nativeChangeDiagnostics =
+				options?.__nativeChangeDiagnostics ??
+				analyzeNativeChangeDiagnostics(parseModule(source, cleanFilename), source, cleanFilename, {
+					dom: options?.renderer?.target !== 'universal',
+					renderer: options?.renderer,
+					rendererBoundaries: options?.rendererBoundaries,
+					rendererRegistry: options?.rendererRegistry,
+				}).diagnostics;
 			const compiled = compile(hydratePreparation.source, cleanFilename, {
 				...options,
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
+				__nativeChangeDiagnostics: nativeChangeDiagnostics,
 				__styleRemap: composeStyleRemap(
 					options?.__styleRemap ?? null,
 					authoredSource,
@@ -3888,6 +3884,21 @@ export function compile(source, filename, options) {
 			ownerRenderer,
 			options,
 		);
+		const serverAuthoredDiagnostics =
+			options?.__nativeChangeDiagnostics ??
+			(serverBoundaryPreparation === null
+				? undefined
+				: analyzeNativeChangeDiagnostics(
+						parseModule(authoredSource, filename),
+						authoredSource,
+						filename,
+						{
+							dom: ownerRenderer.target === 'dom',
+							renderer: ownerRenderer,
+							rendererBoundaries: options?.rendererBoundaries,
+							rendererRegistry: options?.rendererRegistry,
+						},
+					).diagnostics);
 		if (serverBoundaryPreparation !== null) source = serverBoundaryPreparation.source;
 		assertNoLiveClientOnlyImports(source, filename, options?.clientOnlyImports);
 		const serverStyleRemap = composeStyleRemap(
@@ -3900,7 +3911,17 @@ export function compile(source, filename, options) {
 		// (with hydration markers) importing the server runtime from 'octane/server'.
 		// Fragment refs remain client-only because there is no server-side DOM range
 		// object for their imperative API.
-		const compiled = compileServer(source, filename, options, serverStyleRemap);
+		const compiled = compileServer(
+			source,
+			filename,
+			{
+				...options,
+				...(serverAuthoredDiagnostics === undefined
+					? null
+					: { __nativeChangeDiagnostics: serverAuthoredDiagnostics }),
+			},
+			serverStyleRemap,
+		);
 		if (serverBoundaryPreparation?.map && compiled.map) {
 			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
 		}
@@ -3915,6 +3936,21 @@ export function compile(source, filename, options) {
 	const rendererBoundaryPreparation = options?.__rendererBoundariesLowered
 		? null
 		: prepareRendererBoundaryRegions(source, filename, ownerRenderer, options);
+	const rendererAuthoredDiagnostics =
+		options?.__nativeChangeDiagnostics ??
+		(rendererBoundaryPreparation === null
+			? null
+			: analyzeNativeChangeDiagnostics(
+					parseModule(authoredSource, filename),
+					authoredSource,
+					filename,
+					{
+						dom: ownerRenderer.target === 'dom',
+						renderer: ownerRenderer,
+						rendererBoundaries: options?.rendererBoundaries,
+						rendererRegistry: options?.rendererRegistry,
+					},
+				).diagnostics);
 	if (rendererBoundaryPreparation !== null) source = rendererBoundaryPreparation.source;
 	const clientStyleRemap = composeStyleRemap(
 		options?.__styleRemap ?? null,
@@ -3953,6 +3989,9 @@ export function compile(source, filename, options) {
 					__rendererBoundariesLowered: true,
 					__universal: universal,
 					__universalUnits: rendererBoundaryPreparation?.universalUnits,
+					// The owning universal source is outside the DOM diagnostic contract.
+					// Runtime-created DOM boundary hosts retain the development fallback.
+					__nativeChangeDiagnostics: [],
 					// The lowered/expanded text has its own coordinates, and
 					// universal targets are client-only (no server hash to agree
 					// with) — do not restamp against stale origins.
@@ -3978,9 +4017,21 @@ export function compile(source, filename, options) {
 				rendererBoundaryPreparation.mappingNeedles,
 			);
 		}
-		return result;
+		return {
+			...result,
+			diagnostics: rendererAuthoredDiagnostics ?? [],
+		};
 	}
 	const ast = parseModule(source, filename);
+	const nativeChangeAnalysis =
+		options?.__nativeChangeAnalysis ??
+		analyzeNativeChangeDiagnostics(ast, source, filename, {
+			dom: options?.renderer?.target !== 'universal',
+			renderer: options?.renderer,
+			rendererBoundaries: options?.rendererBoundaries,
+			rendererRegistry: options?.rendererRegistry,
+		});
+	const nativeChangeDiagnostics = rendererAuthoredDiagnostics ?? nativeChangeAnalysis.diagnostics;
 	restampAuthoredStyleHashes(ast, clientStyleRemap, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
 	// before emit — they carry no runtime value and would leak invalid TS into
@@ -4031,6 +4082,7 @@ export function compile(source, filename, options) {
 		usedCompilerNames: collectIdentifierNames(ast),
 		profileFilename: (options && options.profileFilename) || filename,
 		mode,
+		nativeChangeClassifications: nativeChangeAnalysis.classifications,
 		dev: devEnabled,
 		profile: profileEnabled,
 		autoMemo: autoMemoEnabled,
@@ -4814,6 +4866,7 @@ export function compile(source, filename, options) {
 	const result = {
 		code: prelude + body + stampBlock + hmrBlock + profileBlock,
 		map: buildSourceMap(source, ctx.mapSourceName, segments),
+		diagnostics: nativeChangeDiagnostics,
 	};
 	for (const unit of universalUnits) {
 		result.code = retargetRuntimeImportAliases(
@@ -4859,6 +4912,14 @@ function ssrUnsupported(what) {
 
 function compileServer(source, filename, options, styleRemap = null) {
 	const ast = parseModule(source, filename);
+	const nativeChangeAnalysis =
+		options?.__nativeChangeAnalysis ??
+		analyzeNativeChangeDiagnostics(ast, source, filename, {
+			dom: options?.renderer?.target !== 'universal',
+			renderer: options?.renderer,
+			rendererBoundaries: options?.rendererBoundaries,
+			rendererRegistry: options?.rendererRegistry,
+		});
 	restampAuthoredStyleHashes(ast, styleRemap, filename);
 	// Drop type-only statements before emit (see isTypeOnlyStatement) — same as
 	// the client path; the server HTML-string output is plain JS too.
@@ -4966,7 +5027,11 @@ function compileServer(source, filename, options, styleRemap = null) {
 	const code = runtimeImport + helpers + body;
 	// Minimal (valid, empty-mapping) source map. SSR source maps are a later
 	// refinement; the client path keeps its real per-token maps.
-	return { code, map: buildSourceMap(source, ctx.mapSourceName, []) };
+	return {
+		code,
+		map: buildSourceMap(source, ctx.mapSourceName, []),
+		diagnostics: options?.__nativeChangeDiagnostics ?? nativeChangeAnalysis.diagnostics,
+	};
 }
 
 // Reject async/generator component declarations — shared by the client and
@@ -5523,6 +5588,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			continue;
 		}
 		if (rawAttrName === 'suppressContentEditableWarning') {
+			bindDiscardedAttributeValue(attr.value);
+			continue;
+		}
+		if (rawAttrName === 'suppressNativeChangeWarning') {
 			bindDiscardedAttributeValue(attr.value);
 			continue;
 		}
@@ -9594,6 +9663,25 @@ function jsxElementToCreateElement(node, ctx) {
 			computed: false,
 		});
 	}
+	if (ctx.dev && !isComponentTag(node)) {
+		const classification = ctx.nativeChangeClassifications?.get(
+			node.start ?? node.openingElement?.start,
+		);
+		if (classification === 'statically-warned' || classification === 'runtime-check') {
+			properties.push({
+				type: 'Property',
+				key: { type: 'Identifier', name: '__octaneNativeChangeDiagnostic' },
+				value: {
+					type: 'Literal',
+					value: classification === 'statically-warned' ? 'static' : 'runtime',
+				},
+				kind: 'init',
+				method: false,
+				shorthand: false,
+				computed: false,
+			});
+		}
+	}
 	const args = [compNode, { type: 'ObjectExpression', properties }];
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
@@ -11059,6 +11147,10 @@ function planJsx(
 			ctx.runtimeNeeded.add('queueRefDetach');
 		}
 		if (b.kind === 'dangerChild') ctx.runtimeNeeded.add('markDangerouslySetInnerHTMLChildren');
+		if (b.kind === 'nativeChangeStatic') {
+			ctx.runtimeNeeded.add('markNativeChangeDiagnosticStatic');
+		}
+		if (b.kind === 'nativeChangeRuntime') ctx.runtimeNeeded.add('queueNativeChangeDiagnostic');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -11752,6 +11844,12 @@ function emitBindingMount(b, elVar, bag) {
 	// keep the server value + skip the warning on a hydration mismatch for this element.
 	if (b.kind === 'suppress') return `    ${elVar}.__oct_suppress = true;`;
 	if (b.kind === 'dangerChild') return `    _$markDangerouslySetInnerHTMLChildren(${elVar});`;
+	if (b.kind === 'nativeChangeStatic') {
+		return `    _$markNativeChangeDiagnosticStatic(${elVar});`;
+	}
+	if (b.kind === 'nativeChangeRuntime') {
+		return `    ${bag.local(`_el$${b.id}`)} = ${elVar};\n    _$queueNativeChangeDiagnostic(${elVar});`;
+	}
 	const E = `(${b.expr})`;
 	switch (b.kind) {
 		case 'textOnlyChild': {
@@ -12012,6 +12110,9 @@ function emitBindingUpdate(b, bag) {
 	// mount pass registered them in; an unmounted field throws at compile time.
 	const F = (prefix) => `_b.${bag.letter(`${prefix}$${b.id}`)}`;
 	switch (b.kind) {
+		case 'nativeChangeRuntime': {
+			return `    _$queueNativeChangeDiagnostic(${F('_el')});`;
+		}
 		case 'textOnlyChild':
 		case 'text': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`;
@@ -12540,6 +12641,29 @@ function emitElementHtml(
 		const attrName = normalizeJsxAttrName(rawAttrName, tag, hostNs);
 
 		const val = attr.value;
+		// Octane's native-change warning opt-out is a reserved JS-only prop.
+		// Keep it on the ordinary final-prop path so source-order updates and
+		// removal work, but never bake it into template HTML.
+		if (rawAttrName === 'suppressNativeChangeWarning') {
+			const expression =
+				val == null
+					? 'true'
+					: printExprWithTsrx(
+							val.type === 'JSXExpressionContainer' ? val.expression : val,
+							ctx,
+							componentName,
+							inlinedSubs,
+						);
+			bindings.push({
+				id: bindings.length,
+				kind: 'attr',
+				name: rawAttrName,
+				expr: expression,
+				path,
+				ns: hostNs,
+			});
+			continue;
+		}
 		if (rawAttrName === 'children') {
 			const childExpr =
 				val == null
@@ -12891,6 +13015,19 @@ function emitElementHtml(
 			path,
 			sources: formControlClientSources,
 		});
+	}
+	if (ctx.dev && firstSpreadIdx === -1) {
+		const classification = ctx.nativeChangeClassifications?.get(
+			node.start ?? node.openingElement?.start,
+		);
+		if (classification === 'statically-warned' || classification === 'runtime-check') {
+			bindings.push({
+				id: bindings.length,
+				kind: classification === 'statically-warned' ? 'nativeChangeStatic' : 'nativeChangeRuntime',
+				path,
+				mountOnly: classification === 'statically-warned',
+			});
+		}
 	}
 	if (
 		!hasNestedJsxChildren &&

@@ -41,6 +41,7 @@ describe('playground compile pipeline', () => {
 		const result = compilePlayground(DEFAULT_SOURCES.tsrx, 'tsrx');
 		expect(result.ok).toBe(true);
 		if (result.ok) {
+			expect(result.warnings).toEqual([]);
 			expect(result.code).toContain("from 'octane'");
 			// The snippet's @for lowers to the runtime's keyed list block.
 			expect(result.code).toContain('forBlock');
@@ -53,6 +54,7 @@ describe('playground compile pipeline', () => {
 		const result = compilePlayground(DEFAULT_SOURCES.tsx, 'tsx');
 		expect(result.ok).toBe(true);
 		if (result.ok) {
+			expect(result.warnings).toEqual([]);
 			expect(result.code).toContain("from 'octane'");
 			// TS annotations must be gone — the playground executes this directly.
 			expect(result.code).not.toContain('useState<');
@@ -63,6 +65,31 @@ describe('playground compile pipeline', () => {
 		const result = compilePlayground('export function App() @{ <div>{oops</div> }', 'tsrx');
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error.length).toBeGreaterThan(0);
+	});
+
+	it('returns nonfatal text-event diagnostics alongside runnable code', () => {
+		const result = compilePlayground(
+			`export function App() @{ <input onChange={() => {}} /> }`,
+			'tsrx',
+		);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.code.length).toBeGreaterThan(0);
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0]).toMatchObject({
+			code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
+			severity: 'warning',
+			filename: 'playground.tsrx',
+		});
+	});
+
+	it('keeps deliberate native text commits quiet when explicitly marked', () => {
+		const result = compilePlayground(
+			`export function App() @{ <input onChange={() => {}} suppressNativeChangeWarning /> }`,
+			'tsrx',
+		);
+		expect(result.ok).toBe(true);
+		if (result.ok) expect(result.warnings).toEqual([]);
 	});
 });
 
