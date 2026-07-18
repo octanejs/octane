@@ -5455,6 +5455,7 @@ export function ssrTry(
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
 	catchFn: ((err: unknown, scope: SSRScope) => string) | null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
+	propagateSuspense = false,
 ): string {
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
@@ -5662,6 +5663,7 @@ export function ssrTry(
 			return ssrBlock(inner);
 		} catch (e) {
 			if (ssrIsSuspense(e)) {
+				if (propagateSuspense) throw e;
 				if (stream !== null) {
 					// Drop seeds pushed by the partially-rendered body — they belong to
 					// the boundary's own slice once it completes.

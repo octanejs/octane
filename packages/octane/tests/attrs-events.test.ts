@@ -6,6 +6,7 @@ import {
 	WithAttrs,
 	StringDataAttribute,
 	RuntimeTypedDataAttribute,
+	DynamicAriaAttribute,
 	Clicker,
 	DoubleClicker,
 	FnSetter,
@@ -67,6 +68,22 @@ describe('attributes', () => {
 		r.unmount();
 	});
 
+	it('preserves enumerated ARIA coercion on the narrow attribute path', () => {
+		const r = mount(DynamicAriaAttribute, { value: 'label' });
+		const el = r.find('#dynamic-aria');
+		const values: unknown[] = [false, true, 0, () => 'function', Symbol('symbol'), ['a', 'b']];
+		for (const value of values) {
+			r.update(DynamicAriaAttribute, { value });
+			expect(el.getAttribute('aria-label')).toBe(String(value));
+			expect(r.find('#dynamic-aria')).toBe(el);
+		}
+		for (const value of [null, undefined]) {
+			r.update(DynamicAriaAttribute, { value });
+			expect(el.getAttribute('aria-label')).toBeNull();
+		}
+		r.unmount();
+	});
+
 	it('specializes only safe data attributes whose values are proven strings', () => {
 		const specialized = compile(
 			`export function C(p) @{ <div data-key={'' + p.id} /> }`,
@@ -83,6 +100,15 @@ describe('attributes', () => {
 		).code;
 		expect(generic).toContain('setAttribute');
 		expect(generic).not.toContain('setStringData');
+
+		const narrow = compile(
+			`export function C(p) @{ <button disabled={p.disabled} aria-label={p.label} /> }`,
+			'attributes-narrow.tsrx',
+			{ dev: false },
+		).code;
+		expect(narrow).toContain('setBooleanAttribute');
+		expect(narrow).toContain('setAriaAttribute');
+		expect(narrow).not.toContain('setAttribute');
 	});
 
 	it('bakes static aria-* boolean literals as enumerated "true"/"false"', () => {

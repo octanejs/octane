@@ -10,6 +10,7 @@ import {
 	canonicalModuleId,
 	createClientReferenceManifest,
 	createOctaneCompiler,
+	findVoidComponentImports,
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
 import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
@@ -434,6 +435,18 @@ export default interface ErasedShape { value: string }
 				collectVoidComponentExports: true,
 			});
 			expect(compiledDefault?.voidComponentExports).toEqual(['default']);
+			const memoComponent =
+				"import { memo as cache } from 'octane';\n" +
+				'function MainImpl(p) @{ if (!p.ready) return null; <main>ready</main> }\n' +
+				'export const Main = cache(MainImpl);\n';
+			const compiledMemo = compiler.transform(memoComponent, component, {
+				hmr: false,
+				dev: false,
+				collectVoidComponentExports: true,
+			});
+			expect(compiledMemo?.voidComponentExports).toEqual(['Main']);
+			expect(compiledMemo?.code).toContain('_$ifBlock');
+			expect(compiledMemo?.code).not.toContain('componentSlot');
 			const proveDefault = (request: string, imported: string) =>
 				request === './Main.tsrx' && imported === 'default';
 			const specialized = compiler.transform(defaultEntry, entry, {
@@ -467,8 +480,9 @@ export default interface ErasedShape { value: string }
 				}),
 			).toMatchObject({ kind: 'none', code: defaultEntry });
 
-			// A component-owned value return makes both default and named exports
-			// ineligible. Nested function returns are a separate scope and stay safe.
+			// A renderable component-owned return stays ineligible. Null-only guards
+			// lower to template control flow above; nested function returns remain a
+			// separate scope and stay safe.
 			writeFileSync(
 				component,
 				"export default function Main(p) @{ if (p.early) return 'early'; <main>ready</main> }\n",
@@ -479,6 +493,34 @@ export default interface ErasedShape { value: string }
 				{ collectVoidComponentExports: true },
 			);
 			expect(valueReturning?.voidComponentExports).toEqual([]);
+
+			const modularSource =
+				"import { Main as Child } from './Main.tsrx';\n" +
+				'export function Parent(p) @{ <section><Child ready={p.ready} /></section> }\n';
+			expect(findVoidComponentImports(modularSource, join(src, 'Parent.tsrx'))).toEqual([
+				{ request: './Main.tsrx', imported: 'Main' },
+			]);
+			const modular = compiler.transform(modularSource, join(src, 'Parent.tsrx'), {
+				hmr: false,
+				dev: false,
+				isVoidComponentImport: (request, imported) =>
+					request === './Main.tsrx' && imported === 'Main',
+			});
+			expect(modular?.code).toContain('_$componentSlotVoid(');
+			expect(modular?.code).not.toContain('_$componentSlot(');
+
+			const shadowed = compiler.transform(
+				"import { Main as Child } from './Main.tsrx';\n" +
+					'export function Parent(Child) @{ <section><Child /></section> }\n',
+				join(src, 'Shadowed.tsrx'),
+				{
+					hmr: false,
+					dev: false,
+					isVoidComponentImport: () => true,
+				},
+			);
+			expect(shadowed?.code).toContain('_$componentSlot(');
+			expect(shadowed?.code).not.toContain('_$componentSlotVoid(');
 
 			const namedEntry =
 				"import { createRoot as root } from 'octane';\n" +
@@ -518,6 +560,53 @@ export default interface ErasedShape { value: string }
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
+	});
+
+	it('lowers statically compilable ErrorBoundary JSX without retaining the builtin', () => {
+		const compiler = createOctaneCompiler({ root: '/project', hmr: false, dev: false });
+		const source = `
+import { ErrorBoundary as Boundary } from 'octane';
+function Thrower(p) @{ if (p.fail) throw new Error('boom'); <span>ok</span> }
+export function App(p) @{
+  <Boundary fallback={(error, reset) => <button onClick={reset}>{(error as Error).message}</button>}>
+    <Thrower fail={p.fail} />
+  </Boundary>
+}`;
+		const client = compiler.transform(source, '/project/src/App.tsrx', {
+			hmr: false,
+			dev: false,
+		});
+		expect(client?.code).toContain('_$tryBlock(');
+		expect(client?.code).toContain(', true);');
+		expect(client?.code).not.toContain('ErrorBoundary');
+
+		const server = compiler.transform(source, '/project/src/App.tsrx', {
+			environment: 'server',
+			dev: false,
+		});
+		expect(server?.code).toContain('_$ssrTry(');
+		expect(server?.code).toContain(', undefined, true)');
+		expect(server?.code).not.toContain('ErrorBoundary');
+
+		const dynamic = compiler.transform(
+			`import { ErrorBoundary as Boundary } from 'octane';
+export function App(p) @{ <Boundary fallback={p.fallback}><span>ok</span></Boundary> }`,
+			'/project/src/Dynamic.tsrx',
+			{ hmr: false, dev: false },
+		);
+		expect(dynamic?.code).toContain('ErrorBoundary as Boundary');
+		expect(dynamic?.code).toContain('_$componentSlot(');
+		expect(dynamic?.code).not.toContain('_$tryBlock(');
+
+		const asyncFallback = compiler.transform(
+			`import { ErrorBoundary as Boundary } from 'octane';
+export function App() @{ <Boundary fallback={async (error) => String(error)}><span>ok</span></Boundary> }`,
+			'/project/src/AsyncFallback.tsrx',
+			{ hmr: false, dev: false },
+		);
+		expect(asyncFallback?.code).toContain('ErrorBoundary as Boundary');
+		expect(asyncFallback?.code).toContain('_$componentSlot(');
+		expect(asyncFallback?.code).not.toContain('_$tryBlock(');
 	});
 
 	it('applies profiling metadata only to client transforms', () => {

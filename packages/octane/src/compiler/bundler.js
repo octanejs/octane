@@ -11,7 +11,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
-import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { compile, hasOnlyLowerableNullishExits, isVoidJsxCodeBlockFunction } from './compile.js';
 import { addSourceMapNeedles, composeSourceMaps } from './compile-universal.js';
 import {
 	hydrateBoundaryPathFromId,
@@ -23,7 +23,7 @@ import {
 	analyzeNativeChangeDiagnostics,
 	formatCompileDiagnostic,
 } from './native-change-diagnostics.js';
-import { findVoidRootImports, slotHooks } from './slot-hooks.js';
+import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -31,7 +31,7 @@ import {
 	findStaticRuntimeImportRequests,
 } from './client-only-server.js';
 
-export { findVoidRootImports };
+export { findVoidComponentImports, findVoidRootImports };
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -172,10 +172,12 @@ function normalizeHmrDialect(value) {
 }
 
 /**
- * Classify only direct function exports whose TSRX body never returns a value.
- * This fact is attached to the module by bundler adapters after compiling the
- * exact source those adapters loaded. Re-exports and indirect bindings remain
- * deliberately unknown.
+ * Classify direct function exports whose production TSRX body has no renderable
+ * JavaScript return. A direct `memo(LocalComponent)` export preserves that
+ * contract, as do null-only early-return guards that compile to template
+ * control flow. Bundler adapters attach this fact after compiling the exact
+ * source they loaded. Re-exports and indirect bindings remain deliberately
+ * unknown.
  */
 export function findVoidComponentExports(source, id) {
 	let ast;
@@ -184,6 +186,74 @@ export function findVoidComponentExports(source, id) {
 	} catch {
 		return [];
 	}
+	const memoLocals = new Set();
+	const declarations = [];
+	for (const node of ast.body || []) {
+		if (node.type === 'ImportDeclaration' && node.source?.value === 'octane') {
+			for (const specifier of node.specifiers || []) {
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					(specifier.imported?.name ?? specifier.imported?.value) === 'memo' &&
+					specifier.local?.name
+				) {
+					memoLocals.add(specifier.local.name);
+				}
+			}
+		}
+		const declaration =
+			node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+				? node.declaration
+				: node;
+		if (declaration) declarations.push(declaration);
+	}
+
+	const voidBindings = new Set();
+	const isVoidFunction = (node) =>
+		isVoidJsxCodeBlockFunction(node) || hasOnlyLowerableNullishExits(node);
+	for (const declaration of declarations) {
+		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
+			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);
+			continue;
+		}
+		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			if (
+				item.id?.type === 'Identifier' &&
+				(item.init?.type === 'FunctionExpression' ||
+					item.init?.type === 'ArrowFunctionExpression') &&
+				isVoidFunction(item.init)
+			) {
+				voidBindings.add(item.id.name);
+			}
+		}
+	}
+	// Resolve only the exact, immutable `const Export = memo(Local)` form. The
+	// imported memo identity is lexical proof; method calls, comparators, and
+	// arbitrary wrappers stay unknown.
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of declarations) {
+			if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+			for (const item of declaration.declarations || []) {
+				const init = item.init;
+				if (
+					item.id?.type !== 'Identifier' ||
+					voidBindings.has(item.id.name) ||
+					init?.type !== 'CallExpression' ||
+					init.callee?.type !== 'Identifier' ||
+					!memoLocals.has(init.callee.name) ||
+					init.arguments?.length !== 1 ||
+					init.arguments[0]?.type !== 'Identifier' ||
+					!voidBindings.has(init.arguments[0].name)
+				)
+					continue;
+				voidBindings.add(item.id.name);
+				changed = true;
+			}
+		}
+	}
+
 	const exports = [];
 	for (const node of ast.body || []) {
 		if (node.type === 'ExportDefaultDeclaration') {
@@ -192,7 +262,7 @@ export function findVoidComponentExports(source, id) {
 				(declaration?.type === 'FunctionDeclaration' ||
 					declaration?.type === 'FunctionExpression' ||
 					declaration?.type === 'ArrowFunctionExpression') &&
-				isVoidJsxCodeBlockFunction(declaration)
+				isVoidFunction(declaration)
 			) {
 				exports.push('default');
 			}
@@ -203,19 +273,14 @@ export function findVoidComponentExports(source, id) {
 		if (
 			declaration?.type === 'FunctionDeclaration' &&
 			declaration.id?.name &&
-			isVoidJsxCodeBlockFunction(declaration)
+			voidBindings.has(declaration.id.name)
 		) {
 			exports.push(declaration.id.name);
 			continue;
 		}
 		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
 		for (const item of declaration.declarations || []) {
-			if (
-				item.id?.type === 'Identifier' &&
-				(item.init?.type === 'FunctionExpression' ||
-					item.init?.type === 'ArrowFunctionExpression') &&
-				isVoidJsxCodeBlockFunction(item.init)
-			) {
+			if (item.id?.type === 'Identifier' && voidBindings.has(item.id.name)) {
 				exports.push(item.id.name);
 			}
 		}
@@ -853,6 +918,9 @@ class OctaneBundlerCompiler {
 				...(hasRendererBoundaries ? { rendererBoundaries: this.renderers.boundaries } : null),
 				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
 				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
+					? { isVoidComponentImport: options.isVoidComponentImport }
+					: null),
 			});
 			if (hydratePreparation?.map && out.map) {
 				out.map = composeSourceMaps(out.map, hydratePreparation.map);

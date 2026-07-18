@@ -758,6 +758,32 @@ let TRANSITION_DEPTH = 0;
  */
 let ASYNC_TRANSITION_COUNT = 0;
 
+/**
+ * Optional transition-swap capability. Generic component/child/control-flow
+ * slots must not reference the concrete off-screen renderer directly: one
+ * ordinary `@if` would otherwise retain the complete WIP/Suspense/descriptor
+ * graph even when the application has no transition entry point. Every path
+ * that can create transition-priority work runs through startTransition(),
+ * which installs this driver before raising TRANSITION_DEPTH.
+ */
+interface TransitionSwapDriver {
+	render: typeof renderOffscreen;
+	commit: typeof commitOffscreen;
+	dispose: typeof disposeWip;
+	splice: typeof spliceWipCapture;
+}
+
+let TRANSITION_SWAP_DRIVER: TransitionSwapDriver | null = null;
+
+function ensureTransitionSwapDriver(): void {
+	TRANSITION_SWAP_DRIVER ??= {
+		render: renderOffscreen,
+		commit: commitOffscreen,
+		dispose: disposeWip,
+		splice: spliceWipCapture,
+	};
+}
+
 interface TransitionActionSlot<T> {
 	value: T;
 	pendingActionBatch?: TransitionActionBatch;
@@ -3392,14 +3418,19 @@ function renderReturnedValue(block: Block, out: unknown): void {
 		existingRet !== undefined &&
 		existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
 	) {
+		const transitionSwap = TRANSITION_SWAP_DRIVER;
 		// A transition can cross the markerless-single-root optimization boundary
 		// (text/list → compiled host fragment, or the reverse). Probe the incoming
 		// returned value off-screen before disposing the committed slot; a suspend or
 		// error then leaves the old DOM/state intact for the enclosing @try hold.
-		if (activeHydration() === null && block.currentRenderMode === 'transition') {
+		if (
+			transitionSwap !== null &&
+			activeHydration() === null &&
+			block.currentRenderMode === 'transition'
+		) {
 			const tail = returnSlotTail(block, existingRet);
 			if (tail !== null) {
-				const probe = renderOffscreen(
+				const probe = transitionSwap.render(
 					block,
 					block.parentNode,
 					tail,
@@ -3407,7 +3438,7 @@ function renderReturnedValue(block: Block, out: unknown): void {
 					out,
 					renderReturnedValue,
 				);
-				disposeWip(probe.wip);
+				transitionSwap.dispose(probe.wip);
 				if (probe.error) throw probe.error;
 				if (probe.suspended) throw new SuspenseException(probe.suspended);
 			}
@@ -8930,6 +8961,36 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 }
 
 /**
+ * Compiler-only fast path for a statically named native boolean attribute.
+ * The compiler has already excluded HTML custom elements, aliases the name to
+ * its lowercase DOM spelling, and only selects names in BOOLEAN_ATTR_PROPS.
+ * Function/symbol/falsy values remove; every other truthy value writes the
+ * canonical empty-string presence form.
+ */
+export function setBooleanAttribute(el: Element, name: string, value: unknown): void {
+	const type = typeof value;
+	const next = !value || type === 'function' || type === 'symbol' ? null : '';
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
+}
+
+/**
+ * Compiler-only fast path for a valid, statically named lowercase `aria-*`
+ * attribute. ARIA values are enumerated: only nullish removes, while booleans,
+ * functions, symbols, numbers, and objects stringify exactly like the generic
+ * attribute path.
+ */
+export function setAriaAttribute(el: Element, name: string, value: unknown): void {
+	const next = value == null ? null : String(value);
+	const hydration = activeHydration();
+	if (hydration !== null && !hydration.allowAttribute(el, name, next)) return;
+	if (next === null) el.removeAttribute(name);
+	else el.setAttribute(name, next);
+}
+
+/**
  * The final attribute string for `(el, name, value)`, or `null` for "absent".
  * One coercion feeds setAttribute's hydration compare AND its write, and the
  * rules mirror the server's ssrAttr byte-for-byte (shared value-type tables in
@@ -12430,13 +12491,34 @@ export function componentSlot(
 	inherit?: boolean,
 	hasKey?: boolean,
 ): void {
+	if (typeof comp !== 'function' && typeof comp !== 'string') {
+		throw invalidElementTypeError(comp);
+	}
+	// Dynamic JSX tags can resolve to a host STRING at runtime. Keep this
+	// descriptor/de-opt capability in the generic entry point: compiler-proven
+	// void component calls can then retain the function-only core without also
+	// retaining hostStringTagBody, generic attributes, or return reconciliation.
+	const body = typeof comp === 'string' ? (hostStringTagBody as unknown as ComponentBody) : comp;
+	const renderProps =
+		typeof comp === 'string'
+			? ({
+					$$kind: ELEMENT_TAG,
+					type: comp,
+					props,
+					key: null,
+					ref: props != null && props.ref !== undefined ? props.ref : null,
+					children: props != null ? props.children : null,
+				} satisfies ElementDescriptor)
+			: props;
 	componentSlotImpl(
 		renderReturnedValue,
 		parentScope,
 		slotKey,
 		domParent,
+		body,
 		comp,
 		props,
+		renderProps,
 		anchor,
 		key,
 		singleRoot,
@@ -12458,12 +12540,15 @@ export function componentSlotVoid(
 	inherit?: boolean,
 	hasKey?: boolean,
 ): void {
+	if (typeof comp !== 'function') throw invalidElementTypeError(comp);
 	componentSlotImpl(
 		null,
 		parentScope,
 		slotKey,
 		domParent,
 		comp,
+		comp,
+		props,
 		props,
 		anchor,
 		key,
@@ -12488,8 +12573,14 @@ function componentSlotImpl(
 	parentScope: Scope,
 	slotKey: number,
 	domParent: Node,
-	comp: ComponentBody | string,
+	// The executable render body is always a function. The generic entry point
+	// maps a host string to hostStringTagBody before entering this shared core.
+	body: ComponentBody,
+	// Reconciliation identity. Generic dynamic tags retain their host string;
+	// ordinary and compiler-proven void calls pass the component function.
+	identity: ComponentBody | string,
 	props: any,
+	renderProps: any,
 	anchor?: Node | null,
 	key?: any,
 	// true = the compiler PROVED the callee renders one element (same-module
@@ -12508,9 +12599,6 @@ function componentSlotImpl(
 	// explicit `key={undefined}` from an unkeyed call.
 	hasKey?: boolean,
 ): void {
-	if (typeof comp !== 'function' && typeof comp !== 'string') {
-		throw invalidElementTypeError(comp);
-	}
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	// A component nested inside a client-built replacement range must mount as
@@ -12527,8 +12615,10 @@ function componentSlotImpl(
 				parentScope,
 				slotKey,
 				domParent,
-				comp,
+				body,
+				identity,
 				props,
+				renderProps,
 				anchor,
 				key,
 				singleRoot,
@@ -12537,30 +12627,6 @@ function componentSlotImpl(
 			),
 		);
 		return;
-	}
-	// A STRING comp: a dynamic JSX tag — `<props.parts.title>`, `<Tag/>` with
-	// `const Tag = 'h1'`, `<{expr}/>` — that resolved to a HOST tag name at
-	// runtime. Render it as a host element through `hostStringTagBody`: the
-	// block's props is a host DESCRIPTOR carrying the tag + props + the compiled
-	// `children` render-fn, which renders INLINE as the element's entire content
-	// (no nested block). That matches the server's emission (ssrComponent's
-	// string branch inlines the fn's HTML like a static host tag), so hydration
-	// adopts `<!--[--><tag>…</tag><!--]-->` uniformly. Identity below still
-	// compares the raw `comp` string: same tag → update in place (props patched,
-	// children reconciled); a different tag or a string↔function flip → tear
-	// down + remount (React's element-type reset).
-	let body = comp as ComponentBody;
-	let renderProps = props;
-	if (typeof comp === 'string') {
-		body = hostStringTagBody as unknown as ComponentBody;
-		renderProps = {
-			$$kind: ELEMENT_TAG,
-			type: comp,
-			props,
-			key: null,
-			ref: props != null && props.ref !== undefined ? props.ref : null,
-			children: props != null ? props.children : null,
-		} satisfies ElementDescriptor;
 	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
 	let hydrationCursor: Node | null = null;
@@ -12585,7 +12651,7 @@ function componentSlotImpl(
 		// `const S = Suspense`): their pairs are load-bearing for streaming.
 		// ssrComponent reads the same bit, so the server emitted a
 		// pair exactly where this falls through to the adoption regimes below.
-		if (inherit === true && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
+		if (inherit === true && hasComponentFlags(identity, COMPONENT_FLAG_BOUNDARY)) inherit = false;
 		if (inherit === true && parentBlock !== null) {
 			const ps = (parentBlock as { startMarker?: Node | null }).startMarker;
 			const pe = (parentBlock as { endMarker?: Node | null }).endMarker;
@@ -12627,7 +12693,10 @@ function componentSlotImpl(
 			end = hydration!.close(open);
 			if (parentBlock === hydration!.rootBlock) hydration!.claimRootRemainder(end.nextSibling);
 			hydration!.node = start.nextSibling;
-		} else if (singleRoot === true || (singleRoot === 2 && (comp as any).$$singleRoot === true)) {
+		} else if (
+			singleRoot === true ||
+			(singleRoot === 2 && (identity as any).$$singleRoot === true)
+		) {
 			// Client singleRoot: NO markers — the component's single root element
 			// self-delimits (set as block.startMarker/endMarker after render below).
 			// The `2` form resolves cross-module callees by their definition-site
@@ -12693,13 +12762,15 @@ function componentSlotImpl(
 		state.currentComp = null;
 	}
 	state.prevKey = key === undefined ? NO_KEY : key;
-	if (comp !== state.currentComp) {
+	if (identity !== state.currentComp) {
+		const transitionSwap = TRANSITION_SWAP_DRIVER;
 		// Off-screen swap (React WIP model): a TRANSITION swap to a DIFFERENT component
 		// that may suspend → render it off-screen first WITHOUT tearing down the old. If
 		// it suspends, dispose + re-throw so the enclosing tryBlock holds the old component
 		// on screen + resumes (the resume re-renders the boundary, re-driving this swap).
 		// Urgent + hydration keep the legacy path.
 		if (
+			transitionSwap !== null &&
 			state.block !== null &&
 			hydration === null &&
 			parentBlock.currentRenderMode === 'transition'
@@ -12714,7 +12785,7 @@ function componentSlotImpl(
 				// pair sits exactly where the old range was — no DOM move needed. We rename
 				// the comments rather than replacing them: descendant slots inside the WIP
 				// (e.g. a return-slot childSlot) may anchor on `wip.end`, so it must survive.
-				const r = renderOffscreen(
+				const r = transitionSwap.render(
 					parentBlock,
 					domParent,
 					state.end,
@@ -12723,7 +12794,7 @@ function componentSlotImpl(
 					outputHandler,
 				);
 				if (r.suspended || r.error) {
-					disposeWip(r.wip);
+					transitionSwap.dispose(r.wip);
 					if (r.error) throw r.error;
 					throw new SuspenseException(r.suspended);
 				}
@@ -12735,8 +12806,8 @@ function componentSlotImpl(
 				state.start = r.wip.start;
 				state.end = r.wip.end;
 				state.block = r.wip.block;
-				state.currentComp = comp;
-				spliceWipCapture(r.wip);
+				state.currentComp = identity;
+				transitionSwap.splice(r.wip);
 				return;
 			}
 			// singleRoot + INHERITED slots keep the PROBE + discard double render:
@@ -12750,7 +12821,7 @@ function componentSlotImpl(
 			// outside the parent's range, and is disposed before the swap.)
 			const probeAfter = state.end ?? state.anchor;
 			if (probeAfter !== null) {
-				const r = renderOffscreen(
+				const r = transitionSwap.render(
 					parentBlock,
 					domParent,
 					probeAfter,
@@ -12758,7 +12829,7 @@ function componentSlotImpl(
 					renderProps,
 					outputHandler,
 				);
-				disposeWip(r.wip);
+				transitionSwap.dispose(r.wip);
 				if (r.error) throw r.error;
 				if (r.suspended) throw new SuspenseException(r.suspended);
 			}
@@ -12798,7 +12869,7 @@ function componentSlotImpl(
 				state.end = newEnd;
 			}
 		}
-		state.currentComp = comp;
+		state.currentComp = identity;
 		if (state.singleRoot) {
 			// Client singleRoot self-mark (mirrors mountItem): render with
 			// endMarker = the slot's anchor, then promote the inserted root element
@@ -12822,9 +12893,9 @@ function componentSlotImpl(
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
-				typeof comp === 'function'
+				typeof identity === 'function'
 			)
-				profileTrackComponent(b, comp);
+				profileTrackComponent(b, identity);
 			state.block = b;
 			try {
 				renderBlock(b);
@@ -12863,9 +12934,9 @@ function componentSlotImpl(
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
-				typeof comp === 'function'
+				typeof identity === 'function'
 			)
-				profileTrackComponent(b, comp);
+				profileTrackComponent(b, identity);
 			// Borrowed range (M3): teardown must sweep BETWEEN the parent's
 			// markers, never remove them (the branch-block precedent).
 			if (state.inherited) b.exclusiveMarkers = true;
@@ -12876,7 +12947,7 @@ function componentSlotImpl(
 		// `memo(Component)` — skip the body when new props shallow-equal the
 		// committed props (React.memo's contract; see tryMemoBail). A string comp
 		// is never memo-wrapped, so it falls through to the re-render below.
-		if (tryMemoBail(state.block, comp, props)) return;
+		if (tryMemoBail(state.block, identity, props)) return;
 		state.block.props = renderProps;
 		renderBlock(state.block);
 	}
@@ -14937,7 +15008,9 @@ export function childSlot(
 		// (`state.end` is non-null on this path for marked slots; an OWNS-PARENT
 		// slot has none — it takes the legacy swap below, like singleRoot
 		// componentSlots.)
+		const transitionSwap = TRANSITION_SWAP_DRIVER;
 		if (
+			transitionSwap !== null &&
 			state.block !== null &&
 			state.end !== null &&
 			hydration === null &&
@@ -14949,16 +15022,30 @@ export function childSlot(
 				isBodyFn &&
 				!__profileHasComponentMetadata(comp)
 					? withProfileComponentOverride(comp, null, () =>
-							renderOffscreen(parentBlock, domParent, state.end!, comp, props, renderReturnedValue),
+							transitionSwap.render(
+								parentBlock,
+								domParent,
+								state.end!,
+								comp,
+								props,
+								renderReturnedValue,
+							),
 						)
-					: renderOffscreen(parentBlock, domParent, state.end!, comp, props, renderReturnedValue);
+					: transitionSwap.render(
+							parentBlock,
+							domParent,
+							state.end!,
+							comp,
+							props,
+							renderReturnedValue,
+						);
 			if (r.suspended || r.error) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
 				// Re-throw so the enclosing tryBlock's existing catch holds the old content
 				// (transition). Re-throwing (vs swallowing the suspend + returning) is what
 				// keeps the try body's success path from immediately RELEASING the hold; the
 				// resume re-renders the try body, which re-drives this swap to completion.
-				disposeWip(r.wip);
+				transitionSwap.dispose(r.wip);
 				if (r.error) throw r.error;
 				throw new SuspenseException(r.suspended);
 			}
@@ -14966,13 +15053,13 @@ export function childSlot(
 				// The retained pair belongs to a coextensive parent range. Probe for
 				// suspension, discard, then use the in-place mount below; committing
 				// a nested WIP pair would split the compacted ownership graph.
-				disposeWip(r.wip);
+				transitionSwap.dispose(r.wip);
 			} else {
 				// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
 				// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
 				// Synchronous, so there is no painted blank between the two.
 				clearChildContent(state);
-				commitOffscreen(r.wip, state.end!);
+				transitionSwap.commit(r.wip, state.end!);
 				state.block = r.wip.block;
 				state.currentComp = comp;
 				state.currentIsBodyFn = isBodyFn;
@@ -16841,6 +16928,9 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 // ---------------------------------------------------------------------------
 
 export function startTransition(fn: () => void | Promise<unknown>): void {
+	// Install the optional off-screen swap graph before any listener or user
+	// update can observe transition priority.
+	ensureTransitionSwapDriver();
 	// Bump the priority flag FIRST so any scheduleRender calls fired by the
 	// listener notification (and by fn itself) are tagged as transition.
 	TRANSITION_DEPTH++;
@@ -17703,6 +17793,7 @@ function renderBranchSlot(
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	if (next !== state.branch) {
+		const transitionSwap = TRANSITION_SWAP_DRIVER;
 		// A markerless branch may share its host boundary with a nested sole-root
 		// branch. The nested branch updates Block markers when it replaces that
 		// host, but this slot's cached `end` is intentionally not part of the Block
@@ -17723,6 +17814,7 @@ function renderBranchSlot(
 		// finds them still attached after its own unmountBlock. Urgent + hydration, and a
 		// swap TO an empty branch (body === null), keep the legacy in-place path below.
 		if (
+			transitionSwap !== null &&
 			state.block !== null &&
 			body !== null &&
 			hydration === null &&
@@ -17738,7 +17830,7 @@ function renderBranchSlot(
 				const oldBlock = state.block;
 				const oldBlockStart = oldBlock.startMarker;
 				const oldBlockEnd = oldBlock.endMarker;
-				const r = renderOffscreen(
+				const r = transitionSwap.render(
 					parentBlock,
 					domParent,
 					liveEnd,
@@ -17749,7 +17841,7 @@ function renderBranchSlot(
 					env,
 				);
 				if (r.suspended || r.error) {
-					disposeWip(r.wip);
+					transitionSwap.dispose(r.wip);
 					if (r.error) throw r.error;
 					throw new SuspenseException(r.suspended);
 				}
@@ -17759,7 +17851,7 @@ function renderBranchSlot(
 				// adopting the WIP pair would strand every outer owner on removed
 				// comments. This mirrors componentSlot's inherited transition path.
 				if (state.borrowed) {
-					disposeWip(r.wip);
+					transitionSwap.dispose(r.wip);
 				} else {
 					r.wip.start.data = marker;
 					r.wip.end.data = '/' + marker;
@@ -17788,7 +17880,7 @@ function renderBranchSlot(
 					);
 					// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
 					r.wip.block.exclusiveMarkers = true;
-					spliceWipCapture(r.wip);
+					transitionSwap.splice(r.wip);
 					return;
 				}
 			}

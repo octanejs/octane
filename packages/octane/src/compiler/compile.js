@@ -548,6 +548,7 @@ function buildProfileRuntimeImport(ctx) {
 // references (including `imported as local` renames).
 function addUserImportSpecifiers(ctx, node) {
 	for (const sp of node.specifiers || []) {
+		if (sp.local?.name && ctx.consumedRuntimeLocals?.has(sp.local.name)) continue;
 		if (sp.type === 'ImportNamespaceSpecifier') {
 			if (sp.local?.name) ctx.userRuntimeNamespaces.add(sp.local.name);
 			continue;
@@ -600,6 +601,194 @@ function collectOctaneImportBindings(astBody) {
 		}
 	}
 	return { locals, namespaces, foreignLocals };
+}
+
+function collectNestedBindingNames(root) {
+	const names = new Set();
+	const seen = new WeakSet();
+	const walk = (value) => {
+		if (!value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) walk(child);
+			return;
+		}
+		if (seen.has(value)) return;
+		seen.add(value);
+		if (value.type === 'ImportDeclaration') return;
+		if (value.type === 'VariableDeclarator') collectBindings(value.id, names);
+		if (
+			value.type === 'FunctionDeclaration' ||
+			value.type === 'FunctionExpression' ||
+			value.type === 'ArrowFunctionExpression'
+		) {
+			if (value.id) collectBindings(value.id, names);
+			for (const param of value.params || []) collectBindings(param, names);
+		}
+		if (value.type === 'ClassDeclaration' || value.type === 'ClassExpression') {
+			if (value.id) collectBindings(value.id, names);
+		}
+		if (value.type === 'CatchClause') collectBindings(value.param, names);
+		for (const key in value) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(value[key]);
+		}
+	};
+	walk(root);
+	return names;
+}
+
+function hasIdentifierReference(root, name) {
+	let found = false;
+	const seen = new WeakSet();
+	const walk = (value) => {
+		if (found || !value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) walk(child);
+			return;
+		}
+		if (seen.has(value)) return;
+		seen.add(value);
+		if (value.type === 'ImportDeclaration') return;
+		if (value.type === 'Identifier' && value.name === name) {
+			found = true;
+			return;
+		}
+		for (const key in value) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(value[key]);
+		}
+	};
+	walk(root);
+	return found;
+}
+
+function errorBoundaryFallback(node, fallbackAttribute) {
+	const suffix = node.start ?? node.loc?.start?.line ?? 0;
+	let errorName = `_error$${suffix}`;
+	let resetName = null;
+	let body = [];
+	if (fallbackAttribute !== undefined) {
+		const authored =
+			fallbackAttribute.value?.type === 'JSXExpressionContainer'
+				? fallbackAttribute.value.expression
+				: fallbackAttribute.value;
+		const fallback = unwrapTsExpr(authored);
+		if (fallback?.type === 'ArrowFunctionExpression') {
+			// Inlining is an exact substitution only for synchronous arrows with the
+			// public `(error, reset)` arity. Function expressions can observe their own
+			// `this`/`arguments`, async arrows return a thenable, and extra parameters
+			// are initialized to `undefined` by the runtime call; all stay on the
+			// generic ErrorBoundary path.
+			if (fallback.async === true || fallback.params?.length > 2) return null;
+			if ((fallback.params || []).some((param) => param.type !== 'Identifier')) return null;
+			if (fallback.params?.[0]?.name) errorName = fallback.params[0].name;
+			if (fallback.params?.[1]?.name) resetName = fallback.params[1].name;
+			if (fallback.body?.type === 'JSXCodeBlock') {
+				if (hasOwnValueReturn(fallback)) return null;
+				body = [
+					...(fallback.body.body || []),
+					...(fallback.body.render ? [fallback.body.render] : []),
+				];
+			} else if (fallback.body?.type === 'BlockStatement') {
+				if (
+					fallback.body.body?.length !== 1 ||
+					fallback.body.body[0].type !== 'ReturnStatement' ||
+					fallback.body.body[0].argument == null
+				)
+					return null;
+				const returned = fallback.body.body[0].argument;
+				body = isJsxNode(returned)
+					? [returned]
+					: [{ type: 'JSXExpressionContainer', expression: returned }];
+			} else if (fallback.body != null) {
+				body = isJsxNode(fallback.body)
+					? [fallback.body]
+					: [{ type: 'JSXExpressionContainer', expression: fallback.body }];
+			}
+		} else if (fallback != null) {
+			if (!isJsxNode(fallback) && fallback.type !== 'Literal') return null;
+			body = isJsxNode(fallback)
+				? [fallback]
+				: [{ type: 'JSXExpressionContainer', expression: fallback }];
+		}
+	}
+	return { errorName, resetName, body };
+}
+
+/**
+ * Lower the exact imported `<ErrorBoundary>` builtin to the same tryBlock IR
+ * as `@try/@catch` when its fallback is statically compilable. This removes the
+ * generic component/children dispatcher while preserving the public JSX API.
+ * Dynamic props, spreads, keys, and shadowed imports stay on the runtime path.
+ */
+function lowerImportedErrorBoundaries(ast) {
+	const boundaryLocals = new Set();
+	for (const node of ast.body || []) {
+		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
+		for (const specifier of node.specifiers || []) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				(specifier.imported?.name ?? specifier.imported?.value) === 'ErrorBoundary' &&
+				specifier.local?.name
+			) {
+				boundaryLocals.add(specifier.local.name);
+			}
+		}
+	}
+	if (boundaryLocals.size === 0) return new Set();
+	const shadowed = collectNestedBindingNames(ast.body);
+	for (const name of shadowed) boundaryLocals.delete(name);
+	if (boundaryLocals.size === 0) return new Set();
+
+	let lowered = false;
+	ast.body = mapAst(ast.body, (node) => {
+		if (node.type !== 'JSXElement') return null;
+		const tag = node.openingElement?.name;
+		if (
+			(tag?.type !== 'Identifier' && tag?.type !== 'JSXIdentifier') ||
+			!boundaryLocals.has(tag.name)
+		)
+			return null;
+		const attributes = node.openingElement?.attributes || [];
+		if (
+			attributes.some(
+				(attribute) =>
+					(attribute.type !== 'JSXAttribute' && attribute.type !== 'Attribute') ||
+					(attribute.name?.name ?? attribute.name) !== 'fallback',
+			)
+		)
+			return null;
+		const fallbackAttribute = attributes.find(
+			(attribute) => (attribute.name?.name ?? attribute.name) === 'fallback',
+		);
+		const fallback = errorBoundaryFallback(node, fallbackAttribute);
+		if (fallback === null) return null;
+		lowered = true;
+		return {
+			type: 'JSXTryExpression',
+			start: node.start,
+			end: node.end,
+			loc: node.loc,
+			block: { type: 'BlockStatement', body: node.children || [] },
+			handler: {
+				type: 'CatchClause',
+				param: { type: 'Identifier', name: fallback.errorName },
+				resetParam:
+					fallback.resetName == null ? null : { type: 'Identifier', name: fallback.resetName },
+				body: { type: 'BlockStatement', body: fallback.body },
+			},
+			pending: null,
+			finalizer: null,
+			propagateSuspense: true,
+			errorBoundaryResetName: fallback.resetName,
+		};
+	});
+	if (!lowered) return new Set();
+	const consumed = new Set();
+	for (const name of boundaryLocals) {
+		if (!hasIdentifierReference(ast.body, name)) consumed.add(name);
+	}
+	return consumed;
 }
 
 // M3 marker elision (docs/comment-marker-elision-plan.md): a component body
@@ -2684,6 +2873,60 @@ export function isVoidJsxCodeBlockFunction(node) {
 }
 
 /**
+ * Whether every component-owned return is a top-level nullish guard that the
+ * production compiler can lower to template control flow. A guard such as
+ * `if (!value) return null` has no renderable value: it only selects between
+ * the component's final template and an empty branch. Keeping that distinction
+ * lets modular components use the void-output ABI without retaining the
+ * generic JavaScript-return reconciler.
+ *
+ * Nested function returns are separate execution scopes. More complicated
+ * control flow stays conservative and retains the generic path.
+ */
+export function hasOnlyLowerableNullishExits(node) {
+	if (node?.body?.type !== 'JSXCodeBlock' || !isPlainHostRoot(node.body.render)) return false;
+	const guards = new Set();
+	for (const statement of node.body.body || []) {
+		if (!isEarlyExitIf(statement, true)) continue;
+		const consequent = statement.consequent;
+		guards.add(consequent.type === 'BlockStatement' ? consequent.body[0] : consequent);
+	}
+	if (guards.size === 0) return false;
+
+	let sawReturn = false;
+	let safe = true;
+	const seen = new WeakSet();
+	const walk = (value) => {
+		if (!safe || !value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) walk(child);
+			return;
+		}
+		if (seen.has(value)) return;
+		seen.add(value);
+		if (
+			value !== node &&
+			(value.type === 'FunctionDeclaration' ||
+				value.type === 'FunctionExpression' ||
+				value.type === 'ArrowFunctionExpression')
+		) {
+			return;
+		}
+		if (value.type === 'ReturnStatement') {
+			sawReturn = true;
+			if (!guards.has(value)) safe = false;
+			return;
+		}
+		for (const key in value) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			walk(value[key]);
+		}
+	};
+	walk(node.body.body || []);
+	return safe && sawReturn;
+}
+
+/**
  * Prove that a component always returns one host element.
  *
  * TSRX's `@{}` form carries that output as `body.render`. Ordinary TSX keeps a
@@ -4041,6 +4284,12 @@ export function compile(source, filename, options) {
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
+	const consumedRuntimeLocals = lowerImportedErrorBoundaries(ast);
+	// A null-only shorthand guard is template control flow, not an arbitrary
+	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
+	// and HMR share one DOM-range shape. HMR still emits the generic component
+	// call ABI, and invalidates normally if an edit introduces a value return.
+	lowerNullishComponentExits(ast);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
@@ -4091,11 +4340,14 @@ export function compile(source, filename, options) {
 		// own component marker pair instead of borrowing the Hydrate block range.
 		hydrateBoundaryModule: options?.__hydrateBoundaryModule === true,
 		hmr: hmrEnabled, // gates Symbol.for vs Symbol() hook slots (allocHookSymbol)
+		isVoidComponentImport:
+			typeof options?.isVoidComponentImport === 'function' ? options.isVoidComponentImport : null,
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		profileRuntimeNeeded: new Set(), // compiler ABI helpers imported from `octane/profiling`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
+		consumedRuntimeLocals,
 		hoistedTemplates: [], // { name, html }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
@@ -4232,6 +4484,7 @@ export function compile(source, filename, options) {
 	// off an identity that can change (see makeCompCall).
 	ctx.importedNames = new Set();
 	ctx.importNamespaceNames = new Set();
+	ctx.importedComponentBindings = new Map();
 	const memoImportNames = new Set();
 	for (const node of ast.body) {
 		if (node.type !== 'ImportDeclaration') continue;
@@ -4239,6 +4492,25 @@ export function compile(source, filename, options) {
 		for (const sp of node.specifiers || []) {
 			if (sp.importKind === 'type') continue;
 			if (sp.local && sp.local.name) ctx.importedNames.add(sp.local.name);
+			if (
+				(node.source.value.startsWith('./') || node.source.value.startsWith('../')) &&
+				sp.local?.name
+			) {
+				if (sp.type === 'ImportDefaultSpecifier') {
+					ctx.importedComponentBindings.set(sp.local.name, {
+						request: node.source.value,
+						imported: 'default',
+					});
+				} else if (sp.type === 'ImportSpecifier') {
+					const imported = sp.imported?.name ?? sp.imported?.value;
+					if (typeof imported === 'string') {
+						ctx.importedComponentBindings.set(sp.local.name, {
+							request: node.source.value,
+							imported,
+						});
+					}
+				}
+			}
 			if (sp.type === 'ImportNamespaceSpecifier' && sp.local?.name) {
 				ctx.importNamespaceNames.add(sp.local.name);
 			}
@@ -4928,6 +5200,10 @@ function compileServer(source, filename, options, styleRemap = null) {
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
+	const consumedRuntimeLocals = lowerImportedErrorBoundaries(ast);
+	// Mirror the client transform so SSR emits the same control-flow ranges
+	// hydration expects in both development and production.
+	lowerNullishComponentExits(ast);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
@@ -4953,6 +5229,7 @@ function compileServer(source, filename, options, styleRemap = null) {
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // rewritten to the server runtime module
 		userRuntimeDefaults: new Set(),
+		consumedRuntimeLocals,
 		hoistedHelpers: [],
 		cssInjections: [],
 		moduleCssInjections: [],
@@ -6363,8 +6640,28 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	let catchFnName = 'null'; // no @catch → ssrTry rethrows non-suspense errors
 	if (node.handler) {
 		const params = node.handler.param ? [node.handler.param] : [];
+		const catchBody = [...node.handler.body.body];
+		if (node.errorBoundaryResetName) {
+			catchBody.unshift({
+				type: 'VariableDeclaration',
+				kind: 'const',
+				declarations: [
+					{
+						type: 'VariableDeclarator',
+						id: { type: 'Identifier', name: node.errorBoundaryResetName },
+						init: {
+							type: 'ArrowFunctionExpression',
+							params: [],
+							expression: false,
+							async: false,
+							body: { type: 'BlockStatement', body: [] },
+						},
+					},
+				],
+			});
+		}
 		const catchSub = ssrCompileSub(
-			node.handler.body.body,
+			catchBody,
 			ctx,
 			'__scatch',
 			params,
@@ -6384,8 +6681,13 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// inline try/catch emit for buffered renders (hydration compatibility).
 	// `siteKey` is a stable source-position hash so a boundary keeps its identity
 	// across streaming passes (the runtime adds the frame path per instance).
-	const namespaceArg = componentNs === null ? '' : `, ${JSON.stringify(componentNs)}`;
-	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName}${namespaceArg})`;
+	const trailing = [];
+	if (componentNs !== null || node.propagateSuspense === true) {
+		trailing.push(componentNs === null ? 'undefined' : JSON.stringify(componentNs));
+	}
+	if (node.propagateSuspense === true) trailing.push('true');
+	const suffix = trailing.length === 0 ? '' : `, ${trailing.join(', ')}`;
+	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName}${suffix})`;
 }
 
 // Deterministic per-boundary site key for ssrTry — same scheme as headKey:
@@ -10345,11 +10647,15 @@ function normalizeChildren(nodes, inSvg = false) {
 			// as the Suspense fallback branch).
 			out.push({
 				type: 'TryStatement',
+				start: n.start,
+				end: n.end,
 				loc: n.loc, // preserve template directive position for dev hydration LOC
 				block: n.block,
 				handler: n.handler || null,
 				finalizer: n.finalizer || null,
 				pending: n.pending || null,
+				propagateSuspense: n.propagateSuspense === true,
+				errorBoundaryResetName: n.errorBoundaryResetName || null,
 			});
 		} else if (n.type === 'JSXSwitchExpression') {
 			// `@switch (d) { @case 1: { ... } @default: { ... } }` — lower to a
@@ -11127,6 +11433,8 @@ function planJsx(
 		if (b.kind === 'textOnlyChild') ctx.runtimeNeeded.add('htext');
 		if (b.kind === 'attr') ctx.runtimeNeeded.add('setAttribute');
 		if (b.kind === 'stringData') ctx.runtimeNeeded.add('setStringData');
+		if (b.kind === 'booleanAttr') ctx.runtimeNeeded.add('setBooleanAttribute');
+		if (b.kind === 'ariaAttr') ctx.runtimeNeeded.add('setAriaAttribute');
 		if (CONTROLLED_KIND_HELPERS[b.kind] !== undefined) {
 			ctx.runtimeNeeded.add(CONTROLLED_KIND_HELPERS[b.kind]);
 		}
@@ -11680,12 +11988,15 @@ function planJsx(
 		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @try).
 		const tryAnchor = anchorExprFor(tc, 'tryAnchor');
-		const tryAnchorArg = tryAnchor ? `, ${tryAnchor}` : '';
 		const tryEnv = envExprFor(tc);
-		const tryEnvArg = tryEnv ? (tryAnchorArg ? `, ${tryEnv}` : `, undefined, ${tryEnv}`) : '';
+		const tryArgs = [];
+		if (tryAnchor || tryEnv || tc.propagateSuspense) tryArgs.push(tryAnchor || 'undefined');
+		if (tryEnv || tc.propagateSuspense) tryArgs.push(tryEnv || 'undefined');
+		if (tc.propagateSuspense) tryArgs.push('true');
+		const tryTrailing = tryArgs.length === 0 ? '' : `, ${tryArgs.join(', ')}`;
 		pushAfter(
 			tc.id,
-			`  _$tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryAnchorArg}${tryEnvArg});`,
+			`  _$tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryTrailing});`,
 		);
 	}
 	for (const sc of ctx._switchCalls) {
@@ -11757,6 +12068,8 @@ function buildLocsLiteral(constructs) {
 const DEFERRABLE_MOUNT_KINDS = new Set([
 	'attr',
 	'stringData',
+	'booleanAttr',
+	'ariaAttr',
 	'class',
 	'style',
 	'formAction',
@@ -11950,6 +12263,22 @@ function emitBindingMount(b, elVar, bag) {
 			return `    {
       const _v = ${E};
       _$setStringData(${elVar}, ${JSON.stringify(b.name)}, _v);
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_prev$${b.id}`)} = _v;
+    }`;
+		}
+		case 'booleanAttr': {
+			return `    {
+      const _v = ${E};
+      _$setBooleanAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
+      ${bag.local(`_el$${b.id}`)} = ${elVar};
+      ${bag.local(`_prev$${b.id}`)} = _v;
+    }`;
+		}
+		case 'ariaAttr': {
+			return `    {
+      const _v = ${E};
+      _$setAriaAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
     }`;
@@ -12163,6 +12492,12 @@ function emitBindingUpdate(b, bag) {
 		}
 		case 'stringData': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setStringData(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
+		}
+		case 'booleanAttr': {
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setBooleanAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
+		}
+		case 'ariaAttr': {
+			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAriaAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
 		}
 		case 'value':
 		case 'checked':
@@ -12965,6 +13300,34 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'formAction',
 				name: tag === 'form' ? 'action' : 'formaction',
+				expr,
+				path,
+				ns: hostNs,
+			});
+		} else if (/^aria-[a-z][a-z0-9_-]*$/.test(attrName)) {
+			// Statically named lowercase ARIA attributes bypass the generic alias,
+			// namespace, URL, controlled-form, and validity routing. Their value
+			// contract is uniform across native/custom HTML, SVG, and MathML:
+			// nullish removes and everything else stringifies.
+			bindings.push({
+				id: bindings.length,
+				kind: 'ariaAttr',
+				name: attrName,
+				expr,
+				path,
+				ns: hostNs,
+			});
+		} else if (
+			!((hostNs === 'html' || hostNs === 'opaque') && tag.includes('-')) &&
+			BOOLEAN_ATTR_PROPS.has(attrName.toLowerCase())
+		) {
+			// Exact native boolean props all share the canonical presence contract.
+			// The lowercase name is the final DOM spelling (including camelCase JSX
+			// aliases such as allowFullScreen -> allowfullscreen).
+			bindings.push({
+				id: bindings.length,
+				kind: 'booleanAttr',
+				name: attrName.toLowerCase(),
 				expr,
 				path,
 				ns: hostNs,
@@ -14063,6 +14426,18 @@ function makeCompCall(
 				// pinned to whichever component happened to mount first.
 				maybeSingleRoot = callSiteOk;
 			}
+			const importedBinding = ctx.importedComponentBindings?.get(compExpr);
+			if (
+				!voidComponent &&
+				!ctx.hmr &&
+				!ctx.dev &&
+				!ctx.profile &&
+				importedBinding !== undefined &&
+				!ctx.currentComponentLocals?.has(compExpr) &&
+				ctx.isVoidComponentImport?.(importedBinding.request, importedBinding.imported) === true
+			) {
+				voidComponent = true;
+			}
 		}
 	}
 
@@ -14197,6 +14572,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
 		pendingHelper: pendingHelperName,
+		propagateSuspense: node.propagateSuspense === true,
 		hostPath: null,
 	};
 }
@@ -14717,18 +15093,27 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
  * Accepts both no-braces (`if (x) continue;`) and single-statement-block
  * (`if (x) { continue; }`). Rejects forms with an alternate or a value-return.
  */
-function isEarlyExitIf(stmt) {
+function isEarlyExitIf(stmt, allowExplicitNull = false) {
 	if (!stmt || stmt.type !== 'IfStatement' || stmt.alternate) return false;
 	const c = stmt.consequent;
-	if (isEarlyExitStatement(c)) return true;
-	if (c.type === 'BlockStatement' && c.body.length === 1 && isEarlyExitStatement(c.body[0]))
+	if (isEarlyExitStatement(c, allowExplicitNull)) return true;
+	if (
+		c.type === 'BlockStatement' &&
+		c.body.length === 1 &&
+		isEarlyExitStatement(c.body[0], allowExplicitNull)
+	)
 		return true;
 	return false;
 }
 
-function isEarlyExitStatement(s) {
+function isEarlyExitStatement(s, allowExplicitNull = false) {
 	if (!s) return false;
-	if (s.type === 'ReturnStatement' && s.argument == null) return true;
+	if (
+		s.type === 'ReturnStatement' &&
+		(s.argument == null ||
+			(allowExplicitNull && s.argument.type === 'Literal' && s.argument.value === null))
+	)
+		return true;
 	if (s.type === 'ContinueStatement' && s.label == null) return true;
 	return false;
 }
@@ -14742,12 +15127,12 @@ function isEarlyExitStatement(s) {
  * Each synthetic `if (!cond) { ... }` becomes an ifBlock at compile time.
  * Symbol-keyed hooks make it safe to declare hooks after an early exit.
  */
-function rewriteEarlyExits(body) {
+function rewriteEarlyExits(body, allowExplicitNull = false) {
 	const out = [];
 	for (let i = 0; i < body.length; i++) {
 		const stmt = body[i];
-		if (isEarlyExitIf(stmt)) {
-			const rest = rewriteEarlyExits(body.slice(i + 1));
+		if (isEarlyExitIf(stmt, allowExplicitNull)) {
+			const rest = rewriteEarlyExits(body.slice(i + 1), allowExplicitNull);
 			if (rest.length > 0) {
 				out.push({
 					type: 'IfStatement',
@@ -14761,6 +15146,34 @@ function rewriteEarlyExits(body) {
 		out.push(stmt);
 	}
 	return out;
+}
+
+/**
+ * Turn compiler-proven shorthand guards into ordinary template control flow:
+ *
+ *   function Card(props) @{ if (!props.value) return null; <article /> }
+ *
+ * becomes the same compiled shape as `@if (props.value) { <article /> }`.
+ * This is deliberately limited to the guards proven by
+ * hasOnlyLowerableNullishExits; mixed/unknown returns keep their established
+ * generic return-value ABI. HMR continues to invoke every component through
+ * its generic slot and invalidates if a later edit introduces a value return.
+ */
+function lowerNullishComponentExits(ast) {
+	for (const statement of ast.body || []) {
+		const node =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (!hasOnlyLowerableNullishExits(node)) continue;
+		const body = node.body;
+		const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
+		const rewritten = rewriteEarlyExits(sequence, true);
+		const renderIndex = rewritten.findIndex(isJsxNode);
+		if (renderIndex === -1 || rewritten.slice(renderIndex + 1).some(isJsxNode)) continue;
+		body.body = rewritten.slice(0, renderIndex);
+		body.render = rewritten[renderIndex];
+	}
 }
 
 function isJsxNode(node) {
