@@ -16,7 +16,7 @@ import {
 	createClientReferenceManifest,
 	createOctaneCompiler,
 	discoverOctaneSourceDependencies,
-	findVoidRootImports,
+	findVoidComponentImports,
 } from './bundler.js';
 
 export { discoverOctaneSourceDependencies };
@@ -303,7 +303,7 @@ export function octane(options = {}) {
 
 			const voidImports =
 				specializeProductionRoots && !server && !hmrEnabled && !profileEnabled
-					? findVoidRootImports(code, id)
+					? findVoidComponentImports(code, id)
 					: [];
 			if (voidImports.length === 0) return transformWithProof(null);
 			return loadVoidComponentImports(this, voidImports, id).then(transformWithProof);

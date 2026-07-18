@@ -48,3 +48,25 @@ export function ErrorHost(props) @{
 		<Thrower bang={props.bang} />
 	</ErrorBoundary>
 }
+
+function ResetThrower(props) @{
+	if (props.state.failed) throw new Error('reset me');
+	<span id="reset-ok">recovered</span>
+}
+
+export function ResetErrorHost(props) @{
+	<ErrorBoundary
+		fallback={(error, reset) => <button
+			id="reset-error"
+			onClick={() => {
+				props.state.failed = false;
+				reset();
+			}}
+		>
+			{'retry:' + (error as Error).message}
+		</button>
+		}
+	>
+		<ResetThrower state={props.state} />
+	</ErrorBoundary>
+}

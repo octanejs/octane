@@ -16,6 +16,10 @@ export function RuntimeTypedDataAttribute(props) @{
 	<div id="runtime-data" data-label={props.value as string}>{'data'}</div>
 }
 
+export function DynamicAriaAttribute(props) @{
+	<div id="dynamic-aria" aria-label={props.value}>{'aria'}</div>
+}
+
 export function Clicker() @{
 	const [n, setN] = useState(0);
 	<button onClick={() => setN(n + 1)}>

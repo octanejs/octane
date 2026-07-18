@@ -5,6 +5,7 @@ import { Canvas } from '@fixture/object-canvas';
 import { Scene } from './Scene.object.tsrx';
 import { DeferredHydrationProof } from './deferred-hydration.tsrx';
 import { PrefetchedHydrationProof } from './prefetched-hydration.tsrx';
+import { GuardedConst } from './GuardedConst.tsrx';
 
 export const fixturePageModuleState = { rendered: false };
 
@@ -42,6 +43,7 @@ function UnsplitHydrationProof() @{
 // state) identical to dev SSR.
 export function Page(props: { params: Record<string, string>; url: string }) @{
 	const [count, setCount] = useState(1);
+	const [guardedVisible, setGuardedVisible] = useState(true);
 	fixturePageModuleState.rendered = true;
 	if (props.params.slug === 'error') {
 		throw new Error('fixture root boundary');
@@ -58,6 +60,10 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 			{'Count: ' + count}
 		</p>
 		<button onClick={() => setCount((current) => current + 1)}>Increment fixture</button>
+		<button onClick={() => setGuardedVisible((visible) => !visible)}>
+			Toggle guarded const
+		</button>
+		<GuardedConst visible={guardedVisible} />
 		<button onClick={() => fixtureRpc('browser')}>Call server</button>
 		<RpcProbe />
 		<Canvas>

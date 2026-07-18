@@ -185,7 +185,7 @@ describe('hmr — runtime wrapper', () => {
 		);
 	});
 
-	it('marks mixed shorthand bodies so HMR can invalidate an ABI-changing edit', async () => {
+	it('distinguishes lowered null guards from renderable value returns during HMR', async () => {
 		const { compile } = await import('octane/compiler');
 		const direct = compile(
 			`export function Foo(p) @{ <span>{p.label as string}</span> }`,
@@ -197,9 +197,16 @@ describe('hmr — runtime wrapper', () => {
 			'file.tsrx',
 			{ hmr: true },
 		).code;
+		const returned = compile(
+			`export function Foo(p) @{ if (p.empty) return 'empty'; <span>{p.label as string}</span> }`,
+			'file.tsrx',
+			{ hmr: true },
+		).code;
 
 		expect(direct).not.toContain('__octaneReturnedOutput');
-		expect(mixed).toContain('{ __octaneReturnedOutput: true }');
+		expect(mixed).not.toContain('__octaneReturnedOutput');
+		expect(mixed).toContain('_$ifBlock');
+		expect(returned).toContain('{ __octaneReturnedOutput: true }');
 		expect(mixed).toContain('if (!Foo[_$HMR].update(module.Foo)) import.meta.hot.invalidate();');
 	});
 

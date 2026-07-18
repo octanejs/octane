@@ -470,6 +470,13 @@ describe('production SSR build', () => {
 						.toEqual({ clicks: 1, dormant: false, queryLoaded: true, sameNode: true });
 					await page.getByRole('button', { name: 'Increment fixture' }).click();
 					await expect.poll(() => page.locator('.count').textContent()).toBe('Count: 2');
+					const guardedConst = page.locator('.vite-guarded-const');
+					expect(await guardedConst.getAttribute('data-fixture-kind')).toBe('guarded');
+					expect(await guardedConst.textContent()).toBe('vite-guarded-const-proof');
+					await page.getByRole('button', { name: 'Toggle guarded const' }).click();
+					await expect.poll(() => guardedConst.count()).toBe(0);
+					await page.getByRole('button', { name: 'Toggle guarded const' }).click();
+					await expect.poll(() => guardedConst.textContent()).toBe('vite-guarded-const-proof');
 					await page.getByRole('button', { name: 'Check hydration module identity' }).click();
 					await expect
 						.poll(() => page.locator('[data-hydration-module-identity]').textContent())

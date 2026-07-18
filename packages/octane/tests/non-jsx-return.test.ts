@@ -234,7 +234,7 @@ export function Parent(p) @{
 	<><EarlyString early={p.early}/><EarlyDescriptor early={p.early}/><EarlyArray early={p.early}/><EarlyVoid early={p.early}/><EarlyUndefined early={p.early}/><VoidStateful/></>
 }`;
 
-	it('keeps own value returns on the generic component path', () => {
+	it('keeps renderable value returns on the generic component path', () => {
 		const code = compile(source, 'value-return.tsrx', { hmr: false }).code;
 		expect(code).not.toContain('componentSlotLite');
 		expect(code).not.toContain('EarlyString.$$singleRoot');
@@ -243,14 +243,17 @@ export function Parent(p) @{
 		// autoMemo guards eligible value-returning calls outside the ordinary
 		// generic return-reconciliation helper; it does not change that helper ABI.
 		expect(code).toContain('return undefined ?? null;');
-		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(5);
-		expect(code.match(/_\$componentSlotVoid\(/g)).toHaveLength(1);
+		// A bare return is an empty template branch in production, so EarlyVoid
+		// joins the direct-render path without retaining return reconciliation.
+		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(4);
+		expect(code.match(/_\$componentSlotVoid\(/g)).toHaveLength(2);
 	});
 
 	it('uses the generic component path during HMR', () => {
 		const code = compile(source, 'value-return.tsrx', { hmr: true }).code;
 		expect(code).not.toContain('componentSlotVoid');
-		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(6);
+		expect(code.match(/_\$componentSlot\(/g)).toHaveLength(5);
+		expect(code.match(/_\$componentSlotLite\(/g)).toHaveLength(1);
 	});
 });
 
