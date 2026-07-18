@@ -1,6 +1,8 @@
 // The docs registry: slug → compiled MDX document (+ sidebar metadata).
 // Static imports keep every document in both module graphs (server-compiled
 // for SSR, client-compiled for hydration/navigation) — fine at this scale.
+// The component-free metadata lives in docs-meta.ts (shared with the remote
+// MCP server); this module zips it with the compiled components.
 import QuickStart from './docs/quick-start.mdx';
 import BuildTools from './docs/build-tools.mdx';
 import CoreApis from './docs/core-apis.mdx';
@@ -8,137 +10,29 @@ import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
-import { BINDING_CATEGORIES, BINDING_COUNT } from './bindings.ts';
+import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
 
-export interface DocEntry {
-	slug: string;
-	title: string;
-	description: string;
-	group: 'Start here' | 'Learn Octane' | 'Explore';
-	sections?: readonly DocSection[];
-	searchTerms?: readonly string[];
+export type { DocSection };
+
+export interface DocEntry extends DocMeta {
 	component: (props?: Record<string, unknown>) => unknown;
 }
 
-export interface DocSection {
-	id: string;
-	title: string;
-}
+const components: Record<string, DocEntry['component']> = {
+	'quick-start': QuickStart as DocEntry['component'],
+	'build-tools': BuildTools as DocEntry['component'],
+	'core-apis': CoreApis as DocEntry['component'],
+	'tsrx-vs-tsx': TsrxVsTsx as DocEntry['component'],
+	'differences-from-react': DifferencesFromReact as DocEntry['component'],
+	profiling: Profiling as DocEntry['component'],
+	bindings: Bindings as DocEntry['component'],
+};
 
-export const docs: DocEntry[] = [
-	{
-		slug: 'quick-start',
-		title: 'Quick start',
-		description: 'Install octane, mount a component, and learn the .tsrx essentials.',
-		group: 'Start here',
-		sections: [
-			{ id: 'install', title: 'Install and configure' },
-			{ id: 'first-component', title: 'Your first component' },
-			{ id: 'mount', title: 'Connect it to the page' },
-			{ id: 'tsrx-at-a-glance', title: 'TSRX at a glance' },
-		],
-		component: QuickStart as DocEntry['component'],
-	},
-	{
-		slug: 'build-tools',
-		title: 'Build tools',
-		description: 'Configure Vite, Rspack, or Rsbuild for Octane apps.',
-		group: 'Start here',
-		sections: [
-			{ id: 'choose-an-integration', title: 'Choose an integration' },
-			{ id: 'vite', title: 'Vite' },
-			{ id: 'rspack', title: 'Rspack' },
-			{ id: 'rsbuild', title: 'Rsbuild' },
-			{ id: 'full-app-configuration', title: 'Full app configuration' },
-			{ id: 'production-and-preview', title: 'Production and preview' },
-			{ id: 'renderer-targets', title: 'Renderer targets' },
-		],
-		component: BuildTools as DocEntry['component'],
-	},
-	{
-		slug: 'core-apis',
-		title: 'Core APIs',
-		description:
-			'Learn how components, state, events, context, effects, async UI, and rendering fit together.',
-		group: 'Learn Octane',
-		sections: [
-			{ id: 'mental-model', title: 'The mental model' },
-			{ id: 'components-and-props', title: 'Components and props' },
-			{ id: 'state-and-events', title: 'State and events' },
-			{ id: 'lists-and-conditions', title: 'Lists and conditions' },
-			{ id: 'context', title: 'Sharing data' },
-			{ id: 'refs-and-effects', title: 'Refs and effects' },
-			{ id: 'async-ui', title: 'Loading data and code' },
-			{ id: 'responsive-updates', title: 'Responsive updates' },
-			{ id: 'roots-and-rendering', title: 'Roots and rendering' },
-			{ id: 'server-rendering', title: 'Server rendering' },
-			{ id: 'api-index', title: 'API index' },
-			{ id: 'practice', title: 'Practice' },
-			{ id: 'next-steps', title: 'Next steps' },
-		],
-		component: CoreApis as DocEntry['component'],
-	},
-	{
-		slug: 'tsrx-vs-tsx',
-		title: 'TSRX vs TSX/JSX',
-		description: 'When to author in .tsrx versus standard .tsx/.jsx, and what each unlocks.',
-		group: 'Learn Octane',
-		sections: [
-			{ id: 'which-should-i-use', title: 'Which should I use?' },
-			{ id: 'component-bodies', title: 'Component bodies' },
-			{ id: 'rendered-control-flow', title: 'Rendered control flow' },
-			{ id: 'text-holes', title: 'Text holes' },
-		],
-		component: TsrxVsTsx as DocEntry['component'],
-	},
-	{
-		slug: 'differences-from-react',
-		title: 'Differences from React',
-		description: 'The deliberate divergences — everything else matching React is the point.',
-		group: 'Explore',
-		sections: [
-			{ id: 'hooks', title: 'Hooks' },
-			{ id: 'events-and-dom', title: 'Events and the DOM' },
-			{ id: 'async-work', title: 'Async work' },
-			{ id: 'errors-and-server', title: 'Errors and server rendering' },
-			{ id: 'not-supported', title: 'APIs left out' },
-		],
-		component: DifferencesFromReact as DocEntry['component'],
-	},
-	{
-		slug: 'profiling',
-		title: 'Profiling',
-		description:
-			'Profile component renders, render causes, and schedule-to-render delay in Chrome.',
-		group: 'Explore',
-		sections: [
-			{ id: 'enable-profiling', title: 'Enable profiling' },
-			{ id: 'record-in-chrome', title: 'Record in Chrome' },
-			{ id: 'console-api', title: 'Console API' },
-			{ id: 'reading-the-data', title: 'Reading the data' },
-			{ id: 'render-causes', title: 'Render causes' },
-			{ id: 'cost-and-privacy', title: 'Cost and privacy' },
-		],
-		component: Profiling as DocEntry['component'],
-	},
-	{
-		slug: 'bindings',
-		title: 'Bindings',
-		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,
-		group: 'Explore',
-		searchTerms: BINDING_CATEGORIES.flatMap((category) => [
-			category.title,
-			category.description,
-			...category.packages,
-		]),
-		sections: [
-			{ id: 'find-a-binding', title: 'Find a binding' },
-			{ id: 'install-and-use', title: 'Install and use' },
-			{ id: 'check-support', title: 'Check support' },
-		],
-		component: Bindings as DocEntry['component'],
-	},
-];
+export const docs: DocEntry[] = docsMeta.map((meta) => {
+	const component = components[meta.slug];
+	if (!component) throw new Error(`docs-meta.ts entry '${meta.slug}' has no MDX import in docs.ts`);
+	return { ...meta, component };
+});
 
 export const docGroups = ['Start here', 'Learn Octane', 'Explore'].map((title) => ({
 	title,

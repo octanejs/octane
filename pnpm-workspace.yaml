@@ -16,23 +16,28 @@ packages:
   - benchmarks/memo-wall/*
   - benchmarks/portal-swarm
   - benchmarks/portal-swarm/*
+  - benchmarks/react-hosted-islands
   - benchmarks/ssr-throughput
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr
   - benchmarks/streaming-ssr/*
   - benchmarks/codegen-size
   - benchmarks/bundle-size
+  - benchmarks/three
   - benchmarks/async-waterfall
   - benchmarks/async-waterfall/*
   - benchmarks/async-composition
   - benchmarks/async-composition/*
   - benchmarks/todomvc
   - benchmarks/todomvc/*
+  - benchmarks/weather-app
+  - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
   - playground/*
   - examples/*
   - website
+  - website-mcp
 
 allowBuilds:
   esbuild: true
@@ -74,6 +79,7 @@ catalogs:
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
+    'chrome-launcher': 1.2.1
     'tabbable': ^6.5.0
     '@lexical/code': 0.46.0
     '@jridgewell/remapping': ^2.3.5
@@ -107,6 +113,12 @@ catalogs:
     '@lexical/text': 0.46.0
     '@lexical/utils': 0.46.0
     '@lexical/yjs': 0.46.0
+    '@tiptap/core': 3.28.0
+    '@tiptap/extension-bubble-menu': 3.28.0
+    '@tiptap/extension-floating-menu': 3.28.0
+    '@tiptap/pm': 3.28.0
+    '@tiptap/react': 3.28.0
+    '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.0
     '@ripple-ts/adapter': ^0.3.86
     '@ripple-ts/vite-plugin': ^0.3.86
@@ -116,6 +128,7 @@ catalogs:
     '@tanstack/ai': 0.41.0
     '@tanstack/ai-client': 0.21.0
     '@tanstack/ai-react': 0.17.0
+    '@tanstack/devtools': 0.12.5
     '@tanstack/history': 1.162.0
     '@tanstack/query-core': ^5.0.0
     '@tanstack/react-query': ^5.0.0
@@ -191,6 +204,7 @@ catalogs:
     jsdom: ^29.0.2
     jotai: ^2.20.1
     lexical: 0.46.0
+    lighthouse: 13.4.0
     lucide-react: 1.24.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
@@ -200,6 +214,9 @@ catalogs:
     preact-render-to-string: ^6.7.0
     prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
+    '@internationalized/date': ^3.12.2
+    '@internationalized/number': ^3.6.7
+    '@internationalized/string': ^3.2.9
     '@dnd-kit/abstract': 0.5.0
     '@dnd-kit/collision': 0.5.0
     '@dnd-kit/dom': 0.5.0
@@ -233,6 +250,7 @@ catalogs:
     'decimal.js-light': ^2.5.1
     'es-toolkit': ^1.39.3
     eventemitter3: ^5.0.1
+    fast-equals: ^5.3.3
     immer: ^11.1.8
     internmap: 2.0.3
     mitt: ^2.1.0
@@ -248,6 +266,10 @@ catalogs:
     'victory-vendor': ^37.0.2
     react: ^19.2.0
     'react-router': 8.2.0
+    react-aria: 3.50.0
+    react-aria-components: 1.19.0
+    react-stately: 3.48.0
+    '@react-types/shared': ^3.36.0
     react-dom: ^19.2.0
     react-i18next: 17.0.9
     ripple: ^0.3.86

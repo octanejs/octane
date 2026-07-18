@@ -40,6 +40,8 @@ export const BENCHMARK_SUITES = [
 	'js-framework',
 	'js-framework-reorder',
 	'todomvc',
+	'weather-app',
+	'weather-app-lighthouse',
 	'chat-stream',
 	'dbmon',
 	'recursive-context',
@@ -48,6 +50,7 @@ export const BENCHMARK_SUITES = [
 	'effectful-list',
 	'memo-wall',
 	'portal-swarm',
+	'react-hosted-islands',
 	'ssr-throughput',
 	'streaming-ssr',
 	'dbmon-deopt',
@@ -56,6 +59,8 @@ export const BENCHMARK_SUITES = [
 	'async-composition',
 	'codegen-size',
 	'bundle-size',
+	'three-renderer',
+	'three-bundle-size',
 ];
 
 const DEFAULT_TIMEOUT_MS = 120_000;

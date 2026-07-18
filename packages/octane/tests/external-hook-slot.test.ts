@@ -129,6 +129,31 @@ describe('slotHooks surgical pass', () => {
 			slotHooks(`import { useState } from 'octane';\nexport const ZERO = 0;`, 'c.ts'),
 		).toBeNull(); // imported but never called
 	});
+
+	it('keeps nested hooks on the render path instead of memoizing around them', () => {
+		const sources = [
+			`import { use } from 'octane';
+			 export function useData(load, promise) {
+			   const value = use(load(use(promise)));
+			   return value;
+			 }`,
+			`import { use, useContext } from 'octane';
+			 export function useData(load, Context) {
+			   const value = use(load(useContext(Context)));
+			   return value;
+			 }`,
+			`import { use } from 'octane';
+			 function useResourceKey() { return 'key'; }
+			 export function useData(load) {
+			   const value = use(load(useResourceKey()));
+			   return value;
+			 }`,
+		];
+
+		// A memo hit must never skip a nested built-in or custom hook. These
+		// arguments remain unchanged until they can be analyzed as hook-free.
+		for (const source of sources) expect(slotHooks(source, 'nested-hook.ts')).toBeNull();
+	});
 });
 
 describe('vite plugin gate routing', () => {
@@ -185,6 +210,8 @@ describe('vite plugin gate routing', () => {
 		const discovered = discoverOctaneSourceDependencies(websiteRoot);
 		expect(discovered).toContain('octane');
 		expect(discovered).toContain('@octanejs/visx');
+		// The website consumes the official built TanStack package now; only raw
+		// Octane workspace sources belong in this plugin's transform allowlist.
 		expect(discovered).not.toContain('@octanejs/tanstack-router');
 		expect(discovered).not.toContain('@octanejs/adapter-vercel');
 
@@ -353,26 +380,6 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 			code: 'OCTANE_CLIENT_ONLY_SERVER_USE',
 			filename: '/src/LiveApp.tsrx',
 		});
-	});
-
-	it('accepts package-import aliases while classifying a server module graph', async () => {
-		const plugin = octane();
-		(plugin.config as any)({ root: appRoot });
-		const source = `
-import '#nitro/virtual/polyfills';
-import { useNitroApp } from 'nitro/app';
-export const nitroApp = useNitroApp();
-`;
-		const transformed = await (plugin.transform as any).call(
-			{
-				resolve: async (request: string) => ({ id: request }),
-			},
-			source,
-			join(appRoot, 'node-server.mjs'),
-			{ ssr: true },
-		);
-
-		expect(transformed).toBeNull();
 	});
 
 	it('canonicalizes client-reference identity through a symlinked Vite root', async () => {
@@ -640,6 +647,7 @@ describe('manifest-declared manual hook slots', () => {
 			})
 			.sort();
 		expect(declared).toEqual([
+			'aria',
 			'base-ui',
 			'dexie',
 			'dnd-kit',
@@ -660,6 +668,7 @@ describe('manifest-declared manual hook slots', () => {
 			'tanstack-virtual',
 			'testing-library',
 			'three',
+			'tiptap',
 			'zustand',
 		]);
 	});

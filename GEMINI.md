@@ -89,7 +89,7 @@ workspace manifests in `docs/packages.md`:
   graders, public reference implementations, and reproducible evaluation
   tooling. It measures framework use rather than monorepo repair. Active
   held-out prompts, tests, and gold artifacts stay outside the repository.
-- `packages/{zustand,jotai,i18next,tanstack-ai,tanstack-query,tanstack-store,tanstack-form,apollo-client,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,floating-ui,radix,hook-form,base-ui,sonner,recharts,visx,three,lucide,redux,redux-toolkit,testing-library,mdx}/`
+- `packages/{zustand,jotai,i18next,tanstack-ai,tanstack-query,tanstack-store,tanstack-form,apollo-client,motion,dnd-kit,stylex,tanstack-router,remix-router,tanstack-table,tanstack-virtual,lexical,tiptap,floating-ui,radix,hook-form,base-ui,sonner,recharts,visx,three,lucide,redux,redux-toolkit,testing-library,mdx}/`
   (npm: `@octanejs/*`) — framework bindings, each an octane port of a React
   library (state, AI, data-fetching, animation, styling, routing, editor,
   positioning, UI primitives, forms and form state, toast notifications, charts and visualization primitives, web 3D, icons,
@@ -150,6 +150,11 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   captures and omits stable hook results (state setters/dispatchers, refs, and
   state getters). It also omits `useEffectEvent` results because Effect Events
   are non-reactive captures, despite their intentionally fresh wrapper identity.
+  Locally declared custom hooks in full-compiled `.tsrx`/`.tsx` modules also
+  qualify when they transparently forward a callback parameter and their final
+  dependency parameter to one of these hooks. Plain `.ts`/`.js` modules,
+  imported/method hooks, and wrappers that transform or inspect those parameters
+  require an explicit dependency argument.
   Explicit arrays retain React's exact behavior and are never rewritten; `null`
   explicitly means run or recompute after every render.
 - **State hooks expose a compiler-driven current-state getter.** `useState` and

@@ -75,3 +75,10 @@ packages/tanstack-form/tests/_fixtures/upstream/*.tsrx
 packages/tanstack-ai/src/*.tsrx
 packages/tanstack-ai/src/*.tsrx.d.ts
 packages/tanstack-ai/tests/_fixtures/*.tsrx
+
+# TanStack Devtools' TSRX component module and its declaration companion: the
+# TSRX Prettier plugin currently duplicates JSDoc blocks on round-trip. Keep the
+# clean source stable until that formatter bug is fixed.
+packages/tanstack-devtools/src/*.tsrx
+packages/tanstack-devtools/src/*.tsrx.d.ts
+packages/tanstack-devtools/tests/_fixtures/*.tsrx

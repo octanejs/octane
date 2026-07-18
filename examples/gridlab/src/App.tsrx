@@ -703,11 +703,14 @@ export function App() @{
 									const isSelected = selected.row === row.index && selected.column === column.index;
 									const inRange = isInSelection(address, currentRange);
 									<div
-										ref={(element: HTMLElement | null, previous: HTMLElement | null) => {
-											if (element !== null) cellElementsRef.current.set(key, element);
-											else if (previous !== null && cellElementsRef.current.get(key) === previous) {
-												cellElementsRef.current.delete(key);
-											}
+										ref={(element: HTMLElement | null) => {
+											if (element === null) return;
+											cellElementsRef.current.set(key, element);
+											return () => {
+												if (cellElementsRef.current.get(key) === element) {
+													cellElementsRef.current.delete(key);
+												}
+											};
 										}}
 										class={[
 											'grid-cell',

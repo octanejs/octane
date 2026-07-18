@@ -50,6 +50,13 @@ function dataScriptOf(html: string): string {
 	return match![1];
 }
 
+function listFiles(root: string, current = root): string[] {
+	return fs.readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+		const file = path.join(current, entry.name);
+		return entry.isDirectory() ? listFiles(root, file) : [path.relative(root, file)];
+	});
+}
+
 let devServer: ViteDevServer | null = null;
 let devOrigin = '';
 let productionServer: Server | null = null;
@@ -162,6 +169,31 @@ describe('production SSR build', () => {
 
 	it('renders a route through the built handler, byte-matching dev SSR', async () => {
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
+		const clientRoot = path.join(distDir, 'client');
+		const deferredCss = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.css') &&
+				fs
+					.readFileSync(path.join(clientRoot, file), 'utf8')
+					.includes('.vite-deferred-hydration-proof'),
+		);
+		const deferredJavaScript = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.js') &&
+				fs
+					.readFileSync(path.join(clientRoot, file), 'utf8')
+					.includes('vite-deferred-hydration-chunk-proof'),
+		);
+		const prefetchedJavaScript = listFiles(clientRoot).find(
+			(file) =>
+				file.endsWith('.js') &&
+				fs
+					.readFileSync(path.join(clientRoot, file), 'utf8')
+					.includes('vite-prefetched-hydration-chunk-proof'),
+		);
+		expect(deferredCss).toBeTruthy();
+		expect(deferredJavaScript).toBeTruthy();
+		expect(prefetchedJavaScript).toBeTruthy();
 
 		for (const url of ['/', '/pages/hello']) {
 			const prodResponse = await handler(new Request(`http://localhost${url}`));
@@ -182,6 +214,11 @@ describe('production SSR build', () => {
 			expect(prodHtml).toContain('fixture-nav');
 			expect(prodHtml).toContain(url === '/' ? 'Fixture page home' : 'Fixture page hello');
 			expect(prodHtml).toContain(`<p class="url">${url}</p>`);
+			expect(prodHtml).toContain(`<link rel="stylesheet" href="/${deferredCss}">`);
+			expect(prodHtml).not.toContain(`src="/${deferredJavaScript}"`);
+			expect(prodHtml).not.toContain(`<link rel="modulepreload" href="/${deferredJavaScript}">`);
+			expect(prodHtml).not.toContain(`src="/${prefetchedJavaScript}"`);
+			expect(prodHtml).not.toContain(`<link rel="modulepreload" href="/${prefetchedJavaScript}">`);
 		}
 	});
 
@@ -205,11 +242,30 @@ describe('production SSR build', () => {
 			]) {
 				const page = await browser.newPage();
 				const errors: string[] = [];
+				const requests: string[] = [];
+				const scriptRequests: string[] = [];
+				page.on('request', (request) => {
+					requests.push(request.url());
+					if (request.resourceType() === 'script') scriptRequests.push(request.url());
+				});
 				await page.addInitScript(() => {
 					const fixture = globalThis as typeof globalThis & {
 						__fixtureCspViolations?: string[];
+						__fixtureDeferredHydrationClicks?: number;
+						__fixtureDeferredHydrationProof?: Element | null;
 					};
 					fixture.__fixtureCspViolations = [];
+					fixture.__fixtureDeferredHydrationClicks = 0;
+					const captureDeferredProof = () => {
+						const proof = document.querySelector('.vite-deferred-hydration-proof');
+						if (proof !== null) {
+							fixture.__fixtureDeferredHydrationProof = proof;
+							proofObserver.disconnect();
+						}
+					};
+					const proofObserver = new MutationObserver(captureDeferredProof);
+					proofObserver.observe(document, { childList: true, subtree: true });
+					captureDeferredProof();
 					document.addEventListener('securitypolicyviolation', (event) => {
 						fixture.__fixtureCspViolations?.push(event.violatedDirective + ': ' + event.blockedURI);
 					});
@@ -247,6 +303,115 @@ describe('production SSR build', () => {
 								requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
 							),
 					);
+					const isDeferredQueryRequest = (requestUrl: string) => {
+						const request = new URL(requestUrl);
+						if (target.name === 'development') {
+							return (
+								request.pathname === '/src/Page.tsrx' &&
+								request.searchParams.get('octane-hydrate') === '0'
+							);
+						}
+						return (
+							request.pathname.startsWith('/assets/') &&
+							request.pathname.endsWith('.js') &&
+							fs
+								.readFileSync(path.join(distDir, 'client', request.pathname), 'utf8')
+								.includes('vite-deferred-hydration-chunk-proof')
+						);
+					};
+					const isPrefetchedChunkRequest = (requestUrl: string) => {
+						const request = new URL(requestUrl);
+						if (target.name === 'development') {
+							return request.pathname === '/src/prefetched-hydration.tsrx';
+						}
+						return (
+							request.pathname.startsWith('/assets/') &&
+							request.pathname.endsWith('.js') &&
+							fs
+								.readFileSync(path.join(distDir, 'client', request.pathname), 'utf8')
+								.includes('vite-prefetched-hydration-chunk-proof')
+						);
+					};
+					await expect.poll(() => requests.some(isPrefetchedChunkRequest)).toBe(true);
+					const prefetchedProof = page.locator('.vite-prefetched-hydration-proof');
+					const prefetchedServerNode = await prefetchedProof.elementHandle();
+					expect(prefetchedServerNode).not.toBeNull();
+					expect(
+						await prefetchedProof.evaluate((element) => ({
+							active: element.getAttribute('data-active'),
+							clicks: element.getAttribute('data-clicks'),
+							text: element.textContent?.trim(),
+						})),
+					).toEqual({
+						active: 'false',
+						clicks: '0',
+						text: 'vite-prefetched-hydration-chunk-proof',
+					});
+					await prefetchedProof.click();
+					expect(await prefetchedProof.getAttribute('data-active')).toBe('false');
+					expect(await prefetchedProof.getAttribute('data-clicks')).toBe('0');
+					const prefetchedChunkRequestsBeforeActivation = requests.filter(isPrefetchedChunkRequest);
+					await page.setViewportSize({ width: 2050, height: 720 });
+					await expect
+						.poll(async () => {
+							return {
+								active: await prefetchedProof.getAttribute('data-active'),
+								sameNode: await prefetchedServerNode!.evaluate(
+									(node) => node === document.querySelector('.vite-prefetched-hydration-proof'),
+								),
+							};
+						})
+						.toEqual({ active: 'true', sameNode: true });
+					await prefetchedProof.click();
+					await expect.poll(() => prefetchedProof.getAttribute('data-clicks')).toBe('1');
+					expect(requests.filter(isPrefetchedChunkRequest)).toEqual(
+						prefetchedChunkRequestsBeforeActivation,
+					);
+					const unsplitProof = page.locator('.vite-unsplit-hydration-proof');
+					const unsplitServerNode = await unsplitProof.elementHandle();
+					expect(unsplitServerNode).not.toBeNull();
+					expect(await unsplitProof.getAttribute('data-active')).toBe('false');
+					expect(await unsplitProof.getAttribute('data-clicks')).toBe('0');
+					await unsplitProof.click();
+					expect(await unsplitProof.getAttribute('data-active')).toBe('false');
+					expect(await unsplitProof.getAttribute('data-clicks')).toBe('0');
+					const scriptRequestsBeforeUnsplitActivation = [...scriptRequests];
+					await page.setViewportSize({ width: 2200, height: 720 });
+					await expect
+						.poll(async () => ({
+							active: await unsplitProof.getAttribute('data-active'),
+							sameNode: await unsplitServerNode!.evaluate(
+								(node) => node === document.querySelector('.vite-unsplit-hydration-proof'),
+							),
+						}))
+						.toEqual({ active: 'true', sameNode: true });
+					await page.evaluate(
+						() =>
+							new Promise<void>((resolve) =>
+								requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+							),
+					);
+					expect(scriptRequests).toEqual(scriptRequestsBeforeUnsplitActivation);
+					await unsplitProof.click();
+					await expect.poll(() => unsplitProof.getAttribute('data-clicks')).toBe('1');
+					const deferredBefore = await page.evaluate(() => {
+						const fixture = globalThis as typeof globalThis & {
+							__fixtureDeferredHydrationClicks?: number;
+							__fixtureDeferredHydrationProof?: Element | null;
+						};
+						const proof = document.querySelector('.vite-deferred-hydration-proof');
+						return {
+							clicks: fixture.__fixtureDeferredHydrationClicks,
+							dormant: proof?.parentElement?.getAttribute('data-octane-hydrate-when'),
+							sameNode: fixture.__fixtureDeferredHydrationProof === proof,
+						};
+					});
+					expect(deferredBefore).toEqual({
+						clicks: 0,
+						dormant: 'interaction',
+						sameNode: true,
+					});
+					expect(requests.some(isDeferredQueryRequest)).toBe(false);
 					const proof = await page.evaluate(() => {
 						const fixture = globalThis as typeof globalThis & {
 							__fixtureAuthoredSceneSetup?: number;
@@ -285,6 +450,24 @@ describe('production SSR build', () => {
 						scene: [{ type: 'scene', children: ['mesh'] }],
 						shellCount: 1,
 					});
+					await page.locator('.vite-deferred-hydration-proof').click();
+					await expect
+						.poll(async () => {
+							const state = await page.evaluate(() => {
+								const fixture = globalThis as typeof globalThis & {
+									__fixtureDeferredHydrationClicks?: number;
+									__fixtureDeferredHydrationProof?: Element | null;
+								};
+								const proof = document.querySelector('.vite-deferred-hydration-proof');
+								return {
+									clicks: fixture.__fixtureDeferredHydrationClicks,
+									dormant: proof?.parentElement?.hasAttribute('data-octane-hydrate-when'),
+									sameNode: fixture.__fixtureDeferredHydrationProof === proof,
+								};
+							});
+							return { ...state, queryLoaded: requests.some(isDeferredQueryRequest) };
+						})
+						.toEqual({ clicks: 1, dormant: false, queryLoaded: true, sameNode: true });
 					await page.getByRole('button', { name: 'Increment fixture' }).click();
 					await expect.poll(() => page.locator('.count').textContent()).toBe('Count: 2');
 					await page.getByRole('button', { name: 'Check hydration module identity' }).click();

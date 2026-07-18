@@ -26,3 +26,20 @@ export function App() @{
 		</Canvas>
 	</main>
 }
+
+export function WebGLFailureApp() @{
+	<main
+		data-octane-three-app="webgl-failure"
+		style={{ width: '64px', height: '64px', marginLeft: '24px', marginTop: '16px' }}
+	>
+		@try {
+			<Canvas frameloop="never" dpr={1}>
+				<Scene />
+			</Canvas>
+		} @catch (error) {
+			<p data-three-webgl-error="">
+				{error.message as string}
+			</p>
+		}
+	</main>
+}

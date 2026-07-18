@@ -10,8 +10,8 @@
 //      effective resolution (a rotate is ~1 DOM move), so a single click
 //      quantizes to the ~0.1ms timer floor. Each timed sample therefore loops
 //      REPS clicks inside the timed window and divides (the signal-favoring
-//      harness's BUMP_REPS pattern): REPS=20 for the tiny ops (rotate /
-//      displace_k / remove*), REPS=4 for reverse + shuffle (reverse is
+//      harness's BUMP_REPS pattern): REPS=100 for the guarded rotate pair,
+//      REPS=20 for displace_k / remove*, and REPS=4 for reverse + shuffle (reverse is
 //      self-inverse and shuffle reseeds per click, so repeated clicks are
 //      valid, comparable work). The 100-row insert ops are big enough to time
 //      with a single click (REPS=1).
@@ -107,8 +107,8 @@ const fill100 = () => new Array(100).fill(NEW);
 const OPS = [
 	{ name: 'reverse', reps: 4, expected: (pre) => pre.slice().reverse() },
 	{ name: 'shuffle', reps: 4, expected: (pre, ctx) => shuffleWithSeed(pre, ctx.nextSeed()) },
-	{ name: 'rotatef', reps: 20, expected: (pre) => [pre[pre.length - 1], ...pre.slice(0, -1)] },
-	{ name: 'rotateb', reps: 20, expected: (pre) => [...pre.slice(1), pre[0]] },
+	{ name: 'rotatef', reps: 100, expected: (pre) => [pre[pre.length - 1], ...pre.slice(0, -1)] },
+	{ name: 'rotateb', reps: 100, expected: (pre) => [...pre.slice(1), pre[0]] },
 	{ name: 'prepend100', reps: 1, expected: (pre) => fill100().concat(pre) },
 	{ name: 'append100', reps: 1, expected: (pre) => pre.concat(fill100()) },
 	{

@@ -35,6 +35,10 @@ import {
 	REJECTION_SENTINEL_KEY,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,
+	HYDRATE_ID_ATTR,
+	HYDRATE_WHEN_ATTR,
+	HYDRATE_ID_COUNT_ATTR,
+	HYDRATE_SEED_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
 	STREAM_SEED_ATTR,
@@ -52,6 +56,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
 // hyphenated style keys stay byte-equal across the two runtimes).
@@ -61,6 +66,11 @@ import {
 	invalidHtmlNestingWithParent,
 } from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
+import {
+	COMPONENT_FLAG_BOUNDARY,
+	hasComponentFlags,
+	markComponentFlags,
+} from './component-flags.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
 interface SSRScope {
@@ -88,9 +98,18 @@ interface SsrElementContext {
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 
 let CURRENT_SCOPE: SSRScope | null = null;
+// Empty compiler batches register child-only warm plans for the synchronous
+// component call stack. A pending descendant batch activates the live plans;
+// invokeComponentBody checkpoints keep nested renders and retries isolated.
+const ACTIVE_PU_WARM_PLANS: Array<() => void> = [];
+let CURRENT_PU_WARM_CLAIMS: Set<object> | null = null;
 let ID_COUNTER = 0;
 let ID_PREFIX = '';
 let CSS: Map<string, string> | null = null;
+// Pre-escaped ` nonce="..."` fragment for renderer-owned inline tags emitted
+// during the active pass. Saved/restored with every other ambient so nested or
+// concurrent server renders cannot leak a CSP nonce across requests.
+let NONCE_ATTR = '';
 // Emit hydration block markers (`<!--[-->…<!--]-->`) and head-adoption markers?
 // True for hydratable output (renderToString / prerender / streaming); flipped
 // false for the whole of a `renderToStaticMarkup` render, which produces clean,
@@ -283,16 +302,18 @@ function reportInvalidHtmlNesting(message: string): void {
 	console.error(warning);
 }
 
-/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
-export function ssrElement(
+/** Scope one native element, optionally forcing its DOM/parser namespace. */
+function withSsrElementContext(
 	tag: string,
 	location: string | undefined,
 	render: () => string,
+	forcedNamespace?: ParserNamespace,
 ): string {
-	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
-
 	const parent = CURRENT_SSR_ELEMENT;
-	const { namespace, childrenNamespace } = ssrElementNamespaces(tag, parent);
+	const { namespace, childrenNamespace } =
+		forcedNamespace === undefined
+			? ssrElementNamespaces(tag, parent)
+			: { namespace: forcedNamespace, childrenNamespace: forcedNamespace };
 	const semanticTag = tag.toLowerCase();
 	const element: SsrElementContext = {
 		tag: semanticTag,
@@ -304,7 +325,12 @@ export function ssrElement(
 
 	// Foreign-content parsing is independent of the HTML repair rules. Stop at
 	// that boundary; <foreignObject> children naturally start a fresh HTML chain.
-	if (namespace === 'html' && parent?.namespace === 'html') {
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		SSR_NESTING_WARNINGS !== null &&
+		namespace === 'html' &&
+		parent?.namespace === 'html'
+	) {
 		const parentMessage = invalidHtmlNestingWithParent(
 			semanticTag,
 			parent.tag,
@@ -334,6 +360,16 @@ export function ssrElement(
 	} finally {
 		CURRENT_SSR_ELEMENT = parent;
 	}
+}
+
+/** Compiler ABI: validate and scope one native element during a DEV SSR render. */
+export function ssrElement(
+	tag: string,
+	location: string | undefined,
+	render: () => string,
+): string {
+	if (process.env.NODE_ENV === 'production' || SSR_NESTING_WARNINGS === null) return render();
+	return withSsrElementContext(tag, location, render);
 }
 
 const NOOP = (): void => {};
@@ -1281,11 +1317,8 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 	}
 	if (typeof v === 'function') {
 		// A host descriptor can receive a compiler-generated children block through
-		// an uncompiled wrapper (`createElement('html', attrs, props.children)`).
-		// That nested function is recreated on every parent pass, while the client
-		// treats it as the same child position. Do not put its transient function
-		// identity into the async scope or a streamed boundary below it gets a new
-		// key on retry and can never reveal its shell placeholder.
+		// an uncompiled wrapper. Its transient function identity must not become part
+		// of the streamed async boundary key used for a later retry.
 		return ssrComponent(scope, v as ServerComponent, {}, undefined, undefined, isChildrenBlock(v));
 	}
 	if (typeof v === 'object') throw invalidChildError(v as object);
@@ -2519,8 +2552,10 @@ function invokeComponentBody(
 	const prevHP = HOOK_PASS;
 	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
 	const snapshot = captureComponentReplayState(scope, frame);
+	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
 	HOOK_PASS = hp;
 	try {
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		let out = comp(props ?? {}, scope, undefined);
 		let passes = 1;
 		while (hp.update) {
@@ -2532,10 +2567,12 @@ function invokeComponentBody(
 			hp.update = false;
 			hp.occ = new Map();
 			rewindComponentReplayState(snapshot, scope, frame);
+			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 			out = comp(props ?? {}, scope, undefined);
 		}
 		return out;
 	} finally {
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
 		HOOK_PASS = prevHP;
 	}
 }
@@ -2627,15 +2664,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
-		// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
+		// Boundary builtins decline inherit through their component capability bit —
+		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
-		// Suspense/ErrorBoundary/ViewTransition keep their pair; both sides agree
-		// by identity).
-		if (
-			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition)
-		)
-			inherit = false;
+		// Suspense/ErrorBoundary/ViewTransition/Hydrate keep their pair; both sides agree
+		// without retaining the concrete built-ins from this generic path).
+		if (inherit === true && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
 		// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
 		// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
 		// client renders these — a value-lowered `createElement(obj.tag, …)` routes
@@ -2757,6 +2791,103 @@ function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
 	return ssrChild(children, scope);
 }
 
+/** Serialize runtime-owned and strategy-supplied attributes for `<Hydrate>`. */
+function ssrHydrateAttrs(
+	id: string,
+	when: HydrationStrategy | (() => HydrationStrategy),
+	idCount: number,
+): string {
+	const direct = typeof when !== 'function' && when !== null ? when : null;
+	let attrs =
+		ssrAttr(HYDRATE_ID_ATTR, id, 'div') +
+		ssrAttr(HYDRATE_WHEN_ATTR, direct?._t ?? 'dynamic', 'div') +
+		ssrAttr(HYDRATE_ID_COUNT_ATTR, idCount, 'div');
+	const strategyAttrs = direct?._a?.();
+	if (strategyAttrs === undefined) return attrs;
+
+	for (const name of Object.keys(strategyAttrs)) {
+		// Protocol attributes are renderer-owned even for a structurally-created
+		// custom strategy descriptor. Do not permit it to shadow boundary state.
+		if (
+			name === HYDRATE_ID_ATTR ||
+			name === HYDRATE_WHEN_ATTR ||
+			name === HYDRATE_ID_COUNT_ATTR ||
+			name === HYDRATE_SEED_ATTR ||
+			!VALID_ATTR_NAME.test(name)
+		)
+			continue;
+		attrs += ssrAttr(name, strategyAttrs[name], 'div');
+	}
+	return attrs;
+}
+
+/**
+ * `<Hydrate when={...}>...</Hydrate>` server boundary.
+ *
+ * The real children always render, preserving useful first-paint HTML. A
+ * hydratable render surrounds them with one inner block range that the client
+ * can adopt later. Child `use()` values move out of the root seed stream into a
+ * direct-child data script, while their consumed `useId()` count remains in the
+ * root sequence and is recorded so the eager hydration cursor can reserve it.
+ * Function-form `when` is deliberately opaque on the server: evaluating it may
+ * read browser state, so only a direct strategy descriptor contributes `_a()`
+ * attributes and its concrete strategy kind.
+ */
+export const Hydrate = /* @__PURE__ */ markComponentFlags(
+	function Hydrate(props: HydrateProps, scope: SSRScope): string {
+		const id = useId();
+
+		// The client always creates an HTMLDivElement. Force the same namespace for
+		// SSR children and attribute semantics instead of inheriting SVG/MathML from
+		// the call site. Direct placement in foreign content remains unsupported: an
+		// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
+		return withSsrElementContext(
+			'div',
+			undefined,
+			() =>
+				ssrInNamespace('html', () => {
+					if (!MARKERS) {
+						return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+					}
+
+					const childIdStart = ID_COUNTER;
+					const serialStart = SERIAL?.length ?? 0;
+					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+					// Suspense slot/content ranges and makes a suspending child a real stream
+					// boundary. `fallback` remains client-only, so the server pending arm is
+					// intentionally empty.
+					const children = ssrBlock(
+						ssrTry(
+							scope,
+							'jsx-hydrate',
+							(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+							null,
+							null,
+							'html',
+						),
+					);
+					const idCount = ID_COUNTER - childIdStart;
+					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+					const attrs = ssrHydrateAttrs(id, props.when, idCount);
+					const seedSidecar =
+						childSeeds.length === 0
+							? ''
+							: '<script type="application/json" ' +
+								HYDRATE_SEED_ATTR +
+								NONCE_ATTR +
+								'>' +
+								serializeSuspenseSeedJson(childSeeds) +
+								'</script>';
+
+					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
+				}),
+			'html',
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'Hydrate',
+);
+
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
  * `@try { … } @pending { fallback }` directive, for authors writing JSX (e.g.
@@ -2767,23 +2898,24 @@ function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
  * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
  */
-export function Suspense(
-	props: { fallback?: unknown; children?: unknown },
-	scope: SSRScope,
-): string {
-	// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
-	// real STREAMING boundary too (registration + template sentinel), with the
-	// identical nested-block byte shape as before for buffered renders. Errors
-	// rethrow to an outer boundary (catchFn = null), matching the old emit.
-	return ssrTry(
-		scope,
-		'jsx-suspense',
-		(_arg, s) => ssrChildrenHtml(props.children, s),
-		(_arg, s) => ssrChild(props.fallback, s),
-		null,
-		FRAME?.namespace ?? 'html',
-	);
-}
+export const Suspense = /* @__PURE__ */ markComponentFlags(
+	function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
+		// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
+		// real STREAMING boundary too (registration + template sentinel), with the
+		// identical nested-block byte shape as before for buffered renders. Errors
+		// rethrow to an outer boundary (catchFn = null), matching the old emit.
+		return ssrTry(
+			scope,
+			'jsx-suspense',
+			(_arg, s) => ssrChildrenHtml(props.children, s),
+			(_arg, s) => ssrChild(props.fallback, s),
+			null,
+			FRAME?.namespace ?? 'html',
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'Suspense',
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // View-transition SSR annotations (docs/view-transitions-plan.md Phase 5) —
@@ -2967,37 +3099,41 @@ function vtSsrStrip(html: string): string {
  * frame, the explicit ssrBlock below is the inner childSlot range), stamped
  * with the Fizz-parity `vt-*` annotations described above.
  */
-export function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
-	VT_SSR_HAS_CANDIDATES = true;
-	const explicit = typeof props.name === 'string';
-	const frame = FRAME;
-	const cand: VtSsrCandidate = {
-		name: explicit
-			? (props.name as string)
-			: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
-		share: vtSsrResolve(props, 'share'),
-		update: vtSsrResolve(props, 'update'),
-		consumed: false,
-	};
-	VT_SSR_STACK.push(cand);
-	const seqBefore = VT_SSR_TRY_SEQ;
-	let inner: string;
-	try {
-		inner = ssrChildrenHtml(props.children, scope);
-	} finally {
-		VT_SSR_STACK.pop();
-	}
-	const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
-	const attrs: Array<[string, string]> = [];
-	if (named) attrs.push(['vt-name', cand.name]);
-	attrs.push(['vt-update', cand.update]);
-	// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
-	// this boundary tops, stripped at emission when unclaimed.
-	attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
-	attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
-	if (named) attrs.push(['vt-share', cand.share]);
-	return ssrBlock(vtSsrAnnotate(inner, attrs));
-}
+export const ViewTransition = /* @__PURE__ */ markComponentFlags(
+	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
+		VT_SSR_HAS_CANDIDATES = true;
+		const explicit = typeof props.name === 'string';
+		const frame = FRAME;
+		const cand: VtSsrCandidate = {
+			name: explicit
+				? (props.name as string)
+				: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+			share: vtSsrResolve(props, 'share'),
+			update: vtSsrResolve(props, 'update'),
+			consumed: false,
+		};
+		VT_SSR_STACK.push(cand);
+		const seqBefore = VT_SSR_TRY_SEQ;
+		let inner: string;
+		try {
+			inner = ssrChildrenHtml(props.children, scope);
+		} finally {
+			VT_SSR_STACK.pop();
+		}
+		const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+		const attrs: Array<[string, string]> = [];
+		if (named) attrs.push(['vt-name', cand.name]);
+		attrs.push(['vt-update', cand.update]);
+		// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
+		// this boundary tops, stripped at emission when unclaimed.
+		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
+		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
+		if (named) attrs.push(['vt-share', cand.share]);
+		return ssrBlock(vtSsrAnnotate(inner, attrs));
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ViewTransition',
+);
 
 /**
  * Server no-op twin of the client `addTransitionType` — transition types only
@@ -3014,27 +3150,31 @@ export function addTransitionType(_type: string): void {}
  * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
  * suspension propagation). `reset` is a server no-op (no re-render).
  */
-export function ErrorBoundary(
-	props: { fallback?: unknown; children?: unknown },
-	scope: SSRScope,
-): string {
-	return ssrBlock(
-		(() => {
-			try {
-				return withAsyncIdentity('error-boundary', 'content', () =>
-					ssrBlock(ssrChildrenHtml(props.children, scope)),
-				);
-			} catch (e) {
-				if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-				const fb =
-					typeof props.fallback === 'function'
-						? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-						: props.fallback;
-				return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
-			}
-		})(),
-	);
-}
+export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
+	function ErrorBoundary(
+		props: { fallback?: unknown; children?: unknown },
+		scope: SSRScope,
+	): string {
+		return ssrBlock(
+			(() => {
+				try {
+					return withAsyncIdentity('error-boundary', 'content', () =>
+						ssrBlock(ssrChildrenHtml(props.children, scope)),
+					);
+				} catch (e) {
+					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+					const fb =
+						typeof props.fallback === 'function'
+							? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+							: props.fallback;
+					return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
+				}
+			})(),
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ErrorBoundary',
+);
 
 // ---------------------------------------------------------------------------
 // Context
@@ -3081,7 +3221,9 @@ function readContext<T>(ctx: Context<T>): T {
 }
 
 export function useContext<T>(ctx: Context<T>): T {
-	return readContext(ctx);
+	if (ctx && (ctx as any).$$kind === CONTEXT_TAG) return readContext(ctx);
+	// Same cold foreign-context path as `use()` (§6.4).
+	return readHostedForeignContext(ctx, 'useContext');
 }
 
 // Sentinel thrown by `use(thenable)` on the server when the value isn't resolved
@@ -3294,6 +3436,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | s
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
 	const serial = hasExternalHydrationOwner(usable as PromiseLike<unknown>) ? null : SERIAL;
+	if (usable == null || typeof (usable as any).then !== 'function') {
+		// Cold path: a FOREIGN host context inside a hosted server pass reads
+		// through the installed host hook (§6.4); anything else diagnoses.
+		return readHostedForeignContext(usable, 'use');
+	}
 	// A thenable. Key it by the current FRAME path + the compiler-injected
 	// call-site key + a per-frame occurrence index (so a use() inside an @for gets
 	// a distinct key per iteration). Scoping to the frame makes the key identical
@@ -3461,12 +3608,13 @@ let PU_ID = 0;
 export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot): T {
 	const res = RESOLVED as ResolvedMap | null;
 	if (res === null) return fn();
+	const resolvedSiteKey = siteKey === undefined ? undefined : resolveHookSlot(siteKey);
 	const base =
-		siteKey === undefined
+		resolvedSiteKey === undefined
 			? '@pu'
-			: typeof siteKey === 'symbol'
-				? (siteKey as symbol).toString()
-				: String(siteKey);
+			: typeof resolvedSiteKey === 'symbol'
+				? (resolvedSiteKey as symbol).toString()
+				: String(resolvedSiteKey);
 	const frame = FRAME;
 	let n = 0;
 	let prefix = ASYNC_SCOPE;
@@ -3480,23 +3628,29 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
 	// Warm adoption: a parent's warm walk may have prefetched this creation
 	// (keyed by the shared slot symbol). Deps must match — a drift between the
 	// warm-time and render-time props is a clean miss (the orphaned entry dies
-	// with the render). TRANSFER: the entry moves into the frame-keyed created
-	// cache so later passes hit it directly.
+	// with the render). The value is adopted once into the frame-keyed created
+	// cache; its unavailable warm tombstone prevents later speculative refetches.
 	if (siteKey !== undefined) {
 		const wlist = res.pu.warm.get(siteKey);
 		if (wlist !== undefined) {
 			for (let i = 0; i < wlist.length; i++) {
 				if (puDepsEqual(wlist[i].deps, deps)) {
+					if (!wlist[i].available) continue;
+					wlist[i].available = false;
 					const value = wlist[i].value;
-					wlist.splice(i, 1);
-					res.pu.created.set(key, { deps, value });
+					res.pu.created.set(key, {
+						deps,
+						value,
+						site: resolvedSiteKey,
+						frame,
+					});
 					return value as T;
 				}
 			}
 		}
 	}
 	const value = fn();
-	res.pu.created.set(key, { deps, value });
+	res.pu.created.set(key, { deps, value, site: resolvedSiteKey, frame });
 	return value;
 }
 
@@ -3509,6 +3663,12 @@ export function puMemo<T>(fn: () => T, deps: unknown[], siteKey?: ServerHookSlot
  * again. Falls through silently when everything is already resolved.
  */
 export function puBatch(thenables: unknown[], warm?: () => void): void {
+	// Compiler registration form. Keep the plan lazy so synchronous component
+	// trees perform no speculative walk and allocate no warm entries.
+	if (thenables.length === 0) {
+		if (warm !== undefined) ACTIVE_PU_WARM_PLANS.push(warm);
+		return;
+	}
 	const res = RESOLVED as ResolvedMap | null;
 	const pu = res !== null ? res.pu : null;
 	let pending = false;
@@ -3571,16 +3731,33 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 	}
 	if (!pending) return;
 	// About to suspend — run the warm walk first (the compiler passes the thunk
-	// on the FIRST in-body batch): descendant components' independent creations
+	// on the active component stack): descendant components' independent creations
 	// start AND register with this round via warmMemo, so their data resolves
 	// before their bodies ever run — component depth collapses to true
 	// data-dependency depth. Speculative: a throwing plan just means fewer
 	// prefetches.
-	if (warm !== undefined) {
+	if (ACTIVE_PU_WARM_PLANS.length !== 0 || warm !== undefined) {
+		const previousClaims = CURRENT_PU_WARM_CLAIMS;
+		CURRENT_PU_WARM_CLAIMS = new Set();
 		try {
-			warm();
-		} catch {
-			/* speculative */
+			for (let i = 0; i < ACTIVE_PU_WARM_PLANS.length; i++) {
+				CURRENT_PU_WARM_CLAIMS = new Set();
+				try {
+					ACTIVE_PU_WARM_PLANS[i]();
+				} catch {
+					// Independent speculative plans cannot block adjacent warming.
+				}
+			}
+			if (warm !== undefined) {
+				CURRENT_PU_WARM_CLAIMS = new Set();
+				try {
+					warm();
+				} catch {
+					/* speculative */
+				}
+			}
+		} finally {
+			CURRENT_PU_WARM_CLAIMS = previousClaims;
 		}
 	}
 	// Same discovery-job bookkeeping as a suspending use(): register the
@@ -3603,16 +3780,18 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 // compiler cannot prove finite (mirrors the client's cap).
 let WARM_DEPTH = 0;
 const WARM_DEPTH_CAP = 64;
-const WARM_SLOT_CAP = 64;
+// Per-slot occurrence queues are render-local and must remain complete: dropping
+// their FIFO head would give a repeated component a later instance's value.
 
 /**
  * Start (and cache) one prefetched creation from a component's compiled fetch
- * plan (`Comp.__warm`). Dedups on (slot, deps) so a re-warm during a later
- * suspending pass never double-starts a fetch. The resulting thenable is
- * REGISTERED with the render loop so the current round awaits it — that is
- * the whole point: the descendant's data settles before its body runs, and
- * its unwraps then resolve by identity (resolvedT). Speculative: a throwing
- * creation is simply not warmed.
+ * plan (`Comp.__warm`). Each plan occurrence claims one matching (slot, deps)
+ * entry, so later passes reuse concrete work while repeated equal-dependency
+ * instances still start separately. The resulting thenable is REGISTERED with
+ * the render loop so the current round awaits it — that is the whole point: the
+ * descendant's data settles before its body runs, and its unwraps then resolve
+ * by identity (resolvedT). Speculative: a throwing creation is simply not
+ * warmed.
  */
 export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): void {
 	const res = RESOLVED;
@@ -3621,8 +3800,38 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 	let list = warm.get(slot);
 	if (list !== undefined) {
 		for (let i = 0; i < list.length; i++) {
-			if (puDepsEqual(list[i].deps, deps)) return; // already warmed
+			const entry = list[i];
+			if (!puDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
+			CURRENT_PU_WARM_CLAIMS?.add(entry);
+			return; // this concrete occurrence already ran or warmed
 		}
+	}
+	// A parent plan recurses through the currently-rendering source component as
+	// well as earlier siblings. Claim every matching created occurrence across
+	// the current render request, not only frame ancestors, before speculating.
+	let activeCreation:
+		| { deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
+		| undefined;
+	for (const created of res.pu.created.values()) {
+		if (
+			created.site === slot &&
+			puDepsEqual(created.deps, deps) &&
+			!CURRENT_PU_WARM_CLAIMS?.has(created)
+		) {
+			activeCreation = created;
+			break;
+		}
+	}
+	if (activeCreation !== undefined) {
+		CURRENT_PU_WARM_CLAIMS?.add(activeCreation);
+		if (list === undefined) {
+			list = [];
+			warm.set(slot, list);
+		}
+		const entry = { deps, value: undefined, available: false };
+		list.push(entry);
+		CURRENT_PU_WARM_CLAIMS?.add(entry);
+		return;
 	}
 	let value: unknown;
 	try {
@@ -3634,8 +3843,9 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 		list = [];
 		warm.set(slot, list);
 	}
-	list.push({ deps, value });
-	if (list.length > WARM_SLOT_CAP) list.shift();
+	const entry = { deps, value, available: true };
+	list.push(entry);
+	CURRENT_PU_WARM_CLAIMS?.add(entry);
 	if (
 		value != null &&
 		typeof (value as any).then === 'function' &&
@@ -4351,12 +4561,15 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 	/** Lazily allocated DEV SSR invalid-nesting warnings reported by this render. */
 	nestingWarnings?: Set<string>;
 	pu: {
-		created: Map<string, { deps: unknown[]; value: unknown }>;
+		created: Map<
+			string,
+			{ deps: unknown[]; value: unknown; site: ServerHookSlot | undefined; frame: Frame | null }
+		>;
 		resolvedT: Map<PromiseLike<unknown>, SuspenseOutcome>;
 		// Warm-walk prefetches (warmMemo), keyed by the creation's SLOT symbol —
-		// deps-matched, TRANSFER semantics: the descendant's real puMemo adopts
-		// (and removes) its entry, so a warmed fetch is consumed exactly once.
-		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown }[]>;
+		// a value is adoptable once, while its retained tombstone prevents a later
+		// dependency stratum from speculatively recreating the same request.
+		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown; available: boolean }[]>;
 	};
 };
 function newResolvedMap(): ResolvedMap {
@@ -4391,9 +4604,12 @@ interface FullPassResult {
 // in-flight pass — the globals are always restored before we yield the tick.
 interface Ambient {
 	scope: SSRScope | null;
+	warmPlans: Array<() => void>;
+	warmClaims: Set<object> | null;
 	id: number;
 	idPrefix: string;
 	css: Map<string, string> | null;
+	nonceAttr: string;
 	markers: boolean;
 	head: HeadBuffer | null;
 	susp: SuspendedList | null;
@@ -4414,9 +4630,12 @@ interface Ambient {
 function saveAmbient(): Ambient {
 	return {
 		scope: CURRENT_SCOPE,
+		warmPlans: ACTIVE_PU_WARM_PLANS.slice(),
+		warmClaims: CURRENT_PU_WARM_CLAIMS,
 		id: ID_COUNTER,
 		idPrefix: ID_PREFIX,
 		css: CSS,
+		nonceAttr: NONCE_ATTR,
 		markers: MARKERS,
 		head: HEAD,
 		susp: SUSPENDED,
@@ -4437,9 +4656,13 @@ function saveAmbient(): Ambient {
 }
 function restoreAmbient(a: Ambient): void {
 	CURRENT_SCOPE = a.scope;
+	ACTIVE_PU_WARM_PLANS.length = 0;
+	ACTIVE_PU_WARM_PLANS.push(...a.warmPlans);
+	CURRENT_PU_WARM_CLAIMS = a.warmClaims;
 	ID_COUNTER = a.id;
 	ID_PREFIX = a.idPrefix;
 	CSS = a.css;
+	NONCE_ATTR = a.nonceAttr;
 	MARKERS = a.markers;
 	HEAD = a.head;
 	SUSPENDED = a.susp;
@@ -4480,8 +4703,11 @@ function runFullFramedPass(
 	markers: boolean = true,
 ): FullPassResult {
 	const saved = saveAmbient();
+	ACTIVE_PU_WARM_PLANS.length = 0;
+	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
 	VT_SSR_TRY_SEQ = 0;
@@ -4568,8 +4794,11 @@ function runDiscoveryRound(
 	identifierPrefix: string,
 ): { suspended: SuspendedList; deferred: Job[] } {
 	const saved = saveAmbient();
+	ACTIVE_PU_WARM_PLANS.length = 0;
+	CURRENT_PU_WARM_CLAIMS = null;
 	ID_COUNTER = 0;
 	ID_PREFIX = identifierPrefix;
+	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
 	VT_SSR_TRY_SEQ = 0;
@@ -4853,6 +5082,142 @@ export async function prerender(
 ): Promise<RenderResult> {
 	const nonceAttr = nonceAttrOf(options);
 	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Hosted server rendering — react-hosted-octane-compat-plan.md §9.1.
+//
+// A React host (octane/react/server) runs one SYNCHRONOUS hosted attempt per
+// Fizz task execution, inside the React component render. The session — kept
+// by the host, keyed on Fizz's replay-stable task identity — persists the
+// resolved/parallel-use maps across that island's Fizz retries, so a replayed
+// pass reuses puMemo's original thenables and every settled outcome replays
+// synchronously. An unhandled suspension is NOT awaited here: the attempt
+// returns one identity-stable, status-stamped STRATUM aggregate that records
+// outcomes into the session as they settle; the host delegates the wait to
+// `React.use(stratum)` (Fizz's positional replay state — Phase 0 evidence).
+// Do NOT call public renderToString for this: its bare-root suspension
+// contract returns partial output and a fresh resolved map per call.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Read hook for FOREIGN host contexts during a hosted pass (§6.4): the server
+// wrapper reads React contexts directly (React.use) — no mirror or registry.
+let HOSTED_FOREIGN_CONTEXT_READER: ((context: object) => unknown) | null = null;
+
+function readHostedForeignContext<T>(usable: unknown, api: string): T {
+	if (usable !== null && typeof usable === 'object' && HOSTED_FOREIGN_CONTEXT_READER !== null) {
+		return HOSTED_FOREIGN_CONTEXT_READER(usable as object) as T;
+	}
+	throw new Error(`${api}(): argument is not a Context nor a thenable`);
+}
+
+/** @internal hosted-host ABI. Opaque outside octane/react/server. */
+export interface HostedServerSession {
+	resolved: ResolvedMap;
+	/** Identity-stable settled-work aggregates, one per suspension stratum. */
+	strata: (PromiseLike<void> & { status?: string })[];
+}
+
+/** @internal hosted-host ABI. */
+export function createHostedServerSession(): HostedServerSession {
+	return { resolved: newResolvedMap(), strata: [] };
+}
+
+export interface HostedAttemptOptions {
+	identifierPrefix?: string;
+	/** CSP nonce for inline seed scripts (same contract as RenderOptions.nonce). */
+	nonce?: string;
+	readForeignContext?: (context: object) => unknown;
+}
+
+export type HostedAttemptResult =
+	| {
+			status: 'complete';
+			html: string;
+			/** Hoisted head output — the host must translate or reject it (§9.2). */
+			head: string;
+			/** Per-hash scoped stylesheets for host-level dedupe (§9.2). */
+			cssEntries: Map<string, string>;
+	  }
+	| { status: 'suspended'; stratum: PromiseLike<void> };
+
+/**
+ * One stratum recorder: settles every suspended job into the session maps
+ * (both string-keyed and thenable-identity parallel-use outcomes), never
+ * rejects, and stamps its own status in place so a Fizz replay's
+ * `React.use(stratum)` unwraps settled strata synchronously.
+ * @internal hosted-host ABI.
+ */
+function recordHostedStratum(
+	suspended: SuspendedList,
+	resolved: ResolvedMap,
+): PromiseLike<void> & { status?: string; value?: unknown } {
+	const pu = resolved.pu;
+	const recorders = suspended.map(({ promise, key }) =>
+		(async () => {
+			const isPu = key.startsWith('|pu#');
+			try {
+				const value = await promise;
+				if (!resolved.has(key)) resolved.set(key, { value });
+				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { value });
+			} catch (reason) {
+				if (!resolved.has(key)) resolved.set(key, { reason });
+				if (isPu && !pu.resolvedT.has(promise)) pu.resolvedT.set(promise, { reason });
+			}
+		})(),
+	);
+	const aggregate = Promise.all(recorders).then(() => {
+		aggregate.status = 'fulfilled';
+		aggregate.value = undefined;
+	}) as Promise<void> & { status?: string; value?: unknown };
+	aggregate.status = 'pending';
+	return aggregate;
+}
+
+/**
+ * Run ONE synchronous hosted pass against a persistent session. Complete
+ * passes return body HTML (suspense seeds appended, view-transition residue
+ * stripped) plus separated head/css channels; a suspended pass registers and
+ * returns its stratum. Unhandled render ERRORS throw out of this call — the
+ * host lets them escape to Fizz (§9.1).
+ * @internal hosted-host ABI.
+ */
+export function renderHostedAttempt(
+	session: HostedServerSession,
+	component: ServerComponent,
+	props: any,
+	options?: HostedAttemptOptions,
+): HostedAttemptResult {
+	const nonceAttr = nonceAttrOf(options as RenderOptions | undefined);
+	const previousReader = HOSTED_FOREIGN_CONTEXT_READER;
+	HOSTED_FOREIGN_CONTEXT_READER = options?.readForeignContext ?? null;
+	let pass: FullPassResult;
+	try {
+		pass = withStream(null, () =>
+			runFullFramedPass(
+				component,
+				props,
+				session.resolved,
+				nonceAttr,
+				options?.identifierPrefix ?? '',
+			),
+		);
+	} finally {
+		HOSTED_FOREIGN_CONTEXT_READER = previousReader;
+	}
+	// Delegate to the host ONLY for a bare suspension that escaped the root.
+	// A suspension OWNED by a local @try ships its @pending arm in this pass's
+	// HTML (the §9.1 v1 contract: hydration/client retry completes it), so the
+	// island is complete from the host's perspective.
+	if (pass.rootSuspended) {
+		const stratum = recordHostedStratum(pass.suspended, session.resolved);
+		session.strata.push(stratum);
+		return { status: 'suspended', stratum };
+	}
+	let body = pass.body;
+	if (pass.serial.length > 0) body += serializeSuspenseSeeds(pass.serial, nonceAttr);
+	if (pass.vtCandidates) body = vtSsrStrip(body);
+	return { status: 'complete', html: body, head: pass.head, cssEntries: pass.cssEntries };
 }
 
 /**

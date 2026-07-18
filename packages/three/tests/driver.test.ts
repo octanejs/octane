@@ -783,4 +783,139 @@ describe('Three universal driver', () => {
 		root.unmount();
 		container.flushDisposals();
 	});
+
+	it('reasserts externally mutated root order and visibility on a retained leaf update', () => {
+		const meshPlan = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent(
+			'three',
+			(props: { items: readonly { id: string; x: number }[] }) =>
+				universalList(props.items, (item) =>
+					universalKey(
+						item.id,
+						universalValue(meshPlan, [
+							universalProps([
+								['set', 'name', item.id],
+								['set', 'position', [item.x, 0, 0]],
+							]),
+						]),
+					),
+				),
+		);
+		const { container, root, scene } = createRoot();
+
+		root.render(Scene, {
+			items: [
+				{ id: 'a', x: 0 },
+				{ id: 'b', x: 1 },
+			],
+		});
+		const [a, b] = scene.children as THREE.Mesh[];
+		scene.add(a);
+		a.visible = false;
+		expect(scene.children).toEqual([b, a]);
+
+		root.render(Scene, {
+			items: [
+				{ id: 'a', x: 2 },
+				{ id: 'b', x: 3 },
+			],
+		});
+		expect(scene.children).toEqual([a, b]);
+		expect(a.visible).toBe(true);
+		expect(a.position.x).toBe(2);
+		expect(b.position.x).toBe(3);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('falls back to the canonical vector setter after public method mutation', () => {
+		const meshPlan = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', (props: { x: number }) =>
+			universalValue(meshPlan, [
+				universalProps([
+					['set', 'name', 'mutable-vector'],
+					['set', 'position', [props.x, 0, 0]],
+				]),
+			]),
+		);
+		const { container, root, scene } = createRoot();
+
+		root.render(Scene, { x: 1 });
+		const mesh = scene.children[0] as THREE.Mesh;
+		(mesh.position as THREE.Vector3 & { fromArray: null }).fromArray = null;
+		expect(() => root.render(Scene, { x: 2 })).not.toThrow();
+		expect(mesh.position.x).toBe(2);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('does not invoke authored array helpers while selecting the direct leaf path', () => {
+		const meshPlan = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const position = [4, 0, 0];
+		position.every = () => {
+			throw new Error('authored every must stay inert');
+		};
+		const Scene = defineUniversalComponent('three', () =>
+			universalValue(meshPlan, [
+				universalProps([
+					['set', 'name', 'safe-array'],
+					['set', 'position', position],
+				]),
+			]),
+		);
+		const { container, root, scene } = createRoot();
+
+		expect(() => root.render(Scene, undefined)).not.toThrow();
+		expect(scene.children[0].position.x).toBe(4);
+
+		root.unmount();
+		container.flushDisposals();
+	});
+
+	it('checks catalogue overrides before staging a built-in direct leaf', () => {
+		let constructions = 0;
+		class Mesh extends THREE.Mesh {
+			constructor() {
+				super();
+				constructions++;
+				if (constructions > 1) throw new Error('constructed twice');
+			}
+		}
+		extend({ Mesh });
+		const meshPlan = universalPlan('three', {
+			kind: 'host',
+			type: 'mesh',
+			propsSlot: 0,
+		});
+		const Scene = defineUniversalComponent('three', () =>
+			universalValue(meshPlan, [
+				universalProps([
+					['set', 'name', 'custom-mesh'],
+					['set', 'position', [1, 0, 0]],
+				]),
+			]),
+		);
+		const { container, root, scene } = createRoot();
+
+		expect(() => root.render(Scene, undefined)).not.toThrow();
+		expect(constructions).toBe(1);
+		expect(scene.children[0]).toBeInstanceOf(Mesh);
+
+		root.unmount();
+		container.flushDisposals();
+	});
 });

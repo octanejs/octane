@@ -59,6 +59,18 @@ pre.shiki {
 }
 `;
 
+function RootDocument(props: { children?: unknown }) @{
+	<Html lang="en">
+		<Head>
+			<HeadContent />
+		</Head>
+		<Body>
+			{props.children}
+			<Scripts />
+		</Body>
+	</Html>
+}
+
 export const Route = createRootRoute({
 	head: () => ({
 		meta: [
@@ -76,6 +88,42 @@ export const Route = createRootRoute({
 				content: '#23272f',
 			},
 			{ title: DEFAULT_TITLE },
+			{
+				property: 'og:type',
+				content: 'website',
+			},
+			{
+				property: 'og:site_name',
+				content: 'Octane',
+			},
+			{
+				property: 'og:title',
+				content: DEFAULT_TITLE,
+			},
+			{
+				property: 'og:description',
+				content: 'React\'s programming model, compiled ahead of time. No VDOM, no rules of hooks.',
+			},
+			{
+				property: 'og:image',
+				content: 'https://octanejs.dev/og-image.png',
+			},
+			{
+				property: 'og:image:width',
+				content: '1200',
+			},
+			{
+				property: 'og:image:height',
+				content: '630',
+			},
+			{
+				property: 'og:image:alt',
+				content: 'Octane — React\'s programming model, compiled ahead of time',
+			},
+			{
+				name: 'twitter:card',
+				content: 'summary_large_image',
+			},
 		],
 		links: [
 			{ rel: 'icon', href: '/favicon.ico', sizes: '48x48 32x32 16x16' },
@@ -89,15 +137,3 @@ export const Route = createRootRoute({
 	shellComponent: RootDocument,
 	component: MainLayout,
 });
-
-function RootDocument(props: { children?: unknown }) @{
-	<Html lang="en">
-		<Head>
-			<HeadContent />
-		</Head>
-		<Body>
-			{props.children}
-			<Scripts />
-		</Body>
-	</Html>
-}

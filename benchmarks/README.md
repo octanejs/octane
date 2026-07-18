@@ -42,7 +42,7 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 Some suites need no preview servers: **news** vite-builds and times each target
 itself (the runner loops its per-target invocations and merges them),
 **ssr-throughput** and **streaming-ssr** are Node-only, and **codegen-size** /
-**bundle-size** are deterministic build/byte checks.
+**bundle-size** / **three-bundle-size** are deterministic build/byte checks.
 
 ## Regression modes
 
@@ -58,13 +58,14 @@ itself (the runner loops its per-target invocations and merges them),
 **What fails CI vs what is local-only:**
 
 - **CI enforces `--ratios` only.** Ratio guards compare two targets measured on
-  the *same machine in the same run*, so they are hardware-independent and safe
-  on shared runners. `.github/workflows/bench.yml` runs
+  the *same machine in the same run*. That cancels shared variation; byte/count
+  ratios are deterministic for a fixed toolchain, while timing guards retain
+  explicit noise headroom. `.github/workflows/bench.yml` runs
   `node benchmarks/bench.mjs --quick --ratios` on manual dispatch + a weekly
   cron, uploads `benchmarks/results/` as an artifact, and fails on a breach.
-- **`--record` / `--compare` are local-only.** The absolute millisecond baselines
-  in `baselines/local/*.json` are specific to the machine that recorded them, so
-  they are a personal regression aid, not a gate. See
+- **`--record` / `--compare` are local-only.** Absolute timing baselines are
+  specific to the recording machine; deterministic byte/count records are
+  portable only across the same fixture and toolchain. Neither is a CI gate. See
   [`baselines/README.md`](baselines/README.md).
 
 The **compare rule** is noise-aware: an op is a regression only if
@@ -105,7 +106,7 @@ after printing its normal tables:
 }
 ```
 
-- Times are **milliseconds**. `score` is the headline value for comparisons:
+- Timing operations are **milliseconds**. `score` is the headline value for comparisons:
   the mean of the latest stable sample window (or `median` when a quick run has
   too few samples to infer a window). This mirrors Benchmark.js's preference for
   mean period + uncertainty over median-only reporting, while keeping sample
@@ -147,6 +148,8 @@ internally, get their own baseline and guard namespace.
 | `js-framework` | js-framework | Octane + reference frameworks | krausest ops incl. `add` |
 | `js-framework-reorder` | js-framework | same fixtures | keyed reorder matrix (LIS vs lastPlacedIndex) |
 | `todomvc` | todomvc | Octane + reference frameworks | Speedometer-style TodoMVC interactions |
+| `weather-app` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | upstream weather UI: cold ready, keyed forecast churn, async search/error/recovery |
+| `weather-app-lighthouse` | weather-app | octane-tsrx, react, preact, solid, svelte, vue | desktop Lighthouse categories plus FCP/LCP/Speed Index/TBT/CLS |
 | `chat-stream` | chat-stream | Octane + reference frameworks | deterministic token streaming + conversation switches |
 | `dbmon` | dbmon | Octane + reference frameworks | per-cell update churn |
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
@@ -162,9 +165,11 @@ internally, get their own baseline and guard namespace.
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
-| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production build of each js-framework app, normalized minify, raw/gzip/brotli |
+| `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
+| `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
+| `three-bundle-size` | three | none (builds, then checks in Chromium) | minimal/full-catalogue shipped JS bytes for Octane Three, R3F, and plain Three |
 
-The two size suites measure **bytes, not milliseconds** (deterministic —
+The size suites measure **bytes, not milliseconds** (deterministic —
 `median === min`, and ratio guards on them are exact, hardware-independent
 numbers). They are the regression gates for
 `docs/compiled-output-optimization-plan.md`: `codegen-size` is the seconds-fast
@@ -173,12 +178,18 @@ baseline, re-record when you change it), `bundle-size` is the cross-framework
 comparison (all targets built with one normalized minify so solid's
 `minify:false` dev config and octane's terser passes don't skew the compare).
 
-`bundle-size` splits every build into an `app` chunk (modules under the app's
-own src/) and a `framework` chunk (node_modules + the octane workspace runtime
-+ virtual helpers) and reports both, plus totals: `app_*` / `fw_*` / `js_*` ×
-raw/gzip/brotli. The `app_*` ops are the primary ratchet — in real apps user
-code eclipses the framework runtime, so the per-component codegen share is
-what must scale; `fw_*` tracks the one-time runtime cost separately.
+`bundle-size` classifies every build's emitted JavaScript into an `app` bucket
+(modules under the app's own src/) and a `framework` bucket (node_modules + the
+Octane workspace runtime + virtual helpers) and reports both, plus totals:
+`app_*` / `fw_*` / `js_*` ×
+raw/gzip/brotli. The harness models each emitted JavaScript file as an
+independently compressed response and sums those modeled transfer sizes; it
+does not inspect a server's content encoding. A bundler's default single chunk
+can be slightly smaller through cross-module compression. The `app_*` ops are
+the primary scaling ratchet as applications grow; `fw_*` tracks the one-time
+runtime cost separately. App-shaped
+sets use `todo_*`, `chat_*`, and `weather_*` operation prefixes; weather's shared
+service and formatting modules count as app code in both framework builds.
 
 ## Adding a suite
 

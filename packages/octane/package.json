@@ -1,6 +1,6 @@
 {
   "name": "octane",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -31,6 +31,9 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./react": "./src/react/index.ts",
+    "./hydration": "./src/hydration/index.ts",
+    "./react/server": "./src/react/server.ts",
     "./server": "./src/server/index.ts",
     "./static": "./src/static/index.ts",
     "./constants": "./src/constants.ts",
@@ -39,7 +42,10 @@
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
-    "./compiler/vite": "./src/compiler/vite.js",
+    "./compiler/vite": {
+      "types": "./src/compiler/vite.d.ts",
+      "default": "./src/compiler/vite.js"
+    },
     "./compiler/volar": "./src/compiler/volar.js"
   },
   "publishConfig": {
@@ -51,6 +57,18 @@
       ".": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
+      },
+      "./react": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "./hydration": {
+        "types": "./dist/hydration/index.d.ts",
+        "default": "./dist/hydration/index.js"
+      },
+      "./react/server": {
+        "types": "./dist/react/server.d.ts",
+        "default": "./dist/react/server.js"
       },
       "./server": {
         "types": "./dist/server/index.d.ts",
@@ -75,7 +93,10 @@
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
-      "./compiler/vite": "./dist/compiler/vite.js",
+      "./compiler/vite": {
+        "types": "./dist/compiler/vite.d.ts",
+        "default": "./dist/compiler/vite.js"
+      },
       "./compiler/volar": "./dist/compiler/volar.js"
     }
   },
@@ -90,12 +111,30 @@
     "devalue": "catalog:default",
     "esrap": "catalog:default"
   },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "vite": "^8.0.16"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
+    "@types/react": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default"
   }
 }

@@ -16,14 +16,17 @@
     "@codemirror/state": "catalog:default",
     "@codemirror/view": "catalog:default",
     "@octanejs/mdx": "workspace:*",
+    "@octanejs/three": "workspace:*",
     "@octanejs/visx": "workspace:*",
-    "@tanstack/octane-router": "https://pkg.pr.new/TanStack/router/@tanstack/octane-router@4f28863f24065796cc0968955e1888a985ba3866",
-    "@tanstack/octane-start": "https://pkg.pr.new/TanStack/router/@tanstack/octane-start@4f28863f24065796cc0968955e1888a985ba3866",
-    "shiki": "catalog:default"
+    "@tanstack/octane-router": "https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31",
+    "@tanstack/octane-start": "https://pkg.pr.new/TanStack/router/@tanstack/octane-start@753f919eeda3d60cac86a6678ea9700e4e8c7a31",
+    "shiki": "catalog:default",
+    "three": "catalog:default"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",
+    "@types/three": "catalog:default",
     "@tsrx/core": "catalog:default",
     "esrap": "catalog:default",
     "nitro": "^3.0.260311-beta",

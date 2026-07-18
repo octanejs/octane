@@ -662,6 +662,53 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-devtools',
+					include: ['packages/tanstack-devtools/tests/conformance/**/*.test.ts'],
+					environment: 'jsdom',
+					setupFiles: ['packages/tanstack-devtools/tests/conformance/test-setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tanstack-devtools-ssr',
+					include: ['packages/tanstack-devtools/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -1351,6 +1398,68 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tiptap',
+					include: [
+						'packages/tiptap/tests/unit/**/*.test.ts',
+						'packages/tiptap/tests/unit/**/*.test.tsx',
+						'packages/tiptap/tests/differential/**/*.test.ts',
+						'packages/tiptap/tests/hydration/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					globalSetup: ['packages/tiptap/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tiptap-ssr',
+					include: ['packages/tiptap/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tiptap\/menus$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/menus/index.ts'),
+						},
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tiptap$/,
+							replacement: resolve(import.meta.dirname, 'packages/tiptap/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'tiptap-browser',
+					include: ['packages/tiptap/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
+				test: {
 					name: 'stylex',
 					include: ['packages/stylex/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -1430,6 +1539,35 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/floating-ui$/,
 							replacement: resolve(import.meta.dirname, 'packages/floating-ui/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'aria',
+					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
+					environment: 'jsdom',
+					// Differential precompile for aria fixtures: rewrites `@octanejs/aria` →
+					// `react-aria` (and `/stately` → `react-stately`, `/components` →
+					// `react-aria-components`) so the React side runs the real React Aria.
+					globalSetup: ['packages/aria/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				// aria's `.ts` hooks forward the caller's slot via subSlot — the package
+				// declares manual hook slots in its package.json, so the auto-slotting pass
+				// skips them (the `.tsx`/`.tsrx` fixtures that call them are full-compiled
+				// and inject the trailing slot).
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/aria$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/aria\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/aria/src') + '/$1/index.ts',
 						},
 					],
 				},
@@ -1683,6 +1821,23 @@ export default defineConfig({
 				// routing, and deployment are owned by @tanstack/octane-start; the
 				// official router and Octane runtime resolve through website/node_modules.
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
+			},
+			{
+				test: {
+					name: 'website-mcp',
+					include: ['website-mcp/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					// built-handler.e2e runs a REAL production `vite build` into
+					// website-mcp/dist and website-mcp/.vercel/output and then imports the emitted
+					// server entry; file-serial so parallel test files can't clobber
+					// the artifacts another file is building or importing.
+					fileParallelism: false,
+				},
+				// No app plugins: the website-mcp tests exercise plain .ts modules (the
+				// content snapshot uses only Vite built-ins — ?raw and
+				// import.meta.glob) plus the production build driven through the
+				// vite JS API, which loads the app's own config and plugins itself.
 			},
 		],
 	},

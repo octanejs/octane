@@ -39,7 +39,7 @@ function serverModule(): Record<string, any> {
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = $1; function $1');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
 }
 function devClientModule(): Record<string, any> {
@@ -49,7 +49,7 @@ function devClientModule(): Record<string, any> {
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	code = code.replace(/export function (\w+)/g, '__exports.$1 = $1; function $1');
+	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ClientRT, {});
 }
 

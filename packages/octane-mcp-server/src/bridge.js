@@ -9,6 +9,7 @@ export const KNOWN_BINDINGS = {
 	jotai: '@octanejs/jotai',
 	'@apollo/client': '@octanejs/apollo-client',
 	'@tanstack/ai-react': '@octanejs/tanstack-ai',
+	'@tanstack/react-devtools': '@octanejs/tanstack-devtools',
 	'@tanstack/react-form': '@octanejs/tanstack-form',
 	'@tanstack/react-query': '@octanejs/tanstack-query',
 	'@tanstack/react-router': '@octanejs/tanstack-router',
@@ -21,8 +22,12 @@ export const KNOWN_BINDINGS = {
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	'@lexical/react': '@octanejs/lexical',
+	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
 	'@floating-ui/react': '@octanejs/floating-ui',
+	'react-aria': '@octanejs/aria',
+	'react-aria-components': '@octanejs/aria',
+	'react-stately': '@octanejs/aria',
 	'radix-ui': '@octanejs/radix',
 	'react-hook-form': '@octanejs/hook-form',
 	'@base-ui-components/react': '@octanejs/base-ui',
@@ -111,6 +116,7 @@ export const KNOWN_VANILLA_CORES = {
 	valtio: 'valtio/vanilla',
 	jotai: 'jotai/vanilla',
 	'@lexical/react': 'lexical',
+	'@tiptap/react': '@tiptap/core',
 };
 
 export const REACT_API_MAP = {
@@ -366,6 +372,28 @@ export async function bridgeReport({ packageName, path, projectRoot }) {
 	report.classComponents = scan.classComponents;
 	report.apis = rows;
 	report.verdict = verdictFor(rows, scan.classComponents);
+	report.plan = planFor(report);
+	return report;
+}
+
+// Filesystem-free variant of bridgeReport for hosted/remote use: the caller
+// pastes source text instead of pointing at an installed package, so there is
+// no node_modules resolution, no version, and no file counting. Everything
+// else (API rows, verdict, plan) matches bridgeReport.
+export function bridgeReportFromSource(source, { packageName } = {}) {
+	const report = {
+		target: packageName ?? 'pasted-source',
+		existingBinding: packageName ? (KNOWN_BINDINGS[packageName] ?? null) : null,
+	};
+	if (packageName) {
+		report.vanillaCore = detectVanillaCore(packageName, null);
+	}
+	const scan = scanSource(source);
+	const rows = apiRows(scan.apis);
+	report.reactImports = [...scan.imports];
+	report.classComponents = scan.classComponent;
+	report.apis = rows;
+	report.verdict = verdictFor(rows, scan.classComponent);
 	report.plan = planFor(report);
 	return report;
 }

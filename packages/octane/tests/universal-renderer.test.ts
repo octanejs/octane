@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
 import * as UniversalRuntime from '../src/universal.js';
 import {
@@ -7,6 +8,7 @@ import {
 	createPortal,
 	createUniversalRoot,
 	defineUniversalComponent,
+	universalFor,
 	universalKey,
 	universalList,
 	universalPlan,
@@ -59,9 +61,18 @@ const Scene = defineUniversalComponent('object', (props: { items: Item[] }) =>
 	]),
 );
 
-function objectRoot() {
+function objectRoot(compilerLeafProps = false) {
 	const container = createObjectContainer();
-	const root = createUniversalRoot(container, createObjectDriver());
+	const driver = createObjectDriver();
+	const root = createUniversalRoot(
+		container,
+		compilerLeafProps
+			? {
+					...driver,
+					capabilities: { ...driver.capabilities, compilerLeafProps: true },
+				}
+			: driver,
+	);
 	return { container, root };
 }
 
@@ -95,6 +106,495 @@ describe('universal compiler target', () => {
 		expect(output).toContain('"kind": "range"');
 		expect(output).toContain('"bindings": [["tone", 0]]');
 		expect(output).not.toContain('<scene');
+	});
+
+	it('infers omitted dependencies for hooks imported from the renderer runtime', () => {
+		const source = `
+			import { useMemo as memo } from 'octane/universal';
+			function useComputed(factory, dependencies) {
+				return memo(factory, dependencies);
+			}
+			export function Scene(props) @{
+				const value = useComputed(() => props.value);
+				<node value={value} />
+			}
+		`;
+		const output = compile(source, '/src/Scene.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+
+		expect(() => parseModule(output, '/dist/Scene.object.js')).not.toThrow();
+		expect(output).toMatch(/memo\(factory, dependencies, [^)]+\)/);
+		expect(output).toContain('() => props.value, [props.value]');
+	});
+
+	it('renders pure keyed host loops without per-item owners while preserving host identity', () => {
+		const source = `
+			export function Scene({items}) @{
+				@for (const item of items; key item.id) {
+					<node name={item.name} vector={[item.value, 0]} />
+				}
+			}
+		`;
+		let output = compile(source, '/src/PureList.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/__octaneUniversalFor\(\s*items/);
+		expect(output).toMatch(/,\s*null,\s*true,\s*true\s*\)/);
+		const hmrOutput = compile(source, '/src/PureList.object.tsrx', {
+			renderer,
+			hmr: true,
+		}).code;
+		expect(hmrOutput).toMatch(/__octaneUniversalFor\(\s*items/);
+		expect(hmrOutput).not.toMatch(/,\s*null,\s*true/);
+
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const ownerlessCalls: unknown[] = [];
+		const compactCalls: unknown[] = [];
+		const runtime = {
+			...UniversalRuntime,
+			universalFor: (...args: unknown[]) => {
+				ownerlessCalls.push(args[4]);
+				compactCalls.push(args[5]);
+				return (UniversalRuntime.universalFor as any)(...args);
+			},
+		};
+		const PureList = new Function('__universal', `${output}\nreturn Scene;`)(runtime) as (
+			props: unknown,
+		) => unknown;
+		const { container, root } = objectRoot(true);
+
+		root.render(PureList as any, {
+			items: [
+				{ id: 'a', name: 'A', value: 1 },
+				{ id: 'b', name: 'B', value: 2 },
+			],
+		});
+		expect(ownerlessCalls).toEqual([true]);
+		expect(compactCalls).toEqual([true]);
+		const a = container.children[0];
+		const b = container.children[1];
+
+		root.render(PureList as any, {
+			items: [
+				{ id: 'a', name: 'Aye', value: 10 },
+				{ id: 'b', name: 'Bee', value: 20 },
+			],
+		});
+		expect(container.children).toEqual([a, b]);
+		expect(container.children.map((child) => child.props.name)).toEqual(['Aye', 'Bee']);
+		expect(container.children.map((child) => child.props.vector)).toEqual([
+			[10, 0],
+			[20, 0],
+		]);
+
+		root.render(PureList as any, {
+			items: [
+				{ id: 'b', name: 'Bee', value: 20 },
+				{ id: 'a', name: 'Aye', value: 10 },
+				{ id: 'c', name: 'See', value: 3 },
+			],
+		});
+		expect(container.children.map((child) => child.props.name)).toEqual(['Bee', 'Aye', 'See']);
+		expect(container.children[0]).toBe(b);
+		expect(container.children[1]).toBe(a);
+		expect(container.children.map((child) => child.props.vector)).toEqual([
+			[20, 0],
+			[10, 0],
+			[3, 0],
+		]);
+
+		const committed = [...container.children];
+		const commits = container.commits.length;
+		expect(() =>
+			root.render(PureList as any, {
+				items: [
+					{ id: 'same', name: 'first', value: 1 },
+					{ id: 'same', name: 'second', value: 2 },
+				],
+			}),
+		).toThrow(/Duplicate universal list key same/);
+		expect(container.children).toEqual(committed);
+		expect(container.commits).toHaveLength(commits);
+
+		root.render(PureList as any, { items: [] });
+		expect(container.children).toEqual([]);
+		root.unmount();
+	});
+
+	it('preserves keyed state reached through data property getters', () => {
+		const source = `
+			export function Scene({items}) @{
+				@for (const item of items; key item.id) {
+					<node name={item.name} />
+				}
+			}
+		`;
+		let output = compile(source, '/src/GetterStateList.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const GetterStateList = new Function('__universal', `${output}\nreturn Scene;`)(
+			UniversalRuntime,
+		) as (props: unknown) => unknown;
+		const setters = new Map<string, (value: string) => void>();
+		const item = (id: string, initial: string) => ({
+			id,
+			get name() {
+				const [value, setValue] = UniversalRuntime.useState(initial, 'getter-state');
+				setters.set(id, setValue);
+				return value;
+			},
+		});
+		const a = item('a', 'A');
+		const b = item('b', 'B');
+		const { container, root } = objectRoot(true);
+
+		root.render(GetterStateList as any, { items: [a, b] });
+		expect(container.children.map((child) => child.props.name)).toEqual(['A', 'B']);
+		const [hostA, hostB] = container.children;
+
+		UniversalRuntime.flushUniversalSync(() => setters.get('a')!('A2'));
+		expect(container.children).toEqual([hostA, hostB]);
+		expect(container.children.map((child) => child.props.name)).toEqual(['A2', 'B']);
+
+		root.render(GetterStateList as any, { items: [b, a] });
+		expect(container.children).toEqual([hostB, hostA]);
+		expect(container.children.map((child) => child.props.name)).toEqual(['B', 'A2']);
+		root.unmount();
+	});
+
+	it('classifies each stable leaf once when one retained host must be recreated', () => {
+		const container = createObjectContainer();
+		const classified: string[] = [];
+		const driver = {
+			...createObjectDriver(),
+			updates: {
+				classify(
+					_type: string,
+					_previous: Readonly<Record<string, unknown>>,
+					next: Readonly<Record<string, unknown>>,
+				) {
+					const name = next.name as string;
+					classified.push(name);
+					return name === 'b' ? ('recreate' as const) : ('update' as const);
+				},
+			},
+		};
+		const root = createUniversalRoot(container, driver);
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [
+				['name', 0],
+				['value', 1],
+			],
+		});
+		const Scene = defineUniversalComponent('object', (props: { values: readonly number[] }) =>
+			universalList(['a', 'b'], (name, index) =>
+				universalKey(name, universalValue(plan, [name, props.values[index]])),
+			),
+		);
+
+		root.render(Scene, { values: [1, 2] });
+		const [a, b] = container.children;
+		const commits = container.commits.length;
+		const aborted = root.prepare(Scene, { values: [3, 4] });
+		expect(aborted.status).toBe('prepared');
+		aborted.abort();
+		expect(container.children).toEqual([a, b]);
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 2]);
+		expect(container.commits).toHaveLength(commits);
+
+		classified.length = 0;
+		root.render(Scene, { values: [3, 4] });
+
+		expect(classified).toEqual(['a', 'b']);
+		expect(container.children[0]).toBe(a);
+		expect(container.children[1]).not.toBe(b);
+		expect(container.children.map((child) => child.props.value)).toEqual([3, 4]);
+		root.unmount();
+	});
+
+	it('expands compact leaves nested below an ordinary host and across an empty transition', () => {
+		const container = createObjectContainer();
+		const baseDriver = createObjectDriver();
+		const root = createUniversalRoot(container, {
+			...baseDriver,
+			capabilities: { ...baseDriver.capabilities, compilerLeafProps: true },
+		});
+		const leafPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+		});
+		const parentPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'scene',
+			children: [{ kind: 'slot', slot: 0 }],
+		});
+		const Scene = defineUniversalComponent('object', (props: { values: readonly number[] }) =>
+			universalValue(parentPlan, [
+				universalFor(
+					props.values,
+					(_value, index) => index,
+					(value) => universalValue(leafPlan, [value]),
+					null,
+					true,
+					true,
+				),
+			]),
+		);
+
+		root.render(Scene, { values: [1, 2] });
+		const parent = container.children[0];
+		const leaves = [...parent.children];
+		root.render(Scene, { values: [3, 4] });
+		expect(container.children[0]).toBe(parent);
+		expect(parent.children).toEqual(leaves);
+		expect(parent.children.map((child) => child.props.value)).toEqual([3, 4]);
+
+		root.render(Scene, { values: [] });
+		expect(container.children[0]).toBe(parent);
+		expect(parent.children).toEqual([]);
+		root.unmount();
+	});
+
+	it('classifies each compact retained leaf once when one host must be recreated', () => {
+		const container = createObjectContainer();
+		const classified: string[] = [];
+		let rejectPreparation = false;
+		const baseDriver = createObjectDriver();
+		const driver = {
+			...baseDriver,
+			capabilities: { ...baseDriver.capabilities, compilerLeafProps: true },
+			updates: {
+				classify(
+					_type: string,
+					_previous: Readonly<Record<string, unknown>>,
+					next: Readonly<Record<string, unknown>>,
+				) {
+					const name = next.name as string;
+					classified.push(name);
+					return name === 'b' ? ('recreate' as const) : ('update' as const);
+				},
+			},
+			prepareBatch(
+				target: Parameters<typeof baseDriver.prepareBatch>[0],
+				batch: Parameters<typeof baseDriver.prepareBatch>[1],
+				context: Parameters<typeof baseDriver.prepareBatch>[2],
+			) {
+				if (rejectPreparation) throw new Error('compact preparation rejected');
+				return baseDriver.prepareBatch(target, batch, context);
+			},
+		};
+		const root = createUniversalRoot(container, driver);
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [
+				['name', 0],
+				['value', 1],
+			],
+		});
+		const Scene = defineUniversalComponent('object', (props: { values: readonly number[] }) =>
+			universalFor(
+				['a', 'b'],
+				(name) => name,
+				(name, index) => universalValue(plan, [name, props.values[index]]),
+				null,
+				true,
+				true,
+			),
+		);
+
+		root.render(Scene, { values: [1, 2] });
+		const [a, b] = container.children;
+		const commits = container.commits.length;
+		const aborted = root.prepare(Scene, { values: [3, 4] });
+		expect(aborted.status).toBe('prepared');
+		aborted.abort();
+		expect(container.children).toEqual([a, b]);
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 2]);
+		expect(container.commits).toHaveLength(commits);
+
+		rejectPreparation = true;
+		expect(() => root.render(Scene, { values: [3, 4] })).toThrow('compact preparation rejected');
+		expect(container.children).toEqual([a, b]);
+		expect(container.children.map((child) => child.props.value)).toEqual([1, 2]);
+		expect(container.commits).toHaveLength(commits);
+
+		rejectPreparation = false;
+		classified.length = 0;
+		root.render(Scene, { values: [3, 4] });
+
+		expect(classified).toEqual(['a', 'b']);
+		expect(container.children[0]).toBe(a);
+		expect(container.children[1]).not.toBe(b);
+		expect(container.children.map((child) => child.props.value)).toEqual([3, 4]);
+		root.unmount();
+	});
+
+	it('preserves lazy keyed-loop evaluation when eliding item owners', () => {
+		const source = `
+			export function Scene({items}) @{
+				@for (const item of items; key item.id) {
+					<node name={item.name} />
+				}
+			}
+		`;
+		let output = compile(source, '/src/LazyPureList.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		expect(output).toMatch(/,\s*null,\s*true,\s*true\s*\)/);
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+
+		const timing: string[] = [];
+		const runtime = {
+			...UniversalRuntime,
+			universalFor: (...args: unknown[]) => {
+				timing.push('descriptor:start');
+				const descriptor = (UniversalRuntime.universalFor as any)(...args);
+				timing.push('descriptor:end');
+				return descriptor;
+			},
+		};
+		const LazyPureList = new Function('__universal', `${output}\nreturn Scene;`)(runtime) as (
+			props: unknown,
+		) => unknown;
+		const items = {
+			*[Symbol.iterator]() {
+				timing.push('iterate');
+				yield {
+					get id() {
+						timing.push('key:a');
+						return 'a';
+					},
+					get name() {
+						timing.push('prop:a');
+						return 'A';
+					},
+				};
+				yield {
+					get id() {
+						timing.push('key:b');
+						return 'b';
+					},
+					get name() {
+						timing.push('prop:b');
+						return 'B';
+					},
+				};
+			},
+		};
+		const props = {
+			get items() {
+				timing.push('source');
+				return items;
+			},
+		};
+		const { container, root } = objectRoot();
+
+		root.render(LazyPureList as any, props);
+
+		expect(timing).toEqual([
+			'source',
+			'descriptor:start',
+			'descriptor:end',
+			'iterate',
+			'key:a',
+			'prop:a',
+			'key:b',
+			'prop:b',
+		]);
+		expect(container.children.map((child) => child.props.name)).toEqual(['A', 'B']);
+		root.unmount();
+	});
+
+	it('keeps scoped keyed loops when item ownership may be observable', () => {
+		const cases = [
+			{
+				label: 'item setup and hooks',
+				source: `import { useState } from 'octane';
+					export function Scene({items}) @{
+						@for (const item of items; key item.id) {
+							const [value] = useState(item.value);
+							<node value={value} />
+						}
+					}`,
+			},
+			{
+				label: 'component children',
+				source: `function Child({value}) @{ <node value={value} /> }
+					export function Scene({items}) @{
+						@for (const item of items; key item.id) { <Child value={item.value} /> }
+					}`,
+			},
+			{
+				label: 'refs',
+				source: `export function Scene({items, hostRef}) @{
+						@for (const item of items; key item.id) { <node ref={hostRef} /> }
+					}`,
+			},
+			{
+				label: 'events',
+				source: `export function Scene({items, select}) @{
+						@for (const item of items; key item.id) { <node onClick={() => select(item.id)} /> }
+					}`,
+			},
+			{
+				label: 'local callbacks',
+				source: `export function Scene({items, attach}) @{
+						@for (const item of items; key item.id) { <node attach={attach} /> }
+					}`,
+			},
+			{
+				label: 'spreads',
+				source: `export function Scene({items, host}) @{
+						@for (const item of items; key item.id) { <node {...host} /> }
+					}`,
+			},
+			{
+				label: 'host children',
+				source: `export function Scene({items}) @{
+						@for (const item of items; key item.id) { <node><leaf /></node> }
+					}`,
+			},
+			{
+				label: 'impure props',
+				source: `export function Scene({items, read}) @{
+						@for (const item of items; key item.id) { <node value={read(item)} /> }
+					}`,
+			},
+		];
+
+		for (const example of cases) {
+			const output = compile(example.source, `/src/${example.label}.object.tsrx`, {
+				renderer,
+				hmr: false,
+			}).code;
+			expect(output, example.label).toContain('__octaneUniversalFor(');
+			expect(output, example.label).not.toMatch(/,\s*null,\s*true\s*\)/);
+		}
 	});
 
 	it('lowers nested components, dynamic JSX values, and ordered spreads without a DOM deopt', () => {
@@ -188,6 +688,246 @@ describe('universal compiler target', () => {
 		expect(output).toContain('import.meta.hot.accept');
 		expect(output).toContain('"componentId":"/src/Profiled.object.tsrx#Scene@3:10"');
 		expect(output).toContain('"line":4,"column":14');
+	});
+
+	it('warms adjacent universal component trees from a parent with no use()', async () => {
+		const source = `
+			import { use } from 'octane';
+			function LeftLeaf({load, token}) @{
+				const value = use(load('left-leaf', token));
+				<leaf value={value} />
+			}
+			function Left({load, token}) @{
+				const value = use(load('left', token));
+				<left value={value}><LeftLeaf load={load} token={token} /></left>
+			}
+			function RightLeaf({load, token}) @{
+				const value = use(load('right-leaf', token));
+				<leaf value={value} />
+			}
+			function Right({load, token}) @{
+				const value = use(load('right', token));
+				<right value={value}><RightLeaf load={load} token={token} /></right>
+			}
+			export function Scene({load, token}) @{
+				<scene><Left load={load} token={token} /><Right load={load} token={token} /></scene>
+			}
+		`;
+		let output = compile(source, '/src/Async.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const Scene = new Function('__universal', `${output}\nreturn Scene;`)(UniversalRuntime) as (
+			props: unknown,
+		) => unknown;
+
+		const calls: string[] = [];
+		const jobs = new Map<string, { promise: Promise<string>; resolve: (value: string) => void }>();
+		const load = (resource: string, token: number) => {
+			const key = `${resource}:${token}`;
+			calls.push(key);
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			jobs.set(key, { promise, resolve });
+			return promise;
+		};
+		const expected = ['left-leaf:0', 'left:0', 'right-leaf:0', 'right:0'];
+		const { container, root } = objectRoot();
+		const settleRound = async (keys: string[]) => {
+			for (const key of keys) jobs.get(key)!.resolve(key);
+			await Promise.all(keys.map((key) => jobs.get(key)!.promise));
+			await Promise.resolve();
+			await Promise.resolve();
+		};
+
+		const suspended = root.render(Scene as any, { load, token: 0 });
+		expect(suspended.status).toBe('suspended');
+		expect([...calls].sort()).toEqual(expected);
+
+		await settleRound(expected);
+
+		const scene = container.children[0];
+		expect(scene.children.map((child) => [child.type, child.props.value])).toEqual([
+			['left', 'left:0'],
+			['right', 'right:0'],
+		]);
+		expect(scene.children.map((child) => child.children[0].props.value)).toEqual([
+			'left-leaf:0',
+			'right-leaf:0',
+		]);
+		expect([...calls].sort()).toEqual(expected);
+
+		const tokenOne = ['left-leaf:1', 'left:1', 'right-leaf:1', 'right:1'];
+		expect(root.render(Scene as any, { load, token: 1 }).status).toBe('suspended');
+		expect(calls.slice(4).sort()).toEqual(tokenOne);
+		await settleRound(tokenOne);
+
+		expect(root.render(Scene as any, { load, token: 0 }).status).toBe('suspended');
+		// A fresh render may return to old dependency values, but the previous
+		// episode's consumed tombstones must not suppress adjacent warming.
+		expect(calls.slice(8).sort()).toEqual(expected);
+		await settleRound(expected);
+		expect(calls).toHaveLength(12);
+		root.unmount();
+	});
+
+	it('skips fulfilled siblings and warms repeated component occurrences independently', async () => {
+		const source = `
+			import { use } from 'octane';
+			function Item({load, name, token}) @{
+				const value = use(load(name, token));
+				<item value={value} />
+			}
+			export function Scene({load, first, second, token}) @{
+				<scene>
+					<Item load={load} name={first} token={token} />
+					<Item load={load} name={second} token={token} />
+				</scene>
+			}
+		`;
+		let output = compile(source, '/src/RepeatedAsync.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const Scene = new Function('__universal', `${output}\nreturn Scene;`)(UniversalRuntime) as (
+			props: unknown,
+		) => unknown;
+
+		const calls: string[] = [];
+		const jobs = new Map<
+			string,
+			Array<{ promise: Promise<string>; resolve: (v: string) => void }>
+		>();
+		const load = (name: string, token: number) => {
+			const key = `${name}:${token}`;
+			calls.push(key);
+			if (key === 'stable:0') {
+				return { status: 'fulfilled', value: 'STABLE', then() {} };
+			}
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			const list = jobs.get(key);
+			const job = { promise, resolve };
+			if (list === undefined) jobs.set(key, [job]);
+			else list.push(job);
+			return promise;
+		};
+		const settle = async (key: string) => {
+			const list = jobs.get(key)!;
+			for (const job of list) job.resolve(key);
+			await Promise.all(list.map((job) => job.promise));
+			await Promise.resolve();
+			await Promise.resolve();
+		};
+		const { container, root } = objectRoot();
+
+		expect(
+			root.render(Scene as any, {
+				load,
+				first: 'stable',
+				second: 'changing',
+				token: 0,
+			}).status,
+		).toBe('suspended');
+		// The second item suspended after the stable item completed. Its ancestor
+		// plan must not invoke the stable loader a second time.
+		expect(calls).toEqual(['stable:0', 'changing:0']);
+		await settle('changing:0');
+
+		expect(
+			root.render(Scene as any, {
+				load,
+				first: 'same',
+				second: 'same',
+				token: 1,
+			}).status,
+		).toBe('suspended');
+		expect(calls.slice(2)).toEqual(['same:1', 'same:1']);
+		await settle('same:1');
+		expect(container.children[0].children.map((child) => child.props.value)).toEqual([
+			'same:1',
+			'same:1',
+		]);
+		expect(calls).toHaveLength(4);
+		root.unmount();
+	});
+
+	it('preserves distinct results across more than 64 same-dependency component occurrences', async () => {
+		const occurrenceCount = 65;
+		const items = Array.from({ length: occurrenceCount }, () => '<Item load={load} />').join('');
+		const source = `
+			import { use } from 'octane';
+			function Item({load}) @{
+				const value = use(load('same'));
+				<item value={value} />
+			}
+			export function Scene({load}) @{
+				<scene>${items}</scene>
+			}
+		`;
+		let output = compile(source, '/src/ManyRepeatedAsync.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		output = output.replace(
+			/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/g,
+			(_match, specifiers: string) =>
+				`const {${specifiers.replace(/\s+as\s+/g, ': ')}} = __universal;`,
+		);
+		output = output.replace('export const Scene =', 'const Scene =');
+		const Scene = new Function('__universal', `${output}\nreturn Scene;`)(UniversalRuntime) as (
+			props: unknown,
+		) => unknown;
+
+		const calls: string[] = [];
+		const jobs: Array<{ promise: Promise<string>; resolve: (value: string) => void }> = [];
+		const load = (key: string) => {
+			calls.push(key);
+			let resolve!: (value: string) => void;
+			const promise = new Promise<string>((done) => {
+				resolve = done;
+			});
+			jobs.push({ promise, resolve });
+			return promise;
+		};
+		const expected = Array.from(
+			{ length: occurrenceCount },
+			(_, index) => `VALUE-${index.toString().padStart(3, '0')}`,
+		);
+		const { container, root } = objectRoot();
+
+		expect(root.render(Scene as any, { load }).status).toBe('suspended');
+		// All occurrences start in the first attempt, before any promise settles.
+		expect(calls).toHaveLength(occurrenceCount);
+		expect(calls.every((key) => key === 'same')).toBe(true);
+		expect(jobs).toHaveLength(occurrenceCount);
+
+		for (let index = occurrenceCount - 1; index >= 0; index--) {
+			jobs[index].resolve(expected[index]);
+		}
+		await Promise.all(jobs.map((job) => job.promise));
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(container.children[0].children.map((child) => child.props.value)).toEqual(expected);
+		expect(calls).toHaveLength(occurrenceCount);
+		root.unmount();
 	});
 
 	it('preserves nested function hoisting and executes supported universal useId hooks', () => {

@@ -1,4 +1,4 @@
-import { use, useId, useState } from 'octane';
+import { Hydrate, use, useId, useState } from 'octane';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -13,6 +13,12 @@ export function AsyncLeaf(props) @{
 	<div id="leaf">
 		{value as string}
 	</div>
+}
+
+export function DeferredAsyncLeaf(props) @{
+	<Hydrate when={props.when} split={false}>
+		<AsyncLeaf promise={props.promise} />
+	</Hydrate>
 }
 
 // A use() that resolves to `undefined`. The resolved value must round-trip

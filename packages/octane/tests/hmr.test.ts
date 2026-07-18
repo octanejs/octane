@@ -87,6 +87,35 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
+	it('rejects an update whose compiled output ABI is incompatible', () => {
+		const v1: ComponentBody<any> = ((_props: any, scope: Scope) => {
+			clearBlockRange(scope);
+			const root = document.createElement('span');
+			root.className = 'leaf';
+			root.textContent = 'committed';
+			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
+		}) as ComponentBody<any>;
+		const v2: ComponentBody<any> = ((_props: any, scope: Scope) => {
+			clearBlockRange(scope);
+			const root = document.createElement('span');
+			root.className = 'leaf';
+			root.textContent = 'incompatible';
+			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
+		}) as ComponentBody<any>;
+		(v2 as any).__octaneReturnedOutput = true;
+
+		const Foo = hmr(v1);
+		const r = mount(Foo);
+		let accepted = true;
+		flushSync(() => {
+			accepted = (Foo as any)[HMR].update(hmr(v2));
+		});
+		expect(accepted).toBe(false);
+		expect((Foo as any)[HMR].fn).toBe(v1);
+		expect(r.find('.leaf').textContent).toBe('committed');
+		r.unmount();
+	});
+
 	it('preserves hook state across update() — stable Symbol.for keys', () => {
 		// Both bodies use the SAME hook symbol (simulating the compiler's
 		// `Symbol.for('octane:file.tsrx:Foo.useState#0')`-stable emit).
@@ -147,13 +176,31 @@ describe('hmr — runtime wrapper', () => {
 		const { code } = compile(src, 'file.tsrx', { hmr: true });
 		// Stable Symbol.for-based hook slot (so re-imports get the same identity).
 		expect(code).toMatch(/Symbol\.for\("octane:file\.tsrx:Foo\.useState#0"\)/);
-		// The public HMR binding remains a hoisted function declaration and shares
-		// metadata with the private identity-stable wrapper.
-		expect(code).toMatch(/export function Foo/);
-		expect(code).toMatch(/const __FooHmr = _\$hmr\(__FooImplementation\)/);
+		// Inline HMR wrapping on the exported component (shadow-proof `_$` alias).
+		expect(code).toMatch(/export const Foo = _\$hmr\(function Foo/);
 		// Vite-shaped accept block.
 		expect(code).toMatch(/if \(import\.meta\.hot\)/);
-		expect(code).toMatch(/Foo\[_\$HMR\]\.update\(module\.Foo\)/);
+		expect(code).toMatch(
+			/if \(!Foo\[_\$HMR\]\.update\(module\.Foo\)\) import\.meta\.hot\.invalidate\(\)/,
+		);
+	});
+
+	it('marks mixed shorthand bodies so HMR can invalidate an ABI-changing edit', async () => {
+		const { compile } = await import('octane/compiler');
+		const direct = compile(
+			`export function Foo(p) @{ <span>{p.label as string}</span> }`,
+			'file.tsrx',
+			{ hmr: true },
+		).code;
+		const mixed = compile(
+			`export function Foo(p) @{ if (p.empty) return null; <span>{p.label as string}</span> }`,
+			'file.tsrx',
+			{ hmr: true },
+		).code;
+
+		expect(direct).not.toContain('__octaneReturnedOutput');
+		expect(mixed).toContain('{ __octaneReturnedOutput: true }');
+		expect(mixed).toContain('if (!Foo[_$HMR].update(module.Foo)) import.meta.hot.invalidate();');
 	});
 
 	it('webpack HMR preserves named and default wrapper identity across repeated updates', async () => {
@@ -183,12 +230,12 @@ describe('hmr — runtime wrapper', () => {
 							.join(', ');
 						return `const { ${properties} } = runtime;`;
 					})
-					.replace(/^export function /gm, 'function ')
 					.replace(/\bexport let /g, 'let ')
 					.replace(/export \{ Default as default \};/g, '')
 					.replaceAll('import.meta.webpackHot', 'hot') + '\nreturn { Named, default: Default };';
 			let dispose: ((value: Record<string, any>) => void) | undefined;
 			let accepted = false;
+			let invalidated = false;
 			const hot = {
 				data,
 				dispose(callback: (value: Record<string, any>) => void) {
@@ -196,6 +243,9 @@ describe('hmr — runtime wrapper', () => {
 				},
 				accept() {
 					accepted = true;
+				},
+				invalidate() {
+					invalidated = true;
 				},
 			};
 			const exports = Function('runtime', 'hot', transformed)(runtime, hot) as {
@@ -205,6 +255,7 @@ describe('hmr — runtime wrapper', () => {
 			const nextData: Record<string, any> = {};
 			dispose?.(nextData);
 			expect(accepted).toBe(true);
+			expect(invalidated).toBe(false);
 			return { exports, data: nextData };
 		};
 
@@ -238,14 +289,12 @@ describe('hmr — runtime wrapper', () => {
 			`export function Named() { return <span>{'named'}</span>; }\n` +
 			`export default function Default() { return <b>{'default'}</b>; }\n`;
 		const vite = compile(source, 'file.tsx', { hmr: 'vite' }).code;
-		expect(vite).toContain('export function Named(');
-		expect(vite).toContain('const __NamedHmr = _$hmr(__NamedImplementation);');
-		expect(vite).toContain('function Default(');
-		expect(vite).toContain('const __DefaultHmr = _$hmr(__DefaultImplementation);');
+		expect(vite).toContain('Named = _$hmr(Named);');
+		expect(vite).toContain('Default = _$hmr(Default);');
 		expect(vite).toContain('import.meta.hot.accept');
 
 		const webpack = compile(source, 'file.tsx', { hmr: 'webpack' }).code;
-		expect(webpack).toContain('export function Named(');
+		expect(webpack).toContain('export { Named };');
 		expect(webpack).toContain('export { Default as default };');
 		expect(webpack).toContain('import.meta.webpackHot.dispose');
 	});

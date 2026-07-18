@@ -43,7 +43,7 @@ export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureM
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) =>
-			`__exports.${name} = ${name}; ${asyncKeyword ?? ''}function ${name}`,
+			`__exports.${name} = ${asyncKeyword ?? ''}function ${name}`,
 	);
 	code = code.replace(
 		/export\s+(const|let|var)\s+(\w+)\s*=/g,

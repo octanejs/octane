@@ -26,7 +26,6 @@ function serverModule(): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
-	code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
 }
@@ -123,11 +122,15 @@ describe('hydrateRoot — nested wrapper and boundary adoption', () => {
 	it('adopts ready content nested inside Suspense and wrapper components', () => {
 		container.innerHTML = renderServer('SuspenseWrapperChain', {});
 		const section = container.querySelector('.suspense-wrapper-chain')!;
-		const serverButton = section.querySelector('.suspense-button');
+		const serverButton = section.querySelector('.suspense-button') as HTMLButtonElement;
 
 		const root = hydrateRoot(container, SuspenseWrapperChain, {});
 		expect(section.querySelector('.suspense-button')).toBe(serverButton);
 		expect(section.querySelector('.pending')).toBeNull();
+
+		flushSync(() => serverButton.click());
+		expect(section.querySelector('.suspense-button')).toBe(serverButton);
+		expect(serverButton.textContent).toBe('ready:1');
 		root.unmount();
 	});
 

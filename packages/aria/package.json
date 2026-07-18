@@ -1,0 +1,63 @@
+{
+  "name": "@octanejs/aria",
+  "version": "0.0.2",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "React Aria for the octane renderer — a port of Adobe's react-aria / react-stately / react-aria-components (accessible behavior hooks, state hooks, and components) onto octane's hooks and native event system.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/aria"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./stately": "./src/stately/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@internationalized/date": "catalog:default",
+    "@internationalized/number": "catalog:default",
+    "@internationalized/string": "catalog:default",
+    "@react-types/shared": "catalog:default",
+    "clsx": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-aria": "catalog:default",
+    "react-dom": "catalog:default",
+    "react-stately": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

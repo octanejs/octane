@@ -18,7 +18,6 @@ function evalServer(source: string, file: string): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
-	code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
 	return fn(RT, {});
@@ -40,6 +39,19 @@ describe('RenderOptions — nonce', () => {
 		expect(out.html).toContain(
 			'<script type="application/json" data-octane-suspense nonce="abc123">',
 		);
+	});
+
+	it('stamps the nonce on a deferred hydration seed script', async () => {
+		const out = await prerender(
+			suspense.DeferredAsyncLeaf,
+			{ promise: Promise.resolve('hello'), when: { _t: 'never' } },
+			{ nonce: 'abc123' },
+		);
+
+		expect(out.html).toContain(
+			'<script type="application/json" data-octane-hydrate-seed nonce="abc123">',
+		);
+		expect(out.html).not.toContain('data-octane-suspense');
 	});
 
 	it('stamps the nonce on scoped style tags (renderToString)', () => {

@@ -1,7 +1,8 @@
 import { createRoot } from 'octane';
-import { App } from './App.tsrx';
+import { App, WebGLFailureApp } from './App.tsrx';
 
 const target = document.getElementById('root');
 if (target === null) throw new Error('Octane Three bundler fixture requires #root');
 
-createRoot(target).render(App);
+const mode = new URLSearchParams(location.search).get('mode');
+createRoot(target).render(mode === 'webgl-failure' ? WebGLFailureApp : App);

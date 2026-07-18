@@ -1,0 +1,20 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-devtools",
+    "version": "0.10.7"
+  },
+  "surface": "Ports the @tanstack/react-devtools 0.10.7 public surface (the `TanStackDevtools` component plus its plugin/init types) onto Octane while reusing the framework-agnostic `@tanstack/devtools` 0.12.5 core (`TanStackDevtoolsCore`) unchanged. Plugin, title, and custom-trigger content authored as Octane elements is portaled into the containers the core creates.",
+  "divergences": [
+    "Public adapter types use Octane-prefixed names: `TanStackDevtoolsOctanePlugin` and `TanStackDevtoolsOctaneInit` (upstream: `TanStackDevtoolsReactPlugin` / `TanStackDevtoolsReactInit`).",
+    "`ref` is the normal React-19-style ref prop and events are native (no synthetic layer), consistent with the rest of the Octane bindings.",
+    "The main entry also re-exports the framework-agnostic `@tanstack/devtools` core surface (`TanStackDevtoolsCore`, container-id constants, and plugin authoring types) so consumers do not need a direct dependency on `@tanstack/devtools` for typing plugins.",
+    "Plugin/title/trigger content is rendered through a tiny `DevtoolsPortal` component (a createPortal VALUE), because Octane renders a returned portal at any position rather than only as a direct JSX child."
+  ],
+  "ssr": "Supported and tested: the component renders its absolutely-positioned anchor element through octane/server without a DOM; the core is constructed but never mounted server-side (mount is a client-only effect).",
+  "notes": [
+    "The component module is authored as TSRX with a checked declaration companion (`devtools.tsrx.d.ts`).",
+    "Upstream `@tanstack/react-devtools` ships no test suite (its `test:lib` runs `vitest --passWithNoTests`), so there is no upstream behavioral suite to port. Coverage is authored fresh: behavioral tests spy on the core to drive the plugin/title/trigger mapping and assert content is portaled into the core-provided containers, plus SSR and type tests.",
+    "No differential rig: both this binding and the React binding drive the identical Solid `@tanstack/devtools` core UI, so there is no framework-authored output to compare beyond the portaled plugin content the behavioral tests already assert."
+  ],
+  "verified": "2026-07-17"
+}

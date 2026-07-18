@@ -12,14 +12,14 @@
 //   --record    write the current numbers as the committed absolute baselines
 //               (baselines/local/<suite>.json).
 //   --compare   fail if any op regressed vs those baselines (noise-aware rule).
-//   --ratios    fail if any committed ratio guard (baselines/ratios.json) is
-//               breached. Ratios are hardware-INDEPENDENT (target/reference on
-//               the SAME machine in the SAME run), so CI can enforce them from
-//               day one — unlike absolute baselines, which are machine-specific.
+//   --ratios    fail if any applicable committed ratio guard
+//               (baselines/ratios.json) is breached. Both sides run on the SAME
+//               machine in the SAME run; byte/count ratios are deterministic,
+//               while timing ratios use explicit noise headroom.
 //
-// Absolute-baseline comparison (--record / --compare) is LOCAL-ONLY by design:
-// the committed baselines/local numbers are whatever machine recorded them, so
-// they are a personal regression aid, not a CI gate. CI runs --ratios only.
+// Absolute-baseline comparison (--record / --compare) is LOCAL-ONLY by design.
+// Timing records depend on the recording machine; deterministic byte/count
+// records depend on the exact fixture and toolchain. CI runs --ratios only.
 //
 // Usage:
 //   node benchmarks/bench.mjs [suite ...]        # default: all suites
@@ -114,6 +114,34 @@ const SUITES = [
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'weather-app',
+		cwd: 'weather-app',
+		servers: [
+			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
+			{ filter: 'react-weather-app-bench', port: 5293 },
+			{ filter: 'preact-weather-app-bench', port: 5294 },
+			{ filter: 'solid-weather-app-bench', port: 5295 },
+			{ filter: 'svelte-weather-app-bench', port: 5296 },
+			{ filter: 'vue-weather-app-bench', port: 5297 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'weather-app-lighthouse',
+		cwd: 'weather-app',
+		servers: [
+			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
+			{ filter: 'react-weather-app-bench', port: 5293 },
+			{ filter: 'preact-weather-app-bench', port: 5294 },
+			{ filter: 'solid-weather-app-bench', port: 5295 },
+			{ filter: 'svelte-weather-app-bench', port: 5296 },
+			{ filter: 'vue-weather-app-bench', port: 5297 },
+		],
+		iter: { normal: 5, quick: 3 },
+		runs: [{ script: 'lighthouse.mjs', args: (n) => [String(n)] }],
 	},
 	{
 		name: 'chat-stream',
@@ -250,6 +278,17 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Node-only structural baseline for React-hosted Octane compat islands
+		// (docs/react-hosted-octane-compat-plan.md Phase 0): deterministic
+		// listener/root/bridge-binding COUNTS at 1/100/1000 islands in jsdom.
+		// Counts are exact, so the iteration knob is unused.
+		name: 'react-hosted-islands',
+		cwd: 'react-hosted-islands',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Node-only (no servers, no browser). Time-budgeted: the iteration knob is a
 		// per-config SECONDS budget; --quick passes the harness's own --quick flag.
 		name: 'ssr-throughput',
@@ -375,6 +414,27 @@ const SUITES = [
 		servers: [],
 		iter: { normal: 1, quick: 1 },
 		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
+		// Three host lifecycle work in a production browser: Octane Three against
+		// R3F 9.6.1 and a direct plain-Three lower bound. The injected renderer
+		// deliberately excludes GPU/driver time while retaining real Three objects,
+		// native pointer dispatch, and raycasting.
+		name: 'three-renderer',
+		cwd: 'three',
+		servers: [{ filter: 'octane-three-bench', port: 5291 }],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Deterministic production bundle bytes for minimal and full-catalogue
+		// Octane Three, R3F, and plain Three entries. The harness loads every built
+		// entry in Chromium and rejects it unless the scene checksum is valid.
+		name: 'three-bundle-size',
+		cwd: 'three',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run-size.mjs', args: () => [] }],
 	},
 ];
 
@@ -668,7 +728,7 @@ function printCompareTable(suiteName, rows) {
 	return regs.length;
 }
 
-// ── ratio guards (hardware-independent) ───────────────────────────────────────
+// ── paired ratio guards ───────────────────────────────────────────────────────
 
 function loadRatios() {
 	if (!fs.existsSync(RATIOS_FILE)) return [];

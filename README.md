@@ -44,6 +44,9 @@ Octane is the day-to-day feel:
   effect events. It is the no-bookkeeping dependency DX associated with signal
   frameworks, while keeping the hooks model you already know. Explicit arrays
   remain authoritative; pass `null` when you intentionally want every render.
+  Locally declared custom hooks in a full-compiled `.tsrx`/`.tsx` module get
+  the same inference when they transparently forward a callback and final
+  dependency parameter to one of these hooks.
 - **No rules of hooks.** Hooks are tracked by call site, not call order, so a
   hook can live inside an `if` or after an early return — the usual React
   footguns simply aren't there. The one rule that remains is enforced for you:
@@ -228,6 +231,28 @@ The buffered/static renderers accept a `RenderOptions` (CSP `nonce`, a root-loca
 [docs/ssr.md](./docs/ssr.md) for the full server guide (Suspense on the server,
 head hoisting, `module server` RPC) and the SSR roadmap.
 
+### Deferred hydration
+
+Use `<Hydrate>` for server-rendered content that should stay visible but does
+not need to become interactive immediately. `when` chooses the activation
+strategy, `split` controls compiler extraction (on by default), and `prefetch`
+can prepare the generated child chunk or other resources ahead of activation.
+
+```tsrx
+import { Hydrate } from 'octane';
+import { visible } from 'octane/hydration';
+
+export function ProductPage() @{
+	<Hydrate when={visible({ rootMargin: '400px' })}>
+		<Reviews />
+	</Hydrate>
+}
+```
+
+The initial server DOM is adopted in place and remains inert until the strategy
+opens the boundary. See [docs/deferred-hydration.md](./docs/deferred-hydration.md)
+for strategies, code splitting, prefetching, fallbacks, and nesting behavior.
+
 ### Streaming SSR
 
 This is the fast-first-paint story, and it works the way React's does.
@@ -350,6 +375,22 @@ useEffect(() => initialize(), []); // explicitly mount/reconnect only
 useEffect(() => sync(room.id), [room.id]); // explicit dependencies
 useEffect(() => measure(), null); // explicitly after every commit
 ```
+
+The same inference applies to a locally declared custom hook in a full-compiled
+`.tsrx`/`.tsx` module when its implementation transparently forwards a callback
+and final dependency parameter:
+
+```jsx
+function useTrackedEffect(callback, dependencies) {
+  useEffect(callback, dependencies);
+}
+
+useTrackedEffect(() => sync(room.id)); // inferred from the closure
+```
+
+This proof is deliberately local and conservative. Plain `.ts`/`.js` modules,
+imported custom hooks, and wrappers that transform or otherwise inspect those
+parameters still require an explicit dependency argument.
 
 `useState` and `useReducer` also expose an optional third tuple member: a stable getter for
 the hook's latest state. It is useful in async callbacks and other long-lived
@@ -511,7 +552,8 @@ generated from the workspace manifests in
   [`stylex`](./packages/stylex), [`router`](./packages/tanstack-router),
   [`remix-router`](./packages/remix-router),
   [`table`](./packages/tanstack-table), [`virtual`](./packages/tanstack-virtual),
-  [`lexical`](./packages/lexical), [`floating-ui`](./packages/floating-ui),
+  [`lexical`](./packages/lexical), [`tiptap`](./packages/tiptap),
+  [`floating-ui`](./packages/floating-ui),
   [`radix`](./packages/radix), [`hook-form`](./packages/hook-form),
   [`base-ui`](./packages/base-ui), [`sonner`](./packages/sonner),
   [`recharts`](./packages/recharts), [`visx`](./packages/visx),

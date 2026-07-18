@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { createRequire } from 'node:module';
 import { octaneMdx } from '@octanejs/mdx/vite';
+import { threeRenderers } from '@octanejs/three/config';
 import { tanstackStart } from '@tanstack/octane-start/plugin/vite';
 import { nitro } from 'nitro/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
@@ -68,7 +69,11 @@ export default defineConfig({
 		// Bindings without a manual hook-slot declaration still compile through
 		// the pass (explicit subSlot tags compose with it), unlike router/mdx.
 		octaneMdx(websiteMdxOptions),
-		tanstackStart(),
+		tanstackStart({
+			// Scene modules stay client-only during Start SSR, matching the website's
+			// existing Octane renderer contract while still shipping through Vite.
+			octane: { renderers: threeRenderers },
+		}),
 		nitro({
 			// Keep production on the runtime selected by the previous Vercel
 			// adapter instead of deriving it from whichever Node version builds.
@@ -112,6 +117,11 @@ export default defineConfig({
 			'@tanstack/octane-router > @tanstack/history',
 			'@tanstack/octane-router > @tanstack/router-core',
 			'@tanstack/octane-router > @tanstack/store',
+			// The home page's 3D logo section is reached only through a deferred
+			// Hydrate chunk, so the scanner never sees three; pre-declare it (and
+			// the SVGLoader example module) to avoid a mid-session optimize pass.
+			'three',
+			'three/examples/jsm/loaders/SVGLoader.js',
 			// Visx primitives are raw workspace sources; these are the runtime
 			// dependencies reached by the site's Bar/Axis/Group/Scale surface.
 			// Resolve them through their owner under pnpm's isolated layout.

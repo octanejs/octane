@@ -39,7 +39,7 @@ function octaneHookLocals(ast) {
 			const local = sp.local?.name;
 			if (!imported || !local) continue;
 			locals.set(local, imported);
-			if (HOOK_NAMES.has(imported)) importsHook = true;
+			if (HOOK_NAMES.has(imported) || imported === 'use') importsHook = true;
 		}
 	}
 	return { locals, importsHook, hasOctaneImport };
@@ -198,6 +198,378 @@ function isTransparentStateTupleWrapper(node, child) {
 	);
 }
 
+const PARALLEL_USE_TS_WRAPPERS = new Set([
+	'TSAsExpression',
+	'TSTypeAssertion',
+	'TSNonNullExpression',
+	'TSSatisfiesExpression',
+	'ParenthesizedExpression',
+	'ChainExpression',
+]);
+function isFunctionNode(node) {
+	return (
+		node?.type === 'FunctionDeclaration' ||
+		node?.type === 'FunctionExpression' ||
+		node?.type === 'ArrowFunctionExpression'
+	);
+}
+
+function unwrapParallelUseValue(node) {
+	while (node && PARALLEL_USE_TS_WRAPPERS.has(node.type)) node = node.expression;
+	return node;
+}
+
+function collectPatternNames(pattern, into) {
+	if (!pattern) return;
+	switch (pattern.type) {
+		case 'Identifier':
+			into.add(pattern.name);
+			return;
+		case 'ObjectPattern':
+			for (const property of pattern.properties || []) {
+				collectPatternNames(
+					property.type === 'RestElement' ? property.argument : property.value,
+					into,
+				);
+			}
+			return;
+		case 'ArrayPattern':
+			for (const element of pattern.elements || []) collectPatternNames(element, into);
+			return;
+		case 'AssignmentPattern':
+			collectPatternNames(pattern.left, into);
+			return;
+		case 'RestElement':
+			collectPatternNames(pattern.argument, into);
+	}
+}
+
+function isTrivialParallelUseArg(node) {
+	node = unwrapParallelUseValue(node);
+	if (!node) return true;
+	if (node.type === 'Identifier' || node.type === 'Literal') return true;
+	return node.type === 'MemberExpression' && !node.computed && isTrivialParallelUseArg(node.object);
+}
+
+function isHookShapedCall(node) {
+	if (typeof node?._octaneImportedHook === 'string') return true;
+	const callee = unwrapParallelUseValue(node?.callee);
+	if (callee?.type === 'Identifier') {
+		return callee.name === 'use' || /^use[A-Z]/.test(callee.name);
+	}
+	return (
+		callee?.type === 'MemberExpression' &&
+		!callee.computed &&
+		callee.property?.type === 'Identifier' &&
+		(callee.property.name === 'use' || /^use[A-Z]/.test(callee.property.name))
+	);
+}
+
+// A generated memo callback cannot directly contain await/yield, and replacing
+// an argument that contains any hook would either overlap a slotted hook's
+// surgical edit or skip that hook on memo hits. Both shapes stay on the
+// ordinary serial use() path.
+function canRewriteParallelUseArg(root) {
+	let safe = true;
+	function visit(node, nestedFunction) {
+		if (!safe || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, nestedFunction);
+			return;
+		}
+		if (!nestedFunction && (node.type === 'AwaitExpression' || node.type === 'YieldExpression')) {
+			safe = false;
+			return;
+		}
+		if (node.type === 'CallExpression' && isHookShapedCall(node)) {
+			safe = false;
+			return;
+		}
+		const childNested = nestedFunction || (node !== root && isFunctionNode(node));
+		for (const key in node) {
+			if (
+				key === 'type' ||
+				key === 'start' ||
+				key === 'end' ||
+				key === 'loc' ||
+				key === 'typeAnnotation' ||
+				key === 'returnType' ||
+				key === 'typeParameters' ||
+				key.startsWith('_octane')
+			) {
+				continue;
+			}
+			visit(node[key], childNested);
+		}
+	}
+	visit(root, false);
+	return safe;
+}
+
+// Dependency paths mirror the full compiler's one-level member policy. The
+// returned nodes retain their original byte offsets so arbitrary TS remains
+// printable without asking the full-module printer to understand it.
+function collectParallelUseDependencies(root, source) {
+	const dependencies = [];
+	const seen = new Set();
+
+	function add(node, rootName) {
+		const text = source.slice(node.start, node.end);
+		const key = `${rootName}\0${text}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		dependencies.push({ node, root: rootName, text });
+	}
+
+	function createLocalScope(parent, kind) {
+		return { parent, kind, names: new Set() };
+	}
+
+	function isLocallyBound(scope, name) {
+		for (let current = scope; current !== null; current = current.parent) {
+			if (current.names.has(name)) return true;
+		}
+		return false;
+	}
+
+	function nearestFunctionScope(scope) {
+		let current = scope;
+		while (current?.parent !== null && current?.kind !== 'function') current = current.parent;
+		return current;
+	}
+
+	function predeclareStatements(statements, blockScope) {
+		for (const original of statements || []) {
+			const statement =
+				original.type === 'ExportNamedDeclaration' || original.type === 'ExportDefaultDeclaration'
+					? original.declaration
+					: original;
+			if (!statement) continue;
+			if (statement.type === 'VariableDeclaration') {
+				const target = statement.kind === 'var' ? nearestFunctionScope(blockScope) : blockScope;
+				for (const declaration of statement.declarations || []) {
+					collectPatternNames(declaration.id, target.names);
+				}
+			} else if (
+				(statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') &&
+				statement.id
+			) {
+				collectPatternNames(statement.id, blockScope.names);
+			}
+		}
+	}
+
+	function collectHoistedVars(node, functionScope, isRoot = true) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) collectHoistedVars(child, functionScope, false);
+			return;
+		}
+		if (
+			!isRoot &&
+			(isFunctionNode(node) || node.type === 'ClassDeclaration' || node.type === 'ClassExpression')
+		) {
+			return;
+		}
+		if (node.type === 'VariableDeclaration' && node.kind === 'var') {
+			for (const declaration of node.declarations || []) {
+				collectPatternNames(declaration.id, functionScope.names);
+			}
+		}
+		for (const key in node) {
+			if (
+				key === 'type' ||
+				key === 'start' ||
+				key === 'end' ||
+				key === 'loc' ||
+				key === 'typeAnnotation' ||
+				key === 'returnType' ||
+				key === 'typeParameters' ||
+				key.startsWith('_octane')
+			) {
+				continue;
+			}
+			collectHoistedVars(node[key], functionScope, false);
+		}
+	}
+
+	function visitPatternExpressions(pattern, scope) {
+		if (!pattern) return;
+		if (pattern.type === 'AssignmentPattern') {
+			visitPatternExpressions(pattern.left, scope);
+			visit(pattern.right, scope);
+		} else if (pattern.type === 'ObjectPattern') {
+			for (const property of pattern.properties || []) {
+				if (property.computed) visit(property.key, scope);
+				visitPatternExpressions(
+					property.type === 'RestElement' ? property.argument : property.value,
+					scope,
+				);
+			}
+		} else if (pattern.type === 'ArrayPattern') {
+			for (const element of pattern.elements || []) visitPatternExpressions(element, scope);
+		} else if (pattern.type === 'RestElement') {
+			visitPatternExpressions(pattern.argument, scope);
+		}
+	}
+
+	function visitBlock(node, parentScope) {
+		const blockScope = createLocalScope(parentScope, 'block');
+		predeclareStatements(node.body, blockScope);
+		for (const statement of node.body || []) visit(statement, blockScope);
+	}
+
+	function visitFunction(node, parentScope) {
+		const functionScope = createLocalScope(parentScope, 'function');
+		if (node.id) collectPatternNames(node.id, functionScope.names);
+		if (node.type !== 'ArrowFunctionExpression') functionScope.names.add('arguments');
+		for (const param of node.params || []) collectPatternNames(param, functionScope.names);
+		collectHoistedVars(node.body, functionScope);
+		for (const param of node.params || []) visitPatternExpressions(param, functionScope);
+		if (node.body?.type === 'BlockStatement') visitBlock(node.body, functionScope);
+		else visit(node.body, functionScope);
+	}
+
+	function visit(node, scope) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, scope);
+			return;
+		}
+		if (PARALLEL_USE_TS_WRAPPERS.has(node.type)) {
+			visit(node.expression, scope);
+			return;
+		}
+		if (node.type?.startsWith('TS')) return;
+		switch (node.type) {
+			case 'Identifier':
+				if (!isLocallyBound(scope, node.name)) add(node, node.name);
+				return;
+			case 'Literal':
+			case 'ThisExpression':
+			case 'Super':
+			case 'MetaProperty':
+			case 'PrivateIdentifier':
+				return;
+			case 'MemberExpression': {
+				const object = unwrapParallelUseValue(node.object);
+				if (
+					!node.computed &&
+					object?.type === 'Identifier' &&
+					!isLocallyBound(scope, object.name)
+				) {
+					add(node, object.name);
+					return;
+				}
+				visit(node.object, scope);
+				if (node.computed) visit(node.property, scope);
+				return;
+			}
+			case 'Property':
+				if (node.computed) visit(node.key, scope);
+				visit(node.value, scope);
+				return;
+			case 'VariableDeclarator':
+				visitPatternExpressions(node.id, scope);
+				visit(node.init, scope);
+				return;
+			case 'CatchClause': {
+				const catchScope = createLocalScope(scope, 'block');
+				collectPatternNames(node.param, catchScope.names);
+				visitPatternExpressions(node.param, catchScope);
+				visit(node.body, catchScope);
+				return;
+			}
+			case 'FunctionDeclaration':
+			case 'FunctionExpression':
+			case 'ArrowFunctionExpression':
+				visitFunction(node, scope);
+				return;
+			case 'BlockStatement':
+				visitBlock(node, scope);
+				return;
+			case 'StaticBlock': {
+				const staticScope = createLocalScope(scope, 'function');
+				collectHoistedVars(node, staticScope);
+				visitBlock(node, staticScope);
+				return;
+			}
+			case 'SwitchStatement': {
+				visit(node.discriminant, scope);
+				const switchScope = createLocalScope(scope, 'block');
+				const statements = [];
+				for (const switchCase of node.cases || []) {
+					statements.push(...(switchCase.consequent || []));
+				}
+				predeclareStatements(statements, switchScope);
+				for (const switchCase of node.cases || []) {
+					visit(switchCase.test, switchScope);
+					for (const statement of switchCase.consequent || []) visit(statement, switchScope);
+				}
+				return;
+			}
+			case 'ForStatement':
+			case 'ForInStatement':
+			case 'ForOfStatement': {
+				const loopScope = createLocalScope(scope, 'block');
+				const declaration = node.type === 'ForStatement' ? node.init : node.left;
+				if (declaration?.type === 'VariableDeclaration' && declaration.kind !== 'var') {
+					for (const item of declaration.declarations || []) {
+						collectPatternNames(item.id, loopScope.names);
+					}
+				}
+				if (node.type === 'ForStatement') {
+					visit(node.init, loopScope);
+					visit(node.test, loopScope);
+					visit(node.update, loopScope);
+				} else {
+					visit(node.left, loopScope);
+					visit(node.right, loopScope);
+				}
+				visit(node.body, loopScope);
+				return;
+			}
+			case 'LabeledStatement':
+				visit(node.body, scope);
+				return;
+			case 'BreakStatement':
+			case 'ContinueStatement':
+				return;
+			case 'ClassDeclaration':
+			case 'ClassExpression': {
+				visit(node.superClass, scope);
+				const classScope = createLocalScope(scope, 'block');
+				if (node.id) collectPatternNames(node.id, classScope.names);
+				visit(node.body, classScope);
+				return;
+			}
+			case 'PropertyDefinition':
+			case 'MethodDefinition':
+				if (node.computed) visit(node.key, scope);
+				visit(node.value, scope);
+				return;
+		}
+		for (const key in node) {
+			if (
+				key === 'type' ||
+				key === 'start' ||
+				key === 'end' ||
+				key === 'loc' ||
+				key === 'typeAnnotation' ||
+				key === 'returnType' ||
+				key === 'typeParameters' ||
+				key.startsWith('_octane')
+			) {
+				continue;
+			}
+			visit(node[key], scope);
+		}
+	}
+
+	visit(root, null);
+	return dependencies;
+}
+
 // Mark base-hook calls whose source tuple can observe index 2. The public base
 // hooks stay on the physical two-item path; escaped or ambiguous tuples
 // conservatively receive the getter-enabled shape.
@@ -256,6 +628,203 @@ function hookOwner(node, name) {
 	return { name, line: loc?.line ?? 0, column: loc?.column ?? 0 };
 }
 
+function allocHookSymbol(st, owner, local, imported, node) {
+	const id = st.nextId++;
+	const sym = allocSlotName(st, `_h$${id}`);
+	let symbolExpr;
+	if (st.hmr) {
+		const key = `octane:${st.filename}:${owner.name}.${local}#${id}`;
+		symbolExpr = `Symbol.for(${JSON.stringify(key)})`;
+	} else if (st.profile) {
+		// The description must be UNIQUE and non-empty: the runtime composes
+		// custom-hook slot paths from slot DESCRIPTIONS (resolveSlot) — a bare
+		// Symbol() collapses those paths and collides state across call sites.
+		// Short filename hash + index; no module path in the output (see
+		// compile.js hookSlotHash for the full rationale).
+		symbolExpr = `Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
+	} else {
+		const numericExpr = id === 0 ? st.slotBaseName : `${st.slotBaseName} + ${id}`;
+		symbolExpr = `Symbol(${numericExpr})`;
+	}
+	if (st.profile) {
+		const componentId = `${st.profileFilename || '<anon>'}#${owner.name}@${owner.line}:${owner.column}`;
+		const loc = node.loc?.start;
+		const metadata = {
+			id: `${componentId}#hook:${id}`,
+			componentId,
+			name: local,
+			kind: imported,
+			file: st.profileFilename || '<anon>',
+			line: loc?.line ?? 0,
+			column: loc?.column ?? 0,
+			index: id,
+		};
+		symbolExpr = `_$__profileHook(${symbolExpr}, ${JSON.stringify(metadata)})`;
+	}
+	st.decls.push(`const ${sym} = ${symbolExpr};`);
+	return sym;
+}
+
+function parallelUseCallOfStatement(statement) {
+	let call = null;
+	if (
+		statement?.type === 'VariableDeclaration' &&
+		(statement.kind === 'const' || statement.kind === 'let') &&
+		statement.declarations?.length === 1
+	) {
+		call = unwrapParallelUseValue(statement.declarations[0].init);
+	} else if (statement?.type === 'ExpressionStatement') {
+		call = unwrapParallelUseValue(statement.expression);
+	}
+	if (
+		call?.type !== 'CallExpression' ||
+		call._octaneImportedHook !== 'use' ||
+		call.arguments.length === 0 ||
+		call.arguments[0]?.type === 'SpreadElement'
+	) {
+		return null;
+	}
+	return call;
+}
+
+function requireParallelHelper(st, imported) {
+	const request = st.environment === 'server' ? 'octane/server' : 'octane';
+	const key = `${request}\0${imported}`;
+	let helper = st.parallelHelpers.get(key);
+	if (helper !== undefined) return helper.local;
+	helper = {
+		imported,
+		local: allocSlotName(st, `_$${imported}`),
+		request,
+	};
+	st.parallelHelpers.set(key, helper);
+	return helper.local;
+}
+
+function emitParallelUseRun(run, owner, st) {
+	if (run.uses.length === 0) return;
+	const memoName = st.environment === 'server' ? 'puMemo' : 'useMemo';
+	const batchName = st.environment === 'server' ? 'puBatch' : 'useBatch';
+	const batchHelper = requireParallelHelper(st, batchName);
+	const temps = [];
+	const declarations = [];
+	for (const entry of run.uses) {
+		const temp = allocSlotName(st, `__pu$${st.nextPuId++}`);
+		temps.push(temp);
+		let creation = st.source.slice(entry.arg.start, entry.arg.end);
+		if (!isTrivialParallelUseArg(entry.arg)) {
+			const memoHelper = requireParallelHelper(st, memoName);
+			const slot = allocHookSymbol(st, owner, 'use() memo', 'useMemo', entry.call);
+			const deps = entry.dependencies.map((dependency) => dependency.text).join(', ');
+			creation = `${memoHelper}(() => (${creation}), [${deps}], ${slot})`;
+		}
+		declarations.push(`const ${temp} = ${creation};`);
+		st.edits.push({ pos: entry.arg.start, end: entry.arg.end, text: temp });
+	}
+	const prefix = `${declarations.join(' ')} ${batchHelper}([${temps.join(', ')}]); `;
+	st.edits.push({ pos: run.uses[0].statement.start, text: prefix });
+}
+
+function transformParallelUseStatementList(statements, owner, st) {
+	let run = null;
+	const flush = () => {
+		if (run !== null) emitParallelUseRun(run, owner, st);
+		run = null;
+	};
+
+	for (const statement of statements || []) {
+		const call = parallelUseCallOfStatement(statement);
+		const arg = call?.arguments[0];
+		if (call !== null && canRewriteParallelUseArg(arg)) {
+			const dependencies = collectParallelUseDependencies(arg, st.source);
+			if (run !== null && dependencies.some((dependency) => run.names.has(dependency.root))) {
+				flush();
+			}
+			if (run === null) run = { uses: [], names: new Set() };
+			run.uses.push({ statement, call, arg, dependencies });
+			if (statement.type === 'VariableDeclaration') {
+				collectPatternNames(statement.declarations[0].id, run.names);
+			}
+			continue;
+		}
+
+		if (
+			run !== null &&
+			statement?.type === 'VariableDeclaration' &&
+			(statement.kind === 'const' || statement.kind === 'let')
+		) {
+			for (const declaration of statement.declarations || []) {
+				collectPatternNames(declaration.id, run.names);
+			}
+			continue;
+		}
+
+		flush();
+		// Conditional blocks remain within this function's one execution scope.
+		// Loops and nested functions deliberately stay untouched; each nested
+		// function body is discovered and processed independently below.
+		if (statement?.type === 'BlockStatement') {
+			transformParallelUseStatementList(statement.body, owner, st);
+		} else if (statement?.type === 'IfStatement') {
+			if (statement.consequent?.type === 'BlockStatement') {
+				transformParallelUseStatementList(statement.consequent.body, owner, st);
+			}
+			if (statement.alternate?.type === 'BlockStatement') {
+				transformParallelUseStatementList(statement.alternate.body, owner, st);
+			} else if (statement.alternate?.type === 'IfStatement') {
+				transformParallelUseStatementList([statement.alternate], owner, st);
+			}
+		}
+	}
+	flush();
+}
+
+function collectParallelUseEdits(ast, st) {
+	function scan(node, owner) {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) scan(child, owner);
+			return;
+		}
+		if (
+			node.type === 'VariableDeclarator' &&
+			node.id?.type === 'Identifier' &&
+			isFunctionNode(node.init)
+		) {
+			const functionOwner = hookOwner(node.id, node.id.name);
+			if (node.init.body?.type === 'BlockStatement') {
+				transformParallelUseStatementList(node.init.body.body, functionOwner, st);
+			}
+			for (const param of node.init.params || []) scan(param, functionOwner);
+			scan(node.init.body, functionOwner);
+			return;
+		}
+		if (isFunctionNode(node)) {
+			const functionOwner = node.id?.type === 'Identifier' ? hookOwner(node, node.id.name) : owner;
+			if (node.body?.type === 'BlockStatement') {
+				transformParallelUseStatementList(node.body.body, functionOwner, st);
+			}
+			for (const param of node.params || []) scan(param, functionOwner);
+			scan(node.body, functionOwner);
+			return;
+		}
+		for (const key in node) {
+			if (
+				key === 'type' ||
+				key === 'start' ||
+				key === 'end' ||
+				key === 'loc' ||
+				key.startsWith('_octane')
+			) {
+				continue;
+			}
+			scan(node[key], owner);
+		}
+	}
+
+	scan(ast.body, hookOwner(null, 'module'));
+}
+
 function walk(node, owner, st) {
 	if (!node || typeof node !== 'object') return;
 	if (Array.isArray(node)) {
@@ -284,39 +853,7 @@ function walk(node, owner, st) {
 				node.callee?.type === 'Identifier'
 					? node.callee.name
 					: `${node.callee?.object?.name || 'octane'}.${imported}`;
-			const id = st.nextId++;
-			const sym = allocSlotName(st, `_h$${id}`);
-			let symbolExpr;
-			if (st.hmr) {
-				const key = `octane:${st.filename}:${owner.name}.${local}#${id}`;
-				symbolExpr = `Symbol.for(${JSON.stringify(key)})`;
-			} else if (st.profile) {
-				// The description must be UNIQUE and non-empty: the runtime composes
-				// custom-hook slot paths from slot DESCRIPTIONS (resolveSlot) — a bare
-				// Symbol() collapses those paths and collides state across call sites.
-				// Short filename hash + index; no module path in the output (see
-				// compile.js hookSlotHash for the full rationale).
-				symbolExpr = `Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
-			} else {
-				const numericExpr = id === 0 ? st.slotBaseName : `${st.slotBaseName} + ${id}`;
-				symbolExpr = `Symbol(${numericExpr})`;
-			}
-			if (st.profile) {
-				const componentId = `${st.profileFilename || '<anon>'}#${owner.name}@${owner.line}:${owner.column}`;
-				const loc = node.loc?.start;
-				const metadata = {
-					id: `${componentId}#hook:${id}`,
-					componentId,
-					name: local,
-					kind: imported,
-					file: st.profileFilename || '<anon>',
-					line: loc?.line ?? 0,
-					column: loc?.column ?? 0,
-					index: id,
-				};
-				symbolExpr = `_$__profileHook(${symbolExpr}, ${JSON.stringify(metadata)})`;
-			}
-			st.decls.push(`const ${sym} = ${symbolExpr};`);
+			const sym = allocHookSymbol(st, owner, local, imported, node);
 			const inferred = st.inferred.get(node);
 			if (inferred !== undefined) {
 				// The dependency callback is already the final user argument. Insert
@@ -373,7 +910,7 @@ function walk(node, owner, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ environment?: 'client' | 'server', hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (ordinary prod builds and SSR) emits
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
@@ -381,6 +918,12 @@ function walk(node, owner, st) {
  * @returns {{ code: string, map: null } | null}
  */
 export function slotHooks(source, id, options) {
+	const environment = options?.environment ?? 'client';
+	if (environment !== 'client' && environment !== 'server') {
+		throw new Error(
+			`Unknown Octane environment ${JSON.stringify(environment)} — expected 'client' or 'server'.`,
+		);
+	}
 	let ast;
 	try {
 		ast = parseModule(source, id);
@@ -411,10 +954,13 @@ export function slotHooks(source, id, options) {
 		profileFilename: (options && options.profileFilename) || id,
 		hmr: !!(options && options.hmr),
 		profile: !!(options && options.profile),
+		environment,
 		hash: hookSlotHash(id),
 		nextId: 0,
+		nextPuId: 0,
 		edits: [],
 		decls: [],
+		parallelHelpers: new Map(),
 		usedNames: collectIdentifierNames(ast),
 		slotBaseName: null,
 		hookSlotsName: null,
@@ -422,6 +968,7 @@ export function slotHooks(source, id, options) {
 	};
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
 	if (importInfo.importsHook) {
+		collectParallelUseEdits(ast, st);
 		for (const node of ast.body || []) walk(node, hookOwner(null, 'module'), st);
 	}
 	if (canSpecializeRoot) {
@@ -448,6 +995,11 @@ export function slotHooks(source, id, options) {
 	if (st.voidRootName !== null) {
 		helperSpecifiers.push(`__createVoidRoot as ${st.voidRootName}`);
 	}
+	for (const helper of st.parallelHelpers.values()) {
+		if (helper.request === 'octane') {
+			helperSpecifiers.push(`${helper.imported} as ${helper.local}`);
+		}
+	}
 	if (!st.hmr && !st.profile && st.nextId > 0) {
 		st.hookSlotsName = allocSlotName(st, '_$hookSlots');
 		helperSpecifiers.unshift(`hookSlots as ${st.hookSlotsName}`);
@@ -456,6 +1008,13 @@ export function slotHooks(source, id, options) {
 		helperSpecifiers.length === 0
 			? ''
 			: `import { ${helperSpecifiers.join(', ')} } from 'octane';\n`;
+	const serverHelperSpecifiers = [...st.parallelHelpers.values()]
+		.filter((helper) => helper.request === 'octane/server')
+		.map((helper) => `${helper.imported} as ${helper.local}`);
+	const serverHelperImport =
+		serverHelperSpecifiers.length === 0
+			? ''
+			: `import { ${serverHelperSpecifiers.join(', ')} } from 'octane/server';\n`;
 	const profileImport = st.profile
 		? "import { __profileHook as _$__profileHook } from 'octane/profiling';\n"
 		: '';
@@ -463,7 +1022,8 @@ export function slotHooks(source, id, options) {
 		!st.hmr && !st.profile && st.nextId > 0
 			? `const ${st.slotBaseName} = /* @__PURE__ */ ${st.hookSlotsName}(${st.nextId});\n`
 			: '';
-	const block = helperImport + profileImport + slotBase + st.decls.join('\n') + '\n';
+	const block =
+		helperImport + serverHelperImport + profileImport + slotBase + st.decls.join('\n') + '\n';
 	code = code.endsWith('\n') ? code + block : code + '\n' + block;
 	return { code, map: null };
 }

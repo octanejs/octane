@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
+import { createOctaneCompiler } from '../src/compiler/bundler.js';
 
 // SSR mirror of the parallel-`use()` pipeline (docs/suspense-parallel-use-
 // plan.md Phase 5). The compiler runs the same memoize (Pass A) + hoist/batch
@@ -12,16 +15,50 @@ import { prerender } from 'octane/static';
 // registered thenables resolve at their unwraps by IDENTITY. True data
 // dependencies stay sequential; seed order stays use()-call order.
 
-function evalServer(source: string, file: string): Record<string, any> {
-	let { code } = compile(source, file, { mode: 'server' });
+function evalModule(
+	code: string,
+	file: string,
+	modules: Record<string, Record<string, any>> = {},
+): Record<string, any> {
 	code = code.replace(
-		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
-	code = code.replace(/export function (\w+)\(/g, '__exports.$1 = $1; function $1(');
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"];?/g,
+		(match: string, names: string, request: string) => {
+			if (modules[request] === undefined) return match;
+			return `const {${names.replace(/ as /g, ': ')}} = __modules[${JSON.stringify(request)}];`;
+		},
+	);
+	code = code.replace(
+		/export\s+(async\s+)?function\s+(\w+)/g,
+		(_m: string, asyncKeyword: string | undefined, name: string) =>
+			`__exports.${name} = ${asyncKeyword ?? ''}function ${name}`,
+	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + '\nreturn __exports;');
-	return fn(RT, {});
+	const fn = new Function(
+		'__rt',
+		'__exports',
+		'__modules',
+		code + `\nreturn __exports;\n//# sourceURL=${file}`,
+	);
+	return fn(RT, {}, modules);
+}
+
+function evalServer(
+	source: string,
+	file: string,
+	modules: Record<string, Record<string, any>> = {},
+): Record<string, any> {
+	return evalModule(compile(source, file, { mode: 'server' }).code, file, modules);
+}
+
+function evalPlainHookFixture(file: string): Record<string, any> {
+	const source = readFileSync(file, 'utf8');
+	const compiler = createOctaneCompiler({ root: process.cwd(), hmr: false, dev: false });
+	const transformed = compiler.transform(source, file, { environment: 'server' });
+	return evalModule(transformed?.code ?? source, file);
 }
 
 function deferred<T>() {
@@ -76,6 +113,43 @@ describe('SSR parallel use() — the server mirror', () => {
 		// Cross-pass creation identity: each fetch fired exactly once across the
 		// suspend pass + the final canonical pass.
 		expect(started).toEqual(['a', 'b', 'c']);
+	});
+
+	it('starts independent reads together when they live in an imported plain-TS custom hook', async () => {
+		const hookRequest = './_fixtures/ssr-parallel-use-custom-hook.ts';
+		const hookFile = join(process.cwd(), 'packages/octane/tests', hookRequest);
+		const mod = evalServer(
+			`import { useSsrResourcePair } from '${hookRequest}';
+			export function Page(p) @{
+				<main>
+					@try {
+						const pair = useSsrResourcePair(p.load, p.version);
+						<div class="ok">{pair.project + '|' + pair.viewer}</div>
+					} @pending { <i>w</i> }
+				</main>
+			}`,
+			'imported-hook.tsrx',
+			{ [hookRequest]: evalPlainHookFixture(hookFile) },
+		);
+		const started: string[] = [];
+		const defs = new Map<string, ReturnType<typeof deferred<string>>>();
+		const load = (key: string) => {
+			started.push(key);
+			const d = deferred<string>();
+			defs.set(key, d);
+			return d.promise;
+		};
+
+		const done = prerender(mod.Page, { load, version: 1 });
+		await drain();
+		expect(started).toEqual(['project', 'viewer']);
+
+		defs.get('project')!.resolve('PROJECT');
+		defs.get('viewer')!.resolve('VIEWER');
+		const out = await done;
+		expect(out.html).toContain('<div class="ok">PROJECT|VIEWER</div>');
+		expect(out.html).not.toContain('<i>w</i>');
+		expect(started).toEqual(['project', 'viewer']);
 	});
 
 	it('keeps TRUE data dependencies sequential (b needs a) while batching within a stratum', async () => {
@@ -164,6 +238,228 @@ describe('SSR parallel use() — the server mirror', () => {
 		// One synchronous pass: the batch registered all three and suspended once.
 		expect(started).toEqual(['a', 'b', 'c']);
 		expect(out.html).toContain('<i>w</i>');
+	});
+
+	it('warms distinct adjacent async siblings and their children from a parent with no use()', async () => {
+		const mod = evalServer(
+			`function LeftLeaf(p) @{
+				const value = use(p.load('left-leaf', p.version));
+				<span class="left-leaf">{value as string}</span>
+			}
+			function LeftPanel(p) @{
+				const value = use(p.load('left-panel', p.version));
+				<section class="left-panel">
+					<strong>{value as string}</strong>
+					<LeftLeaf load={p.load} version={p.version} />
+				</section>
+			}
+			function RightLeaf(p) @{
+				const value = use(p.load('right-leaf', p.version));
+				<span class="right-leaf">{value as string}</span>
+			}
+			function RightPanel(p) @{
+				const value = use(p.load('right-panel', p.version));
+				<section class="right-panel">
+					<strong>{value as string}</strong>
+					<RightLeaf load={p.load} version={p.version} />
+				</section>
+			}
+			export function Page(p) @{
+				<main>
+					@try {
+						<>
+							<LeftPanel load={p.load} version={p.version} />
+							<RightPanel load={p.load} version={p.version} />
+						</>
+					} @pending { <i>w</i> }
+				</main>
+			}`,
+			'adjacent-children.tsrx',
+		);
+		const expected = ['left-panel', 'left-leaf', 'right-panel', 'right-leaf'];
+		const values = new Map([
+			['left-panel', 'LEFT PANEL'],
+			['left-leaf', 'LEFT LEAF'],
+			['right-panel', 'RIGHT PANEL'],
+			['right-leaf', 'RIGHT LEAF'],
+		]);
+		const started: string[] = [];
+		const defs = new Map<string, ReturnType<typeof deferred<string>>>();
+		const load = (key: string) => {
+			started.push(key);
+			const d = deferred<string>();
+			defs.set(key, d);
+			return d.promise;
+		};
+
+		const done = prerender(mod.Page, { load, version: 1 });
+		await drain();
+		// All four calls have the same reactive inputs. Distinct rendered values
+		// prove that warm adoption remains keyed by creation site as well as deps.
+		expect(started).toHaveLength(expected.length);
+		expect(new Set(started)).toEqual(new Set(expected));
+
+		for (const key of expected) defs.get(key)!.resolve(values.get(key)!);
+		const out = await done;
+		for (const value of values.values()) expect(out.html).toContain(value);
+		expect(out.html).not.toContain('<i>w</i>');
+		// Final canonical rendering adopts each warmed thenable instead of firing
+		// the consumer's resource creation a second time.
+		expect([...started].sort()).toEqual([...expected].sort());
+	});
+
+	it('does not warm the final template after setup returns an alternate subtree', async () => {
+		const mod = evalServer(
+			`function Alternate(p) @{
+				const value = use(p.load('alternate'));
+				<span>{value as string}</span>
+			}
+			function Final(p) @{
+				const value = use(p.load('final'));
+				<b>{value as string}</b>
+			}
+			function Choice(p) @{
+				if (p.alternate) return <Alternate load={p.load} />;
+				<Final load={p.load} />
+			}
+			export function Page(p) @{
+				<main>@try { <Choice alternate={true} load={p.load} /> } @pending { <i>w</i> }</main>
+			}`,
+			'early-return-warm.tsrx',
+		);
+		const started: string[] = [];
+		const alternate = deferred<string>();
+		const done = prerender(mod.Page, {
+			load: (key: string) => {
+				started.push(key);
+				return key === 'alternate' ? alternate.promise : new Promise<string>(() => {});
+			},
+		});
+		await drain();
+		expect(started).toEqual(['alternate']);
+		alternate.resolve('ALT');
+		const out = await done;
+		expect(out.html).toContain('ALT');
+		expect(started).toEqual(['alternate']);
+	});
+
+	it('does not refetch an earlier fulfilled sibling when a later sibling suspends', async () => {
+		const mod = evalServer(
+			`function Item(p) @{
+				const value = use(p.load(p.name));
+				<span>{value as string}</span>
+			}
+			function Pair(p) @{
+				<><Item name="stable" load={p.load} /><Item name="changing" load={p.load} /></>
+			}
+			export function Page(p) @{
+				<main>@try { <Pair load={p.load} /> } @pending { <i>w</i> }</main>
+			}`,
+			'fulfilled-sibling.tsrx',
+		);
+		const started: string[] = [];
+		const changing = deferred<string>();
+		const fulfilled = {
+			status: 'fulfilled',
+			value: 'STABLE',
+			then() {},
+		};
+		const done = prerender(mod.Page, {
+			load: (key: string) => {
+				started.push(key);
+				return key === 'stable' ? fulfilled : changing.promise;
+			},
+		});
+		await drain();
+		expect(started).toEqual(['stable', 'changing']);
+		changing.resolve('CHANGING');
+		const out = await done;
+		expect(out.html).toContain('STABLE');
+		expect(out.html).toContain('CHANGING');
+		expect(started).toEqual(['stable', 'changing']);
+	});
+
+	it('warms repeated instances of the same component and dependency values', async () => {
+		const mod = evalServer(
+			`function Item(p) @{
+				const value = use(p.load('same'));
+				<span>{value as string}</span>
+			}
+			function Pair(p) @{
+				<><Item load={p.load} /><Item load={p.load} /></>
+			}
+			export function Page(p) @{
+				<main>@try { <Pair load={p.load} /> } @pending { <i>w</i> }</main>
+			}`,
+			'repeated-siblings.tsrx',
+		);
+		const started: string[] = [];
+		const jobs: ReturnType<typeof deferred<string>>[] = [];
+		const done = prerender(mod.Page, {
+			load: (key: string) => {
+				started.push(key);
+				const job = deferred<string>();
+				jobs.push(job);
+				return job.promise;
+			},
+		});
+		await drain();
+		expect(started).toEqual(['same', 'same']);
+		jobs[0].resolve('FIRST');
+		jobs[1].resolve('SECOND');
+		const out = await done;
+		expect(out.html).toContain('FIRST');
+		expect(out.html).toContain('SECOND');
+		expect(started).toEqual(['same', 'same']);
+	});
+
+	it('preserves distinct results across more than 64 same-dependency component occurrences', async () => {
+		const occurrenceCount = 65;
+		const items = Array.from({ length: occurrenceCount }, () => '<Item load={p.load} />').join('');
+		const mod = evalServer(
+			`function Item(p) @{
+				const value = use(p.load('same'));
+				<span>{value as string}</span>
+			}
+			function Many(p) @{
+				<>${items}</>
+			}
+			export function Page(p) @{
+				<main>@try { <Many load={p.load} /> } @pending { <i>w</i> }</main>
+			}`,
+			'many-repeated-siblings.tsrx',
+		);
+		const started: string[] = [];
+		const jobs: ReturnType<typeof deferred<string>>[] = [];
+		const done = prerender(mod.Page, {
+			load: (key: string) => {
+				started.push(key);
+				const job = deferred<string>();
+				jobs.push(job);
+				return job.promise;
+			},
+		});
+		await drain();
+
+		// The renderer must start every concrete occurrence before any one of them
+		// resolves, despite all 65 sharing one component, call site, and dependency.
+		expect(started).toHaveLength(occurrenceCount);
+		expect(started.every((key) => key === 'same')).toBe(true);
+		expect(jobs).toHaveLength(occurrenceCount);
+
+		const expected = Array.from(
+			{ length: occurrenceCount },
+			(_, index) => `VALUE-${index.toString().padStart(3, '0')}`,
+		);
+		for (let index = occurrenceCount - 1; index >= 0; index--) {
+			jobs[index].resolve(expected[index]);
+		}
+		const out = await done;
+		const container = document.createElement('div');
+		container.innerHTML = out.html;
+		const rendered = Array.from(container.querySelectorAll('span'), (node) => node.textContent);
+		expect(rendered).toEqual(expected);
+		expect(started).toHaveLength(occurrenceCount);
 	});
 
 	// ── Warm walk: nested INDEPENDENT components collapse to one round ──

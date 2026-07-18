@@ -78,29 +78,39 @@ export const SUSPENSE_SEED_WIRE_PREFIX = '\0octane:ssr-seed:';
 export const REJECTION_SENTINEL_KEY = '__octane_new_rejection__';
 
 /**
- * Marks a thenable whose hydration state is owned by an external serializer.
- * Octane still tracks, suspends on, and unwraps the thenable normally, but it
- * neither writes an SSR JSON seed for it nor consumes one during hydration.
- *
- * The global registry keeps the contract stable across duplicate Octane module
- * instances. Prefer marking a mutable wrapper instead of a user-owned promise,
- * which may be frozen or shared with code that does not opt into this contract.
+ * Marks a thenable whose hydration value is owned by an external serializer.
+ * Octane still tracks and unwraps it, but does not emit or consume a duplicate
+ * suspense seed for that thenable.
  */
 export const EXTERNAL_HYDRATION_PROMISE: unique symbol = Symbol.for(
 	'octane.external-hydration-promise',
 );
 
 /**
- * Defines a client hydration root whose component ranges start inside an SSR
- * ancestor, such as a document shell that places its live application inside
- * `<body>`. Mark the root body `passthrough` and the first component that owns
- * nodes in the hydration container `owner`. Octane keeps the intervening
- * component lifecycles but does not claim server ranges that live outside the
- * selected container.
+ * Allows a logical client root to cross SSR ancestors that live outside the
+ * selected hydration container. The root marks itself `passthrough`; the first
+ * component whose DOM is inside the container marks itself `owner`.
  */
 export const HYDRATION_RANGE_BOUNDARY: unique symbol = Symbol.for(
 	'octane.hydration-range-boundary',
 );
+
+// ── Deferred hydration boundary protocol (`<Hydrate>`) ──────────────────────────────
+// The boundary is a persistent real `<div>`: visibility/interaction strategies
+// and procedural prefetching need an Element to observe. During the initial
+// root hydration the client adopts that wrapper but leaves its child block
+// dormant. The attributes below carry the stable boundary id, strategy kind,
+// and number of useId slots reserved by the dormant child. Resolved `use()`
+// values are removed from the root seed stream and stored in a direct-child
+// JSON script so the later subtree hydration owns precisely its own seeds.
+/** Stable id of a server-rendered deferred hydration boundary. */
+export const HYDRATE_ID_ATTR = 'data-octane-hydrate-id';
+/** Serialized strategy kind (`visible`, `idle`, `dynamic`, …). */
+export const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
+/** Number of `useId()` slots consumed while rendering the deferred child. */
+export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
+/** Direct-child JSON script carrying this boundary's `use()` seed slice. */
+export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
 
 // ── Streaming SSR protocol (renderToPipeableStream / renderToReadableStream) ──
 // A boundary that is still PENDING when the shell flushes emits its fallback
