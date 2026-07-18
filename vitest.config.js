@@ -1566,6 +1566,12 @@ export default defineConfig({
 					name: 'aria',
 					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
 					environment: 'jsdom',
+					// The differential fixtures import the real react-aria consumer modules
+					// (useComboBox/useSelect pull in the whole overlays/listbox/menu graph); the
+					// first mount compiles + imports that on a loaded CI shard, which overran the
+					// 5s vitest default. Match the other differential-bearing projects at 30s.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// Differential precompile for aria fixtures: rewrites `@octanejs/aria` →
 					// `react-aria` (and `/stately` → `react-stately`, `/components` →
 					// `react-aria-components`) so the React side runs the real React Aria.
@@ -1666,6 +1672,50 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/sonner$/,
 							replacement: resolve(import.meta.dirname, 'packages/sonner/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'styled-components',
+					include: [
+						'packages/styled-components/tests/**/*.test.ts',
+						'!packages/styled-components/tests/ssr/**/*.test.ts',
+					],
+					environment: 'jsdom',
+					// Differential precompile for styled-components fixtures: rewrites
+					// `@octanejs/styled-components` → the real published styled-components.
+					globalSetup: ['packages/styled-components/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/styled-components$/,
+							replacement: resolve(import.meta.dirname, 'packages/styled-components/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'styled-components-ssr',
+					include: ['packages/styled-components/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/styled-components$/,
+							replacement: resolve(import.meta.dirname, 'packages/styled-components/src/index.ts'),
 						},
 					],
 				},

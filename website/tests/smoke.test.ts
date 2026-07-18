@@ -14,6 +14,7 @@ import {
 	type BenchCard,
 } from '../src/content/benchmarks.ts';
 import { createHomeSummary } from '../src/content/home-benchmark.ts';
+import { BENCH_SECTIONS } from '../src/pages/benchmarks/Benchmarks.tsrx';
 
 afterEach(cleanup);
 
@@ -244,6 +245,26 @@ describe('website routes', () => {
 					card.series.length > 1 ? card.rows.length + 1 : 0,
 				);
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
+			}
+		}
+		// The scroll-spy rail lists every section plus a nested row per benchmark
+		// card, and each link's anchor target exists in the document: a section
+		// heading for level-2 rows, an anchored card wrapper for level-3 rows.
+		const toc = container.querySelector('nav[aria-label="On this page"]')!;
+		expect(toc).toBeTruthy();
+		expect(BENCH_SECTIONS.length).toBe(3 + FRAMEWORK_CARDS.length + OCTANE_CARDS.length);
+		for (const section of BENCH_SECTIONS) {
+			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
+			const target = container.querySelector(`#${section.id}`)!;
+			expect(target, section.id).toBeTruthy();
+			if (section.level === 3) {
+				expect(target.querySelector('figure.bench-card'), section.id).toBeTruthy();
+				// The rail click moves focus onto this wrapper, so it must expose an
+				// accessible name announcing which chart the reader landed on.
+				expect(target.getAttribute('role'), section.id).toBe('group');
+				expect(target.getAttribute('aria-label'), section.id).toBe(section.title);
+			} else {
+				expect(target.tagName).toBe('H2');
 			}
 		}
 	});

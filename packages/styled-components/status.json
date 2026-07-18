@@ -1,0 +1,16 @@
+{
+  "upstream": { "package": "styled-components", "version": "6.4.3" },
+  "surface": "Full v6 web API, ported from the upstream 6.4.3 sources: `styled` with every HTML/SVG tag shortcut, `.attrs`/`.withConfig` chaining, `css`, `keyframes`, `createGlobalStyle`, `createTheme`, `ThemeProvider`/`ThemeContext`/`ThemeConsumer`/`useTheme`/`withTheme`, `StyleSheetManager`/`StyleSheetContext`/`StyleSheetConsumer` (targets, namespaces, vendor prefixing, stylis plugins, `shouldForwardProp`), `ServerStyleSheet`, `isStyledComponent`, `version`, and `__PRIVATE__`. Component selectors, folding (`styled(Styled)`), transient `$` props, `as`/`forwardedAs`, and the grouped CSSOM sheet engine (with upstream `data-styled` rehydration) all behave as upstream. The React Native surface and the RSC-only `stylisPluginRSC` are not ported.",
+  "divergences": [
+    "`ref` is a plain prop (octane has no `forwardRef`); it always attaches to the rendered element and is never subject to `shouldForwardProp` filtering.",
+    "SSR is automatic: server-side inserts flow through octane's css channel, so `renderToString`/streaming return the styles as `<style data-octane=\"sc.<componentId>.<name>\">` chunks in `RenderResult.css` with per-request isolation, and client boot adopts those chunks without duplicate injection. `ServerStyleSheet` ships as a working compat wrapper, but `interleaveWithNodeStream` throws — octane streaming already interleaves styles.",
+    "`defaultProps` on a styled component is resolved by the factory at render time (octane call sites do not apply component `defaultProps`); folding via `styled(Styled)` deep-merges as upstream.",
+    "Polymorphic `as`/`forwardedAs` typing is pragmatic: component targets infer props from their function signature, host tags use a permissive prop bag (octane has no `JSX.IntrinsicElements` map to introspect).",
+    "The babel `css` prop transform is not supported.",
+    "The dev-only dynamic-creation warning uses a per-displayName creation-count heuristic instead of upstream's React-dispatcher probe.",
+    "Unnamed stylis plugins actually throw the documented error 15 (upstream 6.4.3 constructs the error but forgets to throw it).",
+    "Interpolation-position styled components are recognized by an octane brand symbol rather than React's forward-ref `$$typeof` (octane styled components are plain functions)."
+  ],
+  "ssr": "Supported and tested: zero-config collection into `RenderResult.css` via octane's `injectStyle` channel (styled rules, keyframes, and globals, with content-derived immutable chunk ids that make streaming dedup sound), repeat-render and dynamic-global request isolation through a stateless server output backend, hydration adoption of server chunks (removed after adoption, no duplicate rules), and the `ServerStyleSheet` compat surface.",
+  "verified": "2026-07-18"
+}
