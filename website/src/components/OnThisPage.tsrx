@@ -36,9 +36,17 @@ function isAtPageBottom(): boolean {
 export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: string }) @{
 	const sections = props.sections;
 	const resetKey = props.resetKey ?? '';
-	const closeMobileToc = (event: Event) => {
+	// Mobile TOC clicks collapse the summary card FIRST — it sits above the
+	// sections (grid-row: 1), so scrollToSection below must measure the
+	// post-collapse layout — then run the same scroll-and-focus path as the
+	// desktop rail: some targets (the benchmarks card anchors) are non-focusable
+	// wrappers whose aria-label is only announced when focus actually moves, so
+	// leaving mobile clicks to native hash navigation would land screen-reader
+	// users there without hearing which chart they reached.
+	const mobileTocClick = (event: MouseEvent, id: string) => {
 		const link = event.currentTarget as HTMLAnchorElement;
 		link.closest('details')?.removeAttribute('open');
+		scrollToSection(event, id);
 	};
 
 	// The active section id is stored WITH the reset key that measured it, and
@@ -277,7 +285,7 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 							<a
 								href={'#' + section.id}
 								aria-current={activeId === section.id ? 'true' : undefined}
-								onClick={closeMobileToc}
+								onClick={(event: MouseEvent) => mobileTocClick(event, section.id)}
 							>
 								{section.title as string}
 							</a>
