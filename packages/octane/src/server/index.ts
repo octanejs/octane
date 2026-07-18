@@ -35,6 +35,7 @@ export {
 	type RenderResult,
 	type RenderOptions,
 	type StreamOptions,
+	type StreamInjectionSource,
 	setSsrSuspenseTimeout,
 	getSsrSuspenseTimeout,
 	EXTERNAL_HYDRATION_PROMISE,
