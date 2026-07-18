@@ -37,6 +37,8 @@ export {
 	type StreamOptions,
 	setSsrSuspenseTimeout,
 	getSsrSuspenseTimeout,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 
 	// Hooks (server semantics)
 	useState,
