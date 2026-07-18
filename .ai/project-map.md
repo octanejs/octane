@@ -8,6 +8,8 @@ Always prefer current source over summaries:
 
 - `README.md` — positioning, quick start, `.tsrx` syntax, public examples.
 - `AGENTS.md` and `.rulesync/rules/project.md` — shared agent rules. This repo uses RuleSync, so update `.rulesync/rules/` then run `pnpm rules:generate` when changing generated references.
+- `.rulesync/rules/core-engineering.md` — mandatory performance-first design,
+  measurement, and adversarial self-review gates for framework fundamentals.
 - `packages/octane/src/runtime.ts` — client runtime: rendering, hooks, scheduler, events, refs, context, portals, Suspense/transitions, keyed reconciler.
 - `packages/octane/src/runtime.server.ts` and `packages/octane/src/server/index.ts` — SSR and hydration-facing server runtime.
 - `packages/octane/src/compiler/` — TSRX compiler and Vite/Volar integration.

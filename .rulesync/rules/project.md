@@ -263,6 +263,16 @@ Two regression layers beyond the octane project:
 skeleton (in-scope `it.todo`s + out-of-scope reasons). Resolve or remove every
 todo before committing the port.
 
+## Framework-Fundamental Changes
+
+Runtime, compiler, scheduler, reconciler, SSR/hydration, and framework build
+pipeline changes must follow `.rulesync/rules/core-engineering.md`. Treat these
+paths as performance-sensitive by default: establish the observable contract and
+a relevant baseline, protect cold and hot paths deliberately, and perform the
+required adversarial self-review on the final diff. Do not claim performance
+improvements without comparable measurements, and report residual risk when a
+trustworthy measurement is unavailable.
+
 ## Changesets
 
 Add a changeset for user-facing changes to `octane` or `@octanejs/vite-plugin`.
