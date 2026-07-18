@@ -9,6 +9,7 @@ import { LIMIT as TOO_MANY_CLASSES_LIMIT } from '../utils/createWarnTooManyClass
 import { hash, phash } from '../utils/hash';
 import isKeyframes from '../utils/isKeyframes';
 import isPlainObject from '../utils/isPlainObject';
+import isStaticRules from '../utils/isStaticRules';
 import isStatelessFunction from '../utils/isStatelessFunction';
 import isStyledComponent from '../utils/isStyledComponent';
 import { joinStringArray, joinStrings } from '../utils/joinStrings';
@@ -33,14 +34,20 @@ export default class ComponentStyle {
 	baseHash: number;
 	baseStyle: ComponentStyle | null | undefined;
 	componentId: string;
+	isStatic: boolean;
 	rules: RuleSet<any>;
+	/**
+	 * Shared client fast path for proven-static styles. Weak sheet/stylis keys
+	 * avoid retaining custom manager configurations after their trees unmount.
+	 */
+	private staticClassNameCache: WeakMap<StyleSheet, WeakMap<Stringifier, string>> | undefined;
 	dynamicNameCache: Map<string, string> | undefined;
 	/**
 	 * Octane addition: content-addressed cache of compiled stylis output. The
-	 * phantom server sheet never retains names (each request must re-emit its
-	 * chunks), so without this every server render would re-run stylis for the
-	 * same css. Keyed identically to dynamicNameCache (stylis hash + raw css),
-	 * so entries are immutable and safe to share across requests.
+	 * stateless server output re-emits into every active request, so without
+	 * this every server render would re-run stylis for the same css. Keyed
+	 * identically to dynamicNameCache (stylis hash + raw css), so entries are
+	 * immutable and safe to share across requests.
 	 */
 	compiledRulesCache: Map<string, string[]> | undefined;
 
@@ -49,6 +56,7 @@ export default class ComponentStyle {
 		this.componentId = componentId;
 		this.baseHash = phash(SEED, componentId);
 		this.baseStyle = baseStyle;
+		this.isStatic = isStaticRules(rules) && (!baseStyle || baseStyle.isStatic);
 
 		// NOTE: This registers the componentId, which ensures a consistent order
 		// for this component's styles compared to others
@@ -60,6 +68,11 @@ export default class ComponentStyle {
 		styleSheet: StyleSheet,
 		stylis: Stringifier,
 	): string {
+		if (this.isStatic && !styleSheet.server) {
+			const cached = this.staticClassNameCache?.get(styleSheet)?.get(stylis);
+			if (cached !== undefined) return cached;
+		}
+
 		let names = this.baseStyle
 			? this.baseStyle.generateAndInjectStyles(executionContext, styleSheet, stylis)
 			: '';
@@ -141,6 +154,16 @@ export default class ComponentStyle {
 
 				names = joinStrings(names, name);
 			}
+		}
+
+		if (this.isStatic && !styleSheet.server) {
+			let byStylis = this.staticClassNameCache?.get(styleSheet);
+			if (!byStylis) {
+				byStylis = new WeakMap();
+				if (!this.staticClassNameCache) this.staticClassNameCache = new WeakMap();
+				this.staticClassNameCache.set(styleSheet, byStylis);
+			}
+			byStylis.set(stylis, names);
 		}
 
 		return names;

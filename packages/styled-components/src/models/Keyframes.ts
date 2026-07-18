@@ -10,9 +10,9 @@ import { mainStylis } from './StyleSheetManager';
 
 /**
  * Content-addressed cache of compiled keyframe CSS per stylis hash. Octane's
- * phantom server sheet never retains names (each request must re-emit its
- * chunks), so this skips re-running stylis for the same keyframes on every
- * server render. Entries are immutable, so sharing across requests is safe.
+ * stateless server output re-emits into every active request, so this skips
+ * re-running stylis for the same keyframes on every server render. Entries are
+ * immutable, so sharing across requests is safe.
  */
 const kfCompiledCache: WeakMap<Keyframes, Map<string, string[]>> = new WeakMap();
 

@@ -5,8 +5,18 @@ import { describe, expect, it } from 'vitest';
 import { createElement } from 'octane';
 import { renderToPipeableStream, renderToString } from 'octane/server';
 
-import { ServerStyleSheet } from '@octanejs/styled-components';
+import { createGlobalStyle, ServerStyleSheet } from '@octanejs/styled-components';
 import { ServerApp } from './_fixtures/server-app.tsrx';
+
+const RequestGlobal = createGlobalStyle<{ tone: string }>`
+	body {
+		color: ${(props) => props.tone};
+	}
+`;
+
+function RequestApp(props: { tone: string }) {
+	return createElement(RequestGlobal, props);
+}
 
 function chunkIds(css: string): string[] {
 	return Array.from(css.matchAll(/data-octane="(sc\.[^"]+)"/g), (m) => m[1]);
@@ -38,10 +48,20 @@ describe('@octanejs/styled-components — server rendering', () => {
 	it('emits identical, immutable chunk ids across repeated renders (per-request isolation)', () => {
 		const first = renderToString(ServerApp);
 		const second = renderToString(ServerApp);
-		// A phantom main sheet retains nothing between requests, so the second
-		// render re-emits the complete css — byte-identical, ids included.
+		// The stateless server output re-emits the complete CSS into each active
+		// request — byte-identical, ids included.
 		expect(second.css).toBe(first.css);
 		expect(chunkIds(second.css)).toEqual(chunkIds(first.css));
+	});
+
+	it('isolates dynamic global styles between requests', () => {
+		const red = renderToString(RequestApp, { tone: 'crimson' });
+		const blue = renderToString(RequestApp, { tone: 'royalblue' });
+
+		expect(red.css).toContain('color:crimson');
+		expect(red.css).not.toContain('color:royalblue');
+		expect(blue.css).toContain('color:royalblue');
+		expect(blue.css).not.toContain('color:crimson');
 	});
 
 	it('streams chunk tags ahead of the shell html', async () => {
@@ -67,8 +87,12 @@ describe('@octanejs/styled-components — server rendering', () => {
 
 	it('ServerStyleSheet compat: collectStyles + getStyleTags/getStyleElement still work', () => {
 		const sheet = new ServerStyleSheet();
-		const { html } = renderToString(() => sheet.collectStyles(createElement(ServerApp as any, {})));
+		const { html, css } = renderToString(() =>
+			sheet.collectStyles(createElement(ServerApp as any, {})),
+		);
 		expect(html).toContain('id="hero"');
+		// Compatibility capture composes with Octane's automatic request channel.
+		expect(css).toContain('color:tomato');
 
 		const tags = sheet.getStyleTags();
 		expect(tags).toContain('<style ');

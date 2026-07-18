@@ -43,6 +43,29 @@ describe('StyleSheetManager / sheet', () => {
 		host.remove();
 	});
 
+	it('re-injects static styles when a custom target changes', () => {
+		const first = document.createElement('div');
+		const second = document.createElement('div');
+		document.body.append(first, second);
+		const Targeted = styled.div`
+			color: steelblue;
+		`;
+		const App = (props: { target: HTMLElement }) =>
+			createElement(StyleSheetManager as any, {
+				target: props.target,
+				children: createElement(Targeted as any, { id: 'retargeted' }),
+			});
+		const m = mount(App, { target: first });
+		expect(first.textContent).toContain('color:steelblue');
+
+		m.update(App, { target: second });
+
+		expect(second.textContent).toContain('color:steelblue');
+		m.unmount();
+		first.remove();
+		second.remove();
+	});
+
 	it('prefixes selectors with the configured namespace', () => {
 		const Spaced = styled.div`
 			color: darkred;
@@ -54,6 +77,24 @@ describe('StyleSheetManager / sheet', () => {
 			}),
 		);
 		expect(getRenderedCSS()).toContain('#app-scope ');
+		m.unmount();
+	});
+
+	it('re-injects static styles when the stylis configuration changes', () => {
+		const Static = styled.div`
+			color: darkgreen;
+		`;
+		const App = (props: { namespace: string }) =>
+			createElement(StyleSheetManager as any, {
+				namespace: props.namespace,
+				children: createElement(Static as any, { id: 'static-config' }),
+			});
+		const m = mount(App, { namespace: '#first-scope' });
+		expect(getRenderedCSS()).toContain('#first-scope ');
+
+		m.update(App, { namespace: '#second-scope' });
+
+		expect(getRenderedCSS()).toContain('#second-scope ');
 		m.unmount();
 	});
 

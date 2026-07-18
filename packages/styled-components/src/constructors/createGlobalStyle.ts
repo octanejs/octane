@@ -1,8 +1,7 @@
 // Ported from styled-components 6.4.3 (MIT), adapted for octane:
-// - No RSC/`__SERVER__` build flags — server vs client is the sheet's runtime
-//   `server` flag (conditional hooks are legal in octane, slots are explicit).
-// - Server renders styles during component execution (effects never run on the
-//   server); the sheet forwards them to octane's per-request css channel.
+// - Server rendering is stateless and content-addressed. The output backend
+//   forwards rules to octane's active request (and optionally captures a copy
+//   for ServerStyleSheet compatibility).
 // - On the client, the first layout effect additionally adopts-by-replacement:
 //   it removes the server-emitted css-channel tags for this component right
 //   after inserting the equivalent rules into the client engine (pre-paint).
@@ -51,20 +50,6 @@ export default function createGlobalStyle<Props extends object>(
 		const ssc = useStyleSheetContext();
 		const theme = useContext(ThemeContext);
 
-		// Each mount needs a unique instance ID for the shared-group instanceRules
-		// cache. On the server allocate directly (one-shot renders); on the client
-		// keep it stable across re-renders via a ref.
-		let instance: number;
-		if (ssc.styleSheet.server) {
-			instance = ssc.styleSheet.allocateGSInstance(styledComponentId);
-		} else {
-			const instanceRef = useRef<number | null>(null, SLOT_GS_INSTANCE);
-			if (instanceRef.current === null) {
-				instanceRef.current = ssc.styleSheet.allocateGSInstance(styledComponentId);
-			}
-			instance = instanceRef.current;
-		}
-
 		if (process.env.NODE_ENV !== 'production' && (props as any).children != null) {
 			console.warn(
 				`The global style component ${styledComponentId} was given child JSX. createGlobalStyle does not render children.`,
@@ -81,14 +66,17 @@ export default function createGlobalStyle<Props extends object>(
 		}
 
 		if (ssc.styleSheet.server) {
-			// Effects never run during SSR: render the styles now so they reach
-			// octane's css channel for this request.
-			renderStyles(instance, props, ssc.styleSheet, theme, ssc.stylis);
-			// No cleanup runs on the server either — drop the instance cache so
-			// it cannot grow across requests.
-			globalStyle.instanceRules.delete(instance);
+			renderServerStyles(props, ssc.styleSheet, theme, ssc.stylis);
 			return null;
 		}
+
+		// Client mounts need stable identities so multiple global-style instances
+		// can update and unmount independently within their shared rule group.
+		const instanceRef = useRef<number | null>(null, SLOT_GS_INSTANCE);
+		if (instanceRef.current === null) {
+			instanceRef.current = ssc.styleSheet.allocateGSInstance(styledComponentId);
+		}
+		const instance = instanceRef.current;
 
 		// Split into two effects so cleanup (removeStyles → full rebuildGroup) only
 		// fires on actual unmount or sheet/globalStyle swap -- NOT on every prop change.
@@ -147,21 +135,30 @@ export default function createGlobalStyle<Props extends object>(
 		theme: DefaultTheme | undefined,
 		stylis: Stringifier,
 	) {
-		if (globalStyle.isStatic) {
-			globalStyle.renderStyles(
-				instance,
-				STATIC_EXECUTION_CONTEXT as unknown as ExecutionContext & Props,
-				styleSheet,
-				stylis,
-			);
-		} else {
-			const context = {
-				...props,
-				theme: determineTheme(props, theme, (GlobalStyleComponent as any).defaultProps),
-			} as ExecutionContext & Props;
+		globalStyle.renderStyles(instance, resolveExecutionContext(props, theme), styleSheet, stylis);
+	}
 
-			globalStyle.renderStyles(instance, context, styleSheet, stylis);
+	function renderServerStyles(
+		props: ExecutionProps,
+		styleSheet: StyleSheet,
+		theme: DefaultTheme | undefined,
+		stylis: Stringifier,
+	) {
+		globalStyle.renderServerStyles(resolveExecutionContext(props, theme), styleSheet, stylis);
+	}
+
+	function resolveExecutionContext(
+		props: ExecutionProps,
+		theme: DefaultTheme | undefined,
+	): ExecutionContext & Props {
+		if (globalStyle.isStatic) {
+			return STATIC_EXECUTION_CONTEXT as ExecutionContext & Props;
 		}
+
+		return {
+			...props,
+			theme: determineTheme(props, theme, (GlobalStyleComponent as any).defaultProps),
+		} as ExecutionContext & Props;
 	}
 
 	return memo(GlobalStyleComponent as any);

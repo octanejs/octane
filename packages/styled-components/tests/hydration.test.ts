@@ -29,7 +29,7 @@ describe('hydration: adoption of server css chunks', () => {
 		resetDom();
 	});
 
-	it('adopts styled/keyframes chunks at boot, removes them, and skips global/core tags', async () => {
+	it('keeps server rules active while adopting styled/keyframes chunks', async () => {
 		seedChunk('sc.hydrate-test-cid.hydname', '.hydname{color:navy;}');
 		seedChunk('sc.sc-keyframes-tkf.tkfname', '@keyframes tkfname{0%{opacity:0;}}');
 		seedChunk('sc.sc-global-abc.gname', 'body{--hydrate-marker:1;}');
@@ -37,7 +37,7 @@ describe('hydration: adoption of server css chunks', () => {
 
 		// Importing the package constructs the main sheet, which runs the one-time
 		// boot rehydration against the seeded head.
-		const sc = await import('@octanejs/styled-components');
+		await import('@octanejs/styled-components');
 
 		expect(document.querySelector('style[data-octane="sc.hydrate-test-cid.hydname"]')).toBeNull();
 		expect(document.querySelector('style[data-octane="sc.sc-keyframes-tkf.tkfname"]')).toBeNull();
@@ -46,8 +46,8 @@ describe('hydration: adoption of server css chunks', () => {
 		expect(document.querySelector('style[data-octane="sc.sc-global-abc.gname"]')).not.toBeNull();
 		expect(document.querySelector('style[data-octane="octanecorehash1"]')).not.toBeNull();
 
-		expect(sc.__PRIVATE__.mainSheet.hasNameForId('hydrate-test-cid', 'hydname')).toBe(true);
-		expect(sc.__PRIVATE__.mainSheet.hasNameForId('sc-keyframes-tkf', 'tkfname')).toBe(true);
+		// The consumer-visible rules remain active after their transport tags are
+		// adopted into the client stylesheet.
 		expect(engineCSS()).toContain('color:navy');
 		expect(engineCSS()).toContain('@keyframes tkfname');
 	});

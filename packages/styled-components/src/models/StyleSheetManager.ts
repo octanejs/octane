@@ -1,9 +1,9 @@
 // Ported from styled-components 6.4.3 (MIT), adapted for octane. The RSC
 // branches are dropped (octane has no RSC); context is provided via a
 // `createElement(Provider, …)` descriptor so the same code runs on the client
-// and server runtimes. On the server the module-level main sheet is a phantom:
-// it forwards every chunk to octane's per-request SSR css channel and retains
-// nothing, so no styles can leak between requests.
+// and server runtimes. The module-level server sheet uses a stateless output
+// backend: Octane's active render owns every emitted chunk, so nothing
+// request-specific is retained here.
 import { createContext, createElement, isChildrenBlock, useContext, useMemo } from 'octane';
 import type stylis from 'stylis';
 

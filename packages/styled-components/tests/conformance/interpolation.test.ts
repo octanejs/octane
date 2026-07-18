@@ -17,6 +17,23 @@ describe('interpolations', () => {
 		m.unmount();
 	});
 
+	it('re-evaluates interpolation functions when a parent renders with unchanged props', () => {
+		let tone = 'firebrick';
+		const Live = styled.div`
+			color: ${() => tone};
+		`;
+		const App = () => createElement(Live as any, { id: 'live' });
+		const m = mount(App);
+		const firstClass = m.find('#live').getAttribute('class');
+
+		tone = 'midnightblue';
+		m.update(App);
+
+		expect(m.find('#live').getAttribute('class')).not.toBe(firstClass);
+		expect(getRenderedCSS()).toContain('color:midnightblue');
+		m.unmount();
+	});
+
 	it('flattens arrays and nested css`` blocks', () => {
 		const mixin = css`
 			letter-spacing: 11px;

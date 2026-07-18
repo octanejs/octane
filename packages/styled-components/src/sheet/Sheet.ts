@@ -2,12 +2,10 @@ import { DISABLE_SPEEDY, IS_BROWSER, KEYFRAMES_ID_PREFIX } from '../constants';
 import { InsertionTarget } from '../types';
 import { EMPTY_OBJECT } from '../utils/empties';
 import { setToString } from '../utils/setToString';
-import { makeGroupedTag } from './GroupedTag';
 import { getGroupForId } from './GroupIDAllocator';
-import { emitChunk } from './octaneChannel';
 import { getRehydrationContainer, outputSheet, rehydrateSheet } from './Rehydration';
-import { makeTag } from './Tag';
-import { GroupedTag, Sheet, SheetOptions } from './types';
+import { createRuleOutput } from './RuleOutput';
+import { RuleOutput, Sheet, SheetOptions } from './types';
 
 let SHOULD_REHYDRATE = IS_BROWSER;
 
@@ -37,7 +35,7 @@ export default class StyleSheet implements Sheet {
 	names: NamesAllocationMap;
 	options: SheetOptions;
 	server: boolean;
-	tag?: GroupedTag | undefined;
+	private readonly output: RuleOutput;
 
 	/** Register a group ID to give it an index */
 	static registerId(id: string): number {
@@ -61,6 +59,7 @@ export default class StyleSheet implements Sheet {
 		// `isServer: !IS_BROWSER` default (upstream reads the raw argument here and
 		// instead relies on a `__SERVER__` build define this port doesn't have).
 		this.server = !!this.options.isServer;
+		this.output = createRuleOutput(this.options);
 
 		// We rehydrate only once and use the sheet that is created first
 		if (!this.server && IS_BROWSER && SHOULD_REHYDRATE) {
@@ -107,23 +106,12 @@ export default class StyleSheet implements Sheet {
 
 	/** Lazily initialises a GroupedTag for when it's actually needed */
 	getTag() {
-		return this.tag || (this.tag = makeGroupedTag(makeTag(this.options)));
-	}
-
-	/**
-	 * Whether this is a phantom server sheet: every chunk forwards to octane's
-	 * per-request css channel and nothing is retained, so the module-global
-	 * main sheet cannot leak styles (or `names` state) across requests.
-	 */
-	isPhantom(): boolean {
-		return this.server && !this.options.capture;
+		return this.output.getTag();
 	}
 
 	/** Check whether a name is known for caching */
 	hasNameForId(id: string, name: string): boolean {
-		// A phantom sheet must re-observe every chunk so each request's render
-		// re-emits it into that request's css map (octane dedups within a pass).
-		if (this.isPhantom()) return false;
+		if (!this.output.persistent) return false;
 		return this.names.get(id)?.has(name) ?? false;
 	}
 
@@ -145,12 +133,10 @@ export default class StyleSheet implements Sheet {
 
 	/** Insert new rules which also marks the name as known */
 	insertRules(id: string, name: string, rules: string[]) {
-		if (this.server) {
-			emitChunk(id, name, rules);
-			if (!this.options.capture) return;
-		}
+		const group = getGroupForId(id);
+		this.output.insertRules(id, name, group, rules);
+		if (!this.output.persistent) return;
 		this.registerName(id, name);
-		this.getTag().insertRules(getGroupForId(id), rules);
 	}
 
 	/** Clears all cached names for a given group ID */
@@ -162,8 +148,8 @@ export default class StyleSheet implements Sheet {
 
 	/** Clears all rules for a given group ID */
 	clearRules(id: string) {
-		if (this.isPhantom()) return;
-		this.getTag().clearGroup(getGroupForId(id));
+		if (!this.output.persistent) return;
+		this.output.clearGroup(getGroupForId(id));
 		this.clearNames(id);
 	}
 
@@ -171,6 +157,6 @@ export default class StyleSheet implements Sheet {
 	clearTag() {
 		// NOTE: This does not clear the names, since it's only used during SSR
 		// so that we can continuously output only new rules
-		this.tag = undefined;
+		this.output.reset();
 	}
 }

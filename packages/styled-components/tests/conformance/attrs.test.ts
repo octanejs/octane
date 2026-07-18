@@ -32,6 +32,20 @@ describe('.attrs', () => {
 		m.unmount();
 	});
 
+	it('re-evaluates function attrs when a parent renders with unchanged props', () => {
+		let state = 'draft';
+		const Live = styled.div.attrs(() => ({ 'data-state': state }))``;
+		const App = () => createElement(Live as any, { id: 'live-attrs' });
+		const m = mount(App);
+		expect(m.find('#live-attrs').getAttribute('data-state')).toBe('draft');
+
+		state = 'published';
+		m.update(App);
+
+		expect(m.find('#live-attrs').getAttribute('data-state')).toBe('published');
+		m.unmount();
+	});
+
 	it('applies attrs over same-named props; explicit undefined resets to the prop side (v6)', () => {
 		const Sized = styled.input.attrs({ 'data-size': 'attrs' })`
 			color: brown;

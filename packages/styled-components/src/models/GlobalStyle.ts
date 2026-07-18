@@ -31,6 +31,24 @@ export default class GlobalStyle<Props extends object> {
 		this.rebuildGroup(styleSheet);
 	}
 
+	/**
+	 * Server rendering is content-addressed and has no component-instance
+	 * lifecycle. The output backend decides whether to retain a compatibility
+	 * copy; the default Octane backend writes only to the active request.
+	 */
+	renderServerStyles(
+		executionContext: ExecutionContext & Props,
+		styleSheet: StyleSheet,
+		stylis: Stringifier,
+	): void {
+		const rules = this.compileRules(executionContext, styleSheet, stylis);
+		const name = this.componentId + '-' + generateName(hash(joinRules(rules)) >>> 0);
+
+		if (!styleSheet.hasNameForId(this.componentId, name)) {
+			styleSheet.insertRules(this.componentId, name, rules);
+		}
+	}
+
 	renderStyles(
 		instance: number,
 		executionContext: ExecutionContext & Props,
@@ -40,8 +58,8 @@ export default class GlobalStyle<Props extends object> {
 		const id = this.componentId;
 
 		if (this.isStatic) {
-			// The entry name is the dedup key (client: componentId + instance,
-			// server: content hash — see computeRules), so compute before checking.
+			// The component/instance name is the client dedup key, so compute it
+			// before checking the persistent output.
 			const entry =
 				this.instanceRules.get(instance) ??
 				this.computeRules(instance, executionContext, styleSheet, stylis);
@@ -51,12 +69,10 @@ export default class GlobalStyle<Props extends object> {
 			return;
 		}
 
-		// Compute new rules; skip CSSOM rebuild if CSS is unchanged.
-		// The fast-path is only safe on the client where the tag persists between renders.
-		// During SSR, clearTag() destroys the tag between requests, so we must always rebuild.
+		// Compute new rules; skip the client CSSOM rebuild if CSS is unchanged.
 		const prev = this.instanceRules.get(instance);
 		this.computeRules(instance, executionContext, styleSheet, stylis);
-		if (!styleSheet.server && prev) {
+		if (prev) {
 			const a = prev.rules;
 			const b = this.instanceRules.get(instance)!.rules;
 			if (a.length === b.length) {
@@ -79,21 +95,24 @@ export default class GlobalStyle<Props extends object> {
 		styleSheet: StyleSheet,
 		stylis: Stringifier,
 	): InstanceEntry {
-		const flatCSS = joinStringArray(
-			flatten(this.rules as RuleSet<object>, executionContext, styleSheet, stylis) as string[],
-		);
-		const rules = stylis(flatCSS, '');
-		// Octane adaptation: on the server the name doubles as the css-channel
-		// chunk id, which must be immutable across streaming passes — derive it
-		// from the rendered css instead of the per-pass instance counter.
+		const rules = this.compileRules(executionContext, styleSheet, stylis);
 		const entry: InstanceEntry = {
-			name: styleSheet.server
-				? this.componentId + '-' + generateName(hash(joinRules(rules)) >>> 0)
-				: this.componentId + instance,
+			name: this.componentId + instance,
 			rules,
 		};
 		this.instanceRules.set(instance, entry);
 		return entry;
+	}
+
+	private compileRules(
+		executionContext: ExecutionContext & Props,
+		styleSheet: StyleSheet,
+		stylis: Stringifier,
+	): string[] {
+		const flatCSS = joinStringArray(
+			flatten(this.rules as RuleSet<object>, executionContext, styleSheet, stylis) as string[],
+		);
+		return stylis(flatCSS, '');
 	}
 
 	/**

@@ -69,6 +69,17 @@ the upstream SSR docs; prefer the automatic channel and use one of the two per
 page. `interleaveWithNodeStream` throws — octane streaming already interleaves
 styles.
 
+### Architecture
+
+CSS compilation and rule delivery are separate layers. The shared sheet owns
+component ordering and content caches; explicit outputs handle browser
+CSSOM/text insertion, Octane's stateless per-request SSR channel, or the
+in-memory capture used by `ServerStyleSheet`. Dynamic interpolations and
+`.attrs` functions still run on every component render, while unchanged
+compiled CSS is deduplicated by content. Static component styles additionally
+reuse their injected class for stable client sheet/Stylis configurations;
+dynamic styles never use that shortcut.
+
 ## Octane adaptations
 
 - `ref` is a plain prop (octane has no `forwardRef`); it always attaches to

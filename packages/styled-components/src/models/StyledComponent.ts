@@ -2,15 +2,13 @@
 // - No forwardRef: the generated component is a plain octane function
 //   component and `ref` arrives as an ordinary prop, which is always forwarded
 //   to the created element (octane attaches refs from props natively).
-// - No RSC/`__SERVER__` build flags: the render cache is skipped on the server
-//   at runtime, matching the upstream server behavior.
+// - No RSC/`__SERVER__` build flags: server output is selected by the active
+//   stylesheet backend at runtime.
 // - `defaultProps` is resolved by this factory at render time (octane's
 //   compiled call sites do not apply component defaultProps).
 import isPropValid from '@emotion/is-prop-valid';
-import { createElement, useContext, useRef } from 'octane';
+import { createElement, useContext } from 'octane';
 
-import { IS_BROWSER } from '../constants';
-import type StyleSheet from '../sheet';
 import type {
 	AnyComponent,
 	Attrs,
@@ -23,7 +21,6 @@ import type {
 	IStyledStatics,
 	OmitNever,
 	RuleSet,
-	Stringifier,
 	StyledOptions,
 	WebTarget,
 } from '../types';
@@ -45,10 +42,6 @@ import { SC_VERSION } from '../constants';
 import ComponentStyle from './ComponentStyle';
 import { useStyleSheetContext } from './StyleSheetManager';
 import { DefaultTheme, ThemeContext } from './ThemeProvider';
-
-const hasOwn = Object.prototype.hasOwnProperty;
-
-const SLOT_STYLE_MEMO = Symbol.for('@octanejs/styled-components:style-memo');
 
 const identifiers: { [key: string]: number } = {};
 
@@ -77,36 +70,6 @@ function generateId(
 
 	return parentComponentId ? parentComponentId + '-' + componentId : componentId;
 }
-
-/**
- * Shallow-compare two context objects using a stored key count to avoid
- * a second iteration pass. Returns true if all own-property values match.
- */
-function shallowEqualContext(prev: object, next: object, prevKeyCount: number): boolean {
-	const a = prev as Record<string, unknown>;
-	const b = next as Record<string, unknown>;
-	let nextKeyCount = 0;
-	for (const key in b) {
-		if (hasOwn.call(b, key)) {
-			nextKeyCount++;
-			if (a[key] !== b[key]) return false;
-		}
-	}
-	return nextKeyCount === prevKeyCount;
-}
-
-// Cached render inputs + style result: [prevProps, prevTheme, prevStyleSheet, prevStylis,
-// prevPropsKeyCount, cachedContext, cachedClassName, prevComponentStyle]
-type RenderCache = [
-	object, // prevProps
-	DefaultTheme | undefined, // prevTheme
-	StyleSheet, // prevStyleSheet
-	Stringifier, // prevStylis
-	number, // prevPropsKeyCount
-	object, // cachedContext
-	string, // cachedClassName
-	ComponentStyle, // prevComponentStyle (for HMR invalidation)
-];
 
 type StyleContext<Props extends BaseObject> = ExecutionContext &
 	Props & {
@@ -216,59 +179,16 @@ function useStyledComponentImpl<Props extends BaseObject>(
 
 	const theme = determineTheme(props, contextTheme, defaultProps) || EMPTY_OBJECT;
 
-	let context: StyleContext<Props>;
-	let generatedClassName: string;
-
-	// Client-only render cache: skip resolveContext and generateAndInjectStyles
-	// when props+theme haven't changed. propsForElement is always rebuilt since
-	// it's mutated with className/ref after construction. Conditional hooks are
-	// legal in octane (slot-keyed), so the server path simply never allocates
-	// the cache cell.
-	if (IS_BROWSER) {
-		const renderCacheRef = useRef<RenderCache | null>(null, SLOT_STYLE_MEMO);
-		const prev = renderCacheRef.current;
-
-		if (
-			prev !== null &&
-			prev[1] === theme &&
-			prev[2] === ssc.styleSheet &&
-			prev[3] === ssc.stylis &&
-			prev[7] === componentStyle &&
-			shallowEqualContext(prev[0], props, prev[4])
-		) {
-			context = prev[5] as StyleContext<Props>;
-			generatedClassName = prev[6];
-		} else {
-			context = resolveContext<Props>(componentAttrs, props, theme);
-			generatedClassName = componentStyle.generateAndInjectStyles(
-				context,
-				ssc.styleSheet,
-				ssc.stylis,
-			);
-
-			let propsKeyCount = 0;
-			for (const key in props) {
-				if (hasOwn.call(props, key)) propsKeyCount++;
-			}
-			renderCacheRef.current = [
-				props,
-				theme,
-				ssc.styleSheet,
-				ssc.stylis,
-				propsKeyCount,
-				context,
-				generatedClassName,
-				componentStyle,
-			];
-		}
-	} else {
-		context = resolveContext<Props>(componentAttrs, props, theme);
-		generatedClassName = componentStyle.generateAndInjectStyles(
-			context,
-			ssc.styleSheet,
-			ssc.stylis,
-		);
-	}
+	// Attrs are render functions, so always resolve them on an actual component
+	// render. Dynamic styles are evaluated for the same reason. ComponentStyle
+	// shares only proven-static client results by sheet and stylis identity;
+	// server outputs are always revisited for the active request.
+	const context = resolveContext<Props>(componentAttrs, props, theme);
+	const generatedClassName = componentStyle.generateAndInjectStyles(
+		context,
+		ssc.styleSheet,
+		ssc.stylis,
+	);
 
 	if (process.env.NODE_ENV !== 'production' && forwardedComponent.warnTooManyClasses) {
 		forwardedComponent.warnTooManyClasses(generatedClassName);

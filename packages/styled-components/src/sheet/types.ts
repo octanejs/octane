@@ -23,15 +23,21 @@ export type SheetOptions = {
 	nonce?: string | undefined;
 	target?: InsertionTarget | undefined;
 	useCSSOMInjection: boolean;
-	/**
-	 * Octane addition: a server sheet that also accumulates rules in-memory
-	 * (VirtualTag) so `ServerStyleSheet.getStyleTags()` can serialize them. The
-	 * default server sheet is a "phantom" instead — it forwards every chunk to
-	 * octane's SSR css channel and retains nothing, so no state can leak across
-	 * requests.
-	 */
+	/** Retain a server copy for the `ServerStyleSheet` compatibility API. */
 	capture?: boolean;
 };
+
+/**
+ * Destination for compiled rules. The sheet owns names and component order;
+ * an output owns only where rules go and whether they survive an insertion.
+ */
+export interface RuleOutput {
+	readonly persistent: boolean;
+	clearGroup(group: number): void;
+	getTag(): GroupedTag;
+	insertRules(id: string, name: string, group: number, rules: string[]): void;
+	reset(): void;
+}
 
 export interface Sheet {
 	allocateGSInstance(id: string): number;
