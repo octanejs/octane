@@ -3,12 +3,7 @@
   "version": "0.1.8",
   "license": "MIT",
   "type": "module",
-  "sideEffects": [
-    "./src/index.ts",
-    "./src/runtime.ts",
-    "./dist/index.js",
-    "./dist/runtime.js"
-  ],
+  "sideEffects": false,
   "engines": {
     "node": ">=22"
   },
