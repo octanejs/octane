@@ -13,6 +13,7 @@
 // matching, so the catch-all never swallows module requests.
 import { defineConfig, RenderRoute, type Middleware } from '@octanejs/vite-plugin';
 import { vercel } from '@octanejs/adapter-vercel';
+import { threeRenderers } from '@octanejs/three/config';
 
 // Warm the per-URL server router before the render runs. Dynamic import so
 // loading octane.config.ts itself stays cheap; it resolves to the SAME module
@@ -30,6 +31,12 @@ export default defineConfig({
 	// Pin production to the newest supported runtime. Local and CI builds also
 	// support Node 22; Node 20 is no longer part of Octane's baseline.
 	adapter: vercel({ serverless: { runtime: 'nodejs24.x' } }),
+	// The home page's 3D logo section authors its scene in a `.three.tsrx`
+	// module; the preset keeps scene modules client-only on the server and
+	// scopes the Three intrinsic catalogue to those modules.
+	compiler: {
+		renderers: threeRenderers,
+	},
 	router: {
 		routes: [
 			new RenderRoute({ path: '/', entry: ENTRY, before: [warmRouter] }),
