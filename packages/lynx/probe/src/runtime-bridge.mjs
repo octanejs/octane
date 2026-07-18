@@ -107,6 +107,7 @@ export function installPhase0Background(target = globalThis) {
 	}
 
 	const ready = probe.mount();
+	let destroyOperation;
 	return Object.freeze({
 		probe,
 		ready,
@@ -114,13 +115,16 @@ export function installPhase0Background(target = globalThis) {
 		get lastEvent() {
 			return lastEvent;
 		},
-		async destroy() {
-			await probe.destroy();
-			removeMessageListener();
-			for (const deferred of pending.values()) {
-				deferred.reject(new Error('Octane Lynx Phase 0 background transport was destroyed.'));
-			}
-			pending.clear();
+		destroy() {
+			if (destroyOperation !== undefined) return destroyOperation;
+			destroyOperation = probe.destroy().finally(() => {
+				removeMessageListener();
+				for (const deferred of pending.values()) {
+					deferred.reject(new Error('Octane Lynx Phase 0 background transport was destroyed.'));
+				}
+				pending.clear();
+			});
+			return destroyOperation;
 		},
 	});
 }

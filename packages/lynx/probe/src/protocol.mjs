@@ -29,13 +29,32 @@ function assertProtocolIdentity(message, label) {
 	}
 }
 
+function forgetSubtree(rootId, knownHosts, parents) {
+	const pending = [rootId];
+	const forgotten = new Set();
+	while (pending.length > 0) {
+		const id = pending.pop();
+		if (forgotten.has(id)) continue;
+		forgotten.add(id);
+		for (const [childId, parentId] of parents) {
+			if (parentId === id) pending.push(childId);
+		}
+	}
+	for (const id of forgotten) {
+		parents.delete(id);
+		knownHosts.delete(id);
+	}
+}
+
 export function createPhase0BackgroundProbe(send) {
 	invariant(typeof send === 'function', 'background send must be a function.');
 
 	let acceptedVersion = 0;
 	let count = 0;
+	let destroyOperation;
 	let destroyed = false;
 	let fault;
+	let mountOperation;
 	let mounted = false;
 	let tail = Promise.resolve();
 
@@ -54,17 +73,17 @@ export function createPhase0BackgroundProbe(send) {
 		let acknowledgement;
 		try {
 			acknowledgement = await send(batch);
+			assertProtocolIdentity(acknowledgement, 'acknowledgement');
+			invariant(acknowledgement.type === 'ack', 'transport response must be an acknowledgement.');
+			invariant(
+				acknowledgement.acceptedVersion === version,
+				`acknowledgement accepted version must be ${version}.`,
+			);
 		} catch (error) {
 			fault = error;
 			throw error;
 		}
 
-		assertProtocolIdentity(acknowledgement, 'acknowledgement');
-		invariant(acknowledgement.type === 'ack', 'transport response must be an acknowledgement.');
-		invariant(
-			acknowledgement.acceptedVersion === version,
-			`acknowledgement accepted version must be ${version}.`,
-		);
 		acceptedVersion = version;
 		return acknowledgement;
 	}
@@ -79,63 +98,72 @@ export function createPhase0BackgroundProbe(send) {
 		return operation;
 	}
 
-	async function mount() {
-		invariant(!mounted, 'mount may only run once.');
-		await enqueue(() => [
-			{
-				type: 'create',
-				id: PHASE_0_HOST_IDS.counter,
-				hostType: 'view',
-				parentId: PHASE_0_HOST_IDS.page,
+	function mount() {
+		invariant(mountOperation === undefined, 'mount may only run once.');
+		invariant(destroyOperation === undefined, 'cannot mount after destroy was requested.');
+		mountOperation = enqueue(
+			() => [
+				{
+					type: 'create',
+					id: PHASE_0_HOST_IDS.counter,
+					hostType: 'view',
+					parentId: PHASE_0_HOST_IDS.page,
+				},
+				{
+					type: 'dataset',
+					id: PHASE_0_HOST_IDS.counter,
+					name: 'testid',
+					value: 'phase-0-counter',
+				},
+				{
+					type: 'event',
+					id: PHASE_0_HOST_IDS.counter,
+					eventType: 'bindEvent',
+					eventName: 'tap',
+					listenerId: PHASE_0_LISTENER_ID,
+				},
+				{
+					type: 'create',
+					id: PHASE_0_HOST_IDS.label,
+					hostType: 'text',
+					parentId: PHASE_0_HOST_IDS.counter,
+				},
+				{
+					type: 'create',
+					id: PHASE_0_HOST_IDS.value,
+					hostType: 'raw-text',
+					parentId: PHASE_0_HOST_IDS.label,
+					text: 'Count: 0',
+				},
+				{
+					type: 'append',
+					parentId: PHASE_0_HOST_IDS.label,
+					childId: PHASE_0_HOST_IDS.value,
+				},
+				{
+					type: 'append',
+					parentId: PHASE_0_HOST_IDS.counter,
+					childId: PHASE_0_HOST_IDS.label,
+				},
+				{
+					type: 'append',
+					parentId: PHASE_0_HOST_IDS.page,
+					childId: PHASE_0_HOST_IDS.counter,
+				},
+			],
+			() => {
+				mounted = true;
 			},
-			{
-				type: 'dataset',
-				id: PHASE_0_HOST_IDS.counter,
-				name: 'testid',
-				value: 'phase-0-counter',
-			},
-			{
-				type: 'event',
-				id: PHASE_0_HOST_IDS.counter,
-				eventType: 'bindEvent',
-				eventName: 'tap',
-				listenerId: PHASE_0_LISTENER_ID,
-			},
-			{
-				type: 'create',
-				id: PHASE_0_HOST_IDS.label,
-				hostType: 'text',
-				parentId: PHASE_0_HOST_IDS.counter,
-			},
-			{
-				type: 'create',
-				id: PHASE_0_HOST_IDS.value,
-				hostType: 'raw-text',
-				parentId: PHASE_0_HOST_IDS.label,
-				text: 'Count: 0',
-			},
-			{
-				type: 'append',
-				parentId: PHASE_0_HOST_IDS.label,
-				childId: PHASE_0_HOST_IDS.value,
-			},
-			{
-				type: 'append',
-				parentId: PHASE_0_HOST_IDS.counter,
-				childId: PHASE_0_HOST_IDS.label,
-			},
-			{
-				type: 'append',
-				parentId: PHASE_0_HOST_IDS.page,
-				childId: PHASE_0_HOST_IDS.counter,
-			},
-		]);
-		mounted = true;
+		);
+		return mountOperation;
 	}
 
 	async function handleNativeEvent(listenerId, event) {
+		invariant(
+			!destroyed && destroyOperation === undefined,
+			'cannot deliver an event after destroy.',
+		);
 		invariant(mounted, 'cannot deliver an event before mount acknowledgement.');
-		invariant(!destroyed, 'cannot deliver an event after destroy.');
 		invariant(listenerId === PHASE_0_LISTENER_ID, 'received a stale or foreign listener ID.');
 		invariant(event?.eventName === 'tap', 'counter listener only accepts the native tap event.');
 
@@ -157,25 +185,38 @@ export function createPhase0BackgroundProbe(send) {
 		);
 	}
 
-	async function destroy() {
-		if (destroyed) return;
-		if (mounted) {
-			await enqueue(() => [
-				{
-					type: 'event',
-					id: PHASE_0_HOST_IDS.counter,
-					eventType: 'bindEvent',
-					eventName: 'tap',
-					listenerId: undefined,
+	function destroy() {
+		if (destroyOperation !== undefined) return destroyOperation;
+		destroyOperation = (async () => {
+			if (mountOperation === undefined) return;
+			try {
+				await mountOperation;
+			} catch {
+				return;
+			}
+			await enqueue(
+				() => [
+					{
+						type: 'event',
+						id: PHASE_0_HOST_IDS.counter,
+						eventType: 'bindEvent',
+						eventName: 'tap',
+						listenerId: undefined,
+					},
+					{
+						type: 'remove',
+						parentId: PHASE_0_HOST_IDS.page,
+						childId: PHASE_0_HOST_IDS.counter,
+					},
+				],
+				() => {
+					mounted = false;
 				},
-				{
-					type: 'remove',
-					parentId: PHASE_0_HOST_IDS.page,
-					childId: PHASE_0_HOST_IDS.counter,
-				},
-			]);
-		}
-		destroyed = true;
+			);
+		})().finally(() => {
+			destroyed = true;
+		});
+		return destroyOperation;
 	}
 
 	return Object.freeze({
@@ -231,6 +272,15 @@ function validateCommand(command, knownHosts, parents) {
 			knownHosts.has(command.childId),
 			`append child ${JSON.stringify(command.childId)} is missing.`,
 		);
+		invariant(command.childId !== PHASE_0_HOST_IDS.page, 'append cannot move the protocol root.');
+		let ancestorId = command.parentId;
+		while (ancestorId !== undefined) {
+			invariant(
+				ancestorId !== command.childId,
+				`append would create a cycle through ${JSON.stringify(command.childId)}.`,
+			);
+			ancestorId = parents.get(ancestorId);
+		}
 		parents.set(command.childId, command.parentId);
 		return;
 	}
@@ -248,7 +298,7 @@ function validateCommand(command, knownHosts, parents) {
 			parents.get(command.childId) === command.parentId,
 			`host ${JSON.stringify(command.childId)} is not attached to ${JSON.stringify(command.parentId)}.`,
 		);
-		parents.delete(command.childId);
+		forgetSubtree(command.childId, knownHosts, parents);
 		return;
 	}
 
@@ -280,14 +330,6 @@ export function createPhase0MainThreadReceiver(papi) {
 	const hosts = new Map([[PHASE_0_HOST_IDS.page, papi.page]]);
 	const parents = new Map();
 	let acceptedVersion = 0;
-
-	function forgetSubtree(id) {
-		for (const [childId, parentId] of parents) {
-			if (parentId === id) forgetSubtree(childId);
-		}
-		parents.delete(id);
-		hosts.delete(id);
-	}
 
 	function receive(batch) {
 		assertProtocolIdentity(batch, 'batch');
@@ -324,7 +366,7 @@ export function createPhase0MainThreadReceiver(papi) {
 				papi.setText(hosts.get(command.id), command.value);
 			} else if (command.type === 'remove') {
 				papi.remove(hosts.get(command.parentId), hosts.get(command.childId));
-				forgetSubtree(command.childId);
+				forgetSubtree(command.childId, hosts, parents);
 			}
 		}
 
