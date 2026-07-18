@@ -6362,7 +6362,9 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	}
 	let catchFnName = 'null'; // no @catch → ssrTry rethrows non-suspense errors
 	if (node.handler) {
-		const params = node.handler.param ? [node.handler.param] : [];
+		const params = [];
+		if (node.handler.param) params.push(node.handler.param);
+		if (node.handler.resetParam) params.push(node.handler.resetParam);
 		const catchSub = ssrCompileSub(
 			node.handler.body.body,
 			ctx,
@@ -6374,7 +6376,11 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		);
 		inlinedSubs.push(catchSub.fn + ';');
 		// A no-param @catch simply ignores the error argument ssrTry passes.
-		catchFnName = catchSub.fnName;
+		// ssrTry keeps the SSR scope second; adapt the authored reset parameter
+		// around that ABI instead of shifting existing one-parameter helpers.
+		catchFnName = node.handler.resetParam
+			? `(__error, __scope, __reset) => ${catchSub.fnName}(__error, __reset, __scope)`
+			: catchSub.fnName;
 	}
 	ctx.runtimeNeeded.add('ssrTry');
 	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`

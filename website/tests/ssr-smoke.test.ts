@@ -1,25 +1,57 @@
 // @vitest-environment node
 //
-// Production SSR smoke test — runs the REAL `vite build` (client + server
-// bundles via @octanejs/vite-plugin) and drives the built dist/server handler
-// directly: the same export the Vercel adapter's function wraps and
-// `octane-preview` boots locally. Complements smoke.test.ts (client-side
-// render): this proves the DEPLOYED artifact serves every route server-side.
-import { describe, it, expect, beforeAll } from 'vitest';
+// Production SSR smoke test — runs the real TanStack Start + Nitro build and
+// drives the generated server over HTTP. Complements smoke.test.ts
+// (client-side render): this proves the deployable artifact serves every route
+// server-side.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL, fileURLToPath } from 'node:url';
-import { build } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:net';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../src/content/benchmarks.ts';
 
 const websiteRoot = fileURLToPath(new URL('..', import.meta.url));
-const serverEntry = path.join(websiteRoot, 'dist/server/entry.js');
+const serverEntry = path.join(websiteRoot, '.output/server/index.mjs');
 
-let handler: (request: Request) => Promise<Response>;
+let server: ChildProcess;
+let origin: string;
 
 async function get(url: string) {
-	const response = await handler(new Request(`http://localhost${url}`));
+	const response = await fetch(origin + url);
 	return { response, html: await response.text() };
+}
+
+async function getFreePort(): Promise<number> {
+	return new Promise((resolve, reject) => {
+		const socket = createServer();
+		socket.once('error', reject);
+		socket.listen(0, '127.0.0.1', () => {
+			const { port } = socket.address() as import('node:net').AddressInfo;
+			socket.close(() => resolve(port));
+		});
+	});
+}
+
+async function waitForServer(child: ChildProcess, url: string): Promise<void> {
+	const deadline = Date.now() + 30_000;
+	while (Date.now() < deadline) {
+		if (child.exitCode !== null) {
+			throw new Error(`Nitro server exited with code ${child.exitCode} before listening`);
+		}
+		try {
+			const response = await fetch(url);
+			if (response.status < 500) {
+				await response.body?.cancel();
+				return;
+			}
+		} catch {
+			// Server is still starting.
+		}
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	throw new Error(`Nitro server at ${url} never came up`);
 }
 
 function classCount(html: string, className: string): number {
@@ -28,32 +60,59 @@ function classCount(html: string, className: string): number {
 	).length;
 }
 
+function readJavaScriptFiles(root: string): string[] {
+	return fs.readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+		const entryPath = path.join(root, entry.name);
+		if (entry.isDirectory()) return readJavaScriptFiles(entryPath);
+		return entry.name.endsWith('.js') ? [fs.readFileSync(entryPath, 'utf8')] : [];
+	});
+}
+
 beforeAll(async () => {
-	await build({ root: websiteRoot, logLevel: 'silent' });
-	({ handler } = await import(pathToFileURL(serverEntry).href));
+	await new Promise<void>((resolve, reject) => {
+		const build = spawn('pnpm', ['exec', 'vite', 'build'], {
+			cwd: websiteRoot,
+			stdio: 'ignore',
+			env: { ...process.env, NITRO_PRESET: 'node-server' },
+		});
+		build.once('error', reject);
+		build.once('exit', (code) => {
+			if (code === 0) resolve();
+			else reject(new Error(`vite build exited with code ${code}`));
+		});
+	});
+	const port = await getFreePort();
+	origin = `http://127.0.0.1:${port}`;
+	server = spawn(process.execPath, [serverEntry], {
+		cwd: websiteRoot,
+		stdio: 'ignore',
+		env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
+	});
+	await waitForServer(server, origin + '/');
 }, 240_000);
 
-describe('built SSR handler', () => {
-	it('produced the deployable layout (assets static, template with the server)', () => {
-		expect(fs.existsSync(serverEntry)).toBe(true);
-		expect(fs.existsSync(path.join(websiteRoot, 'dist/server/index.html'))).toBe(true);
-		// index.html must NOT be a static file — it would shadow SSR at '/'.
-		expect(fs.existsSync(path.join(websiteRoot, 'dist/client/index.html'))).toBe(false);
+afterAll(async () => {
+	if (!server || server.exitCode !== null) return;
+	server.kill('SIGTERM');
+	await new Promise((resolve) => {
+		server.once('exit', resolve);
+		setTimeout(resolve, 3000);
 	});
+	if (server.exitCode === null) server.kill('SIGKILL');
+});
 
-	it('ran the Vercel adapter (adapter: vercel() in octane.config → .vercel/output)', () => {
-		// The closeBundle → adapter.adapt() wiring: the build above must have
-		// emitted Build Output API v3 alongside dist/.
-		const outputDir = path.join(websiteRoot, '.vercel/output');
-		expect(fs.existsSync(path.join(outputDir, 'functions/index.func/entry.js'))).toBe(true);
-		const config = JSON.parse(fs.readFileSync(path.join(outputDir, 'config.json'), 'utf-8'));
-		expect(config.routes).toContainEqual({ handle: 'filesystem' });
+describe('built Start server', () => {
+	it('produced Nitro server and public asset output', () => {
+		expect(fs.existsSync(serverEntry)).toBe(true);
+		expect(fs.existsSync(path.join(websiteRoot, '.output/public/playground-runtime.mjs'))).toBe(
+			true,
+		);
 	});
 
 	it('server-renders the home page with the hydration payload', async () => {
 		const { response, html } = await get('/');
 		expect(response.status).toBe(200);
-		expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
+		expect(response.headers.get('content-type')).toMatch(/^text\/html\b/);
 		expect(html).toContain('<main');
 		expect(classCount(html, 'home')).toBeGreaterThan(0);
 		// The complete explorer is deterministic server markup: no-JS, hydration,
@@ -65,13 +124,45 @@ describe('built SSR handler', () => {
 		expect(classCount(html, 'home-bench-chart')).toBe(0);
 		expect(classCount(html, 'deferred-bench')).toBe(0);
 		expect(classCount(html, 'bench-plot-shell')).toBe(0);
-		// Hydration wiring: the data script names the app entry + preHydrate hook,
-		// and the template carries the built hydrate script.
-		expect(html).toContain('"entry":"/src/app/App.tsrx"');
-		expect(html).toContain('"preHydrate":"/src/app/router-client.ts"');
-		expect(html).toMatch(
-			/<script(?=[^>]*\bdata-octane-hydrate\b)(?=[^>]*\btype="module")(?=[^>]*\bsrc="\/assets\/[^"]+\.js")[^>]*>/,
+		expect(html).toContain('<html lang="en"');
+		expect(html).toContain('id="__app"');
+		for (const href of [
+			'/favicon.ico',
+			'/favicon.svg',
+			'/apple-touch-icon.png',
+			'/site.webmanifest',
+		]) {
+			expect(html).toContain(`href="${href}"`);
+		}
+		expect(html).toMatch(/<script(?=[^>]*\btype="module")[^>]*>/);
+	});
+
+	it('keeps route-only components out of the home-page asset graph', async () => {
+		const { html } = await get('/');
+		const publicRoot = path.join(websiteRoot, '.output/public');
+		const initialAssetPaths = Array.from(
+			new Set(
+				Array.from(html.matchAll(/(?:src|href)="(\/assets\/[^"?]+\.js)(?:\?[^" ]*)?"/g)).map(
+					(match) => match[1]!,
+				),
+			),
 		);
+		expect(initialAssetPaths.length).toBeGreaterThan(0);
+
+		const initialJavaScript = initialAssetPaths
+			.map((assetPath) => fs.readFileSync(path.join(publicRoot, assetPath.slice(1)), 'utf8'))
+			.join('\n');
+		const allJavaScript = readJavaScriptFiles(path.join(publicRoot, 'assets')).join('\n');
+		const routeOnlySentinels = [
+			'This link contains shared code.',
+			'Every suite at a glance',
+			'Configure Vite, Rspack, or Rsbuild for Octane apps.',
+		];
+
+		for (const sentinel of routeOnlySentinels) {
+			expect(allJavaScript).toContain(sentinel);
+			expect(initialJavaScript).not.toContain(sentinel);
+		}
 	});
 
 	it('server-renders an MDX doc through the bundle (Shiki output included)', async () => {

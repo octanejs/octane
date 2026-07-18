@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedBy": "pnpm native-events:diagnostics",
-  "scannedSourceFiles": 1263,
+  "scannedSourceFiles": 1271,
   "diagnostics": [
     {
       "file": "packages/octane-evals/datasets/train/user-apps-v1/tasks/octane.native-controlled-search/starter/src/App.tsrx",

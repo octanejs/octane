@@ -7,7 +7,7 @@
 // aria-hidden: it is a pointer toy, and everything it says is said in the copy.
 import { Hydrate } from 'octane';
 import { visible } from 'octane/hydration';
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { SpinStage } from './SpinStage.tsrx';
 
 export function Spin() @{

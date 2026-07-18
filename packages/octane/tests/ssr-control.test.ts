@@ -125,6 +125,27 @@ describe('SSR Phase 3 — control flow with block markers', () => {
 		).html;
 		expect(caught).toBe(`<div>${OPEN}${OPEN}<span class="error">boom</span>${CLOSE}${CLOSE}</div>`);
 	});
+
+	it('@catch exposes a callable server reset function', async () => {
+		const boundary = evalServer(
+			`
+				export const Boundary = () => @{
+					@try {
+						throw new Error('boom');
+						<span>{'unreachable'}</span>
+					} @catch (error, reset) {
+						reset();
+						<span data-reset={typeof reset}>{error.message as string}</span>
+					}
+				}
+			`,
+			'ssr-catch-reset.tsrx',
+		);
+
+		expect((await RT.renderToString(boundary.Boundary)).html).toBe(
+			`${OPEN}${OPEN}<span data-reset="function">boom</span>${CLOSE}${CLOSE}`,
+		);
+	});
 });
 
 describe('SSR Phase 3 — component children (context Provider)', () => {

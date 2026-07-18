@@ -6,8 +6,8 @@
 // button inside the opaque-origin frame.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import {
 	compilePlayground,
 	createPreview,
@@ -27,7 +27,7 @@ import {
 afterEach(cleanup);
 
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {

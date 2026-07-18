@@ -12,7 +12,7 @@
 // a `position: fixed` overlay rendered inside it would be clipped to the 60px
 // nav strip instead of covering the viewport.
 import { createPortal, useEffect, useRef, useState } from 'octane';
-import { useNavigate } from '@octanejs/tanstack-router';
+import { useNavigate } from '@tanstack/octane-router';
 import { loadSearchIndex, searchDocs } from '../lib/docs-search.ts';
 import type { SearchGroup, SearchRecord } from '../lib/docs-search.ts';
 import searchUrl from '../assets/search.svg';

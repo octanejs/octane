@@ -8,10 +8,19 @@ pnpm-workspace.yaml
 # Build outputs
 **/dist/
 **/build/
+**/.netlify/
+**/.nitro/
+**/.output/
+**/.tanstack/
+**/.vercel/
+**/.wrangler/
 
 # Generated declaration files
 **/*.d.tsrx.ts
 packages/visx/**/*.tsrx.d.ts
+
+# TanStack Router owns this generated module's formatting.
+website/src/routeTree.gen.ts
 
 # The current TSRX Prettier parser cannot safely round-trip several valid
 # upstream React-shaped TypeScript/JSX constructs used by the Visx port.

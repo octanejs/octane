@@ -49,16 +49,24 @@ async function settleCharts(
 	}
 }
 
+// Both chart implementations use Redux Toolkit's rAF auto-batching. Unmounting
+// unregisters chart state and queues one final notification; let that frame run
+// before Vitest tears down jsdom and removes the animation-frame globals.
+async function unmountCharts(d: { unmount(): void }): Promise<void> {
+	d.unmount();
+	await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 describe('differential: @octanejs/recharts vs real recharts (Phase 1 charts)', () => {
 	it('static BarChart with axes renders byte-identical SVG', async () => {
 		const d = await mountDifferential(CHARTS_FIXTURE, 'BarChartApp', undefined, CACHE);
 		await d.step('settled', settleCharts);
-		d.unmount();
+		await unmountCharts(d);
 	});
 
 	it('static LineChart with axes renders byte-identical SVG', async () => {
 		const d = await mountDifferential(CHARTS_FIXTURE, 'LineChartApp', undefined, CACHE);
 		await d.step('settled', settleCharts);
-		d.unmount();
+		await unmountCharts(d);
 	});
 });

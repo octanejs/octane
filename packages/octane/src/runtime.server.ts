@@ -33,6 +33,8 @@ import {
 	SUSPENSE_SCRIPT_ATTR,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 	HYDRATE_ID_ATTR,
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
@@ -69,7 +71,7 @@ import {
 	hasComponentFlags,
 	markComponentFlags,
 } from './component-flags.js';
-export { normalizeClass };
+export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
 interface SSRScope {
 	parent: SSRScope | null;
@@ -1313,7 +1315,12 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 		if (typeof d.type === 'string') return ssrHostElement(d.type, d.props, d.children, scope);
 		return ssrComponentDescriptor(d, scope);
 	}
-	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
+	if (typeof v === 'function') {
+		// A host descriptor can receive a compiler-generated children block through
+		// an uncompiled wrapper. Its transient function identity must not become part
+		// of the streamed async boundary key used for a later retry.
+		return ssrComponent(scope, v as ServerComponent, {}, undefined, undefined, isChildrenBlock(v));
+	}
 	if (typeof v === 'object') throw invalidChildError(v as object);
 	return escapeHtml(v);
 }
@@ -3427,13 +3434,22 @@ function isHydrationRejectionSeed(value: unknown): value is HydrationRejectionSe
 	);
 }
 
-function recordHydrationRejection(reason: unknown): void {
-	if (SERIAL !== null) SERIAL.push(hydrationRejectionSeed(reason));
+function recordHydrationRejection(serial: unknown[] | null, reason: unknown): void {
+	if (serial !== null) serial.push(hydrationRejectionSeed(reason));
+}
+
+function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
+	try {
+		return (thenable as any)[EXTERNAL_HYDRATION_PROMISE] === true;
+	} catch {
+		return false;
+	}
 }
 
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | string): T;
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
+	const serial = hasExternalHydrationOwner(usable as PromiseLike<unknown>) ? null : SERIAL;
 	if (usable == null || typeof (usable as any).then !== 'function') {
 		// Cold path: a FOREIGN host context inside a hosted server pass reads
 		// through the installed host hook (§6.4); anything else diagnoses.
@@ -3471,10 +3487,10 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		const entryT = RESOLVED.pu.resolvedT.get(usable as PromiseLike<unknown>);
 		if (entryT !== undefined) {
 			if ('reason' in entryT) {
-				recordHydrationRejection(entryT.reason);
+				recordHydrationRejection(serial, entryT.reason);
 				throw entryT.reason;
 			}
-			if (SERIAL !== null) SERIAL.push(entryT.value);
+			if (serial !== null) serial.push(entryT.value);
 			return entryT.value as T;
 		}
 	}
@@ -3485,11 +3501,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		// Serialize a typed rejection seed first so hydration takes the same catch
 		// arm even when the client receives a fresh, still-pending thenable.
 		if ('reason' in entry) {
-			recordHydrationRejection(entry.reason);
+			recordHydrationRejection(serial, entry.reason);
 			throw entry.reason;
 		}
 		// Resolved → return it, and record it (in render order) for client seeding.
-		if (SERIAL !== null) SERIAL.push(entry.value);
+		if (serial !== null) serial.push(entry.value);
 		return entry.value as T;
 	}
 	// React-compatible instrumented thenables expose their synchronous state on
@@ -3505,11 +3521,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 	let status = instrumented.status;
 	const wasUninstrumented = status === undefined;
 	if (status === 'fulfilled') {
-		if (SERIAL !== null) SERIAL.push(instrumented.value);
+		if (serial !== null) serial.push(instrumented.value);
 		return instrumented.value as T;
 	}
 	if (status === 'rejected') {
-		recordHydrationRejection(instrumented.reason);
+		recordHydrationRejection(serial, instrumented.reason);
 		throw instrumented.reason;
 	}
 	if (wasUninstrumented) {
@@ -3535,11 +3551,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
-			if (SERIAL !== null) SERIAL.push(instrumented.value);
+			if (serial !== null) serial.push(instrumented.value);
 			return instrumented.value as T;
 		}
 		if (status === 'rejected') {
-			recordHydrationRejection(instrumented.reason);
+			recordHydrationRejection(serial, instrumented.reason);
 			throw instrumented.reason;
 		}
 	}
@@ -3547,11 +3563,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		instrumented.then(NOOP, NOOP);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
-			if (SERIAL !== null) SERIAL.push(instrumented.value);
+			if (serial !== null) serial.push(instrumented.value);
 			return instrumented.value as T;
 		}
 		if (status === 'rejected') {
-			recordHydrationRejection(instrumented.reason);
+			recordHydrationRejection(serial, instrumented.reason);
 			throw instrumented.reason;
 		}
 	}
@@ -5453,7 +5469,7 @@ export function ssrTry(
 	siteKey: string,
 	tryFn: (arg: unknown, scope: SSRScope) => string,
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
-	catchFn: ((err: unknown, scope: SSRScope) => string) | null,
+	catchFn: ((err: unknown, scope: SSRScope, reset: () => void) => string) | null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
 ): string {
 	VT_SSR_TRY_SEQ++;
@@ -5696,7 +5712,7 @@ export function ssrTry(
 				// consume any seeds appended while rendering it below).
 				const caughtSeeds = entry !== undefined && SERIAL !== null ? SERIAL.slice(serialStart) : [];
 				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
-				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope)));
+				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
 						if (SERIAL !== null) {
