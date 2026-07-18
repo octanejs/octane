@@ -2,7 +2,7 @@
 // navigation supplied by the registry, and keep a local table of contents
 // beside longer guides.
 import { useEffect, useLayoutEffect, useRef, useState } from 'octane';
-import { Link, useParams } from '@octanejs/tanstack-router';
+import { Link, useParams } from '@tanstack/octane-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
 import { useTitle } from '../../hooks/use-title.ts';

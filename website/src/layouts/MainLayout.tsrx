@@ -1,7 +1,7 @@
 // Root layout: the shell every route renders inside — header, the routed page,
 // and (except on the playground, which fills the viewport) the footer. The bar
 // itself lives in Header.tsrx; this component only owns the shell frame.
-import { Outlet, useLocation } from '@octanejs/tanstack-router';
+import { Outlet, useLocation } from '@tanstack/octane-router';
 import { Header } from '../components/Header.tsrx';
 import { Footer } from '../components/Footer.tsrx';
 

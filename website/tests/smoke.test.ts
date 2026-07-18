@@ -3,8 +3,8 @@
 // boundaries; detailed copy and visual behavior belong to focused tests.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
 import {
@@ -46,7 +46,7 @@ function expectedBarCount(card: BenchCard): number {
 // The client store commits matches inside a transition, so wait for the root
 // layout before making route assertions.
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {
