@@ -1,6 +1,9 @@
 {
-  "upstream": { "package": "react-scan", "version": "0.5.7" },
-  "surface": "Phase 2 of 6 (docs/octane-scan-port-plan.md): the programmatic core — `scan`, `setOptions`, `getOptions`, `getReport`, `resetReport`, `onRender(Component, cb)`, and the `log`/`onCommitStart`/`onCommitFinish` options — over octane's profile-build inspection channel. Render outlines, the toolbar/inspector, `useScan`, and the script-tag auto entry are not yet ported.",
+  "upstream": {
+    "package": "react-scan",
+    "version": "0.5.7"
+  },
+  "surface": "Phases 2–3 of 6 (docs/octane-scan-port-plan.md): the programmatic core — `scan`, `setOptions`, `getOptions`, `getReport`, `resetReport`, `onRender(Component, cb)`, the `log`/`onCommitStart`/`onCommitFinish` options — plus the render-outline overlay (labeled per-component flashes fading per `animationSpeed`, re-measured every frame, pointer-transparent, verified in real Chromium). The toolbar/inspector, `useScan`, and the script-tag auto entry are not yet ported.",
   "divergences": [
     "No fibers: callbacks receive an `OctaneRenderInfo` (component metadata, phase, schedule causes, timings, and a pull-based `domNodes()` resolver) instead of a React `Fiber`.",
     "Enablement is a build property, not a runtime flag: the app must compile with `octane({ profile: true })` — octane's production compile strips the inspection channel entirely, so react-scan's `dangerouslyForceRunInProduction` has no equivalent.",

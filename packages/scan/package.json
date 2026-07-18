@@ -44,6 +44,8 @@
   },
   "devDependencies": {
     "octane": "workspace:*",
+    "playwright": "catalog:default",
+    "vite": "catalog:default",
     "vitest": "catalog:default"
   }
 }

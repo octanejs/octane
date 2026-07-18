@@ -69,12 +69,29 @@ const DEFAULT_OPTIONS: Options = {
 	trackUnnecessaryRenders: false,
 };
 
+/**
+ * A per-commit consumer of the renders the core observed (the outline
+ * overlay; later the toolbar). Kept behind a registration seam so this
+ * module stays importable in any environment — index.ts attaches the DOM
+ * overlay only when a document exists.
+ */
+export interface RenderSink {
+	batch(infos: OctaneRenderInfo[], options: Options): void;
+}
+
 let options: Options = { ...DEFAULT_OPTIONS };
 let detach: (() => void) | null = null;
 const report = new Map<string, ComponentReport>();
 const componentListeners = new Map<string, Set<(info: OctaneRenderInfo) => void>>();
 /** Per-batch render tally, flushed to the console on commit-finish when logging. */
 let pendingLog = new Map<string, number>();
+let renderSink: RenderSink | null = null;
+let pendingBatch: OctaneRenderInfo[] = [];
+
+export function __setRenderSink(sink: RenderSink | null): void {
+	renderSink = sink;
+	pendingBatch = [];
+}
 
 function toInfo(event: ProfileEvent): OctaneRenderInfo {
 	return {
@@ -120,9 +137,12 @@ function record(event: ProfileEvent): void {
 
 	const listeners = componentListeners.get(event.componentId);
 	const wantsInfo =
-		options.onRender !== undefined || (listeners !== undefined && listeners.size > 0);
+		renderSink !== null ||
+		options.onRender !== undefined ||
+		(listeners !== undefined && listeners.size > 0);
 	if (wantsInfo) {
 		const info = toInfo(event);
+		if (renderSink !== null) pendingBatch.push(info);
 		try {
 			options.onRender?.(info);
 		} catch {
@@ -153,6 +173,15 @@ const subscriber: ProfileSubscriber = {
 		}
 	},
 	commitFinish() {
+		if (renderSink !== null && pendingBatch.length > 0) {
+			const batch = pendingBatch;
+			pendingBatch = [];
+			try {
+				renderSink.batch(batch, options);
+			} catch {
+				// The overlay must never break the app being scanned.
+			}
+		}
 		try {
 			options.onCommitFinish?.();
 		} catch {
@@ -177,6 +206,7 @@ function applyEnabled(): void {
 		detach();
 		detach = null;
 		pendingLog = new Map();
+		pendingBatch = [];
 	}
 }
 

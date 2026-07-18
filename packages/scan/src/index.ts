@@ -7,6 +7,9 @@
 // channel entirely, so unlike react-scan there is nothing to observe in an
 // unprofiled bundle (an intentional, documented divergence). Under SSR every
 // export is a safe no-op: the server produces no profiler events.
+import { __setRenderSink } from './core.js';
+import { outlineSink } from './outlines.js';
+
 export {
 	scan,
 	setOptions,
@@ -18,3 +21,7 @@ export {
 	type OctaneRenderInfo,
 	type ComponentReport,
 } from './core.js';
+
+// The outline overlay is a DOM consumer; attach it only where a document
+// exists so importing @octanejs/scan stays safe under SSR and in workers.
+if (typeof document !== 'undefined') __setRenderSink(outlineSink);

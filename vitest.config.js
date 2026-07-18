@@ -382,6 +382,18 @@ export default defineConfig({
 				plugins: [octane({ hmr: false, profile: true })],
 			},
 			{
+				// Outline-overlay evidence in real Chromium: the test boots its own
+				// profile-compiled vite server (mirroring octane-events-browser).
+				test: {
+					name: 'scan-browser',
+					include: ['packages/scan/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],

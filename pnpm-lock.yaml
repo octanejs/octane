@@ -3710,6 +3710,12 @@ importers:
       octane:
         specifier: workspace:*
         version: link:../octane
+      playwright:
+        specifier: catalog:default
+        version: 1.61.0
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
@@ -6881,7 +6887,7 @@ packages:
     engines: {node: '>=20.19'}
 
   '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
-    resolution: {integrity: sha512-mkKK62CCjEXt8sUpGlE+Ywx5Gs6QubJjxlnquGX0FEq8Sga5C1I0uQh+0//TkJAQymFUaWtxKHrYWkjSSTAahQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
     version: 1.162.0
     engines: {node: '>=20.19'}
 
@@ -7007,7 +7013,7 @@ packages:
         optional: true
 
   '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
-    resolution: {integrity: sha512-hTWqJtqIFFdvuCl8WXNyrodp2L9zo2G37xKRrcVmVRWpAB2h+U1LuRAfS4tsFTiWOIoE/B+WDVFB8JpoEdw6jQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
     version: 1.162.2
     engines: {node: '>=20.19'}
 
@@ -7017,7 +7023,7 @@ packages:
     engines: {node: '>=22.12.0'}
 
   '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
-    resolution: {integrity: sha512-r4Q31CRkQEhaWJnaT+bLC417jHDahvq+j/BB8LozGzGGD5BrKdr4PArE8K5wT+U6+ekmHp2ruVmFZfFTloV2UQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
     version: 1.162.0
     engines: {node: '>=22.12.0'}
 
