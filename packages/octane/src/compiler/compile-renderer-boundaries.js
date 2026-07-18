@@ -897,6 +897,10 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 		domRegions: Object.freeze(state.domRegions),
 		map: sourceMapFromOrigins(transformed.code, transformed.origins, source, filename),
 		mappingNeedles: Object.freeze(state.mappingNeedles),
+		// Per-character input offsets: region lowering inserts wrapper text, so
+		// scoped-style hashes after a region must be restamped from authored
+		// coordinates (compile.js).
+		origins: transformed.origins,
 		source: transformed.code,
 		universalUnits: Object.freeze(state.universalUnits),
 	});
@@ -979,6 +983,9 @@ export function prepareServerRendererBoundaryRegions(
 	return Object.freeze({
 		analysis: tree.analysis,
 		map: sourceMapFromOrigins(transformed.code, transformed.origins, source, filename),
+		// Blanking preserves offsets, but expose origins anyway so style-hash
+		// restamping composes uniformly across sequential rewrites (compile.js).
+		origins: transformed.origins,
 		source: transformed.code,
 	});
 }

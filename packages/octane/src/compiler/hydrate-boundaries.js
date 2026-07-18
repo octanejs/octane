@@ -477,6 +477,20 @@ function validateBoundary(boundary, filename, hookNames) {
 				'direct hook calls cannot move into a split child. Call the hook in a child component or set `split={false}`',
 			);
 		}
+		// `directHooks` also marks the owning component's direct render scope: a
+		// scoped <style> there belongs to that component's single style scope,
+		// which extraction would tear in half (the server annotates the whole
+		// component with one scope hash; the split chunk would compile the sheet
+		// under another). Styles nested inside functions never joined the
+		// component scope, so they move freely.
+		if (directHooks && node.type === 'JSXStyleElement') {
+			throw extractionError(
+				'OCTANE_HYDRATE_SPLIT_STYLE',
+				filename,
+				node,
+				'a scoped <style> cannot move into a split child — its rules belong to the owning component’s style scope. Move the <style> outside the boundary, into a child component, or set `split={false}`',
+			);
+		}
 		if (isFunction(node)) {
 			// A nested function keeps hook calls in its own invocation. Ordinary
 			// functions also bind their own receiver; arrows still capture `this`
@@ -1302,6 +1316,10 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null) 
 						source,
 						analysis.boundaries.find((boundary) => boundary.path === boundaryPath),
 					),
+		// Per-character authored offsets. Scoped-style hashes are derived from
+		// source positions, so the compiler must restamp them from the AUTHORED
+		// coordinates after this rewrite shifts the text (compile.js).
+		origins: transformed.origins,
 		source: transformed.code,
 	};
 }
@@ -1479,6 +1497,9 @@ export function prepareServerHydrateBoundaries(source, filename) {
 		boundaryPath: null,
 		map: sourceMapFromOrigins(transformed.code, transformed.origins, source, filename),
 		mappingNeedles: [],
+		// Fallback stripping shifts later text, so scoped-style hashes must be
+		// restamped from authored coordinates (see prepareHydrateBoundaries).
+		origins: transformed.origins,
 		source: transformed.code,
 	};
 }

@@ -17,13 +17,16 @@
     "@octanejs/adapter-vercel": "workspace:*",
     "@octanejs/mdx": "workspace:*",
     "@octanejs/tanstack-router": "workspace:*",
+    "@octanejs/three": "workspace:*",
     "@octanejs/visx": "workspace:*",
     "@octanejs/vite-plugin": "workspace:*",
-    "shiki": "catalog:default"
+    "shiki": "catalog:default",
+    "three": "catalog:default"
   },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
     "@shikijs/rehype": "catalog:default",
+    "@types/three": "catalog:default",
     "@tsrx/core": "catalog:default",
     "esrap": "catalog:default",
     "playwright": "catalog:default",

@@ -147,10 +147,11 @@ chunk would not be worthwhile:
 
 The compiler recognizes `Hydrate` imported from `octane`, including an import
 alias. Split children must be authored directly inside the boundary. Extraction
-rejects function-as-children, hook calls directly inside the extracted JSX, and
-`this` or `super` captures; move that work into a child component or opt out
-with `split={false}`. Ordinary lexical values can be captured by the generated
-child component.
+rejects function-as-children, hook calls directly inside the extracted JSX,
+scoped `<style>` elements (their rules belong to the owning component's single
+style scope), and `this` or `super` captures; move that work into a child
+component or opt out with `split={false}`. Ordinary lexical values can be
+captured by the generated child component.
 
 Generated Hydrate chunks are not eagerly module-preloaded. The Vite and Rsbuild
 app integrations still link CSS reachable from a route's deferred chunks,

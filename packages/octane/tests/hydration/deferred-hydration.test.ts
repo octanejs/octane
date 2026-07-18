@@ -13,12 +13,15 @@ import { prerender } from 'octane/static';
 import { flushEffects } from '../_helpers.js';
 import { loadServerFixture } from '../_server-fixture.js';
 import * as splitClient from './_fixtures/deferred-hydration-split.tsrx';
+import * as styledClient from './_fixtures/deferred-hydration-styles.tsrx';
 import * as client from './_fixtures/deferred-hydration.tsrx';
 
 const FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration.tsrx';
 const server = loadServerFixture<typeof client>(FIXTURE);
 const SPLIT_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-split.tsrx';
 const splitServer = loadServerFixture<typeof splitClient>(SPLIT_FIXTURE);
+const STYLED_FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-styles.tsrx';
+const styledServer = loadServerFixture<typeof styledClient>(STYLED_FIXTURE);
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 	let resolve!: (value: T) => void;
@@ -270,6 +273,37 @@ describe('deferred hydration', () => {
 		expect(onActivatedClick).toHaveBeenCalledOnce();
 		expect(onLatestClick).toHaveBeenCalledOnce();
 		expect(onLatestClick).toHaveBeenCalledWith('captured:latest');
+	});
+
+	it('adopts server DOM when a scoped <style> follows a split boundary', async () => {
+		// The extraction rewrite (client) and the fallback strip (server) shift a
+		// trailing <style> tag by different amounts. Scope hashes are derived
+		// from source positions, so without authored-coordinate restamping the
+		// two compiles disagree on the scope class and hydration rebuilds the
+		// whole section instead of adopting it.
+		const onHydrated = vi.fn();
+		const props = { when: load(), onHydrated };
+		const { html } = renderToString(styledServer.StyledSplitHydration, props);
+		container.innerHTML = html;
+		const serverHost = container.querySelector('#styled-split-host') as HTMLElement;
+		const serverNote = container.querySelector('.styled-split-note') as HTMLElement;
+		const serverHostClass = serverHost.className;
+		const serverNoteClass = serverNote.className;
+		expect(serverHostClass).toMatch(/\btsrx-[0-9a-z]+\b/);
+
+		root = hydrateRoot(container, styledClient.StyledSplitHydration, props);
+		await vi.waitFor(async () => {
+			await act(() => {});
+			expect(onHydrated).toHaveBeenCalledOnce();
+		});
+
+		// Adoption, not mismatch recovery: the server nodes survive with their
+		// server-rendered scope classes, and the split child is live.
+		expect(container.querySelector('#styled-split-host')).toBe(serverHost);
+		expect(container.querySelector('.styled-split-note')).toBe(serverNote);
+		expect(serverHost.className).toBe(serverHostClass);
+		expect(serverNote.className).toBe(serverNoteClass);
+		expect(container.querySelector('#styled-split-review')).not.toBeNull();
 	});
 
 	it('finishes eager hydration when a never split boundary is the last child', async () => {

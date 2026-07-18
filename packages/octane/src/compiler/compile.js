@@ -3702,6 +3702,94 @@ function instrumentProfileComponents(ast, ctx) {
  *   module may contain an explicitly renderer-owned component prop.
  * @returns {{ code: string, map: any }}
  */
+// --- Authored scoped-style hashes across source rewrites -------------------
+//
+// @tsrx/core derives each scoped <style> hash from `filename:line:column:css`,
+// making the hash a function of the tag's SOURCE POSITION. Hydrate child
+// extraction, server fallback stripping, and renderer-region lowering all
+// rewrite module text before the main parse — and the client and server
+// rewrites shift positions DIFFERENTLY, so the two compiles of one authored
+// module would disagree on every scope hash downstream of a rewrite: a
+// guaranteed hydration mismatch. The invariant restored here: scoped-style
+// hashes are always the ones the parser computes for the AUTHORED source.
+// Each preparation exposes per-character authored offsets; after parsing
+// rewritten text the authored module is parsed once (the parser recomputes the
+// authored hashes itself, so no hash or line-counting logic is duplicated
+// here) and each style node is restamped through the origins chain.
+
+function composeStyleOrigins(previous, step) {
+	if (!step) return previous ?? null;
+	if (!previous) return step;
+	const composed = new Int32Array(step.length);
+	for (let index = 0; index < step.length; index++) {
+		const offset = step[index];
+		composed[index] = offset >= 0 && offset < previous.length ? previous[offset] : -1;
+	}
+	return composed;
+}
+
+/** Extend a `{ authored, origins }` remap with one more rewrite step. */
+function composeStyleRemap(previous, authoredSource, origins) {
+	if (!origins) return previous ?? null;
+	return {
+		authored: previous?.authored ?? authoredSource,
+		origins: composeStyleOrigins(previous?.origins ?? null, origins),
+	};
+}
+
+function collectScopedStyleNodes(node, found) {
+	if (!node || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const item of node) collectScopedStyleNodes(item, found);
+		return;
+	}
+	if (node.type === 'JSXStyleElement') {
+		const sheet = (node.children || []).find((child) => child && child.type === 'StyleSheet');
+		// Head styles are unscoped: the parser leaves styleScopeHash unset and
+		// nothing downstream reads their position hash, so leave them alone.
+		if (sheet && node.metadata?.styleScopeHash) found.push({ node, sheet });
+		return;
+	}
+	for (const key of Object.keys(node)) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent' || key === 'css') {
+			continue;
+		}
+		const value = node[key];
+		if (value && typeof value === 'object') collectScopedStyleNodes(value, found);
+	}
+}
+
+/** Restamp every scoped <style> in `ast` with its authored-position hash. */
+function restampAuthoredStyleHashes(ast, styleRemap, filename) {
+	if (!styleRemap?.origins) return;
+	const styles = [];
+	collectScopedStyleNodes(ast.body, styles);
+	if (styles.length === 0) return;
+	const { authored, origins } = styleRemap;
+	let authoredHashByOffset = null;
+	for (const { node, sheet } of styles) {
+		const start =
+			typeof node.start === 'number' && node.start >= 0 && node.start < origins.length
+				? origins[node.start]
+				: -1;
+		if (start < 0) continue; // generated text keeps its parser hash
+		if (authoredHashByOffset === null) {
+			authoredHashByOffset = new Map();
+			const authoredStyles = [];
+			collectScopedStyleNodes(parseModule(authored, filename).body, authoredStyles);
+			for (const entry of authoredStyles) {
+				if (typeof entry.node.start === 'number') {
+					authoredHashByOffset.set(entry.node.start, entry.node.metadata.styleScopeHash);
+				}
+			}
+		}
+		const hash = authoredHashByOffset.get(start);
+		if (!hash) continue;
+		sheet.hash = hash;
+		node.metadata.styleScopeHash = hash;
+	}
+}
+
 export function compile(source, filename, options) {
 	const authoredSource = source;
 	const mode = (options && options.mode) || 'client';
@@ -3724,6 +3812,11 @@ export function compile(source, filename, options) {
 				...options,
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
+				__styleRemap: composeStyleRemap(
+					options?.__styleRemap ?? null,
+					authoredSource,
+					hydratePreparation.origins ?? null,
+				),
 			});
 			if (hydratePreparation.map && compiled.map) {
 				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
@@ -3755,12 +3848,17 @@ export function compile(source, filename, options) {
 		);
 		if (serverBoundaryPreparation !== null) source = serverBoundaryPreparation.source;
 		assertNoLiveClientOnlyImports(source, filename, options?.clientOnlyImports);
+		const serverStyleRemap = composeStyleRemap(
+			options?.__styleRemap ?? null,
+			authoredSource,
+			serverBoundaryPreparation?.origins ?? null,
+		);
 		// Server (SSR) codegen: static markup + dynamic holes + control flow +
 		// nested components + scoped CSS, emitted as HTML-string-building bodies
 		// (with hydration markers) importing the server runtime from 'octane/server'.
 		// Fragment refs remain client-only because there is no server-side DOM range
 		// object for their imperative API.
-		const compiled = compileServer(source, filename, options);
+		const compiled = compileServer(source, filename, options, serverStyleRemap);
 		if (serverBoundaryPreparation?.map && compiled.map) {
 			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
 		}
@@ -3776,6 +3874,11 @@ export function compile(source, filename, options) {
 		? null
 		: prepareRendererBoundaryRegions(source, filename, ownerRenderer, options);
 	if (rendererBoundaryPreparation !== null) source = rendererBoundaryPreparation.source;
+	const clientStyleRemap = composeStyleRemap(
+		options?.__styleRemap ?? null,
+		authoredSource,
+		rendererBoundaryPreparation?.origins ?? null,
+	);
 	if (options?.renderer?.target === 'universal') {
 		const renderer = options.renderer;
 		let reverseSourceMapComposed = false;
@@ -3808,6 +3911,10 @@ export function compile(source, filename, options) {
 					__rendererBoundariesLowered: true,
 					__universal: universal,
 					__universalUnits: rendererBoundaryPreparation?.universalUnits,
+					// The lowered/expanded text has its own coordinates, and
+					// universal targets are client-only (no server hash to agree
+					// with) — do not restamp against stale origins.
+					__styleRemap: undefined,
 				});
 				if (expansionMap !== null) {
 					compiled.map = composeSourceMaps(compiled.map, expansionMap);
@@ -3832,6 +3939,7 @@ export function compile(source, filename, options) {
 		return result;
 	}
 	const ast = parseModule(source, filename);
+	restampAuthoredStyleHashes(ast, clientStyleRemap, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
 	// before emit — they carry no runtime value and would leak invalid TS into
 	// the .js (or crash the printer). Runtime-only; Volar keeps them.
@@ -4704,8 +4812,9 @@ function ssrUnsupported(what) {
 	);
 }
 
-function compileServer(source, filename, options) {
+function compileServer(source, filename, options, styleRemap = null) {
 	const ast = parseModule(source, filename);
+	restampAuthoredStyleHashes(ast, styleRemap, filename);
 	// Drop type-only statements before emit (see isTypeOnlyStatement) — same as
 	// the client path; the server HTML-string output is plain JS too.
 	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));

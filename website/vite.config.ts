@@ -93,6 +93,11 @@ export default defineConfig({
 			'@octanejs/tanstack-router > @tanstack/history',
 			'@octanejs/tanstack-router > @tanstack/router-core',
 			'@octanejs/tanstack-router > @tanstack/store',
+			// The home page's 3D logo section is reached only through a deferred
+			// Hydrate chunk, so the scanner never sees three; pre-declare it (and
+			// the SVGLoader example module) to avoid a mid-session optimize pass.
+			'three',
+			'three/examples/jsm/loaders/SVGLoader.js',
 			// Visx primitives are raw workspace sources; these are the runtime
 			// dependencies reached by the site's Bar/Axis/Group/Scale surface.
 			// Resolve them through their owner under pnpm's isolated layout.

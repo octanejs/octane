@@ -4275,6 +4275,9 @@ importers:
       '@octanejs/tanstack-router':
         specifier: workspace:*
         version: link:../packages/tanstack-router
+      '@octanejs/three':
+        specifier: workspace:*
+        version: link:../packages/three
       '@octanejs/visx':
         specifier: workspace:*
         version: link:../packages/visx
@@ -4287,6 +4290,9 @@ importers:
       shiki:
         specifier: catalog:default
         version: 3.23.0
+      three:
+        specifier: catalog:default
+        version: 0.172.0
     devDependencies:
       '@octanejs/testing-library':
         specifier: workspace:*
@@ -4297,6 +4303,9 @@ importers:
       '@tsrx/core':
         specifier: catalog:default
         version: 0.1.40
+      '@types/three':
+        specifier: catalog:default
+        version: 0.172.0
       esrap:
         specifier: ^2.2.9
         version: 2.2.11
