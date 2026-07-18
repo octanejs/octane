@@ -1,4 +1,4 @@
-// /benchmarks — the checked-in runtime, SSR, async and size baselines, charted
+// /benchmarks — the checked-in runtime, SSR, async, and size baselines, charted
 // as deterministic plain-div bar cards (the same bar view the explorer uses).
 // Three sections: the normalized at-a-glance explorer (the same linked bar/heatmap
 // component the home page stages, fed the matrix recomputed from FRAMEWORK_CARDS so
