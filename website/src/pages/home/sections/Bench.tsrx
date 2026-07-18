@@ -1,6 +1,6 @@
 // Benchmark teaser: @octanejs/recharts over the checked-in scores
 // (content/benchmarks.ts) — the full set lives at /benchmarks.
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { BenchBars } from '../../../components/BenchBars.tsrx';
 import { HOME_SUMMARY } from '../../../content/benchmarks.ts';
 
@@ -11,7 +11,7 @@ export function Bench() @{
 			<Link to="/benchmarks" class="bench-all">All suites →</Link>
 		</div>
 		<div class="bench-grid">
-			<BenchBars card={HOME_SUMMARY} showValues={true} width={1100} />
+			<BenchBars card={HOME_SUMMARY} />
 		</div>
 		<p class="bench-note">
 			{'Ratios are geometric means over each suite’s per-operation checked-in benchmark scores ('}

@@ -219,7 +219,7 @@ export const REACT_API_MAP = {
 	},
 	onChange: {
 		status: 'rewrite',
-		note: 'Events are native and delegated; there is no synthetic onChange firing per keystroke. Use onInput for text inputs.',
+		note: 'This is a standard text host using React-style per-edit onChange. Use onInput (or onInputCapture) for per-edit intent. Preserve component callbacks, select/checkable change handlers, and deliberate native text commits; mark the last case with suppressNativeChangeWarning.',
 	},
 	defaultProps: {
 		status: 'rewrite',
@@ -239,6 +239,111 @@ const IMPORT_SOURCES = [
 const SCANNABLE = /\.(js|mjs|cjs|jsx|ts|tsx|mts|cts)$/;
 const SKIP_DIRS = new Set(['node_modules', '.git', '__tests__', '__mocks__', 'test', 'tests']);
 const MAX_FILES = 400;
+
+const NON_TEXT_INPUT_TYPES = new Set([
+	'button',
+	'checkbox',
+	'color',
+	'date',
+	'datetime-local',
+	'file',
+	'hidden',
+	'image',
+	'month',
+	'radio',
+	'range',
+	'reset',
+	'submit',
+	'time',
+	'week',
+]);
+
+function booleanAttributeState(attributes, name, exactTrue = false) {
+	const match = attributes.match(
+		new RegExp(
+			`\\b${name}(?=\\s|=|\\/|$)(?:\\s*=\\s*(?:"([^"]*)"|'([^']*)'|\\{\\s*([^}]*)\\s*\\}))?`,
+		),
+	);
+	if (!match) return 'false';
+	if (!match[0].includes('=')) return 'true';
+	const quoted = match[1] ?? match[2];
+	if (exactTrue && quoted !== undefined) return 'false';
+	if (quoted !== undefined) return quoted.length > 0 ? 'true' : 'false';
+	const expression = match[3]?.trim();
+	if (exactTrue) {
+		if (expression === 'true') return 'true';
+		if (
+			/^(?:false|null|undefined|void\s+0|[+-]?(?:\d+(?:\.\d+)?|\.\d+)|NaN|'[^']*'|"[^"]*")$/.test(
+				expression ?? '',
+			)
+		)
+			return 'false';
+		return 'dynamic';
+	}
+	if (/^(?:false|null|undefined|void\s+0|0|-0|NaN|''|"")$/.test(expression ?? '')) {
+		return 'false';
+	}
+	if (/^(?:true|[1-9]\d*(?:\.\d+)?|'[^']+'|"[^"]+")$/.test(expression ?? '')) {
+		return 'true';
+	}
+	return 'dynamic';
+}
+
+function hasPotentialEventAssignment(attributes, name) {
+	const match = attributes.match(new RegExp(`\\b${name}\\s*=\\s*([^\\s>]+)`));
+	if (!match) return false;
+	const value = match[1];
+	if (value.startsWith('"') || value.startsWith("'")) return false;
+	if (
+		/^\{\s*(?:false|true|null|undefined|void\s+0|0|-0|NaN|''|"")\s*\}/.test(
+			attributes.slice(match.index + match[0].indexOf(value)),
+		)
+	)
+		return false;
+	return true;
+}
+
+function countReactStyleTextChanges(source) {
+	let count = 0;
+	const hosts = source.matchAll(/<(input|textarea)\b((?:[^>]|=>)*)>/g);
+	for (const match of hosts) {
+		const host = match[1].toLowerCase();
+		const attrs = match[2];
+		const changeHandlers = ['onChange', 'onChangeCapture'].filter((name) =>
+			hasPotentialEventAssignment(attrs, name),
+		);
+		if (
+			changeHandlers.length === 0 ||
+			hasPotentialEventAssignment(attrs, 'onInput') ||
+			hasPotentialEventAssignment(attrs, 'onInputCapture')
+		)
+			continue;
+		// A spread can replace the handler, type, editability, or suppression.
+		// Leave that site for the compiler/runtime's final-props diagnostic rather
+		// than suggesting a source rewrite from an incomplete static scan.
+		if (/\{\s*\.\.\./.test(attrs)) continue;
+		const suppression = booleanAttributeState(attrs, 'suppressNativeChangeWarning', true);
+		const readOnly = booleanAttributeState(attrs, 'readOnly');
+		const disabled = booleanAttributeState(attrs, 'disabled');
+		if ([suppression, readOnly, disabled].includes('true')) continue;
+		if ([suppression, readOnly, disabled].includes('dynamic')) continue;
+		if (host === 'input') {
+			const literalType = attrs.match(
+				/\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*["']([^"']*)["']\s*\})/i,
+			);
+			if (!literalType && /\btype\s*=/.test(attrs)) continue;
+			const type = (
+				literalType?.[1] ??
+				literalType?.[2] ??
+				literalType?.[3] ??
+				'text'
+			).toLowerCase();
+			if (NON_TEXT_INPUT_TYPES.has(type)) continue;
+		}
+		count += changeHandlers.length;
+	}
+	return count;
+}
 
 export async function collectSourceFiles(root, out = [], depth = 0) {
 	if (depth > 6 || out.length >= MAX_FILES) return out;
@@ -264,9 +369,12 @@ export async function collectSourceFiles(root, out = [], depth = 0) {
 export function scanSource(source) {
 	const apis = new Map();
 	for (const name of Object.keys(REACT_API_MAP)) {
+		if (name === 'onChange') continue;
 		const matches = source.match(new RegExp(`\\b${name}\\b`, 'g'));
 		if (matches) apis.set(name, matches.length);
 	}
+	const textChanges = countReactStyleTextChanges(source);
+	if (textChanges > 0) apis.set('onChange', textChanges);
 	const imports = new Set();
 	for (const spec of IMPORT_SOURCES) {
 		if (

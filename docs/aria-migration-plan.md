@@ -1,5 +1,48 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-18, later): Phase 3 COMPLETE.** The overlays hooks tier
+> landed: stately `useTooltipTriggerState`; the full aria overlays area
+> (`usePreventScroll`, `ariaHideOutside`, `DismissButton`, `PortalProvider`,
+> `useOverlay`, `useOverlayTrigger`, `useOverlayPosition` + `calculatePosition`,
+> `Overlay`/`useOverlayFocusContain`, `useModal`/`ModalProvider`/`OverlayProvider`/
+> `OverlayContainer`, `useModalOverlay`, `usePopover`); and the consumers
+> `useDialog`, `useTooltip`/`useTooltipTrigger`, `useSelect`/`useHiddenSelect`/
+> `HiddenSelect`, `useComboBox`. 167 tests in the aria project; **Select + ComboBox
+> run byte-identical vs real react-aria** (mount + open/type/filter). The only
+> octane mapping was `ReactDOM.createPortal`→octane `createPortal` (Overlay,
+> useModal) — no octane-core changes, no octane bugs. Dialog/tooltip/overlay
+> focus-trap/dismiss/scroll-lock paths are covered by behavioral tests: the
+> differential rig shares one document, so focus/portal/positioning aren't
+> rig-driveable (same gotcha as Phase 1's focus fixtures). **Autocomplete
+> deferred** — `useComboBox` does not import `autocomplete/*` in 3.50.0.
+> Combobox/select text inputs ride octane's native `onInput` (no synthetic
+> `onChange`); the hidden `<select>`'s native `change` handler is kept as-is
+> (selects are not text inputs). Next: Phase 4 (RAC foundation).
+
+> **Progress (2026-07-18): Phase 2 COMPLETE.** The collections + selection tier
+> landed: the stately collections engine (`CollectionBuilder`/`Item`/`Section`/
+> `getChildNodes`/`useCollection`) and selection core (`Selection`/
+> `SelectionManager`/`useMultipleSelectionState`), the stately state hooks
+> (`useListState`/`useSingleSelectListState`, `useTreeState`,
+> `useMenuTriggerState`/`useSubmenuTriggerState`, `useOverlayTriggerState`,
+> `useSelectState`, `useComboBoxState`, `useTabListState`, `useNumberFieldState`,
+> `useSliderState`), the aria selection area (`useSelectableCollection`/`-Item`/
+> `-List`, `useTypeSelect`, `ListKeyboardDelegate`, `DOMLayoutDelegate`), and the
+> aria hooks `useListBox`/`useOption`/`useListBoxSection`, `useMenu`/`useMenuItem`/
+> `useMenuSection`/`useMenuTrigger`/`useSubmenuTrigger`, `useTab`/`useTabList`/
+> `useTabPanel`, `useSlider`/`useSliderThumb`, `useNumberField`, `useGridList`
+> (+`Item`/`Section`/`SelectionCheckbox`), `useTag`/`useTagGroup`,
+> `useBreadcrumbs`/`useBreadcrumbItem`. 131 tests in the aria project; the tabs and
+> listbox collections run byte-identical vs real react-aria (dynamic collection +
+> click selection). **Key finding:** with default tab selection established by
+> `useTabListState`'s mount effect (not synchronously), react-aria's `useId` locks
+> the tab panel's own id to the first render's value, so `panel.id` does NOT equal
+> the selected tab's `aria-controls` in raw-hook usage — the octane port reproduces
+> this exactly (`parity-collections.test.ts`). Static component-only collection
+> children compile to positional descriptors (not a children block), so literal
+> static collections work; the builder keeps a defensive `isChildrenBlock` guard.
+> No octane-core changes were needed this phase.
+
 > **Progress (2026-07-17, later): Phase 1 COMPLETE.** The focus area (FocusScope at
 > full fidelity — scope tree, containment, restore, autoFocus, focus managers,
 > tree walker — plus FocusRing/useFocusRing/useHasTabbableChild), the i18n area
@@ -274,7 +317,7 @@ tests (rig is HTML-only); spike findings written back into this doc.
 (hook-level: fixtures spread the returned prop bags onto host elements
 identically on both sides); FocusScope trap/restore behavior tests.
 
-### Phase 2 — Collections + selection (hooks tier)
+### Phase 2 — Collections + selection (hooks tier) — COMPLETE (2026-07-18)
 - Stately: the selection engine (`SelectionManager`,
   `useMultipleSelectionState`), legacy JSX collection building (`Item`,
   `Section`, `CollectionBuilder` — walks element **descriptors**; see
@@ -287,10 +330,17 @@ identically on both sides); FocusScope trap/restore behavior tests.
   `useTabList`/`useTab`/`useTabPanel`, `useGridList`, `useTagGroup`,
   `useBreadcrumbs`, `useNumberField`, `useSlider`/`useSliderThumb`.
 
-*Exit:* differential ListBox/Menu/Tabs built from hooks with dynamic
-collections; keyboard selection/typeahead behavior tests.
+*Exit (met):* differential Tabs + ListBox built from hooks with dynamic
+collections, byte-identical vs real react-aria (`parity-collections.test.ts`);
+Menu/Tabs/ListBox roles, roving tabIndex, and click selection covered by
+behavioral tests (`listbox-menu-tabs.test.ts`); slider/numberfield/gridlist/tag/
+breadcrumbs aria wiring covered by `slider-numberfield-gridlist.test.ts`;
+keyboard selection/typeahead by `selectable-collection.test.ts`. (Menu's overlay
+open path isn't rig-driveable — focus can't be driven across the shared
+document — so it stays on behavioral coverage, matching the leaf-differential
+precedent.)
 
-### Phase 3 — Overlays (hooks tier)
+### Phase 3 — Overlays (hooks tier) — COMPLETE (2026-07-18)
 - Stately overlays (`useOverlayTriggerState`, `useTooltipTriggerState`) +
   the whole `@react-aria/overlays` area: `Overlay`/`PortalProvider`,
   `useOverlay`, `useOverlayTrigger`, `useOverlayPosition`
@@ -382,14 +432,15 @@ the whole hooks tier follows the same pattern.
   Phase 4. If octane can't render the same children function at two positions,
   that's an octane fix (portal/render-scope semantics), not a binding
   workaround — budget for it before RAC work starts.
-- **Static children-position JSX in collections** — octane compiles
-  children-position JSX to render functions, so the **hooks-tier** legacy
-  `CollectionBuilder` (which statically walks element descriptors) supports
-  dynamic collections (`items` + render function returning `<Item>`
-  descriptors) and descriptor arrays, but not literal static children. Same
-  divergence class as radix `Slot` — document it. The **RAC tier** does NOT
-  have this limitation (its engine renders the hidden copy, so render-function
-  children work).
+- **Static children-position JSX in collections** — RESOLVED narrower than
+  planned (Phase 2, verified by `collections-engine.test.ts`): component-only
+  children (`<Item>`/`<Section>`) compile to positional DESCRIPTORS, not a
+  children block, so the hooks-tier `CollectionBuilder` walks literal static
+  children too — single and multiple. Dynamic collections (`items` + render
+  function) and descriptor arrays work as planned. The builder keeps a
+  defensive `isChildrenBlock` guard with a descriptive error for any
+  block-forming children shape (mixed host/text content). The **RAC tier**
+  additionally renders the hidden copy, so render-function children work.
 - **Render-phase side effects in the SSR collection path** — upstream relies
   on single-pass, in-order SSR rendering. Octane SSR is single-pass, but the
   parallel-`use()` batching and streaming re-registration behavior

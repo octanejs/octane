@@ -206,7 +206,11 @@ export default defineConfig({
 				test: {
 					name: 'octane',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
-					exclude: [...configDefaults.exclude, 'packages/octane/tests/profiling-runtime.test.tsrx'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					// Precompiles every fixture through @tsrx/react + esbuild before any
 					// test loads — runs in pure Node so esbuild's TextEncoder requirements
@@ -279,7 +283,11 @@ export default defineConfig({
 				test: {
 					name: 'octane-prod',
 					include: ['packages/octane/tests/**/*.test.tsrx', 'packages/octane/tests/**/*.test.ts'],
-					exclude: [...configDefaults.exclude, 'packages/octane/tests/profiling-runtime.test.tsrx'],
+					exclude: [
+						...configDefaults.exclude,
+						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/browser/**/*.test.ts',
+					],
 					environment: 'jsdom',
 					globalSetup: ['packages/octane/tests/differential/_setup.ts'],
 					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
@@ -334,6 +342,16 @@ export default defineConfig({
 						},
 					}),
 				],
+			},
+			{
+				test: {
+					name: 'octane-events-browser',
+					include: ['packages/octane/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
 			},
 			{
 				// Focused production-semantics profiling build. Keeping this to the
@@ -1548,6 +1566,12 @@ export default defineConfig({
 					name: 'aria',
 					include: ['packages/aria/tests/**/*.test.ts', 'packages/aria/tests/**/*.test.tsx'],
 					environment: 'jsdom',
+					// The differential fixtures import the real react-aria consumer modules
+					// (useComboBox/useSelect pull in the whole overlays/listbox/menu graph); the
+					// first mount compiles + imports that on a loaded CI shard, which overran the
+					// 5s vitest default. Match the other differential-bearing projects at 30s.
+					testTimeout: 30_000,
+					hookTimeout: 30_000,
 					// Differential precompile for aria fixtures: rewrites `@octanejs/aria` →
 					// `react-aria` (and `/stately` → `react-stately`, `/components` →
 					// `react-aria-components`) so the React side runs the real React Aria.
@@ -1854,21 +1878,16 @@ export default defineConfig({
 					environment: 'jsdom',
 					globals: false,
 					// ssr-smoke and ssr-hydration.e2e both run a REAL production
-					// `vite build` into the same output roots (website/dist,
-					// website/.vercel/output) and the e2e file then serves that
-					// output with octane-preview. Running the files in parallel
+					// `vite build` into website/.output and the e2e file then serves
+					// that Nitro output. Running the files in parallel
 					// would let one build delete/rewrite artifacts the other is
 					// building or serving, so this project is file-serial by
 					// contract, not by timing.
 					fileParallelism: false,
 				},
-				// The website app stack: octaneMdx() compiles the site's .mdx documents
-				// (same shared options — Shiki + tsrx langAlias — the app itself uses);
-				// octane() compiles the .tsrx pages and slots hooks in app .ts files.
-				// The bindings' own hand-slot-forwarding `.ts` sources are skipped via
-				// their package.json declarations. Package imports (@octanejs/tanstack-router,
-				// octane, …) resolve through website/node_modules workspace links — no
-				// aliases needed.
+				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
+				// routing, and deployment are owned by @tanstack/octane-start; the
+				// official router and Octane runtime resolve through website/node_modules.
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
 			},
 			{

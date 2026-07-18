@@ -30,6 +30,8 @@ packages:
   - benchmarks/async-composition/*
   - benchmarks/todomvc
   - benchmarks/todomvc/*
+  - benchmarks/weather-app
+  - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
   - playground/*
@@ -77,6 +79,7 @@ catalogs:
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
+    'chrome-launcher': 1.2.1
     'tabbable': ^6.5.0
     '@lexical/code': 0.46.0
     '@jridgewell/remapping': ^2.3.5
@@ -201,6 +204,7 @@ catalogs:
     jsdom: ^29.0.2
     jotai: ^2.20.1
     lexical: 0.46.0
+    lighthouse: 13.4.0
     lucide-react: 1.24.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
@@ -300,6 +304,7 @@ catalogs:
 
 patchedDependencies:
   '@tsrx/core@0.1.37': patches/@tsrx__core@0.1.37.patch
+  '@tsrx/core@0.1.40': patches/@tsrx__core@0.1.40.patch
 
 minimumReleaseAgeExclude:
   - '@tanstack/ai-client@0.21.0'

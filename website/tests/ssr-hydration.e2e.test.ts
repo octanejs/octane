@@ -5,7 +5,7 @@
 // server modules and hydrates with DEV-mode client modules. This spec boots the
 // REAL vite dev server, loads every route in headless Chromium, and fails on
 // any hydration-mismatch warning or page error; then builds and repeats against
-// the production `octane-preview` server (prod output has no mismatch warnings
+// the production Nitro preview server (prod output has no mismatch warnings
 // — dev-gated — so there the gate is "no errors + routes render + client-side
 // nav works + the playground compiles, runs, and handles an iframe event").
 //
@@ -14,9 +14,10 @@
 // with the exact setup command when it is missing.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = [
@@ -71,8 +72,13 @@ afterAll(async () => {
 // Spawn a server in its OWN process group so stop() can kill the whole tree.
 // `pnpm exec …` is a wrapper: signalling just the wrapper can orphan the real
 // node server underneath, which then squats the port for every later run.
-function spawnServer(args: string[]): ChildProcess {
-	return spawn('pnpm', args, { cwd: WEBSITE, stdio: 'ignore', detached: true });
+function spawnServer(args: string[], env: NodeJS.ProcessEnv = {}): ChildProcess {
+	return spawn('pnpm', args, {
+		cwd: WEBSITE,
+		stdio: 'ignore',
+		detached: true,
+		env: { ...process.env, ...env },
+	});
 }
 
 // Wait until the SPAWNED server answers. Rejects the moment the child exits —
@@ -290,41 +296,56 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
-	it('the benchmark Visx charts preserve their server geometry through hydration', async () => {
+	it('the benchmark bar charts preserve their server geometry through hydration', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
 		try {
-			const charts = page.locator('svg.bench-chart');
-			expect(await charts.count()).toBe(18);
-			const firstChart = charts.first();
-			const serverChart = await firstChart.elementHandle();
-			expect(serverChart).toBeTruthy();
-			const geometry = await firstChart.evaluate((svg) => ({
-				width: svg.getAttribute('width'),
-				height: svg.getAttribute('height'),
-				viewBox: svg.getAttribute('viewBox'),
-				bars: svg.querySelectorAll('.visx-bar').length,
+			const plots = page.locator('.bench-card .bench-plot');
+			expect(await plots.count()).toBe(18);
+			const firstPlot = plots.first();
+			const serverPlot = await firstPlot.elementHandle();
+			expect(serverPlot).toBeTruthy();
+			const geometry = await firstPlot.evaluate((plot) => ({
+				bars: plot.querySelectorAll('.bench-fill').length,
+				widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
+					bar.getAttribute('style'),
+				),
 			}));
 
 			await page.waitForTimeout(750);
 
 			expect(await page.locator('.recharts-wrapper').count()).toBe(0);
 			expect(await page.locator('.bench-plot-shell').count()).toBe(0);
-			expect(await charts.count()).toBe(18);
+			expect(await plots.count()).toBe(18);
+			// Hydration adopts the server-rendered chart node instead of replacing it.
 			expect(
 				await page.evaluate(
-					(original) => document.querySelector('svg.bench-chart') === original,
-					serverChart,
+					(original) => document.querySelector('.bench-card .bench-plot') === original,
+					serverPlot,
 				),
 			).toBe(true);
 			expect(
-				await firstChart.evaluate((svg) => ({
-					width: svg.getAttribute('width'),
-					height: svg.getAttribute('height'),
-					viewBox: svg.getAttribute('viewBox'),
-					bars: svg.querySelectorAll('.visx-bar').length,
+				await firstPlot.evaluate((plot) => ({
+					bars: plot.querySelectorAll('.bench-fill').length,
+					widths: Array.from(plot.querySelectorAll('.bench-fill'), (bar) =>
+						bar.getAttribute('style'),
+					),
 				})),
 			).toEqual(geometry);
 			expect(geometry.bars).toBeGreaterThan(0);
+
+			// The adopted card is live: picking another operation flips the pressed
+			// state of the picker it hydrated.
+			const firstOps = page.locator('.bench-card').first().locator('.bench-op');
+			await firstOps.nth(1).click();
+			await page.waitForFunction(
+				() =>
+					document
+						.querySelector('.bench-card .bench-op:nth-child(2)')
+						?.getAttribute('aria-pressed') === 'true',
+				null,
+				{ timeout: 5_000 },
+			);
+
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));
 			expect(real).toEqual([]);
 		} finally {
@@ -492,22 +513,14 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
-	// HOT-server regression: editing app modules (HMR update + ssr page reload)
-	// stamps `?t=` cache-busting timestamps onto the modules' importer chains.
-	// The generated hydrate entry must keep loading the SAME browser module
-	// instances as the page's own import chain afterwards — a bare
-	// (analysis-hidden) dynamic import fetched timestamp-less URLs, splitting
-	// the app-router singleton in two (preHydrate committed matches on one
-	// instance, the page rendered the empty other) and breaking hydration on
-	// EVERY reload until the dev server was restarted. Touching router.ts — a
-	// plain .ts module with no self-accepting HMR handler — deterministically
-	// propagates the invalidation up the client chain; the route module edit is
-	// the shape from the original report. Deliberately LAST in this describe:
-	// the invalidation stamps persist in the dev server for the rest of its life.
+	// Editing a route and the router invalidates both the client and SSR module
+	// graphs. A full reload on that hot server must still hydrate through one
+	// current router graph. Keep this last: Vite's cache-busting timestamps stay
+	// in the server graph for the rest of its lifetime.
 	it('hydrates cleanly on reload after HMR edits (hot server)', async () => {
 		const files = [
 			join(WEBSITE, 'src/pages/benchmarks/Benchmarks.tsrx'),
-			join(WEBSITE, 'src/app/router.ts'),
+			join(WEBSITE, 'src/router.ts'),
 		];
 		const originals = files.map((f) => readFileSync(f, 'utf8'));
 		const restore = () => files.forEach((f, i) => writeFileSync(f, originals[i]));
@@ -531,7 +544,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await primer.close();
 
 			// A FULL reload after the edits must hydrate the route cleanly. Let the
-			// module fetches + preHydrate router load finish before judging —
+			// module fetches and Start router load finish before judging —
 			// hydration (and its mismatch warnings) lands well after `load` here.
 			const { page, errors, main } = await loadRoute(`http://localhost:${DEV_PORT}`, '/benchmarks');
 			try {
@@ -549,24 +562,70 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	}, 45_000);
 });
 
-describe.sequential('website production build → hydration (octane-preview)', () => {
+describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
 	let server: ChildProcess;
 	let PREVIEW_PORT: number;
+	const vercelEnv = { NITRO_PRESET: 'vercel' };
+	const outputDir = join(WEBSITE, '.vercel/output');
 
 	beforeAll(async () => {
 		PREVIEW_PORT = await getFreePort();
 		await new Promise<void>((resolve, reject) => {
-			const build = spawn('pnpm', ['exec', 'vite', 'build'], { cwd: WEBSITE, stdio: 'ignore' });
+			const build = spawn('pnpm', ['exec', 'vite', 'build'], {
+				cwd: WEBSITE,
+				stdio: 'ignore',
+				env: { ...process.env, ...vercelEnv },
+			});
 			build.once('exit', (code) =>
 				code === 0 ? resolve() : reject(new Error(`vite build exited ${code}`)),
 			);
 		});
-		server = spawnServer(['exec', 'octane-preview', '--port', String(PREVIEW_PORT)]);
+		server = spawnServer(
+			['exec', 'vite', 'preview', '--port', String(PREVIEW_PORT), '--strictPort'],
+			vercelEnv,
+		);
 		await waitForServer(server, `http://localhost:${PREVIEW_PORT}/`, 30_000);
 	}, 180_000);
 
 	afterAll(async () => {
 		await stop(server);
+	});
+
+	it('emits the Vercel Build Output API contract', () => {
+		const config = JSON.parse(readFileSync(join(outputDir, 'config.json'), 'utf8')) as {
+			version?: number;
+			routes?: Array<{
+				src?: string;
+				dest?: string;
+				handle?: string;
+				continue?: boolean;
+				headers?: Record<string, string>;
+			}>;
+		};
+		const routes = config.routes ?? [];
+		const assetsIndex = routes.findIndex(
+			(route) =>
+				route.src?.startsWith('/assets/') &&
+				route.headers?.['cache-control'] === 'public,max-age=31536000,immutable' &&
+				route.continue === true,
+		);
+		const filesystemIndex = routes.findIndex((route) => route.handle === 'filesystem');
+		const serverFallbackIndex = routes.findIndex(
+			(route) => route.src === '/(.*)' && route.dest === '/__server',
+		);
+
+		expect(config.version).toBe(3);
+		expect(assetsIndex).toBeGreaterThanOrEqual(0);
+		expect(filesystemIndex).toBeGreaterThan(assetsIndex);
+		expect(serverFallbackIndex).toBeGreaterThan(filesystemIndex);
+		expect(existsSync(join(outputDir, 'static/playground-runtime.mjs'))).toBe(true);
+		expect(existsSync(join(outputDir, 'functions/__server.func/index.mjs'))).toBe(true);
+
+		const functionConfig = JSON.parse(
+			readFileSync(join(outputDir, 'functions/__server.func/.vc-config.json'), 'utf8'),
+		) as { runtime?: string; supportsResponseStreaming?: boolean };
+		expect(functionConfig.runtime).toBe('nodejs24.x');
+		expect(functionConfig.supportsResponseStreaming).toBe(true);
 	});
 
 	it.for(ROUTES)('%s renders and runs with no errors', { timeout: 30_000 }, async (route) => {
@@ -621,6 +680,26 @@ describe.sequential('website production build → hydration (octane-preview)', (
 			await waitForLocatorText(heading, 'Count: 0', 20_000);
 			await preview.getByRole('button', { name: 'Increment' }).click();
 			await waitForLocatorText(heading, 'Count: 1');
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
+	it('playground shows compiler warnings without treating runnable code as an error', async () => {
+		const source = `export function App() @{ <input onChange={() => {}} /> }`;
+		const hash = encodePlaygroundHash(source, 'tsrx');
+		const { page, errors } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			`/playground#${hash}`,
+		);
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			const warnings = page.getByRole('region', { name: 'Compiler warnings' });
+			await warnings.waitFor();
+			expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+			expect(await warnings.textContent()).toContain('playground.tsrx:1:');
+			expect(await page.locator('.pg-error').count()).toBe(0);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();

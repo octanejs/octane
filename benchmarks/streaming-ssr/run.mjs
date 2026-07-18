@@ -142,6 +142,29 @@ async function renderOnce(mod, scenario, collect = false) {
 
 const countMatches = (s, re) => (s.match(re) || []).length;
 
+// Octane's stream protocol stores resolved boundary markup in a JSON data
+// script, with `<` escaped, so trusted raw HTML cannot close the transport
+// carrier early. Reconstruct those payloads for semantic verification only;
+// measured chunks, byte counts and timings continue to use the original wire
+// output. Other targets have no matching carrier and pass through unchanged.
+const OCTANE_JSON_CARRIER_RE =
+	/<script\b(?=[^>]*\btype="application\/json")(?=[^>]*\bdata-octane-stream(?:\s|>))[^>]*>([\s\S]*?)<\/script>/g;
+
+function semanticHtmlForVerification(target, html) {
+	return html.replace(OCTANE_JSON_CARRIER_RE, (_carrier, payload) => {
+		let decoded;
+		try {
+			decoded = JSON.parse(payload);
+		} catch (error) {
+			throw new Error(`${target}: invalid Octane JSON stream carrier`, { cause: error });
+		}
+		if (typeof decoded !== 'string') {
+			throw new Error(`${target}: Octane JSON stream carrier did not contain HTML`);
+		}
+		return decoded;
+	});
+}
+
 // Correctness gate (throws on failure). It asserts SEMANTICS — the stream must
 // carry the whole page (shell exactly once, all ten card payloads) and, for
 // the staggered schedule, must genuinely have streamed (first chunk out before
@@ -154,11 +177,12 @@ function verify(target, scenario, r) {
 	const tag = `${target}/${scenario}`;
 	if (countMatches(r.html, /class="masthead"/g) !== 1)
 		throw new Error(`${tag}: expected exactly one shell masthead`);
-	const articles = countMatches(r.html, /<article[\s>]/g);
+	const semanticHtml = semanticHtmlForVerification(target, r.html);
+	const articles = countMatches(semanticHtml, /<article[\s>]/g);
 	if (articles !== CARD_COUNT)
 		throw new Error(`${tag}: expected ${CARD_COUNT} <article> cards, got ${articles}`);
 	for (let i = 0; i < CARD_COUNT; i++) {
-		if (!r.html.includes(`Card ${i} — `))
+		if (!semanticHtml.includes(`Card ${i} — `))
 			throw new Error(`${tag}: card ${i} payload missing from stream`);
 	}
 	if (!r.firstChunk.includes('class="masthead"'))

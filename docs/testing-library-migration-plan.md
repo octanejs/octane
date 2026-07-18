@@ -62,7 +62,11 @@ harness is outside the compiler:
 - `events.test.ts` — events.js:154/207/216, act.js:20; pins the native
   `input`/`change` split (no synthetic onChange remap — still true after the
   2026-07-08 controlled-components reversal: `value`/`checked` are controlled
-  per React, but events stay native).
+  per React, but events stay native). An explicit checkbox `fireEvent.change`
+  remains only a change dispatch, not click activation.
+- `user-event.test.ts` — real user sequences: `type()` emits per-edit input,
+  text `onChange` commits on `tab()`/blur, and checkbox activation orders
+  click → input → change.
 - `renderHook.test.ts` — renderHook.js:10/24/53 + act-wrapped updates,
   cleanup-on-unmount, cross-harness state isolation.
 - `act.test.ts` — act.js:14 + error propagation.
@@ -88,5 +92,6 @@ harness is outside the compiler:
 - **Typed custom queries.** The `queries` render-option is honored at runtime
   but the result type is fixed to the default query set (RTL threads a `Q`
   generic through everything; add if demand appears).
-- `@testing-library/user-event` compatibility is untried — likely mostly-works
-  (it drives real event sequences) and worth a follow-up test slice.
+- Native checkable cancellation/rollback and OS IME behavior require the real
+  Chromium evidence suite; jsdom/user-event coverage here intentionally stops
+  at representable event order and public checked state.

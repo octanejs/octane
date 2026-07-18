@@ -3,8 +3,8 @@
 // boundaries; detailed copy and visual behavior belong to focused tests.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';
 import {
@@ -14,8 +14,14 @@ import {
 	type BenchCard,
 } from '../src/content/benchmarks.ts';
 import { createHomeSummary } from '../src/content/home-benchmark.ts';
+import { BENCH_SECTIONS } from '../src/pages/benchmarks/Benchmarks.tsrx';
 
 afterEach(cleanup);
+
+// Core APIs is owned by core-apis-docs.test.ts: its large interactive guide
+// needs focused assertions and a wider execution budget than generic route
+// smoke coverage. The real-browser hydration suite also visits this route.
+const smoke = docs.filter((doc) => doc.slug !== 'core-apis');
 
 function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined {
 	return Array.from(root.querySelectorAll<HTMLAnchorElement>('a')).find(
@@ -23,19 +29,30 @@ function findLink(root: ParentNode, href: string): HTMLAnchorElement | undefined
 	);
 }
 
+// A card opens on its "overall" view: one bar per series with a computable
+// geomean vs the reference series (rows where either side is missing or zero
+// drop out). Single-series cards chart every operation as its own bar instead.
 function expectedBarCount(card: BenchCard): number {
-	return card.rows.reduce(
-		(count, row) =>
-			count + card.series.filter((series) => typeof row[series.key] === 'number').length,
-		0,
-	);
+	if (card.series.length === 1) {
+		return card.rows.filter((row) => typeof row[card.series[0].key] === 'number').length;
+	}
+	const reference = card.series[0];
+	return card.series.filter((series) =>
+		card.rows.some(
+			(row) =>
+				typeof row[reference.key] === 'number' &&
+				(row[reference.key] as number) > 0 &&
+				typeof row[series.key] === 'number' &&
+				(row[series.key] as number) > 0,
+		),
+	).length;
 }
 
 // Build a fresh router at `url` so tests do not share jsdom location state.
 // The client store commits matches inside a transition, so wait for the root
 // layout before making route assertions.
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {
@@ -140,12 +157,12 @@ describe('website routes', () => {
 		expect(findLink(why, '/docs/tsrx-vs-tsx')).toBeTruthy();
 
 		// The home composes its sections in a fixed order: hero, features, proven, why,
-		// explorer. (Each section carries a compiler-added scoped class after its
+		// spin, explorer. (Each section carries a compiler-added scoped class after its
 		// semantic one.)
 		const homeSections = Array.from(container.querySelectorAll('main .home > section')).map(
 			(section) => section.classList[0],
 		);
-		expect(homeSections).toEqual(['hero', 'features', 'proven', 'why', 'explorer']);
+		expect(homeSections).toEqual(['hero', 'features', 'proven', 'why', 'spin', 'explorer']);
 
 		// The home page renders the interactive benchmark explorer from the checked-in
 		// ×-vs-Octane summary (HOME_SUMMARY). The explorer's own interactions live in
@@ -212,15 +229,34 @@ describe('website routes', () => {
 				const figure = figures[index];
 				const card = cards[index];
 				expect(figure.querySelector('figcaption')).toBeTruthy();
-				expect(figure.querySelector('svg.bench-chart')).toBeTruthy();
-				expect(figure.querySelectorAll('.visx-bar')).toHaveLength(expectedBarCount(card));
-				if (card.series.length <= 2) {
-					expect(figure.querySelectorAll('.value-label')).toHaveLength(expectedBarCount(card));
-					expect(figure.querySelector('.visx-axis-bottom')).toBeNull();
-				} else {
-					expect(figure.querySelector('.visx-axis-bottom')).toBeTruthy();
-				}
+				// One bar per framework for the default "overall" view; multi-series
+				// cards expose "overall" plus every operation as picker buttons,
+				// single-series cards chart their operations directly with no picker.
+				expect(figure.querySelectorAll('.bench-fill')).toHaveLength(expectedBarCount(card));
+				expect(figure.querySelectorAll('.bench-op')).toHaveLength(
+					card.series.length > 1 ? card.rows.length + 1 : 0,
+				);
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
+			}
+		}
+		// The scroll-spy rail lists every section plus a nested row per benchmark
+		// card, and each link's anchor target exists in the document: a section
+		// heading for level-2 rows, an anchored card wrapper for level-3 rows.
+		const toc = container.querySelector('nav[aria-label="On this page"]')!;
+		expect(toc).toBeTruthy();
+		expect(BENCH_SECTIONS.length).toBe(3 + FRAMEWORK_CARDS.length + OCTANE_CARDS.length);
+		for (const section of BENCH_SECTIONS) {
+			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
+			const target = container.querySelector(`#${section.id}`)!;
+			expect(target, section.id).toBeTruthy();
+			if (section.level === 3) {
+				expect(target.querySelector('figure.bench-card'), section.id).toBeTruthy();
+				// The rail click moves focus onto this wrapper, so it must expose an
+				// accessible name announcing which chart the reader landed on.
+				expect(target.getAttribute('role'), section.id).toBe('group');
+				expect(target.getAttribute('aria-label'), section.id).toBe(section.title);
+			} else {
+				expect(target.tagName).toBe('H2');
 			}
 		}
 	});
@@ -232,7 +268,7 @@ describe('website routes', () => {
 		expect(container.querySelector('.topnav-inner')).toBeTruthy();
 	});
 
-	it.each(docs)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
+	it.each(smoke)('/docs/$slug renders its MDX document and active sidebar link', async (doc) => {
 		const { container } = await renderRoute(`/docs/${doc.slug}`);
 
 		expect(container.querySelector('.prose h1')?.textContent?.trim()).toBe(doc.title);
