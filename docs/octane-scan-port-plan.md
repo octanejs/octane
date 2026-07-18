@@ -164,6 +164,19 @@ prod-compile project to prove zero production footprint; (5) a fixture-level
 sanity check that render counts a scan report attributes match
 `profiler.summary()` for the same interaction.
 
+## Known follow-ups
+
+- **Precise lite-scope DOM ranges.** `profiler.domNodes()` resolves lite
+  (hookless) components through the whole-container fallback — the host
+  element's children — because the runtime does not track a range start for
+  lite scopes. Outlines merely over-flash; the inspector's innermost-match
+  can mis-attribute a host's direct child to a lite sibling (asserted
+  loosely in inspector tests). Fix in `packages/octane`: profile builds
+  record the planted range for lite scopes so resolution is exact.
+- **Inspector props/state viewing.** v1 shows identity, report counts, and
+  schedule causes only; live props/state need a new runtime introspection
+  surface and its own privacy discussion.
+
 ## Open questions (resolve in Phase 0 review)
 
 1. Enablement default: require `profile: true`, or emit the inspection

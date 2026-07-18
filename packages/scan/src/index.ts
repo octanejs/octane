@@ -8,6 +8,7 @@
 // unprofiled bundle (an intentional, documented divergence). Under SSR every
 // export is a safe no-op: the server produces no profiler events.
 import { __addRenderSink } from './core.js';
+import { installInspector } from './inspector.js';
 import { outlineSink } from './outlines.js';
 import { installToolbar } from './toolbar.js';
 
@@ -22,11 +23,13 @@ export {
 	type OctaneRenderInfo,
 	type ComponentReport,
 } from './core.js';
+export { useScan } from './use-scan.js';
 
 // The outline overlay and toolbar are DOM consumers; attach them only where
 // a document exists so importing @octanejs/scan stays safe under SSR and in
 // workers.
 if (typeof document !== 'undefined') {
 	__addRenderSink(outlineSink);
+	installInspector();
 	installToolbar();
 }

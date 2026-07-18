@@ -12,6 +12,7 @@ import {
 	__onOptionsChanged,
 	type OctaneRenderInfo,
 } from './core.js';
+import { isInspecting, onInspectionChanged, toggleInspect } from './inspector.js';
 
 const STYLES = `
 	:host {
@@ -51,6 +52,10 @@ const STYLES = `
 	.bar.paused .count {
 		opacity: 0.5;
 	}
+	button[data-active='true'] {
+		border-color: rgba(129, 108, 255, 0.9);
+		background: rgba(129, 108, 255, 0.18);
+	}
 `;
 
 let host: HTMLElement | null = null;
@@ -58,9 +63,11 @@ let bar: HTMLElement | null = null;
 let countEl: HTMLElement | null = null;
 let toggleEl: HTMLButtonElement | null = null;
 let speedEl: HTMLButtonElement | null = null;
+let inspectEl: HTMLButtonElement | null = null;
 let renders = 0;
 let detachSink: (() => void) | null = null;
 let detachOptions: (() => void) | null = null;
+let detachInspection: (() => void) | null = null;
 
 const SPEED_CYCLE = { fast: 'slow', slow: 'off', off: 'fast' } as const;
 
@@ -106,7 +113,15 @@ function attach(): void {
 		const current = getOptions().animationSpeed ?? 'fast';
 		setOptions({ animationSpeed: SPEED_CYCLE[current] });
 	});
-	bar.append(countEl, toggleEl, speedEl);
+	inspectEl = document.createElement('button');
+	inspectEl.type = 'button';
+	inspectEl.setAttribute('data-action', 'inspect');
+	inspectEl.textContent = 'inspect';
+	inspectEl.setAttribute('data-active', String(isInspecting()));
+	inspectEl.addEventListener('click', () => {
+		toggleInspect();
+	});
+	bar.append(countEl, toggleEl, speedEl, inspectEl);
 	shadow.append(style, bar);
 	document.documentElement.appendChild(host);
 }
@@ -118,6 +133,7 @@ function removeToolbar(): void {
 	countEl = null;
 	toggleEl = null;
 	speedEl = null;
+	inspectEl = null;
 }
 
 /**
@@ -132,6 +148,9 @@ export function installToolbar(): void {
 	}
 	detachSink = __addRenderSink({ batch: onBatch });
 	detachOptions = __onOptionsChanged(syncFromOptions);
+	detachInspection = onInspectionChanged((active) => {
+		inspectEl?.setAttribute('data-active', String(active));
+	});
 	syncFromOptions();
 }
 
@@ -139,8 +158,10 @@ export function installToolbar(): void {
 export function teardownToolbar(): void {
 	detachSink?.();
 	detachOptions?.();
+	detachInspection?.();
 	detachSink = null;
 	detachOptions = null;
+	detachInspection = null;
 	renders = 0;
 	removeToolbar();
 }

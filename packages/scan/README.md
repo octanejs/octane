@@ -4,12 +4,13 @@
 automatic render detection and reporting, built on Octane's profile-build
 inspection channel instead of React fiber instrumentation.
 
-Shipped so far (Phases 2–3 of
+Shipped so far (Phases 2–5 of
 [the port plan](../../docs/octane-scan-port-plan.md)): the **programmatic
 core** and the **render-outline overlay** — every component render flashes a
 labeled outline that fades per `animationSpeed` and tracks scroll/layout
-while fading. The toolbar/inspector, `useScan`, and the script-tag auto entry
-land in later phases.
+while fading. The toolbar (counter, pause/resume, speed cycle), click-to-inspect inspector
+(identity, render counts, schedule causes — esc to exit), and `useScan` are
+in. Live props/state viewing and the script-tag auto entry land later.
 
 ## Setup
 
