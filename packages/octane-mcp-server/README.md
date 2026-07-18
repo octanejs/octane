@@ -5,9 +5,10 @@ MCP server for agents working with [Octane](https://github.com/octanejs/octane).
 It serves two audiences:
 
 - **Octane users** (any project): skills and tools for bridging React packages
-  to Octane, migrating React components to `.tsrx`, understanding Octane's
-  intentional divergences from React, and setting up SSR. These work anywhere;
-  the skills ship inside this package.
+  to Octane, engineering production-grade applications and libraries, migrating
+  React components to `.tsrx`, understanding Octane's intentional divergences
+  from React, and setting up SSR. These work anywhere; the skills ship inside
+  this package.
 - **Octane maintainers** (the octane monorepo): repo triage, validation
   planning, benchmark and React-test-port automation. These tools register
   only when the server detects an octane monorepo checkout at its root.
@@ -56,6 +57,31 @@ maintainer tools):
 
 ## Tools (always available)
 
+The server initialization instructions direct coding agents to call
+`octane_engineering_plan` and load `build-octane-software` before creating or
+materially changing Octane code. This makes the correctness, performance
+evidence, adversarial self-review, and handoff requirements available even when
+the host does not automatically discover skills.
+
+### `octane_engineering_plan`
+
+Returns structured engineering gates for application, library, or
+framework-core work. Framework-core plans always require hot-path analysis,
+comparable baseline/candidate performance evidence, the maintainer core and
+performance skills, a second review of the final diff, and explicit residual
+risk reporting. In repo mode, the response also includes validation commands for
+the supplied paths. A framework-core request outside repo mode returns a blocking
+condition directing the client to configure `OCTANE_REPO_ROOT`, because the
+required maintainer skills and repository validation are otherwise unavailable.
+
+```json
+{
+  "scope": "framework-core",
+  "changeKind": "performance",
+  "paths": ["packages/octane/src/runtime.ts"]
+}
+```
+
 ### `octane_bridge_react_package`
 
 Scans a React package (by name from `node_modules`, or any source directory by
@@ -82,6 +108,8 @@ without registering its React-package mapping fails CI.
 Returns a skill by name. Bundled skills (shipped with this package):
 
 - `bridge-react-package` — the full workflow for porting a React library.
+- `build-octane-software` — production engineering, performance, validation,
+  and adversarial self-review gates for Octane code.
 - `migrate-react-component` — React JSX to `.tsrx` conversion reference.
 - `react-divergences` — Octane's intentional differences from React.
 - `setup-ssr` — server rendering and hydration setup.
@@ -106,7 +134,9 @@ mcp-server, benchmark, docs, RuleSync source).
 
 ### `octane_validate_plan`
 
-Recommends validation commands for changed paths and task kind.
+Recommends validation commands for changed paths and task kind. Core task plans
+include the quick benchmark ratio gate in addition to core tests, typechecking,
+and repository-wide formatting.
 
 ### `octane_scaffold_react_port`
 

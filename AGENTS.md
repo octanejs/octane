@@ -1,6 +1,9 @@
 Please also reference the following rules as needed. The list below is provided in TOON format, and `@` stands for the project root directory.
 
-rules[1]:
+rules[2]:
+  - path: @.agents/memories/core-engineering.md
+    description: Performance-first engineering and self-review gates for Octane framework fundamentals
+    applyTo[5]: packages/octane/src/**,packages/app-core/src/**,packages/vite-plugin-octane/src/**,packages/rspack-plugin-octane/src/**,packages/rsbuild-plugin-octane/src/**
   - path: @.agents/memories/testing.md
     description: Octane test quality and observation-boundary rules
     applyTo[5]: **/*.test.*,**/*.spec.*,**/tests/**,**/_fixtures/**,benchmarks/**
@@ -253,6 +256,16 @@ Two regression layers beyond the octane project:
 `scripts/scaffold-react-port.mjs` turns a React test file into a local triage
 skeleton (in-scope `it.todo`s + out-of-scope reasons). Resolve or remove every
 todo before committing the port.
+
+## Framework-Fundamental Changes
+
+Runtime, compiler, scheduler, reconciler, SSR/hydration, and framework build
+pipeline changes must follow `.rulesync/rules/core-engineering.md`. Treat these
+paths as performance-sensitive by default: establish the observable contract and
+a relevant baseline, protect cold and hot paths deliberately, and perform the
+required adversarial self-review on the final diff. Do not claim performance
+improvements without comparable measurements, and report residual risk when a
+trustworthy measurement is unavailable.
 
 ## Changesets
 
