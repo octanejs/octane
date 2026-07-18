@@ -46,7 +46,7 @@ describe('Core APIs documentation', () => {
 			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
 
-		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(6);
+		expect(container.querySelectorAll('.topic-grid a')).toHaveLength(7);
 		expect(container.querySelectorAll('[data-demo]')).toHaveLength(9);
 		for (const id of [
 			'state',
@@ -63,6 +63,9 @@ describe('Core APIs documentation', () => {
 		}
 		for (const id of [
 			'use-sync-external-store',
+			'hydrate-when',
+			'hydrate-split',
+			'hydrate-prefetch',
 			'use-transition',
 			'use-deferred-value',
 			'view-transitions',
@@ -94,6 +97,9 @@ describe('Core APIs documentation', () => {
 		expect(highlightedSource.some((source) => source.includes('renderToString(App'))).toBe(true);
 		for (const sourceMarker of [
 			'export function NetworkStatus()',
+			'<Hydrate when={visible({ rootMargin:',
+			'<Hydrate when={idle()} split={false}>',
+			'<Hydrate when={interaction()} prefetch={idle()}>',
 			'const [isPending, startTransition] = useTransition();',
 			'const deferredQuery = useDeferredValue(query);',
 			'<ViewTransition enter="notice-in" exit="notice-out">',
@@ -115,6 +121,9 @@ describe('Core APIs documentation', () => {
 		expect(groupedApiCodeCount('useContext')).toBe(2);
 		expect(groupedApiCodeCount('addTransitionType')).toBe(2);
 		expect(groupedApiCodeCount('isChildrenBlock')).toBe(3);
+		expect(
+			apiRows.some((row) => row.querySelector(':scope > code')?.textContent === 'Hydrate'),
+		).toBe(true);
 
 		const active = container.querySelector(
 			'a.sidebar-link[href="/docs/core-apis"][data-status="active"]',

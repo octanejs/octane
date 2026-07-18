@@ -831,6 +831,12 @@ class OctaneBundlerCompiler {
 				...(hydratePreparation === null && !hasRendererBoundaries
 					? { __nativeChangeAnalysis: nativeChangeAnalysis }
 					: null),
+				// Scoped-style hashes are position-derived; after the extraction
+				// rewrite the compiler restamps them from these authored
+				// coordinates so client and server compiles agree (compile.js).
+				...(hydratePreparation?.origins != null
+					? { __styleRemap: { authored: source, origins: hydratePreparation.origins } }
+					: null),
 				hmr,
 				mode: environment,
 				dev,

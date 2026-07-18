@@ -50,7 +50,7 @@ The complete component surface is:
 | `split` | `boolean` | Compiler-split the direct children into a deferred chunk. Defaults to `true`. |
 | `prefetch` | `HydrationPrefetchStrategy \| HydrationPrefetchFunction` | Start loading the split chunk or run custom preparation before hydration. |
 | `fallback` | renderable | Client-only loading UI for a later client mount or suspension. |
-| `onHydrated` | `() => void` | Called once after the preserved child DOM becomes interactive. |
+| `onHydrated` | `() => void` | Called once after the child successfully commits on the client. |
 | `children` | renderable | The subtree rendered on the server and deferred on the client. |
 
 `HydrateOptions` is exported from `octane/hydration` for reusable option objects:
@@ -95,7 +95,9 @@ synchronously on the client.
 ```tsrx
 <Hydrate
 	when={() =>
-		navigator.connection?.saveData ? interaction({ events: 'click' }) : visible()
+		window.matchMedia('(pointer: coarse)').matches
+			? interaction({ events: 'click' })
+			: visible()
 	}
 >
 	<Recommendations />
@@ -145,10 +147,11 @@ chunk would not be worthwhile:
 
 The compiler recognizes `Hydrate` imported from `octane`, including an import
 alias. Split children must be authored directly inside the boundary. Extraction
-rejects function-as-children, hook calls directly inside the extracted JSX, and
-`this` or `super` captures; move that work into a child component or opt out
-with `split={false}`. Ordinary lexical values can be captured by the generated
-child component.
+rejects function-as-children, hook calls directly inside the extracted JSX,
+scoped `<style>` elements (their rules belong to the owning component's single
+style scope), and `this` or `super` captures; move that work into a child
+component or opt out with `split={false}`. Ordinary lexical values can be
+captured by the generated child component.
 
 Generated Hydrate chunks are not eagerly module-preloaded. The Vite and Rsbuild
 app integrations still link CSS reachable from a route's deferred chunks,
@@ -159,7 +162,9 @@ not turn deferred JavaScript into an eager dependency.
 ### `prefetch`
 
 A strategy-form prefetch loads the generated child chunk early without making
-the boundary interactive:
+the boundary interactive. It accepts `load()`, `idle()`, `visible()`, `media()`,
+or `interaction()`; `condition()`, `never()`, and function-form strategies are
+activation-only.
 
 ```tsrx
 import { idle, interaction } from 'octane/hydration';
@@ -189,8 +194,8 @@ The procedural context contains:
 
 - `preload()`, which loads the generated child chunk or resolves immediately
   with `split={false}`;
-- `waitFor(strategy)`, which resolves with `'prefetch'`, `'hydrate'`, or
-  `'abort'`;
+- `waitFor(strategy)`, which accepts the same five prefetch strategies and
+  resolves with `'prefetch'`, `'hydrate'`, or `'abort'`;
 - `signal`, an `AbortSignal` for cancelable work; and
 - `element`, the persistent boundary `<div>`.
 
@@ -216,7 +221,8 @@ resolvable single-use `const` spread from the server output. Shared or dynamic
 spread objects are left intact because rewriting them could change observable
 JavaScript behavior; keep their fallback values safe to evaluate on the server.
 
-`onHydrated` runs once after the child has hydrated successfully on the client.
+`onHydrated` runs once after the child successfully commits on the client,
+whether the boundary adopts preserved server DOM or mounts client-only.
 
 ## Correctness and nesting
 

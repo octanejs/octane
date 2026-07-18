@@ -1,45 +1,16 @@
-// A benchmark card: legend chips, a deterministic @octanejs/visx horizontal
-// bar chart (benchmark score ms per operation, lower is better), and a
-// <details> table with the exact numbers — the accessibility/relief channel
-// for the color encoding. The SVG renders identically on the server and client,
-// so hydration adopts the real chart instead of replacing a chart shell.
-import { AxisBottom } from '@octanejs/visx/axis';
-import { Group } from '@octanejs/visx/group';
-import { scaleLinear } from '@octanejs/visx/scale';
-import { Bar } from '@octanejs/visx/shape';
-import type { BenchCard, BenchRow, SeriesDef } from '../content/benchmarks.ts';
-
-const BAR_SIZE = 11;
-const GROUP_PAD = 16;
-const BAR_GAP = 2;
-const AXIS_TEXT = {
-	fill: '#99a1b3',
-	fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-	fontSize: 10,
-	textAnchor: 'middle',
-} as const;
-
-interface ChartValue {
-	series: SeriesDef;
-	value: number;
-	slot: number;
-}
-
-// Unsupported combinations (currently Svelte/Vue Vapor streaming SSR) omit
-// their bars completely. Center the remaining values within the row's normal
-// series-height allocation so gaps never appear between real measurements.
-function chartValues(row: BenchRow, series: SeriesDef[]): ChartValue[] {
-	const values = series.flatMap((entry) => {
-		const value = row[entry.key];
-		return typeof value === 'number'
-			? [
-					{ series: entry, value },
-				]
-			: [];
-	});
-	const start = Math.floor((series.length - values.length) / 2);
-	return values.map((entry, index) => ({ ...entry, slot: start + index }));
-}
+// A benchmark card: an operation picker and one labeled horizontal bar per
+// framework for the picked operation — the same plain-div bar view the
+// benchmark explorer's first panel uses, so the two charts read identically
+// (lower is better, sorted fastest-first). The picker opens on "overall", the
+// card's summary reading: each framework's geometric mean across operations,
+// × vs the reference series. Single-series cards have nothing to compare per
+// operation, so they chart every operation as its own bar instead. The <details> table
+// with the exact numbers for every operation stays as the accessibility/relief
+// channel for the color encoding. The default view is deterministic from the
+// checked-in card, so the server and client render the same markup and
+// hydration adopts the real chart instead of replacing a chart shell.
+import { useMemo, useState } from 'octane';
+import type { BenchCard } from '../content/benchmarks.ts';
 
 function fmt(value: unknown): string {
 	const n =
@@ -72,69 +43,39 @@ function fmtBytes(value: unknown): string {
 	return Math.round(n) + ' B';
 }
 
-function maxValue(card: BenchCard): number {
-	let max = 1;
-	for (const row of card.rows) {
-		for (const series of card.series) {
-			const value = row[series.key];
-			if (typeof value === 'number') max = Math.max(max, value);
-		}
-	}
-	return max;
-}
-
-// The card's one-line reading: each series' geometric mean across operations,
-// relative to the card's first series (Octane .tsrx on framework cards, the
-// tuned fixture on the de-opt cards), ranked fastest-first. Rows where either
-// value is missing (unsupported combinations) drop out of that series' mean.
-interface Verdict {
-	series: SeriesDef;
-	ratio: number;
-}
-
-function verdicts(card: BenchCard): Verdict[] {
-	const reference = card.series[0];
-	const entries: Verdict[] = [];
-	for (const series of card.series) {
-		const ratios: number[] = [];
-		for (const row of card.rows) {
-			const base = row[reference.key];
-			const value = row[series.key];
-			if (typeof base === 'number' && base > 0 && typeof value === 'number' && value > 0) {
-				ratios.push(value / base);
-			}
-		}
-		if (ratios.length > 0) {
-			const mean = Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length);
-			entries.push({ series, ratio: mean });
-		}
-	}
-	return entries.sort((a, b) => a.ratio - b.ratio);
-}
-
-// Chip labels drop trailing version tokens ("React 19" → "React") — the full
+// Bar labels drop trailing version tokens ("React 19" → "React") — the full
 // versioned label stays in the data table header.
 function shortLabel(label: string): string {
 	return label.replace(/\s+[\d][\d.]*.*$/, '');
 }
 
-// A ratio within half a percent of the reference is a tie — show it as the
-// same "1×" as the reference chip instead of a misleadingly precise "1.00×".
-function fmtChipX(ratio: number): string {
-	return Math.abs(ratio - 1) < 0.005 ? '1×' : fmtX(ratio);
+// The picker's synthetic first entry — no suite has an operation named this.
+const OVERALL_OP = 'overall';
+
+interface BarItem {
+	key: string;
+	label: string;
+	value: number;
+	color: string;
 }
 
-function indexedRows(card: BenchCard): Array<{ row: BenchRow; index: number }> {
-	return card.rows.map((row, index) => ({ row, index }));
+interface BarView {
+	present: BarItem[];
+	missing: Array<{ key: string; label: string }>;
+	scaleMax: number;
 }
 
-function barWidth(value: number, widthScale: (value: number) => number): number {
-	return Math.max(2, widthScale(value));
+function barView(present: BarItem[], missing: BarView['missing']): BarView {
+	present.sort((a, b) => a.value - b.value);
+	let max = 0;
+	for (const item of present) max = Math.max(max, item.value);
+	// 1.05 headroom keeps the longest bar off the card edge; an all-zero row
+	// (sub-timer-resolution scores) falls back to 1 so fractions stay finite.
+	return { present, missing, scaleMax: max > 0 ? max * 1.05 : 1 };
 }
 
-export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?: number }) @{
+export function BenchBars(props: { card: BenchCard }) @{
 	const { card } = props;
-	const chartWidth = props.width ?? 560;
 	const format =
 		card.format === 'x'
 			? fmtX
@@ -147,31 +88,68 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 			: card.format === 'bytes'
 				? 'Data table (production build bytes)'
 				: 'Data table (score ms, ' + card.iterations + ' iterations)';
-	// Value labels at bar tips only where they stay readable (≤2 series);
-	// denser cards lean on the number axis + the table view instead.
-	const showValues = props.showValues ?? card.series.length <= 2;
+	// Multi-series cards compare frameworks within one operation at a time —
+	// opening on the "overall" summary (each series' geometric mean across the
+	// card's operations, × vs the first series). Single-series cards compare
+	// their operations against each other instead.
+	const compare = card.series.length > 1;
+	const [op, setOp] = useState(OVERALL_OP);
+	const overall = compare && op === OVERALL_OP;
 
-	// Keep dense seven/eight-series comparisons legible without making each
-	// operation group disproportionately tall.
-	const barSize =
-		card.series.length > 6 ? 9 : BAR_SIZE;
-	const groupHeight = card.series.length * (barSize + BAR_GAP) + GROUP_PAD;
-	const chartHeight = card.rows.length * groupHeight + 24;
-	const longestOp = Math.max(...card.rows.map((row) => String(row.op).length));
-	const categoryWidth = Math.min(170, Math.max(90, longestOp * 6.6 + 12));
-	const rightPadding = showValues ? 48 : 16;
-	const plotWidth = chartWidth - categoryWidth - rightPadding;
-	const widthScale = scaleLinear<number>({
-		domain: [0, maxValue(card)],
-		range: [0, plotWidth],
+	const bars = useMemo(() => {
+		if (!compare) {
+			const only = card.series[0];
+			const present: BarItem[] = [];
+			for (const row of card.rows) {
+				const value = row[only.key];
+				if (typeof value === 'number') present.push({
+					key: row.op as string,
+					label: row.op as string,
+					value,
+					color: only.color,
+				});
+			}
+			return barView(present, []);
+		}
+		const present: BarItem[] = [];
+		const missing: Array<{ key: string; label: string }> = [];
+		if (op === OVERALL_OP) {
+			// Rows where either side is missing or zero (unsupported combinations,
+			// sub-timer-resolution scores) drop out of that series' mean.
+			const reference = card.series[0];
+			for (const s of card.series) {
+				const ratios: number[] = [];
+				for (const row of card.rows) {
+					const base = row[reference.key];
+					const value = row[s.key];
+					if (typeof base === 'number' && base > 0 && typeof value === 'number' && value > 0) {
+						ratios.push(value / base);
+					}
+				}
+				if (ratios.length > 0) present.push({
+					key: s.key,
+					label: shortLabel(s.label),
+					value: Math.exp(ratios.reduce((sum, r) => sum + Math.log(r), 0) / ratios.length),
+					color: s.color,
+				});
+				else missing.push({ key: s.key, label: shortLabel(s.label) });
+			}
+			return barView(present, missing);
+		}
+		const row = card.rows.find((r) => r.op === op) ?? card.rows[0];
+		for (const s of card.series) {
+			const value = row[s.key];
+			if (typeof value === 'number') present.push({
+				key: s.key,
+				label: shortLabel(s.label),
+				value,
+				color: s.color,
+			});
+			else missing.push({ key: s.key, label: shortLabel(s.label) });
+		}
+		return barView(present, missing);
 	});
-	const rows = indexedRows(card);
-	const barsHeight = card.series.length * (barSize + BAR_GAP);
-	// Single-series cards keep the plain legend; everything else gets the ranked
-	// geomean strip (which doubles as the legend — same swatches).
-	const cardVerdicts =
-		card.series.length > 1 ? verdicts(card) : [];
-	const verdictNote = 'geomean vs ' + shortLabel(card.series[0].label) + ' · lower is better';
+	const valueFormat = overall ? fmtX : format;
 
 	<figure class="bench-card">
 		<figcaption class="bench-card-head">
@@ -182,86 +160,68 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				{card.description as string}
 			</span>
 		</figcaption>
-		@if (cardVerdicts.length > 0) {
-			<div class="bench-key-row">
-				@for (const v of cardVerdicts; key v.series.key) {
-					<span class="bench-key" title={v.series.label}>
-						<span class="bench-swatch" style={'background:' + v.series.color}></span>
-						{shortLabel(v.series.label)}
-						<span class="bench-key-x">{fmtChipX(v.ratio)}</span>
-					</span>
-				}
-				<span class="bench-key-note">
-					{verdictNote as string}
-				</span>
-			</div>
-		} @else {
-			<div class="bench-key-row" aria-hidden="true">
-				@for (const s of card.series; key s.key) {
-					<span class="bench-key">
-						<span class="bench-swatch" style={'background:' + s.color}></span>
-						{s.label as string}
-					</span>
+		@if (compare) {
+			<div class="bench-ops" role="group" aria-label="Operation">
+				<button
+					type="button"
+					class={['bench-op', { 'bench-op-on': overall }]}
+					aria-pressed={overall}
+					onClick={() => setOp(OVERALL_OP)}
+				>
+					{OVERALL_OP as string}
+				</button>
+				@for (const r of card.rows; key r.op) {
+					<button
+						type="button"
+						class={['bench-op', { 'bench-op-on': r.op === op }]}
+						aria-pressed={r.op === op}
+						onClick={() => setOp(r.op as string)}
+					>
+						{r.op as string}
+					</button>
 				}
 			</div>
 		}
 		<div class="bench-plot" aria-hidden="true">
-			<svg
-				class="bench-chart"
-				width={chartWidth}
-				height={chartHeight}
-				viewBox={'0 0 ' + chartWidth + ' ' + chartHeight}
-				focusable="false"
-			>
-				@for (const rowEntry of rows; key rowEntry.row.op) {
-					<Group top={rowEntry.index * groupHeight + 4}>
-						<text
-							class="op-label"
-							x={categoryWidth - 12}
-							y={Math.floor(barsHeight / 2) + 4}
-							text-anchor="end"
+			@for (const item of bars.present; key item.key) {
+				<div class="bench-row">
+					<span class="bench-row-label" title={item.label}>
+						{item.label as string}
+					</span>
+					<div class="bench-track">
+						<div
+							class="bench-fill"
+							style={'width:' + (item.value / bars.scaleMax) * 100 + '%;background:' + item.color}
+						></div>
+						<span
+							class={[
+								'bench-val',
+								item.value / bars.scaleMax > 0.62 ? 'bench-val-in' : 'bench-val-out',
+							]}
+							style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
 						>
-							{rowEntry.row.op as string}
-						</text>
-						@for (const entry of chartValues(rowEntry.row, card.series); key entry.series.key) {
-							<>
-								<Bar
-									className="bench-bar"
-									data-series={entry.series.key}
-									x={categoryWidth}
-									y={entry.slot * (barSize + BAR_GAP)}
-									width={barWidth(entry.value, widthScale)}
-									height={barSize}
-									rx="4"
-									fill={entry.series.color}
-								/>
-								@if (showValues) {
-									<text
-										class="value-label"
-										x={categoryWidth + barWidth(entry.value, widthScale) + 6}
-										y={entry.slot * (barSize + BAR_GAP) + barSize - 1}
-									>{format(entry.value)}</text>
-								}
-							</>
-						}
-					</Group>
-				}
-				@if (!showValues) {
-					<AxisBottom
-						axisClassName="bench-value-axis"
-						top={chartHeight - 20}
-						left={categoryWidth}
-						scale={widthScale}
-						numTicks={4}
-						hideAxisLine={true}
-						tickLength={3}
-						tickStroke="rgba(255, 255, 255, 0.18)"
-						tickLabelProps={AXIS_TEXT}
-						tickFormat={format}
-					/>
-				}
-			</svg>
+							{valueFormat(item.value) as string}
+						</span>
+					</div>
+				</div>
+			}
+			@for (const item of bars.missing; key item.key) {
+				<div class="bench-row bench-row-empty">
+					<span class="bench-row-label" title={item.label}>
+						{item.label as string}
+					</span>
+					<div class="bench-track">
+						<span class="bench-val bench-val-out bench-muted" style="left:0">{'—'}</span>
+					</div>
+				</div>
+			}
 		</div>
+		@if (overall) {
+			<p class="bench-plot-note">
+				{'geometric mean across all operations, × vs ' + shortLabel(card.series[0].label) +
+					' — lower is better'}
+			</p>
+		}
 		<details class="bench-table">
 			<summary>
 				{tableCaption as string}
@@ -302,6 +262,7 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				flex-direction: column;
 				gap: 0.75rem;
 				min-width: 0;
+				font-variant-numeric: tabular-nums;
 			}
 			.bench-card-head {
 				display: flex;
@@ -319,49 +280,109 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				font-size: 0.85rem;
 				line-height: 1.45;
 			}
-			.bench-key-row {
+			.bench-ops {
 				display: flex;
 				flex-wrap: wrap;
-				align-items: center;
-				gap: 0.4rem 1rem;
+				gap: 0.35rem;
 			}
-			.bench-key {
-				display: inline-flex;
-				align-items: center;
-				gap: 0.4rem;
+			.bench-op {
+				padding: 0.25rem 0.6rem;
+				border: 1px solid transparent;
+				border-radius: 0.5rem;
+				background: transparent;
 				color: #99a1b3;
-				font-size: 0.8rem;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				font-size: 0.78rem;
+				cursor: pointer;
+				transition:
+					background 0.15s,
+					color 0.15s;
 			}
-			.bench-key-x {
+			.bench-op:hover {
 				color: #f6f7f9;
+				background: rgba(255, 255, 255, 0.04);
+			}
+			.bench-op:focus-visible {
+				outline: 2px solid #ff8296;
+				outline-offset: 2px;
+			}
+			.bench-op-on {
+				background: rgba(255, 65, 90, 0.16);
+				color: #f6f7f9;
+			}
+			/* The plot is one grid: the label column sizes to its longest label (so
+			   the chart hugs the card's left edge instead of a fixed gutter) and the
+			   rows share it through subgrid, keeping every bar's start aligned. */
+			.bench-plot {
+				display: grid;
+				grid-template-columns: max-content 1fr;
+				gap: 0.45rem 0.6rem;
+				padding: 0.25rem 0;
+			}
+			.bench-row {
+				grid-column: 1 / -1;
+				display: grid;
+				grid-template-columns: subgrid;
+				align-items: center;
+			}
+			.bench-row-label {
+				font-size: 0.82rem;
+				color: #f6f7f9;
+				text-align: right;
+				white-space: nowrap;
+				overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.bench-track {
+				position: relative;
+				height: 1.4rem;
+				border-radius: 0 0.35rem 0.35rem 0;
+				background: rgba(255, 255, 255, 0.04);
+			}
+			.bench-fill {
+				position: absolute;
+				left: 0;
+				top: 0;
+				height: 100%;
+				min-width: 2px;
+				border-radius: 0 0.35rem 0.35rem 0;
+				transition:
+					width 0.3s ease,
+					background 0.3s ease;
+			}
+			/* The value rides the bar tip (left set inline to the bar's fraction), so
+			   it tracks the fill on any width. Long bars carry it inside
+			   (right-aligned in the fill); short bars sit it just past the tip. */
+			.bench-val {
+				position: absolute;
+				top: 50%;
+				transform: translateY(-50%);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.75rem;
-				font-variant-numeric: tabular-nums;
+				color: #f6f7f9;
+				white-space: nowrap;
+				transition: left 0.3s ease;
 			}
-			.bench-key-note {
-				margin-left: auto;
+			.bench-val-out {
+				padding-left: 0.4rem;
+			}
+			.bench-val-in {
+				transform: translate(-100%, -50%);
+				padding-right: 0.45rem;
+				color: #fff;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+			}
+			.bench-row:hover .bench-fill {
+				filter: brightness(1.12);
+			}
+			.bench-row-empty .bench-row-label,
+			.bench-muted {
+				color: #99a1b3;
+			}
+			.bench-plot-note {
 				color: #6e7787;
 				font-size: 0.72rem;
-				white-space: nowrap;
-			}
-			.bench-swatch {
-				width: 10px;
-				height: 10px;
-				border-radius: 3px;
-				display: inline-block;
-			}
-			.bench-plot {
-				overflow-x: auto;
-			}
-			.bench-plot svg {
-				display: block;
-				max-width: none;
-			}
-			.op-label,
-			.value-label {
-				fill: #99a1b3;
-				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-				font-size: 11px;
+				margin: 0;
 			}
 			.bench-table {
 				border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -382,7 +403,6 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				border-collapse: collapse;
 				margin: 0.6rem 0 0.4rem;
 				font-size: 0.8rem;
-				font-variant-numeric: tabular-nums;
 			}
 			.bench-table th,
 			.bench-table td {
@@ -396,10 +416,26 @@ export function BenchBars(props: { card: BenchCard; showValues?: boolean; width?
 				color: #99a1b3;
 				font-weight: 500;
 			}
+			.bench-table thead th:first-child {
+				text-align: left;
+			}
 			.bench-table th[scope='row'] {
 				text-align: left;
 				color: #99a1b3;
 				font-weight: 400;
+			}
+			@media (max-width: 640px) {
+				.bench-row-label,
+				.bench-val {
+					font-size: 0.72rem;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.bench-fill,
+				.bench-val,
+				.bench-op {
+					transition: none;
+				}
 			}
 		</style>
 	</figure>
