@@ -2,15 +2,15 @@
 // and the ⌘K dialog wired through the real router.
 import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 import { loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';
 
 afterEach(cleanup);
 
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {

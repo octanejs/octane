@@ -1,58 +1,47 @@
 # Octane website
 
-The official Octane site — an octane app built on `@octanejs/vite-plugin`
-(SSR + routing + hydration), `@octanejs/tanstack-router` (in-app routing), and
-`@octanejs/mdx` (the docs content, Shiki-highlighted at build time).
+The official Octane site — an Octane app built on TanStack Start and
+`@tanstack/octane-router` for file routing, SSR, and hydration. The docs content
+still uses `@octanejs/mdx` with Shiki highlighting at build time.
 
 ## Develop
 
 ```bash
 pnpm --filter website dev        # streaming dev SSR on http://localhost:5179
-pnpm --filter website test       # route smoke tests + built-handler smoke test
+pnpm exec vitest run --project website # route and browser smoke tests
 ```
 
 ## Build & preview
 
 ```bash
-pnpm --filter website build      # → dist/client (static assets) + dist/server (SSR bundle)
-pnpm --filter website preview    # octane-preview: serves the PRODUCTION build on :3000
+pnpm --filter website build      # TanStack Start + Nitro production build
+pnpm --filter website preview    # serves the production build on :3000
+pnpm --filter website start      # runs .output/server/index.mjs directly
 ```
 
-`vite build` produces both bundles:
+`vite build` produces Nitro's deployable `.output/` directory:
 
-- `dist/client/` — hashed static assets (immutable-cacheable). The built
-  `index.html` is **not** here — it is the SSR template and moves to
-  `dist/server/` so static hosting can't shadow the SSR handler at `/`.
-- `dist/server/entry.js` — the self-contained SSR server (app + octane
-  bundled; only node builtins external). Run it directly
-  (`node dist/server/entry.js`, honors `PORT`) or import its exports:
-  `handler` (`(Request) => Promise<Response>`) and `nodeHandler`
-  (`(req, res)` for Node serverless runtimes).
+- `.output/public/` — hashed client assets and public files.
+- `.output/server/index.mjs` — the production SSR server. Run it with the
+  package's `start` script; it honors Nitro's normal host and port variables.
 
-`octane-preview` (the `preview` script) runs exactly that entry — it is the
-pre-deploy verification step.
+The `preview` script is the local pre-deploy verification step.
 
 ## Deploy (Vercel)
 
-Deployment is handled by `@octanejs/adapter-vercel`: `adapter: vercel()` in
-[octane.config.ts](octane.config.ts) makes `vite build` emit Vercel's
-[Build Output API](https://vercel.com/docs/build-output-api/v3) under
-`.vercel/output/` — hashed assets as static files plus one self-contained Node
-function wrapping the SSR handler, with routing/headers in its `config.json`
-(filesystem first, then every page — including the `/*splat` 404 catch-all —
-server-rendered with a real status code). Vercel picks up `.vercel/output`
-automatically after the build command; [vercel.json](vercel.json) only sets
-`buildCommand`.
-
-The adapter doesn't affect local workflows: `octane-preview` still serves
-`dist/server` directly.
+Deployment is handled by Nitro's Vercel preset. Vercel selects that preset from
+its build environment and the existing [vercel.json](vercel.json) runs the
+website build. TanStack Start owns the request handler, route status codes, and
+hydration payload; Nitro packages that handler and the client assets for the
+target platform. The generated function stays pinned to Node.js 24, matching
+the previous adapter.
 
 Project settings in the Vercel dashboard:
 
 | Setting          | Value                                        |
 | ---------------- | -------------------------------------------- |
 | Root Directory   | `website` (enable "Include files outside the Root Directory" — workspace deps) |
-| Framework Preset | Other (vercel.json supplies the build command) |
+| Framework Preset | Other (`vercel.json` supplies the build command) |
 | Install Command  | default (`pnpm install` at the repo root)    |
 | Node.js Version  | 22.x or 24.x                                |
 

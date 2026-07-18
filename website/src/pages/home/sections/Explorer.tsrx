@@ -2,7 +2,7 @@
 // checked-in ×-vs-Octane matrix the teaser above summarizes (HOME_SUMMARY).
 // Staged on the home page for now; it's generic over a BenchCard, so /benchmarks
 // can feed it the full grid next.
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { BenchmarkExplorer } from '../../../components/BenchmarkExplorer.tsrx';
 import { HOME_SUMMARY } from '../../../content/home-benchmark.ts';
 

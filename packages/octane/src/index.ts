@@ -89,6 +89,8 @@ export {
 	__useReducerWithGetter,
 	__createVoidRoot,
 	bindRendererRegionOwner,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 	createHostContextRequest,
 	// Module-load "this module uses <ViewTransition>" hint (view-transitions plan).
 	__vtSeen,

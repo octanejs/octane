@@ -4,13 +4,13 @@
 // on each <pre>; this proves it flows through to a visible label.
 import { it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 
 afterEach(cleanup);
 
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as never, { props: { router } });
 	await waitFor(() => {

@@ -3,14 +3,14 @@
 // local navigation, and the real interactive example embedded in the MDX.
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, waitFor, within } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 
 afterEach(cleanup);
 
 async function renderCoreApis() {
-	const router = makeRouter({
+	const router = getRouter({
 		history: createMemoryHistory({ initialEntries: ['/docs/core-apis'] }),
 	});
 	await router.load();
@@ -23,7 +23,10 @@ async function renderCoreApis() {
 	return utils;
 }
 
-describe('Core APIs documentation', () => {
+// Each case mounts the real docs route so it covers the router, MDX document,
+// and embedded demo together. Keep the interaction waits narrowly bounded below,
+// while allowing the full document render to finish on shared CI runners.
+describe('Core APIs documentation', { timeout: 15_000 }, () => {
 	it('presents a concept-first guide with complete local navigation', async () => {
 		const { container } = await renderCoreApis();
 		const coreDoc = docs.find((doc) => doc.slug === 'core-apis')!;

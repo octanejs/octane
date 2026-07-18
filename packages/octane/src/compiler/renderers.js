@@ -377,11 +377,12 @@ function normalizeFilename(filename) {
 	if (typeof filename !== 'string' || filename.length === 0) {
 		throw configError('resolveRendererForFile requires a non-empty filename.');
 	}
+	const query = filename.indexOf('?');
+	// Node package-import aliases begin with `#`; only a later hash is a suffix.
+	const hash = filename.indexOf('#', filename.startsWith('#') ? 1 : 0);
 	let end = filename.length;
-	for (const suffix of ['?', '#']) {
-		const index = filename.indexOf(suffix);
-		if (index !== -1 && index < end) end = index;
-	}
+	if (query !== -1) end = query;
+	if (hash !== -1 && hash < end) end = hash;
 	let normalized = filename.slice(0, end).replaceAll('\\', '/');
 	while (normalized.startsWith('./')) normalized = normalized.slice(2);
 	while (normalized.startsWith('/')) normalized = normalized.slice(1);

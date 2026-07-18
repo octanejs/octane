@@ -732,7 +732,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/async-composition:
     dependencies:
@@ -751,7 +751,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/async-composition/react:
     dependencies:
@@ -764,10 +764,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/async-waterfall:
     dependencies:
@@ -783,7 +783,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/async-waterfall/preact:
     dependencies:
@@ -793,10 +793,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/async-waterfall/react:
     dependencies:
@@ -809,10 +809,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/async-waterfall/ripple:
     dependencies:
@@ -825,7 +825,7 @@ importers:
         version: 0.3.86
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/async-waterfall/solid:
     dependencies:
@@ -838,10 +838,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/async-waterfall/svelte:
     dependencies:
@@ -851,16 +851,16 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/bundle-size:
     dependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/chat-stream:
     dependencies:
@@ -879,7 +879,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/chat-stream/preact:
     dependencies:
@@ -889,13 +889,13 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/chat-stream/react:
     dependencies:
@@ -908,13 +908,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/chat-stream/ripple:
     dependencies:
@@ -930,7 +930,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/chat-stream/solid:
     dependencies:
@@ -943,10 +943,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/chat-stream/svelte:
     dependencies:
@@ -956,7 +956,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
@@ -965,7 +965,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/chat-stream/vue-vapor:
     dependencies:
@@ -981,10 +981,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/codegen-size:
     dependencies:
@@ -1009,7 +1009,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/octane-jsx:
     dependencies:
@@ -1019,7 +1019,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/octane-tsrx:
     dependencies:
@@ -1029,7 +1029,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/preact:
     dependencies:
@@ -1039,10 +1039,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/react:
     dependencies:
@@ -1055,10 +1055,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/ripple:
     dependencies:
@@ -1071,7 +1071,7 @@ importers:
         version: 0.3.86
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/solid:
     dependencies:
@@ -1084,10 +1084,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/dbmon/svelte:
     dependencies:
@@ -1097,13 +1097,13 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/dbmon/vue-vapor:
     dependencies:
@@ -1119,10 +1119,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list:
     dependencies:
@@ -1141,7 +1141,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list/octane-tsrx:
     dependencies:
@@ -1154,7 +1154,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list/preact:
     dependencies:
@@ -1164,13 +1164,13 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list/react:
     dependencies:
@@ -1183,13 +1183,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list/ripple:
     dependencies:
@@ -1205,7 +1205,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list/solid:
     dependencies:
@@ -1221,10 +1221,10 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/effectful-list/svelte:
     dependencies:
@@ -1234,7 +1234,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
@@ -1243,7 +1243,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/effectful-list/vue-vapor:
     dependencies:
@@ -1259,10 +1259,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework:
     dependencies:
@@ -1281,7 +1281,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/octane-jsx-naive:
     dependencies:
@@ -1294,7 +1294,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/octane-ts:
     dependencies:
@@ -1307,7 +1307,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/octane-tsrx:
     dependencies:
@@ -1320,7 +1320,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/octane-tsrx-naive:
     dependencies:
@@ -1333,7 +1333,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/preact:
     dependencies:
@@ -1343,13 +1343,13 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/react:
     dependencies:
@@ -1362,13 +1362,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/ripple:
     dependencies:
@@ -1384,7 +1384,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/solid:
     dependencies:
@@ -1397,10 +1397,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/js-framework/svelte:
     dependencies:
@@ -1410,7 +1410,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
@@ -1419,7 +1419,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/js-framework/vue-vapor:
     dependencies:
@@ -1435,10 +1435,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall:
     dependencies:
@@ -1457,7 +1457,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/octane-tsrx:
     dependencies:
@@ -1470,7 +1470,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/preact:
     dependencies:
@@ -1480,13 +1480,13 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/react:
     dependencies:
@@ -1499,13 +1499,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/react-compiler:
     dependencies:
@@ -1521,10 +1521,10 @@ importers:
         version: 7.29.7
       '@rolldown/plugin-babel':
         specifier: 0.2.3
-        version: 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       babel-plugin-react-compiler:
         specifier: 1.0.0
         version: 1.0.0
@@ -1533,7 +1533,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/ripple:
     dependencies:
@@ -1549,7 +1549,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/solid:
     dependencies:
@@ -1562,10 +1562,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/memo-wall/svelte:
     dependencies:
@@ -1575,7 +1575,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
@@ -1584,7 +1584,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/memo-wall/vue-vapor:
     dependencies:
@@ -1600,10 +1600,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news:
     dependencies:
@@ -1612,7 +1612,7 @@ importers:
         version: 1.61.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/octane-jsx:
     dependencies:
@@ -1622,7 +1622,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/octane-tsrx:
     dependencies:
@@ -1632,7 +1632,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/preact:
     dependencies:
@@ -1645,10 +1645,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/react:
     dependencies:
@@ -1664,10 +1664,10 @@ importers:
         version: 0.2.37(react@19.2.7)
       '@tsrx/vite-plugin-react':
         specifier: catalog:default
-        version: 0.0.69(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 0.0.69(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/ripple:
     dependencies:
@@ -1680,7 +1680,7 @@ importers:
         version: 0.1.38
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/solid:
     dependencies:
@@ -1696,13 +1696,13 @@ importers:
         version: 0.1.37(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
       '@tsrx/vite-plugin-solid':
         specifier: catalog:default
-        version: 0.0.67(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 0.0.67(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/news/svelte:
     dependencies:
@@ -1712,10 +1712,10 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/news/vue-vapor:
     dependencies:
@@ -1731,10 +1731,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/portal-swarm:
     dependencies:
@@ -1753,7 +1753,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/portal-swarm/preact:
     dependencies:
@@ -1763,13 +1763,13 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/portal-swarm/react:
     dependencies:
@@ -1782,13 +1782,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/portal-swarm/ripple:
     dependencies:
@@ -1804,7 +1804,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/portal-swarm/solid:
     dependencies:
@@ -1820,10 +1820,10 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/portal-swarm/svelte:
     dependencies:
@@ -1833,7 +1833,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
@@ -1842,7 +1842,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/portal-swarm/vue-vapor:
     dependencies:
@@ -1858,10 +1858,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/react-hosted-islands:
     dependencies:
@@ -1879,7 +1879,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context:
     dependencies:
@@ -1895,7 +1895,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context/octane-tsrx:
     dependencies:
@@ -1905,7 +1905,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context/preact:
     dependencies:
@@ -1915,10 +1915,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context/react:
     dependencies:
@@ -1931,10 +1931,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context/ripple:
     dependencies:
@@ -1947,7 +1947,7 @@ importers:
         version: 0.3.86
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context/solid:
     dependencies:
@@ -1960,10 +1960,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/recursive-context/svelte:
     dependencies:
@@ -1973,13 +1973,13 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/recursive-context/vue-vapor:
     dependencies:
@@ -1995,10 +1995,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring:
     dependencies:
@@ -2014,7 +2014,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring/octane-tsrx:
     dependencies:
@@ -2024,7 +2024,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring/preact:
     dependencies:
@@ -2034,10 +2034,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring/react:
     dependencies:
@@ -2050,10 +2050,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring/ripple:
     dependencies:
@@ -2066,7 +2066,7 @@ importers:
         version: 0.3.86
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring/solid:
     dependencies:
@@ -2079,10 +2079,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/signal-favoring/svelte:
     dependencies:
@@ -2092,13 +2092,13 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/signal-favoring/vue-vapor:
     dependencies:
@@ -2114,10 +2114,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/ssr-throughput:
     dependencies:
@@ -2144,7 +2144,7 @@ importers:
         version: 5.56.4
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vue:
         specifier: catalog:default
         version: 3.6.0-beta.17(typescript@5.9.3)
@@ -2157,7 +2157,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/streaming-ssr:
     dependencies:
@@ -2181,7 +2181,7 @@ importers:
         version: 2.0.0-beta.14
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/streaming-ssr/octane:
     dependencies:
@@ -2191,7 +2191,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/streaming-ssr/preact:
     dependencies:
@@ -2204,10 +2204,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/streaming-ssr/react:
     dependencies:
@@ -2223,10 +2223,10 @@ importers:
         version: 0.2.37(react@19.2.7)
       '@tsrx/vite-plugin-react':
         specifier: catalog:default
-        version: 0.0.69(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 0.0.69(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/streaming-ssr/ripple:
     dependencies:
@@ -2239,7 +2239,7 @@ importers:
         version: 0.1.38
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/streaming-ssr/solid:
     dependencies:
@@ -2255,13 +2255,13 @@ importers:
         version: 0.1.37(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
       '@tsrx/vite-plugin-solid':
         specifier: catalog:default
-        version: 0.0.67(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 0.0.67(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/three:
     dependencies:
@@ -2289,13 +2289,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/todomvc:
     dependencies:
@@ -2314,7 +2314,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/todomvc/preact:
     dependencies:
@@ -2324,13 +2324,13 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/todomvc/react:
     dependencies:
@@ -2343,13 +2343,13 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       terser:
         specifier: catalog:default
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/todomvc/ripple:
     dependencies:
@@ -2365,7 +2365,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/todomvc/solid:
     dependencies:
@@ -2378,10 +2378,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/todomvc/svelte:
     dependencies:
@@ -2391,7 +2391,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       svelte-check:
         specifier: catalog:default
         version: 4.7.2(picomatch@4.0.4)(svelte@5.56.4)(typescript@5.9.3)
@@ -2400,7 +2400,7 @@ importers:
         version: 5.48.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/todomvc/vue-vapor:
     dependencies:
@@ -2416,10 +2416,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/weather-app:
     dependencies:
@@ -2441,7 +2441,7 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/weather-app/preact:
     dependencies:
@@ -2451,10 +2451,10 @@ importers:
     devDependencies:
       '@preact/preset-vite':
         specifier: catalog:default
-        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/weather-app/react:
     dependencies:
@@ -2467,10 +2467,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-react':
         specifier: catalog:default
-        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/weather-app/solid:
     dependencies:
@@ -2483,10 +2483,10 @@ importers:
     devDependencies:
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vite-plugin-solid:
         specifier: catalog:default
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   benchmarks/weather-app/svelte:
     dependencies:
@@ -2496,10 +2496,10 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: catalog:default
-        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   benchmarks/weather-app/vue:
     dependencies:
@@ -2509,10 +2509,10 @@ importers:
     devDependencies:
       '@vitejs/plugin-vue':
         specifier: catalog:default
-        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
+        version: 6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/cartlane:
     dependencies:
@@ -2534,7 +2534,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/cinebase:
     dependencies:
@@ -2565,7 +2565,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/draftboard:
     dependencies:
@@ -2584,7 +2584,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/flowboard:
     dependencies:
@@ -2606,7 +2606,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/gridlab:
     dependencies:
@@ -2628,7 +2628,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/hacker-news:
     dependencies:
@@ -2656,7 +2656,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/lexical-playground:
     dependencies:
@@ -2702,7 +2702,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/mailroom:
     dependencies:
@@ -2724,7 +2724,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/pagecraft:
     dependencies:
@@ -2758,7 +2758,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/pulseboard:
     dependencies:
@@ -2786,7 +2786,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/relay:
     dependencies:
@@ -2805,7 +2805,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/streambox:
     dependencies:
@@ -2830,7 +2830,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/threadline:
     dependencies:
@@ -2852,7 +2852,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   examples/wayfinder:
     dependencies:
@@ -2874,7 +2874,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   packages/adapter-vercel:
     devDependencies:
@@ -2923,7 +2923,7 @@ importers:
         version: 7.8.2
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/app-core:
     dependencies:
@@ -2982,7 +2982,7 @@ importers:
         version: 3.48.0(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/base-ui:
     dependencies:
@@ -3019,7 +3019,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/dexie:
     dependencies:
@@ -3053,10 +3053,10 @@ importers:
         version: 19.2.7(react@19.2.7)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/dnd-kit:
     dependencies:
@@ -3099,7 +3099,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/floating-ui:
     dependencies:
@@ -3127,7 +3127,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/hook-form:
     devDependencies:
@@ -3157,7 +3157,7 @@ importers:
         version: 7.81.0(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       zod:
         specifier: catalog:default
         version: 3.25.76
@@ -3194,7 +3194,7 @@ importers:
         version: 17.0.9(i18next@26.3.6(typescript@5.9.3))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/jotai:
     dependencies:
@@ -3219,7 +3219,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/lexical:
     dependencies:
@@ -3304,7 +3304,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/lucide:
     dependencies:
@@ -3335,7 +3335,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/mdx:
     dependencies:
@@ -3372,10 +3372,10 @@ importers:
         version: link:../octane
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/motion:
     dependencies:
@@ -3388,7 +3388,7 @@ importers:
         version: link:../octane
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/octane:
     dependencies:
@@ -3425,10 +3425,10 @@ importers:
         version: 19.2.7(react@19.2.7)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/octane-evals:
     devDependencies:
@@ -3443,7 +3443,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/octane-mcp-server:
     dependencies:
@@ -3456,7 +3456,7 @@ importers:
     devDependencies:
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/radix:
     dependencies:
@@ -3487,7 +3487,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/recharts:
     dependencies:
@@ -3542,7 +3542,7 @@ importers:
         version: 3.9.2(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-is@17.0.2)(react@19.2.7)(redux@5.0.1)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/redux:
     devDependencies:
@@ -3572,7 +3572,7 @@ importers:
         version: 5.0.1
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/redux-toolkit:
     dependencies:
@@ -3609,7 +3609,7 @@ importers:
         version: 9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/remix-router:
     dependencies:
@@ -3637,7 +3637,7 @@ importers:
         version: 8.2.0(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/rsbuild-plugin-octane:
     dependencies:
@@ -3668,7 +3668,7 @@ importers:
         version: 5.7.0
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/rspack-plugin-octane:
     dependencies:
@@ -3687,7 +3687,7 @@ importers:
         version: link:../octane
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/sonner:
     devDependencies:
@@ -3711,7 +3711,7 @@ importers:
         version: 2.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/stylex:
     dependencies:
@@ -3733,10 +3733,10 @@ importers:
         version: link:../octane
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-ai:
     dependencies:
@@ -3776,7 +3776,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-devtools:
     dependencies:
@@ -3795,7 +3795,7 @@ importers:
         version: link:../octane
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-form:
     dependencies:
@@ -3835,7 +3835,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-query:
     dependencies:
@@ -3863,7 +3863,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-router:
     dependencies:
@@ -3897,7 +3897,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-store:
     dependencies:
@@ -3925,7 +3925,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-table:
     dependencies:
@@ -3953,7 +3953,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-virtual:
     dependencies:
@@ -3981,7 +3981,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/testing-library:
     dependencies:
@@ -3997,7 +3997,7 @@ importers:
         version: link:../octane
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/three:
     dependencies:
@@ -4052,10 +4052,10 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tiptap:
     dependencies:
@@ -4101,10 +4101,10 @@ importers:
         version: 19.2.7(react@19.2.7)
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
     optionalDependencies:
       '@tiptap/extension-bubble-menu':
         specifier: catalog:default
@@ -4310,7 +4310,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/vite-plugin-octane:
     dependencies:
@@ -4335,7 +4335,7 @@ importers:
         version: 5.7.0
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   packages/zustand:
     dependencies:
@@ -4360,7 +4360,7 @@ importers:
         version: 19.2.7(react@19.2.7)
       vitest:
         specifier: catalog:default
-        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   playground/octane:
     dependencies:
@@ -4373,7 +4373,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   website:
     dependencies:
@@ -4386,24 +4386,21 @@ importers:
       '@codemirror/view':
         specifier: catalog:default
         version: 6.43.6
-      '@octanejs/adapter-vercel':
-        specifier: workspace:*
-        version: link:../packages/adapter-vercel
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
-      '@octanejs/tanstack-router':
-        specifier: workspace:*
-        version: link:../packages/tanstack-router
       '@octanejs/three':
         specifier: workspace:*
         version: link:../packages/three
       '@octanejs/visx':
         specifier: workspace:*
         version: link:../packages/visx
-      '@octanejs/vite-plugin':
-        specifier: workspace:*
-        version: link:../packages/vite-plugin-octane
+      '@tanstack/octane-router':
+        specifier: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+        version: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)
+      '@tanstack/octane-start':
+        specifier: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+        version: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@753f919eeda3d60cac86a6678ea9700e4e8c7a31(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(octane@packages+octane)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       octane:
         specifier: workspace:*
         version: link:../packages/octane
@@ -4429,6 +4426,9 @@ importers:
       esrap:
         specifier: ^2.2.9
         version: 2.2.11
+      nitro:
+        specifier: ^3.0.260311-beta
+        version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       playwright:
         specifier: catalog:default
         version: 1.61.0
@@ -4437,7 +4437,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   website-mcp:
     dependencies:
@@ -4465,7 +4465,7 @@ importers:
         version: 5.9.3
       vite:
         specifier: catalog:default
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
 packages:
 
@@ -4508,6 +4508,10 @@ packages:
 
   '@asamuzakjp/nwsapi@2.3.9':
     resolution: {integrity: sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q==}
+
+  '@babel/code-frame@7.27.1':
+    resolution: {integrity: sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg==}
+    engines: {node: '>=6.9.0'}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -5365,6 +5369,22 @@ packages:
 
   '@octokit/types@16.0.0':
     resolution: {integrity: sha512-sKq+9r1Mm4efXW1FCk7hFSeJo4QKreL/tTbR0rz/qx/r1Oa2VV83LTA/H/MuCOX7uCIJmQVRKBcbmWoySjAnSg==}
+
+  '@oozcitak/dom@2.0.2':
+    resolution: {integrity: sha512-GjpKhkSYC3Mj4+lfwEyI1dqnsKTgwGy48ytZEhm4A/xnH/8z9M3ZVXKr/YGQi3uCLs1AEBS+x5T2JPiueEDW8w==}
+    engines: {node: '>=20.0'}
+
+  '@oozcitak/infra@2.0.2':
+    resolution: {integrity: sha512-2g+E7hoE2dgCz/APPOEK5s3rMhJvNxSMBrP+U+j1OWsIbtSpWxxlUjq1lU8RIsFJNYv7NMlnVsCuHcUzJW+8vA==}
+    engines: {node: '>=20.0'}
+
+  '@oozcitak/url@3.0.0':
+    resolution: {integrity: sha512-ZKfET8Ak1wsLAiLWNfFkZc/BraDccuTJKR6svTYc7sVjbR+Iu0vtXdiDMY4o6jaFl5TW2TlS7jbLl4VovtAJWQ==}
+    engines: {node: '>=20.0'}
+
+  '@oozcitak/util@10.0.0':
+    resolution: {integrity: sha512-hAX0pT/73190NLqBPPWSdBVGtbY6VOhWYK3qqHqtXQ1gK7kS2yz4+ivsN07hpJ6I3aeMtKP6J6npsEKOAzuTLA==}
+    engines: {node: '>=20.0'}
 
   '@opentelemetry/api-logs@0.57.2':
     resolution: {integrity: sha512-uIX52NnTM0iBh84MShlpouI7UKqkZ7MrUszTmaypHBu4r7NofznSnQRfJ+uUeDtQDj6w8eFGg5KBLDAwAPz1+A==}
@@ -6792,6 +6812,43 @@ packages:
     resolution: {integrity: sha512-79pf/RkhteYZTRgcR4F9kbk84P2N8rugQJswxfIqovlbRiT3yI7eBE+5QorIrZaOKktsgzRlXh1l/du/xpl4iA==}
     engines: {node: '>=20.19'}
 
+  '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {integrity: sha512-mkKK62CCjEXt8sUpGlE+Ywx5Gs6QubJjxlnquGX0FEq8Sga5C1I0uQh+0//TkJAQymFUaWtxKHrYWkjSSTAahQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.162.0
+    engines: {node: '>=20.19'}
+
+  '@tanstack/octane-router@https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.170.18
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: '>=0.1.8'
+
+  '@tanstack/octane-start-client@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.168.16
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      octane: '>=0.1.8'
+
+  '@tanstack/octane-start-server@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.167.22
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      octane: '>=0.1.8'
+
+  '@tanstack/octane-start@https://pkg.pr.new/TanStack/router/@tanstack/octane-start@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/octane-start@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.168.28
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      octane: '>=0.1.8'
+      vite: '>=7.0.0'
+    peerDependenciesMeta:
+      vite:
+        optional: true
+
   '@tanstack/pacer-lite@0.1.1':
     resolution: {integrity: sha512-y/xtNPNt/YeyoVxE/JCx+T7yjEzpezmbb+toK8DDD1P4m7Kzs5YR956+7OKexG3f8aXgC3rLZl7b1V+yNUSy5w==}
     engines: {node: '>=18'}
@@ -6849,6 +6906,76 @@ packages:
     resolution: {integrity: sha512-+NOwEj1kO/6IGmpHRIZHasYxYWpyBQGNIZAST9aNrk9Q3YlU9SgqVnl1pbLa9qAKfeNdXQIRve0RQb/0kyDeDA==}
     engines: {node: '>=20.19'}
 
+  '@tanstack/router-core@https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.171.15
+    engines: {node: '>=20.19'}
+
+  '@tanstack/router-generator@https://pkg.pr.new/TanStack/router/@tanstack/router-generator@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-generator@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.167.21
+    engines: {node: '>=20.19'}
+
+  '@tanstack/router-plugin@https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.168.22
+    engines: {node: '>=20.19'}
+    peerDependencies:
+      '@rsbuild/core': '>=1.0.2 || ^2.0.0'
+      '@tanstack/react-router': ^1.170.18
+      vite: '>=5.0.0 || >=6.0.0 || >=7.0.0 || >=8.0.0'
+      vite-plugin-solid: ^2.11.10 || ^3.0.0-0
+      webpack: '>=5.92.0'
+    peerDependenciesMeta:
+      '@rsbuild/core':
+        optional: true
+      '@tanstack/react-router':
+        optional: true
+      vite:
+        optional: true
+      vite-plugin-solid:
+        optional: true
+      webpack:
+        optional: true
+
+  '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {integrity: sha512-hTWqJtqIFFdvuCl8WXNyrodp2L9zo2G37xKRrcVmVRWpAB2h+U1LuRAfS4tsFTiWOIoE/B+WDVFB8JpoEdw6jQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.162.2
+    engines: {node: '>=20.19'}
+
+  '@tanstack/start-client-core@https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.170.14
+    engines: {node: '>=22.12.0'}
+
+  '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {integrity: sha512-r4Q31CRkQEhaWJnaT+bLC417jHDahvq+j/BB8LozGzGGD5BrKdr4PArE8K5wT+U6+ekmHp2ruVmFZfFTloV2UQ==, tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.162.0
+    engines: {node: '>=22.12.0'}
+
+  '@tanstack/start-plugin-core@https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.171.22
+    engines: {node: '>=22.12.0'}
+    peerDependencies:
+      '@rsbuild/core': ^2.0.0
+      vite: '>=7.0.0'
+    peerDependenciesMeta:
+      '@rsbuild/core':
+        optional: true
+      vite:
+        optional: true
+
+  '@tanstack/start-server-core@https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.169.17
+    engines: {node: '>=22.12.0'}
+
+  '@tanstack/start-storage-context@https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.167.17
+    engines: {node: '>=22.12.0'}
+
   '@tanstack/store@0.11.0':
     resolution: {integrity: sha512-WlzzCt3xi0G6pCAJu1U+2jiECwabETDpQDi3hfkFZvJii9AuZqEKbOiVarX1/bWhTNjU486yQtJCCasi/0q+Cw==}
 
@@ -6861,6 +6988,11 @@ packages:
 
   '@tanstack/virtual-core@3.17.3':
     resolution: {integrity: sha512-8Np/TFELpI0ySuJoVmjvOrQYXH/8sTX0Biv9szhFhY39xOdAAY+smrMxjxOum/ux3eM8MUJQsEJ0/R0UpvC8dw==}
+
+  '@tanstack/virtual-file-routes@https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    resolution: {tarball: https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@753f919eeda3d60cac86a6678ea9700e4e8c7a31}
+    version: 1.162.0
+    engines: {node: '>=20.19'}
 
   '@testing-library/dom@10.4.1':
     resolution: {integrity: sha512-o4PXJQidqJl82ckFaXUeoAW+XysPLauYI43Abki5hABd853iMhitooc6znOnczgbTYmEP6U6/y1ZyKAIsvMKGg==}
@@ -7844,6 +7976,10 @@ packages:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
 
+  ansis@4.3.1:
+    resolution: {integrity: sha512-BJ8/l4R5LRE7hW9WdSuGYrLSHi2ynxeFpDFbH0K/CgNeY/tyhk+vO6TYxXC5r5CpUhNVX310xzPsN/H9lCdfOA==}
+    engines: {node: '>=14'}
+
   argparse@1.0.10:
     resolution: {integrity: sha512-o5Roy6tNG4SL/FOkCAN6RzjiakZS25RLYFrcMttJqbdd8BWrnA+fGz57iN5Pb06pvBGvl5gQ0B48dJlslXvoTg==}
 
@@ -7892,6 +8028,9 @@ packages:
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
     engines: {node: '>= 0.4'}
+
+  babel-dead-code-elimination@1.0.12:
+    resolution: {integrity: sha512-GERT7L2TiYcYDtYk1IpD+ASAYXjKbLTDPhBtYj7X1NuRMDTMtAx9kyBenub1Ev41lo91OHCKdmP+egTDmfQ7Ig==}
 
   babel-plugin-jsx-dom-expressions@0.50.0-next.13:
     resolution: {integrity: sha512-ANjSohrXkRTxqFOENz5vk57UEjLHx4lqOibSXmNZ51aNvzZ7zT22JB+kpv9AutPzhy7tcJaNtnLoq6yqlTZTzw==}
@@ -8012,6 +8151,10 @@ packages:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
     engines: {node: '>= 14.16.0'}
 
+  chokidar@5.0.0:
+    resolution: {integrity: sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw==}
+    engines: {node: '>= 20.19.0'}
+
   chrome-launcher@1.2.1:
     resolution: {integrity: sha512-qmFR5PLMzHyuNJHwOloHPAHhbaNglkfeV/xDtt5b7xiFFyU1I+AZZX0PYseMuhenJSSirgxELYIbswcoc+5H4A==}
     engines: {node: '>=12.13.0'}
@@ -8069,6 +8212,10 @@ packages:
     resolution: {integrity: sha512-N4oog6YJWbR9kGyXvS7jEykLDXIE2C0ILYqNBZBp9iwiJpoCBWYsuAdW6PPFn6w06jjnC+3JstVvWHO4cZqvRg==}
     engines: {node: '>=18'}
 
+  consola@3.4.2:
+    resolution: {integrity: sha512-5IKcdX0nnYavi6G7TtOhwkYzyjfJlatbjMjuLSfE2kYT5pMDOilZ4OvMhi637CcDICTmz3wARPoyhqyX1Y+XvA==}
+    engines: {node: ^14.18.0 || >=16.10.0}
+
   content-disposition@1.0.1:
     resolution: {integrity: sha512-oIXISMynqSqm241k6kcQ5UwttDILMK4BiurCfGEREw6+X9jkkpEe5T9FZaApyLGGOnFuyMWZpdolTXMtvEJ08Q==}
     engines: {node: '>=18'}
@@ -8113,6 +8260,14 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
+
+  crossws@0.4.10:
+    resolution: {integrity: sha512-pz3oubH/dt12KjqsUB0IuXW4nwRDQ583iDsP4555Cpdqx0NoU7pGlWBcayyFI8f/l/idRpgjMEfwuOxSWJYlIA==}
+    peerDependencies:
+      srvx: '>=0.11.5'
+    peerDependenciesMeta:
+      srvx:
+        optional: true
 
   csp_evaluator@1.1.8:
     resolution: {integrity: sha512-EwOnfYuNbTytvbMKsLixTrRgnjOa0WZCxGy8A9nnSYAicrdwn+T/epU/yjgymmOxlgKnvH+8wXt+7p/8ak5Feg==}
@@ -8243,6 +8398,29 @@ packages:
   dayjs@1.11.21:
     resolution: {integrity: sha512-98IT+HOahAisibz/yjKbzuOBwYcjJ7BCLPzARyHiyEBmRz4fatF+KPJszEHXsGYjUG234aH/cOjW1wwTbKUZlA==}
 
+  db0@0.3.4:
+    resolution: {integrity: sha512-RiXXi4WaNzPTHEOu8UPQKMooIbqOEyqA1t7Z6MsdxSCeb8iUC9ko3LcmsLmeUt2SM5bctfArZKkRQggKZz7JNw==}
+    peerDependencies:
+      '@electric-sql/pglite': '*'
+      '@libsql/client': '*'
+      better-sqlite3: '*'
+      drizzle-orm: '*'
+      mysql2: '*'
+      sqlite3: '*'
+    peerDependenciesMeta:
+      '@electric-sql/pglite':
+        optional: true
+      '@libsql/client':
+        optional: true
+      better-sqlite3:
+        optional: true
+      drizzle-orm:
+        optional: true
+      mysql2:
+        optional: true
+      sqlite3:
+        optional: true
+
   debug@4.4.3:
     resolution: {integrity: sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA==}
     engines: {node: '>=6.0'}
@@ -8330,6 +8508,10 @@ packages:
   dexie@4.4.4:
     resolution: {integrity: sha512-jIwsYI8Os2hgnqc6O49YwFDKGc5v5QjGx0wPVp543ip1F53VFAKMLthV2pQosQcVTv3eAskTWYspOx195PM0FQ==}
 
+  diff@8.0.4:
+    resolution: {integrity: sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw==}
+    engines: {node: '>=0.3.1'}
+
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
     engines: {node: '>=8'}
@@ -8406,6 +8588,24 @@ packages:
   entities@8.0.0:
     resolution: {integrity: sha512-zwfzJecQ/Uej6tusMqwAqU/6KL2XaB2VZ2Jg54Je6ahNBGNH6Ek6g3jjNCF0fG9EWQKGZNddNjU5F1ZQn/sBnA==}
     engines: {node: '>=20.19.0'}
+
+  env-runner@0.1.16:
+    resolution: {integrity: sha512-2LRJM4P2KLX6J83QZZrMqvgCDt/D5ea7wPcI3yYiy5cG/9rX5QwdwZFx0D7ktWnjdRyZxYjttGGorb5nFqb1CA==}
+    hasBin: true
+    peerDependencies:
+      '@netlify/runtime': ^4.1.23
+      '@vercel/queue': '>=0.2.0'
+      miniflare: ^4.20260515.0
+      wrangler: ^4.0.0
+    peerDependenciesMeta:
+      '@netlify/runtime':
+        optional: true
+      '@vercel/queue':
+        optional: true
+      miniflare:
+        optional: true
+      wrangler:
+        optional: true
 
   es-define-property@1.0.1:
     resolution: {integrity: sha512-e3nRfgfUZ4rNGL232gUgX06QNyyez04KdjFrF+LTRoOXmrOgFKDg4BCdsjW8EnT69eqdYGmRpJwiPVYNrCaW3g==}
@@ -8531,6 +8731,9 @@ packages:
     resolution: {integrity: sha512-hIS4idWWai69NezIdRt2xFVofaF4j+6INOpJlVOLDO8zXGpUVEVzIYk12UUi2JzjEzWL3IOAxcTubgz9Po0yXw==}
     engines: {node: '>= 18'}
 
+  exsolve@1.1.0:
+    resolution: {integrity: sha512-D+42+T12DdIlJM3uepa55qGiL3sYdLBOxIl2ifQCzCHz4c7eiolaHsi3BIqEr7JxBzxv2pYZQX9kw16ziMcEmw==}
+
   extend-shallow@2.0.1:
     resolution: {integrity: sha512-zCnTtlxNoAiDc3gqY2aYAWFx7XWWiasuF2K8Me5WbN8otHKTUKBwjPtNpRs/rbUZm7KxWAaNj7P1a/p52GbVug==}
     engines: {node: '>=0.10.0'}
@@ -8586,6 +8789,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fetchdts@0.1.7:
+    resolution: {integrity: sha512-YoZjBdafyLIop9lSxXVI33oLD5kN31q4Td+CasofLLYeLXRFeOsuOw0Uo+XNRi9PZlbfdlN2GmRtm4tCEQ9/KA==}
 
   fflate@0.8.3:
     resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
@@ -8750,6 +8956,26 @@ packages:
     resolution: {integrity: sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==}
     engines: {node: '>=6.0'}
 
+  h3@2.0.1-rc.20:
+    resolution: {integrity: sha512-28ljodXuUp0fZovdiSRq4G9OgrxCztrJe5VdYzXAB7ueRvI7pIUqLU14Xi3XqdYJ/khXjfpUOOD2EQa6CmBgsg==}
+    engines: {node: '>=20.11.1'}
+    hasBin: true
+    peerDependencies:
+      crossws: ^0.4.1
+    peerDependenciesMeta:
+      crossws:
+        optional: true
+
+  h3@2.0.1-rc.25:
+    resolution: {integrity: sha512-uIK++Up28xDt4n0+bSWfVssRivNXpUmMmA6CCiK6j9+utLcBMcFK97Gn9PlSZwAPW9oLy3CjGJ4ag40CY9YYtQ==}
+    engines: {node: '>=20.11.1'}
+    hasBin: true
+    peerDependencies:
+      crossws: ^0.4.9
+    peerDependenciesMeta:
+      crossws:
+        optional: true
+
   happy-dom@20.10.6:
     resolution: {integrity: sha512-6QD0ilzDDt93tX44y8tbmZdAcdTRYDhUP+Asgi6pC8Pp5IA3cvaZGyoVN/EGtlq9ziT65iPuBBn3ASLr6hCgVw==}
     engines: {node: '>=20.0.0'}
@@ -8793,6 +9019,9 @@ packages:
     resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
     engines: {node: '>=16.9.0'}
 
+  hookable@6.1.1:
+    resolution: {integrity: sha512-U9LYDy1CwhMCnprUfeAZWZGByVbhd54hwepegYTK7Pi5NvqEj63ifz5z+xukznehT7i6NIZRu89Ay1AZmRsLEQ==}
+
   html-encoding-sniffer@6.0.0:
     resolution: {integrity: sha512-CV9TW3Y3f8/wT0BRFc1/KAVQ3TUHiXmaAb6VW9vtiMFf7SLoMd1PdAc4W3KFOFETBJUb90KatHqlsZMWV+R9Gg==}
     engines: {node: ^20.19.0 || ^22.12.0 || >=24.0.0}
@@ -8828,6 +9057,9 @@ packages:
   https-proxy-agent@5.0.1:
     resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
     engines: {node: '>= 6'}
+
+  httpxy@0.5.5:
+    resolution: {integrity: sha512-uDjmnPyp1q4Sgzf3w+J/Fc6UqcCEj0x4Wjp7OqK5dGhNeDgpyrAmnS6ey8QWrX3SWDon2DMKf9sBa5X9+CVyMA==}
 
   human-id@4.2.0:
     resolution: {integrity: sha512-K3GbkIWqyvvlpfhBPlbEvD97TtqBpAYA4kt+cn2lD2x2HuohzZCibcA2nOlnJT6exqvJLggoB5nv2dNf192nEA==}
@@ -9011,6 +9243,10 @@ packages:
     resolution: {integrity: sha512-KLViCmWx94zOvpLwSlsx6yOCeMhZYaxrJV87Po5k/FoZzcPSahvK5qJ7fYhS61sZi5ikmh2S3Hz55A2l3U69ng==}
     peerDependencies:
       react: ^19.0.0
+
+  jiti@2.7.0:
+    resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
+    hasBin: true
 
   jose@6.2.3:
     resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
@@ -9550,6 +9786,37 @@ packages:
     resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
     engines: {node: '>= 0.6'}
 
+  nf3@0.3.22:
+    resolution: {integrity: sha512-NOcqlHu22X1rUakd0SrqllP8kb3LWFmSAi1svTxaKxz+yB604xlaOmUfI3oO+RkODvaocKDDy8bgthnZL8hrkw==}
+
+  nitro@3.0.260311-beta:
+    resolution: {integrity: sha512-0o0fJ9LUh4WKUqJNX012jyieUOtMCnadkNDWr0mHzdraoHpJP/1CGNefjRyZyMXSpoJfwoWdNEZu2iGf35TUvQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+    peerDependencies:
+      dotenv: '*'
+      giget: '*'
+      jiti: ^2.6.1
+      rollup: ^4.59.0
+      vite: ^7 || ^8 || >=8.0.0-0
+      xml2js: ^0.6.2
+      zephyr-agent: ^0.1.15
+    peerDependenciesMeta:
+      dotenv:
+        optional: true
+      giget:
+        optional: true
+      jiti:
+        optional: true
+      rollup:
+        optional: true
+      vite:
+        optional: true
+      xml2js:
+        optional: true
+      zephyr-agent:
+        optional: true
+
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
     engines: {node: 4.x || >=6.0.0}
@@ -9584,6 +9851,15 @@ packages:
   obug@2.1.3:
     resolution: {integrity: sha512-9miFgM2OFba7hB+pRgvtV84pYTBaoTHohvmIgiRt6dRIzbwEOIaNaP+dIlGs2fNFoB0SeISs0Jz5WFVRid6Xyg==}
     engines: {node: '>=12.20.0'}
+
+  ocache@0.1.5:
+    resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
+
+  ofetch@2.0.0-alpha.3:
+    resolution: {integrity: sha512-zpYTCs2byOuft65vI3z43Dd6iSdFbOZZLb9/d21aCpx2rGastVU9dOCv0lu4ykc1Ur1anAYjDi3SUvR0vq50JA==}
+
+  ohash@2.0.11:
+    resolution: {integrity: sha512-RdR9FQrFwNBNXAr4GixM8YaRZRJ5PUWbKYbE5eOsrwAjJW0q2REGcf79oYPsLyskQCZG1PLN+S/K1V00joZAoQ==}
 
   on-finished@2.4.1:
     resolution: {integrity: sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg==}
@@ -9998,6 +10274,10 @@ packages:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
 
+  readdirp@5.0.0:
+    resolution: {integrity: sha512-9u/XQ1pvrQtYyMpZe7DXKv2p5CNvyVwzUB6uhLAnQwHMSgKMBR62lc7AHljaeteeHXn11XTAaLLUVZYVZyuRBQ==}
+    engines: {node: '>= 20.19.0'}
+
   recharts@3.9.2:
     resolution: {integrity: sha512-G4fy+Pk46RaXgwWMh+Nzhyo/lbFAVqXo9gtetlyehe6Ehge9CsgDuOTwQDD+i1+llaLktNBiNq4bhnGlDRXFtw==}
     engines: {node: '>=18'}
@@ -10116,6 +10396,12 @@ packages:
 
   rope-sequence@1.3.4:
     resolution: {integrity: sha512-UT5EDe2cu2E/6O4igUr5PSFs23nvvukicWHx6GnOPlHAiiYbzNuCRQCuiUdHJQcqKalLKlrYJnjY0ySGsXNQXQ==}
+
+  rou3@0.8.1:
+    resolution: {integrity: sha512-ePa+XGk00/3HuCqrEnK3LxJW7I0SdNg6EFzKUJG73hMAdDcOUC/i/aSz7LSDwLrGr33kal/rqOGydzwl6U7zBA==}
+
+  rou3@0.9.1:
+    resolution: {integrity: sha512-z/sSmzvtwMDDnxsPVhfWMuG6F6mbmhFDXoVqLmMfbpDD9qfV3GDmSQpf0+W296/ZDIpW2wcMmBfpVFzcnOi/nA==}
 
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
@@ -10273,6 +10559,11 @@ packages:
 
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
+
+  srvx@0.11.22:
+    resolution: {integrity: sha512-LqZxxBDMKuMAZzFzJnDCkFOrs9MZQZr0LvHiO/SuSZVdQaXD7xQ5UWTUxheJrQPve1qk9MG2B/yttUvJxw8egQ==}
+    engines: {node: '>=20.16.0'}
+    hasBin: true
 
   stack-trace@1.0.0:
     resolution: {integrity: sha512-H6D7134xi6qONvh7ZHKgviXf+rd3vhGBSvebPZCaUkd8zvQ+7PtDw6CljPTe4cXWNf2IKZGNqw6VJXSb9IgBpA==}
@@ -10508,6 +10799,9 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  ufo@1.6.4:
+    resolution: {integrity: sha512-JFNbkD1Svwe0KvGi8GOeLcP4kAWQ609twvCdcHxq1oSL8svv39ZuSvajcD8B+5D0eL4+s1Is2D/O6KN3qcTeRA==}
+
   uint8array-extras@1.5.0:
     resolution: {integrity: sha512-rvKSBiC5zqCCiDZ9kAOszZcDvdAHwwIKJG33Ykj43OKcWsnmcBRL09YTU4nOeHZ8Y2a7l1MgTd08SBe9A8Qj6A==}
     engines: {node: '>=18'}
@@ -10518,6 +10812,9 @@ packages:
   undici@7.28.0:
     resolution: {integrity: sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==}
     engines: {node: '>=20.18.1'}
+
+  unenv@2.0.0-rc.24:
+    resolution: {integrity: sha512-i7qRCmY42zmCwnYlh9H2SvLEypEFGye5iRmEMKjcGi7zk9UquigRjFtTLz0TYqr0ZGLZhaMHl/foy1bZR+Cwlw==}
 
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
@@ -10561,6 +10858,113 @@ packages:
   unpipe@1.0.0:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
+
+  unplugin@3.3.0:
+    resolution: {integrity: sha512-qa66K+crbfyE6JK10GjvbJeRrOsuC/JpbnHctfyp/i4oBTxWOzJfRZyDiOk1PtErMFRu8JhsU/wPvOdBNWe5Rg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      '@farmfe/core': '*'
+      '@rspack/core': '*'
+      bun-types-no-globals: '*'
+      esbuild: '*'
+      rolldown: '*'
+      rollup: '*'
+      unloader: '*'
+      vite: '*'
+      webpack: '*'
+    peerDependenciesMeta:
+      '@farmfe/core':
+        optional: true
+      '@rspack/core':
+        optional: true
+      bun-types-no-globals:
+        optional: true
+      esbuild:
+        optional: true
+      rolldown:
+        optional: true
+      rollup:
+        optional: true
+      unloader:
+        optional: true
+      vite:
+        optional: true
+      webpack:
+        optional: true
+
+  unstorage@2.0.0-alpha.7:
+    resolution: {integrity: sha512-ELPztchk2zgFJnakyodVY3vJWGW9jy//keJ32IOJVGUMyaPydwcA1FtVvWqT0TNRch9H+cMNEGllfVFfScImog==}
+    peerDependencies:
+      '@azure/app-configuration': ^1.11.0
+      '@azure/cosmos': ^4.9.1
+      '@azure/data-tables': ^13.3.2
+      '@azure/identity': ^4.13.0
+      '@azure/keyvault-secrets': ^4.10.0
+      '@azure/storage-blob': ^12.31.0
+      '@capacitor/preferences': ^6 || ^7 || ^8
+      '@deno/kv': '>=0.13.0'
+      '@netlify/blobs': ^6.5.0 || ^7.0.0 || ^8.1.0 || ^9.0.0 || ^10.0.0
+      '@planetscale/database': ^1.19.0
+      '@upstash/redis': ^1.36.2
+      '@vercel/blob': '>=0.27.3'
+      '@vercel/functions': ^2.2.12 || ^3.0.0
+      '@vercel/kv': ^1.0.1
+      aws4fetch: ^1.0.20
+      chokidar: ^4 || ^5
+      db0: '>=0.3.4'
+      idb-keyval: ^6.2.2
+      ioredis: ^5.9.3
+      lru-cache: ^11.2.6
+      mongodb: ^6 || ^7
+      ofetch: '*'
+      uploadthing: ^7.7.4
+    peerDependenciesMeta:
+      '@azure/app-configuration':
+        optional: true
+      '@azure/cosmos':
+        optional: true
+      '@azure/data-tables':
+        optional: true
+      '@azure/identity':
+        optional: true
+      '@azure/keyvault-secrets':
+        optional: true
+      '@azure/storage-blob':
+        optional: true
+      '@capacitor/preferences':
+        optional: true
+      '@deno/kv':
+        optional: true
+      '@netlify/blobs':
+        optional: true
+      '@planetscale/database':
+        optional: true
+      '@upstash/redis':
+        optional: true
+      '@vercel/blob':
+        optional: true
+      '@vercel/functions':
+        optional: true
+      '@vercel/kv':
+        optional: true
+      aws4fetch:
+        optional: true
+      chokidar:
+        optional: true
+      db0:
+        optional: true
+      idb-keyval:
+        optional: true
+      ioredis:
+        optional: true
+      lru-cache:
+        optional: true
+      mongodb:
+        optional: true
+      ofetch:
+        optional: true
+      uploadthing:
+        optional: true
 
   update-browserslist-db@1.2.3:
     resolution: {integrity: sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==}
@@ -10760,6 +11164,9 @@ packages:
     resolution: {integrity: sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ==}
     engines: {node: '>=20'}
 
+  webpack-virtual-modules@0.6.2:
+    resolution: {integrity: sha512-66/V2i5hQanC51vBQKPH4aI8NMAcBW59FVBs+rC7eGHupMyfn34q7rZIE+ETlJ+XTevqfUhVVBgSUNSW2flEUQ==}
+
   whatwg-mimetype@3.0.0:
     resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
     engines: {node: '>=12'}
@@ -10830,6 +11237,10 @@ packages:
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
     engines: {node: '>=18'}
+
+  xmlbuilder2@4.0.3:
+    resolution: {integrity: sha512-bx8Q1STctnNaaDymWnkfQLKofs0mGNN7rLLapJlGuV3VlvegD7Ls4ggMjE3aUSWItCCzU0PEv45lI87iSigiCA==}
+    engines: {node: '>=20.0'}
 
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
@@ -10974,6 +11385,12 @@ snapshots:
   '@asamuzakjp/generational-cache@1.0.1': {}
 
   '@asamuzakjp/nwsapi@2.3.9': {}
+
+  '@babel/code-frame@7.27.1':
+    dependencies:
+      '@babel/helper-validator-identifier': 7.29.7
+      js-tokens: 4.0.0
+      picocolors: 1.1.1
 
   '@babel/code-frame@7.29.7':
     dependencies:
@@ -12028,6 +12445,23 @@ snapshots:
     dependencies:
       '@octokit/openapi-types': 27.0.0
 
+  '@oozcitak/dom@2.0.2':
+    dependencies:
+      '@oozcitak/infra': 2.0.2
+      '@oozcitak/url': 3.0.0
+      '@oozcitak/util': 10.0.0
+
+  '@oozcitak/infra@2.0.2':
+    dependencies:
+      '@oozcitak/util': 10.0.0
+
+  '@oozcitak/url@3.0.0':
+    dependencies:
+      '@oozcitak/infra': 2.0.2
+      '@oozcitak/util': 10.0.0
+
+  '@oozcitak/util@10.0.0': {}
+
   '@opentelemetry/api-logs@0.57.2':
     dependencies:
       '@opentelemetry/api': 1.9.1
@@ -12281,19 +12715,19 @@ snapshots:
     dependencies:
       playwright: 1.61.0
 
-  '@preact/preset-vite@2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@preact/preset-vite@2.10.5(@babel/core@7.29.7)(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx': 7.29.7(@babel/core@7.29.7)
       '@babel/plugin-transform-react-jsx-development': 7.29.7(@babel/core@7.29.7)
-      '@prefresh/vite': 2.4.12(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      '@prefresh/vite': 2.4.12(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       '@rollup/pluginutils': 5.4.0
       babel-plugin-transform-hook-names: 1.0.2(@babel/core@7.29.7)
       debug: 4.4.3
       magic-string: 0.30.21
       picocolors: 1.1.1
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
-      vite-prerender-plugin: 0.5.13(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      vite-prerender-plugin: 0.5.13(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       zimmerframe: 1.1.4
     transitivePeerDependencies:
       - preact
@@ -12310,7 +12744,7 @@ snapshots:
 
   '@prefresh/utils@1.2.1': {}
 
-  '@prefresh/vite@2.4.12(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@prefresh/vite@2.4.12(preact@10.29.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       '@prefresh/babel-plugin': 0.5.3
@@ -12318,7 +12752,7 @@ snapshots:
       '@prefresh/utils': 1.2.1
       '@rollup/pluginutils': 4.2.1
       preact: 10.29.7(preact-render-to-string@6.7.0)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -13205,14 +13639,14 @@ snapshots:
   '@rolldown/binding-win32-x64-msvc@1.0.3':
     optional: true
 
-  '@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7
       picomatch: 4.0.4
       rolldown: 1.0.3
     optionalDependencies:
       '@babel/runtime': 7.29.7
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   '@rolldown/pluginutils@1.0.1': {}
 
@@ -13478,14 +13912,14 @@ snapshots:
 
   '@sveltejs/load-config@0.2.0': {}
 
-  '@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@sveltejs/vite-plugin-svelte@7.2.0(svelte@5.56.4)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       deepmerge: 4.3.1
       magic-string: 0.30.21
       obug: 2.1.3
       svelte: 5.56.4
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
-      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   '@swc/helpers@0.5.23':
     dependencies:
@@ -13572,6 +14006,59 @@ snapshots:
 
   '@tanstack/history@1.162.0': {}
 
+  '@tanstack/history@https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31': {}
+
+  '@tanstack/octane-router@https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)':
+    dependencies:
+      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/store': 0.9.3
+      isbot: 5.1.43
+      octane: link:packages/octane
+
+  '@tanstack/octane-start-client@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)':
+    dependencies:
+      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      octane: link:packages/octane
+
+  '@tanstack/octane-start-server@https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@753f919eeda3d60cac86a6678ea9700e4e8c7a31(crossws@0.4.10(srvx@0.11.22))(octane@packages+octane)':
+    dependencies:
+      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31(crossws@0.4.10(srvx@0.11.22))
+      octane: link:packages/octane
+    transitivePeerDependencies:
+      - crossws
+
+  '@tanstack/octane-start@https://pkg.pr.new/TanStack/router/@tanstack/octane-start@753f919eeda3d60cac86a6678ea9700e4e8c7a31(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(octane@packages+octane)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
+    dependencies:
+      '@tanstack/octane-router': https://pkg.pr.new/TanStack/router/@tanstack/octane-router@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)
+      '@tanstack/octane-start-client': https://pkg.pr.new/TanStack/router/@tanstack/octane-start-client@753f919eeda3d60cac86a6678ea9700e4e8c7a31(octane@packages+octane)
+      '@tanstack/octane-start-server': https://pkg.pr.new/TanStack/router/@tanstack/octane-start-server@753f919eeda3d60cac86a6678ea9700e4e8c7a31(crossws@0.4.10(srvx@0.11.22))(octane@packages+octane)
+      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-plugin-core': https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31(crossws@0.4.10(srvx@0.11.22))
+      octane: link:packages/octane
+      pathe: 2.0.3
+    optionalDependencies:
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+    transitivePeerDependencies:
+      - '@farmfe/core'
+      - '@rsbuild/core'
+      - '@rspack/core'
+      - '@tanstack/react-router'
+      - bun-types-no-globals
+      - crossws
+      - esbuild
+      - rolldown
+      - rollup
+      - supports-color
+      - unloader
+      - vite-plugin-solid
+      - webpack
+
   '@tanstack/pacer-lite@0.1.1': {}
 
   '@tanstack/query-core@5.101.0': {}
@@ -13631,6 +14118,128 @@ snapshots:
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
 
+  '@tanstack/router-core@https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    dependencies:
+      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      cookie-es: 3.1.1
+      seroval: 1.5.4
+      seroval-plugins: 1.5.4(seroval@1.5.4)
+
+  '@tanstack/router-generator@https://pkg.pr.new/TanStack/router/@tanstack/router-generator@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    dependencies:
+      '@babel/types': 7.29.7
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/virtual-file-routes': https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      jiti: 2.7.0
+      magic-string: 0.30.21
+      prettier: 3.8.4
+      zod: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
+
+  '@tanstack/router-plugin@https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@753f919eeda3d60cac86a6678ea9700e4e8c7a31(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/template': 7.29.7
+      '@babel/types': 7.29.7
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-generator': https://pkg.pr.new/TanStack/router/@tanstack/router-generator@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      chokidar: 5.0.0
+      unplugin: 3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      zod: 4.4.3
+    optionalDependencies:
+      '@rsbuild/core': 2.1.5
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      vite-plugin-solid: 3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+    transitivePeerDependencies:
+      - '@farmfe/core'
+      - '@rspack/core'
+      - bun-types-no-globals
+      - esbuild
+      - rolldown
+      - rollup
+      - supports-color
+      - unloader
+
+  '@tanstack/router-utils@https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    dependencies:
+      '@babel/generator': 7.29.7
+      '@babel/parser': 7.29.7
+      '@babel/types': 7.29.7
+      ansis: 4.3.1
+      babel-dead-code-elimination: 1.0.12
+      diff: 8.0.4
+      pathe: 2.0.3
+      tinyglobby: 0.2.17
+    transitivePeerDependencies:
+      - supports-color
+
+  '@tanstack/start-client-core@https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    dependencies:
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-fn-stubs': https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-storage-context': https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      seroval: 1.5.4
+
+  '@tanstack/start-fn-stubs@https://pkg.pr.new/TanStack/router/@tanstack/start-fn-stubs@753f919eeda3d60cac86a6678ea9700e4e8c7a31': {}
+
+  '@tanstack/start-plugin-core@https://pkg.pr.new/TanStack/router/@tanstack/start-plugin-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(crossws@0.4.10(srvx@0.11.22))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
+    dependencies:
+      '@babel/code-frame': 7.27.1
+      '@babel/core': 7.29.7
+      '@babel/types': 7.29.7
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-generator': https://pkg.pr.new/TanStack/router/@tanstack/router-generator@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-plugin': https://pkg.pr.new/TanStack/router/@tanstack/router-plugin@753f919eeda3d60cac86a6678ea9700e4e8c7a31(@rsbuild/core@2.1.5)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      '@tanstack/router-utils': https://pkg.pr.new/TanStack/router/@tanstack/router-utils@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-server-core': https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31(crossws@0.4.10(srvx@0.11.22))
+      exsolve: 1.1.0
+      lightningcss: 1.32.0
+      pathe: 2.0.3
+      picomatch: 4.0.4
+      seroval: 1.5.4
+      source-map: 0.7.6
+      srvx: 0.11.22
+      tinyglobby: 0.2.17
+      ufo: 1.6.4
+      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      xmlbuilder2: 4.0.3
+      zod: 4.4.3
+    optionalDependencies:
+      '@rsbuild/core': 2.1.5
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+    transitivePeerDependencies:
+      - '@farmfe/core'
+      - '@rspack/core'
+      - '@tanstack/react-router'
+      - bun-types-no-globals
+      - crossws
+      - esbuild
+      - rolldown
+      - rollup
+      - supports-color
+      - unloader
+      - vite-plugin-solid
+      - webpack
+
+  '@tanstack/start-server-core@https://pkg.pr.new/TanStack/router/@tanstack/start-server-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31(crossws@0.4.10(srvx@0.11.22))':
+    dependencies:
+      '@tanstack/history': https://pkg.pr.new/TanStack/router/@tanstack/history@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-client-core': https://pkg.pr.new/TanStack/router/@tanstack/start-client-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      '@tanstack/start-storage-context': https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+      fetchdts: 0.1.7
+      h3-v2: h3@2.0.1-rc.20(crossws@0.4.10(srvx@0.11.22))
+      seroval: 1.5.4
+    transitivePeerDependencies:
+      - crossws
+
+  '@tanstack/start-storage-context@https://pkg.pr.new/TanStack/router/@tanstack/start-storage-context@753f919eeda3d60cac86a6678ea9700e4e8c7a31':
+    dependencies:
+      '@tanstack/router-core': https://pkg.pr.new/TanStack/router/@tanstack/router-core@753f919eeda3d60cac86a6678ea9700e4e8c7a31
+
   '@tanstack/store@0.11.0': {}
 
   '@tanstack/store@0.9.3': {}
@@ -13638,6 +14247,8 @@ snapshots:
   '@tanstack/table-core@8.21.3': {}
 
   '@tanstack/virtual-core@3.17.3': {}
+
+  '@tanstack/virtual-file-routes@https://pkg.pr.new/TanStack/router/@tanstack/virtual-file-routes@753f919eeda3d60cac86a6678ea9700e4e8c7a31': {}
 
   '@testing-library/dom@10.4.1':
     dependencies:
@@ -13936,18 +14547,18 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/vite-plugin-react@0.0.69(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@tsrx/vite-plugin-react@0.0.69(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@tsrx/react': 0.2.37(react@19.2.7)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@typescript-eslint/types'
       - react
 
-  '@tsrx/vite-plugin-solid@0.0.67(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@tsrx/vite-plugin-solid@0.0.67(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@tsrx/solid': 0.1.37(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(solid-js@2.0.0-beta.14)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
     transitivePeerDependencies:
       - '@solidjs/web'
       - '@typescript-eslint/types'
@@ -14587,18 +15198,18 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.17
 
-  '@vitejs/plugin-react@6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@vitejs/plugin-react@6.0.2(@rolldown/plugin-babel@0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(babel-plugin-react-compiler@1.0.0)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
     optionalDependencies:
-      '@rolldown/plugin-babel': 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      '@rolldown/plugin-babel': 0.2.3(@babel/core@7.29.7)(@babel/runtime@7.29.7)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       babel-plugin-react-compiler: 1.0.0
 
-  '@vitejs/plugin-vue@6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))':
+  '@vitejs/plugin-vue@6.0.7(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(vue@3.6.0-beta.17(typescript@5.9.3))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       vue: 3.6.0-beta.17(typescript@5.9.3)
 
   '@vitest/coverage-istanbul@4.1.9(vitest@4.1.9)':
@@ -14613,7 +15224,7 @@ snapshots:
       magicast: 0.5.3
       obug: 2.1.3
       tinyrainbow: 3.1.0
-      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -14629,7 +15240,7 @@ snapshots:
       obug: 2.1.3
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      vitest: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   '@vitest/expect@4.1.9':
     dependencies:
@@ -14640,13 +15251,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))':
+  '@vitest/mocker@4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))':
     dependencies:
       '@vitest/spy': 4.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
   '@vitest/pretty-format@4.1.9':
     dependencies:
@@ -14810,6 +15421,8 @@ snapshots:
 
   ansi-styles@6.2.3: {}
 
+  ansis@4.3.1: {}
+
   argparse@1.0.10:
     dependencies:
       sprintf-js: 1.0.3
@@ -14858,6 +15471,15 @@ snapshots:
       - supports-color
 
   axobject-query@4.1.0: {}
+
+  babel-dead-code-elimination@1.0.12:
+    dependencies:
+      '@babel/core': 7.29.7
+      '@babel/parser': 7.29.7
+      '@babel/traverse': 7.29.7
+      '@babel/types': 7.29.7
+    transitivePeerDependencies:
+      - supports-color
 
   babel-plugin-jsx-dom-expressions@0.50.0-next.13(@babel/core@7.29.7):
     dependencies:
@@ -14979,6 +15601,10 @@ snapshots:
     dependencies:
       readdirp: 4.1.2
 
+  chokidar@5.0.0:
+    dependencies:
+      readdirp: 5.0.0
+
   chrome-launcher@1.2.1:
     dependencies:
       '@types/node': 24.13.2
@@ -15037,6 +15663,8 @@ snapshots:
       graceful-fs: 4.2.11
       xdg-basedir: 5.1.0
 
+  consola@3.4.2: {}
+
   content-disposition@1.0.1: {}
 
   content-disposition@1.1.0: {}
@@ -15070,6 +15698,10 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
+
+  crossws@0.4.10(srvx@0.11.22):
+    optionalDependencies:
+      srvx: 0.11.22
 
   csp_evaluator@1.1.8: {}
 
@@ -15193,6 +15825,8 @@ snapshots:
 
   dayjs@1.11.21: {}
 
+  db0@0.3.4: {}
+
   debug@4.4.3:
     dependencies:
       ms: 2.1.3
@@ -15249,6 +15883,8 @@ snapshots:
       react: 19.2.7
 
   dexie@4.4.4: {}
+
+  diff@8.0.4: {}
 
   dir-glob@3.0.1:
     dependencies:
@@ -15319,6 +15955,13 @@ snapshots:
   entities@7.0.1: {}
 
   entities@8.0.0: {}
+
+  env-runner@0.1.16:
+    dependencies:
+      crossws: 0.4.10(srvx@0.11.22)
+      exsolve: 1.1.0
+      httpxy: 0.5.5
+      srvx: 0.11.22
 
   es-define-property@1.0.1: {}
 
@@ -15502,6 +16145,8 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  exsolve@1.1.0: {}
+
   extend-shallow@2.0.1:
     dependencies:
       is-extendable: 0.1.1
@@ -15565,6 +16210,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+
+  fetchdts@0.1.7: {}
 
   fflate@0.8.3: {}
 
@@ -15731,6 +16378,20 @@ snapshots:
       section-matter: 1.0.0
       strip-bom-string: 1.0.0
 
+  h3@2.0.1-rc.20(crossws@0.4.10(srvx@0.11.22)):
+    dependencies:
+      rou3: 0.8.1
+      srvx: 0.11.22
+    optionalDependencies:
+      crossws: 0.4.10(srvx@0.11.22)
+
+  h3@2.0.1-rc.25(crossws@0.4.10(srvx@0.11.22)):
+    dependencies:
+      rou3: 0.9.1
+      srvx: 0.11.22
+    optionalDependencies:
+      crossws: 0.4.10(srvx@0.11.22)
+
   happy-dom@20.10.6:
     dependencies:
       '@types/node': 24.13.2
@@ -15823,6 +16484,8 @@ snapshots:
 
   hono@4.12.25: {}
 
+  hookable@6.1.1: {}
+
   html-encoding-sniffer@6.0.0(@noble/hashes@2.2.0):
     dependencies:
       '@exodus/bytes': 1.15.1(@noble/hashes@2.2.0)
@@ -15868,6 +16531,8 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  httpxy@0.5.5: {}
 
   human-id@4.2.0: {}
 
@@ -16009,6 +16674,8 @@ snapshots:
       react: 19.2.7
     transitivePeerDependencies:
       - '@types/react'
+
+  jiti@2.7.0: {}
 
   jose@6.2.3: {}
 
@@ -16801,6 +17468,61 @@ snapshots:
 
   negotiator@1.0.0: {}
 
+  nf3@0.3.22: {}
+
+  nitro@3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
+    dependencies:
+      consola: 3.4.2
+      crossws: 0.4.10(srvx@0.11.22)
+      db0: 0.3.4
+      env-runner: 0.1.16
+      h3: 2.0.1-rc.25(crossws@0.4.10(srvx@0.11.22))
+      hookable: 6.1.1
+      nf3: 0.3.22
+      ocache: 0.1.5
+      ofetch: 2.0.0-alpha.3
+      ohash: 2.0.11
+      rolldown: 1.0.3
+      srvx: 0.11.22
+      unenv: 2.0.0-rc.24
+      unstorage: 2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4)(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3)
+    optionalDependencies:
+      dotenv: 8.6.0
+      jiti: 2.7.0
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+    transitivePeerDependencies:
+      - '@azure/app-configuration'
+      - '@azure/cosmos'
+      - '@azure/data-tables'
+      - '@azure/identity'
+      - '@azure/keyvault-secrets'
+      - '@azure/storage-blob'
+      - '@capacitor/preferences'
+      - '@deno/kv'
+      - '@electric-sql/pglite'
+      - '@libsql/client'
+      - '@netlify/blobs'
+      - '@netlify/runtime'
+      - '@planetscale/database'
+      - '@upstash/redis'
+      - '@vercel/blob'
+      - '@vercel/functions'
+      - '@vercel/kv'
+      - '@vercel/queue'
+      - aws4fetch
+      - better-sqlite3
+      - chokidar
+      - drizzle-orm
+      - idb-keyval
+      - ioredis
+      - lru-cache
+      - miniflare
+      - mongodb
+      - mysql2
+      - sqlite3
+      - uploadthing
+      - wrangler
+
   node-fetch@2.7.0:
     dependencies:
       whatwg-url: 5.0.0
@@ -16826,6 +17548,14 @@ snapshots:
   object-inspect@1.13.4: {}
 
   obug@2.1.3: {}
+
+  ocache@0.1.5:
+    dependencies:
+      ohash: 2.0.11
+
+  ofetch@2.0.0-alpha.3: {}
+
+  ohash@2.0.11: {}
 
   on-finished@2.4.1:
     dependencies:
@@ -17300,6 +18030,8 @@ snapshots:
 
   readdirp@4.1.2: {}
 
+  readdirp@5.0.0: {}
+
   recharts@3.9.2(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react-is@17.0.2)(react@19.2.7)(redux@5.0.1):
     dependencies:
       '@reduxjs/toolkit': 2.12.0(react-redux@9.3.0(@types/react@19.2.17)(react@19.2.7)(redux@5.0.1))(react@19.2.7)
@@ -17509,6 +18241,10 @@ snapshots:
 
   rope-sequence@1.3.4: {}
 
+  rou3@0.8.1: {}
+
+  rou3@0.9.1: {}
+
   router@2.2.0:
     dependencies:
       debug: 4.4.3
@@ -17711,6 +18447,8 @@ snapshots:
       jpeg-js: 0.4.4
 
   sprintf-js@1.0.3: {}
+
+  srvx@0.11.22: {}
 
   stack-trace@1.0.0: {}
 
@@ -17925,11 +18663,17 @@ snapshots:
 
   typescript@5.9.3: {}
 
+  ufo@1.6.4: {}
+
   uint8array-extras@1.5.0: {}
 
   undici-types@7.18.2: {}
 
   undici@7.28.0: {}
+
+  unenv@2.0.0-rc.24:
+    dependencies:
+      pathe: 2.0.3
 
   unicorn-magic@0.3.0: {}
 
@@ -17987,6 +18731,24 @@ snapshots:
   universalify@0.1.2: {}
 
   unpipe@1.0.0: {}
+
+  unplugin@3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
+    dependencies:
+      '@jridgewell/remapping': 2.3.5
+      picomatch: 4.0.4
+      webpack-virtual-modules: 0.6.2
+    optionalDependencies:
+      '@rspack/core': 2.1.3(@swc/helpers@0.5.23)
+      esbuild: 0.28.1
+      rolldown: 1.0.3
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+
+  unstorage@2.0.0-alpha.7(chokidar@5.0.0)(db0@0.3.4)(lru-cache@11.5.1)(ofetch@2.0.0-alpha.3):
+    optionalDependencies:
+      chokidar: 5.0.0
+      db0: 0.3.4
+      lru-cache: 11.5.1
+      ofetch: 2.0.0-alpha.3
 
   update-browserslist-db@1.2.3(browserslist@4.28.2):
     dependencies:
@@ -18050,7 +18812,7 @@ snapshots:
       d3-time: 3.1.0
       d3-timer: 3.0.1
 
-  vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)):
+  vite-plugin-solid@3.0.0-next.5(@solidjs/web@2.0.0-beta.14(solid-js@2.0.0-beta.14))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.14)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
     dependencies:
       '@babel/core': 7.29.7
       '@solidjs/web': 2.0.0-beta.14(solid-js@2.0.0-beta.14)
@@ -18059,14 +18821,14 @@ snapshots:
       merge-anything: 5.1.7
       solid-js: 2.0.0-beta.14
       solid-refresh: 0.8.0-next.7(solid-js@2.0.0-beta.14)
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
-      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      vitefu: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
     optionalDependencies:
       '@testing-library/jest-dom': 6.9.1
     transitivePeerDependencies:
       - supports-color
 
-  vite-prerender-plugin@0.5.13(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)):
+  vite-prerender-plugin@0.5.13(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
     dependencies:
       kolorist: 1.8.0
       magic-string: 0.30.21
@@ -18074,9 +18836,9 @@ snapshots:
       simple-code-frame: 1.3.0
       source-map: 0.7.6
       stack-trace: 1.0.0
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
-  vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0):
+  vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -18087,17 +18849,18 @@ snapshots:
       '@types/node': 24.13.2
       esbuild: 0.28.1
       fsevents: 2.3.3
+      jiti: 2.7.0
       terser: 5.48.0
       yaml: 2.9.0
 
-  vitefu@1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)):
+  vitefu@1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
     optionalDependencies:
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
-  vitest@4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)):
+  vitest@4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.9
-      '@vitest/mocker': 4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0))
+      '@vitest/mocker': 4.1.9(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
       '@vitest/pretty-format': 4.1.9
       '@vitest/runner': 4.1.9
       '@vitest/snapshot': 4.1.9
@@ -18114,7 +18877,7 @@ snapshots:
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
-      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(terser@5.48.0)(yaml@2.9.0)
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
@@ -18152,6 +18915,8 @@ snapshots:
   webidl-conversions@3.0.1: {}
 
   webidl-conversions@8.0.1: {}
+
+  webpack-virtual-modules@0.6.2: {}
 
   whatwg-mimetype@3.0.0: {}
 
@@ -18202,6 +18967,13 @@ snapshots:
   xdg-basedir@5.1.0: {}
 
   xml-name-validator@5.0.0: {}
+
+  xmlbuilder2@4.0.3:
+    dependencies:
+      '@oozcitak/dom': 2.0.2
+      '@oozcitak/infra': 2.0.2
+      '@oozcitak/util': 10.0.0
+      js-yaml: 4.2.0
 
   xmlchars@2.2.0: {}
 

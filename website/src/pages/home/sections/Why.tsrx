@@ -9,7 +9,7 @@
 // decorative rail of ported-library marks (./library-icons.ts) fills the space to
 // the right of the prose; it duplicates the ecosystem list in Proven, so it stays
 // aria-hidden and disappears below the two-column breakpoint.
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { LIBRARY_ICONS } from './library-icons.ts';
 
 export function Why() @{

@@ -1,17 +1,17 @@
 // Per-page document titles: each section page names itself in the tab, docs
 // pages name the active document, and leaving a titled page restores the home
-// default — the same string the index.html template ships, so the home page
+// default — the same string the root route head ships, so the home page
 // never needs to set anything.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 import { DEFAULT_TITLE } from '../src/hooks/use-title.ts';
 
 afterEach(cleanup);
 
 async function renderRoute(url: string) {
-	const router = makeRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
+	const router = getRouter({ history: createMemoryHistory({ initialEntries: [url] }) });
 	await router.load();
 	const utils = render(RouterProvider as any, { props: { router } });
 	await waitFor(() => {

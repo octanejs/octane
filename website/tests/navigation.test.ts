@@ -3,8 +3,8 @@
 // with "Failed to execute 'removeChild' on 'Node'" during teardown.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup, fireEvent } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
-import { makeRouter } from '../src/app/router.ts';
+import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { getRouter } from '../src/router.ts';
 
 afterEach(cleanup);
 
@@ -17,7 +17,7 @@ describe('client-side navigation', () => {
 		const onError = (e: ErrorEvent) => errors.push(e.error ?? e.message);
 		window.addEventListener('error', onError);
 		try {
-			const router = makeRouter({ history: createMemoryHistory({ initialEntries: ['/'] }) });
+			const router = getRouter({ history: createMemoryHistory({ initialEntries: ['/'] }) });
 			await router.load();
 			const utils = render(RouterProvider as any, { props: { router } });
 			await waitFor(() => {
