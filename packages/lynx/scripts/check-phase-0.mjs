@@ -90,7 +90,20 @@ for (const artifact of evidence.artifacts) {
 }
 
 assert.equal(evidence.milestoneExit.status, 'blocked');
+const gatesById = new Map(evidence.gates.map((gate) => [gate.id, gate]));
+assert.equal(gatesById.size, evidence.gates.length, 'Phase 0 gate IDs must be unique');
+assert.equal(
+	new Set(evidence.milestoneExit.blockingGateIds).size,
+	evidence.milestoneExit.blockingGateIds.length,
+	'Phase 0 blocking gate IDs must be unique',
+);
+for (const blockingGateId of evidence.milestoneExit.blockingGateIds) {
+	const gate = gatesById.get(blockingGateId);
+	assert(gate, `${blockingGateId} must reference a Phase 0 gate`);
+	assert.notEqual(gate.status, 'passed', `${blockingGateId} cannot block after passing`);
+}
 for (const requiredGate of [
+	'encoded-bundle-in-testing-environment',
 	'public-background-event-receiver',
 	'public-reload-and-background-teardown',
 	'lynx-web-runtime',

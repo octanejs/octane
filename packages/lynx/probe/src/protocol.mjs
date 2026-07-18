@@ -69,8 +69,12 @@ export function createPhase0BackgroundProbe(send) {
 		return acknowledgement;
 	}
 
-	function enqueue(createCommands) {
-		const operation = tail.then(() => commit(createCommands()));
+	function enqueue(createCommands, onAcknowledged) {
+		const operation = tail.then(async () => {
+			const acknowledgement = await commit(createCommands());
+			onAcknowledged?.();
+			return acknowledgement;
+		});
 		tail = operation.catch(() => {});
 		return operation;
 	}
@@ -135,16 +139,22 @@ export function createPhase0BackgroundProbe(send) {
 		invariant(listenerId === PHASE_0_LISTENER_ID, 'received a stale or foreign listener ID.');
 		invariant(event?.eventName === 'tap', 'counter listener only accepts the native tap event.');
 
-		return enqueue(() => {
-			count += 1;
-			return [
-				{
-					type: 'text',
-					id: PHASE_0_HOST_IDS.value,
-					value: `Count: ${count}`,
-				},
-			];
-		});
+		let nextCount;
+		return enqueue(
+			() => {
+				nextCount = count + 1;
+				return [
+					{
+						type: 'text',
+						id: PHASE_0_HOST_IDS.value,
+						value: `Count: ${nextCount}`,
+					},
+				];
+			},
+			() => {
+				count = nextCount;
+			},
+		);
 	}
 
 	async function destroy() {
