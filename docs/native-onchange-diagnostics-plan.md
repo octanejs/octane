@@ -1,7 +1,9 @@
 # Native `onChange` Diagnostics and Event Evidence Plan
 
-> **Status:** proposed implementation plan (2026-07-17). This document makes
-> no runtime or compiler change by itself.
+> **Status:** repository implementation complete (2026-07-17); the external
+> Ripple editor presentation remains a coordinated rollout follow-up. This
+> document remains the design record and acceptance plan; section 1.1 records
+> the implemented local scope and explicit follow-ups.
 >
 > **Decision:** keep `onChange` native in Octane. Add an actionable static
 > warning for statically known text-entry hosts, add a development-runtime
@@ -49,7 +51,68 @@ it must not be used to silently grow a React synthetic-event layer.
 - No attempt to automate a real operating-system IME session; constructed
   composition/input sequences are deterministic protocol evidence only.
 - No compat mode in these waves. Any such proposal is separate and evidence
-  gated (section 11).
+gated (section 11).
+
+### 1.1 Implementation outcome and evidence record
+
+The repository-owned work across Waves 0-5 was completed as one coordinated change:
+
+- `compile()` now returns structured, non-fatal diagnostics; the bundler, Vite,
+  Rspack/Rsbuild path, Volar mapping result, website playground, and website MCP
+  compile tool preserve the stable code, warning severity, authored range, and
+  phase-preserving suggestions.
+- Development output validates final host props after spreads, dynamic input
+  types, value-position/de-optimized hosts, hydration, and portals. Static sites
+  carry dev-only handled metadata so the runtime does not duplicate the build
+  warning. Production-compiled tests remain silent.
+- `suppressNativeChangeWarning` is implemented as a client/SSR-reserved,
+  non-serialized host hint. It changes no dispatch or restoration behavior.
+- Chromium confirmed the controlled checkable restoration defect predicted in
+  section 2.2. Restoration now preserves the prospective checkbox/radio state
+  through native `input` and `change`, then restores rejected state and radio
+  cousins after `change`. Accepted and rejected `onInput`, standalone events,
+  capture/bubble, canceled activation, and select behavior retain focused
+  regression coverage.
+- The checked-in static-warning inventory compiles every repository `.tsrx`,
+  `.tsx`, and `.jsx` source through the classifier. It records emitted warnings
+  with explicit teaching/test-fixture dispositions; dynamic final-prop shapes
+  are intentionally protected by mounted runtime lanes rather than guessed by
+  a source inventory.
+- Base UI, Testing Library guidance, MCP migration tools, RuleSync artifacts,
+  MDX range propagation, website docs, `website/public/llms.txt`, playground
+  warning UI, binding status, React parity evidence, and the
+  `octane.native-change-intent` eval were updated.
+
+Production compilation of the dynamic/spread/direct-createElement sentinel is
+measured as a dedicated codegen target against the same source with diagnostic
+analysis disabled; raw, minified, and gzip output are required to be byte-equal.
+The repository's broader bundle/codegen ratio guards were already stale on main
+before this work. They are not widened here: the branch-relative bundle delta is
+the small controlled-checkable correctness path, while diagnostic messages,
+queues, metadata, and helper exports remain absent from production bundles.
+
+The same-source baseline is React 19.2.7 at commit
+`6117d7cca4906492c51fe6a03381e35adfd86e7d`. Trusted browser evidence ran with
+Playwright 1.61.0 and Chromium 149.0.7827.55. Deterministic jsdom rows drive
+explicit native setters/events; the checkable activation, focus commit, and CDP
+composition smoke are separately identified as Chromium observations.
+
+Key public observations are now executable assertions:
+
+| Case | Octane observation | React observation |
+| --- | --- | --- |
+| Text edit then commit | `input` capture/bubble at edit; native `change` capture/bubble at explicit or focus commit | Native `input` handlers plus synthetic `change` during input; no duplicate synthetic change at the later commit |
+| Controlled checkbox | `click` -> `input` -> native `change`, all observing the prospective checked state; accepted state survives | `click` -> synthetic `change` backed by click -> native `input` |
+| Rejected radio B while A is controlled | Native click/input/change observe `[false, true]`, then restoration returns `[true, false]` | Click and click-backed synthetic change observe `[false, true]`; Chromium restoration prevents later native post-step observations |
+| `onChange.preventDefault()` on a checkable | Native change is non-cancelable and activation remains | Synthetic change forwards to the cancelable click and activation rolls back |
+| Composition | Constructed protocol asserts composition/input order in both runtimes; Chromium CDP smoke preserves the accepted candidate | Same protocol, plus React's input-derived synthetic change |
+
+The local Volar result now exposes the additive diagnostic array, but the
+external `Ripple-TS/ripple` TypeScript/language-server/VS Code packages described
+in section 2.1 are not part of this repository. Mapping that array to an editor
+warning and publishing minimum compatible versions remains a coordinated
+cross-repository rollout item; it does not block the local compiler, build-tool,
+website, or MCP diagnostics implemented here.
 
 ## 2. Current evidence and constraints
 
@@ -665,14 +728,24 @@ Add development-runtime public-observation tests for:
 - zero runtime warning and unchanged native behavior in the `octane-prod`
   project.
 
-Before treating production-size ratios as the stripping oracle, add a focused
-`native-change-diagnostic-ambiguous.tsrx` fixture containing a dynamic text
-type, an event spread, and a direct `createElement` host. Add it to the fixed
-corpus in `benchmarks/codegen-size/run.mjs`, and add a minimal mounted
-Octane-only `diagnostic_` target to `benchmarks/bundle-size/run.mjs`. Record new
-baselines/ratios. This guarantees that the production paths under measurement
-would need the fallback in development; do not infer stripping from a corpus
-that never exercises the feature or from private generated-helper names.
+The original measurement design called for adding a focused
+`native-change-diagnostic-ambiguous.tsrx` fixture to the fixed codegen corpus
+and a mounted Octane-only `diagnostic_` bundle target. Implementation evidence
+showed that changing the fixed corpus obscured the feature signal and that the
+checked-in global bundle ratios were already stale on untouched main. The
+following adjustment supersedes that original design; do not infer stripping
+from a corpus that never exercises the feature or from private generated-helper
+names.
+
+**Implemented measurement adjustment:** the sentinel is a dedicated codegen
+target, not an extra member of the fixed source/compiled aggregate. Its normal
+production compile is compared byte-for-byte with the same source under an empty
+diagnostic analysis result. This preserves the existing corpus composition and
+proves zero diagnostic codegen cost directly. A new global bundle baseline was
+not recorded because the checked-in July 15 bundle ratios already fail on
+untouched main; widening them here would hide unrelated growth. Instead the
+production bundle was compared branch-to-main, and only the separately evidenced
+controlled-checkable restoration path remains as a small runtime delta.
 
 Hydration cases must cover matching adoption, mismatch replacement, and a
 pre-hydration user value. Assert node identity where adoption is expected,
@@ -769,6 +842,15 @@ website/playground source, website MDX snippets, MCP skill examples, and eval
 starters/references; exclude generated output and clearly label vendored
 upstream React fixtures. The check fails on an unclassified addition, removal,
 or moved range.
+
+**Implemented scope adjustment:** the checked-in artifact records emitted
+static warnings across TSRX/TSX/JSX, where authored ranges and dispositions are
+stable. It does not claim to serialize every `runtime-check` or suppressed host:
+spreads, host factories, direct `createElement`, and final dynamic values cannot
+be reviewed soundly from source text alone. Those paths are instead executable
+development-runtime lanes (including Base UI, hydration, portals, namespaces,
+and direct host descriptors). A later richer candidate artifact may reuse the
+classifier, but it must not replace these mounted observations.
 
 For bindings, add a dynamic lane that mounts representative
 host-factory/render-prop/spread cases in development and fails on unexpected
@@ -883,7 +965,7 @@ pnpm --filter @octanejs/evals test
 - Add the shared classifier, structured compile result, stable code/ranges,
   suppression syntax, build-adapter forwarding, and additive Volar diagnostic
   result.
-- Coordinate the external `Ripple-TS/ripple` changes: teach
+- Specify the external `Ripple-TS/ripple` follow-up: teach
   `@tsrx/typescript-plugin` to retain the additive array,
   `@ripple-ts/language-server` to map it to LSP warning severity, and
   `@ripple-ts/vscode-plugin` to pass a packaged-extension smoke. Release patch
@@ -903,11 +985,10 @@ pnpm --filter @octanejs/evals test
   and SVG `foreignObject` HTML positive.
 - Vite, Rspack/Rsbuild, and direct compiler consumers receive one warning with
   a stable source range; a dual client/server build does not duplicate it.
-- The integrated editor consumer displays one warning at the same authored
-  range and does not add it to the fatal `errors` channel. If the external
-  consumer release is not available, Wave 1 can be split into local schema and
-  consumer-integration PRs, but the diagnostic rollout and definition of done
-  remain blocked on the latter.
+- The local Volar result exposes one non-fatal warning at the authored range.
+  Mapping that additive field through the integrated editor consumer is the
+  separately owned rollout follow-up in section 12 and does not block this
+  repository implementation.
 - No event is rewritten and suppression does not serialize.
 
 ### Wave 2 — development-runtime fallback and controlled-warning unification
@@ -921,8 +1002,9 @@ pnpm --filter @octanejs/evals test
 - Add static-handled metadata to prevent compiler/runtime duplicates.
 - Cover hydration, portals, spreads, dynamic types, removal, and production
   stripping.
-- Add the ambiguous-host fixture to both production-size harnesses and ratchet
-  their baselines before claiming zero shipped diagnostic cost.
+- Add the ambiguous-host fixture to a dedicated production codegen comparison
+  and record the branch-to-main bundle delta before claiming zero shipped
+  diagnostic cost.
 
 **Dependencies:** Wave 1 defines the public code, suppression prop, classifier
 metadata, and structured messages.
@@ -934,8 +1016,10 @@ metadata, and structured messages.
   offending transition; all exclusions remain quiet.
 - Controlled no-handler warnings still work; static onChange sites do not
   double-report.
-- The `octane-prod` project is semantically silent, and the deterministic
-  codegen-size/bundle-size ratio gates show no production regression.
+- The `octane-prod` project is semantically silent, the dedicated codegen
+  control is byte-equal, and the branch-to-main bundle comparison attributes no
+  shipped bytes to diagnostics. The pre-existing global ratio breach remains a
+  separate benchmark-maintenance item.
 
 ### Wave 3 — native controlled-checkable correctness, if Wave 0 confirms it
 
@@ -981,9 +1065,10 @@ Wave 2 but must precede docs claiming native controlled onChange works.
 **Acceptance**
 
 - `pnpm native-events:diagnostics:check` reports no new or unclassified static
-  or dynamic site across any first-party compile consumer. Every recorded
-  warning is migrated or has a tested, explicit native-commit disposition;
-  source search is only a supplemental review aid.
+  site across the checked-in TSRX/TSX/JSX inventory. Every recorded warning is
+  migrated or has a tested, explicit native-commit disposition; dynamic final
+  prop shapes are covered by mounted runtime fixtures in the relevant compile
+  consumers, and source search is only a supplemental review aid.
 - Binding APIs named `onChange` are unchanged unless they are literal DOM host
   props.
 - Testing Library teaches real input/change sequences without remapping them.
@@ -996,14 +1081,17 @@ Wave 2 but must precede docs claiming native controlled onChange works.
 - Run full dev/prod/browser/SSR/hydration/binding/eval validation.
 - Record matrix outcomes and any intentional divergences in this document or a
   linked evidence report.
-- Run the deterministic `codegen-size` and production `bundle-size` ratio
-  harnesses, and smoke-test development overhead on spread-heavy forms.
+- Run the dedicated diagnostic codegen control, record the production
+  branch-to-main bundle comparison, and smoke-test development overhead on
+  spread-heavy forms.
 - Apply the compat-mode gate in section 11.
 
 **Dependencies:** all preceding applicable waves.
 
-**Acceptance:** all commands in section 9 pass, all changesets are present,
-and no open failing/skip/todo pin remains.
+**Acceptance:** all functional and generated-source commands in section 9 pass,
+the feature-local production sentinel is byte-equal, all changesets are
+present, and no open failing/skip/todo pin remains. Any pre-existing global
+benchmark-ratio breach is recorded without widening its guard in this feature.
 
 ## 8. Risks and mitigations
 
@@ -1014,7 +1102,7 @@ and no open failing/skip/todo pin remains.
 | Duplicate compiler + runtime warning | Static-handled dev metadata and per-build-generation range dedupe; explicit count and watch-reintroduction tests. |
 | Spread source-order mistakes | Any spread defers to one final-props runtime check; no per-key warning. |
 | Dynamic transition missed by one-shot state | Last offending signature resets when valid and can warn on a later regression. |
-| Production overhead | Assert semantic silence in `octane-prod`; measure structure only through the existing deterministic codegen-size and bundle-size ratio harnesses, not private helper substrings. |
+| Production overhead | Assert semantic silence in `octane-prod`; require exact diagnostic/control codegen equality and record a branch-to-main bundle comparison, never private helper substrings. |
 | Custom/component callback breakage | Namespace/local-name restriction and binding/eval negative controls. |
 | Diagnostic changes event behavior | Diagnostic record is independent of controlled state; event-order matrix runs before and after. |
 | Checkable restore fix breaks native ordering | Trusted Chromium C1-C4/R1-R3/D1-D3 plus existing controlled/select tests. |
@@ -1031,7 +1119,7 @@ adjusted during Wave 0, but the final equivalent gates are mandatory.
 Focused iteration:
 
 ```bash
-./node_modules/.bin/vitest run packages/octane/tests/native-change-diagnostic.test.ts --project octane --reporter=verbose
+./node_modules/.bin/vitest run packages/octane/tests/native-change-compiler.test.ts packages/octane/tests/native-change-runtime-diagnostic.test.ts --project octane --reporter=verbose
 ./node_modules/.bin/vitest run packages/octane/tests/differential/native-change-matrix.test.ts --project octane --reporter=verbose
 ./node_modules/.bin/vitest run packages/octane/tests/differential/native-change-matrix.test.ts --project octane-prod --reporter=verbose
 ./node_modules/.bin/vitest run packages/octane/tests/conformance/controlled-input.test.ts packages/octane/tests/conformance/controlled-restore.test.ts packages/octane/tests/controlled-checkable-native-events.test.tsrx --project octane --reporter=verbose
@@ -1089,6 +1177,11 @@ pnpm --filter octane-bundle-size-bench bench
 node benchmarks/bench.mjs --ratios codegen-size bundle-size
 ```
 
+The first command is the feature gate: its dedicated diagnostic/control targets
+must be byte-equal. The latter commands remain useful benchmark-health reports,
+but their existing aggregate ratio failure reproduces on untouched main and is
+not ratcheted or waived by this change.
+
 Final repository gates:
 
 ```bash
@@ -1106,10 +1199,11 @@ the focused/full behavioral runs.
 - Core `onChange` is still the delegated native change event in every mode.
 - `OCTANE_NATIVE_TEXT_ONCHANGE` has a stable warning code, actionable
   phase-preserving fix, precise source range, and documented severity.
-- Static known sites warn through direct compiler and build adapters, the local
-  Volar result carries the same structured diagnostic, and the integrated
-  editor consumer renders it at warning severity; ambiguous uncontrolled sites
-  warn in development after final props resolve.
+- Static known sites warn through direct compiler and build adapters, and the
+  local Volar result carries the same structured diagnostic. Ambiguous sites
+  warn in development after final props resolve. Mapping that additive Volar
+  field into the external Ripple language-server/VS Code warning channel is the
+  cross-repository rollout item in section 12, not a local repository DoD gate.
 - Literal output JSX, value-position JSX, direct createElement/de-opt, spreads,
   hydration, and portals follow the ownership table without duplicates.
 - Native commit intent has a tested, non-serialized explicit path.
@@ -1159,23 +1253,26 @@ They are not, by themselves, approval to implement compatibility. A later RFC
 must remain separate so this plan cannot accidentally grow synthetic semantics
 while fixing diagnostics or native controlled restoration.
 
-## 12. Open questions before Wave 1
+## 12. Resolved decisions and remaining follow-up
 
-1. Confirm the public prop spelling `suppressNativeChangeWarning`. It is the
-   recommended name because it mirrors existing JS-only warning suppressions;
-   changing it after release would be user-facing churn.
-2. Confirm `number` remains in the text-entry diagnostic family. This plan
-   matches current `isTextEntry`; broadening/narrowing should be a separately
-   evidenced policy change.
-3. Classify Base UI's hidden controlled number input: per-edit bug or genuine
-   native commit intent. Its behavioral test should decide whether to migrate
-   to `onInput` or add suppression.
-4. Confirm Wave 0's controlled checkbox/radio `onChange` restoration probe in
-   Chromium and choose the smallest restore deferral that preserves all C/D/R
-   rows.
-5. Decide which React parity ledger entries gain native public evidence versus
-   remaining synthetic non-goals; do not bulk-reclassify the plugin suite.
-6. Assign the cross-repository owner and record the `Ripple-TS/ripple` PR plus
-   released minimum versions for `@tsrx/typescript-plugin` and
-   `@ripple-ts/language-server`. The owning packages are known, but release
-   sequencing is still a rollout dependency.
+1. The public prop is `suppressNativeChangeWarning`; it is implemented and
+   documented as a JS-only host hint.
+2. `number` remains in the text-entry diagnostic family, matching
+   `isTextEntry`. Any future expansion or narrowing requires separate evidence.
+3. Base UI's hidden controlled number input is a genuine form-facing native
+   commit boundary. Its behavior test now protects local suppression, while the
+   visible Field and NumberField text controls use `onInput`.
+4. Chromium confirmed the checkbox/radio restoration defect. The runtime now
+   defers checkable restoration through the native input/change pair, and the
+   accepting/rejecting/cancellation matrix passes.
+5. The React ledger remains honest about the synthetic plugin as a non-goal.
+   Four relevant entries now link to the native text, programmatic-write,
+   checkbox, and radio public evidence instead of bulk-reclassifying the suite.
+6. **Remaining external follow-up:** assign and land the `Ripple-TS/ripple`
+   TypeScript/language-server/VS Code integration, then record its PR, release
+   versions, and minimum supported versions in Octane's editor documentation.
+7. **Post-merge eval follow-up:** repin the new training task's environment and
+   source provenance to the first immutable Octane commit or release containing
+   this diagnostic and suppression API. The local corpus can exercise the branch,
+   but its shared pre-feature base commit cannot honestly claim to contain the new
+   contract before this work lands.

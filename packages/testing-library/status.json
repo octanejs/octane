@@ -2,13 +2,14 @@
   "upstream": { "package": "@testing-library/react", "version": "unpinned" },
   "surface": "`render`/`rerender`/`cleanup`/`renderHook` + `act` over the verbatim `@testing-library/dom` (every query, `screen`, `within`, `waitFor`, `fireEvent`, `prettyDOM`, `configure`), with commit timing wired to octane's scheduler via the dom-library's `eventWrapper`/`asyncWrapper` config.",
   "divergences": [
-    "`fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires a native `change`, not `input`) and no enter/leave/focus double-dispatch.",
+    "`fireEvent` dispatches real native events — no React remappings (`fireEvent.change` fires an explicit native `change`, not text typing or checkbox click activation) and no enter/leave/focus double-dispatch.",
     "Not ported: the `ReactStrictMode` wrapper, `legacyRoot`, and the `onCaughtError`/`onRecoverableError` options."
   ],
   "ssr": "`hydrate: true` adopts octane SSR output via `hydrateRoot`.",
-  "verified": "2026-07-09",
+  "verified": "2026-07-17",
   "notes": [
-    "The reused framework-agnostic core is `@testing-library/dom@^10.4.1`; the ported react-testing-library layer tracks upstream behavior rather than a pinned release."
+    "The reused framework-agnostic core is `@testing-library/dom@^10.4.1`; the ported react-testing-library layer tracks upstream behavior rather than a pinned release.",
+    "`@testing-library/user-event` drives native text input/commit and checkbox click → input → change sequences without an Octane adapter."
   ],
   "docs": ["docs/testing-library-migration-plan.md"]
 }

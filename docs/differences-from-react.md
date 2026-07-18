@@ -93,15 +93,47 @@ commit/discrete event reasserts. `<textarea>` with children AND a
 
 What differs is the **event layer**: there is no synthetic `onChange`.
 `onInput` is the per-keystroke handler for text controls (the native `change`
-event fires on blur/commit); checkboxes/radios/selects work through native
-`change`/`click`, whose timing matches React anyway. A dev warning flags a
-controlled text control with no `onInput` (special-cased when only `onChange`
-is present). Migration is a rename:
+event fires when the browser commits the edit, usually on blur);
+checkboxes/radios/selects retain their normal native `change` behavior. Migration
+of React-style text editing is a rename:
 
 ```jsx
 <input value={text} onChange={(e) => setText(e.target.value)} /> // React
 <input value={text} onInput={(e) => setText(e.target.value)} /> // Octane
 ```
+
+The compiler warning `OCTANE_NATIVE_TEXT_ONCHANGE` points to `onChange` or
+`onChangeCapture` on statically known text-entry hosts when no usable input handler
+is present. It covers `<textarea>` and `<input>` with a missing/invalid type or the
+`text`, `search`, `url`, `tel`, `password`, `email`, or `number` types. A development
+runtime fallback checks final props for unresolved spreads, dynamic host/type values,
+and de-optimized `createElement` paths. It is nonfatal and never changes which event
+runs. `select`, checkbox/radio/file and other non-text input types, custom elements,
+and component callbacks named `onChange` are not warned. Bubble and capture phases
+are treated symmetrically (`onChangeCapture` suggests `onInputCapture`).
+
+Native commit behavior is sometimes exactly the intent. Use an uncontrolled value
+and the explicit JS-only suppression in that case:
+
+```jsx
+<input
+  defaultValue={savedDraft}
+  onChange={(event) => save(event.currentTarget.value)}
+  suppressNativeChangeWarning
+/>
+```
+
+`suppressNativeChangeWarning` only suppresses this diagnostic. It does not serialize
+to HTML, rename an event, add a listener, or alter controlled-state restoration. Do
+not add a noop `onInput` merely to silence the warning.
+
+Checkbox/radio activation follows the platform's `click` → `input` → non-cancelable
+`change` sequence. `preventDefault()` in native `onChange` therefore cannot roll the
+toggle back; cancel in `onClick` when rollback is intended. React's synthetic
+checkable `onChange` is click-backed and can cancel activation at that callback, an
+intentional event-layer divergence. Octane still lets native input/change handlers
+observe the prospective checked state before restoring rejected controlled state
+and radio cousins.
 
 Form **actions**
 (`<form action={fn}>`, `useActionState`, `useFormStatus`, `useOptimistic`,

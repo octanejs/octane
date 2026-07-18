@@ -17,6 +17,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
+import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
 const ROUTES = [
@@ -636,6 +637,26 @@ describe.sequential('website production build → hydration (octane-preview)', (
 			await waitForLocatorText(heading, 'Count: 0', 20_000);
 			await preview.getByRole('button', { name: 'Increment' }).click();
 			await waitForLocatorText(heading, 'Count: 1');
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
+	it('playground shows compiler warnings without treating runnable code as an error', async () => {
+		const source = `export function App() @{ <input onChange={() => {}} /> }`;
+		const hash = encodePlaygroundHash(source, 'tsrx');
+		const { page, errors } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			`/playground#${hash}`,
+		);
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			const warnings = page.getByRole('region', { name: 'Compiler warnings' });
+			await warnings.waitFor();
+			expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+			expect(await warnings.textContent()).toContain('playground.tsrx:1:');
+			expect(await page.locator('.pg-error').count()).toBe(0);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
