@@ -125,6 +125,16 @@ function globToRegExp(glob) {
 	return new RegExp(`${expression}$`);
 }
 
+function normalizeCrosswalkPath(file) {
+	return file.replaceAll(path.win32.sep, path.posix.sep);
+}
+
+assert.equal(
+	normalizeCrosswalkPath(path.win32.join('packages', 'react', 'example.test.ts')),
+	'packages/react/example.test.ts',
+	'crosswalk paths must normalize Windows separators',
+);
+
 async function walkFiles(directory) {
 	const entries = await readdir(directory, { withFileTypes: true });
 	const nested = await Promise.all(
@@ -152,7 +162,7 @@ async function validatePinnedSourceInventory(upstreamRoot) {
 				const files = await walkFiles(path.join(upstreamRoot, relativeDirectory));
 				return files
 					.filter((file) => /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file))
-					.map((file) => path.relative(upstreamRoot, file));
+					.map((file) => normalizeCrosswalkPath(path.relative(upstreamRoot, file)));
 			}),
 		)
 	)
