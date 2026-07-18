@@ -379,6 +379,72 @@ describe('streaming injection — failure modes', () => {
 		expect(injection.unsubscribed).toBe(true);
 	});
 
+	it('salvages HTML queued during renderComplete into the terminal write on abort', async () => {
+		const value = deferred<string>();
+		const remainder = '<script data-inject="remainder">window.__r=1</script>';
+		// Hand-rolled source: renderComplete queues its serialization remainder
+		// (as a real serverSsr flush does) — on the degraded path there is no
+		// live notify drain left to deliver it, so the terminal write must.
+		const queue: string[] = [];
+		const source: ServerRuntime.StreamInjectionSource = {
+			take: () => queue.splice(0).join(''),
+			subscribe: () => () => {},
+			done: new Promise<void>(() => {}),
+			renderComplete() {
+				queue.push(remainder);
+			},
+		};
+
+		const collector = createPipeableCollector();
+		const render = ServerRuntime.renderToPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{ injection: source, onError: () => {} },
+		);
+		render.pipe(collector.destination);
+		await flushMicrotasks();
+		render.abort(new Error('client disconnected'));
+		const html = await collector.ended;
+		// The remainder shipped, inside <body> ahead of the held tail.
+		expect(html).toContain(remainder);
+		expect(html.indexOf(remainder)).toBeLessThan(html.indexOf('</body>'));
+		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+	});
+
+	it('salvages queued HTML into the terminal write when `done` rejects', async () => {
+		const value = deferred<string>();
+		const remainder = '<script data-inject="late-remainder">window.__lr=1</script>';
+		const queue: string[] = [];
+		let failDone!: (reason: unknown) => void;
+		const done = new Promise<void>((_resolve, reject) => {
+			failDone = reject;
+		});
+		done.catch(() => {});
+		const source: ServerRuntime.StreamInjectionSource = {
+			take: () => queue.splice(0).join(''),
+			// Deliberately never notifies: the queued HTML is only reachable
+			// through the degraded close's terminal salvage.
+			subscribe: () => () => {},
+			done,
+		};
+
+		const collector = createPipeableCollector();
+		ServerRuntime.renderToPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{ injection: source, onError: () => {} },
+		).pipe(collector.destination);
+		value.resolve('streamed');
+		await flushMicrotasks();
+		await flushMicrotasks();
+		queue.push(remainder);
+		failDone(new Error('serialization failed'));
+		const html = await collector.ended;
+		expect(html).toContain(remainder);
+		expect(html.indexOf(remainder)).toBeLessThan(html.indexOf('</body>'));
+		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+	});
+
 	it('signals renderComplete on an aborted render so the source can finalize', async () => {
 		const value = deferred<string>();
 		const injection = createTestInjection();

@@ -6365,8 +6365,13 @@ async function runStream(
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
 		// Rendering ends here, degraded — the source still gets its completion
 		// signal so upstream finalization (serialization flush, timers) is not
-		// stranded waiting on a render that will never finish.
+		// stranded waiting on a render that will never finish. Unsubscribe FIRST:
+		// a notify fired by that finalization would otherwise drain the queue
+		// into a chained write that post-abort can only reject, losing the HTML
+		// the terminal salvage below still delivers.
 		if (injection !== undefined) {
+			injectionUnsubscribe?.();
+			injectionUnsubscribe = undefined;
 			try {
 				injection.renderComplete?.();
 			} catch {
@@ -6374,6 +6379,16 @@ async function runStream(
 			}
 		}
 		let tail = '';
+		if (injection !== undefined && !injectionFailed) {
+			// Terminal salvage: queued injection HTML (typically the source's
+			// just-flushed serialization remainder) still ships, ahead of the
+			// recovery markers and the held tail.
+			try {
+				tail += injection.take();
+			} catch {
+				// A failing source forfeits its remainder; the terminal write goes on.
+			}
+		}
 		for (const b of stream.boundaries.values()) {
 			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
 		}
@@ -6388,7 +6403,6 @@ async function runStream(
 				// The transport is already gone; there is nowhere to send recovery.
 			}
 		}
-		injectionUnsubscribe?.();
 		sink.fatal(err);
 		return;
 	}
@@ -6418,15 +6432,29 @@ async function runStream(
 			}
 		} catch (err) {
 			options?.onError?.(err);
-			if (heldDocumentTail !== '') {
+			// Unsubscribe before salvaging so a late notify cannot drain the
+			// queue into a chained write this degraded close will never deliver.
+			injectionUnsubscribe?.();
+			injectionUnsubscribe = undefined;
+			let terminal = '';
+			if (!injectionFailed) {
+				// Terminal salvage: the source may have queued HTML (e.g. its
+				// serialization remainder) between the failure and this close.
 				try {
-					const terminalWrite = write(heldDocumentTail, true);
+					terminal = injection.take();
+				} catch {
+					// A failing source forfeits its remainder; the tail still ships.
+				}
+			}
+			terminal += heldDocumentTail;
+			if (terminal !== '') {
+				try {
+					const terminalWrite = write(terminal, true);
 					if (terminalWrite !== undefined) await terminalWrite;
 				} catch {
 					// The transport is already gone; there is nowhere to send the tail.
 				}
 			}
-			injectionUnsubscribe?.();
 			sink.fatal(err);
 			return;
 		}
