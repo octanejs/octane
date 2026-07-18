@@ -1,5 +1,5 @@
 // `octane/compiler` is authored in JSDoc'd JS with no shipped declarations —
-// a minimal ambient surface for the one entry point this package consumes.
+// a minimal ambient surface for the entry points this package consumes.
 declare module 'octane/compiler' {
 	export interface CompileDiagnosticPosition {
 		offset: number;
@@ -29,4 +29,9 @@ declare module 'octane/compiler' {
 			profile?: boolean;
 		},
 	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
+	export function __analyzeNativeChangeDiagnostics(
+		ast: unknown,
+		source: string,
+		filename: string,
+	): { diagnostics: CompileDiagnostic[]; classifications: Map<number, string> };
 }

@@ -46,7 +46,7 @@ import {
 	LEAST_UPPER_BOUND,
 } from '@jridgewell/trace-mapping';
 import { compile as mdxCompile, compileSync as mdxCompileSync } from '@mdx-js/mdx';
-import { compile as octaneCompile } from 'octane/compiler';
+import { __analyzeNativeChangeDiagnostics, compile as octaneCompile } from 'octane/compiler';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 import remarkMdxFrontmatter from 'remark-mdx-frontmatter';
@@ -69,6 +69,23 @@ import { SourceMapGenerator } from 'source-map';
  *     attribute: 'onInput' | 'onInputCapture',
  *   }>,
  * }>} diagnostics
+ */
+
+/**
+ * @typedef {object} AuthoredJsxAttributeLocation
+ * @property {string} name
+ * @property {number} start
+ * @property {number} end
+ * @property {{ start: { line: number, column: number }, end: { line: number, column: number } }} loc
+ * @property {boolean} staticallyWarned
+ */
+
+/**
+ * @typedef {object} DiagnosticMappingContext
+ * @property {AuthoredJsxAttributeLocation[]} authoredAttributes
+ * @property {WeakMap<object, AuthoredJsxAttributeLocation>} attributeLocations
+ * @property {string} source
+ * @property {string} id
  */
 
 /**
@@ -108,8 +125,17 @@ export const defaultRemarkPlugins = [remarkGfm, remarkFrontmatter, remarkMdxFron
  * @returns {Promise<CompileMdxResult>}
  */
 export async function compileMdx(source, id, options = {}) {
-	const out = await mdxCompile({ value: source, path: id }, buildMdxOptions(id, options));
-	return octaneStage(String(out.value), out.map, source, id, options);
+	const diagnosticContext = {
+		authoredAttributes: [],
+		attributeLocations: new WeakMap(),
+		source,
+		id,
+	};
+	const out = await mdxCompile(
+		{ value: source, path: id },
+		buildMdxOptions(id, options, diagnosticContext),
+	);
+	return octaneStage(String(out.value), out.map, source, id, options, diagnosticContext);
 }
 
 /**
@@ -121,16 +147,26 @@ export async function compileMdx(source, id, options = {}) {
  * @returns {CompileMdxResult}
  */
 export function compileMdxSync(source, id, options = {}) {
-	const out = mdxCompileSync({ value: source, path: id }, buildMdxOptions(id, options));
-	return octaneStage(String(out.value), out.map, source, id, options);
+	const diagnosticContext = {
+		authoredAttributes: [],
+		attributeLocations: new WeakMap(),
+		source,
+		id,
+	};
+	const out = mdxCompileSync(
+		{ value: source, path: id },
+		buildMdxOptions(id, options, diagnosticContext),
+	);
+	return octaneStage(String(out.value), out.map, source, id, options, diagnosticContext);
 }
 
 /**
  * @param {string} id
  * @param {CompileMdxOptions} options
+ * @param {DiagnosticMappingContext} diagnosticContext
  * @returns {import('@mdx-js/mdx').CompileOptions}
  */
-function buildMdxOptions(id, options) {
+function buildMdxOptions(id, options, diagnosticContext) {
 	const format =
 		options.format && options.format !== 'detect'
 			? options.format
@@ -155,7 +191,167 @@ function buildMdxOptions(id, options) {
 		...(provider === null ? {} : { providerImportSource: provider }),
 		remarkPlugins: options.remarkPlugins ?? defaultRemarkPlugins,
 		rehypePlugins: options.rehypePlugins,
-		recmaPlugins: [...(options.recmaPlugins ?? []), recmaOctaneAdapter],
+		recmaPlugins: [
+			seedAuthoredJsxAttributeLocations(diagnosticContext),
+			...(options.recmaPlugins ?? []),
+			restoreAuthoredJsxAttributeLocations(diagnosticContext),
+			recmaOctaneAdapter,
+		],
+	};
+}
+
+/**
+ * @param {unknown} tree
+ * @param {(attribute: Record<string, any>) => void} callback
+ */
+function visitJsxAttributes(tree, callback) {
+	const activeObjects = new WeakSet();
+	/** @param {unknown} value */
+	function visit(value) {
+		if (value === null || typeof value !== 'object' || activeObjects.has(value)) return;
+		activeObjects.add(value);
+		const node = /** @type {Record<string, any>} */ (value);
+		if (node.type === 'JSXAttribute') callback(node);
+		for (const [key, child] of Object.entries(node)) {
+			if (key === 'loc' || key === 'range' || key === 'position') continue;
+			if (Array.isArray(child)) child.forEach(visit);
+			else visit(child);
+		}
+		activeObjects.delete(value);
+	}
+	visit(tree);
+}
+
+/**
+ * @param {Record<string, any>} node
+ * @param {AuthoredJsxAttributeLocation} location
+ */
+function applyNodeLocation(node, location) {
+	node.start = location.start;
+	node.end = location.end;
+	node.range = [location.start, location.end];
+	node.loc = {
+		start: { ...location.loc.start },
+		end: { ...location.loc.end },
+	};
+}
+
+/**
+ * Add the exact source location missing from MDX's JSXIdentifier attribute
+ * names. Remark and rehype transforms have already established stage-one
+ * source provenance here; the parent JSXAttribute carries that location, and
+ * seeding the child makes the map point directly at the token the Octane
+ * diagnostic covers. Analyze this pre-recma tree once as well: a later
+ * transform may preserve or copy source locations, but only attributes that
+ * were already statically warned at this boundary may receive an authored fix.
+ *
+ * @param {DiagnosticMappingContext} context
+ */
+function seedAuthoredJsxAttributeLocations(context) {
+	return function recmaSeedAuthoredJsxAttributeLocations() {
+		/** @param {unknown} tree */
+		return (tree) => {
+			context.authoredAttributes.length = 0;
+			const occurrences = [];
+			visitJsxAttributes(tree, (attribute) => occurrences.push(attribute));
+			const occurrenceCounts = new Map();
+			for (const attribute of occurrences) {
+				occurrenceCounts.set(attribute, (occurrenceCounts.get(attribute) ?? 0) + 1);
+			}
+			for (const attribute of occurrences) {
+				if (occurrenceCounts.get(attribute) !== 1) continue;
+				const name = attribute.name;
+				if (
+					name?.type !== 'JSXIdentifier' ||
+					typeof name.name !== 'string' ||
+					typeof attribute.start !== 'number' ||
+					typeof attribute.loc?.start?.line !== 'number' ||
+					typeof attribute.loc?.start?.column !== 'number'
+				)
+					continue;
+				const location = {
+					name: name.name,
+					start: attribute.start,
+					end: attribute.start + name.name.length,
+					loc: {
+						start: {
+							line: attribute.loc.start.line,
+							column: attribute.loc.start.column,
+						},
+						end: {
+							line: attribute.loc.start.line,
+							column: attribute.loc.start.column + name.name.length,
+						},
+					},
+					staticallyWarned: false,
+				};
+				context.authoredAttributes.push(location);
+				context.attributeLocations.set(attribute, location);
+				const seededName = { ...name };
+				attribute.name = seededName;
+				applyNodeLocation(seededName, location);
+			}
+			const warningRanges = new Set(
+				__analyzeNativeChangeDiagnostics(tree, context.source, context.id).diagnostics.flatMap(
+					(diagnostic) =>
+						diagnostic.suggestions.map(
+							(suggestion) => `${suggestion.start.offset}:${suggestion.end.offset}`,
+						),
+				),
+			);
+			for (const location of context.authoredAttributes) {
+				location.staticallyWarned = warningRanges.has(`${location.start}:${location.end}`);
+			}
+		};
+	};
+}
+
+/**
+ * Restore exact locations on unchanged attribute identities after user recma
+ * transforms. Classification was frozen before those transforms, so even a
+ * later plugin that copies a location cannot turn a previously-safe authored
+ * callback into an actionable replacement.
+ *
+ * @param {DiagnosticMappingContext} context
+ */
+function restoreAuthoredJsxAttributeLocations(context) {
+	return function recmaRestoreAuthoredJsxAttributeLocations() {
+		/** @param {unknown} tree */
+		return (tree) => {
+			const occurrences = [];
+			visitJsxAttributes(tree, (attribute) => occurrences.push(attribute));
+			const occurrenceCounts = new Map();
+			for (const attribute of occurrences) {
+				occurrenceCounts.set(attribute, (occurrenceCounts.get(attribute) ?? 0) + 1);
+			}
+			for (const attribute of occurrences) {
+				const name = attribute.name;
+				const location = context.attributeLocations.get(attribute);
+				if (
+					location &&
+					occurrenceCounts.get(attribute) === 1 &&
+					name?.type === 'JSXIdentifier' &&
+					name.name === location.name
+				) {
+					// Isolate the authored name from shallow attribute clones. Otherwise a
+					// generated clone can share this child object and regain its location
+					// when the original attribute is restored later in the traversal.
+					const restoredName = { ...name };
+					attribute.name = restoredName;
+					applyNodeLocation(restoredName, location);
+					continue;
+				}
+				// Do not let a plugin-created clone carrying copied positions masquerade
+				// as the one authored attribute captured before user transforms.
+				for (const node of [attribute, name]) {
+					if (node === null || typeof node !== 'object') continue;
+					delete node.start;
+					delete node.end;
+					delete node.range;
+					delete node.loc;
+				}
+			}
+		};
 	};
 }
 
@@ -165,9 +361,10 @@ function buildMdxOptions(id, options) {
  * @param {string} authoredSource
  * @param {string} id
  * @param {CompileMdxOptions} options
+ * @param {DiagnosticMappingContext} diagnosticContext
  * @returns {CompileMdxResult}
  */
-function octaneStage(jsxSource, mdxMap, authoredSource, id, options) {
+function octaneStage(jsxSource, mdxMap, authoredSource, id, options, diagnosticContext) {
 	const mode = options.mode ?? 'client';
 	const out = octaneCompile(jsxSource, id, {
 		mode,
@@ -192,7 +389,14 @@ function octaneStage(jsxSource, mdxMap, authoredSource, id, options) {
 	// callers and Vite warnings point at the JSX the author actually wrote in the
 	// document. Markdown generated by headings/lists has no authored event prop,
 	// so native-change warnings are expected to map only from literal MDX JSX.
-	out.diagnostics = remapDiagnostics(out.diagnostics, mdxMap, jsxSource, authoredSource, id);
+	out.diagnostics = remapDiagnostics(
+		out.diagnostics,
+		mdxMap,
+		jsxSource,
+		authoredSource,
+		id,
+		diagnosticContext.authoredAttributes,
+	);
 	// Fast refresh for documents: octane's compiler only auto-wraps EXPORTED
 	// `@{}`-form components in `hmr(...)` — `MDXContent` (a passthrough function
 	// returning a ternary of descriptors) isn't recognized as one, so the octane
@@ -284,50 +488,50 @@ function mapDiagnosticPosition(trace, source, starts, position, bias) {
 }
 
 /**
+ * Match an Octane diagnostic to an exact authored JSX attribute source-map
+ * segment. Both source-map biases must resolve to the same seeded token: when
+ * they differ, the generated position sits between mappings and belongs to
+ * transformed/generated code rather than an authored attribute.
+ *
  * @param {TraceMap} trace
  * @param {string} jsxSource
  * @param {string} source
  * @param {number[]} starts
  * @param {{ start: { offset: number, line: number, column: number }, end: { offset: number, line: number, column: number } }} range
+ * @param {AuthoredJsxAttributeLocation[]} authoredAttributes
+ * @returns {AuthoredJsxAttributeLocation | null}
  */
-function mapDiagnosticRange(trace, jsxSource, source, starts, range) {
-	// MDX's stage-one map is intentionally sparse: literal JSX elements have
-	// source anchors, but individual attribute tokens often do not. Use the next
-	// authored anchor to select the correct literal JSX occurrence, then recover
-	// the exact token range by text. This is still source-map constrained (rather
-	// than a repository-wide grep) and handles repeated attributes by proximity.
-	const upper = mapDiagnosticPosition(trace, source, starts, range.start, LEAST_UPPER_BOUND);
+function exactAuthoredAttributeForDiagnostic(
+	trace,
+	jsxSource,
+	source,
+	starts,
+	range,
+	authoredAttributes,
+) {
+	const name = jsxSource.slice(range.start.offset, range.end.offset);
+	if (name.length === 0) return null;
 	const lower = mapDiagnosticPosition(trace, source, starts, range.start, GREATEST_LOWER_BOUND);
-	const needle = jsxSource.slice(range.start.offset, range.end.offset);
-	if (needle.length > 0) {
-		const anchor = upper?.offset ?? lower?.offset;
-		let best = -1;
-		let bestDistance = Number.POSITIVE_INFINITY;
-		for (let occurrence = source.indexOf(needle); occurrence !== -1; ) {
-			const distance = anchor === undefined ? occurrence : Math.abs(occurrence - anchor);
-			if (distance < bestDistance) {
-				best = occurrence;
-				bestDistance = distance;
-			}
-			occurrence = source.indexOf(needle, occurrence + Math.max(1, needle.length));
-		}
-		if (best !== -1) {
-			return {
-				start: positionForOffset(source, starts, best),
-				end: positionForOffset(source, starts, best + needle.length),
-			};
-		}
-	}
+	const upper = mapDiagnosticPosition(trace, source, starts, range.start, LEAST_UPPER_BOUND);
+	if (lower === null || upper === null || lower.offset !== upper.offset) return null;
+	return (
+		authoredAttributes.find(
+			(attribute) =>
+				attribute.staticallyWarned && attribute.name === name && attribute.start === lower.offset,
+		) ?? null
+	);
+}
 
-	const start = upper ?? lower;
-	if (start == null) return range;
-	let end =
-		mapDiagnosticPosition(trace, source, starts, range.end, LEAST_UPPER_BOUND) ??
-		mapDiagnosticPosition(trace, source, starts, range.end, GREATEST_LOWER_BOUND);
-	if (end === null || end.offset <= start.offset) {
-		end = positionForOffset(source, starts, start.offset + (range.end.offset - range.start.offset));
-	}
-	return { start, end };
+/**
+ * @param {string} source
+ * @param {number[]} starts
+ * @param {AuthoredJsxAttributeLocation} attribute
+ */
+function rangeForAuthoredAttribute(source, starts, attribute) {
+	return {
+		start: positionForOffset(source, starts, attribute.start),
+		end: positionForOffset(source, starts, attribute.end),
+	};
 }
 
 /**
@@ -336,23 +540,63 @@ function mapDiagnosticRange(trace, jsxSource, source, starts, range) {
  * @param {string} jsxSource
  * @param {string} source
  * @param {string} id
+ * @param {AuthoredJsxAttributeLocation[]} authoredAttributes
  * @returns {CompileMdxResult['diagnostics']}
  */
-function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id) {
+function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id, authoredAttributes) {
 	if (!Array.isArray(diagnostics) || diagnostics.length === 0) return [];
-	if (!mdxMap) return diagnostics.map((diagnostic) => ({ ...diagnostic, filename: id }));
-	const trace = new TraceMap(JSON.parse(JSON.stringify(mdxMap)));
 	const starts = sourceLineStarts(source);
+	const fileStart = positionForOffset(source, starts, 0);
+	const trace = mdxMap ? new TraceMap(JSON.parse(JSON.stringify(mdxMap))) : null;
+	const claimedAttributes = new Set();
 	return diagnostics.map((diagnostic) => {
-		const range = mapDiagnosticRange(trace, jsxSource, source, starts, diagnostic);
+		const attribute = trace
+			? exactAuthoredAttributeForDiagnostic(
+					trace,
+					jsxSource,
+					source,
+					starts,
+					diagnostic,
+					authoredAttributes,
+				)
+			: null;
+		const key = attribute ? `${attribute.name}:${attribute.start}:${attribute.end}` : null;
+		if (attribute === null || key === null || claimedAttributes.has(key)) {
+			return {
+				...diagnostic,
+				filename: id,
+				start: fileStart,
+				end: fileStart,
+				suggestions: [],
+			};
+		}
+		claimedAttributes.add(key);
+		const range = rangeForAuthoredAttribute(source, starts, attribute);
+		const claimedSuggestions = new Set();
 		return {
 			...diagnostic,
 			filename: id,
 			...range,
-			suggestions: diagnostic.suggestions.map((suggestion) => ({
-				...suggestion,
-				...mapDiagnosticRange(trace, jsxSource, source, starts, suggestion),
-			})),
+			suggestions: diagnostic.suggestions.flatMap((suggestion) => {
+				const suggestionAttribute = exactAuthoredAttributeForDiagnostic(
+					trace,
+					jsxSource,
+					source,
+					starts,
+					suggestion,
+					authoredAttributes,
+				);
+				if (suggestionAttribute === null) return [];
+				const suggestionKey = `${suggestionAttribute.name}:${suggestionAttribute.start}:${suggestionAttribute.end}`;
+				if (claimedSuggestions.has(suggestionKey)) return [];
+				claimedSuggestions.add(suggestionKey);
+				return [
+					{
+						...suggestion,
+						...rangeForAuthoredAttribute(source, starts, suggestionAttribute),
+					},
+				];
+			}),
 		};
 	});
 }
