@@ -149,8 +149,8 @@ hardware-independent, enforced by the weekly CI `--ratios` run):
 
 `bundle-size` additionally splits each build into an **`app` chunk** (modules
 under the app's src/) and a **`framework` chunk** (node_modules + the octane
-workspace runtime + virtuals) via rolldown `codeSplitting` — because in real
-apps user code eclipses the runtime, the app-only ops are the primary ratchet.
+workspace runtime + virtuals) via rolldown `codeSplitting`. App output is the
+scaling term as applications grow, so the app-only ops are the primary ratchet.
 Recorded split (gzip): octane-tsrx **app 3,313 / fw 23,152**, octane-jsx app
 2,982 / fw 23,237, react app 2,160 / fw 60,076, ripple app 2,312 / fw 10,502,
 solid app 1,991 / fw 12,741. Reading: octane's TOTAL gap vs ripple is mostly
@@ -574,6 +574,15 @@ Todo and chat still spend more bytes in app plumbing (1,906 vs 1,511 B and
 chunk. Across the fixed 16-file codegen corpus, gzip(minified compiled output)
 is now **22,512 B** versus **22,840 B** for source (**0.986×**). The checked-in
 ratio guards were ratcheted to these final baselines.
+
+**2026-07-18 update:** later correctness work and corpus-source growth made the
+original checkpoint stale. After merging the controlled-checkable activation
+fix, checked/radio restoration became an optional capability so applications
+without a retained `checked` binding do not ship its radio-group graph. Current
+normalized totals are 18,545 / 19,744 / 19,753 B for rows / TodoMVC /
+chat-stream, and the weather app is 40,981 B. The current codegen corpus remains
+24,397 B compiled versus 23,519 B source (1.037×). The deterministic baselines
+and tight ratio guards were refreshed to these reproducible records.
 
 Focused normal/production validation is green for the hook-slot ABI, callback
 sinking, resolved-module root proof, generic value-return transitions,

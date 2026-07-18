@@ -64,6 +64,11 @@ import {
 	invalidHtmlNestingWithParent,
 } from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
+import {
+	COMPONENT_FLAG_BOUNDARY,
+	hasComponentFlags,
+	markComponentFlags,
+} from './component-flags.js';
 export { normalizeClass };
 
 interface SSRScope {
@@ -2652,15 +2657,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
-		// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
+		// Boundary builtins decline inherit through their component capability bit —
+		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
 		// Suspense/ErrorBoundary/ViewTransition/Hydrate keep their pair; both sides agree
-		// by identity).
-		if (
-			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition || comp === Hydrate)
-		)
-			inherit = false;
+		// without retaining the concrete built-ins from this generic path).
+		if (inherit === true && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
 		// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
 		// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
 		// client renders these — a value-lowered `createElement(obj.tag, …)` routes
@@ -2824,56 +2826,60 @@ function ssrHydrateAttrs(
  * read browser state, so only a direct strategy descriptor contributes `_a()`
  * attributes and its concrete strategy kind.
  */
-export function Hydrate(props: HydrateProps, scope: SSRScope): string {
-	const id = useId();
+export const Hydrate = /* @__PURE__ */ markComponentFlags(
+	function Hydrate(props: HydrateProps, scope: SSRScope): string {
+		const id = useId();
 
-	// The client always creates an HTMLDivElement. Force the same namespace for
-	// SSR children and attribute semantics instead of inheriting SVG/MathML from
-	// the call site. Direct placement in foreign content remains unsupported: an
-	// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
-	return withSsrElementContext(
-		'div',
-		undefined,
-		() =>
-			ssrInNamespace('html', () => {
-				if (!MARKERS) {
-					return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
-				}
+		// The client always creates an HTMLDivElement. Force the same namespace for
+		// SSR children and attribute semantics instead of inheriting SVG/MathML from
+		// the call site. Direct placement in foreign content remains unsupported: an
+		// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
+		return withSsrElementContext(
+			'div',
+			undefined,
+			() =>
+				ssrInNamespace('html', () => {
+					if (!MARKERS) {
+						return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+					}
 
-				const childIdStart = ID_COUNTER;
-				const serialStart = SERIAL?.length ?? 0;
-				// The outer range belongs to Hydrate itself. ssrTry supplies the nested
-				// Suspense slot/content ranges and makes a suspending child a real stream
-				// boundary. `fallback` remains client-only, so the server pending arm is
-				// intentionally empty.
-				const children = ssrBlock(
-					ssrTry(
-						scope,
-						'jsx-hydrate',
-						(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-						null,
-						null,
-						'html',
-					),
-				);
-				const idCount = ID_COUNTER - childIdStart;
-				const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-				const attrs = ssrHydrateAttrs(id, props.when, idCount);
-				const seedSidecar =
-					childSeeds.length === 0
-						? ''
-						: '<script type="application/json" ' +
-							HYDRATE_SEED_ATTR +
-							NONCE_ATTR +
-							'>' +
-							serializeSuspenseSeedJson(childSeeds) +
-							'</script>';
+					const childIdStart = ID_COUNTER;
+					const serialStart = SERIAL?.length ?? 0;
+					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+					// Suspense slot/content ranges and makes a suspending child a real stream
+					// boundary. `fallback` remains client-only, so the server pending arm is
+					// intentionally empty.
+					const children = ssrBlock(
+						ssrTry(
+							scope,
+							'jsx-hydrate',
+							(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+							null,
+							null,
+							'html',
+						),
+					);
+					const idCount = ID_COUNTER - childIdStart;
+					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+					const attrs = ssrHydrateAttrs(id, props.when, idCount);
+					const seedSidecar =
+						childSeeds.length === 0
+							? ''
+							: '<script type="application/json" ' +
+								HYDRATE_SEED_ATTR +
+								NONCE_ATTR +
+								'>' +
+								serializeSuspenseSeedJson(childSeeds) +
+								'</script>';
 
-				return '<div' + attrs + '>' + children + seedSidecar + '</div>';
-			}),
-		'html',
-	);
-}
+					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
+				}),
+			'html',
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'Hydrate',
+);
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
@@ -2885,23 +2891,24 @@ export function Hydrate(props: HydrateProps, scope: SSRScope): string {
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
  * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
  */
-export function Suspense(
-	props: { fallback?: unknown; children?: unknown },
-	scope: SSRScope,
-): string {
-	// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
-	// real STREAMING boundary too (registration + template sentinel), with the
-	// identical nested-block byte shape as before for buffered renders. Errors
-	// rethrow to an outer boundary (catchFn = null), matching the old emit.
-	return ssrTry(
-		scope,
-		'jsx-suspense',
-		(_arg, s) => ssrChildrenHtml(props.children, s),
-		(_arg, s) => ssrChild(props.fallback, s),
-		null,
-		FRAME?.namespace ?? 'html',
-	);
-}
+export const Suspense = /* @__PURE__ */ markComponentFlags(
+	function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
+		// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
+		// real STREAMING boundary too (registration + template sentinel), with the
+		// identical nested-block byte shape as before for buffered renders. Errors
+		// rethrow to an outer boundary (catchFn = null), matching the old emit.
+		return ssrTry(
+			scope,
+			'jsx-suspense',
+			(_arg, s) => ssrChildrenHtml(props.children, s),
+			(_arg, s) => ssrChild(props.fallback, s),
+			null,
+			FRAME?.namespace ?? 'html',
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'Suspense',
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // View-transition SSR annotations (docs/view-transitions-plan.md Phase 5) —
@@ -3085,37 +3092,41 @@ function vtSsrStrip(html: string): string {
  * frame, the explicit ssrBlock below is the inner childSlot range), stamped
  * with the Fizz-parity `vt-*` annotations described above.
  */
-export function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
-	VT_SSR_HAS_CANDIDATES = true;
-	const explicit = typeof props.name === 'string';
-	const frame = FRAME;
-	const cand: VtSsrCandidate = {
-		name: explicit
-			? (props.name as string)
-			: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
-		share: vtSsrResolve(props, 'share'),
-		update: vtSsrResolve(props, 'update'),
-		consumed: false,
-	};
-	VT_SSR_STACK.push(cand);
-	const seqBefore = VT_SSR_TRY_SEQ;
-	let inner: string;
-	try {
-		inner = ssrChildrenHtml(props.children, scope);
-	} finally {
-		VT_SSR_STACK.pop();
-	}
-	const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
-	const attrs: Array<[string, string]> = [];
-	if (named) attrs.push(['vt-name', cand.name]);
-	attrs.push(['vt-update', cand.update]);
-	// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
-	// this boundary tops, stripped at emission when unclaimed.
-	attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
-	attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
-	if (named) attrs.push(['vt-share', cand.share]);
-	return ssrBlock(vtSsrAnnotate(inner, attrs));
-}
+export const ViewTransition = /* @__PURE__ */ markComponentFlags(
+	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
+		VT_SSR_HAS_CANDIDATES = true;
+		const explicit = typeof props.name === 'string';
+		const frame = FRAME;
+		const cand: VtSsrCandidate = {
+			name: explicit
+				? (props.name as string)
+				: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+			share: vtSsrResolve(props, 'share'),
+			update: vtSsrResolve(props, 'update'),
+			consumed: false,
+		};
+		VT_SSR_STACK.push(cand);
+		const seqBefore = VT_SSR_TRY_SEQ;
+		let inner: string;
+		try {
+			inner = ssrChildrenHtml(props.children, scope);
+		} finally {
+			VT_SSR_STACK.pop();
+		}
+		const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+		const attrs: Array<[string, string]> = [];
+		if (named) attrs.push(['vt-name', cand.name]);
+		attrs.push(['vt-update', cand.update]);
+		// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
+		// this boundary tops, stripped at emission when unclaimed.
+		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
+		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
+		if (named) attrs.push(['vt-share', cand.share]);
+		return ssrBlock(vtSsrAnnotate(inner, attrs));
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ViewTransition',
+);
 
 /**
  * Server no-op twin of the client `addTransitionType` — transition types only
@@ -3132,27 +3143,31 @@ export function addTransitionType(_type: string): void {}
  * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
  * suspension propagation). `reset` is a server no-op (no re-render).
  */
-export function ErrorBoundary(
-	props: { fallback?: unknown; children?: unknown },
-	scope: SSRScope,
-): string {
-	return ssrBlock(
-		(() => {
-			try {
-				return withAsyncIdentity('error-boundary', 'content', () =>
-					ssrBlock(ssrChildrenHtml(props.children, scope)),
-				);
-			} catch (e) {
-				if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-				const fb =
-					typeof props.fallback === 'function'
-						? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-						: props.fallback;
-				return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
-			}
-		})(),
-	);
-}
+export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
+	function ErrorBoundary(
+		props: { fallback?: unknown; children?: unknown },
+		scope: SSRScope,
+	): string {
+		return ssrBlock(
+			(() => {
+				try {
+					return withAsyncIdentity('error-boundary', 'content', () =>
+						ssrBlock(ssrChildrenHtml(props.children, scope)),
+					);
+				} catch (e) {
+					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+					const fb =
+						typeof props.fallback === 'function'
+							? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+							: props.fallback;
+					return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
+				}
+			})(),
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ErrorBoundary',
+);
 
 // ---------------------------------------------------------------------------
 // Context

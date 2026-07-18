@@ -263,10 +263,12 @@ gated on the M0 pins + the full hydration/e2e/prod-mode suites.
 - **Server** (`ssrComponent(..., inherit)` → `renderComponentFramed`): skips
   the `<!--[-->…<!--]-->` frame wrap (string-tag branch included); the FRAME
   itself is still created — use() path keys and seed order are unchanged.
-- **Boundary builtins** (Suspense / ErrorBoundary / Activity): excluded at
-  compile time by imported name, AND declined at RUNTIME by identity on both
-  sides (componentSlot + ssrComponent check the resolved comp), which is what
-  makes member/aliased/dynamic tags safe to stamp.
+- **Callable boundary builtins** (Suspense / ErrorBoundary / Hydrate /
+  ViewTransition): excluded at compile time by imported name, AND declined at
+  runtime through a shared component capability bit on both sides
+  (componentSlot + ssrComponent read the resolved component), which makes
+  member/aliased/dynamic tags safe to stamp without retaining concrete
+  builtins in the generic path. Activity remains a compiler-lowered sentinel.
 - **Hydration**: inherit sites adopt nothing (resolved before the cursor
   probes — probing would misread the child's own first marker); legacy
   pair-ful server HTML falls into mismatch RECOVERY and re-renders to correct

@@ -165,13 +165,21 @@ for Suspense — is exactly the "content resolves → enter activates" moment.
 
 ## 4. Design
 
-- **Boundary**: `export const ViewTransition` — a runtime builtin identified
-  by function identity, joining `Suspense`/`ErrorBoundary` in the M3
-  inherit-decline check (`runtime.ts:7214`) so its component slot always owns
-  an exact DOM range (needed to enumerate top-level children for name
-  assignment and to scope dirty-tracking). Tier-1 export in `index.ts`
-  (React parity); also alias `unstable_ViewTransition` /
+- **Boundary**: `export const ViewTransition` — a runtime builtin carrying the
+  same boundary capability bit as `Suspense`/`ErrorBoundary` for the M3
+  inherit-decline check, so its component slot always owns an exact DOM range
+  (needed to enumerate top-level children for name assignment and to scope
+  dirty-tracking) without rooting it from the generic component path. Tier-1
+  export in `index.ts` (React parity); also alias `unstable_ViewTransition` /
   `unstable_addTransitionType` so React-experimental imports port unchanged.
+- **Optional runtime capability**: generic scheduling, mutation, passive-effect,
+  teardown, and Suspense-reveal paths call a nullable driver table. Compiler-emitted
+  `__vtSeen` installs the concrete driver at module evaluation for a compiled
+  ViewTransition import; `addTransitionType` and the first direct boundary render
+  install it on their paths. The PURE component initializer keeps this feature
+  edge removable, so the registry, browser adapter, class resolver, and callback
+  machinery disappear from applications that retain none of the ViewTransition
+  APIs.
 - **Dirty tracking**: the reconciler's DOM-op helpers (insert / remove /
   setText / attr / move) mark the nearest enclosing VT boundary via a
   render-walk stack. Fast path: a module-level `VT_MOUNTED_COUNT === 0` guard
@@ -205,7 +213,7 @@ for Suspense — is exactly the "content resolves → enter activates" moment.
 - **Phase 0 — pin the spec.** Scaffold-triage the three DOM test files into
   `tests/conformance/`; land the mock helper; no runtime changes. Output: the
   triaged `it.todo` skeleton IS the refined scope.
-- **Phase 1 — core.** Boundary builtin + identity/inherit-decline + dirty
+- **Phase 1 — core.** Boundary builtin + capability/inherit-decline + dirty
   tracking + enter/exit/update activation on `startTransition` flushes + auto
   names + controller with sync fallback and `flushSync` skip. Flip the Phase-0
   todos covering mount/unmount/content-change callbacks (onEnter/onExit/

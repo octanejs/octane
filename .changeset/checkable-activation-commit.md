@@ -16,3 +16,8 @@ toggle, and re-checking it mid-window would make the browser uncheck the
 activated radio before its follow-up events fire. The rejection contract is
 unchanged: an unheard or rejected toggle still snaps back after the follow-up
 events.
+
+Nested or canceled programmatic activations now close their window at the end
+of their own click dispatch. Checked and radio restoration is also installed as
+an optional runtime capability, so apps without controlled `checked` bindings
+do not retain the radio-group restoration code.

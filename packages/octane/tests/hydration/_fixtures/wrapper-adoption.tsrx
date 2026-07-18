@@ -84,13 +84,21 @@ export function KeyedWrapperList(props: { rows: Row[] }) @{
 	</ul>
 }
 
+// The compiler cannot recognize this local alias as a built-in boundary. The
+// shared runtime capability must still preserve its load-bearing SSR range.
+const Boundary = Suspense;
+
+function AliasedSuspenseBoundary(props: { children?: unknown }) @{
+	<Boundary fallback={<i class="pending">pending</i>}>{props.children}</Boundary>
+}
+
 export function SuspenseWrapperChain() @{
 	<section class="suspense-wrapper-chain">
-		<Suspense fallback={<i class="pending">pending</i>}>
+		<AliasedSuspenseBoundary>
 			<PassThrough>
 				<InteractiveOuter label="ready" className="suspense-button" />
 			</PassThrough>
-		</Suspense>
+		</AliasedSuspenseBoundary>
 	</section>
 }
 

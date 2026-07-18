@@ -40,6 +40,8 @@ export const BENCHMARK_SUITES = [
 	'js-framework',
 	'js-framework-reorder',
 	'todomvc',
+	'weather-app',
+	'weather-app-lighthouse',
 	'chat-stream',
 	'dbmon',
 	'recursive-context',
