@@ -1,0 +1,138 @@
+{
+  "name": "@tanstack/router-plugin",
+  "version": "1.168.22",
+  "description": "Modern and scalable routing for React applications",
+  "author": "Tanner Linsley",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TanStack/router.git",
+    "directory": "packages/router-plugin"
+  },
+  "homepage": "https://tanstack.com/router",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/tannerlinsley"
+  },
+  "keywords": [
+    "react",
+    "location",
+    "router",
+    "routing",
+    "async",
+    "async router",
+    "typescript"
+  ],
+  "type": "module",
+  "types": "dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.cts",
+        "default": "./dist/cjs/index.cjs"
+      }
+    },
+    "./vite": {
+      "import": {
+        "types": "./dist/esm/vite.d.ts",
+        "default": "./dist/esm/vite.js"
+      },
+      "require": {
+        "types": "./dist/cjs/vite.d.cts",
+        "default": "./dist/cjs/vite.cjs"
+      }
+    },
+    "./context": {
+      "import": {
+        "types": "./dist/esm/context.d.ts",
+        "default": "./dist/esm/context.js"
+      },
+      "require": {
+        "types": "./dist/cjs/context.d.cts",
+        "default": "./dist/cjs/context.cjs"
+      }
+    },
+    "./rspack": {
+      "import": {
+        "types": "./dist/esm/rspack.d.ts",
+        "default": "./dist/esm/rspack.js"
+      },
+      "require": {
+        "types": "./dist/cjs/rspack.d.cts",
+        "default": "./dist/cjs/rspack.cjs"
+      }
+    },
+    "./webpack": {
+      "import": {
+        "types": "./dist/esm/webpack.d.ts",
+        "default": "./dist/esm/webpack.js"
+      },
+      "require": {
+        "types": "./dist/cjs/webpack.d.cts",
+        "default": "./dist/cjs/webpack.cjs"
+      }
+    },
+    "./esbuild": {
+      "import": {
+        "types": "./dist/esm/esbuild.d.ts",
+        "default": "./dist/esm/esbuild.js"
+      },
+      "require": {
+        "types": "./dist/cjs/esbuild.d.cts",
+        "default": "./dist/cjs/esbuild.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src",
+    "skills",
+    "bin",
+    "!skills/_artifacts"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "dependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/template": "^7.27.2",
+    "@babel/types": "^7.28.5",
+    "@tanstack/router-core": "1.171.15",
+    "@tanstack/router-generator": "workspace:*",
+    "@tanstack/router-utils": "1.162.2",
+    "chokidar": "^5.0.0",
+    "unplugin": "^3.0.0",
+    "zod": "^4.4.3"
+  },
+  "peerDependencies": {
+    "@rsbuild/core": ">=1.0.2 || ^2.0.0",
+    "vite": ">=5.0.0 || >=6.0.0 || >=7.0.0 || >=8.0.0",
+    "vite-plugin-solid": "^2.11.10 || ^3.0.0-0",
+    "webpack": ">=5.92.0",
+    "@tanstack/react-router": "^1.170.18"
+  },
+  "peerDependenciesMeta": {
+    "@rsbuild/core": {
+      "optional": true
+    },
+    "@tanstack/react-router": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    },
+    "vite-plugin-solid": {
+      "optional": true
+    },
+    "webpack": {
+      "optional": true
+    }
+  },
+  "private": true
+}

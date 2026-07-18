@@ -1,0 +1,1 @@
+{"version":3,"file":"rootPathId.cjs","names":[],"sources":["../../../../src/filesystem/physical/rootPathId.ts"],"sourcesContent":["export const rootPathId = '__root'\n"],"mappings":";AAAA,IAAa,aAAa"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"constants.js","names":[],"sources":["../../../src/start-router-plugin/constants.ts"],"sourcesContent":["export const SERVER_PROP = 'server'\n"],"mappings":";AAAA,IAAa,cAAc"}

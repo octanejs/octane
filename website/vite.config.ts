@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vite';
 import { createRequire } from 'node:module';
 import { octaneMdx } from '@octanejs/mdx/vite';
 import { threeRenderers } from '@octanejs/three/config';
-import { tanstackStart } from '@tanstack/octane-start/plugin/vite';
+import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
 import { nitro } from 'nitro/vite';
 import { websiteMdxOptions } from './mdx-options.ts';
 

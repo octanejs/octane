@@ -1,0 +1,54 @@
+import { default as babel } from '@babel/core';
+import { Config, DeletableNodes, HmrStyle } from '../config.js';
+import { CodeSplitGroupings } from '../constants.js';
+import { SplitNodeMeta } from './types.js';
+import type * as t from '@babel/types';
+export type CompileCodeSplitReferenceRouteOptions = {
+    codeSplitGroupings: CodeSplitGroupings;
+    deleteNodes?: Set<DeletableNodes>;
+    targetFramework: Config['target'];
+    filename: string;
+    id: string;
+    addHmr?: boolean;
+    hmrStyle?: HmrStyle;
+    hmrRouteId?: string;
+    sharedBindings?: Set<string>;
+};
+export type ReferenceRouteCompilerPluginContext = {
+    programPath: babel.NodePath<t.Program>;
+    callExpressionPath: babel.NodePath<t.CallExpression>;
+    insertionPath: babel.NodePath;
+    routeOptions: t.ObjectExpression;
+    createRouteFn: string;
+    opts: CompileCodeSplitReferenceRouteOptions;
+};
+export type ReferenceRouteSplitPropertyCompilerPluginContext = {
+    programPath: babel.NodePath<t.Program>;
+    callExpressionPath: babel.NodePath<t.CallExpression>;
+    insertionPath: babel.NodePath;
+    routeOptions: t.ObjectExpression;
+    prop: t.ObjectProperty;
+    splitNodeMeta: SplitNodeMeta;
+    lazyRouteComponentIdent: string;
+    opts: CompileCodeSplitReferenceRouteOptions;
+};
+export type ReferenceRouteCompilerPluginResult = {
+    modified?: boolean;
+};
+export type ReferenceRouteCompilerPlugin = {
+    name: string;
+    getStableRouteOptionKeys?: () => Array<string>;
+    onRouteOptions?: (ctx: ReferenceRouteCompilerPluginContext) => void | ReferenceRouteCompilerPluginResult;
+    onAddHmr?: (ctx: ReferenceRouteCompilerPluginContext) => void | ReferenceRouteCompilerPluginResult;
+    onUnsplittableRoute?: (ctx: ReferenceRouteCompilerPluginContext) => void | ReferenceRouteCompilerPluginResult;
+    onSplitRouteProperty?: (ctx: ReferenceRouteSplitPropertyCompilerPluginContext) => void | t.Expression;
+};
+export type VirtualRouteCompilerPluginContext = {
+    programPath: babel.NodePath<t.Program>;
+    splitNodeMeta: SplitNodeMeta;
+    localExporterIdent: string;
+};
+export type VirtualRouteCompilerPlugin = {
+    name: string;
+    onExportSplitRouteProperty?: (ctx: VirtualRouteCompilerPluginContext) => void | t.Identifier;
+};
