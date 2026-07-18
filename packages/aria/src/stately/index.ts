@@ -43,3 +43,72 @@ export {
 	mergeValidation,
 } from './form/useFormValidationState';
 export type { FormValidationState } from './form/useFormValidationState';
+
+// selection — mirrors the @react-stately/selection shim surface.
+export { useMultipleSelectionState } from './selection/useMultipleSelectionState';
+export { SelectionManager } from './selection/SelectionManager';
+export { Selection } from './selection/Selection';
+export type { MultipleSelectionStateProps } from './selection/useMultipleSelectionState';
+export type {
+	FocusState,
+	SingleSelectionState,
+	MultipleSelectionState,
+	MultipleSelectionManager,
+} from './selection/types';
+
+// collections — mirrors the @react-stately/collections shim surface.
+export { Item } from './collections/Item';
+export { Section } from './collections/Section';
+export { CollectionBuilder } from './collections/CollectionBuilder';
+export { useCollection } from './collections/useCollection';
+export { getItemCount } from './collections/getItemCount';
+export {
+	getChildNodes,
+	getFirstItem,
+	getLastItem,
+	getNthItem,
+	compareNodeOrder,
+} from './collections/getChildNodes';
+export type { PartialNode } from './collections/types';
+
+// list
+export { useListState, UNSTABLE_useFilteredListState } from './list/useListState';
+export { useSingleSelectListState } from './list/useSingleSelectListState';
+export { ListCollection } from './list/ListCollection';
+export type { ListProps, ListState } from './list/useListState';
+export type { SingleSelectListProps, SingleSelectListState } from './list/useSingleSelectListState';
+
+// tree
+export { useTreeState } from './tree/useTreeState';
+export { TreeCollection } from './tree/TreeCollection';
+export type { TreeProps, TreeState } from './tree/useTreeState';
+
+// menu
+export { useMenuTriggerState } from './menu/useMenuTriggerState';
+export { useSubmenuTriggerState } from './menu/useSubmenuTriggerState';
+export type { MenuTriggerState } from './menu/useMenuTriggerState';
+export type { SubmenuTriggerState } from './menu/useSubmenuTriggerState';
+
+// overlays
+export { useOverlayTriggerState } from './overlays/useOverlayTriggerState';
+export type { OverlayTriggerProps, OverlayTriggerState } from './overlays/useOverlayTriggerState';
+
+// select
+export { useSelectState } from './select/useSelectState';
+export type { SelectState, SelectStateOptions } from './select/useSelectState';
+
+// combobox
+export { useComboBoxState } from './combobox/useComboBoxState';
+export type { ComboBoxState, ComboBoxStateOptions } from './combobox/useComboBoxState';
+
+// tabs
+export { useTabListState } from './tabs/useTabListState';
+export type { TabListProps, TabListState, TabListStateOptions } from './tabs/useTabListState';
+
+// numberfield
+export { useNumberFieldState } from './numberfield/useNumberFieldState';
+export type { NumberFieldState, NumberFieldStateOptions } from './numberfield/useNumberFieldState';
+
+// slider
+export { useSliderState } from './slider/useSliderState';
+export type { SliderState, SliderStateOptions } from './slider/useSliderState';

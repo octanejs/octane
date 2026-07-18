@@ -151,3 +151,102 @@ export type {
 } from './textfield/useTextField';
 export type { AriaToolbarProps, ToolbarAria } from './toolbar/useToolbar';
 export type { VisuallyHiddenAria, VisuallyHiddenProps } from './visually-hidden/VisuallyHidden';
+
+// listbox — mirrors the @react-aria/listbox shim surface.
+export { useListBox } from './listbox/useListBox';
+export { useOption } from './listbox/useOption';
+export { useListBoxSection } from './listbox/useListBoxSection';
+export { listData, getItemId } from './listbox/utils';
+
+// menu — mirrors the @react-aria/menu shim surface.
+export { useMenu } from './menu/useMenu';
+export { useMenuItem } from './menu/useMenuItem';
+export { useMenuSection } from './menu/useMenuSection';
+export { useMenuTrigger } from './menu/useMenuTrigger';
+export { useSubmenuTrigger } from './menu/useSubmenuTrigger';
+
+// tabs — mirrors the @react-aria/tabs shim surface.
+export { useTab } from './tabs/useTab';
+export { useTabList } from './tabs/useTabList';
+export { useTabPanel } from './tabs/useTabPanel';
+
+// slider — mirrors the @react-aria/slider shim surface.
+export { useSlider } from './slider/useSlider';
+export { useSliderThumb } from './slider/useSliderThumb';
+
+// numberfield — mirrors the @react-aria/numberfield shim surface.
+export { useNumberField } from './numberfield/useNumberField';
+
+// gridlist — mirrors the @react-aria/gridlist shim surface.
+export { useGridList } from './gridlist/useGridList';
+export { useGridListItem } from './gridlist/useGridListItem';
+export { useGridListSelectionCheckbox } from './gridlist/useGridListSelectionCheckbox';
+export { useGridListSection } from './gridlist/useGridListSection';
+
+// tag — mirrors the @react-aria/tag shim surface.
+export { useTag } from './tag/useTag';
+export { useTagGroup } from './tag/useTagGroup';
+
+// breadcrumbs — mirrors the @react-aria/breadcrumbs shim surface.
+export { useBreadcrumbItem } from './breadcrumbs/useBreadcrumbItem';
+export { useBreadcrumbs } from './breadcrumbs/useBreadcrumbs';
+
+// listbox/menu/tabs/slider/numberfield/gridlist/tag/breadcrumbs types.
+export type {
+	ListBoxProps,
+	AriaListBoxPropsBase,
+	AriaListBoxProps,
+	AriaListBoxOptions,
+	ListBoxAria,
+} from './listbox/useListBox';
+export type { AriaOptionProps, OptionAria } from './listbox/useOption';
+export type { AriaListBoxSectionProps, ListBoxSectionAria } from './listbox/useListBoxSection';
+export type { AriaMenuTriggerProps, MenuTriggerAria } from './menu/useMenuTrigger';
+export type { MenuProps, AriaMenuProps, AriaMenuOptions, MenuAria } from './menu/useMenu';
+export type { AriaMenuItemProps, MenuItemAria } from './menu/useMenuItem';
+export type { AriaMenuSectionProps, MenuSectionAria } from './menu/useMenuSection';
+export type { AriaSubmenuTriggerProps, SubmenuTriggerAria } from './menu/useSubmenuTrigger';
+export type { AriaTabProps, TabAria } from './tabs/useTab';
+export type { AriaTabPanelProps, TabPanelAria } from './tabs/useTabPanel';
+export type { AriaTabListProps, AriaTabListOptions, TabListAria } from './tabs/useTabList';
+export type { AriaSliderProps, SliderAria } from './slider/useSlider';
+export type {
+	SliderThumbProps,
+	AriaSliderThumbProps,
+	AriaSliderThumbOptions,
+	SliderThumbAria,
+} from './slider/useSliderThumb';
+export type { AriaNumberFieldProps, NumberFieldAria } from './numberfield/useNumberField';
+export type {
+	AriaGridListOptions,
+	AriaGridListProps,
+	GridListAria,
+	GridListProps,
+} from './gridlist/useGridList';
+export type { AriaGridListItemOptions, GridListItemAria } from './gridlist/useGridListItem';
+export type { AriaGridListSectionProps, GridListSectionAria } from './gridlist/useGridListSection';
+export type {
+	AriaGridSelectionCheckboxProps,
+	GridSelectionCheckboxAria,
+} from './grid/useGridSelectionCheckbox';
+export type { AriaTagProps, TagAria } from './tag/useTag';
+export type { TagGroupAria, AriaTagGroupProps, AriaTagGroupOptions } from './tag/useTagGroup';
+export type {
+	BreadcrumbItemProps,
+	AriaBreadcrumbItemProps,
+	BreadcrumbItemAria,
+} from './breadcrumbs/useBreadcrumbItem';
+export type { AriaBreadcrumbsProps, BreadcrumbsAria } from './breadcrumbs/useBreadcrumbs';
+export type { Orientation } from '@react-types/shared';
+
+// selection — mirrors the @react-aria/selection shim surface.
+export { useSelectableCollection } from './selection/useSelectableCollection';
+export { useSelectableItem } from './selection/useSelectableItem';
+export { useSelectableList } from './selection/useSelectableList';
+export { useTypeSelect } from './selection/useTypeSelect';
+export { ListKeyboardDelegate } from './selection/ListKeyboardDelegate';
+export { DOMLayoutDelegate } from './selection/DOMLayoutDelegate';
+export type { AriaSelectableCollectionOptions } from './selection/useSelectableCollection';
+export type { SelectableItemAria, SelectableItemOptions } from './selection/useSelectableItem';
+export type { AriaSelectableListOptions } from './selection/useSelectableList';
+export type { AriaTypeSelectOptions, TypeSelectAria } from './selection/useTypeSelect';
