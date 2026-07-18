@@ -5837,10 +5837,47 @@ interface StreamSink {
 	fatal(err: unknown): void;
 }
 
+/**
+ * A live source of externally-produced HTML (typically framework data
+ * `<script>` tags materializing as loaders settle) merged natively into a
+ * streamed render. Octane emits injected HTML verbatim, in push order, each
+ * drain as its own transport chunk strictly BETWEEN renderer chunks — never
+ * before the shell, and (for document renders) before the held
+ * `</body></html>` tail. The stream stays open until `done` settles.
+ *
+ * This is an Octane extension (React's Fizz owns its data injection
+ * internally); it exists so frameworks like TanStack Start can merge their
+ * data stream without re-parsing the HTML byte stream for safe insertion
+ * points — every boundary between renderer chunks is tag-complete by
+ * construction.
+ */
+export interface StreamInjectionSource {
+	/**
+	 * Pull all queued HTML (concatenated, verbatim). Called at emission
+	 * boundaries and after `subscribe` notifications; return '' when empty.
+	 */
+	take(): string;
+	/**
+	 * The source notifies when new HTML is queued; the renderer then drains
+	 * promptly — even while the render itself is idle awaiting `done`.
+	 * Returns an unsubscribe function; the renderer unsubscribes on
+	 * completion, abort, and failure.
+	 */
+	subscribe(notify: () => void): () => void;
+	/**
+	 * The renderer holds the document tail and the stream close until this
+	 * settles. A rejection fails the stream through the fatal path (after the
+	 * shell, mirroring abort: degraded terminal completion).
+	 */
+	done: Promise<void>;
+}
+
 export interface StreamOptions extends RenderOptions {
 	onShellReady?: () => void;
 	onShellError?: (err: unknown) => void;
 	onAllReady?: () => void;
+	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */
+	injection?: StreamInjectionSource;
 }
 
 function withStream<T>(stream: StreamState | null, fn: () => T): T {
@@ -5851,6 +5888,18 @@ function withStream<T>(stream: StreamState | null, fn: () => T): T {
 	} finally {
 		STREAM = prev;
 	}
+}
+
+// For document renders under external injection, the closing `</body></html>`
+// is split out of the shell and held until both the render and the injection
+// source finish. De-opt block markers interleave with the closing tags
+// (`</body><!--]--></html><!--]-->`), so a true document suffix is `</body>`
+// followed by nothing but comments/whitespace and one `</html>`.
+const DOCUMENT_TAIL_RE = /^<\/body>(?:\s|<!--[^]*?-->)*<\/html>(?:\s|<!--[^]*?-->)*$/;
+function documentTailStart(body: string): number {
+	const index = body.lastIndexOf('</body>');
+	if (index === -1) return -1;
+	return DOCUMENT_TAIL_RE.test(body.slice(index)) ? index : -1;
 }
 
 function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
@@ -5947,6 +5996,77 @@ async function runStream(
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
 		}
 	};
+	// ── External injection (cold path: every hook below no-ops when absent) ──
+	const injection = options?.injection;
+	// Early fatal paths can return before `done` is awaited; observe it up
+	// front so a later rejection never surfaces as an unhandled rejection.
+	if (injection !== undefined) injection.done.then(NOOP, NOOP);
+	let injectionUnsubscribe: (() => void) | undefined;
+	let injectionFailure: unknown;
+	let injectionFailed = false;
+	let signalInjectionFailure: (() => void) | undefined;
+	const failInjection = (err: unknown): void => {
+		if (injectionFailed) return;
+		injectionFailed = true;
+		injectionFailure = err;
+		signalInjectionFailure?.();
+	};
+	// Injection drains interleave with render writes from OUTSIDE the wave
+	// loop (subscribe notifications can fire while the loop awaits a wave or
+	// the done promise). A single promise chain gives all writes a total
+	// order while each write still surfaces its own backpressure/failure to
+	// its caller. Without injection, writes go to the sink directly — the
+	// established path, no chain, no extra microtasks.
+	let writeChain: Promise<void> | null = injection === undefined ? null : Promise.resolve();
+	const write: (chunk: string, terminal?: boolean) => void | Promise<void> =
+		injection === undefined
+			? (chunk, terminal) => sink.write(chunk, terminal)
+			: (chunk, terminal) => {
+					const operation = writeChain!.then(() => sink.write(chunk, terminal));
+					writeChain = operation.then(NOOP, NOOP);
+					return operation;
+				};
+	const drainInjection = (): void | Promise<void> => {
+		if (injection === undefined || injectionFailed) return;
+		let html: string;
+		try {
+			html = injection.take();
+		} catch (err) {
+			failInjection(err);
+			return;
+		}
+		if (!html) return;
+		return write(html);
+	};
+	const notifyInjection = (): void => {
+		const drained = drainInjection();
+		// A transport failure here is re-observed by the next awaited render
+		// write (or the completion wait); the notify path only must not
+		// produce an unhandled rejection.
+		if (drained !== undefined) drained.catch(NOOP);
+	};
+	/** Resolves when `done` settles; rejects on abort, take() failure, or done rejection. */
+	const waitForInjectionDone = (): Promise<void> =>
+		new Promise<void>((resolve, reject) => {
+			let settled = false;
+			const finish = (fn: () => void): void => {
+				if (settled) return;
+				settled = true;
+				signal?.removeEventListener('abort', onAbort);
+				signalInjectionFailure = undefined;
+				fn();
+			};
+			const onAbort = (): void => finish(() => reject(signal!.reason));
+			signalInjectionFailure = () => finish(() => reject(injectionFailure));
+			if (injectionFailed) return finish(() => reject(injectionFailure));
+			if (signal?.aborted) return onAbort();
+			signal?.addEventListener('abort', onAbort, { once: true });
+			injection!.done.then(
+				() => finish(resolve),
+				(err) => finish(() => reject(err)),
+			);
+		});
+
 	const emittedCss = new Set<string>();
 	const flushedSegments = new Set<string>();
 	const observedDone = new Set<string>();
@@ -5994,15 +6114,15 @@ async function runStream(
 		if (errors.length === 0) return;
 		let chunk = '';
 		for (const boundary of errors) chunk += boundaryErrorChunk(boundary, nonceAttr);
-		const write = sink.write(chunk);
+		const errorWrite = write(chunk);
 		const markFlushed = (): void => {
 			for (const boundary of errors) boundary.errorFlushed = true;
 		};
-		if (write === undefined) {
+		if (errorWrite === undefined) {
 			markFlushed();
 			return;
 		}
-		return write.then(markFlushed);
+		return errorWrite.then(markFlushed);
 	};
 
 	let pass: FullPassResult;
@@ -6058,13 +6178,30 @@ async function runStream(
 			escapeEntireInlineStyleContent(sheet) +
 			'</style>';
 	}
-	shell += pass.head + pass.body;
+	// Under external injection a document's closing tail is split out of the
+	// shell and written LAST — injected chunks and streamed segments then land
+	// inside <body> before it (streamed segments otherwise trail `</html>`,
+	// which browsers reparent but external merge layers must not re-parse
+	// around). The tail carries only closing tags + block markers, so it needs
+	// no vt stripping. Without injection the shell shape is unchanged.
+	let heldDocumentTail = '';
+	if (injection !== undefined) {
+		const tailStart = documentTailStart(pass.body);
+		if (tailStart !== -1) {
+			heldDocumentTail = pass.body.slice(tailStart);
+			shell += pass.head + pass.body.slice(0, tailStart);
+		} else {
+			shell += pass.head + pass.body;
+		}
+	} else {
+		shell += pass.head + pass.body;
+	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
 		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
 	try {
-		const shellWrite = sink.write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
+		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		options?.onError?.(err);
@@ -6072,6 +6209,17 @@ async function runStream(
 		return;
 	}
 	sink.shellReady();
+	if (injection !== undefined) {
+		// Subscribe only once the shell is on the wire: injected HTML must never
+		// precede it. HTML queued before this point is picked up by the initial
+		// drain below.
+		try {
+			injectionUnsubscribe = injection.subscribe(notifyInjection);
+		} catch (err) {
+			failInjection(err);
+		}
+		notifyInjection();
+	}
 
 	let suspended = pass.suspended;
 	// `attempt` counts CONSECUTIVE passes that completed no boundary. One pass
@@ -6091,7 +6239,7 @@ async function runStream(
 		if (initiallyDone.length > 0) {
 			let chunk = '';
 			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
-			const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 			if (segmentWrite !== undefined) await segmentWrite;
 			for (const boundary of initiallyDone) {
 				flushedSegments.add(boundary.id);
@@ -6149,7 +6297,7 @@ async function runStream(
 			const done = reachableDoneSegments();
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.
@@ -6172,16 +6320,55 @@ async function runStream(
 		for (const b of stream.boundaries.values()) {
 			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
 		}
+		// Best-effort well-formedness under injection: the held document tail
+		// still closes <body>/<html> after the degraded-boundary markers.
+		if (heldDocumentTail !== '') tail += heldDocumentTail;
 		if (tail !== '') {
 			try {
-				const terminalWrite = sink.write(tail, true);
+				const terminalWrite = write(tail, true);
 				if (terminalWrite !== undefined) await terminalWrite;
 			} catch {
 				// The transport is already gone; there is nowhere to send recovery.
 			}
 		}
+		injectionUnsubscribe?.();
 		sink.fatal(err);
 		return;
+	}
+	if (injection !== undefined) {
+		// Rendering is complete but the injection source may still be producing
+		// (subscribe notifications keep draining through the write chain while
+		// we wait). The stream — and a document's held tail — close only once
+		// `done` settles; abort and source failures route through the same
+		// degraded terminal path as a mid-render abort.
+		try {
+			await waitForInjectionDone();
+			const finalDrain = drainInjection();
+			if (finalDrain !== undefined) await finalDrain;
+			if (injectionFailed) throw injectionFailure;
+			if (heldDocumentTail !== '') {
+				// Cleared before awaiting: a post-acceptance rejection (abort racing
+				// the drain wait) must not resend the tail through the catch below.
+				const tailChunk = heldDocumentTail;
+				heldDocumentTail = '';
+				const tailWrite = write(tailChunk);
+				if (tailWrite !== undefined) await tailWrite;
+			}
+		} catch (err) {
+			options?.onError?.(err);
+			if (heldDocumentTail !== '') {
+				try {
+					const terminalWrite = write(heldDocumentTail, true);
+					if (terminalWrite !== undefined) await terminalWrite;
+				} catch {
+					// The transport is already gone; there is nowhere to send the tail.
+				}
+			}
+			injectionUnsubscribe?.();
+			sink.fatal(err);
+			return;
+		}
+		injectionUnsubscribe?.();
 	}
 	sink.allReady();
 }
