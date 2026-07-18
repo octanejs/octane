@@ -139,6 +139,8 @@ export {
 	markDangerouslySetInnerHTMLChildren,
 	setAttribute,
 	setStringData,
+	setBooleanAttribute,
+	setAriaAttribute,
 	setClassName,
 	setClassAttr,
 	normalizeClass,
