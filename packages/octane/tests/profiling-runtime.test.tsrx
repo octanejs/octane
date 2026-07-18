@@ -383,3 +383,97 @@ describe('profile build component boundaries', () => {
 		target.remove();
 	});
 });
+
+describe('profile build inspection channel', () => {
+	it('streams recorded events to subscribers inside derived commit batches', async () => {
+		const log: string[] = [];
+		const unsubscribe = profiler.subscribe({
+			event: (event) => log.push(`${event.type}:${event.component}:${event.phase}`),
+			commitStart: () => log.push('commit-start'),
+			commitFinish: () => log.push('commit-finish'),
+		});
+		const mounted = mount(CounterApp);
+		// The commit markers are microtask-derived: yield once so the mount
+		// burst's closing microtask runs before the click opens the next burst.
+		await act(() => {});
+		await act(() => mounted.click('button'));
+		unsubscribe();
+
+		// Two synchronous bursts (mount, then the click's update flush), each
+		// bracketed by one derived commit pair, events strictly inside.
+		expect(log[0]).toBe('commit-start');
+		expect(log.at(-1)).toBe('commit-finish');
+		expect(log.filter((entry) => entry === 'commit-start')).toHaveLength(2);
+		expect(log.filter((entry) => entry === 'commit-finish')).toHaveLength(2);
+		const firstFinish = log.indexOf('commit-finish');
+		const mountEvent = log.indexOf('component-render:CounterApp:mount');
+		const updateEvent = log.indexOf('component-render:CounterApp:update');
+		expect(mountEvent).toBeGreaterThan(0);
+		expect(mountEvent).toBeLessThan(firstFinish);
+		expect(updateEvent).toBeGreaterThan(log.indexOf('commit-start', firstFinish));
+		expect(updateEvent).toBeLessThan(log.lastIndexOf('commit-finish'));
+
+		mounted.unmount();
+	});
+
+	it('isolates throwing subscribers and stops delivery after unsubscribe', async () => {
+		let delivered = 0;
+		const detachThrowing = profiler.subscribe({
+			event() {
+				throw new Error('devtools bug');
+			},
+		});
+		const detachCounting = profiler.subscribe({ event: () => delivered++ });
+
+		// The throwing subscriber must not affect application rendering.
+		const mounted = mount(CounterApp);
+		await act(() => mounted.click('button'));
+		expect(mounted.container.querySelector('span')?.textContent).toBe('1');
+		expect(delivered).toBeGreaterThan(0);
+
+		const deliveredBeforeDetach = delivered;
+		detachCounting();
+		detachThrowing();
+		await act(() => mounted.click('button'));
+		expect(mounted.container.querySelector('span')?.textContent).toBe('2');
+		expect(delivered).toBe(deliveredBeforeDetach);
+
+		mounted.unmount();
+	});
+
+	it('resolves a profiled instance to elements covering its rendered DOM', async () => {
+		const mounted = mount(CounterApp);
+		await act(() => mounted.click('button'));
+
+		const appNodes = profiler.domNodes(render('CounterApp', 'mount').instanceId);
+		const button = mounted.container.querySelector('button')!;
+		expect(appNodes.length).toBeGreaterThan(0);
+		expect(appNodes.some((element) => element.contains(button))).toBe(true);
+
+		const leafSpan = mounted.container.querySelector('span')!;
+		const leafNodes = profiler.domNodes(render('CounterLeaf', 'mount').instanceId);
+		expect(leafNodes.length).toBeGreaterThan(0);
+		expect(leafNodes.some((element) => element === leafSpan || element.contains(leafSpan))).toBe(
+			true,
+		);
+
+		mounted.unmount();
+	});
+
+	it('resolves nothing for an unmounted root, a cleared profiler, or an unknown id', () => {
+		const mounted = mount(CounterApp);
+		const instanceId = render('CounterApp', 'mount').instanceId;
+		expect(profiler.domNodes(instanceId).length).toBeGreaterThan(0);
+		expect(profiler.domNodes(987654321)).toEqual([]);
+
+		mounted.unmount();
+		expect(profiler.domNodes(instanceId)).toEqual([]);
+
+		const remounted = mount(CounterApp);
+		// The buffer still holds the first mount, so read the latest event.
+		const remountedId = renders('CounterApp').at(-1)!.instanceId;
+		profiler.clear();
+		expect(profiler.domNodes(remountedId)).toEqual([]);
+		remounted.unmount();
+	});
+});

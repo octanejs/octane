@@ -47,6 +47,7 @@ import {
 	__profileComponentSource,
 	__profileEndRender,
 	__profileHasComponentMetadata,
+	__profileInstallNodeResolver,
 	__profileResolveHook,
 	__profileSchedule,
 	__profileTrackComponent,
@@ -1184,6 +1185,30 @@ function vtRangeElements(block: Block): Element[] {
 	}
 	return els;
 }
+
+/**
+ * Profiling ABI: the top-level elements currently rendered by a profiled
+ * subject, serving `profiler.domNodes()` (docs/octane-scan-port-plan.md). A
+ * full component profiles its Block; a lite component profiles its Scope,
+ * whose `block` is either the real enclosing Block or a LiteBlockImpl
+ * host/anchor context. LiteBlockImpl carries no start marker, so a lite
+ * component resolves through the whole-container regime — a deliberate
+ * over-approximation (the host element's children) rather than a guess at
+ * range boundaries the runtime does not track for lite scopes.
+ */
+function profileSubjectElements(subject: object): Element[] {
+	const block: Block | undefined =
+		'parentNode' in subject ? (subject as Block) : (subject as Scope).block;
+	if (block == null || block.disposed === true) return [];
+	if (block.deoptNode != null && block.deoptNode.nodeType === 1)
+		return [block.deoptNode as Element];
+	if (block.startMarker != null && block.endMarker != null) return vtRangeElements(block);
+	const container = block.parentNode as Element | undefined;
+	if (container == null || container.children === undefined) return [];
+	return Array.from(container.children);
+}
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	__profileInstallNodeResolver(profileSubjectElements);
 
 /**
  * Resolve a class-prop value for one activation kind against the batch's
