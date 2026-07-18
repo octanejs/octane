@@ -5870,6 +5870,14 @@ export interface StreamInjectionSource {
 	 * shell, mirroring abort: degraded terminal completion).
 	 */
 	done: Promise<void>;
+	/**
+	 * Called exactly once when the renderer has finished producing markup —
+	 * after the last boundary segment on success, or on the abort/error path
+	 * before degraded terminal output. Sources that finalize asynchronously
+	 * (e.g. a serialization stream that must flush its remainder) key that
+	 * work here and settle `done` when it completes.
+	 */
+	renderComplete?(): void;
 }
 
 export interface StreamOptions extends RenderOptions {
@@ -5900,6 +5908,32 @@ function documentTailStart(body: string): number {
 	const index = body.lastIndexOf('</body>');
 	if (index === -1) return -1;
 	return DOCUMENT_TAIL_RE.test(body.slice(index)) ? index : -1;
+}
+
+// Locate the insertion point just inside a document's opening <head> tag —
+// where renderer-owned leading styles and hoisted head elements belong in
+// document mode. Quote-aware so an attribute value containing '>' cannot
+// truncate the tag.
+function documentHeadInsertionPoint(body: string): number {
+	let searchFrom = 0;
+	for (;;) {
+		const start = body.indexOf('<head', searchFrom);
+		if (start === -1) return -1;
+		const next = body.charCodeAt(start + 5);
+		if (next === 62 /* > */) return start + 6;
+		if (next === 32 || next === 9 || next === 10 || next === 13) {
+			let quote = 0;
+			for (let i = start + 6; i < body.length; i++) {
+				const code = body.charCodeAt(i);
+				if (quote !== 0) {
+					if (code === quote) quote = 0;
+				} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
+				else if (code === 62 /* > */) return i + 1;
+			}
+			return -1;
+		}
+		searchFrom = start + 5;
+	}
 }
 
 function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
@@ -6166,10 +6200,10 @@ async function runStream(
 	reportRecoverableBoundaryErrors();
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
-	let shell = '';
+	let leadingStyles = '';
 	for (const [hash, sheet] of pass.cssEntries) {
 		emittedCss.add(hash);
-		shell +=
+		leadingStyles +=
 			'<style data-octane="' +
 			hash +
 			'"' +
@@ -6178,23 +6212,36 @@ async function runStream(
 			escapeEntireInlineStyleContent(sheet) +
 			'</style>';
 	}
-	// Under external injection a document's closing tail is split out of the
-	// shell and written LAST — injected chunks and streamed segments then land
-	// inside <body> before it (streamed segments otherwise trail `</html>`,
-	// which browsers reparent but external merge layers must not re-parse
-	// around). The tail carries only closing tags + block markers, so it needs
-	// no vt stripping. Without injection the shell shape is unchanged.
+	// DOCUMENT MODE (external injection + the shell renders a document): the
+	// closing tail is split out of the shell and written LAST — injected chunks
+	// and streamed segments then land inside <body> before it (streamed
+	// segments otherwise trail `</html>`, which browsers reparent but external
+	// merge layers must not re-parse around); `<!DOCTYPE html>` leads the
+	// response; and renderer-owned leading styles + hoisted head elements move
+	// inside the authored <head> instead of preceding `<html>`. The tail
+	// carries only closing tags + block markers, so it needs no vt stripping.
+	// Without injection the shell shape is unchanged.
+	let shell = '';
 	let heldDocumentTail = '';
 	if (injection !== undefined) {
 		const tailStart = documentTailStart(pass.body);
 		if (tailStart !== -1) {
 			heldDocumentTail = pass.body.slice(tailStart);
-			shell += pass.head + pass.body.slice(0, tailStart);
+			const bodyHtml = pass.body.slice(0, tailStart);
+			const headInsert = documentHeadInsertionPoint(bodyHtml);
+			shell =
+				headInsert !== -1
+					? '<!DOCTYPE html>' +
+						bodyHtml.slice(0, headInsert) +
+						leadingStyles +
+						pass.head +
+						bodyHtml.slice(headInsert)
+					: '<!DOCTYPE html>' + leadingStyles + pass.head + bodyHtml;
 		} else {
-			shell += pass.head + pass.body;
+			shell = leadingStyles + pass.head + pass.body;
 		}
 	} else {
-		shell += pass.head + pass.body;
+		shell = leadingStyles + pass.head + pass.body;
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
@@ -6316,6 +6363,16 @@ async function runStream(
 		).length;
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
+		// Rendering ends here, degraded — the source still gets its completion
+		// signal so upstream finalization (serialization flush, timers) is not
+		// stranded waiting on a render that will never finish.
+		if (injection !== undefined) {
+			try {
+				injection.renderComplete?.();
+			} catch {
+				// The stream is already failing; the source's error cannot improve it.
+			}
+		}
 		let tail = '';
 		for (const b of stream.boundaries.values()) {
 			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
@@ -6341,6 +6398,11 @@ async function runStream(
 		// we wait). The stream — and a document's held tail — close only once
 		// `done` settles; abort and source failures route through the same
 		// degraded terminal path as a mid-render abort.
+		try {
+			injection.renderComplete?.();
+		} catch (err) {
+			failInjection(err);
+		}
 		try {
 			await waitForInjectionDone();
 			const finalDrain = drainInjection();

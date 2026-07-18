@@ -19,11 +19,22 @@ const WORKSPACE_SOURCE_EXCLUDES = [
 	'@tanstack/start-fn-stubs',
 ];
 
+// The vendored octane-router is raw source (vite's scanner cannot parse
+// .tsrx), so its registry-dep subpath imports surface only at request time.
+// Any of them discovered AFTER the initial optimize pass triggers vite's
+// "optimized dependencies changed" full page reload mid-session — under a
+// hydrating page that reload races hydration. Pre-declare every registry
+// subpath the octane-router client surface reaches.
+const WORKSPACE_SOURCE_INCLUDES = [
+	'@tanstack/octane-router > @tanstack/router-core/isServer',
+	'@tanstack/octane-router > @tanstack/router-core/scroll-restoration-script',
+];
+
 export function tanstackStart(options) {
 	return [
 		vendoredTanstackStart(options),
 		{
-			name: 'octanejs-tanstack-start:workspace-source-excludes',
+			name: 'octanejs-tanstack-start:workspace-source-deps',
 			configEnvironment(environmentName, environmentOptions) {
 				// Mirror the vendored plugin's own exclude condition: the client
 				// environment always optimizes; the server environment only when
@@ -31,7 +42,14 @@ export function tanstackStart(options) {
 				const applies =
 					environmentName === 'client' ||
 					(environmentName === 'ssr' && environmentOptions.optimizeDeps?.noDiscovery === false);
-				return applies ? { optimizeDeps: { exclude: WORKSPACE_SOURCE_EXCLUDES } } : undefined;
+				return applies
+					? {
+							optimizeDeps: {
+								exclude: WORKSPACE_SOURCE_EXCLUDES,
+								include: WORKSPACE_SOURCE_INCLUDES,
+							},
+						}
+					: undefined;
 			},
 		},
 	];

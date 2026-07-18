@@ -30,6 +30,7 @@ interface TestInjection {
 	fail(reason: unknown): void;
 	readonly subscribed: boolean;
 	readonly unsubscribed: boolean;
+	readonly renderCompleteCalls: number;
 }
 
 function createTestInjection(): TestInjection {
@@ -37,6 +38,7 @@ function createTestInjection(): TestInjection {
 	let notify: (() => void) | null = null;
 	let subscribed = false;
 	let unsubscribed = false;
+	let renderCompleteCalls = 0;
 	const done = deferred<void>();
 	// The renderer must observe `done` rejections itself; a consumer-side guard
 	// here keeps a failed test from dying on an unrelated unhandled rejection.
@@ -53,6 +55,9 @@ function createTestInjection(): TestInjection {
 				};
 			},
 			done: done.promise,
+			renderComplete() {
+				renderCompleteCalls += 1;
+			},
 		},
 		push(html) {
 			queue.push(html);
@@ -65,6 +70,9 @@ function createTestInjection(): TestInjection {
 		},
 		get unsubscribed() {
 			return unsubscribed;
+		},
+		get renderCompleteCalls() {
+			return renderCompleteCalls;
 		},
 	};
 }
@@ -152,6 +160,11 @@ describe('streaming injection — fragment renders', () => {
 		await flushMicrotasks();
 		expect(collector.chunks).toContain(late);
 		expect(ended).toBe(false);
+
+		// The renderer told the source rendering finished (exactly once) while
+		// the stream was still open — that signal is what lets a source finalize
+		// and eventually settle `done`.
+		expect(injection.renderCompleteCalls).toBe(1);
 
 		injection.finish();
 		await collector.ended;
@@ -243,10 +256,62 @@ describe('streaming injection — document renders', () => {
 		const { chunks } = await collectPipeableStream(server.DocumentApp, {
 			promise: value.promise,
 		});
-		// Without injection the shell still contains the closing tags — the
-		// pre-feature stream shape is preserved exactly.
+		// Without injection the shell still contains the closing tags and no
+		// document-mode additions — the pre-feature stream shape is preserved.
 		expect(chunks[0]).toContain('</body>');
 		expect(chunks[0]).toContain('</html>');
+		expect(chunks[0]).not.toContain('<!DOCTYPE html>');
+	});
+
+	it('leads the document with <!DOCTYPE html> under injection', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		value.resolve('streamed');
+		injection.finish();
+
+		const { html, chunks } = await collectPipeableStream(
+			server.DocumentApp,
+			{ promise: value.promise },
+			{ injection: injection.source },
+		);
+		// The doctype is the very first bytes of the response — a misplaced
+		// doctype (or none) drops browsers into quirks mode.
+		expect(chunks[0].startsWith('<!DOCTYPE html>')).toBe(true);
+		expect(html.match(/<!DOCTYPE html>/g)).toHaveLength(1);
+	});
+
+	it('folds leading scoped styles into <head> under injection', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+		value.resolve('streamed');
+		injection.finish();
+
+		const { html } = await collectPipeableStream(
+			server.StyledDocumentApp,
+			{ promise: value.promise },
+			{ injection: injection.source },
+		);
+		const headOpen = html.indexOf('<head');
+		const headClose = html.indexOf('</head>');
+		const styleAt = html.indexOf('<style data-octane=');
+		expect(headOpen).toBeGreaterThan(-1);
+		// Renderer-owned scoped styles live inside the authored <head>, not
+		// before <html>.
+		expect(styleAt).toBeGreaterThan(headOpen);
+		expect(styleAt).toBeLessThan(headClose);
+		// The document still starts with the doctype (styles no longer precede it).
+		expect(html.startsWith('<!DOCTYPE html>')).toBe(true);
+	});
+
+	it('keeps leading styles ahead of the markup for documents without injection', async () => {
+		const value = deferred<string>();
+		value.resolve('streamed');
+		const { html } = await collectPipeableStream(server.StyledDocumentApp, {
+			promise: value.promise,
+		});
+		// The established fragment-friendly shape: renderer styles precede the
+		// rendered markup when no injection source opted into document mode.
+		expect(html.indexOf('<style data-octane=')).toBeLessThan(html.indexOf('<html'));
 	});
 });
 
@@ -311,6 +376,26 @@ describe('streaming injection — failure modes', () => {
 		// Best-effort well-formedness: the held tail is flushed terminally so the
 		// aborted document still closes <body>/<html>.
 		expect(tailOf(html)).toMatch(DOCUMENT_TAIL);
+		expect(injection.unsubscribed).toBe(true);
+	});
+
+	it('signals renderComplete on an aborted render so the source can finalize', async () => {
+		const value = deferred<string>();
+		const injection = createTestInjection();
+
+		const collector = createPipeableCollector();
+		const render = ServerRuntime.renderToPipeableStream(
+			server.FragmentApp,
+			{ promise: value.promise },
+			{ injection: injection.source, onError: () => {} },
+		);
+		render.pipe(collector.destination);
+		await flushMicrotasks();
+		// Abort while the boundary is still pending: the source must still learn
+		// rendering is over, or its serialization would wait forever.
+		render.abort(new Error('client disconnected'));
+		await collector.ended;
+		expect(injection.renderCompleteCalls).toBe(1);
 		expect(injection.unsubscribed).toBe(true);
 	});
 });
