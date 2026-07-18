@@ -12,14 +12,14 @@
 //   --record    write the current numbers as the committed absolute baselines
 //               (baselines/local/<suite>.json).
 //   --compare   fail if any op regressed vs those baselines (noise-aware rule).
-//   --ratios    fail if any committed ratio guard (baselines/ratios.json) is
-//               breached. Ratios are hardware-INDEPENDENT (target/reference on
-//               the SAME machine in the SAME run), so CI can enforce them from
-//               day one — unlike absolute baselines, which are machine-specific.
+//   --ratios    fail if any applicable committed ratio guard
+//               (baselines/ratios.json) is breached. Both sides run on the SAME
+//               machine in the SAME run; byte/count ratios are deterministic,
+//               while timing ratios use explicit noise headroom.
 //
-// Absolute-baseline comparison (--record / --compare) is LOCAL-ONLY by design:
-// the committed baselines/local numbers are whatever machine recorded them, so
-// they are a personal regression aid, not a CI gate. CI runs --ratios only.
+// Absolute-baseline comparison (--record / --compare) is LOCAL-ONLY by design.
+// Timing records depend on the recording machine; deterministic byte/count
+// records depend on the exact fixture and toolchain. CI runs --ratios only.
 //
 // Usage:
 //   node benchmarks/bench.mjs [suite ...]        # default: all suites
@@ -114,6 +114,34 @@ const SUITES = [
 		],
 		iter: { normal: 8, quick: 3 },
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'weather-app',
+		cwd: 'weather-app',
+		servers: [
+			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
+			{ filter: 'react-weather-app-bench', port: 5293 },
+			{ filter: 'preact-weather-app-bench', port: 5294 },
+			{ filter: 'solid-weather-app-bench', port: 5295 },
+			{ filter: 'svelte-weather-app-bench', port: 5296 },
+			{ filter: 'vue-weather-app-bench', port: 5297 },
+		],
+		iter: { normal: 8, quick: 3 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		name: 'weather-app-lighthouse',
+		cwd: 'weather-app',
+		servers: [
+			{ filter: 'octane-tsrx-weather-app-bench', port: 5292 },
+			{ filter: 'react-weather-app-bench', port: 5293 },
+			{ filter: 'preact-weather-app-bench', port: 5294 },
+			{ filter: 'solid-weather-app-bench', port: 5295 },
+			{ filter: 'svelte-weather-app-bench', port: 5296 },
+			{ filter: 'vue-weather-app-bench', port: 5297 },
+		],
+		iter: { normal: 5, quick: 3 },
+		runs: [{ script: 'lighthouse.mjs', args: (n) => [String(n)] }],
 	},
 	{
 		name: 'chat-stream',
@@ -700,7 +728,7 @@ function printCompareTable(suiteName, rows) {
 	return regs.length;
 }
 
-// ── ratio guards (hardware-independent) ───────────────────────────────────────
+// ── paired ratio guards ───────────────────────────────────────────────────────
 
 function loadRatios() {
 	if (!fs.existsSync(RATIOS_FILE)) return [];

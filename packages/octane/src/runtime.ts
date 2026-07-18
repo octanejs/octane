@@ -64,6 +64,11 @@ import {
 	HYDRATE_INTERACTION_EVENTS_ATTR,
 } from './hydration/interaction-config.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
+import {
+	COMPONENT_FLAG_BOUNDARY,
+	hasComponentFlags,
+	markComponentFlags,
+} from './component-flags.js';
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -955,10 +960,12 @@ let deferringStagedRevealEffects = false;
 // named inside the callback (they exist only in the new capture), and all
 // names revert once the transition's `ready` promise settles.
 //
-// Zero-cost guard: everything below is gated on `VT_SEEN`, a sticky flag set
-// by the compiler's module-load hint (`__vtSeen`, emitted when a module
-// imports ViewTransition from 'octane') and by the boundary body itself.
-// Apps that never use ViewTransition never take any of these branches.
+// Zero-cost guard: generic scheduler/render paths see only the nullable
+// `VIEW_TRANSITION_DRIVER`. The concrete implementation is installed by the
+// compiler's module hint, the first boundary render, or the public
+// addTransitionType entry point. Apps that never retain any of those APIs
+// tree-shake the implementation while keeping one cheap null branch at each
+// integration point.
 
 /** Animation class value: a class string, 'auto', 'none', or a per-type map. */
 type ViewTransitionClassValue = string | Record<string, string>;
@@ -1053,14 +1060,34 @@ interface VtRec {
 }
 type VtActivationKind = 'enter' | 'exit' | 'update' | 'share' | 'parent-enter' | 'parent-exit';
 
-/** Sticky "this app uses ViewTransition" flag — the zero-cost guard. */
-let VT_SEEN = false;
+/**
+ * Capability table between the generic runtime and the optional ViewTransition
+ * implementation. Keep concrete VT globals/functions behind this boundary:
+ * otherwise one scheduler branch retains the complete animation graph in every
+ * client bundle.
+ */
+interface ViewTransitionDriver {
+	addType(type: string): void;
+	routeFlush(): boolean;
+	shouldClearTypesAfterFlush(): boolean;
+	clearTypes(): void;
+	interrupt(): void;
+	deferPassives(): boolean;
+	wouldWrap(): boolean;
+	wrapResume(work: () => void): boolean;
+	unregister(block: Block): void;
+	markDirty(): void;
+	queueAllTransition(): boolean;
+	renderBoundary(block: Block, props: ViewTransitionProps): void;
+}
+
+let VIEW_TRANSITION_DRIVER: ViewTransitionDriver | null = null;
 /** Mounted boundary blocks; pruned lazily (disposed) + on unmount. */
-const VT_REGISTRY = new Set<Block>();
+const VT_REGISTRY = /* @__PURE__ */ new Set<Block>();
 /** Boundary blocks registered during the CURRENT wrapped drain (→ enter). */
 let VT_ENTERED: Block[] = [];
 /** Boundaries dirtied by tracked mutations during the current wrapped drain. */
-const VT_DIRTY = new Set<Block>();
+const VT_DIRTY = /* @__PURE__ */ new Set<Block>();
 /** True while the wrapped drain (the update callback's flushWork) runs. */
 let VT_DRAIN = false;
 /** Controller state: idle → pending (update not yet run) → animating. */
@@ -1073,7 +1100,7 @@ let VT_NAME_SEQ = 0;
 /** A scheduled passive drain deferred until the transition's `finished`. */
 let VT_PASSIVES_HELD = false;
 /** Per-boundary callback cleanups (returned by on*), run before the next fire. */
-const VT_CLEANUPS = new WeakMap<Block, () => void>();
+const VT_CLEANUPS = /* @__PURE__ */ new WeakMap<Block, () => void>();
 /**
  * Transition types staged by addTransitionType() for the CURRENT transition
  * batch — captured (and reset) by the flush that commits the batch, whether
@@ -1088,8 +1115,7 @@ let VT_PENDING_TYPES: string[] = [];
  * every on* callback. Types reset when the batch commits.
  */
 export function addTransitionType(type: string): void {
-	VT_SEEN = true;
-	if (VT_PENDING_TYPES.indexOf(type) === -1) VT_PENDING_TYPES.push(type);
+	ensureViewTransitionDriver().addType(type);
 }
 
 /**
@@ -1099,7 +1125,7 @@ export function addTransitionType(type: string): void {
  * VT" only mid-drain — too late to have snapshotted). Semi-public (tier 2).
  */
 export function __vtSeen(): void {
-	VT_SEEN = true;
+	ensureViewTransitionDriver();
 }
 
 /** Nearest enclosing ViewTransition boundary of the currently rendering block. */
@@ -1357,7 +1383,6 @@ function queueAllTransition(): boolean {
  */
 function vtWouldWrap(): boolean {
 	return (
-		VT_SEEN &&
 		VT_STATE === VT_IDLE &&
 		activeHydration() === null &&
 		queueAllTransition() &&
@@ -1369,12 +1394,13 @@ function vtWouldWrap(): boolean {
 /**
  * Same question for a Suspense reveal commit (commitResume /
  * flushStagedReveals — they run OUTSIDE the flush, in thenable microtasks).
- * VT_SEEN is set at module load by the compiler, so the pre-snapshot can run
- * even when the reveal itself mounts the app's first boundary.
+ * The driver is installed at module load by the compiler hint, so the
+ * pre-snapshot can run even when the reveal itself mounts the app's first
+ * boundary. A direct runtime consumer falls back to installation on first
+ * boundary render, matching the pre-capability behavior.
  */
 function vtWouldWrapResume(): boolean {
 	return (
-		VT_SEEN &&
 		VT_STATE === VT_IDLE &&
 		activeHydration() === null &&
 		!inFlush &&
@@ -1382,6 +1408,72 @@ function vtWouldWrapResume(): boolean {
 		typeof document !== 'undefined' &&
 		(document as VTDocument).startViewTransition !== undefined
 	);
+}
+
+/** Install the concrete driver only when a ViewTransition-facing API survives. */
+function ensureViewTransitionDriver(): ViewTransitionDriver {
+	if (VIEW_TRANSITION_DRIVER !== null) return VIEW_TRANSITION_DRIVER;
+	const driver: ViewTransitionDriver = {
+		addType(type) {
+			if (VT_PENDING_TYPES.indexOf(type) === -1) VT_PENDING_TYPES.push(type);
+		},
+		routeFlush() {
+			if (VT_STATE !== VT_IDLE) {
+				// Transition work waits for the active update/animation; urgent work
+				// interrupts and falls through to the ordinary flush.
+				if (queueAllTransition()) return true;
+				if (QUEUE.length > 0 && VT_HANDLE !== null) VT_HANDLE.skipTransition();
+				return false;
+			}
+			if (!vtWouldWrap()) return false;
+			vtFlush();
+			return true;
+		},
+		shouldClearTypesAfterFlush() {
+			if (VT_PENDING_TYPES.length === 0) return false;
+			for (let i = 0; i < QUEUE.length; i++) {
+				if (QUEUE[i].pendingMode === 'transition') return true;
+			}
+			return false;
+		},
+		clearTypes() {
+			VT_PENDING_TYPES = [];
+		},
+		interrupt() {
+			if (VT_STATE !== VT_IDLE && VT_HANDLE !== null) VT_HANDLE.skipTransition();
+		},
+		deferPassives() {
+			if (VT_STATE !== VT_ANIMATING) return false;
+			VT_PASSIVES_HELD = true;
+			return true;
+		},
+		wouldWrap: vtWouldWrap,
+		wrapResume(work) {
+			if (!vtWouldWrapResume()) return false;
+			vtFlush(work);
+			return true;
+		},
+		unregister(block) {
+			if (block.vt !== null) VT_REGISTRY.delete(block);
+		},
+		markDirty() {
+			if (VT_DRAIN) vtMarkDirtyFromCurrentBlock();
+		},
+		queueAllTransition,
+		renderBoundary(block, props) {
+			if (block.vt === null) {
+				// Registration during a wrapped drain is an enter activation; otherwise
+				// the block simply joins the mounted-boundary registry.
+				block.vt = props;
+				VT_REGISTRY.add(block);
+				if (VT_DRAIN) VT_ENTERED.push(block);
+			} else {
+				block.vt = props;
+			}
+		},
+	};
+	VIEW_TRANSITION_DRIVER = driver;
+	return driver;
 }
 
 function tickTransitionCount(delta: number): void {
@@ -1542,6 +1634,8 @@ interface OffscreenWip {
 	end: Comment;
 	capture: OffscreenCapture;
 	domParent: Node;
+	/** Discarded WIPs must not publish detaches for refs whose attach never committed. */
+	refDetachCheckpoint: number;
 }
 
 // FragmentInstances that currently hold event listeners and/or observers. After
@@ -1886,23 +1980,9 @@ function flush(): void {
 		}
 		return;
 	}
-	// View-transition routing (zero-cost when the app never uses ViewTransition).
-	if (VT_SEEN) {
-		if (VT_STATE !== VT_IDLE) {
-			// A view transition is in flight. Transition-lane work waits: work
-			// arriving before the update callback runs is drained BY that callback
-			// (it drains whatever is queued — React's A→B then B→D batching);
-			// work arriving mid-animation is re-armed by the `finished` handler.
-			if (queueAllTransition()) return;
-			// Urgent work interrupts: kill the animation and drain synchronously
-			// (matching React's flushSync-mid-transition rule). The pending update
-			// callback later drains an empty queue — a no-op.
-			if (QUEUE.length > 0 && VT_HANDLE !== null) VT_HANDLE.skipTransition();
-		} else if (vtWouldWrap()) {
-			vtFlush();
-			return;
-		}
-	}
+	// The optional driver owns all concrete ViewTransition state/implementation.
+	// A client that never retains the feature sees only this null check.
+	if (VIEW_TRANSITION_DRIVER?.routeFlush() === true) return;
 	flushWork();
 }
 
@@ -1918,15 +1998,8 @@ function flushWork(): void {
 	// contains transition work consumes them too — they must not leak into a
 	// later, unrelated wrapped flush. (vtFlush captures them before its update
 	// callback runs flushWork, so the wrapped path never reaches this.)
-	let clearTypes = false;
-	if (VT_PENDING_TYPES.length !== 0) {
-		for (let i = 0; i < QUEUE.length; i++) {
-			if (QUEUE[i].pendingMode === 'transition') {
-				clearTypes = true;
-				break;
-			}
-		}
-	}
+	const viewTransitionDriver = VIEW_TRANSITION_DRIVER;
+	const clearViewTransitionTypes = viewTransitionDriver?.shouldClearTypesAfterFlush() === true;
 	try {
 		// React parity: pending PASSIVE effects from an earlier commit flush BEFORE the next
 		// render begins (React's flushPassiveEffects-at-render-start). Without this, a
@@ -1940,7 +2013,7 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
-		if (clearTypes) VT_PENDING_TYPES = [];
+		if (clearViewTransitionTypes) viewTransitionDriver!.clearTypes();
 	}
 }
 
@@ -2210,7 +2283,7 @@ export function flushSync<T>(fn: () => T): T {
 	// flushSync mid-view-transition skips the animation (React's rule): the
 	// sync drain below applies everything now; the pending update callback
 	// later drains an empty queue.
-	if (VT_SEEN && VT_STATE !== VT_IDLE && VT_HANDLE !== null) VT_HANDLE.skipTransition();
+	VIEW_TRANSITION_DRIVER?.interrupt();
 	const prevSync = syncFlush;
 	syncFlush = true;
 	try {
@@ -2447,12 +2520,8 @@ function schedulePassiveFlush(): void {
 		// View-transition ordering (React parity): passive effects wait for the
 		// transition's `finished` — the vtFlush finished handler re-arms this
 		// drain. Direct test-harness drains (drainPassiveEffects) stay ungated.
-		if (VT_STATE === VT_ANIMATING) {
-			passiveScheduled = false;
-			VT_PASSIVES_HELD = true;
-			return;
-		}
 		passiveScheduled = false;
+		if (VIEW_TRANSITION_DRIVER?.deferPassives() === true) return;
 		drainPassivePhase();
 	});
 }
@@ -2579,7 +2648,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			// callback synchronously, so this stays a synchronous drain; a REAL async
 			// startViewTransition under sync act() cannot be awaited here (use the
 			// async act form, which drains through the scheduled microtask flush).
-			if (vtWouldWrap()) flush();
+			if (VIEW_TRANSITION_DRIVER?.wouldWrap() === true) flush();
 			else flushSync(() => {});
 			drainPassiveEffects();
 			if (!hasPendingWork()) break;
@@ -3284,6 +3353,22 @@ function renderBlockInner(block: Block): void {
 // may return a renderable. Compiled-void Blocks carry a null handler, allowing
 // production bundles containing only `@{}` output to tree-shake this whole
 // return/descriptor/childSlot path.
+function returnSlotTail(block: Block, state: any): Node | null {
+	const candidates = [
+		state?.end,
+		state?.block?.endMarker,
+		state?.hostNode,
+		state?.text,
+		block.endMarker,
+		block.parentNode.lastChild,
+	];
+	for (let i = 0; i < candidates.length; i++) {
+		const node = candidates[i] as Node | null | undefined;
+		if (node !== null && node !== undefined && node.parentNode === block.parentNode) return node;
+	}
+	return null;
+}
+
 function renderReturnedValue(block: Block, out: unknown): void {
 	// A single-root fragment descriptor (its renderer is `$$singleRoot`) mounts
 	// MARKERLESS via componentSlot's singleRoot path — the element self-delimits,
@@ -3307,6 +3392,26 @@ function renderReturnedValue(block: Block, out: unknown): void {
 		existingRet !== undefined &&
 		existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
 	) {
+		// A transition can cross the markerless-single-root optimization boundary
+		// (text/list → compiled host fragment, or the reverse). Probe the incoming
+		// returned value off-screen before disposing the committed slot; a suspend or
+		// error then leaves the old DOM/state intact for the enclosing @try hold.
+		if (activeHydration() === null && block.currentRenderMode === 'transition') {
+			const tail = returnSlotTail(block, existingRet);
+			if (tail !== null) {
+				const probe = renderOffscreen(
+					block,
+					block.parentNode,
+					tail,
+					ROOT_RENDERABLE_BODY,
+					out,
+					renderReturnedValue,
+				);
+				disposeWip(probe.wip);
+				if (probe.error) throw probe.error;
+				if (probe.suspended) throw new SuspenseException(probe.suspended);
+			}
+		}
 		disposeReturnSlot(block, existingRet);
 	}
 	if (useSingleRoot) {
@@ -3611,9 +3716,9 @@ function unmountBlock(block: Block, detachDom: boolean = true): void {
 
 function unmountBlockInner(block: Block, detachDom: boolean): void {
 	block.disposed = true;
-	// ViewTransition boundary: unregister eagerly (vtFlush also prunes lazily —
-	// the `disposed` stamp above is what exit detection reads).
-	if (block.vt !== null) VT_REGISTRY.delete(block);
+	// An installed ViewTransition driver unregisters eagerly (its wrapped flush
+	// also prunes lazily; the disposed stamp above drives exit detection).
+	VIEW_TRANSITION_DRIVER?.unregister(block);
 	// De-opt-managed host subtree (deoptItemBody item / hostElementBody element):
 	// detach its stamped refs so a `ref={obj}` / callback ref doesn't keep pointing
 	// at the removed node. Runs even when detachDom is false — those callers
@@ -3667,6 +3772,12 @@ function registerSlot(scope: Scope, slot: any): void {
 	if (slots === null) scope._slots = [slot];
 	else slots.push(slot);
 }
+
+// Slot-owned lifecycle work is carried as a capability instead of making the
+// generic unmount walk reference a concrete feature implementation. Feature
+// graphs such as deferred hydration can then disappear when their public API is
+// not retained by the application bundle.
+const SLOT_FLAG_TEARDOWN = 1 << 0;
 
 function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// Fire THIS scope's teardown BEFORE recursing into children, so deletion
@@ -3739,6 +3850,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	if (slots !== null) {
 		for (let i = 0, n = slots.length; i < n; i++) {
 			const val = slots[i];
+			if ((val.__flags & SLOT_FLAG_TEARDOWN) !== 0) val.__teardown(val);
 			// Read __kind ONCE per slot — the property access is megamorphic across
 			// six slot shapes, so caching the local saves three repeat IC walks.
 			const k = val.__kind;
@@ -3754,9 +3866,8 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 			} else if (k === 'hydrateBlockSlot') {
 				// A load() strategy can begin procedural prefetch during the initial
 				// hydration render, before this slot's passive installer ever runs.
-				// Tear down the slot lifecycle directly so an immediate root unmount
-				// still aborts that work and resolves any pending waitFor subscribers.
-				teardownHydrateBoundary(val);
+				// Its capability teardown above aborts that work and resolves pending
+				// waitFor subscribers without rooting Hydrate in this generic walk.
 				if (val.block) unmountBlock(val.block, detachDom);
 			} else if (k === 'childSlot') {
 				// A `{expr}` value slot holds EITHER a component Block (a component /
@@ -4778,7 +4889,9 @@ const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
 	'never',
 	'dynamic',
 ]);
-const HYDRATE_MARKER_SELECTOR = `[${HYDRATE_ID_ATTR}]`;
+// Keep the selector a literal so this otherwise stand-alone initializer does
+// not retain deferred-hydration constants when the Hydrate export is shaken.
+const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
 const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>();
 const HYDRATE_SLOTS_BY_MARKER = /* @__PURE__ */ new WeakMap<Element, HydrateSlot>();
 const HYDRATE_PENDING_INTENTS = /* @__PURE__ */ new WeakMap<Element, HydrationReplayIntent[]>();
@@ -4801,6 +4914,8 @@ interface HydrationReplayIntent {
 
 interface HydrateSlot {
 	__kind: 'hydrateBlockSlot';
+	__flags: typeof SLOT_FLAG_TEARDOWN;
+	__teardown: typeof teardownHydrateBoundary;
 	block: Block;
 	wrapper: HTMLDivElement;
 	start: Comment;
@@ -5224,8 +5339,6 @@ function ensureEarlyHydrationIntentCapture(ownerDocument: Document): void {
 	}
 }
 
-if (typeof document !== 'undefined') ensureEarlyHydrationIntentCapture(document);
-
 function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrategy): () => void {
 	const ownEvents =
 		hydrateStrategyInteractionEvents(strategy) ??
@@ -5450,6 +5563,8 @@ function createHydrateSlot(
 	block.idState = idState;
 	const state: HydrateSlot = {
 		__kind: 'hydrateBlockSlot',
+		__flags: SLOT_FLAG_TEARDOWN,
+		__teardown: teardownHydrateBoundary,
 		block,
 		wrapper,
 		start,
@@ -5585,58 +5700,70 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
  * A boundary first mounted on the client renders immediately; only existing SSR
  * HTML can be left dormant.
  */
-export const Hydrate: ComponentBody<HydrateProps> = (rawProps, scope) => {
-	const props = rawProps as InternalHydrateProps;
-	const boundaryId = useId(HYDRATE_ID_SLOT);
-	let state = scope.slots[0] as HydrateSlot | undefined;
-	let renderedChild = false;
-	if (state === undefined) {
-		state = createHydrateSlot(props, scope, boundaryId);
-	} else {
-		state.props = props;
-		// A surrounding update makes preserved server HTML potentially stale. Match
-		// the correctness-first contract by opening the boundary, except for never().
-		if (!state.hydrated) {
-			const strategy = resolveHydrateStrategy(state);
-			if (strategy._t === 'never') {
-				// Only the hydration trigger changes here. Preparation has an independent
-				// lifecycle, so do not abort procedural prefetch or resolve waitFor() as
-				// though the still-mounted boundary had unmounted.
-				cleanupHydrateStrategy(state);
-				invalidateHydrateActivation(state);
-			} else if (!state.activationRequested) {
-				requestHydrateBoundary(state);
+function initializeHydrateComponent(): ComponentBody<HydrateProps> {
+	// This must run at module evaluation when Hydrate is retained: an interaction
+	// can precede hydrateRoot. The annotated initializer lets the entire capture
+	// graph disappear when the application never retains the Hydrate export.
+	if (typeof document !== 'undefined') ensureEarlyHydrationIntentCapture(document);
+	return markComponentFlags<ComponentBody<HydrateProps>>(
+		function Hydrate(rawProps, scope) {
+			const props = rawProps as InternalHydrateProps;
+			const boundaryId = useId(HYDRATE_ID_SLOT);
+			let state = scope.slots[0] as HydrateSlot | undefined;
+			let renderedChild = false;
+			if (state === undefined) {
+				state = createHydrateSlot(props, scope, boundaryId);
+			} else {
+				state.props = props;
+				// A surrounding update makes preserved server HTML potentially stale. Match
+				// the correctness-first contract by opening the boundary, except for never().
+				if (!state.hydrated) {
+					const strategy = resolveHydrateStrategy(state);
+					if (strategy._t === 'never') {
+						// Only the hydration trigger changes here. Preparation has an independent
+						// lifecycle, so do not abort procedural prefetch or resolve waitFor() as
+						// though the still-mounted boundary had unmounted.
+						cleanupHydrateStrategy(state);
+						invalidateHydrateActivation(state);
+					} else if (!state.activationRequested) {
+						requestHydrateBoundary(state);
+					}
+				}
 			}
-		}
-	}
 
-	if (state.hasError) throw state.error;
-	if (
-		!state.hydrated &&
-		state.activationReady &&
-		(!state.serverPreserved || !state.serverActivationStarted)
-	) {
-		// A first attempt can suspend after replacing the adopted arm with its
-		// preserved-server pending block. From that point the internal try slot owns
-		// the thenable and resume path; re-entering here on a parent update would
-		// remount that pending block and abandon the in-flight attempt. Client-only
-		// boundaries keep re-entering so new props can supersede suspended data.
-		if (state.serverPreserved) state.serverActivationStarted = true;
-		try {
-			activateHydrateBoundary(state);
-		} catch (error) {
-			// A synchronous render error did not leave a resumable try path behind.
-			// Let an enclosing error boundary retry this activation after reset.
-			if (state.serverPreserved) state.serverActivationStarted = false;
-			throw error;
-		}
-		renderedChild = true;
-	} else if (state.hydrated && !renderedChild) {
-		renderBlock(state.block);
-	}
+			if (state.hasError) throw state.error;
+			if (
+				!state.hydrated &&
+				state.activationReady &&
+				(!state.serverPreserved || !state.serverActivationStarted)
+			) {
+				// A first attempt can suspend after replacing the adopted arm with its
+				// preserved-server pending block. From that point the internal try slot owns
+				// the thenable and resume path; re-entering here on a parent update would
+				// remount that pending block and abandon the in-flight attempt. Client-only
+				// boundaries keep re-entering so new props can supersede suspended data.
+				if (state.serverPreserved) state.serverActivationStarted = true;
+				try {
+					activateHydrateBoundary(state);
+				} catch (error) {
+					// A synchronous render error did not leave a resumable try path behind.
+					// Let an enclosing error boundary retry this activation after reset.
+					if (state.serverPreserved) state.serverActivationStarted = false;
+					throw error;
+				}
+				renderedChild = true;
+			} else if (state.hydrated && !renderedChild) {
+				renderBlock(state.block);
+			}
 
-	useEffect(() => installHydrateBoundary(state!), [state], HYDRATE_SETUP_SLOT);
-};
+			useEffect(() => installHydrateBoundary(state!), [state], HYDRATE_SETUP_SLOT);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'Hydrate',
+	);
+}
+
+export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHydrateComponent();
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
@@ -5646,49 +5773,52 @@ export const Hydrate: ComponentBody<HydrateProps> = (rawProps, scope) => {
  * render as the try body, and `fallback` renders as the pending body whenever a
  * descendant suspends (via `use(thenable)`).
  */
-export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> = (
-	props,
-	scope,
-) => {
-	const block = scope.block;
-	const pendingBody: ComponentBody = (_p, s) => {
-		childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
-	};
-	tryBlock(
-		scope,
-		0,
-		block.parentNode,
-		childrenAsBody(props.children),
-		null,
-		pendingBody,
-		block.endMarker,
+export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> =
+	/* @__PURE__ */ markComponentFlags<
+		ComponentBody<{ fallback?: unknown; children: ComponentBody }>
+	>(
+		function Suspense(props, scope) {
+			const block = scope.block;
+			const pendingBody: ComponentBody = (_p, s) => {
+				childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
+			};
+			tryBlock(
+				scope,
+				0,
+				block.parentNode,
+				childrenAsBody(props.children),
+				null,
+				pendingBody,
+				block.endMarker,
+			);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'Suspense',
 	);
-};
 
 /**
  * `<ViewTransition>` — a transparent boundary that opts its subtree into
  * browser View Transitions on transition-lane commits (enter on insert, exit
  * on delete, update on inner mutation — see the View Transitions block above
  * and docs/view-transitions-plan.md). Renders its children unchanged; all
- * animation machinery lives in the flush controller. Identity-checked like
+ * animation machinery lives in the flush controller. Boundary-flagged like
  * Suspense/ErrorBoundary (M3 inherit-decline), so its block always owns an
- * exact DOM range.
+ * exact DOM range without ordinary component slots retaining its implementation.
  */
-export const ViewTransition: ComponentBody<ViewTransitionProps> = (props, scope) => {
-	VT_SEEN = true;
-	const block = scope.block;
-	if (block.vt === null) {
-		// First render = mount. Registration during a WRAPPED drain is an enter
-		// activation; during any other flush (initial urgent render, no
-		// startViewTransition, hydration) it just joins the registry.
-		block.vt = props;
-		VT_REGISTRY.add(block);
-		if (VT_DRAIN) VT_ENTERED.push(block);
-	} else {
-		block.vt = props;
-	}
-	childSlot(scope, 0, block.parentNode, props.children, block.endMarker);
-};
+function initializeViewTransitionComponent(): ComponentBody<ViewTransitionProps> {
+	return markComponentFlags<ComponentBody<ViewTransitionProps>>(
+		function ViewTransition(props, scope) {
+			const block = scope.block;
+			ensureViewTransitionDriver().renderBoundary(block, props);
+			childSlot(scope, 0, block.parentNode, props.children, block.endMarker);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'ViewTransition',
+	);
+}
+
+export const ViewTransition: ComponentBody<ViewTransitionProps> =
+	/* @__PURE__ */ initializeViewTransitionComponent();
 
 /**
  * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX component form of
@@ -5700,30 +5830,39 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> = (props, scope)
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
 	children: ComponentBody;
-}> = (props, scope) => {
-	const block = scope.block;
-	const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
-		const fb =
-			typeof props.fallback === 'function'
-				? (props.fallback as (e: unknown, r: () => void) => unknown)(
-						catchProps.err,
-						catchProps.reset,
-					)
-				: props.fallback;
-		childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
-	};
-	tryBlock(
-		scope,
-		0,
-		block.parentNode,
-		childrenAsBody(props.children),
-		catchBody,
-		null,
-		block.endMarker,
-		undefined,
-		true,
-	);
-};
+}> = /* @__PURE__ */ markComponentFlags<
+	ComponentBody<{
+		fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
+		children: ComponentBody;
+	}>
+>(
+	function ErrorBoundary(props, scope) {
+		const block = scope.block;
+		const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
+			const fb =
+				typeof props.fallback === 'function'
+					? (props.fallback as (e: unknown, r: () => void) => unknown)(
+							catchProps.err,
+							catchProps.reset,
+						)
+					: props.fallback;
+			childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
+		};
+		tryBlock(
+			scope,
+			0,
+			block.parentNode,
+			childrenAsBody(props.children),
+			catchBody,
+			null,
+			block.endMarker,
+			undefined,
+			true,
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ErrorBoundary',
+);
 
 /**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).
@@ -7766,10 +7905,9 @@ export function setText(node: Text, value: any): void {
 	// call (a measurable cost + GC pressure on text-heavy updates).
 	//
 	// View-transition dirty tracking: setText is the compiler's single text-
-	// mutation choke point AND is prev-guarded (only ACTUAL changes reach it), so
-	// one predictable branch marks the innermost enclosing boundary. VT_DRAIN is
-	// true only inside a wrapped transition drain — zero cost everywhere else.
-	if (VT_DRAIN) vtMarkDirtyFromCurrentBlock();
+	// mutation choke point AND is prev-guarded (only ACTUAL changes reach it).
+	// The optional driver marks the innermost boundary only during a wrapped drain.
+	VIEW_TRANSITION_DRIVER?.markDirty();
 	//
 	// Write via `nodeValue` (a `Node`-level accessor) rather than `data` (which
 	// lives on `CharacterData` one prototype hop deeper) — it's measurably faster
@@ -9997,22 +10135,26 @@ function reportListenerError(err: unknown): void {
 // inherit the outer commit window. Non-discrete events keep microtask-batched
 // semantics so they don't thrash the scheduler.
 function maybeFlushDiscrete(type: string): void {
-	if (_dispatchDepth !== 0 || !DISCRETE_EVENTS.has(type)) return;
-	// Commit handler-scheduled work first, so the controlled restore below
-	// compares the DOM against the values the handlers just rendered.
-	if (hasPendingWork()) {
-		// A transition-only queue in an app armed for ViewTransition must reach the
-		// regular flush controller. flushSync deliberately skips animations; using
-		// it here meant the canonical onClick={() => startTransition(...)} pattern
-		// could never call document.startViewTransition. flush() also knows how to
-		// leave a second transition queued while an earlier one is still in flight.
-		if (VT_SEEN && queueAllTransition()) flush();
-		else flushSync(noop);
+	if (_dispatchDepth === 0 && DISCRETE_EVENTS.has(type)) {
+		// Commit handler-scheduled work first, so the controlled restore below
+		// compares the DOM against the values the handlers just rendered.
+		if (hasPendingWork()) {
+			// A transition-only queue in an app armed for ViewTransition must reach the
+			// regular flush controller. flushSync deliberately skips animations; using
+			// it here meant the canonical onClick={() => startTransition(...)} pattern
+			// could never call document.startViewTransition. flush() also knows how to
+			// leave a second transition queued while an earlier one is still in flight.
+			if (VIEW_TRANSITION_DRIVER?.queueAllTransition() === true) flush();
+			else flushSync(noop);
+		}
+		// The restore runs even when NO work was scheduled — a rejected/unheard
+		// edit (no onInput, or an Object.is-equal setState) schedules nothing and
+		// is exactly the case that must snap back (React's restoreControlledState).
+		if (pendingRestores.length > 0) restoreControlledStates();
 	}
-	// The restore runs even when NO work was scheduled — a rejected/unheard
-	// edit (no onInput, or an Object.is-equal setState) schedules nothing and
-	// is exactly the case that must snap back (React's restoreControlledState).
-	if (pendingRestores.length > 0) restoreControlledStates();
+	// Clear after the click's own handlers (and its outermost flush, when this is
+	// not a nested dispatch), including canceled/eventless activations.
+	if (type === 'click') activationCheckable = null;
 }
 
 function finishCaptureDispatch(event: Event): void {
@@ -10517,6 +10659,20 @@ const RESTORE_EVENTS = /* @__PURE__ */ new Set(RESTORE_EVENT_LIST);
 let pendingRestores: Element[] = [];
 let restoreMicrotaskScheduled = false;
 
+// The checkable input whose click ACTIVATION is currently in flight: the
+// platform has toggled `checked` but the activation's `input`/`change`
+// post-steps have not been dispatched yet. Commits inside this window use
+// React's prop-diff (not DOM-diff) semantics for `checked`, so a handler's
+// flushSync cannot revert the user's toggle before the native input/change
+// handlers get to read it. Set by maybeEnqueueRestore and cleared at the end
+// of that click's dispatch by maybeFlushDiscrete.
+let activationCheckable: Element | null = null;
+
+// Installed by the first retained controlled-checked binding. Generic text and
+// select restoration keep only the nullable call when checked/radio support is
+// absent, allowing the concrete checked + radio-group graph to tree-shake.
+let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) | null = null;
+
 // A native select choice emits `input` immediately followed by `change`. Octane
 // exposes native onChange, so restoring the controlled selection at the end of
 // the first dispatch would make the second handler observe the old value. Hold
@@ -10760,6 +10916,7 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		return;
 	}
 	const b = !!value;
+	CHECKED_RESTORE ??= restoreCheckedState;
 	if (first) {
 		ctrl.c = b;
 		if (process.env.NODE_ENV !== 'production') queueDevControlledCheck(input, ctrl);
@@ -10772,8 +10929,35 @@ function setCheckedState(input: HTMLInputElement, value: unknown, ctrl: Controll
 		return;
 	}
 	if (process.env.NODE_ENV !== 'production' && ctrl.c === -1) devWarnControlledFlip(input, true);
+	// While a click activation is in flight (platform toggled the DOM;
+	// input/change not yet dispatched), an UNCHANGED prop must not clobber the
+	// user's toggle — React's update path diffs prev props, not the DOM, so a
+	// mid-dispatch flushSync commit leaves the drift for the event-side restore.
+	// This covers the activated element AND its radio-group cousins: the platform
+	// unchecked the cousin as part of the same toggle, and re-checking it would
+	// make the browser uncheck the activation target before its follow-up events
+	// fire. A prop that actually CHANGED in this window still writes.
+	const changed = b !== ctrl.c;
 	ctrl.c = b;
-	if (input.checked !== b) input.checked = b;
+	if ((changed || !inActivationWindow(input)) && input.checked !== b) input.checked = b;
+}
+
+/**
+ * True while `input` is the checkable whose click activation is in flight, or
+ * a same-group radio cousin of it (group scope mirrors restoreRadioCousins:
+ * same non-empty name, same form owner).
+ */
+function inActivationWindow(input: HTMLInputElement): boolean {
+	const target = activationCheckable as HTMLInputElement | null;
+	if (target === null) return false;
+	if (input === target) return true;
+	return (
+		input.type === 'radio' &&
+		target.type === 'radio' &&
+		input.name !== '' &&
+		input.name === target.name &&
+		input.form === target.form
+	);
 }
 
 export function setChecked(el: Element, value: unknown): void {
@@ -11164,19 +11348,22 @@ function restoreControlledElement(el: Element): void {
 		if (ctrl.sv !== null) projectSelectValue(el as HTMLSelectElement, ctrl.sv, false);
 		return;
 	}
-	if (ctrl.c !== -1) {
-		const input = el as HTMLInputElement;
-		if (input.checked !== ctrl.c) input.checked = ctrl.c;
-		// A radio's drift flips its GROUP cousins too (checking one unchecks
-		// another) — restore every armed cousin to ITS rendered state
-		// (React's updateNamedCousins).
-		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
-	}
+	CHECKED_RESTORE?.(el as HTMLInputElement, ctrl);
 	if (
 		ctrl.v !== UNCONTROLLED &&
 		valueNeedsWrite(el as HTMLInputElement | HTMLTextAreaElement, ctrl.v)
 	) {
 		(el as HTMLInputElement).value = toControlledString(ctrl.v);
+	}
+}
+
+function restoreCheckedState(input: HTMLInputElement, ctrl: ControlledState): void {
+	if (ctrl.c !== -1) {
+		if (input.checked !== ctrl.c) input.checked = ctrl.c;
+		// A radio's drift flips its GROUP cousins too (checking one unchecks
+		// another) — restore every armed cousin to ITS rendered state
+		// (React's updateNamedCousins).
+		if (input.type === 'radio' && input.name !== '') restoreRadioCousins(input);
 	}
 }
 
@@ -11246,7 +11433,20 @@ function maybeEnqueueRestore(event: Event): void {
 	// A checkable's click never arms — its `input`/`change` follow-ups do
 	// (see the RESTORE_EVENT_LIST comment: restoring after the click flush
 	// would revert the toggle before the native handlers run).
-	if (event.type === 'click') return;
+	if (event.type === 'click') {
+		// Mark the checkable whose ACTIVATION is in flight: the platform toggled
+		// `checked` before this click dispatch, and its `input`/`change` post-steps
+		// have not fired yet. A commit inside this window (a handler's flushSync —
+		// press-state machinery does this) must not reassert the still-uncommitted
+		// prop over the user's toggle: the checked binding switches to React's
+		// prop-diff semantics for the marked element (see setCheckedState), and the
+		// follow-up input/change arms the ordinary restore at the right time.
+		const ctrl = t.$$ctrl as ControlledState;
+		if (ctrl.c !== -1) {
+			activationCheckable = t as Element;
+		}
+		return;
+	}
 	if (event.type === 'input' && t.localName === 'select') {
 		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
 		if (!selectInputRestoreScheduled) {
@@ -12108,6 +12308,7 @@ function componentSlotImpl(
 		} satisfies ElementDescriptor;
 	}
 	let state = parentScope.slots[slotKey] as CompSlot | undefined;
+	let hydrationCursor: Node | null = null;
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Comment | null = null;
@@ -12123,16 +12324,13 @@ function componentSlotImpl(
 		// compile-time unreachable under hydration (bodies with an inherit root
 		// are stamped lite-ineligible, and element-marked singleRoot parents
 		// can't own a noTemplate body).
-		// Boundary builtins decline by IDENTITY (covers member/aliased/dynamic
+		// Boundary builtins decline through their component capability bit (covers
+		// member/aliased/dynamic
 		// tags the compile-time name check can't see — `<octane.Suspense>`,
 		// `const S = Suspense`): their pairs are load-bearing for streaming.
-		// ssrComponent declines on the same identities, so the server emitted a
+		// ssrComponent reads the same bit, so the server emitted a
 		// pair exactly where this falls through to the adoption regimes below.
-		if (
-			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition || comp === Hydrate)
-		)
-			inherit = false;
+		if (inherit === true && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
 		if (inherit === true && parentBlock !== null) {
 			const ps = (parentBlock as { startMarker?: Node | null }).startMarker;
 			const pe = (parentBlock as { endMarker?: Node | null }).endMarker;
@@ -12152,7 +12350,6 @@ function componentSlotImpl(
 		// by consulting the parked cursor (host.firstChild for the first appended
 		// child; the cursor is already on the open marker otherwise).
 		let open: Node | null = null;
-		let hydrationCursor: Node | null = null;
 		if (!inherited && hydration !== null && hydration.isOpen(anchor ?? null)) {
 			open = anchor as Node;
 			hydrationCursor = open;
@@ -12377,10 +12574,23 @@ function componentSlotImpl(
 			try {
 				renderBlock(b);
 			} finally {
-				const last = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
-				if (last !== null && last !== before) {
-					b.startMarker = last;
-					b.endMarker = last;
+				if (
+					hydration !== null &&
+					hydrationCursor !== null &&
+					hydrationCursor.parentNode === domParent
+				) {
+					// An unframed single-root return adopts the element that was already
+					// present, so the client-mount before/after probe cannot observe an
+					// insertion. Stamp the adopted cursor itself as the block boundary;
+					// a later return-shape switch can then unmount that host normally.
+					b.startMarker = hydrationCursor;
+					b.endMarker = hydrationCursor;
+				} else {
+					const last = state.anchor ? state.anchor.previousSibling : domParent.lastChild;
+					if (last !== null && last !== before) {
+						b.startMarker = last;
+						b.endMarker = last;
+					}
 				}
 			}
 		} else {
@@ -12559,6 +12769,7 @@ function renderOffscreen(
 	domParent.insertBefore(start, ref);
 	domParent.insertBefore(end, ref);
 	const capture = createOffscreenCapture();
+	const refDetachCheckpoint = refDetachQueue.length;
 	const prev = WIP_CAPTURE;
 	WIP_CAPTURE = capture;
 	const block = createBlock(
@@ -12590,7 +12801,11 @@ function renderOffscreen(
 	} finally {
 		WIP_CAPTURE = prev;
 	}
-	return { wip: { block, start, end, capture, domParent }, suspended, error };
+	return {
+		wip: { block, start, end, capture, domParent, refDetachCheckpoint },
+		suspended,
+		error,
+	};
 }
 
 // Splice a COMPLETED off-screen WIP's captured effects/refs/store-syncs back into the
@@ -12650,7 +12865,15 @@ function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
 // Discard an off-screen WIP (suspended or superseded): remove its node range + fire any
 // partial cleanups. Captured effects/refs are dropped (they never ran).
 function disposeWip(wip: OffscreenWip): void {
-	unmountBlock(wip.block, true);
+	try {
+		unmountBlock(wip.block, true);
+	} finally {
+		// A completed descendant in an ultimately discarded WIP is marked mounted,
+		// so its teardown can enqueue ref(null). Its attach is still only in the
+		// discarded capture and never became observable; drop the matching detach.
+		refDetachQueue.splice(wip.refDetachCheckpoint);
+		discardOffscreenCapture(wip.capture);
+	}
 }
 
 // Remove the slot's current content (Block, Text, or pure-host node) while
@@ -15096,7 +15319,7 @@ export const HMR: unique symbol = Symbol.for('octane.hmr');
 interface HmrMeta {
 	fn: ComponentBody<any>;
 	liveBlocks: Set<Block>;
-	update(incoming: ComponentBody<any>): void;
+	update(incoming: ComponentBody<any>): boolean;
 }
 
 type HmrWrapper = ComponentBody<any> & { [HMR]: HmrMeta };
@@ -15105,7 +15328,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 	const meta: HmrMeta = {
 		fn,
 		liveBlocks: new Set(),
-		update(incoming: ComponentBody<any>): void {
+		update(incoming: ComponentBody<any>): boolean {
 			// The incoming function is the freshly-recompiled component body. If
 			// the incoming function is itself an HMR wrapper (which it will be when
 			// the new module re-runs `Comp = hmr(Comp)`), unwrap it down to the
@@ -15113,7 +15336,13 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileComponentSource(wrapper, incoming);
 			const incomingMeta = (incoming as any)[HMR] as HmrMeta | undefined;
-			meta.fn = incomingMeta ? incomingMeta.fn : incoming;
+			const nextFn = incomingMeta ? incomingMeta.fn : incoming;
+			// Direct-template shorthand bodies and returned-output shorthand bodies
+			// use different slot-0 ABIs. Let the bundler invalidate/full-reload this
+			// module instead of reusing a live scope with the incompatible layout.
+			if ((meta.fn as any).__octaneReturnedOutput !== (nextFn as any).__octaneReturnedOutput)
+				return false;
+			meta.fn = nextFn;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileComponentSource(wrapper, meta.fn);
 			// Keep the forwarded fetch plan in sync with the swapped body.
@@ -15133,6 +15362,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 					__profileSchedule(b, 'hmr');
 				scheduleRender(b);
 			}
+			return true;
 		},
 	};
 	function wrapper(props: P, scope: Scope, extra: any): unknown {
@@ -15873,10 +16103,11 @@ function swapToPendingFallback(state: TrySlot): void {
 // wraps ONCE at flushStagedReveals (flushingStagedReveals gates the per-
 // boundary wrap here).
 function commitResume(state: TrySlot): void {
-	if (!flushingStagedReveals && vtWouldWrapResume()) {
-		vtFlush(() => commitResumeInner(state));
+	if (
+		!flushingStagedReveals &&
+		VIEW_TRANSITION_DRIVER?.wrapResume(() => commitResumeInner(state)) === true
+	)
 		return;
-	}
 	commitResumeInner(state);
 }
 
@@ -16286,8 +16517,7 @@ function flushStagedReveals(): void {
 		// in commitResume is gated off by flushingStagedReveals). Fully captured
 		// fallback-hidden members also share the lifecycle commit above; a mixed
 		// pre-timeout batch retains the documented per-swap limitation.
-		if (vtWouldWrapResume()) vtFlush(run);
-		else run();
+		if (VIEW_TRANSITION_DRIVER?.wrapResume(run) !== true) run();
 	} finally {
 		flushingStagedReveals = false;
 	}
@@ -19376,13 +19606,8 @@ function coalesceHydratedRanges(
 		ownerGroups.set(owner, group);
 	}
 
-	function isBoundaryComponent(owner: CompSlot): boolean {
-		return (
-			owner.currentComp === Suspense ||
-			owner.currentComp === ErrorBoundary ||
-			owner.currentComp === ViewTransition ||
-			owner.currentComp === Hydrate
-		);
+	function isBoundaryOwner(owner: CompSlot): boolean {
+		return hasComponentFlags(owner.currentComp, COMPONENT_FLAG_BOUNDARY);
 	}
 
 	function mayBorrowCandidate(value: any): boolean {
@@ -19393,7 +19618,7 @@ function coalesceHydratedRanges(
 			return (
 				owner.block !== null &&
 				!owner.keyed &&
-				!isBoundaryComponent(owner) &&
+				!isBoundaryOwner(owner) &&
 				!scopeHasFragmentRef(owner.block)
 			);
 		}
@@ -19403,10 +19628,7 @@ function coalesceHydratedRanges(
 				owner.block !== null &&
 				owner.forSlot === null &&
 				owner.portal === null &&
-				owner.currentComp !== Suspense &&
-				owner.currentComp !== ErrorBoundary &&
-				owner.currentComp !== ViewTransition &&
-				owner.currentComp !== Hydrate &&
+				!hasComponentFlags(owner.currentComp, COMPONENT_FLAG_BOUNDARY) &&
 				!scopeHasFragmentRef(owner.block)
 			);
 		}

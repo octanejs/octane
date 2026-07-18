@@ -1,5 +1,29 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-17, later): Phase 1 COMPLETE.** The focus area (FocusScope at
+> full fidelity — scope tree, containment, restore, autoFocus, focus managers,
+> tree walker — plus FocusRing/useFocusRing/useHasTabbableChild), the i18n area
+> (I18nProvider + formatter/collator/filter hooks over verbatim
+> `@internationalized/*`), the form-validation layer, the remaining utils, the
+> stately state hooks (toggle/toggle-group/checkbox-group/radio-group/
+> searchfield/disclosure/form), and ALL Phase-1 leaf hooks (button family, label/
+> field, checkbox family, radio family, switch, textfield, searchfield with its
+> verbatim intl dictionaries, progress, meter, separator, link, disclosure,
+> toolbar, VisuallyHidden). 73 tests in the aria project; leaf differentials
+> byte-identical vs real react-aria (button/span-button/toggle-button/checkbox/
+> switch/radio-group/textfield/progress). The onChange→onInput wiring held
+> everywhere with one refinement: useToggle's label preventDefault is scoped to
+> non-input targets (upstream's unconditional preventDefault relies on React's
+> synthetic onChange firing anyway; under native events it would cancel the
+> input's own activation for virtual clicks).
+> **Second octane bug found + fixed:** a `flushSync` commit inside a controlled
+> checkable's click dispatch (press-state machinery) reasserted the stale
+> controlled `checked` over the platform's in-flight toggle — the activation's
+> `input`/`change` events fire AFTER the click, so native handlers read a
+> reverted DOM. During the activation window the checked binding now uses
+> React's prop-diff (not DOM-diff) semantics; the rejection contract is
+> unchanged (octane `checkable-activation-commit.test.ts`, changeset added).
+
 > **Progress (2026-07-17): Phase 0 COMPLETE.** Utils foundation + the FULL interactions
 > area landed (usePress at token-level fidelity incl. pointer capture, virtual
 > clicks, keyboard/link paths, meta-key replay, iOS fallbacks; useHover,
