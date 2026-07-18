@@ -1,5 +1,5 @@
 // /benchmarks — the checked-in runtime, SSR, async and size baselines, charted
-// with deterministic @octanejs/visx SVG (the site dogfoods its own charting binding).
+// as deterministic plain-div bar cards (the same bar view the explorer uses).
 // Three sections: the normalized at-a-glance explorer (the same linked bar/heatmap
 // component the home page stages, fed the matrix recomputed from FRAMEWORK_CARDS so
 // it can never drift from the cards below), then the cross-framework comparisons,
@@ -120,14 +120,9 @@ export function Benchmarks() @{
 			}
 			.benchpage-grid {
 				display: grid;
-				grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+				grid-template-columns: 1fr;
 				gap: 1.25rem;
 				align-items: start;
-			}
-			@media (max-width: 560px) {
-				.benchpage-grid {
-					grid-template-columns: 1fr;
-				}
 			}
 		</style>
 	</div>
