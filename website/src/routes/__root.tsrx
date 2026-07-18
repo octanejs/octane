@@ -23,6 +23,14 @@ const BASE_STYLES = `
 html {
 	-webkit-text-size-adjust: 100%;
 }
+/* Smooth anchor scrolling only for readers who accept motion: an unscoped
+   scroll-behavior would also override scrollIntoView({ behavior: 'auto' }),
+   defeating the TOC's reduced-motion fallback. */
+@media (prefers-reduced-motion: no-preference) {
+	html {
+		scroll-behavior: smooth;
+	}
+}
 body {
 	margin: 0;
 	background: var(--bg);
