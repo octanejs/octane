@@ -4,6 +4,7 @@ import {
 	ActivationCommitCheckbox,
 	ActivationCommitRadioGroup,
 	ActivationCommitRejectedCheckbox,
+	NestedCanceledActivation,
 } from './_fixtures/checkable-activation.tsx';
 
 // A click on a checkable toggles the DOM BEFORE the click dispatch, and the native
@@ -49,6 +50,22 @@ describe('controlled checkable with a mid-activation commit', () => {
 		});
 		expect(cb.getAttribute('data-pressed')).toBe('true');
 		expect(cb.checked).toBe(false); // restore reverted the unheard edit
+		r.unmount();
+	});
+
+	it('a canceled nested activation does not suppress a later controlled restore', async () => {
+		const r = mount(NestedCanceledActivation, { version: 0 });
+		const wrap = r.container.querySelector('div')!;
+		const cb = r.container.querySelector('input')!;
+
+		await act(() => {
+			wrap.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+		});
+		expect(cb.checked).toBe(false);
+
+		cb.checked = true;
+		r.update(NestedCanceledActivation, { version: 1 });
+		expect(cb.checked).toBe(false);
 		r.unmount();
 	});
 });

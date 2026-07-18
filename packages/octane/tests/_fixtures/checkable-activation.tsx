@@ -1,4 +1,4 @@
-import { flushSync, useState } from 'octane';
+import { flushSync, useRef, useState } from 'octane';
 
 // A controlled checkbox whose click handler forces a synchronous commit while the
 // platform's activation is still in flight (checked toggled, input/change not yet
@@ -65,5 +65,22 @@ export function ActivationCommitRejectedCheckbox() {
 				flushSync(() => setPressed(true));
 			}}
 		/>
+	);
+}
+
+// A programmatic click can be nested inside another delegated event. Canceling
+// that activation produces no native input/change follow-up, but its temporary
+// activation state must still end when the nested click dispatch does.
+export function NestedCanceledActivation(props: { version: number }) {
+	const input = useRef<HTMLInputElement>(null);
+	return (
+		<div data-version={props.version} onKeyDown={() => input.current!.click()}>
+			<input
+				ref={input}
+				type="checkbox"
+				checked={false}
+				onClick={(event) => event.preventDefault()}
+			/>
+		</div>
 	);
 }
