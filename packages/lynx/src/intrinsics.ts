@@ -178,9 +178,32 @@ export interface LynxListItemSnapAlignment {
 	offset: number;
 }
 
+export interface LynxListScrollStateInfo {
+	state: LynxListScrollState;
+}
+
+export interface LynxListSnapInfo {
+	position: number;
+	currentScrollLeft: number;
+	currentScrollTop: number;
+	targetScrollLeft: number;
+	targetScrollTop: number;
+}
+
+export interface LynxListLayoutCompleteInfo {
+	'layout-id'?: number;
+	scrollInfo: LynxListScrollInfo;
+}
+
 export type LynxListScrollEvent = LynxEvent<'scroll', LynxListScrollInfo>;
 export type LynxListScrollToLowerEvent = LynxEvent<'scrolltolower', LynxListScrollInfo>;
 export type LynxListScrollToUpperEvent = LynxEvent<'scrolltoupper', LynxListScrollInfo>;
+export type LynxListScrollStateChangeEvent = LynxEvent<
+	'scrollstatechange',
+	LynxListScrollStateInfo
+>;
+export type LynxListLayoutCompleteEvent = LynxEvent<'layoutcomplete', LynxListLayoutCompleteInfo>;
+export type LynxListSnapEvent = LynxEvent<'snap', LynxListSnapInfo>;
 
 export type LynxListProps = LynxStandardProps & {
 	'scroll-orientation'?: 'vertical' | 'horizontal';
@@ -200,9 +223,14 @@ export type LynxListProps = LynxStandardProps & {
 	'preload-buffer-count'?: number;
 	'experimental-search-ref-anchor-strategy'?: LynxListSearchRefAnchorStrategy;
 	'scroll-bar-enable'?: boolean;
+	'need-layout-complete-info'?: boolean;
+	'layout-id'?: number;
 	bindscroll?: LynxEventHandler<LynxListScrollEvent>;
 	bindscrolltoupper?: LynxEventHandler<LynxListScrollToUpperEvent>;
 	bindscrolltolower?: LynxEventHandler<LynxListScrollToLowerEvent>;
+	bindscrollstatechange?: LynxEventHandler<LynxListScrollStateChangeEvent>;
+	bindlayoutcomplete?: LynxEventHandler<LynxListLayoutCompleteEvent>;
+	bindsnap?: LynxEventHandler<LynxListSnapEvent>;
 };
 
 export type LynxListItemProps = LynxStandardProps & {
@@ -212,6 +240,10 @@ export type LynxListItemProps = LynxStandardProps & {
 	'full-span'?: boolean;
 	'estimated-main-axis-size-px'?: number;
 	recyclable?: boolean;
+	/** Native reuse pool partition; omission or `''` selects the default pool. */
+	'reuse-identifier'?: string;
+	/** Defer native materialization until the list requests this cell. */
+	defer?: boolean;
 };
 
 /**

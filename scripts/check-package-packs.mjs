@@ -697,7 +697,14 @@ function validatePackedLynxConsumer(tempRoot, archives) {
 	);
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
-		`import { useState } from 'octane';
+		`import { createLynxNativeResource } from '@octanejs/lynx';
+import { lynxPlatformAvailability } from '@octanejs/lynx/platform';
+import { useState } from 'octane';
+
+const resource = createLynxNativeResource('packed-resource');
+if (resource.id !== 'packed-resource' || lynxPlatformAvailability.implementedMilestone !== 4) {
+	throw new Error('packed Lynx Milestone 4 public subpaths are incomplete');
+}
 
 export function App() @{
 	const [count, setCount] = useState(0);
