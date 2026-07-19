@@ -76,9 +76,53 @@ const OCTANE_PLATFORM = {
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 
-function createRendererTypePrelude(renderer) {
-	if (renderer.intrinsics === undefined) return '';
-	return `/** @jsxImportSource ${renderer.intrinsics} */\n`;
+const JSX_IMPORT_SOURCE_PRAGMA = /@jsxImportSource\s+([^\s*]+)/;
+
+/**
+ * TypeScript honors a file-local `@jsxImportSource` pragma in a file's leading
+ * comment trivia, but the virtual TSX strips comments — so an authored pragma
+ * would silently vanish. Recover it from the source's leading trivia so a
+ * `.tsrx` file can opt into a renderer's intrinsics module (for example
+ * `@octanejs/three/intrinsics`) even when the host passes no renderer config
+ * (tsrx-tsc, generic language plugins). Mirrors TS precedence: the in-file
+ * pragma wins over any config-derived import source.
+ */
+function leadingJsxImportSourcePragma(source) {
+	let index = 0;
+	const length = source.length;
+	while (index < length) {
+		const code = source.charCodeAt(index);
+		// space, tab, LF, CR — plain leading whitespace.
+		if (code === 32 || code === 9 || code === 10 || code === 13) {
+			index++;
+			continue;
+		}
+		if (code === 47 /* '/' */ && source.charCodeAt(index + 1) === 47) {
+			let end = source.indexOf('\n', index);
+			if (end === -1) end = length;
+			const match = JSX_IMPORT_SOURCE_PRAGMA.exec(source.slice(index, end));
+			if (match !== null) return match[1];
+			index = end;
+			continue;
+		}
+		if (code === 47 /* '/' */ && source.charCodeAt(index + 1) === 42 /* '*' */) {
+			let end = source.indexOf('*/', index + 2);
+			if (end === -1) end = length;
+			else end += 2;
+			const match = JSX_IMPORT_SOURCE_PRAGMA.exec(source.slice(index, end));
+			if (match !== null) return match[1];
+			index = end;
+			continue;
+		}
+		break; // first real token — leading trivia is over.
+	}
+	return undefined;
+}
+
+function createRendererTypePrelude(renderer, source) {
+	const intrinsics = leadingJsxImportSourcePragma(source) ?? renderer.intrinsics;
+	if (intrinsics === undefined) return '';
+	return `/** @jsxImportSource ${intrinsics} */\n`;
 }
 
 function shiftGeneratedOffsets(mappings, offset) {
@@ -135,7 +179,7 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
-	const prelude = createRendererTypePrelude(renderer);
+	const prelude = createRendererTypePrelude(renderer, source);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
 		ast_from_source: ast,

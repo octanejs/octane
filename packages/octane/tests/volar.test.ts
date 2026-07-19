@@ -100,6 +100,40 @@ describe('compileToVolarMappings', () => {
 		}
 	});
 
+	it('recovers a leading @jsxImportSource pragma into the virtual TSX prelude', () => {
+		// The virtual TSX strips comments, so an authored file-local pragma (TS's
+		// own per-file intrinsics mechanism) must be re-emitted as the prelude —
+		// this is how a `.three.tsrx` opts into `@octanejs/three/intrinsics` when
+		// the host (tsrx-tsc, generic language plugins) passes no renderer config.
+		const jsx = 'export function Scene() @{ <mesh /> }\n';
+		const prelude = '/** @jsxImportSource @fixture/object-intrinsics */\n';
+
+		const block = compileToVolarMappings(prelude + jsx, '/src/Scene.tsrx');
+		expect(block.code.startsWith(prelude)).toBe(true);
+
+		const line = compileToVolarMappings(
+			'// with a @jsxImportSource @fixture/object-intrinsics pragma\n' + jsx,
+			'/src/Scene.tsrx',
+		);
+		expect(line.code.startsWith(prelude)).toBe(true);
+
+		// The source pragma wins over config-selected renderer intrinsics — same
+		// precedence TypeScript gives an in-file pragma over compilerOptions.
+		const overridden = compileToVolarMappings(prelude + jsx, '/src/Scene.object.tsrx', {
+			renderers: OBJECT_RENDERERS,
+		});
+		expect(overridden.code.startsWith(prelude)).toBe(true);
+		expect(overridden.code).not.toContain('@fixture/object-renderer');
+
+		// Only leading trivia counts: a pragma after the first statement is not a
+		// TS pragma and must not become one.
+		const trailing = compileToVolarMappings(
+			jsx + '/** @jsxImportSource @fixture/object-intrinsics */\n',
+			'/src/Scene.tsrx',
+		);
+		expect(trailing.code).not.toContain('@jsxImportSource');
+	});
+
 	it('keeps conflicting DOM and renderer intrinsic types isolated per virtual file', () => {
 		const root = mkdtempSync(join(tmpdir(), 'octane-volar-renderers-'));
 		try {

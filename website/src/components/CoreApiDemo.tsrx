@@ -458,9 +458,7 @@ export function CoreApiDemo() @{
 		hint="Try the buttons"
 	>
 		<div class="counter-layout">
-			<strong class="demo-count" aria-live="polite">
-				{count as string}
-			</strong>
+			<strong class="demo-count" aria-live="polite">{`${count}`}</strong>
 			<div class={['demo-actions', demoStyles.counterActions]}>
 				<button
 					type="button"
@@ -1000,7 +998,7 @@ export function FormActionDemo() @{
 						id="core-api-profile-name"
 						class={['demo-input', demoStyles.input]}
 						name="name"
-						autocomplete="name"
+						autoComplete="name"
 						defaultValue="Ada Lovelace"
 					/>
 				</label>

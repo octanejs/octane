@@ -10,12 +10,20 @@
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
     "allowImportingTsExtensions": true,
-    "skipLibCheck": true,
     "types": ["node"],
     "strict": true,
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "skipLibCheck": true
   },
-  "include": ["./src/"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["./src/", "./vendor/"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "vendor/router-plugin",
+    "vendor/start-plugin-core",
+    "vendor/router-generator",
+    "vendor/**/dist"
+  ]
 }

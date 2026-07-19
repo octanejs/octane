@@ -5807,6 +5807,23 @@ export const ErrorBoundary: ComponentBody<{
 );
 
 /**
+ * The virtual-TSX (IDE / tsrx-tsc) name for `@try { … } @catch (e) { … }`: the
+ * shared tsrx transform's type-only output imports `TsrxErrorBoundary` from
+ * 'octane' and emits the catch clause as `fallback={(error, _reset) => …}`.
+ * Runtime compilation never references this name (`@try` lowers to `tryBlock`),
+ * so this exists for TYPES: the function-typed `fallback` (unlike
+ * `ErrorBoundary`'s renderable-or-render-prop union, which collapses to
+ * `unknown`) gives the emitted arrow contextual parameter types, so authored
+ * `@catch` bindings type-check under `noImplicitAny`. `content` is the
+ * transform's expression-position prop form of children.
+ */
+export const TsrxErrorBoundary = ErrorBoundary as unknown as (props: {
+	fallback?: (error: unknown, reset: () => void) => unknown;
+	content?: unknown;
+	children?: unknown;
+}) => OctaneNode;
+
+/**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).
  *
  * - `use(context)`: walks the Block tree from CURRENT_BLOCK upward to find a

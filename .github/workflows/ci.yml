@@ -150,7 +150,7 @@ jobs:
         run: pnpm build
 
   typecheck_run:
-    name: typecheck packages and examples
+    name: typecheck packages, website, and examples
     runs-on: ubuntu-latest
 
     steps:

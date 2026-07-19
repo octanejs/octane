@@ -87,6 +87,8 @@ export {
 
 	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
+	// `@try`/`@catch` as the language tooling's type-only virtual TSX spells it.
+	TsrxErrorBoundary,
 	__useStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
