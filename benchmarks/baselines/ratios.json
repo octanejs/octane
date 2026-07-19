@@ -24,6 +24,22 @@
     "note": "swap rows: LIS keyed reconcile vs React (known <1x)."
   },
   {
+    "suite": "js-framework",
+    "op": "runlots",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.25,
+    "note": "TSX/TSRX flat-list control: create-10k stayed within 1.03-1.13x across seeded normal and reversed target orders through 2026-07-19. The 1.25 ceiling protects the shared keyed forBlock lowering without relying on sub-millisecond ops."
+  },
+  {
+    "suite": "js-framework",
+    "op": "clear",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.3,
+    "note": "TSX/TSRX flat-list control: seeded quick clear-10k runs measured up to 1.14x through 2026-07-19 with high three-sample teardown variance. The 1.3 ceiling keeps useful headroom while catching a dialect-specific cliff."
+  },
+  {
     "suite": "js-framework-reorder",
     "op": "rotateb",
     "target": "octane-tsrx",
@@ -46,6 +62,78 @@
     "reference": "react",
     "maxRatio": 0.6,
     "note": "Production autoMemo skips the unchanged RowsA region before the keyed wall; if dependency-scoped reuse breaks this rises toward the vanilla React memo-wall cost."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "mount",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.6,
+    "note": "TSX/TSRX component-heavy mount control. Adaptive paired runs stayed at 1.22-1.32x through 2026-07-19; 1.6 leaves browser/JIT headroom while keeping the dialect gap bounded."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "parent_rerender_equal_A",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 600,
+    "note": "Known return-JSX autoMemo gap: the calibrated 8ms batches measured 469-491x through 2026-07-19. This intentionally loose ceiling catches added work until descriptor-output reuse closes the gap; deterministic work gates remain the primary oracle."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "one_change_A",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 32,
+    "note": "Known return-JSX one-change gap measured 21.2-25.9x through 2026-07-19. The 32x ceiling allows normal paired variation while preventing more row/list work from landing."
+  },
+  {
+    "suite": "memo-wall",
+    "op": "ctx_through_wall_A",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 3,
+    "note": "Context-through-wall TSX/TSRX ratio remained 2.24-2.37x through 2026-07-19. The ceiling protects leaf-only refresh behavior while the return-JSX wrapper work is optimized."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "mount",
+    "target": "octane-jsx-dialect-pair",
+    "reference": "octane-tsrx-dialect-pair",
+    "maxRatio": 2.25,
+    "note": "Order-balanced A-B-B-A TSX/TSRX mount guard. Current and historical production ratios are 1.55-1.79x; 2.25 leaves cold-page noise headroom while catching more component-boundary scaffolding."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "update_root",
+    "target": "octane-jsx-dialect-pair",
+    "reference": "octane-tsrx-dialect-pair",
+    "maxRatio": 3.75,
+    "note": "Order-balanced A-B-B-A full context fan-out guard. Current and historical production ratios are 2.28-2.94x; deterministic work gates separately pin blocks, descriptors, keyed survivors and 1024 text writes."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "unmount",
+    "target": "octane-jsx-dialect-pair",
+    "reference": "octane-tsrx-dialect-pair",
+    "maxRatio": 6.75,
+    "note": "Order-balanced A-B-B-A full teardown guard. Current and historical production ratios are 4.05-5.25x; the ceiling catches growth while deterministic work gates bound block/scope teardown."
+  },
+  {
+    "suite": "signal-favoring",
+    "op": "mount",
+    "target": "octane-jsx-dialect-pair",
+    "reference": "octane-tsrx-dialect-pair",
+    "maxRatio": 1.8,
+    "note": "Order-balanced A-B-B-A 100-component chain mount guard. Current and historical production ratios are 1.19-1.41x; 1.8 leaves cold-page noise headroom."
+  },
+  {
+    "suite": "signal-favoring",
+    "op": "bump_shallow",
+    "target": "octane-jsx-dialect-pair",
+    "reference": "octane-tsrx-dialect-pair",
+    "maxRatio": 5.5,
+    "note": "Order-balanced A-B-B-A shallow cascade guard. Current and historical production ratios are 3.0-4.13x; precise work gates separately require one text write and cap every extra block/descriptor path."
   },
   {
     "suite": "dbmon",
@@ -71,6 +159,30 @@
     "minRatio": 1.2,
     "maxRatio": 4.0,
     "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "js_gzip",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.82,
+    "note": "Deterministic TSX/TSRX total-gzip gap. Two clean production runs on 2026-07-19 were byte-identical at 33765 / 18754 = 1.8004x; 1.82 catches retained runtime graph growth while allowing improvements."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "fw_gzip",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.9,
+    "note": "Deterministic TSX/TSRX framework-gzip gap: 30974 / 16407 = 1.8879x on 2026-07-19. This isolates the generic descriptor/runtime graph from application code."
+  },
+  {
+    "suite": "bundle-size",
+    "op": "app_gzip",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.2,
+    "note": "Deterministic TSX/TSRX application-code gzip: 2791 / 2347 = 1.1892x on 2026-07-19. Keeping this separate prevents a framework-size win from hiding generated app-code growth."
   },
   {
     "suite": "bundle-size",
@@ -330,6 +442,108 @@
     "reference": "react",
     "maxRatio": 1.0,
     "note": "Cross-framework transition topology guard: Octane reaches the honest 2-wave dependency floor vs React's 3 waves in the 2026-07-17 record. The 1.5x ratio headroom allows reference improvements; the suite separately enforces Octane's exact seven-resource independent first wave and eight-call ceiling."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "nodes_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 3.66,
+    "note": "Deterministic mounted-tree scaffolding ceiling: TSX 11263 / TSRX 3081 nodes on 2026-07-19. Visible element/text controls below prevent dropped output from looking like an improvement."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "comments_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 820,
+    "note": "Return-JSX boundary-marker tripwire: TSX 8192 / TSRX 10 comments at mount. This is a max-only gap ceiling so direct-return lowering can reduce it without rebaselining."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "elements_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control for the recursive mounted census: both dialects render exactly 2047 visible elements."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "text_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control for the recursive mounted census: both dialects render exactly 1024 text nodes."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "nodes_partial_unmounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 3.66,
+    "note": "Deterministic partial-teardown scaffolding ceiling: TSX 10920 / TSRX 2984 nodes after removing the 32-leaf subtree."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "comments_partial_unmounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 993,
+    "note": "Partial-teardown marker tripwire: TSX 7944 / TSRX 8 comments. Max-only so intended marker removal passes."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "elements_partial_unmounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control after partial teardown: both dialects retain exactly 1984 visible elements."
+  },
+  {
+    "suite": "recursive-context",
+    "op": "text_partial_unmounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control after partial teardown: both dialects retain exactly 992 text nodes."
+  },
+  {
+    "suite": "signal-favoring",
+    "op": "nodes_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.32,
+    "note": "Deterministic 100-component-chain scaffolding ceiling: TSX 418 / TSRX 319 mounted nodes on 2026-07-19."
+  },
+  {
+    "suite": "signal-favoring",
+    "op": "comments_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.91,
+    "note": "Return-JSX chain marker tripwire: TSX 208 / TSRX 109 comments. Max-only so direct component lowering can reduce it."
+  },
+  {
+    "suite": "signal-favoring",
+    "op": "elements_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control for the signal-chain census: both dialects render exactly 100 visible elements."
+  },
+  {
+    "suite": "signal-favoring",
+    "op": "text_mounted",
+    "target": "octane-jsx",
+    "reference": "octane-tsrx",
+    "minRatio": 1,
+    "maxRatio": 1,
+    "note": "Semantic control for the signal-chain census: both dialects render exactly 110 text nodes."
   },
   {
     "suite": "js-framework",

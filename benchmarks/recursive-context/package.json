@@ -6,6 +6,7 @@
   "description": "Recursive component and context fan-out benchmark across Octane and reference frameworks.",
   "scripts": {
     "bench": "node run.mjs",
+    "bench:work": "node work.mjs",
     "bench:long": "node run.mjs 40"
   },
   "dependencies": {

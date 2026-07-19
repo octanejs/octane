@@ -135,6 +135,20 @@ the whole body so target-side portal ranges stay visible. Keep visible
 elements/text as independent guards—a lower total obtained by dropping
 user-visible content is a correctness failure, not an optimization.
 
+Compiler-sensitive work counts use a separate production `work.mjs` invocation
+with jitless Chromium precise call coverage. This avoids source probes changing
+purity or memoization. Such invocations emit unique `*-work` target names, omit
+`iterations` so they cannot overwrite the timing run's sample count, and fail on
+missing production-asset coverage, exact semantic-write mismatches, or increases
+above exhaustive scaffolding ceilings. Specialized component-slot variants use
+aggregate ceilings so a cheaper lowering may replace a generic slot without
+turning an optimization into a gate failure.
+
+When a dialect timing ratio is important, suites may emit
+`octane-{tsrx,jsx}-dialect-pair` aliases. Those aliases combine fully-warmed raw
+samples from a TSRX→TSX→TSX→TSRX sequence with an independent-run mean; the
+original one-pass rows remain unchanged for cross-framework comparisons.
+
 The runner keys everything (result files, baselines, ratio guards) by the
 **manifest suite name**, not the JSON's internal `suite` field — so the deopt
 variants (`dbmon-deopt`, `js-framework-deopt`), which reuse a base harness via a

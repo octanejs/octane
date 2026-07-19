@@ -26,6 +26,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -47,8 +48,8 @@ const TARGETS = process.env.TARGETS
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function summarize(samples) {
-	return summarizeSamples(samples);
+function summarize(samples, options) {
+	return { ...summarizeSamples(samples, options), __samples: samples };
 }
 
 async function freshPage(browser, url) {
@@ -149,6 +150,25 @@ async function semanticGate(browser, url) {
 			expect(document.getElementById('main')?.childNodes.length === 0, 'reset left root DOM');
 			return errors;
 		});
+	} finally {
+		await ctx.close();
+	}
+}
+
+async function measureDom(browser, url) {
+	const { ctx, page } = await freshPage(browser, url);
+	const call = async (name) => {
+		await page.evaluate(async (hook) => {
+			const result = window[hook]();
+			if (result && typeof result.then === 'function') await result;
+		}, name);
+	};
+	try {
+		await call('__mount');
+		const mounted = await page.evaluate(censusDomNodes, '#main');
+		await call('__partialUnmount');
+		const partialUnmounted = await page.evaluate(censusDomNodes, '#main');
+		return { mounted, partialUnmounted };
 	} finally {
 		await ctx.close();
 	}
@@ -274,16 +294,18 @@ async function measurePartialUnmountRemount(browser, url) {
 	return { partial_unmount: summarize(u), partial_remount: summarize(r) };
 }
 
-async function runTarget(t) {
+async function runTarget(t, { verify = true } = {}) {
 	const browser = await chromium.launch({
 		headless: true,
 		args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
 	});
 
 	try {
-		console.error(`  → semantic gate`);
-		const gateErrors = await semanticGate(browser, t.url);
-		if (gateErrors.length > 0) return { gateErrors, results: null };
+		if (verify) {
+			console.error(`  → semantic gate`);
+			const gateErrors = await semanticGate(browser, t.url);
+			if (gateErrors.length > 0) return { gateErrors, results: null };
+		}
 
 		const { ctx, page } = await freshPage(browser, t.url);
 		const hasGc = await page.evaluate(() => typeof window.gc === 'function');
@@ -293,6 +315,7 @@ async function runTarget(t) {
 				'  ! window.gc unavailable (need --js-flags=--expose-gc) — results will be noisier',
 			);
 		}
+		const dom = verify ? await measureDom(browser, t.url) : null;
 
 		console.error(`  → mount`);
 		const mount = await measureMount(browser, t.url);
@@ -304,16 +327,23 @@ async function runTarget(t) {
 		const { partial_unmount, partial_remount } = await measurePartialUnmountRemount(browser, t.url);
 		console.error(`  → unmount`);
 		const unmount = await measureUnmount(browser, t.url);
+		const results = {
+			mount,
+			update_root,
+			update_partial,
+			partial_unmount,
+			partial_remount,
+			unmount,
+		};
+		if (dom !== null) {
+			for (const [op, state, field] of DOM_OPS) {
+				results[op] = deterministicCount(dom[state][field]);
+			}
+			results.__dom = dom;
+		}
 		return {
 			gateErrors: [],
-			results: {
-				mount,
-				update_root,
-				update_partial,
-				partial_unmount,
-				partial_remount,
-				unmount,
-			},
+			results,
 		};
 	} finally {
 		await browser.close();
@@ -329,11 +359,33 @@ const OPS = [
 	'unmount',
 ];
 
+const DOM_OPS = [
+	['nodes_mounted', 'mounted', 'total'],
+	['elements_mounted', 'mounted', 'elements'],
+	['text_mounted', 'mounted', 'text'],
+	['comments_mounted', 'mounted', 'comments'],
+	['empty_text_mounted', 'mounted', 'emptyText'],
+	['whitespace_text_mounted', 'mounted', 'whitespaceText'],
+	['nodes_partial_unmounted', 'partialUnmounted', 'total'],
+	['elements_partial_unmounted', 'partialUnmounted', 'elements'],
+	['text_partial_unmounted', 'partialUnmounted', 'text'],
+	['comments_partial_unmounted', 'partialUnmounted', 'comments'],
+	['empty_text_partial_unmounted', 'partialUnmounted', 'emptyText'],
+	['whitespace_text_partial_unmounted', 'partialUnmounted', 'whitespaceText'],
+];
+
+const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
+
 (async () => {
 	const all = {};
+	const dialectPairs = {};
 	const failures = [];
 	const failedTargets = new Set();
-	for (const t of TARGETS) {
+	const dialectTargets = DIALECT_PAIR_NAMES.map((name) =>
+		TARGETS.find((target) => target.name === name),
+	).filter(Boolean);
+	const remainingTargets = TARGETS.filter((target) => !DIALECT_PAIR_NAMES.includes(target.name));
+	const runVerifiedTarget = async (t) => {
 		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
 		try {
 			const { gateErrors, results } = await runTarget(t);
@@ -344,7 +396,7 @@ const OPS = [
 					failures.push(message);
 					console.error(`  ✗ ${message}`);
 				}
-				continue;
+				return;
 			}
 			all[t.name] = results;
 		} catch (error) {
@@ -353,7 +405,43 @@ const OPS = [
 			failures.push(message);
 			console.error(`  ✗ ${message}`);
 		}
+	};
+	for (const t of dialectTargets) await runVerifiedTarget(t);
+
+	// Order-balanced dialect aliases: the primary pass is TSRX₁ → TSX₁; repeat
+	// only those two in reverse, then combine their fully-warmed raw samples as
+	// independent runs. Existing target rows remain untouched for cross-framework
+	// comparisons, while TSX/TSRX guards use these A-B-B-A aliases.
+	if (dialectTargets.length === 2 && dialectTargets.every((target) => all[target.name])) {
+		const repeat = {};
+		for (const t of [...dialectTargets].reverse()) {
+			console.error(`Repeating ${t.name} for order-balanced dialect pair…`);
+			try {
+				const { results } = await runTarget(t, { verify: false });
+				repeat[t.name] = results;
+			} catch (error) {
+				const alias = `${t.name}-dialect-pair`;
+				failedTargets.add(alias);
+				const message = `${alias}: ${error instanceof Error ? error.message : String(error)}`;
+				failures.push(message);
+				console.error(`  ✗ ${message}`);
+			}
+		}
+		if (dialectTargets.every((target) => repeat[target.name])) {
+			for (const t of dialectTargets) {
+				const alias = `${t.name}-dialect-pair`;
+				dialectPairs[alias] = Object.fromEntries(
+					OPS.map((op) => [
+						op,
+						summarize([...all[t.name][op].__samples, ...repeat[t.name][op].__samples], {
+							scoreMode: 'mean',
+						}),
+					]),
+				);
+			}
+		}
 	}
+	for (const t of remainingTargets) await runVerifiedTarget(t);
 
 	const successfulTargets = TARGETS.filter((t) => all[t.name]);
 	const cols = successfulTargets.map((t) => t.name);
@@ -370,6 +458,22 @@ const OPS = [
 			);
 		}
 		console.log(row.join('| '));
+	}
+	for (const [op] of DOM_OPS) {
+		const row = [op.padEnd(16)];
+		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
+		console.log(row.join('| '));
+	}
+
+	const tsrxPair = dialectPairs['octane-tsrx-dialect-pair'];
+	const jsxPair = dialectPairs['octane-jsx-dialect-pair'];
+	if (tsrxPair && jsxPair) {
+		console.log('\norder-balanced octane-jsx / octane-tsrx dialect ratio:');
+		for (const op of OPS) {
+			console.log(
+				`  ${op.padEnd(16)} ${(scoreOf(jsxPair[op]) / scoreOf(tsrxPair[op])).toFixed(2)}x`,
+			);
+		}
 	}
 
 	if (successfulTargets.length > 1) {
@@ -407,18 +511,28 @@ const OPS = [
 		const payload = {
 			suite: 'recursive-context',
 			iterations: ITER,
-			targets: TARGETS.map((t) => ({
-				name: t.name,
-				ops: all[t.name]
-					? Object.fromEntries(
-							OPS.map((op) => {
-								const r = all[t.name][op];
-								return [op, timingStatForJson(r)];
-							}),
-						)
-					: {},
-				meta: { gates: failedTargets.has(t.name) ? 'fail' : 'pass' },
-			})),
+			targets: [
+				...TARGETS.map((t) => ({
+					name: t.name,
+					ops: all[t.name]
+						? {
+								...Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])])),
+								...Object.fromEntries(
+									DOM_OPS.map(([op]) => [op, deterministicStatForJson(all[t.name][op])]),
+								),
+							}
+						: {},
+					meta: {
+						gates: failedTargets.has(t.name) ? 'fail' : 'pass',
+						...(all[t.name]?.__dom ? { dom: all[t.name].__dom } : null),
+					},
+				})),
+				...Object.entries(dialectPairs).map(([name, results]) => ({
+					name,
+					ops: Object.fromEntries(OPS.map((op) => [op, timingStatForJson(results[op])])),
+					meta: { gates: failedTargets.has(name) ? 'fail' : 'pass', order: 'ABBA' },
+				})),
+			],
 		};
 		if (failures.length > 0) payload.failed = failures.join('; ');
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');

@@ -33,6 +33,7 @@
 
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { censusDomNodes, deterministicCount, deterministicStatForJson } from '../lib/dom-nodes.mjs';
 import { scoreOf, summarizeSamples, timingStatForJson } from '../lib/stats.mjs';
 
 const ITER = parseInt(process.argv[2] || '20', 10);
@@ -171,8 +172,21 @@ async function semanticGate(browser, url) {
 	}
 }
 
-function summarize(samples) {
-	return summarizeSamples(samples);
+async function measureDom(browser, url) {
+	const { ctx, page } = await freshPage(browser, url);
+	try {
+		await page.evaluate(async () => {
+			const result = window.__mount();
+			if (result && typeof result.then === 'function') await result;
+		});
+		return await page.evaluate(censusDomNodes, '#main');
+	} finally {
+		await ctx.close();
+	}
+}
+
+function summarize(samples, options) {
+	return { ...summarizeSamples(samples, options), __samples: samples };
 }
 
 // MOUNT — fresh page per sample; time the synchronous __mount() on a clean heap.
@@ -322,15 +336,18 @@ async function measureUnmount(browser, url) {
 	return summarize(samples);
 }
 
-async function runTarget(t) {
+async function runTarget(t, { verify = true } = {}) {
 	const browser = await chromium.launch({
 		headless: true,
 		args: ['--disable-extensions', '--no-sandbox', '--js-flags=--expose-gc'],
 	});
 	try {
-		console.error(`  → semantic gate`);
-		const gateErrors = await semanticGate(browser, t.url);
-		if (gateErrors.length > 0) return { gateErrors, results: null };
+		if (verify) {
+			console.error(`  → semantic gate`);
+			const gateErrors = await semanticGate(browser, t.url);
+			if (gateErrors.length > 0) return { gateErrors, results: null };
+		}
+		const dom = verify ? await measureDom(browser, t.url) : null;
 
 		console.error(`  → mount`);
 		const mount = await measureMount(browser, t.url);
@@ -348,18 +365,23 @@ async function runTarget(t) {
 		const bump_sweep_reverse = await measureSweep(browser, t.url, '__sweepBatchedReverse');
 		console.error(`  → unmount`);
 		const unmount = await measureUnmount(browser, t.url);
+		const results = {
+			mount,
+			bump_shallow,
+			bump_middle,
+			bump_deep,
+			bump_sweep,
+			bump_sweep_batched,
+			bump_sweep_reverse,
+			unmount,
+		};
+		if (dom !== null) {
+			for (const [op, field] of DOM_OPS) results[op] = deterministicCount(dom[field]);
+			results.__dom = dom;
+		}
 		return {
 			gateErrors: [],
-			results: {
-				mount,
-				bump_shallow,
-				bump_middle,
-				bump_deep,
-				bump_sweep,
-				bump_sweep_batched,
-				bump_sweep_reverse,
-				unmount,
-			},
+			results,
 		};
 	} finally {
 		await browser.close();
@@ -377,11 +399,27 @@ const OPS = [
 	'unmount',
 ];
 
+const DOM_OPS = [
+	['nodes_mounted', 'total'],
+	['elements_mounted', 'elements'],
+	['text_mounted', 'text'],
+	['comments_mounted', 'comments'],
+	['empty_text_mounted', 'emptyText'],
+	['whitespace_text_mounted', 'whitespaceText'],
+];
+
+const DIALECT_PAIR_NAMES = ['octane-tsrx', 'octane-jsx'];
+
 (async () => {
 	const all = {};
+	const dialectPairs = {};
 	const failures = [];
 	const failedTargets = new Set();
-	for (const t of TARGETS) {
+	const dialectTargets = DIALECT_PAIR_NAMES.map((name) =>
+		TARGETS.find((target) => target.name === name),
+	).filter(Boolean);
+	const remainingTargets = TARGETS.filter((target) => !DIALECT_PAIR_NAMES.includes(target.name));
+	const runVerifiedTarget = async (t) => {
 		console.error(`Running ${t.name} (${t.url}) × ${ITER} (+${WARMUP} warmup)…`);
 		try {
 			const { gateErrors, results } = await runTarget(t);
@@ -392,7 +430,7 @@ const OPS = [
 					failures.push(message);
 					console.error(`  ✗ ${message}`);
 				}
-				continue;
+				return;
 			}
 			all[t.name] = results;
 		} catch (error) {
@@ -401,7 +439,42 @@ const OPS = [
 			failures.push(message);
 			console.error(`  ✗ ${message}`);
 		}
+	};
+	for (const t of dialectTargets) await runVerifiedTarget(t);
+
+	// Repeat only the Octane twins in reverse and combine the two independent,
+	// fully-warmed sample sets. Ratio guards use these A-B-B-A aliases so a fixed
+	// target order cannot masquerade as a dialect cost.
+	if (dialectTargets.length === 2 && dialectTargets.every((target) => all[target.name])) {
+		const repeat = {};
+		for (const t of [...dialectTargets].reverse()) {
+			console.error(`Repeating ${t.name} for order-balanced dialect pair…`);
+			try {
+				const { results } = await runTarget(t, { verify: false });
+				repeat[t.name] = results;
+			} catch (error) {
+				const alias = `${t.name}-dialect-pair`;
+				failedTargets.add(alias);
+				const message = `${alias}: ${error instanceof Error ? error.message : String(error)}`;
+				failures.push(message);
+				console.error(`  ✗ ${message}`);
+			}
+		}
+		if (dialectTargets.every((target) => repeat[target.name])) {
+			for (const t of dialectTargets) {
+				const alias = `${t.name}-dialect-pair`;
+				dialectPairs[alias] = Object.fromEntries(
+					OPS.map((op) => [
+						op,
+						summarize([...all[t.name][op].__samples, ...repeat[t.name][op].__samples], {
+							scoreMode: 'mean',
+						}),
+					]),
+				);
+			}
+		}
 	}
+	for (const t of remainingTargets) await runVerifiedTarget(t);
 
 	const successfulTargets = TARGETS.filter((t) => all[t.name]);
 	const cols = successfulTargets.map((t) => t.name);
@@ -419,6 +492,22 @@ const OPS = [
 			row.push(`${fmt(r.median)} (min ${fmt(r.min)}, sd ${fmt(r.stddev)})`.padEnd(W));
 		}
 		console.log(row.join('| '));
+	}
+	for (const [op] of DOM_OPS) {
+		const row = [op.padEnd(14)];
+		for (const c of cols) row.push(String(all[c][op].median).padEnd(W));
+		console.log(row.join('| '));
+	}
+
+	const tsrxPair = dialectPairs['octane-tsrx-dialect-pair'];
+	const jsxPair = dialectPairs['octane-jsx-dialect-pair'];
+	if (tsrxPair && jsxPair) {
+		console.log('\norder-balanced octane-jsx / octane-tsrx dialect ratio:');
+		for (const op of OPS) {
+			console.log(
+				`  ${op.padEnd(14)} ${(scoreOf(jsxPair[op]) / scoreOf(tsrxPair[op])).toFixed(2)}x`,
+			);
+		}
 	}
 
 	if (successfulTargets.length > 1) {
@@ -492,18 +581,28 @@ const OPS = [
 		const payload = {
 			suite: 'signal-favoring',
 			iterations: ITER,
-			targets: TARGETS.map((t) => ({
-				name: t.name,
-				ops: all[t.name]
-					? Object.fromEntries(
-							OPS.map((op) => {
-								const r = all[t.name][op];
-								return [op, timingStatForJson(r)];
-							}),
-						)
-					: {},
-				meta: { gates: failedTargets.has(t.name) ? 'fail' : 'pass' },
-			})),
+			targets: [
+				...TARGETS.map((t) => ({
+					name: t.name,
+					ops: all[t.name]
+						? {
+								...Object.fromEntries(OPS.map((op) => [op, timingStatForJson(all[t.name][op])])),
+								...Object.fromEntries(
+									DOM_OPS.map(([op]) => [op, deterministicStatForJson(all[t.name][op])]),
+								),
+							}
+						: {},
+					meta: {
+						gates: failedTargets.has(t.name) ? 'fail' : 'pass',
+						...(all[t.name]?.__dom ? { dom: all[t.name].__dom } : null),
+					},
+				})),
+				...Object.entries(dialectPairs).map(([name, results]) => ({
+					name,
+					ops: Object.fromEntries(OPS.map((op) => [op, timingStatForJson(results[op])])),
+					meta: { gates: failedTargets.has(name) ? 'fail' : 'pass', order: 'ABBA' },
+				})),
+			],
 		};
 		if (failures.length > 0) payload.failed = failures.join('; ');
 		fs.writeFileSync(process.env.BENCH_JSON, JSON.stringify(payload, null, '\t') + '\n');
