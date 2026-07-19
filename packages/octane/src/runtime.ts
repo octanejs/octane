@@ -3427,9 +3427,21 @@ function renderReturnedValue(block: Block, out: unknown): void {
 		(out as any).$$kind === ELEMENT_TAG &&
 		(out as any).key == null &&
 		typeof (out as any).type === 'function';
+	const existingRet = block.slots[0] as any;
 	const useSingleRoot =
 		isComponentDescriptor &&
-		((out as any).type.$$singleRoot === true || activeHydration()?.passthroughRanges === true);
+		((out as any).type.$$singleRoot === true ||
+			activeHydration()?.passthroughRanges === true ||
+			// STICKY regime: a return slot mounted through the componentSlot route
+			// (most importantly by the passthrough-hydration branch above, whose
+			// condition is false again once hydration ends) keeps that route while
+			// the returned component identity is unchanged. Falling through to the
+			// childSlot route would dispose the slot for a mere kind flip — tearing
+			// down the very subtree hydration just adopted on its FIRST update. An
+			// identity change still disposes below (matching remount semantics).
+			(existingRet !== undefined &&
+				existingRet.__kind === 'componentSlotSlot' &&
+				existingRet.currentComp === (out as any).type));
 	// The private return slot holds EITHER a componentSlotSlot (singleRoot
 	// path) or a childSlot. A re-render can flip which applies: a body that
 	// returns `<SingleRootComp/>` one render and `null` / a portal / an array
@@ -3437,7 +3449,6 @@ function renderReturnedValue(block: Block, out: unknown): void {
 	// shapes are incompatible, so tear the old one down before the other path
 	// reads it as its own kind (else e.g. childSlot would touch a
 	// componentSlotSlot and crash).
-	const existingRet = block.slots[0] as any;
 	if (
 		existingRet !== undefined &&
 		existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
