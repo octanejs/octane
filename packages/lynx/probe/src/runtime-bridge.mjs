@@ -50,11 +50,13 @@ export function installPhase0MainThread(target = globalThis) {
 			const acknowledgement = receiver.receive(message.batch);
 			sendContextMessage(context, {
 				type: ACK_MESSAGE,
+				requestId: message.requestId,
 				acknowledgement,
 			});
 		} catch (error) {
 			sendContextMessage(context, {
 				type: ACK_MESSAGE,
+				requestId: message.requestId,
 				rejection: {
 					...PHASE_0_PROTOCOL,
 					type: 'reject',
@@ -82,6 +84,9 @@ export function installPhase0Background(target = globalThis) {
 	}
 
 	const pending = new Map();
+	let nextRequestId = 1;
+	let postedAnyCommit = false;
+	let mainReadyCancelled = false;
 	let resolveMainReady;
 	let rejectMainReady;
 	const mainReady = new Promise((resolve, reject) => {
@@ -97,6 +102,7 @@ export function installPhase0Background(target = globalThis) {
 	function cancelMainReady() {
 		if (mainReadySettled) return;
 		mainReadySettled = true;
+		mainReadyCancelled = true;
 		rejectMainReady(
 			new Error('Octane Lynx Phase 0 background transport was destroyed before main ready.'),
 		);
@@ -109,10 +115,9 @@ export function installPhase0Background(target = globalThis) {
 		}
 		if (message?.type !== ACK_MESSAGE) return;
 
-		const version = message.acknowledgement?.acceptedVersion ?? message.rejection?.version;
-		const deferred = pending.get(version);
+		const deferred = pending.get(message.requestId);
 		if (!deferred) return;
-		pending.delete(version);
+		pending.delete(message.requestId);
 		if (message.rejection) {
 			deferred.reject(new Error(message.rejection.message));
 		} else {
@@ -122,13 +127,28 @@ export function installPhase0Background(target = globalThis) {
 	sendContextMessage(context, { type: MAIN_READY_REQUEST_MESSAGE });
 
 	const probe = createPhase0BackgroundProbe(async (batch) => {
+		if (batch.type === 'destroy' && mainReadyCancelled && !postedAnyCommit) {
+			return {
+				...PHASE_0_PROTOCOL,
+				type: 'destroy-ack',
+				acceptedVersion: 0,
+			};
+		}
 		await mainReady;
 		return new Promise((resolve, reject) => {
-			pending.set(batch.version, { resolve, reject });
-			sendContextMessage(context, {
-				type: BATCH_MESSAGE,
-				batch,
-			});
+			const requestId = nextRequestId++;
+			pending.set(requestId, { resolve, reject });
+			try {
+				sendContextMessage(context, {
+					type: BATCH_MESSAGE,
+					requestId,
+					batch,
+				});
+				if (batch.type === 'commit') postedAnyCommit = true;
+			} catch (error) {
+				pending.delete(requestId);
+				reject(error);
+			}
 		});
 	});
 

@@ -43,8 +43,35 @@ const LOADER_OPTION_KEYS = new Set([
 	'exclude',
 	'renderers',
 	'requireDirective',
+	'universalRuntime',
 ]);
-const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'transpile']);
+const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'runtime', 'transpile']);
+
+function normalizeUniversalRuntime(value) {
+	if (value === undefined) return undefined;
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+		throw new TypeError('@octanejs/rspack-plugin: `universalRuntime` must be an object.');
+	}
+	for (const key of Object.keys(value)) {
+		if (key !== 'runtime' && key !== 'thread') {
+			throw new TypeError(`@octanejs/rspack-plugin: unknown \`universalRuntime.${key}\` option.`);
+		}
+	}
+	if (
+		typeof value.runtime !== 'string' ||
+		!/^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(value.runtime)
+	) {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `universalRuntime.runtime` must be a lowercase runtime ID.',
+		);
+	}
+	if (value.thread !== 'background' && value.thread !== 'main-thread') {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `universalRuntime.thread` must be "background" or "main-thread".',
+		);
+	}
+	return Object.freeze({ runtime: value.runtime, thread: value.thread });
+}
 
 function assertBooleanOption(options, key) {
 	if (options[key] !== undefined && typeof options[key] !== 'boolean') {
@@ -67,6 +94,17 @@ function normalizeOptions(value, plugin) {
 		throw new TypeError('@octanejs/rspack-plugin: `root` must be a path string.');
 	}
 	if (
+		plugin &&
+		options.runtime !== undefined &&
+		(typeof options.runtime !== 'string' ||
+			options.runtime.trim() !== options.runtime ||
+			!options.runtime)
+	) {
+		throw new TypeError(
+			'@octanejs/rspack-plugin: `runtime` must be a non-empty module request string.',
+		);
+	}
+	if (
 		options.environment !== undefined &&
 		options.environment !== 'client' &&
 		options.environment !== 'server'
@@ -86,6 +124,7 @@ function normalizeOptions(value, plugin) {
 	if (plugin) assertBooleanOption(options, 'transpile');
 	const renderers =
 		options.renderers === undefined ? undefined : normalizeRendererConfig(options.renderers);
+	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
 
 	const normalized = {
 		...(options.root === undefined ? null : { root: options.root }),
@@ -95,10 +134,12 @@ function normalizeOptions(value, plugin) {
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
+		...(universalRuntime === undefined ? null : { universalRuntime }),
 		...(options.requireDirective === undefined
 			? null
 			: { requireDirective: options.requireDirective }),
 		...(plugin && options.transpile !== undefined ? { transpile: options.transpile } : null),
+		...(plugin && options.runtime !== undefined ? { runtime: options.runtime } : null),
 	};
 	if (normalized.exclude) Object.freeze(normalized.exclude);
 	return Object.freeze(normalized);
@@ -121,6 +162,12 @@ export function getOctaneRspackBuildInfo(module) {
 		typeof value.clientReference.id === 'string' &&
 		typeof value.clientReference.moduleId === 'string' &&
 		typeof value.clientReference.renderer === 'string';
+	const universalRuntimeValid =
+		value?.universalRuntime !== null &&
+		typeof value?.universalRuntime === 'object' &&
+		typeof value.universalRuntime.runtime === 'string' &&
+		(value.universalRuntime.thread === 'background' ||
+			value.universalRuntime.thread === 'main-thread');
 	if (
 		value &&
 		typeof value === 'object' &&
@@ -129,7 +176,8 @@ export function getOctaneRspackBuildInfo(module) {
 			value.transformKind === 'slots' ||
 			value.transformKind === 'client-only-stub') &&
 		typeof value.serverRpc === 'boolean' &&
-		(value.clientReference === undefined || nestedReferenceValid)
+		(value.clientReference === undefined || nestedReferenceValid) &&
+		(value.universalRuntime === undefined || universalRuntimeValid)
 	) {
 		return value;
 	}

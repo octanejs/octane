@@ -1,8 +1,10 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **proposed implementation plan**
+Status: **Milestone 0 blocked; Milestone 1 implemented as private scaffolding**
 
 Upstream audit date: **2026-07-18**
+
+Milestone 1 evidence date: **2026-07-19**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -268,6 +270,11 @@ The Lynx implementation remains on the separate universal path. Any extracted
 context, scheduler, or profiling primitive must be host-neutral and leave
 normal DOM output and hot paths byte- and behavior-equivalent. Lynx-specific
 conditionals do not belong in `runtime.ts`.
+
+The host-neutral root uses the standard `queueMicrotask` global when one is
+available and otherwise requires `UniversalRootOptions.scheduleMicrotask`.
+The future Lynx root supplies that option from `lynx.queueMicrotask`; the core
+does not turn thrown scheduler callbacks into Promise rejections.
 
 ### Proposed package layout
 
@@ -560,6 +567,13 @@ extension APIs are documented. If a required lifecycle/event hook is private or
 unstable, stop and upstream a framework-neutral hook before building the port.
 
 ### Milestone 1 — native-safe universal core and package scaffolding (2–3 engineer-weeks)
+
+> **Progress (2026-07-19): implemented.** The private Lynx and Rspeedy packages,
+> DOM-free native universal entry, renderer diagnostics, exact dual-thread
+> production compile graphs, runtime-compatibility evidence, and packed external
+> consumer are in place. This satisfies the build/source exit gate only;
+> Milestone 0's public lifecycle/event and real-device gates remain blocked, so
+> this is not a native preview and does not claim `.lynx.bundle` execution.
 
 - Scaffold `@octanejs/lynx` and `@octanejs/rspeedy-plugin` with package exports,
   licenses, `UPSTREAM.md`, status/crosswalk checks, renderer config, intrinsics,
@@ -944,4 +958,3 @@ Octane has genuine Lynx native capability when all of the following are true:
 - the package status and release notes state exactly which Lynx engine,
   platforms, elements, events, lifecycle APIs, main-thread capabilities, and
   advanced features are supported.
-

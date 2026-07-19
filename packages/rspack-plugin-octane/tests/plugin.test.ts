@@ -116,6 +116,8 @@ describe('OctaneRspackPlugin', () => {
 		const compiler = createCompiler('node');
 		const plugin = octaneRspack({
 			environment: 'client',
+			runtime: '@octanejs/lynx/renderer',
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
 			hmr: false,
 			dev: true,
 			exclude: ['generated'],
@@ -139,9 +141,11 @@ describe('OctaneRspackPlugin', () => {
 		});
 		plugin.apply(compiler as any);
 
-		expect(mocks.resolveRuntimeRequest).toHaveBeenCalledWith('octane', 'client');
+		expect(mocks.resolveRuntimeRequest).not.toHaveBeenCalled();
 		const aliases = compiler.options.resolve.alias as Record<string, string>;
-		expect(aliases['octane$']).toMatch(/(?:^octane$|packages\/octane\/src\/index\.ts$)/);
+		expect(aliases['octane$']).toMatch(
+			/(?:@octanejs\/lynx\/renderer|packages\/lynx\/src\/renderer\.ts)$/,
+		);
 		expect(aliases['/src/object-renderer.js$']).toBe('/project/src/object-renderer.js');
 		expect(aliases[`${existingHostPath}$`]).toBe(
 			resolve('/project', existingHostPath.replace(/^[/\\]+/, '')),
@@ -154,9 +158,10 @@ describe('OctaneRspackPlugin', () => {
 			hmr: false,
 			dev: true,
 			exclude: ['generated'],
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
 			renderers: expect.objectContaining({
 				default: 'dom',
-				signature: expect.stringMatching(/^octane-renderers-v3:/),
+				signature: expect.stringMatching(/^octane-renderers-v4:/),
 				boundaries: {
 					'/src/object-boundaries.js': {
 						Canvas: {
@@ -178,6 +183,7 @@ describe('OctaneRspackPlugin', () => {
 						}),
 					}),
 				}),
+				universalRuntime: { runtime: 'lynx', thread: 'background' },
 			}),
 		);
 	});
@@ -191,6 +197,8 @@ describe('OctaneRspackPlugin', () => {
 		const dom = createCachedCompiler();
 		const object = createCachedCompiler();
 		const boundedObject = createCachedCompiler();
+		const nativeBackground = createCachedCompiler();
+		const nativeMain = createCachedCompiler();
 
 		new OctaneRspackPlugin().apply(dom as any);
 		new OctaneRspackPlugin({
@@ -214,6 +222,14 @@ describe('OctaneRspackPlugin', () => {
 				},
 			},
 		}).apply(boundedObject as any);
+		new OctaneRspackPlugin({
+			runtime: '@octanejs/lynx/renderer',
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
+		}).apply(nativeBackground as any);
+		new OctaneRspackPlugin({
+			runtime: '@octanejs/lynx/renderer',
+			universalRuntime: { runtime: 'lynx', thread: 'main-thread' },
+		}).apply(nativeMain as any);
 
 		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
@@ -221,6 +237,9 @@ describe('OctaneRspackPlugin', () => {
 		expect((object.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 		expect((boundedObject.options as any).cache.version).not.toBe(
 			(object.options as any).cache.version,
+		);
+		expect((nativeBackground.options as any).cache.version).not.toBe(
+			(nativeMain.options as any).cache.version,
 		);
 
 		// requireDirective flips which modules compile vs pass through, so a

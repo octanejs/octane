@@ -1,0 +1,63 @@
+{
+  "name": "@octanejs/lynx",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Private Milestone 1 scaffold for Octane's future Lynx native renderer.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/lynx"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "audit",
+    "src",
+    "LICENSE",
+    "LICENSE-APACHE-2.0",
+    "NOTICE",
+    "README.md",
+    "UPSTREAM.md",
+    "status.json"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./config": {
+      "types": "./src/config.runtime.d.ts",
+      "import": "./src/config.runtime.js",
+      "default": "./src/config.runtime.js"
+    },
+    "./renderer": "./src/renderer.ts",
+    "./intrinsics": "./src/intrinsics.ts",
+    "./intrinsics/jsx-runtime": "./src/intrinsics.ts",
+    "./platform": "./src/platform.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project lynx",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p typetests/tsconfig.json"
+  },
+  "dependencies": {
+    "@lynx-js/types": "catalog:lynx"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:default",
+    "octane": "workspace:*",
+    "typescript": "catalog:lynx",
+    "vitest": "catalog:default"
+  }
+}

@@ -38,6 +38,7 @@
     "./constants": "./src/constants.ts",
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
+    "./universal/native": "./src/universal-native.ts",
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
@@ -88,6 +89,10 @@
       "./universal": {
         "types": "./dist/universal.d.ts",
         "default": "./dist/universal.js"
+      },
+      "./universal/native": {
+        "types": "./dist/universal-native.d.ts",
+        "default": "./dist/universal-native.js"
       },
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",

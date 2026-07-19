@@ -10,6 +10,7 @@
 import { parseModule } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
+import { normalizeUniversalRuntime } from './universal-runtime.js';
 
 const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'Activity',
@@ -241,6 +242,826 @@ function validateRuntimeImports(ast, state) {
 			}
 		}
 	}
+}
+
+const NON_RUNTIME_AST_KEYS = new Set([
+	'end',
+	'implements',
+	'loc',
+	'metadata',
+	'returnType',
+	'start',
+	'superTypeArguments',
+	'superTypeParameters',
+	'typeAnnotation',
+	'typeArguments',
+	'typeParameters',
+]);
+const RUNTIME_TYPESCRIPT_NODES = new Set([
+	'TSAsExpression',
+	'TSEnumDeclaration',
+	'TSEnumMember',
+	'TSExportAssignment',
+	'TSImportEqualsDeclaration',
+	'TSInstantiationExpression',
+	'TSModuleBlock',
+	'TSModuleDeclaration',
+	'TSNonNullExpression',
+	'TSParameterProperty',
+	'TSQualifiedName',
+	'TSSatisfiesExpression',
+	'TSTypeAssertion',
+]);
+
+function forEachRuntimeAstChild(node, visit) {
+	if (
+		typeof node?.type === 'string' &&
+		node.type.startsWith('TS') &&
+		!RUNTIME_TYPESCRIPT_NODES.has(node.type)
+	) {
+		return;
+	}
+	for (const [key, value] of Object.entries(node)) {
+		if (NON_RUNTIME_AST_KEYS.has(key) || value === null || typeof value !== 'object') continue;
+		if (Array.isArray(value)) {
+			for (const child of value) visit(child, key);
+		} else {
+			visit(value, key);
+		}
+	}
+}
+
+function authoredNodePredicate(origins) {
+	if (!origins) return () => true;
+	const authoredOffsets = new Uint32Array(origins.length + 1);
+	for (let index = 0; index < origins.length; index++) {
+		authoredOffsets[index + 1] = authoredOffsets[index] + (origins[index] >= 0 ? 1 : 0);
+	}
+	return (node) => {
+		if (typeof node?.start !== 'number' || typeof node?.end !== 'number') return false;
+		const start = Math.max(0, Math.min(origins.length, node.start));
+		const end = Math.max(start, Math.min(origins.length, node.end));
+		return authoredOffsets[end] !== authoredOffsets[start];
+	};
+}
+
+function originalNodePredicate(origins, sourceLength) {
+	const includedOffsets = new Uint8Array(sourceLength + 1);
+	for (const origin of origins) {
+		if (origin >= 0 && origin < sourceLength) includedOffsets[origin] = 1;
+	}
+	const includedPrefix = new Uint32Array(sourceLength + 1);
+	for (let index = 0; index < sourceLength; index++) {
+		includedPrefix[index + 1] = includedPrefix[index] + includedOffsets[index];
+	}
+	return (node) => {
+		if (typeof node?.start !== 'number' || typeof node?.end !== 'number') return false;
+		const start = Math.max(0, Math.min(sourceLength, node.start));
+		const end = Math.max(start, Math.min(sourceLength, node.end));
+		return includedPrefix[end] !== includedPrefix[start];
+	};
+}
+
+function forbiddenImportMatch(source, forbidden) {
+	return forbidden.find((packageId) => source === packageId || source.startsWith(`${packageId}/`));
+}
+
+function validateForbiddenImports(
+	ast,
+	state,
+	validation,
+	isAuthored,
+	lexicalAnalysis = null,
+	referencedStaticSources = null,
+) {
+	const forbidden = validation.forbiddenImports;
+	if (!forbidden || forbidden.length === 0) return;
+	const { nodeScopes, rootScope, isBound } = lexicalAnalysis ?? createLexicalAnalysis(ast);
+	const requests = [];
+	const collectRequest = (sourceNode, kind = 'import') => {
+		const source = sourceNode?.value;
+		if (
+			typeof source !== 'string' ||
+			(!isAuthored(sourceNode) && !referencedStaticSources?.has(sourceNode))
+		) {
+			return;
+		}
+		const matched = forbiddenImportMatch(source, forbidden);
+		if (matched !== undefined) requests.push({ kind, matched, source, sourceNode });
+	};
+	for (const node of ast.body ?? []) {
+		let sourceNode = null;
+		if (
+			node.type === 'ImportDeclaration' ||
+			node.type === 'ExportNamedDeclaration' ||
+			node.type === 'ExportAllDeclaration'
+		) {
+			sourceNode = node.source;
+		} else if (node.type === 'TSImportEqualsDeclaration') {
+			sourceNode = node.moduleReference?.expression;
+		}
+		collectRequest(sourceNode);
+	}
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (node.type === 'ImportExpression') collectRequest(node.source);
+		if (node.type === 'CallExpression') {
+			let bindingName = null;
+			if (node.callee?.type === 'Identifier' && node.callee.name === 'require') {
+				bindingName = 'require';
+			} else if (
+				(node.callee?.type === 'MemberExpression' ||
+					node.callee?.type === 'OptionalMemberExpression') &&
+				node.callee.object?.type === 'Identifier' &&
+				node.callee.object.name === 'module'
+			) {
+				const propertyName = node.callee.computed
+					? node.callee.property?.value
+					: node.callee.property?.name;
+				if (propertyName === 'require') bindingName = 'module';
+			}
+			const scope = nodeScopes.get(node) ?? rootScope;
+			if (bindingName !== null && !isBound(scope, bindingName)) {
+				collectRequest(node.arguments?.[0], 'CommonJS require');
+			}
+		}
+		forEachRuntimeAstChild(node, visit);
+	};
+	visit(ast);
+	if (requests.length > 0) {
+		requests.sort((left, right) => (left.sourceNode.start ?? 0) - (right.sourceNode.start ?? 0));
+		const { kind, matched, source, sourceNode } = requests[0];
+		throw universalError(
+			state.filename,
+			sourceNode,
+			`renderer ${JSON.stringify(state.renderer.id)} forbids static ${kind} ${JSON.stringify(source)} (matched ${JSON.stringify(matched)}).`,
+		);
+	}
+}
+
+function createLexicalScope(parent, isFunction = false) {
+	const scope = { bindings: new Set(), functionScope: null, importSources: new Map(), parent };
+	scope.functionScope = isFunction ? scope : (parent?.functionScope ?? scope);
+	return scope;
+}
+
+function createLexicalAnalysis(ast) {
+	const bindingNodes = new WeakSet();
+	const nonReferenceNodes = new WeakSet();
+	const nodeScopes = new WeakMap();
+	const rootScope = createLexicalScope(null, true);
+	const hasBinding = (scope, name) => {
+		for (let current = scope; current; current = current.parent) {
+			if (current.bindings.has(name)) return true;
+		}
+		return false;
+	};
+	const commonJsSource = (node, scope) => {
+		if (node?.type !== 'CallExpression') return null;
+		if (
+			node.callee?.type === 'Identifier' &&
+			node.callee.name === 'require' &&
+			!hasBinding(scope, 'require')
+		) {
+			return node.arguments?.[0] ?? null;
+		}
+		if (
+			(node.callee?.type === 'MemberExpression' ||
+				node.callee?.type === 'OptionalMemberExpression') &&
+			node.callee.object?.type === 'Identifier' &&
+			node.callee.object.name === 'module' &&
+			!hasBinding(scope, 'module')
+		) {
+			const propertyName = node.callee.computed
+				? node.callee.property?.value
+				: node.callee.property?.name;
+			if (propertyName === 'require') return node.arguments?.[0] ?? null;
+		}
+		return null;
+	};
+	const declarePattern = (pattern, scope, importSource = null) => {
+		if (!pattern) return;
+		if (pattern.type === 'Identifier') {
+			if (scope !== null) {
+				scope.bindings.add(pattern.name);
+				if (importSource !== null) scope.importSources.set(pattern.name, importSource);
+			}
+			bindingNodes.add(pattern);
+			return;
+		}
+		if (pattern.type === 'RestElement') {
+			declarePattern(pattern.argument, scope, importSource);
+			return;
+		}
+		if (pattern.type === 'AssignmentPattern') {
+			declarePattern(pattern.left, scope, importSource);
+			return;
+		}
+		if (pattern.type === 'TSParameterProperty') {
+			declarePattern(pattern.parameter, scope, importSource);
+			return;
+		}
+		if (pattern.type === 'ArrayPattern') {
+			for (const element of pattern.elements ?? []) {
+				declarePattern(element, scope, importSource);
+			}
+			return;
+		}
+		if (pattern.type === 'ObjectPattern') {
+			for (const property of pattern.properties ?? []) {
+				declarePattern(property.argument ?? property.value, scope, importSource);
+			}
+		}
+	};
+	const visitScopes = (node, scope) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visitScopes(child, scope);
+			return;
+		}
+		nodeScopes.set(node, scope);
+
+		if (node.type === 'ImportDeclaration') {
+			if (node.importKind !== 'type') {
+				for (const specifier of node.specifiers ?? []) {
+					if (specifier.importKind !== 'type' && specifier.local) {
+						declarePattern(specifier.local, scope, node.source);
+					}
+				}
+			}
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, scope));
+			return;
+		}
+		if (
+			node.type === 'ExportNamedDeclaration' &&
+			(node.source != null || node.exportKind === 'type')
+		) {
+			for (const specifier of node.specifiers ?? []) {
+				if (specifier.local) nonReferenceNodes.add(specifier.local);
+				if (specifier.exported) nonReferenceNodes.add(specifier.exported);
+			}
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, scope));
+			return;
+		}
+		if (node.type === 'VariableDeclaration') {
+			const bindingScope = node.kind === 'var' ? scope.functionScope : scope;
+			for (const declaration of node.declarations ?? []) {
+				declarePattern(
+					declaration.id,
+					node.declare === true ? null : bindingScope,
+					node.declare === true ? null : commonJsSource(declaration.init, scope),
+				);
+			}
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, scope));
+			return;
+		}
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			if (node.type === 'FunctionDeclaration' && node.id) declarePattern(node.id, scope);
+			const parameterScope = createLexicalScope(scope, true);
+			if (node.id) declarePattern(node.id, parameterScope);
+			for (const parameter of node.params ?? []) declarePattern(parameter, parameterScope);
+			if (node.id) visitScopes(node.id, parameterScope);
+			for (const parameter of node.params ?? []) visitScopes(parameter, parameterScope);
+			const bodyScope = createLexicalScope(parameterScope, true);
+			visitScopes(node.body, bodyScope);
+			return;
+		}
+		if (node.type === 'ClassDeclaration' || node.type === 'ClassExpression') {
+			if (node.declare === true) {
+				if (node.id) declarePattern(node.id, null);
+				return;
+			}
+			if (node.type === 'ClassDeclaration' && node.id) declarePattern(node.id, scope);
+			for (const decorator of node.decorators ?? []) visitScopes(decorator, scope);
+			const classScope = createLexicalScope(scope);
+			if (node.id) {
+				declarePattern(node.id, classScope);
+				visitScopes(node.id, classScope);
+			}
+			visitScopes(node.superClass, classScope);
+			visitScopes(node.body, classScope);
+			return;
+		}
+		if (node.type === 'BlockStatement' || node.type === 'JSXCodeBlock') {
+			const blockScope = createLexicalScope(scope);
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, blockScope));
+			return;
+		}
+		if (node.type === 'StaticBlock') {
+			const staticScope = createLexicalScope(scope, true);
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, staticScope));
+			return;
+		}
+		if (
+			node.type === 'ForStatement' ||
+			node.type === 'ForInStatement' ||
+			node.type === 'ForOfStatement' ||
+			node.type === 'SwitchStatement'
+		) {
+			const blockScope = createLexicalScope(scope);
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, blockScope));
+			return;
+		}
+		if (node.type === 'CatchClause') {
+			const catchScope = createLexicalScope(scope);
+			declarePattern(node.param, catchScope);
+			visitScopes(node.param, catchScope);
+			visitScopes(node.body, catchScope);
+			return;
+		}
+		if (node.type === 'JSXForExpression') {
+			visitScopes(node.right, scope);
+			const itemScope = createLexicalScope(scope);
+			if (node.left?.type === 'VariableDeclaration') {
+				for (const declaration of node.left.declarations ?? []) {
+					declarePattern(declaration.id, itemScope);
+				}
+			} else {
+				declarePattern(node.left, itemScope);
+			}
+			declarePattern(node.index, itemScope);
+			visitScopes(node.left, itemScope);
+			visitScopes(node.index, itemScope);
+			visitScopes(node.key, itemScope);
+			visitScopes(node.body, itemScope);
+			visitScopes(node.empty, scope);
+			return;
+		}
+		if (node.type === 'JSXTryExpression') {
+			visitScopes(node.block, scope);
+			visitScopes(node.pending, scope);
+			if (node.handler) {
+				const catchScope = createLexicalScope(scope);
+				declarePattern(node.handler.param, catchScope);
+				declarePattern(node.handler.resetParam, catchScope);
+				visitScopes(node.handler.param, catchScope);
+				visitScopes(node.handler.resetParam, catchScope);
+				visitScopes(node.handler.body, catchScope);
+			}
+			return;
+		}
+		if (node.type === 'TSModuleDeclaration') {
+			if (node.declare === true || node.global === true) {
+				if (node.id) declarePattern(node.id, null);
+				return;
+			}
+			if (node.id) declarePattern(node.id, scope);
+			const moduleScope = createLexicalScope(scope, true);
+			if (node.id) {
+				declarePattern(node.id, moduleScope);
+				visitScopes(node.id, moduleScope);
+			}
+			visitScopes(node.body, moduleScope);
+			return;
+		}
+		if (node.type === 'TSEnumDeclaration') {
+			if (node.id) declarePattern(node.id, node.declare === true ? null : scope);
+			if (node.declare === true) return;
+			const enumScope = createLexicalScope(scope);
+			if (node.id) declarePattern(node.id, enumScope);
+			for (const member of node.members ?? []) {
+				if (member.computed !== true && member.id?.type === 'Identifier') {
+					declarePattern(member.id, enumScope);
+				}
+			}
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, enumScope));
+			return;
+		}
+		if (node.type === 'TSImportEqualsDeclaration') {
+			if (node.id) {
+				declarePattern(
+					node.id,
+					node.declare === true ? null : scope,
+					node.moduleReference?.expression ?? null,
+				);
+			}
+			if (node.declare === true) return;
+			forEachRuntimeAstChild(node, (child) => visitScopes(child, scope));
+			return;
+		}
+
+		forEachRuntimeAstChild(node, (child) => visitScopes(child, scope));
+	};
+	visitScopes(ast, rootScope);
+	const resolveBinding = (scope, name) => {
+		for (let current = scope; current; current = current.parent) {
+			if (current.bindings.has(name)) {
+				return {
+					importSource: current.importSources.get(name) ?? null,
+					scope: current,
+				};
+			}
+		}
+		return null;
+	};
+	const isBound = (scope, name) => resolveBinding(scope, name) !== null;
+	return {
+		bindingNodes,
+		nonReferenceNodes,
+		nodeScopes,
+		rootScope,
+		isBound,
+		resolveBinding,
+	};
+}
+
+function isIdentifierReference(node, parent, key, lexicalAnalysis) {
+	const { bindingNodes, nonReferenceNodes } = lexicalAnalysis;
+	if (bindingNodes.has(node) || nonReferenceNodes.has(node)) return false;
+	if (
+		parent?.type === 'ImportSpecifier' ||
+		parent?.type === 'ImportDefaultSpecifier' ||
+		parent?.type === 'ImportNamespaceSpecifier'
+	) {
+		return false;
+	}
+	if (
+		(parent?.type === 'ExportSpecifier' && key === 'exported') ||
+		(parent?.type === 'ExportAllDeclaration' && key === 'exported') ||
+		parent?.type === 'ExportNamespaceSpecifier'
+	) {
+		return false;
+	}
+	if (
+		(parent?.type === 'MemberExpression' || parent?.type === 'OptionalMemberExpression') &&
+		key === 'property' &&
+		!parent.computed
+	) {
+		return false;
+	}
+	if (parent?.type === 'Property' && key === 'key' && !parent.computed) {
+		return parent.shorthand === true && parent.value === node;
+	}
+	if (
+		(parent?.type === 'MethodDefinition' ||
+			parent?.type === 'PropertyDefinition' ||
+			parent?.type === 'TSEnumMember') &&
+		(key === 'key' || key === 'id') &&
+		!parent.computed
+	) {
+		return false;
+	}
+	if (parent?.type === 'TSQualifiedName' && key === 'right') return false;
+	if (
+		(parent?.type === 'LabeledStatement' && key === 'label') ||
+		((parent?.type === 'BreakStatement' || parent?.type === 'ContinueStatement') &&
+			key === 'label') ||
+		(parent?.type === 'ImportAttribute' && key === 'key' && !parent.computed) ||
+		parent?.type === 'MetaProperty'
+	) {
+		return false;
+	}
+	return true;
+}
+
+function isJsxBindingReference(node, parent, key) {
+	if (node.type !== 'JSXIdentifier') return false;
+	if (
+		(parent?.type === 'JSXOpeningElement' || parent?.type === 'JSXClosingElement') &&
+		key === 'name'
+	) {
+		return true;
+	}
+	return parent?.type === 'JSXMemberExpression' && key === 'object';
+}
+
+function referencedImportSources(ast, lexicalAnalysis, isAuthored) {
+	const { nodeScopes, resolveBinding, rootScope } = lexicalAnalysis;
+	const sources = new Set();
+	const seen = new WeakSet();
+	const visit = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, parent, key);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (
+			isAuthored(node) &&
+			((node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexicalAnalysis)) ||
+				isJsxBindingReference(node, parent, key))
+		) {
+			const binding = resolveBinding(nodeScopes.get(node) ?? rootScope, node.name);
+			if (binding?.importSource !== null && binding?.importSource !== undefined) {
+				sources.add(binding.importSource);
+			}
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	};
+	visit(ast);
+	return sources;
+}
+
+function importSourceRanges(sources) {
+	return [...sources]
+		.filter((source) => typeof source.start === 'number' && typeof source.end === 'number')
+		.map((source) => Object.freeze({ end: source.end, start: source.start }))
+		.sort((left, right) => left.start - right.start || left.end - right.end);
+}
+
+/**
+ * Find static import sources whose runtime bindings are referenced by the
+ * authored offsets represented in a renderer-region origin map.
+ */
+export function rendererValidationImportReferences(source, filename, origins) {
+	const ast = parseModule(source, filename);
+	const lexicalAnalysis = createLexicalAnalysis(ast);
+	const isAuthored = originalNodePredicate(origins, source.length);
+	return Object.freeze(
+		importSourceRanges(referencedImportSources(ast, lexicalAnalysis, isAuthored)),
+	);
+}
+
+/** Validate a renderer-selected helper module without compiling or rewriting it. */
+export function validateRendererModuleSource(source, filename, renderer) {
+	if (renderer?.validation === undefined) return;
+	const ast = parseModule(source, filename);
+	validateRendererSource(ast, { filename, renderer });
+}
+
+function validateForbiddenGlobals(ast, state, validation, isAuthored, lexicalAnalysis = null) {
+	const forbidden = new Set(validation.forbiddenGlobals ?? []);
+	if (forbidden.size === 0) return;
+	const analysis = lexicalAnalysis ?? createLexicalAnalysis(ast);
+	const { nodeScopes, rootScope, isBound } = analysis;
+	const references = [];
+	const seen = new WeakSet();
+	const visitReferences = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visitReferences(child, parent, key);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		const scope = nodeScopes.get(node) ?? rootScope;
+		if (
+			node.type === 'Identifier' &&
+			forbidden.has(node.name) &&
+			isAuthored(node) &&
+			isIdentifierReference(node, parent, key, analysis) &&
+			!isBound(scope, node.name)
+		) {
+			references.push({ name: node.name, node });
+		}
+		if (
+			(node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression') &&
+			node.object?.type === 'Identifier' &&
+			node.object.name === 'globalThis' &&
+			!isBound(nodeScopes.get(node.object) ?? scope, 'globalThis')
+		) {
+			const name = node.computed ? node.property?.value : node.property?.name;
+			if (typeof name === 'string' && forbidden.has(name) && isAuthored(node.property ?? node)) {
+				references.push({ name, node: node.property ?? node });
+			}
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visitReferences(child, node, childKey));
+	};
+	visitReferences(ast);
+	if (references.length > 0) {
+		references.sort((left, right) => (left.node.start ?? 0) - (right.node.start ?? 0));
+		const reference = references[0];
+		throw universalError(
+			state.filename,
+			reference.node,
+			`renderer ${JSON.stringify(state.renderer.id)} forbids unbound global ${JSON.stringify(reference.name)}.`,
+		);
+	}
+}
+
+function hostPropMatches(name, pattern) {
+	return pattern.endsWith('*') ? name.startsWith(pattern.slice(0, -1)) : name === pattern;
+}
+
+function validationAttributeName(attribute) {
+	const direct = attributeName(attribute);
+	if (direct !== null) return direct;
+	const name = attribute?.name;
+	if (name?.type !== 'JSXNamespacedName') return null;
+	const namespace = name.namespace?.name;
+	const local = name.name?.name;
+	return typeof namespace === 'string' && typeof local === 'string'
+		? `${namespace}:${local}`
+		: null;
+}
+
+function isStaticallyPrimitiveTextExpression(node) {
+	if (!node || typeof node !== 'object') return false;
+	if (
+		node.type === 'ParenthesizedExpression' ||
+		node.type === 'ChainExpression' ||
+		node.type === 'TSNonNullExpression' ||
+		node.type === 'TSSatisfiesExpression'
+	) {
+		return isStaticallyPrimitiveTextExpression(node.expression);
+	}
+	if (node.type === 'TSAsExpression' || node.type === 'TSTypeAssertion') {
+		if (
+			node.typeAnnotation?.type === 'TSStringKeyword' ||
+			node.typeAnnotation?.type === 'TSNumberKeyword' ||
+			node.typeAnnotation?.type === 'TSBigIntKeyword'
+		) {
+			return true;
+		}
+		return isStaticallyPrimitiveTextExpression(node.expression);
+	}
+	if (node.type === 'Literal') {
+		return (
+			typeof node.value === 'string' ||
+			typeof node.value === 'number' ||
+			typeof node.value === 'bigint'
+		);
+	}
+	if (node.type === 'TemplateLiteral' || node.type === 'UpdateExpression') return true;
+	if (node.type === 'UnaryExpression') {
+		return (
+			node.operator === '+' ||
+			node.operator === '-' ||
+			node.operator === '~' ||
+			node.operator === 'typeof'
+		);
+	}
+	if (node.type === 'BinaryExpression') {
+		return ['+', '-', '*', '/', '%', '**', '<<', '>>', '>>>', '&', '|', '^'].includes(
+			node.operator,
+		);
+	}
+	if (node.type === 'ConditionalExpression') {
+		return (
+			isStaticallyPrimitiveTextExpression(node.consequent) &&
+			isStaticallyPrimitiveTextExpression(node.alternate)
+		);
+	}
+	if (node.type === 'SequenceExpression') {
+		return isStaticallyPrimitiveTextExpression(node.expressions?.at(-1));
+	}
+	return false;
+}
+
+function validateHostTemplates(ast, state, validation, isAuthored) {
+	const textParents = validation.textParents === undefined ? null : new Set(validation.textParents);
+	const hostProps = validation.hostProps;
+	if (textParents === null && hostProps === undefined) return;
+	const sharedProps = hostProps?.['*'] ?? [];
+	const seen = new WeakSet();
+	const visit = (node, nearestHost = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, nearestHost);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (node.type === 'JSXText') {
+			if (
+				textParents !== null &&
+				nearestHost !== null &&
+				isAuthored(node) &&
+				normalizeJsxText(node.value ?? '') !== '' &&
+				!textParents.has(nearestHost)
+			) {
+				throw universalError(
+					state.filename,
+					node,
+					`renderer ${JSON.stringify(state.renderer.id)} does not allow authored JSX text under <${nearestHost}>.`,
+				);
+			}
+			return;
+		}
+		if (node.type === 'JSXExpressionContainer') {
+			if (
+				textParents !== null &&
+				nearestHost !== null &&
+				!textParents.has(nearestHost) &&
+				isAuthored(node) &&
+				isStaticallyPrimitiveTextExpression(node.expression)
+			) {
+				throw universalError(
+					state.filename,
+					node.expression,
+					`renderer ${JSON.stringify(state.renderer.id)} does not allow authored primitive text under <${nearestHost}>.`,
+				);
+			}
+			visit(node.expression, nearestHost);
+			return;
+		}
+		if (node.type === 'JSXElement' || node.type === 'Element') {
+			const name = jsxName(node);
+			const isHost = name !== null && /^[a-z]/.test(name) && !isComponentElement(node);
+			// A component owns the eventual placement of its children. Do not carry
+			// the caller's nearest host through that semantic boundary; the component
+			// body is validated independently at the host site it actually authors.
+			const nextHost = isHost ? name : null;
+			const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+			if (isHost && hostProps !== undefined && Object.hasOwn(hostProps, name)) {
+				const tagProps = hostProps[name];
+				for (const attribute of attributes) {
+					if (
+						attribute.type === 'JSXSpreadAttribute' ||
+						attribute.type === 'SpreadAttribute' ||
+						!isAuthored(attribute)
+					) {
+						continue;
+					}
+					const attributeValue = validationAttributeName(attribute);
+					if (
+						attributeValue === null ||
+						attributeValue === 'key' ||
+						attributeValue === 'children' ||
+						sharedProps.some((pattern) => hostPropMatches(attributeValue, pattern)) ||
+						tagProps.some((pattern) => hostPropMatches(attributeValue, pattern))
+					) {
+						continue;
+					}
+					throw universalError(
+						state.filename,
+						attribute,
+						`renderer ${JSON.stringify(state.renderer.id)} does not allow static attribute ${JSON.stringify(attributeValue)} on <${name}>.`,
+					);
+				}
+			}
+			for (const attribute of attributes) {
+				if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
+					visit(attribute.argument, null);
+					continue;
+				}
+				const attributeHost =
+					isHost && validationAttributeName(attribute) === 'children' ? nextHost : null;
+				visit(attribute.value, attributeHost);
+			}
+			visit(node.children ?? [], nextHost);
+			return;
+		}
+		if (node.type === 'JSXFragment' || node.type === 'Fragment') {
+			visit(node.children ?? [], nearestHost);
+			return;
+		}
+		forEachRuntimeAstChild(node, (child) => visit(child, nearestHost));
+	};
+	visit(ast);
+}
+
+function validateRendererSource(ast, state, origins = null) {
+	const validation = state.renderer.validation;
+	if (validation === undefined) return;
+	const isAuthored = authoredNodePredicate(origins);
+	const needsLexicalAnalysis =
+		(validation.forbiddenImports?.length ?? 0) > 0 ||
+		(validation.forbiddenGlobals?.length ?? 0) > 0;
+	const lexicalAnalysis = needsLexicalAnalysis ? createLexicalAnalysis(ast) : null;
+	validateForbiddenImports(ast, state, validation, isAuthored, lexicalAnalysis);
+	validateForbiddenGlobals(ast, state, validation, isAuthored, lexicalAnalysis);
+	validateHostTemplates(ast, state, validation, isAuthored);
+}
+
+function validateLoweredRendererSource(ast, state, origins, authoredSource) {
+	const validation = state.renderer.validation;
+	if (validation === undefined) return;
+	const isSyntheticAuthored = authoredNodePredicate(origins);
+	if (
+		typeof authoredSource === 'string' &&
+		((validation.forbiddenImports?.length ?? 0) > 0 ||
+			(validation.forbiddenGlobals?.length ?? 0) > 0)
+	) {
+		const authoredAst = parseModule(authoredSource, state.filename);
+		const lexicalAnalysis = createLexicalAnalysis(authoredAst);
+		const isOriginalAuthored = originalNodePredicate(origins, authoredSource.length);
+		const referencedStaticSources = referencedImportSources(
+			authoredAst,
+			lexicalAnalysis,
+			isOriginalAuthored,
+		);
+		state.validationImportReferences = importSourceRanges(referencedStaticSources);
+		validateForbiddenImports(
+			authoredAst,
+			state,
+			validation,
+			isOriginalAuthored,
+			lexicalAnalysis,
+			referencedStaticSources,
+		);
+		validateForbiddenGlobals(authoredAst, state, validation, isOriginalAuthored, lexicalAnalysis);
+	} else {
+		const needsLexicalAnalysis =
+			(validation.forbiddenImports?.length ?? 0) > 0 ||
+			(validation.forbiddenGlobals?.length ?? 0) > 0;
+		const lexicalAnalysis = needsLexicalAnalysis ? createLexicalAnalysis(ast) : null;
+		validateForbiddenImports(ast, state, validation, isSyntheticAuthored, lexicalAnalysis);
+		validateForbiddenGlobals(ast, state, validation, isSyntheticAuthored, lexicalAnalysis);
+	}
+	validateHostTemplates(ast, state, validation, isSyntheticAuthored);
 }
 
 function collectAuthoredHookSites(fn, state) {
@@ -1731,6 +2552,7 @@ export function lowerUniversalRendererRegion(
 	) {
 		throw new TypeError('A renderer-owned universal region requires a universal renderer.');
 	}
+	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
 	const prefix = `__octaneRendererRegion${index}`;
 	const expressionPrefix = kind === 'children' ? `(<>` : `(`;
 	const expressionSuffix = kind === 'children' ? `</>)` : `)`;
@@ -1799,6 +2621,7 @@ export function lowerUniversalRendererRegion(
 		mappingNeedles: [],
 		runtimeImports: new Map(),
 		planPrefix: prefix,
+		validationImportReferences: [],
 	};
 	state.helpers.component = allocName(state, `${prefix}Define`);
 	state.helpers.plan = allocName(state, `${prefix}Plan`);
@@ -1839,6 +2662,16 @@ export function lowerUniversalRendererRegion(
 		state.helpers.hmrSymbol = allocName(state, `${prefix}HmrSymbol`);
 	}
 	if (state.profile) state.helpers.profile = allocName(state, `${prefix}Profile`);
+	if (typeof options.authoredSource === 'string') {
+		state.validationImportReferences = rendererValidationImportReferences(
+			options.authoredSource,
+			filename,
+			synthetic.origins,
+		);
+	}
+	if (renderer.validation !== undefined) {
+		validateLoweredRendererSource(ast, state, synthetic.origins, options.authoredSource);
+	}
 	validateRuntimeImports(ast, state);
 	const regionHelper = allocName(state, `${prefix}Descriptor`);
 	const componentName = allocName(state, `${prefix}Body`);
@@ -2015,11 +2848,13 @@ export function lowerUniversalRendererRegion(
 			renderer,
 			runtimeAliases: Object.freeze((options.runtimeImports ?? []).map(({ local }) => local)),
 			runtimeImports: Object.freeze(options.runtimeImports ?? []),
+			...(universalRuntime === undefined ? null : { universalRuntime }),
 		}),
 		prelude,
 		preludeOrigins: mapOrigins(prelude),
 		expression: loweredRegionExpression,
 		expressionOrigins: mapOrigins(loweredRegionExpression),
+		validationImportReferences: Object.freeze(state.validationImportReferences),
 	});
 }
 
@@ -2039,6 +2874,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 	) {
 		throw new TypeError('Octane universal compiler requires a resolved universal renderer.');
 	}
+	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
 	const ast = parseModule(source, filename);
 	const hmrDialect = options.hmr === true ? 'vite' : options.hmr || false;
 	const state = {
@@ -2075,6 +2911,16 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		state.helpers.hmrSymbol = allocName(state, '__octaneUniversalHmrSymbol');
 	}
 	if (state.profile) state.helpers.profile = allocName(state, '__octaneProfileComponent');
+	if (renderer.validation !== undefined) {
+		const remap = options.__universalValidationRemap;
+		if (remap?.origins && remap.authored) {
+			const validationAst = parseModule(source, filename);
+			remapAuthoredLocations(validationAst, remap.origins, remap.authored);
+			validateRendererSource(validationAst, state, remap.origins);
+		} else {
+			validateRendererSource(ast, state);
+		}
+	}
 	validateRuntimeImports(ast, state);
 
 	const emitted = [];
@@ -2168,5 +3014,6 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		map: result.__universalSourceMapComposed
 			? result.map
 			: composeSourceMaps(result.map, intermediateMap),
+		...(universalRuntime === undefined ? null : { universalRuntime }),
 	};
 }

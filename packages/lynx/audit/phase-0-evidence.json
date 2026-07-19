@@ -13,11 +13,11 @@
       "cwd": "packages/lynx/probe",
       "status": "passed",
       "result": {
-        "tests": 12,
-        "passed": 12,
+        "tests": 17,
+        "passed": 17,
         "failed": 0
       },
-      "scope": "Runs the probe source in @lynx-js/testing-environment with jsdom. It proves a page/view/text tree after either main-first or background-first startup, cancellation before main readiness, one acknowledged tap-driven background update, teardown while a mount acknowledgement is pending, validation-before-mutation for invalid, structurally stale, and conflicting-parent batches, and that background state remains at its last acknowledged value while a commit is pending or rejected. It does not execute the encoded .lynx.bundle."
+      "scope": "Runs the probe source in @lynx-js/testing-environment with jsdom. It proves a page/view/text tree after either main-first or background-first startup, cancellation before main readiness, one acknowledged tap-driven background update, request-correlated idempotent terminal teardown while a mount acknowledgement is pending or after an outcome-ambiguous mount/update transport fault, cleanup when root append throws before or after mutation or removal mutates and then throws, validation-before-mutation for invalid, structurally stale, and conflicting-parent batches, and that background state remains at its last acknowledged value while a commit is pending or rejected. It does not execute the encoded .lynx.bundle."
     },
     {
       "command": "npm run verify:build",
@@ -25,10 +25,10 @@
       "status": "passed",
       "result": {
         "bundleBytes": {
-          "imperative.lynx.bundle": 3246,
-          "imperative.web.bundle": 2872,
-          "main.lynx.bundle": 14230,
-          "main.web.bundle": 13669
+          "imperative.lynx.bundle": 3637,
+          "imperative.web.bundle": 3286,
+          "main.lynx.bundle": 15767,
+          "main.web.bundle": 15189
         },
         "decodedEngineVersion": "3.9",
         "rsbuildVersions": ["2.1.4"],
@@ -65,8 +65,8 @@
   "artifacts": [
     {
       "path": "packages/lynx/probe/dist/imperative.lynx.bundle",
-      "bytes": 3246,
-      "sha256": "2dfd8e567c5dd1c31d36ce0703a687e54edfda65b2ed691475246eadd061addc",
+      "bytes": 3637,
+      "sha256": "2f67eda7159f95a47bd053481e5a3267cb1c861992143906e4e00648aa992f1f",
       "evidence": [
         "tasm decode succeeded",
         "decoded engine-version is 3.9",
@@ -78,8 +78,8 @@
     },
     {
       "path": "packages/lynx/probe/dist/imperative.web.bundle",
-      "bytes": 2872,
-      "sha256": "4923ac01e9a20c91770fc9765e8b7f9a71b7d630f503e6504c2c8436f5849f66",
+      "bytes": 3286,
+      "sha256": "22ee393430bf1c0119064cb13ce1d0f65fff584826bd796da5eaa3bad288de85",
       "evidence": [
         "main-thread.js reference exists",
         "the unused imperative background program is empty",
@@ -88,8 +88,8 @@
     },
     {
       "path": "packages/lynx/probe/dist/main.lynx.bundle",
-      "bytes": 14230,
-      "sha256": "3db9e3c77bded72cddebf043373925e1656879188886086d6de602d98a6c64c6",
+      "bytes": 15767,
+      "sha256": "2e9049b822fc8f6e7610524210443dbf827ecc301c2ab73dcc47bde10251539a",
       "evidence": [
         "tasm decode succeeded",
         "decoded engine-version is 3.9",
@@ -101,8 +101,8 @@
     },
     {
       "path": "packages/lynx/probe/dist/main.web.bundle",
-      "bytes": 13669,
-      "sha256": "dd0ac3b541a21d725f2ccce293d80b84941254dca8a7cb3707bc2a336efe21fa",
+      "bytes": 15189,
+      "sha256": "ec667ebb46eacab16380ed24eae5c97057a2d7bf9897a359448ee87c2298a478",
       "evidence": [
         "main-thread.js reference exists",
         "background.js reference exists",
@@ -113,25 +113,25 @@
   "baselineStatus": {
     "transportedNativeBundleBytes": {
       "status": "captured",
-      "value": 14230,
+      "value": 15767,
       "unit": "bytes",
       "qualification": "Single local production artifact; no regression budget is ratified."
     },
     "transportedWebBundleBytes": {
       "status": "captured",
-      "value": 13669,
+      "value": 15189,
       "unit": "bytes",
       "qualification": "Single local production artifact; no regression budget is ratified."
     },
     "imperativeNativeBundleBytes": {
       "status": "captured",
-      "value": 3246,
+      "value": 3637,
       "unit": "bytes",
       "qualification": "Direct-PAPI control artifact only; no runtime timing or regression budget is ratified."
     },
     "imperativeWebBundleBytes": {
       "status": "captured",
-      "value": 2872,
+      "value": 3286,
       "unit": "bytes",
       "qualification": "Direct-PAPI control artifact only; no runtime timing or regression budget is ratified."
     },
@@ -161,14 +161,14 @@
     },
     "imperativePapiComparison": {
       "status": "bundle-bytes-only",
-      "reason": "The direct-PAPI native/Web controls are 3246/2872 bytes versus 14230/13669 bytes for the transported probe. Both Web controls fail before rendering, and no engine timing is available."
+      "reason": "The direct-PAPI native/Web controls are 3637/3286 bytes versus 15767/15189 bytes for the transported probe. Both Web controls fail before rendering, and no engine timing is available."
     }
   },
   "gates": [
     {
       "id": "source-testing-environment",
       "status": "passed",
-      "evidence": "Twelve Node tests passed using @lynx-js/testing-environment@0.3.0, including both startup orders, cancellation before main readiness, and rejection of conflicting parent links before native mutation."
+      "evidence": "Seventeen Node tests passed using @lynx-js/testing-environment@0.3.0, including both startup orders, cancellation before main readiness, request-correlated idempotent terminal teardown after outcome-ambiguous faults, cleanup when page-root append throws before or after mutation or removal mutates and then throws, and rejection of conflicting parent links before native mutation."
     },
     {
       "id": "production-bundle-encoding",

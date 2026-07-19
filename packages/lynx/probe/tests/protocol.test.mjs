@@ -260,11 +260,24 @@ test('background state remains unchanged for a malformed transport response', as
 	assert.deepEqual(sentVersions, [1, 2]);
 });
 
-test('background state remains unchanged when the transport rejects the commit', async () => {
+test('background state remains unchanged and destroy cleans up when an update is rejected', async () => {
+	const dom = new JSDOM('<!doctype html><html><body></body></html>');
+	installLynxTestingEnv(globalThis, { window: dom.window });
+	activeEnvironment = globalThis.lynxTestingEnv;
+	activeEnvironment.switchToMainThread();
+
+	const papi = createPhase0PAPIAdapter(globalThis);
+	const receiver = createPhase0MainThreadReceiver(papi);
 	const transportError = new Error('native mutation rejected');
+	const sentTypes = [];
+	let rejectUpdate = true;
 	const probe = createPhase0BackgroundProbe((batch) => {
-		if (batch.version === 1) return acknowledge(batch);
-		return Promise.reject(transportError);
+		sentTypes.push(batch.type);
+		if (batch.type === 'commit' && batch.version === 2 && rejectUpdate) {
+			rejectUpdate = false;
+			return Promise.reject(transportError);
+		}
+		return receiver.receive(batch);
 	});
 
 	await probe.mount();
@@ -276,6 +289,56 @@ test('background state remains unchanged when the transport rejects the commit',
 	assert.equal(probe.count, 0);
 	assert.equal(probe.acceptedVersion, 1);
 	assert.equal(probe.fault, transportError);
+
+	await probe.destroy();
+
+	assert.equal(papi.page.childElementCount, 0);
+	assert.equal(receiver.acceptedVersion, 1);
+	assert.equal(probe.acceptedVersion, 1);
+	assert.deepEqual(sentTypes, ['commit', 'commit', 'destroy']);
+});
+
+test('destroy tears down the native tree after a post-mount transport fault', async () => {
+	const dom = new JSDOM('<!doctype html><html><body></body></html>');
+	installLynxTestingEnv(globalThis, { window: dom.window });
+	activeEnvironment = globalThis.lynxTestingEnv;
+	activeEnvironment.switchToMainThread();
+
+	const papi = createPhase0PAPIAdapter(globalThis);
+	const receiver = createPhase0MainThreadReceiver(papi);
+	const transportError = new Error('native update transport failed');
+	const sentTypes = [];
+	let rejectUpdate = true;
+	const probe = createPhase0BackgroundProbe((batch) => {
+		sentTypes.push(batch.type);
+		if (batch.type === 'commit' && batch.version === 2 && rejectUpdate) {
+			rejectUpdate = false;
+			receiver.receive(batch);
+			return Promise.reject(transportError);
+		}
+		return receiver.receive(batch);
+	});
+
+	await probe.mount();
+	assert.ok(papi.page.querySelector('[data-testid="phase-0-counter"]'));
+	await assert.rejects(
+		probe.handleNativeEvent(PHASE_0_LISTENER_ID, { eventName: 'tap' }),
+		transportError,
+	);
+	assert.equal(papi.page.querySelector('[data-testid="phase-0-counter"]')?.textContent, 'Count: 1');
+	assert.equal(receiver.acceptedVersion, 2);
+	assert.equal(probe.acceptedVersion, 1);
+
+	await probe.destroy();
+
+	assert.equal(papi.page.querySelector('[data-testid="phase-0-counter"]'), null);
+	assert.equal(papi.page.childElementCount, 0);
+	assert.equal(receiver.acceptedVersion, 2);
+	assert.equal(probe.acceptedVersion, 2);
+	assert.equal(receiver.destroyed, true);
+	assert.equal(probe.destroyed, true);
+	assert.equal(probe.fault, transportError);
+	assert.deepEqual(sentTypes, ['commit', 'commit', 'destroy']);
 });
 
 test('destroy waits for an in-flight mount and acknowledges native teardown', async () => {
@@ -312,31 +375,180 @@ test('destroy waits for an in-flight mount and acknowledges native teardown', as
 
 	assert.equal(papi.page.querySelector('[data-testid="phase-0-counter"]'), null);
 	assert.equal(papi.page.childElementCount, 0);
-	assert.equal(receiver.acceptedVersion, 2);
-	assert.equal(probe.acceptedVersion, 2);
+	assert.equal(receiver.acceptedVersion, 1);
+	assert.equal(probe.acceptedVersion, 1);
 	assert.equal(probe.destroyed, true);
+	const flushCount = papi.flushCount;
+	assert.equal(receiver.receive({ ...PHASE_0_PROTOCOL, type: 'destroy' }).acceptedVersion, 1);
+	assert.equal(papi.flushCount, flushCount);
+	assert.throws(
+		() =>
+			receiver.receive({
+				...PHASE_0_PROTOCOL,
+				type: 'commit',
+				version: 2,
+				commands: [],
+			}),
+		/cannot receive a commit after destroy/,
+	);
 	await assert.rejects(
 		probe.handleNativeEvent(PHASE_0_LISTENER_ID, { eventName: 'tap' }),
 		/cannot deliver an event after destroy/,
 	);
 });
 
-test('destroy preserves a failed mount and skips invalid teardown', async () => {
+test('destroy requests terminal cleanup after an outcome-ambiguous failed mount', async () => {
+	const dom = new JSDOM('<!doctype html><html><body></body></html>');
+	installLynxTestingEnv(globalThis, { window: dom.window });
+	activeEnvironment = globalThis.lynxTestingEnv;
+	activeEnvironment.switchToMainThread();
+
+	const papi = createPhase0PAPIAdapter(globalThis);
+	const receiver = createPhase0MainThreadReceiver(papi);
 	const mountError = new Error('native mount rejected');
-	let sendCount = 0;
-	const probe = createPhase0BackgroundProbe(() => {
-		sendCount += 1;
-		return Promise.reject(mountError);
+	const sentTypes = [];
+	const probe = createPhase0BackgroundProbe((batch) => {
+		sentTypes.push(batch.type);
+		const acknowledgement = receiver.receive(batch);
+		if (batch.type === 'commit') return Promise.reject(mountError);
+		return acknowledgement;
 	});
 
 	const mount = probe.mount();
-	const destroy = probe.destroy();
-
 	await assert.rejects(mount, mountError);
-	await destroy;
+	assert.ok(papi.page.querySelector('[data-testid="phase-0-counter"]'));
+	await probe.destroy();
 
-	assert.equal(sendCount, 1);
-	assert.equal(probe.acceptedVersion, 0);
+	assert.equal(papi.page.childElementCount, 0);
+	assert.equal(receiver.acceptedVersion, 1);
+	assert.equal(probe.acceptedVersion, 1);
+	assert.equal(receiver.destroyed, true);
 	assert.equal(probe.destroyed, true);
 	assert.equal(probe.fault, mountError);
+	assert.deepEqual(sentTypes, ['commit', 'destroy']);
+});
+
+function createFaultablePAPI({ rootAppendError, rootAppendTiming } = {}) {
+	const page = { children: [] };
+	let flushCount = 0;
+	let removeError;
+	let removeTiming;
+	return {
+		page,
+		create(hostType, parent, text) {
+			return { children: [], hostType, parent, text };
+		},
+		append(parent, child) {
+			if (parent === page && rootAppendError && rootAppendTiming === 'before') {
+				const error = rootAppendError;
+				rootAppendError = undefined;
+				throw error;
+			}
+			parent.children.push(child);
+			if (parent === page && rootAppendError && rootAppendTiming === 'after') {
+				const error = rootAppendError;
+				rootAppendError = undefined;
+				throw error;
+			}
+		},
+		setDataset(element, name, value) {
+			element.dataset = { ...element.dataset, [name]: value };
+		},
+		setEvent(element, eventType, eventName, listenerId) {
+			element.event = { eventName, eventType, listenerId };
+		},
+		setText(element, value) {
+			element.text = value;
+		},
+		isChild(parent, child) {
+			return parent.children.includes(child);
+		},
+		remove(parent, child) {
+			const index = parent.children.indexOf(child);
+			if (removeError && removeTiming === 'before') {
+				const error = removeError;
+				removeError = undefined;
+				throw error;
+			}
+			if (index === -1) throw new Error('cannot remove an unattached child');
+			parent.children.splice(index, 1);
+			if (removeError && removeTiming === 'after') {
+				const error = removeError;
+				removeError = undefined;
+				throw error;
+			}
+		},
+		flush() {
+			flushCount += 1;
+		},
+		failNextRemove(timing, error) {
+			removeError = error;
+			removeTiming = timing;
+		},
+		get flushCount() {
+			return flushCount;
+		},
+	};
+}
+
+test('destroy removes a page root when native append mutates before throwing', async () => {
+	const rootAppendError = new Error('root append failed after mutation');
+	const papi = createFaultablePAPI({ rootAppendError, rootAppendTiming: 'after' });
+	const receiver = createPhase0MainThreadReceiver(papi);
+	const probe = createPhase0BackgroundProbe((batch) => receiver.receive(batch));
+
+	await assert.rejects(probe.mount(), rootAppendError);
+	assert.equal(papi.page.children.length, 1);
+	const counter = papi.page.children[0];
+	assert.equal(counter.event.listenerId, PHASE_0_LISTENER_ID);
+	assert.equal(receiver.acceptedVersion, 0);
+
+	await probe.destroy();
+
+	assert.equal(papi.page.children.length, 0);
+	assert.equal(counter.event.listenerId, undefined);
+	assert.equal(papi.flushCount, 1);
+	assert.equal(receiver.destroyed, true);
+	assert.equal(probe.destroyed, true);
+	assert.equal(probe.fault, rootAppendError);
+});
+
+test('destroy skips root removal when native append throws before mutation', async () => {
+	const rootAppendError = new Error('root append failed before mutation');
+	const papi = createFaultablePAPI({ rootAppendError, rootAppendTiming: 'before' });
+	const receiver = createPhase0MainThreadReceiver(papi);
+	const probe = createPhase0BackgroundProbe((batch) => receiver.receive(batch));
+
+	await assert.rejects(probe.mount(), rootAppendError);
+	assert.equal(papi.page.children.length, 0);
+	const counter = receiver.getHost('counter');
+	assert.equal(counter.event.listenerId, PHASE_0_LISTENER_ID);
+	assert.equal(receiver.acceptedVersion, 0);
+
+	await probe.destroy();
+
+	assert.equal(papi.page.children.length, 0);
+	assert.equal(counter.event.listenerId, undefined);
+	assert.equal(papi.flushCount, 1);
+	assert.equal(receiver.destroyed, true);
+	assert.equal(probe.destroyed, true);
+	assert.equal(probe.fault, rootAppendError);
+});
+
+test('destroy tolerates native remove mutating before throwing', async () => {
+	const removeError = new Error('root remove failed after mutation');
+	const papi = createFaultablePAPI();
+	const receiver = createPhase0MainThreadReceiver(papi);
+	const probe = createPhase0BackgroundProbe((batch) => receiver.receive(batch));
+
+	await probe.mount();
+	const counter = papi.page.children[0];
+	papi.failNextRemove('after', removeError);
+	await probe.destroy();
+
+	assert.equal(papi.page.children.length, 0);
+	assert.equal(counter.event.listenerId, undefined);
+	assert.equal(papi.flushCount, 2);
+	assert.equal(receiver.destroyed, true);
+	assert.equal(probe.destroyed, true);
 });

@@ -80,7 +80,7 @@ export function createPhase0BackgroundProbe(send) {
 				`acknowledgement accepted version must be ${version}.`,
 			);
 		} catch (error) {
-			fault = error;
+			fault ??= error;
 			throw error;
 		}
 
@@ -191,28 +191,31 @@ export function createPhase0BackgroundProbe(send) {
 			if (mountOperation === undefined) return;
 			try {
 				await mountOperation;
-			} catch {
-				return;
+			} catch {}
+			await tail;
+
+			const batch = {
+				...PHASE_0_PROTOCOL,
+				type: 'destroy',
+			};
+			try {
+				const acknowledgement = await send(batch);
+				assertProtocolIdentity(acknowledgement, 'destroy acknowledgement');
+				invariant(
+					acknowledgement.type === 'destroy-ack',
+					'destroy transport response must be an acknowledgement.',
+				);
+				invariant(
+					Number.isSafeInteger(acknowledgement.acceptedVersion) &&
+						acknowledgement.acceptedVersion >= acceptedVersion,
+					`destroy acknowledgement accepted version must be at least ${acceptedVersion}.`,
+				);
+				acceptedVersion = acknowledgement.acceptedVersion;
+			} catch (error) {
+				fault ??= error;
+				throw error;
 			}
-			await enqueue(
-				() => [
-					{
-						type: 'event',
-						id: PHASE_0_HOST_IDS.counter,
-						eventType: 'bindEvent',
-						eventName: 'tap',
-						listenerId: undefined,
-					},
-					{
-						type: 'remove',
-						parentId: PHASE_0_HOST_IDS.page,
-						childId: PHASE_0_HOST_IDS.counter,
-					},
-				],
-				() => {
-					mounted = false;
-				},
-			);
+			mounted = false;
 		})().finally(() => {
 			destroyed = true;
 		});
@@ -334,10 +337,61 @@ export function createPhase0MainThreadReceiver(papi) {
 
 	const hosts = new Map([[PHASE_0_HOST_IDS.page, papi.page]]);
 	const parents = new Map();
+	const pageRoots = new Set();
 	let acceptedVersion = 0;
+	let destroyed = false;
+
+	function acknowledge(version) {
+		return Object.freeze({
+			...PHASE_0_PROTOCOL,
+			type: 'ack',
+			acceptedVersion: version,
+		});
+	}
+
+	function acknowledgeDestroy() {
+		return Object.freeze({
+			...PHASE_0_PROTOCOL,
+			type: 'destroy-ack',
+			acceptedVersion,
+		});
+	}
 
 	function receive(batch) {
 		assertProtocolIdentity(batch, 'batch');
+		if (batch.type === 'destroy') {
+			invariant(batch.version === undefined, 'destroy must not carry a commit version.');
+			invariant(batch.commands === undefined, 'destroy must not carry commit commands.');
+			if (!destroyed) {
+				const hadOwnedHosts = hosts.size > 1;
+				const counter = hosts.get(PHASE_0_HOST_IDS.counter);
+				if (counter !== undefined) {
+					papi.setEvent(counter, 'bindEvent', 'tap', undefined);
+				}
+				for (const childId of pageRoots) {
+					const child = hosts.get(childId);
+					if (child !== undefined && papi.isChild(papi.page, child)) {
+						try {
+							papi.remove(papi.page, child);
+						} catch (error) {
+							// A native remove may detach the root and then throw. It is safe to
+							// continue only when parent inspection proves cleanup already happened.
+							if (papi.isChild(papi.page, child)) throw error;
+						}
+					}
+					forgetSubtree(childId, hosts, parents);
+				}
+				pageRoots.clear();
+				parents.clear();
+				for (const id of [...hosts.keys()]) {
+					if (id !== PHASE_0_HOST_IDS.page) hosts.delete(id);
+				}
+				if (hadOwnedHosts) papi.flush();
+				destroyed = true;
+			}
+			return acknowledgeDestroy();
+		}
+		invariant(!destroyed, 'cannot receive a commit after destroy.');
 		invariant(batch.type === 'commit', 'message must be a commit batch.');
 		invariant(
 			batch.version === acceptedVersion + 1,
@@ -356,6 +410,11 @@ export function createPhase0MainThreadReceiver(papi) {
 				const parent = hosts.get(command.parentId);
 				hosts.set(command.id, papi.create(command.hostType, parent, command.text));
 			} else if (command.type === 'append') {
+				if (command.parentId === PHASE_0_HOST_IDS.page) {
+					// Record the intended root before crossing into PAPI. A native append may
+					// mutate the page and then throw, leaving no acknowledgement or parent link.
+					pageRoots.add(command.childId);
+				}
 				papi.append(hosts.get(command.parentId), hosts.get(command.childId));
 				parents.set(command.childId, command.parentId);
 			} else if (command.type === 'dataset') {
@@ -371,6 +430,9 @@ export function createPhase0MainThreadReceiver(papi) {
 				papi.setText(hosts.get(command.id), command.value);
 			} else if (command.type === 'remove') {
 				papi.remove(hosts.get(command.parentId), hosts.get(command.childId));
+				if (command.parentId === PHASE_0_HOST_IDS.page) {
+					pageRoots.delete(command.childId);
+				}
 				forgetSubtree(command.childId, hosts, parents);
 			}
 		}
@@ -378,11 +440,7 @@ export function createPhase0MainThreadReceiver(papi) {
 		papi.flush();
 		acceptedVersion = batch.version;
 
-		return Object.freeze({
-			...PHASE_0_PROTOCOL,
-			type: 'ack',
-			acceptedVersion,
-		});
+		return acknowledge(acceptedVersion);
 	}
 
 	return Object.freeze({
@@ -392,6 +450,9 @@ export function createPhase0MainThreadReceiver(papi) {
 		},
 		get acceptedVersion() {
 			return acceptedVersion;
+		},
+		get destroyed() {
+			return destroyed;
 		},
 	});
 }

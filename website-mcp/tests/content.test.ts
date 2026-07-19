@@ -49,14 +49,16 @@ describe('docs snapshot', () => {
 });
 
 describe('bindings snapshot', () => {
-	it('captures every package status.json exactly once', async () => {
+	it('captures every public package status.json exactly once', async () => {
 		const packages = await readdir(join(repoRoot, 'packages'), { withFileTypes: true });
 		const withStatus = [];
 		for (const entry of packages) {
 			if (!entry.isDirectory()) continue;
 			try {
-				await readFile(join(repoRoot, 'packages', entry.name, 'status.json'));
-				withStatus.push(entry.name);
+				const packageRoot = join(repoRoot, 'packages', entry.name);
+				await readFile(join(packageRoot, 'status.json'));
+				const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
+				if (manifest.private !== true) withStatus.push(entry.name);
 			} catch {
 				// no status.json — not a binding
 			}
