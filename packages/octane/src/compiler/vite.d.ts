@@ -65,8 +65,12 @@ export interface OctaneVitePluginOptions {
 	 */
 	exclude?: string[];
 	/**
-	 * Compile project modules only when their directive prologue contains
-	 * `'use octane'`. Installed Octane packages retain manifest-based ownership.
+	 * Mixed-toolchain ownership gate: project `.tsrx` modules stay Octane's
+	 * by extension; a project `.tsx` compiles — and a plain project
+	 * `.ts`/`.js` gets octane hook slotting — only with a leading
+	 * `@jsxImportSource octane` pragma comment (a registered renderer's
+	 * intrinsics module also counts). Installed Octane packages retain
+	 * manifest-based ownership.
 	 * @default false
 	 */
 	requireDirective?: boolean;

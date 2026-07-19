@@ -159,9 +159,11 @@ export function octane(options = {}) {
 	// adapter's explicit server-only override, where client profiling must stay off.
 	const profileEnabled = options.profile === true && options.ssr !== true;
 	let projectRoot = resolve(process.cwd());
-	// The mixed-toolchain ownership gate: with `requireDirective: true`, Octane
-	// compiles only modules that declare `'use octane'` (project `.tsx`/`.ts`
-	// without it belong to the host framework's own pipeline — e.g. React's JSX
+	// The mixed-toolchain ownership gate: with `requireDirective: true`, a
+	// project `.tsrx` is Octane's by extension, and Octane compiles a project
+	// `.tsx` (full compile) or plain `.ts`/`.js` (hook slotting) only when it
+	// opens with a leading `/** @jsxImportSource octane */` pragma (unmarked
+	// modules belong to the host framework's own pipeline — e.g. React's JSX
 	// transform). Diagnostics route to Vite's logger once it exists.
 	const requireDirective = options.requireDirective === true;
 	let logger = null;

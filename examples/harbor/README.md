@@ -38,9 +38,10 @@ and exercised by `benchmarks/react-hosted-islands`.
   against the island's own octane-typed `.tsrx` signature (`pnpm typecheck`
   runs `tsrx-tsc`; the tsconfig registers `@tsrx/typescript-plugin` so `.tsrx` imports resolve typed in the editor (TypeScript 5.9/6.x); `src/island-boundary.test-d.tsx` pins the boundary with
   `@ts-expect-error` cases).
-- `src/islands/*.tsrx` — open with `'use octane'`; the Vite config's
-  `requireDirective` split gives Octane exactly these modules and
-  `@vitejs/plugin-react` everything else.
+- `src/islands/*.tsrx` — Octane's by extension, no marker needed; the Vite
+  config's `requireDirective` split gives Octane exactly these modules and
+  `@vitejs/plugin-react` everything else. (An Octane-owned `.tsx` would opt
+  in with a leading `/** @jsxImportSource octane */` pragma.)
 - `src/data/resources.ts` — deterministic seeded thenables (synchronous
   `use()` reads on both server and hydrating client) plus a fail-once refresh
   outage (`?fault=recs`) and a fixed-delay refresh. No network, ever.
