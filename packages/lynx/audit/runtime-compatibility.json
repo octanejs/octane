@@ -3,7 +3,7 @@
   "recordedAt": "2026-07-19",
   "selectedSdk": "3.9.0",
   "selectedRspeedy": "0.16.0",
-  "purpose": "Milestone 2 source-level production-entry and runtime-ownership evidence for Octane's DOM-free Lynx graphs. This is JavaScript build/source evidence, not a .lynx.bundle or native device execution.",
+  "purpose": "Milestones 1–3 source-level production-entry and runtime-ownership evidence for Octane's DOM-free Lynx graphs. This is JavaScript build/source evidence, not a .lynx.bundle or native device execution.",
   "sources": [
     {
       "url": "https://lynxjs.org/guide/scripting-runtime/",
@@ -29,7 +29,7 @@
       "documentedSyntaxCeiling": "ES2019",
       "compileGraph": "packages/rspeedy-plugin-octane/tests/build.test.ts",
       "entry": "packages/rspeedy-plugin-octane/tests/_fixtures/background/src/main-thread.ts",
-      "graphContract": "Consumes @octanejs/lynx/main-thread and contains the receiver, Element PAPI adapter, host driver, and shared protocol without the universal core.",
+      "graphContract": "Consumes @octanejs/lynx/main-thread and contains the receiver, Element PAPI adapter, host driver, host-prop/event/NodesRef boundary modules, and shared protocol without the universal core.",
       "nativeExecution": "blocked by the Phase 0 Explorer/Android/iOS gates"
     },
     "background": {
@@ -37,7 +37,7 @@
       "documentedSyntaxCeiling": "ES2015",
       "compileGraph": "packages/rspeedy-plugin-octane/tests/build.test.ts",
       "entry": "packages/rspeedy-plugin-octane/tests/_fixtures/background/src/background.ts",
-      "graphContract": "Consumes the public Lynx root and a compiled TSRX component and contains the client driver, transport, shared protocol, and Octane universal native core without main-thread host code.",
+      "graphContract": "Consumes the public Lynx root and a compiled TSRX component and contains the client driver, transport, shared protocol, host-prop/event/NodesRef client modules, and Octane universal native core without main-thread host code.",
       "nativeExecution": "blocked by the Phase 0 Explorer/Android/iOS gates"
     }
   },
@@ -75,5 +75,5 @@
       "WeakRef"
     ]
   },
-  "qualification": "The exact pinned Rspeedy toolchain builds isolated Milestone 2 background and main-thread JavaScript entries in production mode. The background entry consumes the public root plus compiled App and includes the universal native core; the main entry consumes the public main-thread receiver and excludes that core. Both graphs exclude DOM and React modules. This is a JavaScript graph/build smoke only: .lynx.bundle assembly, main-thread bytecode encoding, and all native runtime/device execution remain blocked gates."
+  "qualification": "The exact pinned Rspeedy toolchain builds isolated Milestone 3 background and main-thread JavaScript entries in production mode. The background entry consumes the public root plus compiled App and includes the universal native core and asynchronous query/event client boundary; the main entry consumes the public main-thread receiver, PAPI prop/event host boundary, and excludes the universal core. Both graphs exclude DOM and React modules. This is a JavaScript graph/build smoke only: .lynx.bundle assembly, main-thread bytecode encoding, native event receiver wiring, and all native runtime/device execution remain blocked gates."
 }

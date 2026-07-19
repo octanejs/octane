@@ -10,9 +10,7 @@
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": false,
     "types": [],
-    "strict": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "strict": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests", "typetests"]

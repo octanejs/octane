@@ -5,11 +5,11 @@ ReactLynx-to-Octane migration:
 
 - the immutable Milestone 0 audit and React-free framework probe; and
 - the private Milestone 1 compiler/package scaffold plus the source-level
-  Milestone 2 background renderer.
+  Milestones 2–3 background renderer and host boundary.
 
 The package is `0.0.0`, marked `private`, and is not a native renderer release.
 
-## Milestone 2 source surface
+## Milestone 3 source surface
 
 The package now contains:
 
@@ -26,6 +26,13 @@ The package now contains:
   disposal behavior;
 - acknowledgement-gated, cloned public identity handles whose identity survives
   updates and changes generation on recreation;
+- deliberate PAPI routing for attribute removal, classes, complete dataset bags,
+  inline styles, CSS scope metadata, and bundled URL/data-URI image sources;
+- background bind/catch/capture/global-bind registration, versionless native
+  tokens, data-only event payloads, and priority-scoped delivery;
+- generation-scoped asynchronous `invoke`, `measure`, `fields`, `path`, and
+  `setNativeProps` handles;
+- retained Activity visibility with event disconnect/reconnect and no ref churn;
 - renderer-local declarations for `page`, `view`, `text`, `raw-text`, `image`,
   `scroll-view`, `input`, `textarea`, `list`, and `list-item`;
 - explicit custom-native-element augmentation through
@@ -37,12 +44,24 @@ reordering, exposes refs before layout effects, handles an injected post-ACK
 PAPI fault once, and unmounts asynchronously. That is deterministic JavaScript
 host evidence, not native layout, paint, device, or performance evidence.
 
-The source entry points are intentionally not wired into a production
-`.lynx.bundle` yet. Event metadata is staged but native event registration,
-classes/styles/datasets, query and UI methods, form/scroll behavior, and the
-broader intrinsic contract remain Milestone 3 work. Platform APIs remain
-Milestone 4 work; packaged testing helpers and production Rspeedy assembly
-remain Milestone 5 work.
+The Milestone 3 host boundary is implemented in private source and tests. It
+accepts class strings, inline styles, complete dataset bags, CSS scope metadata,
+and bundled URL/data-URI image sources; registers every background
+bind/catch/capture/global-bind event kind; exposes asynchronous `invoke`,
+`measure`, `fields`, `path`, and `setNativeProps` handles; and preserves retained
+host visibility. CSS import and CSS Module extraction, stylesheet/template
+sections, and asset bundling remain owned by the Milestone 5 Rspeedy production
+path.
+
+These tests do not establish production native behavior. `dispatchNativeEvent()`
+and `dispatchNativeEventBatch()` are source/test bridge methods because the
+native callback receiver remains private. `@lynx-js/testing-environment@0.3.0`
+models `__SetDataset` with `Object.assign`, so it cannot observe deletion of
+omitted keys, and it implements selector-query `setNativeProps` while `invoke`,
+`fields`, and `path` throw. Selector compatibility, measurement/layout results,
+form/scroll behavior, and cleanup therefore still require Explorer, Android,
+and iOS evidence. Platform APIs remain Milestone 4 work; packaged testing
+helpers and production Rspeedy assembly remain Milestone 5 work.
 
 The supported package subpaths are:
 
@@ -93,9 +112,10 @@ implemented. Explorer, Android, and iOS execution were unavailable on the
 capture host. These remain explicit gates. The package scaffold does not waive
 them and must not be described as a preview or production renderer.
 
-Milestone 2's private source and official-JavaScript implementation is complete,
-but its formal exit remains gated by that unresolved Milestone 0 lifecycle,
-reload/background teardown, Web, and Android/iOS evidence.
+Milestone 3's host-side private source and official-JavaScript implementation is
+complete, but its formal exit remains unmet. The unresolved Milestone 0 native
+event/lifecycle/reload hooks, Web failure, Android/iOS evidence, real selector
+query/layout behavior, and pinned ReactLynx differential remain gates.
 
 ## What the Phase 0 probe proves
 
@@ -106,7 +126,7 @@ reload/background teardown, Web, and Android/iOS evidence.
 - Complete batches are validated before PAPI mutation, and accepted batches
   cross one explicit flush boundary before acknowledgement.
 - Production native and Web bundles contain no ReactLynx or Preact runtime.
-- The Milestone 2 receiver uses named public `ContextProxy` events rather than
+- The Milestone 3 receiver uses named public `ContextProxy` events rather than
   the probe's `postMessage` fallback and keeps live Element PAPI objects wholly
   on the main thread.
 

@@ -29,8 +29,9 @@ describe('@octanejs/lynx renderer preset', () => {
 			server: 'unsupported',
 			intrinsics: '@octanejs/lynx/intrinsics',
 			text: 'host',
-			capabilities: ['visibility'],
+			capabilities: ['class-name-alias', 'visibility'],
 			validation: expect.objectContaining({
+				textHosts: ['raw-text'],
 				textParents: ['text'],
 				forbiddenGlobals: expect.arrayContaining([
 					'document',

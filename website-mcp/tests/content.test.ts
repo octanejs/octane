@@ -105,6 +105,19 @@ describe('llms text', () => {
 		}
 	});
 
+	it('lists the catalogued bindings package-for-package', () => {
+		const bindingsGuide = LLMS_TXT.split(
+			'Bindings — reach for these when asked about the React equivalent:\n',
+		)[1]?.split('\n## Source')[0];
+		expect(bindingsGuide).toBeDefined();
+		const mentioned = Array.from(
+			bindingsGuide!.matchAll(/`(@octanejs\/[^`]+)`/g),
+			(match) => match[1],
+		);
+		const catalogued = BINDING_CATEGORIES.flatMap((category) => category.packages);
+		expect(new Set(mentioned)).toEqual(new Set(catalogued));
+	});
+
 	it('llms-full.txt extends llms.txt with the whole docs corpus', () => {
 		expect(LLMS_FULL_TXT.startsWith(LLMS_TXT.trimEnd())).toBe(true);
 		for (const doc of DOCS) {

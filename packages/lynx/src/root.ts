@@ -12,11 +12,13 @@ import {
 } from './core/client-driver.js';
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
 import type { LynxContextProxy } from './core/protocol.js';
+import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
 
 interface LynxBackgroundGlobals {
 	readonly lynx?: {
 		getCoreContext?(): LynxContextProxy;
 		queueMicrotask?(callback: () => void): void;
+		createSelectorQuery?: LynxCreateSelectorQuery;
 	};
 	readonly queueMicrotask?: (callback: () => void) => void;
 }
@@ -104,7 +106,13 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 	const target = readBackgroundGlobals(options.target ?? globalThis);
 	const context = resolveContext(target, options.context);
 	const scheduleMicrotask = resolveMicrotaskScheduler(target, options.scheduleMicrotask);
-	const container = createLynxClientContainer();
+	const createSelectorQuery = target.lynx?.createSelectorQuery;
+	const container = createLynxClientContainer({
+		createSelectorQuery:
+			typeof createSelectorQuery === 'function'
+				? () => createSelectorQuery.call(target.lynx)
+				: undefined,
+	});
 	const transport = createLynxBackgroundTransport(context, container, {
 		onDiagnostic: options.onDiagnostic,
 	});

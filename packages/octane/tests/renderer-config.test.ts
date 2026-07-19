@@ -83,6 +83,7 @@ describe('renderer configuration', () => {
 				native: {
 					module: '@octanejs/native/renderer',
 					validation: {
+						textHosts: ['raw-text', 'raw-text'],
 						textParents: ['text', 'label', 'text'],
 						forbiddenGlobals: ['window', 'document', 'window'],
 						forbiddenImports: ['react-dom', '@browser/runtime', 'react-dom'],
@@ -97,6 +98,7 @@ describe('renderer configuration', () => {
 		});
 
 		expect(config.registry.native.validation).toEqual({
+			textHosts: ['raw-text'],
 			textParents: ['label', 'text'],
 			forbiddenGlobals: ['document', 'window'],
 			forbiddenImports: ['@browser/runtime', 'react-dom'],
@@ -123,6 +125,7 @@ describe('renderer configuration', () => {
 						},
 						forbiddenImports: ['react-dom', '@browser/runtime'],
 						forbiddenGlobals: ['window', 'document'],
+						textHosts: ['raw-text'],
 						textParents: ['text', 'label'],
 					},
 				},
@@ -367,6 +370,16 @@ describe('renderer configuration', () => {
 				},
 			}),
 		).toThrow(/textParents\[0\].*host element name beginning with a lowercase letter/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: { textHosts: ['RawText'] },
+					},
+				},
+			}),
+		).toThrow(/textHosts\[0\].*host element name beginning with a lowercase letter/);
 		expect(() =>
 			normalizeRendererConfig({
 				registry: {

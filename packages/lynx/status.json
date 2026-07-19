@@ -3,10 +3,11 @@
     "package": "@lynx-js/react",
     "version": "0.123.0 (b6b809cd)"
   },
-  "surface": "Private Milestone 2 source implementation: data-only Lynx renderer configuration, DOM-free universal compiler ABI, a background root/client driver, named-ContextProxy async transport, a root-scoped main-thread Element PAPI receiver, acknowledgement-gated cloned ref handles, async teardown, and renderer-local declarations for the first ten planned native tags. The official JavaScript environment covers mount, update, keyed reorder, fault, and unmount; no production .lynx.bundle or native-device claim is made.",
+  "surface": "Private Milestone 3 source/test implementation: legal raw-text validation; deliberate PAPI routing for attribute removal, class/className composition, complete datasets, inline styles, CSS-scope metadata, and URL/data-URI image assets; background bind/catch/capture/global-bind event registration and acknowledgement-gated dispatch; asynchronous generation-scoped NodesRef handles; retained visibility; and host creation for the first native element slice. No production .lynx.bundle or native-device claim is made.",
   "divergences": [
     "The package adapts an audited @lynx-js/types@4.0.0 props/events slice into renderer-owned module declarations because the upstream events entry transitively loads global Element/JSX augmentation.",
-    "Background refs receive cloned acknowledgement-gated identity handles, never live main-thread Element PAPI objects; query and UI methods remain deferred to Milestone 3.",
+    "Background refs receive cloned acknowledgement-gated asynchronous handles, never live main-thread Element PAPI objects or synchronous layout.",
+    "Background event handlers receive detached data-only payloads without live event methods or native instances.",
     "Main-thread receiver installation is explicit in this private source phase; automatic Rspeedy production bootstrap is deferred to Milestone 5.",
     "Platform and public testing-helper runtime APIs remain absent instead of being represented by throwing or inert compatibility stubs."
   ],
@@ -14,7 +15,18 @@
   "verified": "2026-07-19",
   "notes": [
     "Milestone 0 remains blocked on public lifecycle/event hooks, reload/background teardown, Web execution, and the Android/iOS engine matrix; this private implementation is not a technical preview.",
-    "Native event binding, complete props/styles/query behavior, and core elements remain Milestone 3; platform capabilities remain Milestone 4; production testing/.lynx.bundle integration remains Milestone 5."
+    "Native __AddEvent token registration is public, but the production background callback receiver remains the private lynxCoreInject.tt.publishEvent hook; dispatchNativeEvent* is a source/test bridge only.",
+    "Milestone 3 implements the host boundary for class strings, inline styles, CSS IDs/scopes, and bundled URL strings. CSS import/CSS Module extraction, stylesheet/template sections, and asset bundling remain Milestone 5 work.",
+    "Octane submits a complete next dataset bag through __SetDataset. @lynx-js/testing-environment@0.3.0 implements that operation with Object.assign, so key deletion is adapter-call evidence only until a real-engine lane proves it.",
+    "The public types expose createSelectorQuery().select(string), while selectUniqueID is commented out. Octane therefore uses generation-scoped [octane-ref] selectors; the testing environment proves selection/setNativeProps only, so invoke/fields/path/measure, selector support, and layout results require real-engine evidence.",
+    "Milestone 3 formal exit remains unmet until equivalent pinned ReactLynx fixtures are compared through public observations on Explorer, Android, and iOS.",
+    "Platform capabilities remain Milestone 4; production testing and .lynx.bundle integration remain Milestone 5."
   ],
-  "docs": ["docs/lynx-native-renderer-plan.md", "packages/lynx/UPSTREAM.md"]
+  "docs": [
+    "docs/lynx-native-renderer-plan.md",
+    "packages/lynx/UPSTREAM.md",
+    "packages/lynx/audit/framework-contracts.md",
+    "packages/lynx/audit/runtime-compatibility.json",
+    "packages/lynx/audit/phase-0-evidence.json"
+  ]
 }

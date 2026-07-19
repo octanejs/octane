@@ -18,6 +18,7 @@ import {
 	createLynxClientDriver,
 	type LynxPublicHandle,
 } from '../src/core/client-driver.js';
+import { createLynxNodesRefSelector } from '../src/core/nodes-ref.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
@@ -93,6 +94,7 @@ function handleSnapshot(
 		id,
 		type,
 		generation,
+		selector: createLynxNodesRefSelector(root, id, generation),
 		...extra,
 	};
 }
