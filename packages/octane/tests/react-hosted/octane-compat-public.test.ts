@@ -206,6 +206,113 @@ describe('octane/react — mount, update, unmount', () => {
 	});
 });
 
+describe('octane/react — component/props authoring form', () => {
+	it('hosts an island through component/props with live state, events, and prop updates', async () => {
+		const log = createLog();
+		function App(props: { name: string }) {
+			return h(OctaneCompat, {
+				component: GreetingIsland,
+				props: { name: props.name, log: log.push },
+			} as any);
+		}
+		const mounted = await mountReactHost(h(App, { name: 'one' }));
+		expect(mounted.host().querySelector('.greeting')?.textContent).toBe('Hello one');
+		expect(log.drain()).toEqual(['island-layout:one']);
+		const button = () => mounted.host().querySelector('.count') as HTMLElement;
+		await reactAct(async () => button().click());
+		expect(button().textContent).toBe('count:1');
+
+		// A committed prop change publishes into the SAME island: content moves,
+		// Octane state survives.
+		await mounted.render(h(App, { name: 'two' }));
+		expect(mounted.host().querySelector('.greeting')?.textContent).toBe('Hello two');
+		expect(button().textContent).toBe('count:1');
+		expect(log.drain()).toEqual(['island-cleanup:one', 'island-layout:two']);
+
+		await mounted.unmount();
+		expect(log.drain()).toEqual(['island-cleanup:two']);
+		expect(document.querySelector('[data-octane-compat]')).toBeNull();
+	});
+
+	it('bails the island update when a parent re-render leaves component/props unchanged (§10)', async () => {
+		const log = createLog();
+		let rerenderParent!: () => void;
+		function App() {
+			const [, bump] = React.useReducer((count: number) => count + 1, 0);
+			rerenderParent = bump;
+			// A fresh `props` object literal per parent render with unchanged
+			// shallow contents must bail exactly like the children form's
+			// recreated element.
+			return h(OctaneCompat, {
+				component: RenderLogIsland,
+				props: { label: 'fixed', log: log.push },
+			} as any);
+		}
+		const mounted = await mountReactHost(h(App));
+		expect(log.drain()).toEqual(['render:fixed']);
+
+		await reactAct(async () => rerenderParent());
+		await reactAct(async () => rerenderParent());
+		expect(log.drain()).toEqual([]);
+		expect(mounted.host().querySelector('.render-log')?.textContent).toBe('label:fixed');
+		await mounted.unmount();
+	});
+
+	it('uses the wrapper key as island identity and supports omitting props entirely', async () => {
+		// The component form has no inner element to key: island identity is the
+		// React key on <OctaneCompat> itself (a key bump remounts the wrapper and
+		// therefore the island, with fresh state).
+		function App(props: { islandKey: string }) {
+			return h(
+				'div',
+				null,
+				h(OctaneCompat, {
+					key: props.islandKey,
+					component: GreetingIsland,
+					props: { name: 'keyed' },
+				} as any),
+				// Omitted `props`: a props-less island renders with the stable
+				// empty transport and stays bail-stable across parent renders.
+				h(OctaneCompat, { key: 'ids', component: UseIdIsland } as any),
+			);
+		}
+		const mounted = await mountReactHost(h(App, { islandKey: 'a' }));
+		const button = () => mounted.container.querySelector('.count') as HTMLElement;
+		await reactAct(async () => button().click());
+		expect(button().textContent).toBe('count:1');
+		const initialId = mounted.container.querySelector('.use-id')?.getAttribute('data-oid');
+		expect(initialId).toBeTruthy();
+
+		await mounted.render(h(App, { islandKey: 'b' }));
+		// Keyed island: replaced with fresh state. Unkeyed-props island: stable.
+		expect(button().textContent).toBe('count:0');
+		expect(mounted.container.querySelector('.use-id')?.getAttribute('data-oid')).toBe(initialId);
+		await mounted.unmount();
+	});
+
+	it('is the same transport as the children form: switching forms preserves the island', async () => {
+		// Both forms resolve to one { type, props, key } transport, so a parent
+		// that switches authoring forms with identical component + props must
+		// bail (island state preserved), not remount.
+		function childrenForm() {
+			return h(OctaneCompat, null, h(GreetingIsland as any, { name: 'same' }));
+		}
+		function componentForm() {
+			return h(OctaneCompat, { component: GreetingIsland, props: { name: 'same' } } as any);
+		}
+		const mounted = await mountReactHost(childrenForm());
+		const button = () => mounted.host().querySelector('.count') as HTMLElement;
+		await reactAct(async () => button().click());
+		expect(button().textContent).toBe('count:1');
+
+		await mounted.render(componentForm());
+		expect(button().textContent).toBe('count:1');
+		await mounted.render(childrenForm());
+		expect(button().textContent).toBe('count:1');
+		await mounted.unmount();
+	});
+});
+
 describe('octane/react — dev validation of the transported child (§3)', () => {
 	let quietConsoleError: ReturnType<typeof vi.spyOn>;
 	beforeEach(() => {
@@ -256,6 +363,46 @@ describe('octane/react — dev validation of the transported child (§3)', () =>
 			}
 		}
 		expect(await rejectionMessage(h(ClassComponent))).toMatch(/class components are React-only/);
+	});
+
+	it('rejects component-form misuse: mixed forms, non-function values, class components', async () => {
+		async function componentRejection(props: Record<string, unknown>): Promise<string> {
+			let caught: unknown = null;
+			const mounted = await mountReactHost(
+				h(
+					SpikeErrorBoundary,
+					{
+						fallback: (error: unknown) => {
+							caught = error;
+							return h('p', { className: 'rejected' }, 'rejected');
+						},
+					} as any,
+					h(OctaneCompat, props as any),
+				),
+			);
+			expect(mounted.container.querySelector('.rejected')).not.toBeNull();
+			await mounted.unmount();
+			return (caught as Error).message;
+		}
+
+		expect(
+			await componentRejection({
+				component: BadgeIsland,
+				props: { label: 'x' },
+				children: h(BadgeIsland as any, { label: 'y' }),
+			}),
+		).toMatch(/either a `component` prop or one element child, not both/);
+		expect(await componentRejection({ component: 42 })).toMatch(
+			/`component` must be a compiled Octane component function/,
+		);
+		class ClassIsland extends React.Component {
+			render(): React.ReactNode {
+				return h('p', null, 'class');
+			}
+		}
+		expect(await componentRejection({ component: ClassIsland })).toMatch(
+			/class components are React-only/,
+		);
 	});
 });
 

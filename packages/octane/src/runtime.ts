@@ -5844,8 +5844,24 @@ export interface ForeignHostContext<T> {
 	readonly Consumer: (props: { children: (value: T) => any }) => any;
 }
 
+/**
+ * Excludes octane ELEMENT descriptors from `use()`'s thenable arms.
+ * `Octane.JSX.Element` type-level-extends `Promise<ReactNode>` (the React 19
+ * tag gate — see src/jsx-runtime.d.ts), so a bare `PromiseLike<T>` arm would
+ * admit elements bivariantly even though their promise protocol is poisoned.
+ * The optional-`never` `$$kind` keeps every real thenable assignable (they
+ * simply lack the property) while rejecting `$$kind`-branded descriptors,
+ * making `use(<El/>)` the same hard type error `await <El/>` is. Octane
+ * contexts are unaffected: they match the separate `Context<T>` arm.
+ */
+type NotAnElementDescriptor = { $$kind?: never };
+
 export function use<T>(
-	usable: Context<T> | PromiseLike<T> | TrackedThenable<T> | ForeignHostContext<T>,
+	usable:
+		| Context<T>
+		| (PromiseLike<T> & NotAnElementDescriptor)
+		| (TrackedThenable<T> & NotAnElementDescriptor)
+		| ForeignHostContext<T>,
 ): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
 		return useContextInternal(usable as Context<T>);

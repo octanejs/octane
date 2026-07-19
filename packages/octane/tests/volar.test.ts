@@ -16,6 +16,24 @@ const OBJECT_RENDERERS = {
 };
 
 /**
+ * Minimal `octane/jsx-runtime` stub for the type-level programs below: the DOM
+ * renderer's virtual TSX pins `@jsxImportSource octane`, so a program that
+ * compiles it needs the module resolvable from its root.
+ */
+function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
+	const octaneRoot = join(root, 'node_modules/octane');
+	mkdirSync(octaneRoot, { recursive: true });
+	writeFileSync(
+		join(octaneRoot, 'package.json'),
+		JSON.stringify({ name: 'octane', exports: { './jsx-runtime': './jsx-runtime.d.ts' } }),
+	);
+	writeFileSync(
+		join(octaneRoot, 'jsx-runtime.d.ts'),
+		`export namespace JSX {\n\tinterface IntrinsicElements {\n${intrinsics}\n\t}\n}\n`,
+	);
+}
+
+/**
  * Volar mappings tests. We exercise the IDE-facing virtual-TSX pipeline:
  *   - Returns a `VolarMappingsResult` plus Octane's non-fatal diagnostics.
  *   - Generates TSX (`code`) containing the user identifiers (so TypeScript's
@@ -87,15 +105,22 @@ describe('compileToVolarMappings', () => {
 			renderers: OBJECT_RENDERERS,
 		});
 		const prelude = '/** @jsxImportSource @fixture/object-intrinsics */\n';
+		// The built-in DOM renderer pins octane's own jsx-runtime: a `.tsrx`
+		// file's JSX is octane's dialect regardless of the HOST tsconfig's
+		// `jsxImportSource` (a React shell hosting islands must not type them
+		// against React's JSX).
+		const domPrelude = '/** @jsxImportSource octane */\n';
 
 		expect(object.code.startsWith(prelude)).toBe(true);
-		expect(dom.code).not.toContain('@jsxImportSource');
-		expect(object.code.slice(prelude.length)).toBe(baseline.code);
+		expect(dom.code.startsWith(domPrelude)).toBe(true);
+		expect(baseline.code.startsWith(domPrelude)).toBe(true);
+		expect(object.code.slice(prelude.length)).toBe(baseline.code.slice(domPrelude.length));
 		expect(object.mappings).toHaveLength(baseline.mappings.length);
+		const shift = prelude.length - domPrelude.length;
 		for (let index = 0; index < object.mappings.length; index++) {
 			expect(object.mappings[index].sourceOffsets).toEqual(baseline.mappings[index].sourceOffsets);
 			expect(object.mappings[index].generatedOffsets).toEqual(
-				baseline.mappings[index].generatedOffsets.map((offset) => offset + prelude.length),
+				baseline.mappings[index].generatedOffsets.map((offset) => offset + shift),
 			);
 		}
 	});
@@ -135,9 +160,11 @@ describe('compileToVolarMappings', () => {
 		expect(overridden.code).not.toContain('@fixture/object-renderer');
 
 		// Only leading trivia counts: a pragma after the first statement is not a
-		// TS pragma and must not become one.
+		// TS pragma and must not suppress the renderer prelude — the virtual TSX
+		// still leads with the DOM renderer's own octane pragma, so TS reads
+		// octane's types, not the trailing comment's module.
 		const trailing = compileToVolarMappings(jsx + `/** ${pragma} */\n`, '/src/Scene.tsrx');
-		expect(trailing.code).not.toContain('@jsxImportSource');
+		expect(trailing.code.startsWith('/** @jsxImportSource octane */\n')).toBe(true);
 	});
 
 	it('keeps conflicting DOM and renderer intrinsic types isolated per virtual file', () => {
@@ -165,18 +192,15 @@ describe('compileToVolarMappings', () => {
 }
 `,
 			);
-			writeFileSync(
-				join(root, 'dom-intrinsics.d.ts'),
-				`declare namespace JSX {
-	interface IntrinsicElements {
-		line: { path: string };
+			// The "DOM side" of the intrinsics conflict lives where dom virtual
+			// files actually read it now: octane's own jsx-runtime module.
+			writeOctaneJsxRuntimeStub(
+				root,
+				`		line: { path: string };
 		path: { d: string };
 		audio: { src: string };
 		source: { src: string };
-		mesh: { domOnly?: boolean };
-	}
-}
-`,
+		mesh: { domOnly?: boolean };`,
 			);
 			const augmentationFile = join(root, 'object-augmentation.d.ts');
 			writeFileSync(
@@ -215,13 +239,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 			writeFileSync(invalidDomFile, invalidDom.code);
 
 			const program = ts.createProgram({
-				rootNames: [
-					join(root, 'dom-intrinsics.d.ts'),
-					augmentationFile,
-					domFile,
-					objectFile,
-					invalidDomFile,
-				],
+				rootNames: [augmentationFile, domFile, objectFile, invalidDomFile],
 				options: {
 					jsx: ts.JsxEmit.Preserve,
 					module: ts.ModuleKind.ESNext,
@@ -336,14 +354,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 					'\treturn { id: String(request) };\n' +
 					'}\n',
 			);
-			writeFileSync(
-				join(root, 'dom-intrinsics.d.ts'),
-				'declare namespace JSX {\n' +
-					'\tinterface IntrinsicElements {\n' +
-					'\t\tbutton: { children?: unknown };\n' +
-					'\t}\n' +
-					'}\n',
-			);
+			writeOctaneJsxRuntimeStub(root, '\t\tbutton: { children?: unknown };');
 			const appFile = join(root, 'App.tsx');
 			const misuseFile = join(root, 'AppMisuse.tsx');
 			writeFileSync(appFile, result.code);
@@ -363,13 +374,13 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 				target: ts.ScriptTarget.ESNext,
 			};
 			const program = ts.createProgram({
-				rootNames: [join(root, 'dom-intrinsics.d.ts'), appFile],
+				rootNames: [appFile],
 				options,
 			});
 			expect(ts.getPreEmitDiagnostics(program)).toHaveLength(0);
 
 			const misuseProgram = ts.createProgram({
-				rootNames: [join(root, 'dom-intrinsics.d.ts'), misuseFile],
+				rootNames: [misuseFile],
 				options,
 			});
 			const misuseDiagnostics = ts.getPreEmitDiagnostics(misuseProgram);

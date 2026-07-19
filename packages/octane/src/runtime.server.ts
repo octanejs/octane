@@ -3455,8 +3455,17 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 	}
 }
 
-export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | string): T;
-export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
+// The `$$kind?: never` intersection rejects octane ELEMENT descriptors, whose
+// promise protocol is type-level-only (the React 19 tag gate) and poisoned —
+// mirrors the client runtime's `use()` (see NotAnElementDescriptor there).
+export function use<T>(
+	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
+	siteKey?: symbol | string,
+): T;
+export function use<T>(
+	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
+	siteKey?: ServerHookSlot,
+): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
 	const serial = hasExternalHydrationOwner(usable as PromiseLike<unknown>) ? null : SERIAL;
 	if (usable == null || typeof (usable as any).then !== 'function') {

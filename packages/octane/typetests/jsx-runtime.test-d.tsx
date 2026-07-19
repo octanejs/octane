@@ -91,3 +91,15 @@ export function TypeSurface() {
 		</main>
 	);
 }
+
+// ── Elements are not promises — the poisoned protocol holds octane-side too ──
+// `Octane.JSX.Element`'s `Promise<React.ReactNode>` parent exists only for the
+// React 19 tag gate (see jsx-runtime.d.ts); consuming an element as a promise
+// is a hard type error inside octane-JSX programs as well.
+declare const someElement: OctaneJSX.Element;
+export async function elementAwaitRejected() {
+	// @ts-expect-error — TS1320: an octane element is not a valid promise
+	await someElement;
+}
+// @ts-expect-error — .then with a callback fails overload resolution
+export const elementThenRejected = someElement.then(() => null);

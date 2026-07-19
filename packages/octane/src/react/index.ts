@@ -59,12 +59,19 @@ import {
 	OPAQUE_HOST_SENTINEL,
 	OPAQUE_HOST_SENTINEL_COMMENT,
 	REACT_CONTEXT_TAG,
-	validateIslandChild,
+	resolveHostedIsland,
+	type OctaneCompatComponentProps,
 	type OctaneCompatProps,
 	type TransportedChild,
 } from './shared.js';
 
-export type { OctaneCompatProps, OctaneReactComponent, OctaneRenderedNode } from './shared.js';
+export type {
+	OctaneCompatComponentProps,
+	OctaneCompatProps,
+	OctaneHostedComponent,
+	OctaneReactComponent,
+	OctaneRenderedNode,
+} from './shared.js';
 import { drainPassiveEffects } from '../runtime.js';
 import { readNearestProviderValue } from './fiber-adapter.js';
 
@@ -553,25 +560,37 @@ class HostedIslandController {
 }
 
 /**
- * Host exactly one compiled Octane component element inside a React tree.
+ * Host exactly one compiled Octane component inside a React tree, in either
+ * authoring form:
  *
- * The child element is consumed as a `{ type, props }` transport — React never
- * invokes it. Its `ref` prop (React 19 places `ref` in props) passes through
- * to the island as an ordinary Octane ref prop. Surrounding React Suspense
+ * - `component`/`props` (typed): `<OctaneCompat component={Island} props={…}/>`
+ *   passes the island transport directly — island prop types flow from the
+ *   component's own octane-typed signature, so a wrong prop is a type error at
+ *   the call site.
+ * - element child: `<OctaneCompat><Island …/></OctaneCompat>` — the child
+ *   element is consumed as a `{ type, props }` transport; React never invokes
+ *   it.
+ *
+ * The island's `ref` prop (React 19 places `ref` in props) passes through to
+ * the island as an ordinary Octane ref prop. Surrounding React Suspense
  * boundaries, error boundaries, and event ancestors are the integration
  * surface; there is nothing to register.
  */
-export function OctaneCompat(props: OctaneCompatProps): React.ReactNode {
+export function OctaneCompat<P>(props: OctaneCompatComponentProps<P>): React.ReactNode;
+export function OctaneCompat(props: OctaneCompatProps): React.ReactNode;
+export function OctaneCompat(
+	props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
+): React.ReactNode {
 	const [controller] = React.useState(() => new HostedIslandController());
 	// One stable invalidation per wrapper — a plain state bump (§5).
 	const [, bump] = React.useReducer((count: number) => count + 1, 0);
 	controller.notify = bump;
 
 	// Render-local transport: an aborted concurrent React render must never
-	// mutate the running Octane tree, so the child and context snapshot are
-	// captured here and published only from the committed layout effect below
-	// (§5 rules 4–5).
-	const child = validateIslandChild(props.children);
+	// mutate the running Octane tree, so the island transport and context
+	// snapshot are captured here and published only from the committed layout
+	// effect below (§5 rules 4–5).
+	const child = resolveHostedIsland(props);
 	// Context reads replay during EVERY wrapper render — including one about
 	// to throw the relay/error — so React records the dependencies (§7 step 3).
 	const snapshot = controller.readReactSnapshots();

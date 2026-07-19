@@ -83,6 +83,82 @@ export const withChildRef = (
 // The scope parameter stays out of the React-facing surface entirely.
 export type ScopeStaysInternal = Scope;
 
+// ── 6. component/props form: typed transport without React element typing ──
+// The RAW compiled component — rejected as a JSX element type in §1 — is
+// accepted DIRECTLY by the `component` prop (its extra scope/extra parameters
+// absorb into the facade's `never[]` rest), and `P` infers from its own props
+// parameter, so island prop mistakes are call-site type errors with zero
+// per-island declarations.
+export const componentForm = <OctaneCompat component={RawGreeting} props={{ name: 'x' }} />;
+// The tsrx-tsc view of a `.tsrx` export — `(props) => <octane element>` — is
+// equally accepted; the return type is deliberately unconstrained.
+declare const TsrxGreeting: (props: GreetingProps) => { $$typeOnly: true };
+export const tsrxForm = <OctaneCompat component={TsrxGreeting} props={{ name: 'x' }} />;
+// @ts-expect-error — wrong prop type at the call site
+export const componentFormWrong = <OctaneCompat component={RawGreeting} props={{ name: 42 }} />;
+// @ts-expect-error — missing required prop
+export const componentFormMissing = <OctaneCompat component={RawGreeting} props={{}} />;
+// @ts-expect-error — `props` itself is required while the island has required props
+export const componentFormNoProps = <OctaneCompat component={RawGreeting} />;
+export const componentFormExcess = (
+	// @ts-expect-error — unknown island prop
+	<OctaneCompat component={RawGreeting} props={{ name: 'x', extra: 1 }} />
+);
+// A props-less island may omit `props` entirely.
+declare const Chrome: ComponentBody<Record<string, never>>;
+export const componentFormOptional = <OctaneCompat component={Chrome} />;
+// The two authoring forms are mutually exclusive.
+declare const greetingElement: React.ReactElement;
+// @ts-expect-error — component and children cannot be combined
+export const bothFormsRejected = OctaneCompat({ component: Chrome, children: greetingElement });
+
+// ── 7. children form: the tsrx-typed island is a React JSX element type ─────
+// `Octane.JSX.Element` extends `Promise<React.ReactNode>` (type-level only) —
+// the ONE member of React's element-constructor return union that is NOT
+// itself a `ReactNode` — so the exact signature tsrx-tsc infers for a `.tsrx`
+// export is accepted by React JSX zero-cast, with exact prop checking…
+import type { JSX as OctaneJSX } from '../src/jsx-runtime.js';
+declare const TsrxJsxGreeting: (props: GreetingProps) => OctaneJSX.Element;
+export const childrenForm = (
+	<OctaneCompat>
+		<TsrxJsxGreeting name="x" />
+	</OctaneCompat>
+);
+// @ts-expect-error — wrong prop type at the child site
+export const childrenFormWrong = <TsrxJsxGreeting name={42} />;
+// @ts-expect-error — missing required prop at the child site
+export const childrenFormMissing = <TsrxJsxGreeting />;
+// …while the nominal separation survives in BOTH directions: octane ELEMENT
+// values stay out of React `ReactNode` slots, and React elements do not pass
+// as octane elements.
+declare const octaneElementValue: OctaneJSX.Element;
+// @ts-expect-error — an octane element is not a React renderable
+export const octaneValueRejectedAsChild = <section>{octaneElementValue}</section>;
+// @ts-expect-error — nor assignable to ReactNode
+export const octaneValueRejectedAsNode: React.ReactNode = octaneElementValue;
+// @ts-expect-error — a React element is not an octane element ($$kind brand)
+export const reactValueRejectedAsOctane: OctaneJSX.Element = greetingElement;
+// …and the promise PROTOCOL is poisoned (jsx-runtime.d.ts): the
+// `Promise<ReactNode>` parent exists ONLY for the tag gate above — consuming
+// an element as a promise is a hard type error in every checkable form.
+export async function elementAwaitRejected() {
+	// @ts-expect-error — TS1320: an octane element is not a valid promise
+	await octaneElementValue;
+}
+// @ts-expect-error — .then with a callback fails overload resolution
+export const elementThenRejected = octaneElementValue.then(() => null);
+// @ts-expect-error — .catch with a callback fails overload resolution
+export const elementCatchRejected = octaneElementValue.catch(() => null);
+// @ts-expect-error — .finally with a callback fails overload resolution
+export const elementFinallyRejected = octaneElementValue.finally(() => {});
+// @ts-expect-error — use() rejects elements via the `$$kind?: never` exclusion
+export const elementUseRejected = use(octaneElementValue);
+// `Promise.resolve(element)` cannot be a call-site error (`resolve` accepts
+// anything), but Awaited<Element> collapses to `never`, so nothing usable
+// comes back out. This pin fails if Awaited ever resolves to a real type.
+export const awaitedElementIsNever: [Awaited<OctaneJSX.Element>] extends [never] ? true : never =
+	true;
+
 // ── 5. Phase 2: real React contexts type through use()/useContext ───────────
 // The core overload is STRUCTURAL (ForeignHostContext<T> — no React types in
 // core); inference must recover T from a genuine React.Context<T>.
