@@ -19,6 +19,8 @@ export function createPhase0PAPIAdapter(target = globalThis) {
 	const addEvent = requireFunction(target, '__AddEvent');
 	const removeElement = requireFunction(target, '__RemoveElement');
 	const flushElementTree = requireFunction(target, '__FlushElementTree');
+	const getParent = target.__GetParent;
+	const elementIsEqual = target.__ElementIsEqual;
 
 	const page = createPage('0', 0);
 	let flushCount = 0;
@@ -48,6 +50,28 @@ export function createPhase0PAPIAdapter(target = globalThis) {
 		},
 		setText(element, value) {
 			setAttribute(element, 'text', value);
+		},
+		isChild(parent, child) {
+			if (typeof getParent === 'function') {
+				if (typeof elementIsEqual !== 'function') {
+					throw new Error(
+						'Octane Lynx Phase 0 requires the Element PAPI function __ElementIsEqual.',
+					);
+				}
+				const actualParent = getParent(child);
+				return actualParent != null && elementIsEqual(actualParent, parent);
+			}
+			// @lynx-js/testing-environment@0.3.0 does not expose the typed
+			// __GetParent PAPI primitive, but its ElementRefs are DOM nodes.
+			if (
+				target.lynxTestingEnv !== undefined &&
+				child !== null &&
+				typeof child === 'object' &&
+				'parentNode' in child
+			) {
+				return child.parentNode === parent;
+			}
+			throw new Error('Octane Lynx Phase 0 requires the Element PAPI function __GetParent.');
 		},
 		remove(parent, child) {
 			removeElement(parent, child);
