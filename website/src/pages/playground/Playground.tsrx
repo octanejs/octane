@@ -1,23 +1,28 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
 // LIVE rendered app or the compiled octane output, switchable with a tab. The
-// whole pipeline runs in the browser: `octane/compiler` compiles on a debounce,
-// the compiled module executes inside a SANDBOXED IFRAME with an opaque origin
-// (see src/lib/playground.ts + playground-sandbox.ts — never in this page),
-// and CodeMirror highlights through Shiki with the real TSRX TextMate grammar
-// (src/lib/shiki-codemirror.ts).
+// whole pipeline runs in the browser: `octane/compiler` (and sucrase for
+// React-host `.react.tsx` files) compiles the virtual files on a debounce, the
+// module graph executes inside a SANDBOXED IFRAME with an opaque origin (see
+// src/lib/playground.ts + playground-modules.ts + playground-sandbox.ts —
+// never in this page), and CodeMirror highlights through Shiki with the real
+// TSRX TextMate grammar (src/lib/shiki-codemirror.ts).
 //
 // Everything editor-related boots in an effect (dynamic imports), so SSR
-// renders just the static shell and hydration stays clean. The source for each
-// language mode is kept in its own buffer — switching modes round-trips your
-// edits. The current source + mode also persist into `location.hash` (debounced)
-// so playground states are shareable links.
+// renders just the static shell and hydration stays clean. A workspace is a
+// set of virtual files with an entry; each language mode keeps its own
+// workspace — switching modes round-trips your edits. The Examples dropdown
+// loads curated workspaces (src/lib/playground-examples.ts); editing any file
+// flips it to “Custom”. The active workspace persists into `location.hash`
+// (debounced) so playground states are shareable links, and the Format button
+// runs client-side Prettier (src/lib/playground-format.ts).
 //
 // Shared links are UNTRUSTED input: a hash payload is decoded into the editor
-// and compiled (source + compiled output are safe to display), but it does NOT
-// execute — even in the sandbox — until the visitor explicitly presses "Run"
-// on the consent overlay. Your own edits from the default sources auto-run as
-// before.
+// and compiled (source + compiled output are safe to display — compilation is
+// pure string work), but it does NOT execute — even in the sandbox — until the
+// visitor explicitly presses "Run" on the consent overlay. Your own edits from
+// the default sources auto-run as before.
 import { useState, useRef, useEffect } from 'octane';
+import { useRouter } from '@tanstack/octane-router';
 import type { CompileDiagnostic } from 'octane/compiler';
 import type { PlaygroundLang } from '../../lib/playground.ts';
 import {
@@ -26,13 +31,40 @@ import {
 	MAX_PLAYGROUND_SOURCE_LENGTH,
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
 } from '../../lib/playground-hash.ts';
+import { EXAMPLES, CUSTOM_EXAMPLE_ID, DEFAULT_EXAMPLE_ID } from '../../lib/playground-examples.ts';
 import { useTitle } from '../../hooks/use-title.ts';
 
 const HASH_DEBOUNCE_MS = 400;
 const COMPILE_DEBOUNCE_MS = 250;
 
+// sessionStorage record of the last hash THIS tab wrote (plus the example it
+// came from). A payload matching it is the visitor's own work surviving a
+// reload or route remount — restored without the shared-code consent gate.
+// sessionStorage is same-origin and per-tab, so a link someone sends can never
+// pre-seed it.
+const OWN_HASH_STORAGE_KEY = 'octane-playground-own-hash';
+
+// The FIRST router event after SSR hydration remounts the whole route tree
+// (tracked octane-start bug — hydrated boundary slots don't survive their
+// first update). Our debounced hash writes are router events, so without
+// priming the remount would fire mid-typing (destroying the editor). Instead
+// the boot effect triggers that one-time remount up front via router.load()
+// when this page is the hydration entry; module state survives the remount so
+// the second boot skips it.
+let routerPrimed = false;
+
+// Static dropdown structure — examples grouped into <optgroup>s in
+// declaration order.
+const EXAMPLE_GROUPS: { group: string; examples: typeof EXAMPLES }[] = [];
+for (const example of EXAMPLES) {
+	const bucket = EXAMPLE_GROUPS.find((candidate) => candidate.group === example.group);
+	if (bucket) bucket.examples.push(example);
+	else EXAMPLE_GROUPS.push({ group: example.group, examples: [example] });
+}
+
 export function Playground() @{
 	useTitle('Octane — Playground');
+	const router = useRouter();
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Mobile only: which panel is visible (desktop always shows both).
@@ -40,18 +72,30 @@ export function Playground() @{
 	const [error, setError] = useState('');
 	const [warnings, setWarnings] = useState<CompileDiagnostic[]>([]);
 	const [ready, setReady] = useState(false);
+	const [formatting, setFormatting] = useState(false);
 	// True while a hash-shared payload is loaded but not yet approved to run.
 	const [gated, setGated] = useState(false);
+	const [exampleId, setExampleId] = useState<string>(DEFAULT_EXAMPLE_ID);
+	const [files, setFiles] = useState<string[]>([]);
+	const [activeFile, setActiveFile] = useState('');
+	// Which language variants the current selection offers (drives the toggle).
+	const [variants, setVariants] = useState<Record<PlaygroundLang, boolean>>({
+		tsrx: true,
+		tsx: true,
+	});
 
 	const sourceHostRef = useRef<HTMLDivElement | null>(null);
 	const outputHostRef = useRef<HTMLDivElement | null>(null);
 	const previewHostRef = useRef<HTMLDivElement | null>(null);
 	// Imperative bridge into the boot closure below — populated once the editor
-	// stack has loaded; the mode buttons (and the consent overlay's Run button)
-	// call through it.
+	// stack has loaded; the toolbar buttons (and the consent overlay's Run
+	// button) call through it.
 	const controllerRef = useRef<
 		{
 			switchLang?: (next: PlaygroundLang) => void;
+			selectExample?: (id: string) => void;
+			selectFile?: (name: string) => void;
+			formatActive?: () => void;
 			approveRun?: () => void;
 		}
 	>({});
@@ -65,26 +109,45 @@ export function Playground() @{
 		let disposed = false;
 		let sourceView: any;
 		let outputView: any;
-		let preview: | { run(code: string): Promise<{ error: string | null }>; destroy(): void }
-		| null = null;
+		let preview: any = null;
 		let compileDebounceId = 0;
 		let hashDebounceId = 0;
 		// Validate the URL payload before loading CodeMirror, Shiki, or the
 		// compiler. Oversized input is ignored in favor of the bounded defaults.
-		const hashResult = decodePlaygroundHash(window.location.hash.slice(1));
+		const rawHash = window.location.hash.slice(1);
+		const hashResult = decodePlaygroundHash(rawHash);
 		const initial = hashResult.ok ? hashResult.value : null;
 		const initialDiagnostic = hashResult.ok ? '' : hashResult.error;
 		if (initialDiagnostic) setError(initialDiagnostic);
 
 		(async () => {
-			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any;
+			// One-time router prime (see routerPrimed above). loadedAt === 0 means
+			// no client-side load has happened yet — this page was the hydration
+			// entry, so the first router event will remount the route tree. Take
+			// that hit NOW, before the editor exists; the remount disposes this
+			// boot and the re-run (routerPrimed already true) boots for real.
+			if (!routerPrimed) {
+				routerPrimed = true;
+				if ((router as any).stores?.loadedAt?.get?.() === 0) {
+					try {
+						await (router as any).load();
+					} catch {
+					}
+					if (disposed) return;
+				}
+			}
+
+			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
+			let pgExamples: any;
 			try {
-				[stateMod, commandsMod, viewMod, shikiMod, pg] = await Promise.all([
+				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgExamples] = await Promise.all([
 					import('@codemirror/state'),
 					import('@codemirror/commands'),
 					import('@codemirror/view'),
 					import('../../lib/shiki-codemirror.ts'),
 					import('../../lib/playground.ts'),
+					import('../../lib/playground-modules.ts'),
+					import('../../lib/playground-examples.ts'),
 				]);
 			} catch (bootError) {
 				// A load failure after unmount (e.g. a test env torn down mid-import)
@@ -101,26 +164,81 @@ export function Playground() @{
 			const { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } = viewMod;
 			const { shikiHighlight } = shikiMod;
 
+			type Workspace = { files: { name: string; source: string }[]; entry: string };
+
+			const cloneWorkspace = (workspace: Workspace): Workspace => ({
+				entry: workspace.entry,
+				files: workspace.files.map((file: { name: string; source: string }) => ({ ...file })),
+			});
+
 			let currentLang: PlaygroundLang = initial?.lang ?? 'tsrx';
-			const buffers: Record<PlaygroundLang, string> = {
-				tsrx: pg.DEFAULT_SOURCES.tsrx,
-				tsx: pg.DEFAULT_SOURCES.tsx,
+			let currentExampleId: string = initial ? CUSTOM_EXAMPLE_ID : DEFAULT_EXAMPLE_ID;
+			const workspaces: Partial<Record<PlaygroundLang, Workspace>> = {
+				tsrx: cloneWorkspace(pgExamples.DEFAULT_WORKSPACES.tsrx),
+				tsx: cloneWorkspace(pgExamples.DEFAULT_WORKSPACES.tsx),
 			};
 			// A hash payload is someone else's code — display + compile it, but
-			// gate EXECUTION behind the consent overlay's Run button. A payload
-			// byte-equal to the default source carries nothing new, so it stays
-			// ungated.
+			// gate EXECUTION behind the consent overlay's Run button. Two payloads
+			// carry nothing new and stay ungated: one byte-equal to the default
+			// workspace, and one this tab wrote itself (the sessionStorage record —
+			// your own work surviving a reload or route remount).
+			const readOwnHash = (): { hash: string; exampleId: string } | null => {
+				try {
+					const stored = window.sessionStorage.getItem(OWN_HASH_STORAGE_KEY);
+					if (!stored) return null;
+					const parsed = JSON.parse(stored);
+					return typeof parsed?.hash === 'string' && typeof parsed?.exampleId === 'string'
+						? parsed
+						: null;
+				} catch {
+					return null;
+				}
+			};
 			let executionGated = false;
 			if (initial) {
-				buffers[currentLang] = initial.source;
-				setLang(currentLang);
-				if (initial.source !== pg.DEFAULT_SOURCES[currentLang]) {
+				workspaces[currentLang] = { entry: initial.entry, files: initial.files };
+				const fallback = pgExamples.DEFAULT_WORKSPACES[currentLang];
+				const isDefault =
+					initial.files.length === 1 && initial.entry === fallback.entry &&
+						initial.files[0].name === fallback.files[0].name &&
+						initial.files[0].source === fallback.files[0].source;
+				const own = readOwnHash();
+				if (isDefault) {
+					currentExampleId = DEFAULT_EXAMPLE_ID;
+				} else if (own && own.hash === rawHash) {
+					currentExampleId = pgExamples.getExample(own.exampleId)
+						? own.exampleId
+						: CUSTOM_EXAMPLE_ID;
+				} else {
 					executionGated = true;
 					setGated(true);
 				}
 			}
+			let currentFile = workspaces[currentLang]!.entry;
 
-			const sourceLangCompartment = new Compartment();
+			const workspace = (): Workspace => workspaces[currentLang]!;
+			const fileSource = (name: string): string => workspace().files.find(
+				(file: { name: string }) => file.name === name,
+			)?.source ??
+				'';
+
+			// Which language variants the current selection can switch to: an
+			// example offers exactly its declared variants; “Custom” keeps both
+			// modes live (a missing side lazily starts from the default counter).
+			const variantAvailability = (): Record<PlaygroundLang, boolean> => {
+				if (currentExampleId === CUSTOM_EXAMPLE_ID) return { tsrx: true, tsx: true };
+				const example = pgExamples.getExample(currentExampleId);
+				if (!example) return { tsrx: true, tsx: true };
+				return { tsrx: example.variants.tsrx != null, tsx: example.variants.tsx != null };
+			};
+
+			const publishWorkspaceState = () => {
+				setLang(currentLang);
+				setExampleId(currentExampleId);
+				setFiles(workspace().files.map((file: { name: string }) => file.name));
+				setActiveFile(currentFile);
+				setVariants(variantAvailability());
+			};
 
 			// github-dark canvas so the Shiki token colors sit on the palette they
 			// were designed for.
@@ -161,71 +279,158 @@ export function Playground() @{
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
 			};
 
-			const compileAndRun = (source: string) => {
+			// The compiled-output pane tracks the ACTIVE file; keep the last good
+			// graph around so switching tabs doesn't need a recompile.
+			let lastCompiled: Map<string, string> | null = null;
+			const showCompiledFor = (name: string) => {
+				const code = lastCompiled?.get(name);
+				if (typeof code === 'string') replaceDoc(outputView, code);
+			};
+
+			let compileSeq = 0;
+			const compileAndRun = async () => {
 				if (disposed) return;
-				if (source.length > MAX_PLAYGROUND_SOURCE_LENGTH) {
+				const seq = ++compileSeq;
+				const { files: wsFiles, entry } = workspace();
+				const total = wsFiles.reduce(
+					(sum: number, file: { source: string }) => sum + file.source.length,
+					0,
+				);
+				if (total > MAX_PLAYGROUND_SOURCE_LENGTH) {
 					setWarnings([]);
 					setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
 					return;
 				}
-				const result = pg.compilePlayground(source, currentLang);
-				if (!result.ok) {
+				const graph = await pgModules.buildModuleGraph(wsFiles, entry);
+				if (disposed || seq !== compileSeq) return;
+				if (!graph.ok) {
 					setWarnings([]);
-					setError(result.error);
+					setError(graph.error);
 					return;
 				}
-				setWarnings(result.warnings);
+				setWarnings(
+					graph.warnings.map((warning: { diagnostic: CompileDiagnostic }) => warning.diagnostic),
+				);
 				setError('');
-				replaceDoc(outputView, result.code);
+				lastCompiled = graph.compiled;
+				showCompiledFor(currentFile);
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.
 				if (executionGated) return;
-				void preview!.run(result.code).then((r) => {
+				void preview.run(graph).then((r: { error: string | null }) => {
 					if (!disposed && r.error) setError(r.error);
 				});
 			};
 
-			// replaceState (not the router) — only the hash on the current entry
-			// changes, so the router's history wiring never sees it.
-			const updateHash = (source: string) => {
+			const scheduleCompile = () => {
+				window.clearTimeout(compileDebounceId);
+				compileDebounceId = window.setTimeout(() => {
+					void compileAndRun();
+				}, COMPILE_DEBOUNCE_MS);
+			};
+
+			// replaceState (not router.navigate) — only the hash on the current
+			// entry changes. The router still observes it (its history wrapper),
+			// which is why the boot primed the one-time post-hydration remount
+			// before any of these writes can happen. While a shared payload is
+			// still gated, the URL keeps the sender's link untouched.
+			const updateHash = () => {
 				window.clearTimeout(hashDebounceId);
 				hashDebounceId = window.setTimeout(() => {
-					const encoded = encodePlaygroundHash(source, currentLang);
-					if (encoded) window.history.replaceState(null, '', '#' + encoded);
+					if (executionGated) return;
+					const { files: wsFiles, entry } = workspace();
+					const encoded = encodePlaygroundHash({
+						lang: currentLang,
+						entry,
+						files: wsFiles,
+					});
+					if (!encoded) return;
+					window.history.replaceState(null, '', '#' + encoded);
+					try {
+						window.sessionStorage.setItem(
+							OWN_HASH_STORAGE_KEY,
+							JSON.stringify({ hash: encoded, exampleId: currentExampleId }),
+						);
+					} catch {
+						// Storage full/unavailable — sharing still works, only the
+						// reload-without-consent nicety is lost.
+					}
 				}, HASH_DEBOUNCE_MS);
 			};
 
+			// One writable EditorView; each file keeps its own EditorState (undo
+			// history included), keyed per variant so mode switches round-trip.
+			const editorStates = new Map<string, any>();
+			const stateKey = (name: string) => currentLang + ':' + name;
+			const grammarFor = (name: string) => (name.endsWith('.tsrx') ? 'tsrx' : 'tsx');
+
+			const makeEditorState = (name: string, doc: string) => EditorState.create({
+				doc,
+				extensions: [
+					EditorState.changeFilter.of((transaction: any) => {
+						if (!transaction.docChanged) return true;
+						const others = workspace().files.reduce(
+							(sum: number, file: { name: string; source: string }) => file.name === currentFile
+								? sum
+								: sum + file.source.length,
+							0,
+						);
+						if (others + transaction.newDoc.length <= MAX_PLAYGROUND_SOURCE_LENGTH) {
+							return true;
+						}
+						setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
+						return false;
+					}),
+					lineNumbers(),
+					history(),
+					drawSelection(),
+					highlightActiveLine(),
+					keymap.of([
+						{
+							key: 'Mod-Shift-f',
+							run: () => {
+								controllerRef.current.formatActive?.();
+								return true;
+							},
+						},
+						...defaultKeymap,
+						...historyKeymap,
+						indentWithTab,
+					]),
+					EditorView.lineWrapping,
+					EditorState.tabSize.of(2),
+					shikiHighlight(grammarFor(name)),
+					sharedTheme,
+					EditorView.updateListener.of((update: any) => {
+						if (!update.docChanged) return;
+						const next = update.state.doc.toString();
+						const file = workspace().files.find(
+							(candidate: { name: string }) => candidate.name === currentFile,
+						);
+						if (file) file.source = next;
+						// Any edit means the buffer no longer matches the example.
+						if (currentExampleId !== CUSTOM_EXAMPLE_ID) {
+							currentExampleId = CUSTOM_EXAMPLE_ID;
+							setExampleId(CUSTOM_EXAMPLE_ID);
+							setVariants(variantAvailability());
+						}
+						scheduleCompile();
+						updateHash();
+					}),
+				],
+			});
+
+			const openFile = (name: string) => {
+				editorStates.set(stateKey(currentFile), sourceView.state);
+				currentFile = name;
+				const existing = editorStates.get(stateKey(name));
+				sourceView.setState(existing ?? makeEditorState(name, fileSource(name)));
+				setActiveFile(name);
+				showCompiledFor(name);
+			};
+
 			sourceView = new EditorView({
-				state: EditorState.create({
-					doc: buffers[currentLang],
-					extensions: [
-						EditorState.changeFilter.of((transaction: any) => {
-							if (!transaction.docChanged) return true;
-							if (transaction.newDoc.length <= MAX_PLAYGROUND_SOURCE_LENGTH) return true;
-							setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
-							return false;
-						}),
-						lineNumbers(),
-						history(),
-						drawSelection(),
-						highlightActiveLine(),
-						keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-						EditorView.lineWrapping,
-						EditorState.tabSize.of(2),
-						sourceLangCompartment.of(shikiHighlight(currentLang)),
-						sharedTheme,
-						EditorView.updateListener.of((update: any) => {
-							if (!update.docChanged) return;
-							const next = update.state.doc.toString();
-							buffers[currentLang] = next;
-							window.clearTimeout(compileDebounceId);
-							compileDebounceId = window.setTimeout(() => {
-								compileAndRun(next);
-							}, COMPILE_DEBOUNCE_MS);
-							updateHash(next);
-						}),
-					],
-				}),
+				state: makeEditorState(currentFile, fileSource(currentFile)),
 				parent: sourceHost,
 			});
 
@@ -246,26 +451,92 @@ export function Playground() @{
 
 			controllerRef.current.switchLang = (next) => {
 				if (next === currentLang || disposed) return;
-				buffers[currentLang] = sourceView.state.doc.toString();
+				if (!variantAvailability()[next]) return;
+				editorStates.set(stateKey(currentFile), sourceView.state);
+				if (!workspaces[next]) {
+					const example =
+						currentExampleId === CUSTOM_EXAMPLE_ID ? null : pgExamples.getExample(currentExampleId);
+					const fromExample =
+						example ? pgExamples.exampleWorkspace(example, next) : null;
+					workspaces[next] = fromExample ?? cloneWorkspace(pgExamples.DEFAULT_WORKSPACES[next]);
+				}
 				currentLang = next;
-				replaceDoc(sourceView, buffers[next]);
-				sourceView.dispatch({
-					effects: sourceLangCompartment.reconfigure(shikiHighlight(next)),
-				});
+				currentFile = workspace().files.some((file: { name: string }) => file.name === currentFile)
+					? currentFile
+					: workspace().entry;
+				const existing = editorStates.get(stateKey(currentFile));
+				sourceView.setState(existing ?? makeEditorState(currentFile, fileSource(currentFile)));
+				publishWorkspaceState();
 				window.clearTimeout(compileDebounceId);
-				compileAndRun(buffers[next]);
-				updateHash(buffers[next]);
+				void compileAndRun();
+				updateHash();
+			};
+
+			controllerRef.current.selectExample = (id) => {
+				if (disposed || id === CUSTOM_EXAMPLE_ID || id === currentExampleId) return;
+				const example = pgExamples.getExample(id);
+				if (!example) return;
+				const nextLang: PlaygroundLang =
+					example.variants[currentLang]
+						? currentLang
+						: example.variants.tsrx
+							? 'tsrx'
+							: 'tsx';
+				currentExampleId = id;
+				currentLang = nextLang;
+				workspaces.tsrx = undefined;
+				workspaces.tsx = undefined;
+				workspaces[nextLang] = pgExamples.exampleWorkspace(example, nextLang);
+				currentFile = workspace().entry;
+				editorStates.clear();
+				sourceView.setState(makeEditorState(currentFile, fileSource(currentFile)));
+				// Picking an example is the visitor's own action — never gated.
+				executionGated = false;
+				setGated(false);
+				publishWorkspaceState();
+				window.clearTimeout(compileDebounceId);
+				void compileAndRun();
+				updateHash();
+			};
+
+			controllerRef.current.selectFile = (name) => {
+				if (disposed || name === currentFile) return;
+				if (!workspace().files.some((file: { name: string }) => file.name === name)) return;
+				openFile(name);
+			};
+
+			controllerRef.current.formatActive = () => {
+				if (disposed) return;
+				setFormatting(true);
+				void (async () => {
+					try {
+						const { formatPlaygroundFile } = await import('../../lib/playground-format.ts');
+						const source = sourceView.state.doc.toString();
+						const result = await formatPlaygroundFile(currentFile, source);
+						if (disposed) return;
+						if (!result.ok) {
+							setError(result.error);
+							return;
+						}
+						if (result.code !== source) replaceDoc(sourceView, result.code);
+					} finally {
+						if (!disposed) setFormatting(false);
+					}
+				})();
 			};
 
 			controllerRef.current.approveRun = () => {
 				if (disposed || !executionGated) return;
 				executionGated = false;
 				setGated(false);
-				buffers[currentLang] = sourceView.state.doc.toString();
-				compileAndRun(buffers[currentLang]);
+				void compileAndRun();
+				// The approved code is the visitor's own now — record it so a
+				// reload doesn't re-gate it.
+				updateHash();
 			};
 
-			compileAndRun(buffers[currentLang]);
+			publishWorkspaceState();
+			void compileAndRun();
 			if (initialDiagnostic) setError(initialDiagnostic);
 			setReady(true);
 		})();
@@ -273,6 +544,9 @@ export function Playground() @{
 		return () => {
 			disposed = true;
 			controllerRef.current.switchLang = undefined;
+			controllerRef.current.selectExample = undefined;
+			controllerRef.current.selectFile = undefined;
+			controllerRef.current.formatActive = undefined;
 			controllerRef.current.approveRun = undefined;
 			window.clearTimeout(compileDebounceId);
 			window.clearTimeout(hashDebounceId);
@@ -285,30 +559,55 @@ export function Playground() @{
 	<div class="pg">
 		<div class="pg-toolbar">
 			<div class="pg-toolbar-side">
+				<select
+					class="pg-select"
+					aria-label="Example"
+					disabled={!ready}
+					value={exampleId}
+					onChange={(e) => controllerRef.current.selectExample?.(e.currentTarget.value)}
+				>
+					@if (exampleId === 'custom') {
+						<option value="custom" disabled>Custom</option>
+					}
+					@for (const group of EXAMPLE_GROUPS; key group.group) {
+						<optgroup label={group.group}>
+							@for (const example of group.examples; key example.id) {
+								<option value={example.id}>
+									{example.label as string}
+								</option>
+							}
+						</optgroup>
+					}
+				</select>
 				<div class="pg-seg" role="group" aria-label="Source language">
 					<button
 						type="button"
 						class={['pg-seg-btn', lang === 'tsrx' && 'active']}
-						disabled={!ready}
-						onClick={() => {
-							setLang('tsrx');
-							controllerRef.current.switchLang?.('tsrx');
-						}}
+						disabled={!ready || !variants.tsrx}
+						title={variants.tsrx ? undefined : 'This example has no TSRX variant'}
+						onClick={() => controllerRef.current.switchLang?.('tsrx')}
 					>
 						TSRX
 					</button>
 					<button
 						type="button"
 						class={['pg-seg-btn', lang === 'tsx' && 'active']}
-						disabled={!ready}
-						onClick={() => {
-							setLang('tsx');
-							controllerRef.current.switchLang?.('tsx');
-						}}
+						disabled={!ready || !variants.tsx}
+						title={variants.tsx ? undefined : 'This example has no TSX variant'}
+						onClick={() => controllerRef.current.switchLang?.('tsx')}
 					>
 						TSX
 					</button>
 				</div>
+				<button
+					type="button"
+					class="pg-format"
+					disabled={!ready || formatting}
+					title="Format with Prettier (Ctrl/Cmd-Shift-F)"
+					onClick={() => controllerRef.current.formatActive?.()}
+				>
+					{(formatting ? 'Formatting…' : 'Format') as string}
+				</button>
 			</div>
 			<div class="pg-seg" role="group" aria-label="Result view">
 				<button
@@ -337,7 +636,8 @@ export function Playground() @{
 					{warnings.length === 1 ? 'Compiler warning' : 'Compiler warnings'}
 				</strong>
 				<ul>
-					@for (const warning of warnings; key warning.code + ':' + warning.start.offset) {
+					@for (const warning of warnings; key warning.filename + ':' + warning.code + ':' +
+						warning.start.offset) {
 						<li>
 							<code>{warning.code}</code>
 							<span>{warning.message}</span>
@@ -356,9 +656,25 @@ export function Playground() @{
 				aria-label="Source editor"
 			>
 				<div class="pg-panel-head">
-					<span>
-						{'Source · .' + lang}
-					</span>
+					@if (files.length > 1) {
+						<div class="pg-tabs" role="tablist" aria-label="Playground files">
+							@for (const name of files; key name) {
+								<button
+									type="button"
+									role="tab"
+									aria-selected={name === activeFile}
+									class={['pg-tab', name === activeFile && 'active']}
+									onClick={() => controllerRef.current.selectFile?.(name)}
+								>
+									{name as string}
+								</button>
+							}
+						</div>
+					} @else {
+						<span>
+							{'Source · ' + (activeFile || '…')}
+						</span>
+					}
 					@if (!ready) {
 						<span class="pg-loading">Loading editor…</span>
 					}
@@ -369,7 +685,7 @@ export function Playground() @{
 			<section class={['pg-panel', pane !== 'result' && 'mobile-hidden']} aria-label="Result">
 				<div class="pg-panel-head">
 					<span>
-						{view === 'preview' ? 'Live preview' : 'Compiled for the octane runtime'}
+						{view === 'preview' ? 'Live preview' : 'Compiled output · ' + (activeFile || '…')}
 					</span>
 				</div>
 				<div class={['pg-result', view !== 'preview' && 'hidden']}>
@@ -436,7 +752,47 @@ export function Playground() @{
 			.pg-toolbar-side {
 				display: flex;
 				align-items: center;
-				gap: 1rem;
+				gap: 0.75rem;
+				flex-wrap: wrap;
+			}
+			.pg-select {
+				font: inherit;
+				font-size: 0.85rem;
+				font-weight: 500;
+				color: #f4eee8;
+				padding: 0.35rem 0.65rem;
+				border-radius: 8px;
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				background: rgba(255, 255, 255, 0.04);
+				cursor: pointer;
+				max-width: 15rem;
+			}
+			.pg-select:disabled {
+				opacity: 0.5;
+				cursor: default;
+			}
+			.pg-select option,
+			.pg-select optgroup {
+				background: #16181d;
+				color: #f4eee8;
+			}
+			.pg-format {
+				font: inherit;
+				font-size: 0.85rem;
+				font-weight: 500;
+				color: #99a1b3;
+				padding: 0.35rem 0.9rem;
+				border-radius: 9999px;
+				border: 1px solid rgba(255, 255, 255, 0.1);
+				background: rgba(255, 255, 255, 0.04);
+				cursor: pointer;
+			}
+			.pg-format:hover:not(:disabled) {
+				color: #f4eee8;
+			}
+			.pg-format:disabled {
+				opacity: 0.5;
+				cursor: default;
 			}
 			.pg-seg {
 				display: inline-flex;
@@ -538,6 +894,31 @@ export function Playground() @{
 				font-size: 0.72rem;
 				letter-spacing: 0.08em;
 				text-transform: uppercase;
+			}
+			.pg-tabs {
+				display: flex;
+				gap: 0.25rem;
+				flex-wrap: wrap;
+			}
+			.pg-tab {
+				border: none;
+				background: transparent;
+				color: #99a1b3;
+				font: inherit;
+				font-size: 0.78rem;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+				text-transform: none;
+				letter-spacing: normal;
+				padding: 0.2rem 0.6rem;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+			.pg-tab:hover {
+				color: #f4eee8;
+			}
+			.pg-tab.active {
+				color: #ff5d72;
+				background: rgba(255, 65, 90, 0.14);
 			}
 			.pg-loading {
 				text-transform: none;

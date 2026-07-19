@@ -7,9 +7,15 @@
  * discovery, and transforms live in ./bundler.js so other integrations share
  * exactly the same behavior.
  */
-import { createHash } from 'node:crypto';
-import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+// Namespace (not named) imports of node builtins: the pure `compile` entry
+// re-exported next to this module must stay importable from BROWSER dev
+// servers (the website playground compiles in-page), where bundler-less
+// module graphs evaluate this file against an externalized `node:*` shim.
+// Named imports trip the shim at evaluation; namespace member access only
+// throws if a Node-only code path actually runs.
+import * as nodeCrypto from 'node:crypto';
+import * as nodeFs from 'node:fs';
+import * as nodePath from 'node:path';
 import {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
 	cleanModuleId,
@@ -27,7 +33,7 @@ const CLIENT_REFERENCE_META = 'octane:client-reference';
 
 function realRoot(path) {
 	try {
-		return realpathSync(path);
+		return nodeFs.realpathSync(path);
 	} catch {
 		return path;
 	}
@@ -56,7 +62,7 @@ function voidImportKey(request, imported) {
 }
 
 function compiledCodeFingerprint(code) {
-	return createHash('sha256').update(code).digest('base64url');
+	return nodeCrypto.createHash('sha256').update(code).digest('base64url');
 }
 
 async function loadVoidComponentImports(context, imports, importer) {
@@ -158,7 +164,7 @@ export function octane(options = {}) {
 	// Profiling is intentionally independent of serve/HMR. `ssr: true` is the
 	// adapter's explicit server-only override, where client profiling must stay off.
 	const profileEnabled = options.profile === true && options.ssr !== true;
-	let projectRoot = resolve(process.cwd());
+	let projectRoot = nodePath.resolve(process.cwd());
 	// The mixed-toolchain ownership gate: with `requireDirective: true`, a
 	// project `.tsrx` is Octane's by extension, and Octane compiles a project
 	// `.tsx` (full compile) or plain `.ts`/`.js` (hook slotting) only when it
@@ -180,7 +186,7 @@ export function octane(options = {}) {
 	const forceSsr = options.ssr;
 
 	const resetCompiler = (root) => {
-		projectRoot = resolve(root);
+		projectRoot = nodePath.resolve(root);
 		compiler = createOctaneCompiler({
 			root: projectRoot,
 			exclude: options.exclude,
@@ -224,7 +230,8 @@ export function octane(options = {}) {
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);
-			if (realRoot(resolve(config.root)) !== realRoot(projectRoot)) resetCompiler(config.root);
+			if (realRoot(nodePath.resolve(config.root)) !== realRoot(projectRoot))
+				resetCompiler(config.root);
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';
 			emitClientReferenceManifest =
 				options.ssr === false || (options.ssr !== true && !config.build?.ssr);

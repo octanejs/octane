@@ -3,7 +3,9 @@
 // and the /playground route's static shell. The full editor/preview stack
 // (CodeMirror + Shiki + sandboxed-iframe execution) is browser-only; the real
 // browser hydration suite runs the default program and clicks its Increment
-// button inside the opaque-origin frame.
+// button inside the opaque-origin frame. The module-graph pipeline and the
+// curated examples have their own files (playground-modules.test.ts,
+// playground-examples.test.ts).
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
 import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
@@ -11,14 +13,15 @@ import { getRouter } from '../src/router.ts';
 import {
 	compilePlayground,
 	createPreview,
-	DEFAULT_SOURCES,
 	PREVIEW_READY_TIMEOUT_MS,
 	PREVIEW_RUN_TIMEOUT_MS,
 } from '../src/lib/playground.ts';
 import { PROTOCOL_KEY, sandboxSrcdoc } from '../src/lib/playground-sandbox.ts';
+import { DEFAULT_WORKSPACES } from '../src/lib/playground-examples.ts';
 import {
 	decodePlaygroundHash,
 	encodePlaygroundHash,
+	MAX_PLAYGROUND_FILES,
 	MAX_PLAYGROUND_HASH_LENGTH,
 	MAX_PLAYGROUND_SOURCE_LENGTH,
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
@@ -37,8 +40,8 @@ async function renderRoute(url: string) {
 }
 
 describe('playground compile pipeline', () => {
-	it('compiles the default TSRX source to client runtime code', () => {
-		const result = compilePlayground(DEFAULT_SOURCES.tsrx, 'tsrx');
+	it('compiles the default TSRX workspace to client runtime code', () => {
+		const result = compilePlayground(DEFAULT_WORKSPACES.tsrx.files[0].source, 'App.tsrx');
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.warnings).toEqual([]);
@@ -50,8 +53,8 @@ describe('playground compile pipeline', () => {
 		}
 	});
 
-	it('compiles the default TSX source to client runtime code', () => {
-		const result = compilePlayground(DEFAULT_SOURCES.tsx, 'tsx');
+	it('compiles the default TSX workspace to client runtime code', () => {
+		const result = compilePlayground(DEFAULT_WORKSPACES.tsx.files[0].source, 'App.tsx');
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.warnings).toEqual([]);
@@ -62,15 +65,15 @@ describe('playground compile pipeline', () => {
 	});
 
 	it('reports compile errors instead of throwing', () => {
-		const result = compilePlayground('export function App() @{ <div>{oops</div> }', 'tsrx');
+		const result = compilePlayground('export function App() @{ <div>{oops</div> }', 'App.tsrx');
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error.length).toBeGreaterThan(0);
 	});
 
-	it('returns nonfatal text-event diagnostics alongside runnable code', () => {
+	it('returns nonfatal text-event diagnostics carrying the virtual file name', () => {
 		const result = compilePlayground(
 			`export function App() @{ <input onChange={() => {}} /> }`,
-			'tsrx',
+			'App.tsrx',
 		);
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
@@ -79,14 +82,14 @@ describe('playground compile pipeline', () => {
 		expect(result.warnings[0]).toMatchObject({
 			code: 'OCTANE_NATIVE_TEXT_ONCHANGE',
 			severity: 'warning',
-			filename: 'playground.tsrx',
+			filename: 'App.tsrx',
 		});
 	});
 
 	it('keeps deliberate native text commits quiet when explicitly marked', () => {
 		const result = compilePlayground(
 			`export function App() @{ <input onChange={() => {}} suppressNativeChangeWarning /> }`,
-			'tsrx',
+			'App.tsrx',
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.warnings).toEqual([]);
@@ -94,13 +97,41 @@ describe('playground compile pipeline', () => {
 });
 
 describe('playground shared-hash bounds', () => {
-	it('round-trips a bounded source payload', () => {
-		const source = 'export default function App() { return "✓"; }';
-		const encoded = encodePlaygroundHash(source, 'tsx');
+	it('round-trips a multi-file v2 payload', () => {
+		const payload = {
+			lang: 'tsrx' as const,
+			entry: 'App.tsrx',
+			files: [
+				{ name: 'App.tsrx', source: "import { x } from './Data.tsrx';" },
+				{ name: 'Data.tsrx', source: 'export const x = 1;' },
+			],
+		};
+		const encoded = encodePlaygroundHash(payload);
 		expect(encoded.length).toBeGreaterThan(0);
+		expect(decodePlaygroundHash(encoded)).toEqual({ ok: true, value: payload });
+	});
+
+	it('round-trips a React-host file name', () => {
+		const payload = {
+			lang: 'tsrx' as const,
+			entry: 'App.react.tsx',
+			files: [
+				{ name: 'App.react.tsx', source: 'export default function App() { return null; }' },
+				{ name: 'Island.tsrx', source: 'export function Island() @{ <b>hi</b> }' },
+			],
+		};
+		expect(decodePlaygroundHash(encodePlaygroundHash(payload))).toEqual({
+			ok: true,
+			value: payload,
+		});
+	});
+
+	it('still decodes legacy single-file payloads as a one-file workspace', () => {
+		const source = 'export default function App() { return "legacy"; }';
+		const encoded = btoa(JSON.stringify({ s: source, l: 'tsx' }));
 		expect(decodePlaygroundHash(encoded)).toEqual({
 			ok: true,
-			value: { source, lang: 'tsx' },
+			value: { lang: 'tsx', entry: 'App.tsx', files: [{ name: 'App.tsx', source }] },
 		});
 	});
 
@@ -117,33 +148,76 @@ describe('playground shared-hash bounds', () => {
 		}
 	});
 
-	it('rejects decoded source before it can reach CodeMirror or Shiki', () => {
-		const payload = JSON.stringify({
-			s: 'x'.repeat(MAX_PLAYGROUND_SOURCE_LENGTH + 1),
-			l: 'tsrx',
-		});
-		const encoded = btoa(payload);
-		expect(encoded.length).toBeLessThan(MAX_PLAYGROUND_HASH_LENGTH);
+	it('bounds the TOTAL source length across files', () => {
+		const half = 'x'.repeat(MAX_PLAYGROUND_SOURCE_LENGTH / 2 + 1);
+		const payload = {
+			lang: 'tsrx' as const,
+			entry: 'App.tsrx',
+			files: [
+				{ name: 'App.tsrx', source: half },
+				{ name: 'Data.tsrx', source: half },
+			],
+		};
+		expect(encodePlaygroundHash(payload)).toBe('');
+		const encoded = btoa(
+			JSON.stringify({
+				v: 2,
+				l: 'tsrx',
+				e: 'App.tsrx',
+				f: payload.files.map((f) => ({ n: f.name, s: f.source })),
+			}),
+		);
 		expect(decodePlaygroundHash(encoded)).toEqual({
 			ok: false,
 			error: PLAYGROUND_SOURCE_LIMIT_ERROR,
 		});
-		expect(encodePlaygroundHash('x'.repeat(MAX_PLAYGROUND_SOURCE_LENGTH + 1), 'tsrx')).toBe('');
+	});
+
+	it('ignores payloads with invalid names, duplicates, a bad entry, or too many files', () => {
+		const enc = (value: unknown) => btoa(JSON.stringify(value));
+		const file = { n: 'App.tsrx', s: 'x' };
+		// Path traversal / nested names never survive decoding.
+		expect(
+			decodePlaygroundHash(
+				enc({ v: 2, l: 'tsrx', e: '../x.tsrx', f: [{ n: '../x.tsrx', s: '' }] }),
+			),
+		).toEqual({ ok: true, value: null });
+		// Duplicate names.
+		expect(decodePlaygroundHash(enc({ v: 2, l: 'tsrx', e: 'App.tsrx', f: [file, file] }))).toEqual({
+			ok: true,
+			value: null,
+		});
+		// Entry not among the files.
+		expect(decodePlaygroundHash(enc({ v: 2, l: 'tsrx', e: 'Nope.tsrx', f: [file] }))).toEqual({
+			ok: true,
+			value: null,
+		});
+		// File-count bound.
+		const many = Array.from({ length: MAX_PLAYGROUND_FILES + 1 }, (_, i) => ({
+			n: `F${i}.tsrx`,
+			s: '',
+		}));
+		expect(decodePlaygroundHash(enc({ v: 2, l: 'tsrx', e: 'F0.tsrx', f: many }))).toEqual({
+			ok: true,
+			value: null,
+		});
 	});
 });
 
 describe('playground sandbox boundary', () => {
-	it('srcdoc pins the security posture: opaque-origin CSP, no network, no form submission', () => {
+	it('srcdoc pins the security posture: opaque-origin CSP, esm.sh-only module loads, no form submission', () => {
 		const srcdoc = sandboxSrcdoc();
 		// One CSP meta owning the whole document.
 		const csp = srcdoc.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
 		expect(csp).toBeTruthy();
-		// default-src 'none' is the deny-all baseline — user code can neither
-		// fetch nor exfiltrate; blob: + inline scripts are the only execution.
+		// default-src 'none' is the deny-all baseline — user code cannot fetch or
+		// exfiltrate (connect-src falls back to it); the ONLY network the sandbox
+		// permits is module loads from esm.sh via script-src.
 		expect(csp).toContain("default-src 'none'");
-		expect(csp).toContain("script-src 'unsafe-inline' blob:");
+		expect(csp).toContain("script-src 'unsafe-inline' blob: https://esm.sh");
 		expect(csp).toContain("form-action 'none'");
 		expect(csp).toContain("base-uri 'none'");
+		expect(csp).not.toContain('connect-src');
 	});
 
 	it('createPreview mounts a sandboxed iframe WITHOUT allow-same-origin', () => {
@@ -166,13 +240,19 @@ describe('playground sandbox boundary', () => {
 		expect(host.querySelector('iframe')).toBeNull();
 	});
 
+	const RUN_PAYLOAD = {
+		entry: 'App.tsrx',
+		entryKind: 'octane' as const,
+		modules: [{ name: 'App.tsrx', code: 'export default function App() {}' }],
+	};
+
 	it('reports when the iframe never boots instead of leaving run pending', async () => {
 		vi.useFakeTimers();
 		const host = document.createElement('div');
 		document.body.appendChild(host);
 		const preview = createPreview(host, () => {});
 		try {
-			const result = preview.run('export default function App() {}');
+			const result = preview.run(RUN_PAYLOAD);
 			await vi.advanceTimersByTimeAsync(PREVIEW_READY_TIMEOUT_MS);
 			await expect(result).resolves.toEqual({
 				error:
@@ -198,7 +278,7 @@ describe('playground sandbox boundary', () => {
 					data: { [PROTOCOL_KEY]: true, type: 'ready' },
 				}),
 			);
-			const result = preview.run('export default function App() {}');
+			const result = preview.run(RUN_PAYLOAD);
 			await vi.advanceTimersByTimeAsync(PREVIEW_RUN_TIMEOUT_MS);
 			await expect(result).resolves.toEqual({
 				error: 'Preview sandbox did not return a render result before the timeout.',
@@ -212,23 +292,36 @@ describe('playground sandbox boundary', () => {
 });
 
 describe('/playground route', () => {
-	it('renders the shell: mode switch, view switch, and both panels', async () => {
+	it('renders the shell: examples picker, mode/view switches, format button, and both panels', async () => {
 		const { container } = await renderRoute('/playground');
+
+		// Examples dropdown (disabled until the editor stack boots) with the
+		// curated set grouped into optgroups.
+		const select = container.querySelector('select.pg-select');
+		expect(select).toBeTruthy();
+		expect(select?.querySelectorAll('optgroup').length).toBeGreaterThan(2);
+		expect(select?.querySelectorAll('option').length).toBeGreaterThan(10);
 
 		// Source-language switch (disabled until the editor stack boots).
 		const langGroup = container.querySelector('[aria-label="Source language"]');
 		const langButtons = Array.from(langGroup?.querySelectorAll('button') ?? []);
 		expect(langButtons.map((b) => b.textContent?.trim())).toEqual(['TSRX', 'TSX']);
 
+		// Prettier format button.
+		const format = container.querySelector('button.pg-format');
+		expect(format?.textContent?.trim()).toBe('Format');
+
 		// Result view switch — live preview vs compiled output.
 		const viewGroup = container.querySelector('[aria-label="Result view"]');
 		const viewButtons = Array.from(viewGroup?.querySelectorAll('button') ?? []);
 		expect(viewButtons.map((b) => b.textContent?.trim())).toEqual(['Preview', 'Compiled output']);
 
-		// Both panels exist; preview is the visible one by default.
+		// Both panels exist; preview is the visible one by default; the file tab
+		// strip only appears for multi-file workspaces.
 		expect(container.querySelector('.pg-preview')).toBeTruthy();
 		expect(container.querySelector('.pg-result')?.classList.contains('hidden')).toBe(false);
 		expect(container.querySelectorAll('.pg-editor').length).toBe(2);
+		expect(container.querySelector('.pg-tabs')).toBeNull();
 
 		// The mobile pane toggle exists (CSS shows it only under 980px).
 		const paneGroup = container.querySelector('.pg-mobile-toggle');

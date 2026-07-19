@@ -1,19 +1,27 @@
 // Playground engine — compiles TSRX/TSX in the browser with the REAL
 // `octane/compiler` (it's pure JS: @tsrx/core parser + esrap printer, no Node
-// APIs) and executes the compiled module for the live preview.
+// APIs) and executes the compiled module graph for the live preview.
 //
 // Execution model: compilation happens here (pure parsing, no authority), but
-// the compiled module EXECUTES inside a sandboxed iframe with an opaque origin
+// the compiled modules EXECUTE inside a sandboxed iframe with an opaque origin
 // (see playground-sandbox.ts) — never in the website's own page. Hash-shared
 // playground links carry arbitrary code, so the page it runs in must have no
-// same-origin storage, cookies, or DOM to steal. The parent fetches the
-// self-contained octane runtime bundle (served by the playgroundRuntime()
-// vite plugin) as text and hands it to the iframe, which builds blob modules
-// on its own side of the boundary.
+// same-origin storage, cookies, or DOM to steal. The parent fetches the octane
+// runtime chunk manifest (served by the playgroundRuntime() vite plugin) and
+// hands it to the iframe, which builds blob modules on its own side of the
+// boundary. Multi-file graphs and third-party esm.sh imports are prepared by
+// playground-modules.ts.
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile, type CompileDiagnostic } from 'octane/compiler';
-import { sandboxSrcdoc, RUNTIME_MODULE_PATH, PROTOCOL_KEY } from './playground-sandbox.ts';
+import {
+	sandboxSrcdoc,
+	RUNTIME_MANIFEST_PATH,
+	PROTOCOL_KEY,
+	type RuntimeManifest,
+} from './playground-sandbox.ts';
+
+export type { CompileDiagnostic };
 
 export type PlaygroundLang = 'tsrx' | 'tsx';
 
@@ -28,13 +36,17 @@ export interface CompileFailure {
 	error: string;
 }
 
-/** Compile playground source for the client runtime. Never throws. */
+/**
+ * Compile one playground file for the client runtime. Never throws. The
+ * filename is the virtual file's real name (e.g. `Island.tsrx`) so diagnostics
+ * and scoped-style hashes reference it.
+ */
 export function compilePlayground(
 	source: string,
-	lang: PlaygroundLang,
+	filename: string,
 ): CompileSuccess | CompileFailure {
 	try {
-		const out = compile(source, `playground.${lang}`, { mode: 'client' });
+		const out = compile(source, filename, { mode: 'client' });
 		return { ok: true, code: out.code, warnings: out.diagnostics };
 	} catch (error) {
 		return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -43,9 +55,16 @@ export function compilePlayground(
 
 // ── Sandboxed execution ─────────────────────────────────────────────────────
 
+/** The subset of a built module graph the sandbox needs to execute a run. */
+export interface RunPayload {
+	entry: string;
+	entryKind: 'octane' | 'react';
+	modules: { name: string; code: string }[];
+}
+
 export interface Preview {
-	/** Execute compiled playground code and render its component. Never throws. */
-	run(code: string): Promise<{ error: string | null }>;
+	/** Execute a compiled playground module graph and render its entry component. Never throws. */
+	run(payload: RunPayload): Promise<{ error: string | null }>;
 	destroy(): void;
 }
 
@@ -56,7 +75,7 @@ export const PREVIEW_RUN_TIMEOUT_MS = 10_000;
  * A live preview bound to `container` — creates the sandboxed iframe and
  * drives the postMessage protocol (see playground-sandbox.ts for the boundary
  * design). `onRuntimeError` reports errors thrown AFTER the initial render
- * resolves (effects, event handlers — caught by the ErrorBoundary the sandbox
+ * resolves (effects, event handlers — caught by the error boundary the sandbox
  * wraps around the user component).
  */
 export function createPreview(
@@ -126,14 +145,14 @@ export function createPreview(
 					switch (msg.type) {
 						case 'boot':
 							bootReceived = true;
-							// Sandbox is listening — hand it the runtime bundle as text (it
+							// Sandbox is listening — hand it the runtime chunk manifest (it
 							// cannot fetch same-origin resources itself; see sandbox notes).
-							fetch(RUNTIME_MODULE_PATH)
+							fetch(RUNTIME_MANIFEST_PATH)
 								.then((res) => {
-									if (!res.ok) throw new Error(`${RUNTIME_MODULE_PATH} → HTTP ${res.status}`);
-									return res.text();
+									if (!res.ok) throw new Error(`${RUNTIME_MANIFEST_PATH} → HTTP ${res.status}`);
+									return res.json() as Promise<RuntimeManifest>;
 								})
-								.then((runtime) => send({ type: 'init', runtime }))
+								.then((manifest) => send({ type: 'init', manifest }))
 								.catch((error) =>
 									settleReady(
 										'Failed to load the preview runtime: ' +
@@ -161,7 +180,7 @@ export function createPreview(
 		: Promise.resolve('Preview iframe is unavailable in this browser environment.');
 
 	return {
-		async run(code) {
+		async run(payload) {
 			const gen = ++generation;
 			const readyError = await ready;
 			if (destroyed || gen !== generation) return { error: null }; // superseded
@@ -179,7 +198,13 @@ export function createPreview(
 					});
 				}, PREVIEW_RUN_TIMEOUT_MS);
 				pending.set(gen, { resolve, timeout });
-				send({ type: 'run', code, gen });
+				send({
+					type: 'run',
+					gen,
+					entry: payload.entry,
+					entryKind: payload.entryKind,
+					modules: payload.modules,
+				});
 			});
 		},
 		destroy() {
@@ -191,78 +216,3 @@ export function createPreview(
 		},
 	};
 }
-
-// ── Default sources ─────────────────────────────────────────────────────────
-
-export const DEFAULT_SOURCES: Record<PlaygroundLang, string> = {
-	tsrx: `import { useState } from 'octane';
-
-export default function App() @{
-	const [count, setCount] = useState(0);
-	const [items, setItems] = useState<string[]>([]);
-
-	<div class="demo">
-		<h2>{'Count: ' + count}</h2>
-		<button onClick={() => setCount(count + 1)}>Increment</button>
-		<button onClick={() => setItems([...items, 'Item #' + (items.length + 1)])}>
-			Add item
-		</button>
-		@if (count >= 5) {
-			<p class="hot">Count is heating up!</p>
-		}
-		<ul>
-			@for (const item of items; key item) {
-				<li>{item}</li>
-			} @empty {
-				<li class="empty">No items yet — add one.</li>
-			}
-		</ul>
-		<style>
-			.demo {
-				font-family: system-ui, sans-serif;
-				display: grid;
-				gap: 0.5rem;
-				justify-items: start;
-			}
-			button {
-				padding: 0.4rem 0.9rem;
-				border-radius: 8px;
-				border: 1px solid #8886;
-				background: transparent;
-				color: inherit;
-				cursor: pointer;
-			}
-			.hot {
-				color: #ff5d72;
-			}
-			.empty {
-				opacity: 0.6;
-			}
-		</style>
-	</div>
-}
-`,
-	tsx: `import { useState } from 'octane';
-
-export default function App() {
-	const [count, setCount] = useState(0);
-	const [items, setItems] = useState<string[]>([]);
-
-	return (
-		<div style={{ fontFamily: 'system-ui, sans-serif' }}>
-			<h2>{'Count: ' + count}</h2>
-			<button onClick={() => setCount(count + 1)}>Increment</button>
-			<button onClick={() => setItems([...items, 'Item #' + (items.length + 1)])}>
-				Add item
-			</button>
-			{count >= 5 ? <p style={{ color: '#ff5d72' }}>Count is heating up!</p> : null}
-			<ul>
-				{items.map((item) => (
-					<li key={item}>{item}</li>
-				))}
-			</ul>
-		</div>
-	);
-}
-`,
-};

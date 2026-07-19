@@ -104,7 +104,7 @@ afterAll(async () => {
 describe('built Start server', () => {
 	it('produced Nitro server and public asset output', () => {
 		expect(fs.existsSync(serverEntry)).toBe(true);
-		expect(fs.existsSync(path.join(websiteRoot, '.output/public/playground-runtime.mjs'))).toBe(
+		expect(fs.existsSync(path.join(websiteRoot, '.output/public/playground-runtime.json'))).toBe(
 			true,
 		);
 	});
