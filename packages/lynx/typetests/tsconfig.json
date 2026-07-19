@@ -16,6 +16,7 @@
       "@octanejs/lynx/config": ["../src/config.ts"],
       "@octanejs/lynx/intrinsics": ["../src/intrinsics.ts"],
       "@octanejs/lynx/intrinsics/jsx-runtime": ["../src/intrinsics.ts"],
+      "@octanejs/lynx/main-thread": ["../src/main-thread.ts"],
       "@octanejs/lynx/platform": ["../src/platform.ts"],
       "@octanejs/lynx/renderer": ["../src/renderer.ts"],
       "@octanejs/lynx/testing": ["../src/testing.ts"]
