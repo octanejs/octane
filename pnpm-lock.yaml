@@ -4457,6 +4457,9 @@ importers:
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
+      '@octanejs/scan':
+        specifier: workspace:*
+        version: link:../packages/scan
       '@octanejs/three':
         specifier: workspace:*
         version: link:../packages/three

@@ -1,4 +1,5 @@
 import { Body, Head, HeadContent, Html, Scripts, createRootRoute } from '@tanstack/octane-router';
+import { useScan } from '@octanejs/scan';
 import { MainLayout } from '../layouts/MainLayout.tsrx';
 import { NotFound } from '../pages/not-found/NotFound.tsrx';
 import { DEFAULT_TITLE } from '../hooks/use-title.ts';
@@ -68,6 +69,10 @@ pre.shiki {
 `;
 
 function RootDocument(props: { children?: unknown }) @{
+	// Local scan testing: starts @octanejs/scan (outlines + toolbar) from a
+	// client effect; a no-op during SSR. Remove together with the vite
+	// config's profile flag.
+	useScan({ log: true});
 	<Html lang="en">
 		<Head>
 			<HeadContent />
