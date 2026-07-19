@@ -1,5 +1,27 @@
 # @octanejs/app-core
 
+## 0.0.7
+
+### Patch Changes
+
+- 9d86d20: Add a DOM-free universal runtime entry, generic renderer validation contracts,
+  an explicit host microtask scheduler option, and compile-only runtime/thread
+  metadata for native universal integrations. Let Rspack integrations select a
+  graph-local Octane runtime while keeping cache and module build metadata
+  distinct across universal runtime specializations. Validate renderer-selected
+  project `.ts` and `.js` helpers without changing which compiler owns their
+  output, and keep nested renderer diagnostics scoped to their authored regions.
+- Updated dependencies [f7e1cba]
+- Updated dependencies [082b681]
+- Updated dependencies [9d86d20]
+- Updated dependencies [082b681]
+- Updated dependencies [742ae9d]
+- Updated dependencies [2932a23]
+- Updated dependencies [e0c2f09]
+- Updated dependencies [082b681]
+- Updated dependencies [082b681]
+  - octane@0.1.11
+
 ## 0.0.6
 
 ### Patch Changes
