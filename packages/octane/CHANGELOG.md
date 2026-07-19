@@ -1,5 +1,37 @@
 # octane
 
+## 0.1.11
+
+### Patch Changes
+
+- f7e1cba: Reduce production client output with a compact single-root compiler ABI and a
+  shared post-paint scheduler callback.
+- 082b681: Elide inline `type` specifiers (`import { a, type B }`, `export { type C, d }`) and type-only star re-exports (`export type * from '…'`, `export type * as Ns from '…'`) from compiled output the way tsc does. Previously these leaked into the emitted JS — as an invalid `type` keyword or a runtime import/re-export of bindings that only exist as types — breaking module loading; a declaration left with no specifiers is now dropped entirely.
+- 9d86d20: Add a DOM-free universal runtime entry, generic renderer validation contracts,
+  an explicit host microtask scheduler option, and compile-only runtime/thread
+  metadata for native universal integrations. Let Rspack integrations select a
+  graph-local Octane runtime while keeping cache and module build metadata
+  distinct across universal runtime specializations. Validate renderer-selected
+  project `.ts` and `.js` helpers without changing which compiler owns their
+  output, and keep nested renderer diagnostics scoped to their authored regions.
+- 082b681: Export `OctaneNode`, the analog of React's `ReactNode`: the type of a renderable prop or child (an alias of `unknown`, matching the jsx-runtime `children` contract). Bindings ported from React should use it for props upstream types as `ReactNode`, which would reject octane's nominal elements.
+- 742ae9d: React-hosted islands are now fully typed at the `<OctaneCompat>` boundary, in both authoring forms. `Octane.JSX.Element` extends `Promise<React.ReactNode>` (type-level only), so the exact signature the tsrx tooling infers for a `.tsrx` export is a valid React 19 JSX element type: `<OctaneCompat><Island …/></OctaneCompat>` type-checks zero-cast with exact island prop checking, while octane element values remain rejected in ordinary `ReactNode` positions. The inherited promise protocol is deliberately poisoned so the parent buys only that tag-gate assignability: `await element` is a hard type error (TS1320 — not a valid promise), `element.then/catch/finally(callback)` fail overload resolution with an explanatory message literal, `use(element)` is rejected by `use()`'s signature, and `Awaited` of an element is `never`, so `Promise.resolve(element)` yields an unusable `Promise<never>`. A typed `component`/`props` form was added alongside — `<OctaneCompat component={Island} props={{ … }} />` (client and server entries) — accepting the same island transport explicitly, with props inferred from the component's own signature. The `.tsrx` language tooling also pins the DOM renderer's virtual TSX to `@jsxImportSource octane`, so islands type against octane's real JSX even under a React-JSX host tsconfig (mixed React/Octane programs with `tsrx-tsc`).
+- 2932a23: Streaming SSR document mode: when a `StreamOptions.injection` source is present and the shell renders a document, the response now leads with `<!DOCTYPE html>`, renderer-owned leading scoped styles (and the hoisted-head buffer) fold inside the authored `<head>`, and the held `</body></html>` tail closes the stream. `StreamInjectionSource` gains an optional `renderComplete()` callback — invoked exactly once when the renderer finishes producing markup (success or degraded abort/error path) so sources can finalize asynchronous serialization and then settle `done`. Without `injection`, streamed output is unchanged.
+- e0c2f09: Streaming SSR: a shell whose root renders `<html>` now always leads the response with `<!DOCTYPE html>` — React Fizz parity, no longer gated on the `injection` document mode. The buffered renderers (`renderToString`, `renderToStaticMarkup`, `prerender`) stay doctype-free, also matching React.
+- 082b681: Type-check `.tsrx` files against a renderer's own intrinsics via a file-local `/** @jsxImportSource … */` pragma: `compileToVolarMappings` now recovers the pragma from the source's leading comments (which the virtual TSX otherwise strips) and re-emits it as the virtual-file prelude, with the same precedence TypeScript gives an in-file pragma over `compilerOptions`. Also export `TsrxErrorBoundary` — the name the language tooling's type-only virtual TSX imports for `@try`/`@catch` — with a function-typed `fallback` so authored `@catch (error)` bindings get contextual parameter types under `noImplicitAny`.
+- 082b681: `module server { … }` blocks now typecheck under the language tooling
+  (tsrx-tsc / Volar). The type-only pipeline used to pass the dialect through
+  verbatim, so the documented static import inside the block was TS1147 and the
+  companion `import { fn } from 'server'` was TS2307 in every consumer. The
+  Volar path now lowers the block before printing: block imports hoist to
+  module top level (aliased through a mangled namespace import when the client
+  half also uses the name), the block becomes a `namespace server` binding that
+  keeps the authored name and location, and `from 'server'` imports become
+  destructures of it — with authored locations preserved, so hover,
+  go-to-definition, and diagnostics still map back to the `.tsrx` source, and
+  `noUnusedLocals`-style checking stays clean. Runtime compilation is
+  unchanged.
+
 ## 0.1.10
 
 ### Patch Changes

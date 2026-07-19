@@ -1,5 +1,26 @@
 # @octanejs/vite-plugin
 
+## 0.1.11
+
+### Patch Changes
+
+- 723058d: Fix the dev SSR error page printing the raw route `entry` tuple. A route
+  configured with the `[exportName, modulePath]` tuple form rendered as the
+  comma-joined array (`Post,/src/Post.tsrx`) on the 500 error overlay; it now
+  resolves the module path through `get_route_entry_path`, "matching how the
+  renderer resolves the entry path everywhere else.
+- Updated dependencies [f7e1cba]
+- Updated dependencies [082b681]
+- Updated dependencies [9d86d20]
+- Updated dependencies [082b681]
+- Updated dependencies [742ae9d]
+- Updated dependencies [2932a23]
+- Updated dependencies [e0c2f09]
+- Updated dependencies [082b681]
+- Updated dependencies [082b681]
+  - octane@0.1.11
+  - @octanejs/app-core@0.0.7
+
 ## 0.1.10
 
 ### Patch Changes
