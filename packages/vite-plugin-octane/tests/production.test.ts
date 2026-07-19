@@ -106,7 +106,11 @@ afterAll(async () => {
 	fs.rmSync(path.join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
 });
 
-describe('production SSR build', () => {
+// Dynamic-importing freshly built output legitimately exceeds vitest's 5s
+// default when the whole suite runs in parallel (module-graph load competes
+// with sibling projects for I/O); the generous budget only matters under
+// contention — these tests finish in well under a second on an idle machine.
+describe('production SSR build', { timeout: 30_000 }, () => {
 	it('emits both bundles, moves the template to dist/server, and strips build metadata', () => {
 		expect(fs.existsSync(path.join(distDir, 'server/entry.js'))).toBe(true);
 		expect(fs.existsSync(path.join(distDir, 'server/index.html'))).toBe(true);
