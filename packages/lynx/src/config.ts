@@ -8,6 +8,7 @@ export const LYNX_RENDERER_ID = 'lynx';
 
 const LYNX_STANDARD_PROPS = [
 	'id',
+	'ref',
 	'class',
 	'className',
 	'style',

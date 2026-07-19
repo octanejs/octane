@@ -1,8 +1,8 @@
 /**
  * Compiler-facing Lynx renderer ABI.
  *
- * Milestone 1 intentionally exposes only Octane's host-neutral universal
- * component core. The Lynx root and host driver arrive in Milestone 2.
+ * Components compile against Octane's host-neutral universal component core;
+ * the background root connects that output to the Milestone 2 async host.
  */
 export * from 'octane/universal/native';
 
