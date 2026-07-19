@@ -76,6 +76,7 @@ describe('Lynx runtime compatibility evidence', () => {
 		expect(universalCore).not.toMatch(
 			/\b(?:FinalizationRegistry|structuredClone|WeakRef)\b|\.(?:toReversed|toSorted)\s*\(/,
 		);
+		expect(universalCore).toContain("typeof AggregateError === 'function'");
 		expect(universalCore).toContain('.description');
 		expect(evidence.universalCoreBuiltins.documentedOrBaseline).toEqual(
 			expect.arrayContaining([
@@ -96,6 +97,9 @@ describe('Lynx runtime compatibility evidence', () => {
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/root.ts'))).toEqual({
 			files: [
 				'src/core/client-driver.ts',
+				'src/core/host-props.ts',
+				'src/core/native-events.ts',
+				'src/core/nodes-ref.ts',
 				'src/core/protocol.ts',
 				'src/core/transport.ts',
 				'src/root.ts',
@@ -106,6 +110,9 @@ describe('Lynx runtime compatibility evidence', () => {
 			files: [
 				'src/config.ts',
 				'src/core/host-driver.ts',
+				'src/core/host-props.ts',
+				'src/core/native-events.ts',
+				'src/core/nodes-ref.ts',
 				'src/core/papi.ts',
 				'src/core/protocol.ts',
 				'src/main-thread.ts',

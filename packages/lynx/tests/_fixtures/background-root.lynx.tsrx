@@ -71,3 +71,20 @@ export function BackgroundRootFixture(props) @{
 		</>
 	</LabelContext.Provider>
 }
+
+function ClassAliasChild(props) @{
+	<view id="component-class-name" data-received={props.className} />
+}
+
+export function ClassAliasFixture(props) @{
+	<view id="class-alias-root">
+		<view
+			id="class-alias-host"
+			className="first"
+			{...props.middle}
+			class="after"
+			className={props.last}
+		/>
+		<ClassAliasChild className="component-value" />
+	</view>
+}

@@ -11,6 +11,8 @@ export interface OctaneRendererRuleOptions {
 
 /** @experimental Static source restrictions enforced for a renderer. */
 export interface OctaneRendererValidationOptions {
+	/** Explicit host tags that represent raw text and must obey `textParents`. */
+	textHosts?: readonly string[];
 	/** Host elements that may directly contain authored primitive text. */
 	textParents?: readonly string[];
 	/** Unbound JavaScript globals that renderer-owned source may not reference. */

@@ -1069,6 +1069,85 @@ describe('universal asynchronous transport', () => {
 		await root.unmountAsync();
 	});
 
+	it('validates every transported delivery before invoking the accepted listener table', async () => {
+		const { loopback, root } = transportRoot();
+		const plan = universalPlan(RENDERER, { kind: 'host', type: 'node', propsSlot: 0 });
+		const log: string[] = [];
+		const Scene = defineUniversalComponent(RENDERER, () =>
+			universalValue(plan, [universalProps([['set', 'onFire', () => log.push('event')]])]),
+		);
+		await root.renderAsync(Scene, undefined);
+		const listener = loopback.listener('fire');
+
+		const missing = await loopback.sendEvent([
+			{ listener, payload: 'valid' },
+			{ listener: Number.MAX_SAFE_INTEGER, payload: 'missing' },
+		]);
+		expect(missing.error?.message).toMatch(/unknown or inactive universal event listener/i);
+		expect(log).toEqual([]);
+
+		const mismatchedPriority = await loopback.sendEvent(
+			[{ listener, payload: 'wrong-priority' }],
+			'default',
+		);
+		expect(mismatchedPriority.error?.message).toMatch(/priority/i);
+		expect(log).toEqual([]);
+		await root.unmountAsync();
+	});
+
+	it('continues transported propagation after callback faults and flushes the scope once', async () => {
+		const { container, loopback, root } = transportRoot();
+		const plan = universalPlan(RENDERER, {
+			kind: 'host',
+			type: 'scene',
+			bindings: [['count', 3]],
+			children: [
+				{ kind: 'host', type: 'first', propsSlot: 0 },
+				{ kind: 'host', type: 'second', propsSlot: 1 },
+				{ kind: 'host', type: 'third', propsSlot: 2 },
+			],
+		});
+		const firstError = new Error('first propagation callback failed');
+		const secondError = new Error('second propagation callback failed');
+		const log: string[] = [];
+		const Scene = defineUniversalComponent(RENDERER, () => {
+			const [count, setCount] = useState(0, 'count');
+			const update = (label: string, error?: Error) => {
+				log.push(`${label}:${count}`);
+				setCount((value) => value + 1);
+				if (error !== undefined) throw error;
+			};
+			return universalValue(plan, [
+				universalProps([['set', 'onFire', () => update('first', firstError)]]),
+				universalProps([['set', 'onFire', () => update('second', secondError)]]),
+				universalProps([['set', 'onFire', () => update('third')]]),
+				count,
+			]);
+		});
+		await root.renderAsync(Scene, undefined);
+		const before = loopback.sentBatches.length;
+
+		const multiple = await loopback.sendEvent([
+			{ listener: loopback.listener('fire', 0), payload: undefined },
+			{ listener: loopback.listener('fire', 1), payload: undefined },
+			{ listener: loopback.listener('fire', 2), payload: undefined },
+		]);
+		expect(multiple.error).toBeInstanceOf(AggregateError);
+		expect((multiple.error as AggregateError).errors).toEqual([firstError, secondError]);
+		expect(log).toEqual(['first:0', 'second:0', 'third:0']);
+		await root.flushTransport();
+		expect(loopback.sentBatches).toHaveLength(before + 1);
+		expect(container.host.children[0].props.count).toBe(3);
+
+		const single = await loopback.sendEvent([
+			{ listener: loopback.listener('fire', 0), payload: undefined },
+		]);
+		expect(single.error).toBe(firstError);
+		await root.flushTransport();
+		expect(container.host.children[0].props.count).toBe(4);
+		await root.unmountAsync();
+	});
+
 	it('rejects stale and foreign event messages while allowing batch-version gaps', async () => {
 		const { loopback, root } = transportRoot();
 		const plan = universalPlan(RENDERER, { kind: 'host', type: 'node', propsSlot: 0 });

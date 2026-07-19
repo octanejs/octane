@@ -6,6 +6,19 @@ import type {
 	UniversalPreparedHostBatch,
 } from 'octane/universal/native';
 import { LYNX_RENDERER_ID } from '../config.js';
+import {
+	decodeLynxNativeEventToken,
+	encodeLynxNativeEventToken,
+	parseLynxNativeEventProp,
+	type LynxNativeEventBinding,
+	type LynxNativeEventToken,
+} from './native-events.js';
+import {
+	LYNX_CSS_SCOPE_PROP,
+	planLynxHostPropPatch,
+	type LynxHostPropPatch,
+} from './host-props.js';
+import { createLynxNodesRefSelector } from './nodes-ref.js';
 import type { LynxElementPAPI, LynxElementRef } from './papi.js';
 
 const LYNX_HOST_STATE: unique symbol = Symbol('octane.lynx.host-state');
@@ -19,6 +32,7 @@ export interface LynxHostHandle {
 	readonly id: number;
 	readonly type: string;
 	readonly generation: number;
+	readonly selector: string;
 }
 
 export type LynxHostHandleDelta =
@@ -52,11 +66,18 @@ interface LynxHostState<Node extends LynxElementRef> {
 	generations: Map<number, number>;
 	readonly ownedNodes: Set<Node>;
 	readonly ownedPageRoots: Set<Node>;
+	/** Physical listener journal retained until native removal succeeds. */
+	readonly nativeEvents: Map<Node, Map<string, LynxNativeEventRegistration>>;
 	acceptedVersion: number;
 	disposed: boolean;
 	disposing: boolean;
 	faulted: boolean;
 	cleanupNeedsFlush: boolean;
+}
+
+interface LynxNativeEventRegistration {
+	readonly binding: LynxNativeEventBinding;
+	readonly token: LynxNativeEventToken;
 }
 
 export interface LynxHostContainer<Node extends LynxElementRef = LynxElementRef> {
@@ -111,7 +132,10 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 			readonly id: number;
 			readonly type: string;
 			readonly props: Readonly<Record<string, unknown>>;
+			readonly patch: LynxHostPropPatch;
+			readonly handle: LynxHostHandle;
 			readonly record: LynxHostRecord<Node>;
+			readonly visible: boolean;
 	  }
 	| {
 			readonly op: 'update';
@@ -119,6 +143,8 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 			readonly type: string;
 			readonly previous: Readonly<Record<string, unknown>>;
 			readonly next: Readonly<Record<string, unknown>>;
+			readonly patch: LynxHostPropPatch;
+			readonly visible: boolean;
 	  }
 	| {
 			readonly op: 'recreate';
@@ -128,6 +154,10 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 			readonly parent: LynxHostParent;
 			readonly children: readonly number[];
 			readonly visible: boolean;
+			readonly events: ReadonlyMap<string, UniversalEventListenerDescriptor>;
+			readonly generation: number;
+			readonly patch: LynxHostPropPatch;
+			readonly handle: LynxHostHandle;
 			readonly record: LynxHostRecord<Node>;
 	  }
 	| {
@@ -146,9 +176,24 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 			readonly op: 'visibility';
 			readonly id: number;
 			readonly state: 'hidden' | 'visible';
+			readonly authoredHidden: unknown;
+			readonly events: ReadonlyMap<string, UniversalEventListenerDescriptor>;
+			readonly generation: number;
 	  }
-	| { readonly op: 'destroy'; readonly id: number }
-	| { readonly op: 'event' };
+	| {
+			readonly op: 'destroy';
+			readonly id: number;
+			readonly events: ReadonlyMap<string, UniversalEventListenerDescriptor>;
+	  }
+	| {
+			readonly op: 'event';
+			readonly id: number;
+			readonly type: string;
+			readonly previous: UniversalEventListenerDescriptor | null;
+			readonly next: UniversalEventListenerDescriptor | null;
+			readonly generation: number;
+			readonly visible: boolean;
+	  };
 
 function hostError(message: string): Error {
 	return new Error(`Octane Lynx host: ${message}`);
@@ -224,8 +269,11 @@ function assertTextProps(
 	label: string,
 ): void {
 	if (type !== '#text') return;
-	if (typeof props.value !== 'string' || Object.keys(props).some((name) => name !== 'value')) {
-		throw hostError(`${label} for #text must contain only a string value.`);
+	if (
+		typeof props.value !== 'string' ||
+		Object.keys(props).some((name) => name !== 'value' && name !== LYNX_CSS_SCOPE_PROP)
+	) {
+		throw hostError(`${label} for #text must contain a string value and optional CSS scope.`);
 	}
 }
 
@@ -252,6 +300,7 @@ function createHandle(root: number, id: number, type: string, generation: number
 		id,
 		type,
 		generation,
+		selector: createLynxNodesRefSelector(root, id, generation),
 	});
 }
 
@@ -313,36 +362,121 @@ function textValue(props: Readonly<Record<string, unknown>>): string {
 			: '';
 }
 
+function authoredHiddenValue(props: Readonly<Record<string, unknown>>): unknown {
+	return props.hidden === null || props.hidden === undefined ? null : props.hidden;
+}
+
+function effectiveHiddenValue(visible: boolean, props: Readonly<Record<string, unknown>>): unknown {
+	return visible ? authoredHiddenValue(props) : true;
+}
+
 function applyProps<Node extends LynxElementRef>(
 	papi: LynxElementPAPI<Node>,
 	node: Node,
 	type: string,
 	previous: Readonly<Record<string, unknown>>,
 	next: Readonly<Record<string, unknown>>,
+	patch: LynxHostPropPatch,
 	creating: boolean,
+	visible: boolean,
 ): void {
+	if (patch.cssScope !== undefined) {
+		papi.setCssId(node, patch.cssScope.value.cssId, patch.cssScope.value.entryName);
+	}
 	if (type === '#text') {
 		if (!creating && !Object.is(previous.value, next.value)) {
 			papi.setAttribute(node, 'text', next.value);
 		}
 		return;
 	}
-	const names = new Set([...Object.keys(previous), ...Object.keys(next)]);
-	for (const name of names) {
-		const hasNext = Object.prototype.hasOwnProperty.call(next, name);
-		const value = hasNext ? next[name] : undefined;
-		if (hasNext && Object.prototype.hasOwnProperty.call(previous, name)) {
-			if (Object.is(previous[name], value)) continue;
-		} else if (!hasNext) {
-			if (!Object.prototype.hasOwnProperty.call(previous, name)) continue;
-		} else if (value === undefined) {
-			continue;
-		}
-		if (name === 'id') {
-			papi.setId(node, value == null ? null : String(value));
-		} else {
-			papi.setAttribute(node, name, value === undefined ? null : value);
-		}
+	if (patch.id !== undefined) papi.setId(node, patch.id.value);
+	if (patch.classes !== undefined) papi.setClasses(node, patch.classes.value);
+	if (patch.inlineStyles !== undefined) papi.setInlineStyles(node, patch.inlineStyles.value);
+	if (patch.dataset !== undefined) papi.setDataset(node, patch.dataset.value);
+	for (const attribute of patch.attributes) {
+		papi.setAttribute(
+			node,
+			attribute.name,
+			attribute.name === 'hidden' ? effectiveHiddenValue(visible, next) : attribute.value,
+		);
+	}
+}
+
+function installNodesRefSelector<Node extends LynxElementRef>(
+	papi: LynxElementPAPI<Node>,
+	node: Node,
+	handle: LynxHostHandle,
+): void {
+	// Raw text has no CSS-selectable Element surface. It still receives a cloned
+	// identity handle for ref ordering, but query methods fail with node-not-found.
+	if (handle.type === '#text' || handle.type === 'raw-text') return;
+	papi.setRefSelector(node, `r${handle.root}-h${handle.id}-g${handle.generation}`);
+}
+
+function nativeEventMap<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+): Map<string, LynxNativeEventRegistration> {
+	let events = state.nativeEvents.get(node);
+	if (events === undefined) {
+		events = new Map();
+		state.nativeEvents.set(node, events);
+	}
+	return events;
+}
+
+function removeNativeEvent<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+	type: string,
+): void {
+	const events = state.nativeEvents.get(node);
+	const registration = events?.get(type);
+	if (registration === undefined) return;
+	state.papi.setEvent(node, registration.binding.type, registration.binding.name, undefined);
+	events!.delete(type);
+	if (events!.size === 0) state.nativeEvents.delete(node);
+}
+
+function installNativeEvent<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+	root: number,
+	id: number,
+	generation: number,
+	type: string,
+	listener: UniversalEventListenerDescriptor,
+): void {
+	const binding = parseLynxNativeEventProp(type);
+	if (binding === null) throw hostError(`event ${JSON.stringify(type)} is not a Lynx event prop.`);
+	const token = encodeLynxNativeEventToken({ root, id, generation, listener: listener.id });
+	const events = nativeEventMap(state, node);
+	if (events.get(type)?.token === token) return;
+	// Journal the intended token before entering PAPI. If native replacement
+	// mutates and then throws, terminal cleanup still knows which tuple to clear.
+	events.set(type, Object.freeze({ binding, token }));
+	state.papi.setEvent(node, binding.type, binding.name, token);
+}
+
+function removeAllNativeEvents<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+): void {
+	const events = state.nativeEvents.get(node);
+	if (events === undefined) return;
+	for (const type of [...events.keys()]) removeNativeEvent(state, node, type);
+}
+
+function installNativeEvents<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+	root: number,
+	id: number,
+	generation: number,
+	events: ReadonlyMap<string, UniversalEventListenerDescriptor>,
+): void {
+	for (const [type, listener] of events) {
+		installNativeEvent(state, node, root, id, generation, type, listener);
 	}
 }
 
@@ -367,6 +501,7 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		generations: new Map(),
 		ownedNodes: new Set(),
 		ownedPageRoots: new Set(),
+		nativeEvents: new Map(),
 		acceptedVersion: 0,
 		disposed: false,
 		disposing: false,
@@ -514,6 +649,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			if (getRecord(command.id) !== undefined) throw hostError(`duplicate host id ${command.id}.`);
 			const props = cloneProps(command.props, `command ${index} create.props`);
 			assertTextProps(command.type, props, `command ${index} create.props`);
+			const patch = planLynxHostPropPatch(command.type, {}, props);
 			const generation = (getGeneration(command.id) ?? 0) + 1;
 			const handle = createHandle(container.root, command.id, command.type, generation);
 			setGeneration(command.id, generation);
@@ -528,7 +664,16 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				handle,
 			};
 			setRecord(command.id, record);
-			operations.push({ op: 'create', id: command.id, type: command.type, props, record });
+			operations.push({
+				op: 'create',
+				id: command.id,
+				type: command.type,
+				props,
+				patch,
+				handle,
+				record,
+				visible: record.visible,
+			});
 			touchHandle(command.id);
 		} else if (command.op === 'update') {
 			assertSafeId(command.id, `command ${index} update.id`);
@@ -537,12 +682,18 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			captureInitialNode(command.id);
 			const props = cloneProps(command.props, `command ${index} update.props`);
 			assertTextProps(record.type, props, `command ${index} update.props`);
+			const patch = planLynxHostPropPatch(record.type, record.props, props);
+			if (patch.requiresRecreate) {
+				throw hostError(`update target ${command.id} requires a recreate command.`);
+			}
 			operations.push({
 				op: 'update',
 				id: command.id,
 				type: record.type,
 				previous: record.props,
 				next: props,
+				patch,
+				visible: record.visible,
 			});
 			record.props = props;
 		} else if (command.op === 'recreate') {
@@ -556,6 +707,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			}
 			const props = cloneProps(command.props, `command ${index} recreate.props`);
 			assertTextProps(command.type, props, `command ${index} recreate.props`);
+			const patch = planLynxHostPropPatch(command.type, {}, props);
 			const generation = (getGeneration(command.id) ?? record.handle.generation) + 1;
 			const handle = createHandle(container.root, command.id, command.type, generation);
 			const recreateChildren = Object.freeze([...record.children]);
@@ -568,6 +720,10 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				parent: record.parent,
 				children: recreateChildren,
 				visible: record.visible,
+				events: new Map(record.events),
+				generation,
+				patch,
+				handle,
 				record,
 			});
 			setGeneration(command.id, generation);
@@ -590,6 +746,15 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			}
 			if (command.op === 'move' && record.parent === undefined) {
 				throw hostError(`move target ${command.id} is detached.`);
+			}
+			if (record.type === '#text' || record.type === 'raw-text') {
+				const parentRecord =
+					typeof command.parent === 'number' ? getRecord(command.parent) : undefined;
+				if (parentRecord?.type !== 'text') {
+					throw hostError(
+						`${record.type} host ${command.id} may only be placed directly under a text host.`,
+					);
+				}
 			}
 			assertNoCycle(getRecord, command.id, command.parent);
 			const previousParent = record.parent;
@@ -643,12 +808,27 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			if (record === undefined) throw hostError(`unknown visibility target ${command.id}.`);
 			captureInitialNode(command.id);
 			record.visible = command.state === 'visible';
-			operations.push({ op: 'visibility', id: command.id, state: command.state });
+			operations.push({
+				op: 'visibility',
+				id: command.id,
+				state: command.state,
+				authoredHidden: authoredHiddenValue(record.props),
+				events: new Map(record.events),
+				generation: record.handle.generation,
+			});
 		} else if (command.op === 'event') {
 			assertSafeId(command.id, `command ${index} event.id`);
 			assertHostType(command.type, `command ${index} event.type`);
 			const record = writeRecord(command.id);
 			if (record === undefined) throw hostError(`unknown event target ${command.id}.`);
+			if (record.type === '#text' || record.type === 'raw-text') {
+				throw hostError(`raw-text host ${command.id} cannot own native events.`);
+			}
+			if (parseLynxNativeEventProp(command.type) === null) {
+				throw hostError(`event ${JSON.stringify(command.type)} is not a Lynx event prop.`);
+			}
+			captureInitialNode(command.id);
+			const previous = record.events.get(command.type) ?? null;
 			if (command.listener === null) {
 				record.events.delete(command.type);
 			} else {
@@ -664,7 +844,15 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 					}),
 				);
 			}
-			operations.push({ op: 'event' });
+			operations.push({
+				op: 'event',
+				id: command.id,
+				type: command.type,
+				previous,
+				next: record.events.get(command.type) ?? null,
+				generation: record.handle.generation,
+				visible: record.visible,
+			});
 		} else if (command.op === 'destroy') {
 			assertSafeId(command.id, `command ${index} destroy.id`);
 			const record = getRecord(command.id);
@@ -687,8 +875,9 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				if (childIndex === -1) throw hostError(`destroy topology is missing ${command.id}.`);
 				siblings!.splice(childIndex, 1);
 			}
+			const events = new Map(record.events);
 			deleteRecord(command.id);
-			operations.push({ op: 'destroy', id: command.id });
+			operations.push({ op: 'destroy', id: command.id, events });
 			touchHandle(command.id);
 		} else if (command.op === 'lifecycle' || command.op === 'local-callback') {
 			throw hostError(`${command.op} commands are not supported by the Lynx async host.`);
@@ -769,7 +958,17 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 							state.ownedNodes.add(node);
 							activeNodes.set(operation.id, node);
 							operation.record.node = node;
-							applyProps(state.papi, node, operation.type, {}, operation.props, true);
+							installNodesRefSelector(state.papi, node, operation.handle);
+							applyProps(
+								state.papi,
+								node,
+								operation.type,
+								{},
+								operation.props,
+								operation.patch,
+								true,
+								operation.visible,
+							);
 						} else if (operation.op === 'update') {
 							applyProps(
 								state.papi,
@@ -777,7 +976,9 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								operation.type,
 								operation.previous,
 								operation.next,
+								operation.patch,
 								false,
+								operation.visible,
 							);
 						} else if (operation.op === 'recreate') {
 							const previous = nodeFor(activeNodes, operation.id, 'recreate');
@@ -789,8 +990,28 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 							state.ownedNodes.add(replacement);
 							activeNodes.set(operation.id, replacement);
 							operation.record.node = replacement;
-							applyProps(state.papi, replacement, operation.type, {}, operation.props, true);
+							installNodesRefSelector(state.papi, replacement, operation.handle);
+							applyProps(
+								state.papi,
+								replacement,
+								operation.type,
+								{},
+								operation.props,
+								operation.patch,
+								true,
+								operation.visible,
+							);
 							if (!operation.visible) state.papi.setAttribute(replacement, 'hidden', true);
+							if (operation.visible) {
+								installNativeEvents(
+									state,
+									replacement,
+									container.root,
+									operation.id,
+									operation.generation,
+									operation.events,
+								);
+							}
 							for (const childId of operation.children) {
 								state.papi.insertBefore(
 									replacement,
@@ -803,6 +1024,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								state.papi.replace(replacement, previous);
 								if (operation.parent === null) state.ownedPageRoots.delete(previous);
 							}
+							removeAllNativeEvents(state, previous);
 							state.ownedNodes.delete(previous);
 						} else if (operation.op === 'insert' || operation.op === 'move') {
 							const node = nodeFor(activeNodes, operation.id, operation.op);
@@ -828,14 +1050,44 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 							state.papi.remove(parent, node);
 							if (operation.parent === null) state.ownedPageRoots.delete(node);
 						} else if (operation.op === 'visibility') {
+							const node = nodeFor(activeNodes, operation.id, 'visibility');
+							if (operation.state === 'hidden') removeAllNativeEvents(state, node);
 							state.papi.setAttribute(
-								nodeFor(activeNodes, operation.id, 'visibility'),
+								node,
 								'hidden',
-								operation.state === 'hidden' ? true : null,
+								operation.state === 'hidden' ? true : operation.authoredHidden,
 							);
+							if (operation.state === 'visible') {
+								installNativeEvents(
+									state,
+									node,
+									container.root,
+									operation.id,
+									operation.generation,
+									operation.events,
+								);
+							}
+						} else if (operation.op === 'event') {
+							const node = nodeFor(activeNodes, operation.id, 'event');
+							if (!operation.visible || operation.next === null) {
+								removeNativeEvent(state, node, operation.type);
+							} else {
+								installNativeEvent(
+									state,
+									node,
+									container.root,
+									operation.id,
+									operation.generation,
+									operation.type,
+									operation.next,
+								);
+							}
 						} else if (operation.op === 'destroy') {
 							const node = activeNodes.get(operation.id);
-							if (node !== undefined) state.ownedNodes.delete(node);
+							if (node !== undefined) {
+								removeAllNativeEvents(state, node);
+								state.ownedNodes.delete(node);
+							}
 							activeNodes.delete(operation.id);
 						}
 					}
@@ -877,6 +1129,15 @@ export function createLynxHostDriver<
 	const driver: LynxHostDriver<Node> = {
 		id: LYNX_RENDERER_ID,
 		capabilities: { text: 'host', visibility: true },
+		updates: Object.freeze({
+			classify(
+				type: string,
+				previous: Readonly<Record<string, unknown>>,
+				next: Readonly<Record<string, unknown>>,
+			) {
+				return planLynxHostPropPatch(type, previous, next).requiresRecreate ? 'recreate' : 'update';
+			},
+		}),
 		prepareBatch(container, batch, _context) {
 			return prepareLynxHostBatch(container, batch);
 		},
@@ -893,6 +1154,40 @@ export function getLynxHostEventListener<Node extends LynxElementRef>(
 	type: string,
 ): UniversalEventListenerDescriptor | null {
 	return container[LYNX_HOST_STATE].records.get(id)?.events.get(type) ?? null;
+}
+
+export interface LynxResolvedNativeEvent {
+	readonly listener: number;
+	readonly priority: UniversalEventListenerDescriptor['priority'];
+}
+
+/** Resolve an opaque PAPI callback token against the currently accepted physical host. */
+export function resolveLynxHostNativeEvent<Node extends LynxElementRef>(
+	container: LynxHostContainer<Node>,
+	token: unknown,
+): LynxResolvedNativeEvent | null {
+	const state = container[LYNX_HOST_STATE];
+	const identity = decodeLynxNativeEventToken(token);
+	if (state.disposed || state.disposing || state.faulted || identity.root !== container.root) {
+		return null;
+	}
+	const record = state.records.get(identity.id);
+	if (
+		record === undefined ||
+		record.node === null ||
+		!record.visible ||
+		record.handle.generation !== identity.generation ||
+		!isRootConnected((id) => state.records.get(id), identity.id)
+	) {
+		return null;
+	}
+	const physical = state.nativeEvents.get(record.node);
+	if (physical === undefined || typeof token !== 'string') return null;
+	for (const [type, descriptor] of record.events) {
+		if (descriptor.id !== identity.listener || physical.get(type)?.token !== token) continue;
+		return Object.freeze({ listener: descriptor.id, priority: descriptor.priority });
+	}
+	return null;
 }
 
 function normalizeCleanupError(error: unknown): Error {
@@ -920,6 +1215,16 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 	state.disposing = true;
 	const roots = [...state.ownedPageRoots];
 	const errors: Error[] = [];
+	for (const [node, events] of [...state.nativeEvents]) {
+		for (const type of [...events.keys()]) {
+			try {
+				removeNativeEvent(state, node, type);
+				state.cleanupNeedsFlush = true;
+			} catch (error) {
+				errors.push(normalizeCleanupError(error));
+			}
+		}
+	}
 	let removedRoots = 0;
 	for (const node of roots) {
 		let attached: boolean;
@@ -961,9 +1266,11 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 			errors.push(normalizeCleanupError(error));
 		}
 	}
-	const complete = state.ownedPageRoots.size === 0 && !state.cleanupNeedsFlush;
+	const complete =
+		state.ownedPageRoots.size === 0 && state.nativeEvents.size === 0 && !state.cleanupNeedsFlush;
 	if (complete) {
 		state.ownedNodes.clear();
+		state.nativeEvents.clear();
 		state.records.clear();
 		state.rootChildren.length = 0;
 		state.generations.clear();

@@ -5,7 +5,7 @@ export type LynxRuntime = 'background' | 'main-thread';
 export type LynxPlatform = 'android' | 'ios' | 'web';
 
 /**
- * Platform APIs remain metadata-only in the Milestone 2 source renderer. Init
+ * Platform APIs remain metadata-only in the Milestone 3 source renderer. Init
  * data, global props, lifecycle, Native Modules, and page controls are deferred
  * to Milestone 4.
  */
