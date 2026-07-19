@@ -1,7 +1,6 @@
 packages:
   - packages/*
   # Vendored TanStack Start PR-branch packages (see packages/tanstack-start/README.md)
-  - packages/tanstack-start/vendor/*
   - benchmarks/news
   - benchmarks/news/*
   - benchmarks/js-framework

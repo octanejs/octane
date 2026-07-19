@@ -19,8 +19,8 @@
     "@octanejs/tanstack-start": "workspace:*",
     "@octanejs/three": "workspace:*",
     "@octanejs/visx": "workspace:*",
-    "@tanstack/octane-router": "workspace:*",
-    "@tanstack/octane-start": "workspace:*",
+    "@tanstack/octane-router": "^1.170.18",
+    "@tanstack/octane-start": "^1.168.28",
     "octane": "workspace:*",
     "shiki": "catalog:default",
     "three": "catalog:default"

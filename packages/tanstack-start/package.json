@@ -49,7 +49,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@tanstack/octane-start": "workspace:*"
+    "@tanstack/octane-start": "^1.168.28"
   },
   "peerDependencies": {
     "octane": "workspace:*",

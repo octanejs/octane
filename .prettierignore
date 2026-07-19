@@ -15,9 +15,6 @@ pnpm-workspace.yaml
 **/.vercel/
 **/.wrangler/
 
-# Vendored TanStack Start PR-branch packages — upstream-formatted, kept verbatim
-# for diffability against upstream (see packages/tanstack-start/README.md)
-packages/tanstack-start/vendor/
 
 # Generated declaration files
 **/*.d.tsrx.ts
