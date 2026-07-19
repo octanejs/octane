@@ -1,9 +1,10 @@
 // @octanejs/aria/components — the react-aria-components surface, ported onto octane.
 // Exports mirror the upstream index (.react-spectrum/packages/react-aria-components/
-// exports/index.ts), restricted to the Phase-4 foundation subset (collections engine,
-// plumbing, and the non-collection components). Collection components (ListBox/Menu/
-// Select/…), date/color families, and drag-and-drop arrive in later phases — see
-// docs/aria-migration-plan.md.
+// exports/index.ts): the Phase-4 foundation (collections engine, plumbing,
+// non-collection components) plus the Phase-5 collection components (Autocomplete,
+// ListBox, Menu, Select, ComboBox, Tabs, TagGroup, GridList, Breadcrumbs, and the
+// inert DragAndDrop context layer). Tree/Table, date/color families, and the
+// drag-and-drop engine arrive in later phases — see docs/aria-migration-plan.md.
 
 // plumbing
 export {
@@ -180,7 +181,122 @@ export type { ToolbarProps, ToolbarRenderProps } from './Toolbar';
 export { TooltipTrigger, Tooltip, TooltipTriggerStateContext, TooltipContext } from './Tooltip';
 export type { TooltipProps, TooltipRenderProps, TooltipTriggerComponentProps } from './Tooltip';
 
+// collection components (Phase 5)
+export {
+	Autocomplete,
+	AutocompleteContext,
+	AutocompleteStateContext,
+	SelectableCollectionContext,
+	FieldInputContext,
+} from './Autocomplete';
+export type { AutocompleteProps, SelectableCollectionContextValue } from './Autocomplete';
+export {
+	ListBoxLoadMoreItem,
+	ListBox,
+	ListBoxItem,
+	ListBoxSection,
+	ListBoxContext,
+	ListStateContext,
+} from './ListBox';
+export type {
+	ListBoxProps,
+	ListBoxRenderProps,
+	ListBoxItemProps,
+	ListBoxItemRenderProps,
+	ListBoxSectionProps,
+	ListBoxLoadMoreItemProps,
+} from './ListBox';
+export {
+	Menu,
+	MenuItem,
+	MenuTrigger,
+	MenuSection,
+	MenuContext,
+	MenuStateContext,
+	RootMenuTriggerStateContext,
+	SubmenuTrigger,
+} from './Menu';
+export type {
+	MenuProps,
+	MenuItemProps,
+	MenuItemRenderProps,
+	MenuTriggerProps,
+	SubmenuTriggerProps,
+	MenuSectionProps,
+} from './Menu';
+export {
+	Select,
+	SelectValue,
+	SelectContext,
+	SelectValueContext,
+	SelectStateContext,
+} from './Select';
+export type {
+	SelectProps,
+	SelectValueProps,
+	SelectValueRenderProps,
+	SelectRenderProps,
+} from './Select';
+export {
+	ComboBox,
+	ComboBoxValue,
+	ComboBoxContext,
+	ComboBoxStateContext,
+	ComboBoxValueContext,
+} from './ComboBox';
+export type {
+	ComboBoxProps,
+	ComboBoxRenderProps,
+	ComboBoxValueProps,
+	ComboBoxValueRenderProps,
+} from './ComboBox';
+export { Tabs, TabList, TabPanels, TabPanel, Tab, TabsContext, TabListStateContext } from './Tabs';
+export type {
+	TabListProps,
+	TabListRenderProps,
+	TabPanelsProps,
+	TabPanelProps,
+	TabPanelRenderProps,
+	TabProps,
+	TabsProps,
+	TabRenderProps,
+	TabsRenderProps,
+} from './Tabs';
+export { TagGroup, TagGroupContext, TagList, TagListContext, Tag } from './TagGroup';
+export type {
+	TagGroupProps,
+	TagListProps,
+	TagListRenderProps,
+	TagProps,
+	TagRenderProps,
+} from './TagGroup';
+export {
+	GridListLoadMoreItem,
+	GridList,
+	GridListItem,
+	GridListContext,
+	GridListHeader,
+	GridListHeaderContext,
+	GridListSection,
+} from './GridList';
+export type {
+	GridListProps,
+	GridListRenderProps,
+	GridListItemProps,
+	GridListItemRenderProps,
+	GridListLoadMoreItemProps,
+	GridListSectionProps,
+} from './GridList';
+export { Breadcrumbs, BreadcrumbsContext, Breadcrumb } from './Breadcrumbs';
+export type { BreadcrumbsProps, BreadcrumbProps, BreadcrumbRenderProps } from './Breadcrumbs';
+export { DropIndicator, DropIndicatorContext, DragAndDropContext } from './DragAndDrop';
+export type { DropIndicatorProps, DropIndicatorRenderProps } from './DragAndDrop';
+export { useDragAndDrop } from './useDragAndDrop';
+export type { DragAndDropHooks, DragAndDropOptions } from './useDragAndDrop';
+
 // re-exports from the hooks surface, as upstream's index does
 export { VisuallyHidden } from '../visually-hidden/VisuallyHidden';
 export type { VisuallyHiddenProps } from '../visually-hidden/VisuallyHidden';
 export type { Placement } from '../overlays/useOverlayPosition';
+export { useFilter } from '../i18n/useFilter';
+export type { Filter } from '../i18n/useFilter';

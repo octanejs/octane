@@ -12,7 +12,7 @@
 // components take the render-phase SSR registration path and emit no HTML, and
 // hideable components render null. `.tsx` → `.ts` (JSX → createElement), no
 // forwardRef (octane refs are props), S()/subSlot component-slot convention.
-import { createContext, createElement, createPortal, useContext, useState } from 'octane';
+import { createContext, createElement, createPortal, Fragment, useContext, useState } from 'octane';
 import { useIsSSR } from '../ssr/SSRProvider';
 
 import { S, subSlot } from '../internal';
@@ -47,7 +47,18 @@ export function Hidden(props: { children: any; target?: Element | null }): any {
 		return children;
 	}
 
-	return createPortal(children, (props.target ?? ownContainer) as Element);
+	// Upstream renders the structural copy inside a real in-DOM `<template>`
+	// element (children redirected into its inert `.content` fragment), so
+	// react-aria's serialized DOM contains an empty `<template></template>`
+	// marker. Our copy lives in the detached container instead, but we render
+	// the same inert placeholder so consumer-observable DOM (and the
+	// differential byte-compare) matches react-aria exactly.
+	return createElement(
+		Fragment,
+		null,
+		createElement('template', null),
+		createPortal(children, (props.target ?? ownContainer) as Element),
+	);
 }
 
 /** Creates a component that returns null if it is in a hidden subtree. */
