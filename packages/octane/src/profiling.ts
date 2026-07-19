@@ -150,9 +150,24 @@ let pending = new WeakMap<object, PendingProfile>();
 // extends a component's lifetime. The FinalizationRegistry reclaims the map
 // entry itself once the subject is collected; `clear()` drops the whole map.
 let instanceSubjects = new Map<number, WeakRef<object>>();
+// The inspection channel is DOM/profile-build-only and dead-code under non-DOM
+// universal renderers (e.g. Lynx), which forbid these GC/scheduling globals.
+// Read them off a bound global reference and schedule via `Promise` so the
+// stripped path carries no forbidden-global reference those renderers' compilers
+// would reject; DOM/profile builds use the real APIs unchanged.
+const globalScope = globalThis as {
+	WeakRef?: { new (target: object): WeakRef<object> };
+	FinalizationRegistry?: {
+		new (cleanup: (heldValue: number) => void): FinalizationRegistry<number>;
+	};
+};
+const WeakRefCtor = globalScope.WeakRef;
+const scheduleMicrotask = (callback: () => void): void => {
+	void Promise.resolve().then(callback);
+};
 const instanceReclaim =
-	typeof FinalizationRegistry !== 'undefined'
-		? new FinalizationRegistry<number>((instanceId) => {
+	globalScope.FinalizationRegistry !== undefined
+		? new globalScope.FinalizationRegistry((instanceId) => {
 				instanceSubjects.delete(instanceId);
 			})
 		: null;
@@ -244,8 +259,10 @@ function instanceFor(subject: object): InstanceProfile {
 	if (instance === undefined) {
 		instance = { id: nextInstanceId++, attempts: 0 };
 		instances.set(subject, instance);
-		instanceSubjects.set(instance.id, new WeakRef(subject));
-		instanceReclaim?.register(subject, instance.id);
+		if (WeakRefCtor !== undefined) {
+			instanceSubjects.set(instance.id, new WeakRefCtor(subject));
+			instanceReclaim?.register(subject, instance.id);
+		}
 	}
 	return instance;
 }
@@ -267,7 +284,7 @@ function notifySubscribers(event: ProfileEvent): void {
 				// Devtools listeners must never break the app.
 			}
 		}
-		queueMicrotask(() => {
+		scheduleMicrotask(() => {
 			batchOpen = false;
 			for (const subscriber of subscribers) {
 				try {

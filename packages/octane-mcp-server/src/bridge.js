@@ -34,6 +34,7 @@ export const KNOWN_BINDINGS = {
 	'@base-ui-components/react': '@octanejs/base-ui',
 	'@dnd-kit/react': '@octanejs/dnd-kit',
 	sonner: '@octanejs/sonner',
+	'react-scan': '@octanejs/scan',
 	recharts: '@octanejs/recharts',
 	'@react-three/fiber': '@octanejs/three',
 	'@visx/visx': '@octanejs/visx',
