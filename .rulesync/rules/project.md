@@ -7,7 +7,7 @@ globs: ['**/*']
 
 # Octane Project Guide for AI Agents
 
-Octane is a fast, TypeScript-first UI framework by Dominic Gannaway — the successor
+Octane is a fast, JavaScript UI framework by Dominic Gannaway — the successor
 to Inferno. It gives you the React programming model (the same hook API, `memo`,
 context, portals, Suspense, transitions) but compiles components ahead of time, so
 most of React's runtime work is already done before the page loads. Components are

@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
-Octane is a fast, TypeScript-first UI framework — the successor to
+Octane is a fast, JavaScript UI framework — the successor to
 [Inferno](https://github.com/infernojs/inferno), the React-like library built to
 stay close to the speed of hand-written DOM code. Octane keeps that goal and
 modernizes everything around it: you write with the React API you already know,

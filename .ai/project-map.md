@@ -1,6 +1,6 @@
 # Octane project map for agents
 
-Octane is a private pnpm monorepo for a TypeScript-first UI framework that keeps a React-shaped authoring/API model while compiling `.tsrx`/JSX ahead of time.
+Octane is a private pnpm monorepo for a JavaScript UI framework that keeps a React-shaped authoring/API model while compiling `.tsrx`/JSX ahead of time.
 
 ## Authoritative sources
 
