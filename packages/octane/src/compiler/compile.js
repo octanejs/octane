@@ -7107,8 +7107,8 @@ function applyCssScoping(componentNode, ctx) {
 // caller passes a freshly-created compiler function that cannot yet be observed;
 // bundlers may therefore discard the initializer together with an unused export.
 function singleRootInitializer(ctx, component) {
-	ctx.runtimeNeeded.add('markSingleRoot');
-	return `/* @__PURE__ */ _$markSingleRoot(${component})`;
+	ctx.runtimeNeeded.add('__s');
+	return `/* @__PURE__ */ _$__s(${component})`;
 }
 
 function compileComponent(node, ctx, options) {

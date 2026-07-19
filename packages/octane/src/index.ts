@@ -187,6 +187,8 @@ export {
 	componentSlotLite,
 	compilerCacheContext,
 	markSingleRoot,
+	// Compact compiler ABI; keep the descriptive export for older compiled output.
+	markSingleRoot as __s,
 	markChildrenBlock,
 	childSlot,
 	positionalChildren,

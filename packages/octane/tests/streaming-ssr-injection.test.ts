@@ -250,17 +250,19 @@ describe('streaming injection — document renders', () => {
 		expect(chunks[chunks.length - 1]).toMatch(DOCUMENT_TAIL);
 	});
 
-	it('keeps document output byte-identical when no injection source is supplied', async () => {
+	it('keeps the tail inside the shell when no injection source is supplied', async () => {
 		const value = deferred<string>();
 		value.resolve('streamed');
 		const { chunks } = await collectPipeableStream(server.DocumentApp, {
 			promise: value.promise,
 		});
-		// Without injection the shell still contains the closing tags and no
-		// document-mode additions — the pre-feature stream shape is preserved.
+		// Without injection there is no tail-holding or head restructuring —
+		// the shell still carries the closing tags. (The doctype itself is NOT
+		// injection-gated: streamed documents always lead with it, see the
+		// doctype parity suite below.)
 		expect(chunks[0]).toContain('</body>');
 		expect(chunks[0]).toContain('</html>');
-		expect(chunks[0]).not.toContain('<!DOCTYPE html>');
+		expect(chunks[0].startsWith('<!DOCTYPE html>')).toBe(true);
 	});
 
 	it('leads the document with <!DOCTYPE html> under injection', async () => {
@@ -463,5 +465,57 @@ describe('streaming injection — failure modes', () => {
 		await collector.ended;
 		expect(injection.renderCompleteCalls).toBe(1);
 		expect(injection.unsubscribed).toBe(true);
+	});
+});
+
+// Doctype parity — independent of injection. React Fizz emits
+// `<!DOCTYPE html>` whenever the STREAMED root renders `<html>`; its test
+// harness treats a doctype-less `<html>` as "almost certainly a bug in React"
+// (per ReactDOMFizzServer-test.js:237, React canary b740af2). The buffered
+// renderers do NOT emit a doctype — verified against react-dom 19.2.7
+// renderToString/renderToStaticMarkup of an `<html>` root.
+describe('streaming document renders — doctype parity', () => {
+	it('streamed documents lead with <!DOCTYPE html> without any injection source', async () => {
+		const value = deferred<string>();
+		value.resolve('streamed');
+		const { html, chunks } = await collectPipeableStream(server.DocumentApp, {
+			promise: value.promise,
+		});
+		expect(chunks[0].startsWith('<!DOCTYPE html>')).toBe(true);
+		expect(html.match(/<!DOCTYPE html>/g)).toHaveLength(1);
+	});
+
+	it('streamed documents lead with <!DOCTYPE html> through the web-stream API', async () => {
+		const value = deferred<string>();
+		value.resolve('streamed');
+		const { chunks } = await collectReadableStream(server.DocumentApp, {
+			promise: value.promise,
+		});
+		expect(chunks[0].startsWith('<!DOCTYPE html>')).toBe(true);
+	});
+
+	it('streamed fragments never receive a doctype', async () => {
+		const value = deferred<string>();
+		value.resolve('streamed');
+		const { html } = await collectPipeableStream(server.FragmentApp, {
+			promise: value.promise,
+		});
+		expect(html).not.toContain('<!DOCTYPE');
+	});
+
+	it('buffered renderers stay doctype-free for document roots, matching React', async () => {
+		const value = deferred<string>();
+		value.resolve('streamed');
+		// renderToString / renderToStaticMarkup of an <html> root produce no
+		// doctype in react-dom 19.2.7; octane matches. (Framework bot paths that
+		// want one — e.g. the Start prerender handler — prepend it themselves.)
+		const buffered = ServerRuntime.renderToString(server.DocumentApp, {
+			promise: value.promise,
+		});
+		expect(buffered.html).not.toContain('<!DOCTYPE');
+		const statics = ServerRuntime.renderToStaticMarkup(server.DocumentApp, {
+			promise: value.promise,
+		});
+		expect(statics.html).not.toContain('<!DOCTYPE');
 	});
 });
