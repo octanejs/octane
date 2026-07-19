@@ -13,7 +13,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT"></a>
 </p>
 
-Octane is a fast, TypeScript-first UI framework — the successor to
+Octane is a fast, JavaScript UI framework — the successor to
 [Inferno](https://github.com/infernojs/inferno), the React-like library built to
 stay close to the speed of hand-written DOM code. Octane keeps that goal and
 modernizes everything around it: you write with the React API you already know,
@@ -68,7 +68,7 @@ Inferno and has worked on React, Lexical, Ripple, and Svelte.
 
 Octane is currently in alpha development.
 
-The core suite contains **3,500+ distinct behavioral tests** across conformance,
+The core suite contains **3,900+ distinct behavioral tests** across conformance,
 differential, hydration, runtime, compiler, and SSR coverage. The `octane-prod`
 project reruns the normal suite against the production compiler path, so those
 executions are valuable mode coverage but are not counted again as unique tests.

@@ -146,7 +146,7 @@ Consequences beyond DX: `useQuery(...)` returns `any` (no narrowing, no
 `queryOptions()`/`infiniteQueryOptions()`/`mutationOptions()`
 (`src/queryOptions.ts:1-3` etc.) are untyped identity functions — the entire
 `dataTag`-based `getQueryData` inference story upstream provides is lost. For a
-"TypeScript-first" framework this is the single largest user-facing gap.
+"JavaScript" framework this is the single largest user-facing gap.
 Classification: **(a) missing and needed** — all of it; nothing here is
 React-specific except `React.ReactNode` in prop types (trivially substitutable).
 The port's `QueryErrorResetBoundaryValue` interface exists
