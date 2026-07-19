@@ -1185,6 +1185,13 @@ function vtMarkDirtyFromCurrentBlock(): void {
 }
 
 /** Top-level ELEMENT nodes of a boundary block's DOM range. */
+// The DOM `Element` type, re-exported for profiling.ts's node-resolver ABI.
+// profiling.ts has a `declare global` block that, on some tsgo builds, drops
+// the `dom` lib for that file so a bare `Element` type fails to resolve there;
+// runtime.ts references `Element` as a value throughout, so the type always
+// resolves here. Importing the alias keeps profiling.ts's ABI DOM-typed.
+export type DomNodeElement = Element;
+
 function vtRangeElements(block: Block): Element[] {
 	const els: Element[] = [];
 	if (block.startMarker !== null && block.endMarker !== null) {

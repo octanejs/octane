@@ -1,8 +1,8 @@
 // This module's `declare global` augmentation makes some tsgo builds drop the
-// `dom` lib for this file, so the DOM `Element` type fails to resolve here even
-// though the tsconfig declares it. Import the type from a module without a
-// global augmentation, where it resolves normally, for the node-resolver ABI.
-import type { DomNodeElement } from './constants.js';
+// `dom` lib for this file, so a bare `Element` type fails to resolve here.
+// runtime.ts references `Element` as a value throughout, so the type always
+// resolves there; import the alias from it for the node-resolver ABI.
+import type { DomNodeElement } from './runtime.js';
 
 /**
  * Build-specialized client profiler for Octane.
