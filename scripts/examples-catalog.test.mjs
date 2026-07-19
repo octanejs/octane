@@ -117,4 +117,39 @@ describe('validateExampleManifest', () => {
 			}
 		}
 	});
+
+	test('rejects React runtimes when the host is explicitly "octane"', () => {
+		const example = createValidExample();
+		example.manifest.host = 'octane';
+		example.packageManifest.dependencies.react = '^19.0.0';
+
+		assert.deepEqual(validate(example), [
+			'examples/hacker-news/package.json must use Octane, not declare the react runtime',
+		]);
+	});
+
+	test('accepts the React runtime for a host:"react" application', () => {
+		const example = createValidExample();
+		example.manifest.host = 'react';
+		example.packageManifest.dependencies.react = '^19.0.0';
+		example.packageManifest.dependencies['react-dom'] = '^19.0.0';
+
+		assert.deepEqual(validate(example), []);
+	});
+
+	test('still requires octane for a host:"react" application', () => {
+		const example = createValidExample();
+		example.manifest.host = 'react';
+		delete example.packageManifest.dependencies.octane;
+		example.packageManifest.dependencies.react = '^19.0.0';
+
+		assert.deepEqual(validate(example), ['examples/hacker-news/package.json must declare octane']);
+	});
+
+	test('rejects an unknown host value', () => {
+		const example = createValidExample();
+		example.manifest.host = 'nuxt';
+
+		assert.deepEqual(validate(example), [`${EXAMPLE_LABEL} "host" must be one of octane, react`]);
+	});
 });

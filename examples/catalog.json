@@ -7,6 +7,7 @@
       "title": "Cartlane",
       "summary": "A production-built commerce checkout proving Octane native form actions, pending state, idempotent server functions, SSR, and hydration.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client", "streaming-ssr", "hydration"],
       "dialects": ["tsrx"],
       "bindings": [],
@@ -92,6 +93,7 @@
       "title": "Cinebase",
       "summary": "A streaming film and television catalog exercising Apollo cache isolation, SSR, hydration, and resilient navigation.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client", "streaming-ssr", "hydration"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/apollo-client"],
@@ -162,6 +164,7 @@
       "title": "Draftboard",
       "summary": "A production-built SVG whiteboard proving Octane pointer capture, imperative refs, keyed identity, keyboard history, portals, and resilient autosave.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": [],
@@ -233,6 +236,7 @@
       "title": "Flowboard",
       "summary": "A production-built issue board proving Octane drag and drop, portaled routes, refs, keyed identity, and recovery behavior.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/dnd-kit"],
@@ -299,6 +303,7 @@
       "title": "Gridlab",
       "summary": "A local-first virtualized spreadsheet proving Octane keyboard, clipboard, IME, formula, focus, and overlapping sync behavior.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/tanstack-virtual"],
@@ -373,6 +378,7 @@
       "title": "Hacker News",
       "summary": "One routed news reader implemented in both React-style TSX and TSRX over the same Octane data layer.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client", "ssr", "hydration"],
       "dialects": ["tsx", "tsrx"],
       "bindings": ["@octanejs/stylex", "@octanejs/tanstack-query", "@octanejs/tanstack-router"],
@@ -429,11 +435,78 @@
       ]
     },
     {
+      "directory": "examples/harbor",
+      "id": "harbor",
+      "title": "Harbor",
+      "summary": "A server-rendered React 19 pricing page hosting three compiled Octane islands through OctaneCompat — the React↔Octane boundary exercised end to end.",
+      "status": "active",
+      "host": "react",
+      "renderModes": ["streaming-ssr", "hydration"],
+      "dialects": ["tsrx"],
+      "bindings": [],
+      "octaneFeatures": [
+        "error-routing",
+        "hydration",
+        "native-events",
+        "octane-compat",
+        "parallel-use",
+        "react-host",
+        "streaming-ssr",
+        "transparent-context"
+      ],
+      "commands": { "build": ["build"], "typecheck": "typecheck", "e2e": "test:e2e" },
+      "journeys": [
+        {
+          "id": "pre-hydration-input-preservation",
+          "title": "Preserve pre-hydration island input through adoption into the hydrated app",
+          "kind": "ssr-hydration",
+          "spec": "e2e/harbor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "island-react-round-trip",
+          "title": "Drive island state natively and hand results back to the React shell",
+          "kind": "golden",
+          "spec": "e2e/harbor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "provider-flip-context",
+          "title": "Flip React providers and observe islands re-render through shared contexts",
+          "kind": "golden",
+          "spec": "e2e/harbor.spec.ts",
+          "critical": true
+        },
+        {
+          "id": "island-fault-boundary-retry",
+          "title": "Route an island fault to the React error boundary, keep siblings alive, and retry",
+          "kind": "resilience",
+          "spec": "e2e/harbor.spec.ts",
+          "critical": true
+        }
+      ],
+      "faultScenarios": [
+        {
+          "id": "delayed-hydration",
+          "description": "?hydrateDelay caps a top-level await before hydrateRoot so pre-hydration interaction is observable."
+        },
+        {
+          "id": "recs-refresh-outage",
+          "description": "?fault=recs makes the first recommendations refresh reject once so the island fault escapes to the React boundary."
+        },
+        {
+          "id": "refresh-latency",
+          "description": "Recommendation refreshes resolve after a fixed local delay so pending UI is observable."
+        }
+      ]
+    },
+    {
       "directory": "examples/lexical-playground",
       "id": "lexical-playground",
       "title": "Lexical Playground",
       "summary": "A production-built rich-text editor exercising the Octane Lexical binding through real browser interactions.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/lexical"],
@@ -477,6 +550,7 @@
       "title": "Mailroom",
       "summary": "A local-first email client proving real data-router fetchers, navigation blockers, durable drafts, and automatic offline outbox delivery.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/remix-router"],
@@ -564,6 +638,7 @@
       "title": "Pagecraft",
       "summary": "A resilient document workspace proving real Lexical selection, rich-text history, and versioned autosave across network races.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/lexical"],
@@ -641,6 +716,7 @@
       "title": "Pulseboard",
       "summary": "A production-built analytics console proving responsive Visx SVG measurement, accessible TanStack Table state, measured TanStack Virtual logs, keyboard navigation, and deterministic recovery.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/tanstack-table", "@octanejs/tanstack-virtual", "@octanejs/visx"],
@@ -716,6 +792,7 @@
       "title": "Relay",
       "summary": "A production-built team chat proving real SSE subscriptions, anchored history prepends, and duplicate-free reconnect replay.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": [],
@@ -791,6 +868,7 @@
       "title": "Streambox",
       "summary": "A production-built video platform proving Octane native media events, persistent player DOM state, and virtualized comments.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/tanstack-virtual"],
@@ -857,6 +935,7 @@
       "title": "Threadline",
       "summary": "A production-built social timeline exercising Zustand external state, optimistic mutations, and keyed survivor identity.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client"],
       "dialects": ["tsrx"],
       "bindings": ["@octanejs/zustand"],
@@ -927,6 +1006,7 @@
       "title": "Wayfinder",
       "summary": "A streaming travel planner proving Octane parallel use, out-of-order Suspense reveals, abort isolation, strict CSP, and hydration adoption.",
       "status": "active",
+      "host": "octane",
       "renderModes": ["client", "streaming-ssr", "hydration"],
       "dialects": ["tsrx"],
       "bindings": [],

@@ -1,0 +1,71 @@
+{
+  "$schema": "../example.schema.json",
+  "schemaVersion": 1,
+  "id": "harbor",
+  "title": "Harbor",
+  "summary": "A server-rendered React 19 pricing page hosting three compiled Octane islands through OctaneCompat — the React↔Octane boundary exercised end to end.",
+  "status": "active",
+  "host": "react",
+  "renderModes": ["streaming-ssr", "hydration"],
+  "dialects": ["tsrx"],
+  "bindings": [],
+  "octaneFeatures": [
+    "error-routing",
+    "hydration",
+    "native-events",
+    "octane-compat",
+    "parallel-use",
+    "react-host",
+    "streaming-ssr",
+    "transparent-context"
+  ],
+  "commands": {
+    "build": ["build"],
+    "typecheck": "typecheck",
+    "e2e": "test:e2e"
+  },
+  "journeys": [
+    {
+      "id": "pre-hydration-input-preservation",
+      "title": "Preserve pre-hydration island input through adoption into the hydrated app",
+      "kind": "ssr-hydration",
+      "spec": "e2e/harbor.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "island-react-round-trip",
+      "title": "Drive island state natively and hand results back to the React shell",
+      "kind": "golden",
+      "spec": "e2e/harbor.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "provider-flip-context",
+      "title": "Flip React providers and observe islands re-render through shared contexts",
+      "kind": "golden",
+      "spec": "e2e/harbor.spec.ts",
+      "critical": true
+    },
+    {
+      "id": "island-fault-boundary-retry",
+      "title": "Route an island fault to the React error boundary, keep siblings alive, and retry",
+      "kind": "resilience",
+      "spec": "e2e/harbor.spec.ts",
+      "critical": true
+    }
+  ],
+  "faultScenarios": [
+    {
+      "id": "delayed-hydration",
+      "description": "?hydrateDelay caps a top-level await before hydrateRoot so pre-hydration interaction is observable."
+    },
+    {
+      "id": "recs-refresh-outage",
+      "description": "?fault=recs makes the first recommendations refresh reject once so the island fault escapes to the React boundary."
+    },
+    {
+      "id": "refresh-latency",
+      "description": "Recommendation refreshes resolve after a fixed local delay so pending UI is observable."
+    }
+  ]
+}
