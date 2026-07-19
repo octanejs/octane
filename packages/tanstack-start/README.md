@@ -44,7 +44,17 @@ both resolve to the vendored workspace packages.
 ## Maintenance
 
 Do not hand-edit `vendor/` beyond the package.json dependency rewrites
-(URL → `workspace:*` / exact registry versions, `octane` peer → `workspace:*`).
+(URL → `workspace:*` / exact registry versions, `octane` peer → `workspace:*`),
+with ONE deliberate exception:
+`vendor/octane-router/src/ssr/renderRouterToStream.ts` was rewritten onto
+octane's native `StreamOptions.injection` API (replacing the
+`transformStreamWithRouter` byte-level merge and its doctype/style wrapper
+transforms). That file is kept **byte-identical** to the patch prepared for
+the upstream PR (TanStack/router#7847), committed here as
+[`tanstack-octane-native-injection.patch`](./tanstack-octane-native-injection.patch)
+so vendor-vs-upstream diffs stay clean and the claim is verifiable
+(`git apply --check` on a checkout of the PR branch); once upstream applies
+it, the file is verbatim again.
 To update, re-vendor from a newer upstream build and re-apply those rewrites.
 Once the upstream PR lands and `@tanstack/octane-*` publish to npm, `vendor/`
 can be deleted and this facade repointed at registry dependencies.

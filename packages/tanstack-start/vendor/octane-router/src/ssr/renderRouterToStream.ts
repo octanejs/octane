@@ -10,24 +10,26 @@ import type { AnyRouter } from '@tanstack/router-core'
 type RouterApp = ComponentBody<{ router: AnyRouter }>
 type ServerComponent = Parameters<typeof renderToReadableStream>[0]
 
-// OCTANE PATCH (diverges from the upstream PR-branch file): the router's data
-// stream is merged through octane's native `StreamOptions.injection` instead
-// of router-core's `transformStreamWithRouter` text transform. Octane emits
-// tag-complete chunks and owns the document tail, so the byte-level re-parse
+// The router's data stream is merged through octane's native
+// `StreamOptions.injection` (octane >= 0.1.11) instead of router-core's
+// `transformStreamWithRouter` text transform. Octane emits tag-complete
+// chunks and owns the document tail, so the byte-level re-parse
 // (closing-tag scans, leftover buffers, the held-`</body>` tail that also
-// buffered every post-shell suspense segment until stream end) is unnecessary
-// — boundary segments now stream out of order again for document renders.
+// buffered every post-shell suspense segment until stream end) is
+// unnecessary — boundary segments stream out of order for document renders,
+// and the transform's 64 KiB tail cap on segment volume disappears.
 // Octane's document mode also emits `<!DOCTYPE html>` and folds the leading
 // renderer-owned styles into `<head>`, replacing the `prependDoctype` and
 // `relocateLeadingOctaneStylesToHead` transforms this file previously piped
 // the stream through.
 //
-// Upstream's serialization timeout is preserved: it arms when octane reports
-// the render finished and fails the stream if serialization never completes.
-// The script barrier lifts when octane subscribes — octane only subscribes
-// after the shell (which carries the barrier anchor) is on the wire, matching
-// the transform's lift-after-marker-flush. (`setRenderFinished` lifts it as a
-// backstop regardless, exactly as upstream.)
+// The serialization timeout is preserved: it arms when octane reports the
+// render finished (`renderComplete`) and fails the stream if serialization
+// never completes. The script barrier lifts when octane subscribes — octane
+// only subscribes after the shell (which carries the barrier anchor) is on
+// the wire, matching the transform's lift-after-marker-flush.
+// (`setRenderFinished` lifts it as a backstop regardless, exactly as
+// before.)
 
 const SERIALIZATION_TIMEOUT_MS = 60_000
 
