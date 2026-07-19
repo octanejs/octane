@@ -2999,27 +2999,23 @@ function drainPostPaint(): void {
 	_postPaintCbs = [];
 	for (let i = 0; i < cbs.length; i++) cbs[i]();
 }
-let _channel: MessageChannel | null | undefined;
-function initPostPaintChannel(): MessageChannel | null {
-	if (_channel === undefined) {
+let _postAfterPaint: (() => void) | undefined;
+function initPostAfterPaint(): () => void {
+	if (_postAfterPaint === undefined) {
 		if (typeof MessageChannel === 'undefined') {
-			_channel = null;
+			_postAfterPaint = () => setTimeout(drainPostPaint, 0);
 		} else {
-			_channel = new MessageChannel();
-			_channel.port1.onmessage = drainPostPaint;
+			const channel = new MessageChannel();
+			channel.port1.onmessage = drainPostPaint;
+			_postAfterPaint = () => channel.port2.postMessage(0);
 		}
 	}
-	return _channel;
+	return _postAfterPaint;
 }
 function schedulePostPaint(cb: () => void): void {
 	_postPaintCbs.push(cb);
-	const channel = initPostPaintChannel();
-	if (channel !== null) {
-		// rAF lands before paint; MessageChannel posts a macrotask after paint.
-		requestAnimationFrame(() => channel.port2.postMessage(0));
-	} else {
-		requestAnimationFrame(() => setTimeout(drainPostPaint, 0));
-	}
+	// rAF lands before paint; the shared callback posts a macrotask after paint.
+	requestAnimationFrame(initPostAfterPaint());
 }
 
 // ---------------------------------------------------------------------------
