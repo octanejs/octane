@@ -1,8 +1,9 @@
-/// <reference lib="dom" />
-// This module's `declare global` augmentation interacts with lib resolution in
-// some tsgo builds, dropping the `dom` lib for this file so the DOM `Element`
-// type in the profiler's node-resolver ABI fails to resolve. Re-request it
-// explicitly; the tsconfig already includes `dom` for every other file.
+// This module's `declare global` augmentation makes some tsgo builds drop the
+// `dom` lib for this file, so the DOM `Element` type fails to resolve here even
+// though the tsconfig declares it. Import the type from a module without a
+// global augmentation, where it resolves normally, for the node-resolver ABI.
+import type { DomNodeElement } from './constants.js';
+
 /**
  * Build-specialized client profiler for Octane.
  *
@@ -179,7 +180,7 @@ const instanceReclaim =
 const subscribers = new Set<ProfileSubscriber>();
 let batchOpen = false;
 /** The runtime-installed subject→elements resolver (profile builds only). */
-let nodeResolver: ((subject: object) => Element[]) | null = null;
+let nodeResolver: ((subject: object) => DomNodeElement[]) | null = null;
 let nextInstanceId = 1;
 let nextFallbackId = 1;
 let currentFrame: ProfileFrame | null = null;
@@ -594,7 +595,9 @@ function eventMatches(event: ProfileEvent, target: string | Function): boolean {
  * calls this once at module load in profile builds; the resolver stays null
  * otherwise, so `domNodes` degrades to an empty answer instead of guessing.
  */
-export function __profileInstallNodeResolver(resolver: (subject: object) => Element[]): void {
+export function __profileInstallNodeResolver(
+	resolver: (subject: object) => DomNodeElement[],
+): void {
 	nodeResolver = resolver;
 }
 
@@ -625,7 +628,7 @@ export interface OctaneProfiler {
 	 * `[]` once it unmounts, its subject is collected, or outside profile
 	 * builds. Pull-based on purpose: recorded events stay DOM-free.
 	 */
-	domNodes(instanceId: number): Element[];
+	domNodes(instanceId: number): DomNodeElement[];
 }
 
 declare global {

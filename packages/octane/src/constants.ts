@@ -212,3 +212,11 @@ export const isUnitlessStyleProp: (name: string) => boolean = _isUnitlessStylePr
  * See dom-tables.js.
  */
 export const cssStyleValue: (name: string, value: unknown) => string = _cssStyleValue;
+
+/**
+ * The DOM `Element` type, re-exported from this augmentation-free module so
+ * consumers with a `declare global` block (e.g. profiling.ts) can reference it
+ * without tripping the tsgo lib-resolution quirk that drops `dom` for such
+ * files.
+ */
+export type DomNodeElement = Element;
