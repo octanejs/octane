@@ -472,7 +472,9 @@ work around it in the binding.**
 - `forwardRef` → ref-as-prop.
 - `className` composition via octane's `normalizeClass` at the apply site; the render-prop
   merge concatenates strings exactly like Base UI.
-- Dev-only warnings skipped (repo policy).
+- Base UI-specific dev warnings were omitted from this package migration's
+  historical scope. Core Octane's progressive React/ReactDOM diagnostic parity
+  policy does not automatically include diagnostics owned by an upstream binding.
 
 ## Verification
 

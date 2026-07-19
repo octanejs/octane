@@ -265,6 +265,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          # The production-error catalog is append-only. Its check compares the
+          # current tree with the PR base or previous main commit.
+          fetch-depth: 0
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -317,6 +321,14 @@ jobs:
         run: |
           pnpm react-parity:test
           pnpm react-parity:check
+
+      # Production error URLs are a public compatibility surface. Keep the
+      # append-only catalog, generated client/server formatters, and literal
+      # runtime call sites synchronized before a package can be built.
+      - name: Check Octane production error catalog
+        env:
+          OCTANE_ERROR_CODES_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: pnpm error-codes:check
 
       # Package discovery is shared by every package-wide repository check.
       # This generated inventory catches unreviewed package additions and stale

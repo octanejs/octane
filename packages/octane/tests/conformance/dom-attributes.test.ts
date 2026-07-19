@@ -3,6 +3,7 @@ import { mount } from '../_helpers';
 import {
 	UnknownAttr,
 	UnknownSpread,
+	StaticInvalidBooleans,
 	BoolInert,
 	BoolDisabled,
 	DownloadAttr,
@@ -31,9 +32,9 @@ import {
 } from './_fixtures/dom-attributes.tsrx';
 
 // ============================================================================
-// HTML attribute matrix — ports of ReactDOMAttribute-test.js and
-// DOMPropertyOperations-test.js (React v19.2.7), plus the empty-string
-// src/href/action + enumerated-attribute core from ReactDOMComponent-test.js.
+// HTML attribute matrix — ports of the latest ReactDOMAttribute-test.js and
+// DOMPropertyOperations-test.js, plus the empty-string src/href/action +
+// enumerated-attribute core from ReactDOMComponent-test.js.
 //
 // Scope notes (per docs/react-parity-migration-plan.md §2):
 //  - controlled `value`/`checked` are SUPPORTED since 2026-07-08 (React
@@ -42,10 +43,49 @@ import {
 //    cases are not ported.
 //  - class/className composes clsx-style (intentional divergence) — React's
 //    coercion cases are not ported.
-//  - DEV-warning cases port their FUNCTIONAL outcome only.
+//  - Existing Octane DEV warnings are asserted exactly; cases whose warning is
+//    not implemented still call out their functional-only coverage locally.
 // ============================================================================
 
+const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+
+function expectDevError(error: ReturnType<typeof vi.spyOn>, message: string): void {
+	expect(error.mock.calls).toEqual(PROD_COMPILE ? [] : [[message]]);
+}
+
 describe('ReactDOMAttribute — unknown attributes', () => {
+	it('warns for static true and false values on non-boolean attributes', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(StaticInvalidBooleans);
+		try {
+			const el = r.find('#static-invalid-booleans');
+			expect(el.hasAttribute('title')).toBe(false);
+			expect(el.hasAttribute('alt')).toBe(false);
+			expect(el.getAttribute('data-ready')).toBe('true');
+			expect(el.getAttribute('aria-hidden')).toBe('true');
+			expect(el.getAttribute('hidden')).toBe('');
+			expect(error.mock.calls).toEqual(
+				PROD_COMPILE
+					? []
+					: [
+							[
+								'Received `true` for a non-boolean attribute `title`. ' +
+									'If you want to write it to the DOM, pass a string instead: ' +
+									'title="true" or title={value.toString()}.',
+							],
+							[
+								'Received `false` for a non-boolean attribute `alt`. ' +
+									'If you used to conditionally omit it with alt={condition && value}, ' +
+									'pass alt={condition ? value : undefined} instead.',
+							],
+						],
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
+	});
+
 	// Per ReactDOMAttribute-test.js:62 — removes values null and undefined
 	it('removes values null and undefined', () => {
 		const r = mount(UnknownAttr, { value: 'something' });
@@ -60,28 +100,48 @@ describe('ReactDOMAttribute — unknown attributes', () => {
 		r.unmount();
 	});
 
-	// Per ReactDOMAttribute-test.js:67 — changes values true, false to null
-	// (false half; warning not ported). `unknown={false}` removes the attribute
-	// in both React and octane.
-	it('removes an unknown attribute set to false', () => {
-		const r = mount(UnknownAttr, { value: 'something' });
-		const el = r.find('#u');
-		r.update(UnknownAttr, { value: false });
-		expect(el.hasAttribute('unknown')).toBe(false);
-		r.unmount();
+	// Per latest ReactDOMAttribute-test.js:67 — "changes values true, false to
+	// null, and also warns once" (false variant). Octane preserves the actionable
+	// condition-to-ternary guidance without React's component-stack suffix.
+	it('removes an unknown attribute set to false and warns in development', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(UnknownSpread, { sp: { conditionalvalue: 'something' } });
+		try {
+			const el = r.find('#us');
+			r.update(UnknownSpread, { sp: { conditionalvalue: false } });
+			expect(el.hasAttribute('conditionalvalue')).toBe(false);
+			expectDevError(
+				error,
+				'Received `false` for a non-boolean attribute `conditionalvalue`. ' +
+					'If you used to conditionally omit it with conditionalvalue={condition && value}, ' +
+					'pass conditionalvalue={condition ? value : undefined} instead.',
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
-	// Per ReactDOMAttribute-test.js:67 (true half) — React REMOVES `unknown={true}`
-	// on a non-boolean attribute (+ dev-warns "Received `true` for a non-boolean
-	// attribute"). Matched since 2026-07-08 (the controlled-components change
-	// reversed the 2026-07-04 native-pass-through adjudication): booleans never
-	// write on non-boolean attributes; boolean attrs keep presence semantics.
-	it('removes an unknown attribute set to true (dev-warns)', () => {
+	// Per latest ReactDOMAttribute-test.js:67 — "changes values true, false to
+	// null, and also warns once" (true variant). Booleans never write on
+	// non-boolean attributes; boolean attrs retain presence semantics.
+	it('removes an unknown attribute set to true and warns in development', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 		const r = mount(UnknownAttr, { value: 'something' });
-		const el = r.find('#u');
-		r.update(UnknownAttr, { value: true });
-		expect(el.hasAttribute('unknown')).toBe(false);
-		r.unmount();
+		try {
+			const el = r.find('#u');
+			r.update(UnknownAttr, { value: true });
+			expect(el.hasAttribute('unknown')).toBe(false);
+			expectDevError(
+				error,
+				'Received `true` for a non-boolean attribute `unknown`. ' +
+					'If you want to write it to the DOM, pass a string instead: ' +
+					'unknown="true" or unknown={value.toString()}.',
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
 	// Per ReactDOMAttribute-test.js:78 — removes unknown attributes that were
@@ -138,29 +198,54 @@ describe('ReactDOMAttribute — unknown attributes', () => {
 		r.unmount();
 	});
 
-	// Per ReactDOMAttribute-test.js:140 — coerces NaN to strings (and warns —
-	// warning not ported, functional outcome only).
-	it('coerces NaN to the string "NaN"', () => {
-		const r = mount(UnknownAttr, { value: NaN });
-		expect(r.find('#u').getAttribute('unknown')).toBe('NaN');
-		r.unmount();
+	// Per latest ReactDOMAttribute-test.js:140 — coerces NaN to a string and
+	// warns with explicit-cast guidance.
+	it('coerces NaN to the string "NaN" and warns in development', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(UnknownSpread, { sp: { nanvalue: NaN } });
+		try {
+			expect(r.find('#us').getAttribute('nanvalue')).toBe('NaN');
+			expectDevError(
+				error,
+				'Received NaN for the `nanvalue` attribute. If this is expected, cast the value to a string.',
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
-	// Per ReactDOMAttribute-test.js:149 — coerces objects to strings (and warns —
-	// warning not ported, functional outcome only).
-	it('coerces objects to strings', () => {
-		const r = mount(UnknownAttr, { value: { hello: 'world' } });
-		const el = r.find('#u');
-		expect(el.getAttribute('unknown')).toBe('[object Object]');
-		r.update(UnknownAttr, {
-			value: {
-				toString() {
-					return 'lol';
+	// Per latest ReactDOMAttribute-test.js:149 — "coerces objects to strings and
+	// warns". Octane warns only for the ambiguous Object.prototype.toString case;
+	// an object with a meaningful custom toString remains silent.
+	it('coerces objects to strings and warns only for plain object coercion', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(UnknownSpread, { sp: { objectvalue: { hello: 'world' } } });
+		try {
+			const el = r.find('#us');
+			expect(el.getAttribute('objectvalue')).toBe('[object Object]');
+			expectDevError(
+				error,
+				'The provided `objectvalue` attribute is an object; it will stringify to ' +
+					'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
+			);
+
+			error.mockClear();
+			r.update(UnknownSpread, {
+				sp: {
+					objectvalue: {
+						toString() {
+							return 'lol';
+						},
+					},
 				},
-			},
-		});
-		expect(el.getAttribute('unknown')).toBe('lol');
-		r.unmount();
+			});
+			expect(el.getAttribute('objectvalue')).toBe('lol');
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
 	// Per ReactDOMAttribute-test.js:160 — throws with Temporal-like objects.
@@ -187,27 +272,83 @@ describe('ReactDOMAttribute — unknown attributes', () => {
 		r.unmount();
 	});
 
-	// Per ReactDOMAttribute-test.js:182 — removes symbols (warning not ported,
-	// functional outcome only). setAttribute guards function/symbol values.
-	it('removes symbols', () => {
-		const r = mount(UnknownAttr, { value: 'something' });
-		const el = r.find('#u');
-		r.update(UnknownAttr, { value: Symbol('foo') });
-		const has = el.hasAttribute('unknown');
-		r.unmount();
-		expect(has).toBe(false);
+	// Per latest ReactDOMAttribute-test.js:182 — symbols are invalid attribute
+	// values. They are removed and share the actionable invalid-value warning.
+	it('removes symbols and warns in development', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(UnknownSpread, { sp: { symbolvalue: 'something' } });
+		try {
+			const el = r.find('#us');
+			r.update(UnknownSpread, { sp: { symbolvalue: Symbol('foo') } });
+			expect(el.hasAttribute('symbolvalue')).toBe(false);
+			expectDevError(
+				error,
+				'Invalid value for prop `symbolvalue` on <div> tag. ' +
+					'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
-	// Per ReactDOMAttribute-test.js:192 — removes functions (warning not ported,
-	// functional outcome only). setAttribute guards function/symbol values so a
-	// function's source text can never leak into the DOM.
-	it('removes functions', () => {
-		const r = mount(UnknownAttr, { value: 'something' });
-		const el = r.find('#u');
-		r.update(UnknownAttr, { value: function someFunction() {} });
-		const has = el.hasAttribute('unknown');
-		r.unmount();
-		expect(has).toBe(false);
+	// Per latest ReactDOMAttribute-test.js:192 — functions are invalid attribute
+	// values. Their source text must never leak into the DOM.
+	it('removes functions and warns in development', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(UnknownSpread, { sp: { functionvalue: 'something' } });
+		try {
+			const el = r.find('#us');
+			r.update(UnknownSpread, { sp: { functionvalue: function someFunction() {} } });
+			expect(el.hasAttribute('functionvalue')).toBe(false);
+			expectDevError(
+				error,
+				'Invalid value for prop `functionvalue` on <div> tag. ' +
+					'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
+	});
+
+	// ReactDOMUnknownPropertyHook's `warnedProperties` object lives at module
+	// scope, not on a root. Two independently-created roots therefore share the
+	// once-per-prop diagnostic lifetime.
+	it('deduplicates an invalid attribute warning across independent roots', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const first = mount(UnknownSpread, { sp: { globaldedupe: Symbol('first') } });
+		const second = mount(UnknownSpread, { sp: { globaldedupe: Symbol('second') } });
+		try {
+			expectDevError(
+				error,
+				'Invalid value for prop `globaldedupe` on <div> tag. ' +
+					'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
+			);
+		} finally {
+			error.mockRestore();
+			first.unmount();
+			second.unmount();
+		}
+	});
+
+	// Per latest ReactDOMComponent-test.js invalid-event-name case. Octane's
+	// native delegated model preserves the same camelCase repair while explaining
+	// why lowercase on* attributes are never written.
+	it('drops a lowercase function event prop and suggests the delegated spelling', () => {
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const r = mount(UnknownSpread, { sp: { onclick: () => undefined } });
+		try {
+			expect(r.find('#us').hasAttribute('onclick')).toBe(false);
+			expectDevError(
+				error,
+				'Unknown event handler property `onclick` was dropped — did you mean `onClick`? ' +
+					'(lowercase on* attributes never write; octane delegates camelCase handlers natively)',
+			);
+		} finally {
+			error.mockRestore();
+			r.unmount();
+		}
 	});
 
 	// Per ReactDOMAttribute-test.js:203 — allows camelCase unknown attributes (and

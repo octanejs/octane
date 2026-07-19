@@ -156,6 +156,16 @@ export interface ServerRenderMatrixCase<
 		ClientModule,
 		ServerModule
 	>;
+	/** Exact diagnostics expected for either hydration lane. */
+	clientDiagnostics?: HydrationDiagnosticExpectation<
+		RenderObservation<State, ServerProps, ClientProps, Capture>
+	>;
+	hydrationDiagnostics?: Partial<
+		Record<
+			'hydrate-match' | 'hydrate-mismatch',
+			HydrationDiagnosticExpectation<RenderObservation<State, ServerProps, ClientProps, Capture>>
+		>
+	>;
 	/** `renderToString` by default; opt into APIs with distinct semantics. */
 	bufferedVariants?: readonly BufferedRenderVariant[];
 	/** `renderToPipeableStream` by default. */
@@ -334,6 +344,10 @@ export function createServerRenderMatrix<
 		};
 		const props = propsFor<State, ClientProps>(undefined, spec.props, context);
 		const container = makeContainer(spec, options.createContainer);
+		const error =
+			spec.clientDiagnostics === undefined
+				? undefined
+				: vi.spyOn(console, 'error').mockImplementation(() => {});
 		let root: Root | undefined;
 		try {
 			root = ClientRuntime.createRoot(container, optionValue(spec.rootOptions, context));
@@ -342,7 +356,8 @@ export function createServerRenderMatrix<
 				props,
 			);
 			ClientRuntime.flushSync(() => {});
-			await assertObservation<State, ServerProps, ClientProps, Capture>(spec, {
+			const diagnostics = error === undefined ? [] : consoleMessages(error);
+			const observation: RenderObservation<State, ServerProps, ClientProps, Capture> = {
 				mode: 'client',
 				variant: 'createRoot',
 				root: container,
@@ -354,10 +369,15 @@ export function createServerRenderMatrix<
 				octaneRoot: root,
 				state,
 				clientProps: props,
-				diagnostics: [],
-			});
+				diagnostics,
+			};
+			await assertObservation<State, ServerProps, ClientProps, Capture>(spec, observation);
+			if (spec.clientDiagnostics !== undefined) {
+				await assertDiagnostics(spec.clientDiagnostics, diagnostics, observation);
+			}
 		} finally {
 			root?.unmount();
+			error?.mockRestore();
 			container.remove();
 		}
 	}
@@ -562,7 +582,10 @@ export function createServerRenderMatrix<
 			};
 			await assertObservation(spec, observation);
 			await assertDiagnostics(
-				mode === 'hydrate-match' ? 'none' : (spec.mismatch?.diagnostics ?? 'hydration-mismatch'),
+				spec.hydrationDiagnostics?.[mode] ??
+					(mode === 'hydrate-match'
+						? 'none'
+						: (spec.mismatch?.diagnostics ?? 'hydration-mismatch')),
 				diagnostics,
 				observation,
 			);

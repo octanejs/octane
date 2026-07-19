@@ -63,6 +63,44 @@ describe('compiler-owned native event callbacks', () => {
 		expect(code).toMatch(/\bconst singleton\b/);
 	});
 
+	it('validates direct dynamic listeners only in development output', () => {
+		const source = `
+      export function App(props) @{
+        <div>
+          <button onClick={props.onClick}>bubble</button>
+          <button onClickCapture={props.onCapture}>capture</button>
+          <button onDoubleClick="bad">static-invalid</button>
+          <button onAuxClick>bare-invalid</button>
+        </div>
+      }
+    `;
+		const development = compile(source, 'event-listener-diagnostics.tsrx', {
+			hmr: true,
+			dev: true,
+		}).code;
+		const production = compile(source, 'event-listener-diagnostics.tsrx', {
+			hmr: false,
+			dev: false,
+		}).code;
+
+		expect(development).toContain('devEventListener as _$devEventListener');
+		expect(development).toContain('_$devEventListener("onClick", (props.onClick))');
+		expect(development).toContain('_$devEventListener("onClickCapture", (props.onCapture))');
+		expect(development).toContain('_$devEventListener("onDoubleClick", ("bad"))');
+		expect(development).toContain('_$devEventListener("onAuxClick", (true))');
+		expect(development).not.toContain('onDoubleClick=');
+		expect(development).not.toContain('onAuxClick=');
+		expect(development).not.toContain('<button onclick=');
+		expect(production).not.toContain('devEventListener');
+		expect(production).toContain('["$$click"] = (props.onClick)');
+		expect(production).toContain('["$$capture:click"] = (props.onCapture)');
+		expect(production).toContain('["$$dblclick"] = ("bad")');
+		expect(production).toContain('["$$auxclick"] = (true)');
+		expect(production).not.toContain('onDoubleClick=');
+		expect(production).not.toContain('onAuxClick=');
+		expect(production).not.toContain('<button onclick=');
+	});
+
 	it('retains an Effect Event mount wrapper only for an unshared native event slot', () => {
 		const source = (spread: string) => `
       import { useEffectEvent } from 'octane';

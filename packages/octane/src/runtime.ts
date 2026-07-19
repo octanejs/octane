@@ -85,6 +85,7 @@ import {
 	hasComponentFlags,
 	markComponentFlags,
 } from './component-flags.js';
+import { formatClientError } from './error-codes.client.generated.js';
 
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 
@@ -1729,9 +1730,7 @@ function inNestedUpdateCallback(): boolean {
 class MaximumUpdateDepthError extends Error {}
 
 function maximumUpdateDepthError(): Error {
-	return new MaximumUpdateDepthError(
-		'Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.',
-	);
+	return new MaximumUpdateDepthError(formatClientError(1));
 }
 
 let CROSS_RENDER_WARNINGS: WeakMap<ComponentBody, WeakSet<ComponentBody>> | null = null;
@@ -1887,9 +1886,7 @@ function drainHydrationRenderPhaseUpdates(root: Block): void {
 
 		const seen = (renders ??= new Map()).get(block) ?? 0;
 		if (seen >= RENDER_PHASE_UPDATE_LIMIT) {
-			throw new Error(
-				'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
-			);
+			throw new Error(formatClientError(9));
 		}
 		renders.set(block, seen + 1);
 		block.crossRenderUpdate = false;
@@ -1967,11 +1964,7 @@ function drainQueue(): { err: any } | null {
 			// ErrorBoundary, like React's equivalent) instead of hanging.
 			if (block.drainStamp === drainId) {
 				if (++block.drainRenders > RENDER_PHASE_UPDATE_LIMIT) {
-					throw crossRenderUpdate
-						? maximumUpdateDepthError()
-						: new Error(
-								'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
-							);
+					throw crossRenderUpdate ? maximumUpdateDepthError() : new Error(formatClientError(9));
 				}
 			} else {
 				block.drainStamp = drainId;
@@ -1993,10 +1986,7 @@ function drainQueue(): { err: any } | null {
 					pendingError.all.push(unhandled);
 					pendingError.err =
 						typeof AggregateError === 'function'
-							? new AggregateError(
-									pendingError.all,
-									'Multiple errors were thrown during the render flush.',
-								)
+							? new AggregateError(pendingError.all, formatClientError(13))
 							: pendingError.all[0];
 				}
 				// React 19 contract: an error no boundary handles unmounts the
@@ -2669,9 +2659,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 					drainPassiveEffects();
 					if (!hasPendingWork()) return value;
 				}
-				throw new Error(
-					`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
-				);
+				throw new Error(formatClientError(14, ACT_DRAIN_LIMIT));
 			} finally {
 				actScopeDepth--;
 			}
@@ -2697,9 +2685,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 			drainPassiveEffects();
 			if (!hasPendingWork()) break;
 			if (i === ACT_DRAIN_LIMIT - 1) {
-				throw new Error(
-					`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
-				);
+				throw new Error(formatClientError(14, ACT_DRAIN_LIMIT));
 			}
 		}
 	} catch (err) {
@@ -2716,9 +2702,7 @@ export function act<T>(fn: () => T | Promise<T>): Promise<T> {
 				drainPassiveEffects();
 				if (!hasPendingWork()) return result as T;
 			}
-			throw new Error(
-				`act(): scheduler did not stabilize after ${ACT_DRAIN_LIMIT} iterations — likely an infinite render loop`,
-			);
+			throw new Error(formatClientError(14, ACT_DRAIN_LIMIT));
 		} finally {
 			actScopeDepth--;
 		}
@@ -4012,12 +3996,7 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 // ---------------------------------------------------------------------------
 
 function missingSlot(name: string): never {
-	throw new Error(
-		`${name} was called without a hook slot. The octane compiler injects ` +
-			`per-call-site keys; ensure your project loads this runtime ` +
-			`through the Vite plugin (octane/compiler/vite). To call hooks by hand, ` +
-			`pass a stable symbol, e.g. useState(0, Symbol.for('my-stable-id')).`,
-	);
+	throw new Error(formatClientError(15, name));
 }
 
 // withSlot — establishes hook call-site identity via a per-render PATH STACK, so a
@@ -4778,7 +4757,7 @@ export function useEffectEvent<F extends (...args: any[]) => any>(fn: F, slot?: 
 	const cell = s;
 	return ((...args: any[]) => {
 		if (CURRENT_SCOPE !== null && EFFECT_EVENT_LIFECYCLE_DEPTH === 0) {
-			throw new Error("A function wrapped in useEffectEvent can't be called during rendering.");
+			throw new Error(formatClientError(11));
 		}
 		return cell.impl.apply(undefined, args);
 	}) as F;
@@ -5024,9 +5003,7 @@ function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
 		typeof strategy !== 'object' ||
 		!HYDRATE_STRATEGY_TYPES.has((strategy as HydrationStrategy)._t)
 	) {
-		throw new Error(
-			'Hydrate: `when` must synchronously return a hydration strategy with a valid type.',
-		);
+		throw new Error(formatClientError(16));
 	}
 	if (typeof raw === 'function') state.dynamicStrategy = strategy;
 	state.strategy = strategy;
@@ -5037,7 +5014,7 @@ function resolveHydrateLoadResult(value: HydrateLoadResult): ComponentBody {
 	const body =
 		value !== null && typeof value === 'object' && 'default' in value ? value.default : value;
 	if (typeof body !== 'function') {
-		throw new Error('Hydrate: the compiler-generated child loader did not resolve to a component.');
+		throw new Error(formatClientError(17));
 	}
 	return body;
 }
@@ -5902,13 +5879,10 @@ function useForeignContext<T>(usable: unknown, api: string): T {
 		const mirror = bridge?.resolveForeignContext?.(usable as object);
 		if (mirror != null) return useContextInternal(mirror as Context<T>);
 		if ((usable as { $$typeof?: unknown }).$$typeof === REACT_FOREIGN_CONTEXT_TAG) {
-			throw new Error(
-				`${api}(): a React context can only be read inside a React-hosted Octane ` +
-					'island (see octane/react); this component is not rendered under one.',
-			);
+			throw new Error(formatClientError(18, api));
 		}
 	}
-	throw new Error(`${api}(): argument is not a Context nor a thenable`);
+	throw new Error(formatClientError(12, api));
 }
 
 /**
@@ -5980,26 +5954,24 @@ function rendererRegionSuspenseHandler(
 export function bindRendererRegionOwner(props: unknown): void {
 	const bridge = (props as any)?.[RENDERER_REGION_OWNER] as RendererRegionOwnerBridge | undefined;
 	if (bridge === undefined) {
-		throw new Error('A renderer-owned DOM region is missing its universal owner bridge.');
+		throw new Error(formatClientError(19));
 	}
 	if (CURRENT_BLOCK === null || CURRENT_SCOPE === null) {
-		throw new Error('bindRendererRegionOwner() must run while a DOM component is rendering.');
+		throw new Error(formatClientError(20));
 	}
 	if (
 		CURRENT_BLOCK.kind !== 'root' ||
 		CURRENT_BLOCK.parentBlock !== null ||
 		CURRENT_SCOPE !== CURRENT_BLOCK
 	) {
-		throw new Error(
-			'bindRendererRegionOwner() must be the first call in a renderer-owned DOM root component.',
-		);
+		throw new Error(formatClientError(21));
 	}
 	const root = CURRENT_BLOCK;
 	// hydrateRoot() runs its adoption pass BEFORE the Root object (and its
 	// disposer) exists, so a hydrating owned root is bound with a LAZY disposer
 	// lookup; every other caller must already have a live root.
 	if (DOM_ROOT_DISPOSERS.get(root) === undefined && currentHydration?.rootBlock !== root) {
-		throw new Error('A renderer-owned DOM region requires a live DOM root.');
+		throw new Error(formatClientError(22));
 	}
 	const previous = RENDERER_REGION_DOM_BINDINGS.get(root);
 	if (previous?.bridge === bridge) return;
@@ -6166,7 +6138,7 @@ class HydrationRejectionException {
 
 function decodeHydrationRejectionPayload(payload: any): unknown {
 	if (payload === null || typeof payload !== 'object') {
-		return new Error('Server-rendered use() rejected');
+		return new Error(formatClientError(23));
 	}
 	switch (payload.kind) {
 		case 'value':
@@ -6182,7 +6154,7 @@ function decodeHydrationRejectionPayload(payload: any): unknown {
 				case '-0':
 					return -0;
 				default:
-					return new Error('Server-rendered use() rejected');
+					return new Error(formatClientError(23));
 			}
 		case 'bigint':
 			try {
@@ -6194,7 +6166,7 @@ function decodeHydrationRejectionPayload(payload: any): unknown {
 			return Symbol(typeof payload.value === 'string' ? payload.value : '');
 		case 'error': {
 			const error = new Error(
-				typeof payload.message === 'string' ? payload.message : 'Server-rendered use() rejected',
+				typeof payload.message === 'string' ? payload.message : formatClientError(23),
 			);
 			if (typeof payload.name === 'string') error.name = payload.name;
 			const fields = payload.fields;
@@ -6211,11 +6183,9 @@ function decodeHydrationRejectionPayload(payload: any): unknown {
 			return error;
 		}
 		case 'fallback':
-			return typeof payload.message === 'string'
-				? payload.message
-				: 'Server-rendered use() rejected';
+			return typeof payload.message === 'string' ? payload.message : formatClientError(23);
 		default:
-			return new Error('Server-rendered use() rejected');
+			return new Error(formatClientError(23));
 	}
 }
 
@@ -6755,10 +6725,10 @@ function resolveLazyModule(mod: any): ComponentBody<any> {
 	}
 	if (typeof comp !== 'function' || (comp as any)[LAZY_COMPONENT] === true) {
 		throw new Error(
-			'lazy: expected the load() promise to resolve to a component function or a ' +
-				"module with a component as its default export, got '" +
-				((comp as any)?.[LAZY_COMPONENT] === true ? 'lazy component' : typeof comp) +
-				"'",
+			formatClientError(
+				10,
+				(comp as any)?.[LAZY_COMPONENT] === true ? 'lazy component' : typeof comp,
+			),
 		);
 	}
 	return comp as ComponentBody<any>;
@@ -7972,12 +7942,12 @@ const DANGER_HTML_RESOLVED_VALUE = '__oct_dangerResolved';
 const DANGER_HTML_RESOLVED_CHILD = '__oct_dangerResolvedChild';
 
 function dangerHtmlChildrenError(): Error {
-	return new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+	return new Error(formatClientError(5));
 }
 
 function validateDangerouslySetInnerHTMLValue(value: unknown): void {
 	if (value != null && (typeof value !== 'object' || !('__html' in value))) {
-		throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+		throw new Error(formatClientError(6));
 	}
 }
 
@@ -7994,10 +7964,7 @@ export function setDangerouslySetInnerHTML(el: Element, value: any): void {
 		return;
 	}
 	if (value != null && VOID_ELEMENTS.has(el.localName)) {
-		throw new Error(
-			`\`${el.localName}\` is a void element tag and must neither have ` +
-				'`children` nor use `dangerouslySetInnerHTML`.',
-		);
+		throw new Error(formatClientError(7, el.localName));
 	}
 	if (
 		value != null &&
@@ -8056,10 +8023,7 @@ export function setDangerouslySetInnerHTMLSources(
 	const resolved = foundDanger && danger != null ? danger : null;
 	const resolvedChild = foundChild ? child : null;
 	if (VOID_ELEMENTS.has(el.localName) && (resolved !== null || resolvedChild != null)) {
-		throw new Error(
-			`\`<${el.localName}>\` is a void element tag and must neither have children nor use ` +
-				'`dangerouslySetInnerHTML`.',
-		);
+		throw new Error(formatClientError(8, el.localName));
 	}
 	if (resolved !== null && resolvedChild != null) throw dangerHtmlChildrenError();
 	validateDangerouslySetInnerHTMLValue(resolved);
@@ -8800,7 +8764,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				name === 'autofocus' &&
 				(el as any).__oct_loc !== undefined
 			) {
-				console.error('Invalid DOM property `autofocus`. Did you mean `autoFocus`?');
+				devWarnAttributeOnce(
+					el,
+					name,
+					'Invalid DOM property `autofocus`. Did you mean `autoFocus`?',
+				);
 			}
 			break;
 		case 12:
@@ -8814,7 +8782,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				name === 'defaultvalue' &&
 				(el as any).__oct_loc !== undefined
 			) {
-				console.error('Invalid DOM property `defaultvalue`. Did you mean `defaultValue`?');
+				devWarnAttributeOnce(
+					el,
+					name,
+					'Invalid DOM property `defaultvalue`. Did you mean `defaultValue`?',
+				);
 			}
 			break;
 		case 14:
@@ -8826,7 +8798,11 @@ export function setAttribute(el: Element, name: string, value: any): void {
 				name === 'defaultchecked' &&
 				(el as any).__oct_loc !== undefined
 			) {
-				console.error('Invalid DOM property `defaultchecked`. Did you mean `defaultChecked`?');
+				devWarnAttributeOnce(
+					el,
+					name,
+					'Invalid DOM property `defaultchecked`. Did you mean `defaultChecked`?',
+				);
 			}
 			break;
 	}
@@ -8902,12 +8878,26 @@ export function setAttribute(el: Element, name: string, value: any): void {
 	// serializer's identical VALID_ATTR_NAME gate (shared in constants.ts).
 	if (!VALID_ATTR_NAME.test(name)) {
 		if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
-			console.error(`Invalid attribute name: \`${name}\` (skipped).`);
+			devWarnAttributeOnce(el, name, `Invalid attribute name: \`${name}\` (skipped).`);
 		}
 		return;
 	}
 	if (ns) el.setAttributeNS(ns, name, next);
 	else el.setAttribute(name, next);
+}
+
+// React's `warnedProperties` cache is module-global and keyed by prop name: once
+// one root reports a host-property problem, later roots using the same property
+// stay quiet too. Allocate lazily only after a development-compiled host reaches
+// a warning branch; every call site is build-time guarded, so optimized bundles
+// remove the cache and helper in full.
+let DEV_ATTRIBUTE_WARNINGS: Set<string> | null = null;
+
+function devWarnAttributeOnce(_el: Element, name: string, message: string): void {
+	const warned = (DEV_ATTRIBUTE_WARNINGS ??= new Set());
+	if (warned.has(name)) return;
+	warned.add(name);
+	console.error(message);
 }
 
 /**
@@ -8936,7 +8926,9 @@ export function setStringData(el: Element, name: string, value: unknown): void {
 			(el as any).__oct_loc !== undefined &&
 			(value as object).toString === Object.prototype.toString
 		) {
-			console.error(
+			devWarnAttributeOnce(
+				el,
+				name,
 				`The provided \`${name}\` attribute is an object; it will stringify to ` +
 					'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
 			);
@@ -9005,7 +8997,36 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 	if (t === 'boolean' && name.startsWith('data-')) return value ? 'true' : 'false';
 	// Function and symbol values are never meaningful attribute text (React
 	// removes them); stringifying a function would leak its source into the DOM.
-	if (t === 'function' || t === 'symbol') return null;
+	if (t === 'function' || t === 'symbol') {
+		if (
+			process.env.NODE_ENV !== 'production' &&
+			(el as any).__oct_loc !== undefined &&
+			!isHtmlCustomElement(el)
+		) {
+			if (
+				t === 'function' &&
+				name.length > 2 &&
+				name.charCodeAt(0) === 111 /* o */ &&
+				name.charCodeAt(1) === 110 /* n */
+			) {
+				devWarnAttributeOnce(
+					el,
+					name,
+					`Unknown event handler property \`${name}\` was dropped — did you mean ` +
+						`\`on${name.charAt(2).toUpperCase()}${name.slice(3)}\`? (lowercase on* ` +
+						'attributes never write; octane delegates camelCase handlers natively)',
+				);
+			} else {
+				devWarnAttributeOnce(
+					el,
+					name,
+					`Invalid value for prop \`${name}\` on <${el.localName}> tag. ` +
+						'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
+				);
+			}
+		}
+		return null;
+	}
 	// React's value-type tables — custom elements are exempt (raw semantics).
 	if (!isHtmlCustomElement(el)) {
 		const lower = name.toLowerCase();
@@ -9026,7 +9047,9 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		// never render `title=""`), with the React DEV diagnostic.
 		if (t === 'boolean') {
 			if (process.env.NODE_ENV !== 'production' && (el as any).__oct_loc !== undefined) {
-				console.error(
+				devWarnAttributeOnce(
+					el,
+					name,
 					`Received \`${value}\` for a non-boolean attribute \`${name}\`. ` +
 						(value === true
 							? `If you want to write it to the DOM, pass a string instead: ` +
@@ -9047,18 +9070,6 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		// attribute); camelCase onX events compile to delegated bindings and
 		// never reach setAttribute. Custom elements keep them (raw semantics).
 		if (name.length > 2 && name.charCodeAt(0) === 111 /* o */ && name.charCodeAt(1) === 110) {
-			// DEV hint: the camelCase form is the working delegated handler.
-			if (
-				process.env.NODE_ENV !== 'production' &&
-				(el as any).__oct_loc !== undefined &&
-				typeof value === 'function'
-			) {
-				console.error(
-					`Unknown event handler property \`${name}\` was dropped — did you mean ` +
-						`\`on${name.charAt(2).toUpperCase()}${name.slice(3)}\`? (lowercase on* ` +
-						'attributes never write; octane delegates camelCase handlers natively)',
-				);
-			}
 			return null;
 		}
 	}
@@ -9071,9 +9082,23 @@ function coerceAttrValue(el: Element, name: string, value: any): string | null {
 		(el as any).__oct_loc !== undefined &&
 		(value as object).toString === Object.prototype.toString
 	) {
-		console.error(
+		devWarnAttributeOnce(
+			el,
+			name,
 			`The provided \`${name}\` attribute is an object; it will stringify to ` +
 				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
+		);
+	}
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		t === 'number' &&
+		Number.isNaN(value) &&
+		(el as any).__oct_loc !== undefined
+	) {
+		devWarnAttributeOnce(
+			el,
+			name,
+			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
 		);
 	}
 	const v = value === true ? '' : String(value);
@@ -9624,7 +9649,7 @@ export function setSpread(
 			} else if (!_delegated.has(ev.type)) {
 				delegateEvents([ev.type]);
 			}
-			(el as any)[ev.key] = v;
+			(el as any)[ev.key] = process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v;
 			continue;
 		}
 		// Controlled `value`/`checked` bypass the identity skip — they must
@@ -9718,12 +9743,13 @@ export function headBlock(
 			const ev = k.length > 2 && k[0] === 'o' && k[1] === 'n' ? eventSlot(k) : null;
 			if (ev !== null) {
 				const v = attrs[k];
+				const listener = process.env.NODE_ENV !== 'production' ? devEventListener(k, v) : v;
 				const hs = (state.handlers ??= new Map<string, EventListener>());
 				const prevH = hs.get(ev.type);
 				if (prevH) el.removeEventListener(ev.type, prevH, ev.capture);
-				if (typeof v === 'function') {
-					el.addEventListener(ev.type, v as EventListener, ev.capture);
-					hs.set(ev.type, v as EventListener);
+				if (typeof listener === 'function') {
+					el.addEventListener(ev.type, listener as EventListener, ev.capture);
+					hs.set(ev.type, listener as EventListener);
 				} else {
 					hs.delete(ev.type);
 				}
@@ -9828,30 +9854,81 @@ export function injectStyle(id: string, css: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Events — top-level delegation. Handlers stored as bare functions or { fn, args } bundles.
+// Events — top-level delegation. Handlers are bare functions or nominal bundles.
 // ---------------------------------------------------------------------------
 
+const EVENT_SLOT_KIND = /* @__PURE__ */ Symbol();
+const HANDLER_BUNDLE_KIND = 1;
+const INVALID_EVENT_LISTENER_KIND = 2;
 interface HandlerBundle {
+	[EVENT_SLOT_KIND]: typeof HANDLER_BUNDLE_KIND;
 	fn: (...args: any[]) => any;
 	args: any[];
 }
-type EventSlot = ((event: Event) => any) | HandlerBundle | null | undefined;
+
+interface InvalidEventListenerSlot {
+	[EVENT_SLOT_KIND]: typeof INVALID_EVENT_LISTENER_KIND;
+	name: string;
+	value: unknown;
+}
+
+type EventSlot = unknown;
+
+function isHandlerBundle(slot: EventSlot): slot is HandlerBundle {
+	return (
+		typeof slot === 'object' &&
+		slot !== null &&
+		(slot as HandlerBundle)[EVENT_SLOT_KIND] === HANDLER_BUNDLE_KIND
+	);
+}
+
+/**
+ * Development compiler/runtime boundary for a dynamic `onXxx` prop. React
+ * validates the prop while applying it, then independently fails again when
+ * dispatch tries to read/invoke the invalid listener. Keep the invalid value in
+ * a DEV-only descriptor so falsy values such as `false` still reach dispatch and
+ * the eventual error can retain the authored prop spelling.
+ *
+ * Production-compiled direct bindings never import or call this helper. Runtime
+ * fallback paths guard their calls with NODE_ENV, so optimized bundles remove
+ * the warning strings, descriptor allocation, and branch in full.
+ */
+export function devEventListener(name: string, listener: unknown): unknown {
+	if (process.env.NODE_ENV === 'production') return listener;
+	if (listener == null || typeof listener === 'function') return listener;
+	if (listener === false) {
+		console.error(
+			`Expected \`${name}\` listener to be a function, instead got \`false\`.\n\n` +
+				`If you used to conditionally omit it with ${name}={condition && value}, ` +
+				`pass ${name}={condition ? value : undefined} instead.`,
+		);
+	} else {
+		console.error(
+			`Expected \`${name}\` listener to be a function, instead got a value of ` +
+				`\`${typeof listener}\` type.`,
+		);
+	}
+	return { [EVENT_SLOT_KIND]: INVALID_EVENT_LISTENER_KIND, name, value: listener };
+}
+
+function isInvalidEventListenerSlot(slot: unknown): slot is InvalidEventListenerSlot {
+	return (
+		process.env.NODE_ENV !== 'production' &&
+		typeof slot === 'object' &&
+		slot !== null &&
+		(slot as InvalidEventListenerSlot)[EVENT_SLOT_KIND] === INVALID_EVENT_LISTENER_KIND
+	);
+}
 
 /** True only for a slot the delegated dispatcher can actually invoke. */
 function isUsableEventSlot(slot: EventSlot): boolean {
-	return (
-		typeof slot === 'function' ||
-		(slot !== null &&
-			typeof slot === 'object' &&
-			typeof slot.fn === 'function' &&
-			Array.isArray(slot.args))
-	);
+	return typeof slot === 'function' || isHandlerBundle(slot);
 }
 
 // ---------------------------------------------------------------------------
 // Event bundle helpers (compiled-output plan 3b) — compiler targets for the
 // `() => fn(arg, …)` bundle optimization. Mount (`evtN`): build the
-// `{ fn, args }` descriptor ONCE, assign it to the element's event slot, and
+// nominal `{ fn, args }` descriptor ONCE, assign it to the element's event slot, and
 // return it for the binding bag (one field instead of el + fn + each arg).
 // Update (`evtNu`): mutate the SAME descriptor in place — dispatch reads
 // `el[key]` at fire time and the slot still points at this object, so the
@@ -9864,7 +9941,7 @@ function isUsableEventSlot(slot: EventSlot): boolean {
 const EMPTY_ARGS: any[] = [];
 
 export function evt0(el: Element, key: string, fn: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: EMPTY_ARGS };
+	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args: EMPTY_ARGS };
 	(el as any)[key] = d;
 	return d;
 }
@@ -9872,7 +9949,7 @@ export function evt0u(d: HandlerBundle, fn: any): void {
 	d.fn = fn;
 }
 export function evt1(el: Element, key: string, fn: any, a0: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: [a0] };
+	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args: [a0] };
 	(el as any)[key] = d;
 	return d;
 }
@@ -9881,7 +9958,7 @@ export function evt1u(d: HandlerBundle, fn: any, a0: any): void {
 	d.args[0] = a0;
 }
 export function evt2(el: Element, key: string, fn: any, a0: any, a1: any): HandlerBundle {
-	const d: HandlerBundle = { fn, args: [a0, a1] };
+	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args: [a0, a1] };
 	(el as any)[key] = d;
 	return d;
 }
@@ -9892,7 +9969,7 @@ export function evt2u(d: HandlerBundle, fn: any, a0: any, a1: any): void {
 	a[1] = a1;
 }
 export function evtN(el: Element, key: string, fn: any, args: any[]): HandlerBundle {
-	const d: HandlerBundle = { fn, args };
+	const d: HandlerBundle = { [EVENT_SLOT_KIND]: HANDLER_BUNDLE_KIND, fn, args };
 	(el as any)[key] = d;
 	return d;
 }
@@ -10167,7 +10244,7 @@ const CAPTURE_FLUSH_FALLBACK = /* @__PURE__ */ Symbol('octane.capture.flushFallb
 const DELEGATED_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched');
 const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
 
-// Invoke one event slot — a bare handler `fn(event)` or a `{ fn, args }` bundle
+// Invoke one event slot — a bare handler `fn(event)` or a nominal `{ fn, args }` bundle
 // (the compiler's stable-arrow optimisation) as `fn(...args, event)`.
 //
 // GUARDED like the platform guards each listener invocation: a throwing handler
@@ -10176,40 +10253,50 @@ const CAPTURE_DISPATCHED = /* @__PURE__ */ Symbol('octane.dispatched.capture');
 // receive the event, exactly as separate native listeners would. `reportError`
 // surfaces through the global error event (window.onerror) like an uncaught
 // listener exception; console.error is the non-browser fallback.
-function fireEventSlot(slot: HandlerBundle | ((e: Event) => any), event: Event): void {
+function fireEventSlot(slot: EventSlot, event: Event): void {
 	try {
 		if (typeof slot === 'function') {
 			slot(event);
 			return;
 		}
-		const fn = slot.fn as unknown;
-		if (typeof fn !== 'function') {
-			// React parity outcome: a non-function listener is reported and ignored;
-			// it never blocks sibling/ancestor handlers. (Report is dev-only.)
-			if (process.env.NODE_ENV !== 'production')
-				console.error(
-					'Expected an event listener to be a function, instead got a value of type ' +
-						typeof (fn ?? slot),
-				);
+		if (process.env.NODE_ENV !== 'production' && isInvalidEventListenerSlot(slot)) {
+			invokeInvalidEventListener(`\`${slot.name}\``, slot.value, event);
 			return;
 		}
-		const a = slot.args;
-		switch (a.length) {
-			case 0:
-				slot.fn(event);
-				break;
-			case 1:
-				slot.fn(a[0], event);
-				break;
-			case 2:
-				slot.fn(a[0], a[1], event);
-				break;
-			default:
-				slot.fn.apply(null, a.concat(event));
+		if (isHandlerBundle(slot)) {
+			const bundle = slot;
+			const a = bundle.args;
+			switch (a.length) {
+				case 0:
+					bundle.fn(event);
+					break;
+				case 1:
+					bundle.fn(a[0], event);
+					break;
+				case 2:
+					bundle.fn(a[0], a[1], event);
+					break;
+				default:
+					bundle.fn.apply(null, a.concat(event));
+			}
+			return;
 		}
+		invokeInvalidEventListener(`${event.type} event`, slot, event);
 	} catch (err) {
 		reportListenerError(err);
 	}
+}
+
+function invokeInvalidEventListener(label: string, listener: unknown, event: Event): void {
+	// React's getListener throws its actionable error for truthy invalid values.
+	// Falsy-but-present listeners pass that check and fail at invocation instead;
+	// preserve that observable distinction (notably the dedicated `false` render
+	// guidance followed by a TypeError at dispatch).
+	if (listener) {
+		throw new Error(formatClientError(46, label, typeof listener));
+	}
+	const invoke = listener as (event: Event) => unknown;
+	invoke(event);
 }
 
 // Surface a guarded listener exception the way the platform surfaces an uncaught
@@ -10339,7 +10426,7 @@ function dispatchDelegated(event: Event): void {
 		}
 		while (node !== null && node !== undefined) {
 			const slot = node[key] as EventSlot;
-			if (slot) {
+			if (slot != null) {
 				// React parity: the handler's element is the currentTarget.
 				setCurrentTarget(event, node);
 				fireEventSlot(slot, event);
@@ -10394,7 +10481,7 @@ function dispatchDelegatedCapture(event: Event): void {
 	try {
 		for (let i = path.length - 1; i >= 0; i--) {
 			const slot = path[i][key] as EventSlot;
-			if (slot) {
+			if (slot != null) {
 				// React parity: the handler's element is the currentTarget.
 				setCurrentTarget(event, path[i]);
 				fireEventSlot(slot, event);
@@ -12160,9 +12247,7 @@ export function cloneElement<P>(
 	...children: any[]
 ): ElementDescriptor<P> {
 	if (!isElementDescriptor(element)) {
-		throw new Error(
-			'cloneElement: the first argument must be an element (from createElement / JSX).',
-		);
+		throw new Error(formatClientError(4));
 	}
 	const props = copyElementConfig(element.props);
 	let key = element.key;
@@ -12276,11 +12361,7 @@ function describeObjectForError(value: object): string {
 
 function invalidChildError(child: object): Error {
 	const found = describeObjectForError(child);
-	return new Error(
-		'Objects are not valid as an Octane child (found: ' +
-			found +
-			'). If you meant to render a collection of children, use an array instead.',
-	);
+	return new Error(formatClientError(3, found));
 }
 
 function invalidElementTypeError(type: unknown): Error {
@@ -12292,10 +12373,7 @@ function invalidElementTypeError(type: unknown): Error {
 				: typeof type === 'object'
 					? describeObjectForError(type as object)
 					: JSON.stringify(type);
-	return new Error(
-		'Element type is invalid: expected a string (for a built-in element) or a function ' +
-			`(for a component), but got: ${found}.`,
-	);
+	return new Error(formatClientError(24, found));
 }
 
 function mapIntoChildren(
@@ -12434,7 +12512,7 @@ export const Children = {
 	/** Assert `children` is a single element and return it (`React.Children.only`). */
 	only<T>(children: T): T {
 		if (!isElementDescriptor(children)) {
-			throw new Error('Children.only expected to receive a single element child.');
+			throw new Error(formatClientError(2));
 		}
 		return children;
 	},
@@ -13380,7 +13458,7 @@ function applyDeoptProp(el: Element, name: string, v: any, ownerBlock: Block): v
 		// (the same classification setSpread/applyHostProps use).
 		const ev = eventSlot(name);
 		if (ev !== null) {
-			(el as any)[ev.key] = v;
+			(el as any)[ev.key] = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
 			if (ev.capture) delegateCaptureEvents([ev.type]);
 			else delegateEvents([ev.type]);
 		} else {
@@ -13598,7 +13676,7 @@ function applyHostProps(el: Element, props: any, scope: Scope, state: HostCompon
 				} else if (!_delegated.has(ev.type)) {
 					delegateEvents([ev.type]);
 				}
-				(el as any)[ev.key] = v;
+				(el as any)[ev.key] = process.env.NODE_ENV !== 'production' ? devEventListener(name, v) : v;
 			} else {
 				setAttribute(el, name, v);
 			}
@@ -13862,10 +13940,7 @@ function reconcileDeoptNode(
 	// A component descriptor must not reach here — the de-opt callers gate on
 	// descNeedsBlocks() and route component-bearing subtrees through Blocks.
 	if (isElementDescriptor(value)) {
-		throw new Error(
-			'Octane: internal — a component descriptor reached the de-opt host reconciler ' +
-				'(should have been routed through a Block via hostElementBody/componentSlot).',
-		);
+		throw new Error(formatClientError(25));
 	}
 	if (t === 'object') throw invalidChildError(value);
 	return null;
@@ -14580,10 +14655,7 @@ export function childSlot(
 		!isPortalTarget(parentScope.block, domParent) &&
 		value != null
 	) {
-		throw new Error(
-			`\`<${(domParent as Element).localName}>\` is a void element tag and must neither have ` +
-				'`children` nor use `dangerouslySetInnerHTML`.',
-		);
+		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}
 	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return;
 	const parentBlock = parentScope.block;
@@ -15376,10 +15448,7 @@ export function childTextHole(
 		!isPortalTarget(parentScope.block, domParent) &&
 		value != null
 	) {
-		throw new Error(
-			`\`<${(domParent as Element).localName}>\` is a void element tag and must neither have ` +
-				'`children` nor use `dangerouslySetInnerHTML`.',
-		);
+		throw new Error(formatClientError(26, (domParent as Element).localName));
 	}
 	if (dangerouslySetInnerHTMLOwnsChild(domParent, value)) return null;
 	const vt = typeof value;
@@ -17872,10 +17941,7 @@ function handleRenderError(block: Block, err: any): void {
 	if (isHostContextRequest(err)) {
 		const bridge = rendererRegionOwnerForBlock(block);
 		if (bridge !== null && bridge.routeSuspense(err.thenable)) return;
-		err = new Error(
-			'A hosted foreign-context request escaped its renderer-region owner; ' +
-				'the owning bridge is gone or declined it.',
-		);
+		err = new Error(formatClientError(27));
 	}
 	if (isSuspenseException(err)) {
 		let b: Block | null = block;
@@ -20376,7 +20442,7 @@ const EMPTY_ROOT_BODY = (() => undefined) as ComponentBody;
 
 function assertValidRootContainer(container: unknown): asserts container is Element {
 	if (container === null || typeof container !== 'object' || (container as Node).nodeType !== 1) {
-		throw new Error('Target container is not a DOM element.');
+		throw new Error(formatClientError(28));
 	}
 }
 
@@ -20488,7 +20554,7 @@ function makeRoot(
 	};
 	root = {
 		render(bodyOrElement: unknown, props?: any) {
-			if (unmounted) throw new Error('Cannot update an unmounted root.');
+			if (unmounted) throw new Error(formatClientError(29));
 			if (inNestedUpdateCallback() || CURRENT_BLOCK !== null) {
 				if (nestedRootRenderChain !== UPDATE_CHAIN_ID) {
 					nestedRootRenderChain = UPDATE_CHAIN_ID;

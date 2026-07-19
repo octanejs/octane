@@ -81,7 +81,7 @@ explain the old plan; they are no longer current scope decisions.
 | StrictMode double-invoke of effects/render | Octane has no StrictMode (verified: no `StrictMode`/double-invoke in runtime). |
 | Synthetic event system internals (`isPropagationStopped`, event pooling, synthetic `onChange`/`onBeforeInput`/`onComposition*`/`onSelect` polyfills) | Octane uses **real delegated DOM events**. Match user-visible OUTCOMES; the synthetic API surface diverges. |
 | **Controlled components + synthetic `onChange`** (value/checked re-asserted from a controlled prop, edits reverted, `defaultValue` mapping, `<select value>`/`<textarea value>` controlled semantics) | ~~**Intentional divergence (decided 2026-06-24).**~~ **REVERSED for controlled components (2026-07-08): they are now SUPPORTED** — `value`/`checked` on `<input>`/`<textarea>`/`<select>` follow React's controlled semantics exactly (prop drives the DOM property, reasserts on every commit and after discrete events, `<select value>` option projection, radio-group restore, IME-composition-safe, `defaultValue`/`defaultChecked` escape hatch), ported as `conformance/controlled-{input,select,textarea,restore}.test.ts` + `differential/controlled-forms.test.ts`. What is STILL not a target: **synthetic `onChange`** — events stay native (`onInput` per edit; native `change` on commit). `OCTANE_NATIVE_TEXT_ONCHANGE` is an authoring diagnostic, not a compatibility event: the compiler reports statically known text hosts and development runtime checks resolve ambiguous uncontrolled props. Deliberate commit behavior uses `suppressNativeChangeWarning`. |
-| DEV-only warnings (unknown props, casing, controlled↔uncontrolled switch, nesting validation) | Octane's warning policy differs; port the functional outcome only. |
+| DEV-only warnings and errors (unknown props, casing, controlled↔uncontrolled switch, nesting validation, API misuse) | **Historical exclusion, superseded.** Octane now ports applicable diagnostics progressively from the latest upstream React/ReactDOM source. Exact parity is the target—not a claim about the current total—for the observable trigger, channel, variants, dedupe, recovery, and stack/source context when the underlying contract is shared. The diagnostic inventory records partial and divergent families; use Octane-specific wording for intentional differences and keep diagnostics for unsupported React-only APIs out of scope. |
 | `class` / `className` value coercion | **Intentional divergence.** Octane composes `class`/`className` clsx-style (strings, numbers, arrays, objects, nesting; falsy drops out) at every apply site — client, spread, SVG, scoped-`<style>`, and SSR (byte-identical, so hydration matches). React coerces `className={['a','b']}` to `"a,b"`; Octane yields `"a b"`. A plain string still takes the fast path. |
 | **`useSyncExternalStore` commit-time getSnapshot re-read** (the `useSyncExternalStore-test.js` `:144` tearing check) | **Intentional divergence (decided 2026-07-03).** React's `updateSyncExternalStore` re-pushes `updateStoreInstance` whenever `inst.getSnapshot !== getSnapshot`, giving a commit-time snapshot re-read even for an unchanged value. Octane drops that: getSnapshot is refreshed in RENDER, and the commit-time store-sync (drainStoreSyncs) only runs when the read snapshot actually moved off the last-committed value (or the store was swapped) — so an unchanged snapshot with an unstable inline getSnapshot (the zustand/query pattern) enqueues nothing. Consequence: a store that mutates WITHOUT notifying in the render→commit window is no longer caught on a render where ONLY getSnapshot identity changed. Octane's synchronous renderer closes React's motivating concurrent-interleaving window, and any store that actually notifies is unaffected (onStoreChange compares against the render-fresh getSnapshot). Do NOT "fix" this back toward React's per-render commit re-read. See `useSyncExternalStore` in `runtime.ts`. |
 | Owner-based identity (`should NOT replace children with different owners`) | Modern React already dropped owner identity — confirm Octane matches (mount=1, unmount=0) but it's a 1-test check, not an area. |
@@ -93,6 +93,17 @@ explain the old plan; they are no longer current scope decisions.
 | ViewTransitions | **Historical exclusion, superseded.** The implementation and its in-scope React ports are complete; see [view-transitions-plan.md](./view-transitions-plan.md) and the live ledger. |
 | Float/resource hoisting (`ReactDOMFloat`) | **Historical blanket exclusion, superseded.** Resource hints and head hoisting now exist, so these cases must be triaged individually against the supported surface. |
 | `React.Children.*` utilities (`ReactChildren-test.js`) | **Historical exclusion, superseded.** Octane now exports `Children`, `createElement`, and `cloneElement`; their upstream cases belong in the live inventory. |
+
+Diagnostics use the latest upstream React/ReactDOM source as a behavioral reference,
+with the inspected commit recorded in focused conformance tests when useful. Octane
+does not commit a mirror of React's diagnostic inventory and does not reuse React's
+production error numbers. Framework-authored errors in the core DOM client and
+server runtimes that remain observable in production use Octane's own append-only
+catalog and generated client/server formatters; deployed codes decode through
+`/errors/<code>` on the Octane website.
+See the [production error-code contract](../packages/octane/error-codes/README.md).
+The diagnostic-specific inventory, rollout order, and landing gates live in the
+[React/ReactDOM diagnostic parity plan](./react-diagnostics-plan.md).
 
 **Verify-existence flags** before porting their files: `useEffectEvent` (exists —
 `callbacks.test.ts`), `useMemoCache`/React-Compiler `c()` cache (likely absent →
@@ -753,6 +764,12 @@ still write verbatim. This narrows the 2026-07-04 ruling to the DEV table only.
   camelCase — a deliberately CURATED slice of React's possibleStandardNames
   (most lowercase attributes simply work natively in octane, so only the
   genuinely-broken cases warn).
+
+**Amendment (2026-07-19):** the earlier decision not to ship React's complete
+`possibleStandardNames` runtime table is no longer a blanket diagnostic-parity
+exclusion. Applicable attribute diagnostics should expand progressively from the
+latest upstream behavior, while native spellings and Octane's browser-aligned
+attribute semantics remain intentional differences.
 
 New tier-2 runtime exports: `setValue`, `setChecked`, `setSelectValue`,
 `setDefaultValue`, `setDefaultChecked`, `setAutoFocus` (next to `setFormAction`);

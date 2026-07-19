@@ -188,6 +188,12 @@ function-based `ErrorBoundary` component:
 An uncaught error is reported through `console.error` rather than React's
 `onUncaughtError` callback.
 
+Framework-authored errors in the core DOM client and server runtimes retain their
+complete messages in development. Optimized production builds replace those messages
+with Octane-owned, append-only codes and a link to the [error decoder](/errors);
+Octane does not reuse React's error numbers. User-thrown errors and compiler
+diagnostics keep their original messages and codes.
+
 Buffered server rendering returns `{ html, css }`; the extra `css` field contains
 Octane's scoped styles. Streaming still reveals Suspense content as it becomes ready.
 During hydration, value mismatches are patched and structural mismatches are rebuilt
@@ -214,8 +220,9 @@ in place with a warning instead of being thrown to a boundary.
 				identity, focus, and state match React; only the exact physical move pattern can differ.
 			</li>
 			<li>
-				Custom-element property handling and unknown-attribute warnings stay closer to the browser
-				and are intentionally less exhaustive than React's tables.
+				Custom-element property handling stays closer to the browser. Applicable attribute
+				diagnostics are expanding progressively from upstream behavior without embedding React's
+				complete property-name table in every runtime.
 			</li>
 		</ul>
 	</div>

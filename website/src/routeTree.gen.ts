@@ -12,9 +12,12 @@ import { Route as rootRouteImport } from './routes/__root.tsrx'
 import { Route as IndexRouteImport } from './routes/index.tsrx'
 import { Route as BenchmarksRouteImport } from './routes/benchmarks.tsrx'
 import { Route as DocsRouteImport } from './routes/docs.tsrx'
+import { Route as ErrorsRouteImport } from './routes/errors.tsrx'
 import { Route as PlaygroundRouteImport } from './routes/playground.tsrx'
 import { Route as DocsIndexRouteImport } from './routes/docs.index.tsrx'
 import { Route as DocsSlugRouteImport } from './routes/docs.$slug.tsrx'
+import { Route as ErrorsIndexRouteImport } from './routes/errors.index.tsrx'
+import { Route as ErrorsCodeRouteImport } from './routes/errors.$code.tsrx'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,6 +32,11 @@ const BenchmarksRoute = BenchmarksRouteImport.update({
 const DocsRoute = DocsRouteImport.update({
   id: '/docs',
   path: '/docs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ErrorsRoute = ErrorsRouteImport.update({
+  id: '/errors',
+  path: '/errors',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlaygroundRoute = PlaygroundRouteImport.update({
@@ -46,30 +54,48 @@ const DocsSlugRoute = DocsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => DocsRoute,
 } as any)
+const ErrorsIndexRoute = ErrorsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ErrorsRoute,
+} as any)
+const ErrorsCodeRoute = ErrorsCodeRouteImport.update({
+  id: '/$code',
+  path: '/$code',
+  getParentRoute: () => ErrorsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/benchmarks': typeof BenchmarksRoute
   '/docs': typeof DocsRouteWithChildren
+  '/errors': typeof ErrorsRouteWithChildren
   '/playground': typeof PlaygroundRoute
   '/docs/$slug': typeof DocsSlugRoute
+  '/errors/$code': typeof ErrorsCodeRoute
   '/docs/': typeof DocsIndexRoute
+  '/errors/': typeof ErrorsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/benchmarks': typeof BenchmarksRoute
   '/playground': typeof PlaygroundRoute
   '/docs/$slug': typeof DocsSlugRoute
+  '/errors/$code': typeof ErrorsCodeRoute
   '/docs': typeof DocsIndexRoute
+  '/errors': typeof ErrorsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/benchmarks': typeof BenchmarksRoute
   '/docs': typeof DocsRouteWithChildren
+  '/errors': typeof ErrorsRouteWithChildren
   '/playground': typeof PlaygroundRoute
   '/docs/$slug': typeof DocsSlugRoute
+  '/errors/$code': typeof ErrorsCodeRoute
   '/docs/': typeof DocsIndexRoute
+  '/errors/': typeof ErrorsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -77,25 +103,39 @@ export interface FileRouteTypes {
     | '/'
     | '/benchmarks'
     | '/docs'
+    | '/errors'
     | '/playground'
     | '/docs/$slug'
+    | '/errors/$code'
     | '/docs/'
+    | '/errors/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/benchmarks' | '/playground' | '/docs/$slug' | '/docs'
+  to:
+    | '/'
+    | '/benchmarks'
+    | '/playground'
+    | '/docs/$slug'
+    | '/errors/$code'
+    | '/docs'
+    | '/errors'
   id:
     | '__root__'
     | '/'
     | '/benchmarks'
     | '/docs'
+    | '/errors'
     | '/playground'
     | '/docs/$slug'
+    | '/errors/$code'
     | '/docs/'
+    | '/errors/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BenchmarksRoute: typeof BenchmarksRoute
   DocsRoute: typeof DocsRouteWithChildren
+  ErrorsRoute: typeof ErrorsRouteWithChildren
   PlaygroundRoute: typeof PlaygroundRoute
 }
 
@@ -122,6 +162,13 @@ declare module '@tanstack/octane-router' {
       preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/errors': {
+      id: '/errors'
+      path: '/errors'
+      fullPath: '/errors'
+      preLoaderRoute: typeof ErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/playground': {
       id: '/playground'
       path: '/playground'
@@ -143,6 +190,20 @@ declare module '@tanstack/octane-router' {
       preLoaderRoute: typeof DocsSlugRouteImport
       parentRoute: typeof DocsRoute
     }
+    '/errors/': {
+      id: '/errors/'
+      path: '/'
+      fullPath: '/errors/'
+      preLoaderRoute: typeof ErrorsIndexRouteImport
+      parentRoute: typeof ErrorsRoute
+    }
+    '/errors/$code': {
+      id: '/errors/$code'
+      path: '/$code'
+      fullPath: '/errors/$code'
+      preLoaderRoute: typeof ErrorsCodeRouteImport
+      parentRoute: typeof ErrorsRoute
+    }
   }
 }
 
@@ -158,10 +219,24 @@ const DocsRouteChildren: DocsRouteChildren = {
 
 const DocsRouteWithChildren = DocsRoute._addFileChildren(DocsRouteChildren)
 
+interface ErrorsRouteChildren {
+  ErrorsCodeRoute: typeof ErrorsCodeRoute
+  ErrorsIndexRoute: typeof ErrorsIndexRoute
+}
+
+const ErrorsRouteChildren: ErrorsRouteChildren = {
+  ErrorsCodeRoute: ErrorsCodeRoute,
+  ErrorsIndexRoute: ErrorsIndexRoute,
+}
+
+const ErrorsRouteWithChildren =
+  ErrorsRoute._addFileChildren(ErrorsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BenchmarksRoute: BenchmarksRoute,
   DocsRoute: DocsRouteWithChildren,
+  ErrorsRoute: ErrorsRouteWithChildren,
   PlaygroundRoute: PlaygroundRoute,
 }
 export const routeTree = rootRouteImport

@@ -105,8 +105,8 @@
     }
   },
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "prepack": "node scripts/build.mjs",
+    "build": "node ../../scripts/error-codes/generate.mjs --check && node scripts/build.mjs",
+    "prepack": "node ../../scripts/error-codes/generate.mjs --check && node scripts/build.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

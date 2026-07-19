@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 1,
+  "nextCode": 47,
+  "codes": {
+    "1": {
+      "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "2": {
+      "message": "Children.only expected to receive a single element child.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "3": {
+      "message": "Objects are not valid as an Octane child (found: %s). If you meant to render a collection of children, use an array instead.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "4": {
+      "message": "cloneElement: the first argument must be an element (from createElement / JSX).",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "5": {
+      "message": "Can only set one of `children` or `props.dangerouslySetInnerHTML`.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "6": {
+      "message": "`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "7": {
+      "message": "`%s` is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "8": {
+      "message": "`<%s>` is a void element tag and must neither have children nor use `dangerouslySetInnerHTML`.",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "9": {
+      "message": "Too many re-renders. Octane limits the number of renders to prevent an infinite loop.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "10": {
+      "message": "lazy: expected the load() promise to resolve to a component function or a module with a component as its default export, got '%s'",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "11": {
+      "message": "A function wrapped in useEffectEvent can't be called during rendering.",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "12": {
+      "message": "%s(): argument is not a Context nor a thenable",
+      "argumentCount": 1,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "13": {
+      "message": "Multiple errors were thrown during the render flush.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "14": {
+      "message": "act(): scheduler did not stabilize after %s iterations — likely an infinite render loop",
+      "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "15": {
+      "message": "%s was called without a hook slot. The octane compiler injects per-call-site keys; ensure your project loads this runtime through the Vite plugin (octane/compiler/vite). To call hooks by hand, pass a stable symbol, e.g. useState(0, Symbol.for('my-stable-id')).",
+      "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "16": {
+      "message": "Hydrate: `when` must synchronously return a hydration strategy with a valid type.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "17": {
+      "message": "Hydrate: the compiler-generated child loader did not resolve to a component.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "18": {
+      "message": "%s(): a React context can only be read inside a React-hosted Octane island (see octane/react); this component is not rendered under one.",
+      "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "19": {
+      "message": "A renderer-owned DOM region is missing its universal owner bridge.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "20": {
+      "message": "bindRendererRegionOwner() must run while a DOM component is rendering.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "21": {
+      "message": "bindRendererRegionOwner() must be the first call in a renderer-owned DOM root component.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "22": {
+      "message": "A renderer-owned DOM region requires a live DOM root.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "23": {
+      "message": "Server-rendered use() rejected",
+      "argumentCount": 0,
+      "runtime": ["client", "server"],
+      "status": "active"
+    },
+    "24": {
+      "message": "Element type is invalid: expected a string (for a built-in element) or a function (for a component), but got: %s.",
+      "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "25": {
+      "message": "Octane: internal — a component descriptor reached the de-opt host reconciler (should have been routed through a Block via hostElementBody/componentSlot).",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "26": {
+      "message": "`<%s>` is a void element tag and must neither have `children` nor use `dangerouslySetInnerHTML`.",
+      "argumentCount": 1,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "27": {
+      "message": "A hosted foreign-context request escaped its renderer-region owner; the owning bridge is gone or declined it.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "28": {
+      "message": "Target container is not a DOM element.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "29": {
+      "message": "Cannot update an unmounted root.",
+      "argumentCount": 0,
+      "runtime": ["client"],
+      "status": "active"
+    },
+    "30": {
+      "message": "Invalid tag: %s",
+      "argumentCount": 1,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "31": {
+      "message": "If you supply `defaultValue` on a <textarea>, do not pass children.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "32": {
+      "message": "octane SSR: a use(thenable) did not settle within %sms.",
+      "argumentCount": 1,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "33": {
+      "message": "octane SSR: exceeded %s suspense passes — a use(thenable) never resolved.",
+      "argumentCount": 1,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "34": {
+      "message": "octane SSR: a root suspension no longer has resumable work.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "35": {
+      "message": "octane SSR: %s root streaming passes completed without producing a shell.",
+      "argumentCount": 1,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "36": {
+      "message": "octane SSR: a pending streamed boundary no longer has resumable work; its error escaped to an ancestor that was already flushed.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "37": {
+      "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved.",
+      "argumentCount": 1,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "38": {
+      "message": "The stream destination closed.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "39": {
+      "message": "octane SSR: destination.write() returned false but the destination cannot emit drain.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "40": {
+      "message": "The stream destination is closed.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "41": {
+      "message": "octane SSR: pipe() may only be called once.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "42": {
+      "message": "The render was aborted.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "43": {
+      "message": "The stream consumer cancelled.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "44": {
+      "message": "The readable stream is closed.",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "45": {
+      "message": "Server-rendered use() rejected (function)",
+      "argumentCount": 0,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "46": {
+      "message": "Expected %s listener to be a function, instead got a value of `%s` type.",
+      "argumentCount": 2,
+      "runtime": ["client"],
+      "status": "active"
+    }
+  }
+}

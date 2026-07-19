@@ -18,6 +18,12 @@ export function UnknownSpread(props) @{
 	<div id="us" {...props.sp} />
 }
 
+// Invalid static booleans must still reach the DEV property validator. The
+// production compiler may fold both away because neither value serializes.
+export function StaticInvalidBooleans() @{
+	<div id="static-invalid-booleans" title alt={false} data-ready aria-hidden hidden />
+}
+
 // New-ish boolean attribute (React 19 knows `inert` as boolean).
 export function BoolInert(props) @{
 	<div id="bi" inert={props.v} />

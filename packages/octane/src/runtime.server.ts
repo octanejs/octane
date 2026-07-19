@@ -71,6 +71,7 @@ import {
 	hasComponentFlags,
 	markComponentFlags,
 } from './component-flags.js';
+import { formatServerError } from './error-codes.server.generated.js';
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
 interface SSRScope {
@@ -228,6 +229,10 @@ let CURRENT_SSR_ELEMENT: SsrElementContext | null = null;
 // null = validation disabled (outside a canonical render / discovery pass),
 // undefined = enabled but no warning set allocated yet.
 let SSR_NESTING_WARNINGS: Set<string> | null | undefined = null;
+// React's shared unknown-property cache lives for the lifetime of its module.
+// Match that prop-name de-duplication across independent SSR calls. Lazily
+// allocated from DEV-only branches, so optimized server bundles erase it.
+let DEV_SSR_ATTRIBUTE_WARNINGS: Set<string> | null = null;
 
 // Walk a frame to its dotted path ('' for the root). Memoized per frame.
 function framePath(f: Frame): string {
@@ -634,9 +639,7 @@ export function cloneElement(
 	...children: any[]
 ): ElementDescriptor {
 	if (!isElementDescriptor(element)) {
-		throw new Error(
-			'cloneElement: the first argument must be an element (from createElement / JSX).',
-		);
+		throw new Error(formatServerError(4));
 	}
 	const props = copyElementConfig(element.props);
 	let key = element.key;
@@ -768,11 +771,7 @@ function describeObjectForError(value: object): string {
 
 function invalidChildError(child: object): Error {
 	const found = describeObjectForError(child);
-	return new Error(
-		'Objects are not valid as an Octane child (found: ' +
-			found +
-			'). If you meant to render a collection of children, use an array instead.',
-	);
+	return new Error(formatServerError(3, found));
 }
 
 function mapIntoChildren(
@@ -899,7 +898,7 @@ export const Children = {
 	},
 	only<T>(children: T): T {
 		if (!isElementDescriptor(children)) {
-			throw new Error('Children.only expected to receive a single element child.');
+			throw new Error(formatServerError(2));
 		}
 		return children;
 	},
@@ -947,7 +946,7 @@ let DANGER_HTML_CHILD_PROBE = 0;
 function probingDangerHtmlChild(value: unknown): boolean {
 	if (DANGER_HTML_CHILD_PROBE === 0) return false;
 	if (value !== null && value !== undefined) {
-		throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+		throw new Error(formatServerError(5));
 	}
 	return true;
 }
@@ -1100,7 +1099,7 @@ function ssrHostElement(
 	// 'div><img onerror=…>') can never become live markup. The client is guarded
 	// by the platform itself: document.createElement throws for these names.
 	if (!VALID_TAG_NAME.test(tag)) {
-		throw new Error('Invalid tag: ' + tag);
+		throw new Error(formatServerError(30, tag));
 	}
 	// Public string descriptors follow HTML's ASCII case-insensitive tag
 	// semantics even when the authored spelling is uppercase. Preserve that
@@ -1163,11 +1162,11 @@ function ssrHostElement(
 			innerHTMLValue != null &&
 			(typeof innerHTMLValue !== 'object' || !('__html' in innerHTMLValue))
 		) {
-			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+			throw new Error(formatServerError(6));
 		}
 		const hasDangerHTML = hasInnerHTMLProp && innerHTMLValue != null;
 		if (hasDangerHTML && (children != null || (rawInner !== undefined && rawInner !== ''))) {
-			throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+			throw new Error(formatServerError(5));
 		}
 		// Controlled <textarea>: the prop IS the content — React's contract
 		// (children + defaultValue throws; children + value warns dev-side, the
@@ -1178,16 +1177,13 @@ function ssrHostElement(
 			(props.value != null || props.defaultValue != null)
 		) {
 			if (hasChildren && props.value == null) {
-				throw new Error('If you supply `defaultValue` on a <textarea>, do not pass children.');
+				throw new Error(formatServerError(31));
 			}
 			const inner = ssrTextareaValue(props.value != null ? props.value : props.defaultValue);
 			return '<' + tag + attrs + '>' + inner + '</' + tag + '>';
 		}
 		if (VOID_ELEMENTS.has(semanticTag) && hasDangerHTML) {
-			throw new Error(
-				`\`${semanticTag}\` is a void element tag and must neither have ` +
-					'`children` nor use `dangerouslySetInnerHTML`.',
-			);
+			throw new Error(formatServerError(7, semanticTag));
 		}
 		if (VOID_ELEMENTS.has(semanticTag) && !hasChildren) {
 			return '<' + tag + attrs + '/>';
@@ -1472,6 +1468,18 @@ function resolveAttributeNamespace(namespace: AttributeNamespace): ParserNamespa
 	return namespace === 'opaque' ? (FRAME?.namespace ?? 'html') : namespace;
 }
 
+// React's shared unknown-property validator de-duplicates by prop name for the
+// lifetime of the renderer module. Discovery-only passes and calls outside a
+// real render are disabled by SSR_NESTING_WARNINGS === null. Every call site is
+// DEV-guarded, so this helper disappears from optimized server bundles.
+function devWarnSsrAttributeOnce(name: string, message: string): void {
+	if (SSR_NESTING_WARNINGS === null) return;
+	const warned = (DEV_SSR_ATTRIBUTE_WARNINGS ??= new Set<string>());
+	if (warned.has(name)) return;
+	warned.add(name);
+	console.error(message);
+}
+
 /**
  * A dynamic attribute: ` name="value"`, ` name` for `true`, or '' to omit.
  * `tag` and `namespace` (when the emit site knows them) gate the tag-sensitive
@@ -1532,7 +1540,40 @@ export function ssrAttr(
 	}
 	// Function/symbol values are never meaningful attribute text (client parity:
 	// setAttribute removes them) — stringifying a function leaks source into markup.
-	if (t === 'function' || t === 'symbol') return '';
+	if (t === 'function' || t === 'symbol') {
+		// React 19 function actions are submit wiring, not invalid attribute text.
+		// The compiler handles direct sites before this helper; retain the same
+		// exception for descriptor/spread paths that arrive here through ssrAttrEntry.
+		if (
+			t === 'function' &&
+			((tag === 'form' && name === 'action') ||
+				((tag === 'button' || tag === 'input') && name === 'formaction'))
+		) {
+			return '';
+		}
+		if (process.env.NODE_ENV !== 'production' && !isCustomTag && tag !== undefined) {
+			if (
+				t === 'function' &&
+				name.length > 2 &&
+				name.charCodeAt(0) === 111 /* o */ &&
+				name.charCodeAt(1) === 110 /* n */
+			) {
+				devWarnSsrAttributeOnce(
+					name,
+					`Unknown event handler property \`${name}\` was dropped — did you mean ` +
+						`\`on${name.charAt(2).toUpperCase()}${name.slice(3)}\`? (lowercase on* ` +
+						'attributes never write; octane delegates camelCase handlers natively)',
+				);
+			} else {
+				devWarnSsrAttributeOnce(
+					name,
+					`Invalid value for prop \`${name}\` on <${tag}> tag. ` +
+						'Either remove it from the element, or pass a string or number value to keep it in the DOM.',
+				);
+			}
+		}
+		return '';
+	}
 	if (!isCustomTag) {
 		// Unknown lowercase `on*` attributes are dropped on standard elements (React
 		// nulls them — an event-ish name with a string payload is markup-injection
@@ -1563,10 +1604,50 @@ export function ssrAttr(
 		}
 		// Booleans on non-boolean attributes never serialize (client parity:
 		// `title={true}` removes).
-		if (t === 'boolean') return '';
+		if (t === 'boolean') {
+			if (process.env.NODE_ENV !== 'production' && tag !== undefined) {
+				devWarnSsrAttributeOnce(
+					name,
+					`Received \`${v}\` for a non-boolean attribute \`${name}\`. ` +
+						(v === true
+							? `If you want to write it to the DOM, pass a string instead: ` +
+								`${name}="true" or ${name}={value.toString()}.`
+							: `If you used to conditionally omit it with ${name}={condition && value}, ` +
+								`pass ${name}={condition ? value : undefined} instead.`),
+				);
+			}
+			return '';
+		}
 		if (POSITIVE_NUMERIC_ATTR_PROPS.has(lower) && !(Number(v) >= 1)) return '';
 	}
 	if (v == null || v === false) return '';
+	// A plain object has no useful attribute representation. Objects with an
+	// intentional toString retain their normal coercion and stay silent.
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		!isCustomTag &&
+		tag !== undefined &&
+		t === 'object' &&
+		(v as object).toString === Object.prototype.toString
+	) {
+		devWarnSsrAttributeOnce(
+			name,
+			`The provided \`${name}\` attribute is an object; it will stringify to ` +
+				'"[object Object]". Pass a string (or a value with a meaningful toString) instead.',
+		);
+	}
+	if (
+		process.env.NODE_ENV !== 'production' &&
+		!isCustomTag &&
+		tag !== undefined &&
+		t === 'number' &&
+		Number.isNaN(v)
+	) {
+		devWarnSsrAttributeOnce(
+			name,
+			`Received NaN for the \`${name}\` attribute. If this is expected, cast the value to a string.`,
+		);
+	}
 	const s = v === true ? '' : String(v);
 	// An empty `src`/`href`/`<object data>` resolves to the CURRENT PAGE's URL — browsers would
 	// re-fetch the whole document as an image/script/stylesheet. React strips
@@ -1641,9 +1722,6 @@ function ssrAttrEntry(
 	// `autoFocus` never serializes (client focuses at its mount commit).
 	if (k === 'autoFocus' && (namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1))
 		return '';
-	// Function/symbol values never serialize (client parity: setAttribute removes
-	// them) — stringifying a function would put its SOURCE into the markup.
-	if (typeof v === 'function' || typeof v === 'symbol') return '';
 	if (k === 'style') return ssrStyle(v);
 	if (k === 'className' || k === 'class') return ssrAttr('class', v, tag, namespace);
 	if (VALID_ATTR_NAME.test(k)) return ssrAttr(k, v, tag, namespace);
@@ -1868,7 +1946,7 @@ export function ssrInnerHtml(
 		if (!present) continue;
 		if (value == null) return undefined;
 		if (typeof value !== 'object' || !('__html' in value)) {
-			throw new Error('`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`');
+			throw new Error(formatServerError(6));
 		}
 		let childValue: unknown;
 		let hasChildSource = false;
@@ -1879,7 +1957,7 @@ export function ssrInnerHtml(
 			break;
 		}
 		if (definitelyHasChildren || (hasChildSource && childValue != null)) {
-			throw new Error('Can only set one of `children` or `props.dangerouslySetInnerHTML`.');
+			throw new Error(formatServerError(5));
 		}
 		if (renderChildren !== undefined) {
 			DANGER_HTML_CHILD_PROBE++;
@@ -1970,10 +2048,7 @@ export function ssrVoidContent(
 	const danger = finalPresentSource(dangerSources);
 	const children = finalPresentSource(childrenSources);
 	if ((danger[0] && danger[1] != null) || (children[0] && children[1] != null)) {
-		throw new Error(
-			`\`<${tag}>\` is a void element tag and must neither have children nor use ` +
-				'`dangerouslySetInnerHTML`.',
-		);
+		throw new Error(formatServerError(8, tag));
 	}
 	return '';
 }
@@ -2583,9 +2658,7 @@ function invokeComponentBody(
 		let passes = 1;
 		while (hp.update) {
 			if (++passes > MAX_RENDER_PHASE_PASSES) {
-				throw new Error(
-					'Too many re-renders. Octane limits the number of renders to prevent an infinite loop.',
-				);
+				throw new Error(formatServerError(9));
 			}
 			hp.update = false;
 			hp.occ = new Map();
@@ -3369,7 +3442,7 @@ function hydrationRejectionPayload(reason: unknown): HydrationRejectionPayload {
 		// Rejection transport must never replace the application's original reason
 		// with an encoder failure. Opaque proxies and exotic host objects degrade
 		// to a fixed message while still seeding the client's catch arm.
-		return { kind: 'fallback', message: 'Server-rendered use() rejected' };
+		return { kind: 'fallback', message: formatServerError(23) };
 	}
 }
 
@@ -3390,7 +3463,7 @@ function hydrationRejectionPayloadUnsafe(reason: unknown): HydrationRejectionPay
 	if (typeof reason === 'symbol') return { kind: 'symbol', value: reason.description ?? '' };
 	if (isErrorReason(reason)) {
 		let name = 'Error';
-		let message = 'Server-rendered use() rejected';
+		let message = formatServerError(23);
 		try {
 			const candidate = (reason as any).name;
 			if (typeof candidate === 'string') name = candidate;
@@ -3426,7 +3499,7 @@ function hydrationRejectionPayloadUnsafe(reason: unknown): HydrationRejectionPay
 		return { kind: 'error', name, message, fields };
 	}
 	if (typeof reason === 'function') {
-		return { kind: 'fallback', message: 'Server-rendered use() rejected (function)' };
+		return { kind: 'fallback', message: formatServerError(45) };
 	}
 	return { kind: 'value', value: reasonSnapshot(reason) };
 }
@@ -3940,10 +4013,10 @@ function resolveLazyModule(mod: any): ServerComponent {
 	}
 	if (typeof comp !== 'function' || (comp as any)[LAZY_COMPONENT] === true) {
 		throw new Error(
-			'lazy: expected the load() promise to resolve to a component function or a ' +
-				"module with a component as its default export, got '" +
-				((comp as any)?.[LAZY_COMPONENT] === true ? 'lazy component' : typeof comp) +
-				"'",
+			formatServerError(
+				10,
+				(comp as any)?.[LAZY_COMPONENT] === true ? 'lazy component' : typeof comp,
+			),
 		);
 	}
 	return comp as ServerComponent;
@@ -4216,7 +4289,7 @@ export function useId(): string {
 }
 
 function throwOnServerEffectEventCall(): never {
-	throw new Error("A function wrapped in useEffectEvent can't be called during rendering.");
+	throw new Error(formatServerError(11));
 }
 
 export function useEffectEvent<F>(_fn: F): F {
@@ -4358,22 +4431,10 @@ export function ssrHeadEl(
 	let s = (MARKERS ? '<!--' + key + '-->' : '') + '<' + tag;
 	if (attrs !== null) {
 		for (const k in attrs) {
-			const v = attrs[k];
-			if (v == null || v === false) continue;
-			// on* event props reach us since the compiler passes them through for the
-			// client headBlock's direct listeners — no server semantics, never serialize
-			// (a function value must not stringify into markup).
-			if (typeof v === 'function' || (k.length > 2 && k[0] === 'o' && k[1] === 'n')) continue;
-			// An empty src/href would make the browser fetch/resolve the page itself
-			// (`<link href="">`, `<base href="">`) — strip like ssrAttr does; head
-			// tags are never <a>/<area>, so the href exemption doesn't apply here.
-			if (v === '' && (k === 'src' || k === 'href')) continue;
-			if (v === true) {
-				s += ' ' + k;
-			} else {
-				const value = typeof v === 'string' ? v : String(v);
-				s += ' ' + k + '="' + escapeAttr(sanitizeURLAttribute(tag, k, value)) + '"';
-			}
+			// Hoisted metadata must share ordinary-host value filtering and DEV
+			// diagnostics. In particular, lowercase event props and invalid booleans
+			// cannot bypass ssrAttr merely because the element moved into <head>.
+			s += ssrAttrEntry(k, attrs[k], tag, 'html');
 		}
 	}
 	if (HEAD_VOID_ELEMENTS.has(tag)) {
@@ -4899,13 +4960,7 @@ async function raceSettleGuards(
 	if (timeoutMs > 0) {
 		racers.push(
 			new Promise<never>((_, reject) => {
-				timer = setTimeout(
-					() =>
-						reject(
-							new Error('octane SSR: a use(thenable) did not settle within ' + timeoutMs + 'ms.'),
-						),
-					timeoutMs,
-				);
+				timer = setTimeout(() => reject(new Error(formatServerError(32, timeoutMs))), timeoutMs);
 				// Don't let the deadline timer hold the event loop open if the render
 				// settles first (Node-only; harmless where unref is absent).
 				(timer as any)?.unref?.();
@@ -5071,11 +5126,7 @@ async function runBuffered(
 			// MAX bounds the TOTAL awaits (full-pass- and round-driven) so a
 			// never-resolving or nondeterministic use() can't wedge the loop.
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				const err = new Error(
-					'octane SSR: exceeded ' +
-						MAX_SUSPENSE_PASSES +
-						' suspense passes — a use(thenable) never resolved.',
-				);
+				const err = new Error(formatServerError(33, MAX_SUSPENSE_PASSES));
 				options?.onError?.(err);
 				throw err;
 			}
@@ -5141,7 +5192,7 @@ function readHostedForeignContext<T>(usable: unknown, api: string): T {
 	if (usable !== null && typeof usable === 'object' && HOSTED_FOREIGN_CONTEXT_READER !== null) {
 		return HOSTED_FOREIGN_CONTEXT_READER(usable as object) as T;
 	}
-	throw new Error(`${api}(): argument is not a Context nor a thenable`);
+	throw new Error(formatServerError(12, api));
 }
 
 /** @internal hosted-host ABI. Opaque outside octane/react/server. */
@@ -6213,14 +6264,10 @@ async function runStream(
 		let rootAttempts = 0;
 		while (pass.rootSuspended) {
 			if (pass.suspended.length === 0) {
-				throw new Error('octane SSR: a root suspension no longer has resumable work.');
+				throw new Error(formatServerError(34));
 			}
 			if (++rootAttempts > MAX_SUSPENSE_PASSES) {
-				throw new Error(
-					'octane SSR: ' +
-						MAX_SUSPENSE_PASSES +
-						' root streaming passes completed without producing a shell.',
-				);
+				throw new Error(formatServerError(35, MAX_SUSPENSE_PASSES));
 			}
 			await settleFirstOfWave(pass.suspended, resolved, timeoutMs, signal);
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
@@ -6336,17 +6383,10 @@ async function runStream(
 		while ([...stream.boundaries.values()].some((b) => b.state === 'pending')) {
 			signal?.throwIfAborted();
 			if (suspended.length === 0) {
-				throw new Error(
-					'octane SSR: a pending streamed boundary no longer has resumable work; ' +
-						'its error escaped to an ancestor that was already flushed.',
-				);
+				throw new Error(formatServerError(36));
 			}
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				throw new Error(
-					'octane SSR: ' +
-						MAX_SUSPENSE_PASSES +
-						' consecutive streaming passes completed no boundary — a use(thenable) never resolved.',
-				);
+				throw new Error(formatServerError(37, MAX_SUSPENSE_PASSES));
 			}
 			await settleFirstOfWave(suspended, resolved, timeoutMs, signal);
 			pass = renderFullPass().pass;
@@ -6547,7 +6587,7 @@ export function renderToPipeableStream(
 	const destinationFailure = (reason: unknown): void => {
 		if (closed) return;
 		closed = true;
-		const error = reason ?? new Error('The stream destination closed.');
+		const error = reason ?? new Error(formatServerError(38));
 		// A stream with no pending boundaries can finish rendering before `pipe()`
 		// supplies its destination. There is then no active runStream await to
 		// observe the abort, so surface late write/end failures here directly.
@@ -6569,11 +6609,7 @@ export function renderToPipeableStream(
 
 	const waitForDrain = (dest: Destination): Promise<void> => {
 		if (dest.once === undefined) {
-			return Promise.reject(
-				new TypeError(
-					'octane SSR: destination.write() returned false but the destination cannot emit drain.',
-				),
-			);
+			return Promise.reject(new TypeError(formatServerError(39)));
 		}
 		return new Promise<void>((resolve, reject) => {
 			let settled = false;
@@ -6601,7 +6637,7 @@ export function renderToPipeableStream(
 				});
 			const onClose = () =>
 				finish(() => {
-					const err = new Error('The stream destination closed.');
+					const err = new Error(formatServerError(38));
 					if (!endCalled) destinationFailure(err);
 					reject(err);
 				});
@@ -6616,7 +6652,7 @@ export function renderToPipeableStream(
 
 	const writeNow = (chunk: string, terminal: boolean): void | Promise<void> => {
 		const dest = destination!;
-		if (closed) return Promise.reject(new Error('The stream destination is closed.'));
+		if (closed) return Promise.reject(new Error(formatServerError(40)));
 		if (!terminal && controller.signal.aborted) {
 			return Promise.reject(controller.signal.reason);
 		}
@@ -6719,7 +6755,7 @@ export function renderToPipeableStream(
 	queueMicrotask(startRender);
 	return {
 		pipe(dest) {
-			if (pipeCalled) throw new Error('octane SSR: pipe() may only be called once.');
+			if (pipeCalled) throw new Error(formatServerError(41));
 			pipeCalled = true;
 			// Produce the shell into the pre-pipe buffer first. Besides retaining the
 			// established synchronous direct-pipe behavior for late destination errors,
@@ -6732,7 +6768,7 @@ export function renderToPipeableStream(
 				nodeDest.once('close', () => {
 					// close after our end() is the normal Writable lifecycle. Before
 					// end(), it means the consumer disconnected and rendering must stop.
-					if (!endCalled) destinationFailure(new Error('The stream destination closed.'));
+					if (!endCalled) destinationFailure(new Error(formatServerError(38)));
 				});
 			}
 			// Chunks accepted into the pre-pipe buffer remain deliverable even if
@@ -6745,7 +6781,7 @@ export function renderToPipeableStream(
 			return dest;
 		},
 		abort(reason?: unknown) {
-			if (!ended) controller.abort(reason ?? new Error('The render was aborted.'));
+			if (!ended) controller.abort(reason ?? new Error(formatServerError(42)));
 		},
 	};
 }
@@ -6805,7 +6841,7 @@ export function renderToReadableStream(
 			cancel(reason) {
 				if (closed) return;
 				consumerCancelled = true;
-				cancelReason = reason ?? new Error('The stream consumer cancelled.');
+				cancelReason = reason ?? new Error(formatServerError(43));
 				removeOuterAbort?.();
 				renderController.abort(cancelReason);
 				wakeWriter();
@@ -6836,7 +6872,7 @@ export function renderToReadableStream(
 
 		const writeReadable = (chunk: string, terminal = false): void | Promise<void> => {
 			if (closed || consumerCancelled) {
-				return Promise.reject(cancelReason ?? new Error('The readable stream is closed.'));
+				return Promise.reject(cancelReason ?? new Error(formatServerError(44)));
 			}
 			if (!terminal && renderController.signal.aborted) {
 				return Promise.reject(renderController.signal.reason);
@@ -6858,7 +6894,7 @@ export function renderToReadableStream(
 				while ((readableController.desiredSize ?? 0) <= 0) {
 					await waitForDemand();
 					if (closed || consumerCancelled) {
-						throw cancelReason ?? new Error('The readable stream is closed.');
+						throw cancelReason ?? new Error(formatServerError(44));
 					}
 				}
 				readableController.enqueue(bytes);
