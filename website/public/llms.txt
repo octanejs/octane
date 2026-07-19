@@ -160,7 +160,7 @@ Bindings — reach for these when asked about the React equivalent:
 - **Forms and content** — `@octanejs/hook-form`, `@octanejs/tanstack-form`, `@octanejs/lexical`, `@octanejs/tiptap`, `@octanejs/mdx`, and `@octanejs/i18next` cover forms, rich-text editing, MDX, and internationalization.
 - **Data-heavy screens** — `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/recharts`, and `@octanejs/visx` cover tables, virtualized lists, charts, and visualization primitives.
 - **Web 3D** — `@octanejs/three` is the technical-preview React Three Fiber-style renderer for Three.js scenes.
-- **Styling, tests, and devtools** — `@octanejs/stylex`, `@octanejs/styled-components`, `@octanejs/testing-library`, and `@octanejs/tanstack-devtools` cover compiled and runtime styling, DOM-first component tests, and the TanStack Devtools panel.
+- **Styling, tests, and devtools** — `@octanejs/stylex`, `@octanejs/styled-components`, `@octanejs/testing-library`, `@octanejs/tanstack-devtools`, and `@octanejs/scan` cover compiled and runtime styling, DOM-first component tests, the TanStack Devtools panel, and render scanning.
 
 Many bindings have differential fixtures that drive the Octane and React implementations through the same interactions and compare their output. Others are verified through their framework-neutral cores, focused behavioral and SSR suites, or public-surface and type checks. The generated status table records the evidence and remaining gaps package by package.
 

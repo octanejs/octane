@@ -385,6 +385,31 @@ export default defineConfig({
 				plugins: [octane({ hmr: false, profile: true })],
 			},
 			{
+				// @octanejs/scan consumes the profile-build inspection channel, so its
+				// tests compile with the same production-semantics profile build as
+				// the octane-profile project above.
+				test: {
+					name: 'scan',
+					include: ['packages/scan/tests/**/*.test.tsrx'],
+					environment: 'jsdom',
+					globals: false,
+					env: { OCTANE_TEST_COMPILE_MODE: 'profile' },
+				},
+				plugins: [octane({ hmr: false, profile: true })],
+			},
+			{
+				// Outline-overlay evidence in real Chromium: the test boots its own
+				// profile-compiled vite server (mirroring octane-events-browser).
+				test: {
+					name: 'scan-browser',
+					include: ['packages/scan/tests/browser/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+					testTimeout: 60_000,
+					hookTimeout: 60_000,
+				},
+			},
+			{
 				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],

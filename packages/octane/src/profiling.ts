@@ -1,3 +1,9 @@
+// This module's `declare global` augmentation makes some tsgo builds drop the
+// `dom` lib for this file, so a bare `Element` type fails to resolve here.
+// runtime.ts references `Element` as a value throughout, so the type always
+// resolves there; import the alias from it for the node-resolver ABI.
+import type { DomNodeElement } from './runtime.js';
+
 /**
  * Build-specialized client profiler for Octane.
  *
@@ -6,8 +12,11 @@
  * helpers behind `__OCTANE_PROFILE_ENABLED__`, allowing normal production
  * bundles to tree-shake this module and every profiling branch away.
  *
- * Profiling deliberately stores identities and timings, never live props,
- * state, reducer actions, DOM nodes, errors, or promises.
+ * Recorded events deliberately store identities and timings, never live props,
+ * state, reducer actions, DOM nodes, errors, or promises. Devtools that need
+ * the live DOM (e.g. @octanejs/scan's render outlines) resolve it PULL-based
+ * through `profiler.domNodes(instanceId)`, which the runtime serves in
+ * profile builds only — nothing DOM-shaped is ever retained in an event.
  */
 
 export interface ComponentProfileMetadata {
@@ -81,6 +90,22 @@ export interface ProfilerStartOptions {
 	timeline?: boolean;
 }
 
+/**
+ * Live event stream consumer (devtools such as @octanejs/scan). `event` fires
+ * synchronously as each event is recorded. The commit markers are DERIVED
+ * batch boundaries, not a runtime scheduler hook: `commitStart` fires before
+ * the first event of a synchronous render burst and `commitFinish` on the
+ * microtask after it — Octane flushes renders synchronously within one
+ * microtask, so a burst maps 1:1 onto a commit for overlay-drawing purposes,
+ * while cascaded follow-up flushes (e.g. effects scheduling new state) are
+ * reported as their own batches.
+ */
+export interface ProfileSubscriber {
+	event?(event: ProfileEvent): void;
+	commitStart?(): void;
+	commitFinish?(): void;
+}
+
 export interface ChromeTrace {
 	traceEvents: Array<{
 		name: string;
@@ -127,6 +152,35 @@ const trackedComponents = new WeakMap<object, Function>();
 
 let instances = new WeakMap<object, InstanceProfile>();
 let pending = new WeakMap<object, PendingProfile>();
+// instanceId → the profiled runtime subject, weakly held so profiling never
+// extends a component's lifetime. The FinalizationRegistry reclaims the map
+// entry itself once the subject is collected; `clear()` drops the whole map.
+let instanceSubjects = new Map<number, WeakRef<object>>();
+// The inspection channel is DOM/profile-build-only and dead-code under non-DOM
+// universal renderers (e.g. Lynx), which forbid these GC/scheduling globals.
+// Read them off a bound global reference and schedule via `Promise` so the
+// stripped path carries no forbidden-global reference those renderers' compilers
+// would reject; DOM/profile builds use the real APIs unchanged.
+const globalScope = globalThis as {
+	WeakRef?: { new (target: object): WeakRef<object> };
+	FinalizationRegistry?: {
+		new (cleanup: (heldValue: number) => void): FinalizationRegistry<number>;
+	};
+};
+const WeakRefCtor = globalScope.WeakRef;
+const scheduleMicrotask = (callback: () => void): void => {
+	void Promise.resolve().then(callback);
+};
+const instanceReclaim =
+	globalScope.FinalizationRegistry !== undefined
+		? new globalScope.FinalizationRegistry((instanceId) => {
+				instanceSubjects.delete(instanceId);
+			})
+		: null;
+const subscribers = new Set<ProfileSubscriber>();
+let batchOpen = false;
+/** The runtime-installed subject→elements resolver (profile builds only). */
+let nodeResolver: ((subject: object) => DomNodeElement[]) | null = null;
 let nextInstanceId = 1;
 let nextFallbackId = 1;
 let currentFrame: ProfileFrame | null = null;
@@ -211,8 +265,49 @@ function instanceFor(subject: object): InstanceProfile {
 	if (instance === undefined) {
 		instance = { id: nextInstanceId++, attempts: 0 };
 		instances.set(subject, instance);
+		if (WeakRefCtor !== undefined) {
+			instanceSubjects.set(instance.id, new WeakRefCtor(subject));
+			instanceReclaim?.register(subject, instance.id);
+		}
 	}
 	return instance;
+}
+
+/**
+ * Notify live subscribers of a just-recorded event, opening a derived commit
+ * batch on the first event and closing it on the post-flush microtask. A
+ * subscriber must never affect application rendering, so every callback is
+ * isolated; a subscriber attached mid-batch simply misses that batch's
+ * `commitStart`.
+ */
+function notifySubscribers(event: ProfileEvent): void {
+	if (!batchOpen) {
+		batchOpen = true;
+		for (const subscriber of subscribers) {
+			try {
+				subscriber.commitStart?.();
+			} catch {
+				// Devtools listeners must never break the app.
+			}
+		}
+		scheduleMicrotask(() => {
+			batchOpen = false;
+			for (const subscriber of subscribers) {
+				try {
+					subscriber.commitFinish?.();
+				} catch {
+					// Devtools listeners must never break the app.
+				}
+			}
+		});
+	}
+	for (const subscriber of subscribers) {
+		try {
+			subscriber.event?.(event);
+		} catch {
+			// Devtools listeners must never break the app.
+		}
+	}
 }
 
 function consumePending(subject: object): {
@@ -254,6 +349,7 @@ function pushEvent(event: ProfileEvent): void {
 		eventBuffer[eventHead] = event;
 		eventHead = (eventHead + 1) % bufferSize;
 	}
+	if (subscribers.size !== 0) notifySubscribers(event);
 	if (!timeline) return;
 	pendingTimelineEvents.push(event);
 	// A child's timeStamp call would otherwise run while its parent's timer is
@@ -494,6 +590,25 @@ function eventMatches(event: ProfileEvent, target: string | Function): boolean {
 	return event.component === target || event.componentId === target;
 }
 
+/**
+ * Runtime ABI: install the subject→top-level-elements resolver. runtime.ts
+ * calls this once at module load in profile builds; the resolver stays null
+ * otherwise, so `domNodes` degrades to an empty answer instead of guessing.
+ */
+export function __profileInstallNodeResolver(
+	resolver: (subject: object) => DomNodeElement[],
+): void {
+	nodeResolver = resolver;
+}
+
+/**
+ * Devtools ABI: the stable componentId events carry for a (possibly wrapped)
+ * component function — the same resolution `why()` applies to its argument.
+ */
+export function __profileComponentId(component: Function): string {
+	return metadataFor(component).id;
+}
+
 export interface OctaneProfiler {
 	start(options?: ProfilerStartOptions): void;
 	stop(): void;
@@ -502,6 +617,18 @@ export interface OctaneProfiler {
 	summary(): ProfileSummary[];
 	why(component: string | Function): ProfileEvent[];
 	exportTrace(): ChromeTrace;
+	/**
+	 * Attach a live event-stream subscriber. Returns its detach function.
+	 * Subscribers survive `stop()`/`start()` (no events are delivered while
+	 * stopped) and are independent of the ring buffer.
+	 */
+	subscribe(subscriber: ProfileSubscriber): () => void;
+	/**
+	 * The top-level elements currently rendered by a profiled instance, or
+	 * `[]` once it unmounts, its subject is collected, or outside profile
+	 * builds. Pull-based on purpose: recorded events stay DOM-free.
+	 */
+	domNodes(instanceId: number): DomNodeElement[];
 }
 
 declare global {
@@ -538,6 +665,7 @@ export const profiler: OctaneProfiler = {
 		pendingTimelineEvents = [];
 		pending = new WeakMap();
 		instances = new WeakMap();
+		instanceSubjects = new Map();
 		nextInstanceId = 1;
 		recordingGeneration++;
 		currentFrame = null;
@@ -620,6 +748,25 @@ export const profiler: OctaneProfiler = {
 		return orderedEvents()
 			.filter((event) => eventMatches(event, component))
 			.map((event) => ({ ...event, causes: event.causes.map((cause) => ({ ...cause })) }));
+	},
+	subscribe(subscriber) {
+		subscribers.add(subscriber);
+		installGlobal();
+		return () => {
+			subscribers.delete(subscriber);
+		};
+	},
+	domNodes(instanceId) {
+		if (nodeResolver === null) return [];
+		const subject = instanceSubjects.get(instanceId)?.deref();
+		if (subject === undefined) return [];
+		try {
+			return nodeResolver(subject);
+		} catch {
+			// Inspection must never throw into devtools; a torn-down subject
+			// simply has no nodes.
+			return [];
+		}
 	},
 	exportTrace() {
 		return {
