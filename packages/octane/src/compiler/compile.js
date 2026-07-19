@@ -3101,6 +3101,8 @@ function isTypeOnlyStatement(node) {
 		if (node.exportKind === 'type') return true;
 		if (node.declaration && isTypeOnlyStatement(node.declaration)) return true;
 	}
+	// `export type * from '…'` / `export type * as Ns from '…'`
+	if (node.type === 'ExportAllDeclaration' && node.exportKind === 'type') return true;
 	return false;
 }
 

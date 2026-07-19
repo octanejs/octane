@@ -66,6 +66,9 @@ describe('compile — inline type-only import/export specifiers', () => {
     import { useState, type Dispatch } from 'octane';
     export { type OnlyAType } from './types.js';
     export { type AlsoAType, realValue } from './mixed.js';
+    export type * from './star-types.js';
+    export type * as StarNs from './star-ns-types.js';
+    export * from './star-values.js';
 
     export function App() {
       const [n] = useState(0);
@@ -88,6 +91,9 @@ describe('compile — inline type-only import/export specifiers', () => {
 			expect(code).not.toMatch(/types\.js/);
 			expect(code).not.toMatch(/AlsoAType/);
 			expect(code).toMatch(/realValue/);
+			// `export type * [as Ns]` is elided whole; a value star export stays.
+			expect(code).not.toMatch(/StarNs/);
+			expect(code).toMatch(/star-values\.js/);
 		});
 	}
 });
