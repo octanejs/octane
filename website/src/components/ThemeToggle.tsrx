@@ -17,8 +17,13 @@ export function ThemeToggle() @{
 	}, []);
 
 	function toggle() {
+		// The applied `data-theme` is the source of truth (the pre-paint script may
+		// have set light before the mount effect synced local state), so flip from
+		// it — not from `theme` — to avoid a dead first click.
+		const current: Theme =
+			document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 		const next: Theme =
-			theme === 'dark' ? 'light' : 'dark';
+			current === 'dark' ? 'light' : 'dark';
 		setTheme(next);
 		document.documentElement.setAttribute('data-theme', next);
 		try {

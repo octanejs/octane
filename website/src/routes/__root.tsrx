@@ -20,10 +20,6 @@ const BASE_STYLES = `
 	/* Surfaces layered over --bg (dark: subtle white tints). */
 	--surface-subtle: rgba(255, 255, 255, 0.03);
 	--surface: rgba(255, 255, 255, 0.06);
-	--surface-hover: rgba(255, 255, 255, 0.1);
-	--surface-strong: rgba(255, 255, 255, 0.14);
-	--overlay: rgba(0, 0, 0, 0.35);
-	--shadow: rgba(0, 0, 0, 0.35);
 	/* Translucent sticky-header/backdrop fills (a tint of --bg). */
 	--header-bg: rgba(35, 39, 47, 0.85);
 	--header-bg-solid: rgba(35, 39, 47, 0.97);
@@ -51,10 +47,6 @@ const BASE_STYLES = `
 	--border-strong: rgba(0, 0, 0, 0.22);
 	--surface-subtle: rgba(0, 0, 0, 0.025);
 	--surface: rgba(0, 0, 0, 0.04);
-	--surface-hover: rgba(0, 0, 0, 0.07);
-	--surface-strong: rgba(0, 0, 0, 0.09);
-	--overlay: rgba(0, 0, 0, 0.12);
-	--shadow: rgba(15, 23, 42, 0.12);
 	--header-bg: rgba(255, 255, 255, 0.85);
 	--header-bg-solid: rgba(255, 255, 255, 0.97);
 	--callout-note: #2f5fd0;
@@ -132,7 +124,7 @@ pre.shiki {
 // Octane never renders it — so it does not participate in hydration. Placed
 // AFTER HeadContent so the theme-color <meta> already exists to update; still in
 // <head>, so it runs before the body paints.
-const THEME_INIT = `(function(){try{var s=localStorage.getItem('octane-theme');var t=s||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
+const THEME_INIT = `(function(){try{var s=localStorage.getItem('octane-theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
 
 function RootDocument(props: { children?: unknown }) @{
 	<Html lang="en">
