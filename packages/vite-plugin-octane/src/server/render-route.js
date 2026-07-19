@@ -266,7 +266,7 @@ pre { background: #2d2d2d; padding: 1rem; border-radius: 4px; overflow-x: auto; 
 </head>
 <body>
 <h1>SSR Render Error</h1>
-<p class="route">Route: ${route.path} → ${route.entry}</p>
+<p class="route">Route: ${route.path} → ${get_route_entry_path(route.entry)}</p>
 <pre>${escapeHtml(message)}</pre>
 ${stack ? `<pre>${escapeHtml(stack)}</pre>` : ''}
 </body>
