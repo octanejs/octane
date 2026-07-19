@@ -197,7 +197,7 @@ jobs:
     # generates its metadata-only release commit. Keep the post-merge CI run
     # (publishing waits for it), but do not repeat the full suite once the merge
     # has been authenticated above.
-    if: ${{ !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
+    if: ${{ always() && !cancelled() && needs.release_merge.outputs.is_release != 'true' }}
     runs-on: ubuntu-latest
 
     strategy:
