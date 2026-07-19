@@ -147,17 +147,19 @@ ownership explicitly. The rule is short:
 
 - **`.tsrx` is always Octane's.** The extension itself is the marker — nothing
   else compiles the syntax, so the files need no annotation at all.
-- **`.tsx` opts in with the pragma.** A `.tsx` is Octane's only if it opens
-  with a leading `/** @jsxImportSource octane */` pragma comment; without the
-  pragma it passes through untouched to the host framework's own pipeline.
-- **`.ts` and `.js` are plain files.** They are never Octane-compiled and
-  always belong to the host toolchain — there is no ownership marker to add.
+- **Everything else opts in with the pragma.** A `.tsx`, `.ts`, or `.js` is
+  Octane's only if it opens with a leading `/** @jsxImportSource octane */`
+  pragma comment — full compilation for `.tsx`, octane hook slotting for
+  `.ts`/`.js`; without the pragma it passes through untouched to the host
+  framework's own pipeline.
 
-The pragma is the same comment TypeScript already reads for per-file JSX
-typing, so one marker does both jobs: it types the file against octane's JSX
-and tells Octane's bundler integrations that this module is theirs to compile.
-It must be leading — at the very top of the file, before any code. A pragma
-naming a registered renderer's intrinsics module (for example
+In a `.tsx` the pragma is the same comment TypeScript already reads for
+per-file JSX typing, so one marker does both jobs: it types the file against
+octane's JSX and tells Octane's bundler integrations that this module is
+theirs to compile. In a JSX-less `.ts`/`.js` module TypeScript ignores the
+pragma, so there it acts purely as the Octane ownership marker. It must be
+leading — at the very top of the file, before any code. A pragma naming a
+registered renderer's intrinsics module (for example
 `@octanejs/three/intrinsics`) claims the file for Octane the same way. A pragma
 pointing at another framework (for example `/** @jsxImportSource react */`)
 does **not** claim the file: it stays with the host toolchain, exactly like a
@@ -208,16 +210,26 @@ export function Badge(props: { label: string }) @{
 }
 ```
 
+```ts
+// src/hooks/useCount.ts — the pragma opts a plain hooks module into Octane
+/** @jsxImportSource octane */
+import { useState } from 'octane';
+
+export function useCount() {
+	return useState(0);
+}
+```
+
 The remaining details:
 
-- Because plain `.ts`/`.js` are never Octane-compiled, custom octane hooks in
-  a mixed project must live in a `.tsrx` module or a pragma-marked `.tsx`
-  module — octane hooks need compiler-assigned hook slots, and an unslotted
-  `useState` throws at runtime. The build warns on an octane-importing plain
-  project module for exactly this reason. (Installed octane packages are
-  unaffected: their package manifest keeps making the per-package decision.)
-- If a project `.tsx` without the pragma imports from `octane`, the build
-  emits a warning naming the file, since that is usually a forgotten pragma.
+- Custom octane hooks in a mixed project need compiler-assigned hook slots —
+  an unslotted `useState` throws at runtime. Put them in a `.tsrx` module, or
+  add the pragma to the `.ts` (or `.tsx`) module that defines them, exactly
+  as above. (Installed octane packages are unaffected: their package manifest
+  keeps making the per-package decision, hook slotting included.)
+- If a project `.tsx`/`.ts`/`.js` without the pragma imports from `octane`,
+  the build emits a warning naming the file, since that is usually a
+  forgotten pragma.
 - A different tsrx compiler (for example `@tsrx/react`) can own part of the
   project's `.tsrx`: list those paths in the integration's `exclude` option.
   Excluded paths are never Octane's — no compilation, no warnings. An octane
@@ -226,8 +238,9 @@ The remaining details:
 - Installed and linked packages are exempt: their package manifest's Octane
   declaration remains the per-package decision, so bindings need no pragmas.
 
-The directive is tolerated (and stripped) even when `requireDirective` is off,
-so shared code and libraries can adopt it unconditionally.
+The pragma is an ordinary comment, so it is valid — and ships unchanged — even
+when `requireDirective` is off; shared code and libraries can adopt it
+unconditionally.
 
 <h2 id="full-app-configuration">Full app configuration</h2>
 

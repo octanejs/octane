@@ -197,9 +197,9 @@ describe('loader with the neutral compiler', () => {
 		});
 		expect(getOctaneRspackBuildInfo(badge.module)?.transformKind).toBe('compile');
 
-		// A plain octane-importing project .ts is never Octane-compiled and
-		// warns through Rspack's module-warning channel, pointing custom-hook
-		// authors at pragma-marked .tsx / .tsrx.
+		// An unmarked octane-importing project .ts skips hook slotting and
+		// warns through Rspack's module-warning channel with the same
+		// add-the-pragma guidance an unmarked .tsx gets.
 		const hook = transform({
 			root,
 			resourcePath: write(root, 'src/useCount.ts', hookSource),
@@ -211,6 +211,17 @@ describe('loader with the neutral compiler', () => {
 		expect(
 			hook.warnings.some((warning) => warning.message.includes('@jsxImportSource octane')),
 		).toBe(true);
+
+		// The pragma turns hook slotting back on for a plain project .ts.
+		const pragmaHookSource = '/** @jsxImportSource octane */\n' + hookSource;
+		const slotted = transform({
+			root,
+			resourcePath: write(root, 'src/usePragmaCount.ts', pragmaHookSource),
+			source: pragmaHookSource,
+			options,
+		});
+		expect(getOctaneRspackBuildInfo(slotted.module)?.transformKind).toBe('slots');
+		expect(slotted.warnings).toHaveLength(0);
 	});
 
 	it('delivers native text onChange diagnostics as Rspack module warnings', () => {

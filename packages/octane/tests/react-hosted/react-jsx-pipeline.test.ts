@@ -6,8 +6,8 @@
  * (TypeScript's `react-jsx` emit — the same `jsx(type, props, key)` element
  * output esbuild, swc, and babel produce), while the Octane island it renders
  * is compiled by the Octane compiler. One page, two compilers: a project
- * `.tsrx` is Octane's by extension, and an Octane-owned `.tsx` opts in with a
- * leading `@jsxImportSource octane` pragma:
+ * `.tsrx` is Octane's by extension, and an Octane-owned `.tsx`/`.ts`/`.js`
+ * opts in with a leading `@jsxImportSource octane` pragma:
  *
  *  - the Octane compiler (requireDirective) passes the host `.tsx` through
  *    untouched and compiles the island;
@@ -100,6 +100,13 @@ describe('React JSX transform + Octane compiler in one pipeline (requireDirectiv
 			'/project/src/Badge.tsx',
 		);
 		expect(pragmaTsx?.kind).toBe('compile');
+		// A plain octane hooks module opts into hook slotting the same way —
+		// the custom-hooks-in-.ts shape a mixed project shares across islands.
+		const pragmaTs = compiler.transform(
+			"/** @jsxImportSource octane */\nimport { useState } from 'octane';\nexport function useCount() { return useState(0); }\n",
+			'/project/src/useCount.ts',
+		);
+		expect(pragmaTs?.kind).toBe('slots');
 	});
 
 	it('renders an Octane island from a host compiled by the real React JSX transform', async () => {

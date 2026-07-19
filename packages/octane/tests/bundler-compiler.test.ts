@@ -998,7 +998,7 @@ describe('requireDirective ownership gate', () => {
 		'  return <p className="host">{\'react\'}</p>;\n' +
 		'}\n';
 
-	it('owns project .tsrx by extension and .tsx only behind the pragma', () => {
+	it('owns project .tsrx by extension and .tsx/.ts/.js behind the pragma', () => {
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),
 			requireDirective: true,
@@ -1020,11 +1020,14 @@ describe('requireDirective ownership gate', () => {
 		expect(lineTsx?.kind).toBe('compile');
 		// An unmarked project .tsx belongs to the host toolchain, untouched.
 		expect(compiler.transform(REACT_TSX, '/project/src/Host.tsx')).toBeNull();
-		// Plain project .ts/.js have no ownership concept: a pragma there
-		// claims nothing and the module stays with the host toolchain.
-		expect(
-			compiler.transform('/** @jsxImportSource octane */\n' + HOOK, '/project/src/useCount.ts'),
-		).toBeNull();
+		// A plain project .ts opts into octane hook slotting with the same
+		// pragma. TypeScript ignores the pragma in a JSX-less module, so
+		// there it acts purely as the Octane ownership marker.
+		const pragmaTs = compiler.transform(
+			'/** @jsxImportSource octane */\n' + HOOK,
+			'/project/src/useCount.ts',
+		);
+		expect(pragmaTs?.kind).toBe('slots');
 	});
 
 	it('does not let a foreign @jsxImportSource pragma claim a file', () => {
@@ -1056,6 +1059,11 @@ describe('requireDirective ownership gate', () => {
 			compiler.transform('/** @jsxImportSource react */\n' + COMPONENT, '/project/src/Odd.tsrx')
 				?.kind,
 		).toBe('compile');
+		// A foreign pragma on a plain .ts claims nothing either — the module
+		// stays with the host toolchain, unslotted.
+		expect(
+			compiler.transform('/** @jsxImportSource react */\n' + HOOK, '/project/src/useReact.ts'),
+		).toBeNull();
 	});
 
 	it("claims files whose pragma names a registered renderer's intrinsics module", () => {
@@ -1089,22 +1097,27 @@ describe('requireDirective ownership gate', () => {
 		).toBeNull();
 	});
 
-	it('never compiles plain project .ts/.js and reports octane-importing ones once', () => {
+	it('gates hook slotting and reports likely-forgotten pragmas once', () => {
 		const warnings: string[] = [];
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),
 			requireDirective: true,
 			warn: (message: string) => warnings.push(message),
 		});
-		// An octane-importing plain project .ts is never Octane-compiled under
-		// the gate: untouched, one diagnostic pointing custom-hook authors at
-		// the module shapes Octane does own.
+		// An unmarked octane-importing project .ts stays with the host
+		// toolchain: untouched, one diagnostic with the same add-the-pragma
+		// guidance an unmarked .tsx gets.
 		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
 		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0]).toContain('/src/useCount.ts');
-		expect(warnings[0]).toContain('never Octane-compiled');
 		expect(warnings[0]).toContain('/** @jsxImportSource octane */');
+		// The pragma turns slotting back on.
+		const directed = compiler.transform(
+			'/** @jsxImportSource octane */\n' + HOOK,
+			'/project/src/useDirected.ts',
+		);
+		expect(directed?.kind).toBe('slots');
 	});
 
 	it('keeps manifest-declared packages exempt from the ownership gate', () => {
@@ -1129,8 +1142,8 @@ describe('requireDirective ownership gate', () => {
 			expect(compiler.transform(COMPONENT, join(packageRoot, 'src/Island.tsrx'))?.kind).toBe(
 				'compile',
 			);
-			// Installed-package .ts hook modules keep their hook slotting — the
-			// no-ownership rule for plain modules is about PROJECT files only.
+			// Installed-package .ts hook modules keep their hook slotting with
+			// no pragma — the manifest is the per-package decision.
 			expect(compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'))?.kind).toBe('slots');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
@@ -1162,10 +1175,18 @@ describe('requireDirective ownership gate', () => {
 		).toBeNull();
 		expect(warnings.some((message) => message.includes('/src/react-app/Island.tsx'))).toBe(true);
 		expect(warnings.some((message) => message.includes('exclu'))).toBe(true);
-		// Plain .ts has no ownership concept, so an excluded octane-importing
-		// .ts is a silent pass — nothing to conflict with.
-		expect(compiler.transform(HOOK, '/project/src/react-app/util.ts')).toBeNull();
-		expect(warnings.some((message) => message.includes('/src/react-app/util.ts'))).toBe(false);
+		// The same conflict diagnostic covers the .ts/.js hook-slot exclusion.
+		expect(
+			compiler.transform(
+				'/** @jsxImportSource octane */\n' + HOOK,
+				'/project/src/react-app/util.ts',
+			),
+		).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/util.ts'))).toBe(true);
+		// An UNMARKED excluded octane-importing .ts is a silent pass — no
+		// ownership claim, nothing to conflict with.
+		expect(compiler.transform(HOOK, '/project/src/react-app/plain.ts')).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/plain.ts'))).toBe(false);
 		// Outside the excluded paths a project .tsrx compiles unconditionally.
 		expect(compiler.transform(COMPONENT, '/project/src/islands/Fine.tsrx')?.kind).toBe('compile');
 	});

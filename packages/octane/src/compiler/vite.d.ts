@@ -64,11 +64,11 @@ export interface OctaneVitePluginOptions {
 	exclude?: string[];
 	/**
 	 * Mixed-toolchain ownership gate: project `.tsrx` modules stay Octane's
-	 * by extension, project `.tsx` compiles only with a leading
+	 * by extension; a project `.tsx` compiles — and a plain project
+	 * `.ts`/`.js` gets octane hook slotting — only with a leading
 	 * `@jsxImportSource octane` pragma comment (a registered renderer's
-	 * intrinsics module also counts), and plain project `.ts`/`.js` are
-	 * never Octane-compiled. Installed Octane packages retain manifest-based
-	 * ownership.
+	 * intrinsics module also counts). Installed Octane packages retain
+	 * manifest-based ownership.
 	 * @default false
 	 */
 	requireDirective?: boolean;

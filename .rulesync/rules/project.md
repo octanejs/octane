@@ -149,9 +149,10 @@ full campaign deleting them. Octane files are fully typed:
   point at that renderer's intrinsics module instead, e.g.
   `@octanejs/three/intrinsics`). In mixed-toolchain builds
   (`requireDirective: true`) the same leading pragma is also the compile
-  ownership marker for octane-owned `.tsx`; `.tsrx` is Octane's by extension
-  and needs no marker, and plain project `.ts`/`.js` are never
-  Octane-compiled there.
+  ownership marker for octane-owned `.tsx`, `.ts`, and `.js` (full compile
+  for `.tsx`, hook slotting for the JSX-less shapes, where TypeScript ignores
+  the pragma and it acts purely as the marker); `.tsrx` is Octane's by
+  extension and needs no marker.
 - Type component props and renderable holes properly: `OctaneNode` from
   `octane` for renderables (never `React.ReactNode`), native DOM event types,
   `{ current: T | null }` refs. Untyped `props` parameters are noImplicitAny

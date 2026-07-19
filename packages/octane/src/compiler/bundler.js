@@ -318,15 +318,17 @@ class OctaneBundlerCompiler {
 		this.renderers = normalizeRendererConfig(options.renderers);
 		// Ownership gate for mixed-toolchain projects (e.g. a React app hosting
 		// Octane islands): when enabled, a project `.tsrx` is Octane's by
-		// extension (nothing else compiles the syntax), a project `.tsx` is
-		// Octane's only if it opens with a leading `/** @jsxImportSource
-		// octane */` pragma (any registered renderer's intrinsics module also
-		// counts), and plain project `.ts`/`.js` are never Octane's. A leading
-		// pragma naming a foreign source (`react`, …) does NOT claim the file.
-		// Unmarked project `.tsx` passes through to the host toolchain.
-		// Installed/linked packages keep their manifest `usesOctane` decision.
-		// The pragma always ships unchanged — it is meaningful to TypeScript
-		// and downstream tools.
+		// extension (nothing else compiles the syntax), and a project
+		// `.tsx`/`.ts`/`.js` is Octane's only if it opens with a leading
+		// `/** @jsxImportSource octane */` pragma (any registered renderer's
+		// intrinsics module also counts) — full compilation for `.tsx`, hook
+		// slotting for plain `.ts`/`.js`. A leading pragma naming a foreign
+		// source (`react`, …) does NOT claim the file. Unmarked project
+		// modules pass through to the host toolchain. Installed/linked
+		// packages keep their manifest `usesOctane` decision. The pragma
+		// always ships unchanged — it is meaningful to TypeScript and
+		// downstream tools (in a JSX-less `.ts`/`.js` module TypeScript
+		// ignores it, so there it acts purely as the ownership marker).
 		this.requireDirective = options.requireDirective === true;
 		this.pragmaOwnedModules = new Set([DOM_RENDERER_MODULE]);
 		for (const renderer of Object.values(this.renderers.registry)) {
@@ -473,11 +475,12 @@ class OctaneBundlerCompiler {
 	/**
 	 * The requireDirective ownership gate for one project-owned module.
 	 * A project `.tsrx` is Octane's by extension — in an Octane pipeline
-	 * nothing else compiles the syntax, so there is nothing to opt into; a
-	 * project `.tsx` is Octane's only when `pragmaOwned` (its leading
-	 * `@jsxImportSource` pragma names octane or a registered renderer's
-	 * intrinsics module); plain project `.ts`/`.js` are never Octane's — they
-	 * stay with the host toolchain, with no ownership marker to look for.
+	 * nothing else compiles the syntax, so there is nothing to opt into;
+	 * every other project module is Octane's only when `pragmaOwned` (its
+	 * leading `@jsxImportSource` pragma names octane or a registered
+	 * renderer's intrinsics module). This gate covers full compilation; the
+	 * plain `.ts`/`.js` hook-slotting branch of `transform` applies the same
+	 * pragma rule inline.
 	 * Two carve-outs: installed and linked packages are exempt (their
 	 * manifest `usesOctane` rule is already the explicit per-package
 	 * decision), and `exclude` path fragments are never Octane's — tsrx
@@ -499,7 +502,8 @@ class OctaneBundlerCompiler {
 	/**
 	 * requireDirective diagnostic: an exclusion beats an ownership pragma,
 	 * and the module stays with its excluded-path owner. Warn once so the
-	 * conflicting signals never resolve as a silent no-op. An excluded
+	 * conflicting signals never resolve as a silent no-op. Shared by the
+	 * full-compile gate and the `.ts`/`.js` hook-slot exclusion. An excluded
 	 * `.tsrx` is NOT a conflict — pairing extension ownership with `exclude`
 	 * is exactly how a project routes `.tsrx` to another tsrx compiler.
 	 */
@@ -513,10 +517,11 @@ class OctaneBundlerCompiler {
 	}
 
 	/**
-	 * requireDirective diagnostic: a project-owned `.tsx` imports from
-	 * 'octane' but declared no ownership, so Octane leaves it to the host
-	 * toolchain untouched. Usually a forgotten pragma; occasionally an
-	 * intentional type-only import — hence a warning, never an error.
+	 * requireDirective diagnostic: a project-owned module (`.tsx`, `.ts`, or
+	 * `.js`) imports from 'octane' but declared no ownership, so Octane
+	 * leaves it to the host toolchain untouched — no compilation, no hook
+	 * slotting. Usually a forgotten pragma; occasionally an intentional
+	 * type-only or hook-free import — hence a warning, never an error.
 	 */
 	_warnUnmarkedOctaneImport(code, filename) {
 		if (this.warn === null || this.warnedOwnership.has(filename)) return;
@@ -524,23 +529,6 @@ class OctaneBundlerCompiler {
 		this.warnedOwnership.add(filename);
 		this.warn(
 			`${filename} imports from 'octane' but has no leading /** @jsxImportSource octane */ pragma — with requireDirective enabled, Octane will not compile or transform it. Add the pragma at the top of the module if Octane should own it.`,
-		);
-	}
-
-	/**
-	 * requireDirective diagnostic: plain project `.ts`/`.js` modules are
-	 * never Octane-compiled in a mixed-toolchain build, so their octane base
-	 * hooks never receive compiler slot keys and would throw at runtime.
-	 * Point hook authors at the module shapes Octane does own. Warning, not
-	 * error: most octane imports from plain modules (types, createRoot,
-	 * helpers) are hook-free and completely fine unslotted.
-	 */
-	_warnPlainModuleOctaneImport(code, filename) {
-		if (this.warn === null || this.warnedOwnership.has(filename)) return;
-		if (!/from\s*['"]octane['"]/.test(code)) return;
-		this.warnedOwnership.add(filename);
-		this.warn(
-			`${filename} imports from 'octane', but plain .ts/.js project modules are never Octane-compiled when requireDirective is enabled. If this module defines custom octane hooks, move them into a .tsrx module or a .tsx module with a leading /** @jsxImportSource octane */ pragma (or use the package-manifest octane.hookSlots.manual protocol).`,
 		);
 	}
 
@@ -738,19 +726,18 @@ class OctaneBundlerCompiler {
 
 	/**
 	 * requireDirective ownership for code-less classification: a project
-	 * `.tsrx` is Octane's by extension; a project `.tsx` needs its leading
-	 * @jsxImportSource pragma read from disk; plain `.ts`/`.js` are never
-	 * Octane's. The transform (which receives real code) remains the
-	 * authoritative gate; an unreadable file is conservatively not Octane's,
-	 * so importers can never hold a client reference for a module whose own
-	 * transform passes through to the host toolchain.
+	 * `.tsrx` is Octane's by extension; any other project module needs its
+	 * leading @jsxImportSource pragma read from disk. The transform (which
+	 * receives real code) remains the authoritative gate; an unreadable file
+	 * is conservatively not Octane's, so importers can never hold a client
+	 * reference for a module whose own transform passes through to the host
+	 * toolchain.
 	 */
 	_ownershipForFile(file) {
 		if (!this.requireDirective) return true;
 		if (!this._isProjectOwnedSource(file)) return true;
 		if (this.exclude.some((path) => file.includes(path))) return false;
 		if (file.endsWith('.tsrx')) return true;
-		if (!file.endsWith('.tsx')) return false;
 		let code;
 		try {
 			code = readFileSync(isAbsolute(file) ? resolve(file) : resolve(this.root, file), 'utf8');
@@ -820,14 +807,15 @@ class OctaneBundlerCompiler {
 				: [];
 
 		const renderer = resolveRendererForFile(this.renderers, filename);
+		const plainHelperSource =
+			(file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts');
 		// Ownership is checked only where it can matter: outside the
-		// requireDirective gate every eligible module already compiles, a
-		// project `.tsrx` is Octane's by extension, and plain `.ts`/`.js`
-		// have no ownership concept — so only project `.tsx` is scanned for
-		// the leading pragma.
+		// requireDirective gate every eligible module already compiles, and a
+		// project `.tsrx` is Octane's by extension — so only project `.tsx`
+		// and plain `.ts`/`.js` are scanned for the leading pragma.
 		const pragmaOwned =
 			this.requireDirective &&
-			file.endsWith('.tsx') &&
+			(file.endsWith('.tsx') || plainHelperSource) &&
 			this._isProjectOwnedSource(file) &&
 			this._pragmaClaimsOwnership(code);
 		const octaneMarked = file.endsWith('.tsrx') || pragmaOwned;
@@ -844,8 +832,6 @@ class OctaneBundlerCompiler {
 			this._isProjectOwnedSource(file) &&
 			(!octaneMarked || this.exclude.some((path) => file.includes(path)));
 		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
-		const plainHelperSource =
-			(file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts');
 		if (
 			plainHelperSource &&
 			renderer.target === 'universal' &&
@@ -958,20 +944,26 @@ class OctaneBundlerCompiler {
 			return this._passThrough(code, collected);
 		}
 
-		if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
+		if (plainHelperSource) {
 			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
-			if (this.exclude.some((path) => file.includes(path))) return null;
+			if (this.exclude.some((path) => file.includes(path))) {
+				// Same conflict diagnostic as the full-compile gate: an ownership
+				// pragma inside an excluded path must not fail silent.
+				if (this.requireDirective) {
+					this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
+				}
+				return null;
+			}
 			if (!/from\s*['"]octane['"]/.test(code)) return null;
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return this._passThrough(code, collected);
 			}
-			// Plain project .ts/.js have no ownership concept in a mixed
-			// toolchain: they always stay with the host pipeline, so hook
-			// slotting is reserved for installed/linked octane packages there.
-			// Custom octane hooks in project code belong in .tsrx or
-			// pragma-marked .tsx modules — hence the diagnostic.
-			if (this.requireDirective && this._isProjectOwnedSource(file)) {
-				this._warnPlainModuleOctaneImport(code, filename);
+			// Hook slotting is an Octane-ownership rewrite, so the ownership
+			// gate applies to it exactly as to full compilation: an unmarked
+			// project module stays with the host pipeline (with the forgotten-
+			// pragma diagnostic), a pragma-marked one gets its hook slots.
+			if (this.requireDirective && !pragmaOwned && this._isProjectOwnedSource(file)) {
+				this._warnUnmarkedOctaneImport(code, filename);
 				return this._passThrough(code, collected);
 			}
 			if (this._hasManualHookSlots(file, collected)) {

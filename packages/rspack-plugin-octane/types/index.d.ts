@@ -107,12 +107,12 @@ export interface OctaneRspackLoaderOptions {
 	};
 	/**
 	 * Mixed-toolchain ownership gate: when `true`, a project `.tsrx` is
-	 * Octane's by extension, a project `.tsx` compiles only when it opens
-	 * with a leading `@jsxImportSource octane` pragma comment (any
-	 * registered renderer's intrinsics module also counts), and plain
-	 * project `.ts`/`.js` are never Octane-compiled. Unmarked project
-	 * `.tsx` passes through to the host framework's own pipeline. Installed
-	 * and linked packages keep their Octane package-manifest decision.
+	 * Octane's by extension, and a project `.tsx` (full compile) or plain
+	 * `.ts`/`.js` (hook slotting) is Octane's only when it opens with a
+	 * leading `@jsxImportSource octane` pragma comment (any registered
+	 * renderer's intrinsics module also counts). Unmarked project modules
+	 * pass through to the host framework's own pipeline. Installed and
+	 * linked packages keep their Octane package-manifest decision.
 	 * @default false
 	 */
 	requireDirective?: boolean;

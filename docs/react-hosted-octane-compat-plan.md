@@ -909,22 +909,24 @@ the ownership.
 Ownership is therefore declared in-band: with `requireDirective: true` on the
 bundler integration (a shared `octane/compiler/bundler` decision inherited by
 the Vite, Rspack, and Rsbuild adapters), a project `.tsrx` is Octane's by
-extension, a project `.tsx` is Octane's only when it opens with a leading
-`/** @jsxImportSource octane */` pragma comment — the same comment TypeScript
-reads for per-file JSX typing, so one marker both types the file and routes
-it — and plain project `.ts`/`.js` are never Octane-compiled. A registered
-renderer's intrinsics module (e.g. `@octanejs/three/intrinsics`) also claims
-the file; a foreign pragma (`react`, …) claims nothing.
+extension, and a project `.tsx`/`.ts`/`.js` is Octane's only when it opens
+with a leading `/** @jsxImportSource octane */` pragma comment. In a `.tsx`
+that is the same comment TypeScript reads for per-file JSX typing, so one
+marker both types the file and routes it; in a JSX-less `.ts`/`.js` module
+TypeScript ignores the pragma, so there it acts purely as the Octane
+ownership marker. A registered renderer's intrinsics module (e.g.
+`@octanejs/three/intrinsics`) also claims the file; a foreign pragma
+(`react`, …) claims nothing.
 
-- Pragma-marked project `.tsx`: full compile.
-- Unmarked project `.tsx`: untouched for the host toolchain, with a
-  once-per-file warning when the module imports from `octane` (usually a
-  forgotten pragma).
-- Plain project `.ts`/`.js`: always the host toolchain's — custom octane
-  hooks belong in `.tsrx` or pragma-marked `.tsx` (unslotted octane hooks
-  throw at runtime), and an octane-importing plain project module gets a
-  once-per-file warning saying so. Installed/linked octane packages keep
-  their hook slotting.
+- Pragma-marked project modules: full compile for `.tsx`, hook slotting for
+  plain `.ts`/`.js` (custom octane hooks need compiler-assigned slots —
+  unslotted octane hooks throw at runtime — so a project hooks module is
+  either `.tsrx`, pragma-marked, or covered by the package-manifest
+  `hookSlots.manual` protocol).
+- Unmarked project `.tsx`/`.ts`/`.js`: untouched for the host toolchain, with
+  a once-per-file warning when the module imports from `octane` (usually a
+  forgotten pragma). Installed/linked octane packages keep their hook
+  slotting with no pragma.
 - Project `.tsrx`: always Octane's. A project routing part of its `.tsrx`
   through a different tsrx compiler (`@tsrx/react`) lists those paths in
   `exclude`: excluded paths are never Octane's, and the exclusion wins even

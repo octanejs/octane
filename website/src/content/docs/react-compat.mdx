@@ -40,8 +40,8 @@ own root surfaces to the nearest **React** Suspense or error boundary.
 
 An Octane island is a compiled `.tsrx` (or Octane-compiled `.tsx`) module, while the
 host app is compiled by React's own toolchain. `requireDirective: true` tells the two
-compilers apart: every `.tsrx` is Octane's by extension, and an Octane-owned `.tsx`
-opts in with a leading `/** @jsxImportSource octane */` pragma:
+compilers apart: every `.tsrx` is Octane's by extension, and an Octane-owned
+`.tsx`/`.ts`/`.js` opts in with a leading `/** @jsxImportSource octane */` pragma:
 
 ```ts
 // vite.config.ts
@@ -205,7 +205,8 @@ own, and prop mistakes at `<OctaneCompat component={Island} props={…} />` or
 <h2 id="next">Next</h2>
 
 - [Build tools](/docs/build-tools#mixed-toolchains) — mixed-toolchain ownership:
-  `.tsrx` by extension, octane `.tsx` via the `@jsxImportSource octane` pragma.
+  `.tsrx` by extension, octane `.tsx`/`.ts`/`.js` via the
+  `@jsxImportSource octane` pragma.
 - [Quick start](/docs/quick-start) — install Octane and write your first `.tsrx`
   component.
 - [Differences from React](/docs/differences-from-react) — the deliberate divergences

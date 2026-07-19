@@ -160,12 +160,11 @@ export function octane(options = {}) {
 	const profileEnabled = options.profile === true && options.ssr !== true;
 	let projectRoot = resolve(process.cwd());
 	// The mixed-toolchain ownership gate: with `requireDirective: true`, a
-	// project `.tsrx` is Octane's by extension, Octane compiles a project
-	// `.tsx` only when it opens with a leading
-	// `/** @jsxImportSource octane */` pragma, and plain project `.ts`/`.js`
-	// are never Octane-compiled (unmarked modules belong to the host
-	// framework's own pipeline — e.g. React's JSX transform). Diagnostics
-	// route to Vite's logger once it exists.
+	// project `.tsrx` is Octane's by extension, and Octane compiles a project
+	// `.tsx` (full compile) or plain `.ts`/`.js` (hook slotting) only when it
+	// opens with a leading `/** @jsxImportSource octane */` pragma (unmarked
+	// modules belong to the host framework's own pipeline — e.g. React's JSX
+	// transform). Diagnostics route to Vite's logger once it exists.
 	const requireDirective = options.requireDirective === true;
 	let logger = null;
 	const warn = (message) => (logger ?? console).warn(message);
