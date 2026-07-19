@@ -277,6 +277,182 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		expect(result.code).toContain('x.label');
 	});
 
+	it('lowers `module server` blocks to checkable TS with types flowing across the boundary', () => {
+		// The documented dialect (docs/ssr.md) puts a static import INSIDE the
+		// server block. Verbatim that can never typecheck (TS1147 for the
+		// in-block import, TS2307 for `from 'server'`), so the Volar path must
+		// lower the block to plain TS: hoisted imports + a namespace-valued
+		// binding the checker can see through.
+		const src =
+			'module server {\n' +
+			"\timport { commitOrder } from './server-domain.ts';\n" +
+			'\n' +
+			'\texport type Receipt = { id: string };\n' +
+			'\n' +
+			'\texport async function placeOrder(request: unknown) {\n' +
+			'\t\treturn commitOrder(request);\n' +
+			'\t}\n' +
+			'}\n' +
+			'\n' +
+			"import { placeOrder, type Receipt } from 'server';\n" +
+			'\n' +
+			'export function App() @{\n' +
+			"\tconst pending: Promise<{ id: string }> = placeOrder('r1');\n" +
+			'\tconst receipt: Receipt = { id: String(pending) };\n' +
+			'\t<button>{receipt.id}</button>\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/App.tsrx');
+		expect(result.errors).toEqual([]);
+		// The dialect never reaches the virtual TSX...
+		expect(result.code).not.toContain('module server');
+		expect(result.code).not.toContain("from 'server'");
+		// ...the block import is hoisted to module top level, ahead of the
+		// namespace the block lowered into. The namespace keeps the AUTHORED
+		// block name so the `server` identifier resolves and stays "used".
+		const hoistedAt = result.code.indexOf("import { commitOrder } from './server-domain.ts';");
+		const namespaceAt = result.code.indexOf('namespace server');
+		expect(hoistedAt).toBeGreaterThanOrEqual(0);
+		expect(namespaceAt).toBeGreaterThan(hoistedAt);
+		// Authored code keeps its mappings: the language server can still
+		// translate positions inside the block, at the boundary import, and on
+		// the block's own `server` name.
+		const mappedSourceOffsets = new Set(result.mappings.flatMap((m) => m.sourceOffsets));
+		expect(mappedSourceOffsets.has(src.indexOf('commitOrder'))).toBe(true);
+		expect(mappedSourceOffsets.has(src.indexOf('placeOrder'))).toBe(true);
+		expect(mappedSourceOffsets.has('module '.length)).toBe(true);
+
+		// Type-level end-to-end: the virtual TSX must produce ZERO diagnostics
+		// under the real TypeScript checker, and the server function's type must
+		// genuinely flow to the client side (a misuse must fail).
+		const misuse = compileToVolarMappings(
+			src.replace('Promise<{ id: string }>', 'Promise<number>'),
+			'/src/App.tsrx',
+		);
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-server-module-'));
+		try {
+			writeFileSync(
+				join(root, 'server-domain.ts'),
+				'export async function commitOrder(request: unknown): Promise<{ id: string }> {\n' +
+					'\treturn { id: String(request) };\n' +
+					'}\n',
+			);
+			writeFileSync(
+				join(root, 'dom-intrinsics.d.ts'),
+				'declare namespace JSX {\n' +
+					'\tinterface IntrinsicElements {\n' +
+					'\t\tbutton: { children?: unknown };\n' +
+					'\t}\n' +
+					'}\n',
+			);
+			const appFile = join(root, 'App.tsx');
+			const misuseFile = join(root, 'AppMisuse.tsx');
+			writeFileSync(appFile, result.code);
+			writeFileSync(misuseFile, misuse.code);
+			// noUnusedLocals proves the lowering leaves nothing dangling: the
+			// namespace is "used" via the boundary destructure, and the hoisted
+			// block import's only uses sit INSIDE the namespace, which count.
+			const options = {
+				allowImportingTsExtensions: true,
+				jsx: ts.JsxEmit.Preserve,
+				module: ts.ModuleKind.ESNext,
+				moduleResolution: ts.ModuleResolutionKind.Bundler,
+				noEmit: true,
+				noUnusedLocals: true,
+				skipLibCheck: true,
+				strict: true,
+				target: ts.ScriptTarget.ESNext,
+			};
+			const program = ts.createProgram({
+				rootNames: [join(root, 'dom-intrinsics.d.ts'), appFile],
+				options,
+			});
+			expect(ts.getPreEmitDiagnostics(program)).toHaveLength(0);
+
+			const misuseProgram = ts.createProgram({
+				rootNames: [join(root, 'dom-intrinsics.d.ts'), misuseFile],
+				options,
+			});
+			const misuseDiagnostics = ts.getPreEmitDiagnostics(misuseProgram);
+			expect(misuseDiagnostics).toHaveLength(1);
+			expect(ts.flattenDiagnosticMessageText(misuseDiagnostics[0].messageText, '\n')).toMatch(
+				/Promise<number>/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('aliases hoisted server-block imports whose local names the client half also uses', () => {
+		// The compiler's isolation rule stops a server block from REFERENCING
+		// client bindings, but both halves may import (or the client may use a
+		// global named like) the same identifier. Hoisting such an import
+		// verbatim would collide or shadow, so it hoists mangled and re-aliases
+		// inside the namespace — value AND type meanings must survive.
+		const src =
+			"import { commitOrder } from './client-domain.ts';\n" +
+			'\n' +
+			'module server {\n' +
+			"\timport { commitOrder, type Money } from './server-domain.ts';\n" +
+			'\n' +
+			'\texport async function placeOrder(amount: Money) {\n' +
+			'\t\treturn commitOrder(amount);\n' +
+			'\t}\n' +
+			'}\n' +
+			'\n' +
+			"import { placeOrder } from 'server';\n" +
+			'\n' +
+			'export function App() @{\n' +
+			"\tconst label: string = commitOrder('client');\n" +
+			'\tconst pending: Promise<{ id: string }> = placeOrder(12);\n' +
+			'\t<button>{label + String(pending)}</button>\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/App.tsrx');
+		expect(result.errors).toEqual([]);
+		expect(result.code).not.toContain('module server');
+
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-server-collision-'));
+		try {
+			writeFileSync(
+				join(root, 'client-domain.ts'),
+				'export function commitOrder(label: string): string {\n\treturn label;\n}\n',
+			);
+			writeFileSync(
+				join(root, 'server-domain.ts'),
+				'export type Money = number;\n' +
+					'export async function commitOrder(amount: Money): Promise<{ id: string }> {\n' +
+					'\treturn { id: String(amount) };\n' +
+					'}\n',
+			);
+			writeFileSync(
+				join(root, 'dom-intrinsics.d.ts'),
+				'declare namespace JSX {\n' +
+					'\tinterface IntrinsicElements {\n' +
+					'\t\tbutton: { children?: unknown };\n' +
+					'\t}\n' +
+					'}\n',
+			);
+			const appFile = join(root, 'App.tsx');
+			writeFileSync(appFile, result.code);
+			const program = ts.createProgram({
+				rootNames: [join(root, 'dom-intrinsics.d.ts'), appFile],
+				options: {
+					allowImportingTsExtensions: true,
+					jsx: ts.JsxEmit.Preserve,
+					module: ts.ModuleKind.ESNext,
+					moduleResolution: ts.ModuleResolutionKind.Bundler,
+					noEmit: true,
+					noUnusedLocals: true,
+					skipLibCheck: true,
+					strict: true,
+					target: ts.ScriptTarget.ESNext,
+				},
+			});
+			expect(ts.getPreEmitDiagnostics(program)).toHaveLength(0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('exposes the (transformed) AST for editor integrations that need to walk it', () => {
 		const src = "export function Foo() @{ <p>{'x'}</p> }\n";
 		const result = compileToVolarMappings(src, 'foo.tsrx');

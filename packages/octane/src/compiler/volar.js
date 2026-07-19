@@ -31,6 +31,7 @@ import {
 } from '@tsrx/core';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
+import { lowerServerModuleForTypes } from './volar-server-module.js';
 
 /**
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
@@ -152,7 +153,14 @@ export function compileToVolarMappings(source, filename, options) {
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	}).diagnostics;
-	const transformed = octaneTransform(ast, source, filename, {
+	// Lower the `module server { … }` dialect to plain checkable TS (hoisted
+	// imports + a namespace binding) BEFORE the typeOnly transform prints it —
+	// verbatim, a static import inside the block is TS1147 and the companion
+	// `import { fn } from 'server'` is TS2307. The lowering is copy-on-write:
+	// `ast` (passed below as `ast_from_source`) stays the original parse, and
+	// replacement nodes keep authored locations so mappings/hover still work.
+	const loweredAst = lowerServerModuleForTypes(ast);
+	const transformed = octaneTransform(loweredAst, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		typeOnly: true,

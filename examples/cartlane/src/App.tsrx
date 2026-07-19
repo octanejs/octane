@@ -30,13 +30,9 @@ import type { RenderRouteProps } from '@octanejs/vite-plugin';
 import './styles.css';
 
 module server {
-	// A `module server` block may not reference client-module bindings, and a
-	// static import here would be invalid TypeScript inside a namespace — the
-	// dynamic import keeps the server implementation out of the client bundle
-	// while staying checkable. `src/server.d.ts` types the matching
-	// `import { placeOrder } from 'server'` boundary below.
+	import { commitOrder } from './server-domain.ts';
+
 	export async function placeOrder(request: unknown) {
-		const { commitOrder } = await import('./server-domain.ts');
 		return commitOrder(request);
 	}
 }

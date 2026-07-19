@@ -147,7 +147,7 @@ catalogs:
     '@vitest/coverage-istanbul': 4.1.9
     '@vitest/coverage-v8': 4.1.9
     '@tsrx/core': ^0.1.43
-    '@tsrx/prettier-plugin': ^0.3.101
+    '@tsrx/prettier-plugin': ^0.3.102
     '@tsrx/typescript-plugin': ^0.3.101
     '@tsrx/ripple': ^0.1.44
     '@tsrx/react': ^0.2.43

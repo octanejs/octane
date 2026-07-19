@@ -274,8 +274,8 @@ catalogs:
       specifier: ^0.1.43
       version: 0.1.43
     '@tsrx/prettier-plugin':
-      specifier: ^0.3.101
-      version: 0.3.101
+      specifier: ^0.3.102
+      version: 0.3.102
     '@tsrx/react':
       specifier: ^0.2.43
       version: 0.2.43
@@ -714,7 +714,7 @@ importers:
         version: 2.31.0(@types/node@24.13.2)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.3.101(prettier@3.8.4)
+        version: 0.3.102(prettier@3.8.4)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
         version: 0.3.101(@tsrx/react@0.2.43(react@19.2.7))(@tsrx/ripple@0.1.44)(@tsrx/solid@0.1.43(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.10(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)))(typescript@5.9.3)
@@ -7410,8 +7410,8 @@ packages:
   '@tsrx/core@0.1.43':
     resolution: {integrity: sha512-LjyeyPGZfh8l+hS+J9g18nysFa663dqHBwPQi6/ABf/vhmEKNUu0W0BLkSoLtag5xuC2G3kW+5QSfpL3+ViMDQ==}
 
-  '@tsrx/prettier-plugin@0.3.101':
-    resolution: {integrity: sha512-/5RdXm8lPoaoLeDoYxmGgADncNqTG00pmaWksR2hj8iCJv8J9/MVOBKkuPqLERGw75G1gAcpTxzi0y8N2amUqw==}
+  '@tsrx/prettier-plugin@0.3.102':
+    resolution: {integrity: sha512-jBuMK3CSMsAKsRGrvzjCUdQbsDGJN0z1G3hVbdDQhvDHFam70Hb5kJT0ldkytvYrBvsI6YTuEBnlOGxAdhzVOQ==}
     peerDependencies:
       prettier: '>=2.0.0'
 
@@ -14887,7 +14887,7 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/prettier-plugin@0.3.101(prettier@3.8.4)':
+  '@tsrx/prettier-plugin@0.3.102(prettier@3.8.4)':
     dependencies:
       '@tsrx/core': 0.1.43
       prettier: 3.8.4

@@ -48,12 +48,13 @@ function stopLinkNavigation(event: MouseEvent): boolean {
 		event.altKey;
 }
 
+const isStringArray = (value: unknown): value is string[] => Array.isArray(value) &&
+	value.every((item) => typeof item === 'string');
+
 function readStringArray(key: string): string[] {
 	try {
 		const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
-		return Array.isArray(parsed) && parsed.every((value) => typeof value === 'string')
-			? parsed as string[]
-			: [];
+		return isStringArray(parsed) ? parsed : [];
 	} catch {
 		return [];
 	}
