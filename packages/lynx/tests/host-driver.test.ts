@@ -8,7 +8,9 @@ import {
 	disposeLynxHostContainer,
 	getLynxHostEventListener,
 	prepareLynxHostBatch,
+	resolveLynxHostNativeEvent,
 } from '../src/core/host-driver.js';
+import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import { createLynxElementPAPI, type LynxElementPAPI } from '../src/core/papi.js';
 
 interface FakeNode {
@@ -17,6 +19,12 @@ interface FakeNode {
 	parent: FakeNode | null;
 	readonly children: FakeNode[];
 	readonly attributes: Record<string, unknown>;
+	classes: string;
+	inlineStyle: string;
+	readonly dataset: Record<string, unknown>;
+	cssScope: { id: number; entryName?: string } | null;
+	readonly events: Map<string, string>;
+	selector: string;
 	id: string | null;
 	text: string;
 }
@@ -41,6 +49,12 @@ function createFakePAPI(): FakePAPI {
 		parent: null,
 		children: [],
 		attributes: {},
+		classes: '',
+		inlineStyle: '',
+		dataset: {},
+		cssScope: null,
+		events: new Map(),
+		selector: '',
 		id: null,
 		text,
 	});
@@ -123,6 +137,38 @@ function createFakePAPI(): FakePAPI {
 				}
 			});
 		},
+		setClasses(node, value) {
+			calls.push('setClasses');
+			node.classes = value;
+		},
+		setInlineStyles(node, value) {
+			calls.push('setInlineStyles');
+			node.inlineStyle =
+				typeof value === 'string'
+					? value
+					: Object.entries(value)
+							.map(([name, entry]) => `${name}:${entry}`)
+							.join(';');
+		},
+		setCssId(node, id, entryName) {
+			calls.push('setCssId');
+			node.cssScope = { id, ...(entryName === undefined ? null : { entryName }) };
+		},
+		setDataset(node, value) {
+			calls.push('setDataset');
+			for (const name of Object.keys(node.dataset)) delete node.dataset[name];
+			Object.assign(node.dataset, value);
+		},
+		setEvent(node, kind, name, listener) {
+			calls.push('setEvent');
+			const key = `${kind}:${name}`;
+			if (listener === undefined) node.events.delete(key);
+			else node.events.set(key, listener);
+		},
+		setRefSelector(node, value) {
+			calls.push('setRefSelector');
+			node.selector = value;
+		},
 		setId(node, id) {
 			calls.push('setId');
 			node.id = id;
@@ -166,6 +212,15 @@ describe('Lynx Element PAPI host driver', () => {
 		environment.clearGlobal();
 		environment.switchToMainThread();
 		try {
+			const setIds: Array<string | null> = [];
+			const testingSetId = globalThis.__SetID;
+			globalThis.__SetID = (node, id) => {
+				setIds.push(id);
+				// @lynx-js/testing-environment@0.3.0 assigns the value to a DOM
+				// string property. Contain that model mismatch here while asserting
+				// that the production adapter preserves the public null contract.
+				testingSetId(node, id ?? '');
+			};
 			const papi = createLynxElementPAPI(globalThis);
 			const container = createLynxHostContainer(papi, { root: 1 });
 			prepareLynxHostBatch(
@@ -182,6 +237,9 @@ describe('Lynx Element PAPI host driver', () => {
 
 			const page = container.page as unknown as Element;
 			expect(page.querySelector('#counter')?.textContent).toBe('Count: 0');
+			prepareLynxHostBatch(container, batch(2, [{ op: 'update', id: 1, props: {} }])).apply();
+			expect(setIds).toEqual(['counter', null]);
+			expect(page.querySelector('#counter')).toBeNull();
 			expect(disposeLynxHostContainer(container).errors).toEqual([]);
 			expect(page.children).toHaveLength(0);
 		} finally {
@@ -209,7 +267,7 @@ describe('Lynx Element PAPI host driver', () => {
 				{ op: 'create', id: 1, type: 'view', props: { id: 'parent', title: 'first' } },
 				{ op: 'create', id: 2, type: 'text', props: { id: 'label' } },
 				{ op: 'create', id: 3, type: '#text', props: { value: 'Count: 0' } },
-				{ op: 'event', id: 1, type: 'tap', listener: { id: 101, priority: 'discrete' } },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 101, priority: 'discrete' } },
 				{ op: 'insert', parent: null, id: 1, before: null },
 				{ op: 'insert', parent: 1, id: 2, before: null },
 				{ op: 'insert', parent: 2, id: 3, before: null },
@@ -230,7 +288,7 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(label).toMatchObject({ type: 'text', id: 'label' });
 		expect(label.attributes.hidden).toBe(true);
 		expect(text).toMatchObject({ type: 'raw-text', text: 'Count: 0' });
-		expect(getLynxHostEventListener(container, 1, 'tap')).toEqual({
+		expect(getLynxHostEventListener(container, 1, 'bindtap')).toEqual({
 			id: 101,
 			priority: 'discrete',
 		});
@@ -288,6 +346,206 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(page.children).toEqual([]);
 		expect(container.instanceCount).toBe(0);
 		expect(papi.flushCount).toBe(3);
+	});
+
+	it('routes classes, styles, datasets, CSS scopes, assets, and removals through PAPI', () => {
+		const { container, driver, page } = createHost(12);
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'image',
+					props: {
+						id: 'hero',
+						class: ['card', { active: true }],
+						style: { width: '20rpx', opacity: 0.5 },
+						'data-index': 1,
+						src: '/assets/hero.abc.png',
+						placeholder: 'data:image/png;base64,AA==',
+						title: 'before',
+						[LYNX_CSS_SCOPE_PROP]: { cssId: 1185352, entryName: 'lazy-card' },
+					},
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+
+		const image = page.children[0];
+		expect(image).toMatchObject({
+			id: 'hero',
+			classes: 'card active',
+			inlineStyle: 'width:20rpx;opacity:0.5',
+			cssScope: { id: 1185352, entryName: 'lazy-card' },
+		});
+		expect(image.dataset).toEqual({ index: 1 });
+		expect(image.attributes).toEqual({
+			src: '/assets/hero.abc.png',
+			placeholder: 'data:image/png;base64,AA==',
+			title: 'before',
+		});
+		expect(image.selector).toBe('r12-h1-g1');
+
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{
+					op: 'update',
+					id: 1,
+					props: {
+						className: 'plain',
+						style: null,
+						'data-active': null,
+						src: '/assets/hero.next.png',
+						[LYNX_CSS_SCOPE_PROP]: 2000000,
+					},
+				},
+			]),
+		).apply();
+
+		expect(image.id).toBe(null);
+		expect(image.classes).toBe('plain');
+		expect(image.inlineStyle).toBe('');
+		expect(image.dataset).toEqual({ active: null });
+		expect(image.cssScope).toEqual({ id: 2000000 });
+		expect(image.attributes).toEqual({ src: '/assets/hero.next.png' });
+		expect(driver.updates?.classify('image', { [LYNX_CSS_SCOPE_PROP]: 2000000 }, {})).toBe(
+			'recreate',
+		);
+		expect(() =>
+			prepareLynxHostBatch(container, batch(3, [{ op: 'update', id: 1, props: {} }])),
+		).toThrow(/requires a recreate command/);
+
+		const recreated = prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'recreate', id: 1, type: 'image', props: {} }]),
+		);
+		recreated.apply();
+		const replacement = page.children[0];
+		expect(replacement).not.toBe(image);
+		expect(replacement.cssScope).toBe(null);
+		expect(replacement.selector).toBe('r12-h1-g2');
+		expect(driver.getPublicInstance(container, 1)?.generation).toBe(2);
+	});
+
+	it('keeps retained visibility separate from the authored hidden prop', () => {
+		const { container, page } = createHost();
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { hidden: false } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const node = page.children[0];
+		expect(node.attributes.hidden).toBe(false);
+
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{ op: 'visibility', id: 1, state: 'hidden' },
+				{ op: 'update', id: 1, props: { hidden: true } },
+			]),
+		).apply();
+		expect(node.attributes.hidden).toBe(true);
+
+		prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'visibility', id: 1, state: 'visible' }]),
+		).apply();
+		expect(node.attributes.hidden).toBe(true);
+
+		prepareLynxHostBatch(
+			container,
+			batch(4, [
+				{ op: 'visibility', id: 1, state: 'hidden' },
+				{ op: 'update', id: 1, props: {} },
+				{ op: 'visibility', id: 1, state: 'visible' },
+			]),
+		).apply();
+		expect(node.attributes).not.toHaveProperty('hidden');
+	});
+
+	it('binds every native event kind, avoids handler-only rebinding, and cleans stale tokens', () => {
+		const { container, page, papi } = createHost(20);
+		const kinds = [
+			['bindtap', 'bindEvent:tap'],
+			['catchtap', 'catchEvent:tap'],
+			['capture-bindtap', 'capture-bind:tap'],
+			['capture-catchtap', 'capture-catch:tap'],
+			['global-bindtap', 'global-bindEvent:tap'],
+		] as const;
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: {} },
+				...kinds.map(([type], index) => ({
+					op: 'event' as const,
+					id: 1,
+					type,
+					listener: { id: 101 + index, priority: 'discrete' as const },
+				})),
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const first = page.children[0];
+		for (const [, key] of kinds) expect(first.events.has(key)).toBe(true);
+		const originalToken = first.events.get('bindEvent:tap')!;
+		expect(resolveLynxHostNativeEvent(container, originalToken)).toEqual({
+			listener: 101,
+			priority: 'discrete',
+		});
+
+		papi.resetCalls();
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{
+					op: 'event',
+					id: 1,
+					type: 'bindtap',
+					listener: { id: 101, priority: 'default' },
+				},
+			]),
+		).apply();
+		expect(papi.calls).not.toContain('setEvent');
+		expect(first.events.get('bindEvent:tap')).toBe(originalToken);
+		expect(resolveLynxHostNativeEvent(container, originalToken)?.priority).toBe('default');
+
+		prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'visibility', id: 1, state: 'hidden' }]),
+		).apply();
+		expect(first.events.size).toBe(0);
+		expect(resolveLynxHostNativeEvent(container, originalToken)).toBe(null);
+		prepareLynxHostBatch(
+			container,
+			batch(4, [{ op: 'visibility', id: 1, state: 'visible' }]),
+		).apply();
+		expect(first.events.size).toBe(5);
+
+		prepareLynxHostBatch(
+			container,
+			batch(5, [{ op: 'recreate', id: 1, type: 'view', props: {} }]),
+		).apply();
+		const replacement = page.children[0];
+		expect(replacement.events.size).toBe(5);
+		expect(first.events.size).toBe(0);
+		expect(resolveLynxHostNativeEvent(container, originalToken)).toBe(null);
+		const replacementToken = replacement.events.get('bindEvent:tap')!;
+		expect(replacementToken).not.toBe(originalToken);
+		expect(resolveLynxHostNativeEvent(container, replacementToken)?.listener).toBe(101);
+
+		prepareLynxHostBatch(
+			container,
+			batch(6, [
+				{ op: 'remove', parent: null, id: 1 },
+				{ op: 'destroy', id: 1 },
+			]),
+		).apply();
+		expect(replacement.events.size).toBe(0);
+		expect(resolveLynxHostNativeEvent(container, replacementToken)).toBe(null);
 	});
 
 	it('recreates a host while preserving child identity and changing only its handle generation', () => {
@@ -380,6 +638,34 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(() =>
 			prepareLynxHostBatch(
 				container,
+				batch(2, [
+					{ op: 'create', id: 3, type: '#text', props: { value: 'illegal' } },
+					{ op: 'insert', parent: 1, id: 3, before: null },
+				]),
+			),
+		).toThrow(/may only be placed directly under a text host/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(2, [
+					{
+						op: 'create',
+						id: 3,
+						type: 'view',
+						props: { 'octane-ref': 'spread-overwrite' },
+					},
+				]),
+			),
+		).toThrow(/reserved for generation-scoped query handles/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(2, [{ op: 'event', id: 1, type: 'tap', listener: { id: 1, priority: 'discrete' } }]),
+			),
+		).toThrow(/not a Lynx event prop/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
 				batch(2, [{ op: 'lifecycle', id: 1, type: 'mount', listener: { id: 1 } }]),
 			),
 		).toThrow(/lifecycle commands are not supported/);
@@ -439,7 +725,7 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(() =>
 			prepareLynxHostBatch(
 				container,
-				batch(2, [{ op: 'event', id: 1, type: 'tap', listener: null }]),
+				batch(2, [{ op: 'event', id: 1, type: 'bindtap', listener: null }]),
 			),
 		).toThrow(/post-fault teardown must remove every remaining host/);
 

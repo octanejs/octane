@@ -912,8 +912,9 @@ function isStaticallyPrimitiveTextExpression(node) {
 
 function validateHostTemplates(ast, state, validation, isAuthored) {
 	const textParents = validation.textParents === undefined ? null : new Set(validation.textParents);
+	const textHosts = validation.textHosts === undefined ? null : new Set(validation.textHosts);
 	const hostProps = validation.hostProps;
-	if (textParents === null && hostProps === undefined) return;
+	if (textParents === null && textHosts === null && hostProps === undefined) return;
 	const sharedProps = hostProps?.['*'] ?? [];
 	const seen = new WeakSet();
 	const visit = (node, nearestHost = null) => {
@@ -964,6 +965,20 @@ function validateHostTemplates(ast, state, validation, isAuthored) {
 			// the caller's nearest host through that semantic boundary; the component
 			// body is validated independently at the host site it actually authors.
 			const nextHost = isHost ? name : null;
+			if (
+				isHost &&
+				textHosts !== null &&
+				textHosts.has(name) &&
+				nearestHost !== null &&
+				(textParents === null || !textParents.has(nearestHost)) &&
+				isAuthored(node)
+			) {
+				throw universalError(
+					state.filename,
+					node,
+					`renderer ${JSON.stringify(state.renderer.id)} does not allow <${name}> under <${nearestHost}>.`,
+				);
+			}
 			const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
 			if (isHost && hostProps !== undefined && Object.hasOwn(hostProps, name)) {
 				const tagProps = hostProps[name];
@@ -1122,6 +1137,10 @@ function jsxName(node) {
 
 function attributeName(attribute) {
 	return attribute?.name?.type === 'JSXIdentifier' ? attribute.name.name : null;
+}
+
+function canonicalHostAttributeName(name, canonicalizeHostClass) {
+	return canonicalizeHostClass && name === 'className' ? 'class' : name;
 }
 
 function jsxNameExpression(node, state) {
@@ -1338,14 +1357,15 @@ function addDynamic(context, expression) {
 	return { kind: 'slot', slot };
 }
 
-function compileProps(attributes, childrenExpression, state) {
+function compileProps(attributes, childrenExpression, state, canonicalizeHostClass = false) {
 	const entries = [];
 	for (const attribute of attributes) {
 		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 			entries.push(`['spread', (${printDynamicExpression(attribute.argument, state)})]`);
 			continue;
 		}
-		const name = attributeName(attribute);
+		const rawName = attributeName(attribute);
+		const name = canonicalHostAttributeName(rawName, canonicalizeHostClass);
 		if (name === null) {
 			throw universalError(state.filename, attribute, 'namespaced JSX attributes are unsupported.');
 		}
@@ -1368,8 +1388,12 @@ function compileProps(attributes, childrenExpression, state) {
 		throw universalError(state.filename, attribute, `unsupported value for JSX attribute ${name}.`);
 	}
 	return `${state.helpers.props}([${entries.join(', ')}]${
-		childrenExpression === null ? '' : `, ${childrenExpression}`
-	})`;
+		childrenExpression === null
+			? canonicalizeHostClass
+				? ', undefined'
+				: ''
+			: `, ${childrenExpression}`
+	}${canonicalizeHostClass ? ', true' : ''})`;
 }
 
 function compilePlainPropsObject(attributes, state) {
@@ -1393,7 +1417,7 @@ function compilePlainPropsObject(attributes, state) {
 	return `{ ${entries.join(', ')} }`;
 }
 
-function compileAttribute(attribute, context, state) {
+function compileAttribute(attribute, context, state, canonicalizeHostClass) {
 	if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 		throw universalError(
 			state.filename,
@@ -1401,7 +1425,7 @@ function compileAttribute(attribute, context, state) {
 			'host spreads require the ordered universal prop program.',
 		);
 	}
-	const name = attributeName(attribute);
+	const name = canonicalHostAttributeName(attributeName(attribute), canonicalizeHostClass);
 	if (name === null) {
 		throw universalError(state.filename, attribute, 'namespaced host attributes are unsupported.');
 	}
@@ -1434,6 +1458,7 @@ function compileHostElement(node, context, state) {
 	if (!/^[a-z]/.test(type)) return compileComponentElement(node, context, state);
 	recordMapping(state, JSON.stringify(type), node.openingElement?.name ?? node.name ?? node);
 	const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+	const canonicalizeHostClass = rendererHasCapability(state, 'class-name-alias');
 	const needsOrderedProps =
 		attributes.some(
 			(attribute) =>
@@ -1442,17 +1467,21 @@ function compileHostElement(node, context, state) {
 				attributeName(attribute) === 'key' ||
 				attributeName(attribute) === 'children',
 		) ||
-		new Set(attributes.map(attributeName).filter(Boolean)).size !==
-			attributes.filter((attribute) => attributeName(attribute) !== null).length;
+		new Set(
+			attributes
+				.map(attributeName)
+				.map((name) => canonicalHostAttributeName(name, canonicalizeHostClass))
+				.filter(Boolean),
+		).size !== attributes.filter((attribute) => attributeName(attribute) !== null).length;
 	const props = {};
 	const bindings = [];
 	let propsSlot = null;
 	if (needsOrderedProps) {
 		propsSlot = context.values.length;
-		context.values.push(compileProps(attributes, null, state));
+		context.values.push(compileProps(attributes, null, state, canonicalizeHostClass));
 	} else {
 		for (const attribute of attributes) {
-			const compiled = compileAttribute(attribute, context, state);
+			const compiled = compileAttribute(attribute, context, state, canonicalizeHostClass);
 			if (compiled === null) continue;
 			if ('slot' in compiled) bindings.push([compiled.name, compiled.slot]);
 			else props[compiled.name] = compiled.staticValue;

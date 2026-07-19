@@ -1,5 +1,5 @@
 /**
- * The Milestone 2 implementation is exercised internally with
+ * The Milestone 3 implementation is exercised internally with
  * `@lynx-js/testing-environment`, but this public testing entry remains
  * metadata-only until the Milestone 5 production path. It intentionally
  * exports no mock renderer or fake root.

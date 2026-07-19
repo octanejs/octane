@@ -1,12 +1,14 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestone 1 implemented; Milestone 2 private source/test implementation complete but exit-blocked by Milestone 0**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestone 3 host-side private source/test implementation complete but formal exit blocked**
 
 Upstream audit date: **2026-07-18**
 
 Milestone 1 evidence date: **2026-07-19**
 
 Milestone 2 source/test evidence date: **2026-07-19**
+
+Milestone 3 source/test evidence date: **2026-07-19**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -114,7 +116,7 @@ export const lynxRenderer = {
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['visibility'],
+	capabilities: ['class-name-alias', 'visibility'],
 } as const;
 ```
 
@@ -630,6 +632,19 @@ pre-ACK failure exposes no public mutation; post-ACK faults are reported once;
 late ACKs/events and stale roots are rejected.
 
 ### Milestone 3 — text, props, CSS, assets, events, refs, and core elements (3–5 engineer-weeks)
+
+> **Progress (2026-07-19): host-side private source/test implementation
+> complete; formal exit blocked.** Legal raw-text contexts, deliberate
+> prop/class/style/dataset/CSS-scope/asset routing, background native-event
+> tokens and priority scopes, acknowledgement-gated asynchronous NodesRef
+> handles, core-element PAPI creation, and retained visibility are implemented
+> and covered by unit or official-JavaScript-environment tests. This is not the
+> Milestone 3 exit: `__AddEvent` publicly installs tokens, but production native
+> delivery still depends on the private `lynxCoreInject.tt.publishEvent`
+> receiver; CSS import/CSS Module extraction and template/asset assembly remain
+> Milestone 5 work; the testing environment cannot prove dataset-key deletion
+> or native query/layout behavior; and no pinned ReactLynx differential has run
+> on Explorer, Android, or iOS.
 
 - Implement the first intrinsic slice and legal raw-text lowering.
 - Implement attribute removal, class composition, datasets, inline styles, CSS
