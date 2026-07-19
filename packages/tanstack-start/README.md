@@ -50,9 +50,11 @@ with ONE deliberate exception:
 octane's native `StreamOptions.injection` API (replacing the
 `transformStreamWithRouter` byte-level merge and its doctype/style wrapper
 transforms). That file is kept **byte-identical** to the patch prepared for
-the upstream PR (TanStack/router#7847,
-`~/Projects/tanstack-octane-native-injection.patch`) so vendor-vs-upstream
-diffs stay clean; once upstream applies it, the file is verbatim again.
+the upstream PR (TanStack/router#7847), committed here as
+[`tanstack-octane-native-injection.patch`](./tanstack-octane-native-injection.patch)
+so vendor-vs-upstream diffs stay clean and the claim is verifiable
+(`git apply --check` on a checkout of the PR branch); once upstream applies
+it, the file is verbatim again.
 To update, re-vendor from a newer upstream build and re-apply those rewrites.
 Once the upstream PR lands and `@tanstack/octane-*` publish to npm, `vendor/`
 can be deleted and this facade repointed at registry dependencies.
