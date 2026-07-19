@@ -146,12 +146,12 @@ catalogs:
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.9
     '@vitest/coverage-v8': 4.1.9
-    '@tsrx/core': ^0.1.43
-    '@tsrx/prettier-plugin': ^0.3.102
-    '@tsrx/typescript-plugin': ^0.3.101
-    '@tsrx/ripple': ^0.1.44
-    '@tsrx/react': ^0.2.43
-    '@tsrx/solid': ^0.1.43
+    '@tsrx/core': ^0.1.44
+    '@tsrx/prettier-plugin': ^0.3.103
+    '@tsrx/typescript-plugin': ^0.3.103
+    '@tsrx/ripple': ^0.1.45
+    '@tsrx/react': ^0.2.44
+    '@tsrx/solid': ^0.1.44
     '@tsrx/vite-plugin-react': ^0.0.75
     '@tsrx/vite-plugin-solid': ^0.0.73
     '@types/babel__core': 7.20.5

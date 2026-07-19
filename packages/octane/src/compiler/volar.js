@@ -31,7 +31,6 @@ import {
 } from '@tsrx/core';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
-import { lowerServerModuleForTypes } from './volar-server-module.js';
 
 /**
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
@@ -47,6 +46,13 @@ import { lowerServerModuleForTypes } from './volar-server-module.js';
  *     `src/runtime.ts`'s ref binding), so no `mergeRefs` helper is needed.
  *   - `validation.requireUseServerForAwait: false` — no server-component
  *     concept in octane (no top-level await validation gates).
+ *   - `serverModule` — octane's `module server { … }` dialect plus its
+ *     boundary `import { fn } from 'server'` (docs/ssr.md). The shared
+ *     type-only transform lowers it to plain checkable TS (hoisted block
+ *     imports + a namespace-valued binding); verbatim it can never
+ *     typecheck (TS1147 in-block import, TS2307 boundary import). The
+ *     runtime compiler (`compile.js`) owns the dialect's real semantics
+ *     (isolation validation, SSR namespace, RPC stubs) and is unaffected.
  *
  * `imports.suspense` and `imports.fragment` aren't real components in
  * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
@@ -76,6 +82,10 @@ const OCTANE_PLATFORM = {
 	},
 	validation: {
 		requireUseServerForAwait: false,
+	},
+	serverModule: {
+		blockName: 'server',
+		importSpecifier: 'server',
 	},
 };
 
@@ -153,14 +163,13 @@ export function compileToVolarMappings(source, filename, options) {
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	}).diagnostics;
-	// Lower the `module server { … }` dialect to plain checkable TS (hoisted
-	// imports + a namespace binding) BEFORE the typeOnly transform prints it —
-	// verbatim, a static import inside the block is TS1147 and the companion
-	// `import { fn } from 'server'` is TS2307. The lowering is copy-on-write:
-	// `ast` (passed below as `ast_from_source`) stays the original parse, and
-	// replacement nodes keep authored locations so mappings/hover still work.
-	const loweredAst = lowerServerModuleForTypes(ast);
-	const transformed = octaneTransform(loweredAst, source, filename, {
+	// The `module server { … }` dialect is lowered to plain checkable TS by
+	// the shared transform itself (via the platform's `serverModule` option)
+	// before the typeOnly print. The lowering is copy-on-write inside
+	// @tsrx/core: `ast` (passed below as `ast_from_source`) stays the
+	// original parse, and replacement nodes keep authored locations so
+	// mappings/hover still work.
+	const transformed = octaneTransform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
 		typeOnly: true,
