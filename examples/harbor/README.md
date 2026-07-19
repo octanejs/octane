@@ -36,7 +36,7 @@ and exercised by `benchmarks/react-hosted-islands`.
   mount through both OctaneCompat authoring forms — the element-child form and
   the `component`/`props` transport form — and every island prop is checked
   against the island's own octane-typed `.tsrx` signature (`pnpm typecheck`
-  runs `tsrx-tsc`; `src/island-boundary.test-d.tsx` pins the boundary with
+  runs `tsrx-tsc`; the tsconfig registers `@tsrx/typescript-plugin` so `.tsrx` imports resolve typed in the editor (TypeScript 5.9/6.x); `src/island-boundary.test-d.tsx` pins the boundary with
   `@ts-expect-error` cases).
 - `src/islands/*.tsrx` — open with `'use octane'`; the Vite config's
   `requireDirective` split gives Octane exactly these modules and

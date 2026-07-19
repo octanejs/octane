@@ -13,7 +13,12 @@
     "strict": true,
     "types": ["node", "vite/client"],
     "jsx": "react-jsx",
-    "jsxImportSource": "octane"
+    "jsxImportSource": "octane",
+    "plugins": [
+      {
+        "name": "@tsrx/typescript-plugin"
+      }
+    ]
   },
   "include": ["src/**/*", "tests/**/*.ts", "env.d.ts", "vite.config.ts", "mdx-options.ts"],
   "exclude": ["node_modules"]

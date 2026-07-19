@@ -176,6 +176,33 @@ list of APIs Octane leaves out.
 	</p>
 </aside>
 
+<h2 id="editor-and-type-checking">Editor and type checking</h2>
+
+Islands keep their real octane types across the boundary — no `declare module
+'*.tsrx'` shims. Two pieces of setup make that work in a React host project:
+
+1. **Type checking**: use `tsrx-tsc` instead of plain `tsc` so `.tsrx` islands
+   join the program with their exported types:
+
+```json
+{ "scripts": { "typecheck": "tsrx-tsc --noEmit -p tsconfig.json" } }
+```
+
+2. **Editor**: register the TypeScript plugin in `tsconfig.json` so imports
+   like `./islands/PriceBadge.tsrx` resolve with full types in `.tsx` files
+   (requires the editor to use TypeScript 5.9/6.x — the plugin API is not
+   available under TS 7 previews):
+
+```json
+{ "compilerOptions": { "plugins": [{ "name": "@tsrx/typescript-plugin" }] } }
+```
+
+The host tsconfig stays pure React (`"jsx": "react-jsx"`, no
+`jsxImportSource`) — each `.tsrx` island types against octane's JSX on its
+own, and prop mistakes at `<OctaneCompat component={Island} props={…} />` or
+`<Island />` call sites surface as ordinary type errors. See
+`examples/harbor` for a complete working setup.
+
 <h2 id="next">Next</h2>
 
 - [Build tools](/docs/build-tools#mixed-toolchains) — the `'use octane'` directive and
