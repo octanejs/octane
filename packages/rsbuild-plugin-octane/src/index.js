@@ -415,14 +415,17 @@ export function pluginOctane(inlineOptions = {}) {
 			api.modifyEnvironmentConfig((config, { mergeEnvironmentConfig }) => {
 				// Octane and several framework bindings use this conventional guard for
 				// diagnostics and production-only branches. Rsbuild does not define it
-				// when a programmatic build inherits mode "none", so scope the define to
-				// browser environments where the Node `process` global is unavailable.
-				if (config.output.target === 'node') return config;
+				// when a programmatic build inherits mode "none". Browser output always
+				// needs a replacement because `process` is absent; production Node output
+				// also needs one so Rspack can remove DEV-only diagnostics without relying
+				// on minification. Keep the Node dev server runtime-controlled.
+				const productionBuild = isProductionBuild();
+				if (config.output.target === 'node' && !productionBuild) return config;
 				return mergeEnvironmentConfig(config, {
 					source: {
 						define: {
 							'process.env.NODE_ENV': JSON.stringify(
-								isProductionBuild() ? 'production' : 'development',
+								productionBuild ? 'production' : 'development',
 							),
 						},
 					},
