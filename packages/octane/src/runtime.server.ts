@@ -5910,6 +5910,22 @@ function documentTailStart(body: string): number {
 	return DOCUMENT_TAIL_RE.test(body.slice(index)) ? index : -1;
 }
 
+// A document render's markup is the root `<html>` element wrapped only by
+// hydration block markers — a prefix scan bounded by wrapper depth, so the
+// common fragment path pays a few byte compares, not a body scan. Streaming
+// renders of a document lead with `<!DOCTYPE html>` (React parity: Fizz emits
+// the doctype whenever the root renders `<html>`, and its test harness treats
+// a doctype-less `<html>` as "almost certainly a bug in React" — per
+// ReactDOMFizzServer-test.js:237, React canary b740af2). Buffered
+// renderToString/renderToStaticMarkup stay doctype-free, also per React.
+function isDocumentRoot(body: string): boolean {
+	let i = 0;
+	while (body.startsWith('<!--[-->', i)) i += 8;
+	if (!body.startsWith('<html', i)) return false;
+	const next = body.charCodeAt(i + 5);
+	return next === 62 /* > */ || next === 32 || next === 9 || next === 10 || next === 13;
+}
+
 // Locate the insertion point just inside a document's opening <head> tag —
 // where renderer-owned leading styles and hoisted head elements belong in
 // document mode. Quote-aware so an attribute value containing '>' cannot
@@ -6212,36 +6228,37 @@ async function runStream(
 			escapeEntireInlineStyleContent(sheet) +
 			'</style>';
 	}
-	// DOCUMENT MODE (external injection + the shell renders a document): the
-	// closing tail is split out of the shell and written LAST — injected chunks
-	// and streamed segments then land inside <body> before it (streamed
-	// segments otherwise trail `</html>`, which browsers reparent but external
-	// merge layers must not re-parse around); `<!DOCTYPE html>` leads the
-	// response; and renderer-owned leading styles + hoisted head elements move
-	// inside the authored <head> instead of preceding `<html>`. The tail
-	// carries only closing tags + block markers, so it needs no vt stripping.
-	// Without injection the shell shape is unchanged.
-	let shell = '';
+	// Streaming DOCUMENT renders always lead with `<!DOCTYPE html>` — React
+	// Fizz parity, injection or not (buffered renderers stay doctype-free,
+	// also per React; see isDocumentRoot).
+	//
+	// DOCUMENT MODE (external injection + the shell renders a document)
+	// additionally restructures the shell: the closing tail is split out and
+	// written LAST — injected chunks and streamed segments then land inside
+	// <body> before it (streamed segments otherwise trail `</html>`, which
+	// browsers reparent but external merge layers must not re-parse around) —
+	// and renderer-owned leading styles + hoisted head elements move inside
+	// the authored <head> instead of preceding `<html>`. The tail carries only
+	// closing tags + block markers, so it needs no vt stripping. Without
+	// injection the shell shape is otherwise unchanged.
+	const documentRoot = isDocumentRoot(pass.body);
+	let shell = documentRoot ? '<!DOCTYPE html>' : '';
 	let heldDocumentTail = '';
-	if (injection !== undefined) {
+	if (injection !== undefined && documentRoot) {
 		const tailStart = documentTailStart(pass.body);
 		if (tailStart !== -1) {
 			heldDocumentTail = pass.body.slice(tailStart);
 			const bodyHtml = pass.body.slice(0, tailStart);
 			const headInsert = documentHeadInsertionPoint(bodyHtml);
-			shell =
+			shell +=
 				headInsert !== -1
-					? '<!DOCTYPE html>' +
-						bodyHtml.slice(0, headInsert) +
-						leadingStyles +
-						pass.head +
-						bodyHtml.slice(headInsert)
-					: '<!DOCTYPE html>' + leadingStyles + pass.head + bodyHtml;
+					? bodyHtml.slice(0, headInsert) + leadingStyles + pass.head + bodyHtml.slice(headInsert)
+					: leadingStyles + pass.head + bodyHtml;
 		} else {
-			shell = leadingStyles + pass.head + pass.body;
+			shell += leadingStyles + pass.head + pass.body;
 		}
 	} else {
-		shell = leadingStyles + pass.head + pass.body;
+		shell += leadingStyles + pass.head + pass.body;
 	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
