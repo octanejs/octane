@@ -31,7 +31,7 @@ const meta = (key: string): string | undefined => {
 describe('seo artifacts', () => {
 	it('sitemap lists the site routes and every published doc', () => {
 		const sitemap = read('sitemap.xml');
-		for (const path of ['/', '/docs', '/benchmarks', '/playground']) {
+		for (const path of ['/', '/docs', '/benchmarks', '/playground', '/errors']) {
 			expect(sitemap).toContain(`<loc>https://octanejs.dev${path}</loc>`);
 		}
 		for (const doc of docs) {
@@ -39,7 +39,7 @@ describe('seo artifacts', () => {
 		}
 		// No stale entries: every listed URL is one of the above.
 		const listed = Array.from(sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)).map((m) => m[1]);
-		expect(listed).toHaveLength(4 + docs.length);
+		expect(listed).toHaveLength(5 + docs.length);
 	});
 
 	it('robots.txt allows crawling and points at the sitemap', () => {

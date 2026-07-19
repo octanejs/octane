@@ -31,6 +31,8 @@ const ROUTES = [
 	'/docs/react-compat',
 	'/docs/profiling',
 	'/docs/bindings',
+	'/errors',
+	'/errors/3?args%5B%5D=%22quoted%22',
 	'/benchmarks',
 	'/playground',
 ];
@@ -635,7 +637,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
 	let server: ChildProcess;
 	let PREVIEW_PORT: number;
-	const vercelEnv = { NITRO_PRESET: 'vercel' };
+	const vercelEnv = { NODE_ENV: 'production', NITRO_PRESET: 'vercel' };
 	const outputDir = join(WEBSITE, '.vercel/output');
 
 	beforeAll(async () => {

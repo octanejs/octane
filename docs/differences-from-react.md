@@ -157,15 +157,37 @@ canonical camelCase aliases (`strokeWidth` → `stroke-width`, `xlinkHref`,
 `className`/`htmlFor`) write the native attribute.
 
 What still differs: attribute **names** pass through natively — native
-spellings (`accept-charset`, `arabic-form`) are the idiom and simply work, and
-there is no exhaustive `possibleStandardNames` DEV table. Only a curated slice
-of genuinely-broken casings warns in dev (`autofocus` → `autoFocus`,
+spellings (`accept-charset`, `arabic-form`) are the idiom and simply work.
+Diagnostic coverage is expanding progressively from the latest upstream behavior
+without shipping React's complete `possibleStandardNames` table as runtime data.
+Today, a curated slice of genuinely-broken casings warns in dev (`autofocus` → `autoFocus`,
 `defaultvalue` → `defaultValue`, `defaultchecked` → `defaultChecked`,
 lowercase `on*` function props → camelCase). Odd objects coerce leniently via
 `toString()` (with a dev `[object Object]` warning) instead of throwing. Octane
 also retains `<area href="">` as a current-document hyperlink, while React
 strips it; a statically authored lowercase SVG `textlength` is canonicalized by
 the browser parser instead of following React's imperative warning path.
+
+## Development diagnostics and production errors
+
+Octane progressively ports applicable development warnings and errors from the
+latest upstream React/ReactDOM source. For a diagnostic classified as exact
+parity, its tests cover observable details such as the trigger, console channel or
+thrown constructor, message variants, dedupe lifetime, recovery, and
+component/source context. Current coverage is intentionally partial: the
+[latest-main diagnostic inventory](./react-diagnostics-plan.md#latest-main-diagnostic-inventory)
+records implemented, pending, adapted, divergent, and unsupported families.
+Diagnostics are adapted when an intentional Octane difference changes the useful
+guidance; React-only APIs remain outside the supported surface.
+
+Development builds retain complete messages. Framework-authored errors in the
+core DOM client and server runtimes that must still throw in production use an
+[Octane-owned error-code catalog](../packages/octane/error-codes/README.md) and
+compact links to `https://octanejs.dev/errors/<code>`. Octane's numbers are
+unrelated to React's and are append-only so an already-deployed bundle continues
+to decode correctly. Compiler diagnostics keep their symbolic `OCTANE_*` codes,
+and user-thrown or transported error messages are never rewritten as framework
+errors.
 
 ## `class`/`className` compose clsx-style
 

@@ -25,11 +25,53 @@ function replaceWithMismatchedMarkup(container: HTMLElement): void {
 }
 
 const mismatch = { mutateServerDom: replaceWithMismatchedMarkup } as const;
+const PROD_COMPILE = process.env.OCTANE_TEST_COMPILE_MODE === 'prod';
+
+function invalidValueWarning(name: string, tag: string): string {
+	return (
+		`Invalid value for prop \`${name}\` on <${tag}> tag. ` +
+		'Either remove it from the element, or pass a string or number value to keep it in the DOM.'
+	);
+}
+
+function nonBooleanTrueWarning(name: string): string {
+	return (
+		`Received \`true\` for a non-boolean attribute \`${name}\`. ` +
+		`If you want to write it to the DOM, pass a string instead: ` +
+		`${name}="true" or ${name}={value.toString()}.`
+	);
+}
+
+function expectAttributeDiagnostics(expected: readonly string[]) {
+	return (diagnostics: readonly string[], observation: { mode: string }): void => {
+		const mismatches = diagnostics.filter((message) => message.includes('hydration mismatch'));
+		const attributes = diagnostics.filter(
+			(message) =>
+				message.startsWith('Invalid value for prop') ||
+				message.startsWith('Received `true` for a non-boolean attribute') ||
+				message.startsWith('Received `false` for a non-boolean attribute'),
+		);
+		const unrelated = diagnostics.filter(
+			(message) => !message.includes('hydration mismatch') && !attributes.includes(message),
+		);
+		expect(attributes).toEqual(PROD_COMPILE ? [] : expected);
+		expect(unrelated).toEqual([]);
+		if (observation.mode === 'hydrate-mismatch' && !PROD_COMPILE) {
+			expect(mismatches.length).toBeGreaterThan(0);
+		} else {
+			expect(mismatches).toEqual([]);
+		}
+	};
+}
 
 // ReactDOMServerIntegrationAttributes-test.js:54-114.
 matrix.itRenders('serializes string attributes and strips unsafe empty URL values', {
 	component: 'StringAttributes',
 	mismatch,
+	clientDiagnostics: expectAttributeDiagnostics([
+		nonBooleanTrueWarning('href'),
+		invalidValueWarning('width', 'div'),
+	]),
 	captureBeforeHydrate: (container) => container.querySelector('#string-attributes'),
 	assertCommon({ root }) {
 		expect(attr(root, 'width-number', 'width')).toBe('30');
@@ -98,6 +140,7 @@ matrix.itRenders('normalizes boolean attributes by truthiness', {
 matrix.itRenders('serializes overloaded boolean download attributes', {
 	component: 'DownloadAttributes',
 	mismatch,
+	clientDiagnostics: expectAttributeDiagnostics([invalidValueWarning('download', 'div')]),
 	captureBeforeHydrate: (container) => container.querySelector('#download-attributes'),
 	assertCommon({ root }) {
 		expect(attr(root, 'download-true', 'download')).toBe('');
@@ -163,6 +206,10 @@ matrix.itRenders('maps class and htmlFor attributes with native casing outcomes'
 matrix.itRenders('serializes numeric attributes and omits reserved props', {
 	component: 'NumericAndReservedAttributes',
 	mismatch,
+	clientDiagnostics: expectAttributeDiagnostics([
+		invalidValueWarning('start', 'ol'),
+		invalidValueWarning('size', 'input'),
+	]),
 	captureBeforeHydrate: (container) => container.querySelector('#numeric-reserved-attributes'),
 	assertCommon({ root }) {
 		expect(attr(root, 'size-positive', 'size')).toBe('2');
