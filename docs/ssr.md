@@ -76,7 +76,10 @@ argument convention). Returns `{ pipe, abort }`; chunks buffer until
 `pipe(destination)` is called. The **shell** — the full page with `@pending`
 fallbacks for anything still suspended — flushes immediately; each Suspense
 boundary then streams **out of order** as a hidden segment plus an inline
-`$OCTRC` swap script when its data settles. Scoped styles flush with the shell
+`$OCTRC` swap script when its data settles. A shell whose root renders
+`<html>` leads the response with `<!DOCTYPE html>` (React Fizz parity —
+streaming only; the buffered renderers stay doctype-free, also matching
+React). Scoped styles flush with the shell
 (before the body markup) and per-wave with their segment; hoisted head elements
 render with the shell only. `hydrateRoot` on the client adopts the swapped-in
 DOM byte-for-byte, including per-boundary `use()` value or rejection seeds (a
@@ -119,17 +122,18 @@ path before degraded terminal output — so a source can finalize asynchronous
 serialization and then settle `done`.
 
 When the shell is a document (`… </body></html>`), **document mode** engages:
-the response leads with `<!DOCTYPE html>`; renderer-owned leading scoped
-styles and the hoisted-head buffer fold inside the authored `<head>` instead
-of preceding `<html>`; and the closing tail is split out and written **last**
-— injected chunks and streamed Suspense segments land inside `<body>`, and
-the stream (tail included) closes only once rendering is complete **and**
-`done` has settled, so late data scripts are never dropped. `subscribe`
+renderer-owned leading scoped styles and the hoisted-head buffer fold inside
+the authored `<head>` instead of preceding `<html>`, and the closing tail is
+split out and written **last** — injected chunks and streamed Suspense
+segments land inside `<body>`, and the stream (tail included) closes only
+once rendering is complete **and** `done` has settled, so late data scripts
+are never dropped. (The `<!DOCTYPE html>` preamble is not injection-gated:
+every streamed document render leads with it, see above.) `subscribe`
 notifications drain promptly even while the render is idle awaiting `done`;
 bound the wait with `signal` (a source that never settles `done` holds the
 response open). A `done` rejection fails the stream through the same degraded
-terminal path as `abort`. Without `injection`, streamed output is
-byte-identical to previous releases (measured flat on the streaming-ssr
+terminal path as `abort`. Without `injection`, streamed output is unchanged
+apart from that doctype preamble (measured flat on the streaming-ssr
 benchmark).
 
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
