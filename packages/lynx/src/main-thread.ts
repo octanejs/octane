@@ -1,5 +1,6 @@
 import type {
 	UniversalHostBatch,
+	UniversalEventPriority,
 	UniversalSerializableValue,
 	UniversalTransportError,
 	UniversalTransportIdentity,
@@ -9,11 +10,17 @@ import {
 	createLynxHostDriver,
 	disposeLynxHostContainer,
 	prepareLynxHostBatch,
+	resolveLynxHostNativeEvent,
 	type LynxHostContainer,
 	type LynxHostDriver,
 	type LynxHostHandle,
 	type LynxPreparedHostBatch,
 } from './core/host-driver.js';
+import {
+	snapshotLynxNativeEventPayload,
+	type LynxNativeEventPayloadSnapshot,
+	type LynxNativeEventToken,
+} from './core/native-events.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
@@ -53,7 +60,21 @@ export interface InstallLynxMainThreadOptions {
 export interface LynxMainThreadController {
 	activeIdentity(): UniversalTransportIdentity | null;
 	diagnostics(): readonly Error[];
+	/** Source/test bridge for one public `__AddEvent` callback token. */
+	dispatchNativeEvent(token: LynxNativeEventToken | string, payload: unknown): void;
+	/** Preserve one native propagation path as a single Octane event scope. */
+	dispatchNativeEventBatch(deliveries: readonly LynxNativeEventDelivery[]): void;
 	close(): void;
+}
+
+export interface LynxNativeEventDelivery {
+	readonly token: LynxNativeEventToken | string;
+	readonly payload: unknown;
+}
+
+interface LynxQueuedNativeEventDelivery {
+	readonly token: LynxNativeEventToken | string;
+	readonly payload: LynxNativeEventPayloadSnapshot;
 }
 
 interface ActiveLynxMainRoot<Node extends LynxElementRef> {
@@ -203,6 +224,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let closed = false;
 	let commitInProgress = false;
 	const queuedCommits: LynxCommitMessage[] = [];
+	const queuedNativeEvents: Array<readonly LynxQueuedNativeEventDelivery[]> = [];
 
 	const report = (value: unknown, fallback = 'Octane Lynx main-thread receiver failed.') => {
 		const error = normalizedError(value, fallback);
@@ -222,7 +244,93 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: validated });
 	};
 
+	const snapshotNativeEventBatch = (
+		deliveries: readonly LynxNativeEventDelivery[],
+	): readonly LynxQueuedNativeEventDelivery[] => {
+		if (!Array.isArray(deliveries)) {
+			throw new TypeError('Octane Lynx native event deliveries must be an array.');
+		}
+		return Object.freeze(
+			deliveries.map((delivery, index) => {
+				if (delivery === null || typeof delivery !== 'object' || Array.isArray(delivery)) {
+					throw new TypeError(`Octane Lynx native event delivery ${index} must be an object.`);
+				}
+				if (typeof delivery.token !== 'string') {
+					throw new TypeError(`Octane Lynx native event delivery ${index} token must be a string.`);
+				}
+				return Object.freeze({
+					token: delivery.token,
+					payload: snapshotLynxNativeEventPayload(delivery.payload),
+				});
+			}),
+		);
+	};
+
+	const deliverNativeEventBatch = (deliveries: readonly LynxQueuedNativeEventDelivery[]): void => {
+		if (deliveries.length === 0) return;
+		if (active === null || active.acceptedVersion <= 0) {
+			throw new Error('Octane Lynx received a native event without an accepted root.');
+		}
+		let priority: UniversalEventPriority | null = null;
+		const transported = deliveries.map((delivery) => {
+			const resolved = resolveLynxHostNativeEvent(active!.container, delivery.token);
+			if (resolved === null) {
+				throw new Error('Octane Lynx received a stale, hidden, removed, or foreign native event.');
+			}
+			if (priority === null) priority = resolved.priority;
+			else if (priority !== resolved.priority) {
+				throw new Error('Octane Lynx native event batch mixes listener priorities.');
+			}
+			return Object.freeze({ listener: resolved.listener, payload: delivery.payload });
+		});
+		dispatch({
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: active.root,
+			version: active.acceptedVersion,
+			type: 'event',
+			priority: priority!,
+			deliveries: Object.freeze(transported),
+		});
+	};
+
+	const submitNativeEventBatch = (deliveries: readonly LynxNativeEventDelivery[]): void => {
+		if (closed) {
+			report(new Error('Octane Lynx received a native event after the main receiver closed.'));
+			return;
+		}
+		let snapshot: readonly LynxQueuedNativeEventDelivery[];
+		try {
+			snapshot = snapshotNativeEventBatch(deliveries);
+		} catch (error) {
+			report(error, 'Octane Lynx could not snapshot a native event.');
+			return;
+		}
+		if (commitInProgress) {
+			queuedNativeEvents.push(snapshot);
+			return;
+		}
+		try {
+			deliverNativeEventBatch(snapshot);
+		} catch (error) {
+			report(error, 'Octane Lynx could not dispatch a native event.');
+		}
+	};
+
+	const drainNativeEvents = (): void => {
+		while (queuedNativeEvents.length !== 0) {
+			for (const deliveries of queuedNativeEvents.splice(0)) {
+				try {
+					deliverNativeEventBatch(deliveries);
+				} catch (error) {
+					report(error, 'Octane Lynx could not dispatch an acknowledgement-gated native event.');
+				}
+			}
+		}
+	};
+
 	const reject = (identity: UniversalTransportIdentity, error: unknown): void => {
+		queuedNativeEvents.length = 0;
 		try {
 			dispatch({
 				...identity,
@@ -231,6 +339,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			});
 		} catch (dispatchError) {
 			throw report(dispatchError, 'Octane Lynx could not dispatch a host rejection.');
+		} finally {
+			// ContextProxy listeners run synchronously in the public test model.
+			// Never retain a native event submitted reentrantly from settlement.
+			queuedNativeEvents.length = 0;
 		}
 	};
 
@@ -365,6 +477,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		try {
 			dispatch(acknowledgement);
 		} catch (error) {
+			queuedNativeEvents.length = 0;
 			const cleanup = disposeRecord(record);
 			if (!cleanup.complete) {
 				report(
@@ -380,14 +493,17 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		if (!applyFailed) {
+			drainNativeEvents();
 			try {
 				dispatch({ ...identity, type: 'complete' });
+				drainNativeEvents();
 			} catch (error) {
 				throw report(error, 'Octane Lynx could not dispatch accepted batch completion.');
 			}
 			return;
 		}
 
+		queuedNativeEvents.length = 0;
 		try {
 			dispatch({
 				...identity,
@@ -396,6 +512,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			});
 		} catch (error) {
 			throw report(error, 'Octane Lynx could not dispatch an accepted host fault.');
+		} finally {
+			queuedNativeEvents.length = 0;
 		}
 	};
 
@@ -421,6 +539,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			// transport. Do not replay commits it dispatched reentrantly before
 			// observing that failure during some unrelated future request.
 			queuedCommits.length = 0;
+			queuedNativeEvents.length = 0;
 			throw error;
 		} finally {
 			commitInProgress = false;
@@ -428,6 +547,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	};
 
 	const handleDispose = (message: LynxDisposeMessage | LynxTerminalDisposeMessage): void => {
+		queuedNativeEvents.length = 0;
 		const terminal = message.type === 'terminal-dispose';
 		const acknowledge = () => {
 			const acknowledgement: LynxDisposeAcknowledgement = {
@@ -546,7 +666,14 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		diagnostics() {
 			return Object.freeze([...reported]);
 		},
+		dispatchNativeEvent(token, payload) {
+			submitNativeEventBatch([{ token, payload }]);
+		},
+		dispatchNativeEventBatch(deliveries) {
+			submitNativeEventBatch(deliveries);
+		},
 		close() {
+			queuedNativeEvents.length = 0;
 			if (!closed) {
 				closed = true;
 				try {

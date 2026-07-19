@@ -9,6 +9,19 @@ import {
 	LYNX_TRANSPORT_RENDERER,
 	type LynxPublicHandleDelta,
 } from './protocol.js';
+import { planLynxHostPropPatch } from './host-props.js';
+import { parseLynxNativeEventProp } from './native-events.js';
+import {
+	createLynxNodesRef,
+	createLynxNodesRefSelector,
+	type LynxCreateSelectorQuery,
+	type LynxMeasureOptions,
+	type LynxMeasureResult,
+	type LynxNodesRefBinding,
+	type LynxNodesRefFieldsOptions,
+	type LynxNodesRefFieldsResult,
+	type LynxNodesRefPathResult,
+} from './nodes-ref.js';
 
 export interface LynxPublicHandle {
 	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
@@ -18,11 +31,20 @@ export interface LynxPublicHandle {
 	readonly generation: number;
 	readonly active: boolean;
 	readonly snapshot: UniversalSerializableValue;
+	invoke<Result extends UniversalSerializableValue = UniversalSerializableValue>(
+		method: string,
+		params?: Readonly<Record<string, UniversalSerializableValue>>,
+	): Promise<Result>;
+	measure(options?: LynxMeasureOptions): Promise<LynxMeasureResult>;
+	fields(options: LynxNodesRefFieldsOptions): Promise<LynxNodesRefFieldsResult>;
+	path(): Promise<LynxNodesRefPathResult | null>;
+	setNativeProps(props: Readonly<Record<string, UniversalSerializableValue>>): Promise<void>;
 }
 
 interface MutableHandleState {
 	active: boolean;
 	snapshot: UniversalSerializableValue;
+	readonly binding: LynxNodesRefBinding;
 }
 
 const HANDLE_STATE = new WeakMap<LynxPublicHandle, MutableHandleState>();
@@ -33,9 +55,20 @@ function createPublicHandle(
 	type: string,
 	generation: number,
 	snapshot: UniversalSerializableValue,
+	createSelectorQuery: LynxCreateSelectorQuery,
 ): LynxPublicHandle {
 	let handle!: LynxPublicHandle;
-	handle = Object.freeze({
+	const selector = createLynxNodesRefSelector(root, id, generation);
+	const binding = createLynxNodesRef({
+		identity: { root, id, type, generation, selector },
+		createSelectorQuery,
+		readState() {
+			const current = HANDLE_STATE.get(handle);
+			if (current === undefined) return null;
+			return { root, id, type, generation, selector, active: current.active };
+		},
+	});
+	const facade: LynxPublicHandle = {
 		renderer: LYNX_TRANSPORT_RENDERER,
 		root,
 		id,
@@ -47,14 +80,34 @@ function createPublicHandle(
 		get snapshot(): UniversalSerializableValue {
 			return HANDLE_STATE.get(handle)!.snapshot;
 		},
-	});
-	HANDLE_STATE.set(handle, { active: false, snapshot });
+		invoke<Result extends UniversalSerializableValue = UniversalSerializableValue>(
+			method: string,
+			params?: Readonly<Record<string, UniversalSerializableValue>>,
+		) {
+			return binding.handle.invoke<Result>(method, params);
+		},
+		measure(options?: LynxMeasureOptions) {
+			return binding.handle.measure(options);
+		},
+		fields(options: LynxNodesRefFieldsOptions) {
+			return binding.handle.fields(options);
+		},
+		path() {
+			return binding.handle.path();
+		},
+		setNativeProps(props: Readonly<Record<string, UniversalSerializableValue>>) {
+			return binding.handle.setNativeProps(props);
+		},
+	};
+	handle = Object.freeze(facade);
+	HANDLE_STATE.set(handle, { active: false, snapshot, binding });
 	return handle;
 }
 
 interface LynxClientContainerState {
 	handles: Map<number, LynxPublicHandle>;
 	readonly generations: Map<number, number>;
+	readonly createSelectorQuery: LynxCreateSelectorQuery;
 }
 
 const CONTAINER_STATE = new WeakMap<LynxClientContainer, LynxClientContainerState>();
@@ -64,14 +117,34 @@ export interface LynxClientContainer {
 	getPublicHandle(id: number): LynxPublicHandle | null;
 }
 
-export function createLynxClientContainer(): LynxClientContainer {
+export interface CreateLynxClientContainerOptions {
+	readonly createSelectorQuery?: LynxCreateSelectorQuery;
+}
+
+export function createLynxClientContainer(
+	options: CreateLynxClientContainerOptions = {},
+): LynxClientContainer {
+	const createSelectorQuery =
+		options.createSelectorQuery ??
+		(() => {
+			throw new Error(
+				'Octane Lynx NodesRef requires the public background-thread lynx.createSelectorQuery() API.',
+			);
+		});
+	if (typeof createSelectorQuery !== 'function') {
+		throw new TypeError('Octane Lynx createSelectorQuery must be a function when provided.');
+	}
 	const container: LynxClientContainer = Object.freeze({
 		renderer: LYNX_TRANSPORT_RENDERER,
 		getPublicHandle(id: number) {
 			return CONTAINER_STATE.get(container)!.handles.get(id) ?? null;
 		},
 	});
-	CONTAINER_STATE.set(container, { handles: new Map(), generations: new Map() });
+	CONTAINER_STATE.set(container, {
+		handles: new Map(),
+		generations: new Map(),
+		createSelectorQuery,
+	});
 	return container;
 }
 
@@ -116,6 +189,7 @@ function validateSnapshotIdentity(
 		id: delta.id,
 		type: delta.type,
 		generation: delta.generation,
+		selector: createLynxNodesRefSelector(identity.root, delta.id, delta.generation),
 	};
 	for (const [name, expectedValue] of Object.entries(expected)) {
 		if (value[name] !== expectedValue) {
@@ -276,10 +350,11 @@ export function prepareLynxHandleDeltas(
 				delta.type,
 				delta.generation,
 				cloneSnapshot(delta.snapshot),
+				state.createSelectorQuery,
 			);
 			createdHandles.add(handle);
 			stageGeneration(delta.id, delta.generation);
-			nextStates.set(handle, { active: true, snapshot: handle.snapshot });
+			nextStates.set(handle, { ...HANDLE_STATE.get(handle)!, active: true });
 			stagedHandles.set(delta.id, handle);
 			continue;
 		}
@@ -303,10 +378,11 @@ export function prepareLynxHandleDeltas(
 				delta.type,
 				delta.generation,
 				cloneSnapshot(delta.snapshot),
+				state.createSelectorQuery,
 			);
 			createdHandles.add(handle);
 			stageGeneration(delta.id, delta.generation);
-			nextStates.set(handle, { active: true, snapshot: handle.snapshot });
+			nextStates.set(handle, { ...HANDLE_STATE.get(handle)!, active: true });
 			stagedHandles.set(delta.id, handle);
 			continue;
 		}
@@ -315,6 +391,7 @@ export function prepareLynxHandleDeltas(
 		}
 		priorStates.set(previous, { ...HANDLE_STATE.get(previous)! });
 		nextStates.set(previous, {
+			...HANDLE_STATE.get(previous)!,
 			active: true,
 			snapshot: cloneSnapshot(delta.snapshot),
 		});
@@ -335,7 +412,13 @@ export function prepareLynxHandleDeltas(
 			if (applied || rolledBack) return;
 			applied = true;
 			for (const handle of priorStates.keys()) {
-				if (finalHandle(handle.id) !== handle) HANDLE_STATE.get(handle)!.active = false;
+				if (finalHandle(handle.id) !== handle) {
+					const current = HANDLE_STATE.get(handle)!;
+					current.active = false;
+					current.binding.invalidate(
+						new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was replaced.`),
+					);
+				}
 			}
 			for (const [handle, next] of nextStates) Object.assign(HANDLE_STATE.get(handle)!, next);
 			for (const [id, handle] of stagedHandles) {
@@ -355,7 +438,13 @@ export function prepareLynxHandleDeltas(
 			for (const [handle, previous] of priorStates) {
 				Object.assign(HANDLE_STATE.get(handle)!, previous);
 			}
-			for (const handle of createdHandles) HANDLE_STATE.get(handle)!.active = false;
+			for (const handle of createdHandles) {
+				const current = HANDLE_STATE.get(handle)!;
+				current.active = false;
+				current.binding.invalidate(
+					new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was rolled back.`),
+				);
+			}
 			for (const [id, previous] of priorGenerations) {
 				if (previous === undefined) state.generations.delete(id);
 				else state.generations.set(id, previous);
@@ -367,7 +456,13 @@ export function prepareLynxHandleDeltas(
 /** @internal Releases query handles when their background transport closes. */
 export function invalidateLynxClientContainer(container: LynxClientContainer): void {
 	const state = containerState(container);
-	for (const handle of state.handles.values()) HANDLE_STATE.get(handle)!.active = false;
+	for (const handle of state.handles.values()) {
+		const current = HANDLE_STATE.get(handle)!;
+		current.active = false;
+		current.binding.invalidate(
+			new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was disposed.`),
+		);
+	}
 	state.handles = new Map();
 }
 
@@ -383,8 +478,6 @@ const DISCRETE_EVENTS = new Set([
 	'touchstart',
 ]);
 const CONTINUOUS_EVENTS = new Set(['layoutchange', 'scroll', 'touchmove', 'wheel']);
-const LYNX_EVENT = /^(capture-bind|capture-catch|global-bind|bind|catch)(.+)$/;
-
 export function createLynxClientDriver(): UniversalHostDriver<
 	LynxClientContainer,
 	LynxPublicHandle
@@ -394,9 +487,9 @@ export function createLynxClientDriver(): UniversalHostDriver<
 		capabilities: Object.freeze({ text: 'host' as const, visibility: true }),
 		events: Object.freeze({
 			classify(name: string) {
-				const match = LYNX_EVENT.exec(name);
-				if (match === null) return null;
-				const nativeName = match[2];
+				const binding = parseLynxNativeEventProp(name);
+				if (binding === null) return null;
+				const nativeName = binding.name;
 				return {
 					type: name,
 					priority: DISCRETE_EVENTS.has(nativeName)
@@ -405,6 +498,15 @@ export function createLynxClientDriver(): UniversalHostDriver<
 							? ('continuous' as const)
 							: ('default' as const),
 				};
+			},
+		}),
+		updates: Object.freeze({
+			classify(
+				type: string,
+				previous: Readonly<Record<string, unknown>>,
+				next: Readonly<Record<string, unknown>>,
+			) {
+				return planLynxHostPropPatch(type, previous, next).requiresRecreate ? 'recreate' : 'update';
 			},
 		}),
 		prepareBatch() {

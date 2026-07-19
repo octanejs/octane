@@ -16,6 +16,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 import { createLynxRoot, type LynxPublicHandle, type LynxRoot } from '../src/index.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
+import { LYNX_NODES_REF_ATTRIBUTE } from '../src/core/nodes-ref.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
@@ -25,7 +26,7 @@ import {
 	type LynxBackgroundInboundMessage,
 	type LynxContextProxy,
 } from '../src/core/protocol.js';
-import { BackgroundRootFixture } from './_fixtures/background-root.lynx.tsrx';
+import { BackgroundRootFixture, ClassAliasFixture } from './_fixtures/background-root.lynx.tsrx';
 
 interface FixtureItem {
 	readonly id: string;
@@ -54,6 +55,10 @@ interface InstalledEnvironment {
 }
 
 const fixture = BackgroundRootFixture as UniversalComponent<FixtureProps>;
+const classAliasFixture = ClassAliasFixture as UniversalComponent<{
+	readonly middle: Readonly<Record<string, unknown>>;
+	readonly last: string;
+}>;
 const simplePlan = universalPlan(LYNX_TRANSPORT_RENDERER, {
 	kind: 'host',
 	type: 'view',
@@ -113,6 +118,14 @@ function identity(root: number, version: number): UniversalTransportIdentity {
 	};
 }
 
+function publicHostHTML(element: Element): string {
+	const clone = element.cloneNode(true) as Element;
+	for (const node of clone.querySelectorAll(`[${LYNX_NODES_REF_ATTRIBUTE}]`)) {
+		node.removeAttribute(LYNX_NODES_REF_ATTRIBUTE);
+	}
+	return clone.innerHTML;
+}
+
 afterEach(async () => {
 	if (backgroundRoot !== null) {
 		try {
@@ -132,6 +145,22 @@ afterEach(async () => {
 });
 
 describe.sequential('@octanejs/lynx background root in the official JS environment', () => {
+	it('applies the Lynx-only className alias in authored host order', async () => {
+		const { dom } = installEnvironment();
+		backgroundRoot = createLynxRoot();
+		await backgroundRoot.render(classAliasFixture, {
+			middle: { class: 'spread', className: 'spread-alias' },
+			last: 'final',
+		});
+
+		expect(dom.window.document.querySelector('#class-alias-host')?.getAttribute('class')).toBe(
+			'final',
+		);
+		expect(
+			dom.window.document.querySelector('#component-class-name')?.getAttribute('data-received'),
+		).toBe('component-value');
+	});
+
 	it('starts when the background root is created before the main receiver', async () => {
 		const dom = new JSDOM('<!doctype html><html><body></body></html>');
 		installLynxTestingEnv(globalThis, {
@@ -396,7 +425,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		const firstB = page.querySelector('#row-b')!;
 		const firstAHandle = rowRefs.get('a')!;
 		const counterHandle = counterRefs.at(-1)!;
-		expect(page.innerHTML).toBe(
+		expect(publicHostHTML(page)).toBe(
 			'<view id="counter"><text>Count: 0</text></view>' +
 				'<view id="summary"><text>summary</text></view>' +
 				'<view id="rows"><view id="row-a"><text>initial:A</text></view>' +
@@ -413,6 +442,11 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		});
 		expect(counterHandle).not.toBeInstanceOf(dom.window.Node);
 		expect(Object.isFrozen(counterHandle)).toBe(true);
+		await counterHandle.setNativeProps({ title: 'set-through-selector-query' });
+		expect(page.querySelector('#counter')?.getAttribute('title')).toBe(
+			'set-through-selector-query',
+		);
+		await expect(counterHandle.measure()).rejects.toThrow(/not implemented/);
 		expect(logs.indexOf('counter-ref:view')).toBeLessThan(logs.indexOf('layout:0'));
 		expect(logs).toEqual(expect.arrayContaining(['counter-ref:view', 'layout:0', 'passive:0']));
 
@@ -446,6 +480,9 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		backgroundRoot = null;
 		expect(page.innerHTML).toBe('');
 		expect(counterHandle.active).toBe(false);
+		await expect(counterHandle.setNativeProps({ title: 'late' })).rejects.toThrow(
+			/replaced|disposed/,
+		);
 		expect(firstAHandle.active).toBe(false);
 		expect(counterRefs.at(-1)).toBeNull();
 		expect(logs).toEqual(
@@ -683,7 +720,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 			),
 		).toEqual(['ack:1', 'complete:1', 'ack:2', 'complete:2', 'ack:3', 'complete:3']);
 		expect(main.activeIdentity()).toMatchObject({ root: 701, version: 3 });
-		expect(dom.window.document.querySelector('page')?.innerHTML).toBe(
+		expect(publicHostHTML(dom.window.document.querySelector('page')!)).toBe(
 			'<view id="reentrant"></view>',
 		);
 	});

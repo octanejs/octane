@@ -29,6 +29,7 @@ const VALIDATION_KEYS = new Set([
 	'forbiddenGlobals',
 	'forbiddenImports',
 	'hostProps',
+	'textHosts',
 	'textParents',
 ]);
 const HOST_NAME = /^[a-z][A-Za-z0-9_$-]*$/;
@@ -145,6 +146,13 @@ function normalizeValidation(value, path) {
 	}
 	assertKnownKeys(value, VALIDATION_KEYS, path);
 	const validation = {};
+	if (value.textHosts !== undefined) {
+		validation.textHosts = normalizeValidationList(
+			value.textHosts,
+			`${path}.textHosts`,
+			validateHostName,
+		);
+	}
 	if (value.textParents !== undefined) {
 		validation.textParents = normalizeValidationList(
 			value.textParents,

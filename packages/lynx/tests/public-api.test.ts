@@ -13,7 +13,7 @@ const packageJson = JSON.parse(
 	exports: Record<string, string>;
 };
 
-describe('@octanejs/lynx Milestone 2 public surface', () => {
+describe('@octanejs/lynx Milestone 3 public surface', () => {
 	it('keeps every required package subpath private and addressable', () => {
 		expect(packageJson.private).toBe(true);
 		expect(packageJson.version).toBe('0.0.0');
@@ -29,10 +29,10 @@ describe('@octanejs/lynx Milestone 2 public surface', () => {
 		]);
 	});
 
-	it('exposes the private background root while keeping later surfaces deferred', () => {
+	it('exposes the private background host surface while keeping later APIs deferred', () => {
 		expect(rootApi.lynxRootAvailability).toMatchObject({
 			available: true,
-			implementedMilestone: 2,
+			implementedMilestone: 3,
 		});
 		expect(platformApi.lynxPlatformAvailability).toMatchObject({
 			available: false,

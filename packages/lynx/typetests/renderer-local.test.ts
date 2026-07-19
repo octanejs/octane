@@ -53,11 +53,10 @@ const viewProps: RendererElements['view'] = {
 		return () => void generation;
 	},
 	style: { opacity: 0.75 },
-	bindtap(event, instance) {
+	bindtap(event) {
 		const targetId: string = event.target.id;
 		const touchX: number = event.detail.x;
 		const firstTouchPageY: number | undefined = event.touches[0]?.pageY;
-		instance?.triggerEvent('packed-lynx-probe');
 		void targetId;
 		void touchX;
 		void firstTouchPageY;
@@ -104,6 +103,9 @@ const installMainThread: (options?: { target?: object }) => LynxMainThreadContro
 // @ts-expect-error DOM-only attributes are not accepted by the Lynx view contract.
 const domOnlyViewProps: RendererElements['view'] = { dangerouslySetInnerHTML: { __html: '' } };
 
+// @ts-expect-error Pinned Lynx inline styles accept strings and numbers, not booleans.
+const booleanStyleProps: RendererElements['view'] = { style: { opacity: true } };
+
 // @ts-expect-error Every list item requires its native recycling key.
 const missingListItemKey: RendererElements['list-item'] = { recyclable: true };
 
@@ -124,5 +126,6 @@ void viewWithObjectRef;
 void renderResult;
 void installMainThread;
 void domOnlyViewProps;
+void booleanStyleProps;
 void missingListItemKey;
 void unregisteredCustomProps;
