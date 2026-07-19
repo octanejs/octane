@@ -164,6 +164,66 @@ prod-compile project to prove zero production footprint; (5) a fixture-level
 sanity check that render counts a scan report attributes match
 `profiler.summary()` for the same interaction.
 
+## Fidelity pass (2026-07-19)
+
+The outline overlay and toolbar were re-ported directly against upstream source
+(`react-scan@0.5.7` `src/new-outlines/canvas.ts` and `src/web/views/toolbar`)
+for visual/behavioral parity rather than an approximation:
+
+- **Outlines** now use react-scan's exact draw routine: indigo
+  `rgb(115,97,230)`, 1px stroke snapped to the pixel grid (`round+0.5`) with a
+  10%-alpha interior fill, a 45-frame linear fade (`α = 1 − frame/45`, reset on
+  re-render), `lerp` easing (0.2 factor, 0.5px snap) toward each freshly
+  measured rect, and `getLabelText` grouping (`A, B ×N`, ≤4 names, 40-char
+  truncation, `×` = U+00D7). `animationSpeed` stays meaningful: `off` skips
+  drawing, `slow` doubles the frame life, `fast` matches upstream.
+- **Toolbar** now mirrors react-scan's bar exactly: black bar, an inspect
+  toggle (crosshair/focus icons, `#999`→`#8e61e3`), the "Outline Re-renders"
+  pill power switch (`#5f3f9a` on / `#404040` off) driving `enabled`, and a
+  color-graded FPS meter (`#ef4444` <30, `#f59e0b` <50, `rgb(214,132,245)`
+  otherwise), on a `#141414` chip. FPS is ported 1:1 from react-scan's
+  frame-count loop — it observes browser paint cadence, nothing React-specific.
+  The upstream animation-speed control does not live in the bar, so it was
+  dropped from ours too; `animationSpeed` remains a programmatic option.
+
+## Interaction inspector (2026-07-19)
+
+Ported react-scan's `core/notifications` engine and its toolbar notifications
+panel (confirmed 100% client-side — even Prompts/Alerts are local). On each
+click/keydown an interaction is timed through the detailed-timing state machine
+(microtask → animation frame → timeout, upstream's fallback path since Octane
+produces commit timing directly), the components that rendered during the
+window are aggregated from the core's render sink, and the result is recorded as
+a bounded History. The bell expands the bar into the panel: a
+`Clicked X — Nms processing time` header (green/amber/red severity by the
+<200/<500 thresholds), the History column, and Ranked (self-time bars) /
+Overview (stat breakdown) / Prompts (a copyable optimization prompt) tabs plus
+an Alerts audio-chime toggle. Palette matches upstream (`#000`/`#0A0A0A` shell,
+`#7521C8` active tab, `#8E61E3` active icon, `#18181B` elevated, severity
+`green-500/50`/`#b77116`/`#b94040`).
+
+## Naming resolution (2026-07-19)
+
+The "Unknown" epidemic on hydrated pages is resolved without a runtime change.
+Root cause: instances only register while the profiler is `active`, and scanning
+was toggled on from an effect *after* hydration, so the initial mounts were
+never recorded and clicks resolved to nobody. Fix, entirely in `@octanejs/scan`
+over the existing public profiler API:
+
+- `index.ts` calls `profiler.start()` at import — before the app hydrates — so
+  every hydration mount registers an instance (in an unprofiled build the
+  profiler is a stripped no-op, so this is inert).
+- A shared `registry.ts` resolves an element to the innermost profiled instance
+  whose `domNodes()` contains it, fed live from the core's render sink and, once,
+  lazily seeded from `profiler.getEvents()` — the backfill that names instances
+  which mounted before the sink was listening. The inspector and interaction
+  profiler both route through it. `registry.test.tsrx` proves a component that
+  mounted before any sink was attached is still resolved; the browser suite
+  asserts a real click resolves to a component name, not `Unknown`.
+
+The `enabled`/pause option keeps its documented meaning (detach the core's
+report/outline stream); the profiler stays active for indexing regardless.
+
 ## Known follow-ups
 
 - **Precise lite-scope DOM ranges.** `profiler.domNodes()` resolves lite

@@ -1,19 +1,11 @@
-// useScan and the click-to-inspect panel: the hook variant starts scanning
-// with the compiler-forwarded call-site slot composing beside other hooks,
-// and inspect mode resolves a clicked element to the innermost profiled
-// component, shows its identity/report/causes, intercepts app clicks while
-// armed, and exits on Escape restoring normal interaction.
+// The inspector plugin + selection service: useScan starts scanning from an
+// effect; arming inspect resolves a clicked element to the innermost profiled
+// component, shows its identity/report, intercepts app clicks while armed, and
+// exits on Escape. The toolbar's inspect button mirrors the selection state.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRoot, useState, type ComponentBody } from 'octane';
 import { profiler } from 'octane/profiling';
-import { getReport, resetReport, setOptions, useScan } from '../src/index.ts';
-import {
-	installInspector,
-	teardownInspector,
-	toggleInspect,
-	isInspecting,
-} from '../src/inspector.ts';
-import { installToolbar, teardownToolbar } from '../src/toolbar.ts';
+import { getSession, resetReport, setOptions, useScan } from '../src/index.ts';
 
 function Leaf(props) @{
 	<span id="leaf">
@@ -52,37 +44,32 @@ async function settle() {
 	await Promise.resolve();
 }
 
+const selection = () => getSession().selection;
 const panel = () => document.querySelector('[data-octane-scan-inspector]');
 const panelText = () => panel()?.shadowRoot?.querySelector('.panel')?.textContent ?? '';
 
 beforeEach(() => {
 	profiler.clear();
 	resetReport();
-	teardownInspector();
-	teardownToolbar();
-	installInspector();
-	installToolbar();
+	selection().setActive(false);
+	setOptions({ enabled: false, showToolbar: true });
 });
 
 afterEach(() => {
-	teardownInspector();
-	teardownToolbar();
-	setOptions({ enabled: false, showToolbar: true, animationSpeed: 'fast' });
+	selection().setActive(false);
+	setOptions({ enabled: false, showToolbar: true });
 });
 
 describe('useScan', () => {
 	it('starts scanning from a component effect, composing beside other hooks', async () => {
 		const mounted = mount(ScannedApp);
 		await settle();
-
-		// The effect ran scan(): renders from here on are recorded.
 		mounted.click('#inc');
 		await settle();
 		expect(mounted.container.querySelector('#leaf')!.textContent).toBe('count: 1');
-		const byName = new Map(getReport().map((entry) => [entry.component, entry]));
+		const byName = new Map(getSession().report.all().map((entry) => [entry.component, entry]));
 		expect(byName.get('ScannedApp')!.renders).toBeGreaterThanOrEqual(1);
 		expect(byName.get('Leaf')!.renders).toBeGreaterThanOrEqual(1);
-
 		mounted.unmount();
 	});
 });
@@ -94,12 +81,12 @@ describe('inspector', () => {
 		mounted.click('#inc');
 		await settle();
 
-		toggleInspect();
-		expect(isInspecting()).toBe(true);
+		selection().setActive(true);
+		expect(selection().get().mode).toBe('hovering');
 		mounted.click('#leaf');
+		expect(selection().get().mode).toBe('locked');
 		expect(panelText()).toContain('Leaf');
 		expect(panelText()).toContain('renders');
-		expect(panelText()).toContain('last render:');
 		// Innermost wins: the shell click resolves to ScannedApp, not Leaf.
 		mounted.click('#shell');
 		expect(panelText()).toContain('ScannedApp');
@@ -110,25 +97,19 @@ describe('inspector', () => {
 	it('intercepts app clicks while armed and restores them after Escape', async () => {
 		const mounted = mount(ScannedApp);
 		await settle();
-		// One recorded interaction before arming, so the clicked element is
-		// resolvable (scanning starts from useScan's mount effect).
 		mounted.click('#inc');
 		await settle();
 		expect(mounted.container.querySelector('#leaf')!.textContent).toBe('count: 1');
 
-		toggleInspect();
+		selection().setActive(true);
 		mounted.click('#inc');
 		await settle();
-		// The click was consumed by inspection — the counter did not advance —
-		// and resolved to a profiled component. (Which one is deliberately not
-		// pinned: lite scopes over-approximate their DOM range to the host's
-		// children, so a host's direct child can attribute to a lite sibling —
-		// the precise-lite-ranges follow-up in the port plan tightens this.)
+		// The click was consumed by inspection — the counter did not advance.
 		expect(mounted.container.querySelector('#leaf')!.textContent).toBe('count: 1');
-		expect(panelText()).not.toBe('');
+		expect(selection().get().mode).toBe('locked');
 
 		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-		expect(isInspecting()).toBe(false);
+		expect(selection().get().mode).toBe('off');
 		expect(panel()).toBeNull();
 		mounted.click('#inc');
 		await settle();
@@ -138,12 +119,13 @@ describe('inspector', () => {
 	});
 
 	it('mirrors inspect state onto the toolbar button', () => {
+		setOptions({ enabled: true });
 		const inspectButton = document.querySelector(
 			'[data-octane-scan-toolbar]',
 		)!.shadowRoot!.querySelector<HTMLButtonElement>('[data-action="inspect"]')!;
 		expect(inspectButton.getAttribute('data-active')).toBe('false');
 		inspectButton.click();
-		expect(isInspecting()).toBe(true);
+		expect(selection().get().mode).toBe('hovering');
 		expect(inspectButton.getAttribute('data-active')).toBe('true');
 		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 		expect(inspectButton.getAttribute('data-active')).toBe('false');

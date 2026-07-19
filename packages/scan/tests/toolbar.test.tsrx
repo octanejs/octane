@@ -1,12 +1,11 @@
-// The scan toolbar contract: a live render counter, the pause/resume toggle
-// driving the master enabled switch, the animation-speed cycle, and
-// showToolbar attach/detach — all in the shadow-rooted plain-DOM toolbar the
-// profiler cannot see (it must never appear in scan's own report).
+// The toolbar plugin's contract, driven entirely through the public API + the
+// default session: an inspect toggle, the "Outline Re-renders" power switch
+// bound to the enabled option, and a live FPS meter — plain shadow-DOM the
+// profiler cannot see. showToolbar attaches/detaches the whole widget.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRoot, useState, type ComponentBody } from 'octane';
 import { profiler } from 'octane/profiling';
-import { getOptions, getReport, resetReport, scan, setOptions } from '../src/index.ts';
-import { installToolbar, teardownToolbar } from '../src/toolbar.ts';
+import { getOptions, getReport, getSession, resetReport, scan, setOptions } from '../src/index.ts';
 
 function App() @{
 	const [count, setCount] = useState(0);
@@ -45,84 +44,58 @@ const shadowQuery = (selector: string) => toolbar()?.shadowRoot?.querySelector<H
 beforeEach(() => {
 	profiler.clear();
 	resetReport();
-	teardownToolbar();
-	installToolbar();
-});
-
-afterEach(() => {
-	teardownToolbar();
+	getSession().selection.setActive(false);
 	setOptions({ enabled: false, showToolbar: true, animationSpeed: 'fast' });
 });
 
+afterEach(() => {
+	getSession().selection.setActive(false);
+	setOptions({ enabled: false, showToolbar: true });
+});
+
 describe('scan toolbar', () => {
-	it('shows a live render counter that the toolbar itself never inflates', async () => {
+	it('renders the inspect toggle, power switch, and FPS meter', () => {
 		scan();
 		expect(toolbar()).toBeTruthy();
-		expect(shadowQuery('.count')!.textContent).toBe('0 renders');
+		expect(shadowQuery('[data-action="inspect"]')).toBeTruthy();
+		expect(shadowQuery('[data-action="toggle"]')).toBeTruthy();
+		expect(shadowQuery('.fps-label')!.textContent).toBe('FPS');
+	});
 
+	it('drives the master enabled option from the power switch, and never scans itself', async () => {
+		scan();
 		const mounted = mount(App);
 		await settle();
-		expect(shadowQuery('.count')!.textContent).toBe('1 renders');
-		mounted.click('#inc');
-		await settle();
-		expect(shadowQuery('.count')!.textContent).toBe('2 renders');
-		// The toolbar is plain DOM the profiler cannot see: nothing scan-owned
-		// may ever appear in the report it displays.
+		// The toolbar is plain DOM the profiler cannot see.
 		expect(getReport().map((entry) => entry.component)).toEqual(['App']);
 
-		mounted.unmount();
-	});
+		const toggle = shadowQuery('[data-action="toggle"]')!;
+		expect(toggle.getAttribute('data-checked')).toBe('true');
 
-	it('pauses and resumes scanning from the toggle button', async () => {
-		scan();
-		const mounted = mount(App);
-		await settle();
-		expect(shadowQuery('[data-action="toggle"]')!.textContent).toBe('pause');
-
-		shadowQuery('[data-action="toggle"]')!.click();
+		toggle.click();
 		expect(getOptions().enabled).toBe(false);
-		expect(shadowQuery('[data-action="toggle"]')!.textContent).toBe('resume');
+		expect(toggle.getAttribute('data-checked')).toBe('false');
 		mounted.click('#inc');
 		await settle();
-		expect(shadowQuery('.count')!.textContent).toBe('1 renders');
+		const pausedRenders = getReport().find((entry) => entry.component === 'App')!.renders;
 
-		shadowQuery('[data-action="toggle"]')!.click();
+		toggle.click();
 		expect(getOptions().enabled).toBe(true);
+		expect(toggle.getAttribute('data-checked')).toBe('true');
 		mounted.click('#inc');
 		await settle();
-		expect(shadowQuery('.count')!.textContent).toBe('2 renders');
+		expect(getReport().find((entry) => entry.component === 'App')!.renders).toBe(pausedRenders + 1);
 
 		mounted.unmount();
 	});
 
-	it('cycles the animation speed through fast, slow, and off', () => {
+	it('detaches on showToolbar: false and re-attaches on showToolbar: true', () => {
 		scan();
-		const speed = shadowQuery('[data-action="speed"]')!;
-		expect(speed.textContent).toBe('fast');
-		speed.click();
-		expect(getOptions().animationSpeed).toBe('slow');
-		speed.click();
-		expect(getOptions().animationSpeed).toBe('off');
-		speed.click();
-		expect(getOptions().animationSpeed).toBe('fast');
-		expect(speed.textContent).toBe('fast');
-	});
-
-	it('detaches on showToolbar: false and re-attaches with the counter intact', async () => {
-		scan();
-		const mounted = mount(App);
-		await settle();
-		expect(shadowQuery('.count')!.textContent).toBe('1 renders');
-
+		expect(toolbar()).toBeTruthy();
 		setOptions({ showToolbar: false });
 		expect(toolbar()).toBeNull();
-		// Still counting while hidden…
-		mounted.click('#inc');
-		await settle();
-
 		setOptions({ showToolbar: true });
-		expect(shadowQuery('.count')!.textContent).toBe('2 renders');
-
-		mounted.unmount();
+		expect(toolbar()).toBeTruthy();
+		expect(shadowQuery('[data-action="toggle"]')!.getAttribute('data-checked')).toBe('true');
 	});
 });

@@ -87,7 +87,11 @@ describe('scan core', () => {
 		scan();
 		const detachListener = onRender(
 			Leaf,
-			(info) => seen.push({ component: info.component, phase: info.phase, nodes: info.domNodes() }),
+			(info) => seen.push({
+				component: info.component.name,
+				phase: info.phase,
+				nodes: info.domNodes(),
+			}),
 		);
 		const mounted = mount(App);
 		await settle();

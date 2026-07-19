@@ -6,17 +6,19 @@
 // wrapper composes like a normal custom hook (see package.json's
 // `octane.hookSlots.manual`).
 import { useEffect } from 'octane';
-import { scan, type Options } from './core.js';
+import { session } from './default-session.js';
+import type { Options } from './services/options.js';
 
-export function useScan(options?: Options): void;
-export function useScan(...args: [options?: Options, slot?: symbol]): void {
+export function useScan(options?: Partial<Options>): void;
+export function useScan(...args: [options?: Partial<Options>, slot?: symbol]): void {
 	const tail = args[args.length - 1];
 	const slot = typeof tail === 'symbol' ? (tail as symbol) : undefined;
 	const head = args[0];
-	const options = typeof head === 'object' && head !== null ? (head as Options) : undefined;
+	const options =
+		typeof head === 'object' && head !== null ? (head as Partial<Options>) : undefined;
 	useEffect(
 		() => {
-			scan(options ?? {});
+			session.setOptions({ enabled: true, ...options });
 		},
 		[],
 		slot,

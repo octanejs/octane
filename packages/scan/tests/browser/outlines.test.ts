@@ -146,3 +146,58 @@ describe('render outlines browser evidence', () => {
 		});
 	});
 });
+
+describe('interaction inspector browser evidence', () => {
+	/** Read a value out of the toolbar's shadow root. */
+	function fromToolbar<T>(target: Page, read: (root: ShadowRoot) => T): Promise<T> {
+		return target.evaluate((source) => {
+			const host = document.querySelector('[data-octane-scan-toolbar]');
+			// eslint-disable-next-line no-new-func
+			const fn = new Function('root', `return (${source})(root);`) as (root: ShadowRoot) => T;
+			return fn(host!.shadowRoot!);
+		}, read.toString());
+	}
+
+	it('records a real click as an interaction and shows it in the History panel', async () => {
+		// A fresh interaction with real browser event/animation timing.
+		await page.locator('#inc').click();
+		await page.waitForFunction(() => {
+			const host = document.querySelector('[data-octane-scan-toolbar]');
+			return host?.shadowRoot?.querySelector('[data-action="notifications"]') != null;
+		});
+
+		// Open the notifications panel from the bell.
+		await fromToolbar(page, (root) =>
+			(root.querySelector('[data-action="notifications"]') as HTMLElement).click(),
+		);
+
+		await page.waitForFunction(() => {
+			const host = document.querySelector('[data-octane-scan-toolbar]');
+			const rows = host?.shadowRoot?.querySelectorAll('.history-row');
+			return rows != null && rows.length > 0;
+		});
+
+		const opened = await fromToolbar(page, (root) =>
+			root.querySelector('.widget')!.classList.contains('open'),
+		);
+		expect(opened).toBe(true);
+
+		const badge = await fromToolbar(
+			page,
+			(root) => root.querySelector('.history-row .history-time')?.textContent ?? '',
+		);
+		expect(badge).toContain('ms');
+
+		// The interaction resolves to a real component name — not "Unknown" — even
+		// though the app rendered before scanning was toggled on.
+		const name = await fromToolbar(
+			page,
+			(root) => root.querySelector('.history-row .history-name')?.textContent ?? '',
+		);
+		expect(['App', 'Label']).toContain(name);
+
+		// The Ranked tab lists at least one component that rendered.
+		const ranked = await fromToolbar(page, (root) => root.querySelectorAll('.rank-row').length);
+		expect(ranked).toBeGreaterThan(0);
+	});
+});
