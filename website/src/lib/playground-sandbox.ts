@@ -27,8 +27,11 @@
 //   iframe → parent  { type: 'boot' }            bootstrap script is listening
 //   iframe → parent  { type: 'ready', error? }   runtime imported (or failed)
 //   iframe → parent  { type: 'result', gen, error }
-//   iframe → parent  { type: 'runtime-error', error }  post-render, from the
-//                                                error boundary around the app
+//   iframe → parent  { type: 'runtime-error', gen, error }  post-render, from
+//                                                the error boundary around the
+//                                                app; gen lets the parent drop
+//                                                late errors from a superseded
+//                                                run
 //
 // Import resolution inside the iframe: the bootstrap blob-ifies the runtime
 // chunks dependencies-first, then installs a SINGLE import map — as a classic
@@ -202,8 +205,10 @@ window.addEventListener('message', async (event) => {
 				]);
 				if (gen !== generation) return;
 				const reactRoot = ReactDOMClient.createRoot(rootEl, {
-					onUncaughtError: (error) => post({ type: 'runtime-error', error: errText(error) }),
-					onCaughtError: (error) => post({ type: 'runtime-error', error: errText(error) }),
+					onUncaughtError: (error) =>
+						post({ type: 'runtime-error', gen: msg.gen, error: errText(error) }),
+					onCaughtError: (error) =>
+						post({ type: 'runtime-error', gen: msg.gen, error: errText(error) }),
 				});
 				root = { kind: 'react', unmount: () => reactRoot.unmount() };
 				reactRoot.render(React.createElement(component));
@@ -215,7 +220,7 @@ window.addEventListener('message', async (event) => {
 						octane.ErrorBoundary,
 						{
 							fallback: (error) => {
-								post({ type: 'runtime-error', error: errText(error) });
+								post({ type: 'runtime-error', gen: msg.gen, error: errText(error) });
 								return null;
 							},
 						},

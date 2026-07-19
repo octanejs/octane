@@ -168,7 +168,12 @@ export function createPreview(
 							break;
 						}
 						case 'runtime-error':
-							if (typeof msg.error === 'string') onRuntimeError(msg.error);
+							// Only the CURRENT run's errors reach the banner — a late
+							// error from a superseded run (a timer firing after a
+							// recompile) must not stick over the newer run's clean render.
+							if (msg.gen === generation && typeof msg.error === 'string') {
+								onRuntimeError(msg.error);
+							}
 							break;
 					}
 				};

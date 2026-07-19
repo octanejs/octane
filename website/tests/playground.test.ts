@@ -265,6 +265,40 @@ describe('playground sandbox boundary', () => {
 		}
 	});
 
+	it('drops runtime errors from superseded runs but reports the current run’s', async () => {
+		const runtimeErrors: string[] = [];
+		const host = document.createElement('div');
+		document.body.appendChild(host);
+		const preview = createPreview(host, (message) => runtimeErrors.push(message));
+		try {
+			const iframe = host.querySelector('iframe')!;
+			const fromSandbox = (data: Record<string, unknown>) => {
+				window.dispatchEvent(
+					new MessageEvent('message', {
+						source: iframe.contentWindow,
+						data: { [PROTOCOL_KEY]: true, ...data },
+					}),
+				);
+			};
+			fromSandbox({ type: 'ready' });
+			const run = preview.run(RUN_PAYLOAD);
+			// Let run() pass its internal ready-await before the sandbox replies.
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			fromSandbox({ type: 'result', gen: 1, error: null });
+			await expect(run).resolves.toEqual({ error: null });
+			// A late error from an OLDER run (e.g. a timer firing after a
+			// recompile) must not surface over the current run's clean render…
+			fromSandbox({ type: 'runtime-error', gen: 0, error: 'stale island exploded' });
+			expect(runtimeErrors).toEqual([]);
+			// …while the current run's errors still do.
+			fromSandbox({ type: 'runtime-error', gen: 1, error: 'live island exploded' });
+			expect(runtimeErrors).toEqual(['live island exploded']);
+		} finally {
+			preview.destroy();
+			host.remove();
+		}
+	});
+
 	it('reports when a ready iframe never returns a render result', async () => {
 		vi.useFakeTimers();
 		const host = document.createElement('div');
