@@ -5,10 +5,10 @@ import { BINDING_COUNT } from '../../../content/bindings.ts';
 export function Proven() @{
 	<section class="proven">
 		<div class="proven-stat">
-			<span class="proven-number">9,900+</span>
+			<span class="proven-number">11,500+</span>
 			<span class="proven-label">
 				{'test executions across the runtime, compiler, SSR and bindings, including ' +
-					'compiler-mode reruns; the core suite has 3,500+ distinct cases. '}
+					'compiler-mode reruns; the core suite has 3,900+ distinct cases. '}
 				<a
 					href="https://github.com/octanejs/octane/blob/main/docs/react-parity-coverage.md"
 					target="_blank"

@@ -2,7 +2,7 @@
 
 Octane implements React's programming model — the same hooks, `memo`, context,
 portals, Suspense, transitions, actions, and SSR/streaming APIs. Its core suite
-contains 3,500+ distinct behavioral tests; production-compiler executions rerun
+contains 3,900+ distinct behavioral tests; production-compiler executions rerun
 the normal cases and are not additional unique coverage. That is a local suite
 count, not a count of tests ported from React. The exact pinned snapshot and
 source-attributed React scenarios, classifications, and coverage are tracked in the generated
