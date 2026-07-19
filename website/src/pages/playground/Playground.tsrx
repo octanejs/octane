@@ -566,9 +566,10 @@ export function Playground() @{
 					value={exampleId}
 					onChange={(e) => controllerRef.current.selectExample?.(e.currentTarget.value)}
 				>
-					@if (exampleId === 'custom') {
-						<option value="custom" disabled>Custom</option>
-					}
+					{/* Static placeholder shown only while the buffer has diverged from
+    every example — always in the DOM (no conditional rendering
+    inside the select) so the option list never reconciles. */}
+					<option value="custom" disabled hidden>Custom</option>
 					@for (const group of EXAMPLE_GROUPS; key group.group) {
 						<optgroup label={group.group}>
 							@for (const example of group.examples; key example.id) {

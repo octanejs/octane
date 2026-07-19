@@ -644,8 +644,11 @@ function fakeFetch(shouldFail: boolean, attempt: number) {
 	});
 }
 
-function Quote(props: { promise: Promise<string> }) @{
-	const quote = use(props.promise);
+// Creating the promise AT the use() call site lets octane memoize it per
+// call site + deps — only changed inputs refetch; unrelated re-renders
+// never resuspend the boundary.
+function Quote(props: { shouldFail: boolean; attempt: number }) @{
+	const quote = use(fakeFetch(props.shouldFail, props.attempt));
 
 	<p class="quote">{'“' + quote + '”'}</p>
 }
@@ -653,8 +656,6 @@ function Quote(props: { promise: Promise<string> }) @{
 export default function App() @{
 	const [attempt, setAttempt] = useState(1);
 	const [shouldFail, setShouldFail] = useState(false);
-
-	const promise = fakeFetch(shouldFail, attempt);
 
 	<div class="demo">
 		<div class="row">
@@ -671,7 +672,7 @@ export default function App() @{
 
 		<div class="panel">
 			@try {
-				<Quote promise={promise} />
+				<Quote shouldFail={shouldFail} attempt={attempt} />
 			} @pending {
 				<p class="hint">loading…</p>
 			} @catch (err, reset) {
@@ -744,8 +745,11 @@ function fakeFetch(shouldFail: boolean, attempt: number) {
 	});
 }
 
-function Quote(props: { promise: Promise<string> }) {
-	const quote = use(props.promise);
+// Creating the promise AT the use() call site lets octane memoize it per
+// call site + deps — only changed inputs refetch; unrelated re-renders
+// never resuspend the boundary.
+function Quote(props: { shouldFail: boolean; attempt: number }) {
+	const quote = use(fakeFetch(props.shouldFail, props.attempt));
 
 	return <p>{'“' + quote + '”'}</p>;
 }
@@ -753,8 +757,6 @@ function Quote(props: { promise: Promise<string> }) {
 export default function App() {
 	const [attempt, setAttempt] = useState(1);
 	const [shouldFail, setShouldFail] = useState(false);
-
-	const promise = fakeFetch(shouldFail, attempt);
 
 	return (
 		<div style={{ display: 'grid', gap: '0.75rem', justifyItems: 'start' }}>
@@ -774,7 +776,7 @@ export default function App() {
 				fallback={(error: Error) => <p style={{ color: '#ff5d72' }}>{error.message}</p>}
 			>
 				<Suspense fallback={<p style={{ opacity: 0.6 }}>loading…</p>}>
-					<Quote promise={promise} />
+					<Quote shouldFail={shouldFail} attempt={attempt} />
 				</Suspense>
 			</ErrorBoundary>
 		</div>
@@ -1201,8 +1203,11 @@ function fakeFetch(attempt: number) {
 	});
 }
 
-function IslandData(props: { promise: Promise<string> }) @{
-	const data = use(props.promise);
+// Creating the promise AT the use() call site lets octane memoize it per
+// call site + deps, so unrelated re-renders (the click counter) never
+// resuspend the boundary — only a changed attempt refetches.
+function IslandData(props: { attempt: number }) @{
+	const data = use(fakeFetch(props.attempt));
 
 	<p class="data">{data as string}</p>
 }
@@ -1210,8 +1215,6 @@ function IslandData(props: { promise: Promise<string> }) @{
 export function Island(props: { start: number }) @{
 	const [count, setCount] = useState(props.start);
 	const [attempt, setAttempt] = useState(1);
-
-	const promise = fakeFetch(attempt);
 
 	<section class="island">
 		<h3>Octane island</h3>
@@ -1222,7 +1225,7 @@ export function Island(props: { start: number }) @{
 		</div>
 
 		@try {
-			<IslandData promise={promise} />
+			<IslandData attempt={attempt} />
 		} @pending {
 			<p class="hint">island loading…</p>
 		}

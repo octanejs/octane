@@ -870,21 +870,13 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 45_000);
 
-	it('playground runs the OctaneCompat React-host example end to end', async (ctx) => {
-		// This example needs the real react/react-dom from esm.sh inside the
-		// sandbox — skip (with a visible reason) when the CDN is unreachable.
-		try {
-			const probe = await fetch('https://esm.sh/react@19.2.0', { method: 'HEAD' });
-			if (!probe.ok) throw new Error(`HTTP ${probe.status}`);
-		} catch (error) {
-			console.warn(
-				`[e2e] skipping OctaneCompat example: esm.sh unreachable (${
-					error instanceof Error ? error.message : String(error)
-				})`,
-			);
-			ctx.skip();
-			return;
-		}
+	it('playground runs the OctaneCompat React-host example end to end', async () => {
+		// This example loads the real react/react-dom from esm.sh inside the
+		// sandbox — like the rest of this browser suite, it requires a working
+		// network. A probe up front turns an unreachable CDN into an immediate,
+		// clearly-attributed failure instead of a slow in-iframe timeout.
+		const probe = await fetch('https://esm.sh/react@19.2.0', { method: 'HEAD' });
+		expect(probe.ok, 'esm.sh must be reachable to exercise the OctaneCompat example').toBe(true);
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
