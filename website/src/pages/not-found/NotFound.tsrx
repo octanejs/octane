@@ -26,7 +26,7 @@ export function NotFound() @{
 				margin: 0 0 0.5rem;
 			}
 			.notfound-sub {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				margin: 0 0 2rem;
 			}
 			.notfound :global(a.notfound-home) {

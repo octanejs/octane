@@ -150,7 +150,7 @@ export function ViewTransitionsDemo() @{
 			}
 			.vtdemo-card {
 				display: inline-block;
-				background: #23272f;
+				background: var(--bg);
 				border: 1px solid #343a46;
 				border-radius: 12px;
 				padding: 1.5rem 2rem;
@@ -183,19 +183,19 @@ export function ViewTransitionsDemo() @{
 				gap: 0.5rem;
 			}
 			.vtdemo-tab {
-				background: #23272f;
-				color: #99a1b3;
+				background: var(--bg);
+				color: var(--text-secondary);
 				border: 1px solid #343a46;
 				border-radius: 8px;
 				padding: 0.4rem 0.9rem;
 				cursor: pointer;
 			}
 			.vtdemo-tab.active {
-				color: #f4eee8;
+				color: var(--text);
 				border-color: #ff415a;
 			}
 			.vtdemo-panel {
-				background: #23272f;
+				background: var(--bg);
 				border: 1px solid #343a46;
 				border-radius: 12px;
 				padding: 1.5rem;

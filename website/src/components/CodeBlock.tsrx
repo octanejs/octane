@@ -128,7 +128,7 @@ export function CodeBlock(props: CodeBlockProps) @{
 				min-height: 2rem;
 				padding: 0 0.5rem;
 				border-bottom: 1px solid var(--border);
-				background: rgba(255, 255, 255, 0.02);
+				background: var(--surface-subtle);
 			}
 			.codeblock-dot {
 				width: 10px;
@@ -175,8 +175,8 @@ export function CodeBlock(props: CodeBlockProps) @{
 			}
 			.codeblock-copy:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.07);
-				border-color: rgba(255, 255, 255, 0.14);
+				background: var(--surface);
+				border-color: var(--border);
 			}
 			/* In the bar the copy button is pushed to the trailing edge. */
 			.codeblock-copy-bar {

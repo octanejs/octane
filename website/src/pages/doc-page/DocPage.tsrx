@@ -128,7 +128,7 @@ export function DocPage() @{
 			.prose :global(.doc-lede) {
 				max-width: 43rem;
 				margin: 0;
-				color: #dfe3e9;
+				color: var(--text-body);
 				font-size: 1.15rem;
 				line-height: 1.7;
 			}
@@ -154,7 +154,7 @@ export function DocPage() @{
 				scroll-margin-top: 5.5rem;
 			}
 			.prose :global(p) {
-				color: #d5d9e0;
+				color: var(--text-body);
 				margin: 0 0 1.1rem;
 			}
 			.prose :global(ol),
@@ -162,7 +162,7 @@ export function DocPage() @{
 				padding-left: 1.4rem;
 			}
 			.prose :global(li) {
-				color: #d5d9e0;
+				color: var(--text-body);
 				margin: 0.45rem 0;
 				padding-left: 0.15rem;
 			}
@@ -209,7 +209,7 @@ export function DocPage() @{
 				padding: 1rem 1.15rem 1rem 3.25rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
-				background: rgba(255, 255, 255, 0.035);
+				background: var(--surface-subtle);
 			}
 			.prose :global(.doc-callout::before) {
 				position: absolute;
@@ -230,7 +230,7 @@ export function DocPage() @{
 			.prose :global(.doc-callout.note::before) {
 				content: 'i';
 				background: rgba(114, 156, 255, 0.2);
-				color: #a9c2ff;
+				color: var(--callout-note);
 			}
 			.prose :global(.doc-callout.important) {
 				border-color: rgba(255, 180, 65, 0.3);
@@ -239,7 +239,7 @@ export function DocPage() @{
 			.prose :global(.doc-callout.important::before) {
 				content: '!';
 				background: rgba(255, 180, 65, 0.2);
-				color: #ffc56d;
+				color: var(--callout-important);
 			}
 			.prose :global(.doc-callout.tip) {
 				border-color: rgba(99, 211, 145, 0.28);
@@ -248,7 +248,7 @@ export function DocPage() @{
 			.prose :global(.doc-callout.tip::before) {
 				content: '✓';
 				background: rgba(99, 211, 145, 0.2);
-				color: #7ee2a7;
+				color: var(--callout-tip);
 			}
 			.prose :global(.doc-callout-title) {
 				margin: 0 0 0.2rem;
@@ -304,7 +304,7 @@ export function DocPage() @{
 				padding: 1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
-				background: rgba(255, 255, 255, 0.025);
+				background: var(--surface-subtle);
 				color: var(--text);
 				text-decoration: none;
 				transition:
@@ -337,7 +337,7 @@ export function DocPage() @{
 				margin: 1.4rem 0;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
-				background: rgba(255, 255, 255, 0.025);
+				background: var(--surface-subtle);
 				overflow: hidden;
 			}
 			.prose :global(details.deep-dive) {
@@ -351,7 +351,7 @@ export function DocPage() @{
 				cursor: pointer;
 			}
 			.prose :global(details summary:hover) {
-				background: rgba(255, 255, 255, 0.035);
+				background: var(--surface-subtle);
 			}
 			.prose :global(details > div) {
 				padding: 0 1rem 0.1rem;
@@ -372,7 +372,7 @@ export function DocPage() @{
 				padding: 1.1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
-				background: rgba(255, 255, 255, 0.025);
+				background: var(--surface-subtle);
 			}
 			.prose :global(.api-index-card h3),
 			.prose :global(.doc-card h3) {
@@ -390,7 +390,7 @@ export function DocPage() @{
 				display: block;
 				margin: 0;
 				padding: 0.55rem 0;
-				border-top: 1px solid rgba(255, 255, 255, 0.06);
+				border-top: 1px solid var(--border);
 			}
 			.prose :global(.api-index-card li:first-child),
 			.prose :global(.doc-card li:first-child) {
@@ -405,7 +405,7 @@ export function DocPage() @{
 			.prose :global(.doc-card li > code) {
 				display: inline-block;
 				margin: 0 0 0.2rem;
-				color: #ff8b9b;
+				color: var(--accent-text);
 			}
 			.prose :global(.api-index-card li > a),
 			.prose :global(.doc-card li > a) {
@@ -415,7 +415,7 @@ export function DocPage() @{
 			}
 			.prose :global(.api-index-card li > a code),
 			.prose :global(.doc-card li > a code) {
-				color: #ff8b9b;
+				color: var(--accent-text);
 			}
 			.prose :global(.api-index-card li > span),
 			.prose :global(.doc-card li > span) {
@@ -438,18 +438,18 @@ export function DocPage() @{
 				font-size: 0.9rem;
 			}
 			.prose :global(thead) {
-				background: rgba(255, 255, 255, 0.04);
+				background: var(--surface-subtle);
 			}
 			.prose :global(th) {
 				text-align: left;
 				color: var(--text);
-				border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+				border-bottom: 1px solid var(--border);
 				padding: 0.65rem 0.8rem;
 			}
 			.prose :global(td) {
-				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				border-bottom: 1px solid var(--border);
 				padding: 0.65rem 0.8rem;
-				color: #d5d9e0;
+				color: var(--text-body);
 				vertical-align: top;
 			}
 			.prose :global(tr:last-child td) {
@@ -479,7 +479,7 @@ export function DocPage() @{
 				padding: 0.9rem 1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.85rem;
-				background: rgba(255, 255, 255, 0.025);
+				background: var(--surface-subtle);
 				color: var(--text);
 				text-decoration: none;
 			}

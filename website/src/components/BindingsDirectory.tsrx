@@ -46,7 +46,7 @@ export function BindingsDirectory() @{
 				padding: 1.1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.9rem;
-				background: rgba(255, 255, 255, 0.025);
+				background: var(--surface-subtle);
 			}
 			.binding-card-head {
 				display: flex;

@@ -141,7 +141,7 @@ export function PortalEventDemo() @{
 			}
 			:global(.portal-demo-toast button) {
 				background: transparent;
-				border-color: rgba(255, 255, 255, 0.15);
+				border-color: var(--border);
 				padding: 0.35rem 0.65rem;
 			}
 			.portal-demo-result {

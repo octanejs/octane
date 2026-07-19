@@ -522,8 +522,8 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				color: var(--text);
 			}
 			.bx-chip-on {
-				background: rgba(255, 255, 255, 0.06);
-				border-color: rgba(255, 255, 255, 0.24);
+				background: var(--surface);
+				border-color: var(--border);
 				color: var(--text);
 			}
 			.bx-chip:not(.bx-chip-on) {
@@ -564,7 +564,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			}
 			.bx-suite:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.04);
+				background: var(--surface-subtle);
 			}
 			.bx-suite-on {
 				background: rgba(255, 65, 90, 0.16);
@@ -584,7 +584,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				top: 0;
 				bottom: 0.2rem;
 				width: 0;
-				border-left: 1px dashed rgba(255, 255, 255, 0.35);
+				border-left: 1px dashed var(--border);
 				pointer-events: none;
 				z-index: 1;
 			}
@@ -700,7 +700,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				color: var(--text);
 			}
 			.bx-seg-on {
-				background: rgba(255, 255, 255, 0.08);
+				background: var(--surface);
 				color: var(--text);
 			}
 			.bx-heat-scroll {
@@ -750,7 +750,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 				font-size: 0.78rem;
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.02);
+				background: var(--surface-subtle);
 				transition: background 0.3s ease;
 			}
 			.bx-cell-null {
@@ -759,12 +759,12 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 					-45deg,
 					transparent,
 					transparent 4px,
-					rgba(255, 255, 255, 0.04) 4px,
-					rgba(255, 255, 255, 0.04) 5px
+					var(--surface-subtle) 4px,
+					var(--surface-subtle) 5px
 				);
 			}
 			.bx-cell-ref {
-				border: 1px dashed rgba(255, 255, 255, 0.25);
+				border: 1px dashed var(--border);
 				background: transparent;
 				color: var(--text-secondary);
 			}
@@ -816,7 +816,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				width: 1.6rem;
 				height: 0.9rem;
 				border-radius: 0.25rem;
-				border: 1px dashed rgba(255, 255, 255, 0.35);
+				border: 1px dashed var(--border);
 			}
 
 			/* Tooltip */
@@ -831,7 +831,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 				padding: 0.5rem 0.65rem;
 				border-radius: 0.55rem;
 				background: #14171c;
-				border: 1px solid rgba(255, 255, 255, 0.14);
+				border: 1px solid var(--border);
 				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 				animation: bx-fade 0.12s ease;
 			}
@@ -845,23 +845,23 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			.bx-tip-fw {
 				font-size: 0.8rem;
 				font-weight: 700;
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.bx-tip-suite {
 				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 				font-size: 0.68rem;
-				color: #99a1b3;
+				color: var(--text-secondary);
 			}
 			.bx-tip-primary {
 				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 				font-size: 0.9rem;
 				font-weight: 600;
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.bx-tip-sec,
 			.bx-tip-fast {
 				font-size: 0.72rem;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				margin-top: 0.15rem;
 			}
 			@keyframes bx-fade {

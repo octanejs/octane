@@ -143,8 +143,8 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 		<style>
 			.bench-card {
 				margin: 0;
-				background: #2b3138;
-				border: 1px solid rgba(255, 255, 255, 0.08);
+				background: var(--panel);
+				border: 1px solid var(--border);
 				border-radius: 12px;
 				padding: 1.25rem 1.25rem 0.75rem;
 				display: flex;
@@ -164,7 +164,7 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 				font-size: 0.95rem;
 			}
 			.bench-card-desc {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-size: 0.85rem;
 				line-height: 1.45;
 			}
@@ -177,7 +177,7 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 				display: inline-flex;
 				align-items: center;
 				gap: 0.4rem;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-size: 0.8rem;
 			}
 			.bench-swatch {
@@ -196,16 +196,16 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 			}
 			.op-label,
 			.value-label {
-				fill: #99a1b3;
+				fill: var(--text-secondary);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 11px;
 			}
 			.bench-table {
-				border-top: 1px solid rgba(255, 255, 255, 0.08);
+				border-top: 1px solid var(--border);
 				padding-top: 0.5rem;
 			}
 			.bench-table summary {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-size: 0.8rem;
 				cursor: pointer;
 			}
@@ -225,16 +225,16 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 				text-align: right;
 				padding: 0.25rem 0.5rem;
 				color: #f6f7f9;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				border-bottom: 1px solid var(--border);
 				white-space: nowrap;
 			}
 			.bench-table thead th {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-weight: 500;
 			}
 			.bench-table th[scope='row'] {
 				text-align: left;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-weight: 400;
 			}
 		</style>

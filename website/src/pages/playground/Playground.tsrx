@@ -442,13 +442,13 @@ export function Playground() @{
 				display: inline-flex;
 				padding: 3px;
 				border-radius: 9999px;
-				border: 1px solid rgba(255, 255, 255, 0.1);
-				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--border);
+				background: var(--surface-subtle);
 			}
 			.pg-seg-btn {
 				border: none;
 				background: transparent;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font: inherit;
 				font-size: 0.85rem;
 				font-weight: 500;
@@ -457,7 +457,7 @@ export function Playground() @{
 				cursor: pointer;
 			}
 			.pg-seg-btn:hover:not(:disabled) {
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.pg-seg-btn.active {
 				color: #ff5d72;
@@ -519,12 +519,12 @@ export function Playground() @{
 				flex-direction: column;
 				min-width: 0;
 				min-height: 0;
-				border-top: 1px solid rgba(255, 255, 255, 0.1);
+				border-top: 1px solid var(--border);
 				overflow: hidden;
 				background: #0d1117;
 			}
 			.pg-panel + .pg-panel {
-				border-left: 1px solid rgba(255, 255, 255, 0.1);
+				border-left: 1px solid var(--border);
 			}
 			.pg-panel-head {
 				display: flex;
@@ -532,9 +532,9 @@ export function Playground() @{
 				justify-content: space-between;
 				gap: 1rem;
 				padding: 0.45rem 0.9rem;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-				background: rgba(255, 255, 255, 0.03);
-				color: #99a1b3;
+				border-bottom: 1px solid var(--border);
+				background: var(--surface-subtle);
+				color: var(--text-secondary);
 				font-size: 0.72rem;
 				letter-spacing: 0.08em;
 				text-transform: uppercase;
@@ -568,7 +568,7 @@ export function Playground() @{
 			.pg-preview {
 				flex: 1;
 				min-height: 0;
-				background: #16181d;
+				background: var(--code-bg);
 			}
 			.pg-consent {
 				position: absolute;
@@ -586,14 +586,14 @@ export function Playground() @{
 				justify-items: start;
 				padding: 1.1rem 1.25rem;
 				border-radius: 12px;
-				border: 1px solid rgba(255, 255, 255, 0.12);
-				background: #16181d;
-				color: #f4eee8;
+				border: 1px solid var(--border);
+				background: var(--code-bg);
+				color: var(--text);
 				font-size: 0.9rem;
 			}
 			.pg-consent-card p {
 				margin: 0;
-				color: #99a1b3;
+				color: var(--text-secondary);
 			}
 			.pg-consent-run {
 				font: inherit;
@@ -629,7 +629,7 @@ export function Playground() @{
 					gap: 0.25rem;
 					padding: 3px;
 					border-radius: 9999px;
-					border: 1px solid rgba(255, 255, 255, 0.1);
+					border: 1px solid var(--border);
 					background: rgba(35, 39, 47, 0.92);
 					backdrop-filter: blur(12px);
 					align-self: center;

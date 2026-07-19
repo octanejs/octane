@@ -86,7 +86,7 @@ const demoStyles = <style>
 	}
 	.secondary {
 		border-color: var(--border);
-		background: rgba(255, 255, 255, 0.04);
+		background: var(--surface-subtle);
 		color: var(--text);
 	}
 	.disabled {
@@ -190,10 +190,10 @@ const demoStyles = <style>
 		display: inline-block;
 		min-width: 1.5rem;
 		border: 1px solid var(--border);
-		border-bottom-color: rgba(255, 255, 255, 0.22);
+		border-bottom-color: var(--border);
 		border-radius: 0.35rem;
 		padding: 0.05rem 0.35rem;
-		background: rgba(255, 255, 255, 0.06);
+		background: var(--surface);
 		color: var(--text);
 		font-size: 0.75rem;
 		text-align: center;
@@ -271,7 +271,7 @@ const demoStyles = <style>
 		border: 1px solid var(--border);
 		border-radius: 999px;
 		padding: 0.45rem 0.8rem;
-		background: rgba(255, 255, 255, 0.035);
+		background: var(--surface-subtle);
 		color: var(--text-secondary);
 		font: inherit;
 		font-size: 0.82rem;
