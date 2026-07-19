@@ -2,10 +2,16 @@
 // @lexical/extension's framework-agnostic core.
 import { namedSignals } from '@lexical/extension';
 import { LinkNode, registerLink } from '@lexical/link';
+import type { LinkAttributes } from '@lexical/link';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
-export function LinkPlugin(props) {
+type Props = {
+	validateUrl?: (url: string) => boolean;
+	attributes?: LinkAttributes;
+};
+
+export function LinkPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const validateUrl = props.validateUrl;
 	const attributes = props.attributes;

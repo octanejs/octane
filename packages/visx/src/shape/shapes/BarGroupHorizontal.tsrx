@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { ScaleInput } from '@octanejs/visx/scale';
@@ -30,7 +30,7 @@ export type BarGroupHorizontalProps<Datum extends DatumObject, Key extends Group
 		/** Total width of the x-axis. */
 		width: number;
 		/** Override render function which is passed the computed Ba/rGroups. */
-		children?: (barGroups: BarGroupHorizontalType<Key>[]) => ReactNode;
+		children?: (barGroups: BarGroupHorizontalType<Key>[]) => OctaneNode;
 	};
 
 export default function BarGroupHorizontal<Datum extends DatumObject, Key extends GroupKey = GroupKey, Y0Scale extends AnyScaleBand = AnyScaleBand, Y1Scale extends AnyScaleBand = AnyScaleBand>({

@@ -16,6 +16,24 @@ const OBJECT_RENDERERS = {
 };
 
 /**
+ * Minimal `octane/jsx-runtime` stub for the type-level programs below: the DOM
+ * renderer's virtual TSX pins `@jsxImportSource octane`, so a program that
+ * compiles it needs the module resolvable from its root.
+ */
+function writeOctaneJsxRuntimeStub(root: string, intrinsics: string): void {
+	const octaneRoot = join(root, 'node_modules/octane');
+	mkdirSync(octaneRoot, { recursive: true });
+	writeFileSync(
+		join(octaneRoot, 'package.json'),
+		JSON.stringify({ name: 'octane', exports: { './jsx-runtime': './jsx-runtime.d.ts' } }),
+	);
+	writeFileSync(
+		join(octaneRoot, 'jsx-runtime.d.ts'),
+		`export namespace JSX {\n\tinterface IntrinsicElements {\n${intrinsics}\n\t}\n}\n`,
+	);
+}
+
+/**
  * Volar mappings tests. We exercise the IDE-facing virtual-TSX pipeline:
  *   - Returns a `VolarMappingsResult` plus Octane's non-fatal diagnostics.
  *   - Generates TSX (`code`) containing the user identifiers (so TypeScript's
@@ -87,17 +105,66 @@ describe('compileToVolarMappings', () => {
 			renderers: OBJECT_RENDERERS,
 		});
 		const prelude = '/** @jsxImportSource @fixture/object-intrinsics */\n';
+		// The built-in DOM renderer pins octane's own jsx-runtime: a `.tsrx`
+		// file's JSX is octane's dialect regardless of the HOST tsconfig's
+		// `jsxImportSource` (a React shell hosting islands must not type them
+		// against React's JSX).
+		const domPrelude = '/** @jsxImportSource octane */\n';
 
 		expect(object.code.startsWith(prelude)).toBe(true);
-		expect(dom.code).not.toContain('@jsxImportSource');
-		expect(object.code.slice(prelude.length)).toBe(baseline.code);
+		expect(dom.code.startsWith(domPrelude)).toBe(true);
+		expect(baseline.code.startsWith(domPrelude)).toBe(true);
+		expect(object.code.slice(prelude.length)).toBe(baseline.code.slice(domPrelude.length));
 		expect(object.mappings).toHaveLength(baseline.mappings.length);
+		const shift = prelude.length - domPrelude.length;
 		for (let index = 0; index < object.mappings.length; index++) {
 			expect(object.mappings[index].sourceOffsets).toEqual(baseline.mappings[index].sourceOffsets);
 			expect(object.mappings[index].generatedOffsets).toEqual(
-				baseline.mappings[index].generatedOffsets.map((offset) => offset + prelude.length),
+				baseline.mappings[index].generatedOffsets.map((offset) => offset + shift),
 			);
 		}
+	});
+
+	it('keeps a leading @jsxImportSource pragma ahead of the virtual TSX', () => {
+		// An authored file-local pragma (TS's own per-file intrinsics mechanism)
+		// must survive into the virtual TSX in leading position — this is how a
+		// `.three.tsrx` opts into `@octanejs/three/intrinsics` when the host
+		// (tsrx-tsc, generic language plugins) passes no renderer config.
+		// @tsrx/core re-emits preserved leading comments; TS honors the first
+		// pragma, so nothing may be prepended ahead of the authored one.
+		const jsx = 'export function Scene() @{ <mesh /> }\n';
+		const pragma = '@jsxImportSource @fixture/object-intrinsics';
+		const leadsWithPragma = (code: string) => {
+			const at = code.indexOf(pragma);
+			expect(at).toBeGreaterThanOrEqual(0);
+			expect(at).toBeLessThan(code.indexOf('export function Scene'));
+			// The authored pragma is the FIRST pragma in the file.
+			expect(code.indexOf('@jsxImportSource')).toBe(code.indexOf(pragma));
+		};
+
+		leadsWithPragma(compileToVolarMappings(`/** ${pragma} */\n` + jsx, '/src/Scene.tsrx').code);
+		leadsWithPragma(
+			compileToVolarMappings(`// with a ${pragma} pragma\n` + jsx, '/src/Scene.tsrx').code,
+		);
+
+		// The source pragma wins over config-selected renderer intrinsics — same
+		// precedence TypeScript gives an in-file pragma over compilerOptions.
+		const overridden = compileToVolarMappings(
+			`/** ${pragma} */\n` + jsx,
+			'/src/Scene.object.tsrx',
+			{
+				renderers: OBJECT_RENDERERS,
+			},
+		);
+		leadsWithPragma(overridden.code);
+		expect(overridden.code).not.toContain('@fixture/object-renderer');
+
+		// Only leading trivia counts: a pragma after the first statement is not a
+		// TS pragma and must not suppress the renderer prelude — the virtual TSX
+		// still leads with the DOM renderer's own octane pragma, so TS reads
+		// octane's types, not the trailing comment's module.
+		const trailing = compileToVolarMappings(jsx + `/** ${pragma} */\n`, '/src/Scene.tsrx');
+		expect(trailing.code.startsWith('/** @jsxImportSource octane */\n')).toBe(true);
 	});
 
 	it('keeps conflicting DOM and renderer intrinsic types isolated per virtual file', () => {
@@ -125,18 +192,15 @@ describe('compileToVolarMappings', () => {
 }
 `,
 			);
-			writeFileSync(
-				join(root, 'dom-intrinsics.d.ts'),
-				`declare namespace JSX {
-	interface IntrinsicElements {
-		line: { path: string };
+			// The "DOM side" of the intrinsics conflict lives where dom virtual
+			// files actually read it now: octane's own jsx-runtime module.
+			writeOctaneJsxRuntimeStub(
+				root,
+				`		line: { path: string };
 		path: { d: string };
 		audio: { src: string };
 		source: { src: string };
-		mesh: { domOnly?: boolean };
-	}
-}
-`,
+		mesh: { domOnly?: boolean };`,
 			);
 			const augmentationFile = join(root, 'object-augmentation.d.ts');
 			writeFileSync(
@@ -175,13 +239,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 			writeFileSync(invalidDomFile, invalidDom.code);
 
 			const program = ts.createProgram({
-				rootNames: [
-					join(root, 'dom-intrinsics.d.ts'),
-					augmentationFile,
-					domFile,
-					objectFile,
-					invalidDomFile,
-				],
+				rootNames: [augmentationFile, domFile, objectFile, invalidDomFile],
 				options: {
 					jsx: ts.JsxEmit.Preserve,
 					module: ts.ModuleKind.ESNext,
@@ -235,6 +293,104 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		expect(result.code).toContain('App');
 		expect(result.code).toContain('props.items');
 		expect(result.code).toContain('x.label');
+	});
+
+	it('lowers `module server` blocks to checkable TS with types flowing across the boundary', () => {
+		// The documented dialect (docs/ssr.md) puts a static import INSIDE the
+		// server block. Verbatim that can never typecheck (TS1147 for the
+		// in-block import, TS2307 for `from 'server'`), so the Volar path must
+		// lower the block to plain TS: hoisted imports + a namespace-valued
+		// binding the checker can see through.
+		const src =
+			'module server {\n' +
+			"\timport { commitOrder } from './server-domain.ts';\n" +
+			'\n' +
+			'\texport type Receipt = { id: string };\n' +
+			'\n' +
+			'\texport async function placeOrder(request: unknown) {\n' +
+			'\t\treturn commitOrder(request);\n' +
+			'\t}\n' +
+			'}\n' +
+			'\n' +
+			"import { placeOrder, type Receipt } from 'server';\n" +
+			'\n' +
+			'export function App() @{\n' +
+			"\tconst pending: Promise<{ id: string }> = placeOrder('r1');\n" +
+			'\tconst receipt: Receipt = { id: String(pending) };\n' +
+			'\t<button>{receipt.id}</button>\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/App.tsrx');
+		expect(result.errors).toEqual([]);
+		// The dialect never reaches the virtual TSX...
+		expect(result.code).not.toContain('module server');
+		expect(result.code).not.toContain("from 'server'");
+		// ...the block import is hoisted to module top level, ahead of the
+		// namespace the block lowered into. The namespace keeps the AUTHORED
+		// block name so the `server` identifier resolves and stays "used".
+		const hoistedAt = result.code.indexOf("import { commitOrder } from './server-domain.ts';");
+		const namespaceAt = result.code.indexOf('namespace server');
+		expect(hoistedAt).toBeGreaterThanOrEqual(0);
+		expect(namespaceAt).toBeGreaterThan(hoistedAt);
+		// Authored code keeps its mappings: the language server can still
+		// translate positions inside the block, at the boundary import, and on
+		// the block's own `server` name.
+		const mappedSourceOffsets = new Set(result.mappings.flatMap((m) => m.sourceOffsets));
+		expect(mappedSourceOffsets.has(src.indexOf('commitOrder'))).toBe(true);
+		expect(mappedSourceOffsets.has(src.indexOf('placeOrder'))).toBe(true);
+		expect(mappedSourceOffsets.has('module '.length)).toBe(true);
+
+		// Type-level end-to-end: the virtual TSX must produce ZERO diagnostics
+		// under the real TypeScript checker, and the server function's type must
+		// genuinely flow to the client side (a misuse must fail).
+		const misuse = compileToVolarMappings(
+			src.replace('Promise<{ id: string }>', 'Promise<number>'),
+			'/src/App.tsrx',
+		);
+		const root = mkdtempSync(join(tmpdir(), 'octane-volar-server-module-'));
+		try {
+			writeFileSync(
+				join(root, 'server-domain.ts'),
+				'export async function commitOrder(request: unknown): Promise<{ id: string }> {\n' +
+					'\treturn { id: String(request) };\n' +
+					'}\n',
+			);
+			writeOctaneJsxRuntimeStub(root, '\t\tbutton: { children?: unknown };');
+			const appFile = join(root, 'App.tsx');
+			const misuseFile = join(root, 'AppMisuse.tsx');
+			writeFileSync(appFile, result.code);
+			writeFileSync(misuseFile, misuse.code);
+			// noUnusedLocals proves the lowering leaves nothing dangling: the
+			// namespace is "used" via the boundary destructure, and the hoisted
+			// block import's only uses sit INSIDE the namespace, which count.
+			const options = {
+				allowImportingTsExtensions: true,
+				jsx: ts.JsxEmit.Preserve,
+				module: ts.ModuleKind.ESNext,
+				moduleResolution: ts.ModuleResolutionKind.Bundler,
+				noEmit: true,
+				noUnusedLocals: true,
+				skipLibCheck: true,
+				strict: true,
+				target: ts.ScriptTarget.ESNext,
+			};
+			const program = ts.createProgram({
+				rootNames: [appFile],
+				options,
+			});
+			expect(ts.getPreEmitDiagnostics(program)).toHaveLength(0);
+
+			const misuseProgram = ts.createProgram({
+				rootNames: [misuseFile],
+				options,
+			});
+			const misuseDiagnostics = ts.getPreEmitDiagnostics(misuseProgram);
+			expect(misuseDiagnostics).toHaveLength(1);
+			expect(ts.flattenDiagnosticMessageText(misuseDiagnostics[0].messageText, '\n')).toMatch(
+				/Promise<number>/,
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it('exposes the (transformed) AST for editor integrations that need to walk it', () => {

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
 export interface Props {
@@ -19,7 +20,7 @@ export interface Props {
 	/** The stroke width. constrained to a `number` type due to use in bounding box calculations */
 	strokeWidth?: number;
 	/** The <marker> contents. Typically one of: `<path>`, `<line>`, `<polyline>`, or `<polygon>` */
-	children: ReactNode;
+	children: OctaneNode;
 }
 
 export type MarkerProps = Props & Omit<SVGProps<SVGMarkerElement>, keyof Props>;

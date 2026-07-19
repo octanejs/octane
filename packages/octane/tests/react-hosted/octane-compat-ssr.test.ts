@@ -147,6 +147,45 @@ describe('octane/react/server — buffered SSR + client hydration (§9.3)', () =
 		await mounted.unmount();
 	});
 
+	it('server-renders the component/props form byte-identically to the children form and hydrates it', async () => {
+		// Both authoring forms resolve to the SAME island transport, so their
+		// server markup must be byte-equal at the same tree position.
+		const childrenForm = h(
+			'main',
+			null,
+			h(OctaneCompatServer, null, h(server.SsrGreeting, { name: 'iso' })),
+		);
+		const componentForm = h(
+			'main',
+			null,
+			h(OctaneCompatServer, { component: server.SsrGreeting, props: { name: 'iso' } } as any),
+		);
+		expect(reactRenderToString(componentForm as any)).toBe(
+			reactRenderToString(childrenForm as any),
+		);
+
+		// The component-form server output hydrates through the component-form
+		// client with adopted node identity, live state, and no mismatch.
+		const clientPage = h(
+			'main',
+			null,
+			h(OctaneCompat, { component: ClientSsrGreeting, props: { name: 'iso' } } as any),
+		);
+		const errors = vi.spyOn(console, 'error');
+		const mounted = await hydratePage(componentForm, clientPage);
+		expect(mounted.serverHtml).toContain('island iso');
+		const host = mounted.host();
+		const serverButton = host.querySelector('.ssr-count');
+		expect(serverButton?.textContent).toBe('clicks:0');
+		expect(errors).not.toHaveBeenCalled();
+		errors.mockRestore();
+		expect(host.querySelector('.ssr-count')).toBe(serverButton);
+
+		await reactAct(async () => (serverButton as HTMLElement).click());
+		expect(host.querySelector('.ssr-count')?.textContent).toBe('clicks:1');
+		await mounted.unmount();
+	});
+
 	it('hydrates Octane useId values byte-identically to the server output', async () => {
 		const serverPage = h(
 			'main',

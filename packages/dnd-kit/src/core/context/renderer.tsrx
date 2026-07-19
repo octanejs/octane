@@ -7,7 +7,7 @@ export type OctaneRenderer = {
 	trackRendering: (callback: () => void) => void;
 };
 
-function RendererImpl(props: { children: unknown; ref?: { current: OctaneRenderer | null } }) {
+function RendererImpl(props: { children?: unknown; ref?: { current: OctaneRenderer | null } }) {
 	const [transitionCount, setTransitionCount] = useState(0);
 	const rendering = useRef<Promise<void> | null>(null);
 	const resolver = useRef<(() => void) | null>(null);

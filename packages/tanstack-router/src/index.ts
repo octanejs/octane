@@ -54,6 +54,16 @@ export {
 	RootRoute,
 	RouteApi,
 } from './route';
+// Framework-facing component types (react-router parity, on octane renderables).
+// route.ts also narrows router-core's *Extensions interfaces to these via module
+// augmentation — mirroring upstream's route.tsx/router.tsx `declare module`.
+export type {
+	SyncRouteComponent,
+	AsyncRouteComponent,
+	RouteComponent,
+	ErrorRouteComponent,
+	NotFoundRouteComponent,
+} from './route';
 export { routerContext, getRouterContext, matchContext, useRouter } from './context';
 export { useStore } from './useStore';
 export { useRouterState } from './useRouterState';
@@ -74,11 +84,13 @@ export {
 export { useAwaited } from './useAwaited';
 export { useLinkProps, createLink, linkOptions } from './link';
 export { useBlocker, Block } from './useBlocker.tsrx';
+export type { UseBlockerOpts, ShouldBlockFn } from './useBlocker.tsrx';
 export { useMatchRoute, MatchRoute } from './MatchRoute.tsrx';
 export { useElementScrollRestoration } from './useElementScrollRestoration';
 export { lazyRouteComponent } from './lazyRouteComponent';
 
 export { RouterProvider, RouterContextProvider } from './RouterProvider.tsrx';
+export type { RouterProps } from './RouterProvider.tsrx';
 export { Outlet } from './Outlet.tsrx';
 export { Link } from './Link.tsrx';
 export { Navigate } from './Navigate.tsrx';

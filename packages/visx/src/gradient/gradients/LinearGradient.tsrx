@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
 type LinearGradientOwnProps = {
@@ -29,7 +30,7 @@ type LinearGradientOwnProps = {
 	/** Transform to apply to linearGradient, overrides rotate. */
 	transform?: string;
 	/** Override of linearGradient children. */
-	children?: ReactNode;
+	children?: OctaneNode;
 	/** (When no x or y values are passed), will orient the gradient vertically instead of horizontally. */
 	vertical?: boolean;
 };

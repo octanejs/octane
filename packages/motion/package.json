@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/motion",
-  "version": "0.1.7",
+  "version": "0.1.9",
   "license": "MIT",
   "type": "module",
   "engines": {

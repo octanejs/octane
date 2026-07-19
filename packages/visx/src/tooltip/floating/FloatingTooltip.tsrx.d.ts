@@ -4,7 +4,7 @@ import type { FloatingTooltipArrowProps, FloatingTooltipContentProps, FloatingTo
 declare function Provider({ children, closeDelay, delay, skipDelay, }: FloatingTooltipProviderProps): React.JSX.Element;
 declare function Root<TData = unknown>({ children, forceMount, ...options }: FloatingTooltipRootProps<TData>): React.JSX.Element;
 declare function Trigger({ disabled, render }: FloatingTooltipTriggerProps): import("octane").ElementDescriptor<any> | React.ReactElement<unknown, string | React.JSXElementConstructor<any>>;
-declare function Portal({ children, container, disabled }: FloatingTooltipPortalProps): string | number | bigint | boolean | React.JSX.Element | Iterable<React.ReactNode> | Promise<string | number | bigint | boolean | React.ReactPortal | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | null | undefined> | null | undefined;
+declare function Portal({ children, container, disabled }: FloatingTooltipPortalProps): unknown;
 declare function Positioner({ children, id, render, style, ...restProps }: FloatingTooltipPositionerProps): import("octane").ElementDescriptor<any> | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | null;
 declare function Content({ children, render, ...restProps }: FloatingTooltipContentProps): import("octane").ElementDescriptor<any> | React.ReactElement<unknown, string | React.JSXElementConstructor<any>> | null;
 declare function Arrow({ height, padding: _padding, render, tipRadius, width, ...restProps }: FloatingTooltipArrowProps): React.JSX.Element | import("octane").ElementDescriptor<any> | null;

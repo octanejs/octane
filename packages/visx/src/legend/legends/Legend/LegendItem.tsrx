@@ -1,4 +1,5 @@
-import type { ReactNode, HTMLProps } from 'react';
+import type { HTMLProps } from 'react';
+import type { OctaneNode } from 'octane';
 import type { FlexDirection } from '../../types';
 
 export type LegendItemProps = {
@@ -9,7 +10,7 @@ export type LegendItemProps = {
 	/** Margin around the legend item. */
 	margin?: string | number;
 	/** Child elements to render inside the legend item (typically LegendShape and LegendLabel). */
-	children?: ReactNode;
+	children?: OctaneNode;
 	/** CSS display property for the legend item. */
 	display?: string;
 };

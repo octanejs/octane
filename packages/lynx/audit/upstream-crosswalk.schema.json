@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://octane.dev/schemas/lynx-upstream-crosswalk.schema.json",
+  "title": "Octane Lynx upstream crosswalk",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "auditDate",
+    "status",
+    "classifications",
+    "upstream",
+    "publicSurface",
+    "testInventory",
+    "gates"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "auditDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "status": {
+      "type": "string"
+    },
+    "classifications": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/classification"
+      }
+    },
+    "upstream": {
+      "type": "object",
+      "required": ["reactLynxOracle", "releaseSet", "nativeEngine"]
+    },
+    "publicSurface": {
+      "type": "object",
+      "required": [
+        "manifestSubpathCount",
+        "subpathGroups",
+        "rootDocumentedExportCount",
+        "rootExportGroups",
+        "reactTypePassthroughCount",
+        "reactTypePassthroughs",
+        "ambientGroups"
+      ]
+    },
+    "testInventory": {
+      "type": "object",
+      "required": [
+        "sourceInventoryStatus",
+        "declaredTaskSourceFileCount",
+        "orphanedSourceFileCount",
+        "totalSourceFileCount",
+        "unclassifiedSourceFileCount",
+        "classificationGroups",
+        "runnerExpandedCases"
+      ],
+      "properties": {
+        "sourceInventoryStatus": {
+          "type": "string"
+        },
+        "matchPolicy": {
+          "type": "string"
+        },
+        "declaredTaskSourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "orphanedSourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "totalSourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unclassifiedSourceFileCount": {
+          "const": 0
+        },
+        "rustCaseCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rustSourceFileCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rustClassification": {
+          "$ref": "#/$defs/classification"
+        },
+        "rustReason": {
+          "type": "string"
+        },
+        "taskCounts": {
+          "type": "array"
+        },
+        "classificationGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["classification", "sourceFileCount", "selectors"],
+            "properties": {
+              "classification": {
+                "$ref": "#/$defs/classification"
+              },
+              "sourceFileCount": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "targetMilestones": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9
+                }
+              },
+              "selectors": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reason": {
+                "type": "string"
+              },
+              "observationBoundary": {
+                "type": "string"
+              },
+              "caseLevelOverrides": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "knownNonRunnableCases": {
+          "type": "array"
+        },
+        "runnerExpandedCases": {
+          "type": "object",
+          "required": [
+            "status",
+            "runnableCaseCount",
+            "unclassifiedRunnableCaseCount",
+            "reason",
+            "requiredEvidence"
+          ],
+          "properties": {
+            "status": {
+              "enum": ["unmet-gate", "complete"]
+            },
+            "runnableCaseCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "unclassifiedRunnableCaseCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "reason": {
+              "type": "string"
+            },
+            "requiredEvidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "gates": {
+      "type": "object",
+      "required": [
+        "publicSubpathsClassified",
+        "rootDocumentedExportsClassified",
+        "reactTypePassthroughsClassified",
+        "ambientSurfaceClassified",
+        "testSourceFilesClassified",
+        "runnerExpandedTestCasesClassified",
+        "phase0CrosswalkComplete",
+        "blockedBy"
+      ]
+    }
+  },
+  "$defs": {
+    "classification": {
+      "enum": ["port", "differential", "intentional-divergence", "deferred", "out-of-scope"]
+    }
+  }
+}

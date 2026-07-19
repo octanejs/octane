@@ -1,4 +1,5 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
+import type { OctaneNode } from 'octane';
 
 import { VISUALLY_HIDDEN_STYLE } from '../utils/table';
 
@@ -6,8 +7,8 @@ export type ChartA11yLivePoliteness = 'polite' | 'assertive';
 
 export type ChartA11yAnnouncerProps = {
 	id?: string;
-	message?: ReactNode;
-	children?: ReactNode;
+	message?: OctaneNode;
+	children?: OctaneNode;
 	politeness?: ChartA11yLivePoliteness;
 	atomic?: boolean;
 	visible?: boolean;

@@ -66,6 +66,20 @@ import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
 } from './hydration/interaction-config.js';
+import {
+	HYDRATE_SUPPORTED_INTERACTION_EVENTS,
+	hydrationEventPathWithin,
+	initializeHydrationEventCapture,
+	markDelegatedDynamicHydrationIntent,
+	registerHydrationIntentBoundary,
+	takeDelegatedDynamicHydrationIntent,
+	takePendingHydrationIntents,
+	unregisterHydrationIntentBoundary,
+	wasEarlyHydrationIntentHandled,
+	type HydrationIntentBoundary,
+	type HydrationIntentBoundaryStatus,
+	type HydrationReplayIntent,
+} from './hydration/event-capture.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
 import {
 	COMPONENT_FLAG_BOUNDARY,
@@ -3010,19 +3024,23 @@ function drainPostPaint(): void {
 	_postPaintCbs = [];
 	for (let i = 0; i < cbs.length; i++) cbs[i]();
 }
-let _channel: MessageChannel | null = null;
-if (typeof MessageChannel !== 'undefined') {
-	_channel = new MessageChannel();
-	_channel.port1.onmessage = drainPostPaint;
+let _postAfterPaint: (() => void) | undefined;
+function initPostAfterPaint(): () => void {
+	if (_postAfterPaint === undefined) {
+		if (typeof MessageChannel === 'undefined') {
+			_postAfterPaint = () => setTimeout(drainPostPaint, 0);
+		} else {
+			const channel = new MessageChannel();
+			channel.port1.onmessage = drainPostPaint;
+			_postAfterPaint = () => channel.port2.postMessage(0);
+		}
+	}
+	return _postAfterPaint;
 }
 function schedulePostPaint(cb: () => void): void {
 	_postPaintCbs.push(cb);
-	if (_channel) {
-		// rAF lands before paint; MessageChannel posts a macrotask after paint.
-		requestAnimationFrame(() => _channel!.port2.postMessage(0));
-	} else {
-		requestAnimationFrame(() => setTimeout(drainPostPaint, 0));
-	}
+	// rAF lands before paint; the shared callback posts a macrotask after paint.
+	requestAnimationFrame(initPostAfterPaint());
 }
 
 // ---------------------------------------------------------------------------
@@ -4810,6 +4828,7 @@ export interface Context<T> {
  * Create a Context. Providers push the value into a Block-scoped slot; `use(ctx)`
  * walks the Block parent chain to find the nearest Provider for that context.
  */
+/* @__NO_SIDE_EFFECTS__ */
 export function createContext<T>(defaultValue: T): Context<T> {
 	// React 19 lets the Context itself serve as its Provider. Make the callable
 	// provider the context object, then retain `.Provider` as an identity alias
@@ -4880,6 +4899,17 @@ export function provideContext<T>(scope: Scope, context: Context<T>, value: T): 
 const CHILDREN_BLOCK: unique symbol = Symbol.for('octane.childrenBlock') as any;
 
 /**
+ * Compiler-emitted: attach markerless single-host-root metadata while a fresh
+ * component function is still being initialized. The compiler only calls this
+ * with an otherwise-unobserved function, so unused initializers are removable.
+ * @internal
+ */
+export function markSingleRoot<T extends Function>(component: T): T {
+	(component as any).$$singleRoot = true;
+	return component;
+}
+
+/**
  * Compiler-emitted: tag a children-block render function so `isChildrenBlock` recognises it.
  * Returns the function for inline use (`{ children: markChildrenBlock(__children$N) }`).
  * @internal
@@ -4924,23 +4954,6 @@ function childrenAsBody(children: unknown): ComponentBody {
 const HYDRATE_ID_SLOT = Symbol('octane.hydrate.id');
 const HYDRATE_SETUP_SLOT = Symbol('octane.hydrate.setup');
 const HYDRATE_NOTIFY_SLOT = Symbol('octane.hydrate.notify');
-const HYDRATE_SUPPORTED_INTERACTION_EVENTS = [
-	'auxclick',
-	'click',
-	'contextmenu',
-	'dblclick',
-	'focusin',
-	'keydown',
-	'keyup',
-	'mousedown',
-	'mouseenter',
-	'mouseover',
-	'mouseup',
-	'pointerdown',
-	'pointerenter',
-	'pointerover',
-	'pointerup',
-] as const;
 const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
 	'load',
 	'idle',
@@ -4951,14 +4964,9 @@ const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
 	'never',
 	'dynamic',
 ]);
-// Keep the selector a literal so this otherwise stand-alone initializer does
-// not retain deferred-hydration constants when the Hydrate export is shaken.
+// Boundary-local interaction capture uses the same marker protocol as the
+// lightweight pre-root event-capture module.
 const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
-const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>();
-const HYDRATE_SLOTS_BY_MARKER = /* @__PURE__ */ new WeakMap<Element, HydrateSlot>();
-const HYDRATE_PENDING_INTENTS = /* @__PURE__ */ new WeakMap<Element, HydrationReplayIntent[]>();
-const HYDRATE_HANDLED_INTENT_EVENTS = /* @__PURE__ */ new WeakSet<Event>();
-const HYDRATE_INTENT_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 
 type HydrateLoadResult = ComponentBody | { default: ComponentBody };
 
@@ -4968,11 +4976,6 @@ type InternalHydrateProps = HydrateProps & {
 	/** Latest lexical values consumed by the compiler-generated split child. */
 	__data?: unknown[];
 };
-
-interface HydrationReplayIntent {
-	event: Event;
-	path: number[];
-}
 
 interface HydrateSlot {
 	__kind: 'hydrateBlockSlot';
@@ -4985,6 +4988,7 @@ interface HydrateSlot {
 	parentBlock: Block;
 	props: InternalHydrateProps;
 	boundaryId: string;
+	intentBoundary: HydrationIntentBoundary;
 	delegatedDynamicIntent: boolean;
 	serverPreserved: boolean;
 	/** Snapshot used instead of authored fallback for an initial SSR boundary. */
@@ -5244,23 +5248,7 @@ function teardownHydrateBoundary(state: HydrateSlot): void {
 	cleanupHydrateInstallers(state);
 	state.prefetchAbort?.abort();
 	resolveHydrateWaiters(state, 'abort');
-	HYDRATE_SLOTS_BY_MARKER.delete(state.wrapper);
-}
-
-function eventPathWithin(root: Element, target: EventTarget | null): number[] | null {
-	if (!(target instanceof Node)) return null;
-	const path: number[] = [];
-	let node: Element | null = target instanceof Element ? target : target.parentElement;
-	while (node !== root) {
-		const parent: Element | null = node?.parentElement ?? null;
-		if (parent === null) return null;
-		const index = Array.prototype.indexOf.call(parent.children, node) as number;
-		if (index < 0) return null;
-		path.push(index);
-		node = parent;
-	}
-	path.reverse();
-	return path;
+	unregisterHydrationIntentBoundary(state.wrapper, state.intentBoundary);
 }
 
 function resolveEventPath(root: Element, path: number[]): Element | null {
@@ -5291,114 +5279,25 @@ function hydrateStrategyInteractionEvents(
 		: custom.split(/\s+/).filter(Boolean);
 }
 
-function markerHandlesEarlyHydrationIntent(marker: Element, eventType: string): boolean {
-	const state = HYDRATE_SLOTS_BY_MARKER.get(marker);
-	if (state !== undefined) {
-		return (
-			hydrateStrategyInteractionEvents(resolveHydrateStrategy(state))?.includes(eventType) ?? false
-		);
-	}
-
-	const when = marker.getAttribute(HYDRATE_WHEN_ATTR);
-	// Before a function-form strategy has run, its server marker can only promise
-	// the same conservative click intent TanStack exposes. Once the component has
-	// registered its slot, the branch above consults the concrete strategy instead.
-	if (when === 'dynamic') return eventType === 'click';
-	if (when !== 'interaction') return false;
-	const custom = marker.getAttribute(HYDRATE_INTERACTION_EVENTS_ATTR);
-	const events: ReadonlyArray<string> =
-		custom === null ? HYDRATE_DEFAULT_INTERACTION_EVENTS : custom.split(/\s+/).filter(Boolean);
-	return events.includes(eventType);
-}
-
 function queueHydrateIntent(state: HydrateSlot, intent: HydrationReplayIntent): void {
 	if (state.hydrated || resolveHydrateStrategy(state)._t === 'never') return;
 	state.replays.push(intent);
 	requestHydrateBoundary(state);
 }
 
-/**
- * Capture intent as soon as the client runtime module is evaluated. This is
- * deliberately document-level: an interaction may happen before hydrateRoot
- * creates a boundary slot, before its passive setup effect, or after streaming
- * inserts a nested marker that an ancestor could not have observed earlier.
- */
-function handleEarlyHydrationIntent(event: Event): void {
-	const target = event.target;
-	if (!(target instanceof Element)) return;
-
-	const markers: Element[] = [];
-	let marker: Element | null = target.closest(HYDRATE_MARKER_SELECTOR);
-	let matches = false;
-	while (marker !== null) {
-		markers.push(marker);
-		matches ||= markerHandlesEarlyHydrationIntent(marker, event.type);
-		marker = marker.parentElement?.closest(HYDRATE_MARKER_SELECTOR) ?? null;
-	}
-	if (!matches || markers.length === 0) return;
-
-	// Parent-first: queue only the outermost still-dormant marker. Its replay is
-	// captured again for the next nested marker after the parent has hydrated.
-	markers.reverse();
-	let candidate: Element | null = null;
-	let candidateState: HydrateSlot | undefined;
-	for (let i = 0; i < markers.length; i++) {
-		const current = markers[i];
-		const when = current.getAttribute(HYDRATE_WHEN_ATTR);
-		if (when === null) continue;
-		const state = HYDRATE_SLOTS_BY_MARKER.get(current);
-		if (state?.hydrated) continue;
-		if (when === 'never' || (state !== undefined && resolveHydrateStrategy(state)._t === 'never')) {
-			return;
-		}
-		candidate = current;
-		candidateState = state;
-		break;
-	}
-	if (candidate === null) return;
-	// Preserve only intent discovered before a dynamic child's slot exists. Once
-	// a slot has resolved `when()`, its concrete strategy owns event matching.
-	for (let i = 0; i < markers.length; i++) {
-		const current = markers[i];
-		if (
-			current !== candidate &&
-			candidate.contains(current) &&
-			current.getAttribute(HYDRATE_WHEN_ATTR) === 'dynamic' &&
-			!HYDRATE_SLOTS_BY_MARKER.has(current)
-		) {
-			HYDRATE_DELEGATED_DYNAMIC_MARKERS.add(current);
-		}
-	}
-
-	const path = eventPathWithin(candidate, event.target);
-	if (path === null) return;
-	const intent = { event, path };
-	HYDRATE_HANDLED_INTENT_EVENTS.add(event);
-	if (event.bubbles) {
-		event.preventDefault();
-		event.stopPropagation();
-		event.stopImmediatePropagation();
-	}
-
-	if (candidateState !== undefined) {
-		queueHydrateIntent(candidateState, intent);
-	} else {
-		const pending = HYDRATE_PENDING_INTENTS.get(candidate) ?? [];
-		pending.push(intent);
-		HYDRATE_PENDING_INTENTS.set(candidate, pending);
-	}
-}
-
-function ensureEarlyHydrationIntentCapture(ownerDocument: Document): void {
-	if (HYDRATE_INTENT_DOCUMENTS.has(ownerDocument)) return;
-	HYDRATE_INTENT_DOCUMENTS.add(ownerDocument);
-	for (let i = 0; i < HYDRATE_SUPPORTED_INTERACTION_EVENTS.length; i++) {
-		ownerDocument.addEventListener(
-			HYDRATE_SUPPORTED_INTERACTION_EVENTS[i],
-			handleEarlyHydrationIntent,
-			true,
-		);
-	}
+function handleRegisteredHydrationIntent(
+	state: HydrateSlot,
+	eventType: string,
+	intent?: HydrationReplayIntent,
+): HydrationIntentBoundaryStatus {
+	if (state.hydrated) return 'hydrated';
+	const strategy = resolveHydrateStrategy(state);
+	if (strategy._t === 'never') return 'never';
+	const status = hydrateStrategyInteractionEvents(strategy)?.includes(eventType)
+		? 'handles'
+		: 'dormant';
+	if (intent !== undefined) queueHydrateIntent(state, intent);
+	return status;
 }
 
 function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrategy): () => void {
@@ -5418,7 +5317,7 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 	if (events.size === 0) return () => undefined;
 
 	const onIntent = (event: Event) => {
-		if (HYDRATE_HANDLED_INTENT_EVENTS.has(event)) return;
+		if (wasEarlyHydrationIntentHandled(event)) return;
 		if (state.hydrated) return;
 		const rawTarget = event.target;
 		let target =
@@ -5445,9 +5344,9 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 		}
 		if (!matches) return;
 		for (let i = 0; i < delegatedDynamicMarkers.length; i++) {
-			HYDRATE_DELEGATED_DYNAMIC_MARKERS.add(delegatedDynamicMarkers[i]);
+			markDelegatedDynamicHydrationIntent(delegatedDynamicMarkers[i]);
 		}
-		const path = eventPathWithin(state.wrapper, event.target);
+		const path = hydrationEventPathWithin(state.wrapper, event.target);
 		if (path === null) return;
 		state.replays.push({ event, path });
 		if (event.bubbles) {
@@ -5567,7 +5466,7 @@ function createHydrateSlot(
 	const hydration = activeHydration();
 	const expected = document.createElement('div');
 	const wrapper = (hydration === null ? expected : hydration.clone(expected)) as HTMLDivElement;
-	ensureEarlyHydrationIntentCapture(wrapper.ownerDocument);
+	initializeHydrationEventCapture(wrapper.ownerDocument);
 	let serverPreserved =
 		hydration !== null && !hydration.isFresh(wrapper) && wrapper.parentNode === parentNode;
 	if (wrapper.parentNode !== parentNode) parentNode.insertBefore(wrapper, parentBlock.endMarker);
@@ -5623,7 +5522,10 @@ function createHydrateSlot(
 		undefined,
 	);
 	block.idState = idState;
-	const state: HydrateSlot = {
+	let state!: HydrateSlot;
+	const intentBoundary: HydrationIntentBoundary = (eventType, intent) =>
+		handleRegisteredHydrationIntent(state, eventType, intent);
+	state = {
 		__kind: 'hydrateBlockSlot',
 		__flags: SLOT_FLAG_TEARDOWN,
 		__teardown: teardownHydrateBoundary,
@@ -5634,7 +5536,8 @@ function createHydrateSlot(
 		parentBlock,
 		props,
 		boundaryId: wrapper.getAttribute(HYDRATE_ID_ATTR) ?? boundaryId,
-		delegatedDynamicIntent: HYDRATE_DELEGATED_DYNAMIC_MARKERS.delete(wrapper),
+		intentBoundary,
+		delegatedDynamicIntent: takeDelegatedDynamicHydrationIntent(wrapper),
 		serverPreserved,
 		preservedFallbackNodes: null,
 		seedRaw,
@@ -5662,11 +5565,10 @@ function createHydrateSlot(
 	};
 	scope.slots[0] = state;
 	registerSlot(scope, state);
-	HYDRATE_SLOTS_BY_MARKER.set(wrapper, state);
+	registerHydrationIntentBoundary(wrapper, intentBoundary);
 	block.body = hydrateBoundaryBody(state);
 	const initialStrategy = resolveHydrateStrategy(state);
-	const pendingIntents = HYDRATE_PENDING_INTENTS.get(wrapper);
-	HYDRATE_PENDING_INTENTS.delete(wrapper);
+	const pendingIntents = takePendingHydrationIntents(wrapper);
 	if (serverPreserved && pendingIntents !== undefined && initialStrategy._t !== 'never') {
 		state.replays.push(...pendingIntents);
 		requestHydrateBoundary(state);
@@ -5763,10 +5665,6 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
  * HTML can be left dormant.
  */
 function initializeHydrateComponent(): ComponentBody<HydrateProps> {
-	// This must run at module evaluation when Hydrate is retained: an interaction
-	// can precede hydrateRoot. The annotated initializer lets the entire capture
-	// graph disappear when the application never retains the Hydrate export.
-	if (typeof document !== 'undefined') ensureEarlyHydrationIntentCapture(document);
 	return markComponentFlags<ComponentBody<HydrateProps>>(
 		function Hydrate(rawProps, scope) {
 			const props = rawProps as InternalHydrateProps;
@@ -5835,10 +5733,12 @@ export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHy
  * render as the try body, and `fallback` renders as the pending body whenever a
  * descendant suspends (via `use(thenable)`).
  */
-export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> =
-	/* @__PURE__ */ markComponentFlags<
-		ComponentBody<{ fallback?: unknown; children: ComponentBody }>
-	>(
+// `children` is typed as a renderable (`unknown`), not `ComponentBody`: the
+// compiler lowers directive/JSX children to a body, but JSX-form usage types
+// children as element values (`Octane.JSX.Element`), and the de-opt path
+// renders element descriptors directly.
+export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
+	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
 		function Suspense(props, scope) {
 			const block = scope.block;
 			const pendingBody: ComponentBody = (_p, s) => {
@@ -5891,11 +5791,12 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> =
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-	children: ComponentBody;
+	// Renderable, not ComponentBody — same reasoning as Suspense above.
+	children: unknown;
 }> = /* @__PURE__ */ markComponentFlags<
 	ComponentBody<{
 		fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-		children: ComponentBody;
+		children: unknown;
 	}>
 >(
 	function ErrorBoundary(props, scope) {
@@ -5927,6 +5828,23 @@ export const ErrorBoundary: ComponentBody<{
 );
 
 /**
+ * The virtual-TSX (IDE / tsrx-tsc) name for `@try { … } @catch (e) { … }`: the
+ * shared tsrx transform's type-only output imports `TsrxErrorBoundary` from
+ * 'octane' and emits the catch clause as `fallback={(error, _reset) => …}`.
+ * Runtime compilation never references this name (`@try` lowers to `tryBlock`),
+ * so this exists for TYPES: the function-typed `fallback` (unlike
+ * `ErrorBoundary`'s renderable-or-render-prop union, which collapses to
+ * `unknown`) gives the emitted arrow contextual parameter types, so authored
+ * `@catch` bindings type-check under `noImplicitAny`. `content` is the
+ * transform's expression-position prop form of children.
+ */
+export const TsrxErrorBoundary = ErrorBoundary as unknown as (props: {
+	fallback?: (error: unknown, reset: () => void) => unknown;
+	content?: unknown;
+	children?: unknown;
+}) => OctaneNode;
+
+/**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).
  *
  * - `use(context)`: walks the Block tree from CURRENT_BLOCK upward to find a
@@ -5951,8 +5869,24 @@ export interface ForeignHostContext<T> {
 	readonly Consumer: (props: { children: (value: T) => any }) => any;
 }
 
+/**
+ * Excludes octane ELEMENT descriptors from `use()`'s thenable arms.
+ * `Octane.JSX.Element` type-level-extends `Promise<ReactNode>` (the React 19
+ * tag gate — see src/jsx-runtime.d.ts), so a bare `PromiseLike<T>` arm would
+ * admit elements bivariantly even though their promise protocol is poisoned.
+ * The optional-`never` `$$kind` keeps every real thenable assignable (they
+ * simply lack the property) while rejecting `$$kind`-branded descriptors,
+ * making `use(<El/>)` the same hard type error `await <El/>` is. Octane
+ * contexts are unaffected: they match the separate `Context<T>` arm.
+ */
+type NotAnElementDescriptor = { $$kind?: never };
+
 export function use<T>(
-	usable: Context<T> | PromiseLike<T> | TrackedThenable<T> | ForeignHostContext<T>,
+	usable:
+		| Context<T>
+		| (PromiseLike<T> & NotAnElementDescriptor)
+		| (TrackedThenable<T> & NotAnElementDescriptor)
+		| ForeignHostContext<T>,
 ): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) {
 		return useContextInternal(usable as Context<T>);
@@ -6126,6 +6060,7 @@ interface HostContextRequestSignal {
  * requested foreign value; the owner then retries the owned root.
  * @internal owner-bridge ABI (octane/react and future hosts).
  */
+/* @__NO_SIDE_EFFECTS__ */
 export function createHostContextRequest(thenable: PromiseLike<unknown>): HostContextRequestSignal {
 	return { $$kind: HOST_CONTEXT_REQUEST_TAG, thenable };
 }
@@ -6860,6 +6795,7 @@ function resolveLazyModule(mod: any): ComponentBody<any> {
  * `$$singleRoot` flag — a value-position lazy mounts through childSlot's
  * marked path, which is correct for any root shape the loaded module may have.
  */
+/* @__NO_SIDE_EFFECTS__ */
 export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ default: C } | C>): C {
 	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
 	let result: any = null; // fulfilled → module value; rejected → the reason
@@ -6976,7 +6912,7 @@ export function useId(slot?: HookSlot): string {
 }
 
 // ---------------------------------------------------------------------------
-// Templates: parse-once HTML → clone-per-instance
+// Templates: inert module token → parse on first mount → clone per instance
 // ---------------------------------------------------------------------------
 
 // Namespace flags: 0 = HTML, 1 = SVG, 2 = MathML, 3 = opaque component
@@ -6984,13 +6920,14 @@ export function useId(slot?: HookSlot): string {
 // component bodies and component children can be inserted under HTML, SVG, or
 // MathML, so clone() resolves their concrete parser context from the render
 // block's actual parent and caches one parsed template per destination.
-interface OpaqueTemplateRecord {
+interface LazyTemplateRecord {
 	html: string;
+	ns: 0 | 1 | 2 | 3;
 	frag: number;
 	parsed: Array<Element | undefined>;
 }
 
-const OPAQUE_TEMPLATE = Symbol('octane.opaque-template');
+const LAZY_TEMPLATE = Symbol('octane.lazy-template');
 
 function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
 	const t = document.createElement('template');
@@ -7025,13 +6962,16 @@ function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
 	return wrapEl.firstChild as Element;
 }
 
+/* @__NO_SIDE_EFFECTS__ */
 export function template(html: string, ns: number = 0, frag: number = 0): Element {
-	if (ns === 3) {
-		return {
-			[OPAQUE_TEMPLATE]: { html, frag, parsed: [] } satisfies OpaqueTemplateRecord,
-		} as unknown as Element;
-	}
-	return parseTemplate(html, ns === 1 ? 1 : ns === 2 ? 2 : 0, frag);
+	return {
+		[LAZY_TEMPLATE]: {
+			html,
+			ns: ns === 1 ? 1 : ns === 2 ? 2 : ns === 3 ? 3 : 0,
+			frag,
+			parsed: [],
+		} satisfies LazyTemplateRecord,
+	} as unknown as Element;
 }
 
 // ---------------------------------------------------------------------------
@@ -7666,20 +7606,26 @@ function parseSeedJson(raw: string): unknown[] | null {
 }
 
 export function clone<T extends Node>(node: T, loc?: string): T {
-	// Every ordinary template is a DOM Node, so keep its hot path to one numeric
-	// property read. Only the compiler's flag-3 token consults the private Symbol.
-	const opaque =
+	// Compiler templates are inert module-scope tokens. Parse each concrete
+	// namespace on its first real mount, then clone the cached node thereafter.
+	// Non-compiler callers can still hand clone() an ordinary DOM Node directly.
+	const lazy =
 		(node as any).nodeType === undefined
-			? ((node as any)[OPAQUE_TEMPLATE] as OpaqueTemplateRecord | undefined)
+			? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 			: undefined;
-	if (opaque !== undefined) {
-		const inherited =
-			CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
-		const ns: 0 | 1 | 2 = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
-		let parsed = opaque.parsed[ns];
+	if (lazy !== undefined) {
+		let ns: 0 | 1 | 2;
+		if (lazy.ns === 3) {
+			const inherited =
+				CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
+			ns = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
+		} else {
+			ns = lazy.ns;
+		}
+		let parsed = lazy.parsed[ns];
 		if (parsed === undefined) {
-			parsed = parseTemplate(opaque.html, ns, opaque.frag);
-			opaque.parsed[ns] = parsed;
+			parsed = parseTemplate(lazy.html, ns, lazy.frag);
+			lazy.parsed[ns] = parsed;
 		}
 		const hydration = activeHydration();
 		return (hydration === null ? parsed.cloneNode(true) : hydration.clone(parsed, loc)) as T;
@@ -8244,7 +8190,22 @@ export function attachRef(
 // resolution later.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const Fragment: unique symbol = Symbol.for('octane.Fragment');
+/** Fragment ref forms (fragment-refs parity): callback, object, or arrays. */
+type FragmentRefValue =
+	| ((instance: unknown) => void | (() => void))
+	| { current: unknown }
+	| readonly FragmentRefValue[]
+	| null;
+
+// The VALUE stays the sentinel symbol (the compiler matches `Fragment` by
+// name and the runtime compares descriptor types by identity); the declared
+// TYPE is component-shaped so long-form `<Fragment key ref>` JSX type-checks —
+// which is the export's entire purpose (see above).
+export const Fragment = Symbol.for('octane.Fragment') as unknown as (props: {
+	children?: unknown;
+	key?: string | number | bigint | null | undefined;
+	ref?: FragmentRefValue;
+}) => unknown;
 
 /**
  * React-19 `<Activity mode="hidden"|"visible">` sentinel. The compiler matches
@@ -12034,6 +11995,7 @@ export interface PortalDescriptor {
 	target: Element;
 	props: any;
 }
+/* @__NO_SIDE_EFFECTS__ */
 export function createPortal(
 	body: ComponentBody | ElementDescriptor | unknown,
 	target: Element,
@@ -12079,6 +12041,16 @@ export interface ElementDescriptor<P = any> {
 	// `null` for the component-value form (children flow through the component).
 	children: any;
 }
+
+// Octane's analog of React's `ReactNode`: the type of a renderable prop or
+// child. Octane renders element descriptors, primitives (coerced to text),
+// nullish values, and arbitrarily nested arrays of these, and the compiler —
+// not the type system — decides how a hole is rendered, so the type is
+// deliberately `unknown` rather than a closed union (see the jsx-runtime
+// `children` contract). Bindings ported from React should use this alias for
+// props upstream typed as `ReactNode`; a structural union or React's own
+// `ReactNode` would reject octane's nominal elements.
+export type OctaneNode = unknown;
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;
@@ -15717,6 +15689,7 @@ function shallowEqualPropsExact(a: any, b: any): boolean {
  * "equal"), `false` to re-render. When omitted, a shallow Object.is comparison
  * of own enumerable keys is used.
  */
+/* @__NO_SIDE_EFFECTS__ */
 export function memo<P>(
 	component: ComponentBody<P>,
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,

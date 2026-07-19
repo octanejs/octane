@@ -4,10 +4,25 @@
 // ./internal). The returned `context`/refs carry the root slot so the interaction
 // hooks (later phases) can compose without their own slot.
 import { arrow as arrowCore, computePosition } from '@floating-ui/dom';
+import type {
+	ComputePositionConfig,
+	Derivable,
+	Middleware,
+	MiddlewareState,
+} from '@floating-ui/dom';
 import { flushSync, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'octane';
 
 import { splitSlot, subSlot } from './internal';
 import { deepEqual, getDPR, roundByDPR } from './utils';
+import type {
+	ArrowOptions,
+	FloatingStyles,
+	MutableRefObject,
+	ReferenceType,
+	UsePositionFloatingData,
+	UsePositionFloatingOptions,
+	UsePositionFloatingReturn,
+} from './types';
 
 // Keep a ref pointed at the latest `value` without retriggering effects.
 function useLatestRef<T>(value: T, slot: symbol | undefined): { current: T } {
@@ -24,9 +39,22 @@ function useLatestRef<T>(value: T, slot: symbol | undefined): { current: T } {
 
 // The positioning core (ported from @floating-ui/react-dom's useFloating). The
 // PUBLIC useFloating (in ./context) wraps this and adds the interaction context.
+// Called as `usePositionFloating([options, slot])` — the array form keeps the
+// compiler-injected trailing slot detectable for plain-`.ts` callers.
+// RT defaults to `any` (not upstream's `ReferenceType`) so that pre-typing
+// callers that supply untyped elements — and therefore give inference no
+// candidate — keep their loose reference typing (e.g. @octanejs/base-ui builds
+// its own stricter FloatingContext from this return). Callers with typed
+// elements infer RT precisely.
+export function usePositionFloating<RT extends ReferenceType = any>(
+	args: [UsePositionFloatingOptions<RT>?, (symbol | undefined)?],
+): UsePositionFloatingReturn<RT>;
+// Loose fallback: pre-typing callers built untyped option bags in plain `.ts`;
+// they keep compiling while still receiving the typed return.
+export function usePositionFloating(args: unknown[]): UsePositionFloatingReturn<any>;
 export function usePositionFloating(args: any[]): any {
 	const [user, slot] = splitSlot(args);
-	const options = (user[0] as any) ?? {};
+	const options = (user[0] as UsePositionFloatingOptions) ?? {};
 
 	const placement = options.placement ?? 'bottom';
 	const strategy = options.strategy ?? 'absolute';
@@ -38,7 +66,7 @@ export function usePositionFloating(args: any[]): any {
 	const whileElementsMounted = options.whileElementsMounted;
 	const open = options.open;
 
-	const [data, setData] = useState(
+	const [data, setData] = useState<UsePositionFloatingData>(
 		{
 			x: 0,
 			y: 0,
@@ -55,14 +83,14 @@ export function usePositionFloating(args: any[]): any {
 		setLatestMiddleware(middleware);
 	}
 
-	const [_reference, _setReference] = useState(null, subSlot(slot, 'ref'));
-	const [_floating, _setFloating] = useState(null, subSlot(slot, 'flo'));
+	const [_reference, _setReference] = useState<ReferenceType | null>(null, subSlot(slot, 'ref'));
+	const [_floating, _setFloating] = useState<HTMLElement | null>(null, subSlot(slot, 'flo'));
 
-	const referenceRef = useRef<any>(null, subSlot(slot, 'rref'));
-	const floatingRef = useRef<any>(null, subSlot(slot, 'rflo'));
+	const referenceRef = useRef<ReferenceType | null>(null, subSlot(slot, 'rref'));
+	const floatingRef = useRef<HTMLElement | null>(null, subSlot(slot, 'rflo'));
 
 	const setReference = useCallback(
-		(node: any) => {
+		(node: ReferenceType | null) => {
 			if (node !== referenceRef.current) {
 				referenceRef.current = node;
 				_setReference(node);
@@ -72,7 +100,7 @@ export function usePositionFloating(args: any[]): any {
 		subSlot(slot, 'sref'),
 	);
 	const setFloating = useCallback(
-		(node: any) => {
+		(node: HTMLElement | null) => {
 			if (node !== floatingRef.current) {
 				floatingRef.current = node;
 				_setFloating(node);
@@ -97,7 +125,11 @@ export function usePositionFloating(args: any[]): any {
 			if (!referenceRef.current || !floatingRef.current) {
 				return;
 			}
-			const config: any = { placement, strategy, middleware: latestMiddleware };
+			const config: Partial<ComputePositionConfig> = {
+				placement,
+				strategy,
+				middleware: latestMiddleware,
+			};
 			if (platformRef.current) {
 				config.platform = platformRef.current;
 			}
@@ -122,7 +154,7 @@ export function usePositionFloating(args: any[]): any {
 		() => {
 			if (open === false && dataRef.current.isPositioned) {
 				dataRef.current.isPositioned = false;
-				setData((d: any) => ({ ...d, isPositioned: false }));
+				setData((d) => ({ ...d, isPositioned: false }));
 			}
 		},
 		[open],
@@ -167,7 +199,7 @@ export function usePositionFloating(args: any[]): any {
 		subSlot(slot, 'm:el'),
 	);
 
-	const floatingStyles = useMemo(
+	const floatingStyles = useMemo<FloatingStyles>(
 		() => {
 			const initialStyles = { position: strategy, left: 0, top: 0 };
 			if (!elements.floating) {
@@ -196,14 +228,14 @@ export function usePositionFloating(args: any[]): any {
 }
 
 // Ref-aware `arrow` middleware: accepts an octane ref ({current}) or an element.
-export const arrow = (options: any) => {
-	function isRef(value: any) {
+export const arrow = (options: ArrowOptions | Derivable<ArrowOptions>): Middleware => {
+	function isRef(value: unknown): value is MutableRefObject<Element | null> {
 		return {}.hasOwnProperty.call(value, 'current');
 	}
 	return {
 		name: 'arrow',
 		options,
-		fn(state: any) {
+		fn(state: MiddlewareState) {
 			const { element, padding } = typeof options === 'function' ? options(state) : options;
 			if (element && isRef(element)) {
 				if (element.current != null) {

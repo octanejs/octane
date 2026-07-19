@@ -9,6 +9,18 @@ export interface OctaneRendererRuleOptions {
 	renderer: string;
 }
 
+/** @experimental Static source restrictions enforced for a renderer. */
+export interface OctaneRendererValidationOptions {
+	/** Host elements that may directly contain authored primitive text. */
+	textParents?: readonly string[];
+	/** Unbound JavaScript globals that renderer-owned source may not reference. */
+	forbiddenGlobals?: readonly string[];
+	/** Package IDs whose static imports, subpaths, and CommonJS requires are forbidden. */
+	forbiddenImports?: readonly string[];
+	/** Allowed static JSX attributes by host name; `*` supplies shared patterns. */
+	hostProps?: Readonly<Record<string, readonly string[]>>;
+}
+
 export type OctaneRendererRegistryEntry =
 	| string
 	| {
@@ -18,6 +30,7 @@ export type OctaneRendererRegistryEntry =
 			intrinsics?: string;
 			text?: 'reject' | 'ignore' | 'host';
 			capabilities?: readonly string[];
+			validation?: OctaneRendererValidationOptions;
 	  };
 
 /** Static metadata for a component prop lowered for another renderer. */

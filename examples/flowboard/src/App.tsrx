@@ -230,7 +230,7 @@ export function App() @{
 			<header class="topbar">
 				<div>
 					<p class="eyebrow">Northstar / Product delivery</p>
-					<h1 ref={boardHeadingRef} tabIndex="-1">Flowboard</h1>
+					<h1 ref={boardHeadingRef} tabIndex={-1}>Flowboard</h1>
 				</div>
 				<div
 					class={['sync-pill', !online && 'sync-pill--offline']}
@@ -364,7 +364,13 @@ function LoadingBoard() @{
 	</section>
 }
 
-function FailureState(props) @{
+type OpenIssue = (issueId: string, trigger: HTMLElement | null) => void;
+type MoveIssue =
+	(issueId: string, destination: IssueStatus, targetIssueId?: string, restoreKeyboardFocus?: boolean) => void;
+type RegisterCard =
+	(issueId: string, element: HTMLElement | null, previous: HTMLElement | null) => void;
+
+function FailureState(props: { onRetry: () => void }) @{
 	<section class="failure-state" role="alert">
 		<div class="failure-symbol" aria-hidden="true">!</div>
 		<p class="eyebrow">Fixture connection interrupted</p>
@@ -374,7 +380,16 @@ function FailureState(props) @{
 	</section>
 }
 
-function BoardColumn(props) @{
+interface BoardColumnProps {
+	status: IssueStatus;
+	hint: string;
+	issues: Issue[];
+	onOpenIssue: OpenIssue;
+	onMoveIssue: MoveIssue;
+	onRegisterCard: RegisterCard;
+}
+
+function BoardColumn(props: BoardColumnProps) @{
 	const data: ColumnDragData = { kind: 'column', status: props.status };
 	const droppable = useDroppable({
 		id: `column:${props.status}`,
@@ -415,7 +430,15 @@ function BoardColumn(props) @{
 	</section>
 }
 
-function IssueCard(props) @{
+interface IssueCardProps {
+	issue: Issue;
+	index: number;
+	onOpenIssue: OpenIssue;
+	onMoveIssue: MoveIssue;
+	onRegisterCard: RegisterCard;
+}
+
+function IssueCard(props: IssueCardProps) @{
 	const issue: Issue = props.issue;
 	const openButtonRef = useRef<HTMLButtonElement | null>(null);
 	const registeredCardRef = useRef<HTMLElement | null>(null);
@@ -523,13 +546,20 @@ function IssueCard(props) @{
 	</article>
 }
 
-function IssuePortal(props) {
+interface IssueDialogProps {
+	issue: Issue | null;
+	requestedId: string;
+	onClose: () => void;
+	onMoveIssue: MoveIssue;
+}
+
+function IssuePortal(props: IssueDialogProps) {
 	const target = document.getElementById('modal-root');
 	if (!target) return null;
 	return createPortal(IssueDialog, target, props);
 }
 
-function IssueDialog(props) @{
+function IssueDialog(props: IssueDialogProps) @{
 	const closeRef = useRef<HTMLButtonElement | null>(null);
 	const dialogRef = useRef<HTMLDialogElement | null>(null);
 
@@ -578,7 +608,7 @@ function IssueDialog(props) @{
 	<dialog
 		class="issue-dialog"
 		ref={dialogRef}
-		tabIndex="-1"
+		tabIndex={-1}
 		aria-labelledby="issue-dialog-title"
 		aria-describedby="issue-dialog-description"
 	>
@@ -622,7 +652,9 @@ function IssueDialog(props) @{
 							value={props.issue.status}
 							onChange={(event) => {
 								const destination = (event.target as HTMLSelectElement).value;
-								if (isIssueStatus(destination)) props.onMoveIssue(props.issue.id, destination);
+								if (props.issue && isIssueStatus(destination)) {
+									props.onMoveIssue(props.issue.id, destination);
+								}
 							}}
 						>
 							@for (const status of ISSUE_STATUSES; key status) {

@@ -1,4 +1,6 @@
-import type { ReactNode, Ref, SVGProps } from 'react';
+import type { Ref } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 
 export type GroupProps = {
@@ -10,7 +12,7 @@ export type GroupProps = {
 	transform?: string;
 	/** className to apply to `<g/>`. */
 	className?: string;
-	children?: ReactNode;
+	children?: OctaneNode;
 	/** ref to underlying `<g/>`. */
 	innerRef?: Ref<SVGGElement>;
 };
@@ -23,7 +25,7 @@ export default function Group({
 	children,
 	innerRef,
 	...restProps
-}: GroupProps & Omit<SVGProps<SVGGElement>, keyof GroupProps>) {
+}: GroupProps & Omit<Octane.SVGProps<SVGGElement>, keyof GroupProps>) {
 	return <g
 		ref={innerRef}
 		className={cx('visx-group', className)}

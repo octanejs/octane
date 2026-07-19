@@ -1,5 +1,10 @@
 import { useState, isChildrenBlock } from 'octane';
 import { QueryErrorResetBoundaryContext, createValue } from './errorResetBoundary.ts';
+import type { OctaneNode } from 'octane';
+
+type QueryErrorResetBoundaryProps = {
+	children?: OctaneNode | ((value: ReturnType<typeof createValue>) => OctaneNode);
+};
 
 // QueryErrorResetBoundary — provides a fresh reset coordinator to its subtree.
 // Place it above an error boundary; call `.reset()` from the boundary's retry so
@@ -9,7 +14,7 @@ import { QueryErrorResetBoundaryContext, createValue } from './errorResetBoundar
 // </QueryErrorResetBoundary>` (react-query QueryErrorResetBoundary.tsx renders
 // `typeof children === 'function' ? children(value) : children`; octane
 // additionally excludes compiled children-blocks via isChildrenBlock).
-export function QueryErrorResetBoundary(props) @{
+export function QueryErrorResetBoundary(props: QueryErrorResetBoundaryProps) @{
 	const [value] = useState(() => createValue());
 	const resolved =
 		typeof props.children === 'function' && !isChildrenBlock(props.children)

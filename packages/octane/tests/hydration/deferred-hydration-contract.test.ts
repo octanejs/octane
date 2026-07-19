@@ -3,6 +3,7 @@ import { act, flushSync, hydrateRoot } from 'octane';
 import {
 	condition,
 	idle,
+	initializeHydrationEventCapture,
 	interaction,
 	load,
 	media,
@@ -43,6 +44,50 @@ describe('deferred hydration contract edges', () => {
 		vi.unstubAllGlobals();
 	});
 
+	it('installs explicit event capture once when the first boundary mounts', () => {
+		const addEventListener = vi.spyOn(document, 'addEventListener');
+		try {
+			initializeHydrationEventCapture(document);
+			expect(
+				addEventListener.mock.calls.filter(([eventName]) => eventName === 'auxclick'),
+			).toHaveLength(1);
+
+			const when = never();
+			container.innerHTML = renderToString(server.EarlyInteractionHydration, { when }).html;
+			root = hydrateRoot(container, client.EarlyInteractionHydration, { when });
+			initializeHydrationEventCapture(document);
+
+			expect(
+				addEventListener.mock.calls.filter(([eventName]) => eventName === 'auxclick'),
+			).toHaveLength(1);
+		} finally {
+			addEventListener.mockRestore();
+		}
+	});
+
+	it('captures interaction intent in another document realm', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		try {
+			const foreignDocument = iframe.contentDocument!;
+			const foreignWindow = iframe.contentWindow!;
+			expect(foreignWindow.Element).not.toBe(Element);
+			foreignDocument.body.innerHTML =
+				'<div data-octane-hydrate-id="foreign" data-octane-hydrate-when="interaction"><button id="foreign-intent">Activate</button></div>';
+			initializeHydrationEventCapture(foreignDocument);
+
+			const event = new foreignWindow.MouseEvent('click', {
+				bubbles: true,
+				cancelable: true,
+			});
+			foreignDocument.getElementById('foreign-intent')!.dispatchEvent(event);
+
+			expect(event.defaultPrevented).toBe(true);
+		} finally {
+			iframe.remove();
+		}
+	});
+
 	for (const dynamic of [false, true]) {
 		it(`captures and replays ${dynamic ? 'dynamic ' : ''}interaction intent dispatched before hydrateRoot`, () => {
 			const when = dynamic
@@ -54,6 +99,7 @@ describe('deferred hydration contract edges', () => {
 			container.innerHTML = html;
 			const button = container.querySelector('#early-interaction') as HTMLButtonElement;
 
+			initializeHydrationEventCapture(document);
 			button.click();
 			expect(onClick).not.toHaveBeenCalled();
 

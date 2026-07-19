@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 
@@ -10,7 +10,7 @@ export type GlyphProps = {
 	/** classname to apply to glyph g element container. */
 	className?: string;
 	/** Children to render. */
-	children?: ReactNode;
+	children?: OctaneNode;
 };
 
 export default function Glyph({ top = 0, left = 0, className, children }: GlyphProps) {

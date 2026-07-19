@@ -1,4 +1,5 @@
 import { useInsertionEffect, useLayoutEffect, useRef, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { createUniversalHostBoundary } from 'octane/universal';
 import type { RendererRegion } from 'octane/universal';
 import type { ComputeFunction, DomEvent } from '../core/events.js';
@@ -27,8 +28,12 @@ export interface CanvasProps extends Omit<RenderProps<HTMLCanvasElement>, 'size'
 	string,
 	unknown
 > {
-	/** Compiler-owned Three renderer region. Application JSX is lowered into this payload. */
-	children?: RendererRegion;
+	/**
+ * Authored Three-scene JSX. The compiler lowers the authored children into a
+ * `RendererRegion` payload at the boundary, so the runtime only ever sees the
+ * region form; `OctaneNode` keeps the authoring side type-checkable.
+ */
+	children?: RendererRegion | OctaneNode;
 	/** Fallback content rendered as native canvas fallback DOM. */
 	fallback?: unknown;
 	/** DOM measurement options compatible with the R3F Canvas surface. */
@@ -118,7 +123,7 @@ function bindCanvasEvents(
 
 /** A measured DOM canvas whose authored children execute in the Three renderer. */
 export function Canvas({
-	ref,
+	ref = null,
 	children,
 	fallback,
 	resize,
@@ -220,8 +225,10 @@ export function Canvas({
 			raycaster,
 			camera,
 			scene,
-			onPointerMissed: pointerMissedHandlerRef.current,
-			onCreated: createdHandlerRef.current,
+			// Both handlers were lazily created during render; the `| null` only
+			// survives because TS cannot carry the narrowing into this closure.
+			onPointerMissed: pointerMissedHandlerRef.current ?? undefined,
+			onCreated: createdHandlerRef.current ?? undefined,
 			size,
 		}).then(() => {
 			if (cancelled) return;
@@ -268,7 +275,9 @@ export function Canvas({
 			? null
 			: {
 					...boundaryMount,
-					props: { ...boundaryMount.props, region: children },
+					// By this point the compiler has lowered the authored JSX children
+					// into the boundary's region payload.
+					props: { ...boundaryMount.props, region: children as RendererRegion | undefined },
 				};
 
 	const wrapperStyle: CanvasStyle = {

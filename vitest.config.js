@@ -5,6 +5,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
+import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 
@@ -59,6 +60,21 @@ const THREE_ALIASES = [
 	{
 		find: /^@octanejs\/three\/intrinsics(?:\/jsx-runtime)?$/,
 		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
+	},
+];
+const LYNX_SOURCE = resolve(import.meta.dirname, 'packages/lynx/src');
+const LYNX_ALIASES = [
+	{
+		find: /^@octanejs\/lynx$/,
+		replacement: resolve(LYNX_SOURCE, 'index.ts'),
+	},
+	{
+		find: /^@octanejs\/lynx\/intrinsics\/jsx-runtime$/,
+		replacement: resolve(LYNX_SOURCE, 'intrinsics.ts'),
+	},
+	{
+		find: /^@octanejs\/lynx\/(.*)$/,
+		replacement: `${LYNX_SOURCE}/$1.ts`,
 	},
 ];
 const VISX_SOURCE = resolve(import.meta.dirname, 'packages/visx/src');
@@ -1871,6 +1887,27 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
+			},
+			{
+				test: {
+					name: 'lynx',
+					include: ['packages/lynx/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				// Lynx has no server compilation mode; execute native fixtures through
+				// the client compiler even though Vitest itself runs them in Node.
+				plugins: [octane({ renderers: lynxRspeedyRenderers, ssr: false })],
+				resolve: { alias: LYNX_ALIASES },
+			},
+			{
+				test: {
+					name: 'rspeedy-plugin',
+					include: ['packages/rspeedy-plugin-octane/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: { alias: LYNX_ALIASES },
 			},
 			{
 				test: {

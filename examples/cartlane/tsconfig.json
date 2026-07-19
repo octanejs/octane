@@ -10,8 +10,14 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "preserve",
-    "types": ["node"]
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": ["node"],
+    "plugins": [
+      {
+        "name": "@tsrx/typescript-plugin"
+      }
+    ]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "e2e/**/*.ts", "vite.config.ts", "octane.config.ts"]
+  "include": ["src/**/*", "e2e/**/*", "vite.config.ts", "octane.config.ts"]
 }

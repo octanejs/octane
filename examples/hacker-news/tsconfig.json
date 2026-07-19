@@ -10,8 +10,14 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "jsx": "preserve",
-    "types": ["node"]
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "types": ["node"],
+    "plugins": [
+      {
+        "name": "@tsrx/typescript-plugin"
+      }
+    ]
   },
   "include": ["shared/**/*", "jsx/**/*", "tsrx/**/*", "e2e/**/*", "env.d.ts"]
 }

@@ -1,6 +1,7 @@
 // Keep package metadata behind an isolated re-export: applications that do not
 // read `version` can tree-shake this module and the package.json payload in full.
 export { version } from './version.js';
+export { initializeHydrationEventCapture } from './hydration/event-capture.js';
 
 // Profiling's application API and compiler ABI live at `octane/profiling`;
 // neither belongs on the React-shaped main namespace.
@@ -82,9 +83,12 @@ export {
 	Children,
 	type ElementDescriptor,
 	type ComponentBody,
+	type OctaneNode,
 
 	// ── 2. Semi-public: compiler-emitted / binding-infrastructure helpers ─────
 	// (the compiled-output ↔ runtime contract; also used by @octanejs/* bindings)
+	// `@try`/`@catch` as the language tooling's type-only virtual TSX spells it.
+	TsrxErrorBoundary,
 	__useStateWithGetter,
 	__useReducerWithGetter,
 	__createVoidRoot,
@@ -182,6 +186,9 @@ export {
 	componentSlotVoid,
 	componentSlotLite,
 	compilerCacheContext,
+	markSingleRoot,
+	// Compact compiler ABI; keep the descriptive export for older compiled output.
+	markSingleRoot as __s,
 	markChildrenBlock,
 	childSlot,
 	positionalChildren,

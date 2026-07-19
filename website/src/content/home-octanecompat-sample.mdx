@@ -8,10 +8,10 @@ export function App() {
 		<div className="dashboard">
 			<h1>Ported one component at a time</h1>
 
-			{/* A compiled Octane island, hosted inside React.
-			    Native events, real React context, SSR + hydration. */}
+			{/* A compiled Octane island, hosted inside React with typed
+			    props. Native events, real React context, SSR + hydration. */}
 			<OctaneCompat>
-				<Counter />
+				<Counter start={3} />
 			</OctaneCompat>
 		</div>
 	);

@@ -1,3 +1,4 @@
+import type { OctaneNode } from 'octane';
 import type { RendererRegion } from 'octane/universal';
 import type { RenderProps } from '../core/root.js';
 import type { ResizeOptions } from './measure.js';
@@ -11,7 +12,7 @@ export type CanvasRef =
 
 export interface CanvasProps
 	extends Omit<RenderProps<HTMLCanvasElement>, 'size'>, Record<string, unknown> {
-	children?: RendererRegion;
+	children?: RendererRegion | OctaneNode;
 	fallback?: unknown;
 	resize?: ResizeOptions;
 	eventSource?: HTMLElement | { current: HTMLElement | null };

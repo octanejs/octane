@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "webworker"],
+    "target": "esnext",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "noEmitOnError": true,
+    "noErrorTruncation": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": false,
+    "types": [],
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane"
+  },
+  "include": ["./src/"],
+  "exclude": ["node_modules", "dist", "tests", "typetests"]
+}

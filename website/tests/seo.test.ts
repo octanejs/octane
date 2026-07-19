@@ -12,12 +12,21 @@ import { Route as RootRoute } from '../src/routes/__root.tsrx';
 
 const publicDir = fileURLToPath(new URL('../public', import.meta.url));
 const read = (name: string) => fs.readFileSync(`${publicDir}/${name}`, 'utf-8');
-const head = RootRoute.options.head!({} as never);
-const meta = (key: string) =>
-	head.meta?.find(
-		(entry: { property?: string; name?: string; content?: string }) =>
-			entry.property === key || entry.name === key,
-	)?.content;
+// `head` is typed `Awaitable` (a route may resolve it asynchronously); the root
+// route's is a plain sync object — `await` unwraps the union either way.
+const head = await RootRoute.options.head!({} as never);
+const meta = (key: string): string | undefined => {
+	// `MetaDescriptor` is a union of tag shapes (title/name/property/…); read
+	// through its `Record<string, unknown>` arm to match on either key form.
+	for (const entry of head.meta ?? []) {
+		if (entry === undefined) continue;
+		const record: Record<string, unknown> = entry;
+		if (record.property === key || record.name === key) {
+			return typeof record.content === 'string' ? record.content : undefined;
+		}
+	}
+	return undefined;
+};
 
 describe('seo artifacts', () => {
 	it('sitemap lists the site routes and every published doc', () => {

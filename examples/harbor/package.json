@@ -1,0 +1,28 @@
+{
+  "name": "harbor-example",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "A React 19 product page that hosts Octane islands through OctaneCompat — shared React context, island-to-host events, SSR-seeded island data, and error-boundary escape.",
+  "scripts": {
+    "dev": "node server.mjs",
+    "build": "vite build",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "e2e": "pnpm test:e2e"
+  },
+  "dependencies": {
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:default",
+    "@types/node": "catalog:default",
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vitejs/plugin-react": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}

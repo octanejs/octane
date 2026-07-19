@@ -1,9 +1,16 @@
 // Ported from @lexical/react/src/LexicalOnChangePlugin.ts.
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { HISTORY_MERGE_TAG } from 'lexical';
+import type { EditorState, LexicalEditor } from 'lexical';
 import { useLayoutEffect } from 'octane';
 
-export function OnChangePlugin(props) {
+type Props = {
+	ignoreHistoryMergeTagChange?: boolean;
+	ignoreSelectionChange?: boolean;
+	onChange: (editorState: EditorState, editor: LexicalEditor, tags: Set<string>) => void;
+};
+
+export function OnChangePlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const ignoreHistoryMergeTagChange =
 		props.ignoreHistoryMergeTagChange === undefined ? true : props.ignoreHistoryMergeTagChange;

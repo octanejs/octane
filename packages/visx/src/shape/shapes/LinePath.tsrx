@@ -1,4 +1,5 @@
-import type { Ref, ReactNode } from 'react';
+import type { Ref } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { Line as LineType } from 'd3-shape';
 import type { AddSVGProps, LinePathConfig } from '../types';
@@ -10,7 +11,7 @@ export type LinePathProps<Datum> = {
 		/** React RefObject passed to the path element. */
 		innerRef?: Ref<SVGPathElement>;
 		/** Override render function which is passed the configured path generator as input. */
-		children?: (args: { path: LineType<Datum> }) => ReactNode;
+		children?: (args: { path: LineType<Datum> }) => OctaneNode;
 		/** Fill color of the path element. */
 		fill?: string;
 		/** className applied to path element. */

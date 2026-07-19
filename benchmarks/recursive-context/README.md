@@ -21,6 +21,7 @@ benchmarks/recursive-context/
 ├── preact/           # Vite app, dev :5264 — native Preact context + hooks
 ├── svelte/           # Vite app, dev :5275 — Svelte 5 createContext + runes
 ├── run.mjs            # Playwright harness — drives all adapters
+├── work.mjs           # untimed Chromium precise-call-coverage gates for Octane
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -93,6 +94,10 @@ node benchmarks/bench.mjs --quick recursive-context
 node benchmarks/bench.mjs recursive-context
 ```
 
+The unified runner also executes `work.mjs` against the already-built Octane
+previews. Run it directly with `pnpm --dir benchmarks/recursive-context
+bench:work` when those two previews are already running.
+
 Output is a side-by-side table of median / min / p95 millis per op, followed by a
 pairwise ratio block, e.g.:
 
@@ -136,5 +141,21 @@ The harness:
 - **UNMOUNT**: one page; per iteration `__mount()` (untimed), time `__unmount()`,
   then `__reset()` + small sleep before the next iteration.
 
-Default: 5 warmups + 20 iters. Pass an integer to `bench` to override iters
+After the semantic gate, the harness publishes zero-variance DOM censuses for
+the mounted tree and the partial-unmount state. Visible element/text counts are
+semantic controls; total/comment counts expose framework bookkeeping. The
+Octane dialect timing rows also have order-balanced aliases: the primary
+TSRX→TSX pass is repeated TSX→TSRX, and the two fully-warmed sample sets are
+combined for TSX/TSRX ratio guards.
+
+`work.mjs` observes the emitted production bundles rather than adding source
+probes that could change compiler purity. A jitless Chromium precise-coverage
+pass caps blocks, generic slots, descriptors, keyed survivor work, and teardown
+scopes at their current levels while permitting reductions. Full/all-slot
+aggregates allow a generic slot to become a cheaper specialized slot without
+allowing duplicate dispatch. Every row requires live production-bundle coverage,
+and the root and partial updates must still execute exactly 1024 and 32 `setText`
+calls.
+
+Default: 10 warmups + 20 iters. Pass an integer to `bench` to override iters
 (`bench:long` runs 40).

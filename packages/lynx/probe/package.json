@@ -1,0 +1,33 @@
+{
+  "name": "@octanejs/lynx-phase-0-probe",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "overrides": {
+    "@rspack/core": "2.1.3"
+  },
+  "scripts": {
+    "audit": "node ../scripts/check-phase-0.mjs",
+    "build": "rspeedy build",
+    "serve:web": "node scripts/serve-web.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "verify:build": "node scripts/verify-build.mjs",
+    "phase0": "npm test && npm run build && npm run verify:build && npm run audit"
+  },
+  "devDependencies": {
+    "@lynx-js/rspeedy": "0.16.0",
+    "@lynx-js/runtime-wrapper-webpack-plugin": "0.2.2",
+    "@lynx-js/tasm": "0.0.39",
+    "@lynx-js/template-webpack-plugin": "0.13.0",
+    "@lynx-js/testing-environment": "0.3.0",
+    "@lynx-js/type-element-api": "0.0.8",
+    "@lynx-js/types": "4.0.0",
+    "@lynx-js/web-core": "0.22.2",
+    "@rsbuild/core": "2.1.4",
+    "jsdom": "29.1.1",
+    "typescript": "5.9.3"
+  }
+}

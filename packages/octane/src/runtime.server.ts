@@ -97,6 +97,15 @@ interface SsrElementContext {
 
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 
+/**
+ * What the public render entries accept. In a split client/server build the
+ * SAME module import is typed by the client-shaped virtual TSX (a unary
+ * `(props) => Octane.JSX.Element`-ish function), while the server bundle
+ * actually receives the server-compiled twin — so the entries accept the
+ * authored component type and trust the build for the server shape.
+ */
+export type ServerEntryComponent = ServerComponent | ((props: any) => unknown);
+
 let CURRENT_SCOPE: SSRScope | null = null;
 // Empty compiler batches register child-only warm plans for the synchronous
 // component call stack. A pending descendant batch activates the live plans;
@@ -3446,8 +3455,17 @@ function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
 	}
 }
 
-export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | string): T;
-export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
+// The `$$kind?: never` intersection rejects octane ELEMENT descriptors, whose
+// promise protocol is type-level-only (the React 19 tag gate) and poisoned —
+// mirrors the client runtime's `use()` (see NotAnElementDescriptor there).
+export function use<T>(
+	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
+	siteKey?: symbol | string,
+): T;
+export function use<T>(
+	usable: Context<T> | (PromiseLike<T> & { $$kind?: never }),
+	siteKey?: ServerHookSlot,
+): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
 	const serial = hasExternalHydrationOwner(usable as PromiseLike<unknown>) ? null : SERIAL;
 	if (usable == null || typeof (usable as any).then !== 'function') {
@@ -5090,10 +5108,11 @@ function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
  * This is the buffered, await-everything behaviour of the old `render()`.
  */
 export async function prerender(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
+	const component = entryComponent as ServerComponent;
 	const nonceAttr = nonceAttrOf(options);
 	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
 }
@@ -5242,10 +5261,11 @@ export function renderHostedAttempt(
  * `use()` in the shell still seeds. Use `prerender` when you need the data awaited.
  */
 export function renderToString(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
+	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap();
@@ -5267,10 +5287,11 @@ export function renderToString(
  * no head-adoption markers, no suspense seed script. For static pages / email.
  */
 export function renderToStaticMarkup(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
+	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap();
@@ -5837,10 +5858,55 @@ interface StreamSink {
 	fatal(err: unknown): void;
 }
 
+/**
+ * A live source of externally-produced HTML (typically framework data
+ * `<script>` tags materializing as loaders settle) merged natively into a
+ * streamed render. Octane emits injected HTML verbatim, in push order, each
+ * drain as its own transport chunk strictly BETWEEN renderer chunks — never
+ * before the shell, and (for document renders) before the held
+ * `</body></html>` tail. The stream stays open until `done` settles.
+ *
+ * This is an Octane extension (React's Fizz owns its data injection
+ * internally); it exists so frameworks like TanStack Start can merge their
+ * data stream without re-parsing the HTML byte stream for safe insertion
+ * points — every boundary between renderer chunks is tag-complete by
+ * construction.
+ */
+export interface StreamInjectionSource {
+	/**
+	 * Pull all queued HTML (concatenated, verbatim). Called at emission
+	 * boundaries and after `subscribe` notifications; return '' when empty.
+	 */
+	take(): string;
+	/**
+	 * The source notifies when new HTML is queued; the renderer then drains
+	 * promptly — even while the render itself is idle awaiting `done`.
+	 * Returns an unsubscribe function; the renderer unsubscribes on
+	 * completion, abort, and failure.
+	 */
+	subscribe(notify: () => void): () => void;
+	/**
+	 * The renderer holds the document tail and the stream close until this
+	 * settles. A rejection fails the stream through the fatal path (after the
+	 * shell, mirroring abort: degraded terminal completion).
+	 */
+	done: Promise<void>;
+	/**
+	 * Called exactly once when the renderer has finished producing markup —
+	 * after the last boundary segment on success, or on the abort/error path
+	 * before degraded terminal output. Sources that finalize asynchronously
+	 * (e.g. a serialization stream that must flush its remainder) key that
+	 * work here and settle `done` when it completes.
+	 */
+	renderComplete?(): void;
+}
+
 export interface StreamOptions extends RenderOptions {
 	onShellReady?: () => void;
 	onShellError?: (err: unknown) => void;
 	onAllReady?: () => void;
+	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */
+	injection?: StreamInjectionSource;
 }
 
 function withStream<T>(stream: StreamState | null, fn: () => T): T {
@@ -5850,6 +5916,60 @@ function withStream<T>(stream: StreamState | null, fn: () => T): T {
 		return fn();
 	} finally {
 		STREAM = prev;
+	}
+}
+
+// For document renders under external injection, the closing `</body></html>`
+// is split out of the shell and held until both the render and the injection
+// source finish. De-opt block markers interleave with the closing tags
+// (`</body><!--]--></html><!--]-->`), so a true document suffix is `</body>`
+// followed by nothing but comments/whitespace and one `</html>`.
+const DOCUMENT_TAIL_RE = /^<\/body>(?:\s|<!--[^]*?-->)*<\/html>(?:\s|<!--[^]*?-->)*$/;
+function documentTailStart(body: string): number {
+	const index = body.lastIndexOf('</body>');
+	if (index === -1) return -1;
+	return DOCUMENT_TAIL_RE.test(body.slice(index)) ? index : -1;
+}
+
+// A document render's markup is the root `<html>` element wrapped only by
+// hydration block markers — a prefix scan bounded by wrapper depth, so the
+// common fragment path pays a few byte compares, not a body scan. Streaming
+// renders of a document lead with `<!DOCTYPE html>` (React parity: Fizz emits
+// the doctype whenever the root renders `<html>`, and its test harness treats
+// a doctype-less `<html>` as "almost certainly a bug in React" — per
+// ReactDOMFizzServer-test.js:237, React canary b740af2). Buffered
+// renderToString/renderToStaticMarkup stay doctype-free, also per React.
+function isDocumentRoot(body: string): boolean {
+	let i = 0;
+	while (body.startsWith('<!--[-->', i)) i += 8;
+	if (!body.startsWith('<html', i)) return false;
+	const next = body.charCodeAt(i + 5);
+	return next === 62 /* > */ || next === 32 || next === 9 || next === 10 || next === 13;
+}
+
+// Locate the insertion point just inside a document's opening <head> tag —
+// where renderer-owned leading styles and hoisted head elements belong in
+// document mode. Quote-aware so an attribute value containing '>' cannot
+// truncate the tag.
+function documentHeadInsertionPoint(body: string): number {
+	let searchFrom = 0;
+	for (;;) {
+		const start = body.indexOf('<head', searchFrom);
+		if (start === -1) return -1;
+		const next = body.charCodeAt(start + 5);
+		if (next === 62 /* > */) return start + 6;
+		if (next === 32 || next === 9 || next === 10 || next === 13) {
+			let quote = 0;
+			for (let i = start + 6; i < body.length; i++) {
+				const code = body.charCodeAt(i);
+				if (quote !== 0) {
+					if (code === quote) quote = 0;
+				} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
+				else if (code === 62 /* > */) return i + 1;
+			}
+			return -1;
+		}
+		searchFrom = start + 5;
 	}
 }
 
@@ -5947,6 +6067,77 @@ async function runStream(
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
 		}
 	};
+	// ── External injection (cold path: every hook below no-ops when absent) ──
+	const injection = options?.injection;
+	// Early fatal paths can return before `done` is awaited; observe it up
+	// front so a later rejection never surfaces as an unhandled rejection.
+	if (injection !== undefined) injection.done.then(NOOP, NOOP);
+	let injectionUnsubscribe: (() => void) | undefined;
+	let injectionFailure: unknown;
+	let injectionFailed = false;
+	let signalInjectionFailure: (() => void) | undefined;
+	const failInjection = (err: unknown): void => {
+		if (injectionFailed) return;
+		injectionFailed = true;
+		injectionFailure = err;
+		signalInjectionFailure?.();
+	};
+	// Injection drains interleave with render writes from OUTSIDE the wave
+	// loop (subscribe notifications can fire while the loop awaits a wave or
+	// the done promise). A single promise chain gives all writes a total
+	// order while each write still surfaces its own backpressure/failure to
+	// its caller. Without injection, writes go to the sink directly — the
+	// established path, no chain, no extra microtasks.
+	let writeChain: Promise<void> | null = injection === undefined ? null : Promise.resolve();
+	const write: (chunk: string, terminal?: boolean) => void | Promise<void> =
+		injection === undefined
+			? (chunk, terminal) => sink.write(chunk, terminal)
+			: (chunk, terminal) => {
+					const operation = writeChain!.then(() => sink.write(chunk, terminal));
+					writeChain = operation.then(NOOP, NOOP);
+					return operation;
+				};
+	const drainInjection = (): void | Promise<void> => {
+		if (injection === undefined || injectionFailed) return;
+		let html: string;
+		try {
+			html = injection.take();
+		} catch (err) {
+			failInjection(err);
+			return;
+		}
+		if (!html) return;
+		return write(html);
+	};
+	const notifyInjection = (): void => {
+		const drained = drainInjection();
+		// A transport failure here is re-observed by the next awaited render
+		// write (or the completion wait); the notify path only must not
+		// produce an unhandled rejection.
+		if (drained !== undefined) drained.catch(NOOP);
+	};
+	/** Resolves when `done` settles; rejects on abort, take() failure, or done rejection. */
+	const waitForInjectionDone = (): Promise<void> =>
+		new Promise<void>((resolve, reject) => {
+			let settled = false;
+			const finish = (fn: () => void): void => {
+				if (settled) return;
+				settled = true;
+				signal?.removeEventListener('abort', onAbort);
+				signalInjectionFailure = undefined;
+				fn();
+			};
+			const onAbort = (): void => finish(() => reject(signal!.reason));
+			signalInjectionFailure = () => finish(() => reject(injectionFailure));
+			if (injectionFailed) return finish(() => reject(injectionFailure));
+			if (signal?.aborted) return onAbort();
+			signal?.addEventListener('abort', onAbort, { once: true });
+			injection!.done.then(
+				() => finish(resolve),
+				(err) => finish(() => reject(err)),
+			);
+		});
+
 	const emittedCss = new Set<string>();
 	const flushedSegments = new Set<string>();
 	const observedDone = new Set<string>();
@@ -5994,15 +6185,15 @@ async function runStream(
 		if (errors.length === 0) return;
 		let chunk = '';
 		for (const boundary of errors) chunk += boundaryErrorChunk(boundary, nonceAttr);
-		const write = sink.write(chunk);
+		const errorWrite = write(chunk);
 		const markFlushed = (): void => {
 			for (const boundary of errors) boundary.errorFlushed = true;
 		};
-		if (write === undefined) {
+		if (errorWrite === undefined) {
 			markFlushed();
 			return;
 		}
-		return write.then(markFlushed);
+		return errorWrite.then(markFlushed);
 	};
 
 	let pass: FullPassResult;
@@ -6046,10 +6237,10 @@ async function runStream(
 	reportRecoverableBoundaryErrors();
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
-	let shell = '';
+	let leadingStyles = '';
 	for (const [hash, sheet] of pass.cssEntries) {
 		emittedCss.add(hash);
-		shell +=
+		leadingStyles +=
 			'<style data-octane="' +
 			hash +
 			'"' +
@@ -6058,13 +6249,44 @@ async function runStream(
 			escapeEntireInlineStyleContent(sheet) +
 			'</style>';
 	}
-	shell += pass.head + pass.body;
+	// Streaming DOCUMENT renders always lead with `<!DOCTYPE html>` — React
+	// Fizz parity, injection or not (buffered renderers stay doctype-free,
+	// also per React; see isDocumentRoot).
+	//
+	// DOCUMENT MODE (external injection + the shell renders a document)
+	// additionally restructures the shell: the closing tail is split out and
+	// written LAST — injected chunks and streamed segments then land inside
+	// <body> before it (streamed segments otherwise trail `</html>`, which
+	// browsers reparent but external merge layers must not re-parse around) —
+	// and renderer-owned leading styles + hoisted head elements move inside
+	// the authored <head> instead of preceding `<html>`. The tail carries only
+	// closing tags + block markers, so it needs no vt stripping. Without
+	// injection the shell shape is otherwise unchanged.
+	const documentRoot = isDocumentRoot(pass.body);
+	let shell = documentRoot ? '<!DOCTYPE html>' : '';
+	let heldDocumentTail = '';
+	if (injection !== undefined && documentRoot) {
+		const tailStart = documentTailStart(pass.body);
+		if (tailStart !== -1) {
+			heldDocumentTail = pass.body.slice(tailStart);
+			const bodyHtml = pass.body.slice(0, tailStart);
+			const headInsert = documentHeadInsertionPoint(bodyHtml);
+			shell +=
+				headInsert !== -1
+					? bodyHtml.slice(0, headInsert) + leadingStyles + pass.head + bodyHtml.slice(headInsert)
+					: leadingStyles + pass.head + bodyHtml;
+		} else {
+			shell += leadingStyles + pass.head + pass.body;
+		}
+	} else {
+		shell += leadingStyles + pass.head + pass.body;
+	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
 		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
 	try {
-		const shellWrite = sink.write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
+		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		options?.onError?.(err);
@@ -6072,6 +6294,17 @@ async function runStream(
 		return;
 	}
 	sink.shellReady();
+	if (injection !== undefined) {
+		// Subscribe only once the shell is on the wire: injected HTML must never
+		// precede it. HTML queued before this point is picked up by the initial
+		// drain below.
+		try {
+			injectionUnsubscribe = injection.subscribe(notifyInjection);
+		} catch (err) {
+			failInjection(err);
+		}
+		notifyInjection();
+	}
 
 	let suspended = pass.suspended;
 	// `attempt` counts CONSECUTIVE passes that completed no boundary. One pass
@@ -6091,7 +6324,7 @@ async function runStream(
 		if (initiallyDone.length > 0) {
 			let chunk = '';
 			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
-			const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 			if (segmentWrite !== undefined) await segmentWrite;
 			for (const boundary of initiallyDone) {
 				flushedSegments.add(boundary.id);
@@ -6149,7 +6382,7 @@ async function runStream(
 			const done = reachableDoneSegments();
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.
@@ -6168,13 +6401,41 @@ async function runStream(
 		).length;
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
+		// Rendering ends here, degraded — the source still gets its completion
+		// signal so upstream finalization (serialization flush, timers) is not
+		// stranded waiting on a render that will never finish. Unsubscribe FIRST:
+		// a notify fired by that finalization would otherwise drain the queue
+		// into a chained write that post-abort can only reject, losing the HTML
+		// the terminal salvage below still delivers.
+		if (injection !== undefined) {
+			injectionUnsubscribe?.();
+			injectionUnsubscribe = undefined;
+			try {
+				injection.renderComplete?.();
+			} catch {
+				// The stream is already failing; the source's error cannot improve it.
+			}
+		}
 		let tail = '';
+		if (injection !== undefined && !injectionFailed) {
+			// Terminal salvage: queued injection HTML (typically the source's
+			// just-flushed serialization remainder) still ships, ahead of the
+			// recovery markers and the held tail.
+			try {
+				tail += injection.take();
+			} catch {
+				// A failing source forfeits its remainder; the terminal write goes on.
+			}
+		}
 		for (const b of stream.boundaries.values()) {
 			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
 		}
+		// Best-effort well-formedness under injection: the held document tail
+		// still closes <body>/<html> after the degraded-boundary markers.
+		if (heldDocumentTail !== '') tail += heldDocumentTail;
 		if (tail !== '') {
 			try {
-				const terminalWrite = sink.write(tail, true);
+				const terminalWrite = write(tail, true);
 				if (terminalWrite !== undefined) await terminalWrite;
 			} catch {
 				// The transport is already gone; there is nowhere to send recovery.
@@ -6182,6 +6443,60 @@ async function runStream(
 		}
 		sink.fatal(err);
 		return;
+	}
+	if (injection !== undefined) {
+		// Rendering is complete but the injection source may still be producing
+		// (subscribe notifications keep draining through the write chain while
+		// we wait). The stream — and a document's held tail — close only once
+		// `done` settles; abort and source failures route through the same
+		// degraded terminal path as a mid-render abort.
+		try {
+			injection.renderComplete?.();
+		} catch (err) {
+			failInjection(err);
+		}
+		try {
+			await waitForInjectionDone();
+			const finalDrain = drainInjection();
+			if (finalDrain !== undefined) await finalDrain;
+			if (injectionFailed) throw injectionFailure;
+			if (heldDocumentTail !== '') {
+				// Cleared before awaiting: a post-acceptance rejection (abort racing
+				// the drain wait) must not resend the tail through the catch below.
+				const tailChunk = heldDocumentTail;
+				heldDocumentTail = '';
+				const tailWrite = write(tailChunk);
+				if (tailWrite !== undefined) await tailWrite;
+			}
+		} catch (err) {
+			options?.onError?.(err);
+			// Unsubscribe before salvaging so a late notify cannot drain the
+			// queue into a chained write this degraded close will never deliver.
+			injectionUnsubscribe?.();
+			injectionUnsubscribe = undefined;
+			let terminal = '';
+			if (!injectionFailed) {
+				// Terminal salvage: the source may have queued HTML (e.g. its
+				// serialization remainder) between the failure and this close.
+				try {
+					terminal = injection.take();
+				} catch {
+					// A failing source forfeits its remainder; the tail still ships.
+				}
+			}
+			terminal += heldDocumentTail;
+			if (terminal !== '') {
+				try {
+					const terminalWrite = write(terminal, true);
+					if (terminalWrite !== undefined) await terminalWrite;
+				} catch {
+					// The transport is already gone; there is nowhere to send the tail.
+				}
+			}
+			sink.fatal(err);
+			return;
+		}
+		injectionUnsubscribe?.();
 	}
 	sink.allReady();
 }
@@ -6194,13 +6509,14 @@ async function runStream(
  * `(Component, props?, options?)`.
  */
 export function renderToPipeableStream(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: StreamOptions,
 ): {
 	pipe: <T extends { write(chunk: string): unknown; end(): unknown }>(destination: T) => T;
 	abort: (reason?: unknown) => void;
 } {
+	const component = entryComponent as ServerComponent;
 	interface Destination {
 		write(chunk: string): unknown;
 		end(): unknown;
@@ -6442,10 +6758,11 @@ export function renderToPipeableStream(
  * pauses `allReady`; read concurrently when waiting for it.
  */
 export function renderToReadableStream(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: StreamOptions,
 ): Promise<ReadableStream<Uint8Array> & { allReady: Promise<void> }> {
+	const component = entryComponent as ServerComponent;
 	return new Promise((resolveShell, rejectShell) => {
 		const encoder = new TextEncoder();
 		const renderController = new AbortController();

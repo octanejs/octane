@@ -8,7 +8,9 @@
 // `withSlot` and passes the call-site symbol as the trailing argument, which
 // each accessor forwards to the hooks it composes.
 import { BaseRoute, BaseRootRoute, BaseRouteApi, notFound } from '@tanstack/router-core';
+import type { ErrorComponentProps, NotFoundRouteProps } from '@tanstack/router-core';
 import { createElement } from 'octane';
+import type { OctaneNode } from 'octane';
 import {
 	useMatch,
 	useParams,
@@ -21,6 +23,45 @@ import {
 import { useRouter } from './context';
 import { splitSlot, subSlot } from './internal';
 import { Link } from './Link.tsrx';
+
+// ── Component types (react-router's route.tsx, on octane renderables) ────────
+// Octane analog of React's `ErrorInfo` (octane reports no component stacks).
+export type ErrorInfo = {
+	componentStack?: string | null;
+	digest?: string | null;
+};
+
+export type SyncRouteComponent<TProps> = (props: TProps) => OctaneNode;
+export type AsyncRouteComponent<TProps> = SyncRouteComponent<TProps> & {
+	preload?: () => Promise<void>;
+};
+export type RouteComponent = AsyncRouteComponent<{}>;
+export type ErrorRouteComponent = AsyncRouteComponent<ErrorComponentProps>;
+export type NotFoundRouteComponent = SyncRouteComponent<NotFoundRouteProps>;
+
+// router-core leaves the framework-facing component options typed `unknown` and
+// each binding narrows them via interface merging — react-router's route.tsx /
+// router.tsx do exactly this with React types; this is the octane equivalent.
+declare module '@tanstack/router-core' {
+	interface UpdatableRouteOptionsExtensions {
+		component?: RouteComponent;
+		errorComponent?: false | null | undefined | ErrorRouteComponent;
+		notFoundComponent?: NotFoundRouteComponent;
+		pendingComponent?: RouteComponent;
+	}
+	interface RootRouteOptionsExtensions {
+		shellComponent?: (props: { children: OctaneNode }) => OctaneNode;
+	}
+	interface RouterOptionsExtensions {
+		defaultComponent?: RouteComponent;
+		defaultErrorComponent?: ErrorRouteComponent;
+		defaultPendingComponent?: RouteComponent;
+		defaultNotFoundComponent?: NotFoundRouteComponent;
+		Wrap?: (props: { children: OctaneNode }) => OctaneNode;
+		InnerWrap?: (props: { children: OctaneNode }) => OctaneNode;
+		defaultOnCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+	}
+}
 
 // Attach the hook accessors to a route-shaped instance (Route / RootRoute /
 // RouteApi). `strictLoaderHooks: false` is RouteApi's mode — its loader hooks

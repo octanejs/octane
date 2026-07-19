@@ -1,5 +1,5 @@
 /* eslint react/jsx-handler-names: 0 */
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
 import type { BaseBrushState as BrushState, UpdateBrush } from './BaseBrush.tsrx';
@@ -25,7 +25,7 @@ export type BrushHandleProps = {
 	isControlled?: boolean;
 	isDragInProgress?: boolean;
 	onBrushHandleChange?: (type?: BrushingType, options?: BrushPageOffset) => void;
-	renderBrushHandle?: (props: BrushHandleRenderProps) => ReactNode;
+	renderBrushHandle?: (props: BrushHandleRenderProps) => OctaneNode;
 };
 
 export type BrushHandleRenderProps = HandleProps & {

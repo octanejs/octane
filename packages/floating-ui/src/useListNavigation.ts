@@ -30,6 +30,150 @@ import {
 	useLatestRef,
 	useModernLayoutEffect,
 } from './utils';
+import type { Dimensions } from '@floating-ui/dom';
+import type { ElementProps, FloatingRootContext, MutableRefObject } from './types';
+
+export interface UseListNavigationProps {
+	/**
+	 * A ref that holds an array of list items.
+	 * @default empty list
+	 */
+	listRef: MutableRefObject<Array<HTMLElement | null>>;
+	/**
+	 * The index of the currently active (focused or highlighted) item, which may
+	 * or may not be selected.
+	 * @default null
+	 */
+	activeIndex: number | null;
+	/**
+	 * A callback that is called when the user navigates to a new active item,
+	 * passed in a new `activeIndex`.
+	 */
+	onNavigate?: (activeIndex: number | null) => void;
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * The currently selected item index, which may or may not be active.
+	 * @default null
+	 */
+	selectedIndex?: number | null;
+	/**
+	 * Whether to focus the item upon opening the floating element. 'auto' infers
+	 * what to do based on the input type (keyboard vs. pointer), while a boolean
+	 * value will force the value.
+	 * @default 'auto'
+	 */
+	focusItemOnOpen?: boolean | 'auto';
+	/**
+	 * Whether hovering an item synchronizes the focus.
+	 * @default true
+	 */
+	focusItemOnHover?: boolean;
+	/**
+	 * Whether pressing an arrow key on the navigation’s main axis opens the
+	 * floating element.
+	 * @default true
+	 */
+	openOnArrowKeyDown?: boolean;
+	/**
+	 * By default elements with either a `disabled` or `aria-disabled` attribute
+	 * are skipped in the list navigation — however, this requires the items to
+	 * be rendered.
+	 * This prop allows you to manually specify indices which should be disabled,
+	 * overriding the default logic.
+	 * For Windows-style select menus, where the menu does not open when
+	 * navigating via arrow keys, specify an empty array.
+	 * @default undefined
+	 */
+	disabledIndices?: Array<number> | ((index: number) => boolean);
+	/**
+	 * Determines whether focus can escape the list, such that nothing is selected
+	 * after navigating beyond the boundary of the list. In some
+	 * autocomplete/combobox components, this may be desired, as screen
+	 * readers will return to the input.
+	 * `loop` must be `true`.
+	 * @default false
+	 */
+	allowEscape?: boolean;
+	/**
+	 * Determines whether focus should loop around when navigating past the first
+	 * or last item.
+	 * @default false
+	 */
+	loop?: boolean;
+	/**
+	 * If the list is nested within another one (e.g. a nested submenu), the
+	 * navigation semantics change.
+	 * @default false
+	 */
+	nested?: boolean;
+	/**
+	 * Allows to specify the orientation of the parent list, which is used to
+	 * determine the direction of the navigation.
+	 * This is useful when list navigation is used within a Composite,
+	 * as the hook can't determine the orientation of the parent list automatically.
+	 */
+	parentOrientation?: UseListNavigationProps['orientation'];
+	/**
+	 * Whether the direction of the floating element’s navigation is in RTL
+	 * layout.
+	 * @default false
+	 */
+	rtl?: boolean;
+	/**
+	 * Whether the focus is virtual (using `aria-activedescendant`).
+	 * Use this if you need focus to remain on the reference element
+	 * (such as an input), but allow arrow keys to navigate list items.
+	 * This is common in autocomplete listbox components.
+	 * Your virtually-focused list items must have a unique `id` set on them.
+	 * If you’re using a component role with the `useRole()` Hook, then an `id` is
+	 * generated automatically.
+	 * @default false
+	 */
+	virtual?: boolean;
+	/**
+	 * The orientation in which navigation occurs.
+	 * @default 'vertical'
+	 */
+	orientation?: 'vertical' | 'horizontal' | 'both';
+	/**
+	 * Specifies how many columns the list has (i.e., it’s a grid). Use an
+	 * orientation of 'horizontal' (e.g. for an emoji picker/date picker, where
+	 * pressing ArrowRight or ArrowLeft can change rows), or 'both' (where the
+	 * current row cannot be escaped with ArrowRight or ArrowLeft, only ArrowUp
+	 * and ArrowDown).
+	 * @default 1
+	 */
+	cols?: number;
+	/**
+	 * Whether to scroll the active item into view when navigating. The default
+	 * value uses nearest options.
+	 */
+	scrollItemIntoView?: boolean | ScrollIntoViewOptions;
+	/**
+	 * When using virtual focus management, this holds a ref to the
+	 * virtually-focused item. This allows nested virtual navigation to be
+	 * enabled, and lets you know when a nested element is virtually focused from
+	 * the root reference handling the events. Requires `FloatingTree` to be
+	 * setup.
+	 */
+	virtualItemRef?: MutableRefObject<HTMLElement | null>;
+	/**
+	 * Only for `cols > 1`, specify sizes for grid items.
+	 * `{ width: 2, height: 2 }` means an item is 2 columns wide and 2 rows tall.
+	 */
+	itemSizes?: Dimensions[];
+	/**
+	 * Only relevant for `cols > 1` and items with different sizes, specify if
+	 * the grid is dense (as defined in the CSS spec for `grid-auto-flow`).
+	 * @default false
+	 */
+	dense?: boolean;
+}
 
 const ARROW_UP = 'ArrowUp';
 const ARROW_DOWN = 'ArrowDown';
@@ -73,10 +217,20 @@ function isCrossOrientationCloseKey(key: string, orientation: any, rtl: boolean,
 	return doSwitch(orientation, vertical, horizontal);
 }
 
-export function useListNavigation(...args: any[]): any {
+/**
+ * Adds arrow key-based navigation of a list of items, either using real DOM
+ * focus or virtual focus.
+ * @see https://floating-ui.com/docs/useListNavigation
+ */
+export function useListNavigation(
+	context: FloatingRootContext,
+	props: UseListNavigationProps,
+	slot?: symbol,
+): ElementProps;
+export function useListNavigation(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseListNavigationProps) ?? {};
 
 	const open = context.open;
 	const onOpenChange = context.onOpenChange;
@@ -128,7 +282,7 @@ export function useListNavigation(...args: any[]): any {
 	const typeableComboboxReference = isTypeableCombobox(elements.domReference);
 	const focusItemOnOpenRef = useRef(focusItemOnOpen, subSlot(slot, 'fioo'));
 	const indexRef = useRef(selectedIndex != null ? selectedIndex : -1, subSlot(slot, 'index'));
-	const keyRef = useRef<any>(null, subSlot(slot, 'key'));
+	const keyRef = useRef<string | null>(null, subSlot(slot, 'key'));
 	const isPointerModalityRef = useRef(true, subSlot(slot, 'pm'));
 	const previousOnNavigateRef = useRef(onNavigate, subSlot(slot, 'ponav'));
 	const previousMountedRef = useRef(!!elements.floating, subSlot(slot, 'pmount'));
@@ -139,8 +293,8 @@ export function useListNavigation(...args: any[]): any {
 	const latestOpenRef = useLatestRef(open, subSlot(slot, 'lor'));
 	const scrollItemIntoViewRef = useLatestRef(scrollItemIntoView, subSlot(slot, 'siir'));
 	const selectedIndexRef = useLatestRef(selectedIndex, subSlot(slot, 'sir'));
-	const [activeId, setActiveId] = useState<any>(undefined, subSlot(slot, 'aid'));
-	const [virtualId, setVirtualId] = useState<any>(undefined, subSlot(slot, 'vid'));
+	const [activeId, setActiveId] = useState<string | undefined>(undefined, subSlot(slot, 'aid'));
+	const [virtualId, setVirtualId] = useState<string | undefined>(undefined, subSlot(slot, 'vid'));
 
 	const focusItem = useEffectEvent(
 		() => {
@@ -436,7 +590,7 @@ export function useListNavigation(...args: any[]): any {
 				const minGridIndex = cellMap.findIndex(
 					(index) => index != null && !isListIndexDisabled(listRef, index, disabledIndices),
 				);
-				const maxGridIndex = cellMap.reduce(
+				const maxGridIndex = cellMap.reduce<number>(
 					(foundIndex, index, cellIndex) =>
 						index != null && !isListIndexDisabled(listRef, index, disabledIndices)
 							? cellIndex
@@ -713,7 +867,7 @@ export function useListNavigation(...args: any[]): any {
 		subSlot(slot, 'm:ref'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference, floating, item } : {}),
 		[enabled, reference, floating, item],
 		subSlot(slot, 'm:ret'),

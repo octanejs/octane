@@ -1,6 +1,8 @@
 // The tiny event emitter shared by useFloatingRootContext and FloatingTree. Kept
 // in its own module so context.ts and tree.ts don't form an import cycle.
-export function createPubSub(): any {
+import type { FloatingEvents } from './types';
+
+export function createPubSub(): FloatingEvents {
 	const map = new Map<string, Set<(data: any) => void>>();
 	return {
 		emit(event: string, data: any) {

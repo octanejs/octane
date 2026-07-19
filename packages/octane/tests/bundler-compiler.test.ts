@@ -158,6 +158,82 @@ describe('bundler-neutral compiler integration', () => {
 		expect(object?.code).toMatch(/from ["']\/src\/object-renderer\.js["']/);
 	});
 
+	it('preserves universal runtime specialization on bundler transform metadata', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			hmr: false,
+			dev: false,
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
+			renderers: {
+				registry: { lynx: '@octanejs/lynx/renderer' },
+				default: 'lynx',
+			},
+		});
+		const source = 'export function App() @{ <view /> }\n';
+		const result = compiler.transform(source, '/project/src/App.tsrx');
+
+		expect(result).toMatchObject({
+			kind: 'compile',
+			renderer: { id: 'lynx', target: 'universal' },
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
+		});
+		expect(result?.code).not.toContain('main-thread');
+		expect(result?.code).not.toContain('background');
+	});
+
+	it('validates renderer-selected project helpers without claiming their output', () => {
+		const renderers = {
+			registry: {
+				native: {
+					module: '@renderers/native',
+					validation: {
+						forbiddenGlobals: ['document'],
+						forbiddenImports: ['browser-only'],
+					},
+				},
+			},
+			default: 'native',
+		};
+		const compiler = createOctaneCompiler({ root: '/project', renderers });
+
+		expect(() =>
+			compiler.transform('export const title = document.title;', '/project/src/environment.ts'),
+		).toThrow(/renderer "native" forbids unbound global "document".*environment\.ts:1:/);
+		expect(() =>
+			compiler.transform("import runtime from 'browser-only';", '/project/src/runtime.js'),
+		).toThrow(/renderer "native" forbids static import "browser-only".*runtime\.js:1:/);
+		expect(
+			compiler.transform('export const platform = "native";', '/project/src/platform.ts'),
+		).toBeNull();
+
+		const excluded = createOctaneCompiler({
+			root: '/project',
+			exclude: ['/generated/'],
+			renderers,
+		});
+		expect(() =>
+			excluded.transform(
+				'export const title = document.title;',
+				'/project/generated/environment.ts',
+			),
+		).not.toThrow();
+		expect(() =>
+			compiler.transform(
+				'export const title = document.title;',
+				'/project/node_modules/example/environment.js',
+			),
+		).not.toThrow();
+
+		const hostOwned = createOctaneCompiler({
+			root: '/project',
+			renderers,
+			requireDirective: true,
+		});
+		expect(() =>
+			hostOwned.transform('export const title = document.title;', '/project/src/host.ts'),
+		).not.toThrow();
+	});
+
 	it('emits identical client-reference identity and an inert server stub for client-only modules', async () => {
 		const compiler = createOctaneCompiler({
 			root: '/project',

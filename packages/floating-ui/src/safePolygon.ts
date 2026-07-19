@@ -4,6 +4,7 @@
 import { isElement } from '@floating-ui/utils/dom';
 
 import { clearTimeoutIfSet, contains, getNodeChildren, getTarget } from './utils';
+import type { HandleClose, HandleCloseContext, SafePolygonOptions } from './types';
 
 function isPointInPolygon(point: number[], polygon: number[][]): boolean {
 	const [x, y] = point;
@@ -19,7 +20,10 @@ function isPointInPolygon(point: number[], polygon: number[][]): boolean {
 	}
 	return isInsideResult;
 }
-function isInside(point: number[], rect: any): boolean {
+function isInside(
+	point: number[],
+	rect: { x: number; y: number; width: number; height: number },
+): boolean {
 	return (
 		point[0] >= rect.x &&
 		point[0] <= rect.x + rect.width &&
@@ -28,7 +32,12 @@ function isInside(point: number[], rect: any): boolean {
 	);
 }
 
-export function safePolygon(options: any = {}): any {
+/**
+ * Generates a safe polygon area that the user can traverse without closing the
+ * floating element once leaving the reference element.
+ * @see https://floating-ui.com/docs/useHover#safepolygon
+ */
+export function safePolygon(options: SafePolygonOptions = {}): HandleClose {
 	const { buffer = 0.5, blockPointerEvents = false, requireIntent = true } = options;
 
 	const timeoutRef = { current: -1 };
@@ -56,9 +65,9 @@ export function safePolygon(options: any = {}): any {
 		return speed;
 	}
 
-	const fn = (_ref: any) => {
+	const fn: HandleClose = (_ref: HandleCloseContext) => {
 		const { x, y, placement, elements, onClose, nodeId, tree } = _ref;
-		return function onMouseMove(event: any) {
+		return function onMouseMove(event: MouseEvent) {
 			function close() {
 				clearTimeoutIfSet(timeoutRef);
 				onClose();

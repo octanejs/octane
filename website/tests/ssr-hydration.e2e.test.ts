@@ -20,6 +20,8 @@ import { join } from 'node:path';
 import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
+const PLAYWRIGHT_ACTION_TIMEOUT = 10_000;
+const PLAYWRIGHT_NAVIGATION_TIMEOUT = 15_000;
 const ROUTES = [
 	'/',
 	'/docs',
@@ -146,24 +148,39 @@ async function stop(child: ChildProcess | undefined): Promise<void> {
 	if (child.exitCode === null) signalGroup('SIGKILL');
 }
 
-// Load `path`, collecting console errors and page errors after hydration has
-// had two animation frames to settle.
-async function loadRoute(base: string, path: string) {
+// Load `path`, collecting console errors and page errors. Interactive callers
+// may also wait for the hydration entry's dynamic imports to go idle before the
+// final two animation frames.
+async function loadRoute(
+	base: string,
+	path: string,
+	options: { waitForNetworkIdle?: boolean } = {},
+) {
 	const page = await browser!.newPage();
+	page.setDefaultTimeout(PLAYWRIGHT_ACTION_TIMEOUT);
+	page.setDefaultNavigationTimeout(PLAYWRIGHT_NAVIGATION_TIMEOUT);
 	const errors: string[] = [];
 	page.on('console', (m) => {
 		if (m.type() === 'error') errors.push(m.text());
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
-	await page.goto(base + path, { waitUntil: 'load' });
-	await page.evaluate(
-		() =>
-			new Promise<void>((resolve) =>
-				requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-			),
-	);
-	const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
-	return { page, errors, main };
+	try {
+		await page.goto(base + path, { waitUntil: 'load' });
+		if (options.waitForNetworkIdle) await page.waitForLoadState('networkidle');
+		await page.waitForFunction(
+			() =>
+				new Promise<boolean>((resolve) =>
+					requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))),
+				),
+			null,
+			{ timeout: PLAYWRIGHT_ACTION_TIMEOUT },
+		);
+		const main = (await page.evaluate(() => document.querySelector('main')?.textContent)) ?? '';
+		return { page, errors, main };
+	} catch (error) {
+		await page.close().catch(() => {});
+		throw error;
+	}
 }
 
 interface RouteGeometry {
@@ -223,24 +240,6 @@ async function waitForLocatorText(
 		await new Promise((resolve) => setTimeout(resolve, 50));
 	}
 	throw new Error(`locator did not reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`);
-}
-
-async function clickUntilLocatorText(
-	trigger: import('playwright').Locator,
-	result: import('playwright').Locator,
-	expected: string,
-	timeoutMs = 10_000,
-): Promise<void> {
-	const deadline = Date.now() + timeoutMs;
-	while (Date.now() < deadline) {
-		if ((await result.textContent())?.trim() === expected) return;
-		await trigger.click();
-		if ((await result.textContent())?.trim() === expected) return;
-		await new Promise((resolve) => setTimeout(resolve, 100));
-	}
-	throw new Error(
-		`click did not make locator reach text ${JSON.stringify(expected)} within ${timeoutMs}ms`,
-	);
 }
 
 describe.sequential('website dev-SSR → hydration (real browser)', () => {
@@ -354,12 +353,15 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
-	it('the Core APIs live examples handle events after hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
+	it('the Core APIs state, list, and search events work after hydration', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+			waitForNetworkIdle: true,
+		});
 		try {
 			const count = page.locator('.demo-count');
 			await waitForLocatorText(count, '0');
-			await clickUntilLocatorText(page.getByRole('button', { name: 'Add one' }), count, '1');
+			await page.getByRole('button', { name: 'Add one' }).click();
+			await waitForLocatorText(count, '1');
 
 			const packingDemo = page.locator('[data-demo="lists"]');
 			const packingStatus = packingDemo.locator('.packing-summary');
@@ -374,6 +376,18 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await page.keyboard.press('/');
 			expect(await page.evaluate(() => document.activeElement?.id)).toBe('core-api-search');
 
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
+	it('the Core APIs async data and transition demos work after hydration', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+			waitForNetworkIdle: true,
+		});
+		try {
 			await page.getByRole('button', { name: 'Load profile' }).click();
 			await waitForLocatorText(
 				page.locator('[data-demo="data"] .data-loading'),
@@ -423,6 +437,18 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				'Camera shoulder bagCategory: Photography',
 			]);
 
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
+	it('the Core APIs form and portal events work after hydration', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+			waitForNetworkIdle: true,
+		});
+		try {
 			await page.locator('#core-api-profile-name').fill('Grace Hopper');
 			await page.getByRole('button', { name: 'Save name' }).click();
 			await waitForLocatorText(page.locator('[data-demo="form"] button[type="submit"]'), 'Saving…');
@@ -465,7 +491,9 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 	}, 30_000);
 
 	it('the embedded View Transitions controls run native transitions after hydration', async () => {
-		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis');
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/core-apis', {
+			waitForNetworkIdle: true,
+		});
 		try {
 			const demo = page.locator('[data-demo="view-transitions"]');
 			const supported = await page.evaluate(
@@ -496,7 +524,8 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			};
 
 			const cardToggle = demo.locator('#vt-toggle-card');
-			await clickUntilLocatorText(cardToggle, cardToggle, 'Add card');
+			await cardToggle.click();
+			await waitForLocatorText(cardToggle, 'Add card');
 			await finishTransition(1);
 
 			await demo.locator('#vt-toggle-hero').click();

@@ -1,6 +1,7 @@
 import type { D3Scale, NumberLike, ScaleInput, ValueOf } from '@octanejs/visx/scale';
 import type { TextProps } from '@octanejs/visx/text';
-import type { ReactNode, Ref, SVGProps } from 'react';
+import type { Ref, SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import type Orientation from './constants/orientation';
 
 // In order to plot values on an axis, output of the scale must be number.
@@ -82,9 +83,9 @@ export type CommonProps<Scale extends AxisScale> = {
 	/** The class name applied to each tick group. */
 	tickClassName?: string;
 	/** Override the component used to render tick labels (instead of <Text /> from @octanejs/visx/text). */
-	tickComponent?: (tickRendererProps: TickRendererProps) => ReactNode;
+	tickComponent?: (tickRendererProps: TickRendererProps) => OctaneNode;
 	/** Override the component used to render all tick lines and labels. */
-	ticksComponent?: (tickRendererProps: TicksRendererProps<Scale>) => ReactNode;
+	ticksComponent?: (tickRendererProps: TicksRendererProps<Scale>) => OctaneNode;
 	/** A [d3 formatter](https://github.com/d3/d3-scale/blob/master/README.md#continuous_tickFormat) for the tick text. */
 	tickFormat?: TickFormatter<ScaleInput<Scale>>;
 	/** Either an object with the props for all tick labels or a function that returns props for a given tick label. */
@@ -141,5 +142,5 @@ export type SharedAxisProps<Scale extends AxisScale> = CommonProps<Scale> & {
 	/** A top pixel offset applied to the entire axis. */
 	top?: number;
 	/** For more control over rendering or to add event handlers to datum, pass a function as children. */
-	children?: (renderProps: AxisRendererProps<Scale>) => ReactNode;
+	children?: (renderProps: AxisRendererProps<Scale>) => OctaneNode;
 };

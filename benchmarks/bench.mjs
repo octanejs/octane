@@ -188,7 +188,10 @@ const SUITES = [
 			{ filter: 'svelte-recursive-bench', port: 5275 },
 		],
 		iter: { normal: 20, quick: 3 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
 	},
 	{
 		name: 'signal-favoring',
@@ -204,7 +207,10 @@ const SUITES = [
 			{ filter: 'svelte-signal-bench', port: 5276 },
 		],
 		iter: { normal: 20, quick: 3 },
-		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+		runs: [
+			{ script: 'run.mjs', args: (n) => [String(n)] },
+			{ label: 'work', script: 'work.mjs', args: () => [] },
+		],
 	},
 	{
 		// News is build-based (no preview servers): its harness vite-builds each

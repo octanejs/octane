@@ -4,12 +4,13 @@
 // than called directly.
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useCharacterLimit } from './shared/useCharacterLimit';
+import type { OctaneNode } from 'octane';
 import { createElement, useMemo, useState } from 'octane';
 
 const CHARACTER_LIMIT = 5;
-let textEncoderInstance = null;
+let textEncoderInstance: TextEncoder | null = null;
 
-function textEncoder() {
+function textEncoder(): TextEncoder | null {
 	if (window.TextEncoder === undefined) {
 		return null;
 	}
@@ -19,7 +20,7 @@ function textEncoder() {
 	return textEncoderInstance;
 }
 
-function utf8Length(text) {
+function utf8Length(text: string) {
 	const currentTextEncoder = textEncoder();
 	if (currentTextEncoder === null) {
 		const m = encodeURIComponent(text).match(/%[89ABab]/g);
@@ -28,15 +29,25 @@ function utf8Length(text) {
 	return currentTextEncoder.encode(text).length;
 }
 
-function DefaultRenderer(props) @{
+type RendererProps = {
+	remainingCharacters: number;
+};
+
+function DefaultRenderer(props: RendererProps) @{
 	<span
 		class={'characters-limit ' + (props.remainingCharacters < 0 ? 'characters-limit-exceeded' : '')}
 	>
-		{props.remainingCharacters as string}
+		{props.remainingCharacters as unknown as string}
 	</span>
 }
 
-export function CharacterLimitPlugin(props) {
+type Props = {
+	charset?: 'UTF-8' | 'UTF-16';
+	maxLength?: number;
+	renderer?: (props: RendererProps) => OctaneNode;
+};
+
+export function CharacterLimitPlugin(props: Props) {
 	const charset = props.charset ?? 'UTF-16';
 	const maxLength = props.maxLength ?? CHARACTER_LIMIT;
 	const renderer = props.renderer ?? DefaultRenderer;
@@ -47,7 +58,7 @@ export function CharacterLimitPlugin(props) {
 	const characterLimitProps = useMemo(
 		() => ({
 			remainingCharacters: setRemainingCharacters,
-			strlen: (text) => {
+			strlen: (text: string) => {
 				if (charset === 'UTF-8') {
 					return utf8Length(text);
 				} else if (charset === 'UTF-16') {

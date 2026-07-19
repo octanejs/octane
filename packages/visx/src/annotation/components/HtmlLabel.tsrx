@@ -1,5 +1,6 @@
 import { useContext, useMemo } from 'octane';
-import type { ReactNode, CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import AnnotationContext from '../context/AnnotationContext.tsrx';
@@ -18,7 +19,7 @@ export type HtmlLabelProps =
 	| 'x'
 	| 'y'> & {
 		/** Pass in a custom element as the label to style as you like. Renders inside a <foreignObject>, be aware that most non-browser SVG renderers will not render HTML <foreignObject>s. See: https://github.com/airbnb/visx/issues/1173#issuecomment-1014380545.  */
-		children?: ReactNode;
+		children?: OctaneNode;
 		/** Optional styles to apply to the HTML container. */
 		containerStyle?: CSSProperties;
 	};

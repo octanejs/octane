@@ -3,8 +3,12 @@
 // node menu offering to replace the link with an embed node. Built on the ported
 // LexicalNodeMenuPlugin. Typed surface + AutoEmbedOption live in autoEmbedShared.ts.
 import { $isLinkNode, AutoLinkNode, LinkNode } from '@lexical/link';
+import type { AutoEmbedOption, EmbedConfig } from './autoEmbedShared';
+import { INSERT_EMBED_COMMAND } from './autoEmbedShared';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { LexicalNodeMenuPlugin } from './LexicalNodeMenuPlugin.tsrx';
+import type { MenuRenderFn } from './shared/menuShared';
+import type { CommandListenerPriority, LexicalNode, NodeKey, NodeMutation } from 'lexical';
 import {
 	$getNodeByKey,
 	$getSelection,
@@ -17,7 +21,15 @@ import { useCallback, useEffect, useMemo, useState } from 'octane';
 
 export { URL_MATCHER, INSERT_EMBED_COMMAND, AutoEmbedOption } from './autoEmbedShared';
 
-export function LexicalAutoEmbedPlugin(props) {
+type LexicalAutoEmbedPluginProps<TEmbedConfig extends EmbedConfig> = {
+	embedConfigs: TEmbedConfig[];
+	onOpenEmbedModalForConfig?: (embedConfig: TEmbedConfig) => void;
+	getMenuOptions: (activeEmbedConfig: TEmbedConfig, embedFn: () => void, dismissFn: () => void) => AutoEmbedOption[];
+	menuRenderFn?: MenuRenderFn<AutoEmbedOption>;
+	menuCommandPriority?: CommandListenerPriority;
+};
+
+export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(props: LexicalAutoEmbedPluginProps<TEmbedConfig>) {
 	const embedConfigs = props.embedConfigs;
 	const onOpenEmbedModalForConfig = props.onOpenEmbedModalForConfig;
 	const getMenuOptions = props.getMenuOptions;
@@ -27,15 +39,15 @@ export function LexicalAutoEmbedPlugin(props) {
 
 	const [editor] = useLexicalComposerContext();
 
-	const [nodeKey, setNodeKey] = useState(null);
-	const [activeEmbedConfig, setActiveEmbedConfig] = useState(null);
+	const [nodeKey, setNodeKey] = useState<NodeKey | null>(null);
+	const [activeEmbedConfig, setActiveEmbedConfig] = useState<TEmbedConfig | null>(null);
 
 	const reset = useCallback(() => {
 		setNodeKey(null);
 		setActiveEmbedConfig(null);
 	}, []);
 
-	const checkIfLinkNodeIsEmbeddable = useCallback(async (key) => {
+	const checkIfLinkNodeIsEmbeddable = useCallback(async (key: NodeKey) => {
 		const url = editor.read('latest', function () {
 			const linkNode = $getNodeByKey(key);
 			if ($isLinkNode(linkNode)) {
@@ -55,7 +67,16 @@ export function LexicalAutoEmbedPlugin(props) {
 	}, [editor, embedConfigs]);
 
 	useEffect(() => {
-		const listener = (nodeMutations, { updateTags, dirtyLeaves }) => {
+		const listener = (
+			nodeMutations: Map<NodeKey, NodeMutation>,
+			{
+				updateTags,
+				dirtyLeaves,
+			}: {
+				updateTags: Set<string>;
+				dirtyLeaves: Set<string>;
+			},
+		) => {
 			for (const [key, mutation] of nodeMutations) {
 				if (mutation === 'created' && updateTags.has(PASTE_TAG) && dirtyLeaves.size <= 3) {
 					checkIfLinkNodeIsEmbeddable(key);
@@ -123,7 +144,11 @@ export function LexicalAutoEmbedPlugin(props) {
 			: [];
 	}, [activeEmbedConfig, embedLinkViaActiveEmbedConfig, getMenuOptions, nodeKey, reset]);
 
-	const onSelectOption = useCallback((selectedOption, targetNode, closeMenu) => {
+	const onSelectOption = useCallback((
+		selectedOption: AutoEmbedOption,
+		targetNode: LexicalNode | null,
+		closeMenu: () => void,
+	) => {
 		editor.update(() => {
 			selectedOption.onSelect(targetNode);
 			closeMenu();

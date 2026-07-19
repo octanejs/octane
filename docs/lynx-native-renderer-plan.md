@@ -1,8 +1,12 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **proposed implementation plan**
+Status: **Milestone 0 blocked; Milestone 1 implemented; Milestone 2 private source/test implementation complete but exit-blocked by Milestone 0**
 
 Upstream audit date: **2026-07-18**
+
+Milestone 1 evidence date: **2026-07-19**
+
+Milestone 2 source/test evidence date: **2026-07-19**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -269,6 +273,11 @@ context, scheduler, or profiling primitive must be host-neutral and leave
 normal DOM output and hot paths byte- and behavior-equivalent. Lynx-specific
 conditionals do not belong in `runtime.ts`.
 
+The host-neutral root uses the standard `queueMicrotask` global when one is
+available and otherwise requires `UniversalRootOptions.scheduleMicrotask`.
+The future Lynx root supplies that option from `lynx.queueMicrotask`; the core
+does not turn thrown scheduler callbacks into Promise rejections.
+
 ### Proposed package layout
 
 ```text
@@ -283,11 +292,13 @@ packages/lynx/
     intrinsics.ts
     renderer.ts
     root.ts
+    main-thread.ts
     platform.ts
     testing.ts
     core/
       client-driver.ts
       host-driver.ts
+      papi.ts
       protocol.ts
       transport.ts
       props.ts
@@ -329,6 +340,7 @@ Required `@octanejs/lynx` exports:
 @octanejs/lynx/renderer
 @octanejs/lynx/intrinsics
 @octanejs/lynx/intrinsics/jsx-runtime
+@octanejs/lynx/main-thread
 @octanejs/lynx/platform
 @octanejs/lynx/testing
 ```
@@ -561,6 +573,13 @@ unstable, stop and upstream a framework-neutral hook before building the port.
 
 ### Milestone 1 — native-safe universal core and package scaffolding (2–3 engineer-weeks)
 
+> **Progress (2026-07-19): implemented.** The private Lynx and Rspeedy packages,
+> DOM-free native universal entry, renderer diagnostics, exact dual-thread
+> production compile graphs, runtime-compatibility evidence, and packed external
+> consumer are in place. This satisfies the build/source exit gate only;
+> Milestone 0's public lifecycle/event and real-device gates remain blocked, so
+> this is not a native preview and does not claim `.lynx.bundle` execution.
+
 - Scaffold `@octanejs/lynx` and `@octanejs/rspeedy-plugin` with package exports,
   licenses, `UPSTREAM.md`, status/crosswalk checks, renderer config, intrinsics,
   type tests, and pack fixtures.
@@ -581,6 +600,17 @@ Octane entry; existing DOM and Three compiler/runtime suites remain unchanged.
 
 ### Milestone 2 — background root, PAPI driver, and async transport (2–3 engineer-weeks)
 
+> **Progress (2026-07-19): private source/test implementation complete; exit
+> blocked.** The background root/client driver, named-`ContextProxy` transport,
+> root-scoped main-thread PAPI receiver, cloned ACK-gated handles, accepted-fault
+> cleanup, and asynchronous unmount are implemented. Compiled counter/keyed-list
+> fixtures pass in the official JavaScript environment, including retained host
+> identity, pre-ACK no-mutation rejection, one post-ACK fault, version gaps, late
+> messages, stale roots, effects/refs/errors, and teardown. This does not waive
+> Milestone 0's missing public native event/lifecycle/reload hooks or Web,
+> Android, and iOS gates; there is still no production `.lynx.bundle` or native
+> preview claim.
+
 - Implement page/root bootstrap and the background client driver.
 - Implement the main PAPI receiver for create, update, recreate, insert, move,
   remove, destroy, visibility, and one flush per accepted batch.
@@ -589,7 +619,8 @@ Octane entry; existing DOM and Three compiler/runtime suites remain unchanged.
 - Implement validation/staging before mutation, ACK at the irreversible host
   acceptance point, abort before ACK, rejection, post-ACK fault reporting,
   version ordering, and async unmount.
-- Install cloned public ref/query handles before acknowledgement.
+- Install cloned public identity handles before acknowledgement; query methods
+  remain Milestone 3 work.
 - Exercise keyed `@for`, components, fragments, conditionals, state updates,
   context, refs, effects, error boundaries, and teardown.
 
@@ -944,4 +975,3 @@ Octane has genuine Lynx native capability when all of the following are true:
 - the package status and release notes state exactly which Lynx engine,
   platforms, elements, events, lifecycle APIs, main-thread capabilities, and
   advanced features are supported.
-

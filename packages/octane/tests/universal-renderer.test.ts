@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
+import { lowerUniversalRendererRegion } from '../src/compiler/compile-universal.js';
+import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import * as UniversalRuntime from '../src/universal.js';
 import {
 	createObjectContainer,
@@ -31,6 +33,20 @@ const renderer = {
 	module: 'octane/universal',
 	target: 'universal',
 	text: 'host',
+} as const;
+
+const validationRenderer = {
+	...renderer,
+	validation: {
+		textParents: ['text'],
+		forbiddenGlobals: ['document', 'window'],
+		forbiddenImports: ['browser-only', 'react-dom'],
+		hostProps: {
+			'*': ['data-*', 'id'],
+			text: ['value'],
+			view: ['bind*'],
+		},
+	},
 } as const;
 
 const itemPlan = universalPlan('object', {
@@ -87,6 +103,519 @@ describe('universal compiler target', () => {
 		});
 
 		expect(explicitDom).toEqual(legacy);
+	});
+
+	it('leaves universal output byte-identical when renderer validation is absent', () => {
+		const source = 'export function Scene() @{ <view id="root" /> }';
+		const baseline = compile(source, '/src/Scene.object.tsrx', { hmr: false, renderer });
+		const optionalValidation = compile(source, '/src/Scene.object.tsrx', {
+			hmr: false,
+			renderer: { ...renderer, validation: undefined },
+		});
+
+		expect(optionalValidation).toEqual(baseline);
+	});
+
+	it('carries frozen runtime/thread metadata without changing emitted code', () => {
+		const source = 'export function Scene() @{ <view id="root" /> }';
+		const baseline = compile(source, '/src/Scene.object.tsrx', { hmr: false, renderer });
+		const background = compile(source, '/src/Scene.object.tsrx', {
+			hmr: false,
+			renderer,
+			universalRuntime: { runtime: 'object', thread: 'background' },
+		});
+		const mainThread = compile(source, '/src/Scene.object.tsrx', {
+			hmr: false,
+			renderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+
+		expect(background.code).toBe(baseline.code);
+		expect(mainThread.code).toBe(baseline.code);
+		expect(background.universalRuntime).toEqual({
+			runtime: 'object',
+			thread: 'background',
+		});
+		expect(mainThread.universalRuntime).toEqual({
+			runtime: 'object',
+			thread: 'main-thread',
+		});
+		expect(Object.isFrozen(background.universalRuntime)).toBe(true);
+		expect(() =>
+			compile(source, '/src/Scene.object.tsrx', {
+				hmr: false,
+				renderer,
+				universalRuntime: { runtime: 'lynx', thread: 'background' },
+			}),
+		).toThrow(/universalRuntime\.runtime "lynx" does not match renderer "object"/);
+		expect(() =>
+			compile(source, '/src/Scene.object.tsrx', {
+				mode: 'server',
+				renderer,
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			}),
+		).toThrow(/universalRuntime is available only in client mode/);
+	});
+
+	it('accepts allowed hosts and props while respecting lexical bindings and property keys', () => {
+		const source = `
+import { document as importedDocument } from './environment';
+export function Scene({ window, rest }) @{
+  const document = window;
+  const names = { document: importedDocument, window: 'local' };
+  <>
+    <view id={names.document} data-state={names.window} bindtap={() => document} {...rest} />
+    <view key="stable" children={null} />
+    <text value={document}>Hello</text>
+  </>
+}`;
+
+		expect(() =>
+			compile(source, '/src/Scene.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+	});
+
+	it('rejects forbidden static module requests and subpaths but not prefix lookalikes', () => {
+		const allowed = `
+import value from 'browser-only-extra';
+export function Scene() @{ <view id={value} /> }
+`;
+		expect(() =>
+			compile(allowed, '/src/Allowed.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+		const reexport = `
+export { window as safe } from 'allowed';
+export function Scene() @{ <view id="safe" /> }
+`;
+		expect(() =>
+			compile(reexport, '/src/Reexport.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+
+		const forbidden = `export { value } from 'browser-only/subpath';`;
+		expect(() =>
+			compile(forbidden, '/src/Import.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			'Octane universal compiler: renderer "object" forbids static import "browser-only/subpath" (matched "browser-only"). at /src/Import.native.tsrx:1:22',
+		);
+
+		expect(() =>
+			compile(`import value = require('browser-only/subpath');`, '/src/ImportEquals.native.ts', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids static import "browser-only\/subpath".*ImportEquals\.native\.ts:1:23/);
+
+		expect(() =>
+			compile(`export const runtime = import('browser-only/lazy');`, '/src/Dynamic.native.ts', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids static import "browser-only\/lazy".*Dynamic\.native\.ts:1:30/);
+
+		const commonJs = `export function loadRuntime() {
+  return require('react-dom/client');
+}`;
+		expect(() =>
+			compile(commonJs, '/src/CommonJs.native.ts', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			/forbids static CommonJS require "react-dom\/client" \(matched "react-dom"\).*CommonJs\.native\.ts:2:17/,
+		);
+
+		const moduleRequire = `export function loadRuntime() {
+  return module.require('browser-only/subpath');
+}`;
+		expect(() =>
+			compile(moduleRequire, '/src/ModuleRequire.native.ts', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			/forbids static CommonJS require "browser-only\/subpath".*ModuleRequire\.native\.ts:2:24/,
+		);
+
+		const allowedCommonJs = `export function loadRuntime(require, module, request) {
+  return [
+    require('react-dom/client'),
+    module.require('browser-only/subpath'),
+    globalThis.require(request),
+  ];
+}
+export const lookalike = require('react-dom-extra');
+export const dynamic = require(request);`;
+		expect(() =>
+			compile(allowedCommonJs, '/src/AllowedCommonJs.native.ts', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+	});
+
+	it('rejects unbound forbidden globals without treating property names as references', () => {
+		const propertyNames = `
+export function Scene() @{
+  const names = { document: 'document', window: 'window' };
+  <view id={names.document} />
+}`;
+		expect(() =>
+			compile(propertyNames, '/src/Properties.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+
+		const forbidden = `export function Scene() @{
+  <view id={document.title} />
+}`;
+		expect(() =>
+			compile(forbidden, '/src/Global.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			'Octane universal compiler: renderer "object" forbids unbound global "document". at /src/Global.native.tsrx:2:12',
+		);
+
+		const globalObject = `export function Scene() @{
+  <view id={globalThis.document.title} />
+}`;
+		expect(() =>
+			compile(globalObject, '/src/GlobalObject.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids unbound global "document".*GlobalObject\.native\.tsrx:2:23/);
+
+		const shadowedGlobalObject = `export function Scene(globalThis) @{
+  <view id={globalThis.document.title} />
+}`;
+		expect(() =>
+			compile(shadowedGlobalObject, '/src/ShadowedGlobalObject.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+
+		const bodyShadow = `export function Scene(value = document) @{
+  const document = null;
+  <view id={value} />
+}`;
+		expect(() =>
+			compile(bodyShadow, '/src/Default.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids unbound global "document".*Default\.native\.tsrx:1:30/);
+
+		expect(() =>
+			compile(`import value = window.module;`, '/src/Qualified.native.ts', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids unbound global "window".*Qualified\.native\.ts:1:15/);
+
+		const ambient = `declare const document: any;
+export function Scene() @{ <view id={document.title} /> }`;
+		expect(() =>
+			compile(ambient, '/src/Ambient.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/forbids unbound global "document".*Ambient\.native\.tsrx:2:37/);
+
+		const enumMembers = `enum Environment {
+  document = 1,
+  copy = document,
+}
+export function Scene() @{ <view id={Environment.copy} /> }`;
+		expect(() =>
+			compile(enumMembers, '/src/Enum.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+	});
+
+	it('rejects text parents and statically named host props at authored locations', () => {
+		const text = `export function Scene() @{
+  <view>Hello</view>
+}`;
+		expect(() =>
+			compile(text, '/src/Text.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			'Octane universal compiler: renderer "object" does not allow authored JSX text under <view>. at /src/Text.native.tsrx:2:8',
+		);
+
+		const dynamicText = `export function Scene({ value }) @{
+  <view>{value as string}</view>
+}`;
+		expect(() =>
+			compile(dynamicText, '/src/DynamicText.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			'Octane universal compiler: renderer "object" does not allow authored primitive text under <view>. at /src/DynamicText.native.tsrx:2:9',
+		);
+
+		const componentChildren = `
+function Label({ children }) @{ <text>{children}</text> }
+export function Scene() @{ <view><Label>Hello</Label></view> }
+`;
+		expect(() =>
+			compile(componentChildren, '/src/ComponentChildren.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+
+		const prop = `export function Scene() @{
+  <view onClick={() => undefined} />
+}`;
+		expect(() =>
+			compile(prop, '/src/Prop.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(
+			'Octane universal compiler: renderer "object" does not allow static attribute "onClick" on <view>. at /src/Prop.native.tsrx:2:8',
+		);
+
+		const nestedText = `
+function Frame({ content }) @{ <text>{content}</text> }
+export function Scene() @{ <Frame content=<view>Invalid</view> /> }
+`;
+		expect(() =>
+			compile(nestedText, '/src/NestedText.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/does not allow authored JSX text under <view>.*NestedText\.native\.tsrx:3:48/);
+
+		const nestedProp = `
+function Frame({ content }) @{ <text>{content}</text> }
+export function Scene() @{ <Frame content={<view onClick={() => undefined} />} /> }
+`;
+		expect(() =>
+			compile(nestedProp, '/src/NestedProp.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/does not allow static attribute "onClick" on <view>.*NestedProp\.native\.tsrx:3:49/);
+
+		const hostChildrenAttribute = 'export function Scene() @{ <view children={<>Invalid</>} /> }';
+		expect(() =>
+			compile(hostChildrenAttribute, '/src/HostChildren.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).toThrow(/does not allow authored JSX text under <view>.*HostChildren\.native\.tsrx/);
+
+		const componentPropBoundary = `
+function Frame({ content }) @{ <text>{content}</text> }
+export function Scene() @{ <view><Frame content={<>Allowed</>} /></view> }
+`;
+		expect(() =>
+			compile(componentPropBoundary, '/src/ComponentProp.native.tsrx', {
+				hmr: false,
+				renderer: validationRenderer,
+			}),
+		).not.toThrow();
+	});
+
+	it('applies validation to lowered renderer regions with authored locations', () => {
+		const region = `
+  <view>Invalid</view>`;
+		expect(() =>
+			lowerUniversalRendererRegion(
+				region,
+				'/src/Boundary.native.tsrx',
+				'dom',
+				validationRenderer,
+				0,
+				'children',
+				{ authoredSource: region },
+			),
+		).toThrow(
+			'Octane universal compiler: renderer "object" does not allow authored JSX text under <view>. at /src/Boundary.native.tsrx:2:8',
+		);
+
+		const lowered = lowerUniversalRendererRegion(
+			'<view />',
+			'/src/Boundary.native.tsrx',
+			'dom',
+			validationRenderer,
+			1,
+			'children',
+			{ universalRuntime: { runtime: 'object', thread: 'background' } },
+		);
+		expect(lowered.metadata.universalRuntime).toEqual({
+			runtime: 'object',
+			thread: 'background',
+		});
+		expect(Object.isFrozen(lowered.metadata.universalRuntime)).toBe(true);
+	});
+
+	it('keeps owning and lowered renderer validation scoped to their authored regions', () => {
+		const config = normalizeRendererConfig({
+			registry: {
+				inner: {
+					module: '@renderers/inner',
+					text: 'host',
+					validation: {
+						forbiddenGlobals: ['document'],
+						forbiddenImports: ['browser-only'],
+						textParents: ['view'],
+					},
+				},
+				outer: {
+					module: '@renderers/outer',
+					text: 'host',
+					validation: { textParents: ['label'] },
+				},
+			},
+			boundaries: {
+				'@scene/bridge': {
+					Native: {
+						ownerRenderer: 'outer',
+						childRenderer: 'inner',
+						prop: 'children',
+					},
+				},
+			},
+		});
+		const options = {
+			hmr: false,
+			renderer: { id: 'outer', ...config.registry.outer },
+			rendererBoundaries: config.boundaries,
+			rendererRegistry: config.registry,
+		};
+		const valid = `
+import { Native } from '@scene/bridge';
+export function Scene({ document }) @{
+  <group><Native><view id={document.value}>Inner</view></Native></group>
+}`;
+		expect(() => compile(valid, '/src/Scoped.native.tsrx', options)).not.toThrow();
+
+		const invalid = `
+import { Native } from '@scene/bridge';
+export function Scene() @{
+  <group>Outer<Native><view>Inner</view></Native></group>
+}`;
+		expect(() => compile(invalid, '/src/Scoped.native.tsrx', options)).toThrow(
+			'Octane universal compiler: renderer "outer" does not allow authored JSX text under <group>. at /src/Scoped.native.tsrx:4:9',
+		);
+
+		const forbiddenImport = `
+import { Native } from '@scene/bridge';
+import runtime from 'browser-only/subpath';
+export function Scene() @{
+  <group><Native><view id={runtime.value}>Inner</view></Native></group>
+}`;
+		expect(() => compile(forbiddenImport, '/src/ScopedImport.native.tsrx', options)).toThrow(
+			/forbids static import "browser-only\/subpath".*ScopedImport\.native\.tsrx:3:20/,
+		);
+
+		const forbiddenRequire = `
+import { Native } from '@scene/bridge';
+const runtime = require('browser-only/subpath');
+export function Scene() @{
+  <group><Native><view id={runtime.value}>Inner</view></Native></group>
+}`;
+		expect(() => compile(forbiddenRequire, '/src/ScopedRequire.native.tsrx', options)).toThrow(
+			/forbids static CommonJS require "browser-only\/subpath".*ScopedRequire\.native\.tsrx:3:/,
+		);
+
+		const ownerOnlyImport = `
+import { Native } from '@scene/bridge';
+import runtime from 'browser-only/owner';
+export function Scene() @{
+  <group id={runtime.value}><Native><view>Inner</view></Native></group>
+}`;
+		expect(() => compile(ownerOnlyImport, '/src/OwnerImport.native.tsrx', options)).not.toThrow();
+
+		const childLocalForbidden = `
+import { Native } from '@scene/bridge';
+function Child() @{ <view id={document.title}>Inner</view> }
+export function Scene() @{ <group><Native><Child /></Native></group> }
+`;
+		expect(() => compile(childLocalForbidden, '/src/ChildGlobal.native.tsrx', options)).toThrow(
+			/renderer "inner" forbids unbound global "document".*ChildGlobal\.native\.tsrx:3:/,
+		);
+
+		const outerStrictConfig = normalizeRendererConfig({
+			registry: {
+				inner: {
+					module: '@renderers/inner',
+					text: 'host',
+					validation: {
+						hostProps: { view: ['id', 'onTap'] },
+						textParents: ['view'],
+					},
+				},
+				outer: {
+					module: '@renderers/outer',
+					text: 'host',
+					validation: {
+						forbiddenGlobals: ['document'],
+						forbiddenImports: ['browser-only'],
+						hostProps: { view: ['id'] },
+						textParents: ['label'],
+					},
+				},
+			},
+			boundaries: {
+				'@scene/bridge': {
+					Native: {
+						ownerRenderer: 'outer',
+						childRenderer: 'inner',
+						prop: 'children',
+					},
+				},
+			},
+		});
+		const outerStrictOptions = {
+			hmr: false,
+			renderer: { id: 'outer', ...outerStrictConfig.registry.outer },
+			rendererBoundaries: outerStrictConfig.boundaries,
+			rendererRegistry: outerStrictConfig.registry,
+		};
+		const childOnly = `
+import { Native } from '@scene/bridge';
+import runtime from 'browser-only/child';
+function Child() @{ <view onTap={runtime.tap}>{document.title}</view> }
+export function Scene() @{ <label><Native><Child /></Native></label> }
+`;
+		expect(() =>
+			compile(childOnly, '/src/ChildOnly.native.tsrx', outerStrictOptions),
+		).not.toThrow();
+
+		const sharedChild = `
+import { Native } from '@scene/bridge';
+function Child() @{ <view id={document.title} /> }
+export function Scene() @{
+  <label><Child /><Native><Child /></Native></label>
+}`;
+		expect(() => compile(sharedChild, '/src/SharedChild.native.tsrx', outerStrictOptions)).toThrow(
+			/renderer "outer" forbids unbound global "document".*SharedChild\.native\.tsrx:3:/,
+		);
 	});
 
 	it('emits a static host plan with dynamic values and keyed range lowering', () => {

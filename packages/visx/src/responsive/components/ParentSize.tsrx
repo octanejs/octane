@@ -1,4 +1,6 @@
-import type { CSSProperties, ReactNode, HTMLAttributes } from 'react';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
+import type { OctaneNode } from 'octane';
 import type { ParentSizeState, UseParentSizeConfig } from '../hooks/useParentSize.tsrx';
 import useParentSize from '../hooks/useParentSize.tsrx';
 
@@ -17,8 +19,8 @@ export type ParentSizeProps = {
  * (`width: 100%; height: 100%; position: relative`); your values take precedence.
  * */
 		parentSizeStyles?: CSSProperties;
-		/** Child render function `({ width, height, top, left, ref, resize }) => ReactNode`. */
-		children: (args: ParentSizeProvidedProps) => ReactNode;
+		/** Child render function `({ width, height, top, left, ref, resize }) => OctaneNode`. */
+		children: (args: ParentSizeProvidedProps) => OctaneNode;
 	} & UseParentSizeConfig;
 
 const defaultOuterStyles: CSSProperties = { width: '100%', height: '100%', position: 'relative' };
@@ -43,7 +45,11 @@ export default function ParentSize({
 	resizeObserverPolyfill,
 	style,
 	...restProps
-}: ParentSizeProps & Omit<HTMLAttributes<HTMLDivElement>, keyof ParentSizeProps>) {
+}: ParentSizeProps &
+	Omit<Octane.HTMLAttributes<HTMLDivElement>, keyof ParentSizeProps | 'style'> & {
+		/** Octane's `style` also accepts a plain string; ParentSize merges styles, so keep the object form. */
+		style?: CSSProperties;
+	}) {
 	const { parentRef, node, resize, ...dimensions } = useParentSize({
 		initialSize,
 		debounceTime,

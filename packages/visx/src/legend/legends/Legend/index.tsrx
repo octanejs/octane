@@ -1,4 +1,5 @@
-import type { ReactNode, CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
+import type { OctaneNode } from 'octane';
 import { createElement } from 'octane';
 import cx from 'classnames';
 import type { AnyD3Scale, ScaleInput } from '@octanejs/visx/scale';
@@ -18,7 +19,7 @@ import type {
 
 export type LegendProps<Scale extends AnyD3Scale> = {
 	/** Optional render function override. */
-	children?: (labels: FormattedLabel<ScaleInput<Scale>, ReturnType<Scale>>[]) => ReactNode;
+	children?: (labels: FormattedLabel<ScaleInput<Scale>, ReturnType<Scale>>[]) => OctaneNode;
 	/** Classname to be applied to legend container. */
 	className?: string;
 	/** Styles to be applied to the legend container. */

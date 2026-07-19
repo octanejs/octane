@@ -57,6 +57,7 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -3101,7 +3102,41 @@ function isTypeOnlyStatement(node) {
 		if (node.exportKind === 'type') return true;
 		if (node.declaration && isTypeOnlyStatement(node.declaration)) return true;
 	}
+	// `export type * from '…'` / `export type * as Ns from '…'`
+	if (node.type === 'ExportAllDeclaration' && node.exportKind === 'type') return true;
 	return false;
+}
+
+// Elide inline `type` specifiers (`import { a, type B }`, `export { type C, d }`)
+// the way tsc does: the specifier disappears from the emitted JS, and a
+// declaration left with no specifiers disappears entirely — matching tsc's
+// whole-import elision (a side-effect `import 'm'` has no specifiers and is
+// untouched). Statement-level `import type` / `export type` never reaches here
+// (isTypeOnlyStatement drops those first).
+function stripTypeOnlySpecifiers(node) {
+	if (
+		(node.type !== 'ImportDeclaration' && node.type !== 'ExportNamedDeclaration') ||
+		node.declaration != null ||
+		!Array.isArray(node.specifiers) ||
+		node.specifiers.length === 0
+	) {
+		return node;
+	}
+	const kind = node.type === 'ImportDeclaration' ? 'importKind' : 'exportKind';
+	const specifiers = node.specifiers.filter((specifier) => specifier[kind] !== 'type');
+	if (specifiers.length === node.specifiers.length) return node;
+	if (specifiers.length === 0) return null;
+	return { ...node, specifiers };
+}
+
+function dropTypeOnlyStatements(body) {
+	const result = [];
+	for (const statement of body) {
+		if (isTypeOnlyStatement(statement)) continue;
+		const stripped = stripTypeOnlySpecifiers(statement);
+		if (stripped != null) result.push(stripped);
+	}
+	return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -4122,6 +4157,10 @@ export function compile(source, filename, options) {
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
+	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
+	if (!options?.__rendererBoundariesLowered) {
+		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
+	}
 	if (!options?.__hydratePrepared) {
 		const query = filename.indexOf('?');
 		const hash = filename.indexOf('#');
@@ -4256,6 +4295,16 @@ export function compile(source, filename, options) {
 	);
 	if (options?.renderer?.target === 'universal') {
 		const renderer = options.renderer;
+		const validationRemap =
+			renderer.validation === undefined
+				? null
+				: composeStyleRemap(
+						options?.__styleRemap ?? null,
+						authoredSource,
+						rendererBoundaryPreparation?.validationOrigins ??
+							rendererBoundaryPreparation?.origins ??
+							null,
+					);
 		let reverseSourceMapComposed = false;
 		const result = compileUniversal(
 			source,
@@ -4280,6 +4329,7 @@ export function compile(source, filename, options) {
 				const compiled = compile(domSource, filename, {
 					...options,
 					renderer: undefined,
+					universalRuntime: undefined,
 					rendererBoundaries: undefined,
 					rendererRegistry: undefined,
 					__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
@@ -4301,7 +4351,9 @@ export function compile(source, filename, options) {
 				}
 				return compiled;
 			},
-			options,
+			validationRemap !== null
+				? { ...options, __universalValidationRemap: validationRemap }
+				: options,
 		);
 		if (rendererBoundaryPreparation !== null && result.map && !reverseSourceMapComposed) {
 			result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
@@ -4331,9 +4383,10 @@ export function compile(source, filename, options) {
 	const nativeChangeDiagnostics = rendererAuthoredDiagnostics ?? nativeChangeAnalysis.diagnostics;
 	restampAuthoredStyleHashes(ast, clientStyleRemap, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
-	// before emit — they carry no runtime value and would leak invalid TS into
-	// the .js (or crash the printer). Runtime-only; Volar keeps them.
-	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));
+	// and inline `type` specifiers before emit — they carry no runtime value and
+	// would leak invalid TS into the .js (or crash the printer). Runtime-only;
+	// Volar keeps them.
+	ast.body = dropTypeOnlyStatements(ast.body);
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -5051,7 +5104,7 @@ export function compile(source, filename, options) {
 			const args = [JSON.stringify(t.html)];
 			if (t.ns || t.frag) args.push(String(t.ns | 0));
 			if (t.frag) args.push(String(t.frag | 0));
-			return `const ${t.name} = _$template(${args.join(', ')});`;
+			return `const ${t.name} = /* @__PURE__ */ _$template(${args.join(', ')});`;
 		})
 		.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
@@ -5131,18 +5184,18 @@ export function compile(source, filename, options) {
 				.join('\n') + '\n';
 	}
 
-	// Cross-module singleRoot stamps (docs/comment-marker-elision-plan.md M1):
-	// a component whose body provably renders ONE plain element carries the
-	// marker on its BINDING, so a `componentSlot(…, 2)` call site in ANOTHER
-	// module can take the markerless singleRoot path at mount. Emitted at the
-	// module tail so it lands on the final binding (incl. the hmr() wrapper —
-	// the stamp goes on what importers see). Also feeds the runtime's existing
+	// Cross-module singleRoot fallback stamps (docs/comment-marker-elision-plan.md
+	// M1). Non-HMR initializers carry this metadata inside a tree-shakeable
+	// binding; the tail remains for HMR wrappers and declaration shapes that cannot
+	// safely move the source binding. Also feeds the runtime's existing
 	// value-position `$$singleRoot` descriptor check.
 	let stampBlock = '';
 	if (ctx.componentInfo) {
 		const stamps = [];
 		for (const [name, info] of ctx.componentInfo) {
-			if (info.singleRoot === true) stamps.push(`${name}.$$singleRoot = true;`);
+			if (info.singleRoot === true && info.singleRootInitialized !== true) {
+				stamps.push(`${name}.$$singleRoot = true;`);
+			}
 		}
 		for (const entry of ctx.devFunctionLocs) {
 			stamps.push(
@@ -5247,9 +5300,10 @@ function compileServer(source, filename, options, styleRemap = null) {
 			rendererRegistry: options?.rendererRegistry,
 		});
 	restampAuthoredStyleHashes(ast, styleRemap, filename);
-	// Drop type-only statements before emit (see isTypeOnlyStatement) — same as
-	// the client path; the server HTML-string output is plain JS too.
-	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));
+	// Drop type-only statements and inline `type` specifiers before emit (see
+	// isTypeOnlyStatement) — same as the client path; the server HTML-string
+	// output is plain JS too.
+	ast.body = dropTypeOnlyStatements(ast.body);
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -7068,6 +7122,15 @@ function applyCssScoping(componentNode, ctx) {
 	return cssHash;
 }
 
+// Attach definition metadata through the component's initializer rather than a
+// free-standing module mutation. The call-site annotation is valid because every
+// caller passes a freshly-created compiler function that cannot yet be observed;
+// bundlers may therefore discard the initializer together with an unused export.
+function singleRootInitializer(ctx, component) {
+	ctx.runtimeNeeded.add('__s');
+	return `/* @__PURE__ */ _$__s(${component})`;
+}
+
 function compileComponent(node, ctx, options) {
 	const name = node.id.name;
 	rejectAsyncOrGenerator(node, name);
@@ -7131,12 +7194,15 @@ function compileComponent(node, ctx, options) {
 	// module const) so the component's own body — where the function-
 	// expression name shadows the const — resolves `_$warmChild(Self, …)` to
 	// an object that carries the plan. hmr() forwards `__warm` from the
-	// wrapped fn onto its wrapper for cross-module references.
-	const warmedFn = ctx._pendingWarm ? `Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })` : fn;
+	// wrapped fn onto its wrapper for cross-module references. Both assignments
+	// below target this freshly-emitted function, so unused initializers may drop.
+	const warmedFn = ctx._pendingWarm
+		? `/* @__PURE__ */ Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })`
+		: fn;
 	ctx._pendingWarm = null;
 	const abiFn =
 		hmrWrap && returnedOutput
-			? `Object.assign(${warmedFn}, { __octaneReturnedOutput: true })`
+			? `/* @__PURE__ */ Object.assign(${warmedFn}, { __octaneReturnedOutput: true })`
 			: warmedFn;
 
 	// HMR-wrap exported components inline so the binding stays a `const` (no
@@ -7146,7 +7212,12 @@ function compileComponent(node, ctx, options) {
 	// function-name identity by NAMING the inner FunctionExpression — `hmr`
 	// returns a wrapper that delegates to whatever fn is currently committed,
 	// and `module.Foo[HMR].update(...)` swaps it on each accept.
-	const valueExpr = hmrWrap && isExported ? `_$hmr(${abiFn})` : abiFn;
+	let valueExpr = hmrWrap && isExported ? `_$hmr(${abiFn})` : abiFn;
+	const componentInfo = ctx.componentInfo.get(name);
+	if (!hmrWrap && componentInfo?.singleRoot === true) {
+		valueExpr = singleRootInitializer(ctx, valueExpr);
+		componentInfo.singleRootInitialized = true;
+	}
 	const declaration = options && options.hmrMutable ? 'let' : 'const';
 	if (isDefault) {
 		if (options && options.hmrMutable) {
@@ -9794,13 +9865,15 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		// compileFunctionBody → emitElementHtml (via ctx._foldedDirectiveCalls).
 		body: { type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
 	};
-	ctx.hoistedHelpers.push(compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash));
+	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
 		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
 		// comment markers), which is required for byte-equal DOM when folding `@{}`.
 		// A returned JSX fragment may have multiple roots and must retain its range.
-		ctx.hoistedHelpers.push(`${fragName}.$$singleRoot = true;`);
+		ctx.hoistedHelpers.push(`const ${fragName} = ${singleRootInitializer(ctx, renderer)};`);
+	} else {
+		ctx.hoistedHelpers.push(renderer);
 	}
 	ctx.runtimeNeeded.add('createElement');
 	return {
@@ -10123,7 +10196,7 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
 		// and custom-hook boundaries retain the trailing-Symbol ABI consumed by
 		// published bindings. Both use the short, path-free description.
 		if (ctx._hookHash === undefined) ctx._hookHash = hookSlotHash(ctx.filename);
-		symbolExpr = `Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)})`;
+		symbolExpr = `/* @__PURE__ */ Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)})`;
 	} else {
 		// Direct sites in a compiler-created render Scope only need a tiny local
 		// integer. Arbitrary callable helpers and custom-hook boundaries can share a
@@ -10132,7 +10205,7 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
 		if (forceSymbol) {
 			const { baseName } = ensureHookSlotBase(ctx);
 			const numericExpr = id === 0 ? baseName : `${baseName} + ${id}`;
-			symbolExpr = `Symbol(${numericExpr})`;
+			symbolExpr = `/* @__PURE__ */ Symbol(${numericExpr})`;
 		} else {
 			symbolExpr = String(id);
 		}

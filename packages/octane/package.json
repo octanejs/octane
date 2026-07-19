@@ -1,14 +1,9 @@
 {
   "name": "octane",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "license": "MIT",
   "type": "module",
-  "sideEffects": [
-    "./src/index.ts",
-    "./src/runtime.ts",
-    "./dist/index.js",
-    "./dist/runtime.js"
-  ],
+  "sideEffects": false,
   "engines": {
     "node": ">=22"
   },
@@ -31,6 +26,10 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./jsx-runtime": "./src/jsx-runtime.d.ts",
+    "./jsx-dev-runtime": "./src/jsx-runtime.d.ts",
+    "./tsrx-iterable": "./src/tsrx-iterable.ts",
+    "./tsrx-spread": "./src/tsrx-spread.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
     "./react/server": "./src/react/server.ts",
@@ -39,6 +38,7 @@
     "./constants": "./src/constants.ts",
     "./profiling": "./src/profiling.ts",
     "./universal": "./src/universal.ts",
+    "./universal/native": "./src/universal-native.ts",
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
@@ -90,6 +90,10 @@
         "types": "./dist/universal.d.ts",
         "default": "./dist/universal.js"
       },
+      "./universal/native": {
+        "types": "./dist/universal-native.d.ts",
+        "default": "./dist/universal-native.js"
+      },
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
@@ -108,6 +112,7 @@
   },
   "dependencies": {
     "@tsrx/core": "catalog:default",
+    "@types/react": "catalog:default",
     "devalue": "catalog:default",
     "esrap": "catalog:default"
   },
@@ -129,7 +134,6 @@
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
-    "@types/react": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
     "playwright": "catalog:default",

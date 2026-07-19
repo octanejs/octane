@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "webworker"],
+    "skipLibCheck": false,
+    "types": [],
+    "noEmit": true,
+    "noErrorTruncation": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@octanejs/lynx": ["../src/index.ts"],
+      "@octanejs/lynx/config": ["../src/config.ts"],
+      "@octanejs/lynx/intrinsics": ["../src/intrinsics.ts"],
+      "@octanejs/lynx/intrinsics/jsx-runtime": ["../src/intrinsics.ts"],
+      "@octanejs/lynx/main-thread": ["../src/main-thread.ts"],
+      "@octanejs/lynx/platform": ["../src/platform.ts"],
+      "@octanejs/lynx/renderer": ["../src/renderer.ts"],
+      "@octanejs/lynx/testing": ["../src/testing.ts"]
+    }
+  },
+  "include": ["./**/*.test.ts"]
+}

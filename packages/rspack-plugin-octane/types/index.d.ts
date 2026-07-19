@@ -11,6 +11,18 @@ export interface OctaneRendererRuleOptions {
 	renderer: string;
 }
 
+/** @experimental Static source restrictions enforced for a renderer. */
+export interface OctaneRendererValidationOptions {
+	/** Host elements that may directly contain authored primitive text. */
+	textParents?: readonly string[];
+	/** Unbound JavaScript globals that renderer-owned source may not reference. */
+	forbiddenGlobals?: readonly string[];
+	/** Package IDs whose static imports, subpaths, and CommonJS requires are forbidden. */
+	forbiddenImports?: readonly string[];
+	/** Allowed static JSX attributes by host name; `*` supplies shared patterns. */
+	hostProps?: Readonly<Record<string, readonly string[]>>;
+}
+
 export type OctaneRendererRegistryEntry =
 	| string
 	| {
@@ -20,6 +32,7 @@ export type OctaneRendererRegistryEntry =
 			intrinsics?: string;
 			text?: 'reject' | 'ignore' | 'host';
 			capabilities?: readonly string[];
+			validation?: OctaneRendererValidationOptions;
 	  };
 
 /** Static metadata for a component prop lowered for another renderer. */
@@ -51,6 +64,7 @@ export interface OctaneResolvedRendererConfig {
 				readonly intrinsics?: string;
 				readonly text: 'reject' | 'ignore' | 'host';
 				readonly capabilities: readonly string[];
+				readonly validation?: Readonly<OctaneRendererValidationOptions>;
 			}
 		>
 	>;
@@ -86,6 +100,11 @@ export interface OctaneRspackLoaderOptions {
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */
 	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
+	/** Compile-only host runtime/thread identity for a universal renderer graph. */
+	universalRuntime?: {
+		readonly runtime: string;
+		readonly thread: 'background' | 'main-thread';
+	};
 	/**
 	 * Mixed-toolchain ownership gate: when `true`, Octane compiles only
 	 * project modules that declare `'use octane'` in their directive prologue.
@@ -101,6 +120,12 @@ export interface OctaneRspackLoaderOptions {
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
 	/**
+	 * Override the exact module used for plain `octane` imports in this graph.
+	 * Universal host integrations use this to share one hook/context runtime
+	 * between compiled templates and plain TypeScript custom hooks.
+	 */
+	runtime?: string;
+	/**
 	 * Add Rspack's built-in SWC loader to strip TypeScript after Octane runs.
 	 * Disable this when another rule already owns TypeScript transpilation.
 	 * @default true
@@ -112,6 +137,11 @@ export interface OctaneRspackBuildInfo {
 	canonicalId: string;
 	transformKind: 'compile' | 'slots' | 'client-only-stub';
 	serverRpc: boolean;
+	/** Universal host runtime/thread identity, when this module was specialized. */
+	universalRuntime?: {
+		readonly runtime: string;
+		readonly thread: 'background' | 'main-thread';
+	};
 	/** Stable identity shared by the client compile and its inert server stub. */
 	clientReference?: {
 		readonly id: string;
