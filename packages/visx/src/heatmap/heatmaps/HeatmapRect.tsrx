@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { GenericCell, ColorScale, OpacityScale } from '../types';
@@ -33,7 +34,7 @@ export type HeatmapRectProps<ColumnDatum, BinDatum> = {
 	/** className to apply to each heatmap rect element. */
 	className?: string;
 	/** Render function override, provided with heatmap. */
-	children?: (cells: RectCell<ColumnDatum, BinDatum>[][]) => ReactNode;
+	children?: (cells: RectCell<ColumnDatum, BinDatum>[][]) => OctaneNode;
 };
 
 export type RectCell<ColumnDatum, BinDatum> = GenericCell<ColumnDatum, BinDatum> & {

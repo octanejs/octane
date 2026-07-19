@@ -3,12 +3,17 @@
 import { useCallback, useMemo, useRef } from 'octane';
 
 import { splitSlot, subSlot } from './internal';
+import type { MutableRefObject, RefCallback } from './types';
 
+export function useMergeRefs<Instance>(
+	refs: Array<MutableRefObject<Instance | null> | RefCallback<Instance> | null | undefined>,
+	slot?: symbol,
+): ((node: Instance | null) => void) | null;
 export function useMergeRefs(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const refs = (user[0] as any[]) ?? [];
 
-	const cleanupRef = useRef<any>(undefined, subSlot(slot, 'cleanup'));
+	const cleanupRef = useRef<(() => void) | undefined>(undefined, subSlot(slot, 'cleanup'));
 
 	const refEffect = useCallback(
 		(instance: any) => {

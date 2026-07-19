@@ -15,6 +15,7 @@ import {
 	type UniversalComponent,
 	type UniversalRoot,
 } from 'octane/universal';
+import type { ThreeElement } from './catalogue.js';
 import { applyThreeProps } from './props.js';
 import {
 	createThreeContainer,
@@ -62,9 +63,20 @@ export type GLProps<TCanvas extends CanvasLike = CanvasLike> =
 	| ((defaults: DefaultGLProps<TCanvas>) => Renderer | Promise<Renderer>)
 	| (Partial<THREE.WebGLRendererParameters> & Record<string, unknown>);
 
-export type CameraProps =
+// R3F-shaped (fiber v9 renderer.ts): declarative camera options accept the
+// element-prop forms — math shorthands like `position: [x, y, z]` included —
+// not only fully-constructed THREE property values.
+export type CameraProps = (
 	| Camera
-	| (Partial<THREE.PerspectiveCamera & THREE.OrthographicCamera> & { manual?: boolean });
+	| Partial<
+			ThreeElement<typeof THREE.Camera> &
+				ThreeElement<typeof THREE.PerspectiveCamera> &
+				ThreeElement<typeof THREE.OrthographicCamera>
+	  >
+) & {
+	/** Flags the camera as manual, putting projection into your own hands. */
+	manual?: boolean;
+};
 
 export interface RenderProps<TCanvas extends CanvasLike = CanvasLike> {
 	gl?: GLProps<TCanvas>;

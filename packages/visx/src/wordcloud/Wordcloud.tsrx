@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import { Group } from '@octanejs/visx/group';
 import type { BaseDatum, CloudWord, WordcloudConfig } from './types';
 import useWordcloud from './useWordcloud.tsrx';
 
 export interface WordcloudProps<Datum extends BaseDatum> extends WordcloudConfig<Datum> {
-	children: (words: CloudWord[]) => ReactNode;
+	children: (words: CloudWord[]) => OctaneNode;
 }
 
 export default function Wordcloud<Datum extends BaseDatum>(props: WordcloudProps<Datum>) {

@@ -97,6 +97,15 @@ interface SsrElementContext {
 
 type ServerComponent = (props: any, scope: SSRScope, extra?: any) => string;
 
+/**
+ * What the public render entries accept. In a split client/server build the
+ * SAME module import is typed by the client-shaped virtual TSX (a unary
+ * `(props) => Octane.JSX.Element`-ish function), while the server bundle
+ * actually receives the server-compiled twin — so the entries accept the
+ * authored component type and trust the build for the server shape.
+ */
+export type ServerEntryComponent = ServerComponent | ((props: any) => unknown);
+
 let CURRENT_SCOPE: SSRScope | null = null;
 // Empty compiler batches register child-only warm plans for the synchronous
 // component call stack. A pending descendant batch activates the live plans;
@@ -5090,10 +5099,11 @@ function passToResult(pass: FullPassResult, nonceAttr: string): RenderResult {
  * This is the buffered, await-everything behaviour of the old `render()`.
  */
 export async function prerender(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): Promise<RenderResult> {
+	const component = entryComponent as ServerComponent;
 	const nonceAttr = nonceAttrOf(options);
 	return passToResult(await runBuffered(component, props, options, nonceAttr), nonceAttr);
 }
@@ -5242,10 +5252,11 @@ export function renderHostedAttempt(
  * `use()` in the shell still seeds. Use `prerender` when you need the data awaited.
  */
 export function renderToString(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
+	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap();
@@ -5267,10 +5278,11 @@ export function renderToString(
  * no head-adoption markers, no suspense seed script. For static pages / email.
  */
 export function renderToStaticMarkup(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: RenderOptions,
 ): RenderResult {
+	const component = entryComponent as ServerComponent;
 	options?.signal?.throwIfAborted();
 	const nonceAttr = nonceAttrOf(options);
 	const resolved: ResolvedMap = newResolvedMap();
@@ -6488,13 +6500,14 @@ async function runStream(
  * `(Component, props?, options?)`.
  */
 export function renderToPipeableStream(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: StreamOptions,
 ): {
 	pipe: <T extends { write(chunk: string): unknown; end(): unknown }>(destination: T) => T;
 	abort: (reason?: unknown) => void;
 } {
+	const component = entryComponent as ServerComponent;
 	interface Destination {
 		write(chunk: string): unknown;
 		end(): unknown;
@@ -6736,10 +6749,11 @@ export function renderToPipeableStream(
  * pauses `allReady`; read concurrently when waiting for it.
  */
 export function renderToReadableStream(
-	component: ServerComponent,
+	entryComponent: ServerEntryComponent,
 	props?: any,
 	options?: StreamOptions,
 ): Promise<ReadableStream<Uint8Array> & { allReady: Promise<void> }> {
+	const component = entryComponent as ServerComponent;
 	return new Promise((resolveShell, rejectShell) => {
 		const encoder = new TextEncoder();
 		const renderController = new AbortController();

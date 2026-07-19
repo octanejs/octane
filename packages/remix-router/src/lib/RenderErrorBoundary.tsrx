@@ -20,9 +20,23 @@
 // derivation says the error cleared (documented divergence: upstream clears
 // in a render-phase derivation; same observable outcome).
 import { useRef, useLayoutEffect } from 'octane';
+import type { OctaneNode } from 'octane';
 import { RouteContext, RouteErrorContext } from './context.ts';
+import type { RouteContextObject } from './context.ts';
+import type { Location } from './router/history.ts';
+import type { RevalidationState } from './router/router.ts';
 
-export function RenderErrorBoundary(props) @{
+type RenderErrorBoundaryProps = {
+	location: Location;
+	revalidation: RevalidationState;
+	error: any;
+	component: OctaneNode;
+	routeContext: RouteContextObject;
+	onError?: (error: unknown, errorInfo?: unknown) => void;
+	children?: OctaneNode;
+};
+
+export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 	// getDerivedStateFromProps, run during render (pure derivation).
 	const state = useRef({
 		location: props.location,
@@ -74,10 +88,15 @@ export function RenderErrorBoundary(props) @{
 	}
 }
 
-function CaughtErrorView(props) @{
+type CaughtErrorViewProps = Omit<RenderErrorBoundaryProps, 'children'> & {
+		caught: unknown;
+		reset: () => void;
+	};
+
+function CaughtErrorView(props: CaughtErrorViewProps) @{
 	// componentDidCatch parity — once per distinct caught error, during render
 	// so a rethrowing onError escapes to the parent boundary.
-	const reported = useRef(null);
+	const reported = useRef<unknown>(null);
 	if (reported.current !== props.caught) {
 		reported.current = props.caught;
 		if (props.onError) {

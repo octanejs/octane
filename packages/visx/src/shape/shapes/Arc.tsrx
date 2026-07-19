@@ -1,4 +1,5 @@
-import type { ReactNode, Ref } from 'react';
+import type { Ref } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { Arc as ArcType } from 'd3-shape';
 import type { $TSFIXME, AddSVGProps, ArcPathConfig } from '../types';
@@ -10,7 +11,7 @@ export type ArcProps<Datum> = {
 		/** A Datum for which to generate an arc. */
 		data?: Datum;
 		/** Override render function which is passed the configured arc generator as input. */
-		children?: (args: { path: ArcType<$TSFIXME, Datum> }) => ReactNode;
+		children?: (args: { path: ArcType<$TSFIXME, Datum> }) => OctaneNode;
 		/** React ref to the path element. */
 		innerRef?: Ref<SVGPathElement>;
 	} & ArcPathConfig<Datum>;

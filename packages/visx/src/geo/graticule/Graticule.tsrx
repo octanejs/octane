@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import { Group } from '@octanejs/visx/group';
 import type { GeoGraticuleGenerator } from 'd3-geo';
 import { geoGraticule } from 'd3-geo';
@@ -38,7 +39,7 @@ export type GraticuleProps = {
 		graticule,
 	}: {
 		graticule: GeoGraticuleGenerator;
-	}) => ReactNode;
+	}) => OctaneNode;
 	/** Sets the major and minor extents of the graticule generator, which defaults to ⟨⟨-180°, -80° - ε⟩, ⟨180°, 80° + ε⟩⟩. */
 	extent?: [[number, number], [number, number]];
 	/** Sets the major extent of the graticule generator, which defaults to ⟨⟨-180°, -90° + ε⟩, ⟨180°, 90° - ε⟩⟩. */

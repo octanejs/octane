@@ -1,5 +1,6 @@
 import { useCallback, useContext, useEffect, useRef } from 'octane';
-import type { CSSProperties, SVGProps, ReactNode } from 'react';
+import type { CSSProperties, SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import { useTooltipInPortal, defaultStyles } from '@octanejs/visx/tooltip';
 import type {
 	TooltipProps as BaseTooltipProps,
@@ -41,9 +42,9 @@ export type TooltipProps<Datum extends object> = {
  * return value is non-null, its content is rendered inside the tooltip container.
  * Content will be rendered in an HTML parent.
  */
-		renderTooltip: (params: RenderTooltipParams<Datum>) => ReactNode;
+		renderTooltip: (params: RenderTooltipParams<Datum>) => OctaneNode;
 		/** Function which handles rendering glyphs. */
-		renderGlyph?: (params: RenderTooltipGlyphProps<Datum>) => ReactNode;
+		renderGlyph?: (params: RenderTooltipGlyphProps<Datum>) => OctaneNode;
 		/** Whether to snap tooltip + crosshair x-coord to the nearest Datum x-coord instead of the event x-coord. */
 		snapTooltipToDatumX?: boolean;
 		/** Whether to snap tooltip + crosshair y-coord to the nearest Datum y-coord instead of the event y-coord. */

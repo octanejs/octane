@@ -7,17 +7,45 @@ import { splitSlot, subSlot } from './internal';
 import { useFloatingParentNodeId } from './tree';
 import { useId } from './useId';
 import { getFloatingFocusElement } from './utils';
+import type { ElementProps, ExtendedUserProps, FloatingRootContext, HTMLProps } from './types';
 
-const componentRoleToAriaRoleMap = new Map<string, string | false>([
+type AriaRole = 'tooltip' | 'dialog' | 'alertdialog' | 'menu' | 'listbox' | 'grid' | 'tree';
+type ComponentRole = 'select' | 'label' | 'combobox';
+
+export interface UseRoleProps {
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * The role of the floating element.
+	 * @default 'dialog'
+	 */
+	role?: AriaRole | ComponentRole;
+}
+
+const componentRoleToAriaRoleMap = new Map<AriaRole | ComponentRole, AriaRole | false>([
 	['select', 'listbox'],
 	['combobox', 'listbox'],
 	['label', false],
 ]);
 
-export function useRole(...args: any[]): any {
+/**
+ * Adds base screen reader props to the reference and floating elements for a
+ * given floating element `role`.
+ * @see https://floating-ui.com/docs/useRole
+ */
+export function useRole(
+	context: FloatingRootContext,
+	props?: UseRoleProps,
+	slot?: symbol,
+): ElementProps;
+export function useRole(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseRoleProps) ?? {};
 
 	const open = context.open;
 	const elements = context.elements;
@@ -34,18 +62,19 @@ export function useRole(...args: any[]): any {
 		subSlot(slot, 'm:fid'),
 	);
 	const mapped = componentRoleToAriaRoleMap.get(role);
-	const ariaRole = mapped != null ? mapped : role;
+	// The map covers every ComponentRole, so the fallback `role` is an AriaRole.
+	const ariaRole = (mapped != null ? mapped : role) as AriaRole | false;
 	const parentId = useFloatingParentNodeId();
 	const isNested = parentId != null;
 
-	const reference = useMemo(
+	const reference = useMemo<HTMLProps<Element>>(
 		() => {
 			if (ariaRole === 'tooltip' || role === 'label') {
 				return {
 					['aria-' + (role === 'label' ? 'labelledby' : 'describedby')]: open
 						? floatingId
 						: undefined,
-				};
+				} as HTMLProps<Element>;
 			}
 			return {
 				'aria-expanded': open ? 'true' : 'false',
@@ -62,9 +91,9 @@ export function useRole(...args: any[]): any {
 		subSlot(slot, 'm:ref'),
 	);
 
-	const floating = useMemo(
+	const floating = useMemo<HTMLProps<HTMLElement>>(
 		() => {
-			const floatingProps: any = {
+			const floatingProps: HTMLProps<HTMLElement> = {
 				id: floatingId,
 				...(ariaRole && { role: ariaRole }),
 			};
@@ -81,9 +110,9 @@ export function useRole(...args: any[]): any {
 	);
 
 	const item = useCallback(
-		(_ref: any) => {
+		(_ref: ExtendedUserProps): HTMLProps<HTMLElement> => {
 			const { active, selected } = _ref;
-			const commonProps: any = {
+			const commonProps: HTMLProps<HTMLElement> = {
 				role: 'option',
 				...(active && { id: floatingId + '-fui-option' }),
 			};
@@ -98,7 +127,7 @@ export function useRole(...args: any[]): any {
 		subSlot(slot, 'cb:item'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference, floating, item } : {}),
 		[enabled, reference, floating, item],
 		subSlot(slot, 'm:ret'),

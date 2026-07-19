@@ -30,16 +30,34 @@ import {
 	FetchersContext,
 	ViewTransitionContext,
 } from '../context.ts';
+import type {
+	ClientOnErrorFunction,
+	FetchersContextObject,
+	Navigator,
+	ViewTransitionContextObject,
+} from '../context.ts';
+import type { Location } from '../router/history.ts';
+import type { Router as DataRouter, RouterState, RouterSubscriber } from '../router/router.ts';
 import { getRoutePattern } from '../router/utils.ts';
+import type { RouteManifest, RouteObject } from '../router/utils.ts';
 import { useOutlet, useRoutesImpl } from '../hooks.ts';
 import { Router } from './Router.tsrx';
 import { Deferred, getOptimisticRouterState, warnOnce } from './utils.ts';
 
-export function Outlet(props) {
+export function Outlet(props: { context?: unknown }) {
 	return useOutlet(props.context);
 }
 
-export function DataRoutes(props) {
+type DataRoutesProps = {
+	routes: RouteObject[];
+	manifest?: RouteManifest;
+	future?: unknown;
+	state: RouterState;
+	isStatic?: boolean;
+	onError?: ClientOnErrorFunction;
+};
+
+export function DataRoutes(props: DataRoutesProps) {
 	return useRoutesImpl(props.routes, undefined, {
 		manifest: props.manifest,
 		state: props.state,
@@ -52,19 +70,41 @@ export function DataRoutes(props) {
 // Memoize to avoid re-renders when updating `ViewTransitionContext`
 const MemoizedDataRoutes = memo(DataRoutes);
 
-export function RouterProvider(props) @{
+type RouterProviderProps = {
+	router: DataRouter;
+	flushSync?: (fn: () => unknown) => undefined;
+	onError?: ClientOnErrorFunction;
+	useTransitions?: boolean;
+};
+
+type VtInterruption = {
+	state: RouterState;
+	currentLocation: Location;
+	nextLocation: Location;
+};
+
+export function RouterProvider(props: RouterProviderProps) @{
 	const { router, flushSync: reactDomFlushSyncImpl, onError, useTransitions } = props;
 
 	const [_state, setStateImpl] = useState(router.state);
-	const [state, setOptimisticState] = useOptimistic(_state);
-	const [pendingState, setPendingState] = useState(undefined);
-	const [vtContext, setVtContext] = useState({ isTransitioning: false });
-	const [renderDfd, setRenderDfd] = useState(undefined);
-	const [transition, setTransition] = useState(undefined);
-	const [interruption, setInterruption] = useState(undefined);
-	const fetcherData = useRef(new Map());
+	// OCTANE NOTE: React's useOptimistic falls back to basicStateReducer, which
+	// applies function updaters — octane's default replaces the state with the
+	// raw queued value, so the upstream `setOptimisticState((s) => …)` call sites
+	// need the reducer spelled out to keep updater semantics.
+	const [state, setOptimisticState] = useOptimistic<
+		RouterState,
+		(current: RouterState) => RouterState
+	>(_state, (current, update) => update(current));
+	const [pendingState, setPendingState] = useState<RouterState | undefined>(undefined);
+	const [vtContext, setVtContext] = useState<ViewTransitionContextObject>({
+		isTransitioning: false,
+	});
+	const [renderDfd, setRenderDfd] = useState<Deferred<void> | undefined>(undefined);
+	const [transition, setTransition] = useState<ViewTransition | undefined>(undefined);
+	const [interruption, setInterruption] = useState<VtInterruption | undefined>(undefined);
+	const fetcherData = useRef<FetchersContextObject>(new Map());
 
-	const setState = useCallback((
+	const setState = useCallback<RouterSubscriber>((
 		newState,
 		{ deletedFetchers, newErrors, flushSync, viewTransitionOpts },
 	) => {
@@ -141,8 +181,8 @@ export function RouterProvider(props) @{
 				});
 			});
 
-			// Update the DOM
-			const t = router.window.document.startViewTransition(() => {
+			// Update the DOM (window presence was checked via isViewTransitionAvailable)
+			const t = router.window!.document.startViewTransition(() => {
 				reactDomFlushSyncImpl(() => setStateImpl(newState));
 			});
 
@@ -202,7 +242,7 @@ export function RouterProvider(props) @{
 	// eventual "completed" render
 	useEffect(() => {
 		if (vtContext.isTransitioning && !vtContext.flushSync) {
-			setRenderDfd(new Deferred());
+			setRenderDfd(new Deferred<void>());
 		}
 	}, [vtContext]);
 
@@ -259,7 +299,7 @@ export function RouterProvider(props) @{
 		}
 	}, [vtContext.isTransitioning, interruption]);
 
-	const navigator = useMemo(() => {
+	const navigator = useMemo<Navigator>(() => {
 		return {
 			createHref: router.createHref,
 			encodeLocation: router.encodeLocation,

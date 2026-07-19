@@ -17,9 +17,21 @@ import {
 	getComposedEventTarget,
 	mergeRegister,
 } from 'lexical';
+import type { ElementFormatType, NodeKey } from 'lexical';
 import { useEffect, useRef } from 'octane';
+import type { OctaneNode } from 'octane';
 
-export function BlockWithAlignableContents(props) {
+type Props = Readonly<{
+		children: OctaneNode;
+		format?: ElementFormatType | null;
+		nodeKey: NodeKey;
+		className: Readonly<{
+			base: string;
+			focus: string;
+		}>;
+	}>;
+
+export function BlockWithAlignableContents(props: Props) {
 	const nodeKey = props.nodeKey;
 	const format = props.format;
 	const className = props.className;

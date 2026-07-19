@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'octane';
-import type { PointerEvent, SVGProps, ReactNode } from 'react';
+import type { PointerEvent, SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import { Group } from '@octanejs/visx/group';
 import type { HandlerArgs as DragArgs } from '@octanejs/visx/drag';
 import { Drag } from '@octanejs/visx/drag';
@@ -48,7 +49,7 @@ export type BaseBrushProps = {
 	disableDraggingOverlay?: boolean;
 	resetOnEnd?: boolean;
 	useWindowMoveEvents?: boolean;
-	renderBrushHandle?: (props: BrushHandleRenderProps) => ReactNode;
+	renderBrushHandle?: (props: BrushHandleRenderProps) => OctaneNode;
 };
 
 export type BaseBrushState = BrushShape & {

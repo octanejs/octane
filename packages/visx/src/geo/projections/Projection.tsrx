@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps, Ref } from 'react';
+import type { SVGProps, Ref } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { GeoPath, GeoProjection, ExtendedFeature } from 'd3-geo';
@@ -38,7 +39,7 @@ export type ProjectionProps<Datum extends GeoPermissibleObjects = GeoPermissible
 	/** Preset projection name, or custom projection function which returns a GeoProjection. */
 	projection?: ProjectionShape;
 	/** Hook to render above features, passed the configured projectionFunc. */
-	projectionFunc?: (projection: GeoProjection) => ReactNode;
+	projectionFunc?: (projection: GeoProjection) => OctaneNode;
 	/** Sets the projection’s clipping circle radius to the specified angle in degree. */
 	clipAngle?: number;
 	/**
@@ -73,7 +74,7 @@ export type ProjectionProps<Datum extends GeoPermissibleObjects = GeoPermissible
 	/** Convenience prop for props.fitExtent where the top-left corner of the extent is [0, 0]. */
 	fitSize?: [[number, number], ExtendedFeature]; // ExtendedFeature | ExtendedFeatureCollection | GeoGeometryObjects
 	/** Hook to render anything at the centroid of a feature. */
-	centroid?: (centroid: [number, number], feature: ParsedFeature<Datum>) => ReactNode;
+	centroid?: (centroid: [number, number], feature: ParsedFeature<Datum>) => OctaneNode;
 	/** className to apply to feature path elements.  */
 	className?: string;
 	/** Override render function which is passed path data and a copy of the constructed projection.  */
@@ -81,7 +82,7 @@ export type ProjectionProps<Datum extends GeoPermissibleObjects = GeoPermissible
 		path: GeoPath<unknown, GeoPermissibleObjects>;
 		features: ParsedFeature<Datum>[];
 		projection: GeoProjection;
-	}) => ReactNode;
+	}) => OctaneNode;
 	/** Function invoked for each feature which returns a Ref to the projection path element for that feature. */
 	innerRef?: (feature: ParsedFeature<Datum>, index: number) => Ref<SVGPathElement>;
 	/** If specified, renders a Graticule with the specified props. Specify `graticule.foreground = true` to be rendered on top of features. */

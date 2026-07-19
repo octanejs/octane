@@ -23,9 +23,7 @@ export function UserPage() @{
 		</div>
 		<div {...stylex.props(styles.userRow)}>
 			<span {...stylex.props(styles.label)}>{'karma:'}</span>
-			<span>
-				{data.karma as string}
-			</span>
+			<span>{`${data.karma}`}</span>
 		</div>
 		@if (data.about) {
 			<div {...stylex.props(styles.userRow)}>

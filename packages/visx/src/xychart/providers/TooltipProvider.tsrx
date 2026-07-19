@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'octane';
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import { debounce } from '@octanejs/visx/responsive';
 import type { DebouncedFunction } from '@octanejs/visx/responsive';
 import { useTooltip } from '@octanejs/visx/tooltip';
@@ -10,7 +10,7 @@ import isValidNumber from '../typeguards/isValidNumber';
 type TooltipProviderProps = {
 	/** Debounce time for when `hideTooltip` is invoked. */
 	hideTooltipDebounceMs?: number;
-	children: ReactNode;
+	children: OctaneNode;
 };
 
 /** Simple wrapper around useTooltip, to provide tooltip data via context. */

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 
 export type PolygonProps = {
@@ -9,7 +10,7 @@ export type PolygonProps = {
 	}: {
 		path: string;
 		polygon: [number, number][];
-	}) => ReactNode;
+	}) => OctaneNode;
 	/** className to apply to path element. */
 	className?: string;
 	/** Array of coordinate arrays for the polygon (e.g., [[x,y], [x1,y1], ...]), used to generate polygon path. */

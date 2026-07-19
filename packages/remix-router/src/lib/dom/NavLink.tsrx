@@ -5,13 +5,46 @@
 // note: a render-prop children is a plain function; the natural block
 // children pass through untouched (isChildrenBlock guard, as in Await).
 import { isChildrenBlock, useContext } from 'octane';
+import type { OctaneNode } from 'octane';
 import { DataRouterStateContext, NavigationContext } from '../context.ts';
+import type { To } from '../router/history.ts';
+import type { RelativeRoutingType } from '../router/router.ts';
 import { stripBasename } from '../router/utils.ts';
 import { useLocation, useResolvedPath } from '../hooks.ts';
 import { useViewTransitionState } from './lib.ts';
 import { Link } from './Link.tsrx';
 
-export function NavLink(props) @{
+export type NavLinkRenderProps = {
+	isActive: boolean;
+	isPending: boolean;
+	isTransitioning: boolean;
+};
+
+type NavLinkProps = {
+	to: To;
+	children?: OctaneNode | ((props: NavLinkRenderProps) => OctaneNode);
+	'aria-current'?: string;
+	caseSensitive?: boolean;
+	className?: string | ((props: NavLinkRenderProps) => string | undefined);
+	end?: boolean;
+	style?: object | ((props: NavLinkRenderProps) => object | undefined);
+	onClick?: (event: MouseEvent) => void;
+	discover?: 'render' | 'none';
+	prefetch?: 'none' | 'intent' | 'render' | 'viewport';
+	relative?: RelativeRoutingType;
+	reloadDocument?: boolean;
+	replace?: boolean;
+	mask?: To;
+	state?: any;
+	target?: string;
+	preventScrollReset?: boolean;
+	viewTransition?: boolean;
+	defaultShouldRevalidate?: boolean;
+	ref?: { current: HTMLAnchorElement | null } | ((node: HTMLAnchorElement | null) => void);
+	[key: string]: unknown;
+};
+
+export function NavLink(props: NavLinkProps) @{
 	const {
 		'aria-current': ariaCurrentProp = 'page',
 		caseSensitive = false,

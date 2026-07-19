@@ -52,6 +52,7 @@ export function App() @{
 							<div class="editor">
 								<ContentEditable
 									aria-label="Rich text editor"
+									aria-placeholder="Enter some rich text…"
 									class="ContentEditable__root"
 									placeholder={placeholder}
 								/>

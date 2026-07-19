@@ -1,5 +1,6 @@
 import { createElement, useEffect, useState } from 'octane';
 import { isServer } from '@tanstack/router-core/isServer';
+import type { RouterManagedTag } from '@tanstack/router-core';
 import { getAssetKey } from './assetKeys.ts';
 import { useRouter } from './context.ts';
 import { useScripts } from './scriptContentUtils.ts';
@@ -11,7 +12,7 @@ export function Scripts() @{
 	useEffect(() => {
 		setHydrating(false);
 	}, []);
-	const renderScripts =
+	const renderScripts: Array<RouterManagedTag> =
 		!(isServer ?? router.isServer) && hydrating
 			? [
 				{

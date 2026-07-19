@@ -1,4 +1,5 @@
-import type { ReactNode, Ref } from 'react';
+import type { Ref } from 'react';
+import type { OctaneNode } from 'octane';
 
 export type AccessorProps<Link, Node> = {
 	/** Given a node, returns its x coordinate. */
@@ -31,7 +32,7 @@ export type SharedLinkProps<Link> = {
 	/** Path generator, given a link returns a path d attribute string */
 	path?: PathType<Link>;
 	/** Render function override which is passed the configured path generator as input. */
-	children?: (args: { path: PathType<Link> }) => ReactNode;
+	children?: (args: { path: PathType<Link> }) => OctaneNode;
 	/** Datum for which to render a link. */
 	data: Link;
 };

@@ -3,10 +3,19 @@
 // children via context, inheriting the parent's theme/nodes/namespace/editable
 // state by default. The nested editor is created ahead of time and passed in.
 import { createLexicalComposerContext, LexicalComposerContext } from './LexicalComposerContext';
+import type { LexicalComposerContextWithEditor } from './LexicalComposerContext';
 import { CollaborationContext } from './LexicalCollaborationContext';
 import invariant from '@lexical/internal/invariant';
 import warnOnlyOnce from '@lexical/internal/warnOnlyOnce';
+import type {
+	EditorThemeClasses,
+	Klass,
+	LexicalEditor,
+	LexicalNode,
+	LexicalNodeReplacement,
+} from 'lexical';
 import { createSharedNodeState, getRegisteredNode, getTransformSetFromKlass } from 'lexical';
+import type { OctaneNode } from 'octane';
 import { useContext, useEffect, useMemo, useRef } from 'octane';
 
 const initialNodesWarning = warnOnlyOnce(
@@ -16,7 +25,16 @@ const explicitNamespaceWarning = warnOnlyOnce(
 	`LexicalNestedComposer initialEditor should explicitly initialize its namespace when the node configuration differs from the parentEditor. For backwards compatibility, the namespace will be initialized from parentEditor until v0.32.0, but this has always had incorrect copy/paste behavior when the configuration differed.\nYou can configure your editor's namespace with createEditor({namespace: 'nested-editor-namespace', nodes: [], parentEditor: $getEditor()}).`,
 );
 
-export function LexicalNestedComposer(props) {
+export interface LexicalNestedComposerProps {
+	children?: OctaneNode;
+	initialEditor: LexicalEditor;
+	initialTheme?: EditorThemeClasses;
+	initialNodes?: readonly (Klass<LexicalNode> | LexicalNodeReplacement)[];
+	skipCollabChecks?: undefined | true;
+	skipEditableListener?: undefined | true;
+}
+
+export function LexicalNestedComposer(props: LexicalNestedComposerProps) {
 	const initialEditor = props.initialEditor;
 	const initialNodes = props.initialNodes;
 	const initialTheme = props.initialTheme;
@@ -32,7 +50,7 @@ export function LexicalNestedComposer(props) {
 
 	const [parentEditor, { getTheme: getParentTheme }] = parentContext;
 
-	const composerContext = useMemo(() => {
+	const composerContext = useMemo<LexicalComposerContextWithEditor>(() => {
 		const composerTheme = initialTheme || getParentTheme() || undefined;
 		const context = createLexicalComposerContext(parentContext, composerTheme);
 
@@ -112,7 +130,7 @@ export function LexicalNestedComposer(props) {
 
 	useEffect(() => {
 		if (!skipEditableListener) {
-			const editableListener = (editable) => initialEditor.setEditable(editable);
+			const editableListener = (editable: boolean) => initialEditor.setEditable(editable);
 			editableListener(parentEditor.isEditable());
 			return parentEditor.registerEditableListener(editableListener);
 		}

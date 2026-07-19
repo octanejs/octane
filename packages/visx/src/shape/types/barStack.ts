@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import type { BarGroupBar } from './barGroup';
 import type { BaseStackProps, StackKey } from './stack';
 import type { PositionScale } from './base';
@@ -51,5 +51,5 @@ export type BaseBarStackProps<
 	/** Returns the desired color for a bar with a given key and index. */
 	color: (key: Key, index: number) => string;
 	/** Override render function which is passed the configured stack generator as input. */
-	children?: (stacks: BarStack<Datum, Key>[]) => ReactNode;
+	children?: (stacks: BarStack<Datum, Key>[]) => OctaneNode;
 };

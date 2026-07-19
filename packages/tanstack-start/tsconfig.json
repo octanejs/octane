@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "target": "esnext",
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noEmitOnError": true,
+    "noErrorTruncation": true,
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "skipLibCheck": true
+  },
+  "include": ["./src/", "./vendor/"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests",
+    "vendor/router-plugin",
+    "vendor/start-plugin-core",
+    "vendor/router-generator",
+    "vendor/**/dist"
+  ]
+}

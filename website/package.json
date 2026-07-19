@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 3000",
-    "start": "node .output/server/index.mjs"
+    "start": "node .output/server/index.mjs",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@codemirror/commands": "catalog:default",

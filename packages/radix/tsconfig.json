@@ -3,7 +3,7 @@
     "module": "esnext",
     "lib": ["esnext", "dom", "dom.iterable"],
     "target": "esnext",
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "jsxImportSource": "octane",
     "noEmit": true,
     "moduleResolution": "bundler",

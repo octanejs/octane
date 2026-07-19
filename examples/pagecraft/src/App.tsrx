@@ -23,17 +23,27 @@ import {
 	UNDO_COMMAND,
 } from 'lexical';
 import { useEffect, useRef, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { loadDocument, loadDocuments, saveDocument } from './api';
 import { PAGECRAFT_NODES } from './nodes';
 import { documentURL, readRoute } from './router';
 import { pagecraftTheme } from './theme';
-import type { PageDocument } from './types';
+import type { DocumentSummary, PageDocument } from './types';
 
 function EditorPlaceholder() {
 	return <div class="editor-placeholder">Start with a thought, a question, or a title…</div>;
 }
 
-function ToolbarButton(props) {
+interface ToolbarButtonProps {
+	label: string;
+	active?: boolean;
+	disabled?: boolean;
+	pressed?: 'true' | 'false';
+	onClick: () => void;
+	children?: OctaneNode;
+}
+
+function ToolbarButton(props: ToolbarButtonProps) {
 	return <button
 		type="button"
 		class={props.active ? 'toolbar-button is-active' : 'toolbar-button'}
@@ -165,7 +175,9 @@ function EditorToolbar() {
 	</div>;
 }
 
-function EditorChangePlugin(props) {
+function EditorChangePlugin(props: {
+	onChange: (editorState: string, plainText: string) => void;
+}) {
 	return <OnChangePlugin
 		ignoreSelectionChange={true}
 		onChange={(editorState) => {
@@ -327,7 +339,10 @@ async function saveOwner(owner: SaveOwner) {
 	}
 }
 
-function changeSaveOwner(owner: SaveOwner, nextSnapshot) {
+function changeSaveOwner(
+	owner: SaveOwner,
+	nextSnapshot: Partial<Pick<SaveOwner, 'title' | 'editorState' | 'plainText'>>,
+) {
 	owner.change += 1;
 	Object.assign(owner, nextSnapshot);
 	owner.error = '';
@@ -362,7 +377,7 @@ function setSaveOwnersOnline(online: boolean) {
 	}
 }
 
-function saveLabel(state) {
+function saveLabel(state: SaveOwnerStatus | 'invalid') {
 	if (state === 'dirty') return 'Unsaved changes';
 	if (state === 'saving') return 'Saving…';
 	if (state === 'offline') return 'Offline · edits stay here';
@@ -371,7 +386,7 @@ function saveLabel(state) {
 	return 'All changes saved';
 }
 
-function DocumentSurface(props) {
+function DocumentSurface(props: { document: PageDocument }) {
 	const document = props.document;
 	const owner = ownerForDocument(document);
 	const [title, setTitle] = useState(owner.title);
@@ -450,6 +465,7 @@ function DocumentSurface(props) {
 					<RichTextPlugin
 						contentEditable={<ContentEditable
 							aria-label="Document body"
+							aria-placeholder="Start with a thought, a question, or a title…"
 							class="document-editor"
 							placeholder={EditorPlaceholder}
 						/>}
@@ -501,11 +517,20 @@ function LoadingDocument() {
 	</div>;
 }
 
+type DocumentState =
+	| { status: 'idle'; documentId: null }
+	| { status: 'loading'; documentId: string }
+	| { status: 'ready'; documentId: string; document: PageDocument }
+	| { status: 'not-found' | 'error'; documentId: string; message: string };
+
 export function App() {
 	const [route, setRoute] = useState(readRoute);
-	const [documents, setDocuments] = useState([]);
+	const [documents, setDocuments] = useState<DocumentSummary[]>([]);
 	const [libraryState, setLibraryState] = useState('loading');
-	const [documentState, setDocumentState] = useState({ status: 'idle', documentId: null });
+	const [documentState, setDocumentState] = useState<DocumentState>({
+		status: 'idle',
+		documentId: null,
+	});
 	const [loadAttempt, setLoadAttempt] = useState(0);
 	const routeRef = useRef(route);
 	routeRef.current = route;
@@ -588,7 +613,7 @@ export function App() {
 		};
 	}, [route.documentId, loadAttempt]);
 
-	function openDocument(documentId, event) {
+	function openDocument(documentId: string, event?: MouseEvent) {
 		if (event !== undefined) {
 			if (
 				event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
@@ -601,7 +626,7 @@ export function App() {
 		setRoute({ documentId });
 	}
 
-	function openWorkspace(event) {
+	function openWorkspace(event: MouseEvent) {
 		if (
 			event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
 		) return;
@@ -611,7 +636,7 @@ export function App() {
 		setRoute({ documentId: null });
 	}
 
-	function updateDocumentTitle(documentId, title) {
+	function updateDocumentTitle(documentId: string, title: string) {
 		setDocuments(
 			(items) => items.map(
 				(item) => (item.id === documentId
@@ -637,9 +662,7 @@ export function App() {
 			</header>
 			<div class="sidebar-heading">
 				<span>Your documents</span>
-				<span class="document-count">
-					{documents.length as string}
-				</span>
+				<span class="document-count">{`${documents.length}`}</span>
 			</div>
 			<nav class="document-nav" aria-label="Documents">
 				@if (libraryState === 'loading') {
@@ -676,7 +699,7 @@ export function App() {
 			</footer>
 		</aside>
 
-		<main class="workspace-main" id="document-workspace" tabindex="-1">
+		<main class="workspace-main" id="document-workspace" tabIndex={-1}>
 			@if (route.documentId === null) {
 				<section class="workspace-empty">
 					<span class="empty-mark" aria-hidden="true">{'✦'}</span>

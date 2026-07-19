@@ -21,9 +21,7 @@ function Counter(props: { paused: boolean; onLog: (message: string) => void }) @
 	// HeroDemo's <style> the hashed selector would never match this node.
 	<button type="button" class="demo-count" onClick={() => setCount(count + 1)}>
 		<span class="demo-count-label">Count</span>
-		<span class="demo-count-value">
-			{count as string}
-		</span>
+		<span class="demo-count-value">{`${count}`}</span>
 
 		<style>
 			.demo-count {

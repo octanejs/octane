@@ -10,9 +10,9 @@
 // `notFound({ data })` payload arrives as the `data` prop.
 import { useRouter } from './context.ts';
 
-export function RouteNotFound(props) @{
+export function RouteNotFound(props: { routeId: string; error?: any }) @{
 	const router = useRouter();
-	const route = router.routesById[props.routeId];
+	const route = (router.routesById as Record<string, any>)[props.routeId];
 	const NotFound = route.options.notFoundComponent ?? router.options.defaultNotFoundComponent;
 
 	@if (NotFound) {

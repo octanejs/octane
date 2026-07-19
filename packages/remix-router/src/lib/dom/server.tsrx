@@ -3,10 +3,13 @@
 // (renders a static data router + the __staticRouterHydrationData script),
 // and createStaticRouter (a stateless DataRouter over a StaticHandlerContext).
 // Render through `octane/server` (renderToString / renderToPipeableStream).
+import type { OctaneNode } from 'octane';
 import type { Location, Path, To } from '../router/history.ts';
 import { Action as NavigationType, createPath, invariant, parsePath } from '../router/history.ts';
 import { IDLE_BLOCKER, IDLE_FETCHER, IDLE_NAVIGATION } from '../router/router.ts';
+import type { Router as DataRouter, StaticHandlerContext } from '../router/router.ts';
 import { convertRoutesToDataRoutes, isRouteErrorResponse } from '../router/utils.ts';
+import type { RouteManifest, RouteObject } from '../router/utils.ts';
 import { ABSOLUTE_URL_REGEX } from '../router/url.ts';
 import { Router } from '../components/Router.tsrx';
 import { DataRoutes } from '../components/RouterProvider.tsrx';
@@ -17,11 +20,17 @@ import {
 	ViewTransitionContext,
 } from '../context.ts';
 
+type StaticRouterProps = {
+	basename?: string;
+	children?: OctaneNode;
+	location?: Partial<Location> | string;
+};
+
 /**
  * A Router that may not navigate to any other location. This is useful on the
  * server where there is no stateful UI.
  */
-export function StaticRouter(props) @{
+export function StaticRouter(props: StaticRouterProps) @{
 	const { basename, children, location: locationPropIn = '/' } = props;
 
 	let locationProp = locationPropIn;
@@ -55,7 +64,14 @@ export function StaticRouter(props) @{
  * A DataRouter that may not navigate to any other location. This is useful on
  * the server where there is no stateful UI.
  */
-export function StaticRouterProvider(props) @{
+type StaticRouterProviderProps = {
+	context: StaticHandlerContext;
+	router: DataRouter;
+	hydrate?: boolean;
+	nonce?: string;
+};
+
+export function StaticRouterProvider(props: StaticRouterProviderProps) @{
 	const { context, router, hydrate = true, nonce } = props;
 
 	invariant(router && context, 'You must provide `router` and `context` to <StaticRouterProvider>');
@@ -68,7 +84,7 @@ export function StaticRouterProvider(props) @{
 		basename: context.basename || '/',
 	};
 
-	const fetchersContext = new Map();
+	const fetchersContext = new Map<string, any>();
 
 	let hydrateScript = '';
 
@@ -123,10 +139,10 @@ export function StaticRouterProvider(props) @{
 	</>
 }
 
-function serializeErrors(errors) {
+function serializeErrors(errors: StaticHandlerContext['errors']): StaticHandlerContext['errors'] {
 	if (!errors) return null;
 	const entries = Object.entries(errors);
-	const serialized = {};
+	const serialized: Record<string, unknown> = {};
 	for (const [key, val] of entries) {
 		// Hey you!  If you change this, please change the corresponding logic in
 		// deserializeErrors in lib/dom/lib.tsx :)
@@ -156,18 +172,18 @@ function getStatelessNavigator() {
 	return {
 		createHref,
 		encodeLocation,
-		push(to) {
+		push(to: To) {
 			throw new Error(`You cannot use navigator.push() on the server because it is a stateless ` +
 				`environment. This error was probably triggered when you did a ` +
 				`\`navigate(${JSON.stringify(to)})\` somewhere in your app.`);
 		},
-		replace(to) {
+		replace(to: To) {
 			throw new Error(`You cannot use navigator.replace() on the server because it is a stateless ` +
 				`environment. This error was probably triggered when you did a ` +
 				`\`navigate(${JSON.stringify(to)}, { replace: true })\` somewhere ` +
 				`in your app.`);
 		},
-		go(delta) {
+		go(delta: number) {
 			throw new Error(`You cannot use navigator.go() on the server because it is a stateless ` +
 				`environment. This error was probably triggered when you did a ` +
 				`\`navigate(${delta})\` somewhere in your app.`);
@@ -186,8 +202,12 @@ function getStatelessNavigator() {
 /**
  * Create a static DataRouter for server-side rendering.
  */
-export function createStaticRouter(routes, context, opts = {}) {
-	const manifest = {};
+export function createStaticRouter(
+	routes: RouteObject[],
+	context: StaticHandlerContext,
+	opts: { branches?: any[]; future?: any } = {},
+): DataRouter {
+	const manifest: RouteManifest = {};
 	const dataRoutes = convertRoutesToDataRoutes(routes, undefined, undefined, manifest);
 
 	// Because our context matches may be from a set of routes passed to
@@ -201,7 +221,7 @@ export function createStaticRouter(routes, context, opts = {}) {
 		};
 	});
 
-	const msg = (method) =>
+	const msg = (method: string) =>
 		`You cannot use router.${method}() on the server because it is a stateless environment`;
 
 	return {
@@ -224,7 +244,7 @@ export function createStaticRouter(routes, context, opts = {}) {
 				navigation: IDLE_NAVIGATION,
 				restoreScrollPosition: null,
 				preventScrollReset: false,
-				revalidation: 'idle',
+				revalidation: 'idle' as const,
 				fetchers: new Map(),
 				blockers: new Map(),
 			};
@@ -292,11 +312,11 @@ export function createStaticRouter(routes, context, opts = {}) {
 	};
 }
 
-function createHref(to) {
+function createHref(to: To) {
 	return typeof to === 'string' ? to : createPath(to);
 }
 
-function encodeLocation(to) {
+function encodeLocation(to: To): Path {
 	let href =
 		typeof to === 'string' ? to : createPath(to);
 	// Treating this as a full URL will strip any trailing spaces so we need to

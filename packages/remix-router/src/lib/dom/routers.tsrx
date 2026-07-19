@@ -3,13 +3,22 @@
 // hash / caller-provided history (upstream repeats the subscribe body in each;
 // so does this transcription).
 import { startTransition, useCallback, useLayoutEffect, useRef, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 import { createBrowserHistory, createHashHistory } from '../router/history';
+import type { BrowserHistory, HashHistory, History, Update } from '../router/history';
 import { Router } from '../components/Router.tsrx';
 
-export function BrowserRouter(props) @{
+type BrowserRouterProps = {
+	basename?: string;
+	children?: OctaneNode;
+	useTransitions?: boolean;
+	window?: Window;
+};
+
+export function BrowserRouter(props: BrowserRouterProps) @{
 	const { basename, children, useTransitions, window } = props;
 
-	const historyRef = useRef(null);
+	const historyRef = useRef<BrowserHistory | null>(null);
 	if (historyRef.current == null) {
 		historyRef.current = createBrowserHistory({ window, v5Compat: true });
 	}
@@ -19,7 +28,7 @@ export function BrowserRouter(props) @{
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState) => {
+	const setState = useCallback((newState: Update) => {
 		if (useTransitions === false) {
 			setStateImpl(newState);
 		} else {
@@ -39,10 +48,12 @@ export function BrowserRouter(props) @{
 	/>
 }
 
-export function HashRouter(props) @{
+type HashRouterProps = BrowserRouterProps;
+
+export function HashRouter(props: HashRouterProps) @{
 	const { basename, children, useTransitions, window } = props;
 
-	const historyRef = useRef(null);
+	const historyRef = useRef<HashHistory | null>(null);
 	if (historyRef.current == null) {
 		historyRef.current = createHashHistory({ window, v5Compat: true });
 	}
@@ -52,7 +63,7 @@ export function HashRouter(props) @{
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState) => {
+	const setState = useCallback((newState: Update) => {
 		if (useTransitions === false) {
 			setStateImpl(newState);
 		} else {
@@ -76,14 +87,21 @@ export function HashRouter(props) @{
  * A declarative router that accepts a pre-instantiated `history` object.
  * Exported as `unstable_HistoryRouter`, as upstream.
  */
-export function HistoryRouter(props) @{
+type HistoryRouterProps = {
+	basename?: string;
+	children?: OctaneNode;
+	history: History;
+	useTransitions?: boolean;
+};
+
+export function HistoryRouter(props: HistoryRouterProps) @{
 	const { basename, children, history, useTransitions } = props;
 
 	const [state, setStateImpl] = useState({
 		action: history.action,
 		location: history.location,
 	});
-	const setState = useCallback((newState) => {
+	const setState = useCallback((newState: Update) => {
 		if (useTransitions === false) {
 			setStateImpl(newState);
 		} else {

@@ -13,7 +13,10 @@
     "types": ["node"],
     "strict": true,
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "allowImportingTsExtensions": true
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { GenericCell, ColorScale, OpacityScale } from '../types';
@@ -29,7 +30,7 @@ export type HeatmapCircleProps<ColumnDatum, BinDatum> = {
 	/** className to apply to each heatmap circle element. */
 	className?: string;
 	/** Render function override, provided with heatmap. */
-	children?: (cells: CircleCell<ColumnDatum, BinDatum>[][]) => ReactNode;
+	children?: (cells: CircleCell<ColumnDatum, BinDatum>[][]) => OctaneNode;
 };
 
 export type CircleCell<ColumnDatum, BinDatum> = GenericCell<ColumnDatum, BinDatum> & {

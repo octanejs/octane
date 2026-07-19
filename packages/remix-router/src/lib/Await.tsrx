@@ -11,18 +11,30 @@
 // catch; the @try/@catch wraps only the CHILDREN render (what upstream's
 // componentDidCatch actually sees).
 import { use, useCallback, useContext, useRef, isChildrenBlock } from 'octane';
+import type { OctaneNode } from 'octane';
 import { AwaitContext, DataRouterContext, DataRouterStateContext } from './context.ts';
 import { getRoutePattern } from './router/utils.ts';
+import type { TrackedPromise } from './router/utils.ts';
+
+type AwaitErrorHandler = (error: unknown, errorInfo?: unknown) => void;
+
+type AwaitProps = {
+	// Upstream types this `TrackedPromise | any` — anything non-promise renders
+	// as an immediately-resolved value.
+	resolve: any;
+	errorElement?: OctaneNode;
+	children?: OctaneNode | ((data: any) => OctaneNode);
+};
 
 // NOTE: children are forwarded in PROP position (children={...}) through the
 // internal layers — a JSX `{props.children}` child would be re-wrapped into an
 // octane children BLOCK at each hop, destroying the render-prop identity the
 // isChildrenBlock guard in ResolveAwait relies on.
-export function Await(props) @{
+export function Await(props: AwaitProps) @{
 	const dataRouterContext = useContext(DataRouterContext);
 	const dataRouterStateContext = useContext(DataRouterStateContext);
 
-	const onError = useCallback((error, errorInfo) => {
+	const onError = useCallback((error: unknown, errorInfo?: unknown) => {
 		if (dataRouterContext && dataRouterContext.onError && dataRouterStateContext) {
 			dataRouterContext.onError(error, {
 				location: dataRouterStateContext.location,
@@ -41,10 +53,12 @@ export function Await(props) @{
 	/>
 }
 
-function AwaitBody(props) @{
+type AwaitBodyProps = AwaitProps & { onError?: AwaitErrorHandler };
+
+function AwaitBody(props: AwaitBodyProps) @{
 	// Upstream AwaitErrorBoundary.render() tracking logic, verbatim.
-	let promise;
-	let status = 'pending';
+	let promise: TrackedPromise;
+	let status: 'pending' | 'success' | 'error' = 'pending';
 
 	if (!(props.resolve instanceof Promise)) {
 		// Didn't get a promise - provide as a resolved promise
@@ -52,22 +66,25 @@ function AwaitBody(props) @{
 		promise = Promise.resolve();
 		Object.defineProperty(promise, '_tracked', { get: () => true });
 		Object.defineProperty(promise, '_data', { get: () => props.resolve });
-	} else if (props.resolve._tracked) {
+	} else if ((props.resolve as TrackedPromise)._tracked) {
 		// Already tracked promise - check contents
 		promise = props.resolve;
 		status = '_error' in promise ? 'error' : '_data' in promise ? 'success' : 'pending';
 	} else {
 		// Raw (untracked) promise - track it
 		status = 'pending';
-		const resolve = props.resolve;
+		const resolve = props.resolve as TrackedPromise;
 		Object.defineProperty(resolve, '_tracked', { get: () => true });
-		promise = resolve.then((data) => Object.defineProperty(resolve, '_data', { get: () => data }), (
-			error,
-		) => {
-			// Log promise rejections
-			props.onError?.(error);
-			Object.defineProperty(resolve, '_error', { get: () => error });
-		});
+		promise = resolve.then(
+			(data: unknown) => Object.defineProperty(resolve, '_data', {
+				get: () => data,
+			}),
+			(error: unknown) => {
+				// Log promise rejections
+				props.onError?.(error);
+				Object.defineProperty(resolve, '_error', { get: () => error });
+			},
+		);
 	}
 
 	if (status === 'error' && !props.errorElement) {
@@ -100,9 +117,15 @@ function AwaitBody(props) @{
 // A render error from the children — upstream's getDerivedStateFromError turns
 // it into a rejected tracked promise rendered through errorElement (or
 // rethrown when there is none).
-function AwaitCaught(props) @{
+type AwaitCaughtProps = {
+	caught: unknown;
+	errorElement?: OctaneNode;
+	onError?: AwaitErrorHandler;
+};
+
+function AwaitCaught(props: AwaitCaughtProps) @{
 	// componentDidCatch parity — once per distinct caught error, during render.
-	const reported = useRef(null);
+	const reported = useRef<unknown>(null);
 	if (reported.current !== props.caught) {
 		reported.current = props.caught;
 		if (props.onError) {
@@ -130,7 +153,7 @@ function AwaitCaught(props) @{
 // Indirection to leverage useAsyncValue for a render-prop API on `<Await>`.
 // (useAsyncValue inlined via AwaitContext to keep this file free of a hooks.ts
 // dependency; identical semantics.)
-function ResolveAwait(props) @{
+function ResolveAwait(props: { children?: OctaneNode | ((data: any) => OctaneNode) }) @{
 	const value = useContext(AwaitContext);
 	const data = value?._data;
 	// Render-prop guard: octane children BLOCKS are functions too — only a real

@@ -1,4 +1,5 @@
-import type { ReactNode, Ref } from 'react';
+import type { Ref } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { AddSVGProps } from '../types';
 
@@ -40,7 +41,7 @@ export type BarRoundedProps = {
 		path,
 	}: {
 		path: string;
-	}) => ReactNode;
+	}) => OctaneNode;
 };
 
 /** Hook that returns a BarRounded path. */

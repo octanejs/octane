@@ -2,6 +2,9 @@
 // initialConfig once (useMemo), seeds its initial state, provides it via context,
 // and renders children. `useLayoutEffect` applies the editable flag on mount.
 import { createLexicalComposerContext, LexicalComposerContext } from './LexicalComposerContext';
+import type { LexicalComposerContextWithEditor } from './LexicalComposerContext';
+import type { InitialConfigType, InitialEditorStateType } from './types';
+import type { LexicalEditor } from 'lexical';
 import {
 	$createParagraphNode,
 	$getRoot,
@@ -11,11 +14,12 @@ import {
 	getActiveElement,
 	HISTORY_MERGE_TAG,
 } from 'lexical';
+import type { OctaneNode } from 'octane';
 import { useMemo, useLayoutEffect } from 'octane';
 
 const HISTORY_MERGE_OPTIONS = { tag: HISTORY_MERGE_TAG };
 
-function initializeEditor(editor, initialEditorState) {
+function initializeEditor(editor: LexicalEditor, initialEditorState?: InitialEditorStateType) {
 	if (initialEditorState === null) {
 		return;
 	} else if (initialEditorState === undefined) {
@@ -58,10 +62,15 @@ function initializeEditor(editor, initialEditorState) {
 	}
 }
 
-export function LexicalComposer(props) @{
+type Props = {
+	initialConfig: InitialConfigType;
+	children?: OctaneNode;
+};
+
+export function LexicalComposer(props: Props) @{
 	const initialConfig = props.initialConfig;
 
-	const composerContext = useMemo(() => {
+	const composerContext = useMemo<LexicalComposerContextWithEditor>(() => {
 		const {
 			theme,
 			namespace,
@@ -80,7 +89,7 @@ export function LexicalComposer(props) @{
 			namespace,
 			nodes,
 			onError: (error) => onError(error, editor),
-			...(onWarn ? { onWarn: (error) => onWarn(error, editor) } : {}),
+			...(onWarn ? { onWarn: (error: Error) => onWarn(error, editor) } : {}),
 			theme,
 		});
 		initializeEditor(editor, initialEditorState);

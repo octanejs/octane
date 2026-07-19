@@ -1,6 +1,7 @@
 import type { AxisScale } from '@octanejs/visx/axis';
 import { useMemo } from 'octane';
-import type { ReactNode, FC } from 'react';
+import type { FC } from 'react';
+import type { OctaneNode } from 'octane';
 import {
 	useTransition as useSpringTransition,
 	animated,
@@ -101,7 +102,7 @@ export default function AnimatedGlyphs<XScale extends AxisScale, YScale extends 
 					onPointerMove,
 					onPointerOut,
 					onPointerUp,
-				}) as ReactNode}
+				}) as OctaneNode}
 			</animated.g>,
 		)}
 	</>;

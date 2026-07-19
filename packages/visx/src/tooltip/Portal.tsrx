@@ -1,11 +1,11 @@
 import { createPortal, useEffect, useState } from 'octane';
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 
 export type PortalProps = {
 	/** Optional z-index to set on the Portal. */
 	zIndex?: number | string;
 	/** Content to render in the Portal. */
-	children: NonNullable<ReactNode>;
+	children: NonNullable<OctaneNode>;
 };
 
 /** Render within a portal using a declarative component API. */

@@ -84,7 +84,7 @@ export function DragDropProvider<T extends Data = Data, U extends Draggable<T> =
 
 	return createElement(
 		DragDropContext.Provider,
-		{ value: manager as DragDropManager },
+		{ value: manager as unknown as DragDropManager },
 		createElement(Renderer, { ref: rendererRef }, children),
 		children,
 	);

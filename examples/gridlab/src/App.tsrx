@@ -611,7 +611,7 @@ export function App() @{
 						aria-label={'Formula for ' + selectedLabel}
 						value={formulaDraft}
 						maxLength={MAX_CELL_TEXT_LENGTH}
-						spellcheck="false"
+						spellCheck={false}
 						onInput={(event) => setFormulaDraft((event.target as HTMLInputElement).value)}
 					/>
 				</form>
@@ -668,9 +668,7 @@ export function App() @{
 										height: row.size + 'px',
 										transform: 'translateY(' + row.start + 'px)',
 									}}
-								>
-									{row.index + 1 as string}
-								</div>
+								>{`${row.index + 1}`}</div>
 							}
 						</div>
 					</div>
@@ -741,7 +739,7 @@ export function App() @{
 											setSelected(address);
 											setAnchor(address);
 										}}
-										onDblClick={() => beginEditing(address)}
+										onDoubleClick={() => beginEditing(address)}
 										onKeyDown={(event) => handleCellKeyDown(event, address)}
 										onCopy={copySelection}
 										onPaste={pasteSelection}
@@ -752,7 +750,7 @@ export function App() @{
 												aria-label={'Edit ' + label}
 												value={editorDraft}
 												maxLength={MAX_CELL_TEXT_LENGTH}
-												spellcheck="false"
+												spellCheck={false}
 												onCompositionStart={() => {
 													composingRef.current = true;
 												}}

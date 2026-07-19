@@ -1,11 +1,12 @@
 import type React from 'react';
+import type { OctaneNode } from 'octane';
 
 export type ChartTooltipItem<Datum = unknown> = {
 	key: string;
 	datum?: Datum;
 	index?: number;
-	label?: React.ReactNode;
-	value?: React.ReactNode;
+	label?: OctaneNode;
+	value?: OctaneNode;
 	rawValue?: unknown;
 	color?: string;
 	x?: number;
@@ -16,11 +17,11 @@ export type ChartTooltipItem<Datum = unknown> = {
 };
 
 export type ChartTooltipConfig<Datum = unknown> = Record<string, {
-		label?: React.ReactNode | ((item: ChartTooltipItem<Datum>) => React.ReactNode);
+		label?: OctaneNode | ((item: ChartTooltipItem<Datum>) => OctaneNode);
 		color?: string | ((item: ChartTooltipItem<Datum>) => string | undefined);
 		icon?: React.ComponentType<{ item: ChartTooltipItem<Datum> }>;
-		formatValue?: (value: unknown, item: ChartTooltipItem<Datum>) => React.ReactNode;
-		formatLabel?: (item: ChartTooltipItem<Datum>) => React.ReactNode;
+		formatValue?: (value: unknown, item: ChartTooltipItem<Datum>) => OctaneNode;
+		formatLabel?: (item: ChartTooltipItem<Datum>) => OctaneNode;
 		hide?: boolean;
 		order?: number;
 	}>;
@@ -28,7 +29,7 @@ export type ChartTooltipConfig<Datum = unknown> = Record<string, {
 export type ChartTooltipIndicator = 'dot' | 'line' | 'dashed' | 'square' | 'none';
 
 export type ChartTooltipLabelRenderParams<Datum = unknown> = {
-	label: React.ReactNode;
+	label: OctaneNode;
 	items: ChartTooltipItem<Datum>[];
 	config?: ChartTooltipConfig<Datum>;
 };
@@ -36,8 +37,8 @@ export type ChartTooltipLabelRenderParams<Datum = unknown> = {
 export type ChartTooltipItemRenderParams<Datum = unknown> = {
 	item: ChartTooltipItem<Datum>;
 	configEntry?: ChartTooltipConfig<Datum>[string];
-	label: React.ReactNode;
-	value: React.ReactNode;
+	label: OctaneNode;
+	value: OctaneNode;
 	color?: string;
 	indicator: ChartTooltipIndicator;
 };
@@ -45,16 +46,16 @@ export type ChartTooltipItemRenderParams<Datum = unknown> = {
 export type ChartTooltipValueRenderParams<Datum = unknown> = ChartTooltipItemRenderParams<Datum>;
 
 export type ChartTooltipContentProps<Datum = unknown> = React.HTMLAttributes<HTMLDivElement> & {
-		label?: React.ReactNode;
+		label?: OctaneNode;
 		items: ChartTooltipItem<Datum>[];
 		config?: ChartTooltipConfig<Datum>;
 		indicator?: ChartTooltipIndicator;
 		hideLabel?: boolean;
 		hideIndicator?: boolean;
 		sortItems?: (a: ChartTooltipItem<Datum>, b: ChartTooltipItem<Datum>) => number;
-		renderLabel?: (params: ChartTooltipLabelRenderParams<Datum>) => React.ReactNode;
-		renderItem?: (params: ChartTooltipItemRenderParams<Datum>) => React.ReactNode;
-		renderValue?: (params: ChartTooltipValueRenderParams<Datum>) => React.ReactNode;
+		renderLabel?: (params: ChartTooltipLabelRenderParams<Datum>) => OctaneNode;
+		renderItem?: (params: ChartTooltipItemRenderParams<Datum>) => OctaneNode;
+		renderValue?: (params: ChartTooltipValueRenderParams<Datum>) => OctaneNode;
 		getItemKey?: (item: ChartTooltipItem<Datum>, index: number) => React.Key;
 		'data-testid'?: string;
 	};

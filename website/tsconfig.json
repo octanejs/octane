@@ -12,15 +12,9 @@
     "skipLibCheck": true,
     "strict": true,
     "types": ["node", "vite/client"],
-    "jsx": "preserve"
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane"
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "tests/**/*.ts",
-    "env.d.ts",
-    "vite.config.ts",
-    "mdx-options.ts"
-  ],
+  "include": ["src/**/*", "tests/**/*.ts", "env.d.ts", "vite.config.ts", "mdx-options.ts"],
   "exclude": ["node_modules"]
 }

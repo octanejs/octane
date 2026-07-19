@@ -22,7 +22,9 @@ import type {
 	FolderId,
 	MailActionResult,
 	MailboxSnapshot,
+	MailDraft,
 	MailMessage,
+	OutboxItem,
 	WorkspaceSnapshot,
 } from './types';
 
@@ -44,6 +46,8 @@ const FOLDER_ICONS: Record<FolderId, string> = {
 	outbox: '◴',
 };
 
+const FOLDER_ORDER: FolderId[] = ['inbox', 'starred', 'sent', 'drafts', 'archive', 'outbox'];
+
 function withSearch(path: string, search: string): string {
 	return `${path}${search}`;
 }
@@ -64,7 +68,7 @@ function composeURL(draftId: string, search: string): string {
 	return withSearch(`/compose/${encodeURIComponent(draftId)}`, search);
 }
 
-function NavItem(props) {
+function NavItem(props: { folder: FolderId; search: string; count: number; active: boolean }) {
 	const label = FOLDER_LABELS[props.folder];
 	const count = Number(props.count);
 	return <Link
@@ -83,7 +87,7 @@ function NavItem(props) {
 	</Link>;
 }
 
-function OutboxSync(props) {
+function OutboxSync(props: { workspace: WorkspaceSnapshot; online: boolean; search: string }) {
 	const fetcher = useFetcher({ key: 'mailroom-outbox-sync' });
 	const queued = props.workspace.outbox[0];
 
@@ -158,14 +162,7 @@ function Shell() {
 					Compose
 				</Link>
 				<nav aria-label="Mailboxes">
-					@for (const folder of [
-						'inbox',
-						'starred',
-						'sent',
-						'drafts',
-						'archive',
-						'outbox',
-					]; key folder) {
+					@for (const folder of FOLDER_ORDER; key folder) {
 						<NavItem
 							folder={folder}
 							search={location.search}
@@ -201,8 +198,13 @@ function Shell() {
 	</div>;
 }
 
-function MessageRow(props) {
-	const message = props.message as MailMessage;
+function MessageRow(props: {
+	message: MailMessage;
+	folder: FolderId;
+	search: string;
+	active: boolean;
+}) {
+	const message = props.message;
 	return <Link
 		to={messageURL(props.folder, message.id, props.search)}
 		class={[
@@ -226,8 +228,8 @@ function MessageRow(props) {
 	</Link>;
 }
 
-function MessageDetail(props) {
-	const message = props.message as MailMessage;
+function MessageDetail(props: { message: MailMessage; search: string }) {
+	const message = props.message;
 	const fetcher = useFetcher({ key: 'mailroom-message-action' });
 	const desiredFromSubmission = fetcher.formData?.get('desired');
 	const optimisticStarred =
@@ -291,7 +293,7 @@ function MessageDetail(props) {
 	</article>;
 }
 
-function DraftList(props) {
+function DraftList(props: { drafts: MailDraft[]; search: string }) {
 	return <>
 		@if (props.drafts.length === 0) {
 			<EmptyMailbox title="No saved drafts" detail="Start a message and save it to keep it here." />
@@ -314,7 +316,7 @@ function DraftList(props) {
 	</>;
 }
 
-function OutboxList(props) {
+function OutboxList(props: { items: OutboxItem[] }) {
 	return <>
 		@if (props.items.length === 0) {
 			<EmptyMailbox
@@ -339,7 +341,7 @@ function OutboxList(props) {
 	</>;
 }
 
-function EmptyMailbox(props) {
+function EmptyMailbox(props: { title: string; detail: string }) {
 	return <div class="empty-mailbox">
 		<div class="empty-orbit" aria-hidden="true">✓</div>
 		<h2>{props.title}</h2>
@@ -427,8 +429,8 @@ function Compose() {
 	const [dirty, setDirty] = useState(false);
 	const [online, setOnline] = useState(navigator.onLine);
 	const [localError, setLocalError] = useState('');
-	const bodyRef = useRef(null);
-	const stayRef = useRef(null);
+	const bodyRef = useRef<HTMLTextAreaElement | null>(null);
+	const stayRef = useRef<HTMLButtonElement | null>(null);
 	const bypassBlocker = useRef(false);
 	const blocker = useBlocker(
 		({ currentLocation, nextLocation }) => dirty && !bypassBlocker.current &&
@@ -482,17 +484,17 @@ function Compose() {
 		}
 	}, [fetcher.data]);
 
-	const updateTo = (event) => {
+	const updateTo = (event: InputEvent & { currentTarget: HTMLInputElement }) => {
 		setTo(event.currentTarget.value);
 		setDirty(true);
 		setLocalError('');
 	};
-	const updateSubject = (event) => {
+	const updateSubject = (event: InputEvent & { currentTarget: HTMLInputElement }) => {
 		setSubject(event.currentTarget.value);
 		setDirty(true);
 		setLocalError('');
 	};
-	const updateBody = (event) => {
+	const updateBody = (event: InputEvent & { currentTarget: HTMLTextAreaElement }) => {
 		setBody(event.currentTarget.value);
 		setDirty(true);
 		setLocalError('');
@@ -716,10 +718,5 @@ const router = createBrowserRouter([
 ]);
 
 export function App() {
-	return <RouterProvider
-		router={router}
-		fallbackElement={<div class="boot-screen" role="status">
-			<span>Opening Mailroom…</span>
-		</div>}
-	/>;
+	return <RouterProvider router={router} />;
 }

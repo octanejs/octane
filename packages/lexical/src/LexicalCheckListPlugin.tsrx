@@ -3,7 +3,11 @@ import { registerCheckList } from '@lexical/list';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
-export function CheckListPlugin(props) {
+type Props = {
+	disableTakeFocusOnClick?: boolean;
+};
+
+export function CheckListPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const disableTakeFocusOnClick =
 		props.disableTakeFocusOnClick === undefined ? false : props.disableTakeFocusOnClick;

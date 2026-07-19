@@ -3,7 +3,7 @@
     "module": "esnext",
     "lib": ["esnext", "dom", "dom.iterable"],
     "target": "esnext",
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "noEmit": true,
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
@@ -13,7 +13,8 @@
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "jsxImportSource": "octane"
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

@@ -11,7 +11,10 @@
 import { isChildrenBlock } from 'octane';
 import { useLinkProps } from './link.ts';
 
-export function Link(props) @{
+// Props are permissive (`any`) at the implementation boundary — upstream's Link
+// implementation is likewise `(props: any)` behind the generic `LinkComponent<'a'>`
+// facade; the full type-safe `to`/`params`/`search` surface is a follow-up.
+export function Link(props: any) @{
 	const { _asChild: AsChild, children, ...rest } = props;
 	const linkProps = useLinkProps(rest);
 	const { disabled: _disabled, ...aProps } = linkProps;

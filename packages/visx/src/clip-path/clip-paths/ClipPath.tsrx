@@ -1,11 +1,12 @@
-import type { SVGProps, ReactNode } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
 export type ClipPathProps = {
 	/** Unique id for the clipPath. */
 	id?: string;
 	/** clipPath children. */
-	children?: ReactNode;
+	children?: OctaneNode;
 };
 
 /** Handles rendering of <defs> and <clipPath> elements for you, with any children you want. */

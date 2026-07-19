@@ -5,11 +5,22 @@
 // instance), wraps in `router.options.Wrap` when configured, and provides the
 // router; `RouterProvider` renders `<Matches/>` inside it.
 import { hasKeys } from '@tanstack/router-core';
+import type { AnyRouter } from '@tanstack/router-core';
+import type { OctaneNode } from 'octane';
 import { routerContext } from './context.ts';
 import { Matches } from './Matches.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
 
-export function RouterContextProvider(props) @{
+// Upstream's `RouterProps` is `Omit<RouterOptions<…>, 'context'> & { router }` —
+// extra props reconfigure the instance via `router.update()`. The generic facade
+// lives in RouterProvider.tsrx.d.ts (the surface plain-TS consumers resolve); the
+// implementation keeps the router-typed member strict and the passthrough loose.
+export type RouterProps = {
+	router: AnyRouter;
+	context?: Record<string, any>;
+} & Record<string, any>;
+
+export function RouterContextProvider(props: RouterProps & { children?: OctaneNode }) @{
 	const { router, children, ...rest } = props;
 	if (hasKeys(rest)) {
 		router.update({
@@ -28,7 +39,7 @@ export function RouterContextProvider(props) @{
 	</Wrap>
 }
 
-export function RouterProvider(props) @{
+export function RouterProvider(props: RouterProps) @{
 	const { router, ...rest } = props;
 
 	<RouterContextProvider router={router} {...rest}>

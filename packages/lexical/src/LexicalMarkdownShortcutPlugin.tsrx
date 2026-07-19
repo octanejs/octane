@@ -5,11 +5,12 @@ import {
 	$isHorizontalRuleNode,
 	HorizontalRuleNode,
 } from '@lexical/extension';
+import type { ElementTransformer, Transformer } from '@lexical/markdown';
 import { registerMarkdownShortcuts, TRANSFORMERS } from '@lexical/markdown';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
-const HR = {
+const HR: ElementTransformer = {
 	dependencies: [HorizontalRuleNode],
 	export: (node) => ($isHorizontalRuleNode(node) ? '***' : null),
 	regExp: /^(---|\*\*\*|___)\s?$/,
@@ -26,9 +27,13 @@ const HR = {
 	type: 'element',
 };
 
-export const DEFAULT_TRANSFORMERS = [HR, ...TRANSFORMERS];
+export const DEFAULT_TRANSFORMERS: Transformer[] = [HR, ...TRANSFORMERS];
 
-export function MarkdownShortcutPlugin(props) {
+type Props = Readonly<{
+		transformers?: Transformer[];
+	}>;
+
+export function MarkdownShortcutPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const transformers =
 		props.transformers === undefined ? DEFAULT_TRANSFORMERS : props.transformers;

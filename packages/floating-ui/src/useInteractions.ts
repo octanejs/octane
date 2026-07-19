@@ -4,11 +4,16 @@ import { useCallback, useMemo } from 'octane';
 
 import { splitSlot, subSlot } from './internal';
 import { FOCUSABLE_ATTRIBUTE } from './utils';
+import type { ElementProps, UseInteractionsReturn } from './types';
 
 const ACTIVE_KEY = 'active';
 const SELECTED_KEY = 'selected';
 
-function mergeProps(userProps: any, propsList: any[], elementKey: string): any {
+function mergeProps(
+	userProps: any,
+	propsList: Array<ElementProps | void | null | undefined>,
+	elementKey: 'reference' | 'floating' | 'item',
+): Record<string, unknown> {
 	const map = new Map<string, any[]>();
 	const isItem = elementKey === 'item';
 	let domUserProps = userProps;
@@ -31,7 +36,7 @@ function mergeProps(userProps: any, propsList: any[], elementKey: string): any {
 				return propsOrGetProps;
 			})
 			.concat(userProps)
-			.reduce((acc: any, props: any) => {
+			.reduce((acc: Record<string, unknown>, props: any) => {
 				if (!props) {
 					return acc;
 				}
@@ -62,9 +67,13 @@ function mergeProps(userProps: any, propsList: any[], elementKey: string): any {
 	};
 }
 
+export function useInteractions(
+	propsList?: Array<ElementProps | void | null | undefined>,
+	slot?: symbol,
+): UseInteractionsReturn;
 export function useInteractions(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
-	const propsList = (user[0] as any[]) ?? [];
+	const propsList: Array<ElementProps | void | null | undefined> = (user[0] as any[]) ?? [];
 
 	const referenceDeps = propsList.map((key) => (key == null ? undefined : key.reference));
 	const floatingDeps = propsList.map((key) => (key == null ? undefined : key.floating));

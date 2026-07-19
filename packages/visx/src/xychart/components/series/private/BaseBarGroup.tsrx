@@ -1,5 +1,6 @@
 import { useContext, useMemo, useEffect, useCallback } from 'octane';
-import type { ReactElement, ReactNode, FC } from 'react';
+import type { ReactElement, FC } from 'react';
+import type { OctaneNode } from 'octane';
 import type { PositionScale } from '@octanejs/visx/shape';
 import { scaleBand } from '@octanejs/visx/scale';
 import type { BaseBarSeriesProps } from './BaseBarSeries.tsrx';
@@ -23,7 +24,7 @@ import getChildrenAndGrandchildrenWithProps from '../../../utils/getChildrenAndG
 export type BaseBarGroupProps<XScale extends PositionScale, YScale extends PositionScale, Datum extends object> =
 	{
 		/** `BarSeries` elements */
-		children: ReactNode;
+		children: OctaneNode;
 		/** Group band scale padding, [0, 1] where 0 = no padding, 1 = no bar. */
 		padding?: number;
 		/** Comparator function to sort `dataKeys` within a bar group. By default the DOM rendering order of `BarGroup`s `children` is used. */

@@ -1,5 +1,4 @@
 import type { MouseTouchOrPointerEvent } from '@octanejs/visx/drag';
-import type { PointerEvent } from 'react';
 import type { Bounds, Point, Scale } from './types';
 
 export function normalizeBrushStartEnd(start: Point, end: Point, extent: Bounds): void {

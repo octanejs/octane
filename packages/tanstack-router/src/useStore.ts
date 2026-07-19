@@ -13,11 +13,22 @@ interface Atom<T> {
 	get: () => T;
 }
 
-export function useStore<T, S = T>(...args: any[]): S {
+// Public signature mirrors @tanstack/react-store's `useStore(store, selector,
+// compare)`; the store parameter is the structural `{ get }` shape so router-core's
+// `RouterReadableStore`/`RouterWritableStore` atoms (whose types omit `subscribe`)
+// infer `T` directly. The trailing `slot` is the binding's forwarded call-site slot
+// (see internal.ts) — the implementation splits it off the raw argument list.
+export function useStore<T, S = T>(
+	atom: { get: () => T },
+	selector?: (state: T) => S,
+	compare?: (a: S, b: S) => boolean,
+	slot?: symbol,
+): S;
+export function useStore(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
-	const atom = user[0] as Atom<T>;
-	const selector = (user[1] ?? ((s: T) => s as unknown as S)) as (s: T) => S;
-	const compare = (user[2] ?? Object.is) as (a: S, b: S) => boolean;
+	const atom = user[0] as Atom<unknown>;
+	const selector = (user[1] ?? ((s: unknown) => s)) as (s: unknown) => unknown;
+	const compare = (user[2] ?? Object.is) as (a: unknown, b: unknown) => boolean;
 
 	// Re-subscribe only when the atom identity changes (it's stable across renders).
 	const subscribe = useCallback(
@@ -28,8 +39,8 @@ export function useStore<T, S = T>(...args: any[]): S {
 
 	// Memoize selector output: same store input → same output; structurally-equal
 	// output keeps its previous reference (so useSyncExternalStore doesn't loop).
-	const cache = useRef<{ in: T; out: S } | null>(null, subSlot(slot, 'us:cache'));
-	const getSnapshot = (): S => {
+	const cache = useRef<{ in: unknown; out: unknown } | null>(null, subSlot(slot, 'us:cache'));
+	const getSnapshot = (): unknown => {
 		const input = atom.get();
 		const prev = cache.current;
 		if (prev && Object.is(prev.in, input)) return prev.out;

@@ -7,6 +7,7 @@
 import { getNodeName, isHTMLElement, isShadowRoot } from '@floating-ui/utils/dom';
 import { focusable, isTabbable, tabbable } from 'tabbable';
 import { createElement, useEffect, useMemo, useRef } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { FocusGuard, usePortalContext } from './FloatingPortal';
 import { S } from './internal';
@@ -33,9 +34,11 @@ import {
 	useEffectEvent,
 	useLatestRef,
 	useModernLayoutEffect,
+	type CSSProperties,
 } from './utils';
+import type { FloatingRootContext, HTMLProps, MutableRefObject, RefCallback } from './types';
 
-const HIDDEN_STYLES: any = {
+const HIDDEN_STYLES: CSSProperties = {
 	border: 0,
 	clip: 'rect(0 0 0 0)',
 	height: '1px',
@@ -63,7 +66,7 @@ function getCounterMap(control: any) {
 let uncontrolledElementsSet = new WeakSet<any>();
 let markerMap: any = {};
 let lockCount = 0;
-export const supportsInert = () =>
+export const supportsInert = (): boolean =>
 	typeof HTMLElement !== 'undefined' && 'inert' in HTMLElement.prototype;
 function unwrapHost(node: any): any {
 	if (!node) {
@@ -180,13 +183,13 @@ function markOthers(avoidElements: any[], ariaHidden = false, inert = false): ()
 
 // ── previously-focused element tracking (for return focus) ───────────────────
 const LIST_LIMIT = 20;
-let previouslyFocusedElements: any[] = [];
+let previouslyFocusedElements: Array<WeakRef<Element>> = [];
 function clearDisconnectedPreviouslyFocusedElements() {
 	previouslyFocusedElements = previouslyFocusedElements.filter(
 		(elementRef) => elementRef.deref()?.isConnected,
 	);
 }
-function addPreviouslyFocusedElement(element: any) {
+function addPreviouslyFocusedElement(element: Element | null | undefined) {
 	clearDisconnectedPreviouslyFocusedElements();
 	if (element && getNodeName(element) !== 'body') {
 		previouslyFocusedElements.push(new WeakRef(element));
@@ -195,18 +198,21 @@ function addPreviouslyFocusedElement(element: any) {
 		}
 	}
 }
-function getPreviouslyFocusedElement() {
+function getPreviouslyFocusedElement(): Element | undefined {
 	clearDisconnectedPreviouslyFocusedElements();
 	return previouslyFocusedElements[previouslyFocusedElements.length - 1]?.deref();
 }
-function getFirstTabbableElement(container: any) {
+function getFirstTabbableElement(container: Element) {
 	const tabbableOptions = getTabbableOptions();
 	if (isTabbable(container, tabbableOptions)) {
 		return container;
 	}
 	return tabbable(container, tabbableOptions)[0] || container;
 }
-function handleTabIndex(floatingFocusElement: any, orderRef: any) {
+function handleTabIndex(
+	floatingFocusElement: HTMLElement,
+	orderRef: MutableRefObject<Array<'reference' | 'floating' | 'content'>>,
+) {
 	if (
 		!orderRef.current.includes('floating') &&
 		!floatingFocusElement.getAttribute('role')?.includes('dialog')
@@ -215,7 +221,7 @@ function handleTabIndex(floatingFocusElement: any, orderRef: any) {
 	}
 	const options = getTabbableOptions();
 	const focusableElements = focusable(floatingFocusElement, options);
-	const tabbableContent = focusableElements.filter((element: any) => {
+	const tabbableContent = focusableElements.filter((element) => {
 		const dataTabIndex = element.getAttribute('data-tabindex') || '';
 		return (
 			isTabbable(element, options) ||
@@ -237,10 +243,13 @@ function handleTabIndex(floatingFocusElement: any, orderRef: any) {
 	}
 }
 
-function useLiteMergeRefs(refs: any[], slot: symbol): any {
+function useLiteMergeRefs<T>(
+	refs: Array<MutableRefObject<T | null> | undefined>,
+	slot: symbol,
+): (value: T | null) => void {
 	return useMemo(
 		() => {
-			return (value: any) => {
+			return (value: T | null) => {
 				refs.forEach((ref) => {
 					if (ref) {
 						ref.current = value;
@@ -253,7 +262,11 @@ function useLiteMergeRefs(refs: any[], slot: symbol): any {
 	);
 }
 
-export function VisuallyHiddenDismiss(props: any): any {
+export function VisuallyHiddenDismiss(
+	props: HTMLProps<HTMLButtonElement> & {
+		ref?: MutableRefObject<HTMLButtonElement | null> | RefCallback<HTMLButtonElement> | null;
+	},
+): OctaneNode {
 	return createElement('button', {
 		...props,
 		type: 'button',
@@ -263,7 +276,95 @@ export function VisuallyHiddenDismiss(props: any): any {
 	});
 }
 
-export function FloatingFocusManager(props: any): any {
+export interface FloatingFocusManagerProps {
+	children: OctaneNode;
+	/**
+	 * The floating context returned from `useFloatingRootContext` (a full
+	 * `FloatingContext` from `useFloating` is structurally compatible).
+	 */
+	context: FloatingRootContext;
+	/**
+	 * Whether or not the focus manager should be disabled. Useful to delay focus
+	 * management until after a transition completes or some other conditional
+	 * state.
+	 * @default false
+	 */
+	disabled?: boolean;
+	/**
+	 * The order in which focus cycles.
+	 * @default ['content']
+	 */
+	order?: Array<'reference' | 'floating' | 'content'>;
+	/**
+	 * Which element to initially focus. Can be either a number (tabbable index as
+	 * specified by the `order`) or a ref.
+	 * @default 0
+	 */
+	initialFocus?: number | MutableRefObject<HTMLElement | null>;
+	/**
+	 * Determines if the focus guards are rendered. If not, focus can escape into
+	 * the address bar/console/browser UI, like in native dialogs.
+	 * @default true
+	 */
+	guards?: boolean;
+	/**
+	 * Determines if focus should be returned to the reference element once the
+	 * floating element closes/unmounts (or if that is not available, the
+	 * previously focused element). This prop is ignored if the floating element
+	 * lost focus.
+	 * It can be also set to a ref to explicitly control the element to return focus to.
+	 * @default true
+	 */
+	returnFocus?: boolean | MutableRefObject<HTMLElement | null>;
+	/**
+	 * Determines if focus should be restored to the nearest tabbable element if
+	 * focus inside the floating element is lost (such as due to the removal of
+	 * the currently focused element from the DOM).
+	 * @default false
+	 */
+	restoreFocus?: boolean;
+	/**
+	 * Determines if focus is “modal”, meaning focus is fully trapped inside the
+	 * floating element and outside content cannot be accessed. This includes
+	 * screen reader virtual cursors.
+	 * @default true
+	 */
+	modal?: boolean;
+	/**
+	 * If your focus management is modal and there is no explicit close button
+	 * available, you can use this prop to render a visually-hidden dismiss
+	 * button at the start and end of the floating element. This allows
+	 * touch-based screen readers to escape the floating element due to lack of
+	 * an `esc` key.
+	 * @default undefined
+	 */
+	visuallyHiddenDismiss?: boolean | string;
+	/**
+	 * Determines whether `focusout` event listeners that control whether the
+	 * floating element should be closed if the focus moves outside of it are
+	 * attached to the reference and floating elements. This affects non-modal
+	 * focus management.
+	 * @default true
+	 */
+	closeOnFocusOut?: boolean;
+	/**
+	 * Determines whether outside elements are `inert` when `modal` is enabled.
+	 * This enables pointer modality without a backdrop.
+	 * @default false
+	 */
+	outsideElementsInert?: boolean;
+	/**
+	 * Returns a list of elements that should be considered part of the
+	 * floating element.
+	 */
+	getInsideElements?: () => Element[];
+}
+
+/**
+ * Provides focus management for the floating element.
+ * @see https://floating-ui.com/docs/FloatingFocusManager
+ */
+export function FloatingFocusManager(props: FloatingFocusManagerProps): OctaneNode {
 	const context = props.context;
 	const children = props.children;
 	const disabled = props.disabled ?? false;
@@ -301,8 +402,8 @@ export function FloatingFocusManager(props: any): any {
 	const returnFocusRef = useLatestRef(returnFocus, S('FFM:return'));
 	const tree = useFloatingTree();
 	const portalContext = usePortalContext();
-	const startDismissButtonRef = useRef<any>(null, S('FFM:startDismiss'));
-	const endDismissButtonRef = useRef<any>(null, S('FFM:endDismiss'));
+	const startDismissButtonRef = useRef<HTMLButtonElement | null>(null, S('FFM:startDismiss'));
+	const endDismissButtonRef = useRef<HTMLButtonElement | null>(null, S('FFM:endDismiss'));
 	const preventReturnFocusRef = useRef(false, S('FFM:preventReturn'));
 	const isPointerDownRef = useRef(false, S('FFM:pointerDown'));
 	const tabbableIndexRef = useRef(-1, S('FFM:tabbableIndex'));
@@ -313,10 +414,10 @@ export function FloatingFocusManager(props: any): any {
 	const getTabbableContent = useEffectEvent((container = floatingFocusElement) => {
 		return container ? tabbable(container, getTabbableOptions()) : [];
 	}, S('FFM:getContent'));
-	const getTabbableElements = useEffectEvent((container?: any) => {
+	const getTabbableElements = useEffectEvent((container?: HTMLElement) => {
 		const content = getTabbableContent(container);
 		return orderRef.current
-			.map((type: string) => {
+			.map((type) => {
 				if (domReference && type === 'reference') {
 					return domReference;
 				}
@@ -333,7 +434,7 @@ export function FloatingFocusManager(props: any): any {
 		() => {
 			if (disabled) return;
 			if (!modal) return;
-			function onKeyDown(event: any) {
+			function onKeyDown(event: KeyboardEvent) {
 				if (event.key === 'Tab') {
 					if (
 						contains(
@@ -388,7 +489,7 @@ export function FloatingFocusManager(props: any): any {
 		() => {
 			if (disabled) return;
 			if (!floating) return;
-			function handleFocusIn(event: any) {
+			function handleFocusIn(event: FocusEvent) {
 				const target = getTarget(event);
 				const tabbableContent = getTabbableContent();
 				const tabbableIndex = tabbableContent.indexOf(target as any);
@@ -415,8 +516,8 @@ export function FloatingFocusManager(props: any): any {
 					isPointerDownRef.current = false;
 				});
 			}
-			function handleFocusOutside(event: any) {
-				const relatedTarget = event.relatedTarget;
+			function handleFocusOutside(event: FocusEvent) {
+				const relatedTarget = event.relatedTarget as Element | null;
 				const currentTarget = event.currentTarget;
 				const target = getTarget(event);
 				queueMicrotask(() => {
@@ -526,8 +627,8 @@ export function FloatingFocusManager(props: any): any {
 		S('FFM:e:focusout'),
 	);
 
-	const beforeGuardRef = useRef<any>(null, S('FFM:beforeGuard'));
-	const afterGuardRef = useRef<any>(null, S('FFM:afterGuard'));
+	const beforeGuardRef = useRef<HTMLSpanElement | null>(null, S('FFM:beforeGuard'));
+	const afterGuardRef = useRef<HTMLSpanElement | null>(null, S('FFM:afterGuard'));
 	const mergedBeforeGuardRef = useLiteMergeRefs(
 		[beforeGuardRef, portalContext?.beforeInsideRef],
 		S('FFM:mergeBefore'),
@@ -743,13 +844,13 @@ export function FloatingFocusManager(props: any): any {
 		S('FFM:e:tabIndex'),
 	);
 
-	function renderDismissButton(location: string) {
+	function renderDismissButton(location: 'start' | 'end') {
 		if (disabled || !visuallyHiddenDismiss || !modal) {
 			return null;
 		}
 		return createElement(VisuallyHiddenDismiss, {
 			ref: location === 'start' ? startDismissButtonRef : endDismissButtonRef,
-			onClick: (event: any) => onOpenChange(false, event),
+			onClick: (event: MouseEvent) => onOpenChange(false, event),
 			children: typeof visuallyHiddenDismiss === 'string' ? visuallyHiddenDismiss : 'Dismiss',
 		});
 	}
@@ -765,7 +866,7 @@ export function FloatingFocusManager(props: any): any {
 			createElement(FocusGuard, {
 				'data-type': 'inside',
 				ref: mergedBeforeGuardRef,
-				onFocus: (event: any) => {
+				onFocus: (event: FocusEvent) => {
 					if (modal) {
 						const els = getTabbableElements();
 						enqueueFocus(order[0] === 'reference' ? els[0] : els[els.length - 1]);
@@ -790,7 +891,7 @@ export function FloatingFocusManager(props: any): any {
 			createElement(FocusGuard, {
 				'data-type': 'inside',
 				ref: mergedAfterGuardRef,
-				onFocus: (event: any) => {
+				onFocus: (event: FocusEvent) => {
 					if (modal) {
 						enqueueFocus(getTabbableElements()[0]);
 					} else if (

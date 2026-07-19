@@ -20,14 +20,14 @@ export interface DocEntry extends DocMeta {
 }
 
 const components: Record<string, DocEntry['component']> = {
-	'quick-start': QuickStart as DocEntry['component'],
-	'build-tools': BuildTools as DocEntry['component'],
-	'core-apis': CoreApis as DocEntry['component'],
-	'tsrx-vs-tsx': TsrxVsTsx as DocEntry['component'],
-	'differences-from-react': DifferencesFromReact as DocEntry['component'],
-	'react-compat': ReactCompat as DocEntry['component'],
-	profiling: Profiling as DocEntry['component'],
-	bindings: Bindings as DocEntry['component'],
+	'quick-start': QuickStart,
+	'build-tools': BuildTools,
+	'core-apis': CoreApis,
+	'tsrx-vs-tsx': TsrxVsTsx,
+	'differences-from-react': DifferencesFromReact,
+	'react-compat': ReactCompat,
+	profiling: Profiling,
+	bindings: Bindings,
 };
 
 export const docs: DocEntry[] = docsMeta.map((meta) => {

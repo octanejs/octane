@@ -261,7 +261,7 @@ function ThreadPanel({
 			<header class="thread-header">
 				<div>
 					<p class="eyebrow">Focused conversation</p>
-					<h2 id="thread-heading" ref={headingRef} tabIndex="-1">Thread</h2>
+					<h2 id="thread-heading" ref={headingRef} tabIndex={-1}>Thread</h2>
 				</div>
 				<button type="button" class="icon-button" onClick={onClose} aria-label="Close thread">
 					×
@@ -309,7 +309,7 @@ function ThreadPanel({
 					<label for="thread-reply">Reply to thread</label>
 					<textarea
 						id="thread-reply"
-						rows="3"
+						rows={3}
 						value={draft}
 						onInput={(event: InputEvent) => setDraft(
 							(event.currentTarget as HTMLTextAreaElement).value,
@@ -765,7 +765,7 @@ export function App() @{
 			<header class="channel-header">
 				<div class="channel-title">
 					<p class="mobile-brand">Relay / Northstar</p>
-					<h1 ref={channelHeadingRef} tabIndex="-1">{`# ${channelDetails.label}`}</h1>
+					<h1 ref={channelHeadingRef} tabIndex={-1}>{`# ${channelDetails.label}`}</h1>
 					<p>{channelDetails.description}</p>
 				</div>
 				<div class="channel-tools">
@@ -795,7 +795,7 @@ export function App() @{
 				</div>
 			}
 
-			<div id="conversation" class="conversation" ref={conversationRef} tabIndex="-1">
+			<div id="conversation" class="conversation" ref={conversationRef} tabIndex={-1}>
 				@if (loadState === 'loading') {
 					<LoadingConversation />
 				} @else if (loadState === 'error') {
@@ -839,7 +839,7 @@ export function App() @{
 					<label for="message-composer">{`Message #${route.channel}`}</label>
 					<textarea
 						id="message-composer"
-						rows="3"
+						rows={3}
 						value={composer}
 						onInput={(event: InputEvent) => {
 							const value = (event.currentTarget as HTMLTextAreaElement).value;

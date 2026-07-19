@@ -4,11 +4,29 @@ import { useLexicalComposerContext } from './LexicalComposerContext';
 import { LexicalMenu } from './shared/LexicalMenu.tsrx';
 import { useMenuAnchorRef } from './shared/useMenuAnchorRef';
 import { $getNodeByKey, COMMAND_PRIORITY_LOW } from 'lexical';
+import type { CommandListenerPriority, NodeKey, TextNode } from 'lexical';
 import { startTransition, useCallback, useEffect, useState } from 'octane';
+import type { MenuOption, MenuRenderFn, MenuResolution } from './shared/menuShared';
 
 export { MenuOption } from './shared/menuShared';
 
-export function LexicalNodeMenuPlugin(props) {
+/**
+ * Props for the {@link LexicalNodeMenuPlugin} component.
+ */
+export type NodeMenuPluginProps<TOption extends MenuOption> = {
+	onSelectOption: (option: TOption, textNodeContainingQuery: | TextNode
+	| null, closeMenu: () => void, matchingString: string) => void;
+	options: TOption[];
+	nodeKey: NodeKey | null;
+	menuRenderFn?: MenuRenderFn<TOption>;
+	onClose?: () => void;
+	onOpen?: (resolution: MenuResolution) => void;
+	anchorClassName?: string;
+	commandPriority?: CommandListenerPriority;
+	parent?: HTMLElement;
+};
+
+export function LexicalNodeMenuPlugin<TOption extends MenuOption>(props: NodeMenuPluginProps<TOption>) {
 	const options = props.options;
 	const nodeKey = props.nodeKey;
 	const onClose = props.onClose;
@@ -21,7 +39,7 @@ export function LexicalNodeMenuPlugin(props) {
 	const parent = props.parent;
 
 	const [editor] = useLexicalComposerContext();
-	const [resolution, setResolution] = useState(null);
+	const [resolution, setResolution] = useState<MenuResolution | null>(null);
 	const anchorElementRef = useMenuAnchorRef(resolution, setResolution, anchorClassName, parent);
 
 	const closeNodeMenu = useCallback(() => {
@@ -31,7 +49,7 @@ export function LexicalNodeMenuPlugin(props) {
 		}
 	}, [onClose, resolution]);
 
-	const openNodeMenu = useCallback((res) => {
+	const openNodeMenu = useCallback((res: MenuResolution) => {
 		setResolution(res);
 		if (onOpen != null && resolution === null) {
 			onOpen(res);

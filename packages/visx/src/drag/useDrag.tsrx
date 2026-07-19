@@ -1,4 +1,3 @@
-import type { MouseEvent, TouchEvent, PointerEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'octane';
 import { Point, subtractPoints, sumPoints } from '@octanejs/visx/point';
 import { localPoint } from '@octanejs/visx/event';
@@ -6,6 +5,8 @@ import useStateWithCallback from './util/useStateWithCallback.tsrx';
 import restrictPoint from './util/restrictPoint';
 import useSamplesAlongPath from './util/useSamplesAlongPath.tsrx';
 
+// Native DOM events — octane delivers native, delegated events (no synthetic
+// layer), so the drag handlers accept the platform types directly.
 export type MouseTouchOrPointerEvent = MouseEvent | TouchEvent | PointerEvent;
 
 export type HandlerArgs = DragState & {
@@ -129,8 +130,6 @@ export default function useDrag(
 	const restrictToPathSamples = useSamplesAlongPath(restrictToPath);
 
 	const handleDragStart = useCallback((event: MouseTouchOrPointerEvent) => {
-		event.persist?.();
-
 		setDragStateWithCallback((currState) => {
 			// eslint-disable-next-line no-shadow
 			const { x = 0, y = 0, dx, dy } = currState;
@@ -165,8 +164,6 @@ export default function useDrag(
 	]);
 
 	const handleDragMove = useCallback((event: MouseTouchOrPointerEvent) => {
-		event.persist?.();
-
 		setDragStateWithCallback((currState) => {
 			if (!currState.isDragging) return currState;
 			// eslint-disable-next-line no-shadow
@@ -194,8 +191,6 @@ export default function useDrag(
 	]);
 
 	const handleDragEnd = useCallback((event: MouseTouchOrPointerEvent) => {
-		event.persist?.();
-
 		setDragStateWithCallback(
 			(currState) => ({ ...currState, isDragging: false }),
 			onDragEnd &&

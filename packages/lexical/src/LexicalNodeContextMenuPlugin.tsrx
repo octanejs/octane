@@ -21,9 +21,12 @@ import {
 	FloatingOverlay,
 	FloatingFocusManager,
 } from '@octanejs/floating-ui';
+import type { FloatingStyles } from '@octanejs/floating-ui';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { $getNearestNodeFromDOMNode, $getRoot } from 'lexical';
+import type { LexicalNode } from 'lexical';
 import { useEffect, useRef, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 
 class MenuOption {
 	key: string;
@@ -43,12 +46,17 @@ class MenuOption {
 export class NodeContextMenuOption extends MenuOption {
 	type: string;
 	title: string;
-	icon: unknown;
+	icon: OctaneNode | null;
 	disabled: boolean;
 	$onSelect: () => void;
-	$showOn?: (node: unknown) => boolean;
+	$showOn?: (node: LexicalNode) => boolean;
 
-	constructor(title, options) {
+	constructor(title: string, options: {
+		disabled?: boolean;
+		icon?: OctaneNode;
+		$onSelect: () => void;
+		$showOn?: (node: LexicalNode) => boolean;
+	}) {
 		super(title);
 		this.type = 'item';
 		this.title = title;
@@ -63,9 +71,9 @@ export class NodeContextMenuOption extends MenuOption {
 
 export class NodeContextMenuSeparator extends MenuOption {
 	type: string;
-	$showOn?: (node: unknown) => boolean;
+	$showOn?: (node: LexicalNode) => boolean;
 
-	constructor(options) {
+	constructor(options?: { $showOn?: (node: LexicalNode) => boolean }) {
 		super('_separator');
 		this.type = 'separator';
 		if (options && options.$showOn) {
@@ -74,10 +82,56 @@ export class NodeContextMenuSeparator extends MenuOption {
 	}
 }
 
+type ContextMenuType = NodeContextMenuOption | NodeContextMenuSeparator;
+
+interface MenuSeparatorType {
+	className: string | undefined;
+	key: string;
+	type: string;
+}
+
+interface MenuItemType extends MenuSeparatorType {
+	disabled: boolean;
+	icon: OctaneNode | null;
+	label: string;
+	onSelect: () => void;
+	title: string;
+}
+
+type MenuType = MenuItemType | MenuSeparatorType;
+
+interface Props {
+	label?: string;
+	nested?: boolean;
+	className?: string;
+	itemClassName?: string;
+	separatorClassName?: string;
+	items: ContextMenuType[];
+}
+
+// A renderable menu entry as ContextMenuList consumes it: a MenuType flattened so
+// item-only fields are optional (`type` is a plain string, so the union does not
+// discriminate), plus the item's resolved getItemProps() bag —
+// `Record<string, unknown>`, the @octanejs/floating-ui prop-getter return type.
+type ContextMenuListItem = MenuSeparatorType & {
+		disabled?: boolean;
+		icon?: OctaneNode | null;
+		label?: string;
+		itemProps: Record<string, unknown>;
+	};
+
+type ContextMenuListProps = {
+	className: string | undefined;
+	setFloating: (node: HTMLElement | null) => void;
+	floatingStyles: FloatingStyles;
+	floatingProps: Record<string, unknown>;
+	items: ContextMenuListItem[];
+};
+
 // The floating menu container + its items. Mirrors the React render's inner <div>:
 // the resolved floating props are spread onto it, and each item spreads its own
 // getItemProps() onto a <button> (or <hr> for a separator).
-function ContextMenuList(props) @{
+function ContextMenuList(props: ContextMenuListProps) @{
 	<div
 		class={props.className}
 		ref={props.setFloating}
@@ -100,19 +154,19 @@ function ContextMenuList(props) @{
 	</div>
 }
 
-export function NodeContextMenuPlugin(props) @{
+export function NodeContextMenuPlugin(props: Props) @{
 	const items = props.items;
 	const className = props.className;
 	const itemClassName = props.itemClassName;
 	const separatorClassName = props.separatorClassName;
 
 	const [editor] = useLexicalComposerContext();
-	const [activeIndex, setActiveIndex] = useState(null);
+	const [activeIndex, setActiveIndex] = useState<number | null>(null);
 	const [isOpen, setIsOpen] = useState(false);
-	const [renderItems, setRenderItems] = useState([]);
+	const [renderItems, setRenderItems] = useState<MenuType[]>([]);
 
-	const listItemsRef = useRef([]);
-	const listContentRef = useRef([]);
+	const listItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
+	const listContentRef = useRef<(string | null)[]>([]);
 
 	const f = useFloating({
 		middleware: [
@@ -149,7 +203,7 @@ export function NodeContextMenuPlugin(props) @{
 
 	// Build the menu model on right-click and open the menu at the cursor.
 	useEffect(() => {
-		function onContextMenu(e) {
+		function onContextMenu(e: MouseEvent) {
 			e.preventDefault();
 
 			f.refs.setPositionReference({
@@ -167,10 +221,10 @@ export function NodeContextMenuPlugin(props) @{
 				},
 			});
 
-			let visibleItems = [];
+			let visibleItems: ContextMenuType[] = [];
 			if (items) {
 				editor.read(() => {
-					const node = $getNearestNodeFromDOMNode(e.target) ?? $getRoot();
+					const node = $getNearestNodeFromDOMNode(e.target as Element) ?? $getRoot();
 					if (node) {
 						visibleItems = items.filter((option) => (option.$showOn ? option.$showOn(node) : true));
 					}
@@ -187,12 +241,12 @@ export function NodeContextMenuPlugin(props) @{
 				}
 				return {
 					className: itemClassName,
-					disabled: option.disabled,
-					icon: option.icon,
+					disabled: (option as NodeContextMenuOption).disabled,
+					icon: (option as NodeContextMenuOption).icon,
 					key: option.key,
-					label: option.title,
-					onSelect: () => editor.update(() => option.$onSelect()),
-					title: option.title,
+					label: (option as NodeContextMenuOption).title,
+					onSelect: () => editor.update(() => (option as NodeContextMenuOption).$onSelect()),
+					title: (option as NodeContextMenuOption).title,
 					type: option.type,
 				};
 			});
@@ -216,8 +270,8 @@ export function NodeContextMenuPlugin(props) @{
 	listItemsRef.current = [];
 	const itemsForRender = renderItems.map((item, index) => {
 		const onSelect = () => {
-			if (item.onSelect) {
-				item.onSelect();
+			if ((item as MenuItemType).onSelect) {
+				(item as MenuItemType).onSelect();
 			}
 			setIsOpen(false);
 		};
@@ -226,7 +280,7 @@ export function NodeContextMenuPlugin(props) @{
 			itemProps: getItemProps({
 				onClick: onSelect,
 				onMouseUp: onSelect,
-				ref: (node) => {
+				ref: (node: HTMLButtonElement | null) => {
 					listItemsRef.current[index] = node;
 				},
 				tabIndex: activeIndex === index ? 0 : -1,

@@ -2,11 +2,13 @@
 // @lexical/react/src/shared/LexicalMenu.tsx. A `.tsrx` component (auto-slotted
 // hooks). The hooks (useMenuAnchorRef / useDynamicPositioning) + non-component
 // pieces live in the sibling `.ts` files.
+import type { MenuOption, MenuRef, MenuRenderFn, MenuResolution } from './menuShared';
 import {
 	$splitNodeContainingQuery,
 	scrollIntoViewIfNeeded,
 	SCROLL_TYPEAHEAD_OPTION_INTO_VIEW_COMMAND,
 } from './menuShared';
+import type { CommandListenerPriority, LexicalEditor, TextNode } from 'lexical';
 import {
 	COMMAND_PRIORITY_LOW,
 	KEY_ARROW_DOWN_COMMAND,
@@ -18,9 +20,17 @@ import {
 } from 'lexical';
 import { createPortal, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'octane';
 
-function MenuItem(props) @{
+type MenuItemProps<TOption extends MenuOption> = {
+	index: number;
+	isSelected: boolean;
+	onClick: () => void;
+	onMouseEnter: () => void;
+	option: TOption;
+};
+
+function MenuItem<TOption extends MenuOption>(props: MenuItemProps<TOption>) @{
 	<li
-		tabindex={-1}
+		tabIndex={-1}
 		class={props.isSelected ? 'item selected' : 'item'}
 		ref={props.option.setRefElement}
 		role="option"
@@ -34,7 +44,14 @@ function MenuItem(props) @{
 	</li>
 }
 
-function DefaultMenu(props) @{
+type DefaultMenuProps<TOption extends MenuOption> = {
+	options: TOption[];
+	selectedIndex: number | null;
+	selectOptionAndCleanUp: (option: TOption) => void;
+	setHighlightedIndex: (index: number) => void;
+};
+
+function DefaultMenu<TOption extends MenuOption>(props: DefaultMenuProps<TOption>) @{
 	<div class="typeahead-popover mentions-menu">
 		<ul>{props.options.map(
 			(option, i) => <MenuItem
@@ -52,7 +69,21 @@ function DefaultMenu(props) @{
 	</div>
 }
 
-export function LexicalMenu(props) {
+type LexicalMenuProps<TOption extends MenuOption> = {
+	close: () => void;
+	editor: LexicalEditor;
+	anchorElementRef: MenuRef;
+	resolution: MenuResolution;
+	options: TOption[];
+	shouldSplitNodeWithQuery?: boolean;
+	menuRenderFn?: MenuRenderFn<TOption>;
+	onSelectOption: (option: TOption, textNodeContainingQuery: | TextNode
+	| null, closeMenu: () => void, matchingString: string) => void;
+	commandPriority?: CommandListenerPriority;
+	preselectFirstItem?: boolean;
+};
+
+export function LexicalMenu<TOption extends MenuOption>(props: LexicalMenuProps<TOption>) {
 	const close = props.close;
 	const editor = props.editor;
 	const anchorElementRef = props.anchorElementRef;
@@ -65,7 +96,7 @@ export function LexicalMenu(props) {
 		props.commandPriority != null ? props.commandPriority : COMMAND_PRIORITY_LOW;
 	const preselectFirstItem = props.preselectFirstItem !== false;
 
-	const [rawSelectedIndex, setHighlightedIndex] = useState(null);
+	const [rawSelectedIndex, setHighlightedIndex] = useState<number | null>(null);
 	const selectedIndex =
 		rawSelectedIndex !== null ? Math.min(options.length - 1, rawSelectedIndex) : null;
 
@@ -77,7 +108,7 @@ export function LexicalMenu(props) {
 		}
 	}, [matchingString, preselectFirstItem]);
 
-	const selectOptionAndCleanUp = useCallback((selectedEntry) => {
+	const selectOptionAndCleanUp = useCallback((selectedEntry: TOption) => {
 		editor.update(() => {
 			const textNodeContainingQuery =
 				resolution.match != null && shouldSplitNodeWithQuery
@@ -92,7 +123,7 @@ export function LexicalMenu(props) {
 		});
 	}, [editor, shouldSplitNodeWithQuery, resolution.match, onSelectOption, close]);
 
-	const updateSelectedIndex = useCallback((index) => {
+	const updateSelectedIndex = useCallback((index: number) => {
 		const rootElem = editor.getRootElement();
 		if (rootElem !== null) {
 			rootElem.setAttribute('aria-activedescendant', 'typeahead-item-' + index);

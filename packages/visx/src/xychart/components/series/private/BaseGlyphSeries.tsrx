@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo } from 'octane';
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import type { AxisScale } from '@octanejs/visx/axis';
 import DataContext from '../../../context/DataContext.tsrx';
 import type { DataContextType, GlyphProps, GlyphsProps, SeriesProps } from '../../../types';
@@ -15,7 +15,7 @@ export type BaseGlyphSeriesProps<XScale extends AxisScale, YScale extends AxisSc
 		/** The size of a `Glyph`, a `number` or a function which takes a `Datum` and returns a `number`. */
 		size?: number | ((d: Datum) => number);
 		/** Function which handles rendering glyphs. */
-		renderGlyphs: (glyphsProps: GlyphsProps<XScale, YScale, Datum>) => ReactNode;
+		renderGlyphs: (glyphsProps: GlyphsProps<XScale, YScale, Datum>) => OctaneNode;
 	};
 
 export function BaseGlyphSeries<XScale extends AxisScale, YScale extends AxisScale, Datum extends object>({

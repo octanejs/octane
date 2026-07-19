@@ -14,8 +14,15 @@
 //     commit later, same observable outcome). Match passes the router's `loadedAt`
 //     so navigation clears route error UI.
 import { useState, useRef, useLayoutEffect } from 'octane';
+import type { OctaneNode } from 'octane';
+import type { ErrorInfo, ErrorRouteComponent } from './route.ts';
 
-export function CatchBoundary(props) @{
+export function CatchBoundary(props: {
+	getResetKey: () => number | string;
+	children: OctaneNode;
+	errorComponent?: ErrorRouteComponent;
+	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+}) @{
 	@try {
 		<>
 			{props.children}
@@ -31,10 +38,16 @@ export function CatchBoundary(props) @{
 	}
 }
 
-function CatchErrorView(props) @{
+function CatchErrorView(props: {
+	error: any;
+	reset: () => void;
+	getResetKey?: () => number | string;
+	errorComponent?: ErrorRouteComponent;
+	onCatch?: (error: Error, errorInfo: ErrorInfo) => void;
+}) @{
 	// componentDidCatch parity — once per distinct caught error, during render so a
 	// rethrow (the notFound-forwarding path) escapes to the parent boundary.
-	const reported = useRef(null);
+	const reported = useRef<unknown>(null);
 	if (reported.current !== props.error) {
 		reported.current = props.error;
 		if (props.onCatch) props.onCatch(props.error, { componentStack: '' });
@@ -60,7 +73,11 @@ function CatchErrorView(props) @{
 // The default error UI, markup-identical to react-router's ErrorComponent (string
 // styles serialize to the same inline css React produces, so the differential rig
 // can byte-compare it).
-export function ErrorComponent(props) @{
+export function ErrorComponent(props: {
+	error: any;
+	reset?: () => void;
+	info?: { componentStack?: string };
+}) @{
 	const [show, setShow] = useState(process.env.NODE_ENV !== 'production');
 
 	<div style="padding:.5rem;max-width:100%">

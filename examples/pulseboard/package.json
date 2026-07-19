@@ -8,7 +8,7 @@
     "dev": "vite --host --port 5229 --strictPort",
     "build": "vite build",
     "preview": "vite preview --host --port 5229 --strictPort",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
     "test:e2e": "pnpm build && OCTANE_EXAMPLE_PREVIEW=1 playwright test --config e2e/playwright.config.ts",
     "test:e2e:dev": "playwright test --config e2e/playwright.config.ts"
   },

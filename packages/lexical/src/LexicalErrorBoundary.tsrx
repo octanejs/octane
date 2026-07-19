@@ -4,10 +4,26 @@
 // the caught error) — preserving the (error, info) callback Rich/PlainTextPlugin
 // pass for decorator-render failures.
 import { ErrorBoundary } from 'octane';
+import type { OctaneNode } from 'octane';
 
-export function LexicalErrorBoundary(props) @{
+// Octane analog of React's `ErrorInfo`.
+type ErrorInfo = {
+	componentStack?: string | null;
+	digest?: string | null;
+};
+
+/**
+ * Props for the {@link LexicalErrorBoundary} component.
+ */
+export type LexicalErrorBoundaryProps = {
+	children: OctaneNode;
+	fallback?: OctaneNode;
+	onError: (error: Error, info: ErrorInfo) => void;
+};
+
+export function LexicalErrorBoundary(props: LexicalErrorBoundaryProps) @{
 	<ErrorBoundary
-		fallback={(error, _reset) => {
+		fallback={(error: unknown, _reset: VoidFunction) => {
 			if (props.onError) {
 				props.onError(error instanceof Error ? error : new Error(String(error), { cause: error }), {
 					componentStack: '',

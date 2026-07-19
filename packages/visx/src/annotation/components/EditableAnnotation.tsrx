@@ -1,6 +1,7 @@
 /* eslint-disable react/jsx-handler-names */
 import { useCallback, useRef } from 'octane';
-import type { SVGProps, ReactNode, MouseEvent, TouchEvent } from 'react';
+import type { SVGProps, MouseEvent, TouchEvent } from 'react';
+import type { OctaneNode } from 'octane';
 import type { UseDrag, HandlerArgs as DragHandlerArgs } from '@octanejs/visx/drag';
 import { useDrag } from '@octanejs/visx/drag';
 import type { AnnotationContextType } from '../types';
@@ -12,7 +13,7 @@ export type EditableAnnotationProps = Pick<AnnotationContextType, 'x' | 'y' | 'd
 		/** Height of the possible drag canvas (e.g., SVG container). */
 		height: number;
 		/** Annotation children (Subject, Label, Connector) */
-		children: ReactNode;
+		children: OctaneNode;
 		/** Whether the Label position (dx, dy) is editable. */
 		canEditLabel?: boolean;
 		/** Whether the Subject position (x, y) is editable. */

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { PickD3Scale, ContinuousDomainScaleType } from '@octanejs/visx/scale';
 import { scaleLinear } from '@octanejs/visx/scale';
@@ -17,7 +18,7 @@ export type ViolinPlotProps<Datum extends object> = SharedProps & {
 		/** Width of the violin plot glyph. */
 		width?: number;
 		/** Override render function to fully control the rendering of the ViolinPlot glyph. */
-		children?: (providedProps: { path: string }) => ReactNode;
+		children?: (providedProps: { path: string }) => OctaneNode;
 	};
 
 const defaultCountAccessor = (d: { count?: unknown }) => typeof d.count === 'number' ? d.count : 0;

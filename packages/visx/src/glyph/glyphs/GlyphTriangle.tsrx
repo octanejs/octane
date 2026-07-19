@@ -1,4 +1,5 @@
-import type { ReactNode, SVGProps } from 'react';
+import type { SVGProps } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { Symbol } from 'd3-shape';
 import { symbol, symbolTriangle } from 'd3-shape';
@@ -10,7 +11,7 @@ export type GlyphTriangleProps<Datum> = {
 		path,
 	}: {
 		path: Symbol<unknown, Datum>;
-	}) => ReactNode;
+	}) => OctaneNode;
 	/** classname to apply to glyph path element. */
 	className?: string;
 	/** Top offset to apply to glyph g element container. */

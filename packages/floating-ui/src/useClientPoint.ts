@@ -11,6 +11,33 @@ import {
 	useEffectEvent,
 	useModernLayoutEffect,
 } from './utils';
+import type { ElementProps, FloatingRootContext } from './types';
+
+export interface UseClientPointProps {
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * Whether to restrict the client point to an axis and use the reference
+	 * element (if it exists) as the other axis. This can be useful if the
+	 * floating element is also interactive.
+	 * @default 'both'
+	 */
+	axis?: 'x' | 'y' | 'both';
+	/**
+	 * An explicitly defined `x` client coordinate.
+	 * @default null
+	 */
+	x?: number | null;
+	/**
+	 * An explicitly defined `y` client coordinate.
+	 * @default null
+	 */
+	y?: number | null;
+}
 
 function createVirtualElement(domElement: any, data: any): any {
 	let offsetX: number | null = null;
@@ -57,10 +84,20 @@ function isMouseBasedEvent(event: any): boolean {
 	return event != null && event.clientX != null;
 }
 
-export function useClientPoint(...args: any[]): any {
+/**
+ * Positions the floating element relative to a client point (in the viewport),
+ * such as the mouse position. By default, it follows the mouse cursor.
+ * @see https://floating-ui.com/docs/useClientPoint
+ */
+export function useClientPoint(
+	context: FloatingRootContext,
+	props?: UseClientPointProps,
+	slot?: symbol,
+): ElementProps;
+export function useClientPoint(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseClientPointProps) ?? {};
 
 	const open = context.open;
 	const dataRef = context.dataRef;
@@ -74,12 +111,15 @@ export function useClientPoint(...args: any[]): any {
 	const y = props.y ?? null;
 
 	const initialRef = useRef(false, subSlot(slot, 'init'));
-	const cleanupListenerRef = useRef<any>(null, subSlot(slot, 'cleanup'));
-	const [pointerType, setPointerType] = useState<any>(undefined, subSlot(slot, 'ptype'));
+	const cleanupListenerRef = useRef<(() => void) | null>(null, subSlot(slot, 'cleanup'));
+	const [pointerType, setPointerType] = useState<string | undefined>(
+		undefined,
+		subSlot(slot, 'ptype'),
+	);
 	const [reactive, setReactive] = useState<any[]>([], subSlot(slot, 'reactive'));
 
 	const setReference = useEffectEvent(
-		(px: number, py: number) => {
+		(px: number | null, py: number | null) => {
 			if (initialRef.current) return;
 			if (dataRef.current.openEvent && !isMouseBasedEvent(dataRef.current.openEvent)) {
 				return;
@@ -92,7 +132,7 @@ export function useClientPoint(...args: any[]): any {
 	);
 
 	const handleReferenceEnterOrMove = useEffectEvent(
-		(event: any) => {
+		(event: MouseEvent) => {
 			if (x != null || y != null) return;
 			if (!open) {
 				setReference(event.clientX, event.clientY);
@@ -108,7 +148,7 @@ export function useClientPoint(...args: any[]): any {
 		() => {
 			if (!openCheck || !enabled || x != null || y != null) return;
 			const win = getWindow(floating);
-			function handleMouseMove(event: any) {
+			function handleMouseMove(event: MouseEvent) {
 				const target = getTarget(event);
 				if (!contains(floating, target as any)) {
 					setReference(event.clientX, event.clientY);
@@ -170,7 +210,7 @@ export function useClientPoint(...args: any[]): any {
 
 	const reference = useMemo(
 		() => {
-			function setPointerTypeRef(_ref: any) {
+			function setPointerTypeRef(_ref: PointerEvent) {
 				const { pointerType: pt } = _ref;
 				setPointerType(pt);
 			}
@@ -185,7 +225,7 @@ export function useClientPoint(...args: any[]): any {
 		subSlot(slot, 'm:ref'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference } : {}),
 		[enabled, reference],
 		subSlot(slot, 'm:ret'),

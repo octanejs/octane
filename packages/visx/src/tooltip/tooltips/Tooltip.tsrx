@@ -1,9 +1,10 @@
-import type { ReactNode, CSSProperties, HTMLAttributes, Ref } from 'react';
+import type { CSSProperties, HTMLAttributes, Ref } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 
 export type TooltipProps = {
 	/** Tooltip content. */
-	children?: ReactNode;
+	children?: OctaneNode;
 	/** Optional className to apply to the Tooltip in addition to `visx-tooltip`. */
 	className?: string;
 	/** The `left` position of the Tooltip. */

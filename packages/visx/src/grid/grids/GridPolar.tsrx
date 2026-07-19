@@ -1,4 +1,5 @@
-import type { CSSProperties, SVGProps } from 'react';
+import type { CSSProperties } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { ScaleInput } from '@octanejs/visx/scale';
@@ -54,11 +55,11 @@ export type GridPolarProps<AngleScale extends GridScale, RadialScale extends Gri
 		/**
  * Style object set as the angle line path style attribute.
  */
-		lineStyleAngle?: CSSProperties & LineProps & Omit<SVGProps<SVGLineElement>, keyof LineProps>;
+		lineStyleAngle?: CSSProperties & LineProps & Omit<Octane.SVGProps<SVGLineElement>, keyof LineProps>;
 		/**
  * Style object set as the radius line path style attribute.
  */
-		lineStyleRadial?: CSSProperties & LineProps & Omit<SVGProps<SVGLineElement>, keyof LineProps>;
+		lineStyleRadial?: CSSProperties & LineProps & Omit<Octane.SVGProps<SVGLineElement>, keyof LineProps>;
 		/**
  * The number of angle ticks wanted for the grid. Note this is approximate due to d3's algorithm,
  * you can use tickValues for greater control

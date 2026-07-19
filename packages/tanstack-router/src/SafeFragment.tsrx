@@ -5,7 +5,10 @@
 // — crucially — means a route WITHOUT a pendingComponent/errorComponent does not
 // create a boundary at all, so suspensions and errors bubble to the nearest
 // ancestor that has one (react-router parity).
-export function SafeFragment(props) @{
+// Props are `any` (upstream parity: react-router's `SafeFragment(props: any)`) —
+// it stands in for Suspense/CatchBoundary/CatchNotFound/shellComponent at dynamic
+// boundary slots, so it must accept any boundary's props and render only children.
+export function SafeFragment(props: any) @{
 	<>
 		{props.children}
 	</>

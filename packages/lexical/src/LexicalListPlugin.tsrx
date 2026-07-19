@@ -10,7 +10,23 @@ import { useLexicalComposerContext } from './LexicalComposerContext';
 import { mergeRegister } from 'lexical';
 import { useEffect } from 'octane';
 
-export function ListPlugin(props) {
+/**
+ * Props for the {@link ListPlugin} component.
+ */
+export interface ListPluginProps {
+	/**
+ * When `true`, enforces strict indentation rules for list items, ensuring
+ * consistent structure. When `false` (default), indentation is more flexible.
+ */
+	hasStrictIndent?: boolean;
+	/**
+ * When `true`, splitting a numbered list will preserve the numbering
+ * continuity. When `false` (default), the new split list resets to 1.
+ */
+	shouldPreserveNumbering?: boolean;
+}
+
+export function ListPlugin(props: ListPluginProps) {
 	const [editor] = useLexicalComposerContext();
 	const hasStrictIndent =
 		props.hasStrictIndent === undefined ? false : props.hasStrictIndent;

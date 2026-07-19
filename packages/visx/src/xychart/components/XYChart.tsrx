@@ -1,6 +1,7 @@
 /* eslint jsx-a11y/mouse-events-have-key-events: 'off', @typescript-eslint/no-explicit-any: 'off' */
 import { useContext, useEffect } from 'octane';
-import type { ReactNode, PointerEvent } from 'react';
+import type { PointerEvent } from 'react';
+import type { OctaneNode } from 'octane';
 import { ParentSize } from '@octanejs/visx/responsive';
 import type { ResizeObserverPolyfill } from '@octanejs/visx/responsive';
 import type { AxisScaleOutput } from '@octanejs/visx/axis';
@@ -35,7 +36,7 @@ export type XYChartProps<XScaleConfig extends ScaleConfig<AxisScaleOutput, any, 
 	/** Margin to apply around the outside. */
 	margin?: Margin;
 	/** XYChart children (Series, Tooltip, etc.). */
-	children: ReactNode;
+	children: OctaneNode;
 	/** If DataContext is not available, XYChart will wrap itself in a DataProvider and set this as the theme. */
 	theme?: DataProviderProps<XScaleConfig, YScaleConfig>['theme'];
 	/** If DataContext is not available, XYChart will wrap itself in a DataProvider and set this as the xScale config. */

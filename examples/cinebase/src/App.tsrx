@@ -27,13 +27,13 @@ function AppLink(props: {
 	class?: string;
 	label?: string;
 	navigate: NavigationProps['navigate'];
-	children: unknown;
+	children?: unknown;
 }) @{
 	<a
 		href={props.href}
 		class={props.class}
 		aria-label={props.label}
-		onClick={(event) => {
+		onClick={(event: MouseEvent) => {
 			if (stopLinkNavigation(event)) return;
 			event.preventDefault();
 			props.navigate(props.href);
@@ -56,9 +56,10 @@ function Header(props: NavigationProps & { watchlistCount: number }) @{
 				<AppLink href="/" class="nav-link" navigate={props.navigate}>Discover</AppLink>
 				<AppLink href="/watchlist" class="nav-link watchlist-link" navigate={props.navigate}>
 					Watchlist
-					<span class="count-badge" aria-label={`${props.watchlistCount} saved titles`}>
-						{props.watchlistCount as string}
-					</span>
+					<span
+						class="count-badge"
+						aria-label={`${props.watchlistCount} saved titles`}
+					>{`${props.watchlistCount}`}</span>
 				</AppLink>
 			</nav>
 		</div>
@@ -162,7 +163,7 @@ function TitleCard(props: {
 				<span class="rating">
 					<span aria-hidden="true">★</span>
 
-					{props.title.rating as string}
+					{`${props.title.rating}`}
 				</span>
 				<span>{props.title.genres.slice(0, 2).join(' · ')}</span>
 			</div>
@@ -236,7 +237,7 @@ function CatalogPage(props: {
 					defaultValue={props.search}
 					ref={searchInput}
 					placeholder="Search films, series, and genres"
-					onInput={(event) => {
+					onInput={(event: Event) => {
 						const search = (event.currentTarget as HTMLInputElement).value;
 						props.navigate(catalogHref(search, props.genre), true);
 					}}
@@ -352,7 +353,7 @@ function TitlePage(props: {
 							<span class="rating">
 								<span aria-hidden="true">★</span>
 
-								{title.rating as string}
+								{`${title.rating}`}
 							</span>
 							<span>{title.genres.join(' · ')}</span>
 						</div>
@@ -464,7 +465,7 @@ function Shell(props: AppProps) @{
 		<a class="skip-link" href="#main">Skip to content</a>
 		<OfflineBanner />
 		<Header navigate={navigate} watchlistCount={watchlistIds.length} />
-		<main id="main" tabindex="-1">
+		<main id="main" tabIndex={-1}>
 			@if (route.kind === 'catalog') {
 				<CatalogPage
 					search={route.search}

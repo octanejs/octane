@@ -23,7 +23,9 @@ function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
 // Shiki markup, so there is no prop-slot component to break SSR/hydration.
 function DocPre(props: { children?: unknown; [key: string]: unknown }) @{
 	const { children, ...preProps } = props;
-	const language = preProps['data-language'] ?? preProps.dataLanguage ?? '' as string;
+	const stamped = preProps['data-language'] ?? preProps.dataLanguage;
+	const language =
+		typeof stamped === 'string' ? stamped : '';
 
 	<CodeBlock variant="plain" language={language}>
 		<pre {...preProps}>{children}</pre>

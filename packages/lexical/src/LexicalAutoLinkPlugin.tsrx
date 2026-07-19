@@ -1,12 +1,20 @@
 // Ported from @lexical/react/src/LexicalAutoLinkPlugin.ts (useAutoLink inlined).
 import invariant from '@lexical/internal/invariant';
 import { AutoLinkNode, registerAutoLink } from '@lexical/link';
+import type { ChangeHandler, LinkMatcher } from '@lexical/link';
+import type { ElementNode } from 'lexical';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
 export { createLinkMatcherWithRegExp } from '@lexical/link';
 
-export function AutoLinkPlugin(props) {
+type Props = {
+	matchers: LinkMatcher[];
+	onChange?: ChangeHandler;
+	excludeParents?: ((parent: ElementNode) => boolean)[];
+};
+
+export function AutoLinkPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const matchers = props.matchers;
 	const onChange = props.onChange;

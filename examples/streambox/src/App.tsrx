@@ -436,7 +436,7 @@ export function App() @{
 			</div>
 		</aside>
 
-		<main id="watch-main" class="watch-main" tabindex="-1">
+		<main id="watch-main" class="watch-main" tabIndex={-1}>
 			@if (!online) {
 				<div class="offline-banner" role="status">
 					<span aria-hidden="true">↯</span>
@@ -472,7 +472,7 @@ export function App() @{
 					<section class="watch-column">
 						<section
 							class="player-shell"
-							style={{ '--video-accent': video.accent }}
+							style={'--video-accent: ' + video.accent}
 							data-testid="player-shell"
 						>
 							<div class="player-frame">

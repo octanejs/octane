@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import type { RadialLine } from 'd3-shape';
 import type { LinePathProps } from './LinePath.tsrx';
@@ -8,7 +8,7 @@ import { radialLine } from '../util/D3ShapeFactories';
 export type LineRadialProps<Datum> =
 	Pick<LinePathProps<Datum>, 'className' | 'data' | 'fill' | 'innerRef'> & {
 		/** Override render function which is passed the configured path generator as input. */
-		children?: (args: { path: RadialLine<Datum> }) => ReactNode;
+		children?: (args: { path: RadialLine<Datum> }) => OctaneNode;
 	} & RadialLinePathConfig<Datum>;
 
 export default function LineRadial<Datum>({

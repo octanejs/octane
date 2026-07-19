@@ -1,11 +1,17 @@
 import { createElement, useLayoutEffect } from 'octane';
 import { isServer } from '@tanstack/router-core/isServer';
+import type { RouterManagedTag } from '@tanstack/router-core';
 import { useRouter } from './context.ts';
 import { useHydrated } from './ClientOnly.tsrx';
 
+export type AssetProps = RouterManagedTag & {
+	assetKey: string;
+	target: 'head' | 'body';
+};
+
 const MANAGED_KEY_ATTR = 'data-tsr-managed-key';
 
-function attributeName(name) {
+function attributeName(name: string) {
 	switch (name) {
 		case 'charSet':
 			return 'charset';
@@ -20,7 +26,7 @@ function attributeName(name) {
 	}
 }
 
-function setAttributes(element, attrs) {
+function setAttributes(element: Element, attrs: RouterManagedTag['attrs']) {
 	if (!attrs) {
 		return;
 	}
@@ -37,7 +43,7 @@ function setAttributes(element, attrs) {
 	}
 }
 
-function findManagedElement(parent, key) {
+function findManagedElement(parent: HTMLElement, key: string) {
 	for (const element of parent.querySelectorAll(`[${MANAGED_KEY_ATTR}]`)) {
 		if (element.getAttribute(MANAGED_KEY_ATTR) === key) {
 			return element;
@@ -46,7 +52,7 @@ function findManagedElement(parent, key) {
 	return undefined;
 }
 
-function mountAsset(props) {
+function mountAsset(props: AssetProps) {
 	const parent = props.target === 'head' ? document.head : document.body;
 	const existing = findManagedElement(parent, props.assetKey);
 	if (existing) {
@@ -63,7 +69,7 @@ function mountAsset(props) {
 	return () => element.remove();
 }
 
-export function Asset(props) @{
+export function Asset(props: AssetProps) @{
 	const router = useRouter();
 	const server = isServer ?? router.isServer;
 	const hydrated = useHydrated();

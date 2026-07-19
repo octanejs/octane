@@ -14,6 +14,7 @@ import {
 	useRef,
 	useState,
 } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { S, splitSlot, subSlot } from './internal';
 import { useId } from './useId';
@@ -26,9 +27,11 @@ import {
 	isOutsideEvent,
 	isSafari,
 	useModernLayoutEffect,
+	type CSSProperties,
 } from './utils';
+import type { HTMLProps, MutableRefObject, OpenChangeReason, RefCallback } from './types';
 
-const HIDDEN_STYLES: any = {
+const HIDDEN_STYLES: CSSProperties = {
 	border: 0,
 	clip: 'rect(0 0 0 0)',
 	height: '1px',
@@ -42,8 +45,12 @@ const HIDDEN_STYLES: any = {
 	left: 0,
 };
 
-export function FocusGuard(props: any): any {
-	const [role, setRole] = useState<any>(undefined, S('FocusGuard:role'));
+export function FocusGuard(
+	props: HTMLProps<HTMLSpanElement> & {
+		ref?: MutableRefObject<HTMLSpanElement | null> | RefCallback<HTMLSpanElement> | null;
+	},
+): OctaneNode {
+	const [role, setRole] = useState<'button' | undefined>(undefined, S('FocusGuard:role'));
 	useModernLayoutEffect(
 		() => {
 			if (isSafari()) {
@@ -63,28 +70,66 @@ export function FocusGuard(props: any): any {
 	});
 }
 
-const HIDDEN_OWNER_STYLES: any = {
+const HIDDEN_OWNER_STYLES: CSSProperties = {
 	clipPath: 'inset(50%)',
 	position: 'fixed',
 	top: 0,
 	left: 0,
 };
-export const PortalContext = createContext<any>(null);
+
+// What a non-modal FloatingFocusManager registers on its enclosing portal.
+export interface FocusManagerState {
+	modal: boolean;
+	open: boolean;
+	onOpenChange: (open: boolean, event?: Event, reason?: OpenChangeReason) => void;
+	domReference: Element | null;
+	closeOnFocusOut: boolean;
+}
+
+interface PortalContextValue {
+	preserveTabOrder: boolean;
+	portalNode: HTMLElement | null;
+	setFocusManagerState: (
+		state:
+			| FocusManagerState
+			| null
+			| ((prev: FocusManagerState | null) => FocusManagerState | null),
+	) => void;
+	beforeInsideRef: MutableRefObject<HTMLSpanElement | null>;
+	afterInsideRef: MutableRefObject<HTMLSpanElement | null>;
+	beforeOutsideRef: MutableRefObject<HTMLSpanElement | null>;
+	afterOutsideRef: MutableRefObject<HTMLSpanElement | null>;
+}
+
+export const PortalContext = createContext<PortalContextValue | null>(null);
 const attr = createAttribute('portal');
 
-export function useFloatingPortalNode(...args: any[]): any {
+export interface UseFloatingPortalNodeProps {
+	id?: string;
+	root?: HTMLElement | ShadowRoot | null | MutableRefObject<HTMLElement | ShadowRoot | null>;
+}
+
+/**
+ * @see https://floating-ui.com/docs/FloatingPortal#usefloatingportalnode
+ */
+export function useFloatingPortalNode(
+	props?: UseFloatingPortalNodeProps,
+	slot?: symbol,
+): HTMLElement | null;
+export function useFloatingPortalNode(slot?: symbol): HTMLElement | null;
+export function useFloatingPortalNode(...args: any[]): HTMLElement | null {
 	// Exported hook → may be called directly by consumers (compiler injects the
 	// slot) or by FloatingPortal (passes an S() slot); fall back to S() otherwise.
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useFloatingPortalNode');
-	const props = (user[0] as any) ?? {};
+	const props = (user[0] as UseFloatingPortalNodeProps) ?? {};
 	const id = props.id;
 	const root = props.root;
 
 	const uniqueId = useId(subSlot(slot, 'id'));
 	const portalContext = usePortalContext();
-	const [portalNode, setPortalNode] = useState<any>(null, subSlot(slot, 'node'));
-	const portalNodeRef = useRef<any>(null, subSlot(slot, 'noderef'));
+	const [portalNode, setPortalNode] = useState<HTMLElement | null>(null, subSlot(slot, 'node'));
+	const portalNodeRef = useRef<HTMLElement | null>(null, subSlot(slot, 'noderef'));
 
 	useModernLayoutEffect(
 		() => {
@@ -121,10 +166,15 @@ export function useFloatingPortalNode(...args: any[]): any {
 			if (root === null) return;
 			if (!uniqueId) return;
 			if (portalNodeRef.current) return;
-			let container = root || portalContext?.portalNode;
+			let container:
+				| HTMLElement
+				| ShadowRoot
+				| MutableRefObject<HTMLElement | ShadowRoot | null>
+				| null
+				| undefined = root || portalContext?.portalNode;
 			if (container && !isNode(container)) container = container.current;
 			container = container || document.body;
-			let idWrapper = null;
+			let idWrapper: HTMLDivElement | null = null;
 			if (id) {
 				idWrapper = document.createElement('div');
 				idWrapper.id = id;
@@ -145,18 +195,45 @@ export function useFloatingPortalNode(...args: any[]): any {
 	return portalNode;
 }
 
-export function FloatingPortal(props: any): any {
+export interface FloatingPortalProps {
+	children?: OctaneNode;
+	/**
+	 * Optionally selects the node with the id if it exists, or create it and
+	 * append it to the specified `root` (by default `document.body`).
+	 */
+	id?: string;
+	/**
+	 * Specifies the root node the portal container will be appended to.
+	 */
+	root?: HTMLElement | ShadowRoot | null | MutableRefObject<HTMLElement | ShadowRoot | null>;
+	/**
+	 * When using non-modal focus management using `FloatingFocusManager`, this
+	 * will preserve the tab order context based on the octane tree instead of the
+	 * DOM tree.
+	 */
+	preserveTabOrder?: boolean;
+}
+
+/**
+ * Portals the floating element into a given container element — by default,
+ * outside of the app root and into the body.
+ * @see https://floating-ui.com/docs/FloatingPortal
+ */
+export function FloatingPortal(props: FloatingPortalProps): OctaneNode {
 	const children = props.children;
 	const id = props.id;
 	const root = props.root;
 	const preserveTabOrder = props.preserveTabOrder ?? true;
 
-	const portalNode = useFloatingPortalNode([{ id, root }, S('FloatingPortal:node')]);
-	const [focusManagerState, setFocusManagerState] = useState<any>(null, S('FloatingPortal:fms'));
-	const beforeOutsideRef = useRef<any>(null, S('FloatingPortal:bo'));
-	const afterOutsideRef = useRef<any>(null, S('FloatingPortal:ao'));
-	const beforeInsideRef = useRef<any>(null, S('FloatingPortal:bi'));
-	const afterInsideRef = useRef<any>(null, S('FloatingPortal:ai'));
+	const portalNode = useFloatingPortalNode({ id, root }, S('FloatingPortal:node'));
+	const [focusManagerState, setFocusManagerState] = useState<FocusManagerState | null>(
+		null,
+		S('FloatingPortal:fms'),
+	);
+	const beforeOutsideRef = useRef<HTMLSpanElement | null>(null, S('FloatingPortal:bo'));
+	const afterOutsideRef = useRef<HTMLSpanElement | null>(null, S('FloatingPortal:ao'));
+	const beforeInsideRef = useRef<HTMLSpanElement | null>(null, S('FloatingPortal:bi'));
+	const afterInsideRef = useRef<HTMLSpanElement | null>(null, S('FloatingPortal:ai'));
 	const modal = focusManagerState?.modal;
 	const open = focusManagerState?.open;
 	const shouldRenderGuards =
@@ -171,7 +248,7 @@ export function FloatingPortal(props: any): any {
 			if (!portalNode || !preserveTabOrder || modal) {
 				return;
 			}
-			function onFocus(event: any) {
+			function onFocus(event: FocusEvent) {
 				if (portalNode && isOutsideEvent(event)) {
 					const focusing = event.type === 'focusin';
 					const manageFocus = focusing ? enableFocusInside : disableFocusInside;
@@ -199,7 +276,7 @@ export function FloatingPortal(props: any): any {
 		S('FloatingPortal:e:enable'),
 	);
 
-	const value = useMemo(
+	const value = useMemo<PortalContextValue>(
 		() => ({
 			preserveTabOrder,
 			beforeOutsideRef,
@@ -221,7 +298,7 @@ export function FloatingPortal(props: any): any {
 				createElement(FocusGuard, {
 					'data-type': 'outside',
 					ref: beforeOutsideRef,
-					onFocus: (event: any) => {
+					onFocus: (event: FocusEvent) => {
 						if (isOutsideEvent(event, portalNode)) {
 							beforeInsideRef.current?.focus();
 						} else {
@@ -239,7 +316,7 @@ export function FloatingPortal(props: any): any {
 				createElement(FocusGuard, {
 					'data-type': 'outside',
 					ref: afterOutsideRef,
-					onFocus: (event: any) => {
+					onFocus: (event: FocusEvent) => {
 						if (isOutsideEvent(event, portalNode)) {
 							afterInsideRef.current?.focus();
 						} else {
@@ -254,4 +331,4 @@ export function FloatingPortal(props: any): any {
 	});
 }
 
-export const usePortalContext = () => useContext(PortalContext);
+export const usePortalContext = (): PortalContextValue | null => useContext(PortalContext);

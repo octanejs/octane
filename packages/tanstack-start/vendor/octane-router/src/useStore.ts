@@ -13,6 +13,17 @@ interface Atom<T> {
   get: () => T
 }
 
+// Public signature mirrors @tanstack/react-store's `useStore(store, selector,
+// compare)`; the store parameter is the structural `{ get }` shape so router-core's
+// `RouterReadableStore`/`RouterWritableStore` atoms (whose types omit `subscribe`)
+// infer `T` directly. The trailing `slot` is the binding's forwarded call-site slot
+// (see internal.ts) — the implementation splits it off the raw argument list.
+export function useStore<T, TSelected = T>(
+  atom: { get: () => T },
+  selector?: (state: T) => TSelected,
+  compare?: (a: TSelected, b: TSelected) => boolean,
+  slot?: symbol,
+): TSelected
 export function useStore<T, TSelected = T>(...args: Array<any>): TSelected {
   const [user, slot] = splitSlot(args)
   const atom = user[0] as Atom<T>

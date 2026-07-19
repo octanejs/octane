@@ -1,5 +1,6 @@
 import { Fragment, createElement } from 'octane';
-import type { JSX as ReactJSX, ReactNode } from 'react';
+import type { JSX as ReactJSX } from 'react';
+import type { OctaneNode } from 'octane';
 import createThemeStyle from '../tokens/style';
 import type { CSSVarStyle, VisxThemeDefinition } from '../tokens/types';
 import warn from '../utils/warn';
@@ -9,7 +10,7 @@ export type ThemeScopeElement = keyof ReactJSX.IntrinsicElements;
 interface BaseThemeScopeProps {
 	className?: string;
 	style?: CSSVarStyle;
-	children: ReactNode;
+	children: OctaneNode;
 }
 
 interface AutoThemeScopeProps extends BaseThemeScopeProps {

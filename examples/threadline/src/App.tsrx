@@ -1,7 +1,8 @@
 import { useRef, useState } from 'octane';
 import { hrefForRoute, people, personForHandle, postsForRoute, useThreadlineStore } from './store';
+import type { Notice, Person, Post, Route } from './store';
 
-function openRoute(event, href, navigate) {
+function openRoute(event: MouseEvent, href: string, navigate: (href: string) => void) {
 	if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
 		return;
 	}
@@ -44,7 +45,19 @@ function ReplyIcon() {
 	</svg>;
 }
 
-function NavItem({ href, label, icon, active, navigate }) @{
+function NavItem({
+	href,
+	label,
+	icon,
+	active,
+	navigate,
+}: {
+	href: string;
+	label: string;
+	icon: string;
+	active: boolean;
+	navigate: (href: string) => void;
+}) @{
 	<a
 		class={{ 'nav-item': true, active }}
 		href={href}
@@ -65,7 +78,13 @@ function NavItem({ href, label, icon, active, navigate }) @{
 	</a>
 }
 
-function Avatar({ person, size = 'medium' }) @{
+function Avatar({
+	person,
+	size = 'medium',
+}: {
+	person: Person;
+	size?: 'small' | 'medium' | 'large';
+}) @{
 	<span
 		class={'avatar avatar-' + size}
 		style={{ backgroundColor: person.accent }}
@@ -75,7 +94,15 @@ function Avatar({ person, size = 'medium' }) @{
 	</span>
 }
 
-function NoticeBar({ notice, retryMutation, dismissNotice }) @{
+function NoticeBar({
+	notice,
+	retryMutation,
+	dismissNotice,
+}: {
+	notice: Notice;
+	retryMutation: (noticeId: number) => void;
+	dismissNotice: (noticeId: number) => void;
+}) @{
 	@if (notice.tone === 'error') {
 		<div class="notice notice-error" role="alert">
 			<div>
@@ -120,9 +147,15 @@ function NoticeBar({ notice, retryMutation, dismissNotice }) @{
 	}
 }
 
-function Composer({ publishPost, receiveLivePost }) @{
+function Composer({
+	publishPost,
+	receiveLivePost,
+}: {
+	publishPost: (body: string) => void;
+	receiveLivePost: () => void;
+}) @{
 	const [draft, setDraft] = useState('');
-	const editorRef = useRef(null);
+	const editorRef = useRef<HTMLTextAreaElement | null>(null);
 	const remaining = 280 - draft.length;
 	const submit = () => {
 		const body = draft.trim();
@@ -147,9 +180,9 @@ function Composer({ publishPost, receiveLivePost }) @{
 				id="composer-input"
 				ref={editorRef}
 				value={draft}
-				maxlength="280"
+				maxLength={280}
 				placeholder="Share what you’re working on…"
-				onInput={(event) => setDraft(event.target.value.slice(0, 280))}
+				onInput={(event) => setDraft(event.currentTarget.value.slice(0, 280))}
 				onKeyDown={(event) => {
 					if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
 						event.preventDefault();
@@ -176,9 +209,9 @@ function Composer({ publishPost, receiveLivePost }) @{
 					for a live update
 				</p>
 				<div class="composer-submit">
-					<span class={{ 'character-count': true, warning: remaining < 30 }}>
-						{remaining as string}
-					</span>
+					<span class={{ 'character-count': true, warning: remaining < 30 }}>{String(
+						remaining,
+					)}</span>
 					<button class="post-button" type="submit" disabled={draft.trim().length === 0}>
 						Post
 					</button>
@@ -188,7 +221,19 @@ function Composer({ publishPost, receiveLivePost }) @{
 	</form>
 }
 
-function PostCard({ post, pending, navigate, toggleLike, toggleSave }) @{
+function PostCard({
+	post,
+	pending,
+	navigate,
+	toggleLike,
+	toggleSave,
+}: {
+	post: Post;
+	pending: boolean;
+	navigate: (href: string) => void;
+	toggleLike: (postId: string) => void;
+	toggleSave: (postId: string) => void;
+}) @{
 	const author = personForHandle(post.author);
 	const profileHref = '/profile/' + author.handle;
 	<article class="post-card" aria-label={'Post by ' + author.name}>
@@ -223,9 +268,7 @@ function PostCard({ post, pending, navigate, toggleLike, toggleSave }) @{
 			<footer class="post-actions">
 				<span class="post-action passive" aria-label={'Replies to post by ' + author.name}>
 					<ReplyIcon />
-					<span>
-						{post.replies as string}
-					</span>
+					<span>{String(post.replies)}</span>
 				</span>
 				<button
 					class={{ 'post-action': true, liked: post.liked }}
@@ -235,9 +278,7 @@ function PostCard({ post, pending, navigate, toggleLike, toggleSave }) @{
 					onClick={() => toggleLike(post.id)}
 				>
 					<HeartIcon />
-					<span>
-						{post.likes as string}
-					</span>
+					<span>{String(post.likes)}</span>
 					@if (pending) {
 						<span class="sr-only">Syncing reaction</span>
 					}
@@ -256,7 +297,15 @@ function PostCard({ post, pending, navigate, toggleLike, toggleSave }) @{
 	</article>
 }
 
-function ProfileHeader({ person, isFollowing, toggleFollow }) @{
+function ProfileHeader({
+	person,
+	isFollowing,
+	toggleFollow,
+}: {
+	person: Person;
+	isFollowing: boolean;
+	toggleFollow: (handle: string) => void;
+}) @{
 	<section class="profile-card" aria-labelledby="profile-title">
 		<div class="profile-cover" style={{ backgroundColor: person.accent }}></div>
 		<div class="profile-details">
@@ -314,7 +363,7 @@ function LoadingTimeline() @{
 	</div>
 }
 
-function EmptyTimeline({ route, profile }) @{
+function EmptyTimeline({ route, profile }: { route: Route; profile: Person }) @{
 	<section class="empty-state">
 		<div class="empty-illustration" aria-hidden="true">✦</div>
 		@if (route.kind === 'saved') {
@@ -338,7 +387,15 @@ function EmptyTimeline({ route, profile }) @{
 	</section>
 }
 
-function RightRail({ online, setOnline, navigate }) @{
+function RightRail({
+	online,
+	setOnline,
+	navigate,
+}: {
+	online: boolean;
+	setOnline: (online: boolean) => void;
+	navigate: (href: string) => void;
+}) @{
 	<aside class="right-rail" aria-label="Explore Threadline">
 		<section class="side-card connection-card">
 			<div class="side-heading">
@@ -471,7 +528,7 @@ export function App() @{
 			</a>
 		</aside>
 
-		<main id="main-content" class="timeline-column" tabindex="-1">
+		<main id="main-content" class="timeline-column" tabIndex={-1}>
 			<button class={{ 'compact-network': true, online }} onClick={() => setOnline(!online)}>
 				<span aria-hidden="true"></span>
 				{online ? 'Work offline' : 'Reconnect'}

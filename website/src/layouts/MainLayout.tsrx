@@ -6,7 +6,7 @@ import { Header } from '../components/Header.tsrx';
 import { Footer } from '../components/Footer.tsrx';
 
 export function MainLayout() @{
-	const pathname = useLocation({ select: (l: any) => l.pathname });
+	const pathname = useLocation({ select: (l) => l.pathname });
 	const showFooter = pathname !== '/playground';
 
 	<div class="shell">

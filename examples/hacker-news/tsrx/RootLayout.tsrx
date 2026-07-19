@@ -46,7 +46,7 @@ export function RootLayout() @{
 		<main {...stylex.props(styles.main)}>
 			@try {
 				<Outlet />
-			} @catch (error) {
+			} @catch (error: unknown, _reset: () => void) {
 				<ErrorFallback error={error} />
 			}
 		</main>

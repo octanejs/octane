@@ -4,7 +4,12 @@ import { registerClickableLink } from '@lexical/link';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
-export function ClickableLinkPlugin(props) {
+type Props = {
+	newTab?: boolean;
+	disabled?: boolean;
+};
+
+export function ClickableLinkPlugin(props: Props) {
 	const [editor] = useLexicalComposerContext();
 	const newTab = props.newTab !== false;
 	const disabled = props.disabled === true;

@@ -46,6 +46,13 @@ import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js'
  *     `src/runtime.ts`'s ref binding), so no `mergeRefs` helper is needed.
  *   - `validation.requireUseServerForAwait: false` — no server-component
  *     concept in octane (no top-level await validation gates).
+ *   - `serverModule` — octane's `module server { … }` dialect plus its
+ *     boundary `import { fn } from 'server'` (docs/ssr.md). The shared
+ *     type-only transform lowers it to plain checkable TS (hoisted block
+ *     imports + a namespace-valued binding); verbatim it can never
+ *     typecheck (TS1147 in-block import, TS2307 boundary import). The
+ *     runtime compiler (`compile.js`) owns the dialect's real semantics
+ *     (isolation validation, SSR namespace, RPC stubs) and is unaffected.
  *
  * `imports.suspense` and `imports.fragment` aren't real components in
  * octane (we lower `@try`/`@pending` to `tryBlock` and fragments to
@@ -62,7 +69,11 @@ const OCTANE_PLATFORM = {
 		suspense: 'octane',
 		dynamic: 'octane',
 		errorBoundary: 'octane',
-		forOfIterableHelper: '@tsrx/core/runtime/iterable',
+		forOfIterableHelper: 'octane/tsrx-iterable',
+		// Host-element spreads in the virtual TSX lower to
+		// `__normalize_spread_props(...)`; the shared transform imports the
+		// helpers from this module (identity-typed — see octane/tsrx-spread).
+		refProp: 'octane/tsrx-spread',
 	},
 	jsx: {
 		rewriteClassAttr: false,
@@ -72,9 +83,33 @@ const OCTANE_PLATFORM = {
 	validation: {
 		requireUseServerForAwait: false,
 	},
+	serverModule: {
+		blockName: 'server',
+		importSpecifier: 'server',
+	},
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+
+const JSX_IMPORT_SOURCE_PRAGMA = /@jsxImportSource\s+([^\s*]+)/;
+
+/**
+ * Does the parsed file carry an authored `@jsxImportSource` pragma in its
+ * LEADING comments (the position TS reads pragmas from)? Decided on the parse
+ * artifacts — the collected comment nodes and the first statement's offset —
+ * not by re-scanning text. `@tsrx/core` ≥0.1.43 re-emits preserved leading
+ * comments into the virtual TSX, so when this is true the authored pragma is
+ * already in the generated code and no renderer-config prelude may be added:
+ * TS honors the FIRST pragma, so a prelude would shadow the authored one.
+ */
+function hasAuthoredLeadingPragma(ast, comments) {
+	const firstStatementStart = ast.body?.[0]?.start;
+	return comments.some(
+		(comment) =>
+			(firstStatementStart == null || comment.end <= firstStatementStart) &&
+			JSX_IMPORT_SOURCE_PRAGMA.test(comment.value),
+	);
+}
 
 function createRendererTypePrelude(renderer) {
 	if (renderer.intrinsics === undefined) return '';
@@ -115,6 +150,8 @@ export function compileToVolarMappings(source, filename, options) {
 	const ast = parseModule(source, filename, {
 		collect: true,
 		loose: !!options?.loose,
+		preserveParens: true,
+		keywordTokens: true,
 		errors,
 		comments,
 	});
@@ -126,6 +163,12 @@ export function compileToVolarMappings(source, filename, options) {
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	}).diagnostics;
+	// The `module server { … }` dialect is lowered to plain checkable TS by
+	// the shared transform itself (via the platform's `serverModule` option)
+	// before the typeOnly print. The lowering is copy-on-write inside
+	// @tsrx/core: `ast` (passed below as `ast_from_source`) stays the
+	// original parse, and replacement nodes keep authored locations so
+	// mappings/hover still work.
 	const transformed = octaneTransform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
@@ -133,7 +176,9 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
-	const prelude = createRendererTypePrelude(renderer);
+	const prelude = hasAuthoredLeadingPragma(ast, comments)
+		? ''
+		: createRendererTypePrelude(renderer);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
 		ast_from_source: ast,

@@ -3,15 +3,32 @@
 // component: `children(entries, editor)` returns the element to render.
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { $isHeadingNode, HeadingNode } from '@lexical/rich-text';
+import type { HeadingTagType } from '@lexical/rich-text';
 import { $getNextRightPreorderNode } from '@lexical/utils';
 import { $getNodeByKey, $getRoot, $isElementNode, TextNode } from 'lexical';
+import type { ElementNode, LexicalEditor, LexicalNode, NodeKey } from 'lexical';
 import { useEffect, useState } from 'octane';
+import type { OctaneNode } from 'octane';
 
-function toEntry(heading) {
+/**
+ * A single entry in the table of contents, as a tuple of the heading node's
+ * {@link NodeKey}, its text content, and its heading tag (for example `'h1'`).
+ */
+export type TableOfContentsEntry = [key: NodeKey, text: string, tag: HeadingTagType];
+
+type Props = {
+	children: (values: Array<TableOfContentsEntry>, editor: LexicalEditor) => OctaneNode;
+};
+
+function toEntry(heading: HeadingNode): TableOfContentsEntry {
 	return [heading.getKey(), heading.getTextContent(), heading.getTag()];
 }
 
-function $insertHeadingIntoTableOfContents(prevHeading, newHeading, currentTableOfContents) {
+function $insertHeadingIntoTableOfContents(
+	prevHeading: HeadingNode | null,
+	newHeading: HeadingNode | null,
+	currentTableOfContents: Array<TableOfContentsEntry>,
+): Array<TableOfContentsEntry> {
 	if (newHeading === null) {
 		return currentTableOfContents;
 	}
@@ -40,7 +57,10 @@ function $insertHeadingIntoTableOfContents(prevHeading, newHeading, currentTable
 	return newTableOfContents;
 }
 
-function $deleteHeadingFromTableOfContents(key, currentTableOfContents) {
+function $deleteHeadingFromTableOfContents(
+	key: NodeKey,
+	currentTableOfContents: Array<TableOfContentsEntry>,
+): Array<TableOfContentsEntry> {
 	const newTableOfContents = [];
 	for (const heading of currentTableOfContents) {
 		if (heading[0] !== key) {
@@ -50,7 +70,10 @@ function $deleteHeadingFromTableOfContents(key, currentTableOfContents) {
 	return newTableOfContents;
 }
 
-function $updateHeadingInTableOfContents(heading, currentTableOfContents) {
+function $updateHeadingInTableOfContents(
+	heading: HeadingNode,
+	currentTableOfContents: Array<TableOfContentsEntry>,
+): Array<TableOfContentsEntry> {
 	const newTableOfContents = [];
 	for (const oldHeading of currentTableOfContents) {
 		if (oldHeading[0] === heading.getKey()) {
@@ -62,8 +85,12 @@ function $updateHeadingInTableOfContents(heading, currentTableOfContents) {
 	return newTableOfContents;
 }
 
-function $updateHeadingPosition(prevHeading, heading, currentTableOfContents) {
-	const newTableOfContents = [];
+function $updateHeadingPosition(
+	prevHeading: HeadingNode | null,
+	heading: HeadingNode,
+	currentTableOfContents: Array<TableOfContentsEntry>,
+): Array<TableOfContentsEntry> {
+	const newTableOfContents: Array<TableOfContentsEntry> = [];
 	const newEntry = toEntry(heading);
 
 	if (!prevHeading) {
@@ -82,7 +109,7 @@ function $updateHeadingPosition(prevHeading, heading, currentTableOfContents) {
 	return newTableOfContents;
 }
 
-function $getPreviousHeading(node) {
+function $getPreviousHeading(node: LexicalNode): HeadingNode | null {
 	let prevHeading = $getNextRightPreorderNode(node);
 	while (prevHeading !== null && !$isHeadingNode(prevHeading)) {
 		prevHeading = $getNextRightPreorderNode(prevHeading);
@@ -90,14 +117,14 @@ function $getPreviousHeading(node) {
 	return prevHeading;
 }
 
-export function TableOfContentsPlugin(props) {
-	const [tableOfContents, setTableOfContents] = useState([]);
+export function TableOfContentsPlugin(props: Props) {
+	const [tableOfContents, setTableOfContents] = useState<Array<TableOfContentsEntry>>([]);
 	const [editor] = useLexicalComposerContext();
 
 	useEffect(() => {
-		let currentTableOfContents = [];
+		let currentTableOfContents: Array<TableOfContentsEntry> = [];
 		editor.read('latest', () => {
-			const updateCurrentTableOfContents = (node) => {
+			const updateCurrentTableOfContents = (node: ElementNode) => {
 				for (const child of node.getChildren()) {
 					if ($isHeadingNode(child)) {
 						currentTableOfContents.push([
@@ -120,7 +147,7 @@ export function TableOfContentsPlugin(props) {
 			dirtyElements,
 		}) => {
 			editorState.read(() => {
-				const updateChildHeadings = (node) => {
+				const updateChildHeadings = (node: ElementNode) => {
 					for (const child of node.getChildren()) {
 						if ($isHeadingNode(child)) {
 							const prevHeading = $getPreviousHeading(child);

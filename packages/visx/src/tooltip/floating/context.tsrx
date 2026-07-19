@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'octane';
+import type { OctaneNode } from 'octane';
 import type React from 'react';
 import type { FloatingTooltipRootState } from './types';
 
 const FloatingTooltipContext = createContext<FloatingTooltipRootState<any> | null>(null);
 
 export type FloatingTooltipContextProviderProps = {
-	children: React.ReactNode;
+	children: OctaneNode;
 	value: FloatingTooltipRootState<any>;
 };
 
