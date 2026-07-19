@@ -16,7 +16,6 @@
     "@codemirror/state": "catalog:default",
     "@codemirror/view": "catalog:default",
     "@octanejs/mdx": "workspace:*",
-    "@octanejs/scan": "workspace:*",
     "@octanejs/tanstack-start": "workspace:*",
     "@octanejs/three": "workspace:*",
     "@octanejs/visx": "workspace:*",

@@ -72,9 +72,7 @@ export default defineConfig({
 		tanstackStart({
 			// Scene modules stay client-only during Start SSR, matching the website's
 			// existing Octane renderer contract while still shipping through Vite.
-			// profile: true compiles the profiling channel in so @octanejs/scan can
-			// observe renders — local scan testing only, do not ship.
-			octane: { renderers: threeRenderers, profile: true },
+			octane: { renderers: threeRenderers },
 		}),
 		nitro({
 			// Keep production on the runtime selected by the previous Vercel

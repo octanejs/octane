@@ -4813,9 +4813,6 @@ importers:
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
-      '@octanejs/scan':
-        specifier: workspace:*
-        version: link:../packages/scan
       '@octanejs/tanstack-start':
         specifier: workspace:*
         version: link:../packages/tanstack-start
