@@ -12,6 +12,46 @@ const FIXTURE = resolve(import.meta.dirname, '_fixtures/background');
 const FORBIDDEN_MODULE =
 	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
 
+const BUILD_CASES = [
+	{
+		entry: './src/background.ts',
+		expectedModules: [
+			'/packages/rspeedy-plugin-octane/tests/_fixtures/background/src/background.ts',
+			'/packages/rspeedy-plugin-octane/tests/_fixtures/background/src/App.tsrx',
+			'/packages/lynx/src/root.ts',
+			'/packages/lynx/src/core/client-driver.ts',
+			'/packages/lynx/src/core/protocol.ts',
+			'/packages/lynx/src/core/transport.ts',
+			'/packages/octane/src/universal-native.ts',
+			'/packages/octane/src/universal-core.ts',
+		],
+		forbiddenModules: [
+			'/packages/lynx/src/main-thread.ts',
+			'/packages/lynx/src/core/host-driver.ts',
+			'/packages/lynx/src/core/papi.ts',
+		],
+		thread: 'background',
+	},
+	{
+		entry: './src/main-thread.ts',
+		expectedModules: [
+			'/packages/rspeedy-plugin-octane/tests/_fixtures/background/src/main-thread.ts',
+			'/packages/lynx/src/main-thread.ts',
+			'/packages/lynx/src/core/host-driver.ts',
+			'/packages/lynx/src/core/papi.ts',
+			'/packages/lynx/src/core/protocol.ts',
+		],
+		forbiddenModules: [
+			'/packages/lynx/src/root.ts',
+			'/packages/lynx/src/core/client-driver.ts',
+			'/packages/lynx/src/core/transport.ts',
+			'/packages/octane/src/universal-native.ts',
+			'/packages/octane/src/universal-core.ts',
+		],
+		thread: 'main-thread',
+	},
+] as const;
+
 function readJavaScript(directory: string): string {
 	let output = '';
 	for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -49,21 +89,21 @@ class MetadataProbePlugin {
 
 function metadataProbe(observed: unknown[], moduleIdentifiers: string[]) {
 	return {
-		name: 'octane:phase-one-metadata-probe',
+		name: 'octane:lynx-runtime-graph-probe',
 		setup(api: any) {
 			api.modifyBundlerChain((chain: any) => {
 				chain
-					.plugin('octane:phase-one-metadata-probe')
+					.plugin('octane:lynx-runtime-graph-probe')
 					.use(MetadataProbePlugin, [observed, moduleIdentifiers]);
 			});
 		},
 	};
 }
 
-describe('@octanejs/rspeedy-plugin native compile builds', () => {
-	it.each(['background', 'main-thread'] as const)(
-		'bundles %s TSRX as one DOM-free native universal graph',
-		async (thread) => {
+describe('@octanejs/rspeedy-plugin native production entries', () => {
+	it.each(BUILD_CASES)(
+		'bundles the $thread entry as its isolated DOM-free graph',
+		async ({ entry, expectedModules, forbiddenModules, thread }) => {
 			const temporaryRoot = mkdtempSync(join(tmpdir(), 'octane-rspeedy-build-'));
 			const outputRoot = join(temporaryRoot, 'dist');
 			const observed: unknown[] = [];
@@ -82,7 +122,7 @@ describe('@octanejs/rspeedy-plugin native compile builds', () => {
 						filenameHash: false,
 						sourceMap: false,
 					},
-					source: { entry: { main: './src/App.tsrx' } },
+					source: { entry: { main: entry } },
 					splitChunks: false,
 					plugins: [
 						pluginOctane({ thread, hmr: false, dev: false }),
@@ -99,29 +139,36 @@ describe('@octanejs/rspeedy-plugin native compile builds', () => {
 					),
 				);
 
-				expect([...canonicalModules].some((identifier) => identifier.endsWith('/App.tsrx'))).toBe(
-					true,
-				);
-				expect(
-					[...canonicalModules].filter((identifier) => identifier.endsWith('/universal-core.ts')),
-				).toHaveLength(1);
-				expect(
-					[...canonicalModules].filter((identifier) => identifier.endsWith('/universal-native.ts')),
-				).toHaveLength(1);
+				for (const suffix of expectedModules) {
+					expect(
+						[...canonicalModules].some((identifier) => identifier.endsWith(suffix)),
+						`expected ${thread} graph to contain ${suffix}`,
+					).toBe(true);
+				}
+				for (const suffix of forbiddenModules) {
+					expect(
+						[...canonicalModules].some((identifier) => identifier.endsWith(suffix)),
+						`expected ${thread} graph to exclude ${suffix}`,
+					).toBe(false);
+				}
 				expect([...canonicalModules].some((identifier) => FORBIDDEN_MODULE.test(identifier))).toBe(
 					false,
 				);
-				expect(observed).toEqual(
-					expect.arrayContaining([
-						expect.objectContaining({
-							transformKind: 'compile',
-							universalRuntime: { runtime: 'lynx', thread },
-						}),
-					]),
-				);
+				if (thread === 'background') {
+					expect(observed).toEqual(
+						expect.arrayContaining([
+							expect.objectContaining({
+								transformKind: 'compile',
+								universalRuntime: { runtime: 'lynx', thread },
+							}),
+						]),
+					);
+				} else {
+					expect(observed).toEqual([]);
+				}
 
 				const output = readJavaScript(outputRoot);
-				expect(output).toContain('octane-phase1-es2017');
+				if (thread === 'background') expect(output).toContain('octane-phase1-es2017');
 				expect(output).not.toMatch(/\?\.|\?\?/);
 				expect(output).not.toMatch(/\b(?:document|window|HTMLElement|MutationObserver)\b/);
 			} finally {

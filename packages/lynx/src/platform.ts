@@ -5,8 +5,9 @@ export type LynxRuntime = 'background' | 'main-thread';
 export type LynxPlatform = 'android' | 'ios' | 'web';
 
 /**
- * Platform APIs are metadata-only during Milestone 1. Init data, global props,
- * lifecycle, Native Modules, and page controls are deferred to Milestone 4.
+ * Platform APIs remain metadata-only in the Milestone 2 source renderer. Init
+ * data, global props, lifecycle, Native Modules, and page controls are deferred
+ * to Milestone 4.
  */
 export const lynxPlatformAvailability = {
 	available: false,

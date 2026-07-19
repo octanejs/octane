@@ -5,6 +5,7 @@ import { configDefaults, defineConfig } from 'vitest/config';
 import { octane } from './packages/octane/src/compiler/vite.js';
 import { octaneMdx } from './packages/mdx/src/vite.js';
 import { stylex } from './packages/stylex/src/vite.js';
+import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 
@@ -1869,6 +1870,9 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
+				// Lynx has no server compilation mode; execute native fixtures through
+				// the client compiler even though Vitest itself runs them in Node.
+				plugins: [octane({ renderers: lynxRspeedyRenderers, ssr: false })],
 				resolve: { alias: LYNX_ALIASES },
 			},
 			{

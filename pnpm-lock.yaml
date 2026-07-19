@@ -703,6 +703,9 @@ catalogs:
     '@lynx-js/rspeedy':
       specifier: 0.16.0
       version: 0.16.0
+    '@lynx-js/testing-environment':
+      specifier: 0.3.0
+      version: 0.3.0
     '@lynx-js/types':
       specifier: 4.0.0
       version: 4.0.0
@@ -3420,9 +3423,15 @@ importers:
         specifier: catalog:lynx
         version: 4.0.0
     devDependencies:
+      '@lynx-js/testing-environment':
+        specifier: catalog:lynx
+        version: 0.3.0
       '@types/react':
         specifier: catalog:default
         version: 19.2.17
+      jsdom:
+        specifier: catalog:default
+        version: 29.1.1(@noble/hashes@2.2.0)
       octane:
         specifier: workspace:*
         version: link:../octane
@@ -5728,6 +5737,9 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
+
+  '@lynx-js/testing-environment@0.3.0':
+    resolution: {integrity: sha512-a08y6fmEZZHNva/bCs4UT8SavTPFnH8j0wb01gnnC6RA28r0139I5ApjAzaPi+LSaj1pH+A5o41bDts2iV+ulw==}
 
   '@lynx-js/types@4.0.0':
     resolution: {integrity: sha512-FBtBV8wt+9/CAUbTdZwvbhGjJEnyzKLWVpq5gaTHTbhDztbhdP0avZ0nHD6I5HSgAhzYNB9oDrqMt/r6YqBkng==}
@@ -13607,6 +13619,8 @@ snapshots:
       - supports-color
       - utf-8-validate
       - webpack
+
+  '@lynx-js/testing-environment@0.3.0': {}
 
   '@lynx-js/types@4.0.0':
     dependencies:

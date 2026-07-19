@@ -4,19 +4,28 @@ import type {
 	LynxEventTarget as NativeLynxEventTarget,
 	LynxImageErrorEvent,
 	LynxImageLoadEvent,
-	LynxStandardProps,
+	LynxStandardProps as NativeLynxStandardProps,
 } from './native-types.js';
+import type { LynxPublicHandle } from './core/client-driver.js';
 
 /**
  * Renderer-local adaptation of the first Lynx intrinsic slice.
  *
  * Upstream's props/events entry transitively imports its global Element graph,
  * so this module uses the renderer-owned, module-scoped compatibility slice in
- * native-types.ts. These declarations do not imply that the Milestone 2 host
- * driver exists yet.
+ * native-types.ts.
  */
 
-export type { LynxStandardProps } from './native-types.js';
+export type LynxRefCallback<T = LynxPublicHandle> = (value: T | null) => void | (() => void);
+export type LynxRefObject<T = LynxPublicHandle> = { current: T | null };
+export type LynxRef<T = LynxPublicHandle> =
+	| LynxRefCallback<T>
+	| LynxRefObject<T>
+	| readonly LynxRef<T>[];
+
+export type LynxStandardProps = NativeLynxStandardProps & {
+	ref?: LynxRef;
+};
 export type LynxEventTarget = NativeLynxEventTarget;
 export type LynxEvent<Kind extends string = string, Detail = unknown> = NativeLynxEvent<
 	Kind,

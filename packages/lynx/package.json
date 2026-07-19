@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 1 scaffold for Octane's future Lynx native renderer.",
+  "description": "Private Milestone 2 source implementation of Octane's Lynx native renderer.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -41,6 +41,7 @@
     "./renderer": "./src/renderer.ts",
     "./intrinsics": "./src/intrinsics.ts",
     "./intrinsics/jsx-runtime": "./src/intrinsics.ts",
+    "./main-thread": "./src/main-thread.ts",
     "./platform": "./src/platform.ts",
     "./testing": "./src/testing.ts"
   },
@@ -55,7 +56,9 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@lynx-js/testing-environment": "catalog:lynx",
     "@types/react": "catalog:default",
+    "jsdom": "catalog:default",
     "octane": "workspace:*",
     "typescript": "catalog:lynx",
     "vitest": "catalog:default"

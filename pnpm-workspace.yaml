@@ -67,6 +67,7 @@ overrides:
 catalogs:
   lynx:
     '@lynx-js/rspeedy': 0.16.0
+    '@lynx-js/testing-environment': 0.3.0
     '@lynx-js/types': 4.0.0
     '@rsbuild/core': 2.1.4
     '@rspack/core': 2.1.3

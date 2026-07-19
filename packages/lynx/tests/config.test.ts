@@ -46,7 +46,7 @@ describe('@octanejs/lynx renderer preset', () => {
 					'react',
 				]),
 				hostProps: expect.objectContaining({
-					'*': expect.arrayContaining(['className', 'data-*', 'bind*']),
+					'*': expect.arrayContaining(['ref', 'className', 'data-*', 'bind*']),
 					text: expect.arrayContaining(['text-maxline']),
 					view: [],
 				}),
