@@ -20,15 +20,20 @@ import {
 	type Recommendation,
 } from './plans.ts';
 
-/** Loose thenable shape: either a seeded synchronous read or a real Promise. */
-export interface Resource<T> {
+/**
+ * Thenable shape `use()` accepts: either a seeded synchronous read or a real
+ * Promise. The optional `status`/`value` pair is the pre-settled fast path
+ * octane reads without ever registering a continuation.
+ */
+export interface Resource<T> extends PromiseLike<T> {
 	status?: 'fulfilled';
 	value?: T;
-	then(onFulfilled?: (value: T) => unknown, onRejected?: (reason: unknown) => unknown): unknown;
 }
 
 function seed<T>(value: T): Resource<T> {
-	return { status: 'fulfilled', value, then() {} };
+	// The inert `then` never runs: use() reads a fulfilled seed synchronously
+	// (that is the point of seeding), so the thenable side is type-level only.
+	return { status: 'fulfilled', value, then() {} } as Resource<T>;
 }
 
 const REFRESH_DELAY_MS = 350;

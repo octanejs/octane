@@ -10,13 +10,20 @@
 // retry pass re-throws it out of use() and — with no @catch — the fault
 // escapes into the React shell's error boundary.
 import { use, useState } from 'octane';
+import type { Plan, Rating, Recommendation } from '../data/plans.ts';
 import {
 	ratingResource,
 	recommendationsResource,
 	refreshRecommendations,
+	type Resource,
 } from '../data/resources.ts';
 
-function PicksBody(props) @{
+interface PicksBodyProps {
+	picksResource: Resource<Recommendation[]>;
+	ratingResource: Resource<Rating>;
+}
+
+function PicksBody(props: PicksBodyProps) @{
 	const picks = use(props.picksResource);
 	const rating = use(props.ratingResource);
 	<>
@@ -34,7 +41,12 @@ function PicksBody(props) @{
 	</>
 }
 
-export function Recommendations(props) @{
+export interface RecommendationsProps {
+	plan: Plan;
+	faultScenario: string | null;
+}
+
+export function Recommendations(props: RecommendationsProps) @{
 	const [picksResource, setPicksResource] = useState(() => recommendationsResource(props.plan.id));
 	<section class="picks" data-island="recommendations">
 		<h3 class="picks-title">

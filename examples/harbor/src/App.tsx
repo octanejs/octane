@@ -1,9 +1,13 @@
 // The React 19 shell. React owns the page — providers, header state, error
 // boundary, layout — and mounts three compiled Octane islands through
-// OctaneCompat. The Compat component arrives AS A PROP: entry-server passes
-// the octane/react/server variant, entry-client the octane/react one, with
+// OctaneCompat. Both authoring forms appear below and BOTH are fully typed
+// against each island's own octane-typed signature: the element-child form
+// (PriceBadge) and the `component`/`props` transport form (the other two).
+// The Compat component arrives AS A PROP: entry-server passes the
+// octane/react/server variant, entry-client the octane/react one, with
 // identical trees and island props on both sides.
-import { useEffect, useState, type ComponentType, type ReactElement } from 'react';
+import { useEffect, useState } from 'react';
+import type { OctaneCompat } from 'octane/react';
 import {
 	LocaleContext,
 	ThemeContext,
@@ -15,18 +19,13 @@ import { IslandErrorBoundary } from './shell/ErrorBoundary.tsx';
 import { FEATURED_PLAN, PLANS } from './data/plans.ts';
 import { resetRecommendations } from './data/resources.ts';
 import { PriceBadge } from './islands/PriceBadge.tsrx';
-import { PlanConfigurator } from './islands/PlanConfigurator.tsrx';
+import { PlanConfigurator, type CompareEntry } from './islands/PlanConfigurator.tsrx';
 import { Recommendations } from './islands/Recommendations.tsrx';
-
-export interface CompareEntry {
-	planId: string;
-	seats: number;
-}
 
 export interface AppProps {
 	url: string;
-	/** Exactly ONE compiled-Octane element child per mount — the OctaneCompat contract. */
-	Compat: ComponentType<{ children: ReactElement }>;
+	/** The environment's OctaneCompat variant — client and server share one public type. */
+	Compat: typeof OctaneCompat;
 }
 
 function faultScenarioFrom(url: string): string | null {
@@ -76,9 +75,7 @@ export function App({ url, Compat }: AppProps) {
 								)}
 							</article>
 						))}
-						<Compat>
-							<PlanConfigurator plan={FEATURED_PLAN} onAddToCompare={onAddToCompare} />
-						</Compat>
+						<Compat component={PlanConfigurator} props={{ plan: FEATURED_PLAN, onAddToCompare }} />
 						<IslandErrorBoundary
 							onRetry={() => {
 								resetRecommendations(FEATURED_PLAN.id);
@@ -87,9 +84,11 @@ export function App({ url, Compat }: AppProps) {
 						>
 							{/* The key bump replaces the island wholesale on retry — a clean
 							    remount whose seeded resources read synchronously again. */}
-							<Compat key={'recs-' + recsGeneration}>
-								<Recommendations plan={FEATURED_PLAN} faultScenario={faultScenario} />
-							</Compat>
+							<Compat
+								key={'recs-' + recsGeneration}
+								component={Recommendations}
+								props={{ plan: FEATURED_PLAN, faultScenario }}
+							/>
 						</IslandErrorBoundary>
 						{compares.length > 0 && (
 							<aside className="compare-summary">

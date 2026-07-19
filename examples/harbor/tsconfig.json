@@ -11,7 +11,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "types": ["node"]
+    "types": ["node"],
+    "plugins": [{ "name": "@tsrx/typescript-plugin" }]
   },
   "include": ["src/**/*", "e2e/**/*", "env.d.ts", "vite.config.ts"]
 }

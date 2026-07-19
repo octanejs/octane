@@ -32,9 +32,19 @@ import {
 	renderHostedAttempt,
 	type HostedServerSession,
 } from '../runtime.server.js';
-import { validateIslandChild, type OctaneCompatProps, type TransportedChild } from './shared.js';
+import {
+	resolveHostedIsland,
+	type OctaneCompatComponentProps,
+	type OctaneCompatProps,
+} from './shared.js';
 
-export type { OctaneCompatProps, OctaneReactComponent, OctaneRenderedNode } from './shared.js';
+export type {
+	OctaneCompatComponentProps,
+	OctaneCompatProps,
+	OctaneHostedComponent,
+	OctaneReactComponent,
+	OctaneRenderedNode,
+} from './shared.js';
 
 /**
  * Server envelope: marker-parity twin of the client root envelope — the
@@ -56,13 +66,15 @@ function hostedServerEnvelope(props: {
 
 /**
  * Fizz replays a suspended task with the IDENTICAL props object, so the
- * transported child's props are request-local, replay-stable session keys
- * (Phase 0, §9.1) — no module-global request state, no AsyncLocalStorage.
+ * wrapper's own props are request-local, replay-stable session keys (Phase 0,
+ * §9.1) — no module-global request state, no AsyncLocalStorage. Keying on the
+ * WRAPPER props (rather than the transported island props) keeps the key
+ * unique per island for both authoring forms, including `component`-form
+ * islands that omit `props` and share the frozen empty transport object.
  */
 const SESSIONS = new WeakMap<object, HostedServerSession>();
 
-function sessionFor(child: TransportedChild): HostedServerSession {
-	const key = child.props;
+function sessionFor(key: object): HostedServerSession {
 	let session = SESSIONS.get(key);
 	if (session === undefined) {
 		session = createHostedServerSession();
@@ -71,12 +83,16 @@ function sessionFor(child: TransportedChild): HostedServerSession {
 	return session;
 }
 
-export function OctaneCompat(props: OctaneCompatProps): React.ReactNode {
-	const child = validateIslandChild(props.children);
+export function OctaneCompat<P>(props: OctaneCompatComponentProps<P>): React.ReactNode;
+export function OctaneCompat(props: OctaneCompatProps): React.ReactNode;
+export function OctaneCompat(
+	props: OctaneCompatProps | OctaneCompatComponentProps<unknown>,
+): React.ReactNode {
+	const child = resolveHostedIsland(props);
 	// The island-stable identifier prefix; the client wrapper derives the same
 	// value at the same tree position, so Octane ids hydrate byte-identically.
 	const identifierPrefix = React.useId();
-	const session = sessionFor(child);
+	const session = sessionFor(props);
 
 	// Replay committed strata IN ORDER: identity-stable and status-stamped, so
 	// settled ones unwrap synchronously and use()-call positions stay aligned

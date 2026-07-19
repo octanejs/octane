@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node server.mjs",
     "build": "vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
     "test:e2e": "playwright test --config e2e/playwright.config.ts",
     "e2e": "pnpm test:e2e"
   },

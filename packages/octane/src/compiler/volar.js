@@ -30,7 +30,11 @@ import {
 	parseModule,
 } from '@tsrx/core';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
-import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
+import {
+	DOM_RENDERER_MODULE,
+	normalizeRendererConfig,
+	resolveRendererForFile,
+} from './renderers.js';
 
 /**
  * Platform descriptor for `createJsxTransform`. Mirrors `tsrx-react`'s React
@@ -112,8 +116,22 @@ function hasAuthoredLeadingPragma(ast, comments) {
 }
 
 function createRendererTypePrelude(renderer) {
-	if (renderer.intrinsics === undefined) return '';
-	return `/** @jsxImportSource ${renderer.intrinsics} */\n`;
+	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
+	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
+	// the registry entry declares no `intrinsics`. Without the pragma the host
+	// tsconfig's `jsxImportSource` leaks in — in an octane project that is
+	// already `octane` (no observable change), but in a mixed-host program (a
+	// React shell hosting islands through `octane/react`, tsrx-tsc over a
+	// `react-jsx` tsconfig) every island would be typed against REACT's JSX and
+	// reject octane's real contract (`class`, native event payloads, …).
+	// An authored leading pragma still wins (checked by the caller).
+	const intrinsics =
+		renderer.intrinsics ??
+		(renderer.module === DOM_RENDERER_MODULE && renderer.target === 'dom'
+			? DOM_RENDERER_MODULE
+			: undefined);
+	if (intrinsics === undefined) return '';
+	return `/** @jsxImportSource ${intrinsics} */\n`;
 }
 
 function shiftGeneratedOffsets(mappings, offset) {

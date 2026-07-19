@@ -126,6 +126,26 @@ the runtime/compiler over patching tests or generated output.
 - Refs are passed as props (React-19 style): `ref={cb}`, `ref={obj}`, or multi-ref
   `ref={[a, b]}`. There is no `forwardRef`.
 
+## Types For `.tsrx` And Octane `.tsx` Files
+
+Never write `declare module '*.tsrx';` (or import octane modules as `any`).
+That shim erases every export's type and hides real errors — the repo spent a
+full campaign deleting them. Octane files are fully typed:
+
+- `.tsrx` files type-check through `tsrx-tsc` / the tsrx TypeScript plugin;
+  consumers get real exported types, so `typecheck` scripts must use
+  `tsrx-tsc --noEmit` (never plain `tsc`) whenever the program contains
+  `.tsrx` files, with `"jsx": "react-jsx"` + `"jsxImportSource": "octane"` in
+  the tsconfig.
+- Octane-owned `.tsx` files declare themselves with a leading
+  `/** @jsxImportSource octane */` pragma (files owned by another renderer
+  point at that renderer's intrinsics module instead, e.g.
+  `@octanejs/three/intrinsics`).
+- Type component props and renderable holes properly: `OctaneNode` from
+  `octane` for renderables (never `React.ReactNode`), native DOM event types,
+  `{ current: T | null }` refs. Untyped `props` parameters are noImplicitAny
+  errors, not a style choice.
+
 ## Intentional Divergences From React
 
 Octane is React-shaped but deliberately differs in a few places. Do **not** "fix"
