@@ -22,7 +22,6 @@
 // visitor explicitly presses "Run" on the consent overlay. Your own edits from
 // the default sources auto-run as before.
 import { useState, useRef, useEffect } from 'octane';
-import { useRouter } from '@tanstack/octane-router';
 import type { CompileDiagnostic } from 'octane/compiler';
 import type { PlaygroundLang } from '../../lib/playground.ts';
 import {
@@ -44,15 +43,6 @@ const COMPILE_DEBOUNCE_MS = 250;
 // pre-seed it.
 const OWN_HASH_STORAGE_KEY = 'octane-playground-own-hash';
 
-// The FIRST router event after SSR hydration remounts the whole route tree
-// (tracked octane-start bug — hydrated boundary slots don't survive their
-// first update). Our debounced hash writes are router events, so without
-// priming the remount would fire mid-typing (destroying the editor). Instead
-// the boot effect triggers that one-time remount up front via router.load()
-// when this page is the hydration entry; module state survives the remount so
-// the second boot skips it.
-let routerPrimed = false;
-
 // Static dropdown structure — examples grouped into <optgroup>s in
 // declaration order.
 const EXAMPLE_GROUPS: { group: string; examples: typeof EXAMPLES }[] = [];
@@ -64,7 +54,6 @@ for (const example of EXAMPLES) {
 
 export function Playground() @{
 	useTitle('Octane — Playground');
-	const router = useRouter();
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Mobile only: which panel is visible (desktop always shows both).
@@ -121,22 +110,6 @@ export function Playground() @{
 		if (initialDiagnostic) setError(initialDiagnostic);
 
 		(async () => {
-			// One-time router prime (see routerPrimed above). loadedAt === 0 means
-			// no client-side load has happened yet — this page was the hydration
-			// entry, so the first router event will remount the route tree. Take
-			// that hit NOW, before the editor exists; the remount disposes this
-			// boot and the re-run (routerPrimed already true) boots for real.
-			if (!routerPrimed) {
-				routerPrimed = true;
-				if ((router as any).stores?.loadedAt?.get?.() === 0) {
-					try {
-						await (router as any).load();
-					} catch {
-					}
-					if (disposed) return;
-				}
-			}
-
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
 			let pgExamples: any;
 			try {
@@ -330,10 +303,9 @@ export function Playground() @{
 			};
 
 			// replaceState (not router.navigate) — only the hash on the current
-			// entry changes. The router still observes it (its history wrapper),
-			// which is why the boot primed the one-time post-hydration remount
-			// before any of these writes can happen. While a shared payload is
-			// still gated, the URL keeps the sender's link untouched.
+			// entry changes; the router observes it through its history wrapper
+			// without remounting the route. While a shared payload is still
+			// gated, the URL keeps the sender's link untouched.
 			const updateHash = () => {
 				window.clearTimeout(hashDebounceId);
 				hashDebounceId = window.setTimeout(() => {
