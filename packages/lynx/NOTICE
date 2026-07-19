@@ -1,0 +1,14 @@
+Third-party notices for @octanejs/lynx
+======================================
+
+The renderer-local declarations in src/native-types.ts adapt public type
+contracts from:
+
+  @lynx-js/types 4.0.0
+  Copyright 2024-2025 The Lynx Authors. All rights reserved.
+  Licensed under the Apache License, Version 2.0.
+  See LICENSE-APACHE-2.0 in this package.
+
+The adapted declarations retain the upstream notice and mark their
+module-scoping modification. No Lynx or ReactLynx implementation source is
+vendored in @octanejs/lynx.

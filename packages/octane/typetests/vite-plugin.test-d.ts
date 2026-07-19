@@ -16,6 +16,12 @@ export const options = {
 			object: {
 				module: '/src/object-renderer.js',
 				server: 'client-only',
+				validation: {
+					textParents: ['text'],
+					forbiddenGlobals: ['document'],
+					forbiddenImports: ['react-dom'],
+					hostProps: { '*': ['id', 'data-*'], view: ['bind*'] },
+				},
 			},
 		},
 		rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
@@ -27,6 +33,20 @@ export const discovered: string[] = discoverOctaneSourceDependencies(process.cwd
 
 // @ts-expect-error — compiler options are a closed public surface.
 octane({ handWrittenViteShim: true });
+
+octane({
+	renderers: {
+		registry: {
+			object: {
+				module: '/src/object-renderer.js',
+				validation: {
+					// @ts-expect-error — validation lists contain module/global/host names.
+					forbiddenImports: [123],
+				},
+			},
+		},
+	},
+});
 
 octane({
 	renderers: {

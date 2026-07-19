@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/rspeedy-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Private Phase 1 Rspeedy compiler integration for Octane Lynx.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/rspeedy-plugin-octane"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "types/index.d.ts",
+  "files": [
+    "src",
+    "types",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "UPSTREAM.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest run --root ../.. --project rspeedy-plugin"
+  },
+  "dependencies": {
+    "@octanejs/lynx": "workspace:*",
+    "@octanejs/rspack-plugin": "workspace:*"
+  },
+  "peerDependencies": {
+    "@lynx-js/rspeedy": "0.16.0",
+    "@rsbuild/core": "2.1.4",
+    "@rspack/core": "2.1.3",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@lynx-js/rspeedy": "catalog:lynx",
+    "@octanejs/lynx": "workspace:*",
+    "@octanejs/rspack-plugin": "workspace:*",
+    "@rsbuild/core": "catalog:lynx",
+    "@rspack/core": "catalog:lynx",
+    "@types/node": "catalog:default",
+    "octane": "workspace:*",
+    "typescript": "catalog:lynx",
+    "vitest": "catalog:default"
+  }
+}

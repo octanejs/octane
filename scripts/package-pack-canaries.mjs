@@ -1,5 +1,12 @@
 import path from 'node:path';
 
+export const NATIVE_GRAPH_FORBIDDEN_MODULE =
+	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
+
+export function isForbiddenNativeGraphModule(identifier) {
+	return NATIVE_GRAPH_FORBIDDEN_MODULE.test(identifier);
+}
+
 function collectLocalProtocols(value, label, output) {
 	if (typeof value === 'string') {
 		if (/^(?:workspace|catalog|link):/.test(value)) output.push({ label, value });

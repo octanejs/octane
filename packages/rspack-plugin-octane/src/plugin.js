@@ -237,6 +237,8 @@ export class OctaneRspackPlugin {
 			profile,
 			exclude: this.options.exclude ?? [],
 			renderers: this.options.renderers?.signature,
+			runtime: this.options.runtime,
+			universalRuntime: this.options.universalRuntime,
 			// Ownership flips which modules compile vs pass through — cached
 			// transform results must not survive a requireDirective toggle.
 			requireDirective: this.options.requireDirective === true,
@@ -248,8 +250,12 @@ export class OctaneRspackPlugin {
 			profile,
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
+			...(this.options.universalRuntime === undefined
+				? null
+				: { universalRuntime: this.options.universalRuntime }),
 		});
-		const runtimeRequest = neutralCompiler.resolveRuntimeRequest('octane', environment);
+		const runtimeRequest =
+			this.options.runtime ?? neutralCompiler.resolveRuntimeRequest('octane', environment);
 
 		compiler.options.resolve ??= {};
 		addUniqueExtensions(compiler.options.resolve);
@@ -266,6 +272,9 @@ export class OctaneRspackPlugin {
 			...(this.options.dev === undefined ? null : { dev: this.options.dev }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
+			...(this.options.universalRuntime === undefined
+				? null
+				: { universalRuntime: this.options.universalRuntime }),
 			...(this.options.requireDirective === undefined
 				? null
 				: { requireDirective: this.options.requireDirective }),

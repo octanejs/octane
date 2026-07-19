@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "package": "@lynx-js/react",
+    "version": "0.123.0 (b6b809cd)"
+  },
+  "surface": "Private Milestone 1 scaffold only: data-only Lynx renderer configuration, a DOM-free universal compiler ABI facade, explicit dual-thread compile metadata through a pinned Rspeedy integration, renderer-local type declarations for the first ten planned native tags, custom-element augmentation, and honest root/platform/testing availability metadata. No native root or host driver is implemented.",
+  "divergences": [
+    "The package adapts an audited @lynx-js/types@4.0.0 props/events slice into renderer-owned module declarations because the upstream events entry transitively loads global Element/JSX augmentation.",
+    "Root, platform, and testing runtime APIs are absent instead of being represented by throwing or inert compatibility stubs."
+  ],
+  "ssr": "Unsupported. Lynx first-screen adoption is a native runtime protocol, not HTML SSR or Octane hydration.",
+  "verified": "2026-07-19",
+  "notes": [
+    "Milestone 0 remains blocked on public lifecycle/event hooks and the Android/iOS engine matrix; this private scaffold is not a technical preview.",
+    "The background root/PAPI host is deferred to Milestone 2, platform capabilities to Milestone 4, and production testing/.lynx.bundle integration to Milestone 5."
+  ],
+  "docs": ["docs/lynx-native-renderer-plan.md", "packages/lynx/UPSTREAM.md"]
+}

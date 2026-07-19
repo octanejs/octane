@@ -788,6 +788,11 @@ keeps two same-turn commits distinct instead of dropping or merging the first
 commit's passive phase. Cleanup walks retain the previous render's declaration
 order even when removed hooks and dependency-changed hooks share a phase.
 
+Universal roots use the host's standard `queueMicrotask` by default. A runtime
+without that global must pass `scheduleMicrotask` in `UniversalRootOptions` so
+updates, retries, passive work, and asynchronous error propagation keep the
+host scheduler's ordering and error channel.
+
 Within the host batch, the core orders creates/updates/recreates, callback and
 event descriptors, detach/removes, placements (`insert`/`move`), descendant-
 first hides, ancestor-first reveals, and final destroys so every referenced

@@ -10,6 +10,7 @@ const SPECIAL_ROLES = new Map([
 	['octane', 'core runtime + compiler'],
 	['@octanejs/app-core', 'metaframework core'],
 	['@octanejs/rspack-plugin', 'compiler integration'],
+	['@octanejs/rspeedy-plugin', 'native compiler integration'],
 	['@octanejs/rsbuild-plugin', 'metaframework'],
 	['@octanejs/vite-plugin', 'metaframework'],
 	// TanStack Start facade over the vendored @tanstack/octane-* packages —
@@ -25,6 +26,7 @@ const SPECIAL_ROLES = new Map([
 const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/app-core',
 	'@octanejs/rspack-plugin',
+	'@octanejs/rspeedy-plugin',
 	'@octanejs/rsbuild-plugin',
 	'@octanejs/vite-plugin',
 ]);

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-07-19",
+  "selectedSdk": "3.9.0",
+  "selectedRspeedy": "0.16.0",
+  "purpose": "Milestone 1 syntax and built-in compatibility evidence for the DOM-free Octane universal graph. This is build/source evidence, not native device execution.",
+  "sources": [
+    {
+      "url": "https://lynxjs.org/guide/scripting-runtime/",
+      "evidence": "Lynx documents PrimJS on the main thread, PrimJS by default on Android background threads, JavaScriptCore by default on iOS background threads, ES2019/ES2015 syntax ceilings, and the Map/Set/WeakMap/WeakSet, Array.flatMap, Object.entries/values, Promise.finally, and Symbol.prototype.description built-ins used by the universal core."
+    },
+    {
+      "url": "https://lynxjs.org/blog/lynx-3-2.html",
+      "evidence": "Lynx 3.2 introduced Promise microtask semantics and lynx.queueMicrotask; the selected SDK is 3.9.0."
+    },
+    {
+      "url": "https://lynxjs.org/api/lynx-testing-environment/interface.lynxglobalthis",
+      "evidence": "Lynx documents the globalThis object of its dual-thread environment; the universal core uses it only to resolve the optional standard queueMicrotask global."
+    },
+    {
+      "package": "@lynx-js/rspeedy@0.16.0",
+      "path": "CHANGELOG.md",
+      "evidence": "The exact Rspeedy 0.16.0 package records an ES2017 default output target and explicit block-scoping lowering for both layers."
+    }
+  ],
+  "runtimes": {
+    "main-thread": {
+      "engine": "PrimJS",
+      "documentedSyntaxCeiling": "ES2019",
+      "compileGraph": "packages/rspeedy-plugin-octane/tests/build.test.ts",
+      "nativeExecution": "blocked by the Phase 0 Explorer/Android/iOS gates"
+    },
+    "background": {
+      "engines": ["PrimJS (Android default)", "JavaScriptCore (iOS default)"],
+      "documentedSyntaxCeiling": "ES2015",
+      "compileGraph": "packages/rspeedy-plugin-octane/tests/build.test.ts",
+      "nativeExecution": "blocked by the Phase 0 Explorer/Android/iOS gates"
+    }
+  },
+  "emittedSyntax": {
+    "rspeedyTarget": "ES2017",
+    "checkedForBothLayers": ["optional chaining is lowered", "nullish coalescing is lowered"]
+  },
+  "universalCoreBuiltins": {
+    "documentedOrBaseline": [
+      "Array.prototype.flatMap",
+      "globalThis",
+      "Map",
+      "Object.assign",
+      "Object.entries",
+      "Object.freeze",
+      "Object.getPrototypeOf",
+      "Object.is",
+      "Object.keys",
+      "Object.values",
+      "Promise",
+      "Promise.prototype.finally",
+      "Set",
+      "Symbol",
+      "Symbol.for",
+      "Symbol.prototype.description",
+      "WeakMap",
+      "WeakSet"
+    ],
+    "microtaskContract": "Universal roots use the standard queueMicrotask global when present. A native host without that global must pass options.scheduleMicrotask; Lynx provides lynx.queueMicrotask for this integration point.",
+    "symbolContract": "Nested hook slots use Symbol.prototype.description, which the selected Lynx runtimes document as supported.",
+    "diagnosedApplicationGlobals": [
+      "FinalizationRegistry",
+      "queueMicrotask",
+      "structuredClone",
+      "WeakRef"
+    ]
+  },
+  "qualification": "Both Rspeedy compiler layers are exercised in a production build and the background graph satisfies the Milestone 1 dependency exit gate. Main-thread bytecode encoding and all native runtime/device execution remain later blocked gates."
+}
