@@ -220,6 +220,15 @@ change, always run the repository-wide `pnpm format:check` before handoff. Runni
 Prettier only on touched source files is not a substitute: generated baselines,
 docs, and RuleSync outputs must pass the same formatting gate as CI.
 
+Any change to `pnpm-lock.yaml` (dependency bumps, workspace override edits,
+`pnpm install` after catalog changes) must be accompanied by regenerating the
+evals corpus in the same commit — its manifests digest the lockfile, and CI
+fails the freshness tests otherwise:
+
+```bash
+pnpm --dir packages/octane-evals corpus:generate
+```
+
 ```bash
 pnpm test                 # full vitest run
 pnpm typecheck            # tsgo --noEmit across all packages
