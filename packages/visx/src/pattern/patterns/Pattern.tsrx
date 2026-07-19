@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import useStableId from '../../kernel/ids/useStableId.tsrx';
 
 export type PatternProps = {
@@ -9,7 +9,7 @@ export type PatternProps = {
 	/** Height of the pattern. */
 	height: number;
 	/** Children of pattern element to render. */
-	children: ReactNode;
+	children: OctaneNode;
 };
 
 export default function Pattern({ id, width, height, children }: PatternProps) {

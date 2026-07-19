@@ -10,11 +10,72 @@ import {
 	useLatestRef,
 	useModernLayoutEffect,
 } from './utils';
+import type { ElementProps, FloatingRootContext, MutableRefObject } from './types';
 
-export function useTypeahead(...args: any[]): any {
+export interface UseTypeaheadProps {
+	/**
+	 * A ref which contains an array of strings whose indices match the HTML
+	 * elements of the list.
+	 * @default empty list
+	 */
+	listRef: MutableRefObject<Array<string | null>>;
+	/**
+	 * The index of the active (focused or highlighted) item in the list.
+	 * @default null
+	 */
+	activeIndex: number | null;
+	/**
+	 * Callback invoked with the matching index if found as the user types.
+	 */
+	onMatch?: (index: number) => void;
+	/**
+	 * Callback invoked with the typing state as the user types.
+	 */
+	onTypingChange?: (isTyping: boolean) => void;
+	/**
+	 * Whether the Hook is enabled, including all internal Effects and event
+	 * handlers.
+	 * @default true
+	 */
+	enabled?: boolean;
+	/**
+	 * A function that returns the matching string from the list.
+	 * @default lowercase-finder
+	 */
+	findMatch?:
+		| null
+		| ((list: Array<string | null>, typedString: string) => string | null | undefined);
+	/**
+	 * The number of milliseconds to wait before resetting the typed string.
+	 * @default 750
+	 */
+	resetMs?: number;
+	/**
+	 * An array of keys to ignore when typing.
+	 * @default []
+	 */
+	ignoreKeys?: Array<string>;
+	/**
+	 * The index of the selected item in the list, if available.
+	 * @default null
+	 */
+	selectedIndex?: number | null;
+}
+
+/**
+ * Provides a matching callback that can be used to focus an item as the user
+ * types, often used in tandem with `useListNavigation()`.
+ * @see https://floating-ui.com/docs/useTypeahead
+ */
+export function useTypeahead(
+	context: FloatingRootContext,
+	props: UseTypeaheadProps,
+	slot?: symbol,
+): ElementProps;
+export function useTypeahead(...args: any[]): ElementProps {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingRootContext;
+	const props = (user[1] as UseTypeaheadProps) ?? {};
 
 	const open = context.open;
 	const dataRef = context.dataRef;
@@ -31,11 +92,11 @@ export function useTypeahead(...args: any[]): any {
 
 	const timeoutIdRef = useRef(-1, subSlot(slot, 'timeout'));
 	const stringRef = useRef('', subSlot(slot, 'string'));
-	const prevIndexRef = useRef(
+	const prevIndexRef = useRef<number | null>(
 		(selectedIndex != null ? selectedIndex : activeIndex) ?? -1,
 		subSlot(slot, 'prev'),
 	);
-	const matchIndexRef = useRef<any>(null, subSlot(slot, 'match'));
+	const matchIndexRef = useRef<number | null>(null, subSlot(slot, 'match'));
 
 	const onMatch = useEffectEvent(unstableOnMatch, subSlot(slot, 'onmatch'));
 	const onTypingChange = useEffectEvent(unstableOnTypingChange, subSlot(slot, 'ontyping'));
@@ -65,7 +126,7 @@ export function useTypeahead(...args: any[]): any {
 	);
 
 	const setTypingChange = useEffectEvent(
-		(value: any) => {
+		(value: boolean) => {
 			if (value) {
 				if (!dataRef.current.typing) {
 					dataRef.current.typing = value;
@@ -82,8 +143,12 @@ export function useTypeahead(...args: any[]): any {
 	);
 
 	const onKeyDown = useEffectEvent(
-		(event: any) => {
-			function getMatchingIndex(list: any[], orderedList: any[], string: string) {
+		(event: KeyboardEvent) => {
+			function getMatchingIndex(
+				list: Array<string | null>,
+				orderedList: Array<string | null>,
+				string: string,
+			) {
 				const str = findMatchRef.current
 					? findMatchRef.current(orderedList, string)
 					: orderedList.find(
@@ -150,7 +215,7 @@ export function useTypeahead(...args: any[]): any {
 	const floating = useMemo(
 		() => ({
 			onKeyDown,
-			onKeyUp(event: any) {
+			onKeyUp(event: KeyboardEvent) {
 				if (event.key === ' ') {
 					setTypingChange(false);
 				}
@@ -160,7 +225,7 @@ export function useTypeahead(...args: any[]): any {
 		subSlot(slot, 'm:flo'),
 	);
 
-	return useMemo(
+	return useMemo<ElementProps>(
 		() => (enabled ? { reference, floating } : {}),
 		[enabled, reference, floating],
 		subSlot(slot, 'm:ret'),

@@ -19,9 +19,11 @@ import { SafeFragment } from './SafeFragment.tsrx';
 
 export function Outlet() @{
 	const router = useRouter();
-	const parentId = useContext(matchContext);
-	const parentStore = router.stores.matchStores.get(parentId);
-	const parentRouteId = useStore(parentStore, (m) => m?.routeId);
+	// Outlet only renders inside a match's component, so the context id (and its
+	// pooled store) are present — same invariant upstream asserts with invariant().
+	const parentId = useContext(matchContext)!;
+	const parentStore = router.stores.matchStores.get(parentId)!;
+	const parentRouteId = useStore(parentStore, (m) => m?.routeId as string | undefined);
 	const globalNotFound = useStore(parentStore, (m) => m?.globalNotFound ?? false);
 	const childId = useStore(router.stores.matchesId, (ids) => {
 		const i = ids.indexOf(parentId);
@@ -38,7 +40,7 @@ export function Outlet() @{
 		DefaultPending ? createElement(DefaultPending, {}) : null;
 
 	@if (globalNotFound) {
-		<RouteNotFound routeId={parentRouteId} />
+		<RouteNotFound routeId={parentRouteId!} />
 	} @else {
 		@if (childId) {
 			<RootSuspense fallback={pendingElement}>

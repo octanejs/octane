@@ -1,4 +1,6 @@
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'octane';
+import type { OctaneNode } from 'octane';
+import type { RenderRouteProps } from '@octanejs/vite-plugin';
 import {
 	DESTINATIONS,
 	findDestination,
@@ -9,12 +11,21 @@ import {
 	normalizeMonth,
 	searchDestinations,
 } from './data.ts';
+import type { Destination, Month, PlanningRun } from './data.ts';
 import './styles.css';
 
 const SAVED_STORAGE_KEY = 'wayfinder:saved:v1';
 const NOTES_STORAGE_KEY = 'wayfinder:notes:v1';
 
-function parseRoute(value) {
+type Navigate = (href: string) => void;
+
+type AppRoute =
+	| { name: 'discover'; scenario: string }
+	| { name: 'saved'; scenario: string }
+	| { name: 'trip'; tripId: string; month: Month; scenario: string }
+	| { name: 'not-found'; scenario: string };
+
+function parseRoute(value: string): AppRoute {
 	const url = new URL(value, 'https://wayfinder.local');
 	const scenario = url.searchParams.get('scenario') ?? '';
 	if (url.pathname === '/') return { name: 'discover', scenario };
@@ -31,39 +42,41 @@ function parseRoute(value) {
 	return { name: 'not-found', scenario };
 }
 
-function stopLinkNavigation(event) {
+function stopLinkNavigation(event: MouseEvent): boolean {
 	return event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey ||
 		event.shiftKey ||
 		event.altKey;
 }
 
-function readStringArray(key) {
+const isStringArray = (value: unknown): value is string[] => Array.isArray(value) &&
+	value.every((item) => typeof item === 'string');
+
+function readStringArray(key: string): string[] {
 	try {
-		const parsed = JSON.parse(localStorage.getItem(key) ?? '[]');
-		return Array.isArray(parsed) && parsed.every((value) => typeof value === 'string')
-			? parsed
-			: [];
+		const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
+		return isStringArray(parsed) ? parsed : [];
 	} catch {
 		return [];
 	}
 }
 
-function readNote(tripId) {
+function readNote(tripId: string): string {
 	try {
-		const parsed = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) ?? '{}');
-		return parsed !== null && typeof parsed === 'object' && typeof parsed[tripId] === 'string'
-			? parsed[tripId]
-			: '';
+		const parsed: unknown = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) ?? '{}');
+		if (parsed === null || typeof parsed !== 'object') return '';
+		const note = (parsed as Record<string, unknown>)[tripId];
+		return typeof note === 'string' ? note : '';
 	} catch {
 		return '';
 	}
 }
 
-function writeNotes(tripId, note) {
+function writeNotes(tripId: string, note: string): boolean {
 	try {
-		const parsed = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) ?? '{}');
-		const notes =
-			parsed !== null && typeof parsed === 'object' ? parsed : {};
+		const parsed: unknown = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) ?? '{}');
+		const notes = (parsed !== null && typeof parsed === 'object'
+			? parsed
+			: {}) as Record<string, string>;
 		notes[tripId] = note;
 		localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
 		return true;
@@ -72,7 +85,19 @@ function writeNotes(tripId, note) {
 	}
 }
 
-function AppLink(props) @{
+function describeError(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+interface AppLinkProps {
+	href: string;
+	class?: string;
+	label?: string;
+	navigate: Navigate;
+	children?: OctaneNode;
+}
+
+function AppLink(props: AppLinkProps) @{
 	<a
 		href={props.href}
 		class={props.class}
@@ -92,7 +117,12 @@ function Mark() @{
 	</span>
 }
 
-function Header(props) @{
+interface HeaderProps {
+	navigate: Navigate;
+	savedCount: number;
+}
+
+function Header(props: HeaderProps) @{
 	<header class="site-header">
 		<div class="header-inner">
 			<AppLink href="/" class="brand" navigate={props.navigate}>
@@ -122,16 +152,18 @@ function Header(props) @{
 					navigate={props.navigate}
 				>
 					Saved
-					<span aria-label={`${props.savedCount} saved trips`}>
-						{props.savedCount as string}
-					</span>
+					<span aria-label={`${props.savedCount} saved trips`}>{`${props.savedCount}`}</span>
 				</AppLink>
 			</nav>
 		</div>
 	</header>
 }
 
-function DestinationArtwork(props) @{
+interface DestinationArtworkProps {
+	destination: Destination;
+}
+
+function DestinationArtwork(props: DestinationArtworkProps) @{
 	<div class={['destination-art', `art-${props.destination.accent}`]} aria-hidden="true">
 		<div class="art-sun"></div>
 		<div class="art-line art-line-one"></div>
@@ -140,7 +172,12 @@ function DestinationArtwork(props) @{
 	</div>
 }
 
-function DestinationCard(props) @{
+interface DestinationCardProps {
+	destination: Destination;
+	navigate: Navigate;
+}
+
+function DestinationCard(props: DestinationCardProps) @{
 	<article class="destination-card" data-destination-id={props.destination.id}>
 		<AppLink
 			href={`/trips/${props.destination.id}?month=oct`}
@@ -166,13 +203,28 @@ function DestinationCard(props) @{
 	</article>
 }
 
-function DiscoverPage(props) @{
-	const [query, setQuery] = useState('');
-	const [result, setResult] = useState({ status: 'idle', items: DESTINATIONS, message: '' });
-	const [abortNotice, setAbortNotice] = useState('');
-	const activeSearch = useRef(null);
+interface SearchResult {
+	status: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+	items: readonly Destination[];
+	message: string;
+}
 
-	const runSearch = (nextQuery, recover = false) => {
+interface DiscoverPageProps {
+	navigate: Navigate;
+	scenario: string;
+}
+
+function DiscoverPage(props: DiscoverPageProps) @{
+	const [query, setQuery] = useState('');
+	const [result, setResult] = useState<SearchResult>({
+		status: 'idle',
+		items: DESTINATIONS,
+		message: '',
+	});
+	const [abortNotice, setAbortNotice] = useState('');
+	const activeSearch = useRef<AbortController | null>(null);
+
+	const runSearch = (nextQuery: string, recover = false) => {
 		setQuery(nextQuery);
 		if (activeSearch.current !== null) {
 			activeSearch.current.abort(new DOMException('Superseded by a newer search', 'AbortError'));
@@ -300,7 +352,11 @@ function DiscoverPage(props) @{
 	</main>
 }
 
-function PlanningFallback(props) @{
+interface PlanningFallbackProps {
+	city: string;
+}
+
+function PlanningFallback(props: PlanningFallbackProps) @{
 	<section class="plan-card plan-loading" role="status" aria-live="polite">
 		<div class="plan-loading-mark">
 			<span></span>
@@ -313,7 +369,12 @@ function PlanningFallback(props) @{
 	</section>
 }
 
-function PairedPlan(props) @{
+interface PairedPlanProps {
+	run: PlanningRun;
+	city: string;
+}
+
+function PairedPlan(props: PairedPlanProps) @{
 	<section class="plan-card" data-parallel-plan="ready" aria-labelledby="plan-heading">
 		@try {
 			const route = use(props.run.route());
@@ -368,14 +429,19 @@ function PairedPlan(props) @{
 				<p class="eyebrow">Planning interrupted</p>
 				<h2>Route and stays could not be paired.</h2>
 				<p>
-					{error.message as string}
+					{describeError(error) as string}
 				</p>
 			</div>
 		}
 	</section>
 }
 
-function FareRegion(props) @{
+interface FareRegionProps {
+	destinationId: string;
+	month: Month;
+}
+
+function FareRegion(props: FareRegionProps) @{
 	<section class="insight-card fare-card" aria-labelledby="fare-heading">
 		@try {
 			const fare = use(loadFareWatch(props.destinationId, props.month));
@@ -399,14 +465,20 @@ function FareRegion(props) @{
 			<div class="inline-error" role="alert">
 				<h2>Fare watch is resting.</h2>
 				<p>
-					{error.message as string}
+					{describeError(error) as string}
 				</p>
 			</div>
 		}
 	</section>
 }
 
-function WeatherRegion(props) @{
+interface WeatherRegionProps {
+	destinationId: string;
+	month: Month;
+	scenario: string;
+}
+
+function WeatherRegion(props: WeatherRegionProps) @{
 	const [attempt, setAttempt] = useState(0);
 	<section class="insight-card weather-card" aria-labelledby="weather-heading">
 		@try {
@@ -432,7 +504,7 @@ function WeatherRegion(props) @{
 				<p class="eyebrow">Forecast unavailable</p>
 				<h2>The local weather desk did not answer.</h2>
 				<p>
-					{error.message as string}
+					{describeError(error) as string}
 				</p>
 				<button
 					class="button button-light"
@@ -449,9 +521,21 @@ function WeatherRegion(props) @{
 	</section>
 }
 
-function TripPage(props) @{
+interface TripPageProps {
+	tripId: string;
+	month: Month;
+	scenario: string;
+	navigate: Navigate;
+	saved: boolean;
+	toggleSaved: (destinationId: string) => void;
+	initialNote: string;
+	storageReady: boolean;
+	requestState: Map<string, unknown> | undefined;
+}
+
+function TripPage(props: TripPageProps) @{
 	const destination = findDestination(props.tripId);
-	const noteInput = useRef(null);
+	const noteInput = useRef<HTMLTextAreaElement | null>(null);
 	const noteTrip = useRef(props.tripId);
 	const storageNoteReady = useRef(false);
 	const [noteStatus, setNoteStatus] = useState('');
@@ -601,7 +685,13 @@ function TripPage(props) @{
 	}
 }
 
-function SavedPage(props) @{
+interface SavedPageProps {
+	saved: readonly string[];
+	storageReady: boolean;
+	navigate: Navigate;
+}
+
+function SavedPage(props: SavedPageProps) @{
 	const savedDestinations = DESTINATIONS.filter(
 		(destination) => props.saved.includes(destination.id),
 	);
@@ -635,7 +725,11 @@ function SavedPage(props) @{
 	</main>
 }
 
-function Footer(props) @{
+interface FooterProps {
+	navigate: Navigate;
+}
+
+function Footer(props: FooterProps) @{
 	<footer class="site-footer">
 		<div class="brand">
 			<Mark />
@@ -648,20 +742,20 @@ function Footer(props) @{
 	</footer>
 }
 
-export function App(props) @{
+export function App(props: RenderRouteProps) @{
 	const initialUrl = props.url ?? '/';
 	const [route, setRoute] = useState(() => parseRoute(initialUrl));
-	const [saved, setSaved] = useState([]);
+	const [saved, setSaved] = useState<string[]>([]);
 	const [storageReady, setStorageReady] = useState(false);
 	const [hydrated, setHydrated] = useState(false);
 
-	const navigate = useCallback((href) => {
+	const navigate = useCallback((href: string) => {
 		history.pushState(null, '', href);
 		setRoute(parseRoute(href));
 		window.scrollTo({ top: 0, behavior: 'instant' });
 	}, []);
 
-	const toggleSaved = (destinationId) => {
+	const toggleSaved = (destinationId: string) => {
 		setSaved((current) => {
 			const next =
 				current.includes(destinationId)

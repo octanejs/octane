@@ -32,3 +32,12 @@ declare module 'octane/compiler' {
 		},
 	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 }
+
+// `.mdx` documents compile (via @octanejs/mdx) to octane component modules with
+// a default export and an optional `frontmatter` const.
+declare module '*.mdx' {
+	import type { OctaneNode } from 'octane';
+	const MDXContent: (props?: Record<string, unknown>) => OctaneNode;
+	export default MDXContent;
+	export const frontmatter: Record<string, unknown>;
+}

@@ -26,6 +26,10 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./jsx-runtime": "./src/jsx-runtime.d.ts",
+    "./jsx-dev-runtime": "./src/jsx-runtime.d.ts",
+    "./tsrx-iterable": "./src/tsrx-iterable.ts",
+    "./tsrx-spread": "./src/tsrx-spread.ts",
     "./react": "./src/react/index.ts",
     "./hydration": "./src/hydration/index.ts",
     "./react/server": "./src/react/server.ts",
@@ -103,6 +107,7 @@
   },
   "dependencies": {
     "@tsrx/core": "catalog:default",
+    "@types/react": "catalog:default",
     "devalue": "catalog:default",
     "esrap": "catalog:default"
   },
@@ -124,7 +129,6 @@
   },
   "devDependencies": {
     "@tsrx/react": "catalog:default",
-    "@types/react": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
     "playwright": "catalog:default",

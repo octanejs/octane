@@ -1,4 +1,4 @@
-import type { SVGProps } from 'react';
+import type { Octane } from 'octane/jsx-runtime';
 import cx from 'classnames';
 import { Line } from '@octanejs/visx/shape';
 import type { LineProps } from '@octanejs/visx/shape';
@@ -22,7 +22,7 @@ export type GridRowsProps<Scale extends GridScale> = CommonGridProps & {
 	};
 
 export type AllGridRowsProps<Scale extends GridScale> =
-	GridRowsProps<Scale> & Omit<LineProps & Omit<SVGProps<SVGLineElement>, keyof LineProps>, keyof GridRowsProps<Scale>>;
+	GridRowsProps<Scale> & Omit<LineProps & Omit<Octane.SVGProps<SVGLineElement>, keyof LineProps>, keyof GridRowsProps<Scale>>;
 
 export default function GridRows<Scale extends GridScale>({
 	top = 0,

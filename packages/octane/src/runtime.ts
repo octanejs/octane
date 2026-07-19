@@ -5708,10 +5708,12 @@ export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHy
  * render as the try body, and `fallback` renders as the pending body whenever a
  * descendant suspends (via `use(thenable)`).
  */
-export const Suspense: ComponentBody<{ fallback?: unknown; children: ComponentBody }> =
-	/* @__PURE__ */ markComponentFlags<
-		ComponentBody<{ fallback?: unknown; children: ComponentBody }>
-	>(
+// `children` is typed as a renderable (`unknown`), not `ComponentBody`: the
+// compiler lowers directive/JSX children to a body, but JSX-form usage types
+// children as element values (`Octane.JSX.Element`), and the de-opt path
+// renders element descriptors directly.
+export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
+	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
 		function Suspense(props, scope) {
 			const block = scope.block;
 			const pendingBody: ComponentBody = (_p, s) => {
@@ -5764,11 +5766,12 @@ export const ViewTransition: ComponentBody<ViewTransitionProps> =
  */
 export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-	children: ComponentBody;
+	// Renderable, not ComponentBody — same reasoning as Suspense above.
+	children: unknown;
 }> = /* @__PURE__ */ markComponentFlags<
 	ComponentBody<{
 		fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-		children: ComponentBody;
+		children: unknown;
 	}>
 >(
 	function ErrorBoundary(props, scope) {
@@ -5798,6 +5801,23 @@ export const ErrorBoundary: ComponentBody<{
 	COMPONENT_FLAG_BOUNDARY,
 	'ErrorBoundary',
 );
+
+/**
+ * The virtual-TSX (IDE / tsrx-tsc) name for `@try { … } @catch (e) { … }`: the
+ * shared tsrx transform's type-only output imports `TsrxErrorBoundary` from
+ * 'octane' and emits the catch clause as `fallback={(error, _reset) => …}`.
+ * Runtime compilation never references this name (`@try` lowers to `tryBlock`),
+ * so this exists for TYPES: the function-typed `fallback` (unlike
+ * `ErrorBoundary`'s renderable-or-render-prop union, which collapses to
+ * `unknown`) gives the emitted arrow contextual parameter types, so authored
+ * `@catch` bindings type-check under `noImplicitAny`. `content` is the
+ * transform's expression-position prop form of children.
+ */
+export const TsrxErrorBoundary = ErrorBoundary as unknown as (props: {
+	fallback?: (error: unknown, reset: () => void) => unknown;
+	content?: unknown;
+	children?: unknown;
+}) => OctaneNode;
 
 /**
  * React 19's `use()` — accepts either a Context<T> or a thenable (Promise<T>).
@@ -8129,7 +8149,22 @@ export function attachRef(
 // resolution later.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const Fragment: unique symbol = Symbol.for('octane.Fragment');
+/** Fragment ref forms (fragment-refs parity): callback, object, or arrays. */
+type FragmentRefValue =
+	| ((instance: unknown) => void | (() => void))
+	| { current: unknown }
+	| readonly FragmentRefValue[]
+	| null;
+
+// The VALUE stays the sentinel symbol (the compiler matches `Fragment` by
+// name and the runtime compares descriptor types by identity); the declared
+// TYPE is component-shaped so long-form `<Fragment key ref>` JSX type-checks —
+// which is the export's entire purpose (see above).
+export const Fragment = Symbol.for('octane.Fragment') as unknown as (props: {
+	children?: unknown;
+	key?: string | number | bigint | null | undefined;
+	ref?: FragmentRefValue;
+}) => unknown;
 
 /**
  * React-19 `<Activity mode="hidden"|"visible">` sentinel. The compiler matches
@@ -11965,6 +12000,16 @@ export interface ElementDescriptor<P = any> {
 	// `null` for the component-value form (children flow through the component).
 	children: any;
 }
+
+// Octane's analog of React's `ReactNode`: the type of a renderable prop or
+// child. Octane renders element descriptors, primitives (coerced to text),
+// nullish values, and arbitrarily nested arrays of these, and the compiler —
+// not the type system — decides how a hole is rendered, so the type is
+// deliberately `unknown` rather than a closed union (see the jsx-runtime
+// `children` contract). Bindings ported from React should use this alias for
+// props upstream typed as `ReactNode`; a structural union or React's own
+// `ReactNode` would reject octane's nominal elements.
+export type OctaneNode = unknown;
 
 function hasElementConfigKey(config: any): boolean {
 	if (config == null || (typeof config !== 'object' && typeof config !== 'function')) return false;

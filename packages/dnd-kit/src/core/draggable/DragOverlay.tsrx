@@ -65,7 +65,12 @@ export function DragOverlay<T extends Data, U extends Draggable<T>>(props: DragO
 	let content: unknown = null;
 	if (source && !isDisabled) {
 		content = typeof children === 'function' && !isChildrenBlock(children)
-			? createElement(OverlayChildren, { source, children })
+			? // The typeof/isChildrenBlock guard proves this is the render function,
+				// but `object` in DragOverlayChild keeps a bare Function arm in the union.
+				createElement(OverlayChildren, {
+					source,
+					children: children as (source: Draggable<Data>) => DragOverlayChild,
+				})
 			: children;
 	}
 

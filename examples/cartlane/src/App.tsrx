@@ -25,12 +25,14 @@ import {
 	routeFromUrl,
 	updateCartLine,
 } from './domain.ts';
+import type { CartLine, CheckoutState, FieldErrors, OrderReceipt, Product } from './domain.ts';
+import type { RenderRouteProps } from '@octanejs/vite-plugin';
 import './styles.css';
 
 module server {
 	import { commitOrder } from './server-domain.ts';
 
-	export async function placeOrder(request) {
+	export async function placeOrder(request: unknown) {
 		return commitOrder(request);
 	}
 }
@@ -64,11 +66,30 @@ function writeStorage(kind: StorageKind, key: string, value: string): void {
 	}
 }
 
-function pause(milliseconds) {
+function pause(milliseconds: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function AddToCartButton(props) @{
+type Navigate = (destination: string) => void;
+type CartFormAction = (formData: FormData) => Promise<void>;
+type CatalogStatus = 'loading' | 'ready' | 'error';
+
+/**
+ * Cart lines only ever hold catalog product ids (`addToCart` and
+ * `readStoredCart` both verify them), so a miss here is a programming error.
+ */
+function requireProduct(productId: string): Product {
+	const product = getProduct(productId);
+	if (!product) throw new Error(`Unknown product in cart: ${productId}`);
+	return product;
+}
+
+interface AddToCartButtonProps {
+	compact?: boolean;
+	label: string;
+}
+
+function AddToCartButton(props: AddToCartButtonProps) @{
 	const status = useFormStatus();
 	<button
 		class={['button', props.compact && 'button--compact']}
@@ -101,7 +122,12 @@ function CheckoutSubmit() @{
 	</div>
 }
 
-function ProductArtwork(props) @{
+interface ProductArtworkProps {
+	product: Product;
+	index: number;
+}
+
+function ProductArtwork(props: ProductArtworkProps) @{
 	<div class="product-art" style={'--product-accent:' + props.product.accent} aria-hidden="true">
 		<span class="product-art__halo"></span>
 		<span class="product-art__glyph">{props.product.glyph}</span>
@@ -111,7 +137,14 @@ function ProductArtwork(props) @{
 	</div>
 }
 
-function ProductCard(props) @{
+interface ProductCardProps {
+	product: Product;
+	index: number;
+	navigate: Navigate;
+	addToCart: CartFormAction;
+}
+
+function ProductCard(props: ProductCardProps) @{
 	<article class="product-card" data-product-id={props.product.id}>
 		<a
 			class="product-card__visual"
@@ -153,7 +186,12 @@ function ProductCard(props) @{
 	</article>
 }
 
-function Header(props) @{
+interface HeaderProps {
+	navigate: Navigate;
+	count: number;
+}
+
+function Header(props: HeaderProps) @{
 	<header class="site-header">
 		<a
 			class="wordmark"
@@ -187,16 +225,27 @@ function Header(props) @{
 				aria-label={'Basket, ' + props.count + (props.count === 1 ? ' item' : ' items')}
 			>
 				<span>Basket</span>
-				<span class="cart-count" aria-hidden="true">
-					{props.count as string}
-				</span>
+				<span class="cart-count" aria-hidden="true">{`${props.count}`}</span>
 			</a>
 		</nav>
 	</header>
 }
 
-function Catalog(props) @{
-	<main id="main-content" class="catalog" tabindex="-1">
+interface CatalogProps {
+	status: CatalogStatus;
+	products: Product[];
+	query: string;
+	setQuery: (query: string) => void;
+	category: string;
+	setCategory: (category: string) => void;
+	retryCatalog: () => void;
+	clearFilters: () => void;
+	navigate: Navigate;
+	addToCart: CartFormAction;
+}
+
+function Catalog(props: CatalogProps) @{
+	<main id="main-content" class="catalog" tabIndex={-1}>
 		<section class="hero">
 			<div class="hero__copy">
 				<p class="kicker">Edition 07 · useful things, considered</p>
@@ -283,9 +332,15 @@ function Catalog(props) @{
 	</main>
 }
 
-function ProductDetail(props) @{
+interface ProductDetailProps {
+	product: Product | undefined;
+	navigate: Navigate;
+	addToCart: CartFormAction;
+}
+
+function ProductDetail(props: ProductDetailProps) @{
 	@if (!props.product) {
-		<main id="main-content" class="empty-page" tabindex="-1">
+		<main id="main-content" class="empty-page" tabIndex={-1}>
 			<p class="eyebrow">Not found</p>
 			<h1>That object is not in this edition.</h1>
 			<a
@@ -297,7 +352,7 @@ function ProductDetail(props) @{
 			>Return to the collection</a>
 		</main>
 	} @else {
-		<main id="main-content" class="product-detail" tabindex="-1">
+		<main id="main-content" class="product-detail" tabIndex={-1}>
 			<nav class="breadcrumbs" aria-label="Breadcrumb">
 				<a
 					href="/"
@@ -345,8 +400,19 @@ function ProductDetail(props) @{
 	}
 }
 
-function CartPage(props) @{
-	<main id="main-content" class="cart-page" tabindex="-1">
+interface CartPageProps {
+	lines: CartLine[];
+	storageReady: boolean;
+	count: number;
+	subtotal: number;
+	delivery: number;
+	total: number;
+	navigate: Navigate;
+	adjustCart: CartFormAction;
+}
+
+function CartPage(props: CartPageProps) @{
+	<main id="main-content" class="cart-page" tabIndex={-1}>
 		<div class="page-heading">
 			<p class="eyebrow">Your selection</p>
 			<h1>Basket</h1>
@@ -381,36 +447,38 @@ function CartPage(props) @{
 					@for (const line of props.lines; key line.productId) {
 						<article class="cart-line" data-cart-product={line.productId}>
 							<ProductArtwork
-								product={getProduct(line.productId)}
+								product={requireProduct(line.productId)}
 								index={PRODUCTS.findIndex((product) => product.id === line.productId)}
 							/>
 							<div class="cart-line__copy">
-								<p class="eyebrow">{getProduct(line.productId).category}</p>
-								<h2>{getProduct(line.productId).name}</h2>
-								<p>{formatMoney(getProduct(line.productId).priceCents)} each</p>
+								<p class="eyebrow">{requireProduct(line.productId).category}</p>
+								<h2>{requireProduct(line.productId).name}</h2>
+								<p>{formatMoney(requireProduct(line.productId).priceCents)} each</p>
 								<form class="quantity-form" action={props.adjustCart}>
 									<input type="hidden" name="productId" value={line.productId} />
 									<button
 										type="submit"
 										name="intent"
 										value="decrease"
-										aria-label={'Decrease ' + getProduct(line.productId).name + ' quantity'}
+										aria-label={'Decrease ' + requireProduct(line.productId).name + ' quantity'}
 									>−</button>
-									<output aria-label={'Quantity for ' + getProduct(line.productId).name}>
-										{line.quantity as string}
-									</output>
+									<output
+										aria-label={'Quantity for ' + requireProduct(line.productId).name}
+									>{`${line.quantity}`}</output>
 									<button
 										type="submit"
 										name="intent"
 										value="increase"
-										aria-label={'Increase ' + getProduct(line.productId).name + ' quantity'}
+										aria-label={'Increase ' + requireProduct(line.productId).name + ' quantity'}
 									>+</button>
 									<button class="remove-line" type="submit" name="intent" value="remove">
 										Remove
 									</button>
 								</form>
 							</div>
-							<strong>{formatMoney(getProduct(line.productId).priceCents * line.quantity)}</strong>
+							<strong>{formatMoney(
+								requireProduct(line.productId).priceCents * line.quantity,
+							)}</strong>
 						</article>
 					}
 				</section>
@@ -451,7 +519,12 @@ function CartPage(props) @{
 	</main>
 }
 
-function FieldError(props) @{
+interface FieldErrorProps {
+	id: string;
+	message?: string;
+}
+
+function FieldError(props: FieldErrorProps) @{
 	@if (props.message) {
 		<p class="field-error" id={props.id}>{props.message}</p>
 	} @else {
@@ -459,10 +532,21 @@ function FieldError(props) @{
 	}
 }
 
-function CheckoutPage(props) @{
-	const errors =
+interface CheckoutPageProps {
+	lines: CartLine[];
+	storageReady: boolean;
+	checkoutKey: string;
+	state: CheckoutState;
+	pending: boolean;
+	action: (formData: FormData) => void;
+	total: number;
+	navigate: Navigate;
+}
+
+function CheckoutPage(props: CheckoutPageProps) @{
+	const errors: FieldErrors =
 		props.state.status === 'invalid' ? props.state.errors : {};
-	<main id="main-content" class="checkout-page" tabindex="-1">
+	<main id="main-content" class="checkout-page" tabIndex={-1}>
 		<nav class="checkout-steps" aria-label="Checkout progress">
 			<span class="checkout-step checkout-step--done">Basket</span>
 			<span aria-hidden="true">—</span>
@@ -513,7 +597,7 @@ function CheckoutPage(props) @{
 								<span>Full name</span>
 								<input
 									name="name"
-									autocomplete="name"
+									autoComplete="name"
 									aria-invalid={errors.name ? 'true' : undefined}
 									aria-describedby={errors.name ? 'name-error' : undefined}
 								/>
@@ -525,7 +609,7 @@ function CheckoutPage(props) @{
 									name="email"
 									type="email"
 									maxLength={CHECKOUT_EMAIL_MAX_LENGTH}
-									autocomplete="email"
+									autoComplete="email"
 									aria-invalid={errors.email ? 'true' : undefined}
 									aria-describedby={errors.email ? 'email-error' : undefined}
 								/>
@@ -538,7 +622,7 @@ function CheckoutPage(props) @{
 								<span>Street address</span>
 								<input
 									name="address"
-									autocomplete="street-address"
+									autoComplete="street-address"
 									aria-invalid={errors.address ? 'true' : undefined}
 									aria-describedby={errors.address ? 'address-error' : undefined}
 								/>
@@ -550,7 +634,7 @@ function CheckoutPage(props) @{
 									<input
 										name="city"
 										maxLength={CHECKOUT_CITY_MAX_LENGTH}
-										autocomplete="address-level2"
+										autoComplete="address-level2"
 										aria-invalid={errors.city ? 'true' : undefined}
 										aria-describedby={errors.city ? 'city-error' : undefined}
 									/>
@@ -560,7 +644,7 @@ function CheckoutPage(props) @{
 									<span>Postal code</span>
 									<input
 										name="postalCode"
-										autocomplete="postal-code"
+										autoComplete="postal-code"
 										aria-invalid={errors.postalCode ? 'true' : undefined}
 										aria-describedby={errors.postalCode ? 'postal-error' : undefined}
 									/>
@@ -574,8 +658,8 @@ function CheckoutPage(props) @{
 								<span>Card number</span>
 								<input
 									name="cardNumber"
-									inputmode="numeric"
-									autocomplete="cc-number"
+									inputMode="numeric"
+									autoComplete="cc-number"
 									placeholder="4242 4242 4242 4242"
 									aria-invalid={errors.cardNumber ? 'true' : undefined}
 									aria-describedby={errors.cardNumber ? 'card-error card-hint' : 'card-hint'}
@@ -603,9 +687,11 @@ function CheckoutPage(props) @{
 					@for (const line of props.lines; key line.productId) {
 						<div class="checkout-summary__line">
 							<span>
-								{line.quantity + ' × ' + getProduct(line.productId).name}
+								{line.quantity + ' × ' + requireProduct(line.productId).name}
 							</span>
-							<strong>{formatMoney(line.quantity * getProduct(line.productId).priceCents)}</strong>
+							<strong>{formatMoney(
+								line.quantity * requireProduct(line.productId).priceCents,
+							)}</strong>
 						</div>
 					}
 					<div class="checkout-summary__total">
@@ -618,9 +704,16 @@ function CheckoutPage(props) @{
 	</main>
 }
 
-function OrderPage(props) @{
+interface OrderPageProps {
+	orderId: string;
+	order: OrderReceipt | null;
+	checkoutState: CheckoutState;
+	navigate: Navigate;
+}
+
+function OrderPage(props: OrderPageProps) @{
 	@if (!props.order || props.order.id !== props.orderId) {
-		<main id="main-content" class="empty-page" tabindex="-1">
+		<main id="main-content" class="empty-page" tabIndex={-1}>
 			<p class="eyebrow">Order lookup</p>
 			<h1>We could not find that order on this device.</h1>
 			<p>Cartlane stores this deterministic receipt locally after checkout.</p>
@@ -633,7 +726,7 @@ function OrderPage(props) @{
 			>Return to the collection</a>
 		</main>
 	} @else {
-		<main id="main-content" class="confirmation" tabindex="-1" data-order-id={props.order.id}>
+		<main id="main-content" class="confirmation" tabIndex={-1} data-order-id={props.order.id}>
 			<div class="confirmation__mark" aria-hidden="true">✓</div>
 			<p class="eyebrow">Order confirmed</p>
 			<h1>Thank you. It is in good hands.</h1>
@@ -658,9 +751,7 @@ function OrderPage(props) @{
 				<dl>
 					<div>
 						<dt>Items</dt>
-						<dd>
-							{props.order.lineCount as string}
-						</dd>
+						<dd>{`${props.order.lineCount}`}</dd>
 					</div>
 					<div>
 						<dt>Delivering to</dt>
@@ -684,28 +775,28 @@ function OrderPage(props) @{
 	}
 }
 
-export function App(props) @{
+export function App(props: RenderRouteProps) @{
 	const initialUrl = props.url ?? '/';
 	const initialScenario = new URL(initialUrl, 'https://cartlane.local').searchParams.get(
 		'scenario',
 	);
 	const [route, setRoute] = useState(() => routeFromUrl(initialUrl));
-	const [lines, setLines] = useState([]);
+	const [lines, setLines] = useState<CartLine[]>([]);
 	const [storageReady, setStorageReady] = useState(false);
 	const [checkoutKey, setCheckoutKey] = useState('');
-	const [lastOrder, setLastOrder] = useState(null);
+	const [lastOrder, setLastOrder] = useState<OrderReceipt | null>(null);
 	const [online, setOnline] = useState(true);
 	const [hydrated, setHydrated] = useState(false);
 	const [notice, setNotice] = useState('');
 	const [query, setQuery] = useState('');
 	const [category, setCategory] = useState('All');
-	const [catalogStatus, setCatalogStatus] = useState(
+	const [catalogStatus, setCatalogStatus] = useState<CatalogStatus>(
 		initialScenario === 'catalog-failure' ? 'loading' : 'ready',
 	);
 	const failurePendingRef = useRef(initialScenario === 'catalog-failure');
-	const catalogTimerRef = useRef(null);
+	const catalogTimerRef = useRef<number | null>(null);
 
-	const navigate = useCallback((destination) => {
+	const navigate = useCallback((destination: string) => {
 		history.pushState(null, '', destination);
 		setRoute(routeFromUrl(destination));
 		window.scrollTo({ top: 0, behavior: 'instant' });
@@ -759,7 +850,7 @@ export function App(props) @{
 		}, 180);
 	}, []);
 
-	const addToCart = useCallback(async (formData) => {
+	const addToCart = useCallback(async (formData: FormData) => {
 		const productId = String(formData.get('productId') ?? '');
 		const product = getProduct(productId);
 		if (!product) return;
@@ -769,7 +860,7 @@ export function App(props) @{
 		setNotice(product.name + ' added to your basket.');
 	}, []);
 
-	const adjustCart = useCallback(async (formData) => {
+	const adjustCart = useCallback(async (formData: FormData) => {
 		const productId = String(formData.get('productId') ?? '');
 		const intent = String(formData.get('intent') ?? '');
 		if (intent !== 'increase' && intent !== 'decrease' && intent !== 'remove') return;
@@ -783,9 +874,9 @@ export function App(props) @{
 	}, []);
 
 	const [checkoutState, checkoutAction, checkoutPending] = useActionState(async (
-		previous,
-		formData,
-	) => {
+		previous: CheckoutState,
+		formData: FormData,
+	): Promise<CheckoutState> => {
 		if (!navigator.onLine) {
 			return {
 				status: 'failure',
@@ -793,7 +884,7 @@ export function App(props) @{
 				recoverable: true,
 			};
 		}
-		let submittedLines = null;
+		let submittedLines: unknown = null;
 		try {
 			submittedLines = JSON.parse(String(formData.get('cart') ?? '[]'));
 		} catch {

@@ -1,4 +1,5 @@
-import type { ReactNode, SVGAttributes } from 'react';
+import type { SVGAttributes } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { SankeyExtraProperties, SankeyGraph, SankeyLink, SankeyNode } from 'd3-sankey';
@@ -42,7 +43,7 @@ type SankeyChildrenFunction<NodeDatum extends SankeyExtraProperties, LinkDatum e
 	(args: {
 		graph: SankeyGraph<NodeDatum, LinkDatum>;
 		createPath: CreatePath<NodeDatum, LinkDatum>;
-	}) => ReactNode;
+	}) => OctaneNode;
 
 export type SankeyProps<NodeDatum extends SankeyExtraProperties, LinkDatum extends SankeyExtraProperties> = {
 	/** The root data from which to derive the sankey layout. */

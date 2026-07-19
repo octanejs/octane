@@ -3101,7 +3101,41 @@ function isTypeOnlyStatement(node) {
 		if (node.exportKind === 'type') return true;
 		if (node.declaration && isTypeOnlyStatement(node.declaration)) return true;
 	}
+	// `export type * from '…'` / `export type * as Ns from '…'`
+	if (node.type === 'ExportAllDeclaration' && node.exportKind === 'type') return true;
 	return false;
+}
+
+// Elide inline `type` specifiers (`import { a, type B }`, `export { type C, d }`)
+// the way tsc does: the specifier disappears from the emitted JS, and a
+// declaration left with no specifiers disappears entirely — matching tsc's
+// whole-import elision (a side-effect `import 'm'` has no specifiers and is
+// untouched). Statement-level `import type` / `export type` never reaches here
+// (isTypeOnlyStatement drops those first).
+function stripTypeOnlySpecifiers(node) {
+	if (
+		(node.type !== 'ImportDeclaration' && node.type !== 'ExportNamedDeclaration') ||
+		node.declaration != null ||
+		!Array.isArray(node.specifiers) ||
+		node.specifiers.length === 0
+	) {
+		return node;
+	}
+	const kind = node.type === 'ImportDeclaration' ? 'importKind' : 'exportKind';
+	const specifiers = node.specifiers.filter((specifier) => specifier[kind] !== 'type');
+	if (specifiers.length === node.specifiers.length) return node;
+	if (specifiers.length === 0) return null;
+	return { ...node, specifiers };
+}
+
+function dropTypeOnlyStatements(body) {
+	const result = [];
+	for (const statement of body) {
+		if (isTypeOnlyStatement(statement)) continue;
+		const stripped = stripTypeOnlySpecifiers(statement);
+		if (stripped != null) result.push(stripped);
+	}
+	return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -4331,9 +4365,10 @@ export function compile(source, filename, options) {
 	const nativeChangeDiagnostics = rendererAuthoredDiagnostics ?? nativeChangeAnalysis.diagnostics;
 	restampAuthoredStyleHashes(ast, clientStyleRemap, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
-	// before emit — they carry no runtime value and would leak invalid TS into
-	// the .js (or crash the printer). Runtime-only; Volar keeps them.
-	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));
+	// and inline `type` specifiers before emit — they carry no runtime value and
+	// would leak invalid TS into the .js (or crash the printer). Runtime-only;
+	// Volar keeps them.
+	ast.body = dropTypeOnlyStatements(ast.body);
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
@@ -5247,9 +5282,10 @@ function compileServer(source, filename, options, styleRemap = null) {
 			rendererRegistry: options?.rendererRegistry,
 		});
 	restampAuthoredStyleHashes(ast, styleRemap, filename);
-	// Drop type-only statements before emit (see isTypeOnlyStatement) — same as
-	// the client path; the server HTML-string output is plain JS too.
-	ast.body = ast.body.filter((n) => !isTypeOnlyStatement(n));
+	// Drop type-only statements and inline `type` specifiers before emit (see
+	// isTypeOnlyStatement) — same as the client path; the server HTML-string
+	// output is plain JS too.
+	ast.body = dropTypeOnlyStatements(ast.body);
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.

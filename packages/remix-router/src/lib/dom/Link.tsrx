@@ -4,13 +4,35 @@
 // inert outside a FrameworkContext upstream and is dropped here — the
 // `prefetch` prop is accepted and ignored (framework mode is out of scope).
 import { useContext } from 'octane';
+import type { OctaneNode } from 'octane';
 import { NavigationContext } from '../context.ts';
+import type { To } from '../router/history.ts';
+import type { RelativeRoutingType } from '../router/router.ts';
 import { ABSOLUTE_URL_REGEX } from '../router/url.ts';
 import { parseToInfo, resolveTo, joinPaths } from '../router/utils.ts';
 import { useHref, useLocation } from '../hooks.ts';
 import { useLinkClickHandler } from './hooks.ts';
 
-export function Link(props) @{
+type LinkProps = {
+	to: To;
+	children?: OctaneNode;
+	onClick?: (event: MouseEvent) => void;
+	discover?: 'render' | 'none';
+	prefetch?: 'none' | 'intent' | 'render' | 'viewport';
+	relative?: RelativeRoutingType;
+	reloadDocument?: boolean;
+	replace?: boolean;
+	mask?: To;
+	state?: any;
+	target?: string;
+	preventScrollReset?: boolean;
+	viewTransition?: boolean;
+	defaultShouldRevalidate?: boolean;
+	ref?: { current: HTMLAnchorElement | null } | ((node: HTMLAnchorElement | null) => void);
+	[key: string]: unknown;
+};
+
+export function Link(props: LinkProps) @{
 	const {
 		onClick,
 		discover = 'render',
@@ -71,10 +93,11 @@ export function Link(props) @{
 		defaultShouldRevalidate,
 		useTransitions,
 	});
-	function handleClick(event) {
+	function handleClick(event: MouseEvent) {
 		if (onClick) onClick(event);
 		if (!event.defaultPrevented) {
-			internalOnClick(event);
+			// Delegated listener — currentTarget is the <a> this handler renders on.
+			internalOnClick(event as MouseEvent & { currentTarget: HTMLAnchorElement });
 		}
 	}
 

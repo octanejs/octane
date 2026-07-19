@@ -9,8 +9,11 @@
     "noEmitOnError": true,
     "noErrorTruncation": true,
     "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
     "types": ["node"],
-    "strict": true
+    "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane"
   },
   "include": ["./src/"],
   "exclude": ["node_modules", "dist", "tests"]

@@ -10,6 +10,7 @@ import {
 } from '@lexical/extension';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useLexicalNodeSelection } from './useLexicalNodeSelection';
+import type { SerializedHorizontalRuleNode } from '@lexical/extension';
 import {
 	$applyNodeReplacement,
 	addClassNamesToElement,
@@ -19,11 +20,13 @@ import {
 	mergeRegister,
 	removeClassNamesFromElement,
 } from 'lexical';
+import type { DOMConversionMap, DOMConversionOutput, NodeKey } from 'lexical';
 import { useEffect } from 'octane';
+import type { OctaneNode } from 'octane';
 
 export { $isHorizontalRuleNode, INSERT_HORIZONTAL_RULE_COMMAND } from '@lexical/extension';
 
-function HorizontalRuleComponent(props) {
+function HorizontalRuleComponent(props: { nodeKey: NodeKey }) {
 	const nodeKey = props.nodeKey;
 	const [editor] = useLexicalComposerContext();
 	const [isSelected, setSelected, clearSelection] = useLexicalNodeSelection(nodeKey);
@@ -68,15 +71,15 @@ export class HorizontalRuleNode extends BaseHorizontalRuleNode {
 		return 'horizontalrule';
 	}
 
-	static clone(node) {
+	static clone(node: HorizontalRuleNode): HorizontalRuleNode {
 		return new HorizontalRuleNode(node.__key);
 	}
 
-	static importJSON(serializedNode) {
+	static importJSON(serializedNode: SerializedHorizontalRuleNode): HorizontalRuleNode {
 		return $createHorizontalRuleNode().updateFromJSON(serializedNode);
 	}
 
-	static importDOM() {
+	static importDOM(): DOMConversionMap | null {
 		return {
 			hr: () => ({
 				conversion: $convertHorizontalRuleElement,
@@ -85,15 +88,15 @@ export class HorizontalRuleNode extends BaseHorizontalRuleNode {
 		};
 	}
 
-	decorate() {
+	decorate(): OctaneNode {
 		return <HorizontalRuleComponent nodeKey={this.__key} />;
 	}
 }
 
-function $convertHorizontalRuleElement() {
+function $convertHorizontalRuleElement(): DOMConversionOutput {
 	return { node: $createHorizontalRuleNode() };
 }
 
-export function $createHorizontalRuleNode() {
+export function $createHorizontalRuleNode(): HorizontalRuleNode {
 	return $applyNodeReplacement(new HorizontalRuleNode());
 }

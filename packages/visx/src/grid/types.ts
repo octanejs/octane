@@ -1,4 +1,5 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties } from 'react';
+import type { OctaneNode } from 'octane';
 import type { D3Scale, NumberLike } from '@octanejs/visx/scale';
 
 // In order to plot values on an axis, output of the scale must be number.
@@ -20,7 +21,7 @@ export type CommonGridProps = {
 	/** classname to apply to line group element. */
 	className?: string;
 	/** Optionally override rendering of grid lines. */
-	children?: (props: { lines: GridLines }) => ReactNode;
+	children?: (props: { lines: GridLines }) => OctaneNode;
 	/** Top offset to apply to glyph g element container. */
 	top?: number;
 	/** Left offset to apply to glyph g element container. */

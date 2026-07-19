@@ -2,6 +2,7 @@
 // internal useDelayUnmount) — placement-aware CSS-transition state/styles for a
 // floating element. ReactDOM.flushSync → octane flushSync.
 import { flushSync, useEffect, useMemo, useState } from 'octane';
+import type { Placement, Side } from '@floating-ui/dom';
 
 import { splitSlot, subSlot } from './internal';
 import {
@@ -9,7 +10,20 @@ import {
 	execWithArgsOrReturn,
 	useLatestRef,
 	useModernLayoutEffect,
+	type CSSProperties,
 } from './utils';
+import type { FloatingContext, ReferenceType } from './types';
+
+export type TransitionStatus = 'unmounted' | 'initial' | 'open' | 'close';
+
+type Duration = number | Partial<{ open: number; close: number }>;
+
+// Styles (or a side/placement-aware factory of styles) for one transition state.
+// Upstream's `CSSStylesProperty`, with `React.CSSProperties` → the octane style
+// object form.
+type CSSStylesProperty =
+	| CSSProperties
+	| ((params: { side: Side; placement: Placement }) => CSSProperties);
 
 function useDelayUnmount(open: boolean, durationMs: number, slot: symbol | undefined): boolean {
 	const [isMounted, setIsMounted] = useState(open, subSlot(slot, 'mounted'));
@@ -29,10 +43,31 @@ function useDelayUnmount(open: boolean, durationMs: number, slot: symbol | undef
 	return isMounted;
 }
 
-export function useTransitionStatus(...args: any[]): any {
+export interface UseTransitionStatusProps {
+	/**
+	 * The duration of the transition in milliseconds, or an object containing
+	 * `open` and `close` keys for different durations.
+	 */
+	duration?: Duration;
+}
+
+/**
+ * Provides a status string to apply CSS transitions to a floating element,
+ * correctly handling placement-aware transitions.
+ * @see https://floating-ui.com/docs/useTransition#usetransitionstatus
+ */
+export function useTransitionStatus(
+	context: FloatingContext,
+	props?: UseTransitionStatusProps,
+	slot?: symbol,
+): { isMounted: boolean; status: TransitionStatus };
+export function useTransitionStatus(...args: any[]): {
+	isMounted: boolean;
+	status: TransitionStatus;
+} {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingContext;
+	const props = (user[1] as UseTransitionStatusProps) ?? {};
 
 	const open = context.open;
 	const floating = context.elements.floating;
@@ -40,7 +75,7 @@ export function useTransitionStatus(...args: any[]): any {
 
 	const isNumberDuration = typeof duration === 'number';
 	const closeDuration = (isNumberDuration ? duration : duration.close) || 0;
-	const [status, setStatus] = useState('unmounted', subSlot(slot, 'status'));
+	const [status, setStatus] = useState<TransitionStatus>('unmounted', subSlot(slot, 'status'));
 	const isMounted = useDelayUnmount(open, closeDuration, subSlot(slot, 'unmount'));
 	if (!isMounted && status === 'close') {
 		setStatus('unmounted');
@@ -71,10 +106,41 @@ export function useTransitionStatus(...args: any[]): any {
 	return { isMounted, status };
 }
 
-export function useTransitionStyles(...args: any[]): any {
+export interface UseTransitionStylesProps extends UseTransitionStatusProps {
+	/**
+	 * The styles to apply when the floating element is initially mounted.
+	 */
+	initial?: CSSStylesProperty;
+	/**
+	 * The styles to apply when the floating element is transitioning to the
+	 * `open` state.
+	 */
+	open?: CSSStylesProperty;
+	/**
+	 * The styles to apply when the floating element is transitioning to the
+	 * `close` state.
+	 */
+	close?: CSSStylesProperty;
+	/**
+	 * The styles to apply to all states.
+	 */
+	common?: CSSStylesProperty;
+}
+
+/**
+ * Provides styles to apply CSS transitions to a floating element, correctly
+ * handling placement-aware transitions. Wrapper around `useTransitionStatus`.
+ * @see https://floating-ui.com/docs/useTransition#usetransitionstyles
+ */
+export function useTransitionStyles<RT extends ReferenceType = ReferenceType>(
+	context: FloatingContext<RT>,
+	props?: UseTransitionStylesProps,
+	slot?: symbol,
+): { isMounted: boolean; styles: CSSProperties };
+export function useTransitionStyles(...args: any[]): { isMounted: boolean; styles: CSSProperties } {
 	const [user, slot] = splitSlot(args);
-	const context = user[0];
-	const props = (user[1] as any) ?? {};
+	const context = user[0] as FloatingContext;
+	const props = (user[1] as UseTransitionStylesProps) ?? {};
 
 	const unstableInitial = props.initial ?? { opacity: 0 };
 	const unstableOpen = props.open;
@@ -83,13 +149,13 @@ export function useTransitionStyles(...args: any[]): any {
 	const duration = props.duration ?? 250;
 
 	const placement = context.placement;
-	const side = placement.split('-')[0];
+	const side = placement.split('-')[0] as Side;
 	const fnArgs = useMemo(() => ({ side, placement }), [side, placement], subSlot(slot, 'args'));
 	const isNumberDuration = typeof duration === 'number';
 	const openDuration = (isNumberDuration ? duration : duration.open) || 0;
 	const closeDuration = (isNumberDuration ? duration : duration.close) || 0;
 
-	const [styles, setStyles] = useState(
+	const [styles, setStyles] = useState<CSSProperties>(
 		() => ({
 			...execWithArgsOrReturn(unstableCommon, fnArgs),
 			...execWithArgsOrReturn(unstableInitial, fnArgs),
@@ -114,7 +180,7 @@ export function useTransitionStyles(...args: any[]): any {
 					return acc;
 				}, {});
 			if (status === 'initial') {
-				setStyles((s: any) => ({
+				setStyles((s) => ({
 					transitionProperty: s.transitionProperty,
 					...commonStyles,
 					...initialStyles,

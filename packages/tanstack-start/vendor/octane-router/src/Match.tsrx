@@ -24,6 +24,7 @@ import {
 	isNotFound,
 	rootRouteId,
 } from '@tanstack/router-core';
+import type { NotFoundError, ParsedLocation } from '@tanstack/router-core';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext } from './context.ts';
 import { Outlet } from './Outlet.tsrx';
@@ -34,9 +35,11 @@ import { SafeFragment } from './SafeFragment.tsrx';
 import { ClientOnly } from './ClientOnly.tsrx';
 import { ScrollRestorationScript } from './scroll-restoration.tsrx';
 
-export function Match(props) @{
+export function Match(props: { matchId: string }) @{
 	const router = useRouter();
-	const matchStore = router.stores.matchStores.get(props.matchId);
+	// Match only renders for ids the router has stores for (Matches/Outlet hand
+	// them down), so the pooled store is present — same invariant upstream asserts.
+	const matchStore = router.stores.matchStores.get(props.matchId)!;
 	const resetKey = useStore(router.stores.loadedAt, (l) => l);
 	const matchState = useStore(
 		matchStore,
@@ -50,8 +53,8 @@ export function Match(props) @{
 			previous.ssr === next.ssr &&
 			previous._displayPending === next._displayPending,
 	);
-	const routeId = matchState.routeId;
-	const route = router.routesById[routeId];
+	const routeId = matchState.routeId as string;
+	const route = (router.routesById as Record<string, any>)[routeId];
 
 	const PendingComponent = route.options.pendingComponent ?? router.options.defaultPendingComponent;
 	const routeErrorComponent = route.options.errorComponent ?? router.options.defaultErrorComponent;
@@ -84,9 +87,9 @@ export function Match(props) @{
 				<CatchWrap
 					getResetKey={() => resetKey}
 					errorComponent={routeErrorComponent || ErrorComponent}
-					onCatch={(error, errorInfo) => {
+					onCatch={(error: Error, errorInfo: { componentStack: string }) => {
 						if (isNotFound(error)) {
-							error.routeId ??= routeId;
+							error.routeId ??= routeId as NotFoundError['routeId'];
 							throw error;
 						}
 						if (routeOnCatch) {
@@ -95,8 +98,8 @@ export function Match(props) @{
 					}}
 				>
 					<NotFoundWrap
-						fallback={(error) => {
-							error.routeId ??= routeId;
+						fallback={(error: NotFoundError) => {
+							error.routeId ??= routeId as NotFoundError['routeId'];
 
 							if (
 								!routeNotFoundComponent || error.routeId && error.routeId !== routeId ||
@@ -129,24 +132,26 @@ export function Match(props) @{
 	</ShellComponent>
 }
 
-function MatchInner(props) {
+function MatchInner(props: { matchId: string }) {
 	const router = useRouter();
-	const matchStore = router.stores.matchStores.get(props.matchId);
+	// Same invariant as Match above: the pooled store exists for rendered ids.
+	const matchStore = router.stores.matchStores.get(props.matchId)!;
 	const match = useStore(matchStore, (m) => m);
-	const routeId = match.routeId;
-	const route = router.routesById[routeId];
+	const routeId = match.routeId as string;
+	const route = (router.routesById as Record<string, any>)[routeId];
 
 	// The live match in the router (if still mounted there) wins over the
 	// snapshot for promise lookups, per upstream getMatchPromise.
-	const getMatchPromise = (key) => router.getMatch(match.id)?._nonReactive[key] ??
+	const getMatchPromise = (key: 'displayPendingPromise' | 'minPendingPromise' | 'loadPromise') =>
+		router.getMatch(match.id)?._nonReactive[key] ??
 		match._nonReactive[key];
 
 	if (match._displayPending) {
-		use(getMatchPromise('displayPendingPromise'));
+		use(getMatchPromise('displayPendingPromise')!);
 	}
 
 	if (match._forcePending) {
-		use(getMatchPromise('minPendingPromise'));
+		use(getMatchPromise('minPendingPromise')!);
 	}
 
 	if (match.status === 'pending') {
@@ -155,7 +160,7 @@ function MatchInner(props) {
 		if (pendingMinMs) {
 			const routerMatch = router.getMatch(match.id);
 			if (routerMatch && !routerMatch._nonReactive.minPendingPromise) {
-				const minPendingPromise = createControlledPromise();
+				const minPendingPromise = createControlledPromise<void>();
 				routerMatch._nonReactive.minPendingPromise = minPendingPromise;
 				setTimeout(() => {
 					minPendingPromise.resolve();
@@ -163,7 +168,7 @@ function MatchInner(props) {
 				}, pendingMinMs);
 			}
 		}
-		use(getMatchPromise('loadPromise'));
+		use(getMatchPromise('loadPromise')!);
 	}
 
 	if (match.status === 'notFound') {
@@ -173,7 +178,7 @@ function MatchInner(props) {
 	if (match.status === 'redirected') {
 		// Observed mid-transition while a redirect is in flight — suspend on the
 		// load so this stale render is abandoned and the redirect completes.
-		use(getMatchPromise('loadPromise'));
+		use(getMatchPromise('loadPromise')!);
 	}
 
 	if (match.status === 'error') {
@@ -206,7 +211,7 @@ function MatchInner(props) {
 // `resolvedLocation` to the new location.
 function OnRendered() @{
 	const router = useRouter();
-	const prevResolvedLocationRef = useRef(undefined);
+	const prevResolvedLocationRef = useRef<ParsedLocation<any> | undefined>(undefined);
 	const renderedLocationKey = useStore(
 		router.stores.resolvedLocation,
 		(loc) => loc?.state.__TSR_key,

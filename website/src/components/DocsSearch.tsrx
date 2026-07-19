@@ -165,8 +165,8 @@ function SearchDialog(props: DialogProps) @{
 					class="search-input"
 					placeholder="Search the docs"
 					aria-label="Search the documentation"
-					autocomplete="off"
-					spellcheck={false}
+					autoComplete="off"
+					spellCheck={false}
 					value={query}
 					onInput={onQuery}
 				/>

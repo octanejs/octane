@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { OctaneNode } from 'octane';
 import type {
 	Boundary,
 	Delay,
@@ -130,14 +131,14 @@ export type FloatingTooltipProviderProps = {
 	delay?: Delay;
 	closeDelay?: number;
 	skipDelay?: number;
-	children: React.ReactNode;
+	children: OctaneNode;
 };
 
 export type FloatingTooltipRootState<TData = unknown> = UseFloatingTooltipReturn<TData>;
 
 export type FloatingTooltipRootProps<TData = unknown> = UseFloatingTooltipOptions<TData> & {
 	forceMount?: boolean;
-	children: React.ReactNode | ((state: FloatingTooltipRootState<TData>) => React.ReactNode);
+	children: OctaneNode | ((state: FloatingTooltipRootState<TData>) => OctaneNode);
 };
 
 export type FloatingTooltipTriggerState = {
@@ -156,7 +157,7 @@ export type FloatingTooltipTriggerProps = {
 export type FloatingTooltipPortalProps = {
 	container?: HTMLElement | ShadowRoot | React.RefObject<HTMLElement | ShadowRoot | null> | null;
 	disabled?: boolean;
-	children: React.ReactNode;
+	children: OctaneNode;
 };
 
 export type FloatingTooltipPositionerState = FloatingTooltipRootState;

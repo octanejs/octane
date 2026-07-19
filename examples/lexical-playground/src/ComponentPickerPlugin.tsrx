@@ -11,6 +11,7 @@ import { $setBlocksType } from '@lexical/selection';
 import { $createHeadingNode, $createQuoteNode } from '@lexical/rich-text';
 import { INSERT_ORDERED_LIST_COMMAND, INSERT_UNORDERED_LIST_COMMAND } from '@lexical/list';
 import { $createParagraphNode, $getSelection, $isRangeSelection } from 'lexical';
+import type { ElementNode, TextNode } from 'lexical';
 import { createPortal, useCallback, useMemo, useState } from 'octane';
 
 class ComponentPickerOption extends MenuOption {
@@ -23,7 +24,14 @@ class ComponentPickerOption extends MenuOption {
 	}
 }
 
-function ComponentPickerMenu(props) @{
+type PickerItemProps = {
+	options: ComponentPickerOption[];
+	selectedIndex: number | null;
+	selectOptionAndCleanUp: (option: ComponentPickerOption) => void;
+	setHighlightedIndex: (index: number) => void;
+};
+
+function ComponentPickerMenu(props: { itemProps: PickerItemProps }) @{
 	<div class="typeahead-popover component-picker-menu">
 		<ul>{props.itemProps.options.map(
 			(option, i) => <li
@@ -46,11 +54,11 @@ function ComponentPickerMenu(props) @{
 
 export function ComponentPickerPlugin() {
 	const [editor] = useLexicalComposerContext();
-	const [queryString, setQueryString] = useState(null);
+	const [queryString, setQueryString] = useState<string | null>(null);
 	const triggerFn = useBasicTypeaheadTriggerMatch('/', { minLength: 0 });
 
 	const options = useMemo(() => {
-		const $block = (create) => () => {
+		const $block = (create: () => ElementNode) => () => {
 			const selection = $getSelection();
 			if ($isRangeSelection(selection)) {
 				$setBlocksType(selection, create);
@@ -82,7 +90,11 @@ export function ComponentPickerPlugin() {
 		return all.filter((o) => o.title.toLowerCase().includes(q));
 	}, [editor, queryString]);
 
-	const onSelectOption = useCallback((selectedOption, nodeToRemove, closeMenu) => {
+	const onSelectOption = useCallback((
+		selectedOption: ComponentPickerOption,
+		nodeToRemove: TextNode | null,
+		closeMenu: () => void,
+	) => {
 		editor.update(() => {
 			if (nodeToRemove) {
 				nodeToRemove.remove();
@@ -94,7 +106,7 @@ export function ComponentPickerPlugin() {
 
 	// React-compatible: return a portal (octane renders a createPortal value at any
 	// position — no host-element wrapper needed).
-	const menuRenderFn = (anchorRef, itemProps) => {
+	const menuRenderFn = (anchorRef: { current: HTMLElement | null }, itemProps: PickerItemProps) => {
 		if (anchorRef.current == null || !itemProps.options.length) {
 			return null;
 		}

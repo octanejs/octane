@@ -4,18 +4,27 @@
 // up; the reset key is `not-found-${pathname}-${status}` so navigating away (or a
 // new load settling) clears the not-found UI.
 import { isNotFound } from '@tanstack/router-core';
+import type { ErrorComponentProps, NotFoundError } from '@tanstack/router-core';
+import type { OctaneNode } from 'octane';
 import { useRouter } from './context.ts';
 import { useStore } from './useStore.ts';
 import { CatchBoundary } from './CatchBoundary.tsrx';
 
-function NotFoundFallback(props) {
+function NotFoundFallback(props: {
+	error: unknown;
+	render?: (error: NotFoundError) => OctaneNode;
+}) {
 	if (isNotFound(props.error)) {
 		return props.render ? props.render(props.error) : null;
 	}
 	throw props.error;
 }
 
-export function CatchNotFound(props) @{
+export function CatchNotFound(props: {
+	fallback?: (error: NotFoundError) => OctaneNode;
+	onCatch?: (error: Error, errorInfo: { componentStack: string }) => void;
+	children: OctaneNode;
+}) @{
 	const router = useRouter();
 	const pathname = useStore(router.stores.location, (l) => l.pathname);
 	const status = useStore(router.stores.status, (s) => s);
@@ -23,7 +32,7 @@ export function CatchNotFound(props) @{
 
 	<CatchBoundary
 		getResetKey={() => resetKey}
-		onCatch={(error, errorInfo) => {
+		onCatch={(error: Error, errorInfo: { componentStack: string }) => {
 			if (isNotFound(error)) {
 				if (props.onCatch) {
 					props.onCatch(error, errorInfo);
@@ -32,7 +41,8 @@ export function CatchNotFound(props) @{
 				throw error;
 			}
 		}}
-		errorComponent={(p) => NotFoundFallback({ error: p.error, render: props.fallback })}
+		errorComponent={(p: ErrorComponentProps) =>
+			NotFoundFallback({ error: p.error, render: props.fallback })}
 	>{props.children}</CatchBoundary>
 }
 

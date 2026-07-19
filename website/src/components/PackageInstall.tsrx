@@ -106,7 +106,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 						id={id + '-tab-' + pm}
 						aria-selected={manager === pm}
 						aria-controls={id + '-panel'}
-						tabindex={manager === pm ? 0 : -1}
+						tabIndex={manager === pm ? 0 : -1}
 						class={['pkg-tab', manager === pm && 'pkg-tab-active']}
 						onClick={() => setManager(pm)}
 					>

@@ -10,26 +10,50 @@ import {
 	useRef,
 	useState,
 } from 'octane';
+import type { OctaneNode } from 'octane';
 
 import { createPubSub } from './pubsub';
 import { S, splitSlot, subSlot } from './internal';
 import { useId } from './useId';
 import { useModernLayoutEffect } from './utils';
+import type { FloatingNodeType, FloatingTreeType, ReferenceType } from './types';
 
-export const FloatingNodeContext = createContext<any>(null);
-export const FloatingTreeContext = createContext<any>(null);
+interface FloatingNodeContextValue {
+	id: string | undefined;
+	parentId: string | null;
+}
 
+export const FloatingNodeContext = createContext<FloatingNodeContextValue | null>(null);
+export const FloatingTreeContext = createContext<FloatingTreeType | null>(null);
+
+/**
+ * Returns the parent node id for nested floating elements, if available.
+ * Returns `null` for top-level floating elements.
+ */
 export const useFloatingParentNodeId = (): string | null => {
 	const context = useContext(FloatingNodeContext);
-	return context ? context.id : null;
+	// A FloatingNode's `id` may be undefined (upstream allows it); the public
+	// contract is `string | null`, so coalesce.
+	return context ? (context.id ?? null) : null;
 };
 
-export const useFloatingTree = (): any => useContext(FloatingTreeContext);
+/**
+ * Returns the nearest floating tree context, if available.
+ */
+export const useFloatingTree = <
+	RT extends ReferenceType = ReferenceType,
+>(): FloatingTreeType<RT> | null => useContext(FloatingTreeContext) as FloatingTreeType<RT> | null;
 
+/**
+ * Registers a node into the `FloatingTree`, returning its id.
+ * @see https://floating-ui.com/docs/FloatingTree
+ */
+export function useFloatingNodeId(customParentId?: string, slot?: symbol): string;
+export function useFloatingNodeId(slot?: symbol): string;
 export function useFloatingNodeId(...args: any[]): string {
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useFloatingNodeId');
-	const customParentId = user[0];
+	const customParentId = user[0] as string | undefined;
 
 	const id = useId(subSlot(slot, 'id'));
 	const tree = useFloatingTree();
@@ -50,7 +74,16 @@ export function useFloatingNodeId(...args: any[]): string {
 	return id;
 }
 
-export function FloatingNode(props: any): any {
+export interface FloatingNodeProps {
+	children?: OctaneNode;
+	id: string | undefined;
+}
+
+/**
+ * Provides parent node context for nested floating elements.
+ * @see https://floating-ui.com/docs/FloatingTree
+ */
+export function FloatingNode(props: FloatingNodeProps): OctaneNode {
 	const children = props.children;
 	const id = props.id;
 	const parentId = useFloatingParentNodeId();
@@ -58,25 +91,34 @@ export function FloatingNode(props: any): any {
 	return createElement(FloatingNodeContext.Provider, { value, children });
 }
 
-export function FloatingTree(props: any): any {
+export interface FloatingTreeProps {
+	children?: OctaneNode;
+}
+
+/**
+ * Provides context for nested floating elements when they are not children of
+ * each other on the DOM.
+ * @see https://floating-ui.com/docs/FloatingTree
+ */
+export function FloatingTree(props: FloatingTreeProps): OctaneNode {
 	const children = props.children;
-	const nodesRef = useRef<any[]>([], S('FloatingTree:nodes'));
+	const nodesRef = useRef<FloatingNodeType[]>([], S('FloatingTree:nodes'));
 	const addNode = useCallback(
-		(node: any) => {
+		(node: FloatingNodeType) => {
 			nodesRef.current = [...nodesRef.current, node];
 		},
 		[],
 		S('FloatingTree:add'),
 	);
 	const removeNode = useCallback(
-		(node: any) => {
+		(node: FloatingNodeType) => {
 			nodesRef.current = nodesRef.current.filter((n) => n !== node);
 		},
 		[],
 		S('FloatingTree:remove'),
 	);
 	const [events] = useState(() => createPubSub(), S('FloatingTree:events'));
-	const value = useMemo(
+	const value = useMemo<FloatingTreeType>(
 		() => ({ nodesRef, addNode, removeNode, events }),
 		[addNode, removeNode, events],
 		S('FloatingTree:value'),

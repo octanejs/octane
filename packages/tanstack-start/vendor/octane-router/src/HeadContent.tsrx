@@ -1,11 +1,17 @@
 import { createElement, useEffect } from 'octane';
 import { DEV_STYLES_ATTR } from '@tanstack/router-core';
+import type { AssetCrossOriginConfig } from '@tanstack/router-core';
 import { Asset } from './Asset.tsrx';
+import type { AssetProps } from './Asset.tsrx';
 import { getAssetKey } from './assetKeys.ts';
 import { useTags } from './headContentUtils.ts';
 import { useHydrated } from './ClientOnly.tsrx';
 
-export function HeadContent(props) @{
+export interface HeadContentProps {
+	assetCrossOrigin?: AssetCrossOriginConfig;
+}
+
+export function HeadContent(props: HeadContentProps) @{
 	const tags = useTags(props.assetCrossOrigin);
 	const hydrated = useHydrated();
 
@@ -26,7 +32,9 @@ export function HeadContent(props) @{
 			: tags;
 	<>
 		{filteredTags.map((tag, index) =>
-			createElement(Asset, {
+			// `key` is lifted out of props by createElement (React semantics); the
+			// explicit type argument admits it alongside the AssetProps shape.
+			createElement<AssetProps & { key?: string }>(Asset, {
 				...tag,
 				assetKey: getAssetKey('head', tag, index),
 				target: 'head',

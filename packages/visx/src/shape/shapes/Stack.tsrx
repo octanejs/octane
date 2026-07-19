@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { Area as AreaType, Stack as StackType, SeriesPoint, Series } from 'd3-shape';
@@ -20,7 +20,7 @@ export type StackProps<Datum, Key> = BaseStackProps<Datum, Key> & {
 			stacks: Series<Datum, Key>[];
 			path: AreaType<SeriesPoint<Datum>>;
 			stack: StackType<$TSFIXME, Datum, Key>;
-		}) => ReactNode;
+		}) => OctaneNode;
 		/** Sets the x0 accessor function, and sets x1 to null. */
 		x?: AccessorForArrayItem<SeriesPoint<Datum>, number>;
 		/** Specifies the x0 accessor function which defaults to d => d[0]. */

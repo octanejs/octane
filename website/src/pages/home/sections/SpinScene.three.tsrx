@@ -1,3 +1,4 @@
+/** @jsxImportSource @octanejs/three/intrinsics */
 // The 3D flame: the logo's two flame outlines (./flame.ts) extruded into real
 // geometry. Drag anywhere on the canvas to throw it around (with inertia); left
 // alone it settles back into a slow idle spin. The scene is deliberately
@@ -62,7 +63,7 @@ interface DragState {
 }
 
 export function SpinScene() @{
-	const group = useRef<THREE.Group>(null);
+	const group = useRef<THREE.Group | null>(null);
 	const gl = useThree((state) => state.gl);
 	const invalidate = useThree((state) => state.invalidate);
 	const setFrameloop = useThree((state) => state.setFrameloop);
@@ -78,7 +79,10 @@ export function SpinScene() @{
 	});
 
 	useEffect(() => {
-		const canvas = gl.domElement;
+		// `RootState['gl']` is the minimal renderer contract (a custom renderer may
+		// have no DOM element at all); this scene renders through the web <Canvas>,
+		// whose renderer always draws into a real canvas element.
+		const canvas = gl.domElement as HTMLCanvasElement;
 		const state = drag.current;
 		const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 		let onScreen = true;

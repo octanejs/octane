@@ -1,12 +1,25 @@
 // Router — transcribed from react-router@8.2.0 lib/components.tsx. The
 // low-level context provider every router variant renders through.
 import { useMemo } from 'octane';
+import type { OctaneNode } from 'octane';
 import { LocationContext, NavigationContext } from '../context.ts';
+import type { Navigator } from '../context.ts';
 import { Action as NavigationType, invariant, parsePath, warning } from '../router/history.ts';
+import type { Location } from '../router/history.ts';
 import { stripBasename } from '../router/utils.ts';
 import { useInRouterContext } from '../hooks.ts';
 
-export function Router(props) @{
+type RouterProps = {
+	basename?: string;
+	children?: OctaneNode;
+	location: Partial<Location> | string;
+	navigationType?: NavigationType;
+	navigator: Navigator;
+	static?: boolean;
+	useTransitions?: boolean;
+};
+
+export function Router(props: RouterProps) @{
 	const {
 		basename: basenameProp = '/',
 		children = null,

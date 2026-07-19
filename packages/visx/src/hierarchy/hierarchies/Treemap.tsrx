@@ -1,5 +1,6 @@
 import { createElement } from 'octane';
-import type { ReactNode, FunctionComponent, ComponentClass } from 'react';
+import type { FunctionComponent, ComponentClass } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { HierarchyRectangularNode, HierarchyNode } from 'd3-hierarchy';
@@ -16,7 +17,7 @@ export type TreemapProps<Datum> = {
 	/** The root hierarchy node from which to derive the treemap layout. */
 	root: HierarchyNode<Datum>;
 	/** Render override function which is passed the computed pack layout data. */
-	children?: (pack: HierarchyRectangularNode<Datum>) => ReactNode;
+	children?: (pack: HierarchyRectangularNode<Datum>) => OctaneNode;
 	/** top offset applied to the g element container. */
 	top?: number;
 	/** left offset applied to the g element container. */

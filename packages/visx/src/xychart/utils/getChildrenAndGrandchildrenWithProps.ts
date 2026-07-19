@@ -1,17 +1,18 @@
-import type { ReactElement, ReactNode } from 'react';
+import type { ReactElement } from 'react';
+import type { OctaneNode } from 'octane';
 import { Children } from 'octane';
 
-/** Returns whether the ReactNode has props (and therefore is an `Element` versus primitive type) */
-function isChildWithProps<P extends object>(child: ReactNode): child is ReactElement<P> {
+/** Returns whether the OctaneNode has props (and therefore is an `Element` versus primitive type) */
+function isChildWithProps<P extends object>(child: OctaneNode): child is ReactElement<P> {
 	return !!child && typeof child === 'object' && 'props' in child && child.props != null;
 }
 
 /**
- * Returns children and grandchildren of type ReactNode.
+ * Returns children and grandchildren of type OctaneNode.
  * Flattens children one level to support Fragments and Array type children.
  */
 export default function getChildrenAndGrandchildrenWithProps<P extends object>(
-	children: ReactNode,
+	children: OctaneNode,
 ): ReactElement<P>[] {
 	return Children.toArray(children)
 		.flatMap((child) => {

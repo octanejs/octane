@@ -153,7 +153,7 @@ export function Playground() @{
 				{ dark: true },
 			);
 
-			preview = pg.createPreview(previewHost, (message) => {
+			preview = pg.createPreview(previewHost, (message: string) => {
 				if (!disposed) setError(message);
 			});
 

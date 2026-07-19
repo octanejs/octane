@@ -25,7 +25,7 @@ function SavedToast(props: SavedToastProps) {
 }
 
 export function PortalEventDemo() @{
-	const portalTargetRef = useRef<HTMLElement | null>(null);
+	const portalTargetRef = useRef<HTMLDivElement | null>(null);
 	const [targetReady, setTargetReady] = useState(false);
 	const [showToast, setShowToast] = useState(false);
 	const [parentClicks, setParentClicks] = useState(0);

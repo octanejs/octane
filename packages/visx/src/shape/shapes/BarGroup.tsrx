@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { OctaneNode } from 'octane';
 import cx from 'classnames';
 import { Group } from '@octanejs/visx/group';
 import type { ScaleInput } from '@octanejs/visx/scale';
@@ -28,7 +28,7 @@ export type BarGroupProps<Datum extends DatumObject, Key extends GroupKey = Grou
 		/** Total height of the y-axis. */
 		height: number;
 		/** Override render function which is passed the computed BarGroups. */
-		children?: (barGroups: BarGroupType<Key>[]) => ReactNode;
+		children?: (barGroups: BarGroupType<Key>[]) => OctaneNode;
 	};
 
 /**

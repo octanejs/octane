@@ -50,7 +50,7 @@ allowBuilds:
   tldjs: false
 
 # Variables
-esrap_common: &esrap_common ^2.2.9
+esrap_common: &esrap_common ^2.3.0
 
 overrides:
   esrap: *esrap_common
@@ -122,8 +122,8 @@ catalogs:
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
     '@playwright/test': ^1.61.0
-    '@ripple-ts/adapter': ^0.3.86
-    '@ripple-ts/vite-plugin': ^0.3.86
+    '@ripple-ts/adapter': ^0.3.101
+    '@ripple-ts/vite-plugin': ^0.3.101
     '@solidjs/web': '2.0.0-beta.14'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
@@ -146,13 +146,14 @@ catalogs:
     '@testing-library/jest-dom': ^6.9.1
     '@vitest/coverage-istanbul': 4.1.9
     '@vitest/coverage-v8': 4.1.9
-    '@tsrx/core': ^0.1.40
-    '@tsrx/prettier-plugin': ^0.3.97
-    '@tsrx/ripple': ^0.1.38
-    '@tsrx/react': ^0.2.37
-    '@tsrx/solid': ^0.1.37
-    '@tsrx/vite-plugin-react': ^0.0.69
-    '@tsrx/vite-plugin-solid': ^0.0.67
+    '@tsrx/core': ^0.1.44
+    '@tsrx/prettier-plugin': ^0.3.103
+    '@tsrx/typescript-plugin': ^0.3.103
+    '@tsrx/ripple': ^0.1.45
+    '@tsrx/react': ^0.2.44
+    '@tsrx/solid': ^0.1.44
+    '@tsrx/vite-plugin-react': ^0.0.75
+    '@tsrx/vite-plugin-solid': ^0.0.73
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
     '@types/d3-chord': ^1.0.9
@@ -274,7 +275,7 @@ catalogs:
     '@react-types/shared': ^3.36.0
     react-dom: ^19.2.0
     react-i18next: 17.0.9
-    ripple: ^0.3.86
+    ripple: ^0.3.101
     rxjs: ^7.8.2
     rulesync: ^8.17.0
     solid-js: '2.0.0-beta.14'
@@ -304,9 +305,8 @@ catalogs:
     yjs: ^13.6.0
     zustand: ^5.0.0
 
-patchedDependencies:
-  '@tsrx/core@0.1.37': patches/@tsrx__core@0.1.37.patch
-  '@tsrx/core@0.1.40': patches/@tsrx__core@0.1.40.patch
+# patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
+# superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
   - '@tanstack/ai-client@0.21.0'
