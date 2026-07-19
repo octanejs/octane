@@ -1,5 +1,5 @@
 // The bindings knowledge, snapshotted at build time: the curated catalog the
-// website ships, every package's machine-readable status.json, and the
+// website ships, every public binding's machine-readable status.json, and the
 // React-package → binding map maintained in @octanejs/mcp-server.
 import categories from '../../../website/src/content/bindings.json';
 import { KNOWN_BINDINGS } from '@octanejs/mcp-server/bridge';
@@ -33,11 +33,14 @@ const statusModules = import.meta.glob('../../../packages/*/status.json', {
 	import: 'default',
 }) as Record<string, Omit<BindingStatus, 'package' | 'dir'>>;
 
+const catalogPackages = new Set(BINDING_CATEGORIES.flatMap((category) => category.packages));
+
 export const BINDING_STATUSES: readonly BindingStatus[] = Object.entries(statusModules)
 	.map(([path, status]) => {
 		const dir = path.split('/').at(-2)!;
 		return { package: `@octanejs/${dir}`, dir, ...status };
 	})
+	.filter((status) => catalogPackages.has(status.package))
 	.sort((a, b) => a.package.localeCompare(b.package));
 
 /**

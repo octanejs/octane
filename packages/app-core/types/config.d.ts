@@ -16,6 +16,7 @@ export type {
 	ExperimentalRendererConfigOptions,
 	ExperimentalRendererRegistryEntry,
 	ExperimentalRendererRuleOptions,
+	ExperimentalRendererValidationOptions,
 	ExperimentalResolvedRendererBoundary,
 	ExperimentalResolvedRendererConfig,
 	ExperimentalResolvedRendererRegistryEntry,

@@ -57,6 +57,7 @@ import {
 import { assertNoLiveClientOnlyImports } from './client-only-server.js';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { assertUniversalRuntimeTarget, normalizeUniversalRuntime } from './universal-runtime.js';
 
 // DOM truth tables shared with the client/server runtimes (via constants.ts) —
 // static bakes and dynamic writes MUST agree on which attributes render, under
@@ -4156,6 +4157,10 @@ export function compile(source, filename, options) {
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
+	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
+	if (!options?.__rendererBoundariesLowered) {
+		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
+	}
 	if (!options?.__hydratePrepared) {
 		const query = filename.indexOf('?');
 		const hash = filename.indexOf('#');
@@ -4290,6 +4295,16 @@ export function compile(source, filename, options) {
 	);
 	if (options?.renderer?.target === 'universal') {
 		const renderer = options.renderer;
+		const validationRemap =
+			renderer.validation === undefined
+				? null
+				: composeStyleRemap(
+						options?.__styleRemap ?? null,
+						authoredSource,
+						rendererBoundaryPreparation?.validationOrigins ??
+							rendererBoundaryPreparation?.origins ??
+							null,
+					);
 		let reverseSourceMapComposed = false;
 		const result = compileUniversal(
 			source,
@@ -4314,6 +4329,7 @@ export function compile(source, filename, options) {
 				const compiled = compile(domSource, filename, {
 					...options,
 					renderer: undefined,
+					universalRuntime: undefined,
 					rendererBoundaries: undefined,
 					rendererRegistry: undefined,
 					__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
@@ -4335,7 +4351,9 @@ export function compile(source, filename, options) {
 				}
 				return compiled;
 			},
-			options,
+			validationRemap !== null
+				? { ...options, __universalValidationRemap: validationRemap }
+				: options,
 		);
 		if (rendererBoundaryPreparation !== null && result.map && !reverseSourceMapComposed) {
 			result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);

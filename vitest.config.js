@@ -61,6 +61,21 @@ const THREE_ALIASES = [
 		replacement: resolve(THREE_SOURCE, 'intrinsics.ts'),
 	},
 ];
+const LYNX_SOURCE = resolve(import.meta.dirname, 'packages/lynx/src');
+const LYNX_ALIASES = [
+	{
+		find: /^@octanejs\/lynx$/,
+		replacement: resolve(LYNX_SOURCE, 'index.ts'),
+	},
+	{
+		find: /^@octanejs\/lynx\/intrinsics\/jsx-runtime$/,
+		replacement: resolve(LYNX_SOURCE, 'intrinsics.ts'),
+	},
+	{
+		find: /^@octanejs\/lynx\/(.*)$/,
+		replacement: `${LYNX_SOURCE}/$1.ts`,
+	},
+];
 const VISX_SOURCE = resolve(import.meta.dirname, 'packages/visx/src');
 const VISX_ALIASES = [
 	{
@@ -1846,6 +1861,24 @@ export default defineConfig({
 					environment: 'node',
 					globals: false,
 				},
+			},
+			{
+				test: {
+					name: 'lynx',
+					include: ['packages/lynx/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: { alias: LYNX_ALIASES },
+			},
+			{
+				test: {
+					name: 'rspeedy-plugin',
+					include: ['packages/rspeedy-plugin-octane/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				resolve: { alias: LYNX_ALIASES },
 			},
 			{
 				test: {

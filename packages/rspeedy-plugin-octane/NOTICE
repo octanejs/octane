@@ -1,0 +1,3 @@
+This package interoperates with the Apache-2.0-licensed Lynx and Rspeedy
+projects. No upstream source is included. See UPSTREAM.md for the pinned
+compatibility boundary.

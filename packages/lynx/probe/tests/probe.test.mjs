@@ -4,6 +4,7 @@ import { afterEach, test } from 'node:test';
 import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing-environment';
 import { JSDOM } from 'jsdom';
 
+import { PHASE_0_LISTENER_ID, PHASE_0_PROTOCOL } from '../src/protocol.mjs';
 import { installPhase0Background, installPhase0MainThread } from '../src/runtime-bridge.mjs';
 
 let activeEnvironment;
@@ -81,6 +82,73 @@ test(
 		assert.equal(counter.textContent, 'Count: 0');
 
 		await background.destroy();
+		assert.equal(mainThread.papi.page.childElementCount, 0);
+		mainThread.destroy();
+	},
+);
+
+test(
+	'a delayed commit acknowledgement cannot complete terminal destroy',
+	{ timeout: 1_000 },
+	async () => {
+		const environment = createEnvironment();
+		environment.switchToMainThread();
+		const context = globalThis.lynx.getJSContext();
+		const dispatchMessage = context.dispatchEvent.bind(context);
+		let delayedCommitAcknowledgement;
+		context.dispatchEvent = (event) => {
+			const message = event?.data;
+			if (
+				message?.type === 'octane-lynx-phase-0:ack' &&
+				message.acknowledgement?.type === 'ack' &&
+				message.acknowledgement.acceptedVersion === 2
+			) {
+				delayedCommitAcknowledgement = message;
+				return dispatchMessage({
+					type: 'message',
+					data: {
+						type: 'octane-lynx-phase-0:ack',
+						requestId: message.requestId,
+						rejection: {
+							...PHASE_0_PROTOCOL,
+							type: 'reject',
+							version: 2,
+							message: 'simulated delayed commit acknowledgement',
+						},
+					},
+				});
+			}
+			if (message?.type === 'octane-lynx-phase-0:batch' && message.batch?.type === 'destroy') {
+				assert.ok(delayedCommitAcknowledgement);
+				environment.switchToMainThread();
+				dispatchMessage({ type: 'message', data: delayedCommitAcknowledgement });
+				environment.switchToBackgroundThread();
+				setImmediate(() => {
+					environment.switchToBackgroundThread();
+					dispatchMessage(event);
+				});
+				return;
+			}
+			return dispatchMessage(event);
+		};
+
+		const mainThread = installPhase0MainThread(globalThis);
+		environment.switchToBackgroundThread();
+		const background = installPhase0Background(globalThis);
+		await background.ready;
+
+		await assert.rejects(
+			background.deliverNativeEvent(PHASE_0_LISTENER_ID, { eventName: 'tap' }),
+			/simulated delayed commit acknowledgement/,
+		);
+		assert.equal(
+			mainThread.papi.page.querySelector('[data-testid="phase-0-counter"]')?.textContent,
+			'Count: 1',
+		);
+
+		await background.destroy();
+
+		assert.equal(mainThread.receiver.destroyed, true);
 		assert.equal(mainThread.papi.page.childElementCount, 0);
 		mainThread.destroy();
 	},

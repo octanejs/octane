@@ -15,21 +15,26 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
-	getPublishablePackages,
+	getWorkspacePackages,
 	REPO_ROOT,
 	validateWorkspacePackages,
 } from './workspace-packages.mjs';
 import {
 	createPackedExampleManifest,
 	isWithinDirectory,
+	NATIVE_GRAPH_FORBIDDEN_MODULE,
 	renderPackedExampleWorkspace,
 } from './package-pack-canaries.mjs';
 
-const packages = getPublishablePackages();
+const privatePackScaffolds = new Set(['@octanejs/lynx', '@octanejs/rspeedy-plugin']);
+const packages = getWorkspacePackages().filter(
+	(pkg) => !pkg.private || privatePackScaffolds.has(pkg.name),
+);
 const packageVersions = new Map(packages.map((pkg) => [pkg.name, pkg.version]));
 const octaneSingletonConsumers = new Set([
 	'@octanejs/app-core',
 	'@octanejs/rspack-plugin',
+	'@octanejs/rspeedy-plugin',
 	'@octanejs/rsbuild-plugin',
 	'@octanejs/vite-plugin',
 ]);
@@ -646,6 +651,245 @@ process.stdout.write(output, () => process.exit(0));
 	);
 }
 
+/**
+ * Exercise the private Phase 1 Lynx compiler packages exactly as an external
+ * application consumes them. This is intentionally a production JavaScript
+ * compile check, not a native bundle or device-runtime claim.
+ */
+function validatePackedLynxConsumer(tempRoot, archives) {
+	const consumerDirectory = path.join(tempRoot, 'external-lynx-consumer');
+	const sourceDirectory = path.join(consumerDirectory, 'src');
+	const outputDirectory = path.join(consumerDirectory, 'dist');
+	if (isWithinDirectory(REPO_ROOT, consumerDirectory)) {
+		throw new Error('packed Lynx consumer must be created outside the workspace');
+	}
+	mkdirSync(sourceDirectory, { recursive: true });
+	const archiveSpecs = Object.fromEntries(
+		['octane', '@octanejs/rspack-plugin', '@octanejs/lynx', '@octanejs/rspeedy-plugin'].map(
+			(packageName) => [packageName, fileArchiveSpec(archives, packageName)],
+		),
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'package.json'),
+		JSON.stringify(
+			{
+				name: 'octane-packed-lynx-consumer-smoke',
+				private: true,
+				type: 'module',
+				engines: { node: '>=22' },
+				dependencies: {
+					'@lynx-js/rspeedy': '0.16.0',
+					'@octanejs/lynx': archiveSpecs['@octanejs/lynx'],
+					'@octanejs/rspack-plugin': archiveSpecs['@octanejs/rspack-plugin'],
+					'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
+					'@rsbuild/core': '2.1.4',
+					'@rspack/core': '2.1.3',
+					octane: archiveSpecs.octane,
+				},
+			},
+			null,
+			2,
+		) + '\n',
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'pnpm-workspace.yaml'),
+		renderPackedExampleWorkspace(archiveSpecs),
+	);
+	writeFileSync(
+		path.join(sourceDirectory, 'App.tsrx'),
+		`import { useState } from 'octane';
+
+export function App() @{
+	const [count, setCount] = useState(0);
+	<view id="packed-lynx" bindtap={() => setCount((value) => value + 1)}>
+		<text>{\`Count: \${count}\`}</text>
+	</view>
+}
+
+globalThis.__octanePackedLynxProbe = 'octane-packed-lynx-compiled';
+`,
+	);
+	writeFileSync(
+		path.join(consumerDirectory, 'build.mjs'),
+		`import { createRspeedy } from '@lynx-js/rspeedy';
+import { pluginOctane, assertLynxToolchain } from '@octanejs/rspeedy-plugin';
+import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import path from 'node:path';
+
+const root = ${JSON.stringify(consumerDirectory)};
+const outputRoot = ${JSON.stringify(outputDirectory)};
+const request = createRequire(import.meta.url);
+const directRuntime = realpathSync(request.resolve('octane'));
+const directLynx = realpathSync(request.resolve('@octanejs/lynx'));
+const directRspackPlugin = realpathSync(request.resolve('@octanejs/rspack-plugin'));
+const rspeedyPlugin = realpathSync(request.resolve('@octanejs/rspeedy-plugin'));
+
+for (const [name, entry] of [
+	['@octanejs/lynx', directLynx],
+	['@octanejs/rspack-plugin', directRspackPlugin],
+	['@octanejs/rspeedy-plugin', rspeedyPlugin],
+]) {
+	const peerRuntime = realpathSync(createRequire(entry).resolve('octane'));
+	if (peerRuntime !== directRuntime) {
+		throw new Error(name + ' resolved a second Octane runtime:\\n  app: ' + directRuntime + '\\n  package: ' + peerRuntime);
+	}
+}
+
+const pluginRequest = createRequire(rspeedyPlugin);
+if (realpathSync(pluginRequest.resolve('@octanejs/lynx')) !== directLynx) {
+	throw new Error('@octanejs/rspeedy-plugin resolved a second @octanejs/lynx install');
+}
+if (realpathSync(pluginRequest.resolve('@octanejs/rspack-plugin')) !== directRspackPlugin) {
+	throw new Error('@octanejs/rspeedy-plugin resolved a second @octanejs/rspack-plugin install');
+}
+
+const toolchain = assertLynxToolchain(root);
+for (const [name, version] of Object.entries({
+	'@lynx-js/rspeedy': '0.16.0',
+	'@rsbuild/core': '2.1.4',
+	'@rspack/core': '2.1.3',
+})) {
+	if (toolchain[name].version !== version) {
+		throw new Error(name + ' resolved ' + toolchain[name].version + ', expected ' + version);
+	}
+}
+
+const virtualStore = path.join(root, 'node_modules/.pnpm');
+const octaneRoots = new Set();
+const reactPackages = [];
+for (const entry of readdirSync(virtualStore, { withFileTypes: true })) {
+	if (!entry.isDirectory()) continue;
+	if (/^(?:react|react-dom|preact)@/.test(entry.name)) reactPackages.push(entry.name);
+	const octaneRoot = path.join(virtualStore, entry.name, 'node_modules/octane');
+	if (existsSync(octaneRoot)) octaneRoots.add(realpathSync(octaneRoot));
+}
+if (octaneRoots.size !== 1) {
+	throw new Error('expected one physical Octane install, found ' + octaneRoots.size + ': ' + [...octaneRoots].join(', '));
+}
+if (reactPackages.length) {
+	throw new Error('packed Lynx consumer installed React runtimes: ' + reactPackages.join(', '));
+}
+
+const moduleIdentifiers = [];
+class ModuleGraphProbePlugin {
+	apply(compiler) {
+		compiler.hooks.compilation.tap(this.constructor.name, (compilation) => {
+			compilation.hooks.finishModules.tap(this.constructor.name, (modules) => {
+				for (const module of modules) {
+					for (const identifier of [module.identifier?.(), module.nameForCondition?.()]) {
+						if (typeof identifier === 'string') moduleIdentifiers.push(identifier);
+					}
+				}
+			});
+		});
+	}
+}
+const graphProbe = {
+	name: 'octane:packed-lynx-module-graph-probe',
+	setup(api) {
+		api.modifyBundlerChain((chain) => {
+			chain.plugin('octane:packed-lynx-module-graph-probe').use(ModuleGraphProbePlugin);
+		});
+	},
+};
+
+const rspeedy = await createRspeedy({
+	cwd: root,
+	loadEnv: false,
+	environment: ['lynx'],
+	rspeedyConfig: {
+		mode: 'production',
+		environments: { lynx: {} },
+		dev: { hmr: false, liveReload: false },
+		output: {
+			cleanDistPath: true,
+			distPath: { root: outputRoot },
+			filenameHash: false,
+			sourceMap: false,
+		},
+		source: { entry: { main: './src/App.tsrx' } },
+		splitChunks: false,
+		plugins: [pluginOctane({ thread: 'background', hmr: false, dev: false }), graphProbe],
+	},
+});
+let result;
+try {
+	result = await rspeedy.build();
+	const modules = new Set(
+		moduleIdentifiers.map((identifier) => identifier.split(/[?!]/, 1)[0].replaceAll('\\\\', '/')),
+	);
+	const matchingModules = (pattern) => [...modules].filter((identifier) => pattern.test(identifier));
+	if (matchingModules(/\\/App\\.tsrx$/).length !== 1) {
+		throw new Error('production graph did not contain exactly one ordinary App.tsrx entry');
+	}
+	if (matchingModules(/\\/universal-core\\.[jt]s$/).length !== 1) {
+		throw new Error('production graph did not contain exactly one Octane universal core');
+	}
+	if (matchingModules(/\\/universal-native\\.[jt]s$/).length !== 1) {
+		throw new Error('production graph did not contain exactly one Octane native universal facade');
+	}
+	const forbiddenModule = new RegExp(
+		${JSON.stringify(NATIVE_GRAPH_FORBIDDEN_MODULE.source)},
+		${JSON.stringify(NATIVE_GRAPH_FORBIDDEN_MODULE.flags)},
+	);
+	const forbiddenModules = [...modules].filter((identifier) => forbiddenModule.test(identifier));
+	if (forbiddenModules.length) {
+		throw new Error('production Lynx graph contains DOM or React modules: ' + forbiddenModules.join(', '));
+	}
+
+	function readJavaScript(directory) {
+		let output = '';
+		for (const entry of readdirSync(directory, { withFileTypes: true })) {
+			const filename = path.join(directory, entry.name);
+			if (entry.isDirectory()) output += readJavaScript(filename);
+			else if (/\\.(?:c|m)?js$/.test(entry.name)) output += readFileSync(filename, 'utf8');
+		}
+		return output;
+	}
+	const output = readJavaScript(outputRoot);
+	if (!output.includes('octane-packed-lynx-compiled')) {
+		throw new Error('production Rspeedy build emitted no executable JavaScript probe');
+	}
+	if (/\\b(?:document|window|HTMLElement|MutationObserver)\\b/.test(output)) {
+		throw new Error('production Rspeedy JavaScript contains a DOM runtime global');
+	}
+	if (/(?:^|[^$\\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\\w]|$)/i.test(output)) {
+		throw new Error('production Rspeedy JavaScript contains a React runtime reference');
+	}
+} finally {
+	await result?.close();
+}
+`,
+	);
+
+	execFileSync(
+		'pnpm',
+		[
+			'install',
+			'--prefer-offline',
+			'--ignore-scripts',
+			'--no-frozen-lockfile',
+			'--config.auto-install-peers=false',
+		],
+		{
+			cwd: consumerDirectory,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		},
+	);
+	execFileSync(process.execPath, ['build.mjs'], {
+		cwd: consumerDirectory,
+		encoding: 'utf8',
+		stdio: ['ignore', 'pipe', 'pipe'],
+		timeout: 120_000,
+	});
+
+	console.log(
+		'built one packed Lynx production JavaScript graph outside the workspace; exact toolchain, singleton Octane/native core, and DOM/React exclusions passed',
+	);
+}
+
 const tempRoot = mkdtempSync(path.join(os.tmpdir(), 'octane-pack-check-'));
 const failures = [];
 const packedArchives = new Map();
@@ -689,6 +933,10 @@ try {
 				label: 'external packed consumer',
 				run: () => validatePackedConsumer(tempRoot, packedArchives),
 			},
+			{
+				label: 'external packed Lynx consumer',
+				run: () => validatePackedLynxConsumer(tempRoot, packedArchives),
+			},
 			...packedExampleCanaries.map((canary) => ({
 				label: canary.label,
 				run: () => validatePackedExample(tempRoot, packedArchives, canary),
@@ -713,5 +961,5 @@ if (failures.length) {
 }
 
 console.log(
-	`validated ${packages.length} publishable package tarball(s); preserved ${rawTsrxFiles} raw TSRX source file(s).`,
+	`validated ${packages.length} package tarball(s); preserved ${rawTsrxFiles} raw TSRX source file(s).`,
 );

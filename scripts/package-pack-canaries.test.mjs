@@ -3,9 +3,36 @@ import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
 	createPackedExampleManifest,
+	isForbiddenNativeGraphModule,
 	isWithinDirectory,
 	renderPackedExampleWorkspace,
 } from './package-pack-canaries.mjs';
+
+describe('isForbiddenNativeGraphModule', () => {
+	test('rejects built and source DOM or React runtime modules from native graphs', () => {
+		for (const identifier of [
+			'/app/node_modules/octane/dist/runtime.js',
+			'/app/node_modules/octane/src/runtime.ts',
+			'/app/node_modules/octane/dist/runtime.server.mjs',
+			'/app/node_modules/octane/dist/universal-dom-boundary.js',
+			'/app/node_modules/octane/src/dom-tables.js',
+			'/app/node_modules/octane/src/hydration/index.ts',
+			'/app/node_modules/react-dom/index.js',
+			'C:\\app\\node_modules\\@lynx-js\\react\\runtime.js',
+		]) {
+			assert.equal(isForbiddenNativeGraphModule(identifier), true, identifier);
+		}
+
+		for (const identifier of [
+			'/app/node_modules/octane/dist/universal-core.js',
+			'/app/node_modules/octane/dist/universal-native.js',
+			'/app/node_modules/octane/dist/profiling.js',
+			'/app/src/runtime-utils.js',
+		]) {
+			assert.equal(isForbiddenNativeGraphModule(identifier), false, identifier);
+		}
+	});
+});
 
 describe('createPackedExampleManifest', () => {
 	test('rewrites a real example for packed dependencies without mutating its source manifest', () => {

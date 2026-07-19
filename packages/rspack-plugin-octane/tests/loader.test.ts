@@ -82,12 +82,14 @@ describe('octane Rspack loader', () => {
 			code: 'const rpc = _$__serverRpc(1);',
 			map,
 			kind: 'compile',
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
 			dependencies: ['/project/package.json', '/project/src/package.json'],
 			missingDependencies: ['/project/src/missing/package.json'],
 		});
 		const output = runLoader({
 			hot: true,
 			options: {
+				universalRuntime: { runtime: 'lynx', thread: 'background' },
 				renderers: {
 					registry: { object: '/src/object-renderer.js' },
 					boundaries: {
@@ -125,6 +127,7 @@ describe('octane Rspack loader', () => {
 						},
 					},
 				}),
+				universalRuntime: { runtime: 'lynx', thread: 'background' },
 			}),
 		);
 		expect(mocks.transform).toHaveBeenCalledWith(
@@ -143,6 +146,7 @@ describe('octane Rspack loader', () => {
 			canonicalId: '/src/App.tsrx',
 			transformKind: 'compile',
 			serverRpc: true,
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
 		});
 	});
 

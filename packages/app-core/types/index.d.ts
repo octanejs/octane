@@ -190,6 +190,18 @@ export interface ExperimentalRendererRuleOptions {
 	renderer: string;
 }
 
+/** @experimental Static source restrictions enforced for a renderer. */
+export interface ExperimentalRendererValidationOptions {
+	/** Host elements that may directly contain authored primitive text. */
+	textParents?: readonly string[];
+	/** Unbound JavaScript globals that renderer-owned source may not reference. */
+	forbiddenGlobals?: readonly string[];
+	/** Package IDs whose static imports, subpaths, and CommonJS requires are forbidden. */
+	forbiddenImports?: readonly string[];
+	/** Allowed static JSX attributes by host name; `*` supplies shared patterns. */
+	hostProps?: Readonly<Record<string, readonly string[]>>;
+}
+
 /**
  * @experimental A string selects the universal compiler target. The object
  * form carries explicit target metadata for normalized configs and future
@@ -208,6 +220,8 @@ export type ExperimentalRendererRegistryEntry =
 			text?: 'reject' | 'ignore' | 'host';
 			/** Serializable feature flags consumed by compiler and runtime integrations. */
 			capabilities?: readonly string[];
+			/** Optional source restrictions enforced when compiling for this renderer. */
+			validation?: ExperimentalRendererValidationOptions;
 	  };
 
 /**
@@ -258,6 +272,7 @@ export interface ExperimentalResolvedRendererRegistryEntry {
 	readonly intrinsics?: string;
 	readonly text: 'reject' | 'ignore' | 'host';
 	readonly capabilities: readonly string[];
+	readonly validation?: Readonly<ExperimentalRendererValidationOptions>;
 }
 
 /** @experimental Canonical renderer-owned child-region metadata. */

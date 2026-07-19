@@ -104,6 +104,9 @@ export default function octaneLoader(source, inputSourceMap) {
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(options.renderers === undefined ? null : { renderers: options.renderers }),
+			...(options.universalRuntime === undefined
+				? null
+				: { universalRuntime: options.universalRuntime }),
 			...(options.requireDirective === undefined
 				? null
 				: { requireDirective: options.requireDirective }),
@@ -138,6 +141,9 @@ export default function octaneLoader(source, inputSourceMap) {
 						result.kind === 'compile' &&
 						(result.code.includes('_$__serverRpc(') ||
 							result.code.includes('export const _$_server_$_')),
+					...(result.universalRuntime === undefined
+						? null
+						: { universalRuntime: result.universalRuntime }),
 					...(result.clientReference === undefined
 						? null
 						: { clientReference: { ...result.clientReference } }),

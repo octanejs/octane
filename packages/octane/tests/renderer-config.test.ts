@@ -25,7 +25,7 @@ describe('renderer configuration', () => {
 			boundaries: {},
 			rules: [],
 		});
-		expect(config.signature).toMatch(/^octane-renderers-v3:/);
+		expect(config.signature).toMatch(/^octane-renderers-v4:/);
 		expect(resolveRendererForFile(config, '/src/App.tsrx')).toEqual({
 			id: 'dom',
 			module: 'octane',
@@ -74,6 +74,61 @@ describe('renderer configuration', () => {
 			id: 'three',
 			...config.registry.three,
 		});
+		expect(normalizeRendererConfig(config).signature).toBe(config.signature);
+	});
+
+	it('normalizes renderer validation as frozen, canonical data', () => {
+		const config = normalizeRendererConfig({
+			registry: {
+				native: {
+					module: '@octanejs/native/renderer',
+					validation: {
+						textParents: ['text', 'label', 'text'],
+						forbiddenGlobals: ['window', 'document', 'window'],
+						forbiddenImports: ['react-dom', '@browser/runtime', 'react-dom'],
+						hostProps: {
+							view: ['bind*', 'className', 'bind*'],
+							'*': ['id', 'data-*'],
+							text: ['value'],
+						},
+					},
+				},
+			},
+		});
+
+		expect(config.registry.native.validation).toEqual({
+			textParents: ['label', 'text'],
+			forbiddenGlobals: ['document', 'window'],
+			forbiddenImports: ['@browser/runtime', 'react-dom'],
+			hostProps: {
+				'*': ['data-*', 'id'],
+				text: ['value'],
+				view: ['bind*', 'className'],
+			},
+		});
+		expect(Object.isFrozen(config.registry.native.validation)).toBe(true);
+		expect(Object.isFrozen(config.registry.native.validation!.textParents)).toBe(true);
+		expect(Object.isFrozen(config.registry.native.validation!.hostProps)).toBe(true);
+		expect(Object.isFrozen(config.registry.native.validation!.hostProps!.view)).toBe(true);
+
+		const reordered = normalizeRendererConfig({
+			registry: {
+				native: {
+					module: '@octanejs/native/renderer',
+					validation: {
+						hostProps: {
+							text: ['value'],
+							'*': ['data-*', 'id'],
+							view: ['className', 'bind*'],
+						},
+						forbiddenImports: ['react-dom', '@browser/runtime'],
+						forbiddenGlobals: ['window', 'document'],
+						textParents: ['text', 'label'],
+					},
+				},
+			},
+		});
+		expect(reordered.signature).toBe(config.signature);
 		expect(normalizeRendererConfig(config).signature).toBe(config.signature);
 	});
 
@@ -282,6 +337,66 @@ describe('renderer configuration', () => {
 				},
 			}),
 		).toThrow(/capabilities\[0\].*lowercase renderer ID/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: () => undefined,
+					} as any,
+				},
+			}),
+		).toThrow(/validation must be a data-only renderer validation object/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: { callback: 'not-data' },
+					} as any,
+				},
+			}),
+		).toThrow(/validation\.callback is not a supported option/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: { textParents: ['View'] },
+					},
+				},
+			}),
+		).toThrow(/textParents\[0\].*host element name beginning with a lowercase letter/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: { forbiddenGlobals: ['globalThis\.document'] },
+					},
+				},
+			}),
+		).toThrow(/forbiddenGlobals\[0\].*JavaScript identifier/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: { forbiddenImports: ['./browser-runtime'] },
+					},
+				},
+			}),
+		).toThrow(/forbiddenImports\[0\].*package or project-root module ID/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						validation: { hostProps: { view: ['data-*suffix'] } },
+					},
+				},
+			}),
+		).toThrow(/hostProps\["view"\]\[0\].*prefix ending in "\*"/);
 		expect(() =>
 			normalizeRendererConfig({
 				registry: { three: '@octanejs/three/renderer' },

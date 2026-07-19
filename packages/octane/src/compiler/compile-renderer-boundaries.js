@@ -6,6 +6,7 @@ import {
 import {
 	lowerUniversalRendererRegion,
 	originsFromSourceMap,
+	rendererValidationImportReferences,
 	sourceMapFromOrigins,
 } from './compile-universal.js';
 import { parseModule } from '@tsrx/core';
@@ -499,6 +500,7 @@ function collectRuntimeCallNames(node, runtime) {
 function collectLocalSpecializationInfo(source, filename) {
 	const ast = parseModule(source, filename);
 	const components = new Map();
+	const exported = new Set();
 	const runtime = { direct: new Map(), namespaces: new Set(), moduleBindings: new Set() };
 	for (const statement of ast.body ?? []) {
 		if (statement.type === 'ImportDeclaration') {
@@ -529,8 +531,93 @@ function collectLocalSpecializationInfo(source, filename) {
 	for (const statement of ast.body ?? []) {
 		const component = localComponentDeclaration(statement, runtime);
 		if (component !== null) components.set(component.name, component);
+		if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
+			if (component !== null) exported.add(component.name);
+			for (const specifier of statement.specifiers ?? []) {
+				if (specifier.local?.name) exported.add(specifier.local.name);
+			}
+		}
+		if (statement.type === 'ExportDefaultDeclaration') {
+			if (component !== null) exported.add(component.name);
+			if (statement.declaration?.type === 'Identifier') exported.add(statement.declaration.name);
+		}
 	}
-	return { components, runtime };
+	return { ast, components, exported, runtime };
+}
+
+function includedOriginalPredicate(origins, sourceLength) {
+	const included = new Uint8Array(sourceLength + 1);
+	for (const origin of origins) {
+		if (origin >= 0 && origin < sourceLength) included[origin] = 1;
+	}
+	const prefix = new Uint32Array(sourceLength + 1);
+	for (let index = 0; index < sourceLength; index++) {
+		prefix[index + 1] = prefix[index] + included[index];
+	}
+	return (node) => {
+		if (typeof node?.start !== 'number' || typeof node?.end !== 'number') return false;
+		const start = Math.max(0, Math.min(sourceLength, node.start));
+		const end = Math.max(start, Math.min(sourceLength, node.end));
+		return prefix[end] !== prefix[start];
+	};
+}
+
+function owningComponentForReference(components, node) {
+	for (const component of components.values()) {
+		if (component.declaration.start <= node.start && node.end <= component.declaration.end) {
+			return component.name;
+		}
+	}
+	return null;
+}
+
+function ownerReachableComponents(sourceLength, origins, localSpecializations) {
+	const localNames = new Set(localSpecializations.components.keys());
+	const isIncluded = includedOriginalPredicate(origins, sourceLength);
+	const dependencies = new Map();
+	const reachable = new Set(
+		[...localSpecializations.exported].filter((name) => localNames.has(name)),
+	);
+	const record = (node, name) => {
+		if (!localNames.has(name) || !isIncluded(node)) return;
+		const owner = owningComponentForReference(localSpecializations.components, node);
+		if (owner === null) {
+			reachable.add(name);
+			return;
+		}
+		let references = dependencies.get(owner);
+		if (references === undefined) dependencies.set(owner, (references = new Set()));
+		references.add(name);
+	};
+	walkScopedReferences(localSpecializations.ast, {
+		call: record,
+		tag: record,
+	});
+	const queue = [...reachable];
+	while (queue.length > 0) {
+		for (const dependency of dependencies.get(queue.shift()) ?? []) {
+			if (reachable.has(dependency)) continue;
+			reachable.add(dependency);
+			queue.push(dependency);
+		}
+	}
+	return reachable;
+}
+
+function maskOriginalRanges(origins, sourceLength, ranges) {
+	if (ranges.length === 0) return origins;
+	const masked = new Uint8Array(sourceLength);
+	for (const range of ranges) {
+		const start = Math.max(0, Math.min(sourceLength, range.start));
+		const end = Math.max(start, Math.min(sourceLength, range.end));
+		masked.fill(1, start, end);
+	}
+	const output = new Int32Array(origins);
+	for (let index = 0; index < output.length; index++) {
+		const origin = output[index];
+		if (origin >= 0 && origin < sourceLength && masked[origin] === 1) output[index] = -1;
+	}
+	return output;
 }
 
 function remapText(code, relativeOrigins, input) {
@@ -683,6 +770,7 @@ function specializeLocalComponents(value, kind, index, state) {
 			queue.push(reference);
 		}
 	}
+	for (const name of selected) state.specializedLocalNames.add(name);
 
 	const prefix = `__octaneRendererRegion${index}`;
 	const cloneNames = new Map();
@@ -812,8 +900,12 @@ function lowerBoundaryNode(node, ownerRenderer, state) {
 				profileFilename: state.profileFilename,
 				regionOrigins: specialization.region.origins,
 				runtimeImports: specialization.runtimeImports,
+				universalRuntime: state.universalRuntime,
 			},
 		);
+		for (const reference of lowered.validationImportReferences) {
+			state.childValidationImportReferences.set(`${reference.start}:${reference.end}`, reference);
+		}
 		state.preludes.push({ code: lowered.prelude, origins: lowered.preludeOrigins });
 		state.universalUnits.push(lowered.metadata);
 		for (const mapping of lowered.mappings) {
@@ -859,6 +951,7 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 	if (tree === null || tree.roots.length === 0) return null;
 
 	const state = {
+		childValidationImportReferences: new Map(),
 		domRegions: [],
 		filename,
 		hmr: options?.hmr === true ? 'vite' : options?.hmr || false,
@@ -870,6 +963,8 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 		profileFilename: options?.profileFilename,
 		rendererRegistry,
 		source,
+		specializedLocalNames: new Set(),
+		universalRuntime: options?.universalRuntime,
 		universalUnits: [],
 	};
 	const replacements = [];
@@ -879,6 +974,7 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 	}
 
 	let transformed = applySourceReplacements(source, 0, source.length, replacements);
+	const ownerSourceLength = transformed.code.length;
 	if (state.preludes.length > 0) {
 		transformed = concatMapped(
 			transformed,
@@ -892,6 +988,38 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 		transformed = expandDomRendererRegionsMapped(transformed, state.domRegions);
 		state.domRegions = [];
 	}
+	let validationOrigins = transformed.origins;
+	if (ownerRenderer.validation !== undefined && state.preludes.length > 0) {
+		validationOrigins = new Int32Array(transformed.origins.length);
+		validationOrigins.fill(-1);
+		validationOrigins.set(transformed.origins.subarray(0, ownerSourceLength));
+	}
+	if (ownerRenderer.validation !== undefined && state.specializedLocalNames.size > 0) {
+		const reachable = ownerReachableComponents(
+			source.length,
+			validationOrigins,
+			state.localSpecializations,
+		);
+		const childOnlyDeclarations = [...state.specializedLocalNames]
+			.filter((name) => !reachable.has(name))
+			.map((name) => state.localSpecializations.components.get(name)?.declaration)
+			.filter(Boolean);
+		validationOrigins = maskOriginalRanges(validationOrigins, source.length, childOnlyDeclarations);
+	}
+	if (
+		(ownerRenderer.validation?.forbiddenImports?.length ?? 0) > 0 &&
+		state.childValidationImportReferences.size > 0
+	) {
+		const ownerReferences = new Set(
+			rendererValidationImportReferences(source, filename, validationOrigins).map(
+				(reference) => `${reference.start}:${reference.end}`,
+			),
+		);
+		const childOnlyImports = [...state.childValidationImportReferences]
+			.filter(([key]) => !ownerReferences.has(key))
+			.map(([, reference]) => reference);
+		validationOrigins = maskOriginalRanges(validationOrigins, source.length, childOnlyImports);
+	}
 	return Object.freeze({
 		analysis: tree.analysis,
 		domRegions: Object.freeze(state.domRegions),
@@ -901,6 +1029,7 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 		// scoped-style hashes after a region must be restamped from authored
 		// coordinates (compile.js).
 		origins: transformed.origins,
+		...(ownerRenderer.validation === undefined ? {} : { validationOrigins }),
 		source: transformed.code,
 		universalUnits: Object.freeze(state.universalUnits),
 	});

@@ -12,13 +12,18 @@ import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
 import { compile, hasOnlyLowerableNullishExits, isVoidJsxCodeBlockFunction } from './compile.js';
-import { addSourceMapNeedles, composeSourceMaps } from './compile-universal.js';
+import {
+	addSourceMapNeedles,
+	composeSourceMaps,
+	validateRendererModuleSource,
+} from './compile-universal.js';
 import {
 	hydrateBoundaryPathFromId,
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
+import { normalizeUniversalRuntime } from './universal-runtime.js';
 import {
 	analyzeNativeChangeDiagnostics,
 	formatCompileDiagnostic,
@@ -370,6 +375,7 @@ class OctaneBundlerCompiler {
 			hmr: normalizeHmrDialect(options.hmr),
 			dev: options.dev,
 			profile: options.profile === true,
+			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
 		// Ownership gate for mixed-toolchain projects (e.g. a React app hosting
@@ -830,6 +836,9 @@ class OctaneBundlerCompiler {
 		// of both HMR and dev hydration diagnostics. Server transforms stay byte-for-
 		// byte identical even when a shared client/server bundler configuration opts in.
 		const profile = environment === 'client' && (options.profile ?? this.defaults.profile) === true;
+		const universalRuntime = normalizeUniversalRuntime(
+			options.universalRuntime ?? this.defaults.universalRuntime,
+		);
 		const filename = this._canonicalModuleId(file);
 		const clientOnlyImports =
 			environment === 'server' && Array.isArray(options.clientOnlyImports)
@@ -854,6 +863,21 @@ class OctaneBundlerCompiler {
 		// The directive is a build-time ownership signal only — never ship it.
 		// Blanking (not deleting) keeps positions stable for source maps.
 		const source = directive === null ? code : stripDirective(code, directive);
+		const plainHelperSource =
+			(file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts');
+		if (
+			plainHelperSource &&
+			renderer.target === 'universal' &&
+			renderer.validation !== undefined &&
+			this._isProjectOwnedSource(file) &&
+			!this.exclude.some((path) => file.includes(path)) &&
+			!hostOwned
+		) {
+			// Renderer rules also own the runtime assumptions of their project-local
+			// helper modules. Validate those assumptions without claiming their output:
+			// the existing hook-slot/pass-through branch below remains authoritative.
+			validateRendererModuleSource(source, filename, renderer);
+		}
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const clientReference =
@@ -908,6 +932,7 @@ class OctaneBundlerCompiler {
 				dev,
 				profile,
 				profileFilename,
+				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
 				// universal branch selected at this template boundary.
@@ -934,6 +959,7 @@ class OctaneBundlerCompiler {
 				diagnostics: out.diagnostics,
 				kind: 'compile',
 				renderer,
+				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
 				...(environment === 'client' && options.collectVoidComponentExports === true
 					? { voidComponentExports: findVoidComponentExports(compileSource, filename) }

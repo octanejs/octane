@@ -8,7 +8,7 @@
 
 export const DOM_RENDERER_ID = 'dom';
 export const DOM_RENDERER_MODULE = 'octane';
-export const RENDERER_CONFIG_VERSION = 3;
+export const RENDERER_CONFIG_VERSION = 4;
 
 const RENDERER_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const MODULE_EXPORT_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
@@ -22,8 +22,17 @@ const REGISTRY_ENTRY_KEYS = new Set([
 	'server',
 	'target',
 	'text',
+	'validation',
 ]);
 const BOUNDARY_ENTRY_KEYS = new Set(['childRenderer', 'ownerRenderer', 'prop', 'server']);
+const VALIDATION_KEYS = new Set([
+	'forbiddenGlobals',
+	'forbiddenImports',
+	'hostProps',
+	'textParents',
+]);
+const HOST_NAME = /^[a-z][A-Za-z0-9_$-]*$/;
+const HOST_PROP_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$:.-]*\*?$/;
 
 function configError(message) {
 	return new Error(`octane/compiler/renderers: ${message}`);
@@ -74,6 +83,95 @@ function normalizeCapabilities(value, path) {
 	return Object.freeze([...new Set(capabilities)].sort());
 }
 
+function normalizeValidationList(value, path, validate) {
+	if (!Array.isArray(value)) {
+		throw configError(`${path} must be an array of strings.`);
+	}
+	return Object.freeze(
+		[...new Set(value.map((item, index) => validate(item, `${path}[${index}]`)))].sort(),
+	);
+}
+
+function validateHostName(value, path) {
+	if (typeof value !== 'string' || !HOST_NAME.test(value)) {
+		throw configError(`${path} must be a host element name beginning with a lowercase letter.`);
+	}
+	return value;
+}
+
+function validateGlobalName(value, path) {
+	if (typeof value !== 'string' || !MODULE_EXPORT_NAME.test(value)) {
+		throw configError(`${path} must be a JavaScript identifier.`);
+	}
+	return value;
+}
+
+function validateHostPropPattern(value, path) {
+	if (typeof value !== 'string' || !HOST_PROP_PATTERN.test(value)) {
+		throw configError(
+			`${path} must be an exact static JSX attribute name or a prefix ending in "*".`,
+		);
+	}
+	return value;
+}
+
+function normalizeHostProps(value, path) {
+	if (!isRecord(value)) {
+		throw configError(
+			`${path} must be an object keyed by host element names beginning with a lowercase letter.`,
+		);
+	}
+	const entries = Object.entries(value)
+		.map(([hostValue, propsValue]) => {
+			const host =
+				hostValue === '*'
+					? hostValue
+					: validateHostName(hostValue, `${path} key ${JSON.stringify(hostValue)}`);
+			const props = normalizeValidationList(
+				propsValue,
+				`${path}[${JSON.stringify(host)}]`,
+				validateHostPropPattern,
+			);
+			return [host, props];
+		})
+		.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+	return Object.freeze(Object.fromEntries(entries));
+}
+
+function normalizeValidation(value, path) {
+	if (value === undefined) return undefined;
+	if (!isRecord(value)) {
+		throw configError(`${path} must be a data-only renderer validation object.`);
+	}
+	assertKnownKeys(value, VALIDATION_KEYS, path);
+	const validation = {};
+	if (value.textParents !== undefined) {
+		validation.textParents = normalizeValidationList(
+			value.textParents,
+			`${path}.textParents`,
+			validateHostName,
+		);
+	}
+	if (value.forbiddenGlobals !== undefined) {
+		validation.forbiddenGlobals = normalizeValidationList(
+			value.forbiddenGlobals,
+			`${path}.forbiddenGlobals`,
+			validateGlobalName,
+		);
+	}
+	if (value.forbiddenImports !== undefined) {
+		validation.forbiddenImports = normalizeValidationList(
+			value.forbiddenImports,
+			`${path}.forbiddenImports`,
+			validateModuleId,
+		);
+	}
+	if (value.hostProps !== undefined) {
+		validation.hostProps = normalizeHostProps(value.hostProps, `${path}.hostProps`);
+	}
+	return Object.freeze(validation);
+}
+
 function normalizeRegistryEntry(id, value, path) {
 	let moduleId;
 	let target;
@@ -81,6 +179,7 @@ function normalizeRegistryEntry(id, value, path) {
 	let intrinsics;
 	let text;
 	let capabilities;
+	let validation;
 	if (typeof value === 'string') {
 		moduleId = validateModuleId(value, path);
 		target = 'universal';
@@ -122,6 +221,7 @@ function normalizeRegistryEntry(id, value, path) {
 			throw configError(`${path}.text must be "reject", "ignore", or "host".`);
 		}
 		capabilities = normalizeCapabilities(value.capabilities, `${path}.capabilities`);
+		validation = normalizeValidation(value.validation, `${path}.validation`);
 	}
 
 	if (id === DOM_RENDERER_ID) {
@@ -131,7 +231,8 @@ function normalizeRegistryEntry(id, value, path) {
 			server !== 'render' ||
 			intrinsics !== undefined ||
 			text !== 'host' ||
-			capabilities.length !== 0
+			capabilities.length !== 0 ||
+			validation !== undefined
 		) {
 			throw configError(
 				`compiler.renderers.registry.dom is built in as { module: ${JSON.stringify(DOM_RENDERER_MODULE)}, target: "dom" } and cannot be replaced.`,
@@ -148,6 +249,7 @@ function normalizeRegistryEntry(id, value, path) {
 		...(intrinsics === undefined ? {} : { intrinsics }),
 		text,
 		capabilities,
+		...(validation === undefined ? {} : { validation }),
 	});
 }
 
@@ -486,15 +588,18 @@ export function normalizeRendererConfig(input = {}) {
 
 	const signature = stableSignature({
 		default: defaultRenderer,
-		registry: entries.map(([id, { module, target, server, intrinsics, text, capabilities }]) => [
-			id,
-			module,
-			target,
-			server,
-			intrinsics ?? null,
-			text,
-			capabilities,
-		]),
+		registry: entries.map(
+			([id, { module, target, server, intrinsics, text, capabilities, validation }]) => [
+				id,
+				module,
+				target,
+				server,
+				intrinsics ?? null,
+				text,
+				capabilities,
+				validation ?? null,
+			],
+		),
 		rules: rules.map(({ renderer, include, exclude }) => [renderer, include, exclude]),
 		boundaries: Object.entries(boundaries).flatMap(([moduleId, exports]) =>
 			Object.entries(exports).map(

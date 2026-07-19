@@ -78,11 +78,30 @@ describe('declarative options', () => {
 		);
 	});
 
+	it('normalizes compile-runtime metadata and a plugin-only runtime request', () => {
+		const universalRuntime = { runtime: 'lynx', thread: 'background' as const };
+		const options = normalizePluginOptions({
+			runtime: '@octanejs/lynx/renderer',
+			universalRuntime,
+		});
+		universalRuntime.runtime = 'later';
+
+		expect(options).toEqual({
+			runtime: '@octanejs/lynx/renderer',
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
+		});
+		expect(Object.isFrozen(options.universalRuntime)).toBe(true);
+		expect(() => normalizeLoaderOptions({ runtime: 'other' })).toThrow(/unknown option `runtime`/);
+	});
+
 	it.each([
 		[{ environment: 'worker' }, /environment/],
 		[{ hmr: 'webpack' }, /hmr/],
 		[{ exclude: 'vendor' }, /exclude/],
 		[{ renderers: { default: 'missing' } }, /default references unknown renderer/],
+		[{ universalRuntime: { runtime: 'lynx', thread: 'worker' } }, /thread/],
+		[{ universalRuntime: { runtime: 'Lynx', thread: 'background' } }, /runtime/],
+		[{ runtime: '' }, /runtime/],
 		[{ transform: () => {} }, /unknown option/],
 	] as const)('rejects invalid options %#', (value, message) => {
 		expect(() => normalizePluginOptions(value)).toThrow(message);
@@ -97,6 +116,19 @@ describe('getOctaneRspackBuildInfo', () => {
 			serverRpc: true,
 		};
 		expect(getOctaneRspackBuildInfo({ buildInfo: { octane: value } })).toBe(value);
+		expect(
+			getOctaneRspackBuildInfo({
+				buildInfo: {
+					octane: {
+						...value,
+						universalRuntime: { runtime: 'lynx', thread: 'background' },
+					},
+				},
+			}),
+		).toEqual({
+			...value,
+			universalRuntime: { runtime: 'lynx', thread: 'background' },
+		});
 		expect(
 			getOctaneRspackBuildInfo({
 				buildInfo: {
@@ -130,6 +162,16 @@ describe('getOctaneRspackBuildInfo', () => {
 		).toBeNull();
 		expect(
 			getOctaneRspackBuildInfo({ buildInfo: { octane: { ...value, serverRpc: 'yes' } } }),
+		).toBeNull();
+		expect(
+			getOctaneRspackBuildInfo({
+				buildInfo: {
+					octane: {
+						...value,
+						universalRuntime: { runtime: 'lynx', thread: 'worker' },
+					},
+				},
+			}),
 		).toBeNull();
 		expect(getOctaneRspackBuildInfo(null)).toBeNull();
 	});
