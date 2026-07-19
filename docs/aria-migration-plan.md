@@ -1,5 +1,27 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-18, latest): Phase 4 COMPLETE.** The RAC foundation landed
+> as `@octanejs/aria/components`: the collections engine re-hosted per §2(a) on a
+> **detached real-DOM store** (BaseCollection near-verbatim; Document adapted —
+> refs register `(NodeClass, props, rendered, render)` into a
+> `WeakMap<Element, ElementNode>`, prop dirt via ref re-fires, STRUCTURAL dirt via
+> a MutationObserver on the detached root — verified load-bearing; snapshots
+> rebuild by document-order walk with clone-only-when-changed identity; octane
+> `useSyncExternalStore` delivers them; SSR registration ported structurally,
+> coverage deferred to Phase 8), the RAC plumbing (Provider/useContextProps/
+> slotted contexts/useRenderProps with ref-as-prop adaptation — useContextProps
+> returns REF-FREE merged props + an explicit merged ref), and ALL Phase-4
+> non-collection components incl. 1.19.0's split variants (CheckboxField/
+> CheckboxButton, SwitchField/SwitchButton, RadioField/RadioButton) and the new
+> SelectionIndicator/SharedElementTransition internals. 34 files / 250 aria
+> tests; **five differentials drive the REAL react-aria-components 1.19.0 on both
+> sides byte-identical** — Button (hover + MID-PRESS pressed state), ToggleButton,
+> Checkbox, TextField typing, Disclosure expand/collapse — the data-* exit
+> criterion is met. No octane-core changes, no octane bugs (portals to detached
+> containers, render-phase setState, queueMicrotask+flushSync handoffs all per
+> spec). Out of scope → Phase 5+: RAC collection components, date/color,
+> DnD, Autocomplete, Toast, Table/Tree, Virtualizer.
+
 > **Progress (2026-07-18, later): Phase 3 COMPLETE.** The overlays hooks tier
 > landed: stately `useTooltipTriggerState`; the full aria overlays area
 > (`usePreventScroll`, `ariaHideOutside`, `DismissButton`, `PortalProvider`,
@@ -353,7 +375,7 @@ precedent.)
 *Exit:* differential Select/ComboBox/Dialog/Tooltip hook-level fixtures (open
 state, portal'd ARIA wiring); focus-trap/dismiss/scroll-lock behavior tests.
 
-### Phase 4 — RAC foundation (`@octanejs/aria/components`)
+### Phase 4 — RAC foundation (`@octanejs/aria/components`) — COMPLETE (2026-07-18)
 - **The collection host** from §2(a): `BaseCollection` port, the detached
   real-DOM `Document` store, `CollectionBuilder`/`createLeafComponent`/
   `createBranchComponent`, `Hidden`, `useCachedChildren`, SSR registration

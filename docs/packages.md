@@ -15,7 +15,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/adapter-vercel` | [`packages/adapter-vercel`](../packages/adapter-vercel) | deployment adapter | `0.0.7` | 1 |
 | `@octanejs/apollo-client` | [`packages/apollo-client`](../packages/apollo-client) | framework binding | `0.1.5` | 5 |
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.6` | 9 |
-| `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.4` | 2 |
+| `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.4` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.8` | 2 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.3` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.5` | 4 |
