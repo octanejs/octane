@@ -1178,7 +1178,12 @@ publish build), exercised consumer-shaped by
     tsrx-tsc infers for a `.tsrx` export is therefore a valid React JSX
     element type with exact prop checking, while octane ELEMENT values remain
     rejected in `ReactNode` positions (nominal separation survives in both
-    directions; pinned in typetests §7).
+    directions; pinned in typetests §7). The inherited promise protocol is
+    consumption-poisoned: `await element` is TS1320, `.then/.catch/.finally`
+    with a callback fail overload resolution against an explanatory message
+    literal, `use(element)` is rejected by `use()`'s `$$kind` exclusion, and
+    `Awaited` of an element is `never` — the `Promise<ReactNode>` parent buys
+    only the tag gate, never promise-style consumption.
   - A typed `component`/`props` form was added alongside —
     `<OctaneCompat component={Island} props={…}/>`
     (`OctaneCompatComponentProps` in `src/react/shared.ts`, both entries) —

@@ -49,6 +49,16 @@ export const protectedSlot = <div>{octaneElementValue}</div>;
 // @ts-expect-error — and out of ReactNode annotations
 export const protectedAnnotation: React.ReactNode = octaneElementValue;
 
+// The `Promise<ReactNode>` parent that opens the tag gate is CONSUMPTION-
+// poisoned (jsx-runtime.d.ts): an island element cannot be awaited or used as
+// a thenable — those are hard type errors, not silent runtime no-ops.
+export async function elementAwaitRejected() {
+	// @ts-expect-error — TS1320: an octane element is not a valid promise
+	await octaneElementValue;
+}
+// @ts-expect-error — .then with a callback fails overload resolution
+export const elementThenRejected = octaneElementValue.then(() => null);
+
 // Callback payloads flow typed out of the island: `entry` infers CompareEntry.
 export const callbackTyped = (
 	<OctaneCompat

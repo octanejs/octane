@@ -179,12 +179,56 @@ declare namespace Octane {
 		// type: `<Island …/>` typechecks zero-cast inside `<OctaneCompat>` with
 		// exact prop checking, while an octane ELEMENT value remains a type
 		// error in arbitrary React `ReactNode` slots (`<div>{octaneEl}</div>`).
-		// Known, accepted cost: element values satisfy `PromiseLike`
-		// structurally, so `await element` (a runtime no-op for non-thenables)
-		// and `use(element)` typecheck; the runtime owns those diagnostics.
+		//
+		// The promise PROTOCOL below is deliberately poisoned so the parent
+		// buys ONLY that tag-gate assignability — consuming an element as a
+		// promise is a hard type error, not a runtime surprise:
+		//
+		//  - `await element` is TS1320 ("not a valid promise"): neither `then`
+		//    overload's first parameter has a call signature (the checker takes
+		//    the union of first parameters across overloads, strips `undefined`,
+		//    and is left with the non-callable message literal). The same
+		//    poisoning makes an async function returning an element — or
+		//    awaiting a `Promise<Element>` — TS1058/TS1320.
+		//  - `.then(cb)` / `.catch(cb)` / `.finally(cb)` fail overload
+		//    resolution, and the message-literal overload puts the explanation
+		//    in the error text itself. `use(element)` is rejected by the
+		//    runtime's `use()` signature (the `$$kind` exclusion in runtime.ts).
+		//  - `Awaited<Element>` is `never` (conditional-type inference reads the
+		//    LAST overload's parameter — the non-callable message literal), so
+		//    `Promise.resolve(element)` is `Promise<never>`: not a call-site
+		//    error (`resolve` accepts anything), but unusable downstream.
+		//
+		// Assignability is unaffected by the poisoning: the undefined-parameter
+		// overloads stay compatible with `Promise<ReactNode>`'s methods (method
+		// parameters relate bivariantly, and `undefined` is assignable to the
+		// optional-callback parameters), which keeps the React tag gate open,
+		// while `finally`'s `Promise<React.ReactNode>` RETURN keeps `Element`
+		// un-assignable to `Promise<AwaitedReactNode>` — the `ReactNode` fence.
+		// Do not replace that return with `never`: it is the one covariant
+		// `ReactNode` mention holding the fence.
 		// Pinned by typetests/react-hosted-jsx.test-d.tsx §7 and
 		// examples/harbor/src/island-boundary.test-d.tsx.
-		interface Element extends OctaneElement, Promise<React.ReactNode> {}
+		interface Element extends OctaneElement, Promise<React.ReactNode> {
+			/** @deprecated Octane elements are not promises — render them through OctaneCompat. */
+			then(onfulfilled?: undefined, onrejected?: undefined): never;
+			/** @deprecated Octane elements are not promises — render them through OctaneCompat. */
+			then(
+				onfulfilled: 'Octane elements are not promises — render them through OctaneCompat',
+			): never;
+			/** @deprecated Octane elements are not promises — render them through OctaneCompat. */
+			catch(onrejected?: undefined): never;
+			/** @deprecated Octane elements are not promises — render them through OctaneCompat. */
+			catch(
+				onrejected: 'Octane elements are not promises — render them through OctaneCompat',
+			): never;
+			/** @deprecated Octane elements are not promises — render them through OctaneCompat. */
+			finally(onfinally?: undefined): Promise<React.ReactNode>;
+			/** @deprecated Octane elements are not promises — render them through OctaneCompat. */
+			finally(
+				onfinally: 'Octane elements are not promises — render them through OctaneCompat',
+			): Promise<React.ReactNode>;
+		}
 		// `any` disables tag/return-type validation: an octane component is ANY
 		// function used at a `<F/>` site, and may return renderables TS cannot
 		// know about (primitives, null, arrays) — the compiler owns that check.

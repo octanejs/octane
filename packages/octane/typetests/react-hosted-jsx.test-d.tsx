@@ -138,6 +138,26 @@ export const octaneValueRejectedAsChild = <section>{octaneElementValue}</section
 export const octaneValueRejectedAsNode: React.ReactNode = octaneElementValue;
 // @ts-expect-error — a React element is not an octane element ($$kind brand)
 export const reactValueRejectedAsOctane: OctaneJSX.Element = greetingElement;
+// …and the promise PROTOCOL is poisoned (jsx-runtime.d.ts): the
+// `Promise<ReactNode>` parent exists ONLY for the tag gate above — consuming
+// an element as a promise is a hard type error in every checkable form.
+export async function elementAwaitRejected() {
+	// @ts-expect-error — TS1320: an octane element is not a valid promise
+	await octaneElementValue;
+}
+// @ts-expect-error — .then with a callback fails overload resolution
+export const elementThenRejected = octaneElementValue.then(() => null);
+// @ts-expect-error — .catch with a callback fails overload resolution
+export const elementCatchRejected = octaneElementValue.catch(() => null);
+// @ts-expect-error — .finally with a callback fails overload resolution
+export const elementFinallyRejected = octaneElementValue.finally(() => {});
+// @ts-expect-error — use() rejects elements via the `$$kind?: never` exclusion
+export const elementUseRejected = use(octaneElementValue);
+// `Promise.resolve(element)` cannot be a call-site error (`resolve` accepts
+// anything), but Awaited<Element> collapses to `never`, so nothing usable
+// comes back out. This pin fails if Awaited ever resolves to a real type.
+export const awaitedElementIsNever: [Awaited<OctaneJSX.Element>] extends [never] ? true : never =
+	true;
 
 // ── 5. Phase 2: real React contexts type through use()/useContext ───────────
 // The core overload is STRUCTURAL (ForeignHostContext<T> — no React types in
