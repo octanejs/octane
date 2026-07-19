@@ -101,7 +101,9 @@ Output is a table of median + min millis per operation: `run`, `replace`,
 `add`, `update`, `select`, `swap`, `remove`, `runlots`, `clear`. The harness
 uses `page.evaluate(el.click)` to fire clicks synchronously inside the page —
 avoids per-click CDP IPC overhead (~10ms each on Chromium) so the numbers
-reflect the renderer's wall time, not Playwright transport.
+reflect the renderer's wall time, not Playwright transport. Before warmup, each
+target receives the same seeded `Math.random` stream so generated label lengths
+and allocation patterns cannot drift between dialects.
 
 ## Keyed-reorder matrix (`run-reorder.mjs`)
 

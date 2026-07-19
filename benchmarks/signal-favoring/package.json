@@ -6,6 +6,7 @@
   "description": "100-component chain comparing hook cascades with fine-grained updates across Octane and reference frameworks.",
   "scripts": {
     "bench": "node run.mjs",
+    "bench:work": "node work.mjs",
     "bench:long": "node run.mjs 40"
   },
   "dependencies": {

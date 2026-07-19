@@ -112,3 +112,11 @@ export function censusDomNodes(rootSelector = '#main') {
 export function deterministicCount(value) {
 	return { median: value, min: value, samples: [value] };
 }
+
+export function deterministicStatForJson(stat) {
+	return {
+		median: stat.median,
+		min: stat.min,
+		samples: Array.isArray(stat.samples) ? stat.samples.length : stat.samples,
+	};
+}

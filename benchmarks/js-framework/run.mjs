@@ -69,6 +69,20 @@ const OPS = [
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Use the same data stream for every target. Label generation is inside the
+// measured create operations, so uncontrolled randomness would add dialect
+// noise through different string lengths and allocation patterns.
+const seedRandom = (page) =>
+	page.evaluate(() => {
+		let state = 0x5eed5eed >>> 0;
+		Math.random = () => {
+			state = (state + 0x6d2b79f5) | 0;
+			let value = Math.imul(state ^ (state >>> 15), 1 | state);
+			value = (value + Math.imul(value ^ (value >>> 7), 61 | value)) ^ value;
+			return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+		};
+	});
+
 async function ensureState(page, pre) {
 	if (pre === 'empty') {
 		await page.evaluate(() => {
@@ -136,6 +150,7 @@ async function runTarget(t) {
 	const page = await context.newPage();
 	await page.goto(t.url, { waitUntil: 'load' });
 	await page.waitForSelector(t.ready, { timeout: 10000 });
+	await seedRandom(page);
 
 	// Warmup — let JIT settle.
 	for (let i = 0; i < 3; i++) {

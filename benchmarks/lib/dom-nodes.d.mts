@@ -25,3 +25,11 @@ export interface DeterministicCount {
 }
 
 export function deterministicCount(value: number): DeterministicCount;
+
+export interface DeterministicJsonStat {
+	median: number;
+	min: number;
+	samples: number;
+}
+
+export function deterministicStatForJson(stat: DeterministicCount): DeterministicJsonStat;

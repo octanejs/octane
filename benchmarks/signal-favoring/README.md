@@ -30,6 +30,7 @@ benchmarks/signal-favoring/
 ├── svelte/           # Vite app, dev :5276 — Svelte 5 runes, 100 generated SFCs
 ├── gen.mjs            # Source generator for the App fixtures (scaffold; see note below)
 ├── run.mjs            # Playwright harness — drives all adapters
+├── work.mjs           # untimed Chromium precise-call-coverage gates for Octane
 ├── package.json       # umbrella: `pnpm bench`
 └── README.md
 ```
@@ -128,6 +129,10 @@ node benchmarks/bench.mjs --quick signal-favoring
 node benchmarks/bench.mjs signal-favoring
 ```
 
+The unified runner also executes `work.mjs` against the already-built Octane
+previews. Run it directly with `pnpm --dir benchmarks/signal-favoring
+bench:work` when those two previews are already running.
+
 ## Measurement contract
 
 Each adapter installs these globals on `window`:
@@ -151,5 +156,18 @@ The harness:
   before the rAF gate.
 - **UNMOUNT**: one page; per iteration `__mount()` (untimed), time `__unmount()`,
   then `__reset()`.
+
+After the semantic gate, the harness publishes a zero-variance mounted DOM
+census. Visible element/text counts control for equivalent output; total/comment
+counts expose framework bookkeeping. The Octane timing rows also have
+order-balanced aliases: the primary TSRX→TSX pass is repeated TSX→TSRX, and the
+two fully-warmed sample sets are combined for TSX/TSRX ratio guards.
+
+`work.mjs` uses jitless Chromium precise call coverage rather than source
+counters, which would change the program presented to the compiler. It caps
+blocks, aggregate component-slot dispatch, child slots, descriptors, and
+teardown work at the current production levels while allowing every count to
+fall. Every row requires live production-bundle coverage. C1/C51/C91 must still
+perform exactly one text write, and the ancestor-first batch exactly ten.
 
 Default: 5 warmups + 20 iters. Pass an integer to `bench` to override iters.
