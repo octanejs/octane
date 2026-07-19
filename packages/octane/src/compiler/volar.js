@@ -83,50 +83,26 @@ const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 const JSX_IMPORT_SOURCE_PRAGMA = /@jsxImportSource\s+([^\s*]+)/;
 
 /**
- * TypeScript honors a file-local `@jsxImportSource` pragma in a file's leading
- * comment trivia, but the virtual TSX strips comments — so an authored pragma
- * would silently vanish. Recover it from the source's leading trivia so a
- * `.tsrx` file can opt into a renderer's intrinsics module (for example
- * `@octanejs/three/intrinsics`) even when the host passes no renderer config
- * (tsrx-tsc, generic language plugins). Mirrors TS precedence: the in-file
- * pragma wins over any config-derived import source.
+ * Does the parsed file carry an authored `@jsxImportSource` pragma in its
+ * LEADING comments (the position TS reads pragmas from)? Decided on the parse
+ * artifacts — the collected comment nodes and the first statement's offset —
+ * not by re-scanning text. `@tsrx/core` ≥0.1.43 re-emits preserved leading
+ * comments into the virtual TSX, so when this is true the authored pragma is
+ * already in the generated code and no renderer-config prelude may be added:
+ * TS honors the FIRST pragma, so a prelude would shadow the authored one.
  */
-function leadingJsxImportSourcePragma(source) {
-	let index = 0;
-	const length = source.length;
-	while (index < length) {
-		const code = source.charCodeAt(index);
-		// space, tab, LF, CR — plain leading whitespace.
-		if (code === 32 || code === 9 || code === 10 || code === 13) {
-			index++;
-			continue;
-		}
-		if (code === 47 /* '/' */ && source.charCodeAt(index + 1) === 47) {
-			let end = source.indexOf('\n', index);
-			if (end === -1) end = length;
-			const match = JSX_IMPORT_SOURCE_PRAGMA.exec(source.slice(index, end));
-			if (match !== null) return match[1];
-			index = end;
-			continue;
-		}
-		if (code === 47 /* '/' */ && source.charCodeAt(index + 1) === 42 /* '*' */) {
-			let end = source.indexOf('*/', index + 2);
-			if (end === -1) end = length;
-			else end += 2;
-			const match = JSX_IMPORT_SOURCE_PRAGMA.exec(source.slice(index, end));
-			if (match !== null) return match[1];
-			index = end;
-			continue;
-		}
-		break; // first real token — leading trivia is over.
-	}
-	return undefined;
+function hasAuthoredLeadingPragma(ast, comments) {
+	const firstStatementStart = ast.body?.[0]?.start;
+	return comments.some(
+		(comment) =>
+			(firstStatementStart == null || comment.end <= firstStatementStart) &&
+			JSX_IMPORT_SOURCE_PRAGMA.test(comment.value),
+	);
 }
 
-function createRendererTypePrelude(renderer, source) {
-	const intrinsics = leadingJsxImportSourcePragma(source) ?? renderer.intrinsics;
-	if (intrinsics === undefined) return '';
-	return `/** @jsxImportSource ${intrinsics} */\n`;
+function createRendererTypePrelude(renderer) {
+	if (renderer.intrinsics === undefined) return '';
+	return `/** @jsxImportSource ${renderer.intrinsics} */\n`;
 }
 
 function shiftGeneratedOffsets(mappings, offset) {
@@ -183,15 +159,9 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
-	// @tsrx/core can re-emit a preserved authored pragma itself (its typeOnly
-	// print keeps leading TS-semantic comments as of >0.1.42). When the
-	// generated TSX already leads with a pragma, adding a prelude would double
-	// it — and TS honors the FIRST pragma, so a config-derived prelude would
-	// shadow the authored one.
-	const prelude =
-		leadingJsxImportSourcePragma(transformed.code) !== undefined
-			? ''
-			: createRendererTypePrelude(renderer, source);
+	const prelude = hasAuthoredLeadingPragma(ast, comments)
+		? ''
+		: createRendererTypePrelude(renderer);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
 		ast_from_source: ast,
