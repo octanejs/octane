@@ -1,3 +1,8 @@
+/// <reference lib="dom" />
+// This module's `declare global` augmentation interacts with lib resolution in
+// some tsgo builds, dropping the `dom` lib for this file so the DOM `Element`
+// type in the profiler's node-resolver ABI fails to resolve. Re-request it
+// explicitly; the tsconfig already includes `dom` for every other file.
 /**
  * Build-specialized client profiler for Octane.
  *
