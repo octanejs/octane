@@ -16,6 +16,7 @@ const BASE_STYLES = `
 	--accent-text: #ff5d72;
 	--on-accent: #16181d;
 	--border: rgba(255, 255, 255, 0.1);
+	--border-strong: rgba(255, 255, 255, 0.22);
 	/* Surfaces layered over --bg (dark: subtle white tints). */
 	--surface-subtle: rgba(255, 255, 255, 0.03);
 	--surface: rgba(255, 255, 255, 0.06);
@@ -47,6 +48,7 @@ const BASE_STYLES = `
 	--accent-text: #d81f38;
 	--on-accent: #ffffff;
 	--border: rgba(0, 0, 0, 0.12);
+	--border-strong: rgba(0, 0, 0, 0.22);
 	--surface-subtle: rgba(0, 0, 0, 0.025);
 	--surface: rgba(0, 0, 0, 0.04);
 	--surface-hover: rgba(0, 0, 0, 0.07);
@@ -123,17 +125,20 @@ pre.shiki {
 `;
 
 // Runs before first paint (and before hydration) so the theme is correct with
-// no flash: honor a saved choice, else fall back to the OS preference. The
-// server can't know either, so it renders the dark default and this reconciles
-// on the client. `data-theme` is owned entirely by the client — Octane never
-// renders it — so it does not participate in hydration.
-const THEME_INIT = `(function(){try{var s=localStorage.getItem('octane-theme');var t=s||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
+// no flash: honor a saved choice, else fall back to the OS preference, and align
+// the address-bar theme-color to it (the SSR meta is the dark default). The
+// server can't know the theme, so it renders the dark default and this
+// reconciles on the client. `data-theme` is owned entirely by the client —
+// Octane never renders it — so it does not participate in hydration. Placed
+// AFTER HeadContent so the theme-color <meta> already exists to update; still in
+// <head>, so it runs before the body paints.
+const THEME_INIT = `(function(){try{var s=localStorage.getItem('octane-theme');var t=s||(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
 
 function RootDocument(props: { children?: unknown }) @{
 	<Html lang="en">
 		<Head>
-			<script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
 			<HeadContent />
+			<script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
 		</Head>
 		<Body>
 			{props.children}

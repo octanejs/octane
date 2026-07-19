@@ -159,7 +159,7 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-card-title {
 				font-weight: 600;
-				color: #f6f7f9;
+				color: var(--text);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.95rem;
 			}
@@ -210,7 +210,7 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 				cursor: pointer;
 			}
 			.bench-table summary:hover {
-				color: #f6f7f9;
+				color: var(--text);
 			}
 			.bench-table table {
 				width: 100%;
@@ -224,7 +224,7 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 			.bench-table td {
 				text-align: right;
 				padding: 0.25rem 0.5rem;
-				color: #f6f7f9;
+				color: var(--text);
 				border-bottom: 1px solid var(--border);
 				white-space: nowrap;
 			}

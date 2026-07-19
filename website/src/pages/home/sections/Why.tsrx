@@ -183,7 +183,7 @@ export function Why() @{
 			}
 			.why-rail-tile:hover {
 				color: var(--text);
-				border-color: var(--border);
+				border-color: var(--border-strong);
 			}
 			.why-rail-tile svg {
 				width: 1.9rem;

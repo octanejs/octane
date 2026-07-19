@@ -845,23 +845,23 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			.bx-tip-fw {
 				font-size: 0.8rem;
 				font-weight: 700;
-				color: var(--text);
+				color: #f4eee8;
 			}
 			.bx-tip-suite {
 				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 				font-size: 0.68rem;
-				color: var(--text-secondary);
+				color: #99a1b3;
 			}
 			.bx-tip-primary {
 				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 				font-size: 0.9rem;
 				font-weight: 600;
-				color: var(--text);
+				color: #f4eee8;
 			}
 			.bx-tip-sec,
 			.bx-tip-fast {
 				font-size: 0.72rem;
-				color: var(--text-secondary);
+				color: #99a1b3;
 				margin-top: 0.15rem;
 			}
 			@keyframes bx-fade {

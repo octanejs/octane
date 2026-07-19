@@ -351,7 +351,7 @@ export function DocPage() @{
 				cursor: pointer;
 			}
 			.prose :global(details summary:hover) {
-				background: var(--surface-subtle);
+				background: var(--surface);
 			}
 			.prose :global(details > div) {
 				padding: 0 1rem 0.1rem;

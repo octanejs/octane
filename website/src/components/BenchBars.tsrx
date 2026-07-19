@@ -271,7 +271,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-card-title {
 				font-weight: 600;
-				color: #f6f7f9;
+				color: var(--text);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.95rem;
 			}
@@ -299,7 +299,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 					color 0.15s;
 			}
 			.bench-op:hover {
-				color: #f6f7f9;
+				color: var(--text);
 				background: var(--surface-subtle);
 			}
 			.bench-op:focus-visible {
@@ -308,7 +308,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-op-on {
 				background: rgba(255, 65, 90, 0.16);
-				color: #f6f7f9;
+				color: var(--text);
 			}
 			/* The plot is one grid: the label column sizes to its longest label (so
 			   the chart hugs the card's left edge instead of a fixed gutter) and the
@@ -327,7 +327,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-row-label {
 				font-size: 0.82rem;
-				color: #f6f7f9;
+				color: var(--text);
 				text-align: right;
 				white-space: nowrap;
 				overflow: hidden;
@@ -359,7 +359,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				transform: translateY(-50%);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.75rem;
-				color: #f6f7f9;
+				color: var(--text);
 				white-space: nowrap;
 				transition: left 0.3s ease;
 			}
@@ -395,7 +395,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				cursor: pointer;
 			}
 			.bench-table summary:hover {
-				color: #f6f7f9;
+				color: var(--text);
 			}
 			.bench-table table {
 				width: 100%;
@@ -408,7 +408,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			.bench-table td {
 				text-align: right;
 				padding: 0.25rem 0.5rem;
-				color: #f6f7f9;
+				color: var(--text);
 				border-bottom: 1px solid var(--border);
 				white-space: nowrap;
 			}
