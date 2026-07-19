@@ -6,7 +6,11 @@
 import { use } from 'octane';
 import { LocaleContext, ThemeContext } from '../shell/contexts.ts';
 
-export function PriceBadge(props) @{
+export interface PriceBadgeProps {
+	pricePerSeat: number;
+}
+
+export function PriceBadge(props: PriceBadgeProps) @{
 	const locale = use(LocaleContext);
 	const theme = use(ThemeContext);
 	const price = new Intl.NumberFormat(locale, {

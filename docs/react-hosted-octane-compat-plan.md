@@ -1169,6 +1169,23 @@ publish build), exercised consumer-shaped by
   element types (memo/forwardRef/lazy), plain renderables, multiple children,
   and class components — a compiler-emitted component brand (measured against
   codegen-size) remains future work tied to the declaration tooling.
+- Shipped later (2026-07-19): the §3 zero-cast typing goal is closed for
+  tsrx-tsc programs, in both authoring forms.
+  - The element-child form types directly: `Octane.JSX.Element` now extends
+    `Promise<React.ReactNode>` (type-level only — see the rationale comment in
+    `src/jsx-runtime.d.ts`), the one member of React 19's element-constructor
+    return union that is not itself a `ReactNode`. The exact signature
+    tsrx-tsc infers for a `.tsrx` export is therefore a valid React JSX
+    element type with exact prop checking, while octane ELEMENT values remain
+    rejected in `ReactNode` positions (nominal separation survives in both
+    directions; pinned in typetests §7).
+  - A typed `component`/`props` form was added alongside —
+    `<OctaneCompat component={Island} props={…}/>`
+    (`OctaneCompatComponentProps` in `src/react/shared.ts`, both entries) —
+    accepting the island transport explicitly; `P` infers from the island's
+    props parameter. Both forms resolve to the same `{ type, props, key }`
+    transport (tests pin cross-form island preservation and server markup
+    byte-parity).
 - Under React SSR the client shell renders an empty host and mounts on the
   client; Phase 4 replaces this with the hosted server renderer via
   conditional exports.

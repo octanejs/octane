@@ -11,21 +11,33 @@
 // effect reads the adopted input ONCE and folds any pre-hydration edit into
 // state, so the first "Add to compare" reports what the user actually typed.
 import { use, useLayoutEffect, useRef, useState } from 'octane';
+import type { Plan } from '../data/plans.ts';
 import { LocaleContext } from '../shell/contexts.ts';
 
 const MIN_SEATS = 1;
 const MAX_SEATS = 500;
 
-function clampSeats(raw) {
+function clampSeats(raw: string | number): number {
 	const parsed = Math.floor(Number(raw));
 	if (!Number.isFinite(parsed)) return MIN_SEATS;
 	return Math.min(MAX_SEATS, Math.max(MIN_SEATS, parsed));
 }
 
-export function PlanConfigurator(props) @{
+/** What "Add to compare" hands back to the React shell. */
+export interface CompareEntry {
+	planId: string;
+	seats: number;
+}
+
+export interface PlanConfiguratorProps {
+	plan: Plan;
+	onAddToCompare: (entry: CompareEntry) => void;
+}
+
+export function PlanConfigurator(props: PlanConfiguratorProps) @{
 	const locale = use(LocaleContext);
 	const [seats, setSeats] = useState(3);
-	const inputRef = useRef(null);
+	const inputRef = useRef<HTMLInputElement | null>(null);
 	useLayoutEffect(() => {
 		const element = inputRef.current;
 		if (element && element.value !== String(seats)) {
@@ -59,7 +71,7 @@ export function PlanConfigurator(props) @{
 					min={MIN_SEATS}
 					max={MAX_SEATS}
 					value={seats}
-					onInput={(event) => setSeats(clampSeats(event.target.value))}
+					onInput={(event) => setSeats(clampSeats(event.currentTarget.value))}
 				/>
 			</label>
 			<button

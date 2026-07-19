@@ -58,8 +58,8 @@ export default defineConfig({
 'use octane';
 import { useState } from 'octane';
 
-export function Counter() @{
-	const [count, setCount] = useState(0);
+export function Counter(props: { start: number }) @{
+	const [count, setCount] = useState(props.start);
 	<button onClick={() => setCount(count + 1)}>
 		{'clicks: ' + count}
 	</button>
@@ -74,7 +74,8 @@ the compilers are wired up.
 <h2 id="render-an-island">Render an island</h2>
 
 Import the compiled Octane component and the host, then wrap the component in
-`<OctaneCompat>`. It takes exactly one compiled Octane element as its child:
+`<OctaneCompat>`. It takes exactly one compiled Octane element as its child, consumed
+as a `{ component, props }` transport — React never invokes it:
 
 ```tsx
 // App.tsx — compiled by React's toolchain
@@ -86,11 +87,27 @@ export function App() {
 		<main>
 			<h1>My React app</h1>
 			<OctaneCompat>
-				<Counter />
+				<Counter start={3} />
 			</OctaneCompat>
 		</main>
 	);
 }
+```
+
+Both the child site and the island are fully typed: under octane's TypeScript tooling
+(`tsrx-tsc`, the editor plugin) the `.tsrx` export keeps its own octane-typed
+signature, React JSX accepts it zero-cast, and a wrong, missing, or unknown island
+prop is a type error at `<Counter …/>`. (Octane _element values_ remain rejected in
+ordinary React `ReactNode` positions — only the component transport crosses the
+boundary.)
+
+The equivalent `component`/`props` form passes the same transport explicitly, with
+`props` checked against the island's props parameter; island identity follows the
+React `key` on `<OctaneCompat>` itself, and `props` may be omitted for an island that
+takes none:
+
+```tsx
+<OctaneCompat component={Counter} props={{ start: 3 }} />
 ```
 
 Events inside the island are native and **delegated at the island host**, so React

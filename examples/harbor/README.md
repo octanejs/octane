@@ -32,7 +32,12 @@ and exercised by `benchmarks/react-hosted-islands`.
   **server** faults surface in Fizz `onError`, never in React boundaries.
 - `src/App.tsx` — the shell. The Compat component arrives **as a prop**:
   `entry-server.tsx` passes it from `octane/react/server`, `entry-client.tsx`
-  from `octane/react`; trees and island props are otherwise identical.
+  from `octane/react`; trees and island props are otherwise identical. Islands
+  mount through both OctaneCompat authoring forms — the element-child form and
+  the `component`/`props` transport form — and every island prop is checked
+  against the island's own octane-typed `.tsrx` signature (`pnpm typecheck`
+  runs `tsrx-tsc`; `src/island-boundary.test-d.tsx` pins the boundary with
+  `@ts-expect-error` cases).
 - `src/islands/*.tsrx` — open with `'use octane'`; the Vite config's
   `requireDirective` split gives Octane exactly these modules and
   `@vitejs/plugin-react` everything else.

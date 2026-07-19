@@ -166,7 +166,25 @@ declare namespace Octane {
 	namespace JSX {
 		// Mirrors React's `JSX.Element extends ReactElement<any, any>`: a JSX
 		// expression is an opaque-but-real element value.
-		interface Element extends OctaneElement {}
+		//
+		// The extra `Promise<React.ReactNode>` parent is TYPE-LEVEL ONLY — an
+		// octane element is a plain descriptor at runtime, never a thenable. It
+		// exists for React-hosted islands (`octane/react`): React 19's
+		// `JSX.ElementType` admits `(props: P) => ReactNode | Promise<ReactNode>`,
+		// and `Promise<ReactNode>` is the ONE member of that return union that is
+		// not itself assignable to `ReactNode` (whose promise arm is
+		// `Promise<AwaitedReactNode>`, and `ReactNode ≰ AwaitedReactNode`). So a
+		// compiled octane component — `(props) => Octane.JSX.Element`, exactly
+		// how tsrx-tsc types a `.tsrx` export — IS a valid React JSX element
+		// type: `<Island …/>` typechecks zero-cast inside `<OctaneCompat>` with
+		// exact prop checking, while an octane ELEMENT value remains a type
+		// error in arbitrary React `ReactNode` slots (`<div>{octaneEl}</div>`).
+		// Known, accepted cost: element values satisfy `PromiseLike`
+		// structurally, so `await element` (a runtime no-op for non-thenables)
+		// and `use(element)` typecheck; the runtime owns those diagnostics.
+		// Pinned by typetests/react-hosted-jsx.test-d.tsx §7 and
+		// examples/harbor/src/island-boundary.test-d.tsx.
+		interface Element extends OctaneElement, Promise<React.ReactNode> {}
 		// `any` disables tag/return-type validation: an octane component is ANY
 		// function used at a `<F/>` site, and may return renderables TS cannot
 		// know about (primitives, null, arrays) — the compiler owns that check.
