@@ -35,7 +35,8 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./stately": "./src/stately/index.ts"
+    "./stately": "./src/stately/index.ts",
+    "./components": "./src/components/index.ts"
   },
   "scripts": {
     "test": "vitest run"
@@ -56,6 +57,7 @@
     "octane": "workspace:*",
     "react": "catalog:default",
     "react-aria": "catalog:default",
+    "react-aria-components": "catalog:default",
     "react-dom": "catalog:default",
     "react-stately": "catalog:default",
     "vitest": "catalog:default"
