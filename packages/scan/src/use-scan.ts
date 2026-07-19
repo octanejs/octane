@@ -16,11 +16,15 @@ export function useScan(...args: [options?: Partial<Options>, slot?: symbol]): v
 	const head = args[0];
 	const options =
 		typeof head === 'object' && head !== null ? (head as Partial<Options>) : undefined;
+	// Keyed on `options` (not `[]`) so later changes to the argument reach the
+	// session, matching a direct `setOptions`/`scan()` call. `enabled: true` is
+	// intentional and idempotent: like `scan()`, `useScan` is an active
+	// "start scanning" call, so re-applying its options keeps scanning on.
 	useEffect(
 		() => {
 			session.setOptions({ enabled: true, ...options });
 		},
-		[],
+		[options],
 		slot,
 	);
 }
