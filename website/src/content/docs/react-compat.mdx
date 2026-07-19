@@ -39,8 +39,9 @@ own root surfaces to the nearest **React** Suspense or error boundary.
 <h2 id="set-up">Set up the toolchain</h2>
 
 An Octane island is a compiled `.tsrx` (or Octane-compiled `.tsx`) module, while the
-host app is compiled by React's own toolchain. Tell the two compilers apart with
-`requireDirective: true` and a `'use octane'` directive on the modules Octane owns:
+host app is compiled by React's own toolchain. `requireDirective: true` tells the two
+compilers apart: every `.tsrx` is Octane's by extension, and an Octane-owned `.tsx`
+opts in with a leading `/** @jsxImportSource octane */` pragma:
 
 ```ts
 // vite.config.ts
@@ -54,8 +55,7 @@ export default defineConfig({
 ```
 
 ```tsrx
-// src/islands/Counter.tsrx — compiled by Octane
-'use octane';
+// src/islands/Counter.tsrx — compiled by Octane, no marker needed
 import { useState } from 'octane';
 
 export function Counter(props: { start: number }) @{
@@ -66,8 +66,8 @@ export function Counter(props: { start: number }) @{
 }
 ```
 
-The ownership rules — what the directive means, when a missing directive is an error,
-and how `exclude` hands a path to another toolchain — live in
+The ownership rules — what the pragma means and how `exclude` hands a path to
+another toolchain — live in
 [Build tools](/docs/build-tools#mixed-toolchains). This page is about what you do once
 the compilers are wired up.
 
@@ -122,7 +122,6 @@ pass the React context object straight through:
 
 ```tsrx
 // src/islands/ThemedBadge.tsrx
-'use octane';
 import { use } from 'octane';
 import { ThemeContext } from '../theme.ts';
 
@@ -205,8 +204,8 @@ own, and prop mistakes at `<OctaneCompat component={Island} props={…} />` or
 
 <h2 id="next">Next</h2>
 
-- [Build tools](/docs/build-tools#mixed-toolchains) — the `'use octane'` directive and
-  mixed-toolchain ownership rules.
+- [Build tools](/docs/build-tools#mixed-toolchains) — mixed-toolchain ownership:
+  `.tsrx` by extension, octane `.tsx` via the `@jsxImportSource octane` pragma.
 - [Quick start](/docs/quick-start) — install Octane and write your first `.tsrx`
   component.
 - [Differences from React](/docs/differences-from-react) — the deliberate divergences

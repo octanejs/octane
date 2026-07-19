@@ -22,8 +22,10 @@ export interface OctaneRsbuildPluginOptions {
 	 */
 	exclude?: string[];
 	/**
-	 * Mixed-toolchain ownership gate: compile only project modules declaring
-	 * `'use octane'`; undirected project `.tsx`/`.ts` pass through to the host
+	 * Mixed-toolchain ownership gate: project `.tsrx` stays Octane's by
+	 * extension; a project `.tsx` compiles only with a leading
+	 * `@jsxImportSource octane` pragma comment; plain project `.ts`/`.js`
+	 * are never Octane-compiled. Unmarked `.tsx` passes through to the host
 	 * framework's own pipeline. See `@octanejs/rspack-plugin` for details.
 	 * @default false
 	 */

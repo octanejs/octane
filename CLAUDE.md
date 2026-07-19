@@ -140,7 +140,11 @@ full campaign deleting them. Octane files are fully typed:
 - Octane-owned `.tsx` files declare themselves with a leading
   `/** @jsxImportSource octane */` pragma (files owned by another renderer
   point at that renderer's intrinsics module instead, e.g.
-  `@octanejs/three/intrinsics`).
+  `@octanejs/three/intrinsics`). In mixed-toolchain builds
+  (`requireDirective: true`) the same leading pragma is also the compile
+  ownership marker for octane-owned `.tsx`; `.tsrx` is Octane's by extension
+  and needs no marker, and plain project `.ts`/`.js` are never
+  Octane-compiled there.
 - Type component props and renderable holes properly: `OctaneNode` from
   `octane` for renderables (never `React.ReactNode`), native DOM event types,
   `{ current: T | null }` refs. Untyped `props` parameters are noImplicitAny

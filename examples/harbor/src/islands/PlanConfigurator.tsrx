@@ -1,4 +1,3 @@
-'use octane';
 // Island state + native events + the island→React return path. The seats
 // input is CONTROLLED on octane's native event model (onInput fires per
 // keystroke; there is no synthetic onChange), the total recomputes from

@@ -22,7 +22,12 @@ import {
 	prepareHydrateBoundaries,
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
-import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
+import {
+	DOM_RENDERER_MODULE,
+	normalizeRendererConfig,
+	resolveRendererForFile,
+} from './renderers.js';
+import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import {
 	analyzeNativeChangeDiagnostics,
@@ -294,73 +299,6 @@ export function findVoidComponentExports(source, id) {
 	return exports;
 }
 
-const USE_OCTANE_DIRECTIVE = 'use octane';
-
-/**
- * Locate a `'use octane'` directive in the module's directive prologue.
- *
- * Directives are string-literal expression statements before any other
- * statement; comments, a BOM, and other directives (`'use client'`,
- * `'use strict'`, …) may precede it, in any order. Returns the directive's
- * `[start, end)` source span — including a same-line trailing semicolon — or
- * `null`. A string containing escape sequences is not a directive (spec
- * semantics) but still ends the candidate only if unterminated.
- */
-export function findUseOctaneDirective(code) {
-	const length = code.length;
-	let i = code.charCodeAt(0) === 0xfeff ? 1 : 0;
-	for (;;) {
-		while (i < length && /\s/.test(code[i])) i++;
-		if (code.startsWith('//', i)) {
-			const newline = code.indexOf('\n', i);
-			if (newline === -1) return null;
-			i = newline + 1;
-			continue;
-		}
-		if (code.startsWith('/*', i)) {
-			const close = code.indexOf('*/', i + 2);
-			if (close === -1) return null;
-			i = close + 2;
-			continue;
-		}
-		const quote = code[i];
-		if (quote !== '"' && quote !== "'") return null;
-		const start = i;
-		let value = '';
-		let escaped = false;
-		let closed = false;
-		for (i++; i < length; i++) {
-			const ch = code[i];
-			if (ch === '\\') {
-				escaped = true;
-				i++;
-				continue;
-			}
-			if (ch === quote) {
-				closed = true;
-				i++;
-				break;
-			}
-			if (ch === '\n' || ch === '\r') break;
-			value += ch;
-		}
-		if (!closed) return null;
-		let end = i;
-		while (end < length && (code[end] === ' ' || code[end] === '\t')) end++;
-		if (code[end] === ';') end++;
-		if (!escaped && value === USE_OCTANE_DIRECTIVE) return { start, end };
-		i = end;
-	}
-}
-
-/**
- * Blank a directive span with equal-length whitespace so every later source
- * position — and therefore every source map — survives unchanged.
- */
-function stripDirective(code, span) {
-	return code.slice(0, span.start) + ' '.repeat(span.end - span.start) + code.slice(span.end);
-}
-
 class OctaneBundlerCompiler {
 	constructor(options) {
 		this.root = resolve(options.root ?? process.cwd());
@@ -379,15 +317,23 @@ class OctaneBundlerCompiler {
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
 		// Ownership gate for mixed-toolchain projects (e.g. a React app hosting
-		// Octane islands): when enabled, a project-owned module is Octane's only
-		// if it declares `'use octane'` in its directive prologue. Undirected
-		// project `.tsx`/`.ts`/`.js` pass through to the host toolchain; an
-		// undirected project `.tsrx` is a hard error. Installed/linked packages
-		// keep their manifest `usesOctane` decision. The directive itself is
-		// tolerated (and stripped from compiled output) in every mode.
+		// Octane islands): when enabled, a project `.tsrx` is Octane's by
+		// extension (nothing else compiles the syntax), a project `.tsx` is
+		// Octane's only if it opens with a leading `/** @jsxImportSource
+		// octane */` pragma (any registered renderer's intrinsics module also
+		// counts), and plain project `.ts`/`.js` are never Octane's. A leading
+		// pragma naming a foreign source (`react`, …) does NOT claim the file.
+		// Unmarked project `.tsx` passes through to the host toolchain.
+		// Installed/linked packages keep their manifest `usesOctane` decision.
+		// The pragma always ships unchanged — it is meaningful to TypeScript
+		// and downstream tools.
 		this.requireDirective = options.requireDirective === true;
+		this.pragmaOwnedModules = new Set([DOM_RENDERER_MODULE]);
+		for (const renderer of Object.values(this.renderers.registry)) {
+			if (renderer.intrinsics !== undefined) this.pragmaOwnedModules.add(renderer.intrinsics);
+		}
 		this.warn = typeof options.warn === 'function' ? options.warn : null;
-		this.warnedUndirected = new Set();
+		this.warnedOwnership = new Set();
 		this.warnedCompileDiagnostics = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
@@ -513,64 +459,88 @@ class OctaneBundlerCompiler {
 	}
 
 	/**
-	 * The requireDirective ownership gate for one project-owned module.
-	 * Returns whether Octane owns the module; throws for an undirected
-	 * project-owned `.tsrx` (in an Octane-only pipeline nothing else compiles
-	 * the syntax, so a silent pass-through is a guaranteed confusing
-	 * downstream parse error). Two carve-outs: installed and linked packages
-	 * are exempt (their manifest `usesOctane` rule is already the explicit
-	 * per-package decision), and `exclude` path fragments are never Octane's —
-	 * tsrx syntax can target other renderers (e.g. `@tsrx/react`), so a
-	 * project routing part of its `.tsrx` through a different tsrx compiler
-	 * lists those paths in `exclude`, and the exclusion wins even over a
-	 * directive.
+	 * Does a leading `@jsxImportSource` pragma claim this module for Octane?
+	 * `octane` itself and every registered renderer's intrinsics module count;
+	 * a pragma naming a FOREIGN source (`react`, `@emotion/react`, …) does not
+	 * claim the file — under the requireDirective gate the module behaves
+	 * exactly like an unmarked one.
 	 */
-	_passesDirectiveGate(file, filename, directive) {
-		if (!this.requireDirective) return true;
-		if (!this._isProjectOwnedSource(file)) return true;
-		if (this.exclude.some((path) => file.includes(path))) {
-			this._warnExcludedDirectiveConflict(file, filename, directive);
-			return false;
-		}
-		if (directive !== null) return true;
-		if (file.endsWith('.tsrx')) {
-			const error = new Error(
-				`${filename} is Octane source (.tsrx) but has no 'use octane' module directive, and this build enables requireDirective. Add 'use octane' at the top of the module (alongside any other directives, before imports), route the file to its owning tsrx compiler with the integration's \`exclude\` option, or disable requireDirective.`,
-			);
-			error.code = 'OCTANE_DIRECTIVE_REQUIRED';
-			error.filename = filename;
-			throw error;
-		}
-		return false;
+	_pragmaClaimsOwnership(code) {
+		const pragmaModule = findLeadingJsxImportSourcePragma(code);
+		return pragmaModule !== null && this.pragmaOwnedModules.has(pragmaModule);
 	}
 
 	/**
-	 * requireDirective diagnostic: an exclusion beats a `'use octane'`
-	 * directive, and the module stays with its excluded-path owner. Warn once
-	 * so the conflicting signals never resolve as a silent no-op. Shared by
-	 * the full-compile gate and the `.ts`/`.js` hook-slot exclusion.
+	 * The requireDirective ownership gate for one project-owned module.
+	 * A project `.tsrx` is Octane's by extension — in an Octane pipeline
+	 * nothing else compiles the syntax, so there is nothing to opt into; a
+	 * project `.tsx` is Octane's only when `pragmaOwned` (its leading
+	 * `@jsxImportSource` pragma names octane or a registered renderer's
+	 * intrinsics module); plain project `.ts`/`.js` are never Octane's — they
+	 * stay with the host toolchain, with no ownership marker to look for.
+	 * Two carve-outs: installed and linked packages are exempt (their
+	 * manifest `usesOctane` rule is already the explicit per-package
+	 * decision), and `exclude` path fragments are never Octane's — tsrx
+	 * syntax can target other renderers (e.g. `@tsrx/react`), so a project
+	 * routing part of its `.tsrx` through a different tsrx compiler lists
+	 * those paths in `exclude`, and the exclusion wins even over an
+	 * ownership pragma.
 	 */
-	_warnExcludedDirectiveConflict(file, filename, directive) {
-		if (directive === null || this.warn === null) return;
-		if (!this._isProjectOwnedSource(file) || this.warnedUndirected.has(filename)) return;
-		this.warnedUndirected.add(filename);
+	_passesOwnershipGate(file, filename, pragmaOwned) {
+		if (!this.requireDirective) return true;
+		if (!this._isProjectOwnedSource(file)) return true;
+		if (this.exclude.some((path) => file.includes(path))) {
+			this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
+			return false;
+		}
+		return file.endsWith('.tsrx') || pragmaOwned;
+	}
+
+	/**
+	 * requireDirective diagnostic: an exclusion beats an ownership pragma,
+	 * and the module stays with its excluded-path owner. Warn once so the
+	 * conflicting signals never resolve as a silent no-op. An excluded
+	 * `.tsrx` is NOT a conflict — pairing extension ownership with `exclude`
+	 * is exactly how a project routes `.tsrx` to another tsrx compiler.
+	 */
+	_warnExcludedPragmaConflict(file, filename, pragmaOwned) {
+		if (!pragmaOwned || this.warn === null) return;
+		if (!this._isProjectOwnedSource(file) || this.warnedOwnership.has(filename)) return;
+		this.warnedOwnership.add(filename);
 		this.warn(
-			`${filename} declares 'use octane' but matches an excluded path — the exclusion wins and Octane will not compile it.`,
+			`${filename} declares Octane ownership with a leading @jsxImportSource pragma but matches an excluded path — the exclusion wins and Octane will not compile it.`,
 		);
 	}
 
 	/**
-	 * requireDirective diagnostic: a project-owned module imports from
+	 * requireDirective diagnostic: a project-owned `.tsx` imports from
 	 * 'octane' but declared no ownership, so Octane leaves it to the host
-	 * toolchain untouched. Usually a forgotten directive; occasionally an
+	 * toolchain untouched. Usually a forgotten pragma; occasionally an
 	 * intentional type-only import — hence a warning, never an error.
 	 */
-	_warnUndirectedOctaneImport(code, filename) {
-		if (this.warn === null || this.warnedUndirected.has(filename)) return;
+	_warnUnmarkedOctaneImport(code, filename) {
+		if (this.warn === null || this.warnedOwnership.has(filename)) return;
 		if (!/from\s*['"]octane['"]/.test(code)) return;
-		this.warnedUndirected.add(filename);
+		this.warnedOwnership.add(filename);
 		this.warn(
-			`${filename} imports from 'octane' but has no 'use octane' module directive — with requireDirective enabled, Octane will not compile or transform it. Add 'use octane' at the top of the module if Octane should own it.`,
+			`${filename} imports from 'octane' but has no leading /** @jsxImportSource octane */ pragma — with requireDirective enabled, Octane will not compile or transform it. Add the pragma at the top of the module if Octane should own it.`,
+		);
+	}
+
+	/**
+	 * requireDirective diagnostic: plain project `.ts`/`.js` modules are
+	 * never Octane-compiled in a mixed-toolchain build, so their octane base
+	 * hooks never receive compiler slot keys and would throw at runtime.
+	 * Point hook authors at the module shapes Octane does own. Warning, not
+	 * error: most octane imports from plain modules (types, createRoot,
+	 * helpers) are hook-free and completely fine unslotted.
+	 */
+	_warnPlainModuleOctaneImport(code, filename) {
+		if (this.warn === null || this.warnedOwnership.has(filename)) return;
+		if (!/from\s*['"]octane['"]/.test(code)) return;
+		this.warnedOwnership.add(filename);
+		this.warn(
+			`${filename} imports from 'octane', but plain .ts/.js project modules are never Octane-compiled when requireDirective is enabled. If this module defines custom octane hooks, move them into a .tsrx module or a .tsx module with a leading /** @jsxImportSource octane */ pragma (or use the package-manifest octane.hookSlots.manual protocol).`,
 		);
 	}
 
@@ -767,23 +737,27 @@ class OctaneBundlerCompiler {
 	}
 
 	/**
-	 * requireDirective ownership for code-less classification: read the module
-	 * prologue from disk. The transform (which receives real code) remains the
-	 * authoritative gate; an unreadable file is conservatively not Octane's, so
-	 * importers can never hold a client reference for a module whose own
+	 * requireDirective ownership for code-less classification: a project
+	 * `.tsrx` is Octane's by extension; a project `.tsx` needs its leading
+	 * @jsxImportSource pragma read from disk; plain `.ts`/`.js` are never
+	 * Octane's. The transform (which receives real code) remains the
+	 * authoritative gate; an unreadable file is conservatively not Octane's,
+	 * so importers can never hold a client reference for a module whose own
 	 * transform passes through to the host toolchain.
 	 */
-	_directiveOwnershipForFile(file) {
+	_ownershipForFile(file) {
 		if (!this.requireDirective) return true;
 		if (!this._isProjectOwnedSource(file)) return true;
 		if (this.exclude.some((path) => file.includes(path))) return false;
+		if (file.endsWith('.tsrx')) return true;
+		if (!file.endsWith('.tsx')) return false;
 		let code;
 		try {
 			code = readFileSync(isAbsolute(file) ? resolve(file) : resolve(this.root, file), 'utf8');
 		} catch {
 			return false;
 		}
-		return findUseOctaneDirective(code) !== null;
+		return this._pragmaClaimsOwnership(code);
 	}
 
 	/** Classify a bundler-resolved module without loading or evaluating it. */
@@ -792,10 +766,10 @@ class OctaneBundlerCompiler {
 		const filename = this._canonicalModuleId(file);
 		const renderer = resolveRendererForFile(this.renderers, filename);
 		// A renderer rule can only claim modules Octane owns. Under the
-		// requireDirective gate an undirected project module belongs to the
+		// requireDirective gate an unmarked project module belongs to the
 		// host toolchain: no client reference, matching its pass-through
 		// transform (server-graph identity must not split from output).
-		if (renderer.server === 'client-only' && !this._directiveOwnershipForFile(file)) return null;
+		if (renderer.server === 'client-only' && !this._ownershipForFile(file)) return null;
 		const collected = { dependencies: new Set(), missingDependencies: new Set() };
 		this._assertClientOnlySourceSupported(file, filename, renderer, collected);
 		return renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
@@ -846,23 +820,30 @@ class OctaneBundlerCompiler {
 				: [];
 
 		const renderer = resolveRendererForFile(this.renderers, filename);
-		const directive = findUseOctaneDirective(code);
+		// Ownership is checked only where it can matter: outside the
+		// requireDirective gate every eligible module already compiles, a
+		// project `.tsrx` is Octane's by extension, and plain `.ts`/`.js`
+		// have no ownership concept — so only project `.tsx` is scanned for
+		// the leading pragma.
+		const pragmaOwned =
+			this.requireDirective &&
+			file.endsWith('.tsx') &&
+			this._isProjectOwnedSource(file) &&
+			this._pragmaClaimsOwnership(code);
+		const octaneMarked = file.endsWith('.tsrx') || pragmaOwned;
 		const fullCompile =
 			this._isFullCompileSource(file, collected) &&
-			this._passesDirectiveGate(file, filename, directive);
+			this._passesOwnershipGate(file, filename, pragmaOwned);
 		// The narrow-the-rule config error concerns modules Octane owns. Under
-		// the directive gate a host-owned project module (undirected, or in an
+		// the ownership gate a host-owned project module (unmarked, or in an
 		// excluded path) may legitimately sit inside a client-only include in a
 		// mixed repo — it passes through here, and clientReferenceForFile
 		// returns no reference for it, so classification and transform agree.
 		const hostOwned =
 			this.requireDirective &&
 			this._isProjectOwnedSource(file) &&
-			(directive === null || this.exclude.some((path) => file.includes(path)));
+			(!octaneMarked || this.exclude.some((path) => file.includes(path)));
 		if (!hostOwned) this._assertClientOnlySourceSupported(file, filename, renderer, collected);
-		// The directive is a build-time ownership signal only — never ship it.
-		// Blanking (not deleting) keeps positions stable for source maps.
-		const source = directive === null ? code : stripDirective(code, directive);
 		const plainHelperSource =
 			(file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts');
 		if (
@@ -876,7 +857,7 @@ class OctaneBundlerCompiler {
 			// Renderer rules also own the runtime assumptions of their project-local
 			// helper modules. Validate those assumptions without claiming their output:
 			// the existing hook-slot/pass-through branch below remains authoritative.
-			validateRendererModuleSource(source, filename, renderer);
+			validateRendererModuleSource(code, filename, renderer);
 		}
 		if (fullCompile) {
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
@@ -896,8 +877,8 @@ class OctaneBundlerCompiler {
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
 			const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(
-				parseModule(source, filename),
-				source,
+				parseModule(code, filename),
+				code,
 				filename,
 				{
 					dom: renderer.target === 'dom',
@@ -907,13 +888,11 @@ class OctaneBundlerCompiler {
 				},
 			);
 			const nativeChangeDiagnostics = nativeChangeAnalysis.diagnostics;
-			// Hydrate-boundary preparation consumes the directive-stripped source;
-			// blanking preserved every position, so its maps stay consistent.
 			const hydratePreparation =
 				environment === 'client'
-					? prepareHydrateBoundaries(source, filename, hydrateBoundaryPath)
-					: prepareServerHydrateBoundaries(source, filename);
-			const compileSource = hydratePreparation?.source ?? source;
+					? prepareHydrateBoundaries(code, filename, hydrateBoundaryPath)
+					: prepareServerHydrateBoundaries(code, filename);
+			const compileSource = hydratePreparation?.source ?? code;
 			const out = compile(compileSource, filename, {
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
@@ -925,7 +904,7 @@ class OctaneBundlerCompiler {
 				// rewrite the compiler restamps them from these authored
 				// coordinates so client and server compiles agree (compile.js).
 				...(hydratePreparation?.origins != null
-					? { __styleRemap: { authored: source, origins: hydratePreparation.origins } }
+					? { __styleRemap: { authored: code, origins: hydratePreparation.origins } }
 					: null),
 				hmr,
 				mode: environment,
@@ -950,7 +929,7 @@ class OctaneBundlerCompiler {
 			});
 			if (hydratePreparation?.map && out.map) {
 				out.map = composeSourceMaps(out.map, hydratePreparation.map);
-				out.map = addSourceMapNeedles(out.map, out.code, source, hydratePreparation.mappingNeedles);
+				out.map = addSourceMapNeedles(out.map, out.code, code, hydratePreparation.mappingNeedles);
 			}
 			this._forwardCompileDiagnostics(out.diagnostics);
 			return {
@@ -971,44 +950,37 @@ class OctaneBundlerCompiler {
 			assertNoLiveClientOnlyImports(code, filename, clientOnlyImports);
 		}
 		if (file.endsWith('.tsx')) {
-			// Either not Octane-eligible, or an undirected project module in a
+			// Either not Octane-eligible, or an unmarked project module in a
 			// requireDirective build — the host toolchain's JSX pipeline owns it.
-			if (this.requireDirective && directive === null && this._isProjectOwnedSource(file)) {
-				this._warnUndirectedOctaneImport(code, filename);
+			if (this.requireDirective && !pragmaOwned && this._isProjectOwnedSource(file)) {
+				this._warnUnmarkedOctaneImport(code, filename);
 			}
 			return this._passThrough(code, collected);
 		}
 
 		if ((file.endsWith('.ts') || file.endsWith('.js')) && !file.endsWith('.d.ts')) {
 			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
-			if (this.exclude.some((path) => file.includes(path))) {
-				// Same conflict diagnostic as the full-compile gate: a directive
-				// inside an excluded path must not fail silent.
-				if (this.requireDirective) {
-					this._warnExcludedDirectiveConflict(file, filename, directive);
-				}
-				return null;
-			}
+			if (this.exclude.some((path) => file.includes(path))) return null;
 			if (!/from\s*['"]octane['"]/.test(code)) return null;
 			if (!this._isInstalledOctaneSource(file, collected)) {
 				return this._passThrough(code, collected);
 			}
-			// Hook slotting is an Octane-ownership rewrite, so the directive gate
-			// applies to it exactly as to full compilation.
-			if (this.requireDirective && directive === null && this._isProjectOwnedSource(file)) {
-				this._warnUndirectedOctaneImport(code, filename);
+			// Plain project .ts/.js have no ownership concept in a mixed
+			// toolchain: they always stay with the host pipeline, so hook
+			// slotting is reserved for installed/linked octane packages there.
+			// Custom octane hooks in project code belong in .tsrx or
+			// pragma-marked .tsx modules — hence the diagnostic.
+			if (this.requireDirective && this._isProjectOwnedSource(file)) {
+				this._warnPlainModuleOctaneImport(code, filename);
 				return this._passThrough(code, collected);
 			}
-			// From here the module is Octane-owned even when nothing gets
-			// rewritten (manual slots, or no hooks to slot) — the returned code
-			// is Octane output, so the build-time directive never appears in it.
 			if (this._hasManualHookSlots(file, collected)) {
-				return this._passThrough(source, collected);
+				return this._passThrough(code, collected);
 			}
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
 				environment === 'client' && hmr === false && dev === false && profile === false;
-			const out = slotHooks(source, filename, {
+			const out = slotHooks(code, filename, {
 				environment,
 				hmr: !!hmr,
 				profile,
@@ -1019,7 +991,7 @@ class OctaneBundlerCompiler {
 						}
 					: {}),
 			});
-			if (out === null) return this._passThrough(source, collected);
+			if (out === null) return this._passThrough(code, collected);
 			return {
 				code: out.code,
 				map: out.map,

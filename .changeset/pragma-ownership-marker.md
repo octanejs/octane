@@ -1,0 +1,5 @@
+---
+'octane': patch
+---
+
+Mixed-toolchain ownership (`requireDirective: true`) is now a three-line rule: a project `.tsrx` is Octane's by extension and needs no marker; a project `.tsx` is Octane's only when it opens with a leading `/** @jsxImportSource octane */` pragma comment — the same comment TypeScript reads for per-file JSX typing, so one marker both types the file and routes it to Octane's bundler integrations (Vite, Rspack, Rsbuild); and plain project `.ts`/`.js` are never Octane-compiled — they always belong to the host toolchain, so custom octane hooks must live in `.tsrx` or pragma-marked `.tsx` modules (octane-importing plain project modules get a warning saying so; installed octane packages keep their manifest-driven hook slotting). A pragma naming a registered renderer's intrinsics module (e.g. `@octanejs/three/intrinsics`) claims the file the same way; a pragma pointing at a foreign source (`react`, `@emotion/react`, …) claims nothing and the module stays with the host toolchain.
