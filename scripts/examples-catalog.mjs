@@ -7,7 +7,7 @@ export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url
 export const EXAMPLES_ROOT = path.join(REPO_ROOT, 'examples');
 export const CATALOG_PATH = path.join(EXAMPLES_ROOT, 'catalog.json');
 
-const TOP_LEVEL_FIELDS = new Set([
+const REQUIRED_TOP_LEVEL_FIELDS = new Set([
 	'$schema',
 	'schemaVersion',
 	'id',
@@ -22,6 +22,10 @@ const TOP_LEVEL_FIELDS = new Set([
 	'journeys',
 	'faultScenarios',
 ]);
+// `host` is optional (absent means "octane"): a "react" host marks a React-owned
+// application whose Octane islands run through octane/react (OctaneCompat).
+const ALLOWED_TOP_LEVEL_FIELDS = new Set([...REQUIRED_TOP_LEVEL_FIELDS, 'host']);
+const HOST_VALUES = new Set(['octane', 'react']);
 const COMMAND_FIELDS = new Set(['build', 'typecheck', 'e2e']);
 const JOURNEY_FIELDS = new Set(['id', 'title', 'kind', 'spec', 'critical']);
 const FAULT_FIELDS = new Set(['id', 'description']);
@@ -142,7 +146,9 @@ function isInside(directory, candidate) {
 export function validateExampleManifest(example, errors = []) {
 	const { directory, directoryName, manifest, packageManifest } = example;
 	const label = `examples/${directoryName}/example.json`;
-	if (!checkFields(manifest, TOP_LEVEL_FIELDS, TOP_LEVEL_FIELDS, label, errors)) return errors;
+	if (!checkFields(manifest, ALLOWED_TOP_LEVEL_FIELDS, REQUIRED_TOP_LEVEL_FIELDS, label, errors)) {
+		return errors;
+	}
 
 	if (manifest.$schema !== '../example.schema.json') {
 		errors.push(`${label} "$schema" must be "../example.schema.json"`);
@@ -157,6 +163,9 @@ export function validateExampleManifest(example, errors = []) {
 	checkString(manifest.summary, `${label} "summary"`, errors, { minLength: 20 });
 	if (!STATUS_VALUES.has(manifest.status)) {
 		errors.push(`${label} "status" must be one of ${[...STATUS_VALUES].join(', ')}`);
+	}
+	if ('host' in manifest && !HOST_VALUES.has(manifest.host)) {
+		errors.push(`${label} "host" must be one of ${[...HOST_VALUES].join(', ')}`);
 	}
 	checkStringArray(manifest.renderModes, `${label} "renderModes"`, errors, {
 		minItems: 1,
@@ -200,11 +209,15 @@ export function validateExampleManifest(example, errors = []) {
 		if (typeof dependencies.octane !== 'string') {
 			errors.push(`examples/${directoryName}/package.json must declare octane`);
 		}
-		for (const reactRuntime of ['react', 'react-dom']) {
-			if (reactRuntime in dependencies) {
-				errors.push(
-					`examples/${directoryName}/package.json must use Octane, not declare the ${reactRuntime} runtime`,
-				);
+		// A React-hosted application (host: "react") legitimately declares the React
+		// runtime its shell runs on; every other app must stay React-free.
+		if (manifest.host !== 'react') {
+			for (const reactRuntime of ['react', 'react-dom']) {
+				if (reactRuntime in dependencies) {
+					errors.push(
+						`examples/${directoryName}/package.json must use Octane, not declare the ${reactRuntime} runtime`,
+					);
+				}
 			}
 		}
 		for (const binding of Array.isArray(manifest.bindings) ? manifest.bindings : []) {
@@ -362,6 +375,7 @@ export function createExamplesCatalog(examples) {
 			title: manifest.title,
 			summary: manifest.summary,
 			status: manifest.status,
+			host: manifest.host ?? 'octane',
 			renderModes: manifest.renderModes,
 			dialects: manifest.dialects,
 			bindings: manifest.bindings,

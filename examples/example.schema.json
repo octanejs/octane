@@ -40,6 +40,10 @@
     "status": {
       "enum": ["active", "experimental"]
     },
+    "host": {
+      "description": "Rendering host framework. Defaults to \"octane\". \"react\" marks a React-hosted application whose Octane islands run through octane/react (OctaneCompat); only such applications may declare the react runtime.",
+      "enum": ["octane", "react"]
+    },
     "renderModes": {
       "type": "array",
       "minItems": 1,
