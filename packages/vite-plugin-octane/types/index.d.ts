@@ -23,13 +23,15 @@ export interface OctanePluginOptions {
 	 */
 	exclude?: string[];
 	/**
-	 * Mixed-toolchain ownership gate: when `true`, Octane compiles only
-	 * project modules that declare `'use octane'` in their directive prologue.
-	 * Undirected project `.tsx`/`.ts`/`.js` pass through to the host
-	 * framework's own pipeline (e.g. React's JSX transform); an undirected
-	 * project `.tsrx` is a build error. Installed and linked packages keep
-	 * their Octane package-manifest decision. The directive is always
-	 * tolerated and stripped from compiled output, even when this is off.
+	 * Mixed-toolchain ownership gate: when `true`, a project `.tsrx` is
+	 * Octane's by extension, and a project `.tsx` (full compile) or plain
+	 * `.ts`/`.js` (hook slotting) is Octane's only when it opens with a
+	 * leading `@jsxImportSource octane` pragma comment (any registered
+	 * renderer's intrinsics module also counts). A pragma naming a
+	 * foreign source (e.g. `react`) does not claim the file. Unmarked
+	 * project modules pass through to the host framework's own pipeline
+	 * (e.g. React's JSX transform). Installed and linked packages keep
+	 * their Octane package-manifest decision.
 	 * @default false
 	 */
 	requireDirective?: boolean;

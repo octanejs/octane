@@ -1,4 +1,3 @@
-'use octane';
 // The simplest boundary proof: a stateless island that reads the React
 // shell's REAL context objects with plain use(). A provider flip in React
 // re-renders this island live — locale changes the Intl formatting, theme

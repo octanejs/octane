@@ -157,17 +157,18 @@ describe('loader with the neutral compiler', () => {
 		expect(result.module.buildInfo.octane).toMatchObject({ serverRpc: true });
 	});
 
-	it('gates ownership behind requireDirective and reports forgotten directives', () => {
+	it('gates ownership behind requireDirective and reports forgotten pragmas', () => {
 		const options = { requireDirective: true };
 		// Fixtures exist on disk, as in a real build: the loader realpaths the
 		// resource, so project ownership resolves against the realpathed root.
 		const reactSource = "import * as React from 'react';\nexport const Host = () => <p/>;\n";
-		const islandSource = "'use octane';\nexport function Island() @{ <p>{'island'}</p> }";
-		const badSource = 'export function Bad() @{ <p/> }';
+		const islandSource = "export function Island() @{ <p>{'island'}</p> }";
+		const pragmaTsxSource =
+			"/** @jsxImportSource octane */\nexport function Badge() @{ <p>{'badge'}</p> }";
 		const hookSource =
 			"import { useState } from 'octane';\nexport function useCount() { return useState(0); }\n";
 
-		// An undirected project .tsx belongs to the host toolchain: untouched,
+		// An unmarked project .tsx belongs to the host toolchain: untouched,
 		// no Octane build metadata.
 		const host = transform({
 			root,
@@ -178,28 +179,27 @@ describe('loader with the neutral compiler', () => {
 		expect(host.content).toBe(reactSource);
 		expect(getOctaneRspackBuildInfo(host.module)).toBeNull();
 
-		// The directive claims a module for Octane and never ships.
+		// A project .tsrx is Octane's by extension — no marker needed.
 		const island = transform({
 			root,
 			resourcePath: write(root, 'src/Island.tsrx', islandSource),
 			source: islandSource,
 			options,
 		});
-		expect(String(island.content)).not.toContain('use octane');
 		expect(getOctaneRspackBuildInfo(island.module)?.transformKind).toBe('compile');
 
-		// An undirected .tsrx has no other compiler — surfaced as a build error.
-		expect(() =>
-			transform({
-				root,
-				resourcePath: write(root, 'src/Bad.tsrx', badSource),
-				source: badSource,
-				options,
-			}),
-		).toThrow(/has no 'use octane' module directive/);
+		// A leading @jsxImportSource octane pragma claims a .tsx for Octane.
+		const badge = transform({
+			root,
+			resourcePath: write(root, 'src/Badge.tsx', pragmaTsxSource),
+			source: pragmaTsxSource,
+			options,
+		});
+		expect(getOctaneRspackBuildInfo(badge.module)?.transformKind).toBe('compile');
 
-		// An undirected octane-importing .ts skips slotting and warns through
-		// Rspack's module-warning channel.
+		// An unmarked octane-importing project .ts skips hook slotting and
+		// warns through Rspack's module-warning channel with the same
+		// add-the-pragma guidance an unmarked .tsx gets.
 		const hook = transform({
 			root,
 			resourcePath: write(root, 'src/useCount.ts', hookSource),
@@ -208,7 +208,20 @@ describe('loader with the neutral compiler', () => {
 		});
 		expect(String(hook.content)).toContain('useCount');
 		expect(getOctaneRspackBuildInfo(hook.module)).toBeNull();
-		expect(hook.warnings.some((warning) => warning.message.includes("'use octane'"))).toBe(true);
+		expect(
+			hook.warnings.some((warning) => warning.message.includes('@jsxImportSource octane')),
+		).toBe(true);
+
+		// The pragma turns hook slotting back on for a plain project .ts.
+		const pragmaHookSource = '/** @jsxImportSource octane */\n' + hookSource;
+		const slotted = transform({
+			root,
+			resourcePath: write(root, 'src/usePragmaCount.ts', pragmaHookSource),
+			source: pragmaHookSource,
+			options,
+		});
+		expect(getOctaneRspackBuildInfo(slotted.module)?.transformKind).toBe('slots');
+		expect(slotted.warnings).toHaveLength(0);
 	});
 
 	it('delivers native text onChange diagnostics as Rspack module warnings', () => {

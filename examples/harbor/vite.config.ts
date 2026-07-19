@@ -1,7 +1,8 @@
-// Mixed-toolchain build: Octane compiles only modules that open with
-// 'use octane' (the islands); everything else — the React 19 shell — passes
-// through untouched to @vitejs/plugin-react. This is the documented
-// requireDirective ownership split for React-hosted apps.
+// Mixed-toolchain build: Octane owns every project .tsrx by extension (the
+// islands), and would own a .tsx only if it opened with a leading
+// /** @jsxImportSource octane */ pragma; everything else — the React 19
+// shell — passes through untouched to @vitejs/plugin-react. This is the
+// documented requireDirective ownership split for React-hosted apps.
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';

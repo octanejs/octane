@@ -5,11 +5,12 @@
  * A React host module goes through the REAL automatic-runtime JSX transform
  * (TypeScript's `react-jsx` emit — the same `jsx(type, props, key)` element
  * output esbuild, swc, and babel produce), while the Octane island it renders
- * is compiled by the Octane compiler from a `'use octane'` module. One page,
- * two compilers, ownership routed by the directive:
+ * is compiled by the Octane compiler. One page, two compilers: a project
+ * `.tsrx` is Octane's by extension, and an Octane-owned `.tsx`/`.ts`/`.js`
+ * opts in with a leading `@jsxImportSource octane` pragma:
  *
  *  - the Octane compiler (requireDirective) passes the host `.tsx` through
- *    untouched and compiles the directive-carrying island;
+ *    untouched and compiles the island;
  *  - the transpiled host evaluates against real `react/jsx-runtime` and
  *    mounts the island through `OctaneCompat`, staying live across host
  *    re-renders and unmounting cleanly.
@@ -80,27 +81,32 @@ function evaluateHostModule(code: string): { HostApp: React.ComponentType<{ labe
 }
 
 describe('React JSX transform + Octane compiler in one pipeline (requireDirective)', () => {
-	it('routes host .tsx to React and the directive island to Octane', () => {
+	it('routes host .tsx to React and the island to Octane', () => {
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),
 			requireDirective: true,
 		});
 		// Octane leaves the React host module to the host toolchain, untouched.
 		expect(compiler.transform(HOST_SOURCE, '/project/src/HostApp.tsx')).toBeNull();
-		// The same island source compiles only under its ownership directive.
+		// The island .tsrx compiles by extension — no marker needed.
 		const islandSource = readFileSync(
 			join(process.cwd(), 'packages/octane/tests/react-hosted/_fixtures/islands.tsrx'),
 			'utf8',
 		);
-		expect(() => compiler.transform(islandSource, '/project/src/islands.tsrx')).toThrow(
-			/has no 'use octane' module directive/,
+		expect(compiler.transform(islandSource, '/project/src/islands.tsrx')?.kind).toBe('compile');
+		// Octane-in-.tsx authoring opts in with the leading pragma instead.
+		const pragmaTsx = compiler.transform(
+			"/** @jsxImportSource octane */\nexport function Badge() @{ <p>{'badge'}</p> }\n",
+			'/project/src/Badge.tsx',
 		);
-		const compiled = compiler.transform(
-			"'use octane';\n" + islandSource,
-			'/project/src/islands.tsrx',
+		expect(pragmaTsx?.kind).toBe('compile');
+		// A plain octane hooks module opts into hook slotting the same way —
+		// the custom-hooks-in-.ts shape a mixed project shares across islands.
+		const pragmaTs = compiler.transform(
+			"/** @jsxImportSource octane */\nimport { useState } from 'octane';\nexport function useCount() { return useState(0); }\n",
+			'/project/src/useCount.ts',
 		);
-		expect(compiled?.kind).toBe('compile');
-		expect(compiled?.code).not.toContain('use octane');
+		expect(pragmaTs?.kind).toBe('slots');
 	});
 
 	it('renders an Octane island from a host compiled by the real React JSX transform', async () => {
