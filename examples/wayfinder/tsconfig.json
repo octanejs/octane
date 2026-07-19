@@ -14,5 +14,5 @@
     "jsxImportSource": "octane",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "e2e/**/*.ts", "vite.config.ts", "octane.config.ts"]
+  "include": ["src/**/*", "e2e/**/*", "vite.config.ts", "octane.config.ts"]
 }
