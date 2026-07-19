@@ -4,7 +4,7 @@
 [![npm version](https://img.shields.io/npm/v/octane?logo=npm)](https://www.npmjs.com/package/octane)
 [![npm downloads](https://img.shields.io/npm/dm/octane?logo=npm&label=downloads)](https://www.npmjs.com/package/octane)
 
-Octane is a fast, TypeScript-first UI framework, and the successor to
+Octane is a fast, JavaScript UI framework, and the successor to
 [Inferno](https://github.com/infernojs/inferno). It gives you the React API you
 already know, a compiler that keeps the runtime small and fast, no rules of
 hooks, and no hand-maintained dependency arrays in the common case. Omit a hook's
