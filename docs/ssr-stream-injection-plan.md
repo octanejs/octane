@@ -16,9 +16,13 @@ production preview), streaming-ssr benchmark flat for the no-injection path;
 user docs in `docs/ssr.md`. Open questions resolved: the tail is held (and
 document mode engages) ONLY when `injection` is present; `onAllReady`/close
 both gate on `done`; the script-barrier lift maps to octane's post-shell
-subscribe. Remaining follow-up: auto-doctype for document renders WITHOUT
-injection is a candidate React-parity change, measured separately; upstream
-the native-path `renderRouterToStream` to TanStack.
+subscribe. DOCTYPE PARITY landed 2026-07-19 as its own phase: STREAMED
+document roots always lead with `<!DOCTYPE html>` (no longer injection-gated
+— React Fizz emits it whenever the root renders `<html>`; its harness treats
+a doctype-less `<html>` as "almost certainly a bug in React",
+ReactDOMFizzServer-test.js:237 at canary b740af2), while the buffered
+renderers stay doctype-free, verified against react-dom 19.2.7. Remaining
+follow-up: upstream the native-path `renderRouterToStream` to TanStack.
 Requested by: TanStack team feedback via the `@tanstack/octane-start` integration
 (2026-07-18).
 
