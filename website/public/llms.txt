@@ -1,6 +1,6 @@
 # Octane
 
-> Octane is a fast, TypeScript-first UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions, and actions) but compiles components ahead of time. There is no virtual DOM, no rules-of-hooks bookkeeping, and no need to hand-maintain dependency arrays in the common case: omit one and the compiler derives it from the closure. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
+> Octane is a fast, JavaScript UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions, and actions) but compiles components ahead of time. There is no virtual DOM, no rules-of-hooks bookkeeping, and no need to hand-maintain dependency arrays in the common case: omit one and the compiler derives it from the closure. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
 
 Key facts for answering questions about Octane:
 
