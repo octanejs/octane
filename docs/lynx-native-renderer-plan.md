@@ -1,10 +1,14 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestone 1 implemented as private scaffolding**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestone 3 host-side private source/test implementation complete but formal exit blocked**
 
 Upstream audit date: **2026-07-18**
 
 Milestone 1 evidence date: **2026-07-19**
+
+Milestone 2 source/test evidence date: **2026-07-19**
+
+Milestone 3 source/test evidence date: **2026-07-19**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -112,7 +116,7 @@ export const lynxRenderer = {
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['visibility'],
+	capabilities: ['class-name-alias', 'visibility'],
 } as const;
 ```
 
@@ -290,11 +294,13 @@ packages/lynx/
     intrinsics.ts
     renderer.ts
     root.ts
+    main-thread.ts
     platform.ts
     testing.ts
     core/
       client-driver.ts
       host-driver.ts
+      papi.ts
       protocol.ts
       transport.ts
       props.ts
@@ -336,6 +342,7 @@ Required `@octanejs/lynx` exports:
 @octanejs/lynx/renderer
 @octanejs/lynx/intrinsics
 @octanejs/lynx/intrinsics/jsx-runtime
+@octanejs/lynx/main-thread
 @octanejs/lynx/platform
 @octanejs/lynx/testing
 ```
@@ -595,6 +602,17 @@ Octane entry; existing DOM and Three compiler/runtime suites remain unchanged.
 
 ### Milestone 2 — background root, PAPI driver, and async transport (2–3 engineer-weeks)
 
+> **Progress (2026-07-19): private source/test implementation complete; exit
+> blocked.** The background root/client driver, named-`ContextProxy` transport,
+> root-scoped main-thread PAPI receiver, cloned ACK-gated handles, accepted-fault
+> cleanup, and asynchronous unmount are implemented. Compiled counter/keyed-list
+> fixtures pass in the official JavaScript environment, including retained host
+> identity, pre-ACK no-mutation rejection, one post-ACK fault, version gaps, late
+> messages, stale roots, effects/refs/errors, and teardown. This does not waive
+> Milestone 0's missing public native event/lifecycle/reload hooks or Web,
+> Android, and iOS gates; there is still no production `.lynx.bundle` or native
+> preview claim.
+
 - Implement page/root bootstrap and the background client driver.
 - Implement the main PAPI receiver for create, update, recreate, insert, move,
   remove, destroy, visibility, and one flush per accepted batch.
@@ -603,7 +621,8 @@ Octane entry; existing DOM and Three compiler/runtime suites remain unchanged.
 - Implement validation/staging before mutation, ACK at the irreversible host
   acceptance point, abort before ACK, rejection, post-ACK fault reporting,
   version ordering, and async unmount.
-- Install cloned public ref/query handles before acknowledgement.
+- Install cloned public identity handles before acknowledgement; query methods
+  remain Milestone 3 work.
 - Exercise keyed `@for`, components, fragments, conditionals, state updates,
   context, refs, effects, error boundaries, and teardown.
 
@@ -613,6 +632,19 @@ pre-ACK failure exposes no public mutation; post-ACK faults are reported once;
 late ACKs/events and stale roots are rejected.
 
 ### Milestone 3 — text, props, CSS, assets, events, refs, and core elements (3–5 engineer-weeks)
+
+> **Progress (2026-07-19): host-side private source/test implementation
+> complete; formal exit blocked.** Legal raw-text contexts, deliberate
+> prop/class/style/dataset/CSS-scope/asset routing, background native-event
+> tokens and priority scopes, acknowledgement-gated asynchronous NodesRef
+> handles, core-element PAPI creation, and retained visibility are implemented
+> and covered by unit or official-JavaScript-environment tests. This is not the
+> Milestone 3 exit: `__AddEvent` publicly installs tokens, but production native
+> delivery still depends on the private `lynxCoreInject.tt.publishEvent`
+> receiver; CSS import/CSS Module extraction and template/asset assembly remain
+> Milestone 5 work; the testing environment cannot prove dataset-key deletion
+> or native query/layout behavior; and no pinned ReactLynx differential has run
+> on Explorer, Android, or iOS.
 
 - Implement the first intrinsic slice and legal raw-text lowering.
 - Implement attribute removal, class composition, datasets, inline styles, CSS

@@ -1,7 +1,8 @@
 /**
- * Testing is metadata-only during Milestone 1. Real helpers over
- * `@lynx-js/testing-environment` are deferred to the Milestone 5 production
- * path; this module intentionally exports no mock renderer or fake root.
+ * The Milestone 3 implementation is exercised internally with
+ * `@lynx-js/testing-environment`, but this public testing entry remains
+ * metadata-only until the Milestone 5 production path. It intentionally
+ * exports no mock renderer or fake root.
  */
 export const lynxTestingAvailability = {
 	available: false,

@@ -1197,19 +1197,91 @@ function renderableKey(value: UniversalRenderable): UniversalKey | null {
 	return null;
 }
 
+function defineUniversalProtoProp(props: Record<PropertyKey, unknown>, value: unknown): void {
+	// Assignment would invoke Object.prototype.__proto__ instead of creating
+	// the own data property required by object-spread/JSX semantics.
+	Object.defineProperty(props, '__proto__', {
+		configurable: true,
+		enumerable: true,
+		value,
+		writable: true,
+	});
+}
+
+function assignUniversalPropSpread(
+	props: Record<PropertyKey, unknown>,
+	value: unknown,
+	canonicalizeHostClass: boolean,
+): void {
+	const source = Object(value);
+	const hasOwnProto = Object.prototype.propertyIsEnumerable.call(source, '__proto__');
+	const hasOwnClassName =
+		canonicalizeHostClass && Object.prototype.propertyIsEnumerable.call(source, 'className');
+	if (!hasOwnProto && !hasOwnClassName) {
+		// Keep the ordinary spread path on the native Object.assign fast path,
+		// including its enumerable-symbol and getter ordering semantics.
+		Object.assign(props, source);
+		return;
+	}
+
+	let protoAssigned = false;
+	const needsProtoGuard = hasOwnProto && !Object.prototype.hasOwnProperty.call(props, '__proto__');
+	if (needsProtoGuard) {
+		Object.defineProperty(props, '__proto__', {
+			configurable: true,
+			set(next) {
+				protoAssigned = true;
+				defineUniversalProtoProp(props, next);
+			},
+		});
+	}
+	if (hasOwnClassName) {
+		Object.defineProperty(props, 'className', {
+			configurable: true,
+			set(next) {
+				props.class = next;
+			},
+		});
+	}
+	try {
+		Object.assign(props, source);
+	} finally {
+		if (needsProtoGuard && !protoAssigned) delete props.__proto__;
+		if (hasOwnClassName) delete props.className;
+	}
+}
+
 export function universalProps(
 	entries: readonly UniversalPropEntry[],
 	children: unknown = NO_CHILDREN,
+	canonicalizeHostClass = false,
 ): UniversalPropsValue {
 	const props: Record<string, unknown> = {};
-	for (const entry of entries) {
-		if (entry[0] === 'set') {
-			props[entry[1]] = entry[2];
-			continue;
+	if (!canonicalizeHostClass) {
+		for (const entry of entries) {
+			if (entry[0] === 'set') {
+				if (entry[1] === '__proto__') defineUniversalProtoProp(props, entry[2]);
+				else props[entry[1]] = entry[2];
+				continue;
+			}
+			const spread = entry[1];
+			if (spread == null) continue;
+			assignUniversalPropSpread(props, spread, false);
 		}
-		const spread = entry[1];
-		if (spread == null) continue;
-		Object.assign(props, Object(spread));
+	} else {
+		// Universal host compilers canonicalize React's alias in authored prop
+		// order. Components keep their ordinary `className` prop untouched.
+		for (const entry of entries) {
+			if (entry[0] === 'set') {
+				const name = entry[1];
+				if (name === '__proto__') defineUniversalProtoProp(props, entry[2]);
+				else props[name === 'className' ? 'class' : name] = entry[2];
+				continue;
+			}
+			const spread = entry[1];
+			if (spread == null) continue;
+			assignUniversalPropSpread(props, spread, true);
+		}
 	}
 	if (children !== NO_CHILDREN) props.children = children;
 	const hasKey = Object.prototype.hasOwnProperty.call(props, 'key');
@@ -4428,9 +4500,43 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		) {
 			throw new TypeError(`Unknown universal event priority ${JSON.stringify(message.priority)}.`);
 		}
-		return this.eventScope(message.priority, () =>
-			message.deliveries.map(({ listener, payload }) => this.dispatchEvent(listener, payload)),
-		);
+		// Validate the complete propagation batch before invoking any callback. A
+		// renderer must not be able to prefix a stale or priority-forged listener
+		// with a valid delivery and thereby partially dispatch an invalid message.
+		for (const { listener } of message.deliveries) {
+			const event = this.handlers.get(listener);
+			if (event === undefined || event.owner.disposed) {
+				throw new Error(`Unknown or inactive universal event listener ${listener}.`);
+			}
+			if (event.priority !== message.priority) {
+				throw new Error(
+					`Universal event listener ${listener} has priority ${JSON.stringify(event.priority)}, not transported priority ${JSON.stringify(message.priority)}.`,
+				);
+			}
+		}
+
+		let errors: unknown[] | null = null;
+		const results = this.eventScope(message.priority, () => {
+			const values = new Array<unknown>(message.deliveries.length);
+			for (let index = 0; index < message.deliveries.length; index++) {
+				const { listener, payload } = message.deliveries[index];
+				try {
+					values[index] = this.dispatchEvent(listener, payload);
+				} catch (error) {
+					(errors ??= []).push(error);
+				}
+			}
+			return values;
+		});
+		// TypeScript does not model assignments made by the event-scope callback.
+		const dispatchedErrors = errors as unknown[] | null;
+		if (dispatchedErrors !== null) {
+			if (dispatchedErrors.length === 1) throw dispatchedErrors[0];
+			throw typeof AggregateError === 'function'
+				? new AggregateError(dispatchedErrors, 'Multiple universal event listeners failed.')
+				: dispatchedErrors[0];
+		}
+		return results;
 	}
 
 	invokeLocalCallback(listener: number, args: readonly unknown[]): unknown {

@@ -29,8 +29,9 @@ describe('@octanejs/lynx renderer preset', () => {
 			server: 'unsupported',
 			intrinsics: '@octanejs/lynx/intrinsics',
 			text: 'host',
-			capabilities: ['visibility'],
+			capabilities: ['class-name-alias', 'visibility'],
 			validation: expect.objectContaining({
+				textHosts: ['raw-text'],
 				textParents: ['text'],
 				forbiddenGlobals: expect.arrayContaining([
 					'document',
@@ -46,7 +47,7 @@ describe('@octanejs/lynx renderer preset', () => {
 					'react',
 				]),
 				hostProps: expect.objectContaining({
-					'*': expect.arrayContaining(['className', 'data-*', 'bind*']),
+					'*': expect.arrayContaining(['ref', 'className', 'data-*', 'bind*']),
 					text: expect.arrayContaining(['text-maxline']),
 					view: [],
 				}),

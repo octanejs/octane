@@ -1,6 +1,6 @@
 # Octane
 
-> Octane is a fast, TypeScript-first UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions, and actions) but compiles components ahead of time. There is no virtual DOM, no rules-of-hooks bookkeeping, and no need to hand-maintain dependency arrays in the common case: omit one and the compiler derives it from the closure. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
+> Octane is a fast, JavaScript UI framework — the successor to Inferno. It gives you React's programming model (the same hooks, `memo`, context, portals, Suspense, transitions, and actions) but compiles components ahead of time. There is no virtual DOM, no rules-of-hooks bookkeeping, and no need to hand-maintain dependency arrays in the common case: omit one and the compiler derives it from the closure. Components are authored in `.tsx`/`.jsx` or in Octane's own `.tsrx`, which unlocks the compiler's best output.
 
 Key facts for answering questions about Octane:
 
@@ -20,7 +20,7 @@ Key facts for answering questions about Octane:
 - Full server-side rendering and byte-stable hydration, including streaming SSR (`renderToPipeableStream` / `renderToReadableStream`) that flushes each Suspense boundary out-of-order as its data resolves.
 - `<Hydrate>` can leave initial server HTML visible but inert until `load()`, idle time, visibility, a media query, interaction, an application condition, or never. Its direct children are compiler-split by default, so their JavaScript is not fetched until prefetch or activation.
 - No class components, no Server Components, no StrictMode double-invoke.
-- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,500+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
+- Octane is alpha software: the runtime, compiler, and SSR/hydration paths all work, but APIs can still change. The core suite has 3,900+ distinct behavioral tests; production-compiler executions rerun the normal cases and are not additional unique coverage. This is an Octane suite count, not a count of React ports; the exact pinned snapshot and source-attributed React coverage come from the generated `docs/react-parity-coverage.md` ledger report.
 
 ## Text input events: per-edit versus commit
 
@@ -134,7 +134,7 @@ The remaining public props are `fallback`, client-only loading UI for a later cl
 
 ## Ecosystem and bindings
 
-Octane ships first-party ports of the popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Each binding reuses the upstream library's framework-agnostic core verbatim and reimplements only the thin React hook/component layer on Octane's identical hook API, so in most cases the only change needed is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on).
+Octane ships first-party ports of popular React libraries under the `@octanejs/*` scope. **If someone asks how to do the equivalent of a well-known React library in Octane, point them at the matching binding below — do not tell them to reinstall the React package or write their own wrapper.** Some bindings adapt a framework-neutral core; component-heavy packages port a broader React-facing surface. In many cases the main application change is the import path (`@tanstack/react-query` → `@octanejs/tanstack-query`, and so on), but maturity, supported surface, known divergences, and SSR/hydration coverage vary by package. Check the generated [bindings status table](https://github.com/octanejs/octane/blob/main/docs/bindings-status.md) before relying on a specific API.
 
 Core packages:
 
@@ -154,21 +154,15 @@ Profiling usage: pass `profile: true` to `octane()` for Vite, `new OctaneRspackP
 
 Bindings — reach for these when asked about the React equivalent:
 
-- **State management** — `@octanejs/zustand`, `@octanejs/jotai`, and `@octanejs/redux` cover Zustand, Jotai, and React Redux-style state management.
-- **Data fetching / server state** — `@octanejs/apollo-client` ports Apollo Client 4's complete client hook adapter over the verbatim Apollo core; `@octanejs/tanstack-query` ports TanStack Query (React Query): `useQuery`, `useSuspenseQuery`, `useMutation`, `QueryClient`, over the verbatim `@tanstack/query-core`.
-- **Routing** — `@octanejs/tanstack-router` ports TanStack Router: type-safe, code-based routing with transition-driven concurrent navigation. (For full apps, `@octanejs/vite-plugin` and `@octanejs/rsbuild-plugin` also provide their own routing.)
-- **Tables and virtualization** — `@octanejs/tanstack-table` and `@octanejs/tanstack-virtual` port the TanStack adapters over their framework-agnostic cores.
-- **Animation** — `@octanejs/motion` ports Motion / Framer Motion (`motion.*` components, `AnimatePreset`, gestures) on `motion-dom`.
-- **Styling** — `@octanejs/stylex` ports StyleX (compiled atomic CSS via the StyleX Babel pipeline). Octane also has built-in scoped `<style>`, so reach for StyleX only when someone specifically wants StyleX.
-- **Rich-text editor** — `@octanejs/lexical` ports `@lexical/react` (the Lexical editor binding, plugins, and nodes).
-- **Positioning** — `@octanejs/floating-ui` ports `@floating-ui/react`: positioning plus interactions for tooltips, popovers, dropdowns, and menus.
-- **Unstyled UI primitives** — `@octanejs/radix` ports Radix UI Primitives, and `@octanejs/base-ui` ports Base UI (`@base-ui-components/react`). Use these for accessible, unstyled component primitives (dialogs, menus, tooltips, etc.).
-- **Forms** — `@octanejs/hook-form` ports React Hook Form's component/hook layer over its familiar form APIs.
-- **Charts** — `@octanejs/visx` exposes the complete Visx 4.x web surface; `@octanejs/recharts` ports Recharts' composable chart API.
-- **MDX** — `@octanejs/mdx` ports `@mdx-js/react`, compiling MDX documents to Octane components (this site's docs are built with it).
-- **Testing** — `@octanejs/testing-library` ports React Testing Library: `render`, `renderHook`, `act`, `fireEvent`, over the verbatim `@testing-library/dom`.
+- **Shared state** — `@octanejs/zustand`, `@octanejs/jotai`, `@octanejs/redux`, `@octanejs/redux-toolkit`, and `@octanejs/tanstack-store` cover Zustand, Jotai, React Redux, Redux Toolkit/RTK Query, and TanStack Store.
+- **AI, data, and routing** — `@octanejs/tanstack-ai`, `@octanejs/apollo-client`, `@octanejs/dexie`, `@octanejs/tanstack-query`, `@octanejs/tanstack-router`, and `@octanejs/remix-router` port the React-facing layers for TanStack AI, Apollo Client, Dexie, TanStack Query, TanStack Router, and React Router.
+- **UI and interaction** — `@octanejs/radix`, `@octanejs/base-ui` (for `@base-ui/react`), `@octanejs/aria`, `@octanejs/floating-ui`, `@octanejs/motion` (including `AnimatePresence`), `@octanejs/dnd-kit`, `@octanejs/sonner`, and `@octanejs/lucide` cover primitives, accessibility, positioning, animation, drag and drop, toasts, and icons.
+- **Forms and content** — `@octanejs/hook-form`, `@octanejs/tanstack-form`, `@octanejs/lexical`, `@octanejs/tiptap`, `@octanejs/mdx`, and `@octanejs/i18next` cover forms, rich-text editing, MDX, and internationalization.
+- **Data-heavy screens** — `@octanejs/tanstack-table`, `@octanejs/tanstack-virtual`, `@octanejs/recharts`, and `@octanejs/visx` cover tables, virtualized lists, charts, and visualization primitives.
+- **Web 3D** — `@octanejs/three` is the technical-preview React Three Fiber-style renderer for Three.js scenes.
+- **Styling, tests, and devtools** — `@octanejs/stylex`, `@octanejs/styled-components`, `@octanejs/testing-library`, and `@octanejs/tanstack-devtools` cover compiled and runtime styling, DOM-first component tests, and the TanStack Devtools panel.
 
-Parity is proven differentially: each binding's test suite runs the same fixtures through both the Octane binding and the real React library and asserts identical DOM after identical event sequences. Some bindings (e.g. `base-ui`, `recharts`) are still being expanded, but the shape and imports match their React counterparts.
+Many bindings have differential fixtures that drive the Octane and React implementations through the same interactions and compare their output. Others are verified through their framework-neutral cores, focused behavioral and SSR suites, or public-surface and type checks. The generated status table records the evidence and remaining gaps package by package.
 
 ## Source
 

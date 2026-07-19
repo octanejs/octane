@@ -26,25 +26,10 @@ export interface LynxEvent<Kind = string, Detail = any> {
 	detail: Detail;
 }
 
-export interface LynxDispatchEvent<Kind = string, Detail = any> extends LynxEvent<Kind, Detail> {
-	preventDefault(): void;
-	stopPropagation(): void;
-}
+/** Background handlers receive detached data, never live main-thread methods or instances. */
+export interface LynxDispatchEvent<Kind = string, Detail = any> extends LynxEvent<Kind, Detail> {}
 
-export interface LynxEventInstance {
-	querySelector(...params: any[]): any;
-	querySelectorAll(...params: any[]): any;
-	requestAnimationFrame(...params: any[]): any;
-	cancelAnimationFrame(...params: any[]): any;
-	triggerEvent(...params: any[]): any;
-	getStore(...params: any[]): any;
-	setStore(...params: any[]): any;
-	getData(...params: any[]): any;
-	setData(...params: any[]): any;
-	getProperties(...params: any[]): any;
-}
-
-export type LynxEventHandler<Event> = (event: Event, instance?: LynxEventInstance) => void;
+export type LynxEventHandler<Event> = (event: Event) => void;
 
 export interface LynxTouch {
 	identifier: number;
@@ -174,6 +159,15 @@ export interface LynxAppearanceEvent extends LynxDispatchEvent<
 
 export interface LynxAccessibilityActionEvent extends LynxDispatchEvent<string, { name: string }> {}
 
+export type LynxClassValue =
+	| string
+	| number
+	| boolean
+	| null
+	| undefined
+	| readonly LynxClassValue[]
+	| { readonly [name: string]: unknown };
+
 type LynxEventPrefix = 'bind' | 'catch' | 'capture-bind' | 'capture-catch' | 'global-bind';
 type LynxPrefixedEvent<Name extends string, Event> = {
 	[Property in `${LynxEventPrefix}${Name}`]?: LynxEventHandler<Event>;
@@ -215,13 +209,13 @@ export type LynxStandardEventProps = LynxPrefixedEvent<'bgload', LynxImageLoadEv
 	LynxPrefixedEvent<'longtap', LynxTouchEvent>;
 
 export interface LynxStyleProperties {
-	[property: string]: string | number | boolean | null | undefined;
+	[property: string]: string | number | null | undefined;
 }
 
 export type LynxStandardProps = LynxStandardEventProps & {
 	id?: string;
-	className?: string;
-	class?: string;
+	className?: LynxClassValue;
+	class?: LynxClassValue;
 	hidden?: boolean;
 	animation?: { actions: Record<string, unknown>[] };
 	flatten?: boolean;

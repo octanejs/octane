@@ -8,6 +8,7 @@ export const LYNX_RENDERER_ID = 'lynx';
 
 const LYNX_STANDARD_PROPS = [
 	'id',
+	'ref',
 	'class',
 	'className',
 	'style',
@@ -49,6 +50,7 @@ const LYNX_STANDARD_PROPS = [
 ] as const;
 
 const LYNX_VALIDATION = {
+	textHosts: ['raw-text'],
 	textParents: ['text'],
 	forbiddenGlobals: [
 		'customElements',
@@ -171,7 +173,7 @@ export const lynxRenderer = {
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['visibility'],
+	capabilities: ['class-name-alias', 'visibility'],
 	validation: LYNX_VALIDATION,
 } as const;
 

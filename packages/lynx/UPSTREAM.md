@@ -24,7 +24,7 @@ The renderer-owned declarations in `src/native-types.ts` adapt the public
 The adapted file retains the upstream copyright/license notice and marks the
 Octane-specific module-scoping change.
 
-## Milestone 1 package boundary
+## Milestone 1–3 package boundary
 
 The private package scaffold keeps `@lynx-js/types@4.0.0` pinned as the type
 provenance authority, but does not import its `./props` or `./events` entries.
@@ -42,9 +42,28 @@ Its registry artifact records git commit
 recorded in [`audit/toolchain.json`](./audit/toolchain.json). No ReactLynx
 runtime or React JSX declaration is a production dependency of the scaffold.
 
-The intrinsic declarations are not a native behavior claim. The Phase 0 public
-hook blockers and Android/iOS engine gates remain authoritative until the
-Milestone 2 host driver and later production/device milestones satisfy them.
+Milestones 2–3 call only the audited public Element PAPI, selector-query, and
+cross-thread `ContextProxy` surfaces. The adapter, host topology, prop/event
+boundary, query handles, transport protocol, and root lifecycle are original
+Octane code; no Lynx or ReactLynx implementation source was copied.
+`@lynx-js/testing-environment@0.3.0` is a development-only behavioral host and
+is not shipped in the renderer graph.
+
+The public `__AddEvent` operation installs a string token but does not publish a
+framework-neutral background callback receiver. Octane's
+`dispatchNativeEvent*` methods therefore remain a source/test bridge and do not
+satisfy the `lynxCoreInject.tt.publishEvent` stop gate. Likewise, the public
+query types expose `createSelectorQuery().select(string)` but leave
+`selectUniqueID` commented out, so Octane installs a generation-scoped
+`[octane-ref]` selector and still requires real-engine selector/layout evidence.
+The testing environment models complete dataset application with
+`Object.assign` and does not implement native `invoke`, `fields`, or `path`;
+dataset-key deletion and asynchronous query results are not native claims.
+
+The intrinsic declarations and JavaScript-environment host tests are not a
+native layout or device claim. The Phase 0 public hook, reload/background
+teardown, Web, and Android/iOS gates remain authoritative until later
+production/device milestones satisfy them.
 
 Milestone 1 syntax and built-in assumptions for the exact Rspeedy graph are
 recorded in [`audit/runtime-compatibility.json`](./audit/runtime-compatibility.json).

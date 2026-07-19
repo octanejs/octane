@@ -1,5 +1,28 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-19): Phase 5 COMPLETE (Tree/Table deferred).** The RAC
+> collection components landed over the Phase-4 engine: Autocomplete in full
+> (the deferred aria `useAutocomplete` + stately `useAutocompleteState` ported,
+> + intl dicts), ListBox(+Item/Section/LoadMoreItem — `useLoadMoreSentinel`
+> hoisted to `src/utils/`), Menu(+Trigger/SubmenuTrigger/Item/Section — replaces
+> the Phase-4 stub; submenus fully keyboard-driveable in jsdom),
+> Select(+SelectValue), ComboBox(+ComboBoxValue), Tabs(+TabList/Tab/TabPanels/
+> TabPanel), TagGroup(+TagList/Tag), GridList(+Item/Section/Header/LoadMoreItem),
+> Breadcrumbs(+Breadcrumb), and the DragAndDrop context layer (contexts/
+> DropIndicator/DragAndDropHooks type; dnd branches inert, `useDragAndDrop()`
+> throws — engine is Phase 7). 41 files / 315 aria tests; **six differentials
+> drive the REAL react-aria-components byte-identical** (ListBox selection +
+> keyed reverse, Tabs switch, TagGroup multi-select, GridList row selection,
+> Breadcrumbs, ComboBox typing); portal'd Menu/Select open-state carries
+> behavioral coverage. **One engine parity fix surfaced by the differentials:**
+> upstream's client `Hidden` renders an in-DOM `<template>` wrapper (children
+> redirected into its inert `.content`), so react-aria's serialized DOM contains
+> an empty `<template></template>` — our `Hidden` now renders the same inert
+> placeholder beside its detached-container portal, making consumer-observable
+> DOM byte-identical. **Deferred:** `Tree` (needs the unported `useTree` area)
+> and `Table` (needs the table hook + stately area) — a follow-up phase;
+> `useSearchAutocomplete` likewise. No octane-core changes, no octane bugs.
+
 > **Progress (2026-07-18, latest): Phase 4 COMPLETE.** The RAC foundation landed
 > as `@octanejs/aria/components`: the collections engine re-hosted per §2(a) on a
 > **detached real-DOM store** (BaseCollection near-verbatim; Document adapted —
@@ -393,11 +416,13 @@ state, portal'd ARIA wiring); focus-trap/dismiss/scroll-lock behavior tests.
 make interaction state VISIBLE to the HTML-only rig — differential fixtures
 click/hover/focus through the real components on both sides, byte-equal.
 
-### Phase 5 — RAC collection components
+### Phase 5 — RAC collection components — COMPLETE 2026-07-19 (Tree/Table deferred)
 `Menu`, `ListBox`, `Select`, `ComboBox`, `Autocomplete`, `Tabs`, `TagGroup`,
-`GridList`, `Breadcrumbs`, `Tree`, and **`Table` last** (the densest: column
-resizing, sort, selection, drag). Each: differential fixture + keyboard/focus
-behavior tests.
+`GridList`, `Breadcrumbs` landed with differential fixtures + keyboard/focus
+behavior tests. `Tree` and **`Table` last** (the densest: column resizing,
+sort, selection, drag) are DEFERRED to a follow-up phase — each requires an
+entire unported react-aria hook area (`useTree`/`useTreeItem`; the table grid
+hooks + stately table) and lands with that area.
 
 ### Phase 6 — Date/time + color families
 Stately calendar/date/color state + aria `useCalendar`/`useRangeCalendar`,

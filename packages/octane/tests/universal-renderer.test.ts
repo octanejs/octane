@@ -38,6 +38,7 @@ const renderer = {
 const validationRenderer = {
 	...renderer,
 	validation: {
+		textHosts: ['raw-text'],
 		textParents: ['text'],
 		forbiddenGlobals: ['document', 'window'],
 		forbiddenImports: ['browser-only', 'react-dom'],
@@ -374,6 +375,21 @@ export function Scene() @{ <view id={Environment.copy} /> }`;
 		).toThrow(
 			'Octane universal compiler: renderer "object" does not allow authored primitive text under <view>. at /src/DynamicText.native.tsrx:2:9',
 		);
+
+		expect(() =>
+			compile(
+				'export function Scene() @{ <view><raw-text text="invalid" /></view> }',
+				'/src/RawText.native.tsrx',
+				{ hmr: false, renderer: validationRenderer },
+			),
+		).toThrow(/does not allow <raw-text> under <view>.*RawText\.native\.tsrx:1:/);
+		expect(() =>
+			compile(
+				'export function Scene() @{ <text><raw-text text="valid" /></text> }',
+				'/src/RawTextValid.native.tsrx',
+				{ hmr: false, renderer: validationRenderer },
+			),
+		).not.toThrow();
 
 		const componentChildren = `
 function Label({ children }) @{ <text>{children}</text> }
@@ -1158,6 +1174,75 @@ export function Scene() @{
 		expect(output.code).not.toMatch(/<[A-Za-z{]/);
 		expect(output.map.sourcesContent).toEqual([source]);
 		expect(output.map.sources).toEqual(['Scene.object.tsrx']);
+	});
+
+	it('capability-gates className aliasing to renderer host props', () => {
+		const source = `
+			function Child({ className }) { return <leaf received={className} />; }
+			export function Scene({ middle, last }) {
+				return <scene>
+					<node className="first" {...middle} class="after" className={last} />
+					<Child className="component-value" />
+				</scene>;
+			}
+		`;
+		const ordinary = compile(source, '/src/ClassAliases.object.tsrx', {
+			renderer,
+			hmr: false,
+		}).code;
+		const aliased = compile(source, '/src/ClassAliases.object.tsrx', {
+			renderer: { ...renderer, capabilities: ['class-name-alias'] },
+			hmr: false,
+		}).code;
+
+		expect(ordinary).toContain('[\'set\', "className", "first"]');
+		expect(ordinary).toContain('[\'set\', "class", "after"]');
+		expect(ordinary).not.toMatch(/\],\s*undefined,\s*true\s*\)/);
+		expect(aliased).toContain('[\'set\', "class", "first"]');
+		expect(aliased).toContain("['spread', middle]");
+		expect(aliased).toMatch(/\['set', "class", last\]\s*\],\s*undefined,\s*true\s*\)/);
+		expect(aliased).toContain('[\'set\', "className", "component-value"]');
+	});
+
+	it('copies __proto__ as own prop data without polluting universal props', () => {
+		const marker = Symbol('spread-marker');
+		const spread = JSON.parse(
+			'{"className":"spread-class","__proto__":{"id":"forged","class":"owned"}}',
+		) as Record<PropertyKey, unknown>;
+		Object.defineProperty(spread, marker, {
+			enumerable: true,
+			value: 'symbol-value',
+		});
+
+		for (const canonicalizeHostClass of [false, true]) {
+			const props = universalProps(
+				[
+					['set', 'before', 1],
+					['spread', spread],
+					['set', 'after', 2],
+				],
+				undefined,
+				canonicalizeHostClass,
+			).props as Readonly<Record<PropertyKey, unknown>>;
+
+			expect(Object.getPrototypeOf(props)).toBe(Object.prototype);
+			expect(Object.prototype.hasOwnProperty.call(props, '__proto__')).toBe(true);
+			expect(props.__proto__).toEqual({ id: 'forged', class: 'owned' });
+			expect(props.id).toBeUndefined();
+			expect(props[marker]).toBe('symbol-value');
+			if (canonicalizeHostClass) {
+				expect(props.class).toBe('spread-class');
+				expect(Object.prototype.hasOwnProperty.call(props, 'className')).toBe(false);
+			} else {
+				expect(props.className).toBe('spread-class');
+			}
+		}
+
+		const direct = universalProps([['set', '__proto__', { direct: true }]]).props as Readonly<
+			Record<string, unknown>
+		>;
+		expect(Object.getPrototypeOf(direct)).toBe(Object.prototype);
+		expect(direct.__proto__).toEqual({ direct: true });
 	});
 
 	it('lowers every universal directive and preserves explicit host keys in the prop program', () => {
