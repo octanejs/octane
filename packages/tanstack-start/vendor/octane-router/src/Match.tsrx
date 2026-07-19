@@ -54,7 +54,7 @@ export function Match(props: { matchId: string }) @{
 			previous._displayPending === next._displayPending,
 	);
 	const routeId = matchState.routeId as string;
-	const route = router.routesById[routeId];
+	const route = (router.routesById as Record<string, any>)[routeId];
 
 	const PendingComponent = route.options.pendingComponent ?? router.options.defaultPendingComponent;
 	const routeErrorComponent = route.options.errorComponent ?? router.options.defaultErrorComponent;
@@ -89,7 +89,7 @@ export function Match(props: { matchId: string }) @{
 					errorComponent={routeErrorComponent || ErrorComponent}
 					onCatch={(error: Error, errorInfo: { componentStack: string }) => {
 						if (isNotFound(error)) {
-							error.routeId ??= routeId;
+							error.routeId ??= routeId as NotFoundError['routeId'];
 							throw error;
 						}
 						if (routeOnCatch) {
@@ -99,7 +99,7 @@ export function Match(props: { matchId: string }) @{
 				>
 					<NotFoundWrap
 						fallback={(error: NotFoundError) => {
-							error.routeId ??= routeId;
+							error.routeId ??= routeId as NotFoundError['routeId'];
 
 							if (
 								!routeNotFoundComponent || error.routeId && error.routeId !== routeId ||
@@ -138,7 +138,7 @@ function MatchInner(props: { matchId: string }) {
 	const matchStore = router.stores.matchStores.get(props.matchId)!;
 	const match = useStore(matchStore, (m) => m);
 	const routeId = match.routeId as string;
-	const route = router.routesById[routeId];
+	const route = (router.routesById as Record<string, any>)[routeId];
 
 	// The live match in the router (if still mounted there) wins over the
 	// snapshot for promise lookups, per upstream getMatchPromise.

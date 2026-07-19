@@ -63,6 +63,10 @@ const OCTANE_PLATFORM = {
 		dynamic: 'octane',
 		errorBoundary: 'octane',
 		forOfIterableHelper: 'octane/tsrx-iterable',
+		// Host-element spreads in the virtual TSX lower to
+		// `__normalize_spread_props(...)`; the shared transform imports the
+		// helpers from this module (identity-typed — see octane/tsrx-spread).
+		refProp: 'octane/tsrx-spread',
 	},
 	jsx: {
 		rewriteClassAttr: false,
@@ -179,7 +183,15 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
-	const prelude = createRendererTypePrelude(renderer, source);
+	// @tsrx/core can re-emit a preserved authored pragma itself (its typeOnly
+	// print keeps leading TS-semantic comments as of >0.1.42). When the
+	// generated TSX already leads with a pragma, adding a prelude would double
+	// it — and TS honors the FIRST pragma, so a config-derived prelude would
+	// shadow the authored one.
+	const prelude =
+		leadingJsxImportSourcePragma(transformed.code) !== undefined
+			? ''
+			: createRendererTypePrelude(renderer, source);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
 		ast_from_source: ast,

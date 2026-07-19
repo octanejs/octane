@@ -258,7 +258,7 @@ export class LazyRoute<TRoute extends AnyRoute> {
       const [, slot] = splitSlot(args)
       const router = useRouter()
       return internalHooks.useNavigate(
-        { from: router.routesById[id].fullPath },
+        { from: (router.routesById as Record<string, any>)[id].fullPath },
         subSlot(slot, 'lr:n'),
       )
     }) as typeof this.useNavigate
