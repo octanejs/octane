@@ -127,10 +127,23 @@ export function inspectorPlugin(): Plugin {
 		const why = document.createElement('div');
 		why.className = 'why';
 		why.textContent = `Why did ${instance.component.name} render?`;
+		// The schedule causes the profiler recorded — which hook scheduled the
+		// render, with source — richer than react-scan's prop-diff guessing.
+		const causes = document.createElement('div');
+		causes.className = 'cause';
+		causes.textContent =
+			'last render: ' +
+			(instance.causes.length === 0
+				? '—'
+				: instance.causes
+						.map((cause) =>
+							cause.hook !== undefined ? `${cause.type} (${cause.hook})` : cause.type,
+						)
+						.join(', '));
 		const hint = document.createElement('div');
 		hint.className = 'hint';
 		hint.textContent = 'esc to exit · click another component to inspect it';
-		panel.append(name, file, stats, why, hint);
+		panel.append(name, file, stats, why, causes, hint);
 		shadow.append(style, panel);
 		document.documentElement.appendChild(panelHost);
 	}

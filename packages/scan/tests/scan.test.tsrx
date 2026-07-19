@@ -141,6 +141,29 @@ describe('scan core', () => {
 		mounted.unmount();
 	});
 
+	it('does not resume a paused scan when onRender is registered', async () => {
+		// Pause scanning, THEN observe a component. Registering the observer must
+		// not override the pause — no events should flow until scanning resumes.
+		scan();
+		setOptions({ enabled: false });
+		const seen: string[] = [];
+		const detachListener = onRender(App, (info) => seen.push(info.component.name));
+		const mounted = mount(App);
+		await settle();
+		mounted.click('button');
+		await settle();
+		expect(seen).toHaveLength(0);
+
+		// Resuming delivers events to the still-attached observer.
+		setOptions({ enabled: true });
+		mounted.click('button');
+		await settle();
+		expect(seen.length).toBeGreaterThan(0);
+
+		detachListener();
+		mounted.unmount();
+	});
+
 	it('logs per-commit render groups when log is enabled', async () => {
 		const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 		try {

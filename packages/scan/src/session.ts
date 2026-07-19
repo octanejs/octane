@@ -158,9 +158,11 @@ export function createSession(source: InspectionSource): ScanSession {
 			return typeof teardown === 'function' ? teardown : () => {};
 		},
 		onEvent(listener) {
-			// onRender needs live events even before scan() connects the feed, so
-			// ensure the feed is connected when someone starts observing.
-			connectFeed();
+			// Connect the live feed so onRender receives events — but only when
+			// scanning is enabled, so registering a callback never overrides a
+			// pause (`enabled: false`). While paused, the listener stays attached
+			// and simply starts receiving events once scanning resumes.
+			if (options.get().enabled !== false) connectFeed();
 			return pipeline.onEvent(listener);
 		},
 		setOptions(patch) {

@@ -5,12 +5,19 @@
 // buffer — so an instance that mounted before scanning was enabled (a hydrated
 // page's initial render) is still resolvable. The selection service and the
 // interaction profiler depend on it; it depends only on the contract + source.
-import type { ComponentIdentity, InspectionEvent, InspectionSource } from '../contract.js';
+import type {
+	ComponentIdentity,
+	InspectionEvent,
+	InspectionSource,
+	ScheduleCause,
+} from '../contract.js';
 import type { Pipeline } from '../pipeline.js';
 
 export interface ComponentInstance {
 	readonly instanceId: number;
 	readonly component: ComponentIdentity;
+	/** Schedule causes of this instance's most recent render (may be empty). */
+	readonly causes: readonly ScheduleCause[];
 	/** Current top-level DOM elements of this instance (lazy). */
 	domNodes(): Element[];
 	/** Union bounding rect of `domNodes()`, or null if unmounted/detached. */
@@ -64,6 +71,7 @@ export function createRegistry(
 		return {
 			instanceId,
 			component: event.component,
+			causes: event.causes,
 			domNodes: () => source.domNodes(instanceId),
 			rect: () => unionRect(source.domNodes(instanceId)),
 		};

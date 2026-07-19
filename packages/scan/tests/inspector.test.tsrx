@@ -87,6 +87,8 @@ describe('inspector', () => {
 		expect(selection().get().mode).toBe('locked');
 		expect(panelText()).toContain('Leaf');
 		expect(panelText()).toContain('renders');
+		// The panel reports the profiler's schedule causes for the render.
+		expect(panelText()).toContain('last render:');
 		// Innermost wins: the shell click resolves to ScannedApp, not Leaf.
 		mounted.click('#shell');
 		expect(panelText()).toContain('ScannedApp');
