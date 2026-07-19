@@ -1183,17 +1183,21 @@ function applyListUpdate<Node extends LynxElementRef>(
 		if (!cell.awaitingEnqueue) continue;
 		const item = nextById.get(cell.tree.logicalId);
 		if (item !== undefined) cell.item = item;
+		else destroyListCell(state, list, cell);
 	}
 	// Pooled cells retain the metadata that selected their partition. Rekey
-	// them when the still-live logical item changes reuse-identifier, and drop
-	// a cell that has become explicitly non-recyclable rather than leaving an
-	// unreachable entry in its former pool.
+	// cells whose logical item is still live, and destroy cells whose item was
+	// removed or became explicitly non-recyclable.
 	const pooledCells: LynxPhysicalListCell<Node>[] = [];
 	for (const pool of list.recyclePools.values()) pooledCells.push(...pool);
 	list.recyclePools.clear();
 	for (const cell of pooledCells) {
 		const item = nextById.get(cell.tree.logicalId);
-		if (item !== undefined) cell.item = item;
+		if (item === undefined) {
+			destroyListCell(state, list, cell);
+			continue;
+		}
+		cell.item = item;
 		if (cell.item.recyclable) poolListCell(list, cell);
 		else destroyListCell(state, list, cell);
 	}

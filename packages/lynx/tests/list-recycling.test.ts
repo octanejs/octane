@@ -69,6 +69,18 @@ function largeListUnmount(itemCount: number): UniversalHostCommand[] {
 	return commands;
 }
 
+function removeListItem(index: number): UniversalHostCommand[] {
+	const ids = idsAt(index);
+	return [
+		{ op: 'remove', parent: ids.text, id: ids.raw },
+		{ op: 'destroy', id: ids.raw },
+		{ op: 'remove', parent: ids.item, id: ids.text },
+		{ op: 'destroy', id: ids.text },
+		{ op: 'remove', parent: 1, id: ids.item },
+		{ op: 'destroy', id: ids.item },
+	];
+}
+
 describe('Lynx native list recycling', () => {
 	it('materializes requested cells, reuses their native identity, and makes late callbacks inert', () => {
 		const dom = new JSDOM();
@@ -212,6 +224,119 @@ describe('Lynx native list recycling', () => {
 				leaveCount: 1,
 			});
 			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+		} finally {
+			environment.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
+	it('retires a pooled cell when its logical item is removed', () => {
+		const dom = new JSDOM();
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.clearGlobal();
+		environment.switchToMainThread();
+		try {
+			const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 12 });
+			prepareLynxHostBatch(container, batch(1, largeListMount(2))).apply();
+			const list = (container.page as unknown as Element).querySelector('#feed')!;
+			const removedSign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+			globalThis.elementTree.leaveListItem(list as never, removedSign);
+
+			prepareLynxHostBatch(container, batch(2, removeListItem(0))).apply();
+			expect(getLynxListDiagnostics(container, 1)).toMatchObject({
+				logicalItems: 1,
+				physicalCells: 0,
+				attachedCells: 0,
+				pooledCells: 0,
+			});
+			expect(() => globalThis.elementTree.leaveListItem(list as never, removedSign)).not.toThrow();
+
+			const remainingSign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+			expect(remainingSign).not.toBe(removedSign);
+			expect(list.firstElementChild?.textContent).toBe('Row 1');
+			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+		} finally {
+			environment.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
+	it('retires both physical cells when a moved item is removed before enqueue', () => {
+		const dom = new JSDOM();
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.clearGlobal();
+		environment.switchToMainThread();
+		try {
+			const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 13 });
+			prepareLynxHostBatch(container, batch(1, largeListMount(2))).apply();
+			const list = (container.page as unknown as Element).querySelector('#feed')!;
+			const oldSign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+			prepareLynxHostBatch(
+				container,
+				batch(2, [{ op: 'move', parent: 1, id: idsAt(0).item, before: null }]),
+			).apply();
+			const currentSign = globalThis.elementTree.enterListItemAtIndex(list as never, 1);
+			expect(currentSign).not.toBe(oldSign);
+
+			prepareLynxHostBatch(container, batch(3, removeListItem(0))).apply();
+			expect(getLynxListDiagnostics(container, 1)).toMatchObject({
+				logicalItems: 1,
+				physicalCells: 0,
+				attachedCells: 0,
+				pooledCells: 0,
+			});
+			expect(() => globalThis.elementTree.leaveListItem(list as never, oldSign)).not.toThrow();
+			expect(() => globalThis.elementTree.leaveListItem(list as never, currentSign)).not.toThrow();
+
+			const remainingSign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+			expect(remainingSign).not.toBe(oldSign);
+			expect(remainingSign).not.toBe(currentSign);
+			expect(list.firstElementChild?.textContent).toBe('Row 1');
+			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+		} finally {
+			environment.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
+	it('keeps accepted list cleanup terminally disposable when cell removal faults', () => {
+		const dom = new JSDOM();
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.clearGlobal();
+		environment.switchToMainThread();
+		try {
+			const remove = globalThis.__RemoveElement as (parent: object, child: object) => unknown;
+			const failure = new Error('injected pooled cell cleanup failure');
+			let failNextRemove = false;
+			globalThis.__RemoveElement = (parent: object, child: object) => {
+				if (failNextRemove) {
+					failNextRemove = false;
+					throw failure;
+				}
+				return remove(parent, child);
+			};
+			const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 14 });
+			prepareLynxHostBatch(container, batch(1, largeListMount(2))).apply();
+			const page = container.page as unknown as Element;
+			const list = page.querySelector('#feed')!;
+			const removedSign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+			globalThis.elementTree.leaveListItem(list as never, removedSign);
+			failNextRemove = true;
+
+			expect(() => prepareLynxHostBatch(container, batch(2, removeListItem(0))).apply()).toThrow(
+				failure,
+			);
+			expect(container.acceptedVersion).toBe(2);
+			expect(container.instanceCount).toBe(4);
+			expect(() => prepareLynxHostBatch(container, batch(3, []))).toThrow(/post-fault teardown/);
+			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+			expect(page.children).toHaveLength(0);
 		} finally {
 			environment.clearGlobal();
 			uninstallLynxTestingEnv(globalThis);
