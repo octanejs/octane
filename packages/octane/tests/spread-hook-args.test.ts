@@ -22,7 +22,7 @@ describe('spread hook arguments', () => {
 			'spread-prod.tsrx',
 			{ hmr: false },
 		);
-		expect(code).toMatch(/const _h\$0 = Symbol\(_hs\$\);/);
+		expect(code).toMatch(/const _h\$0 = \/\* @__PURE__ \*\/ Symbol\(_hs\$\);/);
 		expect(code).toContain('useState(...args, _h$0)');
 	});
 });

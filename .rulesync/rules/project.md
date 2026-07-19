@@ -120,7 +120,13 @@ the runtime/compiler over patching tests or generated output.
 - Events are **native, delegated** DOM events (`onClick`, `onInput`, `onSubmit`),
   not a synthetic event layer — behavior matches the platform. There is no
   synthetic `onChange`: `onInput` is the per-keystroke handler for text controls
-  (native `change` fires on blur/commit).
+  (native `change` fires on blur/commit). The compiler reports
+  `OCTANE_NATIVE_TEXT_ONCHANGE` on statically known text-entry hosts that appear
+  to use React's per-edit convention; a development runtime fallback checks final
+  ambiguous uncontrolled props. Deliberate native commit behavior may keep
+  `onChange` with the JS-only, non-serialized `suppressNativeChangeWarning` host
+  hint. Do not suppress or rename component/library callbacks, selects, or
+  checkbox/radio change handlers.
 - Template control flow uses directive blocks: `@if (c) { } @else { }`,
   `@for (const x of xs; key x.id) { } @empty { }`, `@switch (v) { @case (a) { } @default { } }`,
   and `@try { } @pending { } @catch (e) { }`. Plain JS control flow stays in setup.
@@ -164,7 +170,9 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   and reasserts on every commit and after discrete events; `defaultValue`/
   `defaultChecked` are the uncontrolled escape hatch — but WITHOUT a synthetic
   layer: `onInput` drives text inputs per keystroke; there is no `onChange`
-  normalization (native `change` fires on blur). Do not add a synthetic `onChange`.
+  normalization (native `change` fires on blur). Treat
+  `OCTANE_NATIVE_TEXT_ONCHANGE` as migration guidance, not an event rewrite. Do
+  not add a synthetic `onChange`.
 - **Keyed reconciler is LIS-based** (minimal DOM moves), not React's
   `lastPlacedIndex`. The final DOM is identical; the set of physically-moved nodes
   can differ. Survivor node identity and final order ARE guaranteed (and tested).
@@ -254,6 +262,16 @@ Two regression layers beyond the octane project:
 `scripts/scaffold-react-port.mjs` turns a React test file into a local triage
 skeleton (in-scope `it.todo`s + out-of-scope reasons). Resolve or remove every
 todo before committing the port.
+
+## Framework-Fundamental Changes
+
+Runtime, compiler, scheduler, reconciler, SSR/hydration, and framework build
+pipeline changes must follow `.rulesync/rules/core-engineering.md`. Treat these
+paths as performance-sensitive by default: establish the observable contract and
+a relevant baseline, protect cold and hot paths deliberately, and perform the
+required adversarial self-review on the final diff. Do not claim performance
+improvements without comparable measurements, and report residual risk when a
+trustworthy measurement is unavailable.
 
 ## Changesets
 

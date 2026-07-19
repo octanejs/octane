@@ -110,7 +110,7 @@ describe('slotHooks surgical pass', () => {
 		const stripped = code
 			.replace(/^import \{ hookSlots as _\$hookSlots \} from 'octane';\n/gm, '')
 			.replace(/^const _hs\$ = \/\* @__PURE__ \*\/ _\$hookSlots\(\d+\);\n/gm, '')
-			.replace(/^const _h\$\d+ = Symbol\(_hs\$(?: \+ \d+)?\);\n/gm, '')
+			.replace(/^const _h\$\d+ = \/\* @__PURE__ \*\/ Symbol\(_hs\$(?: \+ \d+)?\);\n/gm, '')
 			.replace(/, _h\$\d+(?=[),])/g, '');
 		expect(stripped).toBe(
 			SRC.replace("useCallback(() => 'nd:' + label)", "useCallback(() => 'nd:' + label, [label])"),
@@ -210,7 +210,9 @@ describe('vite plugin gate routing', () => {
 		const discovered = discoverOctaneSourceDependencies(websiteRoot);
 		expect(discovered).toContain('octane');
 		expect(discovered).toContain('@octanejs/visx');
-		expect(discovered).toContain('@octanejs/tanstack-router');
+		// The website consumes the official built TanStack package now; only raw
+		// Octane workspace sources belong in this plugin's transform allowlist.
+		expect(discovered).not.toContain('@octanejs/tanstack-router');
 		expect(discovered).not.toContain('@octanejs/adapter-vercel');
 
 		const config = (octane().config as any)({ root: websiteRoot });
@@ -658,6 +660,7 @@ describe('manifest-declared manual hook slots', () => {
 			'motion',
 			'radix',
 			'remix-router',
+			'styled-components',
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',

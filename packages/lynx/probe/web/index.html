@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Octane Lynx Phase 0</title>
+		<link rel="stylesheet" href="/static/css/client.css" />
+		<script type="module" src="/static/js/client.js"></script>
+		<style>
+			html,
+			body,
+			lynx-view {
+				display: block;
+				height: 100%;
+				margin: 0;
+				width: 100%;
+			}
+		</style>
+	</head>
+	<body>
+		<lynx-view id="phase-0-view"></lynx-view>
+		<script>
+			const bundle = new URL(location.href).searchParams.has('imperative')
+				? '/dist/imperative.web.bundle'
+				: '/dist/main.web.bundle';
+			document.getElementById('phase-0-view').setAttribute('url', bundle);
+		</script>
+	</body>
+</html>

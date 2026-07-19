@@ -1,5 +1,7 @@
 packages:
   - packages/*
+  # Vendored TanStack Start PR-branch packages (see packages/tanstack-start/README.md)
+  - packages/tanstack-start/vendor/*
   - benchmarks/news
   - benchmarks/news/*
   - benchmarks/js-framework
@@ -30,6 +32,8 @@ packages:
   - benchmarks/async-composition/*
   - benchmarks/todomvc
   - benchmarks/todomvc/*
+  - benchmarks/weather-app
+  - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
   - playground/*
@@ -77,6 +81,7 @@ catalogs:
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
+    'chrome-launcher': 1.2.1
     'tabbable': ^6.5.0
     '@lexical/code': 0.46.0
     '@jridgewell/remapping': ^2.3.5
@@ -202,6 +207,7 @@ catalogs:
     jsdom: ^29.0.2
     jotai: ^2.20.1
     lexical: 0.46.0
+    lighthouse: 13.4.0
     lucide-react: 1.24.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
@@ -211,6 +217,9 @@ catalogs:
     preact-render-to-string: ^6.7.0
     prettier-plugin-svelte: ^4.1.1
     '@base-ui/react': ^1.6.0
+    '@internationalized/date': ^3.12.2
+    '@internationalized/number': ^3.6.7
+    '@internationalized/string': ^3.2.9
     '@dnd-kit/abstract': 0.5.0
     '@dnd-kit/collision': 0.5.0
     '@dnd-kit/dom': 0.5.0
@@ -271,6 +280,11 @@ catalogs:
     rulesync: ^8.17.0
     solid-js: '2.0.0-beta.14'
     sonner: 2.0.7
+    styled-components: 6.4.3
+    stylis: ^4.3.2
+    '@types/stylis': ^4.2.5
+    '@emotion/is-prop-valid': 1.4.0
+    csstype: 3.2.3
     svelte: ^5.56.4
     svelte-check: ^4.7.2
     terser: ^5.31.0
@@ -291,8 +305,8 @@ catalogs:
     yjs: ^13.6.0
     zustand: ^5.0.0
 
-# patchedDependencies: the @tsrx/core@0.1.37 JSX parse patch is superseded —
-# @tsrx/core >= 0.1.42 ships the fix.
+# patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
+# superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
   - '@tanstack/ai-client@0.21.0'

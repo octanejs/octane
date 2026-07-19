@@ -1,0 +1,64 @@
+import { BaseObject, Interpolation, RuleSet, StyledObject, StyleFunction, Styles } from '../types';
+import { EMPTY_ARRAY } from '../utils/empties';
+import flatten from '../utils/flatten';
+import interleave from '../utils/interleave';
+import isFunction from '../utils/isFunction';
+import isPlainObject from '../utils/isPlainObject';
+
+import { cssTagged } from '../utils/cssTagged';
+
+const addTag = <T extends RuleSet<any>>(arg: T): T & { isCss: true } => {
+	cssTagged.add(arg);
+	return arg as T & { isCss: true };
+};
+
+/**
+ * Tag a CSS template literal for use in styled components, createGlobalStyle, or attrs.
+ * Enables interpolation type-checking and shared style blocks.
+ *
+ * ```tsx
+ * const truncate = css`
+ *   white-space: nowrap;
+ *   overflow: hidden;
+ *   text-overflow: ellipsis;
+ * `;
+ * ```
+ */
+function css(styles: Styles<object>, ...interpolations: Interpolation<object>[]): RuleSet<object>;
+function css<Props extends object>(
+	styles: Styles<NoInfer<Props>>,
+	...interpolations: Interpolation<NoInfer<Props>>[]
+): RuleSet<NoInfer<Props>>;
+function css<Props extends object = BaseObject>(
+	styles: Styles<NoInfer<Props>>,
+	...interpolations: Interpolation<NoInfer<Props>>[]
+): RuleSet<NoInfer<Props>> {
+	if (isFunction(styles) || isPlainObject(styles)) {
+		const styleFunctionOrObject = styles as StyleFunction<Props> | StyledObject<Props>;
+
+		return addTag(
+			flatten<Props>(
+				interleave<Props>(EMPTY_ARRAY, [
+					styleFunctionOrObject,
+					...interpolations,
+				]) as Interpolation<object>,
+			),
+		);
+	}
+
+	const styleStringArray = styles as TemplateStringsArray;
+
+	if (
+		interpolations.length === 0 &&
+		styleStringArray.length === 1 &&
+		typeof styleStringArray[0] === 'string'
+	) {
+		return flatten<Props>(styleStringArray);
+	}
+
+	return addTag(
+		flatten<Props>(interleave<Props>(styleStringArray, interpolations) as Interpolation<object>),
+	);
+}
+
+export default css;

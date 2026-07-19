@@ -33,6 +33,8 @@ import {
 	SUSPENSE_SCRIPT_ATTR,
 	SUSPENSE_SEED_WIRE_PREFIX,
 	REJECTION_SENTINEL_KEY,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 	HYDRATE_ID_ATTR,
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
@@ -64,7 +66,12 @@ import {
 	invalidHtmlNestingWithParent,
 } from './html-tree-validation.js';
 import { sanitizeURL, sanitizeURLAttribute } from './sanitize-url.js';
-export { normalizeClass };
+import {
+	COMPONENT_FLAG_BOUNDARY,
+	hasComponentFlags,
+	markComponentFlags,
+} from './component-flags.js';
+export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
 
 interface SSRScope {
 	parent: SSRScope | null;
@@ -1317,7 +1324,12 @@ function ssrDescriptorContent(v: unknown, scope: SSRScope): string {
 		if (typeof d.type === 'string') return ssrHostElement(d.type, d.props, d.children, scope);
 		return ssrComponentDescriptor(d, scope);
 	}
-	if (typeof v === 'function') return ssrComponent(scope, v as ServerComponent, {});
+	if (typeof v === 'function') {
+		// A host descriptor can receive a compiler-generated children block through
+		// an uncompiled wrapper. Its transient function identity must not become part
+		// of the streamed async boundary key used for a later retry.
+		return ssrComponent(scope, v as ServerComponent, {}, undefined, undefined, isChildrenBlock(v));
+	}
 	if (typeof v === 'object') throw invalidChildError(v as object);
 	return escapeHtml(v);
 }
@@ -1498,7 +1510,13 @@ export function ssrAttr(
 		return ' ' + name + '="' + escapeAttr(String(v)) + '"';
 	}
 	// React-only warning-suppression hints never serialize (client parity).
-	if (name === 'suppressContentEditableWarning' || name === 'suppressHydrationWarning') return '';
+	if (
+		name === 'suppressContentEditableWarning' ||
+		name === 'suppressHydrationWarning' ||
+		name === 'suppressNativeChangeWarning' ||
+		name === '__octaneNativeChangeDiagnostic'
+	)
+		return '';
 	const t = typeof v;
 	// spellcheck / contenteditable / draggable are ENUMERATED — a boolean
 	// stringifies ("false" is a real state; absent means inherit). Global
@@ -1612,7 +1630,13 @@ function ssrAttrEntry(
 ): string {
 	namespace = resolveAttributeNamespace(namespace);
 	if (k === 'key' || k === 'ref' || k === 'children') return '';
-	if (k === 'suppressHydrationWarning' || k === 'suppressContentEditableWarning') return '';
+	if (
+		k === 'suppressHydrationWarning' ||
+		k === 'suppressContentEditableWarning' ||
+		k === 'suppressNativeChangeWarning' ||
+		k === '__octaneNativeChangeDiagnostic'
+	)
+		return '';
 	if (k.length > 2 && k[0] === 'o' && k[1] === 'n' && k[2] >= 'A' && k[2] <= 'Z') return '';
 	// `autoFocus` never serializes (client focuses at its mount commit).
 	if (k === 'autoFocus' && (namespace !== 'html' || tag === undefined || tag.indexOf('-') === -1))
@@ -1710,7 +1734,9 @@ export function ssrAttrs(
 			rawName === 'children' ||
 			rawName === 'dangerouslySetInnerHTML' ||
 			rawName === 'suppressHydrationWarning' ||
-			rawName === 'suppressContentEditableWarning'
+			rawName === 'suppressContentEditableWarning' ||
+			rawName === 'suppressNativeChangeWarning' ||
+			rawName === '__octaneNativeChangeDiagnostic'
 		)
 			continue;
 		if (skipFormControls && isAggregatedFormAttribute(tag, rawName)) continue;
@@ -2661,15 +2687,12 @@ export function ssrComponent(
 	try {
 		const explicitNamespace = NEXT_COMPONENT_NAMESPACE;
 		NEXT_COMPONENT_NAMESPACE = null;
-		// Boundary builtins decline inherit by IDENTITY — mirrors componentSlot's
+		// Boundary builtins decline inherit through their component capability bit —
+		// mirrors componentSlot's
 		// client-side decline exactly (member/aliased/dynamic tags resolving to
 		// Suspense/ErrorBoundary/ViewTransition/Hydrate keep their pair; both sides agree
-		// by identity).
-		if (
-			inherit === true &&
-			(comp === Suspense || comp === ErrorBoundary || comp === ViewTransition || comp === Hydrate)
-		)
-			inherit = false;
+		// without retaining the concrete built-ins from this generic path).
+		if (inherit === true && hasComponentFlags(comp, COMPONENT_FLAG_BOUNDARY)) inherit = false;
 		// A member/dynamic tag (`<obj.tag/>`, `<{expr}/>`) can resolve to a host tag
 		// STRING at runtime (e.g. MDX's `_components.h1` mapping, unoverridden). The
 		// client renders these — a value-lowered `createElement(obj.tag, …)` routes
@@ -2833,56 +2856,60 @@ function ssrHydrateAttrs(
  * read browser state, so only a direct strategy descriptor contributes `_a()`
  * attributes and its concrete strategy kind.
  */
-export function Hydrate(props: HydrateProps, scope: SSRScope): string {
-	const id = useId();
+export const Hydrate = /* @__PURE__ */ markComponentFlags(
+	function Hydrate(props: HydrateProps, scope: SSRScope): string {
+		const id = useId();
 
-	// The client always creates an HTMLDivElement. Force the same namespace for
-	// SSR children and attribute semantics instead of inheriting SVG/MathML from
-	// the call site. Direct placement in foreign content remains unsupported: an
-	// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
-	return withSsrElementContext(
-		'div',
-		undefined,
-		() =>
-			ssrInNamespace('html', () => {
-				if (!MARKERS) {
-					return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
-				}
+		// The client always creates an HTMLDivElement. Force the same namespace for
+		// SSR children and attribute semantics instead of inheriting SVG/MathML from
+		// the call site. Direct placement in foreign content remains unsupported: an
+		// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
+		return withSsrElementContext(
+			'div',
+			undefined,
+			() =>
+				ssrInNamespace('html', () => {
+					if (!MARKERS) {
+						return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+					}
 
-				const childIdStart = ID_COUNTER;
-				const serialStart = SERIAL?.length ?? 0;
-				// The outer range belongs to Hydrate itself. ssrTry supplies the nested
-				// Suspense slot/content ranges and makes a suspending child a real stream
-				// boundary. `fallback` remains client-only, so the server pending arm is
-				// intentionally empty.
-				const children = ssrBlock(
-					ssrTry(
-						scope,
-						'jsx-hydrate',
-						(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-						null,
-						null,
-						'html',
-					),
-				);
-				const idCount = ID_COUNTER - childIdStart;
-				const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-				const attrs = ssrHydrateAttrs(id, props.when, idCount);
-				const seedSidecar =
-					childSeeds.length === 0
-						? ''
-						: '<script type="application/json" ' +
-							HYDRATE_SEED_ATTR +
-							NONCE_ATTR +
-							'>' +
-							serializeSuspenseSeedJson(childSeeds) +
-							'</script>';
+					const childIdStart = ID_COUNTER;
+					const serialStart = SERIAL?.length ?? 0;
+					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+					// Suspense slot/content ranges and makes a suspending child a real stream
+					// boundary. `fallback` remains client-only, so the server pending arm is
+					// intentionally empty.
+					const children = ssrBlock(
+						ssrTry(
+							scope,
+							'jsx-hydrate',
+							(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+							null,
+							null,
+							'html',
+						),
+					);
+					const idCount = ID_COUNTER - childIdStart;
+					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+					const attrs = ssrHydrateAttrs(id, props.when, idCount);
+					const seedSidecar =
+						childSeeds.length === 0
+							? ''
+							: '<script type="application/json" ' +
+								HYDRATE_SEED_ATTR +
+								NONCE_ATTR +
+								'>' +
+								serializeSuspenseSeedJson(childSeeds) +
+								'</script>';
 
-				return '<div' + attrs + '>' + children + seedSidecar + '</div>';
-			}),
-		'html',
-	);
-}
+					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
+				}),
+			'html',
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'Hydrate',
+);
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
@@ -2894,23 +2921,24 @@ export function Hydrate(props: HydrateProps, scope: SSRScope): string {
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
  * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
  */
-export function Suspense(
-	props: { fallback?: unknown; children?: unknown },
-	scope: SSRScope,
-): string {
-	// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
-	// real STREAMING boundary too (registration + template sentinel), with the
-	// identical nested-block byte shape as before for buffered renders. Errors
-	// rethrow to an outer boundary (catchFn = null), matching the old emit.
-	return ssrTry(
-		scope,
-		'jsx-suspense',
-		(_arg, s) => ssrChildrenHtml(props.children, s),
-		(_arg, s) => ssrChild(props.fallback, s),
-		null,
-		FRAME?.namespace ?? 'html',
-	);
-}
+export const Suspense = /* @__PURE__ */ markComponentFlags(
+	function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
+		// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
+		// real STREAMING boundary too (registration + template sentinel), with the
+		// identical nested-block byte shape as before for buffered renders. Errors
+		// rethrow to an outer boundary (catchFn = null), matching the old emit.
+		return ssrTry(
+			scope,
+			'jsx-suspense',
+			(_arg, s) => ssrChildrenHtml(props.children, s),
+			(_arg, s) => ssrChild(props.fallback, s),
+			null,
+			FRAME?.namespace ?? 'html',
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'Suspense',
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // View-transition SSR annotations (docs/view-transitions-plan.md Phase 5) —
@@ -3094,37 +3122,41 @@ function vtSsrStrip(html: string): string {
  * frame, the explicit ssrBlock below is the inner childSlot range), stamped
  * with the Fizz-parity `vt-*` annotations described above.
  */
-export function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
-	VT_SSR_HAS_CANDIDATES = true;
-	const explicit = typeof props.name === 'string';
-	const frame = FRAME;
-	const cand: VtSsrCandidate = {
-		name: explicit
-			? (props.name as string)
-			: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
-		share: vtSsrResolve(props, 'share'),
-		update: vtSsrResolve(props, 'update'),
-		consumed: false,
-	};
-	VT_SSR_STACK.push(cand);
-	const seqBefore = VT_SSR_TRY_SEQ;
-	let inner: string;
-	try {
-		inner = ssrChildrenHtml(props.children, scope);
-	} finally {
-		VT_SSR_STACK.pop();
-	}
-	const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
-	const attrs: Array<[string, string]> = [];
-	if (named) attrs.push(['vt-name', cand.name]);
-	attrs.push(['vt-update', cand.update]);
-	// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
-	// this boundary tops, stripped at emission when unclaimed.
-	attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
-	attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
-	if (named) attrs.push(['vt-share', cand.share]);
-	return ssrBlock(vtSsrAnnotate(inner, attrs));
-}
+export const ViewTransition = /* @__PURE__ */ markComponentFlags(
+	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
+		VT_SSR_HAS_CANDIDATES = true;
+		const explicit = typeof props.name === 'string';
+		const frame = FRAME;
+		const cand: VtSsrCandidate = {
+			name: explicit
+				? (props.name as string)
+				: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+			share: vtSsrResolve(props, 'share'),
+			update: vtSsrResolve(props, 'update'),
+			consumed: false,
+		};
+		VT_SSR_STACK.push(cand);
+		const seqBefore = VT_SSR_TRY_SEQ;
+		let inner: string;
+		try {
+			inner = ssrChildrenHtml(props.children, scope);
+		} finally {
+			VT_SSR_STACK.pop();
+		}
+		const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+		const attrs: Array<[string, string]> = [];
+		if (named) attrs.push(['vt-name', cand.name]);
+		attrs.push(['vt-update', cand.update]);
+		// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
+		// this boundary tops, stripped at emission when unclaimed.
+		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
+		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
+		if (named) attrs.push(['vt-share', cand.share]);
+		return ssrBlock(vtSsrAnnotate(inner, attrs));
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ViewTransition',
+);
 
 /**
  * Server no-op twin of the client `addTransitionType` — transition types only
@@ -3141,27 +3173,31 @@ export function addTransitionType(_type: string): void {}
  * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
  * suspension propagation). `reset` is a server no-op (no re-render).
  */
-export function ErrorBoundary(
-	props: { fallback?: unknown; children?: unknown },
-	scope: SSRScope,
-): string {
-	return ssrBlock(
-		(() => {
-			try {
-				return withAsyncIdentity('error-boundary', 'content', () =>
-					ssrBlock(ssrChildrenHtml(props.children, scope)),
-				);
-			} catch (e) {
-				if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-				const fb =
-					typeof props.fallback === 'function'
-						? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-						: props.fallback;
-				return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
-			}
-		})(),
-	);
-}
+export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
+	function ErrorBoundary(
+		props: { fallback?: unknown; children?: unknown },
+		scope: SSRScope,
+	): string {
+		return ssrBlock(
+			(() => {
+				try {
+					return withAsyncIdentity('error-boundary', 'content', () =>
+						ssrBlock(ssrChildrenHtml(props.children, scope)),
+					);
+				} catch (e) {
+					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+					const fb =
+						typeof props.fallback === 'function'
+							? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+							: props.fallback;
+					return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
+				}
+			})(),
+		);
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'ErrorBoundary',
+);
 
 // ---------------------------------------------------------------------------
 // Context
@@ -3407,13 +3443,22 @@ function isHydrationRejectionSeed(value: unknown): value is HydrationRejectionSe
 	);
 }
 
-function recordHydrationRejection(reason: unknown): void {
-	if (SERIAL !== null) SERIAL.push(hydrationRejectionSeed(reason));
+function recordHydrationRejection(serial: unknown[] | null, reason: unknown): void {
+	if (serial !== null) serial.push(hydrationRejectionSeed(reason));
+}
+
+function hasExternalHydrationOwner(thenable: PromiseLike<unknown>): boolean {
+	try {
+		return (thenable as any)[EXTERNAL_HYDRATION_PROMISE] === true;
+	} catch {
+		return false;
+	}
 }
 
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: symbol | string): T;
 export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHookSlot): T {
 	if (usable && (usable as any).$$kind === CONTEXT_TAG) return readContext(usable as Context<T>);
+	const serial = hasExternalHydrationOwner(usable as PromiseLike<unknown>) ? null : SERIAL;
 	if (usable == null || typeof (usable as any).then !== 'function') {
 		// Cold path: a FOREIGN host context inside a hosted server pass reads
 		// through the installed host hook (§6.4); anything else diagnoses.
@@ -3451,10 +3496,10 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		const entryT = RESOLVED.pu.resolvedT.get(usable as PromiseLike<unknown>);
 		if (entryT !== undefined) {
 			if ('reason' in entryT) {
-				recordHydrationRejection(entryT.reason);
+				recordHydrationRejection(serial, entryT.reason);
 				throw entryT.reason;
 			}
-			if (SERIAL !== null) SERIAL.push(entryT.value);
+			if (serial !== null) serial.push(entryT.value);
 			return entryT.value as T;
 		}
 	}
@@ -3465,11 +3510,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		// Serialize a typed rejection seed first so hydration takes the same catch
 		// arm even when the client receives a fresh, still-pending thenable.
 		if ('reason' in entry) {
-			recordHydrationRejection(entry.reason);
+			recordHydrationRejection(serial, entry.reason);
 			throw entry.reason;
 		}
 		// Resolved → return it, and record it (in render order) for client seeding.
-		if (SERIAL !== null) SERIAL.push(entry.value);
+		if (serial !== null) serial.push(entry.value);
 		return entry.value as T;
 	}
 	// React-compatible instrumented thenables expose their synchronous state on
@@ -3485,11 +3530,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 	let status = instrumented.status;
 	const wasUninstrumented = status === undefined;
 	if (status === 'fulfilled') {
-		if (SERIAL !== null) SERIAL.push(instrumented.value);
+		if (serial !== null) serial.push(instrumented.value);
 		return instrumented.value as T;
 	}
 	if (status === 'rejected') {
-		recordHydrationRejection(instrumented.reason);
+		recordHydrationRejection(serial, instrumented.reason);
 		throw instrumented.reason;
 	}
 	if (wasUninstrumented) {
@@ -3515,11 +3560,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
-			if (SERIAL !== null) SERIAL.push(instrumented.value);
+			if (serial !== null) serial.push(instrumented.value);
 			return instrumented.value as T;
 		}
 		if (status === 'rejected') {
-			recordHydrationRejection(instrumented.reason);
+			recordHydrationRejection(serial, instrumented.reason);
 			throw instrumented.reason;
 		}
 	}
@@ -3527,11 +3572,11 @@ export function use<T>(usable: Context<T> | PromiseLike<T>, siteKey?: ServerHook
 		instrumented.then(NOOP, NOOP);
 		status = instrumented.status;
 		if (status === 'fulfilled') {
-			if (SERIAL !== null) SERIAL.push(instrumented.value);
+			if (serial !== null) serial.push(instrumented.value);
 			return instrumented.value as T;
 		}
 		if (status === 'rejected') {
-			recordHydrationRejection(instrumented.reason);
+			recordHydrationRejection(serial, instrumented.reason);
 			throw instrumented.reason;
 		}
 	}
@@ -5436,8 +5481,9 @@ export function ssrTry(
 	siteKey: string,
 	tryFn: (arg: unknown, scope: SSRScope) => string,
 	pendFn: ((arg: unknown, scope: SSRScope) => string) | null,
-	catchFn: ((err: unknown, scope: SSRScope) => string) | null,
+	catchFn: ((err: unknown, scope: SSRScope, reset: () => void) => string) | null,
 	namespace: 'html' | 'svg' | 'mathml' = FRAME?.namespace ?? 'html',
+	propagateSuspense = false,
 ): string {
 	VT_SSR_TRY_SEQ++;
 	// Consume the nearest un-consumed outer ViewTransition candidate: its
@@ -5645,6 +5691,7 @@ export function ssrTry(
 			return ssrBlock(inner);
 		} catch (e) {
 			if (ssrIsSuspense(e)) {
+				if (propagateSuspense) throw e;
 				if (stream !== null) {
 					// Drop seeds pushed by the partially-rendered body — they belong to
 					// the boundary's own slice once it completes.
@@ -5679,7 +5726,7 @@ export function ssrTry(
 				// consume any seeds appended while rendering it below).
 				const caughtSeeds = entry !== undefined && SERIAL !== null ? SERIAL.slice(serialStart) : [];
 				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
-				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope)));
+				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
 						if (SERIAL !== null) {
@@ -5802,10 +5849,55 @@ interface StreamSink {
 	fatal(err: unknown): void;
 }
 
+/**
+ * A live source of externally-produced HTML (typically framework data
+ * `<script>` tags materializing as loaders settle) merged natively into a
+ * streamed render. Octane emits injected HTML verbatim, in push order, each
+ * drain as its own transport chunk strictly BETWEEN renderer chunks — never
+ * before the shell, and (for document renders) before the held
+ * `</body></html>` tail. The stream stays open until `done` settles.
+ *
+ * This is an Octane extension (React's Fizz owns its data injection
+ * internally); it exists so frameworks like TanStack Start can merge their
+ * data stream without re-parsing the HTML byte stream for safe insertion
+ * points — every boundary between renderer chunks is tag-complete by
+ * construction.
+ */
+export interface StreamInjectionSource {
+	/**
+	 * Pull all queued HTML (concatenated, verbatim). Called at emission
+	 * boundaries and after `subscribe` notifications; return '' when empty.
+	 */
+	take(): string;
+	/**
+	 * The source notifies when new HTML is queued; the renderer then drains
+	 * promptly — even while the render itself is idle awaiting `done`.
+	 * Returns an unsubscribe function; the renderer unsubscribes on
+	 * completion, abort, and failure.
+	 */
+	subscribe(notify: () => void): () => void;
+	/**
+	 * The renderer holds the document tail and the stream close until this
+	 * settles. A rejection fails the stream through the fatal path (after the
+	 * shell, mirroring abort: degraded terminal completion).
+	 */
+	done: Promise<void>;
+	/**
+	 * Called exactly once when the renderer has finished producing markup —
+	 * after the last boundary segment on success, or on the abort/error path
+	 * before degraded terminal output. Sources that finalize asynchronously
+	 * (e.g. a serialization stream that must flush its remainder) key that
+	 * work here and settle `done` when it completes.
+	 */
+	renderComplete?(): void;
+}
+
 export interface StreamOptions extends RenderOptions {
 	onShellReady?: () => void;
 	onShellError?: (err: unknown) => void;
 	onAllReady?: () => void;
+	/** Merge externally-produced HTML into the stream (see StreamInjectionSource). */
+	injection?: StreamInjectionSource;
 }
 
 function withStream<T>(stream: StreamState | null, fn: () => T): T {
@@ -5815,6 +5907,44 @@ function withStream<T>(stream: StreamState | null, fn: () => T): T {
 		return fn();
 	} finally {
 		STREAM = prev;
+	}
+}
+
+// For document renders under external injection, the closing `</body></html>`
+// is split out of the shell and held until both the render and the injection
+// source finish. De-opt block markers interleave with the closing tags
+// (`</body><!--]--></html><!--]-->`), so a true document suffix is `</body>`
+// followed by nothing but comments/whitespace and one `</html>`.
+const DOCUMENT_TAIL_RE = /^<\/body>(?:\s|<!--[^]*?-->)*<\/html>(?:\s|<!--[^]*?-->)*$/;
+function documentTailStart(body: string): number {
+	const index = body.lastIndexOf('</body>');
+	if (index === -1) return -1;
+	return DOCUMENT_TAIL_RE.test(body.slice(index)) ? index : -1;
+}
+
+// Locate the insertion point just inside a document's opening <head> tag —
+// where renderer-owned leading styles and hoisted head elements belong in
+// document mode. Quote-aware so an attribute value containing '>' cannot
+// truncate the tag.
+function documentHeadInsertionPoint(body: string): number {
+	let searchFrom = 0;
+	for (;;) {
+		const start = body.indexOf('<head', searchFrom);
+		if (start === -1) return -1;
+		const next = body.charCodeAt(start + 5);
+		if (next === 62 /* > */) return start + 6;
+		if (next === 32 || next === 9 || next === 10 || next === 13) {
+			let quote = 0;
+			for (let i = start + 6; i < body.length; i++) {
+				const code = body.charCodeAt(i);
+				if (quote !== 0) {
+					if (code === quote) quote = 0;
+				} else if (code === 34 /* " */ || code === 39 /* ' */) quote = code;
+				else if (code === 62 /* > */) return i + 1;
+			}
+			return -1;
+		}
+		searchFrom = start + 5;
 	}
 }
 
@@ -5912,6 +6042,77 @@ async function runStream(
 			stream.activePassBoundaryKeys = previousBoundaryKeys;
 		}
 	};
+	// ── External injection (cold path: every hook below no-ops when absent) ──
+	const injection = options?.injection;
+	// Early fatal paths can return before `done` is awaited; observe it up
+	// front so a later rejection never surfaces as an unhandled rejection.
+	if (injection !== undefined) injection.done.then(NOOP, NOOP);
+	let injectionUnsubscribe: (() => void) | undefined;
+	let injectionFailure: unknown;
+	let injectionFailed = false;
+	let signalInjectionFailure: (() => void) | undefined;
+	const failInjection = (err: unknown): void => {
+		if (injectionFailed) return;
+		injectionFailed = true;
+		injectionFailure = err;
+		signalInjectionFailure?.();
+	};
+	// Injection drains interleave with render writes from OUTSIDE the wave
+	// loop (subscribe notifications can fire while the loop awaits a wave or
+	// the done promise). A single promise chain gives all writes a total
+	// order while each write still surfaces its own backpressure/failure to
+	// its caller. Without injection, writes go to the sink directly — the
+	// established path, no chain, no extra microtasks.
+	let writeChain: Promise<void> | null = injection === undefined ? null : Promise.resolve();
+	const write: (chunk: string, terminal?: boolean) => void | Promise<void> =
+		injection === undefined
+			? (chunk, terminal) => sink.write(chunk, terminal)
+			: (chunk, terminal) => {
+					const operation = writeChain!.then(() => sink.write(chunk, terminal));
+					writeChain = operation.then(NOOP, NOOP);
+					return operation;
+				};
+	const drainInjection = (): void | Promise<void> => {
+		if (injection === undefined || injectionFailed) return;
+		let html: string;
+		try {
+			html = injection.take();
+		} catch (err) {
+			failInjection(err);
+			return;
+		}
+		if (!html) return;
+		return write(html);
+	};
+	const notifyInjection = (): void => {
+		const drained = drainInjection();
+		// A transport failure here is re-observed by the next awaited render
+		// write (or the completion wait); the notify path only must not
+		// produce an unhandled rejection.
+		if (drained !== undefined) drained.catch(NOOP);
+	};
+	/** Resolves when `done` settles; rejects on abort, take() failure, or done rejection. */
+	const waitForInjectionDone = (): Promise<void> =>
+		new Promise<void>((resolve, reject) => {
+			let settled = false;
+			const finish = (fn: () => void): void => {
+				if (settled) return;
+				settled = true;
+				signal?.removeEventListener('abort', onAbort);
+				signalInjectionFailure = undefined;
+				fn();
+			};
+			const onAbort = (): void => finish(() => reject(signal!.reason));
+			signalInjectionFailure = () => finish(() => reject(injectionFailure));
+			if (injectionFailed) return finish(() => reject(injectionFailure));
+			if (signal?.aborted) return onAbort();
+			signal?.addEventListener('abort', onAbort, { once: true });
+			injection!.done.then(
+				() => finish(resolve),
+				(err) => finish(() => reject(err)),
+			);
+		});
+
 	const emittedCss = new Set<string>();
 	const flushedSegments = new Set<string>();
 	const observedDone = new Set<string>();
@@ -5959,15 +6160,15 @@ async function runStream(
 		if (errors.length === 0) return;
 		let chunk = '';
 		for (const boundary of errors) chunk += boundaryErrorChunk(boundary, nonceAttr);
-		const write = sink.write(chunk);
+		const errorWrite = write(chunk);
 		const markFlushed = (): void => {
 			for (const boundary of errors) boundary.errorFlushed = true;
 		};
-		if (write === undefined) {
+		if (errorWrite === undefined) {
 			markFlushed();
 			return;
 		}
-		return write.then(markFlushed);
+		return errorWrite.then(markFlushed);
 	};
 
 	let pass: FullPassResult;
@@ -6011,10 +6212,10 @@ async function runStream(
 	reportRecoverableBoundaryErrors();
 	// SHELL: styles first (so painted fallbacks are styled), hoisted head, body,
 	// the shell-scope seed script, then the swap runtime iff anything is pending.
-	let shell = '';
+	let leadingStyles = '';
 	for (const [hash, sheet] of pass.cssEntries) {
 		emittedCss.add(hash);
-		shell +=
+		leadingStyles +=
 			'<style data-octane="' +
 			hash +
 			'"' +
@@ -6023,13 +6224,43 @@ async function runStream(
 			escapeEntireInlineStyleContent(sheet) +
 			'</style>';
 	}
-	shell += pass.head + pass.body;
+	// DOCUMENT MODE (external injection + the shell renders a document): the
+	// closing tail is split out of the shell and written LAST — injected chunks
+	// and streamed segments then land inside <body> before it (streamed
+	// segments otherwise trail `</html>`, which browsers reparent but external
+	// merge layers must not re-parse around); `<!DOCTYPE html>` leads the
+	// response; and renderer-owned leading styles + hoisted head elements move
+	// inside the authored <head> instead of preceding `<html>`. The tail
+	// carries only closing tags + block markers, so it needs no vt stripping.
+	// Without injection the shell shape is unchanged.
+	let shell = '';
+	let heldDocumentTail = '';
+	if (injection !== undefined) {
+		const tailStart = documentTailStart(pass.body);
+		if (tailStart !== -1) {
+			heldDocumentTail = pass.body.slice(tailStart);
+			const bodyHtml = pass.body.slice(0, tailStart);
+			const headInsert = documentHeadInsertionPoint(bodyHtml);
+			shell =
+				headInsert !== -1
+					? '<!DOCTYPE html>' +
+						bodyHtml.slice(0, headInsert) +
+						leadingStyles +
+						pass.head +
+						bodyHtml.slice(headInsert)
+					: '<!DOCTYPE html>' + leadingStyles + pass.head + bodyHtml;
+		} else {
+			shell = leadingStyles + pass.head + pass.body;
+		}
+	} else {
+		shell = leadingStyles + pass.head + pass.body;
+	}
 	if (pass.serial.length > 0) shell += serializeSuspenseSeeds(pass.serial, nonceAttr);
 	const anyPending = stream.boundaries.size > 0;
 	if (anyPending)
 		shell += '<script ' + STREAM_SCRIPT_ATTR + nonceAttr + '>' + STREAM_RUNTIME_JS + '</script>';
 	try {
-		const shellWrite = sink.write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
+		const shellWrite = write(pass.vtCandidates ? vtSsrStrip(shell) : shell);
 		if (shellWrite !== undefined) await shellWrite;
 	} catch (err) {
 		options?.onError?.(err);
@@ -6037,6 +6268,17 @@ async function runStream(
 		return;
 	}
 	sink.shellReady();
+	if (injection !== undefined) {
+		// Subscribe only once the shell is on the wire: injected HTML must never
+		// precede it. HTML queued before this point is picked up by the initial
+		// drain below.
+		try {
+			injectionUnsubscribe = injection.subscribe(notifyInjection);
+		} catch (err) {
+			failInjection(err);
+		}
+		notifyInjection();
+	}
 
 	let suspended = pass.suspended;
 	// `attempt` counts CONSECUTIVE passes that completed no boundary. One pass
@@ -6056,7 +6298,7 @@ async function runStream(
 		if (initiallyDone.length > 0) {
 			let chunk = '';
 			for (const boundary of initiallyDone) chunk += segmentChunk(boundary, nonceAttr);
-			const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+			const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 			if (segmentWrite !== undefined) await segmentWrite;
 			for (const boundary of initiallyDone) {
 				flushedSegments.add(boundary.id);
@@ -6114,7 +6356,7 @@ async function runStream(
 			const done = reachableDoneSegments();
 			for (const b of done) chunk += segmentChunk(b, nonceAttr);
 			if (chunk !== '') {
-				const segmentWrite = sink.write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
+				const segmentWrite = write(pass.vtCandidates ? vtSsrStrip(chunk) : chunk);
 				if (segmentWrite !== undefined) await segmentWrite;
 				// A boundary isn't considered flushed until the transport accepted its
 				// chunk through any active backpressure gate.
@@ -6133,13 +6375,41 @@ async function runStream(
 		).length;
 		const reports = signal?.aborted ? Math.max(1, pendingBoundaryCount) : 1;
 		for (let i = 0; i < reports; i++) options?.onError?.(err);
+		// Rendering ends here, degraded — the source still gets its completion
+		// signal so upstream finalization (serialization flush, timers) is not
+		// stranded waiting on a render that will never finish. Unsubscribe FIRST:
+		// a notify fired by that finalization would otherwise drain the queue
+		// into a chained write that post-abort can only reject, losing the HTML
+		// the terminal salvage below still delivers.
+		if (injection !== undefined) {
+			injectionUnsubscribe?.();
+			injectionUnsubscribe = undefined;
+			try {
+				injection.renderComplete?.();
+			} catch {
+				// The stream is already failing; the source's error cannot improve it.
+			}
+		}
 		let tail = '';
+		if (injection !== undefined && !injectionFailed) {
+			// Terminal salvage: queued injection HTML (typically the source's
+			// just-flushed serialization remainder) still ships, ahead of the
+			// recovery markers and the held tail.
+			try {
+				tail += injection.take();
+			} catch {
+				// A failing source forfeits its remainder; the terminal write goes on.
+			}
+		}
 		for (const b of stream.boundaries.values()) {
 			if (!flushedSegments.has(b.id) && !b.errorFlushed) tail += boundaryErrorChunk(b, nonceAttr);
 		}
+		// Best-effort well-formedness under injection: the held document tail
+		// still closes <body>/<html> after the degraded-boundary markers.
+		if (heldDocumentTail !== '') tail += heldDocumentTail;
 		if (tail !== '') {
 			try {
-				const terminalWrite = sink.write(tail, true);
+				const terminalWrite = write(tail, true);
 				if (terminalWrite !== undefined) await terminalWrite;
 			} catch {
 				// The transport is already gone; there is nowhere to send recovery.
@@ -6147,6 +6417,60 @@ async function runStream(
 		}
 		sink.fatal(err);
 		return;
+	}
+	if (injection !== undefined) {
+		// Rendering is complete but the injection source may still be producing
+		// (subscribe notifications keep draining through the write chain while
+		// we wait). The stream — and a document's held tail — close only once
+		// `done` settles; abort and source failures route through the same
+		// degraded terminal path as a mid-render abort.
+		try {
+			injection.renderComplete?.();
+		} catch (err) {
+			failInjection(err);
+		}
+		try {
+			await waitForInjectionDone();
+			const finalDrain = drainInjection();
+			if (finalDrain !== undefined) await finalDrain;
+			if (injectionFailed) throw injectionFailure;
+			if (heldDocumentTail !== '') {
+				// Cleared before awaiting: a post-acceptance rejection (abort racing
+				// the drain wait) must not resend the tail through the catch below.
+				const tailChunk = heldDocumentTail;
+				heldDocumentTail = '';
+				const tailWrite = write(tailChunk);
+				if (tailWrite !== undefined) await tailWrite;
+			}
+		} catch (err) {
+			options?.onError?.(err);
+			// Unsubscribe before salvaging so a late notify cannot drain the
+			// queue into a chained write this degraded close will never deliver.
+			injectionUnsubscribe?.();
+			injectionUnsubscribe = undefined;
+			let terminal = '';
+			if (!injectionFailed) {
+				// Terminal salvage: the source may have queued HTML (e.g. its
+				// serialization remainder) between the failure and this close.
+				try {
+					terminal = injection.take();
+				} catch {
+					// A failing source forfeits its remainder; the tail still ships.
+				}
+			}
+			terminal += heldDocumentTail;
+			if (terminal !== '') {
+				try {
+					const terminalWrite = write(terminal, true);
+					if (terminalWrite !== undefined) await terminalWrite;
+				} catch {
+					// The transport is already gone; there is nowhere to send the tail.
+				}
+			}
+			sink.fatal(err);
+			return;
+		}
+		injectionUnsubscribe?.();
 	}
 	sink.allReady();
 }

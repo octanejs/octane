@@ -9,7 +9,7 @@ public and potentially present in model training data.
 
 ## Included user-app training corpus
 
-`datasets/train/user-apps-v1` contains eighteen executable application-authoring
+`datasets/train/user-apps-v1` contains nineteen executable application-authoring
 tasks. They ask a model to write an Octane app from a normal user request; none
 asks it to repair or modify the Octane monorepo.
 
@@ -17,12 +17,13 @@ asks it to repair or modify the Octane monorepo.
 | --- | --- |
 | TSRX patterns | Components, state, native events, controlled forms, `@if`, keyed `@for`/`@empty`, `@switch`, and `@try` |
 | Composition and state | Parent/child composition, local versus lifted state, functional updates, reducers, context, and keyed identity |
-| React divergences | Conditional hooks, inferred hook dependencies, current-state getters, native controlled input, ref props/multi-ref, class composition, and parallel `use()` |
+| React divergences | Conditional hooks, inferred hook dependencies, current-state getters, native controlled input, deliberate text commit handling, ref props/multi-ref, class composition, and parallel `use()` |
 | Core platform | Suspense/error handling, SSR, hydration, controlled inputs, and `useId` |
 | Integrations | Zustand, Hook Form, i18next, and TanStack Query through their public `@octanejs/*` APIs |
 
 Representative executable tasks include
 [`octane.composed-team-board`](./datasets/train/user-apps-v1/tasks/octane.composed-team-board/prompt.md),
+[`octane.native-change-intent`](./datasets/train/user-apps-v1/tasks/octane.native-change-intent/prompt.md),
 [`octane.native-controlled-search`](./datasets/train/user-apps-v1/tasks/octane.native-controlled-search/prompt.md),
 [`octane.state-getter`](./datasets/train/user-apps-v1/tasks/octane.state-getter/prompt.md),
 [`octane.parallel-use-dashboard`](./datasets/train/user-apps-v1/tasks/octane.parallel-use-dashboard/prompt.md),
@@ -37,7 +38,7 @@ Every task directory contains:
 - `reference/src/App.tsrx`: the public target answer for training and corpus
   regression testing.
 
-Run all eighteen reference answers with:
+Run all nineteen reference answers with:
 
 ```bash
 pnpm --filter @octanejs/evals test:user-apps

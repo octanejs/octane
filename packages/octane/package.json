@@ -1,14 +1,9 @@
 {
   "name": "octane",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "license": "MIT",
   "type": "module",
-  "sideEffects": [
-    "./src/index.ts",
-    "./src/runtime.ts",
-    "./dist/index.js",
-    "./dist/runtime.js"
-  ],
+  "sideEffects": false,
   "engines": {
     "node": ">=22"
   },
@@ -135,6 +130,7 @@
     "@tsrx/react": "catalog:default",
     "esbuild": "catalog:default",
     "happy-dom": "catalog:default",
+    "playwright": "catalog:default",
     "react": "catalog:default",
     "react-dom": "catalog:default",
     "vite": "catalog:default",

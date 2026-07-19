@@ -122,6 +122,27 @@ Available strategies:
 `mouseenter`, `mouseover`, `mouseup`, `pointerdown`, `pointerenter`,
 `pointerover`, and `pointerup`.
 
+#### Capture interactions before `hydrateRoot()`
+
+An immediate `hydrateRoot()` call needs no extra setup: mounting the first
+`Hydrate` boundary installs interaction capture as a synchronous fallback. If
+your client entry awaits route discovery, data, or dynamic imports before it
+calls `hydrateRoot()`, install the lightweight capture queue before that work so
+an interaction during the gap can be replayed:
+
+```ts
+import { hydrateRoot } from 'octane';
+import { initializeHydrationEventCapture } from 'octane/hydration';
+
+initializeHydrationEventCapture();
+
+await prepareClient();
+hydrateRoot(document.getElementById('app')!, App);
+```
+
+Calling `initializeHydrationEventCapture()` more than once is safe; Octane
+installs the listeners only once per document.
+
 Hydration is one-way: after `condition()` becomes true and the boundary
 hydrates, making it false again does not return the subtree to a dormant state.
 
@@ -147,10 +168,11 @@ chunk would not be worthwhile:
 
 The compiler recognizes `Hydrate` imported from `octane`, including an import
 alias. Split children must be authored directly inside the boundary. Extraction
-rejects function-as-children, hook calls directly inside the extracted JSX, and
-`this` or `super` captures; move that work into a child component or opt out
-with `split={false}`. Ordinary lexical values can be captured by the generated
-child component.
+rejects function-as-children, hook calls directly inside the extracted JSX,
+scoped `<style>` elements (their rules belong to the owning component's single
+style scope), and `this` or `super` captures; move that work into a child
+component or opt out with `split={false}`. Ordinary lexical values can be
+captured by the generated child component.
 
 Generated Hydrate chunks are not eagerly module-preloaded. The Vite and Rsbuild
 app integrations still link CSS reachable from a route's deferred chunks,

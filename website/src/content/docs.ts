@@ -8,6 +8,7 @@ import BuildTools from './docs/build-tools.mdx';
 import CoreApis from './docs/core-apis.mdx';
 import TsrxVsTsx from './docs/tsrx-vs-tsx.mdx';
 import DifferencesFromReact from './docs/differences-from-react.mdx';
+import ReactCompat from './docs/react-compat.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
 import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
@@ -24,6 +25,7 @@ const components: Record<string, DocEntry['component']> = {
 	'core-apis': CoreApis as DocEntry['component'],
 	'tsrx-vs-tsx': TsrxVsTsx as DocEntry['component'],
 	'differences-from-react': DifferencesFromReact as DocEntry['component'],
+	'react-compat': ReactCompat as DocEntry['component'],
 	profiling: Profiling as DocEntry['component'],
 	bindings: Bindings as DocEntry['component'],
 };

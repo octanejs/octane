@@ -135,6 +135,85 @@ export function findVoidRootImports(source, id) {
 	return [...unique.values()];
 }
 
+// Cross-module component calls need the same definition-site proof as a
+// disposable plain-JS root. Discover only bare JSX tags backed by relative
+// default/named imports; member/dynamic tags and package/virtual resolution stay
+// conservative. The full compiler validates the local binding again before it
+// consumes the proof, so a nested lexical shadow cannot change the call ABI.
+function collectVoidJsxImportCandidates(ast) {
+	const imports = new Map();
+	for (const node of ast.body || []) {
+		if (
+			node.type !== 'ImportDeclaration' ||
+			typeof node.source?.value !== 'string' ||
+			(!node.source.value.startsWith('./') && !node.source.value.startsWith('../')) ||
+			node.importKind === 'type'
+		)
+			continue;
+		for (const specifier of node.specifiers || []) {
+			if (specifier.importKind === 'type' || !specifier.local?.name) continue;
+			if (specifier.type === 'ImportDefaultSpecifier') {
+				imports.set(specifier.local.name, {
+					request: node.source.value,
+					imported: 'default',
+				});
+			} else if (specifier.type === 'ImportSpecifier') {
+				const imported = specifier.imported?.name ?? specifier.imported?.value;
+				if (typeof imported === 'string') {
+					imports.set(specifier.local.name, { request: node.source.value, imported });
+				}
+			}
+		}
+	}
+	if (imports.size === 0) return [];
+
+	const candidates = [];
+	const seen = new WeakSet();
+	const walk = (value) => {
+		if (!value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) walk(child);
+			return;
+		}
+		if (seen.has(value)) return;
+		seen.add(value);
+		if (value.type === 'JSXElement' || value.type === 'Element') {
+			const tag = value.openingElement?.name || value.id || value.name;
+			if ((tag?.type === 'Identifier' || tag?.type === 'JSXIdentifier') && imports.has(tag.name)) {
+				candidates.push(imports.get(tag.name));
+			}
+		}
+		for (const key in value) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent') continue;
+			walk(value[key]);
+		}
+	};
+	walk(ast.body || []);
+	return candidates;
+}
+
+/**
+ * Return every imported component contract a production transform can use:
+ * disposable plain-JS roots plus component tags in compiled JSX output.
+ */
+export function findVoidComponentImports(source, id) {
+	let ast;
+	try {
+		ast = parseModule(source, id);
+	} catch {
+		return [];
+	}
+	const unique = new Map();
+	for (const candidate of [
+		...collectVoidRootCandidates(ast),
+		...collectVoidJsxImportCandidates(ast),
+	]) {
+		const { request, imported } = candidate;
+		unique.set(`${request}\0${imported}`, { request, imported });
+	}
+	return [...unique.values()];
+}
+
 function collectVoidRootEdits(ast, st, isVoidComponentImport) {
 	if (typeof isVoidComponentImport !== 'function') return;
 	for (const candidate of collectVoidRootCandidates(ast)) {
@@ -641,10 +720,10 @@ function allocHookSymbol(st, owner, local, imported, node) {
 		// Symbol() collapses those paths and collides state across call sites.
 		// Short filename hash + index; no module path in the output (see
 		// compile.js hookSlotHash for the full rationale).
-		symbolExpr = `Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
+		symbolExpr = `/* @__PURE__ */ Symbol(${JSON.stringify(`${st.hash}#${id}`)})`;
 	} else {
 		const numericExpr = id === 0 ? st.slotBaseName : `${st.slotBaseName} + ${id}`;
-		symbolExpr = `Symbol(${numericExpr})`;
+		symbolExpr = `/* @__PURE__ */ Symbol(${numericExpr})`;
 	}
 	if (st.profile) {
 		const componentId = `${st.profileFilename || '<anon>'}#${owner.name}@${owner.line}:${owner.column}`;

@@ -1,7 +1,7 @@
 // Hand-written declarations for src/vite.js (authored in `.js` so it loads
 // from a consumer's vite.config.ts under Node's native ESM loader — same
 // convention as @octanejs/vite-plugin's types/). Keep in lockstep.
-import type { CompileMdxOptions } from './compile.js';
+import type { CompileMdxOptions, CompileMdxResult } from './compile.js';
 
 export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' | 'hmr' | 'dev'> {
 	/**
@@ -30,12 +30,18 @@ export interface OctaneMdxPlugin {
 	transform(
 		this: {
 			addWatchFile?(id: string): void;
+			warn?(warning: {
+				code: string;
+				message: string;
+				id: string;
+				loc: { file: string; line: number; column: number };
+			}): void;
 			environment?: { config?: { consumer?: string } };
 		},
 		code: string,
 		id: string,
 		options?: { ssr?: boolean },
-	): Promise<{ code: string; map: unknown } | null>;
+	): Promise<CompileMdxResult | null>;
 }
 
 export declare function octaneMdx(options?: OctaneMdxPluginOptions): OctaneMdxPlugin;

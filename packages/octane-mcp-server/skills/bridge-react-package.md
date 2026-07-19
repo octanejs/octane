@@ -21,6 +21,7 @@ of bridging by hand:
 | `@tanstack/react-virtual` | `@octanejs/tanstack-virtual` |
 | `framer-motion` / `motion` | `@octanejs/motion` |
 | `@stylexjs/stylex` | `@octanejs/stylex` |
+| `styled-components` | `@octanejs/styled-components` |
 | `react-router` / `react-router-dom` | `@octanejs/remix-router` |
 | `@lexical/react` | `@octanejs/lexical` |
 | `lucide-react` | `@octanejs/lucide` |
@@ -87,10 +88,13 @@ So a bridge never means "run the React package unchanged". It means:
      style) and drop the wrapper.
    - Class components: rewrite as function components. Error boundary classes
      become `<ErrorBoundary>` or the `@try { } @catch (e) { }` directive.
-   - Synthetic `onChange` on text inputs: use native `onInput`. Octane events
-     are native and delegated. Controlled `value`/`checked` follow React's
-     semantics (the prop drives the DOM property and reasserts on commits), so
-     controlled-input logic ports unchanged apart from the event name.
+   - Synthetic `onChange` on standard text hosts: use native `onInput` when the
+     callback means every edit. Octane events are native and delegated.
+     Controlled `value`/`checked` follow React's semantics (the prop drives the
+     DOM property and reasserts on commits), so per-edit controlled-input logic
+     ports unchanged apart from the event name. Do not blanket-rewrite public
+     callbacks, selects, or checkbox/radio handlers. A deliberate uncontrolled
+     text commit may keep `onChange` with `suppressNativeChangeWarning`.
    - StrictMode double-invoke: does not exist; delete test expectations that
      count double renders.
 

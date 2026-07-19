@@ -95,13 +95,42 @@ use the same keyed hydration ranges as arrays. A thenable that settles while it
 is first subscribed is unwrapped in that render without publishing a fallback.
 
 `StreamOptions` extends `RenderOptions` with `onShellReady()`,
-`onShellError(err)`, and `onAllReady()`. A recoverable error in Suspense content
-reaches `onError`, preserves the emitted fallback, and marks only that boundary
-for client rendering. Calling `abort(reason)` reports the reason for each
-abandoned pending task, preserves emitted fallbacks for client recovery, closes
-the destination, and invokes `onAllReady` once as the terminal readiness
-notification; an unpublished shell still fails only once through
+`onShellError(err)`, `onAllReady()`, and `injection`. A recoverable error in
+Suspense content reaches `onError`, preserves the emitted fallback, and marks
+only that boundary for client rendering. Calling `abort(reason)` reports the
+reason for each abandoned pending task, preserves emitted fallbacks for client
+recovery, closes the destination, and invokes `onAllReady` once as the terminal
+readiness notification; an unpublished shell still fails only once through
 `onShellError`.
+
+#### `injection?: StreamInjectionSource` (Octane extension)
+
+Merge a live stream of externally-produced HTML — typically framework data
+`<script>` tags materializing as loaders settle (e.g. TanStack Start's data
+stream) — into the response natively, instead of re-parsing the emitted HTML
+for safe insertion points. The source is
+`{ take(): string; subscribe(notify) => unsubscribe; done: Promise<void>; renderComplete?() }`:
+the renderer `take()`s queued HTML and emits it verbatim, in push order, each
+drain as its own transport chunk strictly **between** renderer chunks (every
+such boundary is tag-complete by construction) — never before the shell.
+`renderComplete()` fires exactly once when the renderer has finished producing
+markup — after the last boundary segment on success, or on the abort/error
+path before degraded terminal output — so a source can finalize asynchronous
+serialization and then settle `done`.
+
+When the shell is a document (`… </body></html>`), **document mode** engages:
+the response leads with `<!DOCTYPE html>`; renderer-owned leading scoped
+styles and the hoisted-head buffer fold inside the authored `<head>` instead
+of preceding `<html>`; and the closing tail is split out and written **last**
+— injected chunks and streamed Suspense segments land inside `<body>`, and
+the stream (tail included) closes only once rendering is complete **and**
+`done` has settled, so late data scripts are never dropped. `subscribe`
+notifications drain promptly even while the render is idle awaiting `done`;
+bound the wait with `signal` (a source that never settles `done` holds the
+response open). A `done` rejection fails the stream through the same degraded
+terminal path as `abort`. Without `injection`, streamed output is
+byte-identical to previous releases (measured flat on the streaming-ssr
+benchmark).
 
 ### `renderToReadableStream(component, props?, options?)` — `octane/server`
 

@@ -1,0 +1,169 @@
+---
+title: React compatibility
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">Host Octane inside React</p>
+	<h1>React compatibility</h1>
+	<p className="doc-lede">
+		{
+			'Already have a React 19 app? octane/react lets you render compiled Octane islands inside it — one component at a time, no rewrite. Events stay native, context is shared, and it renders on the server.'
+		}
+	</p>
+</div>
+
+<aside className="doc-callout note">
+	<p className="doc-callout-title">Migrate incrementally</p>
+	<p>
+		{
+			'OctaneCompat is for adopting Octane inside an existing React tree, not for shipping a whole app. Wrap the parts you have ported; leave the rest as React and move at your own pace.'
+		}
+	</p>
+</aside>
+
+<h2 id="what-is-octanecompat">What OctaneCompat is</h2>
+
+`octane/react` exports a single component, `<OctaneCompat>`, that hosts a compiled
+Octane subtree inside a real React 19 tree. React owns the wrapper and one host
+element; a private Octane root owns every descendant — the **island**.
+
+Because Octane compiles ahead of time, the island is already the framework's own
+render output. `<OctaneCompat>` just gives it a place to live inside React, so you can
+port a screen, a widget, or a single component without touching the React code around
+it.
+
+Local Octane `@try` / Suspense / error boundaries inside the island always get first
+chance to handle a throw or a pending state; only something that escapes the island's
+own root surfaces to the nearest **React** Suspense or error boundary.
+
+<h2 id="set-up">Set up the toolchain</h2>
+
+An Octane island is a compiled `.tsrx` (or Octane-compiled `.tsx`) module, while the
+host app is compiled by React's own toolchain. Tell the two compilers apart with
+`requireDirective: true` and a `'use octane'` directive on the modules Octane owns:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { octane } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+	plugins: [octane({ requireDirective: true }), react()],
+});
+```
+
+```tsrx
+// src/islands/Counter.tsrx — compiled by Octane
+'use octane';
+import { useState } from 'octane';
+
+export function Counter() @{
+	const [count, setCount] = useState(0);
+	<button onClick={() => setCount(count + 1)}>
+		{'clicks: ' + count}
+	</button>
+}
+```
+
+The ownership rules — what the directive means, when a missing directive is an error,
+and how `exclude` hands a path to another toolchain — live in
+[Build tools](/docs/build-tools#mixed-toolchains). This page is about what you do once
+the compilers are wired up.
+
+<h2 id="render-an-island">Render an island</h2>
+
+Import the compiled Octane component and the host, then wrap the component in
+`<OctaneCompat>`. It takes exactly one compiled Octane element as its child:
+
+```tsx
+// App.tsx — compiled by React's toolchain
+import { OctaneCompat } from 'octane/react';
+import { Counter } from './islands/Counter.tsrx';
+
+export function App() {
+	return (
+		<main>
+			<h1>My React app</h1>
+			<OctaneCompat>
+				<Counter />
+			</OctaneCompat>
+		</main>
+	);
+}
+```
+
+Events inside the island are native and **delegated at the island host**, so React
+ancestors observe real capture and bubble order, the real target, and
+`stopPropagation()` / `preventDefault()` exactly as the platform reports them — there
+is no synthetic event layer bridging the two.
+
+<h2 id="react-context">Share React context</h2>
+
+An island reads your app's real React contexts with ordinary `use()` / `useContext()` —
+pass the React context object straight through:
+
+```tsrx
+// src/islands/ThemedBadge.tsrx
+'use octane';
+import { use } from 'octane';
+import { ThemeContext } from '../theme.ts';
+
+export function ThemedBadge() @{
+	const theme = use(ThemeContext);
+	<span className={'badge badge-' + theme}>Octane island</span>
+}
+```
+
+The host resolves the nearest committed provider value and keeps the island in sync as
+the provider updates — no adapter or prop-drilling required. Reading a context that has
+no provider yields its `createContext` default, just as it does in React.
+
+<h2 id="server-rendering">Server rendering and hydration</h2>
+
+Islands render on the server too. Wherever React runs on the server — Fizz streaming or
+`renderToString` — import the host from `octane/react/server`; the client entry
+(`octane/react`) hydrates its output.
+
+```tsx
+// entry.server.tsx
+import { OctaneCompat } from 'octane/react/server';
+```
+
+Each island runs one synchronous server pass; an unresolved island suspension is
+delegated to React so the shell can stream and fill in. Scoped island CSS is emitted as
+React 19 style resources (a stable per-hash `href` with `precedence="octane"`), so Fizz
+hoists and deduplicates it across islands. The island's HTML is written as an opaque
+region the client adopts without re-rendering, so hydration never touches the
+descendants React did not own.
+
+<h2 id="not-supported">What isn't supported</h2>
+
+One part of React does **not** cross over:
+
+- **React Server Components** — RSC, Flight, and `cache()`. Islands are client and
+  server-rendered function components; there is no Server Component boundary between
+  React and Octane.
+
+Everything else you rely on in a React app comes along: hooks, Suspense, transitions,
+context, portals, error boundaries, native events, and server rendering with hydration.
+See [Differences from React](/docs/differences-from-react#not-supported) for the full
+list of APIs Octane leaves out.
+
+<aside className="doc-callout tip">
+	<p className="doc-callout-title">Start small</p>
+	<p>
+		{
+			'Pick one leaf component, port it to .tsrx, and wrap it in OctaneCompat. When that ships cleanly, move up the tree. The React code around each island never has to change.'
+		}
+	</p>
+</aside>
+
+<h2 id="next">Next</h2>
+
+- [Build tools](/docs/build-tools#mixed-toolchains) — the `'use octane'` directive and
+  mixed-toolchain ownership rules.
+- [Quick start](/docs/quick-start) — install Octane and write your first `.tsrx`
+  component.
+- [Differences from React](/docs/differences-from-react) — the deliberate divergences
+  (everything else matching React is the point).

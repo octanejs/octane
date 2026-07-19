@@ -1,5 +1,5 @@
 // The "proven" stat strip: three numbers that back the claims above.
-import { Link } from '@octanejs/tanstack-router';
+import { Link } from '@tanstack/octane-router';
 import { BINDING_COUNT } from '../../../content/bindings.ts';
 
 export function Proven() @{

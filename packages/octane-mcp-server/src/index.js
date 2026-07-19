@@ -18,6 +18,7 @@ const PACKAGE_ROOT = resolve(dirname(__filename), '..');
 // workflows: triage, PRs, core changes).
 export const BUNDLED_SKILLS = {
 	'bridge-react-package': 'skills/bridge-react-package.md',
+	'build-octane-software': 'skills/build-octane-software.md',
 	'migrate-react-component': 'skills/migrate-react-component.md',
 	'react-divergences': 'skills/react-divergences.md',
 	'setup-ssr': 'skills/setup-ssr.md',
@@ -40,6 +41,8 @@ export const BENCHMARK_SUITES = [
 	'js-framework',
 	'js-framework-reorder',
 	'todomvc',
+	'weather-app',
+	'weather-app-lighthouse',
 	'chat-stream',
 	'dbmon',
 	'recursive-context',
@@ -62,6 +65,14 @@ export const BENCHMARK_SUITES = [
 ];
 
 const DEFAULT_TIMEOUT_MS = 120_000;
+
+export function instructionsFor(repoMode) {
+	const common =
+		'Before creating or materially changing Octane software, call octane_engineering_plan and load the build-octane-software skill. Treat its correctness, performance evidence, and adversarial self-review gates as required. Load the task-specific migration, binding, divergence, or SSR skill in addition when relevant. Do not claim a performance improvement without comparable measurements.';
+	return repoMode
+		? `${common} For Octane framework-fundamental work, also load octane-core-extend and performance-audit, establish a relevant baseline before editing, and use octane_validate_plan for the final changed paths.`
+		: common;
+}
 
 export function text(content) {
 	return { content: [{ type: 'text', text: content }] };
@@ -168,7 +179,7 @@ export function validationFor(paths, taskKind) {
 	) {
 		commands.add('pnpm typecheck');
 	}
-	if (areas.has('benchmark') || taskKind === 'performance') {
+	if (areas.has('benchmark') || taskKind === 'performance' || taskKind === 'core') {
 		commands.add('node benchmarks/bench.mjs --quick --ratios');
 	}
 	if (taskKind === 'api' || taskKind === 'core' || taskKind === 'package')
@@ -176,6 +187,74 @@ export function validationFor(paths, taskKind) {
 	commands.add('pnpm format:check');
 
 	return [...commands];
+}
+
+export function engineeringPlanFor(input, repoMode = false) {
+	const paths = input.paths ?? [];
+	const scope = input.scope;
+	const changeKind = input.changeKind ?? 'feature';
+	const performanceSensitive =
+		scope === 'framework-core' ||
+		changeKind === 'performance' ||
+		input.performanceSensitive === true;
+	const correctnessGate =
+		changeKind === 'bug'
+			? 'Reproduce the bug through a realistic public boundary and verify that the test has a credible pre-fix failure.'
+			: 'Protect the new or changed behavior through a realistic public boundary with an assertion that would fail if the contract were absent.';
+	const plan = {
+		scope,
+		changeKind,
+		performanceSensitive,
+		areas: paths.map((path) => ({ path, area: areaForPath(path) })),
+		requiredSkills: ['build-octane-software'],
+		gates: {
+			contract: [
+				'State the consumer-observable behavior, invariants, failure states, and supported execution modes.',
+				'Inspect current source, callers, tests, configuration, and documented Octane divergences before editing.',
+			],
+			correctness: [
+				correctnessGate,
+				'Exercise applicable empty, large, repeated, nested, error, abort, cleanup, production, SSR, and hydration cases.',
+			],
+			performance: performanceSensitive
+				? [
+						'Identify hot paths and record a relevant baseline before editing.',
+						'Compare baseline and candidate with the same environment, warmup, iterations, and semantic controls.',
+						'Inspect allocations, retained memory, DOM work, compiler and generated-code cost, SSR/hydration work, and bundle size as applicable.',
+						'Do not claim improvement when the delta is within noise or no trustworthy measurement exists.',
+					]
+				: [
+						'Check that the change does not add unnecessary reactive work, retained state, dependencies, or common-path cost.',
+						'Measure the important user journey when the change can materially affect it.',
+					],
+			selfReview: [
+				'Read the complete diff adversarially and try to falsify the solution with boundary and lifecycle cases.',
+				'Trace new state and allocations through invalidation, cleanup, errors, and aborts.',
+				'Compare with a simpler design and remove complexity that does not justify its permanent cost.',
+				'Resolve findings, rerun affected checks, and repeat the review on the final diff.',
+			],
+			handoff: [
+				'Report the protected contract, validation commands and results, and applicable baseline/candidate measurements.',
+				'Report improvements made during self-review, untested modes, inconclusive evidence, and residual risk.',
+			],
+		},
+	};
+
+	if (scope === 'framework-core' && repoMode) {
+		plan.requiredSkills.push('octane-core-extend', 'performance-audit');
+	}
+	if (scope === 'framework-core' && !repoMode) {
+		plan.blockingConditions = [
+			'Framework-core work requires the MCP server to run against an Octane monorepo checkout. Set OCTANE_REPO_ROOT, reconnect, and request this plan again so maintainer skills and repository validation are available.',
+		];
+	}
+	if (repoMode) {
+		const taskKind =
+			scope === 'framework-core' ? 'core' : performanceSensitive ? 'performance' : changeKind;
+		plan.validationCommands = validationFor(paths, taskKind);
+	}
+
+	return plan;
 }
 
 export function runCommand(command, args, options = {}) {
@@ -302,7 +381,7 @@ function registerUserTools(server, repoRoot, repoMode) {
 		{
 			title: 'Octane skill',
 			description:
-				'Return an Octane agent skill by name. Bundled skills cover working WITH octane in any project: bridging React packages, migrating React components to .tsrx, intentional React divergences, and SSR setup.' +
+				'Return an Octane agent skill by name. Load build-octane-software before creating or materially changing Octane code; other bundled skills cover React package bridges, component migration, intentional divergences, and SSR setup.' +
 				(repoMode ? ' Repo skills cover octane maintainer workflows.' : ''),
 			inputSchema: {
 				name: z.enum(Object.keys(skills)),
@@ -316,11 +395,32 @@ function registerUserTools(server, repoRoot, repoMode) {
 	);
 
 	server.registerTool(
+		'octane_engineering_plan',
+		{
+			title: 'Plan high-quality Octane engineering work',
+			description:
+				'Return required correctness, performance-evidence, adversarial self-review, and handoff gates before creating or materially changing Octane software. Framework-core scope always requires baseline/candidate performance evidence and the maintainer core/performance skills.',
+			inputSchema: {
+				scope: z.enum(['application', 'library', 'framework-core']),
+				changeKind: z
+					.enum(['bug', 'feature', 'performance', 'refactor', 'api', 'docs', 'test', 'unknown'])
+					.default('feature'),
+				paths: z.array(z.string()).default([]).describe('Repository-relative changed paths.'),
+				performanceSensitive: z
+					.boolean()
+					.optional()
+					.describe('Force performance evidence for application or library work.'),
+			},
+		},
+		async (input) => text(JSON.stringify(engineeringPlanFor(input, repoMode), null, 2)),
+	);
+
+	server.registerTool(
 		'octane_bridge_react_package',
 		{
 			title: 'Bridge a React package to Octane',
 			description:
-				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, class components, synthetic onChange, react-dom/server imports), whether a framework-agnostic core can be reused verbatim, whether an official @octanejs binding already exists, and a step-by-step bridge plan. Follow up with the bridge-react-package skill for the full workflow.',
+				'Scan a React package (from node_modules by name, or any source directory by path) for React API usage and return an Octane compatibility report: which APIs map 1:1, which need rewrites (forwardRef, class components, React-style text-host onChange, react-dom/server imports), whether a framework-agnostic core can be reused verbatim, whether an official @octanejs binding already exists, and a step-by-step bridge plan. Follow up with the bridge-react-package skill for the full workflow.',
 			inputSchema: {
 				package: z
 					.string()
@@ -475,7 +575,10 @@ function registerRepoTools(server, repoRoot) {
 export function createServer(options = {}) {
 	const repoRoot = resolve(options.repoRoot || process.env.OCTANE_REPO_ROOT || process.cwd());
 	const repoMode = isOctaneRepo(repoRoot);
-	const server = new McpServer({ name: 'octane', version: '0.2.0' });
+	const server = new McpServer(
+		{ name: 'octane', version: '0.2.0' },
+		{ instructions: instructionsFor(repoMode) },
+	);
 	registerUserTools(server, repoRoot, repoMode);
 	if (repoMode) registerRepoTools(server, repoRoot);
 	return server;

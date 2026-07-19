@@ -11,7 +11,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseModule } from '@tsrx/core';
-import { compile, isVoidJsxCodeBlockFunction } from './compile.js';
+import { compile, hasOnlyLowerableNullishExits, isVoidJsxCodeBlockFunction } from './compile.js';
 import { addSourceMapNeedles, composeSourceMaps } from './compile-universal.js';
 import {
 	hydrateBoundaryPathFromId,
@@ -19,7 +19,11 @@ import {
 	prepareServerHydrateBoundaries,
 } from './hydrate-boundaries.js';
 import { normalizeRendererConfig, resolveRendererForFile } from './renderers.js';
-import { findVoidRootImports, slotHooks } from './slot-hooks.js';
+import {
+	analyzeNativeChangeDiagnostics,
+	formatCompileDiagnostic,
+} from './native-change-diagnostics.js';
+import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import {
 	assertNoLiveClientOnlyImports,
 	createClientOnlyServerStub,
@@ -27,7 +31,7 @@ import {
 	findStaticRuntimeImportRequests,
 } from './client-only-server.js';
 
-export { findVoidRootImports };
+export { findVoidComponentImports, findVoidRootImports };
 export { HYDRATE_QUERY_PARAM } from './hydrate-boundaries.js';
 export {
 	CLIENT_REFERENCE_MANIFEST_FILENAME,
@@ -57,7 +61,8 @@ export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 /** Strip bundler query/hash suffixes without changing the underlying path. */
 export function cleanModuleId(id) {
 	const query = id.indexOf('?');
-	const hash = id.indexOf('#');
+	// A leading `#` is a Node package-import alias, not a URL fragment.
+	const hash = id.indexOf('#', id.startsWith('#') ? 1 : 0);
 	let end = id.length;
 	if (query !== -1) end = query;
 	if (hash !== -1 && hash < end) end = hash;
@@ -168,10 +173,12 @@ function normalizeHmrDialect(value) {
 }
 
 /**
- * Classify only direct function exports whose TSRX body never returns a value.
- * This fact is attached to the module by bundler adapters after compiling the
- * exact source those adapters loaded. Re-exports and indirect bindings remain
- * deliberately unknown.
+ * Classify direct function exports whose production TSRX body has no renderable
+ * JavaScript return. A direct `memo(LocalComponent)` export preserves that
+ * contract, as do null-only early-return guards that compile to template
+ * control flow. Bundler adapters attach this fact after compiling the exact
+ * source they loaded. Re-exports and indirect bindings remain deliberately
+ * unknown.
  */
 export function findVoidComponentExports(source, id) {
 	let ast;
@@ -180,6 +187,74 @@ export function findVoidComponentExports(source, id) {
 	} catch {
 		return [];
 	}
+	const memoLocals = new Set();
+	const declarations = [];
+	for (const node of ast.body || []) {
+		if (node.type === 'ImportDeclaration' && node.source?.value === 'octane') {
+			for (const specifier of node.specifiers || []) {
+				if (
+					specifier.type === 'ImportSpecifier' &&
+					(specifier.imported?.name ?? specifier.imported?.value) === 'memo' &&
+					specifier.local?.name
+				) {
+					memoLocals.add(specifier.local.name);
+				}
+			}
+		}
+		const declaration =
+			node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+				? node.declaration
+				: node;
+		if (declaration) declarations.push(declaration);
+	}
+
+	const voidBindings = new Set();
+	const isVoidFunction = (node) =>
+		isVoidJsxCodeBlockFunction(node) || hasOnlyLowerableNullishExits(node);
+	for (const declaration of declarations) {
+		if (declaration.type === 'FunctionDeclaration' && declaration.id?.name) {
+			if (isVoidFunction(declaration)) voidBindings.add(declaration.id.name);
+			continue;
+		}
+		if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+		for (const item of declaration.declarations || []) {
+			if (
+				item.id?.type === 'Identifier' &&
+				(item.init?.type === 'FunctionExpression' ||
+					item.init?.type === 'ArrowFunctionExpression') &&
+				isVoidFunction(item.init)
+			) {
+				voidBindings.add(item.id.name);
+			}
+		}
+	}
+	// Resolve only the exact, immutable `const Export = memo(Local)` form. The
+	// imported memo identity is lexical proof; method calls, comparators, and
+	// arbitrary wrappers stay unknown.
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const declaration of declarations) {
+			if (declaration.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
+			for (const item of declaration.declarations || []) {
+				const init = item.init;
+				if (
+					item.id?.type !== 'Identifier' ||
+					voidBindings.has(item.id.name) ||
+					init?.type !== 'CallExpression' ||
+					init.callee?.type !== 'Identifier' ||
+					!memoLocals.has(init.callee.name) ||
+					init.arguments?.length !== 1 ||
+					init.arguments[0]?.type !== 'Identifier' ||
+					!voidBindings.has(init.arguments[0].name)
+				)
+					continue;
+				voidBindings.add(item.id.name);
+				changed = true;
+			}
+		}
+	}
+
 	const exports = [];
 	for (const node of ast.body || []) {
 		if (node.type === 'ExportDefaultDeclaration') {
@@ -188,7 +263,7 @@ export function findVoidComponentExports(source, id) {
 				(declaration?.type === 'FunctionDeclaration' ||
 					declaration?.type === 'FunctionExpression' ||
 					declaration?.type === 'ArrowFunctionExpression') &&
-				isVoidJsxCodeBlockFunction(declaration)
+				isVoidFunction(declaration)
 			) {
 				exports.push('default');
 			}
@@ -199,19 +274,14 @@ export function findVoidComponentExports(source, id) {
 		if (
 			declaration?.type === 'FunctionDeclaration' &&
 			declaration.id?.name &&
-			isVoidJsxCodeBlockFunction(declaration)
+			voidBindings.has(declaration.id.name)
 		) {
 			exports.push(declaration.id.name);
 			continue;
 		}
 		if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue;
 		for (const item of declaration.declarations || []) {
-			if (
-				item.id?.type === 'Identifier' &&
-				(item.init?.type === 'FunctionExpression' ||
-					item.init?.type === 'ArrowFunctionExpression') &&
-				isVoidJsxCodeBlockFunction(item.init)
-			) {
+			if (item.id?.type === 'Identifier' && voidBindings.has(item.id.name)) {
 				exports.push(item.id.name);
 			}
 		}
@@ -312,6 +382,7 @@ class OctaneBundlerCompiler {
 		this.requireDirective = options.requireDirective === true;
 		this.warn = typeof options.warn === 'function' ? options.warn : null;
 		this.warnedUndirected = new Set();
+		this.warnedCompileDiagnostics = new Set();
 		// Deliberately instance-scoped: separate projects/build environments must
 		// never share nearest-manifest decisions.
 		this.manifestRuleCache = new Map();
@@ -320,6 +391,10 @@ class OctaneBundlerCompiler {
 
 	/** Clear cached manifest/discovery decisions after a watched path changes. */
 	invalidate(path) {
+		// Invalidation starts a new watch generation. Diagnostics are deduped
+		// across client/server and hydrate-query transforms within one generation,
+		// but a fixed and later reintroduced warning must be visible again.
+		this.warnedCompileDiagnostics.clear();
 		if (path == null) {
 			this.manifestRuleCache.clear();
 			this.discoveryCache = null;
@@ -491,6 +566,16 @@ class OctaneBundlerCompiler {
 		this.warn(
 			`${filename} imports from 'octane' but has no 'use octane' module directive — with requireDirective enabled, Octane will not compile or transform it. Add 'use octane' at the top of the module if Octane should own it.`,
 		);
+	}
+
+	_forwardCompileDiagnostics(diagnostics) {
+		if (this.warn === null) return;
+		for (const diagnostic of diagnostics ?? []) {
+			const key = `${diagnostic.code}\0${diagnostic.filename}\0${diagnostic.start.offset}\0${diagnostic.end.offset}`;
+			if (this.warnedCompileDiagnostics.has(key)) continue;
+			this.warnedCompileDiagnostics.add(key);
+			this.warn(formatCompileDiagnostic(diagnostic));
+		}
 	}
 
 	_assertClientOnlySourceSupported(file, filename, renderer, collected) {
@@ -786,6 +871,18 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
+			const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(
+				parseModule(source, filename),
+				source,
+				filename,
+				{
+					dom: renderer.target === 'dom',
+					renderer,
+					rendererBoundaries: this.renderers.boundaries,
+					rendererRegistry: this.renderers.registry,
+				},
+			);
+			const nativeChangeDiagnostics = nativeChangeAnalysis.diagnostics;
 			// Hydrate-boundary preparation consumes the directive-stripped source;
 			// blanking preserved every position, so its maps stay consistent.
 			const hydratePreparation =
@@ -796,6 +893,16 @@ class OctaneBundlerCompiler {
 			const out = compile(compileSource, filename, {
 				__hydratePrepared: true,
 				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
+				__nativeChangeDiagnostics: nativeChangeDiagnostics,
+				...(hydratePreparation === null && !hasRendererBoundaries
+					? { __nativeChangeAnalysis: nativeChangeAnalysis }
+					: null),
+				// Scoped-style hashes are position-derived; after the extraction
+				// rewrite the compiler restamps them from these authored
+				// coordinates so client and server compiles agree (compile.js).
+				...(hydratePreparation?.origins != null
+					? { __styleRemap: { authored: source, origins: hydratePreparation.origins } }
+					: null),
 				hmr,
 				mode: environment,
 				dev,
@@ -812,14 +919,19 @@ class OctaneBundlerCompiler {
 				...(hasRendererBoundaries ? { rendererBoundaries: this.renderers.boundaries } : null),
 				...(hasRendererBoundaries ? { rendererRegistry: this.renderers.registry } : null),
 				...(clientOnlyImports.length > 0 ? { clientOnlyImports } : null),
+				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
+					? { isVoidComponentImport: options.isVoidComponentImport }
+					: null),
 			});
 			if (hydratePreparation?.map && out.map) {
 				out.map = composeSourceMaps(out.map, hydratePreparation.map);
 				out.map = addSourceMapNeedles(out.map, out.code, source, hydratePreparation.mappingNeedles);
 			}
+			this._forwardCompileDiagnostics(out.diagnostics);
 			return {
 				code: out.code,
 				map: out.map,
+				diagnostics: out.diagnostics,
 				kind: 'compile',
 				renderer,
 				...(clientReference === null ? null : { clientReference }),

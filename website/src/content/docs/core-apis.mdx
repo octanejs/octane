@@ -229,7 +229,9 @@ export function NameField() @{
 		<code>onInput</code>
 		{' for each keystroke in a text field. Native '}
 		<code>change</code>
-		{' fires when the browser commits the edit, often on blur. Events such as '}
+		{
+			' fires when the browser commits the edit, often on blur. The compiler warning OCTANE_NATIVE_TEXT_ONCHANGE catches likely React-style text-host wiring; dynamic final props are checked in development. Events such as '
+		}
 		<code>onClick</code>
 		{', '}
 		<code>onSubmit</code>
@@ -238,6 +240,20 @@ export function NameField() @{
 		{' otherwise work as normal browser events.'}
 	</p>
 </aside>
+
+When commit-on-blur is intentional, keep native `onChange` and mark that local host
+explicitly. The hint is not rendered to the DOM and does not alter the event:
+
+```tsrx
+<input
+	defaultValue={savedDraft}
+	onChange={(event) => save(event.currentTarget.value)}
+	suppressNativeChangeWarning
+/>
+```
+
+No suppression is needed for `select`, checkbox/radio inputs, custom elements, or
+component API props named `onChange`; they are outside the text-entry diagnostic.
 
 For state with many related updates, `useReducer(reducer, initialState)` keeps the update
 rules in one function. It supports the same optional third-item latest-state getter as
@@ -676,6 +692,27 @@ import { interaction, visible } from 'octane/hydration';
 	<Recommendations />
 </Hydrate>
 ```
+
+#### Capture interactions before `hydrateRoot()`
+
+An immediate `hydrateRoot()` call needs no extra setup: mounting the first `Hydrate`
+boundary installs interaction capture as a synchronous fallback. If your client entry
+awaits route discovery, data, or dynamic imports before it calls `hydrateRoot()`,
+install the lightweight capture queue before that work so an interaction during the
+gap can be replayed:
+
+```ts
+import { hydrateRoot } from 'octane';
+import { initializeHydrationEventCapture } from 'octane/hydration';
+
+initializeHydrationEventCapture();
+
+await prepareClient();
+hydrateRoot(document.getElementById('app')!, App);
+```
+
+Calling `initializeHydrationEventCapture()` more than once is safe; Octane installs
+the listeners only once per document.
 
 <h3 id="hydrate-split">
 	Control the child chunk with <code>split</code>

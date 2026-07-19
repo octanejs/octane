@@ -36,6 +36,7 @@ interface BundlerEvidence {
 	};
 	hmrSelfAccept: boolean;
 	rspackBundleHasScene: boolean;
+	viteRenderedThreeModules: string[];
 }
 
 function startStaticServer(root: string): Promise<Server> {
@@ -140,6 +141,18 @@ describe('Three Canvas bundler and browser integration', () => {
 				expect(existsSync(resolve(output, chunk))).toBe(true);
 			}
 		}
+	});
+
+	it('tree-shakes unused public-root features from the production Canvas bundle', () => {
+		expect(bundlerEvidence.viteRenderedThreeModules).toContain('src/web/Canvas.tsrx');
+		expect(bundlerEvidence.viteRenderedThreeModules).not.toEqual(
+			expect.arrayContaining([
+				'src/core/portal.ts',
+				'src/scheduling.ts',
+				'src/web/DOMRegion.ts',
+				'src/web/dom-region.ts',
+			]),
+		);
 	});
 
 	it('loads and caches a real browser asset through the Three loader path', async () => {

@@ -35,8 +35,11 @@ export {
 	type RenderResult,
 	type RenderOptions,
 	type StreamOptions,
+	type StreamInjectionSource,
 	setSsrSuspenseTimeout,
 	getSsrSuspenseTimeout,
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
 
 	// Hooks (server semantics)
 	useState,

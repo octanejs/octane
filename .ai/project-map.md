@@ -8,6 +8,8 @@ Always prefer current source over summaries:
 
 - `README.md` — positioning, quick start, `.tsrx` syntax, public examples.
 - `AGENTS.md` and `.rulesync/rules/project.md` — shared agent rules. This repo uses RuleSync, so update `.rulesync/rules/` then run `pnpm rules:generate` when changing generated references.
+- `.rulesync/rules/core-engineering.md` — mandatory performance-first design,
+  measurement, and adversarial self-review gates for framework fundamentals.
 - `packages/octane/src/runtime.ts` — client runtime: rendering, hooks, scheduler, events, refs, context, portals, Suspense/transitions, keyed reconciler.
 - `packages/octane/src/runtime.server.ts` and `packages/octane/src/server/index.ts` — SSR and hydration-facing server runtime.
 - `packages/octane/src/compiler/` — TSRX compiler and Vite/Volar integration.
@@ -52,7 +54,7 @@ Run targeted package tests by project/file, e.g.:
 
 - Octane is React-shaped, not React-cloned. Check documented intentional divergences before changing behavior.
 - Hooks use compiler-injected call-site slots; conditional and early-return hooks are valid. Slot-keyed hooks in plain JS loops are a compile error — use the keyed `@for` directive or a child component (`use()`/`useContext` are exempt).
-- Events are native delegated DOM events, not React synthetic events. There is no synthetic `onChange` normalization: `onInput` is the per-keystroke handler; native `change` fires on blur/commit.
+- Events are native delegated DOM events, not React synthetic events. There is no synthetic `onChange` normalization: `onInput` is the per-edit handler; native `change` fires on commit/blur. `OCTANE_NATIVE_TEXT_ONCHANGE` reports likely React-style text-host wiring at compile time (or at development runtime for ambiguous final props). Keep genuine text commit behavior with `suppressNativeChangeWarning`; do not rewrite component callbacks, selects, or checkbox/radio handlers.
 - Controlled `value`/`checked` match React (2026-07-08): the prop drives the DOM property and reasserts on every commit and after discrete events; `defaultValue`/`defaultChecked` are the uncontrolled escape hatch.
 - Keyed reconciliation is LIS-based; final DOM and node identity matter more than matching React's move set.
 - `class`/`className` compose clsx-style.

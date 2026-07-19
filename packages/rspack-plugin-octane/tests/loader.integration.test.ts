@@ -211,6 +211,16 @@ describe('loader with the neutral compiler', () => {
 		expect(hook.warnings.some((warning) => warning.message.includes("'use octane'"))).toBe(true);
 	});
 
+	it('delivers native text onChange diagnostics as Rspack module warnings', () => {
+		const source = `export function App() @{ <input onChange={() => {}} /> }\n`;
+		const resourcePath = write(root, 'src/App.tsrx', source);
+		const result = transform({ root, resourcePath, source });
+
+		expect(result.warnings).toHaveLength(1);
+		expect(result.warnings[0].message).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
+		expect(result.warnings[0].message).toContain('/src/App.tsrx:1:');
+	});
+
 	it('compiles eligible raw dependency TSX', () => {
 		const packageRoot = join(root, 'node_modules/@fixture/raw');
 		mkdirSync(packageRoot, { recursive: true });
@@ -269,7 +279,7 @@ describe('loader with the neutral compiler', () => {
 		writeFileSync(manifest, '{"name":"nested","octane":{"hookSlots":{"manual":[]}}}\n');
 		const compiled = transform({ root, resourcePath, source });
 		expect(String(compiled.content)).toContain('useState(1, _h$0)');
-		expect(String(compiled.content)).toContain('const _h$0 = Symbol(');
+		expect(String(compiled.content)).toContain('const _h$0 = /* @__PURE__ */ Symbol(');
 		expect(compiled.dependencies).toContain(realpathSync(manifest));
 		expect(compiled.module.buildInfo.octane).toMatchObject({ transformKind: 'slots' });
 	});

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from './_helpers';
-import { SuspenseHost, SuspenseHostJsx, ErrorHost } from './_fixtures/boundary.tsrx';
+import {
+	SuspenseHost,
+	SuspenseHostJsx,
+	ErrorHost,
+	ResetErrorHost,
+} from './_fixtures/boundary.tsrx';
 
 describe('<Suspense> component', () => {
 	it('shows an outer fallback when a nested ErrorBoundary child suspends', async () => {
@@ -39,6 +44,14 @@ describe('<ErrorBoundary> component', () => {
 	it('catches a thrown error and renders the fallback render-prop', () => {
 		const r = mount(ErrorHost, { bang: true });
 		expect(r.container.textContent).toContain('caught:boom');
+		r.unmount();
+	});
+	it('passes reset to an inline compiled fallback', () => {
+		const state = { failed: true };
+		const r = mount(ResetErrorHost, { state });
+		expect(r.find('#reset-error').textContent).toBe('retry:reset me');
+		r.click('#reset-error');
+		expect(r.find('#reset-ok').textContent).toBe('recovered');
 		r.unmount();
 	});
 });

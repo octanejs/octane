@@ -87,6 +87,35 @@ describe('hmr — runtime wrapper', () => {
 		r.unmount();
 	});
 
+	it('rejects an update whose compiled output ABI is incompatible', () => {
+		const v1: ComponentBody<any> = ((_props: any, scope: Scope) => {
+			clearBlockRange(scope);
+			const root = document.createElement('span');
+			root.className = 'leaf';
+			root.textContent = 'committed';
+			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
+		}) as ComponentBody<any>;
+		const v2: ComponentBody<any> = ((_props: any, scope: Scope) => {
+			clearBlockRange(scope);
+			const root = document.createElement('span');
+			root.className = 'leaf';
+			root.textContent = 'incompatible';
+			scope.block.parentNode.insertBefore(root, scope.block.endMarker);
+		}) as ComponentBody<any>;
+		(v2 as any).__octaneReturnedOutput = true;
+
+		const Foo = hmr(v1);
+		const r = mount(Foo);
+		let accepted = true;
+		flushSync(() => {
+			accepted = (Foo as any)[HMR].update(hmr(v2));
+		});
+		expect(accepted).toBe(false);
+		expect((Foo as any)[HMR].fn).toBe(v1);
+		expect(r.find('.leaf').textContent).toBe('committed');
+		r.unmount();
+	});
+
 	it('preserves hook state across update() — stable Symbol.for keys', () => {
 		// Both bodies use the SAME hook symbol (simulating the compiler's
 		// `Symbol.for('octane:file.tsrx:Foo.useState#0')`-stable emit).
@@ -151,7 +180,34 @@ describe('hmr — runtime wrapper', () => {
 		expect(code).toMatch(/export const Foo = _\$hmr\(function Foo/);
 		// Vite-shaped accept block.
 		expect(code).toMatch(/if \(import\.meta\.hot\)/);
-		expect(code).toMatch(/Foo\[_\$HMR\]\.update\(module\.Foo\)/);
+		expect(code).toMatch(
+			/if \(!Foo\[_\$HMR\]\.update\(module\.Foo\)\) import\.meta\.hot\.invalidate\(\)/,
+		);
+	});
+
+	it('distinguishes lowered null guards from renderable value returns during HMR', async () => {
+		const { compile } = await import('octane/compiler');
+		const direct = compile(
+			`export function Foo(p) @{ <span>{p.label as string}</span> }`,
+			'file.tsrx',
+			{ hmr: true },
+		).code;
+		const mixed = compile(
+			`export function Foo(p) @{ if (p.empty) return null; <span>{p.label as string}</span> }`,
+			'file.tsrx',
+			{ hmr: true },
+		).code;
+		const returned = compile(
+			`export function Foo(p) @{ if (p.empty) return 'empty'; <span>{p.label as string}</span> }`,
+			'file.tsrx',
+			{ hmr: true },
+		).code;
+
+		expect(direct).not.toContain('__octaneReturnedOutput');
+		expect(mixed).not.toContain('__octaneReturnedOutput');
+		expect(mixed).toContain('_$ifBlock');
+		expect(returned).toContain('{ __octaneReturnedOutput: true }');
+		expect(mixed).toContain('if (!Foo[_$HMR].update(module.Foo)) import.meta.hot.invalidate();');
 	});
 
 	it('webpack HMR preserves named and default wrapper identity across repeated updates', async () => {
@@ -186,6 +242,7 @@ describe('hmr — runtime wrapper', () => {
 					.replaceAll('import.meta.webpackHot', 'hot') + '\nreturn { Named, default: Default };';
 			let dispose: ((value: Record<string, any>) => void) | undefined;
 			let accepted = false;
+			let invalidated = false;
 			const hot = {
 				data,
 				dispose(callback: (value: Record<string, any>) => void) {
@@ -193,6 +250,9 @@ describe('hmr — runtime wrapper', () => {
 				},
 				accept() {
 					accepted = true;
+				},
+				invalidate() {
+					invalidated = true;
 				},
 			};
 			const exports = Function('runtime', 'hot', transformed)(runtime, hot) as {
@@ -202,6 +262,7 @@ describe('hmr — runtime wrapper', () => {
 			const nextData: Record<string, any> = {};
 			dispose?.(nextData);
 			expect(accepted).toBe(true);
+			expect(invalidated).toBe(false);
 			return { exports, data: nextData };
 		};
 
@@ -287,7 +348,7 @@ describe('hmr — runtime wrapper', () => {
 		expect(dev?.code).toMatch(/Symbol\.for\("octane:\/abs\/custom\.ts:useCounter\.useState#0"\)/);
 		const prod = slotHooks(src, '/abs/custom.ts');
 		expect(prod?.code).toMatch(/_\$hookSlots\(1\)/);
-		expect(prod?.code).toMatch(/const _h\$0 = Symbol\(_hs\$\);/);
+		expect(prod?.code).toMatch(/const _h\$0 = \/\* @__PURE__ \*\/ Symbol\(_hs\$\);/);
 		expect(prod?.code).not.toMatch(/Symbol\.for|abs\/custom/);
 	});
 
@@ -305,7 +366,7 @@ describe('hmr — runtime wrapper', () => {
 		const call = code.match(/useState\(1, ([^)]+)\)/);
 		expect(call?.[1]).toMatch(/^_h\$\d+$/);
 		expect(code).not.toMatch(/useState\(1, _h\$\d+, _h\$\d+\)/);
-		expect(code).toMatch(/const _h\$\d+ = Symbol\(_hs\$(?: \+ \d+)?\);/);
+		expect(code).toMatch(/const _h\$\d+ = \/\* @__PURE__ \*\/ Symbol\(_hs\$(?: \+ \d+)?\);/);
 	});
 
 	it('avoids user bindings when naming full-compiler and surgical slot declarations', async () => {
@@ -317,14 +378,14 @@ describe('hmr — runtime wrapper', () => {
 		const full = compile(source, 'slot-names.tsrx', { hmr: false }).code;
 		expect(full).toContain('hookSlots as _$hookSlots$');
 		expect(full).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
-		expect(full).toMatch(/const _h\$0\$ = Symbol\(_hs\$\$\);/);
+		expect(full).toMatch(/const _h\$0\$ = \/\* @__PURE__ \*\/ Symbol\(_hs\$\$\);/);
 		expect(full).toContain('useStateWithGetter(1, _h$0$)');
 
 		const { slotHooks } = await import('../src/compiler/slot-hooks.js');
 		const surgical = slotHooks(source, 'slot-names.ts')!.code;
 		expect(surgical).toContain('hookSlots as _$hookSlots$');
 		expect(surgical).toContain('const _hs$$ = /* @__PURE__ */ _$hookSlots$(1);');
-		expect(surgical).toMatch(/const _h\$0\$ = Symbol\(_hs\$\$\);/);
+		expect(surgical).toMatch(/const _h\$0\$ = \/\* @__PURE__ \*\/ Symbol\(_hs\$\$\);/);
 		expect(surgical).toContain('useStateWithGetter(1, _h$0$)');
 	});
 

@@ -371,7 +371,7 @@ function FieldControl(props: any): any {
 					'aria-labelledby': labelId,
 					autoFocus: autoFocus || undefined,
 					...(isControlled ? { value } : { defaultValue }),
-					onChange(event: any) {
+					onInput(event: any) {
 						const inputValue = event.currentTarget.value;
 						onValueChange?.(inputValue, createChangeEventDetails(REASONS.none, event));
 						setDirty(inputValue !== validityData.initialValue);

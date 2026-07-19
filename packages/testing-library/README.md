@@ -67,6 +67,17 @@ React-specific remappings:
   commit and after discrete events, exactly like React — only the synthetic
   `onChange` normalization is absent, so a controlled text input updates its
   state from `onInput`.
+- **Text commit behavior is separate and intentional.** `user.type(input, text)`
+  emits native `input` events; a text `onChange` does not run until the edit is
+  committed, such as when `await user.tab()` blurs the field. A commit-only host
+  should use `defaultValue`, native `onChange`, and
+  `suppressNativeChangeWarning`. The hint only acknowledges intent; it does not
+  remap or dispatch an event.
+- **Checkables need click activation when activation is under test.**
+  `await user.click(checkbox)` produces the native `click` → `input` → `change`
+  sequence and automatic checked-state transition. `fireEvent.change(checkbox)`
+  is only an explicit change dispatch; it does not model the click, activation,
+  cancellation/rollback, or full event ordering.
 - **No enter/leave/focus double-dispatch.** RTL's `fireEvent.mouseEnter` also
   fires `mouseover` (and `focus` fires `focusin`, `select` fires `keyup`, …)
   purely to feed React's plugin system, which listens to different native
@@ -125,7 +136,7 @@ dispatches **real native events**, which is exactly octane's event model (a
 better fit than React, where it relies on the synthetic layer picking natives
 up). Install it alongside this package and use it unchanged; the pairing is
 pinned by `tests/user-event.test.ts` (click, `type()` per-keystroke `onInput`,
-`keyboard()`).
+text commit on `tab()`, checkbox click ordering, `keyboard()`).
 
 ## Status
 

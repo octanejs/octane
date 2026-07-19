@@ -1,0 +1,60 @@
+{
+  "name": "@octanejs/styled-components",
+  "version": "0.1.2",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "description": "styled-components for the octane renderer — the full v6 web API (styled, css, keyframes, createGlobalStyle, theming, StyleSheetManager, ServerStyleSheet) over octane's ref-as-prop components and its automatic SSR css channel.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/styled-components"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@emotion/is-prop-valid": "catalog:default",
+    "csstype": "catalog:default",
+    "stylis": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "@types/stylis": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "styled-components": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

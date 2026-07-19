@@ -88,7 +88,10 @@ deterministic `setTimeout` schedule:
   boundary in all five fixtures.
 - **octane**: per-round full re-passes (documented divergence from React Fizz
   in `runtime.server.ts`) — batches all boundaries that resolve in the same
-  round into one chunk, and re-renders the whole page each round.
+  round into one chunk, and re-renders the whole page each round. Resolved
+  boundary markup travels in parser-safe JSON data scripts so trusted raw HTML
+  cannot close a protocol carrier early; the correctness gate decodes those
+  carriers before inspecting the semantic page shape.
 - **React**: splits the shell across ~2KB view-buffer writes (`chunkCount`
   counts them); streams one segment + swap script per boundary.
 - **Preact**: uses `preact-render-to-string/stream-node` with a real Node
@@ -109,7 +112,9 @@ deterministic `setTimeout` schedule:
 The harness correctness gate asserts semantics only (shell exactly once, all
 10 card payloads present, and — for staggered — the first chunk flushed before
 the slowest data could resolve and the stream outlived the 50ms schedule).
-Chunk framing is deliberately NOT gated; it's part of the result.
+Protocol payload decoding is confined to this verification pass; measured
+bytes, chunks, and timings always use the original wire output. Chunk framing
+is deliberately NOT gated; it's part of the result.
 
 ## Run
 
