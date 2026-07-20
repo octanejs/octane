@@ -686,9 +686,7 @@ function CheckoutPage(props: CheckoutPageProps) @{
 					<p class="eyebrow">Your order</p>
 					@for (const line of props.lines; key line.productId) {
 						<div class="checkout-summary__line">
-							<span>
-								{line.quantity + ' × ' + requireProduct(line.productId).name}
-							</span>
+							<span>{line.quantity + ' × ' + requireProduct(line.productId).name}</span>
 							<strong>{formatMoney(
 								line.quantity * requireProduct(line.productId).priceCents,
 							)}</strong>

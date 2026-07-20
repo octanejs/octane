@@ -95,7 +95,7 @@ export function areaForPath(path) {
 	if (path.startsWith('packages/rspack-plugin-octane/')) return 'rspack-plugin';
 	if (path.startsWith('packages/rsbuild-plugin-octane/')) return 'rsbuild-plugin';
 	if (path.startsWith('packages/vite-plugin-octane/')) return 'vite-plugin';
-	if (path.startsWith('packages/adapter-vercel/')) return 'deploy-adapter';
+	if (/^packages\/adapter-[^/]+\//.test(path)) return 'deploy-adapter';
 	if (path.startsWith('packages/octane-evals/')) return 'evals';
 	if (path.startsWith('packages/octane-mcp-server/')) return 'mcp-server';
 	const packageMatch = path.match(/^packages\/([^/]+)\//);
@@ -167,9 +167,14 @@ export function validationFor(paths, taskKind) {
 		);
 	}
 	if (areas.has('deploy-adapter')) {
-		commands.add(
-			'./node_modules/.bin/vitest run packages/adapter-vercel/tests --project adapter-vercel',
-		);
+		for (const path of paths) {
+			const match = path.match(/^packages\/(adapter-[^/]+)\//);
+			if (match) {
+				commands.add(
+					`./node_modules/.bin/vitest run packages/${match[1]}/tests --project ${match[1]}`,
+				);
+			}
+		}
 	}
 	if (
 		areas.has('metaframework-core') ||

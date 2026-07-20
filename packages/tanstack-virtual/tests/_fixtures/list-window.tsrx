@@ -15,9 +15,7 @@ export function WindowList(props: { initialOffset?: number }) @{
 	captured.instance = virtualizer;
 	<div style={{ height: virtualizer.getTotalSize() + 'px', position: 'relative' }}>
 		@for (const item of virtualizer.getVirtualItems(); key item.key) {
-			<div class="wrow" data-index={item.index}>
-				{'Row ' + item.index}
-			</div>
+			<div class="wrow" data-index={item.index}>{'Row ' + item.index}</div>
 		}
 	</div>
 }

@@ -16,9 +16,7 @@ export function NestedStoryFeed(props) @{
 				} @pending {
 					<p class="story-pending" data-story-id={story.id}>Loading story</p>
 				} @catch (error) {
-					<p class="story-error" data-story-id={story.id}>
-						{'Unavailable: ' + error.message}
-					</p>
+					<p class="story-error" data-story-id={story.id}>{'Unavailable: ' + error.message}</p>
 				};
 			} @empty {
 				<p id="empty-feed">No stories</p>

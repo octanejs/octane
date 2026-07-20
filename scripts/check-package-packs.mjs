@@ -141,7 +141,7 @@ function validatePackedPackage(pkg, manifest, files) {
 			);
 		}
 	}
-	if (pkg.name === '@octanejs/adapter-vercel') {
+	if (pkg.role === 'deployment adapter') {
 		const expectedAppCore = packageVersions.get('@octanejs/app-core');
 		if (manifest.peerDependencies?.['@octanejs/app-core'] !== expectedAppCore) {
 			errors.push(
@@ -653,9 +653,9 @@ process.stdout.write(output, () => process.exit(0));
 }
 
 /**
- * Exercise the private Phase 1 Lynx compiler packages exactly as an external
- * application consumes them. This is intentionally a production JavaScript
- * compile check, not a native bundle or device-runtime claim.
+ * Exercise the private Milestone 5 Lynx packages exactly as an external
+ * application consumes them. This builds and decodes the native artifact but
+ * remains a source/build check, not a device-runtime claim.
  */
 function validatePackedLynxConsumer(tempRoot, archives) {
 	const consumerDirectory = path.join(tempRoot, 'external-lynx-consumer');
@@ -679,7 +679,9 @@ function validatePackedLynxConsumer(tempRoot, archives) {
 				type: 'module',
 				engines: { node: '>=22' },
 				dependencies: {
+					'@lynx-js/tasm': '0.0.39',
 					'@lynx-js/rspeedy': '0.16.0',
+					'@lynx-js/testing-environment': '0.3.0',
 					'@octanejs/lynx': archiveSpecs['@octanejs/lynx'],
 					'@octanejs/rspack-plugin': archiveSpecs['@octanejs/rspack-plugin'],
 					'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
@@ -718,8 +720,17 @@ globalThis.__octanePackedLynxProbe = 'octane-packed-lynx-compiled';
 `,
 	);
 	writeFileSync(
+		path.join(sourceDirectory, 'background.ts'),
+		`import { root } from '@octanejs/lynx';
+import { App } from './App.tsrx';
+
+void root.render(App);
+`,
+	);
+	writeFileSync(
 		path.join(consumerDirectory, 'build.mjs'),
 		`import { createRspeedy } from '@lynx-js/rspeedy';
+import { decode_napi, decode_wasm, supportNapi } from '@lynx-js/tasm';
 import { pluginOctane, assertLynxToolchain } from '@octanejs/rspeedy-plugin';
 import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -728,6 +739,16 @@ import path from 'node:path';
 const root = ${JSON.stringify(consumerDirectory)};
 const outputRoot = ${JSON.stringify(outputDirectory)};
 const request = createRequire(import.meta.url);
+const testingFacade = realpathSync(request.resolve('@octanejs/lynx/testing'));
+const testingEnvironment = realpathSync(request.resolve('@lynx-js/testing-environment'));
+const canonicalRoot = realpathSync(root);
+const isInstalledHere = (target) => {
+	const relative = path.relative(canonicalRoot, target);
+	return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+};
+if (!isInstalledHere(testingFacade) || !isInstalledHere(testingEnvironment)) {
+	throw new Error('packed Lynx testing facade or its explicit optional peer resolved outside the consumer');
+}
 const directRuntime = realpathSync(request.resolve('octane'));
 const directLynx = realpathSync(request.resolve('@octanejs/lynx'));
 const directRspackPlugin = realpathSync(request.resolve('@octanejs/rspack-plugin'));
@@ -755,6 +776,9 @@ if (realpathSync(pluginRequest.resolve('@octanejs/rspack-plugin')) !== directRsp
 const toolchain = assertLynxToolchain(root);
 for (const [name, version] of Object.entries({
 	'@lynx-js/rspeedy': '0.16.0',
+	'@lynx-js/tasm': '0.0.39',
+	'@lynx-js/web-core': '0.22.2',
+	'@lynx-js/webpack-runtime-globals': '0.0.7',
 	'@rsbuild/core': '2.1.4',
 	'@rspack/core': '2.1.3',
 })) {
@@ -816,9 +840,9 @@ const rspeedy = await createRspeedy({
 			filenameHash: false,
 			sourceMap: false,
 		},
-		source: { entry: { main: './src/App.tsrx' } },
+		source: { entry: { main: './src/background.ts' } },
 		splitChunks: false,
-		plugins: [pluginOctane({ thread: 'background', hmr: false, dev: false }), graphProbe],
+		plugins: [pluginOctane({ hmr: false, dev: false }), graphProbe],
 	},
 });
 let result;
@@ -837,6 +861,9 @@ try {
 	if (matchingModules(/\\/universal-native\\.[jt]s$/).length !== 1) {
 		throw new Error('production graph did not contain exactly one Octane native universal facade');
 	}
+	if (matchingModules(/\\/@octanejs\\/lynx\\/src\\/main-thread\\.[jt]s$/).length !== 1) {
+		throw new Error('production graph did not contain exactly one generated Octane main receiver');
+	}
 	const forbiddenModule = new RegExp(
 		${JSON.stringify(NATIVE_GRAPH_FORBIDDEN_MODULE.source)},
 		${JSON.stringify(NATIVE_GRAPH_FORBIDDEN_MODULE.flags)},
@@ -846,24 +873,42 @@ try {
 		throw new Error('production Lynx graph contains DOM or React modules: ' + forbiddenModules.join(', '));
 	}
 
-	function readJavaScript(directory) {
-		let output = '';
-		for (const entry of readdirSync(directory, { withFileTypes: true })) {
-			const filename = path.join(directory, entry.name);
-			if (entry.isDirectory()) output += readJavaScript(filename);
-			else if (/\\.(?:c|m)?js$/.test(entry.name)) output += readFileSync(filename, 'utf8');
+	const bundlePath = path.join(outputRoot, 'main.lynx.bundle');
+	if (!existsSync(bundlePath)) {
+		throw new Error('production Rspeedy build emitted no main.lynx.bundle');
+	}
+	const bundle = readFileSync(bundlePath);
+	const decoded = supportNapi() ? decode_napi(bundle) : await decode_wasm(bundle);
+	const scriptText = (script) => {
+		if (typeof script === 'string') return script;
+		if (Array.isArray(script)) {
+			if (script.every((value) => Number.isInteger(value) && value >= 0 && value <= 255)) {
+				return Buffer.from(script).toString('latin1');
+			}
+			return script.map(scriptText).join('\\n');
 		}
-		return output;
+		if (script !== null && typeof script === 'object') {
+			return Object.values(script).map(scriptText).join('\\n');
+		}
+		return '';
+	};
+	const mainThread = scriptText(decoded['main-thread-script']);
+	const background = scriptText(decoded['background-thread-script']);
+	const completeBundle = scriptText(decoded);
+	if (decoded['engine-version'] !== '3.9') {
+		throw new Error('packed native bundle targets engine ' + decoded['engine-version'] + ', expected 3.9');
 	}
-	const output = readJavaScript(outputRoot);
-	if (!output.includes('octane-packed-lynx-compiled')) {
-		throw new Error('production Rspeedy build emitted no executable JavaScript probe');
+	if (!mainThread.includes('getJSContext') || !background.includes('getCoreContext')) {
+		throw new Error('packed native bundle is missing its generated main receiver or background graph');
 	}
-	if (/\\b(?:document|window|HTMLElement|MutationObserver)\\b/.test(output)) {
-		throw new Error('production Rspeedy JavaScript contains a DOM runtime global');
+	if (!background.includes('octane-packed-lynx-compiled')) {
+		throw new Error('packed native bundle background section omitted the authored application');
 	}
-	if (/(?:^|[^$\\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\\w]|$)/i.test(output)) {
-		throw new Error('production Rspeedy JavaScript contains a React runtime reference');
+	if (/\\b(?:document|window|HTMLElement|MutationObserver)\\b/.test(completeBundle)) {
+		throw new Error('packed native bundle contains a DOM runtime global');
+	}
+	if (/(?:^|[^$\\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\\w]|$)/i.test(completeBundle)) {
+		throw new Error('packed native bundle contains a React runtime reference');
 	}
 } finally {
 	await result?.close();
@@ -894,7 +939,7 @@ try {
 	});
 
 	console.log(
-		'built one packed Lynx production JavaScript graph outside the workspace; exact toolchain, singleton Octane/native core, and DOM/React exclusions passed',
+		'built and decoded one packed Lynx Milestone 5 native bundle outside the workspace; exact toolchain, singleton Octane/native core, and DOM/React exclusions passed',
 	);
 }
 

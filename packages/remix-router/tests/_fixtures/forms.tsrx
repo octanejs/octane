@@ -31,9 +31,7 @@ function FormPage() @{
 	const location = useLocation();
 	const submit = useSubmit();
 	<div>
-		<p id="loc">
-			{location.pathname + location.search}
-		</p>
+		<p id="loc">{location.pathname + location.search}</p>
 		<p id="action-out">
 			{actionData ? actionData.via + ':' + actionData.method + ':' + actionData.name : '(none)'}
 		</p>

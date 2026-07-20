@@ -44,6 +44,13 @@ packages:
 allowBuilds:
   esbuild: true
   playwright: true
+  # Miniflare's local Cloudflare runtime binary; required by the adapter's
+  # committed workerd integration test, with no project code generation.
+  workerd: true
+  # Miniflare can optionally transform image bindings through sharp. The
+  # Cloudflare adapter runtime test exercises Workers/SSR only, so no native
+  # sharp install step is needed.
+  sharp: false
   # tldjs's postinstall is a no-op unless npm_config_tldjs_update_rules=true, and
   # it ships a bundled rules.json — so its build is not needed (pulled transitively
   # via rulesync). Explicitly declined to silence the ignored-builds warning.
@@ -66,9 +73,14 @@ overrides:
 
 catalogs:
   lynx:
+    '@lynx-js/css-extract-webpack-plugin': 0.9.0
     '@lynx-js/rspeedy': 0.16.0
+    '@lynx-js/runtime-wrapper-webpack-plugin': 0.2.2
+    '@lynx-js/tasm': 0.0.39
+    '@lynx-js/template-webpack-plugin': 0.13.0
     '@lynx-js/testing-environment': 0.3.0
     '@lynx-js/types': 4.0.0
+    '@lynx-js/webpack-dev-transport': 0.3.0
     '@rsbuild/core': 2.1.4
     '@rspack/core': 2.1.3
     typescript: 5.9.3
@@ -154,8 +166,8 @@ catalogs:
     '@vitest/coverage-istanbul': 4.1.9
     '@vitest/coverage-v8': 4.1.9
     '@tsrx/core': ^0.1.44
-    '@tsrx/prettier-plugin': ^0.3.103
-    '@tsrx/typescript-plugin': ^0.3.103
+    '@tsrx/prettier-plugin': ^0.3.104
+    '@tsrx/typescript-plugin': ^0.3.104
     '@tsrx/ripple': ^0.1.45
     '@tsrx/react': ^0.2.44
     '@tsrx/solid': ^0.1.44
@@ -220,6 +232,7 @@ catalogs:
     lucide-react: 1.24.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
+    miniflare: 4.20260714.0
     playwright: ^1.61.0
     prettier: ^3.8.4
     preact: ^10.29.7

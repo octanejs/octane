@@ -1,4 +1,5 @@
 import {
+	existsSync,
 	mkdtempSync,
 	mkdirSync,
 	readFileSync,
@@ -9,7 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRsbuild } from '@rsbuild/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pluginOctane } from '../src/index.js';
@@ -41,7 +42,12 @@ function readJavaScript(directory: string): string {
 		.join('\n');
 }
 
-function writeApp(root: string, target: string) {
+function writeApp(
+	root: string,
+	target: string,
+	serverTarget?: 'webworker' | 'cloudflare',
+	minify?: boolean,
+) {
 	write(root, 'package.json', JSON.stringify({ private: true, type: 'module' }) + '\n');
 	write(
 		root,
@@ -57,15 +63,32 @@ function writeApp(root: string, target: string) {
 	write(
 		root,
 		'octane.config.ts',
-		`import { defineConfig, RenderRoute } from '@octanejs/rsbuild-plugin';
+		`${serverTarget === 'cloudflare' ? "import { cloudflare } from '@octanejs/adapter-cloudflare';\n" : ''}import { defineConfig, RenderRoute } from '@octanejs/rsbuild-plugin';
 export default defineConfig({
-	build: { target: ${target} },
+	build: { target: ${target}${minify === undefined ? '' : `, minify: ${minify}`} },
+	${
+		serverTarget === 'cloudflare'
+			? 'adapter: cloudflare(),'
+			: serverTarget
+				? `adapter: {
+		name: 'fixture-webworker',
+		serverTarget: 'webworker',
+		runtime: {
+			hash: () => '00000000',
+			createAsyncContext: () => ({ run: (_store, fn) => fn(), getStore: () => undefined }),
+		},
+	},`
+				: ''
+	}
 	router: { routes: [new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })] },
 });
 `,
 	);
 	link(root, 'octane', join(repositoryRoot, 'packages/octane'));
 	link(root, '@octanejs/rsbuild-plugin', join(repositoryRoot, 'packages/rsbuild-plugin-octane'));
+	if (serverTarget === 'cloudflare') {
+		link(root, '@octanejs/adapter-cloudflare', join(repositoryRoot, 'packages/adapter-cloudflare'));
+	}
 }
 
 describe('Rsbuild build.target mapping', () => {
@@ -121,6 +144,67 @@ describe('Rsbuild build.target mapping', () => {
 				['node', 'browserslist:chrome >= 100,firefox >= 100'],
 			]),
 		);
+	});
+
+	it('emits an importable Cloudflare Worker entry only in production', async () => {
+		writeApp(root, JSON.stringify('es2022'), 'cloudflare');
+		const production = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		const productionConfigs = await production.initConfigs({ action: 'build' });
+		const workerConfig = productionConfigs.find((config) =>
+			Array.isArray(config.target)
+				? config.target.includes('webworker')
+				: config.target === 'webworker',
+		)!;
+
+		expect(production.getNormalizedConfig({ environment: 'node' }).output.target).toBe(
+			'web-worker',
+		);
+		expect(workerConfig.target).toEqual(['webworker', 'es2022']);
+		expect((workerConfig.experiments as { outputModule?: boolean })?.outputModule).toBe(true);
+		expect(workerConfig.output?.module).toBe(true);
+		expect(workerConfig.output?.chunkFilename).toBe('chunks/[name].js');
+		expect(workerConfig.output?.library).toEqual({ type: 'module' });
+		expect(workerConfig.externalsType).toBe('module');
+		expect(workerConfig.optimization?.minimize).toBe(true);
+
+		await production.build();
+		const entryFile = join(root, 'dist/server/entry.js');
+		expect(existsSync(entryFile)).toBe(true);
+		expect(existsSync(join(root, 'dist/server/worker.js'))).toBe(true);
+		const worker = (await import(`${pathToFileURL(entryFile).href}?test=${Date.now()}`)) as {
+			createWebWorkerHandler?: unknown;
+		};
+		expect(worker.createWebWorkerHandler).toBeTypeOf('function');
+
+		const development = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		const developmentConfigs = await development.initConfigs({ action: 'dev' });
+		expect(development.getNormalizedConfig({ environment: 'node' }).output.target).toBe('node');
+		expect(
+			developmentConfigs.some((config) =>
+				Array.isArray(config.target) ? config.target.includes('node') : config.target === 'node',
+			),
+		).toBe(true);
+	}, 120_000);
+
+	it.each([true, false])('honors build.minify=%s for webworker output', async (minify) => {
+		writeApp(root, JSON.stringify('es2022'), 'webworker', minify);
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		const configs = await instance.initConfigs({ action: 'build' });
+		const workerConfig = configs.find((config) =>
+			Array.isArray(config.target)
+				? config.target.includes('webworker')
+				: config.target === 'webworker',
+		)!;
+		expect(workerConfig.optimization?.minimize).toBe(minify);
 	});
 
 	it('emits profiling only in the client production bundle', async () => {

@@ -21,26 +21,18 @@ function ChildImpl(props) @{
 export const AutoMemoChild = memo(ChildImpl);
 
 export function AutoMemoOpaqueChild() @{
-	<span class="opaque">
-		{'opaque ' + opaqueVersion}
-	</span>
+	<span class="opaque">{'opaque ' + opaqueVersion}</span>
 }
 
 export function AutoMemoOpaqueReturned() {
 	return <>
-		<span class="returned-opaque-a">
-			{'returned opaque a ' + opaqueVersion}
-		</span>
-		<span class="returned-opaque-b">
-			{'returned opaque b ' + opaqueVersion}
-		</span>
+		<span class="returned-opaque-a">{'returned opaque a ' + opaqueVersion}</span>
+		<span class="returned-opaque-b">{'returned opaque b ' + opaqueVersion}</span>
 	</>;
 }
 
 function CustomChildImpl() @{
-	<span class="custom">
-		{'custom ' + opaqueVersion}
-	</span>
+	<span class="custom">{'custom ' + opaqueVersion}</span>
 }
 
 export const AutoMemoCustomChild = memo(CustomChildImpl, () => false);

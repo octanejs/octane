@@ -49,9 +49,7 @@ export function PlanConfigurator(props: PlanConfiguratorProps) @{
 		maximumFractionDigits: 0,
 	}).format(seats * props.plan.pricePerSeat);
 	<section class="configurator" data-island="plan-configurator">
-		<h3 class="configurator-title">
-			{'Configure ' + props.plan.name}
-		</h3>
+		<h3 class="configurator-title">{'Configure ' + props.plan.name}</h3>
 		<div class="configurator-row">
 			<button
 				class="seats-step"

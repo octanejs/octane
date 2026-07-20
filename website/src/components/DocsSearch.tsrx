@@ -227,9 +227,7 @@ function SearchDialog(props: DialogProps) @{
 						@if (query.trim().length < 2) {
 							<span>Type to search the documentation.</span>
 						} @else {
-							<span>
-								{'No matches for “' + query.trim() + '”.'}
-							</span>
+							<span>{'No matches for “' + query.trim() + '”.'}</span>
 						}
 					}
 				</p>

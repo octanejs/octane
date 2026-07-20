@@ -37,9 +37,7 @@ export function FilterPaginate() @{
 			value={table.getColumn('name')!.getFilterValue() as string ?? ''}
 			onInput={(e) => table.getColumn('name')!.setFilterValue((e.target as HTMLInputElement).value)}
 		/>
-		<span id="pi">
-			{table.getState().pagination.pageIndex + '/' + table.getPageCount()}
-		</span>
+		<span id="pi">{table.getState().pagination.pageIndex + '/' + table.getPageCount()}</span>
 		<button id="prev" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
 			prev
 		</button>

@@ -34,8 +34,6 @@ export function TabsSpec() {
 		<div {...tabListProps} ref={listRef}>{[...state.collection].map(
 			(item: any) => <Tab key={item.key} item={item} state={state} />,
 		)}</div>
-		<div {...tabPanelProps} ref={panelRef}>
-			{'panel:' + selected}
-		</div>
+		<div {...tabPanelProps} ref={panelRef}>{'panel:' + selected}</div>
 	</div>;
 }

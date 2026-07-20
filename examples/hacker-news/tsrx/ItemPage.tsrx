@@ -47,9 +47,7 @@ export function ItemPage() @{
 		@if (item.text) {
 			<div {...stylex.props(styles.storyText)} dangerouslySetInnerHTML={{ __html: item.text }} />
 		}
-		<div {...stylex.props(styles.meta)}>
-			{comments + ' ' + pluralize(comments, 'comment')}
-		</div>
+		<div {...stylex.props(styles.meta)}>{comments + ' ' + pluralize(comments, 'comment')}</div>
 		<div data-testid="comments">
 			@for (const kid of kids; key kid) {
 				@try {

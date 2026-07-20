@@ -35,9 +35,7 @@ export function Page(props: { params: Record<string, string> }) @{
 	const mode = props.params.mode ?? 'ready';
 
 	<main data-three-page={mode}>
-		<h1>
-			{'Three SSR ' + mode}
-		</h1>
+		<h1>{'Three SSR ' + mode}</h1>
 		<button onClick={() => setMounted(false)}>Unmount Canvas</button>
 		@if (mounted) {
 			@try {

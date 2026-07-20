@@ -273,7 +273,6 @@ describe('KNOWN_BINDINGS', () => {
 			'@octanejs/rspack-plugin',
 			'@octanejs/rsbuild-plugin',
 			'@octanejs/vite-plugin',
-			'@octanejs/adapter-vercel',
 			'@octanejs/mcp-server',
 		]);
 		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -289,7 +288,12 @@ describe('KNOWN_BINDINGS', () => {
 			} catch {
 				continue; // not a package dir
 			}
-			if (manifest.private || NON_BINDINGS.has(manifest.name)) continue;
+			if (
+				manifest.private ||
+				NON_BINDINGS.has(manifest.name) ||
+				manifest.name?.startsWith('@octanejs/adapter-')
+			)
+				continue;
 			bindings.push(manifest.name);
 			bindingDirectories.push(entry.name);
 		}

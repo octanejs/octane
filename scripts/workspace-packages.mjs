@@ -16,7 +16,6 @@ const SPECIAL_ROLES = new Map([
 	// TanStack Start is a metaframework integration rather than a library
 	// binding, so it stays outside the binding status/catalog contract.
 	['@octanejs/tanstack-start', 'metaframework'],
-	['@octanejs/adapter-vercel', 'deployment adapter'],
 	['@octanejs/mcp-server', 'agent tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
 ]);
@@ -37,6 +36,7 @@ function readJson(file) {
 function roleFor(manifest) {
 	const special = SPECIAL_ROLES.get(manifest.name);
 	if (special) return special;
+	if (manifest.name?.startsWith('@octanejs/adapter-')) return 'deployment adapter';
 	if (manifest.name?.startsWith('@octanejs/')) return 'framework binding';
 	return 'other package';
 }
@@ -147,7 +147,7 @@ export function validateWorkspacePackages(packages = getWorkspacePackages()) {
 			}
 		}
 
-		if (pkg.name === '@octanejs/adapter-vercel') {
+		if (pkg.role === 'deployment adapter') {
 			if (pkg.manifest.peerDependencies?.['@octanejs/app-core'] !== 'workspace:*') {
 				errors.push(`${label} must peer on the exact workspace app core`);
 			}

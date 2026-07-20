@@ -48,11 +48,6 @@ export function InlineModal(props) @{
 	const [n, setN] = useState(0);
 	<section class="inline-anchor">
 		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
-		{createPortal(
-			<div class="inline-modal">
-				{'count:' + n}
-			</div>,
-			props.target,
-		)}
+		{createPortal(<div class="inline-modal">{'count:' + n}</div>, props.target)}
 	</section>
 }

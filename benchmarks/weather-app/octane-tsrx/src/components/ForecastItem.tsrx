@@ -78,9 +78,7 @@ function ForecastItemImpl({ daily, index, isActive, onToggle }: ForecastItemProp
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">Rain</div>
-					<div class="forecast-detail-item__value">
-						{daily.rain_sum[index].toFixed(1) + ' mm'}
-					</div>
+					<div class="forecast-detail-item__value">{daily.rain_sum[index].toFixed(1) + ' mm'}</div>
 				</div>
 				<div class="forecast-detail-item">
 					<div class="forecast-detail-item__label">UV Index</div>

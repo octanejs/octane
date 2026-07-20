@@ -1953,6 +1953,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'adapter-cloudflare',
+					include: ['packages/adapter-cloudflare/tests/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'website',
 					include: ['website/tests/**/*.test.ts'],
 					environment: 'jsdom',

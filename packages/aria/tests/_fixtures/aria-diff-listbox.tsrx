@@ -41,8 +41,6 @@ export function ListBoxSpec() {
 		<ul {...listBoxProps} ref={ref}>{[...state.collection].map(
 			(item: any) => <Option key={item.key} item={item} state={state} />,
 		)}</ul>
-		<output>
-			{'selected:' + selected}
-		</output>
+		<output>{'selected:' + selected}</output>
 	</div>;
 }

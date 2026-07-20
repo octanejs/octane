@@ -108,6 +108,8 @@ export interface Context {
 	 * renderer inline scripts, hydration data, and the hydrate module script.
 	 */
 	state: Map<string, unknown>;
+	/** Request-scoped bindings supplied by the active platform integration. */
+	platform?: unknown;
 }
 
 export type NextFunction = () => Promise<Response>;
@@ -117,7 +119,11 @@ export type RouteHandler = (context: Context) => Response | Promise<Response>;
 export function compose(
 	middlewares: Middleware[],
 ): (context: Context, finalHandler: () => Promise<Response>) => Promise<Response>;
-export function createContext(request: Request, params: Record<string, string>): Context;
+export function createContext(
+	request: Request,
+	params: Record<string, string>,
+	platform?: unknown,
+): Context;
 export function runMiddlewareChain(
 	context: Context,
 	globalMiddlewares: Middleware[],
@@ -402,11 +408,14 @@ export interface AdaptContext {
  *   a deployment target (e.g. @octanejs/adapter-vercel emits `.vercel/output`).
  * - `serve(handler, opts)` — replaces the generated server entry's built-in
  *   Node boot when running `node dist/server/entry.js` / `octane-preview`.
+ * - `serverTarget` — selects the integration's Node or Web Worker server build.
  * - `runtime` — platform primitives (hashing, async context) replacing the
- *   entry's Node defaults; needed on non-Node runtimes.
+ *   entry's Node defaults; required for `serverTarget: 'webworker'`.
  */
 export interface OctaneAdapter {
 	name?: string;
+	/** Server bundle runtime selected by the active app integration. @default 'node' */
+	serverTarget?: 'node' | 'webworker';
 	adapt?: (ctx: AdaptContext) => void | Promise<void>;
 	serve?: AdapterServeFunction;
 	runtime?: RuntimePrimitives;

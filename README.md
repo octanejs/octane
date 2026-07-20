@@ -545,7 +545,7 @@ Octane itself. Good places to start:
 ## Packages
 
 This is a pnpm monorepo containing the core runtime+compiler, the metaframework
-plugin (and its Vercel adapter), an MCP server, private evaluation tooling, and
+plugin (and its Vercel and Cloudflare adapters), an MCP server, private evaluation tooling, and
 the framework bindings. The current workspace package inventory and counts are
 generated from the workspace manifests in
 [`docs/packages.md`](./docs/packages.md):
@@ -564,7 +564,9 @@ generated from the workspace manifests in
   integration for every Vite app: compiler integration for SPAs, plus dev SSR,
   routing, hydration, and production server builds when app routes are configured;
   [`@octanejs/adapter-vercel`](./packages/adapter-vercel) deploys its build
-  output to Vercel.
+  output to Vercel, while
+  [`@octanejs/adapter-cloudflare`](./packages/adapter-cloudflare) emits a
+  streaming module Worker for Cloudflare Workers Static Assets.
 - [`@octanejs/tanstack-start`](./packages/tanstack-start) is the public Octane
   TanStack Start integration. It owns the Octane-specific Start runtime,
   file-route generation, server-function compilation, streaming SSR, hydration,

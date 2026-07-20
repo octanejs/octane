@@ -30,9 +30,7 @@ export function SharedRefList(props) @{
 		<button id="remove-first" onClick={() => setItems(items.slice(1))}>{'rm'}</button>
 		<ul>
 			@for (const item of items; key item.id) {
-				<li ref={props.register}>
-					{'item-' + item.id}
-				</li>
+				<li ref={props.register}>{'item-' + item.id}</li>
 			}
 		</ul>
 	</div>

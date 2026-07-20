@@ -4,18 +4,14 @@ import { useState } from 'octane';
 // wrapper itself (so each test gets a fresh payload) and passes it in as
 // `props.comp`.
 export function Greeting(props) @{
-	<div class="loaded">
-		{'hello ' + props.name}
-	</div>
+	<div class="loaded">{'hello ' + props.name}</div>
 }
 
 // Hook state inside a lazily-loaded component — used to prove the loaded
 // component updates in place (no remount) across parent re-renders.
 export function Counter(props) @{
 	const [n, setN] = useState(0);
-	<button class="counter" onClick={() => setN(n + 1)}>
-		{'n:' + n + ' p:' + props.p}
-	</button>
+	<button class="counter" onClick={() => setN(n + 1)}>{'n:' + n + ' p:' + props.p}</button>
 }
 
 // Host that mounts whatever component the test passes, inside a boundary.

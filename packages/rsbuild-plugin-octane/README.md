@@ -46,8 +46,10 @@ export default defineConfig({
 
 `index.html` must contain `<!--ssr-head-->` in `<head>` and
 `<!--ssr-body-->` inside `<div id="root">`. In app mode the plugin creates a
-`web` hydration environment and a `node` SSR environment. Override their names
-with `clientEnvironment` and `serverEnvironment` when composing a larger
+`web` hydration environment and a `node` SSR environment. A deployment adapter
+with `serverTarget: 'webworker'` changes only the production server target to
+`web-worker`; development SSR remains Node-based. Override the environment
+names with `clientEnvironment` and `serverEnvironment` when composing a larger
 Rsbuild setup.
 
 ```sh
@@ -58,9 +60,11 @@ pnpm octane-rsbuild-preview
 
 Production assets are written to `dist/client`; the self-contained ESM server,
 SSR template, and route asset map are written to `dist/server`. Change the
-shared root with `build.outDir` in `octane.config.ts`. The generated server
-exports `handler` and `nodeHandler`, auto-boots under Node, and invokes a
-configured adapter after both environments finish.
+shared root with `build.outDir` in `octane.config.ts`. The default generated
+server exports `handler` and `nodeHandler` and auto-boots under Node. A
+webworker adapter instead receives an importable `createWebWorkerHandler`
+factory for its platform wrapper. The configured adapter runs after both
+environments finish.
 
 `build.target` applies to both application transforms and Rspack's generated
 runtime. Use one ES level (`es2018`, `es2022`, and so on), `modules`, `false`, or

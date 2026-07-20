@@ -57,9 +57,7 @@ function UserDetail() @{
 function SearchPage() @{
 	const [searchParams, setSearchParams] = useSearchParams({ q: 'fallback' });
 	<div>
-		<p id="q">
-			{'q=' + (searchParams.get('q') ?? '(none)')}
-		</p>
+		<p id="q">{'q=' + (searchParams.get('q') ?? '(none)')}</p>
 		<button id="set-q" onClick={() => setSearchParams({ q: 'octane' })}>set</button>
 		<button id="clear-q" onClick={() => setSearchParams({})}>clear</button>
 	</div>

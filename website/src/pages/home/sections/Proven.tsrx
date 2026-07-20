@@ -23,9 +23,7 @@ export function Proven() @{
 			</span>
 		</div>
 		<div class="proven-stat">
-			<span class="proven-number">
-				{BINDING_COUNT + ''}
-			</span>
+			<span class="proven-number">{BINDING_COUNT + ''}</span>
 			<span class="proven-label">
 				{'first-party ecosystem bindings for state, data, routing, UI, forms, charts, 3D, '}
 				<Link to="/docs/$slug" params={{ slug: 'bindings' }}>and more</Link>

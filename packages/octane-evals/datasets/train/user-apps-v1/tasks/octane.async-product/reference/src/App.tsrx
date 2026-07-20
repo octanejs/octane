@@ -17,9 +17,7 @@ export function App(props: {
 				<h2>
 					{product.name as string}
 				</h2>
-				<p class="price">
-					{'$' + (product.priceCents / 100).toFixed(2)}
-				</p>
+				<p class="price">{'$' + (product.priceCents / 100).toFixed(2)}</p>
 			</article>
 		} @pending {
 			<p class="loading">Loading product…</p>

@@ -37,16 +37,12 @@ function About() @{
 
 function UserDetail() @{
 	const params = useParams();
-	<p>
-		{'User ' + params.id}
-	</p>
+	<p>{'User ' + params.id}</p>
 }
 
 function Splat() @{
 	const params = useParams();
-	<p>
-		{'Splat ' + params['*']}
-	</p>
+	<p>{'Splat ' + params['*']}</p>
 }
 
 // Nested block-children Routes: layout route + index + params + splat.

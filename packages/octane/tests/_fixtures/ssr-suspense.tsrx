@@ -320,13 +320,9 @@ export function TransientObjectKeyBoundary(props) @{
 function StableKeyReorderItem(props) @{
 	@try {
 		const value = use(props.promise);
-		<span class="stable-key-ready" data-item={props.id}>
-			{props.id + ':' + value}
-		</span>
+		<span class="stable-key-ready" data-item={props.id}>{props.id + ':' + value}</span>
 	} @pending {
-		<i class="stable-key-loading" data-item={props.id}>
-			{props.id + ':loading'}
-		</i>
+		<i class="stable-key-loading" data-item={props.id}>{props.id + ':loading'}</i>
 	}
 }
 

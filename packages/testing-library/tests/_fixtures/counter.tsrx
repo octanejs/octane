@@ -3,9 +3,7 @@ import { useState, useEffect } from 'octane';
 // Click → state fixture (the fireEvent + state-update port).
 export function Counter() @{
 	const [count, setCount] = useState(0);
-	<button onClick={() => setCount(count + 1)}>
-		{'Count: ' + count}
-	</button>
+	<button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
 }
 
 // Counter whose render is observed from a passive effect — RTL's act.js
@@ -15,9 +13,7 @@ export function EffectfulCounter(props) @{
 	useEffect(() => {
 		props.callback();
 	}, null);
-	<button onClick={() => setCount(count + 1)}>
-		{'Count: ' + count}
-	</button>
+	<button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
 }
 
 // Native-event semantics fixtures: octane's onInput/onChange are the NATIVE

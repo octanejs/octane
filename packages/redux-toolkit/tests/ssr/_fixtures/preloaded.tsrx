@@ -23,9 +23,7 @@ export function createPreloadedStore() {
 
 function PreloadedResult() @{
 	const result = preloadedApi.useGetValueQuery('value');
-	<p id="preloaded-result">
-		{'result=' + (result.data || '-') + ':' + result.status}
-	</p>
+	<p id="preloaded-result">{'result=' + (result.data || '-') + ':' + result.status}</p>
 }
 
 export function PreloadedApp(props) @{

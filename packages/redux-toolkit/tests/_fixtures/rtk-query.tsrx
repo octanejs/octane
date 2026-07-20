@@ -66,15 +66,9 @@ function QueryPanel() @{
 	});
 
 	<section id="query">
-		<p id="first">
-			{'first=' + (first.data?.value || '-') + ':' + first.status}
-		</p>
-		<p id="second">
-			{'second=' + (second.data?.value || '-') + ':' + second.status}
-		</p>
-		<p id="selected">
-			{'selected=' + (selected.value || '-')}
-		</p>
+		<p id="first">{'first=' + (first.data?.value || '-') + ':' + first.status}</p>
+		<p id="second">{'second=' + (second.data?.value || '-') + ':' + second.status}</p>
+		<p id="selected">{'selected=' + (selected.value || '-')}</p>
 		<button id="swap" onClick={() => setArg((value) => value === 'a' ? 'c' : 'a')}>swap</button>
 		<button id="refetch" onClick={() => first.refetch()}>refetch</button>
 	</section>
@@ -90,12 +84,8 @@ function LazyMutationPanel() @{
 	const [trigger, lazy] = api.useLazyGetValueQuery();
 	const [mutate, mutation] = api.useSetValueMutation();
 	<section id="actions">
-		<p id="lazy">
-			{'lazy=' + (lazy.data?.value || '-') + ':' + lazy.status}
-		</p>
-		<p id="mutation">
-			{'mutation=' + (mutation.data?.value || '-') + ':' + mutation.status}
-		</p>
+		<p id="lazy">{'lazy=' + (lazy.data?.value || '-') + ':' + lazy.status}</p>
+		<p id="mutation">{'mutation=' + (mutation.data?.value || '-') + ':' + mutation.status}</p>
 		<button id="load" onClick={() => trigger('lazy')}>load</button>
 		<button id="mutate" onClick={() => mutate('mutation')}>mutate</button>
 		<button id="reset-lazy" onClick={() => lazy.reset()}>reset lazy</button>
@@ -113,9 +103,7 @@ function InfinitePanel() @{
 	const result = api.useGetPagesInfiniteQuery('page');
 	const pages = result.data?.pages.join('|') || '-';
 	<section id="infinite">
-		<p id="pages">
-			{'pages=' + pages + ':' + result.status}
-		</p>
+		<p id="pages">{'pages=' + pages + ':' + result.status}</p>
 		<button id="next" onClick={() => result.fetchNextPage()}>next</button>
 		<button id="previous" onClick={() => result.fetchPreviousPage()}>previous</button>
 	</section>
@@ -137,9 +125,7 @@ function SkipPrefetchPanel() @{
 		<p id="conditional">
 			{'conditional=' + (conditional.data?.value || '-') + ':' + conditional.status}
 		</p>
-		<p id="skip-token">
-			{'token=' + skippedByToken.status}
-		</p>
+		<p id="skip-token">{'token=' + skippedByToken.status}</p>
 		<p id="prefetched">
 			{'prefetched=' + (prefetched.data?.value || '-') + ':' + prefetched.status}
 		</p>
@@ -180,9 +166,7 @@ export const customApi = createCustomApi({
 
 function CustomContextPanel() @{
 	const result = customApi.useGetCustomQuery('value');
-	<p id="custom-context">
-		{'custom=' + (result.data || '-') + ':' + result.status}
-	</p>
+	<p id="custom-context">{'custom=' + (result.data || '-') + ':' + result.status}</p>
 }
 
 export function CustomContextApp() @{

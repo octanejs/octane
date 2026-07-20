@@ -36,9 +36,7 @@ function Home() @{
 
 function Slow() @{
 	const data = useLoaderData();
-	<h1>
-		{'Slow:' + data}
-	</h1>
+	<h1>{'Slow:' + data}</h1>
 }
 
 const routes = [

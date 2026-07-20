@@ -53,9 +53,7 @@ function ItemPage() @{
 		<p class="item-loader">{String(loaderData)}</p>
 		<p class="item-deps">{JSON.stringify(deps)}</p>
 		<p class="item-context">{String(context.fromBeforeLoad)}</p>
-		<p class="item-counts">
-			{matches.length + '/' + parents.length + '/' + children.length}
-		</p>
+		<p class="item-counts">{matches.length + '/' + parents.length + '/' + children.length}</p>
 	</article>
 }
 
@@ -66,9 +64,7 @@ const summaryApi = getRouteApi('/items/summary/$id');
 function ItemSummary() @{
 	const loaderData = summaryApi.useLoaderData();
 	const params = summaryApi.useParams();
-	<p class="api-summary">
-		{String(loaderData) + ':' + params.id}
-	</p>
+	<p class="api-summary">{String(loaderData) + ':' + params.id}</p>
 }
 
 function HomePage() @{

@@ -56,10 +56,11 @@ pnpm rules:generate
 
 This is a pnpm monorepo containing the core `octane` runtime+compiler, the
 `@octanejs/vite-plugin` and `@octanejs/tanstack-start` metaframeworks (plus the
-`@octanejs/adapter-vercel` deploy adapter), the `@octanejs/mcp-server` MCP
-server, the private `@octanejs/evals` evaluation tooling package, and the
-`@octanejs/*` framework bindings. The current workspace package inventory and
-counts are generated from workspace manifests in `docs/packages.md`:
+Vercel and Cloudflare deploy adapters), the `@octanejs/mcp-server` MCP server,
+the private
+`@octanejs/evals` evaluation tooling package, and the `@octanejs/*` framework
+bindings. The current workspace package inventory and counts are generated from
+workspace manifests in `docs/packages.md`:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -70,7 +71,9 @@ counts are generated from workspace manifests in `docs/packages.md`:
   metaframework plugin (routing, streaming dev SSR, hydration wiring, and the
   production build: `vite build` → static client assets + a self-contained SSR
   server bundle; preview with `octane-preview`); `packages/adapter-vercel`
-  deploys it to Vercel (Build Output API).
+  deploys it to Vercel (Build Output API), while
+  `packages/adapter-cloudflare` emits a module Worker for Cloudflare Workers
+  Static Assets.
 - `packages/tanstack-start/` (npm: `@octanejs/tanstack-start`) — the public
   Octane TanStack Start integration. It owns the Octane-specific Start runtime,
   Vite/compiler pipeline, and route generator, and uses

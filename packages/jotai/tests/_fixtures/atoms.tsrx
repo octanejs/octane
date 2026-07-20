@@ -13,17 +13,13 @@ export const renders = { count: 0, derived: 0, writer: 0, two: 0, a: 0, b: 0 };
 export function Counter(props: { count: any }) @{
 	renders.count++;
 	const value = useAtomValue(props.count);
-	<span id="count">
-		{'count=' + value}
-	</span>
+	<span id="count">{'count=' + value}</span>
 }
 
 function Derived(props: { derived: any }) @{
 	renders.derived++;
 	const value = useAtomValue(props.derived);
-	<span id="derived">
-		{'derived=' + value}
-	</span>
+	<span id="derived">{'derived=' + value}</span>
 }
 
 function IncButton(props: { count: any }) @{
@@ -58,9 +54,7 @@ export function TwoAtoms(props: { a: any; b: any }) @{
 	const [a, setA] = useAtom(props.a);
 	const [b, setB] = useAtom(props.b);
 	<div>
-		<span id="two">
-			{'a=' + a + ' b=' + b}
-		</span>
+		<span id="two">{'a=' + a + ' b=' + b}</span>
 		<button id="bump-a" onClick={() => setA((v: number) => v + 1)}>{'a'}</button>
 		<button id="bump-b" onClick={() => setB((v: number) => v + 1)}>{'b'}</button>
 	</div>
@@ -78,17 +72,13 @@ export function TwinReaders(props: { count: any }) @{
 function ReaderA(props: { count: any }) @{
 	renders.a++;
 	const v = useAtomValue(props.count);
-	<span id="ra">
-		{'ra=' + v}
-	</span>
+	<span id="ra">{'ra=' + v}</span>
 }
 
 function ReaderB(props: { count: any }) @{
 	renders.b++;
 	const v = useAtomValue(props.count);
-	<span id="rb">
-		{'rb=' + v}
-	</span>
+	<span id="rb">{'rb=' + v}</span>
 }
 
 // useStore resolution capture: default store / nearest Provider / options.store.
@@ -96,9 +86,7 @@ export const capturedStores: Record<string, unknown> = {};
 
 function StoreCapture(props: { id: string; options?: any }) @{
 	capturedStores[props.id] = useStore(props.options);
-	<span>
-		{'cap:' + props.id}
-	</span>
+	<span>{'cap:' + props.id}</span>
 }
 
 export function StoreResolutionApp(props: { providerStore: any; optionsStore: any }) @{
@@ -115,9 +103,7 @@ export function StoreResolutionApp(props: { providerStore: any; optionsStore: an
 // outer Provider, and under a nested (shadowing) Provider.
 function Reader(props: { id: string; count: any }) @{
 	const v = useAtomValue(props.count);
-	<span id={props.id}>
-		{props.id + '=' + v}
-	</span>
+	<span id={props.id}>{props.id + '=' + v}</span>
 }
 
 export function ScopesApp(props: { count: any; outer: any; inner: any }) @{

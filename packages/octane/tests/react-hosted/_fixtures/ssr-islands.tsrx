@@ -9,12 +9,8 @@ import { use, useId, useLayoutEffect, useRef, useState } from 'octane';
 export function SsrGreeting(props) @{
 	const [count, setCount] = useState(0);
 	<section class="ssr-island">
-		<h3 class="ssr-title">
-			{'island ' + props.name}
-		</h3>
-		<button class="ssr-count" onClick={() => setCount(count + 1)}>
-			{'clicks:' + count}
-		</button>
+		<h3 class="ssr-title">{'island ' + props.name}</h3>
+		<button class="ssr-count" onClick={() => setCount(count + 1)}>{'clicks:' + count}</button>
 	</section>
 }
 
@@ -74,9 +70,7 @@ export function SsrLocallyGuarded(props) @{
 		} @pending {
 			<p class="ssr-local-pending">{'local pending'}</p>
 		} @catch (error) {
-			<p class="ssr-local-caught">
-				{'caught:' + (error as Error).message}
-			</p>
+			<p class="ssr-local-caught">{'caught:' + (error as Error).message}</p>
 		}
 	</div>
 }

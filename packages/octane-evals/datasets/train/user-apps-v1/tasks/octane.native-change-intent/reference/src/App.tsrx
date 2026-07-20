@@ -29,9 +29,7 @@ export function App() @{
 				onInput={(event) => setTitle((event.currentTarget as HTMLInputElement).value)}
 			/>
 		</label>
-		<output aria-label="Live title value">
-			{title || 'Empty'}
-		</output>
+		<output aria-label="Live title value">{title || 'Empty'}</output>
 
 		<label>
 			Draft note
@@ -76,8 +74,6 @@ export function App() @{
 			Dynamic alias
 			<input {...aliasInputProps} />
 		</label>
-		<output aria-label="Dynamic alias value">
-			{alias || 'Empty'}
-		</output>
+		<output aria-label="Dynamic alias value">{alias || 'Empty'}</output>
 	</main>
 }
