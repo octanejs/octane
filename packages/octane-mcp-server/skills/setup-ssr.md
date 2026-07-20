@@ -66,9 +66,13 @@ hydration-stable; the client adopts server DOM instead of rebuilding it.
    self-contained SSR server at `dist/server/entry.js` (exports
    `handler`/`nodeHandler`; preview with `octane-preview`);
    `server.render: 'buffered'` switches it to the await-everything `prerender`.
-   A deploy adapter can restructure the output for a host — for example
-   `adapter: vercel()` from `@octanejs/adapter-vercel` emits Vercel's Build
-   Output API.
+   A deploy adapter prepares the output for a host: `adapter: vercel()` from
+   `@octanejs/adapter-vercel` emits Vercel's Build Output API, while
+   `adapter: cloudflare()` from `@octanejs/adapter-cloudflare` emits a module
+   Worker at `dist/server/worker.js` for Workers Static Assets. Cloudflare apps
+   keep a user-owned `wrangler.jsonc` pointing `main` at that Worker and
+   `assets.directory` at `dist/client`, with `nodejs_compat` enabled. Leave
+   `assets.not_found_handling` unset or `"none"` so navigation misses reach SSR.
 2. **Custom server**: write `entry-server.ts` exporting a function that calls
    `prerender()` (or `renderToString()`, or a streaming renderer) and splices
    the result into your HTML template, and `entry-client.ts` calling

@@ -46,6 +46,13 @@ packages:
 allowBuilds:
   esbuild: true
   playwright: true
+  # Miniflare's local Cloudflare runtime binary; required by the adapter's
+  # committed workerd integration test, with no project code generation.
+  workerd: true
+  # Miniflare can optionally transform image bindings through sharp. The
+  # Cloudflare adapter runtime test exercises Workers/SSR only, so no native
+  # sharp install step is needed.
+  sharp: false
   # tldjs's postinstall is a no-op unless npm_config_tldjs_update_rules=true, and
   # it ships a bundled rules.json — so its build is not needed (pulled transitively
   # via rulesync). Explicitly declined to silence the ignored-builds warning.
@@ -222,6 +229,7 @@ catalogs:
     lucide-react: 1.24.0
     motion: ^12.0.0
     motion-dom: ^12.0.0
+    miniflare: 4.20260714.0
     playwright: ^1.61.0
     prettier: ^3.8.4
     preact: ^10.29.7

@@ -83,7 +83,7 @@ export interface HandlerOptions {
 export function createHandler(
 	manifest: ServerManifest,
 	options: HandlerOptions,
-): (request: Request) => Promise<Response>;
+): (request: Request, platform?: unknown) => Promise<Response>;
 
 export function createPropsWrapper(Page: Component, pageProps: Record<string, unknown>): Component;
 export function createLayoutWrapper(
