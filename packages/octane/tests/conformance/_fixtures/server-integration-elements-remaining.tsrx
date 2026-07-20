@@ -431,9 +431,7 @@ export function ObjectWithEmptyData() @{
 
 function MemoBody(props) @{
 	props.log('body');
-	<span id="memo-with-comparator">
-		{'Count: ' + props.count}
-	</span>
+	<span id="memo-with-comparator">{'Count: ' + props.count}</span>
 }
 
 export const MemoWithComparator = memo(MemoBody, (previous, next) => {

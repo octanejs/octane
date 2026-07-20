@@ -22,9 +22,7 @@ export function BasicEditor(props) @{
 	}, [editor, props.onEditor]);
 
 	<section data-tiptap-fixture="basic">
-		<output id="editor-state">
-			{text ?? 'deferred'}
-		</output>
+		<output id="editor-state">{text ?? 'deferred'}</output>
 		<button
 			id="replace-content"
 			type="button"

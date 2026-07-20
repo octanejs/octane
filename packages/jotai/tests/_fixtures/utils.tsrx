@@ -16,9 +16,7 @@ export function ResetApp(props: { count: any }) @{
 	const [v, setV] = useAtom(props.count);
 	const reset = useResetAtom(props.count);
 	<div>
-		<span id="resv">
-			{'v=' + v}
-		</span>
+		<span id="resv">{'v=' + v}</span>
 		<button id="set5" onClick={() => setV(5)}>{'5'}</button>
 		<button id="reset" onClick={() => reset()}>{'r'}</button>
 	</div>
@@ -47,9 +45,7 @@ export function HydrateApp(props: { values: any; count: any; options?: any }) @{
 	useHydrateAtoms(props.values, props.options);
 	const v = useAtomValue(props.count, props.options);
 	<div>
-		<span id="hy">
-			{'v=' + v + ' n=' + n}
-		</span>
+		<span id="hy">{'v=' + v + ' n=' + n}</span>
 		<button id="rerender" onClick={() => setN(n + 1)}>{'r'}</button>
 	</div>
 }
@@ -58,9 +54,7 @@ export function HydrateApp(props: { values: any; count: any; options?: any }) @{
 export function ReducerApp(props: { count: any; reducer: any }) @{
 	const [state, dispatch] = useReducerAtom(props.count, props.reducer);
 	<div>
-		<span id="rv">
-			{'v=' + state}
-		</span>
+		<span id="rv">{'v=' + state}</span>
 		<button id="dispatch-inc" onClick={() => dispatch({ type: 'inc' })}>{'+'}</button>
 	</div>
 }
@@ -69,9 +63,7 @@ export function ReducerApp(props: { count: any; reducer: any }) @{
 export function WithReducerApp(props: { count: any }) @{
 	const [v, dispatch] = useAtom(props.count);
 	<div>
-		<span id="wrv">
-			{'v=' + v}
-		</span>
+		<span id="wrv">{'v=' + v}</span>
 		<button id="wr-inc" onClick={() => dispatch({ type: 'inc' })}>{'+'}</button>
 	</div>
 }

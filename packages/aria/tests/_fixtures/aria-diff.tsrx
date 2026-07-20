@@ -63,9 +63,7 @@ export function KeyEcho() {
 	return <div onKeyDown={() => setParent((p: string) => p + '!')}>
 		<input id="key-stop" {...keyboardProps} />
 		<input id="key-pass" {...passProps} />
-		<span>
-			{'child:' + child + ' parent:' + parent}
-		</span>
+		<span>{'child:' + child + ' parent:' + parent}</span>
 	</div>;
 }
 

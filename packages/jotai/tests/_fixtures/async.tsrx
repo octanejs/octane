@@ -6,9 +6,7 @@ import { useAtomValue } from '@octanejs/jotai';
 
 function AsyncReader(props: { asyncAtom: any }) @{
 	const v = useAtomValue(props.asyncAtom);
-	<span id="async">
-		{'v=' + v}
-	</span>
+	<span id="async">{'v=' + v}</span>
 }
 
 export function AsyncApp(props: { asyncAtom: any }) @{
@@ -18,9 +16,7 @@ export function AsyncApp(props: { asyncAtom: any }) @{
 		} @pending {
 			<span id="fallback">{'loading'}</span>
 		} @catch (e) {
-			<span id="error">
-				{'error:' + (e as any).message}
-			</span>
+			<span id="error">{'error:' + (e as any).message}</span>
 		}
 	</div>
 }
@@ -37,7 +33,5 @@ export function LoadableApp(props: { loadableAtom: any }) @{
 // unwrap(asyncAtom, fallback) — sync view of an async atom, no boundary.
 export function UnwrapApp(props: { unwrapped: any }) @{
 	const v = useAtomValue(props.unwrapped);
-	<span id="unwrap">
-		{'v=' + v}
-	</span>
+	<span id="unwrap">{'v=' + v}</span>
 }

@@ -26,9 +26,7 @@ function PicksBody(props: PicksBodyProps) @{
 	const picks = use(props.picksResource);
 	const rating = use(props.ratingResource);
 	<>
-		<p class="picks-rating">
-			{'Rated ' + rating.score + ' by ' + rating.reviews + ' crews'}
-		</p>
+		<p class="picks-rating">{'Rated ' + rating.score + ' by ' + rating.reviews + ' crews'}</p>
 		<ul class="picks-list">
 			@for (const pick of picks; key pick.id) {
 				<li class="pick" data-pick={pick.id}>
@@ -48,9 +46,7 @@ export interface RecommendationsProps {
 export function Recommendations(props: RecommendationsProps) @{
 	const [picksResource, setPicksResource] = useState(() => recommendationsResource(props.plan.id));
 	<section class="picks" data-island="recommendations">
-		<h3 class="picks-title">
-			{'Included with ' + props.plan.name}
-		</h3>
+		<h3 class="picks-title">{'Included with ' + props.plan.name}</h3>
 		@try {
 			<PicksBody picksResource={picksResource} ratingResource={ratingResource(props.plan.id)} />
 		} @pending {

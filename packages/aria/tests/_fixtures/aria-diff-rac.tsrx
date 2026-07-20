@@ -27,9 +27,7 @@ export function ButtonSpec() {
 		<Button id="btn" className={pressedClass} onPress={() => setCount((c: number) => c + 1)}>
 			Press me
 		</Button>
-		<output>
-			{'presses:' + count}
-		</output>
+		<output>{'presses:' + count}</output>
 	</div>;
 }
 

@@ -321,9 +321,7 @@ export function DeferredSpawnListenerApp(props) @{
 	props.expose(setValue);
 	const deferredValue = useDeferredValue(value);
 	<div>
-		<span id="deferred">
-			{'Deferred: ' + deferredValue}
-		</span>
+		<span id="deferred">{'Deferred: ' + deferredValue}</span>
 		<TransitionPendingProbe log={props.log} />
 	</div>
 }

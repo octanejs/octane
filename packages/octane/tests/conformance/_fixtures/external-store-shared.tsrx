@@ -51,9 +51,7 @@ function SelectedA(props) @{
 	useLayoutEffect(() => {
 		props.probe.value = 'A' + value;
 	}, null);
-	<span id="selected-a">
-		{'A' + value}
-	</span>
+	<span id="selected-a">{'A' + value}</span>
 }
 
 function SelectedB(props) @{
@@ -61,9 +59,7 @@ function SelectedB(props) @{
 	useLayoutEffect(() => {
 		props.probe.value = 'B' + value;
 	}, null);
-	<span id="selected-b">
-		{'B' + value}
-	</span>
+	<span id="selected-b">{'B' + value}</span>
 }
 
 export function SelectedPair(props) @{
@@ -89,9 +85,7 @@ function ChangingSelection(props) @{
 	const getSnapshot =
 		props.step === 0 ? props.getSnapshotA : props.getSnapshotB;
 	const value = useSyncExternalStore(props.store.subscribe, getSnapshot);
-	<span id="commit-selection">
-		{label + value}
-	</span>
+	<span id="commit-selection">{label + value}</span>
 }
 
 export function SelectionChangeDuringCommit(props) @{
@@ -117,9 +111,7 @@ function StableSelection(props) @{
 			props.commitProbe.lastStep = props.step;
 		}
 	}, null);
-	<span id="stable-commit-selection">
-		{'A' + value}
-	</span>
+	<span id="stable-commit-selection">{'A' + value}</span>
 }
 
 export function StableSelectionDuringCommit(props) @{

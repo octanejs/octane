@@ -76,17 +76,13 @@ export function CustomMemoDeps(props) @{
 export function CustomMemoPair(props) @{
 	const first = useComputed(() => 'A' + props.value);
 	const second = useComputed(() => 'B' + props.value);
-	<span>
-		{first + '/' + second}
-	</span>
+	<span>{first + '/' + second}</span>
 }
 
 export function CastCustomMemoPair(props) @{
 	const first = (useComputed as typeof useComputed)(() => 'A' + props.value);
 	const second = (useComputed as typeof useComputed)(() => 'B' + props.value);
-	<span>
-		{first + '/' + second}
-	</span>
+	<span>{first + '/' + second}</span>
 }
 
 function useMemo(callback, options) {

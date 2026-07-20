@@ -23,9 +23,7 @@ function UserCard(props: UserCardProps) @{
 		@if (query.isPending) {
 			<p role="status">Loading user…</p>
 		} @else if (query.isError) {
-			<p role="alert">
-				{'Could not load user: ' + (query.error as Error).message}
-			</p>
+			<p role="alert">{'Could not load user: ' + (query.error as Error).message}</p>
 		} @else {
 			<>
 				<h1>

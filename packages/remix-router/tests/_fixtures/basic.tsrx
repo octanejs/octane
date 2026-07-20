@@ -43,30 +43,22 @@ export function About() @{
 
 export function UserDetail() @{
 	const params = useParams();
-	<p>
-		{'User ' + params.id}
-	</p>
+	<p>{'User ' + params.id}</p>
 }
 
 export function Splat() @{
 	const params = useParams();
-	<p>
-		{'Splat ' + params['*']}
-	</p>
+	<p>{'Splat ' + params['*']}</p>
 }
 
 export function LoaderPage() @{
 	const data = useLoaderData();
-	<p>
-		{'data:' + data.value}
-	</p>
+	<p>{'data:' + data.value}</p>
 }
 
 export function LocationProbe() @{
 	const location = useLocation();
-	<p>
-		{location.pathname + location.search + location.hash}
-	</p>
+	<p>{location.pathname + location.search + location.hash}</p>
 }
 
 export function MatchesProbe() @{

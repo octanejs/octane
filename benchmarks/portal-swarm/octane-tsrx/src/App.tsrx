@@ -41,9 +41,7 @@ function SectionA() @{
 	bindA(setOpen, setTick, setDistinct);
 
 	<section class="secA">
-		<h3 class="tick">
-			{'A:' + tick}
-		</h3>
+		<h3 class="tick">{'A:' + tick}</h3>
 		<ul class="list">
 			@for (const item of ITEMS; key item.id) {
 				<li class="item">
@@ -77,9 +75,7 @@ function SectionB() @{
 	bindB(setOpen, setTick, setDistinct);
 
 	<section class="secB">
-		<h3 class="tick">
-			{'B:' + tick}
-		</h3>
+		<h3 class="tick">{'B:' + tick}</h3>
 		<ul class="list">
 			@for (const item of ITEMS; key item.id) {
 				<ItemB item={item} open={open} distinct={distinct} />
@@ -104,9 +100,7 @@ function SectionBS() @{
 	bindBS(setOpen, setTick, setDistinct);
 
 	<section class="secBS">
-		<h3 class="tick">
-			{'BS:' + tick}
-		</h3>
+		<h3 class="tick">{'BS:' + tick}</h3>
 		<ul class="list">
 			@for (const item of ITEMS; key item.id) {
 				<ItemBS item={item} open={open} distinct={distinct} />

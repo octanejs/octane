@@ -12,9 +12,7 @@ const asyncAtom = atom(pending);
 
 function Reader() @{
 	const v = useAtomValue(asyncAtom);
-	<span id="value">
-		{'v=' + v}
-	</span>
+	<span id="value">{'v=' + v}</span>
 }
 
 export function AsyncApp() @{

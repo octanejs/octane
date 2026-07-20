@@ -110,9 +110,7 @@ export function TodoApp() @{
 				</section>
 				<footer class="footer">
 					<span class="todo-count">
-						<strong>
-							{'' + remaining}
-						</strong>
+						<strong>{'' + remaining}</strong>
 						{remaining === 1 ? ' item left' : ' items left'}
 					</span>
 					<ul class="filters">

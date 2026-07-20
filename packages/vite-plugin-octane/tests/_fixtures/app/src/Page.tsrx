@@ -52,13 +52,9 @@ export function Page(props: { params: Record<string, string>; url: string }) @{
 		use(loadPendingFixture());
 	}
 	<main>
-		<h1>
-			{'Fixture page ' + (props.params.slug ?? 'home')}
-		</h1>
+		<h1>{'Fixture page ' + (props.params.slug ?? 'home')}</h1>
 		<p class="url">{props.url}</p>
-		<p class="count">
-			{'Count: ' + count}
-		</p>
+		<p class="count">{'Count: ' + count}</p>
 		<button onClick={() => setCount((current) => current + 1)}>Increment fixture</button>
 		<button onClick={() => setGuardedVisible((visible) => !visible)}>
 			Toggle guarded const

@@ -68,9 +68,7 @@ function CurrentItem({ db, id }: { db: any; id: number }) @{
 	} @catch (error, reset) {
 		<div id="errorBoundrary">
 			<h1>Something went wrong.</h1>
-			<p>
-				{'' + error}
-			</p>
+			<p>{'' + error}</p>
 			<button id="btnRetry" onClick={() => reset()}>
 				Retry
 			</button>
@@ -112,9 +110,7 @@ export function UpstreamApp({ db }: { db: any }) @{
 	} @catch (error, reset) {
 		<div id="errorBoundrary">
 			<h1>Something went wrong.</h1>
-			<p>
-				{'' + error}
-			</p>
+			<p>{'' + error}</p>
 			<button id="btnRetry" onClick={() => reset()}>
 				Retry
 			</button>

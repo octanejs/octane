@@ -13,9 +13,7 @@ export function App(props: { initialName: string }) @{
 			value={name}
 			onInput={(event) => setName((event.target as HTMLInputElement).value)}
 		/>
-		<h1 id="greeting">
-			{'Welcome, ' + greeting}
-		</h1>
+		<h1 id="greeting">{'Welcome, ' + greeting}</h1>
 		<button id="submit-count" type="button" onClick={() => setSubmitted((count) => count + 1)}>
 			{'Submitted: ' + submitted}
 		</button>

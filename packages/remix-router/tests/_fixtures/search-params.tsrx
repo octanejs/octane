@@ -5,12 +5,8 @@ import { MemoryRouter, Route, Routes, useSearchParams } from '@octanejs/remix-ro
 function SearchPage(props: { defaultInit?: any }) @{
 	const [searchParams, setSearchParams] = useSearchParams(props.defaultInit);
 	<div>
-		<p id="q">
-			{'q=' + (searchParams.get('q') ?? '(none)')}
-		</p>
-		<p id="page">
-			{'page=' + (searchParams.get('page') ?? '(none)')}
-		</p>
+		<p id="q">{'q=' + (searchParams.get('q') ?? '(none)')}</p>
+		<p id="page">{'page=' + (searchParams.get('page') ?? '(none)')}</p>
 		<button id="set-obj" onClick={() => setSearchParams({ q: 'octane' })}>set-obj</button>
 		<button
 			id="set-fn"

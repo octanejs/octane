@@ -52,9 +52,7 @@ function ThemedValue(props) @{
 	const [val, setVal] = useState(0);
 	_setVal = setVal;
 	props.log('render:' + theme + ':' + val);
-	<span id="themed">
-		{theme + ':' + val}
-	</span>
+	<span id="themed">{theme + ':' + val}</span>
 }
 
 export function ContextDefeatsBailout(props) @{

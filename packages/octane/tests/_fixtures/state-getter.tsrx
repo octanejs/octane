@@ -49,7 +49,5 @@ export function RenderPhaseNullableReducerGetter(props) @{
 export function ServerGetter() @{
 	const [count, setCount, getCount] = useState(0);
 	if (count < 2) setCount(count + 1);
-	<span>
-		{'Count: ' + getCount()}
-	</span>
+	<span>{'Count: ' + getCount()}</span>
 }

@@ -120,12 +120,8 @@ interface WelcomeCardProps {
 
 function WelcomeCard(props: WelcomeCardProps) @{
 	<section class="welcome-card">
-		<h2>
-			{'Hello, ' + props.name}
-		</h2>
-		<p>
-			{'You have ' + props.unread + ' unread messages.'}
-		</p>
+		<h2>{'Hello, ' + props.name}</h2>
+		<p>{'You have ' + props.unread + ' unread messages.'}</p>
 	</section>
 }
 
@@ -177,9 +173,7 @@ export function Counter() @{
 	const [count, setCount] = useState(0);
 
 	<section>
-		<p>
-			{'Items packed: ' + count}
-		</p>
+		<p>{'Items packed: ' + count}</p>
 		<button onClick={() => setCount((current) => current + 1)}>
 			Add one
 		</button>
@@ -333,9 +327,7 @@ const Theme = createContext('light');
 
 function ThemeLabel() @{
 	const theme = use(Theme);
-	<p>
-		{'The current theme is ' + theme + '.'}
-	</p>
+	<p>{'The current theme is ' + theme + '.'}</p>
 }
 
 export function Settings() @{
@@ -569,9 +561,7 @@ export function ProfilePage(props: { data: Promise<ProfileData> }) @{
 	} @pending {
 		<p>Loading profile…</p>
 	} @catch (error) {
-		<p>
-			{'Could not load profile: ' + (error instanceof Error ? error.message : String(error))}
-		</p>
+		<p>{'Could not load profile: ' + (error instanceof Error ? error.message : String(error))}</p>
 	}
 }
 ```
@@ -1036,9 +1026,7 @@ export function Editor(props: { toastRoot: HTMLElement }) @{
 		</button>
 
 		<section onClick={() => setClicksSeen((count) => count + 1)}>
-			<p>
-				{'Toast clicks handled by the editor: ' + clicksSeen}
-			</p>
+			<p>{'Toast clicks handled by the editor: ' + clicksSeen}</p>
 
 			@if (toastOpen) {
 				<SavedToast target={props.toastRoot} onDismiss={() => setToastOpen(false)} />

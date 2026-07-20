@@ -248,9 +248,7 @@ function PostCard({
 					<strong>
 						{author.name as string}
 					</strong>
-					<span>
-						{'@' + author.handle}
-					</span>
+					<span>{'@' + author.handle}</span>
 				</a>
 				<span class="meta-separator">·</span>
 				<time>
@@ -315,9 +313,7 @@ function ProfileHeader({
 					<h1 id="profile-title">
 						{person.name as string}
 					</h1>
-					<p>
-						{'@' + person.handle}
-					</p>
+					<p>{'@' + person.handle}</p>
 				</div>
 				@if (person.handle !== 'avery') {
 					<button
@@ -373,9 +369,7 @@ function EmptyTimeline({ route, profile }: { route: Route; profile: Person }) @{
 			</>
 		} @else if (route.kind === 'profile') {
 			<>
-				<h2>
-					{profile.name + ' has not posted yet'}
-				</h2>
+				<h2>{profile.name + ' has not posted yet'}</h2>
 				<p>This quiet timeline is ready for their first update.</p>
 			</>
 		} @else {
@@ -431,9 +425,7 @@ function RightRail({
 						<strong>
 							{person.name as string}
 						</strong>
-						<small>
-							{'@' + handle}
-						</small>
+						<small>{'@' + handle}</small>
 					</span>
 					<span class="row-arrow" aria-hidden="true">→</span>
 				</a>

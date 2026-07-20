@@ -40,9 +40,7 @@ function FormsPage() @{
 	const fetchers = useFetchers();
 	const FForm = fetcher.Form;
 	<div>
-		<p id="loc">
-			{location.pathname + location.search}
-		</p>
+		<p id="loc">{location.pathname + location.search}</p>
 		<p id="nav-state">{navigation.state}</p>
 		<p id="action-out">
 			{actionData ? actionData.via + ':' + actionData.method + ':' + actionData.name : '(none)'}

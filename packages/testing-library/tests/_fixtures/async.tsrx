@@ -17,9 +17,7 @@ export function Loader(props) @{
 		@if (message === null) {
 			<div>Loading...</div>
 		} @else {
-			<div data-testid="message">
-				{'Loaded this message: ' + message}
-			</div>
+			<div data-testid="message">{'Loaded this message: ' + message}</div>
 		}
 	</div>
 }

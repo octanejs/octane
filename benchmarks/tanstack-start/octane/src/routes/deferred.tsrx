@@ -36,20 +36,15 @@ function Deferred() @{
 	const data = Route.useLoaderData();
 
 	<div class="p-2">
-		<div data-testid="regular-person">
-			{data.person.name + ' - ' + data.person.randomNumber}
-		</div>
+		<div data-testid="regular-person">{data.person.name + ' - ' + data.person.randomNumber}</div>
 		<Await promise={data.deferredPerson} fallback={<div>Loading person...</div>}>
-			{(person) => <div data-testid="deferred-person">
-				{person.name + ' - ' + person.randomNumber}
-			</div>}
+			{(person) =>
+				<div data-testid="deferred-person">{person.name + ' - ' + person.randomNumber}</div>}
 		</Await>
 		<Await promise={data.deferredStuff} fallback={<div>Loading stuff...</div>}>
 			{(stuff) => <h3 data-testid="deferred-stuff">{stuff}</h3>}
 		</Await>
-		<div data-testid="deferred-count">
-			{'Count: ' + count}
-		</div>
+		<div data-testid="deferred-count">{'Count: ' + count}</div>
 		<div>
 			<button data-testid="deferred-increment" onClick={() => setCount(count + 1)}>
 				Increment

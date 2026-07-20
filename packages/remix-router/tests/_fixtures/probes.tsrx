@@ -31,9 +31,7 @@ export function NavPage(props: { label: string }) @{
 
 export function StateProbe() @{
 	const location = useLocation();
-	<p class="state">
-		{'state:' + JSON.stringify(location.state)}
-	</p>
+	<p class="state">{'state:' + JSON.stringify(location.state)}</p>
 }
 
 // Renders "<status> <statusText>" for ErrorResponses (e.g. "404 Not Found").
@@ -49,53 +47,39 @@ export function StatusProbe() @{
 
 export function RouteLoaderDataProbe(props: { routeId: string }) @{
 	const data = useRouteLoaderData(props.routeId) as any;
-	<p class="rld">
-		{'rld:' + (data === undefined ? 'undefined' : JSON.stringify(data))}
-	</p>
+	<p class="rld">{'rld:' + (data === undefined ? 'undefined' : JSON.stringify(data))}</p>
 }
 
 export function ActionProbe() @{
 	const data = useActionData() as any;
-	<p class="action">
-		{'action:' + (data === undefined ? 'none' : data.msg)}
-	</p>
+	<p class="action">{'action:' + (data === undefined ? 'none' : data.msg)}</p>
 }
 
 export function RevalidatorPage() @{
 	const data = useLoaderData() as any;
 	const revalidator = useRevalidator();
 	nav.revalidator = revalidator;
-	<p class="reval">
-		{'n:' + data.n + ':' + revalidator.state}
-	</p>
+	<p class="reval">{'n:' + data.n + ':' + revalidator.state}</p>
 }
 
 export function NavTypeProbe() @{
 	const type = useNavigationType();
-	<p class="navtype">
-		{'t:' + type}
-	</p>
+	<p class="navtype">{'t:' + type}</p>
 }
 
 export function PathHrefProbe(props: { to: any }) @{
 	const path = useResolvedPath(props.to);
 	const href = useHref(props.to);
 	<div>
-		<p class="rp">
-			{path.pathname + '|' + path.search + '|' + path.hash}
-		</p>
-		<p class="href">
-			{'href:' + href}
-		</p>
+		<p class="rp">{path.pathname + '|' + path.search + '|' + path.hash}</p>
+		<p class="href">{'href:' + href}</p>
 	</div>
 }
 
 // Mounted OUTSIDE any router by the outside-router invariant tests.
 export function NavigationStateProbe() @{
 	const navigation = useNavigation();
-	<p class="navstate">
-		{'s:' + navigation.state}
-	</p>
+	<p class="navstate">{'s:' + navigation.state}</p>
 }
 
 export function HydrateFallback() @{

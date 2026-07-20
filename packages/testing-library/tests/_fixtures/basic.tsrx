@@ -1,9 +1,7 @@
 // Minimal presentational fixtures for the render/rerender/cleanup ports.
 
 export function Greeting(props) @{
-	<div>
-		{'Hello, ' + props.name + '!'}
-	</div>
+	<div>{'Hello, ' + props.name + '!'}</div>
 }
 
 export function Message(props) @{

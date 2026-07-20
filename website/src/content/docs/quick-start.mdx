@@ -71,9 +71,7 @@ export function App(props: AppProps) @{
 		<h1>
 			{props.title as string}
 		</h1>
-		<p>
-			{'Button pressed ' + count + ' times'}
-		</p>
+		<p>{'Button pressed ' + count + ' times'}</p>
 		<button onClick={() => setCount((current) => current + 1)}>
 			Press me
 		</button>

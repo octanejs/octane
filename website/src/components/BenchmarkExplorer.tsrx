@@ -454,9 +454,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 						</div>
 					}
 					@if (hovered.fastest) {
-						<div class="bx-tip-fast">
-							{'fastest: ' + hovered.fastest}
-						</div>
+						<div class="bx-tip-fast">{'fastest: ' + hovered.fastest}</div>
 					}
 				</div>
 			}

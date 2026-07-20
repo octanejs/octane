@@ -514,9 +514,7 @@ export function ListConditionsDemo() @{
 			} @else if (packedCount === items.length) {
 				<span>Everything is packed.</span>
 			} @else {
-				<span>
-					{packedCount + ' of ' + items.length + ' packed'}
-				</span>
+				<span>{packedCount + ' of ' + items.length + ' packed'}</span>
 			}
 		</p>
 		<ul class="packing-list">
@@ -845,9 +843,7 @@ export function TransitionDemo() @{
 							' stays on screen.'}
 					</span>
 				} @else {
-					<span>
-						{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}
-					</span>
+					<span>{DASHBOARD_REPORTS[selection.id].label + ' is ready.'}</span>
 				}
 			</p>
 			@try {
@@ -902,9 +898,7 @@ function ProductResults(props: { query: string; isStale: boolean }) @{
 
 	<section aria-busy={props.isStale}>
 		<div class="search-summary" aria-live="polite">
-			<span>
-				{'Showing results for ' + visibleQuery}
-			</span>
+			<span>{'Showing results for ' + visibleQuery}</span>
 			@if (props.isStale) {
 				<strong class="search-updating">Updating…</strong>
 			}
@@ -913,9 +907,7 @@ function ProductResults(props: { query: string; isStale: boolean }) @{
 			@for (const product of products; key product.id) {
 				<li class="product-result">
 					{product.name as string}
-					<small class="product-category">
-						{'Category: ' + product.category}
-					</small>
+					<small class="product-category">{'Category: ' + product.category}</small>
 				</li>
 			} @empty {
 				<li class="product-empty">No products match this search.</li>

@@ -19,13 +19,9 @@ export function App() @{
 	const [b] = useCounter(100);
 	<div class="app">
 		@if (a > 0) {
-			<p class="a">
-				{'a:' + a}
-			</p>
+			<p class="a">{'a:' + a}</p>
 		}
-		<p class="b">
-			{'b:' + b}
-		</p>
+		<p class="b">{'b:' + b}</p>
 		<button class="bump" onClick={() => setA((v: number) => v + 1)}>bump</button>
 	</div>
 }

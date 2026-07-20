@@ -644,9 +644,7 @@ export function Playground() @{
 							}
 						</div>
 					} @else {
-						<span>
-							{'Source · ' + (activeFile || '…')}
-						</span>
+						<span>{'Source · ' + (activeFile || '…')}</span>
 					}
 					@if (!ready) {
 						<span class="pg-loading">Loading editor…</span>

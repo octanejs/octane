@@ -272,9 +272,7 @@ function MessageDetail(props: { message: MailMessage; search: string }) {
 				<span class="sender-avatar" aria-hidden="true">{message.from.slice(0, 1)}</span>
 				<span>
 					<strong>{message.from}</strong>
-					<small>
-						{'to ' + message.to.join(', ')}
-					</small>
+					<small>{'to ' + message.to.join(', ')}</small>
 				</span>
 				<time>{message.receivedAt}</time>
 			</div>
@@ -302,12 +300,8 @@ function DraftList(props: { drafts: MailDraft[]; search: string }) {
 				@for (const draft of props.drafts; key draft.id) {
 					<Link class="draft-row" to={composeURL(draft.id, props.search)}>
 						<span class="draft-badge">Draft</span>
-						<strong>
-							{draft.subject || 'Untitled draft'}
-						</strong>
-						<span>
-							{draft.to || 'No recipient'}
-						</span>
+						<strong>{draft.subject || 'Untitled draft'}</strong>
+						<span>{draft.to || 'No recipient'}</span>
 						<small>{draft.updatedAt}</small>
 					</Link>
 				}
@@ -329,9 +323,7 @@ function OutboxList(props: { items: OutboxItem[] }) {
 					<div class="draft-row queued-row" role="listitem">
 						<span class="draft-badge is-queued">Queued</span>
 						<strong>{item.subject}</strong>
-						<span>
-							{'To ' + item.to}
-						</span>
+						<span>{'To ' + item.to}</span>
 						<span class="queued-preview">{item.body}</span>
 						<small>{item.queuedAt}</small>
 					</div>
@@ -589,9 +581,7 @@ function Compose() {
 				/>
 			</label>
 			@if (localError !== '' || actionError !== '') {
-				<div class="compose-alert" role="alert">
-					{localError || actionError}
-				</div>
+				<div class="compose-alert" role="alert">{localError || actionError}</div>
 			}
 			<div class="compose-actions">
 				<button

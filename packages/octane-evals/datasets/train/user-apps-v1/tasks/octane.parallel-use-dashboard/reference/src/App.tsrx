@@ -35,9 +35,7 @@ export function App(props: {
 		} @catch (error) {
 			const message =
 				error instanceof Error ? error.message : String(error);
-			<p role="alert">
-				{'Could not load dashboard: ' + message}
-			</p>
+			<p role="alert">{'Could not load dashboard: ' + message}</p>
 		}
 	</section>
 }

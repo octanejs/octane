@@ -92,15 +92,9 @@ export function DeferredCustomViews(props) @{
 			<output id="deferred-custom-status">
 				{editor ? 'ready' : 'deferred'}
 			</output>
-			<output id="deferred-custom-text">
-				{editorText ?? 'deferred'}
-			</output>
-			<output id="deferred-shell-clicks">
-				{'shell:' + shellClicks}
-			</output>
-			<output id="deferred-menu-clicks">
-				{'menu:' + menuClicks}
-			</output>
+			<output id="deferred-custom-text">{editorText ?? 'deferred'}</output>
+			<output id="deferred-shell-clicks">{'shell:' + shellClicks}</output>
+			<output id="deferred-menu-clicks">{'menu:' + menuClicks}</output>
 			<button
 				id="deferred-shell-action"
 				type="button"

@@ -49,9 +49,7 @@ function DefaultNotFound() @{
 // The NotFoundError is spread onto the component (react-router's
 // renderRouteNotFound), so `notFound({ data })` arrives as the `data` prop.
 function ItemNotFound(props) @{
-	<p class="item-notfound">
-		{'Missing item ' + props.data.id}
-	</p>
+	<p class="item-notfound">{'Missing item ' + props.data.id}</p>
 }
 
 export interface NotFoundRouterOptions {

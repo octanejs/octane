@@ -63,9 +63,7 @@ export function RenderPropResetApp(props: { client: unknown }) @{
 		<QueryErrorResetBoundary>
 			{(value) => {
 				renderPropValues.push(value);
-				return <span id="rp-child">
-					{'reset:' + typeof value.reset}
-				</span>;
+				return <span id="rp-child">{'reset:' + typeof value.reset}</span>;
 			}}
 		</QueryErrorResetBoundary>
 	</QueryClientProvider>
@@ -121,9 +119,7 @@ function CombineReader() @{
 			allDone: results.every((r: any) => r.isSuccess),
 		}),
 	});
-	<span id="combined">
-		{combined.sum + ':' + combined.allDone}
-	</span>
+	<span id="combined">{combined.sum + ':' + combined.allDone}</span>
 }
 
 export function CombineApp(props: { client: unknown }) @{
@@ -137,9 +133,7 @@ export const skipTokenCalls = { count: 0 };
 
 function SkipTokenReader() @{
 	const q = useQuery({ queryKey: ['skip'], queryFn: skipToken });
-	<span id="skip">
-		{q.status + ':' + q.fetchStatus}
-	</span>
+	<span id="skip">{q.status + ':' + q.fetchStatus}</span>
 }
 
 export function SkipTokenApp(props: { client: unknown }) @{
@@ -228,9 +222,7 @@ function MutationStateReader(props: { mutationFn: (v: string) => Promise<string>
 	});
 	<div>
 		<button id="mutate" onClick={() => mutation.mutate('v-' + ++mutationCounter.n)}>go</button>
-		<span id="vars">
-			{variables.join(',') || 'none' as string}
-		</span>
+		<span id="vars">{variables.join(',') || 'none' as string}</span>
 	</div>
 }
 

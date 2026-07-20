@@ -16,9 +16,7 @@ function RootLayout() @{
 			<p class="mr-home">{'home matched'}</p>
 		</MatchRoute>
 		<MatchRoute to="/other">
-			{(params) => <p class="mr-other">
-				{'other:' + String(!!params)}
-			</p>}
+			{(params) => <p class="mr-other">{'other:' + String(!!params)}</p>}
 		</MatchRoute>
 		<ClientOnly fallback={<p class="co-fallback">{'no js'}</p>}>
 			<p class="co-content">{'client content'}</p>
@@ -37,9 +35,7 @@ function GuardedPage(props) @{
 	});
 	const hydrated = useHydrated();
 	blockerState.resolver = resolver;
-	<p class="guarded">
-		{'status:' + resolver.status + ':' + hydrated}
-	</p>
+	<p class="guarded">{'status:' + resolver.status + ':' + hydrated}</p>
 }
 
 function OtherPage() @{

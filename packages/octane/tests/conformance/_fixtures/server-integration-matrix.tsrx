@@ -98,9 +98,7 @@ export function ControlledSelectMarkup() {
 
 export function InitialState() @{
 	const [count] = useState(() => 2);
-	<span id="initial-state">
-		{'Count: ' + count}
-	</span>
+	<span id="initial-state">{'Count: ' + count}</span>
 }
 
 const Colour = createContext('none');
@@ -125,9 +123,7 @@ export function HostRef(props) @{
 }
 
 function MemoBody(props) @{
-	<span id="memo-value">
-		{'Count: ' + props.count}
-	</span>
+	<span id="memo-value">{'Count: ' + props.count}</span>
 }
 
 export const MemoComponent = memo(MemoBody);
@@ -162,9 +158,7 @@ export function RenderPhaseStateMany() @{
 		setCount((value) => value + 1);
 		setCount((value) => value + 1);
 	}
-	<span id="render-phase-state-many">
-		{'Count: ' + count}
-	</span>
+	<span id="render-phase-state-many">{'Count: ' + count}</span>
 }
 
 function reducerA(state, action) {
@@ -182,9 +176,7 @@ export function RenderPhaseCurrentReducer() @{
 		dispatch('increment');
 		setReducer(() => (reducer === reducerA ? reducerB : reducerA));
 	}
-	<span id="render-phase-current-reducer">
-		{'Count: ' + count}
-	</span>
+	<span id="render-phase-current-reducer">{'Count: ' + count}</span>
 }
 
 export function RenderPhaseCurrentReducerGetter() @{
@@ -222,9 +214,7 @@ export function RenderPhaseMemoCallbackRef(props) @{
 	callbackWitness.current = { text, callback: capitalize };
 	if (count < 3) setCount(count + 1);
 	if (text === 'hello' && count === 2) setText('hello, world.');
-	<span id="render-phase-memo-callback-ref" ref={hostRef}>
-		{capitalized + '/' + capitalize()}
-	</span>
+	<span id="render-phase-memo-callback-ref" ref={hostRef}>{capitalized + '/' + capitalize()}</span>
 }
 
 // ReactDOMServerIntegrationNewContext-test.js public function-component
@@ -339,16 +329,12 @@ const CompositeContext = createContext({ foo: 0, bar: 0, baz: 0 });
 function CompositeFooAndBar() @{
 	const { foo } = useContext(CompositeContext);
 	const { bar } = useContext(CompositeContext);
-	<span id="same-context-foo-bar">
-		{'Foo: ' + foo + ', Bar: ' + bar}
-	</span>
+	<span id="same-context-foo-bar">{'Foo: ' + foo + ', Bar: ' + bar}</span>
 }
 
 function CompositeBaz() @{
 	const { baz } = useContext(CompositeContext);
-	<span id="same-context-baz">
-		{'Baz: ' + baz}
-	</span>
+	<span id="same-context-baz">{'Baz: ' + baz}</span>
 }
 
 export function SameContextMultipleReads() @{

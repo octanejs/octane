@@ -42,9 +42,7 @@ function Users() @{
 
 function UserDetail() @{
 	const params = useParams();
-	<p>
-		{'Item ' + params.id}
-	</p>
+	<p>{'Item ' + params.id}</p>
 }
 
 const routes = [

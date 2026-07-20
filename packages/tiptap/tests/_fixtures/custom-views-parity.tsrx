@@ -269,9 +269,7 @@ export function CustomViewsParity(props) @{
 
 	<ParityTheme.Provider value={theme}>
 		<section data-custom-views-parity="true">
-			<output data-parity-editor-text="true">
-				{editorText ?? 'deferred'}
-			</output>
+			<output data-parity-editor-text="true">{editorText ?? 'deferred'}</output>
 			<button type="button" data-parity-theme-toggle="true" onClick={() => setTheme('night')}>
 				toggle theme
 			</button>

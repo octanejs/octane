@@ -9,11 +9,7 @@ import { useState } from 'octane';
 export function HydrationIsland(props) @{
 	const [count, setCount] = useState(0);
 	<section class="hy-island">
-		<h3 class="hy-title">
-			{'island ' + props.name}
-		</h3>
-		<button class="hy-count" onClick={() => setCount(count + 1)}>
-			{'clicks:' + count}
-		</button>
+		<h3 class="hy-title">{'island ' + props.name}</h3>
+		<button class="hy-count" onClick={() => setCount(count + 1)}>{'clicks:' + count}</button>
 	</section>
 }

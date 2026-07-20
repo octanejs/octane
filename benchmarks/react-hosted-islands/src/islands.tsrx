@@ -14,25 +14,19 @@ export function IslandEnvelope(props) @{
 /** An island with NO event bindings — the zero-cost ready-path case (§11). */
 export function EmptyIsland(props) @{
 	<section class="empty-island">
-		<span class="idx">
-			{'island ' + props.index}
-		</span>
+		<span class="idx">{'island ' + props.index}</span>
 	</section>
 }
 
 /** An island with one delegated click binding. */
 export function ClickIsland(props) @{
 	<section class="click-island">
-		<button class="go" onClick={() => props.onPing(props.index)}>
-			{'go ' + props.index}
-		</button>
+		<button class="go" onClick={() => props.onPing(props.index)}>{'go ' + props.index}</button>
 	</section>
 }
 
 /** Reads a REAL React context through the transparent Phase 2 path. */
 export function ContextIsland() @{
 	const theme = use(BenchTheme);
-	<p class="ctx-island">
-		{'theme:' + theme}
-	</p>
+	<p class="ctx-island">{'theme:' + theme}</p>
 }

@@ -72,9 +72,7 @@ export function HistoryApp(props: { history: any }) @{
 // Data mode on the browser history: createBrowserRouter + RouterProvider.
 function UserView() @{
 	const user = useLoaderData();
-	<h1>
-		{'User ' + user.name}
-	</h1>
+	<h1>{'User ' + user.name}</h1>
 }
 
 export function BrowserDataApp() @{

@@ -19,9 +19,7 @@ function Page() @{
 		<button id="reject" onClick={() => rejectMsg(new Error('await-fail'))}>x</button>
 		<Suspense fallback={<p class="fallback">waiting</p>}>
 			<Await resolve={data.msg} errorElement={<p class="await-err">failed</p>}>
-				{(value) => <p class="value">
-					{'got:' + value}
-				</p>}
+				{(value) => <p class="value">{'got:' + value}</p>}
 			</Await>
 		</Suspense>
 	</div>

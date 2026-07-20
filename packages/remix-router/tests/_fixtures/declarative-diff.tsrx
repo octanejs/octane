@@ -37,9 +37,7 @@ function About() @{
 
 function UserDetail() @{
 	const params = useParams();
-	<p>
-		{'User ' + params.id}
-	</p>
+	<p>{'User ' + params.id}</p>
 }
 
 export function DeclarativeDiffApp() @{

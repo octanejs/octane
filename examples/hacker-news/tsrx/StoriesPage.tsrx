@@ -39,9 +39,7 @@ function StoriesList({
 			} @else {
 				<span data-testid="page-prev-disabled" {...stylex.props(styles.pagerDisabled)}>‹ prev</span>
 			}
-			<span data-testid="page-indicator" {...stylex.props(styles.pagerPage)}>
-				{'page ' + page}
-			</span>
+			<span data-testid="page-indicator" {...stylex.props(styles.pagerPage)}>{'page ' + page}</span>
 			@if (hasMore) {
 				<Link
 					to="."

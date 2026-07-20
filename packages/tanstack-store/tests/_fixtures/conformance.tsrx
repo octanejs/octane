@@ -16,9 +16,7 @@ export function SelectorPair(props: {
 	const left = useSelector(props.left);
 	const right = useSelector(props.right);
 
-	<p id="pair">
-		{left + '/' + right}
-	</p>
+	<p id="pair">{left + '/' + right}</p>
 }
 
 export function ComparedSelection(props: {
@@ -28,9 +26,7 @@ export function ComparedSelection(props: {
 		compare: (previous, next) => previous.visible === next.visible,
 	});
 
-	<p id="selection">
-		{value.visible + '/' + value.ignored}
-	</p>
+	<p id="selection">{value.visible + '/' + value.ignored}</p>
 }
 
 export function DerivedPair(props: {
@@ -40,9 +36,7 @@ export function DerivedPair(props: {
 	const atom = useSelector(props.atom);
 	const store = useSelector(props.store);
 
-	<p id="derived-pair">
-		{atom + '/' + store}
-	</p>
+	<p id="derived-pair">{atom + '/' + store}</p>
 }
 
 export function SwitchingSource(props: {
@@ -68,9 +62,7 @@ export function CreatedAtoms() @{
 	const [parentRender, setParentRender] = useState(0);
 
 	<div>
-		<p id="created-atoms">
-			{firstValue + '/' + secondValue + '/' + parentRender}
-		</p>
+		<p id="created-atoms">{firstValue + '/' + secondValue + '/' + parentRender}</p>
 		<button id="first-atom" onClick={() => setFirst((value) => value + 1)}>first</button>
 		<button id="second-atom" onClick={() => setSecond((value) => value + 5)}>second</button>
 		<button id="parent-render" onClick={() => setParentRender((value) => value + 1)}>parent</button>
@@ -89,9 +81,7 @@ export function CreatedStores() @{
 	const count = useSelector(actionStore, (state) => state.count);
 
 	<div>
-		<p id="created-stores">
-			{plain + '/' + count}
-		</p>
+		<p id="created-stores">{plain + '/' + count}</p>
 		<button id="plain-store" onClick={() => plainStore.setState((value) => value + 1)}>
 			plain
 		</button>
@@ -117,9 +107,7 @@ export function LegacyStore(props: { store: Store<{ value: number; meta: number 
 		(previous, next) => previous.value === next.value,
 	);
 
-	<p id="legacy">
-		{value.value + '/' + value.meta}
-	</p>
+	<p id="legacy">{value.value + '/' + value.meta}</p>
 }
 
 type ContextValue = { atom: Atom<number> };

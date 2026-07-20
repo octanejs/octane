@@ -86,9 +86,7 @@ export function PaginationTable() @{
 	});
 	captured.table = table;
 	<div>
-		<span id="pi">
-			{table.getState().pagination.pageIndex + '/' + table.getPageCount()}
-		</span>
+		<span id="pi">{table.getState().pagination.pageIndex + '/' + table.getPageCount()}</span>
 		<button id="prev" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
 			prev
 		</button>

@@ -66,9 +66,7 @@ export function App() @{
 			<ul>
 				@for (const product of lines; key product.id) {
 					<li>
-						<span>
-							{product.name + ' × ' + (quantities[product.id] ?? 0)}
-						</span>
+						<span>{product.name + ' × ' + (quantities[product.id] ?? 0)}</span>
 						<button aria-label={'Decrease ' + product.name} onClick={() => decrease(product.id)}>
 							{'Decrease ' + product.name}
 						</button>
@@ -76,9 +74,7 @@ export function App() @{
 				}
 			</ul>
 		}
-		<p>
-			{'Total: ' + formatPrice(total)}
-		</p>
+		<p>{'Total: ' + formatPrice(total)}</p>
 		<button disabled={lines.length === 0} onClick={clear}>Clear cart</button>
 	</main>
 }

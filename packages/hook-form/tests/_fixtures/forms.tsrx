@@ -23,9 +23,7 @@ export function RegisterForm() {
 		<p id="dirty">
 			{isDirty ? 'dirty' : 'pristine'}
 		</p>
-		<p id="submits">
-			{'count: ' + submitCount}
-		</p>
+		<p id="submits">{'count: ' + submitCount}</p>
 		<button id="submit" type="submit">{'submit'}</button>
 		<button id="reset" type="button" onClick={() => reset()}>{'reset'}</button>
 		<button

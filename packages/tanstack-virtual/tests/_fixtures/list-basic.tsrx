@@ -50,9 +50,7 @@ export function BasicList(props: {
 	captured.instance = virtualizer;
 	captured.scrollEl = scrollRef;
 	<div>
-		<button id="bump" onClick={() => setBump(bump + 1)}>
-			{'b' + bump}
-		</button>
+		<button id="bump" onClick={() => setBump(bump + 1)}>{'b' + bump}</button>
 		<button id="count-swap" onClick={() => setCount(count === 10 ? 200 : 10)}>swap</button>
 		<button
 			id="scroll-500"

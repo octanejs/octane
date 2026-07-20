@@ -22,9 +22,7 @@ export function BoundaryActionState(props) @{
 		@try {
 			<ExposedActionState action={props.action} initial={props.initial} expose={props.expose} />
 		} @catch (e) {
-			<span id="err">
-				{'Caught an error: ' + e.message}
-			</span>
+			<span id="err">{'Caught an error: ' + e.message}</span>
 		}
 	</div>
 }

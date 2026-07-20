@@ -108,9 +108,7 @@ export function SwapApp() @{
 		/>
 		<button id="swap-data" onClick={() => setAlt(!alt)}>data</button>
 		<button id="swap-cols" onClick={() => setAltCols(!altCols)}>cols</button>
-		<button id="bump" onClick={() => setBump(bump + 1)}>
-			{'bump=' + bump}
-		</button>
+		<button id="bump" onClick={() => setBump(bump + 1)}>{'bump=' + bump}</button>
 	</div>
 }
 

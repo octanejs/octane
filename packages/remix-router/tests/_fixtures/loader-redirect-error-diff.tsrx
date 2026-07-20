@@ -33,9 +33,7 @@ function Home() @{
 
 function DataPage() @{
 	const data = useLoaderData();
-	<p>
-		{'loader:' + data.value}
-	</p>
+	<p>{'loader:' + data.value}</p>
 }
 
 function LoginPage() @{

@@ -10,17 +10,13 @@ export const cellProps: unknown[] = [];
 
 function NameCell(props: any) @{
 	cellProps.push(props);
-	<em class="name-cell">
-		{'nc:' + props.getValue()}
-	</em>
+	<em class="name-cell">{'nc:' + props.getValue()}</em>
 }
 
 // NOTE: declaration + memo() — a function EXPRESSION with an @{ } body is not
 // a supported syntax position for the compiler's component lowering.
 function AgeCell(props: any) @{
-	<strong class="age-cell">
-		{'mc:' + props.getValue()}
-	</strong>
+	<strong class="age-cell">{'mc:' + props.getValue()}</strong>
 }
 const MemoAgeCell = memo(AgeCell);
 

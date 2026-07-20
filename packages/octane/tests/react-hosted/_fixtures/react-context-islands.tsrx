@@ -9,23 +9,17 @@ import { HostLocale, HostTheme } from './react-contexts.js';
 
 export function HostThemeIsland() @{
 	const theme = use(HostTheme);
-	<p class="host-theme">
-		{'theme:' + String(theme)}
-	</p>
+	<p class="host-theme">{'theme:' + String(theme)}</p>
 }
 
 export function HostThemeViaUseContextIsland() @{
 	const theme = useContext(HostTheme);
-	<p class="host-theme-uc">
-		{'theme:' + String(theme)}
-	</p>
+	<p class="host-theme-uc">{'theme:' + String(theme)}</p>
 }
 
 function MemoHostLeafBody() @{
 	const theme = use(HostTheme);
-	<p class="memo-host-theme">
-		{'memo:' + theme}
-	</p>
+	<p class="memo-host-theme">{'memo:' + theme}</p>
 }
 
 /**
@@ -44,25 +38,19 @@ export function MemoHostThemeIsland() @{
 export function LoggingHostThemeIsland(props) @{
 	const theme = use(HostTheme);
 	props.log('render:' + props.tag + ':' + theme);
-	<p class="logging-host-theme">
-		{props.tag + ':' + theme}
-	</p>
+	<p class="logging-host-theme">{props.tag + ':' + theme}</p>
 }
 
 export function TwoHostContextsIsland() @{
 	const theme = use(HostTheme);
 	const locale = use(HostLocale);
-	<p class="two-host">
-		{'t:' + theme + ' l:' + locale}
-	</p>
+	<p class="two-host">{'t:' + theme + ' l:' + locale}</p>
 }
 
 export function DuplicateReadIsland() @{
 	const first = use(HostTheme);
 	const second = use(HostTheme);
-	<p class="dup-read">
-		{first + '/' + second}
-	</p>
+	<p class="dup-read">{first + '/' + second}</p>
 }
 
 export function ConditionalHostReadIsland(props) @{
@@ -102,9 +90,7 @@ export function GuardedHostThemeIsland(props) @{
 		} @pending {
 			<p class="guard-pending">{'guard pending'}</p>
 		} @catch (error) {
-			<p class="guard-caught">
-				{'caught:' + String(error)}
-			</p>
+			<p class="guard-caught">{'caught:' + String(error)}</p>
 		}
 	</div>
 }

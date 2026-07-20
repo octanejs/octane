@@ -5,7 +5,5 @@ import { useState } from 'octane';
 // composes with real compiled octane components, delegated events included.
 export default function Counter(props) @{
 	const [count, setCount] = useState(props.start ?? 0);
-	<button data-testid="counter" onClick={() => setCount(count + 1)}>
-		{'count: ' + count}
-	</button>
+	<button data-testid="counter" onClick={() => setCount(count + 1)}>{'count: ' + count}</button>
 }
