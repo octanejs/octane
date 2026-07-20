@@ -4,11 +4,11 @@
 // refresh them from the pinned checkout on version bumps, never hand-edit.
 //
 // Upstream's Parcel build additionally compiles each message through
-// @internationalized/string-compiler, so `{columnName}`/`{value}` placeholders become
-// message FUNCTIONS (LocalizedStringFormatter returns plain strings verbatim, without
-// interpolation). Every table dictionary uses only simple `{variable}` placeholders (no
-// plural/select/number ICU arguments), so the equivalent compile step here is a simple
-// substitution wrapper applied at module init.
+// @internationalized/string-compiler, so `{variable}` placeholders and plural/select
+// ICU arguments become message FUNCTIONS (LocalizedStringFormatter interpolates only
+// function messages — plain strings are returned verbatim). `compileDictionaries`
+// applies the equivalent compile step here at module init.
+import { compileDictionaries } from '../compileMessages';
 import ar_AE from './ar-AE.json';
 import bg_BG from './bg-BG.json';
 import cs_CZ from './cs-CZ.json';
@@ -44,7 +44,7 @@ import uk_UA from './uk-UA.json';
 import zh_CN from './zh-CN.json';
 import zh_TW from './zh-TW.json';
 
-const dictionaries = {
+export default compileDictionaries({
 	'ar-AE': ar_AE,
 	'bg-BG': bg_BG,
 	'cs-CZ': cs_CZ,
@@ -79,31 +79,4 @@ const dictionaries = {
 	'uk-UA': uk_UA,
 	'zh-CN': zh_CN,
 	'zh-TW': zh_TW,
-} as Record<string, Record<string, string>>;
-
-type Variables = Record<string, string | number | boolean> | undefined;
-
-function compileString(message: string): string | ((args: Variables) => string) {
-	if (!message.includes('{')) {
-		return message;
-	}
-	return (args: Variables) =>
-		message.replace(/\{(\w+)\}/g, (_, name: string) => String(args?.[name] ?? ''));
-}
-
-function compileDictionary(
-	strings: Record<string, string>,
-): Record<string, string | ((args: Variables) => string)> {
-	let out: Record<string, string | ((args: Variables) => string)> = {};
-	for (let key in strings) {
-		out[key] = compileString(strings[key]);
-	}
-	return out;
-}
-
-const compiled: Record<string, Record<string, any>> = {};
-for (let locale in dictionaries) {
-	compiled[locale] = compileDictionary(dictionaries[locale]);
-}
-
-export default compiled;
+});
