@@ -30,6 +30,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(areaForPath('packages/radix/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/octane-mcp-server/src/index.js')).toBe('mcp-server');
 		expect(areaForPath('packages/adapter-vercel/src/index.ts')).toBe('deploy-adapter');
+		expect(areaForPath('packages/adapter-cloudflare/src/index.js')).toBe('deploy-adapter');
 		expect(areaForPath('packages/octane-evals/tools/run.mjs')).toBe('evals');
 		expect(areaForPath('website/src/pages/index.tsrx')).toBe('website');
 		expect(areaForPath('benchmarks/news/run.mjs')).toBe('benchmark');
@@ -40,6 +41,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		const commands = validationFor(
 			[
 				'packages/adapter-vercel/src/index.ts',
+				'packages/adapter-cloudflare/src/index.js',
 				'packages/octane-evals/tools/run.mjs',
 				'website/src/pages/index.tsrx',
 			],
@@ -48,6 +50,9 @@ describe('@octanejs/mcp-server helpers', () => {
 
 		expect(commands).toContain(
 			'./node_modules/.bin/vitest run packages/adapter-vercel/tests --project adapter-vercel',
+		);
+		expect(commands).toContain(
+			'./node_modules/.bin/vitest run packages/adapter-cloudflare/tests --project adapter-cloudflare',
 		);
 		expect(commands).toContain(
 			'./node_modules/.bin/vitest run packages/octane-evals/tests --project octane-evals',

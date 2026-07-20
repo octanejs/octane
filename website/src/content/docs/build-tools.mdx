@@ -283,8 +283,8 @@ SSR templates require both markers:
 
 The generated client entry hydrates the matched route, layout, pre-hydration
 hook, and root boundaries. The generated server entry statically imports route
-and `module server` owners, supports streaming or buffered SSR, and exposes Web
-and Node request handlers.
+and `module server` owners, supports streaming or buffered SSR, and exposes the
+request-handler shape selected by the deployment adapter.
 
 <h2 id="production-and-preview">Production and preview</h2>
 
@@ -301,6 +301,36 @@ SSR entry and template metadata to `dist/server`. `octane-rsbuild-preview`
 starts that server entry. Change `build.outDir` in `octane.config.ts` to move
 both outputs together; configured deployment adapters run after both
 environments finish.
+
+For Cloudflare Workers, install `@octanejs/adapter-cloudflare` and set
+`adapter: cloudflare()` in `octane.config.ts`. The build emits the module Worker
+at `dist/server/worker.js`. Keep `wrangler.jsonc` user-owned so bindings and
+routes remain explicit:
+
+```bash
+pnpm add @octanejs/adapter-cloudflare
+pnpm add -D wrangler
+```
+
+```jsonc
+{
+	"name": "my-octane-app",
+	"main": "./dist/server/worker.js",
+	"compatibility_date": "2026-07-14",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"directory": "./dist/client",
+		"binding": "ASSETS",
+	},
+}
+```
+
+Leave static assets asset-first and keep `assets.not_found_handling` unset or
+set to `"none"`: both the `"single-page-application"` and `"404-page"` modes can
+prevent navigation misses from reaching Octane SSR. Cloudflare bindings and the
+execution context are available to middleware and `ServerRoute` handlers as
+`context.platform.{env,ctx}`. Use `wrangler dev` for platform-local preview and
+`wrangler deploy` for deployment.
 
 Rsbuild app mode currently expects root-path hosting: keep `server.base` at `/`
 and `output.assetPrefix` at `auto` or `/`. Deployments beneath a subpath should

@@ -140,7 +140,7 @@ function validatePackedPackage(pkg, manifest, files) {
 			);
 		}
 	}
-	if (pkg.name === '@octanejs/adapter-vercel') {
+	if (pkg.role === 'deployment adapter') {
 		const expectedAppCore = packageVersions.get('@octanejs/app-core');
 		if (manifest.peerDependencies?.['@octanejs/app-core'] !== expectedAppCore) {
 			errors.push(
