@@ -1,0 +1,27 @@
+{
+  "name": "tanstack-start-bench-react",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "React flavor of the Start benchmark app — pinned to the same TanStack release family as the vendored Octane flavor.",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "start": "node serve.mjs"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "1.170.18",
+    "@tanstack/react-start": "1.168.28",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "srvx": "^0.11.22"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:default",
+    "@types/react-dom": "catalog:default",
+    "@vitejs/plugin-react": "catalog:default",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
