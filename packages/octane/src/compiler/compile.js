@@ -8453,19 +8453,17 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			if (!a.value || a.value.type !== 'JSXExpressionContainer') return a;
 			const expr = unwrapTsExpr(a.value.expression);
 			if (!isPropCreationExpr(expr, ctx)) return a;
-			const symVar = allocHookSymbol(
-				ctx,
-				`${componentName}.prop.memo#${ctx.nextHookSymId}`,
-				{
-					componentName,
-					name: 'prop memo',
-					kind: 'useMemo',
-					node: expr,
-				},
-				// Same reservation rule as use() memos: warm caches span component
-				// scopes, so every warmable creation site gets a composable Symbol.
-				true,
-			);
+			// Tail-allocated (see allocTailHookSymbol): this slot exists only in
+			// the server compile, and taking an inline id here would shift every
+			// later shared site's id relative to the client compile. Composable
+			// Symbol for the same reason as use() memos: warm caches span
+			// component scopes.
+			const symVar = allocTailHookSymbol(ctx, `${componentName}.prop.memo`, {
+				componentName,
+				name: 'prop memo',
+				kind: 'useMemo',
+				node: expr,
+			});
 			const deps = collectDepPaths(expr);
 			const memoAlias = requireRuntimeForContext(ctx, 'puMemo');
 			changed = true;
@@ -10436,6 +10434,7 @@ function ensureHookSlotBase(ctx) {
 }
 
 function joinHoistedHelpers(ctx) {
+	flushTailHookSymbols(ctx);
 	return ctx.hoistedHelpers
 		.map((helper) => {
 			if (helper === HOOK_SLOT_BASE_HELPER) {
@@ -10449,9 +10448,35 @@ function joinHoistedHelpers(ctx) {
 		.join('\n');
 }
 
-function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
+// Server-only slots (prop memos) must not perturb the shared hook-symbol
+// sequence: the client compile never allocates them, and the two compiles of
+// one module should agree on every shared site's id. Nothing crosses the
+// SSR/client boundary by slot id (hydration seeds are consumed by positional
+// cursor), so this is a symmetry invariant, not a wire contract — but it keeps
+// numeric hook slots, HMR stable keys, and profile indices identical across
+// modes for every site that exists in both. The NAME is allocated eagerly (the
+// rewritten AST needs it); the id is assigned at module finalize
+// (joinHoistedHelpers), after every shared site has claimed its id, so
+// server-only slots take the tail of the module's range.
+function allocTailHookSymbol(ctx, debugName, profile = null) {
+	const pending = (ctx._pendingTailHookSlots ??= []);
+	const name = allocCompilerName(ctx, `_pm$${pending.length}`);
+	pending.push({ name, debugName, profile });
+	return name;
+}
+
+function flushTailHookSymbols(ctx) {
+	const pending = ctx._pendingTailHookSlots;
+	if (pending === undefined) return;
+	ctx._pendingTailHookSlots = undefined;
+	for (const p of pending) {
+		allocHookSymbol(ctx, `${p.debugName}#${ctx.nextHookSymId}`, p.profile, true, p.name);
+	}
+}
+
+function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, presetName = null) {
 	const id = ctx.nextHookSymId++;
-	const name = allocCompilerName(ctx, `_h$${id}`);
+	const name = presetName ?? allocCompilerName(ctx, `_h$${id}`);
 	let symbolExpr;
 	if (ctx.hmr) {
 		// HMR (dev serve): Symbol.for(stableKey) so re-imports produce the SAME

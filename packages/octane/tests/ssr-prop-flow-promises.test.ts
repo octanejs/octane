@@ -248,8 +248,7 @@ describe('streaming SSR — promises created in an ancestor, unwrapped via props
 
 	it('hydrates the memoized prop-flow shape — seeds adopt positionally despite server-only prop-memo slots', async () => {
 		// The server compile allocates a prop-memo slot the client compile never
-		// sees, shifting later server slot ids relative to the client's. That
-		// divergence must be invisible across the boundary: seeds serialize in
+		// sees. That must be invisible across the boundary: seeds serialize in
 		// use()-call order and the client consumes them by positional cursor,
 		// never by slot identity. Server-render the fixture, hydrate the
 		// CLIENT-compiled module over it, and require full adoption — no

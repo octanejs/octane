@@ -1,11 +1,12 @@
 import { use, useState } from 'octane';
 
 // Prop-flow hydration shape: SeedPage inline-creates a promise in child-prop
-// position (server compile caches it via a server-only prop-memo slot, which
-// advances the module's hook-symbol counter ahead of SeedCard's client slots)
-// AND both components carry state hooks plus a seeded use(). Hydration must be
-// insensitive to that server/client slot-id divergence: seeds are consumed by
-// the positional cursor in use()-call order, never by slot identity.
+// position (the server compile caches it via a prop-memo slot the client
+// compile never allocates) AND both components carry state hooks plus a
+// seeded use(). Hydration must be insensitive to server-only slots: seeds are
+// consumed by the positional cursor in use()-call order, never by slot
+// identity, and the shared sites' ids stay aligned across the two compiles
+// (server-only slots take the tail of the module's range).
 export function SeedPage(p) @{
 	const [label] = useState('L');
 	<main>
