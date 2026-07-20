@@ -90,10 +90,8 @@ Headline findings:
    consistently faster to first byte from a cold process at both layers
    (`import_renderer`: octane's bundled server runtime parses ~7x faster than
    react-dom/server, 1.4ms vs 9.6ms). If cold TTFB looks worse in production,
-   suspect the deployment host or bundle-size-sensitive environments
-   (serverless): octane's Start server bundle is **~2.7x larger** (523KB vs
-   194KB, `serverBundleBytes` meta), which cheap dev-machine cold starts
-   under-penalize.
+   suspect the deployment host, not octane's code volume (see the
+   `serverBundleBytes` caveat below).
 2. **The reproducible octane gap is warm per-request TTFB at the Start app
    layer** (~2.3x on `/posts`), and it is NOT present at the raw-renderer
    layer — the cost lives in the octane Start SSR path (router SSR +
@@ -126,8 +124,17 @@ changed by this benchmark PR), each gated by an op above:
    many-boundary pages to surface.
 4. Wire-format weight: markers, JSON carriers, seed scripts (gates:
    `bytes_staggered` / `deferredBytes` meta).
-5. Server bundle size (~2.7x react's; gate: `serverBundleBytes` meta) —
-   dominates serverless cold starts that this loopback bench can't see.
+
+`serverBundleBytes` caveat: octane's `dist/server` (523KB) reads ~2.7x
+react's (194KB), but the comparison is an accounting asymmetry, not code
+volume — octane's bundle is **self-contained** (the whole runtime + vendored
+Start chain compile in, unminified, only node builtins + srvx external),
+while react's `dist/server` is app glue that externalizes react, react-dom
+(its production server file alone is 277KB minified), and react-router to
+`node_modules`. Total framework code parsed at boot favors octane — that is
+why octane's cold start wins despite the "bigger" directory. A genuinely
+fully-bundled comparison (Cloudflare Workers, where nothing can be external)
+reverses the numbers outright.
 
 Ratio guards for the stable ops live in `benchmarks/baselines/ratios.json`
 (the known-bad warm gaps get loose "only catch further regression" ceilings —
