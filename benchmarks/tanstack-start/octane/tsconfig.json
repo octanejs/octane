@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*", "vite.config.ts"],
+  "include": ["src/**/*", "vite.config.ts", "vite.config.minimal.ts"],
   "compilerOptions": {
     "strict": true,
     "esModuleInterop": true,

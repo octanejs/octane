@@ -1,9 +1,9 @@
-import { render, create_ssr_stream } from 'ripple/server';
+import { render, createStream } from 'ripple/server';
 import { App, setCards } from './App.tsrx';
 import { makeCards, type Scenario } from './data';
 
 // Streaming SSR entry — Ripple target. Ripple's streaming mode is
-// `render(App, { stream: sink })` with a `create_ssr_stream()` web
+// `render(App, { stream: sink })` with a `createStream()` web
 // ReadableStream: the sync pass streams the shell (fallbacks included), then
 // each suspended block's resolved output is pushed as it settles. The chunks
 // arrive through a reader loop (web-stream-only API). NOTE Ripple's streamed
@@ -18,7 +18,7 @@ export async function renderStream(
 	onChunk: (chunk: string) => void,
 ): Promise<void> {
 	setCards(makeCards(scenario));
-	const { stream, sink } = create_ssr_stream();
+	const { stream, sink } = createStream();
 	const decoder = new TextDecoder();
 	const reader = stream.getReader();
 	const pump = (async () => {

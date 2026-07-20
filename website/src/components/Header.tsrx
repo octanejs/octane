@@ -1,16 +1,15 @@
 // The sticky top bar: two clusters — wordmark + section links on the left,
-// search and the X/Discord/GitHub icons on the right. Router <Link>s are separate
+// search and the theme toggle on the right. Router <Link>s are separate
 // components, so their classes are styled through :global() descendant holes.
 // Below 720px the left link row collapses behind a hamburger into a dropdown
-// panel, while search and the social icons stay in the bar as icons.
+// panel; the X/Discord/GitHub icons move out of the bar into the bottom of that
+// dropdown (the same <SocialIcons> is rendered in both places, toggled by CSS).
 import { useState } from 'octane';
 import { Link } from '@octanejs/tanstack-router';
 import { DocsSearch } from './DocsSearch.tsrx';
-import { SOCIAL } from '../constants/site.ts';
-import logoUrl from '../assets/octane-logo.svg';
-import xUrl from '../assets/x.svg';
-import discordUrl from '../assets/discord.svg';
-import githubUrl from '../assets/github.svg';
+import { ThemeToggle } from './ThemeToggle.tsrx';
+import { SocialIcons } from './SocialIcons.tsrx';
+import logoSvg from '../assets/octane-logo.svg?raw';
 
 export function Header() @{
 	const [menuOpen, setMenuOpen] = useState(false);
@@ -45,7 +44,11 @@ export function Header() @{
 					</svg>
 				</button>
 				<Link to="/" class="wordmark" aria-label="Octane home">
-					<img src={logoUrl} alt="Octane" class="wordmark-img" width="122" height="32" />
+					<span
+						class="wordmark-img"
+						aria-hidden="true"
+						dangerouslySetInnerHTML={{ __html: logoSvg }}
+					/>
 				</Link>
 				<nav
 					id="site-nav"
@@ -59,53 +62,18 @@ export function Header() @{
 					<a class="nav-link" href="/llms.txt" target="_blank" rel="noreferrer">
 						llms.txt
 					</a>
+					<div class="menu-social">
+						<SocialIcons />
+					</div>
 				</nav>
 			</div>
 			<div class="nav-right">
 				<DocsSearch />
 				<span class="nav-sep" aria-hidden="true"></span>
-				<a
-					class="nav-icon"
-					href={SOCIAL.x}
-					target="_blank"
-					rel="noreferrer"
-					title="X"
-					aria-label="Octane on X"
-				>
-					<span
-						class="nav-icon-glyph"
-						style={'--icon:url("' + xUrl + '")'}
-						aria-hidden="true"
-					></span>
-				</a>
-				<a
-					class="nav-icon"
-					href={SOCIAL.discord}
-					target="_blank"
-					rel="noreferrer"
-					title="Discord"
-					aria-label="Octane on Discord"
-				>
-					<span
-						class="nav-icon-glyph"
-						style={'--icon:url("' + discordUrl + '")'}
-						aria-hidden="true"
-					></span>
-				</a>
-				<a
-					class="nav-icon"
-					href={SOCIAL.github}
-					target="_blank"
-					rel="noreferrer"
-					title="GitHub"
-					aria-label="Octane on GitHub"
-				>
-					<span
-						class="nav-icon-glyph"
-						style={'--icon:url("' + githubUrl + '")'}
-						aria-hidden="true"
-					></span>
-				</a>
+				<span class="bar-social">
+					<SocialIcons />
+				</span>
+				<ThemeToggle />
 			</div>
 		</div>
 		<style>
@@ -113,7 +81,7 @@ export function Header() @{
 				position: sticky;
 				top: 0;
 				z-index: 10;
-				background: rgba(35, 39, 47, 0.85);
+				background: var(--header-bg);
 				backdrop-filter: blur(12px);
 				border-bottom: 1px solid var(--border);
 			}
@@ -161,7 +129,13 @@ export function Header() @{
 			/* 32px, not 30: the logo viewBox carries 8 units of optical headroom at
 			   the bottom (see octane-logo.svg), so the taller box keeps the glyphs
 			   at their original rendered size. */
-			.topnav-inner :global(img.wordmark-img) {
+			/* Inline SVG so the wordmark lettering follows --text per theme (the
+			   flame keeps its brand red); sized by the svg child. */
+			.topnav-inner :global(.wordmark-img) {
+				display: inline-flex;
+				color: var(--text);
+			}
+			.topnav-inner :global(.wordmark-img svg) {
 				height: 32px;
 				width: auto;
 				display: block;
@@ -181,7 +155,7 @@ export function Header() @{
 			}
 			.menu-btn:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.06);
+				background: var(--surface);
 			}
 			.navlinks {
 				display: flex;
@@ -194,35 +168,14 @@ export function Header() @{
 				margin: 0 0.5rem;
 				background: var(--border);
 			}
-			.nav-icon {
+			/* Social icons show in the bar at desktop width; the in-menu copy is
+			   hidden until the mobile breakpoint moves them into the dropdown. */
+			.bar-social {
 				display: inline-flex;
 				align-items: center;
-				justify-content: center;
-				width: 36px;
-				height: 36px;
-				border-radius: 9999px;
-				color: var(--text-secondary);
-				transition:
-					background 0.15s,
-					color 0.15s;
 			}
-			.nav-icon:hover {
-				color: var(--text);
-				background: rgba(255, 255, 255, 0.06);
-				text-decoration: none;
-			}
-			/* The brand svgs live in assets/ and are tinted through a mask, so they
-			   still follow the link's currentColor on hover. The url() in --icon
-			   MUST stay quoted: vite inlines these as data: URIs whose attributes
-			   carry raw ' quotes, which an unquoted url() token cannot hold — the
-			   mask would fall back to none and paint a solid box. */
-			.nav-icon-glyph {
-				width: 20px;
-				height: 20px;
-				flex: none;
-				background: currentColor;
-				mask: var(--icon) center / contain no-repeat;
-				-webkit-mask: var(--icon) center / contain no-repeat;
+			.menu-social {
+				display: none;
 			}
 			@media (max-width: 720px) {
 				.menu-btn {
@@ -230,6 +183,19 @@ export function Header() @{
 				}
 				.nav-left {
 					gap: 0.5rem;
+				}
+				/* Move the social icons out of the bar and into the menu footer. */
+				.bar-social,
+				.nav-sep {
+					display: none;
+				}
+				.menu-social {
+					display: flex;
+					justify-content: start;
+					gap: 0.5rem;
+					margin-top: 0.5rem;
+					padding-top: 0.85rem;
+					border-top: 1px solid var(--border);
 				}
 				.navlinks {
 					display: none;
@@ -241,7 +207,7 @@ export function Header() @{
 					align-items: stretch;
 					gap: 0.25rem;
 					padding: 0.75rem 1rem 1rem;
-					background: rgba(35, 39, 47, 0.97);
+					background: var(--header-bg-solid);
 					backdrop-filter: blur(12px);
 					border-bottom: 1px solid var(--border);
 				}
@@ -267,7 +233,7 @@ export function Header() @{
 			}
 			.navlinks :global(a.nav-link:hover) {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.06);
+				background: var(--surface);
 				text-decoration: none;
 			}
 			.navlinks :global(a.nav-link[data-status='active']) {

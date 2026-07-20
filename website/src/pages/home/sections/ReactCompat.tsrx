@@ -142,7 +142,7 @@ export function ReactCompat() @{
 				align-items: center;
 				gap: 0.4rem;
 				padding: 0.6rem 1rem;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+				border-bottom: 1px solid var(--border);
 			}
 			.compat-dot {
 				width: 10px;
@@ -185,8 +185,8 @@ export function ReactCompat() @{
 			}
 			.compat-code-copy:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.07);
-				border-color: rgba(255, 255, 255, 0.14);
+				background: var(--surface);
+				border-color: var(--border);
 			}
 			.compat-code-copy-icon {
 				width: 15px;

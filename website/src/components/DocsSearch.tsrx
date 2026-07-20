@@ -344,7 +344,7 @@ function SearchDialog(props: DialogProps) @{
 				border-radius: 0.7rem;
 			}
 			.search-head.active {
-				background: rgba(255, 255, 255, 0.07);
+				background: var(--surface);
 			}
 			.search-crumb {
 				display: block;
@@ -450,7 +450,7 @@ export function DocsSearch() @{
 				padding: 0 0.6rem;
 				border: 1px solid var(--border);
 				border-radius: 9999px;
-				background: rgba(255, 255, 255, 0.04);
+				background: var(--surface-subtle);
 				color: var(--text-secondary);
 				font: inherit;
 				font-size: 0.875rem;
@@ -462,8 +462,8 @@ export function DocsSearch() @{
 			}
 			.search-trigger:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.08);
-				border-color: rgba(255, 255, 255, 0.2);
+				background: var(--surface);
+				border-color: var(--border);
 			}
 			.search-trigger-icon {
 				width: 16px;

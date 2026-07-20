@@ -1,0 +1,16 @@
+{
+  "name": "react-ssr-workerd-fixture",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "ssr-workerd bench fixture: the streaming-ssr react page behind a module Worker calling react-dom/server.edge renderToReadableStream (Fizz edge). Worker-only: no client build, no dev server.",
+  "dependencies": {
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "@tsrx/vite-plugin-react": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
