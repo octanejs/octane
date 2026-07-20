@@ -194,7 +194,7 @@ export function DocsLayout() @{
 			}
 			.sidebar-list :global(a.sidebar-link:hover) {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.06);
+				background: var(--surface);
 				text-decoration: none;
 			}
 			.sidebar-list :global(a.sidebar-link[data-status='active']),

@@ -300,3 +300,60 @@ export type { VisuallyHiddenProps } from '../visually-hidden/VisuallyHidden';
 export type { Placement } from '../overlays/useOverlayPosition';
 export { useFilter } from '../i18n/useFilter';
 export type { Filter } from '../i18n/useFilter';
+
+// tree + table (Tree/Table phase)
+export {
+	TreeLoadMoreItem,
+	Tree,
+	TreeItem,
+	TreeContext,
+	TreeItemContent,
+	TreeHeader,
+	TreeSection,
+	TreeStateContext,
+} from './Tree';
+export type {
+	TreeProps,
+	TreeRenderProps,
+	TreeEmptyStateRenderProps,
+	TreeItemProps,
+	TreeItemRenderProps,
+	TreeItemContentProps,
+	TreeItemContentRenderProps,
+	TreeLoadMoreItemProps,
+	TreeLoadMoreItemRenderProps,
+} from './Tree';
+export {
+	TableLoadMoreItem,
+	Table,
+	Row,
+	Cell,
+	Column,
+	ColumnResizer,
+	TableHeader,
+	TableBody,
+	TableContext,
+	ResizableTableContainer,
+	useTableOptions,
+	TableStateContext,
+	TableColumnResizeStateContext,
+	TableFooter,
+} from './Table';
+export type {
+	TableProps,
+	TableRenderProps,
+	TableHeaderProps,
+	TableBodyProps,
+	TableBodyRenderProps,
+	ResizableTableContainerProps,
+	ColumnProps,
+	ColumnRenderProps,
+	ColumnResizerProps,
+	ColumnResizerRenderProps,
+	RowProps,
+	RowRenderProps,
+	CellProps,
+	CellRenderProps,
+	TableLoadMoreItemProps,
+	TableFooterProps,
+} from './Table';
