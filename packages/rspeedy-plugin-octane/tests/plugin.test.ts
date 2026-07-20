@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { mergeRsbuildConfig } from '@rsbuild/core';
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 
@@ -18,6 +19,10 @@ const temporaryRoots: string[] = [];
 const testRequire = createRequire(import.meta.url);
 
 type BundlerChainCallback = (chain: unknown, context: unknown) => void;
+type EnvironmentConfigCallback = (
+	config: Record<string, unknown>,
+	context: { name: string; mergeEnvironmentConfig: typeof mergeRsbuildConfig },
+) => Record<string, unknown> | undefined;
 
 function bundlerChainCallback(
 	value: BundlerChainCallback | { handler: BundlerChainCallback },
@@ -168,6 +173,44 @@ afterEach(() => {
 });
 
 describe('@octanejs/rspeedy-plugin', () => {
+	it('enforces application output invariants without discarding user configuration', () => {
+		const root = createToolchainRoot();
+		const callbacks: EnvironmentConfigCallback[] = [];
+		pluginOctane().setup({
+			context: { rootPath: root },
+			modifyEnvironmentConfig(callback: EnvironmentConfigCallback) {
+				callbacks.push(callback);
+			},
+			modifyBundlerChain() {},
+		} as never);
+		const userConfig = {
+			output: { distPath: { root: 'dist/native' }, injectStyles: true },
+			splitChunks: { chunks: 'all', minSize: 4096 },
+			tools: {
+				rspack: {
+					experiments: { css: true },
+					output: { iife: true, uniqueName: 'consumer-app' },
+				},
+			},
+		};
+		const config = callbacks.reduce<Record<string, unknown>>(
+			(current, callback) =>
+				callback(current, { mergeEnvironmentConfig: mergeRsbuildConfig, name: 'lynx' }) ?? current,
+			userConfig,
+		);
+
+		expect(config).toMatchObject({
+			output: { distPath: { root: 'dist/native' }, injectStyles: false },
+			splitChunks: { chunks: 'all', minSize: 4096 },
+			tools: {
+				rspack: {
+					experiments: { css: true },
+					output: { iife: false, uniqueName: 'consumer-app' },
+				},
+			},
+		});
+	});
+
 	it('installs one background compiler graph and preserves entry metadata', () => {
 		const state = applyPlugin({ thread: 'background' });
 

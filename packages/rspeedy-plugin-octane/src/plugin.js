@@ -89,13 +89,10 @@ export function pluginOctane(value) {
 				configureLynxCSS(api, options.environments);
 				api.modifyEnvironmentConfig?.((config, { name, mergeEnvironmentConfig }) => {
 					if (!appliesToEnvironment({ name })) return;
-					return mergeEnvironmentConfig(
-						{
-							...(config.splitChunks === undefined ? { splitChunks: false } : null),
-							tools: { rspack: { output: { iife: false } } },
-						},
-						config,
-					);
+					return mergeEnvironmentConfig(config, {
+						...(config.splitChunks === undefined ? { splitChunks: false } : null),
+						tools: { rspack: { output: { iife: false } } },
+					});
 				});
 			}
 			api.modifyBundlerChain((chain, { environment }) => {

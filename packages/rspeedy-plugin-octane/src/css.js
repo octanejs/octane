@@ -18,7 +18,7 @@ export function configureLynxCSS(api, environments) {
 		) {
 			return;
 		}
-		return mergeEnvironmentConfig({ output: { injectStyles: false } }, config);
+		return mergeEnvironmentConfig(config, { output: { injectStyles: false } });
 	});
 	api.modifyBundlerChain((chain, { CHAIN_ID, environment }) => {
 		if (
