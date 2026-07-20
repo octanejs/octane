@@ -6,6 +6,8 @@ import {
 } from '@octanejs/lynx/config';
 import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 
+import { applyLynxApplication, exposeLynxTemplatePlugin } from './application.js';
+import { configureLynxCSS } from './css.js';
 import { applyLynxEntryLayer, resolveLynxLayer } from './layers.js';
 import { assertLynxToolchain } from './toolchain.js';
 
@@ -41,10 +43,12 @@ function normalizeOptions(value) {
 			throw new TypeError(`${PLUGIN_NAME}: \`${key}\` must be a boolean.`);
 		}
 	}
+	const application = options.thread === undefined;
 	const thread = options.thread ?? 'background';
 	const layer = resolveLynxLayer(thread);
 	return Object.freeze({
 		...layer,
+		application,
 		thread,
 		renderers:
 			thread === 'main-thread' ? lynxRspeedyMainThreadRenderers : lynxRspeedyBackgroundRenderers,
@@ -64,9 +68,8 @@ function normalizeOptions(value) {
 }
 
 /**
- * Phase 1 Rspeedy integration: compile one selected Lynx thread graph through
- * Octane without installing ReactLynx, React Refresh, templates, CSS, or a
- * native receiver. Production bundle assembly remains a Milestone 5 gate.
+ * Build an Octane Lynx application, or compile one isolated thread graph when
+ * `thread` is selected explicitly for diagnostics and source-level testing.
  *
  * @returns {import('@rsbuild/core').RsbuildPlugin}
  */
@@ -78,18 +81,29 @@ export function pluginOctane(value) {
 		setup(api) {
 			const root = resolve(api.context.rootPath);
 			assertLynxToolchain(root);
+			const appliesToEnvironment = (environment) =>
+				(options.environments === undefined || options.environments.includes(environment.name)) &&
+				(!options.application || /^(?:lynx|web)(?:-|$)/.test(environment.name));
+			if (options.application) {
+				exposeLynxTemplatePlugin(api);
+				configureLynxCSS(api, options.environments);
+				api.modifyEnvironmentConfig?.((config, { name, mergeEnvironmentConfig }) => {
+					if (!appliesToEnvironment({ name })) return;
+					return mergeEnvironmentConfig(
+						{
+							...(config.splitChunks === undefined ? { splitChunks: false } : null),
+							tools: { rspack: { output: { iife: false } } },
+						},
+						config,
+					);
+				});
+			}
 			api.modifyBundlerChain((chain, { environment }) => {
-				if (
-					options.environments !== undefined &&
-					!options.environments.includes(environment.name)
-				) {
-					return;
-				}
+				if (!appliesToEnvironment(environment)) return;
 				const extensionAlias = chain.resolve.extensionAlias;
 				const configuredAliases = extensionAlias.has('.js') ? extensionAlias.get('.js') : ['.js'];
 				const aliases = Array.isArray(configuredAliases) ? configuredAliases : [configuredAliases];
 				if (!aliases.includes('.ts')) extensionAlias.set('.js', ['.ts', ...aliases]);
-				applyLynxEntryLayer(chain, options.layer);
 				chain.plugin(`${PLUGIN_NAME}:compiler`).use(OctaneRspackPlugin, [
 					{
 						environment: 'client',
@@ -105,6 +119,20 @@ export function pluginOctane(value) {
 							: { requireDirective: options.requireDirective }),
 					},
 				]);
+			});
+			api.modifyBundlerChain({
+				order: 'post',
+				handler(chain, context) {
+					const { environment } = context;
+					if (!appliesToEnvironment(environment)) return;
+					if (options.application) {
+						const rspeedyConfig =
+							api.useExposed?.(Symbol.for('rspeedy.api'))?.config ?? api.getRsbuildConfig?.() ?? {};
+						applyLynxApplication(chain, context, rspeedyConfig, options);
+					} else {
+						applyLynxEntryLayer(chain, options.layer);
+					}
+				},
 			});
 		},
 	};

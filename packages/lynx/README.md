@@ -1,16 +1,18 @@
 # Octane Lynx
 
-This directory now contains two deliberately separate pieces of the
+This directory now contains three deliberately separate pieces of the
 ReactLynx-to-Octane migration:
 
-- the immutable Milestone 0 audit and React-free framework probe; and
+- the immutable Milestone 0 audit and React-free framework probe;
 - the private Milestone 1 compiler/package scaffold plus the source-level
   Milestones 2–4 background renderer, host boundary, native list, and platform
-  API boundary.
+  API boundary; and
+- the private Milestone 5 production source/build path and packaged JavaScript
+  testing facade.
 
 The package is `0.0.0`, marked `private`, and is not a native renderer release.
 
-## Milestones 3–4 source surface
+## Milestones 3–5 private surface
 
 The package now contains:
 
@@ -52,7 +54,25 @@ The package now contains:
 - renderer-local declarations for `page`, `view`, `text`, `raw-text`, `image`,
   `scroll-view`, `input`, `textarea`, `list`, and `list-item`;
 - explicit custom-native-element augmentation through
-  `LynxCustomIntrinsicElements`.
+  `LynxCustomIntrinsicElements`; and
+- a stable `@octanejs/lynx/testing` facade over the exact
+  `@lynx-js/testing-environment@0.3.0` JavaScript host emulator.
+
+The private `@octanejs/rspeedy-plugin` Milestone 5 application mode now owns
+production bundle assembly. `pluginOctane()` splits every authored application
+entry into a background graph and a generated main-thread receiver, installs
+Octane's receiver in that generated graph, and configures Lynx's
+framework-neutral template, CSS extraction, runtime-wrapper, and native
+encoding packages. Production build tests construct and decode `.lynx.bundle`
+artifacts while checking CSS/assets, source/debug information, and the absence
+of React, Preact, and ReactLynx runtimes. Development builds wire the pinned Lynx
+transport, but no runtime HMR or live-reload claim is made.
+
+The generated main receiver does not render the application. Main-thread
+component rendering, first paint, and background adoption remain Milestone 6.
+Passing an explicit `thread: 'background'` or `thread: 'main-thread'` to the
+Rspeedy plugin retains the earlier isolated compiler-graph diagnostic mode; it
+is not the production application path.
 
 The official `@lynx-js/testing-environment` lane mounts compiled `.lynx.tsrx`,
 updates state/context/conditionals, preserves keyed host identity while
@@ -60,8 +80,16 @@ reordering, exposes refs before layout effects, handles an injected post-ACK
 PAPI fault once, and unmounts asynchronously. The Milestone 4 lane additionally
 models 1,000 logical list items, materializes cells only when the public test
 environment requests an index, reuses native cell identity, and makes late list
-callbacks inert. That is deterministic JavaScript host evidence, not native
-layout, paint, allocation, scrolling, device, or performance evidence.
+callbacks inert. Applications and package tests can import the environment's
+stable classes, install/uninstall helpers, element-tree initializer, and global
+event emitter through `@octanejs/lynx/testing`. That is deterministic JavaScript
+host evidence, not native layout, paint, allocation, scrolling, device, or
+performance evidence.
+
+The testing subpath requires the optional peer
+`@lynx-js/testing-environment@0.3.0`; install that exact package in projects that
+import `@octanejs/lynx/testing`. Applications that do not use the testing
+subpath do not need the peer.
 
 The Node-only `lynx-list` benchmark adds a deterministic source-level operation
 gate: a 12-cell visible window over 1,000 logical items allocates 12 fake-PAPI
@@ -75,8 +103,8 @@ and bundled URL/data-URI image sources; registers every background
 bind/catch/capture/global-bind event kind; exposes asynchronous `invoke`,
 `measure`, `fields`, `path`, and `setNativeProps` handles; and preserves retained
 host visibility. CSS import and CSS Module extraction, stylesheet/template
-sections, and asset bundling remain owned by the Milestone 5 Rspeedy production
-path.
+sections, and asset bundling are now connected by the private Milestone 5
+Rspeedy production source/build path.
 
 These tests do not establish production native behavior. `dispatchNativeEvent()`
 and `dispatchNativeEventBatch()` are source/test bridge methods because the
@@ -92,10 +120,10 @@ tests cover reset key removal and an update between render and layout
 subscription. Installing and proving the native update receiver that maintains
 that snapshot remains a formal gate. The `reload()` API forwards a public
 request; it is not the missing framework reload receiver. No public
-page-destroy receiver has been installed. Packaged testing helpers and
-production Rspeedy assembly remain Milestone 5 work.
+page-destroy receiver has been installed. The packaged testing facade and
+production Rspeedy assembly do not remove those native execution gates.
 
-## Milestone 4 exclusions and examples
+## Milestones 4–5 exclusions and examples
 
 The initial Milestone 4 surface rejects nested `<list>` hosts and does not claim
 Lynx host proof for portals, Suspense, lazy bundles, gestures, or animations.
@@ -130,26 +158,45 @@ The supported package subpaths are:
 @octanejs/lynx/testing
 ```
 
-Framework bootstrap installs the receiver on the main thread before rendering
-the background root:
+The production source/build path generates and installs the main-thread
+receiver. Application authors supply only the background entry:
 
 ```ts
-// main-thread entry
-import { installLynxMainThread } from '@octanejs/lynx/main-thread';
-
-installLynxMainThread();
-```
-
-```ts
-// background entry
+// src/index.ts — background runtime
 import { root } from '@octanejs/lynx';
 import { App } from './App.lynx.tsrx';
 
 await root.render(App);
 ```
 
-This manual bootstrap documents the implemented seam; the Rspeedy plugin does
-not install it automatically until the Milestone 5 production path exists.
+```js
+// rspeedy.config.mjs
+import { defineConfig } from '@lynx-js/rspeedy';
+import { pluginOctane } from '@octanejs/rspeedy-plugin';
+
+export default defineConfig({
+	source: { entry: './src/index.ts' },
+	plugins: [pluginOctane()],
+});
+```
+
+`installLynxMainThread()` remains public for isolated receiver tests and the
+explicit one-thread compiler diagnostic mode. It is not a second application
+entry in normal application mode.
+
+Milestone 5 remains pinned to Lynx SDK `3.9.0` with target SDK `3.9`, Rspeedy
+`0.16.0`, Rsbuild `2.1.4`, Rspack `2.1.3`, template plugin `0.13.0`, CSS extract
+plugin `0.9.0`, runtime wrapper `0.2.2`, dev transport `0.3.0`, tasm `0.0.39`,
+testing environment `0.3.0`, Lynx types `4.0.0`, and the blocked Web control
+`@lynx-js/web-core@0.22.2`. This is one exact private compatibility set, not a
+minimum-to-current supported range.
+
+Native applications keep Lynx's event spelling: `bind`, `catch`,
+`capture-bind`, `capture-catch`, and `global-bind`. There is no DOM-style event
+alias or synthetic event layer. Page destroy, framework reload/background
+teardown, and native string-event delivery still lack the public framework
+hooks required by the plan. List recycling and the app-owned Native Module and
+custom-element boundary remain exactly as qualified above.
 
 ## Current decision
 
@@ -163,14 +210,16 @@ The production Web control and transport bundles currently fail before
 rendering under `@lynx-js/web-core@0.22.2` with a `MutationObserver` target type
 error; the transported path additionally reports that Web `postMessage` is not
 implemented. Explorer, Android, and iOS execution were unavailable on the
-capture host. These remain explicit gates. The package scaffold does not waive
-them and must not be described as a preview or production renderer.
+capture host. These remain explicit gates. The private Milestone 5 bundle path
+does not waive them and must not be described as a preview or production
+renderer.
 
-Milestones 3–4 have host-side private source and official-JavaScript
-implementations, but their formal exits remain unmet. The unresolved Milestone
-0 native event/lifecycle/reload hooks, Web failure, Android/iOS evidence, real
+Milestones 3–5 have host/build-side private source and official-JavaScript
+evidence, but their formal exits remain unmet. The unresolved Milestone 0
+native event/lifecycle/reload hooks, Web failure, Android/iOS evidence, real
 selector-query/layout/list allocation behavior, app-native module/element
-execution, and pinned ReactLynx differential remain gates.
+execution, source-map resolution in an engine, runtime HMR cleanup, and pinned
+ReactLynx differential remain gates.
 
 ## What the Phase 0 probe proves
 
@@ -181,7 +230,7 @@ execution, and pinned ReactLynx differential remain gates.
 - Complete batches are validated before PAPI mutation, and accepted batches
   cross one explicit flush boundary before acknowledgement.
 - Production native and Web bundles contain no ReactLynx or Preact runtime.
-- The Milestone 3–4 receiver uses named public `ContextProxy` events rather than
+- The Milestone 3–5 receiver uses named public `ContextProxy` events rather than
   the probe's `postMessage` fallback and keeps live Element PAPI objects wholly
   on the main thread.
 

@@ -15,6 +15,14 @@ import {
 
 const temporaryRoots: string[] = [];
 
+type BundlerChainCallback = (chain: unknown, context: unknown) => void;
+
+function bundlerChainCallback(
+	value: BundlerChainCallback | { handler: BundlerChainCallback },
+): BundlerChainCallback {
+	return typeof value === 'function' ? value : value.handler;
+}
+
 function packageDirectory(root: string, name: string): string {
 	return join(root, 'node_modules', ...name.split('/'));
 }
@@ -40,10 +48,11 @@ function createToolchainRoot(): string {
 	return root;
 }
 
-function createChain() {
-	const initial = {
+function createChain(
+	initial: Record<string, unknown[]> = {
 		app: ['./src/setup.js', { filename: 'background.js', import: ['./src/App.lynx.tsrx'] }],
-	};
+	},
+) {
 	const entries = new Map<string, unknown[]>(Object.entries(initial));
 	const plugins = new Map<string, { implementation: unknown; options: unknown[] }>();
 	const extensionAliases = new Map<string, string[]>();
@@ -82,6 +91,11 @@ function createChain() {
 						values.push(value);
 						entries.set(name, values);
 					},
+					prepend(value: unknown) {
+						const values = entries.get(name) ?? [];
+						values.unshift(value);
+						entries.set(name, values);
+					},
 				};
 			},
 			plugin(name: string) {
@@ -112,19 +126,31 @@ function compilerOptions(state: ReturnType<typeof createChain>) {
 	};
 }
 
-function applyPlugin(options: Parameters<typeof pluginOctane>[0], environment = 'lynx') {
+function applyPlugin(
+	options: Parameters<typeof pluginOctane>[0],
+	environment = 'lynx',
+	context: Record<string, unknown> = {},
+	entries?: Record<string, unknown[]>,
+) {
 	const root = createToolchainRoot();
-	const callbacks: Array<(chain: unknown, context: unknown) => void> = [];
+	const callbacks: BundlerChainCallback[] = [];
 	const plugin = pluginOctane(options);
 	plugin.setup({
 		context: { rootPath: root },
-		modifyBundlerChain(callback: (chain: unknown, context: unknown) => void) {
-			callbacks.push(callback);
+		modifyBundlerChain(callback: BundlerChainCallback | { handler: BundlerChainCallback }) {
+			callbacks.push(bundlerChainCallback(callback));
 		},
 	} as never);
-	const state = createChain();
+	const state = createChain(entries);
 	for (const callback of callbacks) {
-		callback(state.chain, { environment: { name: environment } });
+		callback(state.chain, {
+			...context,
+			environment: {
+				config: {},
+				...((context.environment as Record<string, unknown> | undefined) ?? {}),
+				name: environment,
+			},
+		});
 	}
 	return state;
 }
@@ -135,7 +161,7 @@ afterEach(() => {
 
 describe('@octanejs/rspeedy-plugin', () => {
 	it('installs one background compiler graph and preserves entry metadata', () => {
-		const state = applyPlugin(undefined);
+		const state = applyPlugin({ thread: 'background' });
 
 		expect(state.entries.get('app')).toEqual([
 			{ import: ['./src/setup.js'], layer: LYNX_BACKGROUND_LAYER },
@@ -182,8 +208,210 @@ describe('@octanejs/rspeedy-plugin', () => {
 		);
 	});
 
+	it('wires development transport around the generated receiver without React refresh', () => {
+		const state = applyPlugin(
+			undefined,
+			'lynx',
+			{
+				environment: { config: { dev: { hmr: true, liveReload: true } } },
+				isDev: true,
+				isProd: false,
+			},
+			{ app: ['./src/setup.js', './src/App.lynx.tsrx'] },
+		);
+
+		expect(state.entries.get('app')).toEqual([
+			{ import: ['@lynx-js/webpack-dev-transport/client'], layer: LYNX_BACKGROUND_LAYER },
+			{ import: ['@rspack/core/hot/dev-server'], layer: LYNX_BACKGROUND_LAYER },
+			{
+				filename: '.rspeedy/app/background.js',
+				import: ['./src/setup.js', './src/App.lynx.tsrx'],
+				layer: LYNX_BACKGROUND_LAYER,
+			},
+		]);
+		const receiver = state.entries.get('app__octane_main_thread');
+		expect(receiver).toHaveLength(2);
+		expect(receiver?.[0]).toEqual(
+			expect.objectContaining({
+				import: [expect.stringMatching(/hotModuleReplacement\.lepus\.cjs$/)],
+				layer: LYNX_MAIN_THREAD_LAYER,
+			}),
+		);
+		expect(receiver?.[1]).toEqual(
+			expect.objectContaining({
+				filename: '.rspeedy/app/main-thread.js',
+				import: [expect.stringMatching(/main-thread-entry\.js$/)],
+				layer: LYNX_MAIN_THREAD_LAYER,
+			}),
+		);
+		expect(JSON.stringify([...state.entries.values()])).not.toMatch(
+			/@lynx-js\/react|react-refresh/i,
+		);
+	});
+
+	it('preserves public entry loading metadata on the background graph', () => {
+		const library = { type: 'commonjs2' };
+		const state = applyPlugin(
+			undefined,
+			'lynx',
+			{},
+			{
+				app: [
+					{
+						asyncChunks: false,
+						baseUri: 'lynx://octane/',
+						chunkLoading: false,
+						import: ['./src/App.tsrx'],
+						layer: LYNX_BACKGROUND_LAYER,
+						library,
+						publicPath: '/assets/',
+						runtime: false,
+						wasmLoading: false,
+					},
+				],
+			},
+		);
+
+		expect(state.entries.get('app')).toEqual([
+			{
+				asyncChunks: false,
+				baseUri: 'lynx://octane/',
+				chunkLoading: false,
+				filename: '.rspeedy/app/background.js',
+				import: ['./src/App.tsrx'],
+				layer: LYNX_BACKGROUND_LAYER,
+				library,
+				publicPath: '/assets/',
+				runtime: false,
+				wasmLoading: false,
+			},
+		]);
+	});
+
+	it('rejects conflicting entry loading metadata instead of discarding it', () => {
+		expect(() =>
+			applyPlugin(
+				undefined,
+				'lynx',
+				{},
+				{
+					app: [
+						{ import: ['./src/one.ts'], publicPath: '/one/' },
+						{ import: ['./src/two.ts'], publicPath: '/two/' },
+					],
+				},
+			),
+		).toThrow(/entry "app".*conflicting "publicPath" options/);
+	});
+
+	it('rejects dependOn because every native bundle must be self-contained', () => {
+		expect(() =>
+			applyPlugin(
+				undefined,
+				'lynx',
+				{},
+				{
+					app: [{ dependOn: 'shared', import: ['./src/App.tsrx'] }],
+					shared: ['./src/shared.ts'],
+				},
+			),
+		).toThrow(/cannot use dependOn.*complete background graph/);
+	});
+
+	it('diagnoses entry filenames and layers owned by application mode', () => {
+		expect(() =>
+			applyPlugin(
+				undefined,
+				'lynx',
+				{},
+				{
+					app: [{ filename: 'custom.js', import: ['./src/App.tsrx'] }],
+				},
+			),
+		).toThrow(/cannot set filename.*output\.filename\.js/);
+		expect(() =>
+			applyPlugin(
+				undefined,
+				'lynx',
+				{},
+				{
+					app: [{ import: ['./src/App.tsrx'], layer: 'custom-layer' }],
+				},
+			),
+		).toThrow(/cannot use layer "custom-layer".*octane:background/);
+	});
+
+	it('follows structured filename-hash enablement for generated background assets', () => {
+		const entries = { app: ['./src/App.tsrx'] };
+		const production = applyPlugin(
+			undefined,
+			'lynx',
+			{
+				environment: { config: { output: { filenameHash: { enable: false } } } },
+				isDev: false,
+				isProd: true,
+			},
+			entries,
+		);
+		const development = applyPlugin(
+			undefined,
+			'lynx',
+			{
+				environment: {
+					config: { output: { filenameHash: { enable: 'always', format: 'fullhash:6' } } },
+				},
+				isDev: true,
+				isProd: false,
+			},
+			entries,
+		);
+
+		expect(production.entries.get('app')?.at(-1)).toEqual(
+			expect.objectContaining({ filename: '.rspeedy/app/background.js' }),
+		);
+		expect(development.entries.get('app')?.at(-1)).toEqual(
+			expect.objectContaining({ filename: '.rspeedy/app/background.[fullhash:6].js' }),
+		);
+	});
+
+	it('preserves a functional JavaScript filename policy for the background layout', () => {
+		const state = applyPlugin(
+			undefined,
+			'lynx',
+			{
+				environment: {
+					config: { output: { filename: { js: () => 'assets/custom.js' } } },
+				},
+				isDev: false,
+				isProd: true,
+			},
+			{ app: ['./src/App.tsrx'] },
+		);
+		const filename = (
+			state.entries.get('app')?.at(-1) as {
+				filename: (pathData: unknown, assetInfo: unknown) => string;
+			}
+		).filename;
+
+		expect(filename({}, {})).toBe('.rspeedy/assets/custom/background.js');
+	});
+
+	it('rejects an authored entry that collides with its generated receiver', () => {
+		expect(() =>
+			applyPlugin(
+				undefined,
+				'lynx',
+				{},
+				{
+					app: ['./src/App.tsrx'],
+					app__octane_main_thread: ['./src/collision.ts'],
+				},
+			),
+		).toThrow(/app__octane_main_thread.*collides.*generated main-thread receiver/);
+	});
+
 	it('diagnoses background-only APIs at main-thread authored locations', () => {
-		const background = compilerOptions(applyPlugin(undefined));
+		const background = compilerOptions(applyPlugin({ thread: 'background' }));
 		const mainThread = compilerOptions(applyPlugin({ thread: 'main-thread' }));
 		const renderer = (compiler: ReturnType<typeof compilerOptions>) =>
 			({ id: 'lynx', ...compiler.renderers.registry.lynx }) as never;
@@ -236,11 +464,11 @@ export function App() @{ <view /> }
 
 	it('preserves existing JavaScript extension aliases while adding TypeScript source', () => {
 		const root = createToolchainRoot();
-		const callbacks: Array<(chain: unknown, context: unknown) => void> = [];
-		pluginOctane().setup({
+		const callbacks: BundlerChainCallback[] = [];
+		pluginOctane({ thread: 'background' }).setup({
 			context: { rootPath: root },
-			modifyBundlerChain(callback: (chain: unknown, context: unknown) => void) {
-				callbacks.push(callback);
+			modifyBundlerChain(callback: BundlerChainCallback | { handler: BundlerChainCallback }) {
+				callbacks.push(bundlerChainCallback(callback));
 			},
 		} as never);
 		const state = createChain();

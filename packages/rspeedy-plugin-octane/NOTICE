@@ -1,3 +1,4 @@
 This package interoperates with the Apache-2.0-licensed Lynx and Rspeedy
-projects. No upstream source is included. See UPSTREAM.md for the pinned
-compatibility boundary.
+projects through their published APIs. No upstream implementation source is
+included or adapted. See UPSTREAM.md for the pinned compatibility boundary and
+the audited reference-only surface.

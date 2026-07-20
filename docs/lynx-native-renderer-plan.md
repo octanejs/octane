@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–4 have private source/test implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–5 have private source/test/build implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-18**
 
@@ -11,6 +11,8 @@ Milestone 2 source/test evidence date: **2026-07-19**
 Milestone 3 source/test evidence date: **2026-07-19**
 
 Milestone 4 source/test evidence date: **2026-07-19**
+
+Milestone 5 source/build evidence date: **2026-07-20**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -163,15 +165,28 @@ to mix freely:
 
 | Surface | Audited manifest version | Role in this plan |
 | --- | ---: | --- |
+| Lynx native SDK | `3.9.0` (target `3.9`) | Exact Android/iOS engine and Explorer gate |
 | `@lynx-js/react` | `0.123.0` | Behavioral oracle, public API/test crosswalk, no production dependency |
 | `@lynx-js/react-rsbuild-plugin` | `0.18.0` | Reference for dual-layer graph and lifecycle wiring only |
 | `@lynx-js/rspeedy` | `0.16.0` | Native toolchain and public plugin host |
-| `@lynx-js/template-webpack-plugin` | `0.13.0` | Framework-neutral `.lynx.bundle` assembly candidate |
+| `@lynx-js/template-webpack-plugin` | `0.13.0` | Framework-neutral `.lynx.bundle` assembly |
+| `@lynx-js/css-extract-webpack-plugin` | `0.9.0` | Framework-neutral stylesheet extraction |
+| `@lynx-js/runtime-wrapper-webpack-plugin` | `0.2.2` | Background runtime wrapping |
+| `@lynx-js/webpack-dev-transport` | `0.3.0` | Development transport wiring; not runtime HMR evidence |
+| `@lynx-js/tasm` | `0.0.39` | Native bundle encoding and test decoding |
+| `@lynx-js/testing-environment` | `0.3.0` | Pure-JavaScript source testing environment |
 | `@lynx-js/types` | `4.0.0` | Source intrinsic/event/platform types to adapt renderer-locally |
+| `@lynx-js/web-core` | `0.22.2` | Exact Web control; execution currently blocked |
+| `@rsbuild/core` | `2.1.4` | Exact core selected by Rspeedy `0.16.0` |
+| `@rspack/core` | `2.1.3` | Exact bundler core selected by the Lynx compatibility set |
 
-Milestone 0 must replace this moving-main audit with one exact published Lynx
-SDK/Rspeedy compatibility set and one upstream commit. Minimum/current lanes are
-added only after the first production bundle works.
+The immutable compatibility record began with the Phase 0 SDK/probe pins and
+now records the Milestone 5 CSS and development-transport additions with their
+registry integrity. Milestone 5 consumes the exact package versions above as
+one physical compatibility graph. This is not a minimum-to-current support range. The
+remaining Milestone 0 exit also requires the public runtime hooks and execution
+evidence described below. Minimum/current lanes are added only after the private
+source/build path works in the required engines.
 
 Primary upstream contracts:
 
@@ -744,7 +759,31 @@ and bounded native allocation while scrolling; init/global data updates render;
 the sample native module and custom element work on Android and iOS; teardown
 leaves no native nodes, listeners, callbacks, or resource handles.
 
-### Milestone 5 — Rspeedy production path and technical preview (2–3 engineer-weeks)
+### Milestone 5 — Rspeedy production path toward technical preview (2–3 engineer-weeks)
+
+> **Progress (2026-07-20): private source/build implementation complete; formal
+> exit blocked.** With `thread` omitted, `pluginOctane()` now treats every
+> authored entry as an application: the authored code becomes the background
+> graph and an internal entry installs the Octane main-thread receiver. The
+> plugin uses the pinned framework-neutral template, CSS extraction,
+> runtime-wrapper, development transport, and native encoder packages to emit a
+> `.lynx.bundle` per entry while retaining Octane's shared renderer resolver and
+> cache identities. Explicit `thread: 'background'` and
+> `thread: 'main-thread'` remain isolated compiler-graph diagnostic modes. The
+> public `@octanejs/lynx/testing` subpath is now a thin facade over the pinned
+> JavaScript testing environment, and production smoke evidence builds and
+> decodes the bundle without a React, Preact, or ReactLynx runtime. This does not
+> render the application on the main thread and does not implement first-paint
+> adoption (Milestone 6). No Lynx Web, Android, or iOS execution; device error
+> capture; authored-source-map resolution in an engine; or state-preserving HMR
+> evidence has landed. The packages therefore remain private and are not a
+> technical preview.
+
+Both packages already appear in the generated private-package inventory. The
+public bindings-status generator intentionally excludes private packages, so
+`packages/lynx/status.json` remains the machine-readable status source without
+a public website binding entry. A release changeset is deferred until the
+packages are eligible to publish.
 
 - Finish `@octanejs/rspeedy-plugin` using framework-neutral Lynx template, CSS,
   runtime-wrapper, and encoding packages.
