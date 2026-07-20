@@ -1,5 +1,29 @@
 # @octanejs/app-core
 
+## 0.0.8
+
+### Patch Changes
+
+- a88f9ea: Add a Cloudflare Workers adapter for full-stack Octane apps. Vite and Rsbuild
+  can now emit a Worker-targeted server bundle and a streaming module Worker for
+  Workers Static Assets, with Cloudflare bindings and execution context available
+  through request-scoped middleware and server-route context.
+
+  Initialize streaming SSR token entropy on the first render so module evaluation
+  remains valid in runtimes that prohibit random generation in global scope.
+
+- Updated dependencies [a88f9ea]
+- Updated dependencies [443bba7]
+- Updated dependencies [d388e80]
+- Updated dependencies [2f2a204]
+- Updated dependencies [0223241]
+- Updated dependencies [f9234f6]
+- Updated dependencies [fa11116]
+- Updated dependencies [ec7ffbf]
+- Updated dependencies [25d266b]
+- Updated dependencies [d388e80]
+  - octane@0.1.12
+
 ## 0.0.7
 
 ### Patch Changes
