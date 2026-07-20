@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount } from './_helpers';
 import {
+	BranchChainHost,
 	ChainHost,
 	PropChainHost,
+	SetupShadowHost,
 	ShadowedLoopHost,
 	SwitchingChainHost,
 } from './_fixtures/use-chain-memo.tsrx';
@@ -112,6 +114,47 @@ describe('use()-fed const chain memoization', () => {
 		});
 		await act(() => {});
 		expect(r.html()).toContain('v=B');
+		r.unmount();
+	});
+
+	it('memoizes a chain const declared in an else-if arm (fetches once across the replay)', async () => {
+		const calls: string[] = [];
+		let release: (() => void) | null = null;
+		const fetchUser = (id: string) => {
+			calls.push(id);
+			return new Promise<string>((resolve) => {
+				release = () => resolve('U' + id);
+			});
+		};
+		const r = mount(BranchChainHost, { fetchUser, mode: 'b', id: 'x' });
+		expect(r.html()).toContain('loading');
+		expect(calls).toEqual(['x']);
+		await act(() => release!());
+		expect(r.html()).toContain('label=Ux');
+		// The replay re-entered the else-if arm; its memoized creation must hit.
+		expect(calls).toEqual(['x']);
+		r.unmount();
+	});
+
+	it('a setup-block shadow does not freeze the outer same-named const', () => {
+		let n = 0;
+		const build = () => ({ n: ++n });
+		const fetchThing = (id: string) =>
+			({ then: () => {}, status: 'fulfilled', value: 'V' + id }) as unknown as Promise<string>;
+		const log: string[] = [];
+		const r = mount(SetupShadowHost, {
+			log: (entry: string) => log.push(entry),
+			build,
+			fetchThing,
+			id: 'a',
+		});
+		expect(r.html()).toContain('l=t0:Va');
+		expect(log).toEqual(['built:1']);
+		r.click('#tick');
+		// The outer `const item = build()` must keep recreating per render —
+		// the inner shadowed use() binding cannot taint it into memoization.
+		expect(log).toEqual(['built:1', 'built:2']);
+		expect(r.html()).toContain('l=t1:Va');
 		r.unmount();
 	});
 

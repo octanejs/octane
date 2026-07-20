@@ -88,6 +88,71 @@ export function SwitchingChainHost({
 	}
 }
 
+// A chain const declared in an `else if` arm — the alternate is an
+// IfStatement, not a block, and must still be reached by the taint pass.
+function BranchReader({
+	fetchUser,
+	mode,
+	id,
+}: {
+	fetchUser: (id: string) => Promise<string>;
+	mode: string;
+	id: string;
+}) @{
+	let label = 'none';
+	if (mode === 'a') {
+		label = 'a';
+	} else if (mode === 'b') {
+		const q = fetchUser(id);
+		label = use(q);
+	}
+	<p>{'label=' + label}</p>
+}
+
+export function BranchChainHost({
+	fetchUser,
+	mode,
+	id,
+}: {
+	fetchUser: (id: string) => Promise<string>;
+	mode: string;
+	id: string;
+}) @{
+	@try {
+		<BranchReader fetchUser={fetchUser} mode={mode} id={id} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
+// A setup block shadows `item` and use()s the inner binding; the unrelated
+// outer `const item = build()` must keep recreating per render (name-based
+// tainting must not freeze it).
+export function SetupShadowHost({
+	log,
+	build,
+	fetchThing,
+	id,
+}: {
+	log: (entry: string) => void;
+	build: () => { n: number };
+	fetchThing: (id: string) => Promise<string>;
+	id: string;
+}) @{
+	const [tick, setTick] = useState(0);
+	const item = build();
+	log('built:' + item.n);
+	let label = 't' + tick;
+	{
+		const item = fetchThing(id);
+		label = label + ':' + use(item);
+	}
+	<div>
+		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		{'l=' + label}
+	</div>
+}
+
 // A @for arm binds its own `item`; use(item.promise) must NOT taint the
 // unrelated same-named body const into memoization — `build()` re-runs every
 // render exactly as an unmemoized creation should.

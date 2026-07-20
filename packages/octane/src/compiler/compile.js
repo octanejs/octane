@@ -5643,7 +5643,16 @@ function ssrCompileBody(
 		// Pass A′ mirror (see the client pipeline): use()-fed const chains
 		// memoize at their declarations via `_$puMemo`, closing the same
 		// per-pass recreation hole for the setup-const authoring shape.
-		workingStatements = memoizeUseFedCreations(workingStatements, jsxNodes, ctx, name, creations);
+		const puParamNames = new Set();
+		for (const param of node.params || []) collectPatternNames(param, puParamNames);
+		workingStatements = memoizeUseFedCreations(
+			workingStatements,
+			jsxNodes,
+			ctx,
+			name,
+			creations,
+			puParamNames,
+		);
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -7495,8 +7504,19 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		const warmChildren = [];
 		// Pass A′ first: use()-fed const chains memoize at their declarations,
 		// so Pass A then sees their trivial identifier arguments as already
-		// stable and the warm plan includes the chain heads.
-		workingStatements = memoizeUseFedCreations(workingStatements, jsxNodes, ctx, name, creations);
+		// stable and the warm plan includes the chain heads. Param names feed
+		// the shadow exclusion (a candidate sharing a param's name is
+		// ambiguous for name-based tainting).
+		const puParamNames = new Set();
+		for (const param of node.params || []) collectPatternNames(param, puParamNames);
+		workingStatements = memoizeUseFedCreations(
+			workingStatements,
+			jsxNodes,
+			ctx,
+			name,
+			creations,
+			puParamNames,
+		);
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -8498,7 +8518,7 @@ function makeCreationMemoCall(
 // isPropCreationExpr: a call/new reached during render, no JSX, no
 // hook-shaped calls.
 
-function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) {
+function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, paramNames) {
 	// 1. Seed roots: free identifiers of EVERY use() argument, trivial or not
 	//    — a non-trivial argument's memo will list these as deps, so a
 	//    render-created dep would otherwise defeat that memo every render.
@@ -8508,15 +8528,24 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 	if (seedRoots.size === 0) return stmts;
 
 	// 2. Candidates, in declaration order with their guard chains, plus the
-	//    full body-local binding-name set for dependency coarsening.
+	//    full body-local binding-name set for dependency coarsening. Tainting
+	//    below is NAME-based, so a name declared more than once in the walked
+	//    setup region — or colliding with a component param — is ambiguous: a
+	//    use() of the inner binding would also taint (and freeze) the
+	//    unrelated outer one. Such shadowed names are excluded from
+	//    memoization entirely; their chains just keep today's
+	//    recreate-per-render behavior.
 	const candidates = [];
 	const localNames = new Set();
+	const shadowedNames = new Set();
 	collectCandidates(stmts, []);
 	if (candidates.length === 0) return stmts;
 
 	// 3. Upstream taint closure: a tainted const taints everything its init
 	//    references. Iterate to fixpoint (chains are declaration-ordered, so
 	//    one reverse sweep converges; the loop is a cheap safety net).
+	//    Shadowed names neither taint nor cascade — which concrete binding
+	//    the seed meant is unknowable by name.
 	const tainted = new Set();
 	let changed = true;
 	while (changed) {
@@ -8525,6 +8554,7 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 			const candidate = candidates[i];
 			if (tainted.has(candidate)) continue;
 			if (!seedRoots.has(candidate.name)) continue;
+			if (shadowedNames.has(candidate.name) || paramNames?.has(candidate.name) === true) continue;
 			tainted.add(candidate);
 			changed = true;
 			for (const free of collectFreeIdentifiers(candidate.init, [])) seedRoots.add(free);
@@ -8572,8 +8602,14 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 			if (stmt.type === 'VariableDeclaration') {
 				// Every body-local binding (const OR let, any pattern) joins the
 				// coarsening set below — a member path rooted at a render-created
-				// local is never a safe dependency witness.
-				for (const d of stmt.declarations || []) collectPatternNames(d.id, localNames);
+				// local is never a safe dependency witness. A name seen twice is
+				// shadowed (ambiguous for name-based tainting).
+				const declared = new Set();
+				for (const d of stmt.declarations || []) collectPatternNames(d.id, declared);
+				for (const name of declared) {
+					if (localNames.has(name)) shadowedNames.add(name);
+					localNames.add(name);
+				}
 				if (stmt.kind !== 'const') continue;
 				const decl = stmt.declarations?.length === 1 ? stmt.declarations[0] : null;
 				if (decl && decl.id?.type === 'Identifier' && decl.init) {
@@ -8583,16 +8619,24 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 				continue;
 			}
 			if (stmt.type === 'IfStatement') {
-				const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
-				if (stmt.consequent?.type === 'BlockStatement') {
-					collectCandidates(stmt.consequent.body, [...guards, stmt.test]);
-				}
-				if (stmt.alternate?.type === 'BlockStatement') {
-					collectCandidates(stmt.alternate.body, [...guards, not(stmt.test)]);
-				}
+				collectIfCandidates(stmt, guards);
 				continue;
 			}
 			if (stmt.type === 'BlockStatement') collectCandidates(stmt.body, guards);
+		}
+	}
+
+	// `else if` alternates are IfStatements, not blocks — recurse the whole
+	// chain so consts in every arm are collected with the right guard chain.
+	function collectIfCandidates(stmt, guards) {
+		const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+		if (stmt.consequent?.type === 'BlockStatement') {
+			collectCandidates(stmt.consequent.body, [...guards, stmt.test]);
+		}
+		if (stmt.alternate?.type === 'BlockStatement') {
+			collectCandidates(stmt.alternate.body, [...guards, not(stmt.test)]);
+		} else if (stmt.alternate?.type === 'IfStatement') {
+			collectIfCandidates(stmt.alternate, [...guards, not(stmt.test)]);
 		}
 	}
 
@@ -8610,10 +8654,13 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 						stmt.consequent?.type === 'BlockStatement'
 							? { ...stmt.consequent, body: rewriteStatements(stmt.consequent.body) }
 							: stmt.consequent,
+					// `else if` alternates are IfStatements — rewrite the chain.
 					alternate:
 						stmt.alternate?.type === 'BlockStatement'
 							? { ...stmt.alternate, body: rewriteStatements(stmt.alternate.body) }
-							: stmt.alternate,
+							: stmt.alternate?.type === 'IfStatement'
+								? rewriteStatements([stmt.alternate])[0]
+								: stmt.alternate,
 				};
 			}
 			if (stmt.type === 'BlockStatement') return { ...stmt, body: rewriteStatements(stmt.body) };
