@@ -10797,13 +10797,6 @@ let activationCheckable: Element | null = null;
 // absent, allowing the concrete checked + radio-group graph to tree-shake.
 let CHECKED_RESTORE: ((input: HTMLInputElement, ctrl: ControlledState) => void) | null = null;
 
-// A native select choice emits `input` immediately followed by `change`. Octane
-// exposes native onChange, so restoring the controlled selection at the end of
-// the first dispatch would make the second handler observe the old value. Hold
-// select-input restores until the current task's native event pair completes.
-let pendingSelectInputRestores: Element[] = [];
-let selectInputRestoreScheduled = false;
-
 // Commit-deferred controlled work, drained at the HEAD of commitEffects:
 //  - select re-projection: compiled binding mounts run BEFORE the same
 //    render's @for/@if construct calls, so a `<select value>` binding fires
@@ -11751,20 +11744,28 @@ function maybeEnqueueRestore(event: Event): void {
 	// The activation's follow-up events have arrived — the write-guard window is over.
 	if (t === activationCheckable) activationCheckable = null;
 	if (event.type === 'input' && t.localName === 'select') {
-		if (pendingSelectInputRestores.indexOf(t) === -1) pendingSelectInputRestores.push(t);
-		if (!selectInputRestoreScheduled) {
-			selectInputRestoreScheduled = true;
-			queueMicrotask(() => {
-				selectInputRestoreScheduled = false;
-				const list = pendingSelectInputRestores;
-				pendingSelectInputRestores = [];
-				for (let i = 0; i < list.length; i++) restoreControlledElement(list[i]);
-			});
-		}
+		// A native select pick dispatches `input` and then `change` in SEPARATE
+		// tasks (popup commit, keyboard typeahead), with microtask checkpoints
+		// between them. Octane exposes native onChange, so restoring here — or in
+		// a microtask — would revert the user's pick before its `change` handler
+		// can read it. Mark the pick in flight instead: the `change` dispatch
+		// owns the after-handlers restore (the generic path below), and the task
+		// fallback settles a sequence `change` never completes (a stopped
+		// propagation below the root, or a synthetic lone `input`).
+		t.$$selectPick = true;
+		setTimeout(() => {
+			if (t.$$selectPick === true) {
+				t.$$selectPick = false;
+				restoreControlledElement(t);
+			}
+		}, 0);
 		return;
 	}
 	if (event.type === 'input' && checkable && t.$$checkableActivation === true) return;
-	if (event.type === 'change' && checkable) t.$$checkableActivation = false;
+	if (event.type === 'change') {
+		if (checkable) t.$$checkableActivation = false;
+		if (t.localName === 'select') t.$$selectPick = false;
+	}
 	if (pendingRestores.indexOf(t) === -1) pendingRestores.push(t);
 }
 

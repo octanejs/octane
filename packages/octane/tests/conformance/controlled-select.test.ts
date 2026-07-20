@@ -62,15 +62,44 @@ describe('conformance: controlled <select> (single)', () => {
 		r.unmount();
 	});
 
-	// The browser normally follows select input with change in the same task.
-	// If change never arrives, the deferred restore still settles the controlled
-	// element before the next task rather than abandoning the rendered value.
-	it('reverts an unhandled input-only pick at the microtask boundary', async () => {
+	// A REAL user pick dispatches native `input` and `change` in SEPARATE tasks
+	// (popup commit, keyboard typeahead), with a microtask checkpoint between
+	// them. The pick must survive that gap: restoring the controlled value
+	// after the lone `input` would revert the selection before `change` even
+	// dispatches, so every controlled select's onChange would read the OLD
+	// value and user picks could never commit.
+	it('keeps a user pick alive across the input→change task gap for onChange to commit', async () => {
+		let received = '';
+		let r = mount(CaptureSelect, {
+			value: 'a',
+			onChange: (e: Event) => {
+				received = (e.target as HTMLSelectElement).value;
+				r.update(CaptureSelect, { value: received, onChange: () => {} });
+			},
+		});
+		const sel = r.find('#cs') as HTMLSelectElement;
+		sel.value = 'b'; // the platform applies the pick before either event
+		sel.dispatchEvent(new Event('input', { bubbles: true }));
+		// The browser's microtask checkpoint between the two native events.
+		await Promise.resolve();
+		expect(sel.value).toBe('b');
+		sel.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(received).toBe('b');
+		expect(sel.value).toBe('b');
+		r.unmount();
+	});
+
+	// An input-only pick that no handler commits (and whose native `change`
+	// never arrives — a synthetic lone `input`) still settles back to the
+	// rendered value once the browser's post-event work completes. The revert
+	// waits a full task, not a microtask, so it can never race the native
+	// input→change sequence above.
+	it('reverts an unhandled input-only pick after the event task settles', async () => {
 		const r = mount(StaticSelect, { value: 'a' });
 		const sel = r.find('#ss') as HTMLSelectElement;
 		sel.value = 'b';
 		sel.dispatchEvent(new Event('input', { bubbles: true }));
-		await Promise.resolve();
+		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(sel.value).toBe('a');
 		r.unmount();
 	});

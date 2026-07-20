@@ -733,10 +733,16 @@ export function Playground() @{
 				font-size: 0.85rem;
 				font-weight: 500;
 				color: #f4eee8;
-				padding: 0.35rem 0.65rem;
+				/* Custom chevron (appearance: none drops the native one) so the
+				   indicator gets breathing room from the right edge. */
+				appearance: none;
+				padding: 0.35rem 2.1rem 0.35rem 0.65rem;
 				border-radius: 8px;
 				border: 1px solid rgba(255, 255, 255, 0.1);
 				background: rgba(255, 255, 255, 0.04);
+				background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2399a1b3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+				background-repeat: no-repeat;
+				background-position: right 0.75rem center;
 				cursor: pointer;
 				max-width: 15rem;
 			}
