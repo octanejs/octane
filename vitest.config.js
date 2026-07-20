@@ -1725,6 +1725,44 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'cmdk',
+					include: ['packages/cmdk/tests/**/*.test.ts', '!packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'cmdk-ssr',
+					include: ['packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'styled-components',
 					include: [
 						'packages/styled-components/tests/**/*.test.ts',

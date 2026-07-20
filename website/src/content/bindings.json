@@ -25,7 +25,7 @@
   },
   {
     "title": "UI and interaction",
-    "description": "Primitives, positioning, motion, drag and drop, toasts, and icons.",
+    "description": "Primitives, positioning, motion, drag and drop, toasts, command menus, and icons.",
     "packages": [
       "@octanejs/radix",
       "@octanejs/base-ui",
@@ -34,6 +34,7 @@
       "@octanejs/motion",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
+      "@octanejs/cmdk",
       "@octanejs/lucide"
     ]
   },

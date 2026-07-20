@@ -1,0 +1,17 @@
+{
+  "upstream": { "package": "cmdk", "version": "1.1.1" },
+  "surface": "Alpha, in progress (Phases 0-4): the full component set — `Command`/`Command.Root`, `Command.Input`, `Command.List`, `Command.Item`, `Command.Group`, `Command.Separator`, `Command.Dialog`, `Command.Empty`, `Command.Loading` — plus the flat aliases, `useCommandState`, and `defaultFilter`, with the DOM-authoritative store/registration, `useValue` text-content inference, `onInput`-driven search, score filtering + DOM sort, keyboard navigation (arrows/Home/End/vim/Enter), controlled `value`/`onValueChange`/`loop`/`shouldFilter`/custom `filter`/`forceMount`, and a Radix-backed `Command.Dialog`. `asChild` is not supported (see divergences); SSR/hydration are not yet covered.",
+  "divergences": [
+    "No forwardRef: components take `ref` as a normal prop; multi-ref uses octane's `ref={[a, b]}` instead of composeRefs.",
+    "`Command.Input` drives search from the native `onInput` event; the public `onValueChange(search)` API is unchanged (no synthetic `onChange`).",
+    "Item value is inferred from the provided `value` prop or the rendered `textContent`; cmdk's string-child inspection is dropped because octane's compiled children are opaque.",
+    "score sort() reorders only the items that stay visible (score > 0), leaving the non-matches in place until they unmount; upstream also moves the non-matches to the bottom first, but moving-then-unmounting a node orphans it in an octane hydrated tree. The visible result (matches in score order) is identical.",
+    "`asChild` is not supported: cmdk's SlottableWithNestedChildren clones a child element and re-parents the component's own content into it, which has no faithful equivalent over octane's opaque compiled children. Components always render their own host element.",
+    "`Command.Dialog` builds on @octanejs/radix's Dialog (composed via createElement descriptors, since radix's Portal iterates children) instead of @radix-ui/react-dialog.",
+    "The vendored scorer gained explicit parameter type annotations for strict typecheck and repo-style formatting; the algorithm and score constants are unchanged from cmdk@1.1.1."
+  ],
+  "ssr": "Supported and tested: the menu server-renders all items in source order without browser globals (the DOM-authoritative filter/selection is post-hydration work), and `hydrateRoot` adopts the server nodes without a mismatch, then activates — values infer from textContent, the first item selects, Empty hides, and typing filters live.",
+  "verified": "2026-07-20",
+  "notes": ["Port in progress. See docs/cmdk-port-plan.md for the phased plan and open risks."],
+  "docs": ["docs/cmdk-port-plan.md"]
+}

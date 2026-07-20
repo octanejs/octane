@@ -23,6 +23,7 @@ export const KNOWN_BINDINGS = {
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
 	nuqs: '@octanejs/nuqs',
+	cmdk: '@octanejs/cmdk',
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',
