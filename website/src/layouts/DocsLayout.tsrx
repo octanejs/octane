@@ -1,22 +1,13 @@
 // Docs section shell: sidebar of documents (from the registry) + the routed
 // document via <Outlet/>.
 import { Link, Outlet, useParams } from '@octanejs/tanstack-router';
-import { useState } from 'octane';
 import { OnThisPage } from '../components/OnThisPage.tsrx';
 import { docGroups, defaultDoc, findDoc } from '../content/docs.ts';
+import { useAnimatedMobileNavigation } from '../hooks/use-animated-mobile-navigation.ts';
 
 export function DocsLayout() @{
-	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-	const closeMobileNavigation = () => {
-		if (!mobileMenuOpen) return;
-		setMobileMenuOpen(false);
-		// Reveal the target only after the overlay has closed. A timer also covers
-		// browsers that omit transitionend.
-		const reduce =
-			typeof window.matchMedia === 'function' &&
-				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		return new Promise<void>((resolve) => window.setTimeout(resolve, reduce ? 0 : 240));
-	};
+	const { mobileMenuOpen, mobileMenuPanel, toggleMobileNavigation, closeMobileNavigation } =
+		useAnimatedMobileNavigation();
 
 	// The Link's own data-status covers `/docs/$slug`, but the bare `/docs` index
 	// renders the default doc (quick-start) without a slug in the URL — so no link
@@ -33,12 +24,12 @@ export function DocsLayout() @{
 				class="sidebar-mobile-toggle"
 				aria-expanded={mobileMenuOpen}
 				aria-controls="docs-sidebar-nav"
-				onClick={() => setMobileMenuOpen((open) => !open)}
+				onClick={toggleMobileNavigation}
 			>
 				<span>Documentation</span>
 				<span class="sidebar-mobile-icon" aria-hidden="true">+</span>
 			</button>
-			<div class={['sidebar-panel', mobileMenuOpen && 'is-open']}>
+			<div class={['sidebar-panel', mobileMenuOpen && 'is-open']} ref={mobileMenuPanel}>
 				<div class="sidebar-panel-inner">
 					<nav id="docs-sidebar-nav" class="sidebar-nav" aria-label="Documentation">
 						<p class="sidebar-title">Documentation</p>

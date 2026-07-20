@@ -651,11 +651,17 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			await page.waitForFunction(
 				() => {
 					const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect();
+					const panel = document.querySelector<HTMLElement>('.sidebar-panel')!;
+					const panelInner = document
+						.querySelector('.sidebar-panel-inner')!
+						.getBoundingClientRect();
 					const target = document.querySelector('#rspack')!.getBoundingClientRect();
 					return (
 						location.hash === '#rspack' &&
 						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
 							'false' &&
+						getComputedStyle(panel).visibility === 'hidden' &&
+						panelInner.height < 1 &&
 						target.top >= sidebar.bottom + 8 &&
 						target.top <= sidebar.bottom + 30
 					);

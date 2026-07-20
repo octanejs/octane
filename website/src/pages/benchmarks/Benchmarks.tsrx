@@ -6,12 +6,12 @@
 // then the octane-internal de-opt ("authoring cliff") suites. All numbers are the
 // checked-in benchmark scores; the page cannot drift from the repo because the
 // JSON is imported at build time.
-import { useState } from 'octane';
 import { BenchBars } from '../../components/BenchBars.tsrx';
 import { BenchmarkExplorer } from '../../components/BenchmarkExplorer.tsrx';
 import { OnThisPage } from '../../components/OnThisPage.tsrx';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../../content/benchmarks.ts';
 import { createHomeSummary } from '../../content/home-benchmark.ts';
+import { useAnimatedMobileNavigation } from '../../hooks/use-animated-mobile-navigation.ts';
 import { useTitle } from '../../hooks/use-title.ts';
 
 const OVERVIEW = createHomeSummary(FRAMEWORK_CARDS);
@@ -37,15 +37,8 @@ export const BENCH_SECTIONS: readonly { id: string; title: string; level?: 2 | 3
 
 export function Benchmarks() @{
 	useTitle('Octane — Benchmarks');
-	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-	const closeMobileNavigation = () => {
-		if (!mobileMenuOpen) return;
-		setMobileMenuOpen(false);
-		const reduce =
-			typeof window.matchMedia === 'function' &&
-				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		return new Promise<void>((resolve) => window.setTimeout(resolve, reduce ? 0 : 240));
-	};
+	const { mobileMenuOpen, mobileMenuPanel, toggleMobileNavigation, closeMobileNavigation } =
+		useAnimatedMobileNavigation();
 
 	<div class="benchpage">
 		<div class="benchpage-frame">
@@ -55,12 +48,12 @@ export function Benchmarks() @{
 					class="benchpage-sidebar-toggle"
 					aria-expanded={mobileMenuOpen}
 					aria-controls="benchmark-sidebar-nav"
-					onClick={() => setMobileMenuOpen((open) => !open)}
+					onClick={toggleMobileNavigation}
 				>
 					<span>Benchmarks</span>
 					<span class="benchpage-sidebar-icon" aria-hidden="true">+</span>
 				</button>
-				<div class={['benchpage-sidebar-panel', mobileMenuOpen && 'is-open']}>
+				<div class={['benchpage-sidebar-panel', mobileMenuOpen && 'is-open']} ref={mobileMenuPanel}>
 					<div class="benchpage-sidebar-panel-inner">
 						<div id="benchmark-sidebar-nav">
 							<a class="benchpage-sidebar-link" href="/benchmarks" aria-current="page">
