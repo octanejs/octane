@@ -1,0 +1,52 @@
+{
+  "name": "@octanejs/adapter-cloudflare",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "Cloudflare Workers adapter for Octane apps",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/adapter-cloudflare"
+  },
+  "files": [
+    "src",
+    "types",
+    "README.md",
+    "LICENSE"
+  ],
+  "module": "src/index.js",
+  "main": "src/index.js",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "worker": "./src/worker.js",
+      "browser": "./src/worker.js",
+      "import": "./src/index.js",
+      "default": "./src/index.js"
+    }
+  },
+  "peerDependencies": {
+    "@octanejs/app-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/app-core": "workspace:*",
+    "@octanejs/rsbuild-plugin": "workspace:*",
+    "@octanejs/vite-plugin": "workspace:*",
+    "@rsbuild/core": "catalog:default",
+    "@types/node": "catalog:default",
+    "miniflare": "catalog:default",
+    "octane": "workspace:*",
+    "vite": "catalog:default"
+  }
+}

@@ -14,6 +14,7 @@ export const SERVER_ONLY_ADAPTER_IDS = new Set([
 	'@ripple-ts/adapter-bun',
 	'@ripple-ts/adapter-vercel',
 	'@octanejs/adapter-vercel',
+	'@octanejs/adapter-cloudflare',
 ]);
 
 /** @type {Map<string, string>} */
@@ -37,6 +38,9 @@ export function webResponseToNodeResponse() {
   throw new Error('[octane] Node response helpers cannot run in the browser.');
 }
 export function vercel() {
+  throw new Error('[octane] Deploy adapters cannot run in the browser.');
+}
+export function cloudflare() {
   throw new Error('[octane] Deploy adapters cannot run in the browser.');
 }
 export function adapt() {

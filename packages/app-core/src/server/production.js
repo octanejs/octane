@@ -68,8 +68,8 @@ const FETCH_COORDINATOR_KEY = Symbol.for('octane.app-core.fetch-coordinator');
 
 /**
  * @typedef {Object} FetchCoordinator
- * @property {import('@ripple-ts/adapter/rpc').AsyncContext} asyncContext
- * @property {((request: Request) => Promise<Response>) | null} handler
+ * @property {import('@ripple-ts/adapter/rpc').AsyncContext<{ origin?: string, platform?: unknown }>} asyncContext
+ * @property {((request: Request, platform?: unknown) => Promise<Response>) | null} handler
  */
 
 /**
@@ -94,7 +94,7 @@ function getFetchCoordinator(runtime) {
 		if (!shared.handler) {
 			return Promise.resolve(new Response('Octane handler is not ready', { status: 503 }));
 		}
-		return shared.handler(request);
+		return shared.handler(request, shared.asyncContext.getStore()?.platform);
 	});
 	return coordinator;
 }
@@ -112,13 +112,15 @@ function getFetchCoordinator(runtime) {
  * Create the production request handler from a manifest.
  *
  * The returned function is a standard Web `fetch`-style handler:
- * `(request: Request) => Promise<Response>` — the generated server entry boots
- * it behind the adapter's `serve()` (or the built-in Node server), and
- * serverless wrappers import it directly.
+ * `(request: Request, platform?: unknown) => Promise<Response>` — the generated
+ * server entry boots it behind the adapter's `serve()` (or the built-in Node
+ * server), and serverless wrappers import it directly. Integrations can expose
+ * request-scoped platform bindings to middleware and routes via the optional
+ * second argument.
  *
  * @param {ServerManifest} manifest
  * @param {HandlerOptions} deps
- * @returns {(request: Request) => Promise<Response>}
+ * @returns {(request: Request, platform?: unknown) => Promise<Response>}
  */
 export function createHandler(manifest, deps) {
 	const { renderToReadableStream, prerender, htmlTemplate, executeServerFunction } = deps;
@@ -142,7 +144,10 @@ export function createHandler(manifest, deps) {
 	const fetchCoordinator = getFetchCoordinator(runtime);
 	const asyncContext = fetchCoordinator?.asyncContext;
 
-	const handler = async function handler(/** @type {Request} */ request) {
+	const handler = async function handler(
+		/** @type {Request} */ request,
+		/** @type {unknown} */ platform = undefined,
+	) {
 		const url = new URL(request.url);
 		const method = request.method;
 
@@ -153,6 +158,16 @@ export function createHandler(manifest, deps) {
 					headers: { 'Content-Type': 'application/json' },
 				});
 			}
+			/** @type {import('@ripple-ts/adapter/rpc').AsyncContext<{ origin?: string, platform?: unknown }>} */
+			const requestAsyncContext =
+				platform === undefined
+					? asyncContext
+					: {
+							run(store, fn) {
+								return asyncContext.run({ ...store, platform }, fn);
+							},
+							getStore: () => asyncContext.getStore(),
+						};
 			return handle_rpc_request(request, {
 				resolveFunction(/** @type {string} */ hash) {
 					const entry = rpcLookup.get(hash);
@@ -161,7 +176,7 @@ export function createHandler(manifest, deps) {
 					return typeof fn === 'function' ? fn : null;
 				},
 				executeServerFunction,
-				asyncContext,
+				asyncContext: requestAsyncContext,
 				trustProxy,
 			});
 		}
@@ -175,7 +190,7 @@ export function createHandler(manifest, deps) {
 			return new Response('Not Found', { status: 404 });
 		}
 
-		const context = createContext(request, match.params);
+		const context = createContext(request, match.params, platform);
 
 		try {
 			if (match.route.type === 'render') {

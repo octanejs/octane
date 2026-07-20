@@ -210,9 +210,9 @@ function collect_hydrate_module_paths(config) {
  * build is redirected to `{outDir}/client` with a manifest, the hydrate entry
  * is injected into index.html (so Vite bundles + hashes it), and closeBundle
  * runs a second, `ssr: true` build of a generated server entry to
- * `{outDir}/server/entry.js` — a self-contained module (app + octane bundled,
- * node builtins external) exporting `handler`/`nodeHandler` and auto-booting
- * under `node`. See server/virtual-entry.js and server/production.js.
+ * `{outDir}/server/entry.js`. Node-target adapters get the existing bootable
+ * `handler`/`nodeHandler` module; webworker-target adapters get an importable
+ * `createWebWorkerHandler` factory for their deployment wrapper.
  *
  * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
  * @returns {Plugin[]}
@@ -670,6 +670,7 @@ export function octane(inlineOptions = {}) {
 		async closeBundle() {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
 			const cfg = /** @type {ResolvedOctaneConfig} */ (buildOctaneConfig);
+			const webWorkerServer = cfg.adapter?.serverTarget === 'webworker';
 
 			console.log('[@octanejs/vite-plugin] Client build done. Building the server bundle…');
 
@@ -712,9 +713,11 @@ export function octane(inlineOptions = {}) {
 					rootBoundary: cfg.rootBoundary,
 					rpcModulePaths: [...serverModuleModules],
 					clientAssetMap,
+					...(webWorkerServer ? { mode: 'webworker' } : null),
 					// The virtual entry has no filesystem importer, so resolve app-core
 					// from this package before handing source to Vite. This also works
 					// when app-core is nested under the plugin by a package manager.
+					configModuleId: requireFromPlugin.resolve('@octanejs/app-core/config'),
 					productionModuleId: requireFromPlugin.resolve('@octanejs/app-core/production'),
 					nodeModuleId: requireFromPlugin.resolve('@octanejs/app-core/node'),
 				}),
@@ -764,6 +767,10 @@ export function octane(inlineOptions = {}) {
 					minify: cfg.build.minify ?? false,
 					rollupOptions: {
 						input: VIRTUAL_SERVER_ENTRY_ID,
+						// Cloudflare's nodejs_compat exposes `node:` modules directly.
+						// Preserve application imports as well as Octane's current runtime
+						// dependencies instead of replacing them with browser shims.
+						...(webWorkerServer ? { external: [/^node:/] } : null),
 						output: {
 							entryFileNames: ENTRY_FILENAME,
 							format: 'esm',
@@ -771,6 +778,7 @@ export function octane(inlineOptions = {}) {
 					},
 				},
 				ssr: {
+					...(webWorkerServer ? { target: 'webworker' } : null),
 					// Self-contained server bundle: everything except node builtins is
 					// bundled, so dist/server deploys without node_modules. 'vite'
 					// stays external as a guard — nothing should reach it (the facade
@@ -788,9 +796,11 @@ export function octane(inlineOptions = {}) {
 			}
 
 			console.log(`[@octanejs/vite-plugin] Server build complete: ${path.join(outDir, 'server')}`);
-			console.log(
-				`[@octanejs/vite-plugin] Start with: node ${outDir}/server/${ENTRY_FILENAME} (or octane-preview)`,
-			);
+			if (!webWorkerServer) {
+				console.log(
+					`[@octanejs/vite-plugin] Start with: node ${outDir}/server/${ENTRY_FILENAME} (or octane-preview)`,
+				);
+			}
 
 			// ------------------------------------------------------------------
 			// Deploy adapter (SvelteKit-style): with both bundles on disk, let the

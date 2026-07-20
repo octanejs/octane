@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { transform } from 'esbuild';
 import { RenderRoute } from '../src/routes.js';
 import {
+	SERVER_ONLY_ADAPTER_IDS,
 	create_client_entry_source,
+	create_adapter_browser_stub_source,
 	generateServerEntry,
 	generateServerManifestEntry,
 	normalize_module_reference,
@@ -50,6 +52,35 @@ describe('bundler-neutral app codegen', () => {
 		expect(source).not.toContain("readFileSync(join(__dirname, './index.html')");
 		expect(source).not.toContain('isMainModule');
 		await expect(transform(source, { loader: 'js' })).resolves.toBeDefined();
+	});
+
+	it('emits a platform-neutral Web Worker handler factory', async () => {
+		const source = generateServerEntry({
+			routes: [new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })],
+			octaneConfigPath: '/workspace/octane.config.ts',
+			moduleImports: {
+				'/src/Page.tsrx': '/workspace/src/Page.tsrx',
+			},
+			configImportPath: '/workspace/octane.config.ts',
+			mode: 'webworker',
+			clientAssetMap: {
+				'/src/Page.tsrx': { js: 'assets/page.js', css: ['assets/page.css'] },
+			},
+		});
+
+		expect(source).toContain('export const manifest =');
+		expect(source).toContain('export const rendererDeps =');
+		expect(source).toContain('export function createWebWorkerHandler');
+		expect(source).toContain('clientAssets = manifest.clientAssets');
+		expect(source).toContain("adapter.serverTarget 'webworker' requires adapter.runtime");
+		expect(source).not.toMatch(/from ['"]node:/);
+		expect(source).not.toContain('nodeHandler');
+		await expect(transform(source, { loader: 'js' })).resolves.toBeDefined();
+	});
+
+	it('stubs the Cloudflare deploy adapter in browser bundles', () => {
+		expect(SERVER_ONLY_ADAPTER_IDS).toContain('@octanejs/adapter-cloudflare');
+		expect(create_adapter_browser_stub_source()).toContain('export function cloudflare()');
 	});
 
 	it('can load a late client asset map beside the production server entry', () => {

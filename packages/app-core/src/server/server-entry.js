@@ -3,20 +3,29 @@
  * Production server-entry generator.
  *
  * `generateServerEntry` emits the module an integration uses as its server
- * bundle input. The generated module statically
- * imports every RenderRoute entry/layout module (compiled in server mode by
- * the active bundler integration) plus
- * octane.config.ts itself, wires them into `createHandler`, and:
+ * bundle input. The generated module statically imports every RenderRoute
+ * entry/layout module (compiled in server mode by the active bundler
+ * integration) plus octane.config.ts itself. Its mode selects one of three
+ * deployment surfaces:
  *
- *   - exports `handler`  — the Web fetch handler `(Request) => Promise<Response>`
- *   - exports `nodeHandler` — a Node `(req, res)` wrapper for serverless
- *     platforms (e.g. a Vercel Node function does
- *     `export { nodeHandler as default } from '../dist/server/entry.js'`)
- *   - auto-boots when run directly (`node dist/server/entry.js`): the
- *     adapter's `serve()` when configured, else the built-in Node server
- *     (static dist/client assets + the handler).
+ *   - `handler` exports the Web fetch handler and a Node `(req, res)` wrapper
+ *     for serverless platforms, then auto-boots when run directly.
+ *   - `manifest` exports the template-free manifest and renderer dependencies
+ *     consumed by integrations that inject the current HTML themselves.
+ *   - `webworker` exports those manifest values plus a
+ *     `createWebWorkerHandler({ htmlTemplate, clientAssets? })` factory, without
+ *     template filesystem access, a Node HTTP bridge, or automatic boot.
  *
- * It is unused in dev, where the active integration loads modules directly.
+ * The Node handler's wrapper supports platforms such as Vercel, where a
+ * function can do:
+ *
+ *   - `export { nodeHandler as default } from '../dist/server/entry.js'`
+ *
+ * Its direct-execution path uses the adapter's `serve()` when configured,
+ * otherwise the built-in Node server (static dist/client assets + the handler).
+ *
+ * Dev integrations use the manifest shape while loading request modules
+ * directly; the deployment handler shapes are production-only.
  */
 
 /** @import { Route, RootBoundaryOptions } from '@octanejs/app-core' */
@@ -35,7 +44,7 @@ import { get_route_entry_export_name, get_route_entry_path } from '../routes.js'
  * @property {Record<string, string>} [moduleImports] - Stable module ID → bundler import specifier
  * @property {((id: string) => string)} [resolveImport] - Fallback module-specifier mapper
  * @property {string} [configImportPath] - Bundler import specifier for octane.config.ts
- * @property {'handler' | 'manifest'} [mode] - Emit a bootable handler or a template-free manifest module
+ * @property {'handler' | 'manifest' | 'webworker'} [mode] - Emit a bootable handler, template-free manifest, or Web Worker factory module
  * @property {string} [serverRuntimeModuleId] - Renderer server runtime module ID
  * @property {string} [staticRuntimeModuleId] - Renderer static runtime module ID
  * @property {string} [productionModuleId] - App-core production runtime module ID
@@ -160,24 +169,57 @@ export function generateServerEntry(options) {
 		})
 		.join('\n');
 
-	if (mode === 'manifest') {
-		const assetFileImports = clientAssetMapFile
+	if (mode === 'manifest' || mode === 'webworker') {
+		const isWebWorker = mode === 'webworker';
+		const readsAssetFile = !isWebWorker && Boolean(clientAssetMapFile);
+		const assetFileImports = readsAssetFile
 			? `import { readFileSync } from 'node:fs';\nimport { fileURLToPath } from 'node:url';\nimport { dirname, join } from 'node:path';\n`
 			: '';
-		const assetDirectory = clientAssetMapFile
+		const platformImports = isWebWorker
+			? ''
+			: `import { createHash } from 'node:crypto';\nimport { AsyncLocalStorage } from 'node:async_hooks';\n`;
+		const handlerImport = isWebWorker
+			? `import { createHandler } from ${JSON.stringify(productionModuleId)};\n`
+			: '';
+		const assetDirectory = readsAssetFile
 			? `const __dirname = dirname(fileURLToPath(import.meta.url));\n`
 			: '';
-		const clientAssets = clientAssetMapFile
+		const clientAssets = readsAssetFile
 			? `JSON.parse(readFileSync(join(__dirname, ${JSON.stringify(clientAssetMapFile)}), 'utf-8'))`
 			: JSON.stringify(clientAssetMap, null, '\t');
+		const runtime = isWebWorker
+			? `const runtime = octaneConfig.adapter?.runtime;
+if (!runtime) {
+	throw new Error(
+		"[octane] adapter.serverTarget 'webworker' requires adapter.runtime platform primitives.",
+	);
+}`
+			: `const runtime = octaneConfig.adapter?.runtime ?? {
+	hash: (str) => createHash('sha256').update(str).digest('hex').slice(0, 8),
+	createAsyncContext: () => {
+		const als = new AsyncLocalStorage();
+		return { run: (store, fn) => als.run(store, fn), getStore: () => als.getStore() };
+	},
+};`;
+		const workerFactory = isWebWorker
+			? `
+export function createWebWorkerHandler({ htmlTemplate, clientAssets = manifest.clientAssets }) {
+	return createHandler(
+		{ ...manifest, clientAssets },
+		{ ...rendererDeps, htmlTemplate },
+	);
+}
+`
+			: '';
+		const entryDescription = isWebWorker
+			? 'the Web Worker server entry'
+			: 'the template-free server manifest entry';
 
 		return `\
-// Auto-generated by ${generatedBy} — the template-free server manifest entry.
+// Auto-generated by ${generatedBy} — ${entryDescription}.
 // Do not edit; regenerated by the active app integration.
 
-${assetFileImports}import { createHash } from 'node:crypto';
-import { AsyncLocalStorage } from 'node:async_hooks';
-import {
+${assetFileImports}${platformImports}import {
 	renderToReadableStream,
 	executeServerFunction,
 	Suspense,
@@ -186,19 +228,13 @@ import {
 } from ${JSON.stringify(serverRuntimeModuleId)};
 import { prerender } from ${JSON.stringify(staticRuntimeModuleId)};
 import { resolveOctaneConfig } from ${JSON.stringify(configModuleId)};
-import _rawOctaneConfig from ${JSON.stringify(resolvedConfigImport)};
+${handlerImport}import _rawOctaneConfig from ${JSON.stringify(resolvedConfigImport)};
 
 ${import_lines.join('\n')}
 
 export const octaneConfig = resolveOctaneConfig(_rawOctaneConfig);
 
-const runtime = octaneConfig.adapter?.runtime ?? {
-	hash: (str) => createHash('sha256').update(str).digest('hex').slice(0, 8),
-	createAsyncContext: () => {
-		const als = new AsyncLocalStorage();
-		return { run: (store, fn) => als.run(store, fn), getStore: () => als.getStore() };
-	},
-};
+${runtime}
 
 const components = {
 ${component_entries}
@@ -258,6 +294,7 @@ export const rendererDeps = {
 	ErrorBoundary,
 	createElement,
 };
+${workerFactory}
 `;
 	}
 

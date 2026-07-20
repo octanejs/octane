@@ -59,15 +59,20 @@ export function compose(middlewares) {
  * Create a context object for the request
  * @param {Request} request
  * @param {Record<string, string>} params
+ * @param {unknown} [platform]
  * @returns {Context}
  */
-export function createContext(request, params) {
-	return {
+export function createContext(request, params, platform) {
+	const context = /** @type {Context} */ ({
 		request,
 		params,
 		url: new URL(request.url),
 		state: new Map(),
-	};
+	});
+	// Preserve the existing context shape for Node and other integrations that
+	// do not supply request-scoped platform bindings.
+	if (platform !== undefined) context.platform = platform;
+	return context;
 }
 
 /**

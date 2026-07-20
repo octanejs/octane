@@ -490,9 +490,14 @@ describe('server-only adapter browser stub', () => {
 	const load = meta.load as (id: string) => Promise<string | undefined>;
 
 	it('client-side imports of adapter packages resolve to the stub, server gets the real one', async () => {
-		for (const id of ['@octanejs/adapter-vercel', '@ripple-ts/adapter-node']) {
+		for (const id of [
+			'@octanejs/adapter-cloudflare',
+			'@octanejs/adapter-vercel',
+			'@ripple-ts/adapter-node',
+		]) {
 			expect(await resolveId(id, undefined, { ssr: false })).toBe(RESOLVED_ADAPTER_BROWSER_STUB_ID);
 		}
+		expect(await resolveId('@octanejs/adapter-cloudflare', undefined, { ssr: true })).toBe(null);
 		expect(await resolveId('@octanejs/adapter-vercel', undefined, { ssr: true })).toBe(null);
 	});
 
@@ -500,7 +505,7 @@ describe('server-only adapter browser stub', () => {
 		const source = (await load(RESOLVED_ADAPTER_BROWSER_STUB_ID)) as string;
 		// The union of the listed adapters' public names — a client import of any
 		// of them must resolve (and only throw on USE).
-		for (const name of ['vercel', 'adapt', 'serve']) {
+		for (const name of ['cloudflare', 'vercel', 'adapt', 'serve']) {
 			expect(source).toContain(`export function ${name}`);
 		}
 		expect(source).not.toContain('node:');

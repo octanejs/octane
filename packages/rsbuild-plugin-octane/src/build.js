@@ -45,7 +45,9 @@ export async function finalizeOctaneRsbuildOutput(options) {
 	fs.renameSync(clientAssetMap, serverAssetMap);
 
 	log(`Server build complete: ${path.relative(root, serverEntry)}`);
-	log(`Start with: node ${path.relative(root, serverEntry)} (or octane-rsbuild-preview)`);
+	if (options.config.adapter?.serverTarget !== 'webworker') {
+		log(`Start with: node ${path.relative(root, serverEntry)} (or octane-rsbuild-preview)`);
+	}
 
 	if (options.config.adapter?.adapt) {
 		const adapterName = options.config.adapter.name ?? 'adapter';

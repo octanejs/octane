@@ -145,6 +145,7 @@ Core packages:
 - `@octanejs/vite-plugin` — the recommended Vite integration for SPAs and full apps: compilation by default, plus routing, streaming dev SSR, hydration wiring, and production client/server builds when configured.
 - `@octanejs/rsbuild-plugin` — the equivalent full app integration for Rsbuild 2.x, built on `@octanejs/rspack-plugin`. It is shaped as an Rsbuild plugin for future Rspeedy reuse, but the current renderer target is DOM rather than Lynx.
 - `@octanejs/adapter-vercel` — deploys a full-app production build to Vercel.
+- `@octanejs/adapter-cloudflare` — deploys a full-app production build to Cloudflare Workers with Workers Static Assets.
 
 Rspack usage: install `octane`, `@rspack/core`, and `@octanejs/rspack-plugin`, then add `new OctaneRspackPlugin()` to the Rspack plugins array. Rsbuild full-app usage: install `octane`, `@rsbuild/core`, and `@octanejs/rsbuild-plugin`, then add `pluginOctane()` to `rsbuild.config.ts`; add declarative `RenderRoute`/`ServerRoute` entries in `octane.config.ts` for routing, SSR, hydration, RPC, production builds, and preview.
 

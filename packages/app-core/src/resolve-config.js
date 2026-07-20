@@ -123,6 +123,22 @@ export function resolveOctaneConfig(raw, options = {}) {
 		if (raw.adapter.serve !== undefined && typeof raw.adapter.serve !== 'function') {
 			throw new Error('[octane] adapter.serve must be a function.');
 		}
+		if (
+			raw.adapter.serverTarget !== undefined &&
+			raw.adapter.serverTarget !== 'node' &&
+			raw.adapter.serverTarget !== 'webworker'
+		) {
+			throw new Error("[octane] adapter.serverTarget must be 'node' or 'webworker'.");
+		}
+		if (
+			raw.adapter.serverTarget === 'webworker' &&
+			(typeof raw.adapter.runtime?.hash !== 'function' ||
+				typeof raw.adapter.runtime?.createAsyncContext !== 'function')
+		) {
+			throw new Error(
+				'[octane] A webworker adapter must provide runtime.hash and runtime.createAsyncContext functions.',
+			);
+		}
 	}
 
 	if (

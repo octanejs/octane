@@ -47,7 +47,8 @@ export interface ServerEntryOptions {
 	moduleImports?: Record<string, string>;
 	resolveImport?: (id: string) => string;
 	configImportPath?: string;
-	mode?: 'handler' | 'manifest';
+	/** Server module shape emitted for the active adapter target. @default 'handler' */
+	mode?: 'handler' | 'manifest' | 'webworker';
 	serverRuntimeModuleId?: string;
 	staticRuntimeModuleId?: string;
 	productionModuleId?: string;
@@ -56,7 +57,7 @@ export interface ServerEntryOptions {
 	generatedBy?: string;
 }
 
-/** Generate a production fetch-handler + optional Node auto-boot entry. */
+/** Generate a production server entry in the requested module shape. */
 export function generateServerEntry(options: ServerEntryOptions): string;
 /** Generate a template-free bundle exporting `manifest` and `rendererDeps`. */
 export function generateServerManifestEntry(options: ServerEntryOptions): string;
