@@ -143,6 +143,40 @@ function shiftGeneratedOffsets(mappings, offset) {
 }
 
 /**
+ * Published consumer contract of this entry point: functions whose body is a
+ * native `@{ … }` template are identifiable on `sourceAst` via
+ * `metadata.native_tsrx_body === true`, with the body node's `start`/`end`
+ * spanning `@{` through `}`. TanStack's octane route-generator plugin
+ * (`@tanstack/octane-router/generator-plugin`) masks route files by that
+ * marker before babel-based route transforms parse them. `@tsrx/core` used to
+ * stamp it during parsing and now marks only the transformed clone (reachable
+ * solely through `metadata.path` back-references), so re-stamp the parse tree
+ * here: a `JSXCodeBlock` body IS a native template body.
+ *
+ * @param {unknown} root
+ */
+function markNativeTemplateBodies(root) {
+	const seen = new WeakSet();
+	/** @param {unknown} value */
+	const visit = (value) => {
+		if (!value || typeof value !== 'object' || seen.has(value)) return;
+		seen.add(value);
+		if (Array.isArray(value)) {
+			for (const item of value) visit(item);
+			return;
+		}
+		const node = /** @type {Record<string, any>} */ (value);
+		if (node.body && !Array.isArray(node.body) && node.body.type === 'JSXCodeBlock') {
+			(node.metadata ??= {}).native_tsrx_body = true;
+		}
+		for (const key in node) {
+			if (key !== 'metadata' && key !== 'loc') visit(node[key]);
+		}
+	};
+	visit(root);
+}
+
+/**
  * Compile a .tsrx source string to a Volar `VolarMappingsResult`.
  *
  * Parse → JSX transform (typeOnly) → wrap as Volar payload. We always run
@@ -194,6 +228,9 @@ export function compileToVolarMappings(source, filename, options) {
 		errors,
 		comments,
 	});
+	// After the transform: the copy-on-write lowering must not observe the
+	// marker mid-flight, and `ast` is what ships below as `sourceAst`.
+	markNativeTemplateBodies(ast);
 	const prelude = hasAuthoredLeadingPragma(ast, comments)
 		? ''
 		: createRendererTypePrelude(renderer);
