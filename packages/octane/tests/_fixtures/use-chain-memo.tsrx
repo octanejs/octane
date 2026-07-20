@@ -125,6 +125,44 @@ export function BranchChainHost({
 	}
 }
 
+function NestedBranchReader({
+	fetchUser,
+	inner,
+	outer,
+	id,
+}: {
+	fetchUser: (id: string) => Promise<string>;
+	inner: boolean;
+	outer: boolean;
+	id: string;
+}) @{
+	let label = 'none';
+	if (outer)
+		if (inner) {
+			const q = fetchUser(id);
+			label = use(q);
+		}
+	<p>{'label=' + label}</p>
+}
+
+export function NestedBranchChainHost({
+	fetchUser,
+	inner,
+	outer,
+	id,
+}: {
+	fetchUser: (id: string) => Promise<string>;
+	inner: boolean;
+	outer: boolean;
+	id: string;
+}) @{
+	@try {
+		<NestedBranchReader fetchUser={fetchUser} inner={inner} outer={outer} id={id} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
 // A setup block shadows `item` and use()s the inner binding; the unrelated
 // outer `const item = build()` must keep recreating per render (name-based
 // tainting must not freeze it).

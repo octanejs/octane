@@ -3,6 +3,7 @@ import { act, mount } from './_helpers';
 import {
 	BranchChainHost,
 	ChainHost,
+	NestedBranchChainHost,
 	PropChainHost,
 	SetupShadowHost,
 	ShadowedLoopHost,
@@ -132,6 +133,30 @@ describe('use()-fed const chain memoization', () => {
 		await act(() => release!());
 		expect(r.html()).toContain('label=Ux');
 		// The replay re-entered the else-if arm; its memoized creation must hit.
+		expect(calls).toEqual(['x']);
+		r.unmount();
+	});
+
+	it('memoizes a chain const declared in nested conditional arms', async () => {
+		const calls: string[] = [];
+		let release: (() => void) | null = null;
+		const fetchUser = (id: string) => {
+			calls.push(id);
+			return new Promise<string>((resolve) => {
+				release = () => resolve('U' + id);
+			});
+		};
+		const r = mount(NestedBranchChainHost, {
+			fetchUser,
+			inner: true,
+			outer: true,
+			id: 'x',
+		});
+		expect(r.html()).toContain('loading');
+		expect(calls).toEqual(['x']);
+		await act(() => release!());
+		expect(r.html()).toContain('label=Ux');
+		// Replaying through both guards must reuse the declaration memo.
 		expect(calls).toEqual(['x']);
 		r.unmount();
 	});

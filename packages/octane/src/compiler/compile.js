@@ -8360,14 +8360,14 @@ function useCallOfStatement(stmt, ctx) {
 // `_$useMemo(() => <expr>, [deps], _h$N)` in place. Records every creation
 // with its guard chain for the warm plan. Returns a new array.
 function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, locals) {
-	return stmts.map((stmt) => rewriteStmt(stmt));
+	return stmts.map((stmt) => rewriteStmt(stmt, guards));
 
-	function rewriteStmt(stmt) {
+	function rewriteStmt(stmt, activeGuards) {
 		if (!stmt || typeof stmt !== 'object') return stmt;
 		if (LOOP_TYPES.has(stmt.type) || FN_TYPES.has(stmt.type)) return stmt;
 		const call = useCallOfStatement(stmt, ctx);
 		if (call) {
-			const rewritten = rewriteUseCall(call);
+			const rewritten = rewriteUseCall(call, activeGuards);
 			if (rewritten === call) return stmt;
 			if (stmt.type === 'VariableDeclaration') {
 				return {
@@ -8378,25 +8378,48 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 			return { ...stmt, expression: rewritten };
 		}
 		if (stmt.type === 'IfStatement') {
+			const not = {
+				type: 'UnaryExpression',
+				operator: '!',
+				prefix: true,
+				argument: stmt.test,
+			};
 			return {
 				...stmt,
-				consequent: rewriteStmt(stmt.consequent),
-				alternate: stmt.alternate ? rewriteStmt(stmt.alternate) : stmt.alternate,
+				consequent: rewriteStmt(stmt.consequent, [...activeGuards, stmt.test]),
+				alternate: stmt.alternate
+					? rewriteStmt(stmt.alternate, [...activeGuards, not])
+					: stmt.alternate,
 			};
 		}
 		if (stmt.type === 'BlockStatement') {
 			return {
 				...stmt,
-				body: parallelUseMemoizePass(stmt.body, ctx, componentName, creations, guards, locals),
+				body: parallelUseMemoizePass(
+					stmt.body,
+					ctx,
+					componentName,
+					creations,
+					activeGuards,
+					locals,
+				),
 			};
 		}
 		return stmt;
 	}
 
-	function rewriteUseCall(call) {
+	function rewriteUseCall(call, activeGuards) {
 		const arg = unwrapTsExpr(call.arguments[0]);
 		if (isTrivialUseArg(arg)) return call;
-		const memoCall = makeCreationMemoCall(ctx, componentName, arg, guards, locals, creations, call);
+		const memoCall = makeCreationMemoCall(
+			ctx,
+			componentName,
+			arg,
+			activeGuards,
+			locals,
+			creations,
+			call,
+		);
 		return { ...call, arguments: [memoCall, ...call.arguments.slice(1)] };
 	}
 }
@@ -8626,18 +8649,18 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 		}
 	}
 
-	// `else if` alternates are IfStatements, not blocks — recurse the whole
-	// chain so consts in every arm are collected with the right guard chain.
+	// An `else if` alternate — or a nested braceless consequent — is another
+	// IfStatement, not a block. Recurse every conditional arm so its consts are
+	// collected with the complete guard chain.
 	function collectIfCandidates(stmt, guards) {
 		const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
-		if (stmt.consequent?.type === 'BlockStatement') {
-			collectCandidates(stmt.consequent.body, [...guards, stmt.test]);
-		}
-		if (stmt.alternate?.type === 'BlockStatement') {
-			collectCandidates(stmt.alternate.body, [...guards, not(stmt.test)]);
-		} else if (stmt.alternate?.type === 'IfStatement') {
-			collectIfCandidates(stmt.alternate, [...guards, not(stmt.test)]);
-		}
+		collectIfArm(stmt.consequent, [...guards, stmt.test]);
+		if (stmt.alternate) collectIfArm(stmt.alternate, [...guards, not(stmt.test)]);
+	}
+
+	function collectIfArm(stmt, guards) {
+		if (stmt?.type === 'BlockStatement') collectCandidates(stmt.body, guards);
+		else if (stmt?.type === 'IfStatement') collectIfCandidates(stmt, guards);
 	}
 
 	function rewriteStatements(list) {
@@ -8650,22 +8673,21 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 			if (stmt.type === 'IfStatement') {
 				return {
 					...stmt,
-					consequent:
-						stmt.consequent?.type === 'BlockStatement'
-							? { ...stmt.consequent, body: rewriteStatements(stmt.consequent.body) }
-							: stmt.consequent,
-					// `else if` alternates are IfStatements — rewrite the chain.
-					alternate:
-						stmt.alternate?.type === 'BlockStatement'
-							? { ...stmt.alternate, body: rewriteStatements(stmt.alternate.body) }
-							: stmt.alternate?.type === 'IfStatement'
-								? rewriteStatements([stmt.alternate])[0]
-								: stmt.alternate,
+					consequent: rewriteIfArm(stmt.consequent),
+					alternate: stmt.alternate ? rewriteIfArm(stmt.alternate) : stmt.alternate,
 				};
 			}
 			if (stmt.type === 'BlockStatement') return { ...stmt, body: rewriteStatements(stmt.body) };
 			return stmt;
 		});
+	}
+
+	function rewriteIfArm(stmt) {
+		if (stmt?.type === 'BlockStatement') {
+			return { ...stmt, body: rewriteStatements(stmt.body) };
+		}
+		if (stmt?.type === 'IfStatement') return rewriteStatements([stmt])[0];
+		return stmt;
 	}
 }
 
@@ -9143,7 +9165,20 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 	function transformStmtBlock(s) {
 		if (!s) return s;
 		if (s.type === 'BlockStatement') return { ...s, body: transformList(s.body) };
-		return s;
+		// An `else if` alternate is another IfStatement, not a block. Keep
+		// recursing through the chain so every arm reaches Pass B.
+		if (s.type === 'IfStatement') {
+			return {
+				...s,
+				consequent: transformStmtBlock(s.consequent),
+				alternate: s.alternate ? transformStmtBlock(s.alternate) : s.alternate,
+			};
+		}
+		// A braceless arm can be a bare `use(make())` expression. Batching
+		// expands that one statement into hoist + batch + unwrap statements, so
+		// introduce the lexical block required to keep them in the guarded arm.
+		const body = transformList([s]);
+		return body.length === 1 ? body[0] : { type: 'BlockStatement', body };
 	}
 
 	function emitRun(run, out) {
@@ -10150,15 +10185,13 @@ function inlineHookMemoPass(stmts, ctx, authoredTier) {
 		if (!stmt || typeof stmt !== 'object' || !stmt.type) return [stmt];
 		if (LOOP_TYPES.has(stmt.type) || FN_TYPES.has(stmt.type)) return [stmt];
 		if (stmt.type === 'IfStatement') {
-			// `else if` chains keep their sites reachable: an IfStatement
-			// alternate re-enters walkStmt (always a 1-element array).
-			const alternate =
-				stmt.alternate == null
-					? stmt.alternate
-					: stmt.alternate.type === 'IfStatement'
-						? walkStmt(stmt.alternate)[0]
-						: walkBlock(stmt.alternate);
-			return [{ ...stmt, consequent: walkBlock(stmt.consequent), alternate }];
+			return [
+				{
+					...stmt,
+					consequent: walkArm(stmt.consequent),
+					alternate: stmt.alternate == null ? stmt.alternate : walkArm(stmt.alternate),
+				},
+			];
 		}
 		if (stmt.type === 'BlockStatement') {
 			return [{ ...stmt, body: inlineHookMemoPass(stmt.body, ctx, authoredTier) }];
@@ -10172,11 +10205,14 @@ function inlineHookMemoPass(stmts, ctx, authoredTier) {
 		return [stmt];
 	}
 
-	function walkBlock(node) {
-		// A guarded single statement can't be a lexical declaration; only real
-		// blocks can contain sites.
-		if (!node || node.type !== 'BlockStatement') return node;
-		return { ...node, body: inlineHookMemoPass(node.body, ctx, authoredTier) };
+	function walkArm(node) {
+		// Nested braceless conditionals keep their sites reachable. A direct
+		// braceless creation has already been promoted to a block by Pass B.
+		if (node?.type === 'IfStatement') return walkStmt(node)[0];
+		if (node?.type === 'BlockStatement') {
+			return { ...node, body: inlineHookMemoPass(node.body, ctx, authoredTier) };
+		}
+		return node;
 	}
 }
 
