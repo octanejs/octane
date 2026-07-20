@@ -104,6 +104,12 @@ async function state(runtime: 'octane' | 'react'): Promise<any> {
 	return page!.evaluate((side) => (window as any).__nativeChangeMatrix.state(side), runtime);
 }
 
+async function waitForPageTimerTask(page: Page): Promise<void> {
+	// A timer queued by the preceding browser event runs before this
+	// same-page timer barrier, independent of runner scheduling latency.
+	await page.evaluate(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+}
+
 describe.sequential('native checkbox and radio browser evidence', () => {
 	// React 19.2.7 derives checkable onChange from click:
 	// https://github.com/facebook/react/blob/6117d7cca4906492c51fe6a03381e35adfd86e7d/packages/react-dom-bindings/src/events/plugins/ChangeEventPlugin.js#L233-L260
@@ -185,7 +191,7 @@ describe.sequential('native checkbox and radio browser evidence', () => {
 	it('reasserts a controlled value committed by a click handler after canceled activation', async () => {
 		const page = await openCase('CheckboxPreventClickAccept');
 		await page.locator('#octane-root #matrix-checkbox-prevent-click-accept').click();
-		await page.waitForTimeout(10);
+		await waitForPageTimerTask(page);
 
 		expect((await state('octane')).inputs[0].checked).toBe(true);
 		expect((await state('octane')).output).toBe('checked');
@@ -201,7 +207,7 @@ describe.sequential('native checkbox and radio browser evidence', () => {
 			input.addEventListener('change', (event) => event.stopPropagation());
 		});
 		await page.locator('#octane-root #matrix-checkbox').click();
-		await page.waitForTimeout(10);
+		await waitForPageTimerTask(page);
 
 		expect((await state('octane')).inputs[0].checked).toBe(false);
 		expect((await state('octane')).output).toBe('clear');
