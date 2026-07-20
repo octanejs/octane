@@ -210,9 +210,10 @@ describe('vite plugin gate routing', () => {
 		const discovered = discoverOctaneSourceDependencies(websiteRoot);
 		expect(discovered).toContain('octane');
 		expect(discovered).toContain('@octanejs/visx');
-		// The website consumes the official built TanStack package now; only raw
-		// Octane workspace sources belong in this plugin's transform allowlist.
-		expect(discovered).not.toContain('@octanejs/tanstack-router');
+		// The website consumes the repository-owned TanStack source packages, so
+		// Vite must transform and keep both packages inside its SSR graph.
+		expect(discovered).toContain('@octanejs/tanstack-router');
+		expect(discovered).toContain('@octanejs/tanstack-start');
 		expect(discovered).not.toContain('@octanejs/adapter-vercel');
 
 		const config = (octane().config as any)({ root: websiteRoot });
@@ -597,7 +598,7 @@ export function App() @{ <main><Canvas><Scene /></Canvas><p>after</p></main> }
 });
 
 describe('manifest-declared manual hook slots', () => {
-	// Bindings whose `.ts` sources hand-forward hook slots declare
+	// Packages whose `.ts` or `.js` sources hand-forward hook slots declare
 	// `"octane": { "hookSlots": { "manual": ["src"] } }` in their OWN
 	// package.json; the plugin finds the nearest manifest and skips the surgical
 	// pass for files under the declared directories — no per-config `exclude`
@@ -629,9 +630,9 @@ describe('manifest-declared manual hook slots', () => {
 		expect(run(HOOK, id)?.code).toMatch(/useState\(0, _h\$\d+\)/);
 	});
 
-	it('the declaration registry matches the hand-slot-forwarding bindings exactly', () => {
-		// The definitive list. Adding a binding here without the manifest flag (or
-		// removing the flag from a listed one) means its sources double-slot the
+	it('the declaration registry matches the hand-slot-forwarding packages exactly', () => {
+		// The definitive list. Adding a package here without the manifest flag (or
+		// removing the flag from a listed one) means its .ts/.js sources double-slot the
 		// moment ANOTHER project imports them — the exact drift the declaration
 		// exists to prevent. Redux, Recharts, and Hook Form are auto-slotted by
 		// design and therefore carry no flag.
@@ -664,6 +665,7 @@ describe('manifest-declared manual hook slots', () => {
 			'stylex',
 			'tanstack-query',
 			'tanstack-router',
+			'tanstack-start',
 			'tanstack-store',
 			'tanstack-table',
 			'tanstack-virtual',

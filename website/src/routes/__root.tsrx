@@ -1,4 +1,4 @@
-import { Body, Head, HeadContent, Html, Scripts, createRootRoute } from '@tanstack/octane-router';
+import { Body, Head, HeadContent, Html, Scripts, createRootRoute } from '@octanejs/tanstack-router';
 import { MainLayout } from '../layouts/MainLayout.tsrx';
 import { NotFound } from '../pages/not-found/NotFound.tsrx';
 import { DEFAULT_TITLE } from '../hooks/use-title.ts';

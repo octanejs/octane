@@ -4,8 +4,8 @@
 //
 //   react          — @tanstack/react-start behind react/serve.mjs (node:http
 //                    static fast-path + srvx fetch handler)
-//   octane-minimal — the vendored @tanstack/octane-start behind
-//                    octane/serve.mjs, a line-for-line mirror of react's host
+//   octane-minimal — @octanejs/tanstack-start behind octane/serve.mjs, a
+//                    line-for-line mirror of react's host
 //   octane-nitro   — the same octane app as its nitro deployment output
 //                    (node .output/server/index.mjs)
 //

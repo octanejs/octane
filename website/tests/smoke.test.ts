@@ -3,7 +3,7 @@
 // boundaries; detailed copy and visual behavior belong to focused tests.
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import { docs, defaultDoc, docGroups } from '../src/content/docs.ts';
 import { BINDING_CATEGORIES, BINDING_COUNT } from '../src/content/bindings.ts';

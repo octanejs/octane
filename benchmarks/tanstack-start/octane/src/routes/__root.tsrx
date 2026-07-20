@@ -7,9 +7,9 @@ import {
 	Outlet,
 	Scripts,
 	createRootRoute,
-} from '@tanstack/octane-router';
+} from '@octanejs/tanstack-router';
 import { DefaultCatchBoundary } from '../components/DefaultCatchBoundary.tsrx';
-import { NotFound } from '../components/NotFound.tsrx';
+import { DefaultNotFound } from '../components/NotFound.tsrx';
 import { seo } from '../utils/seo.ts';
 import '../styles/app.css';
 
@@ -27,7 +27,7 @@ export const Route = createRootRoute({
 	shellComponent: RootDocument,
 	component: RootLayout,
 	errorComponent: DefaultCatchBoundary,
-	notFoundComponent: NotFound,
+	notFoundComponent: DefaultNotFound,
 });
 
 function RootDocument(props: { children?: unknown }) @{

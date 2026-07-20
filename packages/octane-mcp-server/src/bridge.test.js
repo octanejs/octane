@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { getBindingPackages } from '../../../scripts/workspace-packages.mjs';
 import {
 	bridgeReport,
 	bridgeReportFromSource,
@@ -261,44 +262,14 @@ describe('KNOWN_BINDINGS', () => {
 		expect(upstreamPackages.every((name) => KNOWN_BINDINGS[name] === '@octanejs/visx')).toBe(true);
 	});
 
-	it('covers every published @octanejs binding (derived from workspace manifests)', async () => {
-		// The expected set is DERIVED from packages/*/package.json rather than
-		// hand-maintained, so publishing a new binding without registering it in
-		// KNOWN_BINDINGS fails here. Only genuinely-not-a-binding packages (the
-		// core runtime, build/deploy infrastructure, this MCP server) are
-		// excluded by name.
-		const NON_BINDINGS = new Set([
-			'octane',
-			'@octanejs/app-core',
-			'@octanejs/rspack-plugin',
-			'@octanejs/rsbuild-plugin',
-			'@octanejs/vite-plugin',
-			'@octanejs/mcp-server',
-		]);
-		const packagesRoot = fileURLToPath(new URL('../..', import.meta.url));
-		const bindings = [];
-		const bindingDirectories = [];
-		for (const entry of await readdir(packagesRoot, { withFileTypes: true })) {
-			if (!entry.isDirectory()) continue;
-			let manifest;
-			try {
-				manifest = JSON.parse(
-					await readFile(join(packagesRoot, entry.name, 'package.json'), 'utf8'),
-				);
-			} catch {
-				continue; // not a package dir
-			}
-			if (
-				manifest.private ||
-				NON_BINDINGS.has(manifest.name) ||
-				manifest.name?.startsWith('@octanejs/adapter-')
-			)
-				continue;
-			bindings.push(manifest.name);
-			bindingDirectories.push(entry.name);
-		}
+	it('covers every published @octanejs binding (derived from workspace manifests)', () => {
+		// Use the same role classification as the generated package inventory so
+		// metaframeworks and infrastructure cannot drift into the binding catalog.
+		const bindings = getBindingPackages();
 		expect(bindings.length).toBeGreaterThan(0);
-		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(new Set(bindings));
-		expect(KNOWN_BINDING_PACKAGE_DIRS).toEqual(new Set(bindingDirectories));
+		expect(new Set(Object.values(KNOWN_BINDINGS))).toEqual(
+			new Set(bindings.map(({ name }) => name)),
+		);
+		expect(KNOWN_BINDING_PACKAGE_DIRS).toEqual(new Set(bindings.map(({ dir }) => dir)));
 	});
 });

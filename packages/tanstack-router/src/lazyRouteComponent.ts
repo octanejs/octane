@@ -6,6 +6,7 @@
 //   createRoute({ path: 'item/$id', component: lazyRouteComponent(() => import('./Item')) })
 import { use, createElement } from 'octane';
 import { isModuleNotFoundError } from '@tanstack/router-core';
+import { toExternalHydrationThenable } from './externalHydration';
 
 export function lazyRouteComponent(
 	importer: () => Promise<any>,
@@ -48,7 +49,7 @@ export function lazyRouteComponent(
 			throw new Promise(() => {});
 		}
 		if (error) throw error;
-		if (!comp) use(load());
+		if (!comp) use(toExternalHydrationThenable(load()));
 		return createElement(comp, props);
 	};
 	Lazy.preload = load;

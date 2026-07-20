@@ -15,6 +15,6 @@
     "jsx": "react-jsx",
     "jsxImportSource": "octane"
   },
-  "include": ["./src/"],
+  "include": ["./src/", "./typetests/"],
   "exclude": ["node_modules", "dist", "tests"]
 }

@@ -567,6 +567,11 @@ generated from the workspace manifests in
   output to Vercel, while
   [`@octanejs/adapter-cloudflare`](./packages/adapter-cloudflare) emits a
   streaming module Worker for Cloudflare Workers Static Assets.
+- [`@octanejs/tanstack-start`](./packages/tanstack-start) is the public Octane
+  TanStack Start integration. It owns the Octane-specific Start runtime,
+  file-route generation, server-function compilation, streaming SSR, hydration,
+  and Vite development and production integration, using
+  [`@octanejs/tanstack-router`](./packages/tanstack-router) as its router binding.
 - [`@octanejs/mcp-server`](./packages/octane-mcp-server) exposes octane docs and
   compile tooling to AI agents over MCP.
 - [`@octanejs/evals`](./packages/octane-evals) is the private workspace package

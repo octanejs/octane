@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**43 publishable package(s), including 35 framework binding(s).**
+**44 publishable package(s), including 35 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -44,7 +44,8 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/tanstack-devtools` | [`packages/tanstack-devtools`](../packages/tanstack-devtools) | framework binding | `0.0.5` | 1 |
 | `@octanejs/tanstack-form` | [`packages/tanstack-form`](../packages/tanstack-form) | framework binding | `0.0.5` | 1 |
 | `@octanejs/tanstack-query` | [`packages/tanstack-query`](../packages/tanstack-query) | framework binding | `0.1.10` | 1 |
-| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.10` | 2 |
+| `@octanejs/tanstack-router` | [`packages/tanstack-router`](../packages/tanstack-router) | framework binding | `0.1.10` | 6 |
+| `@octanejs/tanstack-start` | [`packages/tanstack-start`](../packages/tanstack-start) | metaframework | `0.1.0` | 11 |
 | `@octanejs/tanstack-store` | [`packages/tanstack-store`](../packages/tanstack-store) | framework binding | `0.0.5` | 1 |
 | `@octanejs/tanstack-table` | [`packages/tanstack-table`](../packages/tanstack-table) | framework binding | `0.1.8` | 1 |
 | `@octanejs/tanstack-virtual` | [`packages/tanstack-virtual`](../packages/tanstack-virtual) | framework binding | `0.1.8` | 1 |
@@ -61,4 +62,3 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 - `@octanejs/evals` ([`packages/octane-evals`](../packages/octane-evals))
 - `@octanejs/lynx` ([`packages/lynx`](../packages/lynx))
 - `@octanejs/rspeedy-plugin` ([`packages/rspeedy-plugin-octane`](../packages/rspeedy-plugin-octane))
-- `@octanejs/tanstack-start` ([`packages/tanstack-start`](../packages/tanstack-start))

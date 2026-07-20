@@ -3,7 +3,7 @@ import {
 	defaultParseSearch,
 	defaultStringifySearch,
 	type RouterHistory,
-} from '@tanstack/octane-router';
+} from '@octanejs/tanstack-router';
 import { routeTree } from './routeTree.gen.ts';
 import './app/stale-chunk-reload.ts';
 
@@ -59,7 +59,7 @@ export function getRouter(options: WebsiteRouterOptions = {}) {
 	});
 }
 
-declare module '@tanstack/octane-router' {
+declare module '@octanejs/tanstack-router' {
 	interface Register {
 		router: ReturnType<typeof getRouter>;
 	}
