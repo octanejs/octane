@@ -1,7 +1,7 @@
 // One documentation page: render compiled MDX in a readable article, add the
 // navigation supplied by the registry, and keep a local table of contents
 // beside longer guides.
-import { Link, useParams } from '@tanstack/octane-router';
+import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
 import { OnThisPage } from '../../components/OnThisPage.tsrx';

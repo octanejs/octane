@@ -4,7 +4,7 @@
 // on each <pre>; this proves it flows through to a visible label.
 import { it, expect, afterEach } from 'vitest';
 import { render, waitFor, cleanup } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 
 afterEach(cleanup);

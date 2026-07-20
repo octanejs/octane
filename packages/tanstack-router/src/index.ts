@@ -19,9 +19,11 @@
 // createLink/useLinkProps, navigation blocking (useBlocker/Block), the full
 // read-hook set (useMatch and friends, nearest-match resolution via
 // matchContext), Route/getRouteApi hook accessors, Await/useAwaited, lazy
-// routes, and search validation/middleware from core. Deferred: file-based
-// routing + codegen (`createFileRoute`, @tanstack/router-plugin), SSR entries
-// (RouterServer/RouterClient, HeadContent/Scripts), and devtools.
+// routes, search validation/middleware from core, generated file routes,
+// document/head assets, and Start-compatible SSR/hydration. Devtools remain
+// separate.
+import './frameworkTypes';
+
 export * from '@tanstack/router-core';
 export {
 	createHistory,
@@ -48,25 +50,39 @@ export {
 	createRoute,
 	createRootRoute,
 	createRootRouteWithContext,
+	rootRouteWithContext,
 	createRouteMask,
 	getRouteApi,
 	Route,
 	RootRoute,
 	RouteApi,
+	NotFoundRoute,
 } from './route';
+export {
+	FileRoute,
+	createFileRoute,
+	FileRouteLoader,
+	LazyRoute,
+	createLazyRoute,
+	createLazyFileRoute,
+} from './fileRoute';
 // Framework-facing component types (react-router parity, on octane renderables).
 // route.ts also narrows router-core's *Extensions interfaces to these via module
 // augmentation — mirroring upstream's route.tsx/router.tsx `declare module`.
 export type {
+	DefaultRouteTypes,
 	SyncRouteComponent,
 	AsyncRouteComponent,
 	RouteComponent,
+	RouteTypes,
 	ErrorRouteComponent,
 	NotFoundRouteComponent,
+	AnyRootRoute,
 } from './route';
 export { routerContext, getRouterContext, matchContext, useRouter } from './context';
 export { useStore } from './useStore';
 export { useRouterState } from './useRouterState';
+export type { UseRouterStateOptions, UseRouterStateResult } from './useRouterState';
 export {
 	useMatch,
 	useLocation,
@@ -81,10 +97,53 @@ export {
 	useNavigate,
 	useCanGoBack,
 } from './hooks';
+export type {
+	UseLoaderDataBaseOptions,
+	UseLoaderDataOptions,
+	UseLoaderDataRoute,
+	UseLoaderDepsBaseOptions,
+	UseLoaderDepsOptions,
+	UseLoaderDepsRoute,
+	UseLocationBaseOptions,
+	UseLocationResult,
+	UseMatchBaseOptions,
+	UseMatchOptions,
+	UseMatchResult,
+	UseMatchRoute,
+	UseMatchesBaseOptions,
+	UseMatchesResult,
+	UseParamsBaseOptions,
+	UseParamsOptions,
+	UseParamsRoute,
+	UseRouteContextRoute,
+	UseSearchBaseOptions,
+	UseSearchOptions,
+	UseSearchRoute,
+} from './routeHookTypes';
 export { useAwaited } from './useAwaited';
+export type { AwaitOptions } from './useAwaited';
 export { useLinkProps, createLink, linkOptions } from './link';
+export type { LinkOptionsFn, LinkOptionsFnOptions } from './link';
+export type {
+	ActiveLinkOptionProps,
+	ActiveLinkOptions,
+	CreateLinkProps,
+	LinkComponent,
+	LinkComponentProps,
+	LinkComponentRoute,
+	LinkProps,
+	LinkPropsChildren,
+	OctaneAnchorProps,
+	OctaneRenderable,
+	UseLinkPropsOptions,
+} from './linkTypes';
 export { useBlocker, Block } from './useBlocker.tsrx';
-export type { UseBlockerOpts, ShouldBlockFn } from './useBlocker.tsrx';
+export type {
+	BlockerResolver,
+	ShouldBlockFn,
+	ShouldBlockFnArgs,
+	UseBlockerOpts,
+} from './useBlocker.tsrx';
 export { useMatchRoute, MatchRoute } from './MatchRoute.tsrx';
 export { useElementScrollRestoration } from './useElementScrollRestoration';
 export { lazyRouteComponent } from './lazyRouteComponent';
@@ -101,3 +160,24 @@ export { Match } from './Match.tsrx';
 export { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
 export { CatchNotFound, DefaultGlobalNotFound } from './not-found.tsrx';
 export { ClientOnly, useHydrated } from './ClientOnly.tsrx';
+export { HeadContent } from './HeadContent.tsrx';
+export type { HeadContentProps } from './HeadContent.tsrx';
+export { Scripts } from './Scripts.tsrx';
+export { ScriptOnce } from './ScriptOnce.tsrx';
+export { Asset } from './Asset.tsrx';
+export type { AssetProps } from './Asset.tsrx';
+export { useTags } from './headContentUtils';
+export { Html } from './Html';
+export type { HtmlProps } from './Html';
+export { Head } from './Head';
+export type { HeadProps } from './Head';
+export { Body } from './Body';
+export type { BodyProps } from './Body';
+export type { OctaneElementAttributes, OctaneScriptAttributes } from './frameworkTypes';
+export type {
+	InferStructuralSharing,
+	ValidateLinkOptions,
+	ValidateLinkOptionsArray,
+	ValidateUseParamsOptions,
+	ValidateUseSearchOptions,
+} from './typePrimitives';

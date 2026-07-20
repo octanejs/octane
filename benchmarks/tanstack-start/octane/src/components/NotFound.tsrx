@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 
 export function NotFound(props: { children?: unknown }) @{
 	<div class="space-y-2 p-2" data-testid="default-not-found-component">
@@ -23,4 +23,8 @@ export function NotFound(props: { children?: unknown }) @{
 			</Link>
 		</p>
 	</div>
+}
+
+export function DefaultNotFound() @{
+	<NotFound />
 }

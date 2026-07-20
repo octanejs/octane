@@ -13,10 +13,8 @@ const SPECIAL_ROLES = new Map([
 	['@octanejs/rspeedy-plugin', 'native compiler integration'],
 	['@octanejs/rsbuild-plugin', 'metaframework'],
 	['@octanejs/vite-plugin', 'metaframework'],
-	// TanStack Start facade over the vendored @tanstack/octane-* packages —
-	// a metaframework integration, not a library binding: it is private while
-	// upstream is unreleased, so it must stay out of the binding status/catalog
-	// contract (status.json ⇔ publishable binding in the public directory).
+	// TanStack Start is a metaframework integration rather than a library
+	// binding, so it stays outside the binding status/catalog contract.
 	['@octanejs/tanstack-start', 'metaframework'],
 	['@octanejs/adapter-vercel', 'deployment adapter'],
 	['@octanejs/mcp-server', 'agent tooling'],
@@ -28,6 +26,7 @@ const OCTANE_SINGLETON_CONSUMERS = new Set([
 	'@octanejs/rspack-plugin',
 	'@octanejs/rspeedy-plugin',
 	'@octanejs/rsbuild-plugin',
+	'@octanejs/tanstack-start',
 	'@octanejs/vite-plugin',
 ]);
 

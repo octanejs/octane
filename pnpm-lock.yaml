@@ -235,8 +235,8 @@ catalogs:
       specifier: 3.14.5
       version: 3.14.5
     '@tanstack/router-core':
-      specifier: 1.171.13
-      version: 1.171.13
+      specifier: 1.171.15
+      version: 1.171.15
     '@tanstack/store':
       specifier: ^0.9.3
       version: 0.9.3
@@ -2323,15 +2323,12 @@ importers:
 
   benchmarks/tanstack-start/octane:
     dependencies:
+      '@octanejs/tanstack-router':
+        specifier: workspace:*
+        version: link:../../../packages/tanstack-router
       '@octanejs/tanstack-start':
         specifier: workspace:*
         version: link:../../../packages/tanstack-start
-      '@tanstack/octane-router':
-        specifier: workspace:*
-        version: link:../../../packages/tanstack-start/vendor/octane-router
-      '@tanstack/octane-start':
-        specifier: workspace:*
-        version: link:../../../packages/tanstack-start/vendor/octane-start
       octane:
         specifier: workspace:*
         version: link:../../../packages/octane
@@ -4122,10 +4119,13 @@ importers:
         version: 1.162.0
       '@tanstack/router-core':
         specifier: catalog:default
-        version: 1.171.13
+        version: 1.171.15
       '@tanstack/store':
         specifier: catalog:default
         version: 0.9.3
+      isbot:
+        specifier: ^5.1.22
+        version: 5.1.43
     devDependencies:
       '@tanstack/react-router':
         specifier: catalog:default
@@ -4151,130 +4151,11 @@ importers:
 
   packages/tanstack-start:
     dependencies:
-      '@tanstack/octane-start':
-        specifier: workspace:*
-        version: link:vendor/octane-start
-      vite:
-        specifier: '>=7.0.0'
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
-    devDependencies:
-      octane:
-        specifier: workspace:*
-        version: link:../octane
-
-  packages/tanstack-start/vendor/octane-router:
-    dependencies:
-      '@tanstack/history':
-        specifier: 1.162.0
-        version: 1.162.0
-      '@tanstack/router-core':
-        specifier: 1.171.15
-        version: 1.171.15
-      '@tanstack/store':
-        specifier: ^0.9.3
-        version: 0.9.3
-      isbot:
-        specifier: ^5.1.22
-        version: 5.1.43
-    devDependencies:
-      octane:
-        specifier: workspace:*
-        version: link:../../../octane
-
-  packages/tanstack-start/vendor/octane-start:
-    dependencies:
-      '@tanstack/octane-router':
-        specifier: workspace:*
-        version: link:../octane-router
-      '@tanstack/octane-start-client':
-        specifier: workspace:*
-        version: link:../octane-start-client
-      '@tanstack/octane-start-server':
-        specifier: workspace:*
-        version: link:../octane-start-server
-      '@tanstack/start-client-core':
-        specifier: 1.170.14
-        version: 1.170.14
-      '@tanstack/start-plugin-core':
-        specifier: workspace:*
-        version: link:../start-plugin-core
-      '@tanstack/start-server-core':
-        specifier: 1.169.17
-        version: 1.169.17(crossws@0.4.10(srvx@0.11.22))
-      pathe:
-        specifier: ^2.0.3
-        version: 2.0.3
-      vite:
-        specifier: '>=7.0.0'
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
-    devDependencies:
-      octane:
-        specifier: workspace:*
-        version: link:../../../octane
-
-  packages/tanstack-start/vendor/octane-start-client:
-    dependencies:
-      '@tanstack/octane-router':
-        specifier: workspace:*
-        version: link:../octane-router
-      '@tanstack/router-core':
-        specifier: 1.171.15
-        version: 1.171.15
-      '@tanstack/start-client-core':
-        specifier: 1.170.14
-        version: 1.170.14
-    devDependencies:
-      octane:
-        specifier: workspace:*
-        version: link:../../../octane
-
-  packages/tanstack-start/vendor/octane-start-server:
-    dependencies:
-      '@tanstack/octane-router':
-        specifier: workspace:*
-        version: link:../octane-router
-      '@tanstack/router-core':
-        specifier: 1.171.15
-        version: 1.171.15
-      '@tanstack/start-server-core':
-        specifier: 1.169.17
-        version: 1.169.17(crossws@0.4.10(srvx@0.11.22))
-    devDependencies:
-      octane:
-        specifier: workspace:*
-        version: link:../../../octane
-
-  packages/tanstack-start/vendor/router-generator:
-    dependencies:
-      '@babel/types':
-        specifier: ^7.28.5
-        version: 7.29.7
-      '@tanstack/router-core':
-        specifier: 1.171.15
-        version: 1.171.15
-      '@tanstack/router-utils':
-        specifier: 1.162.2
-        version: 1.162.2
-      '@tanstack/virtual-file-routes':
-        specifier: 1.162.0
-        version: 1.162.0
-      jiti:
-        specifier: ^2.7.0
-        version: 2.7.0
-      magic-string:
-        specifier: ^0.30.21
-        version: 0.30.21
-      prettier:
-        specifier: ^3.5.0
-        version: 3.8.4
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/tanstack-start/vendor/router-plugin:
-    dependencies:
+      '@babel/code-frame':
+        specifier: 7.27.1
+        version: 7.27.1
       '@babel/core':
-        specifier: ^7.28.5
+        specifier: catalog:default
         version: 7.29.7
       '@babel/template':
         specifier: ^7.27.2
@@ -4282,86 +4163,53 @@ importers:
       '@babel/types':
         specifier: ^7.28.5
         version: 7.29.7
-      '@rsbuild/core':
-        specifier: '>=1.0.2 || ^2.0.0'
-        version: 2.1.5
-      '@tanstack/react-router':
-        specifier: ^1.170.18
-        version: 1.170.18(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      '@tanstack/router-core':
-        specifier: 1.171.15
-        version: 1.171.15
-      '@tanstack/router-generator':
+      '@octanejs/tanstack-router':
         specifier: workspace:*
-        version: link:../router-generator
+        version: link:../tanstack-router
+      '@tanstack/router-core':
+        specifier: catalog:default
+        version: 1.171.15
       '@tanstack/router-utils':
         specifier: 1.162.2
         version: 1.162.2
-      chokidar:
-        specifier: ^5.0.0
-        version: 5.0.0
-      unplugin:
-        specifier: ^3.0.0
-        version: 3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(webpack@5.108.4(esbuild@0.28.1))
-      vite:
-        specifier: '>=5.0.0 || >=6.0.0 || >=7.0.0 || >=8.0.0'
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
-      vite-plugin-solid:
-        specifier: ^2.11.10 || ^3.0.0-0
-        version: 3.0.0-next.5(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(@testing-library/jest-dom@6.9.1)(solid-js@2.0.0-beta.15)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
-      webpack:
-        specifier: '>=5.92.0'
-        version: 5.108.4(esbuild@0.28.1)
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-
-  packages/tanstack-start/vendor/start-plugin-core:
-    dependencies:
-      '@babel/code-frame':
-        specifier: 7.27.1
-        version: 7.27.1
-      '@babel/core':
-        specifier: ^7.28.5
-        version: 7.29.7
-      '@babel/types':
-        specifier: ^7.28.5
-        version: 7.29.7
-      '@rsbuild/core':
-        specifier: ^2.0.0
-        version: 2.1.5
-      '@tanstack/router-core':
-        specifier: 1.171.15
-        version: 1.171.15
-      '@tanstack/router-generator':
-        specifier: workspace:*
-        version: link:../router-generator
-      '@tanstack/router-plugin':
-        specifier: workspace:*
-        version: link:../router-plugin
-      '@tanstack/router-utils':
-        specifier: 1.162.2
-        version: 1.162.2
+      '@tanstack/start-client-core':
+        specifier: 1.170.14
+        version: 1.170.14
       '@tanstack/start-server-core':
         specifier: 1.169.17
         version: 1.169.17(crossws@0.4.10(srvx@0.11.22))
+      '@tanstack/virtual-file-routes':
+        specifier: 1.162.0
+        version: 1.162.0
+      chokidar:
+        specifier: ^5.0.0
+        version: 5.0.0
       exsolve:
         specifier: ^1.0.7
         version: 1.1.0
+      jiti:
+        specifier: ^2.7.0
+        version: 2.7.0
       lightningcss:
         specifier: ^1.32.0
         version: 1.32.0
+      magic-string:
+        specifier: ^0.30.21
+        version: 0.30.21
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
       picomatch:
         specifier: ^4.0.3
         version: 4.0.4
+      prettier:
+        specifier: catalog:default
+        version: 3.8.4
       seroval:
         specifier: ^1.5.4
         version: 1.5.4
       source-map:
-        specifier: ^0.7.6
+        specifier: catalog:default
         version: 0.7.6
       srvx:
         specifier: ^0.11.9
@@ -4372,9 +4220,9 @@ importers:
       ufo:
         specifier: ^1.5.4
         version: 1.6.4
-      vite:
-        specifier: '>=7.0.0'
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      unplugin:
+        specifier: ^3.0.0
+        version: 3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))
       vitefu:
         specifier: ^1.1.1
         version: 1.1.3(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
@@ -4384,6 +4232,19 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: catalog:default
+        version: 24.13.2
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@24.13.2)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
 
   packages/tanstack-store:
     dependencies:
@@ -4875,6 +4736,9 @@ importers:
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
+      '@octanejs/tanstack-router':
+        specifier: workspace:*
+        version: link:../packages/tanstack-router
       '@octanejs/tanstack-start':
         specifier: workspace:*
         version: link:../packages/tanstack-start
@@ -4884,12 +4748,6 @@ importers:
       '@octanejs/visx':
         specifier: workspace:*
         version: link:../packages/visx
-      '@tanstack/octane-router':
-        specifier: workspace:*
-        version: link:../packages/tanstack-start/vendor/octane-router
-      '@tanstack/octane-start':
-        specifier: workspace:*
-        version: link:../packages/tanstack-start/vendor/octane-start
       octane:
         specifier: workspace:*
         version: link:../packages/octane
@@ -7430,11 +7288,6 @@ packages:
 
   '@stylexjs/stylex@0.19.0':
     resolution: {integrity: sha512-CnUFp7YMaDLDeemsWOfJgoC/gKM5P/yBNMcpJaE6ChJmXr7s0DJwSeGTTlHJcqqwN9OW1qGtmARWLFhGZN1pTA==}
-
-  '@sveltejs/acorn-typescript@1.0.10':
-    resolution: {integrity: sha512-4WfKk68eTih+MiJD4fSbxN7E8kVBmTMPWHUPYjvl2N0rMs53YLTT8/YjKU5Dtnz5LqDjl7LEw4U7lXR2W3J5WA==}
-    peerDependencies:
-      acorn: ^8.9.0
 
   '@sveltejs/acorn-typescript@1.0.11':
     resolution: {integrity: sha512-LFuZUkjJ9iF7JZye/aG5XM0SFcQ5VyL0oVX4WJ9dc0Va3R3s0OauX1BESVCb+YN/ol8TAfqGDDAQsTG627Y5kw==}
@@ -15636,6 +15489,7 @@ snapshots:
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
       solid-js: 2.0.0-beta.15
+    optional: true
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -15661,10 +15515,6 @@ snapshots:
       css-mediaquery: 0.1.2
       invariant: 2.2.4
       styleq: 0.2.1
-
-  '@sveltejs/acorn-typescript@1.0.10(acorn@8.17.0)':
-    dependencies:
-      acorn: 8.17.0
 
   '@sveltejs/acorn-typescript@1.0.11(acorn@8.17.0)':
     dependencies:
@@ -17474,6 +17324,7 @@ snapshots:
       babel-plugin-jsx-dom-expressions: 0.50.0-next.13(@babel/core@7.29.7)
     optionalDependencies:
       solid-js: 2.0.0-beta.15
+    optional: true
 
   bail@2.0.2: {}
 
@@ -19129,7 +18980,7 @@ snapshots:
 
   make-dir@4.0.0:
     dependencies:
-      semver: 7.8.4
+      semver: 7.8.5
 
   markdown-extensions@2.0.0: {}
 
@@ -19633,6 +19484,18 @@ snapshots:
     dependencies:
       brace-expansion: 2.1.2
 
+  minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(lightningcss@1.32.0)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0)):
+    dependencies:
+      '@jridgewell/trace-mapping': 0.3.31
+      jest-worker: 27.5.1
+      schema-utils: 4.3.3
+      terser: 5.48.0
+      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.32.0)
+    optionalDependencies:
+      esbuild: 0.28.1
+      lightningcss: 1.32.0
+    optional: true
+
   minimizer-webpack-plugin@5.6.1(esbuild@0.28.1)(postcss@8.5.15)(webpack@5.108.4(esbuild@0.28.1)(postcss@8.5.15)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
@@ -19653,6 +19516,7 @@ snapshots:
       webpack: 5.108.4(esbuild@0.28.1)
     optionalDependencies:
       esbuild: 0.28.1
+    optional: true
 
   mitt@2.1.0: {}
 
@@ -20890,6 +20754,7 @@ snapshots:
       '@babel/generator': 7.29.7
       '@babel/types': 7.29.7
       solid-js: 2.0.0-beta.15
+    optional: true
 
   sonner@2.0.7(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
     dependencies:
@@ -21055,7 +20920,7 @@ snapshots:
     dependencies:
       '@jridgewell/remapping': 2.3.5
       '@jridgewell/sourcemap-codec': 1.5.5
-      '@sveltejs/acorn-typescript': 1.0.10(acorn@8.17.0)
+      '@sveltejs/acorn-typescript': 1.0.11(acorn@8.17.0)
       '@types/estree': 1.0.9
       '@types/trusted-types': 2.0.7
       acorn: 8.17.0
@@ -21265,6 +21130,18 @@ snapshots:
 
   unpipe@1.0.0: {}
 
+  unplugin@3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0)):
+    dependencies:
+      '@jridgewell/remapping': 2.3.5
+      picomatch: 4.0.4
+      webpack-virtual-modules: 0.6.2
+    optionalDependencies:
+      '@rspack/core': 2.1.3(@swc/helpers@0.5.23)
+      esbuild: 0.28.1
+      rolldown: 1.0.3
+      vite: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+      webpack: 5.108.4(esbuild@0.28.1)(lightningcss@1.32.0)
+
   unplugin@3.3.0(@rspack/core@2.1.3(@swc/helpers@0.5.23))(esbuild@0.28.1)(rolldown@1.0.3)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))(webpack@5.108.4(esbuild@0.28.1)):
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -21379,6 +21256,7 @@ snapshots:
       '@testing-library/jest-dom': 6.9.1
     transitivePeerDependencies:
       - supports-color
+    optional: true
 
   vite-prerender-plugin@0.5.13(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)):
     dependencies:
@@ -21515,6 +21393,46 @@ snapshots:
       - lightningcss
       - postcss
       - uglify-js
+    optional: true
+
+  webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0):
+    dependencies:
+      '@types/estree': 1.0.9
+      '@types/json-schema': 7.0.15
+      '@webassemblyjs/ast': 1.14.1
+      '@webassemblyjs/wasm-edit': 1.14.1
+      '@webassemblyjs/wasm-parser': 1.14.1
+      acorn: 8.17.0
+      acorn-import-phases: 1.0.4(acorn@8.17.0)
+      browserslist: 4.28.2
+      chrome-trace-event: 1.0.4
+      enhanced-resolve: 5.24.2
+      es-module-lexer: 2.1.0
+      eslint-scope: 5.1.1
+      events: 3.3.0
+      graceful-fs: 4.2.11
+      loader-runner: 4.3.2
+      mime-db: 1.54.0
+      minimizer-webpack-plugin: 5.6.1(esbuild@0.28.1)(lightningcss@1.32.0)(webpack@5.108.4(esbuild@0.28.1)(lightningcss@1.32.0))
+      neo-async: 2.6.2
+      schema-utils: 4.3.3
+      tapable: 2.3.3
+      watchpack: 2.5.2
+      webpack-sources: 3.5.1
+    transitivePeerDependencies:
+      - '@minify-html/node'
+      - '@swc/core'
+      - '@swc/css'
+      - '@swc/html'
+      - clean-css
+      - cssnano
+      - csso
+      - esbuild
+      - html-minifier-terser
+      - lightningcss
+      - postcss
+      - uglify-js
+    optional: true
 
   webpack@5.108.4(esbuild@0.28.1)(postcss@8.5.15):
     dependencies:

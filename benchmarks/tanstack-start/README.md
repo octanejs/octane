@@ -1,12 +1,12 @@
 # tanstack-start — the same Start app on Octane and React
 
-One application, built and served twice: `octane/` runs the repo's vendored
-`@tanstack/octane-start` (native `StreamOptions.injection` stream path,
-nitro `.output` server); `react/` runs `@tanstack/react-start` from npm,
-**pinned to the same release family as the vendored packages**
-(react-start 1.168.28, react-router 1.170.18), served by a minimal srvx
-front (`serve.mjs`). A correctness gate proves the two render and behave as
-the same app; the perf suite then quantifies the differences.
+One application, built and served twice: `octane/` runs the repository's
+`@octanejs/tanstack-start` port (native `StreamOptions.injection` stream path,
+Nitro `.output` server); `react/` runs `@tanstack/react-start` from npm, pinned
+to the corresponding TanStack release family (react-start 1.168.28,
+react-router 1.170.18) and served by a minimal srvx front (`serve.mjs`). A
+correctness gate proves the two render and behave as the same app; the perf
+suite then quantifies the differences.
 
 ## Provenance
 

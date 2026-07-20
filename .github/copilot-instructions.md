@@ -55,11 +55,11 @@ pnpm rules:generate
 ## Repo Map
 
 This is a pnpm monorepo containing the core `octane` runtime+compiler, the
-`@octanejs/vite-plugin` metaframework (plus its `@octanejs/adapter-vercel`
-deploy adapter), the `@octanejs/mcp-server` MCP server, the private
-`@octanejs/evals` evaluation tooling package, and the `@octanejs/*` framework
-bindings. The current workspace package inventory and counts are generated from
-workspace manifests in `docs/packages.md`:
+`@octanejs/vite-plugin` and `@octanejs/tanstack-start` metaframeworks (plus the
+`@octanejs/adapter-vercel` deploy adapter), the `@octanejs/mcp-server` MCP
+server, the private `@octanejs/evals` evaluation tooling package, and the
+`@octanejs/*` framework bindings. The current workspace package inventory and
+counts are generated from workspace manifests in `docs/packages.md`:
 
 - `packages/octane/` (npm: `octane`) — the runtime **and** the compiler together.
   - `src/runtime.ts` — client runtime.
@@ -71,6 +71,10 @@ workspace manifests in `docs/packages.md`:
   production build: `vite build` → static client assets + a self-contained SSR
   server bundle; preview with `octane-preview`); `packages/adapter-vercel`
   deploys it to Vercel (Build Output API).
+- `packages/tanstack-start/` (npm: `@octanejs/tanstack-start`) — the public
+  Octane TanStack Start integration. It owns the Octane-specific Start runtime,
+  Vite/compiler pipeline, and route generator, and uses
+  `@octanejs/tanstack-router` for the renderer binding.
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
 - `packages/octane-evals/` (private workspace package: `@octanejs/evals`) —

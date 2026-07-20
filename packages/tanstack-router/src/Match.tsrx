@@ -33,13 +33,26 @@ import { RouteNotFound } from './RouteNotFound.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
 import { CatchNotFound } from './not-found.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
+import { ClientOnly } from './ClientOnly.tsrx';
+import { ScrollRestorationScript } from './scroll-restoration.tsrx';
 
 export function Match(props: { matchId: string }) @{
 	const router = useRouter();
 	const matchStore = router.stores.matchStores.get(props.matchId)!;
-	const resetKey = useStore(router.stores.loadedAt, (l) => l);
-	const routeId = useStore(matchStore, (m) => m.routeId as string);
-	const route = router.routesById[routeId];
+	const resetKey = useStore(router.stores.loadedAt, (l: any) => l as number | string);
+	const matchState = useStore(
+		matchStore,
+		(m: any) => ({
+			routeId: m.routeId,
+			ssr: m.ssr,
+			_displayPending: m._displayPending,
+		}),
+		(previous, next) =>
+			previous.routeId === next.routeId && previous.ssr === next.ssr &&
+				previous._displayPending === next._displayPending,
+	);
+	const routeId = matchState.routeId as string;
+	const route = (router.routesById as Record<string, any>)[routeId];
 
 	const PendingComponent = route.options.pendingComponent ?? router.options.defaultPendingComponent;
 	const routeErrorComponent = route.options.errorComponent ?? router.options.defaultErrorComponent;
@@ -47,13 +60,16 @@ export function Match(props: { matchId: string }) @{
 	const routeNotFoundComponent = route.isRoot
 		? route.options.notFoundComponent ?? router.options.notFoundRoute?.options.component
 		: route.options.notFoundComponent;
+	const resolvedNoSsr = matchState.ssr === false || matchState.ssr === 'data-only';
 
 	// Boundary presence, per upstream MatchView. The root route only gets a
 	// Suspense boundary when explicitly opted in via wrapInSuspense.
+	const suspenseSignal =
+		route.options.wrapInSuspense ?? PendingComponent ??
+			(routeErrorComponent as ErrorRouteComponent | undefined)?.preload;
 	const SuspenseWrap =
-		(!route.isRoot || route.options.wrapInSuspense) &&
-		(route.options.wrapInSuspense ?? PendingComponent ??
-		(routeErrorComponent as ErrorRouteComponent | undefined)?.preload)
+		(!route.isRoot || route.options.wrapInSuspense || resolvedNoSsr) &&
+		(suspenseSignal || resolvedNoSsr)
 			? Suspense
 			: SafeFragment;
 	const CatchWrap = routeErrorComponent ? CatchBoundary : SafeFragment;
@@ -74,7 +90,7 @@ export function Match(props: { matchId: string }) @{
 					errorComponent={routeErrorComponent || ErrorComponent}
 					onCatch={(error: Error, errorInfo: ErrorInfo) => {
 						if (isNotFound(error)) {
-							error.routeId ??= routeId;
+							(error as any).routeId ??= routeId;
 							throw error;
 						}
 						if (routeOnCatch) routeOnCatch(error, errorInfo);
@@ -82,7 +98,7 @@ export function Match(props: { matchId: string }) @{
 				>
 					<NotFoundWrap
 						fallback={(error: NotFoundError) => {
-							error.routeId ??= routeId;
+							(error as any).routeId ??= routeId;
 
 							if (
 								!routeNotFoundComponent || error.routeId && error.routeId !== routeId ||
@@ -93,13 +109,24 @@ export function Match(props: { matchId: string }) @{
 							return createElement(routeNotFoundComponent, error as any);
 						}}
 					>
-						<MatchInner matchId={props.matchId} />
+						@if (resolvedNoSsr || matchState._displayPending) {
+							<ClientOnly fallback={pendingElement}>
+								<MatchInner matchId={props.matchId} />
+							</ClientOnly>
+						} @else {
+							<MatchInner matchId={props.matchId} />
+						}
 					</NotFoundWrap>
 				</CatchWrap>
 			</SuspenseWrap>
 		</matchContext.Provider>
 		@if (parentRouteId === rootRouteId) {
-			<OnRendered />
+			<>
+				<OnRendered />
+				@if (router.options.scrollRestoration) {
+					<ScrollRestorationScript />
+				}
+			</>
 		}
 	</ShellComponent>
 }
@@ -107,9 +134,9 @@ export function Match(props: { matchId: string }) @{
 function MatchInner(props: { matchId: string }) {
 	const router = useRouter();
 	const matchStore = router.stores.matchStores.get(props.matchId)!;
-	const match = useStore(matchStore, (m) => m);
+	const match = useStore(matchStore, (m: any) => m);
 	const routeId = match.routeId as string;
-	const route = router.routesById[routeId];
+	const route = (router.routesById as Record<string, any>)[routeId];
 
 	// The live match in the router (if still mounted there) wins over the
 	// snapshot for promise lookups, per upstream getMatchPromise.
@@ -182,7 +209,7 @@ function OnRendered() @{
 	const prevResolvedLocationRef = useRef<ParsedLocation<any> | undefined>(undefined);
 	const renderedLocationKey = useStore(
 		router.stores.resolvedLocation,
-		(loc) => loc?.state.__TSR_key,
+		(loc: ParsedLocation<any> | undefined) => loc?.state.__TSR_key,
 	);
 
 	useLayoutEffect(() => {

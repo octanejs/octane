@@ -1,14 +1,16 @@
 {
-  "upstream": { "package": "@tanstack/react-router", "version": "1.170.16" },
-  "surface": "Code-based routing at full binding parity (2026-07-06 gap-closure sweep): the full Match pipeline, router lifecycle events, the complete read-hook family, full-parity `Link` (preloading, masking, `activeProps`), `useBlocker`/`Block`, `Await`/`defer`, scroll restoration, lazy routes, not-found handling, and search-param validation/middleware — differential-verified byte-equal vs the real `@tanstack/react-router`.",
+  "upstream": { "package": "@tanstack/react-router", "version": "1.170.18" },
+  "surface": "Octane's TanStack Router binding: typed route factories and hooks, the full Match pipeline and lifecycle, file routes with TSRX-aware generator integration, full Link navigation/preloading/masking behavior, blocking, Await/deferred hydration, scroll restoration, lazy routes, not-found handling, document/head assets, and client/server SSR entries.",
   "divergences": [
     "Refs are props — `createLink`'s `forwardRef` becomes a `ref` prop.",
-    "No `flushSync` in the `Link` click handler; navigation state updates run synchronously."
+    "Link callbacks receive native DOM events rather than React synthetic events.",
+    "Router devtools are distributed separately."
   ],
-  "ssr": "SSR entries (`RouterServer`/`RouterClient`, `HeadContent`/`Scripts`) not yet ported; no SSR tests.",
-  "verified": "2026-07-06",
+  "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by retained upstream conformance tests.",
+  "verified": "2026-07-20",
   "notes": [
-    "Still open: file-based routing + the codegen plugin, devtools, and the typed public surface (factories/hooks are still `any`)."
+    "The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.",
+    "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator."
   ],
   "docs": ["docs/tanstack-parity-audit.md"]
 }

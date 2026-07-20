@@ -1,16 +1,25 @@
 {
-  "include": ["**/*.ts", "**/*.d.ts"],
+  "include": ["src/**/*", "vite.config.ts"],
   "compilerOptions": {
     "strict": true,
     "esModuleInterop": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "allowJs": true,
     "lib": ["DOM", "DOM.Iterable", "ES2024"],
     "isolatedModules": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "target": "ES2024",
     "types": ["node"],
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "octane",
+    "plugins": [
+      {
+        "name": "@tsrx/typescript-plugin"
+      }
+    ]
   }
 }

@@ -1,4 +1,4 @@
-import { ErrorComponent, createFileRoute } from '@tanstack/octane-router';
+import { ErrorComponent, createFileRoute } from '@octanejs/tanstack-router';
 import { fetchPost } from '../utils/posts.ts';
 import { NotFound } from '../components/NotFound.tsrx';
 

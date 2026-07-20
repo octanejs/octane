@@ -1,7 +1,7 @@
 # Octane website
 
-The official Octane site — an Octane app built on TanStack Start and
-`@tanstack/octane-router` for file routing, SSR, and hydration. The docs content
+The official Octane site — an Octane app built on `@octanejs/tanstack-start` and
+`@octanejs/tanstack-router` for file routing, SSR, and hydration. The docs content
 still uses `@octanejs/mdx` with Shiki highlighting at build time.
 
 ## Develop
