@@ -5,7 +5,7 @@
 // panel; the X/Discord/GitHub icons move out of the bar into the bottom of that
 // dropdown (the same <SocialIcons> is rendered in both places, toggled by CSS).
 import { useState } from 'octane';
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 import { DocsSearch } from './DocsSearch.tsrx';
 import { ThemeToggle } from './ThemeToggle.tsrx';
 import { SocialIcons } from './SocialIcons.tsrx';

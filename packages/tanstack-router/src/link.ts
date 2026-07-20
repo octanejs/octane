@@ -9,6 +9,7 @@
 // with replace/resetScroll/hashScrollIntoView/viewTransition/startTransition/
 // ignoreBlocker forwarded), and data-status/data-transitioning reflection.
 import { useRef, useState, useEffect, useCallback, flushSync, createElement } from 'octane';
+import type { ComponentBody } from 'octane';
 import {
 	deepEqual,
 	exactPathTest,
@@ -22,6 +23,9 @@ import { useRouter } from './context';
 import { useStore } from './useStore';
 import { splitSlot, subSlot } from './internal';
 import { Link } from './Link.tsrx';
+import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
+import type { LinkComponent, OctaneAnchorProps, UseLinkPropsOptions } from './linkTypes';
+import type { ValidateLinkOptions, ValidateLinkOptionsArray } from './typePrimitives';
 
 const STATIC_EMPTY_OBJECT = {};
 const STATIC_ACTIVE_OBJECT = { class: 'active' };
@@ -82,6 +86,13 @@ function mergeStyles(base: any, active: any, inactive: any): any {
 	return Object.assign({}, ...parts);
 }
 
+export function useLinkProps<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string = string,
+	const TTo extends string | undefined = undefined,
+	const TMaskFrom extends string = TFrom,
+	const TMaskTo extends string = '',
+>(options: UseLinkPropsOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>): OctaneAnchorProps;
 export function useLinkProps(...args: any[]): Record<string, any> {
 	const [user, slot] = splitSlot(args);
 	const options = (user[0] ?? {}) as Record<string, any>;
@@ -371,13 +382,23 @@ export function useLinkProps(...args: any[]): Record<string, any> {
 
 // Wrap a design-system component so it navigates like <Link> — the component
 // receives the fully-built link props (href, handlers, data-status, …).
+export function createLink<const TComp extends ComponentBody<any>>(
+	Comp: TComp,
+): LinkComponent<TComp>;
 export function createLink(Comp: any): any {
 	return function CreatedLink(props: any) {
 		return createElement(Link as any, { ...props, _asChild: Comp });
 	};
 }
 
-// Identity helper for pre-validating navigation options (type-level upstream).
-export function linkOptions(options: any): any {
-	return options;
-}
+export type LinkOptionsFnOptions<TOptions, TComp, TRouter extends AnyRouter = RegisteredRouter> =
+	TOptions extends ReadonlyArray<any>
+		? ValidateLinkOptionsArray<TRouter, TOptions, string, TComp>
+		: ValidateLinkOptions<TRouter, TOptions, string, TComp>;
+
+export type LinkOptionsFn<TComp> = <const TOptions, TRouter extends AnyRouter = RegisteredRouter>(
+	options: LinkOptionsFnOptions<TOptions, TComp, TRouter>,
+) => TOptions;
+
+// Identity helper for pre-validating and reusing navigation options.
+export const linkOptions: LinkOptionsFn<'a'> = (options) => options as any;

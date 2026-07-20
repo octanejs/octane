@@ -27,8 +27,8 @@ export function CatchNotFound(props: {
 	children: OctaneNode;
 }) @{
 	const router = useRouter();
-	const pathname = useStore(router.stores.location, (l) => l.pathname);
-	const status = useStore(router.stores.status, (s) => s);
+	const pathname = useStore(router.stores.location, (l: any) => l.pathname as string);
+	const status = useStore(router.stores.status, (s: any) => s as string);
 	const resetKey = `not-found-${pathname}-${status}`;
 
 	<CatchBoundary

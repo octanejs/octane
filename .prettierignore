@@ -15,16 +15,13 @@ pnpm-workspace.yaml
 **/.vercel/
 **/.wrangler/
 
-# Vendored TanStack Start PR-branch packages — upstream-formatted, kept verbatim
-# for diffability against upstream (see packages/tanstack-start/README.md)
-packages/tanstack-start/vendor/
-
 # Generated declaration files
 **/*.d.tsrx.ts
 packages/visx/**/*.tsrx.d.ts
 
 # TanStack Router owns this generated module's formatting.
 website/src/routeTree.gen.ts
+benchmarks/tanstack-start/octane/src/routeTree.gen.ts
 
 # The current TSRX Prettier parser cannot safely round-trip several valid
 # upstream React-shaped TypeScript/JSX constructs used by the Visx port.
@@ -86,3 +83,5 @@ packages/tanstack-ai/tests/_fixtures/*.tsrx
 packages/tanstack-devtools/src/*.tsrx
 packages/tanstack-devtools/src/*.tsrx.d.ts
 packages/tanstack-devtools/tests/_fixtures/*.tsrx
+dist-redact
+.content-collections

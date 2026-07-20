@@ -5,9 +5,9 @@
 TanStack Router splits a framework-agnostic core (`@tanstack/router-core` — the
 router, route tree, matching, history, and the reactive store) from a thin React
 binding (`@tanstack/react-router`). Mirroring `@octanejs/tanstack-query`, this package
-re-exports the core **verbatim** and reimplements only the binding on octane's hooks.
-The public surface matches `@tanstack/react-router`, so most router code works by
-changing the import.
+re-exports the core **verbatim** and reimplements the framework binding on octane's
+hooks. The main runtime surface follows `@tanstack/react-router`, so most router
+code works by changing the import.
 
 ```tsx
 import {
@@ -55,7 +55,7 @@ tree renders **pull-based**: `RouterProvider` renders the first match, and each 
 component's `<Outlet/>` looks up the next match via `matchContext` — so navigation
 re-renders only the matches that changed.
 
-## v1 scope
+## Scope
 
 Included: `createRouter`, `createRootRoute`, `createRoute`, `RouterProvider`,
 `Outlet`, `Link`, `Navigate`, `useRouter`, `useRouterState`, `useLocation`,
@@ -66,7 +66,8 @@ rendering** (`notFoundComponent`/`defaultNotFoundComponent`/`notFoundMode` — a
 unknown URL or a loader throwing `notFound()` renders the not-found UI inside the
 layout, per TanStack's fuzzy/root boundary rules), plus the full
 `@tanstack/router-core` re-export (`redirect`, `notFound`, history, search helpers,
-types).
+types). The typed route factories, route-bound hooks, and `Link` surface preserve
+TanStack Router's registered-route inference.
 
 The 2026-07-06 gap-closure sweep (see `docs/tanstack-parity-audit.md`) additionally
 landed the full Match pipeline (per-route Suspense/CatchBoundary/CatchNotFound,
@@ -77,6 +78,21 @@ pending/error/redirected/notFound statuses), router lifecycle events, `useBlocke
 validation/middleware, and full `Link` parity (preloading, masking,
 `activeProps`/`inactiveProps`) — differential-verified byte-equal against the real
 `@tanstack/react-router`.
+
+File routing is supported through `createFileRoute` and `createLazyFileRoute`.
+`@octanejs/tanstack-start` consumes the exported
+`@octanejs/tanstack-router/generator-plugin` from its package-owned generator; the
+integration masks native `.tsrx` template bodies without changing source offsets,
+so generated route-tree edits preserve authored Octane route modules.
+
+The `@octanejs/tanstack-router/ssr/server` and `/ssr/client` entries provide
+`RouterServer`, `RouterClient`, buffered rendering, and readable-stream rendering.
+Route-owned `Html`/`Head`/`Body`, `HeadContent`, `Scripts`, and `ScriptOnce` preserve
+full-document SSR, head assets, and hydration. Streaming uses Octane's native
+injection source, so the document begins with a doctype, renderer styles are placed
+inside `<head>` with the configured CSP nonce, and serialized router data can stream
+without a byte-level HTML transform. These entries are the router foundation used
+by `@octanejs/tanstack-start`.
 
 ```tsx
 // streaming a deferred loader value
@@ -91,10 +107,6 @@ validation/middleware, and full `Link` parity (preloading, masking,
 createRoute({ path: 'item/$id', component: lazyRouteComponent(() => import('./Item')) })
 ```
 
-Deferred: file-based routing + the codegen plugin, devtools, the SSR entries
-(`RouterServer`/`RouterClient`, `HeadContent`/`Scripts`), and the typed public
-surface (factories/hooks are still `any`).
-
 Current scope, divergences, and verification status are tracked in the generated
 [bindings status table](../../docs/bindings-status.md) (sourced from this
 package's `status.json`).
@@ -103,5 +115,6 @@ package's `status.json`).
 
 - **Refs are props** (octane's model) — `createLink`'s `forwardRef` becomes a `ref`
   prop.
-- **No `flushSync`** in the `Link` click handler (the one hard `react-dom`
-  coupling) — navigation state updates run synchronously in v1.
+- **Native DOM events** — link callbacks receive browser events rather than React
+  synthetic events.
+- Router devtools are distributed separately and are not part of this binding.

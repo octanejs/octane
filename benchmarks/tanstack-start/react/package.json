@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "React flavor of the Start benchmark app — pinned to the same TanStack release family as the vendored Octane flavor.",
+  "description": "React flavor of the Start benchmark app — pinned to the corresponding TanStack release family for the Octane flavor.",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",

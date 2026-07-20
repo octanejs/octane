@@ -1,5 +1,11 @@
 # TanStack Parity Audit — `@octanejs/tanstack-router` & `@octanejs/tanstack-query`
 
+> **2026-07-20 update:** the Start integration closed the router gaps this
+> point-in-time audit identified for file routes/code generation, typed public
+> route APIs, and SSR document/head/streaming entries. The body below remains the
+> original 2026-07-06 evidence record; current scope is tracked in
+> `packages/tanstack-router/status.json` and the generated bindings status table.
+
 Audited 2026-07-06 against the installed upstream sources (npm ships `src/`, so this
 is a diff against real upstream code, not just `.d.ts`):
 

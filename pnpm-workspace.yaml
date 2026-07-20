@@ -1,7 +1,5 @@
 packages:
   - packages/*
-  # Vendored TanStack Start PR-branch packages (see packages/tanstack-start/README.md)
-  - packages/tanstack-start/vendor/*
   - benchmarks/news
   - benchmarks/news/*
   - benchmarks/js-framework
@@ -23,6 +21,9 @@ packages:
   - benchmarks/ssr-throughput/*
   - benchmarks/streaming-ssr
   - benchmarks/streaming-ssr/*
+  - benchmarks/ssr-http
+  - benchmarks/ssr-workerd
+  - benchmarks/ssr-workerd/*
   - benchmarks/codegen-size
   - benchmarks/bundle-size
   - benchmarks/three
@@ -38,6 +39,8 @@ packages:
   - benchmarks/chat-stream/*
   - benchmarks/tanstack-start
   - benchmarks/tanstack-start/*
+  - benchmarks/tanstack-com
+  - benchmarks/tanstack-com/*
   - playground/*
   - examples/*
   - website
@@ -159,7 +162,7 @@ catalogs:
     '@tanstack/react-store': ^0.11.0
     '@tanstack/react-table': 8.21.3
     '@tanstack/react-virtual': 3.14.5
-    '@tanstack/router-core': 1.171.13
+    '@tanstack/router-core': 1.171.15
     '@tanstack/store': ^0.9.3
     '@tanstack/table-core': 8.21.3
     '@tanstack/virtual-core': 3.17.3

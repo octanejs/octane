@@ -1,2 +1,11 @@
-export * from '@tanstack/octane-start/server-entry';
-export { default } from '@tanstack/octane-start/server-entry';
+import type { Register } from '@octanejs/tanstack-start';
+import type { RequestHandler } from './server.js';
+
+export type ServerEntry = {
+	fetch: RequestHandler<Register>;
+};
+
+export declare function createServerEntry(entry: ServerEntry): ServerEntry;
+
+declare const defaultEntry: ServerEntry;
+export default defaultEntry;

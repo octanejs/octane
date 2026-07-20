@@ -7,7 +7,7 @@
 // aria-hidden: it is a pointer toy, and everything it says is said in the copy.
 import { Hydrate } from 'octane';
 import { visible } from 'octane/hydration';
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 import { SpinStage } from './SpinStage.tsrx';
 
 export function Spin() @{
@@ -21,7 +21,9 @@ export function Spin() @{
 				<p
 					class="spin-lead"
 				>{'Octane supports Three.js through @octanejs/three – a technical-preview port of React Three Fiber.'}</p>
-				<Link to="/docs/bindings" class="spin-link">Browse all the bindings →</Link>
+				<Link to="/docs/$slug" params={{ slug: 'bindings' }} class="spin-link">
+					Browse all the bindings →
+				</Link>
 			</div>
 			<div class="spin-stage-cell" aria-hidden="true">
 				<Hydrate when={visible()}>

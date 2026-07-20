@@ -1,13 +1,9 @@
 node_modules
 dist
+dist-redact
 build
 .output
 *.tsbuildinfo
-# Vendored TanStack Start packages ship PREBUILT dist (consumed as-is, no build
-# step in this repo) — exempt them from the global dist ignore or installs from
-# a fresh clone (CI, Vercel) resolve into missing files.
-!packages/tanstack-start/vendor/**/dist
-!packages/tanstack-start/vendor/**/dist/**
 .DS_Store
 coverage
 .vite

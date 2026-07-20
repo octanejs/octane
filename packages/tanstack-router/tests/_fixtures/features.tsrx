@@ -33,6 +33,20 @@ function AwaitPage() @{
 	</div>
 }
 
+// Router-owned hydration promises may be frozen or expose hostile metadata
+// accessors. Await must not annotate or inspect those inputs directly.
+const frozenExternalPromise = Object.freeze(Promise.resolve('externally hydrated'));
+
+function ExternalAwaitPage() @{
+	<div class="external-await-page">
+		<Await promise={frozenExternalPromise} fallback="loading">
+			{(value) => <span class="external-await-resolved">
+				{value as string}
+			</span>}
+		</Await>
+	</div>
+}
+
 export function makeLazyRouter() {
 	const rootRoute = createRootRoute({ component: RootLayout });
 	const lazyRoute = createRoute({
@@ -52,6 +66,19 @@ export function makeAwaitRouter() {
 		getParentRoute: () => rootRoute,
 		path: '/',
 		component: AwaitPage,
+	});
+	return createRouter({
+		routeTree: rootRoute.addChildren([awaitRoute]),
+		history: createMemoryHistory({ initialEntries: ['/'] }),
+	});
+}
+
+export function makeExternalAwaitRouter() {
+	const rootRoute = createRootRoute({ component: RootLayout });
+	const awaitRoute = createRoute({
+		getParentRoute: () => rootRoute,
+		path: '/',
+		component: ExternalAwaitPage,
 	});
 	return createRouter({
 		routeTree: rootRoute.addChildren([awaitRoute]),

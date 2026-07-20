@@ -7,11 +7,13 @@
 // call sites).
 import { useSyncExternalStore } from 'octane';
 import type { OctaneNode } from 'octane';
+import { splitSlot, subSlot } from './internal.ts';
 
 const subscribe = () => () => {};
 
-export function useHydrated() {
-	return useSyncExternalStore(subscribe, () => true, () => false);
+export function useHydrated(...args: Array<unknown>) {
+	const [, slot] = splitSlot(args);
+	return useSyncExternalStore(subscribe, () => true, () => false, subSlot(slot, 'hydrated'));
 }
 
 export function ClientOnly(props: { children?: OctaneNode; fallback?: OctaneNode }) @{

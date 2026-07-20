@@ -1,47 +1,52 @@
-import { tanstackStart as vendoredTanstackStart } from '@tanstack/octane-start/plugin/vite';
+import { START_ENVIRONMENT_NAMES, tanStackStartVite } from '#tanstack-start/plugin-core/vite';
+import { octaneRouteGeneratorPlugin } from '@octanejs/tanstack-router/generator-plugin';
+import { octane } from 'octane/compiler/vite';
+import { octaneStartDefaultEntryPaths } from './default-entry-paths.js';
+import { validateOctaneCompilerOptions } from './validate-options.js';
 
-export * from '@tanstack/octane-start/plugin/vite';
-
-// The Start runtime chain must be SOURCE-served, never prebundled: the start
-// compiler strips server-only branches (createIsomorphicFn / createServerFn)
-// per environment, and prebundled dep chunks bypass plugin transforms — a
-// prebundle executes @tanstack/start-storage-context's server-only
-// `new AsyncLocalStorage()` in the browser. The vendored plugin already
-// excludes @tanstack/octane-start + @tanstack/octane-router; while those were
-// node_modules installs their nested deps were implicitly source-served too,
-// but as vendored workspace links (vendor/) imports crossing into the
-// registry-installed start-* core packages become eligible for runtime dep
-// discovery, so the binding excludes them for every consumer.
+// The Start runtime chain must be source-served. Its compiler removes
+// environment-specific branches; a prebundled dependency bypasses that
+// transform and can execute server-only storage code in the browser.
 const WORKSPACE_SOURCE_EXCLUDES = [
-	'@tanstack/octane-start-client',
+	'@octanejs/tanstack-start',
+	'@octanejs/tanstack-router',
 	'@tanstack/start-client-core',
 	'@tanstack/start-storage-context',
 	'@tanstack/start-fn-stubs',
+	'@tanstack/start-static-server-functions',
+	'octane',
 ];
 
-// The vendored octane-router is raw source (vite's scanner cannot parse
-// .tsrx), so its registry-dep subpath imports surface only at request time.
-// Any of them discovered AFTER the initial optimize pass triggers vite's
-// "optimized dependencies changed" full page reload mid-session — under a
-// hydrating page that reload races hydration. Pre-declare every registry
-// subpath the octane-router client surface reaches.
+// The router ships raw TSRX, so its registry subpath imports surface after
+// initial dependency discovery. Predeclare them to prevent a mid-hydration
+// optimized-dependency reload on a cold cache.
 const WORKSPACE_SOURCE_INCLUDES = [
-	'@tanstack/octane-router > @tanstack/router-core/isServer',
-	'@tanstack/octane-router > @tanstack/router-core/scroll-restoration-script',
+	'@octanejs/tanstack-router > @tanstack/router-core/isServer',
+	'@octanejs/tanstack-router > @tanstack/router-core/scroll-restoration-script',
 ];
 
 export function tanstackStart(options) {
+	const { octane: octaneOptions, ...startOptions } = options ?? {};
+	validateOctaneCompilerOptions(octaneOptions);
+
+	const corePluginOptions = {
+		framework: 'octane',
+		defaultEntryPaths: octaneStartDefaultEntryPaths,
+		providerEnvironmentName: START_ENVIRONMENT_NAMES.server,
+		ssrIsProvider: true,
+		ssrResolverStrategy: { type: 'default' },
+		routerGeneratorPlugins: [octaneRouteGeneratorPlugin()],
+	};
+
 	return [
-		vendoredTanstackStart(options),
+		octane(octaneOptions),
 		{
 			name: 'octanejs-tanstack-start:workspace-source-deps',
 			configEnvironment(environmentName, environmentOptions) {
-				// Mirror the vendored plugin's own exclude condition: the client
-				// environment always optimizes; the server environment only when
-				// discovery is explicitly enabled.
 				const applies =
-					environmentName === 'client' ||
-					(environmentName === 'ssr' && environmentOptions.optimizeDeps?.noDiscovery === false);
+					environmentName === START_ENVIRONMENT_NAMES.client ||
+					(environmentName === START_ENVIRONMENT_NAMES.server &&
+						environmentOptions.optimizeDeps?.noDiscovery === false);
 				return applies
 					? {
 							optimizeDeps: {
@@ -52,5 +57,6 @@ export function tanstackStart(options) {
 					: undefined;
 			},
 		},
+		tanStackStartVite(corePluginOptions, startOptions),
 	];
 }

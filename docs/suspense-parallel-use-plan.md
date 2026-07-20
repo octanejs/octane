@@ -135,6 +135,39 @@ What shipped, and where it deviates from the phases as written:
   true-dependency strata or siblings from refetching prior work. Client, SSR,
   production, and universal-renderer regressions pin distinct and repeated
   same-dependency siblings plus exactly-once creation.
+- **Prop-flow creations + uncached-recreation guard LANDED 2026-07-20.** The
+  React-trained "uncached promise" shape — per-request promises created in an
+  ancestor's render and passed down through props to descendant `use()` sites —
+  livelocked streaming SSR: every wave re-pass re-ran the ancestor, the fresh
+  instances could never resolve by identity (`resolvedT`), and `puBatch` threw
+  before the unwraps could record their stable string keys, so the render
+  burned MAX_SUSPENSE_PASSES and served only @pending fallbacks (on CPU-metered
+  hosts this presented as ~50 full render passes of billed CPU per request).
+  Two-layer fix:
+  - Server Pass A now also memoizes INLINE creations in component-prop
+    position (`<Kid p={make(x)}/>` → `p: _$puMemo(() => make(x), deps, slot)`),
+    deps-keyed like a use()-site memo. Inline-only by design: the value has no
+    other binding, so cross-pass caching cannot observe an escape or a
+    mutation. Warm plans print the SAME slot through the now value-returning
+    `warmMemo`, so the warm walk claims the render's creation (and vice versa)
+    instead of racing a second one — creation runs exactly once per request.
+    Hook-shaped calls and JSX-bearing expressions are excluded; @for/@switch
+    arms remain excluded (v1 rule).
+  - Shapes the compiler cannot see (locals flowing into props, spreads,
+    foreign bodies) hit a runtime livelock guard (`observeSuspenseWave`, wired
+    into the streaming wave, pre-shell root, and buffered loops — all off the
+    hot path): two consecutive no-progress cycles whose settled wave was
+    entirely batch-registered and whose next pass registers only fresh
+    identities — while `pu.created` didn't grow and no plain string key
+    recorded — cannot be a legitimate waterfall level, so batching is disabled
+    for the rest of the request. `puBatch` then keeps its status probes but
+    stops registering/suspending; the first unresolved `use()` suspends under
+    its stable frame-scoped string key and key replay completes the render
+    (degraded but correct — matching what un-batched `use()` always did for
+    per-pass creations). A dev-only console.error names the pattern; the
+    MAX-pass errors (retired 33/37 → 47/48) now hint at the cause. Pinned in
+    `tests/ssr-prop-flow-promises.test.ts` (streaming + prerender + bare-root,
+    exactly-once creation for the memoized shape).
 - **Decision points resolved:** (1) unconditional, with no serial-timing mode;
   (2) loops excluded — mandatory (Phase 0); (3) member-path deps; (4)
   AbortSignal not shipped; (5)

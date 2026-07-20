@@ -1,1 +1,1 @@
-export * from '@tanstack/octane-start/ssr-rpc';
+export { createSsrRpc } from '@tanstack/start-server-core/createSsrRpc';
