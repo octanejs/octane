@@ -5126,6 +5126,11 @@ export function compile(source, filename, options) {
 		})
 		.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
+	// No tail slots exist on the client today (prop memos are server-only), but
+	// flush before assembly so a future client-side tail site cannot trip the
+	// joinHoistedHelpers assertion — imports are built after this join, so the
+	// timing is safe here.
+	flushTailHookSymbols(ctx);
 	const helpers = joinHoistedHelpers(ctx);
 	const helpersBlock = helpers ? helpers + '\n\n' : '';
 
@@ -5424,6 +5429,9 @@ function compileServer(source, filename, options, styleRemap = null) {
 		}
 	}
 
+	// Assign deferred (server-only) slot ids BEFORE the import list is built:
+	// the flush may register `hookSlots` as a needed runtime import.
+	flushTailHookSymbols(ctx);
 	const runtimeImport = buildRuntimeImport(ctx, 'octane/server');
 	const joinedHelpers = joinHoistedHelpers(ctx);
 	const helpers = joinedHelpers ? joinedHelpers + '\n\n' : '';
@@ -10434,7 +10442,15 @@ function ensureHookSlotBase(ctx) {
 }
 
 function joinHoistedHelpers(ctx) {
-	flushTailHookSymbols(ctx);
+	if (ctx._pendingTailHookSlots !== undefined) {
+		// Flushing here would be too late for the server pipeline: its runtime
+		// import list is built BEFORE the helpers join, and a flush-time
+		// ensureHookSlotBase would register `hookSlots` after the imports were
+		// printed — the emitted module then references _$hookSlots without
+		// importing it (broke every prod module whose only slot sites were prop
+		// memos). Each pipeline flushes explicitly before assembling imports.
+		throw new Error('octane compiler: tail hook slots were not flushed before module assembly.');
+	}
 	return ctx.hoistedHelpers
 		.map((helper) => {
 			if (helper === HOOK_SLOT_BASE_HELPER) {

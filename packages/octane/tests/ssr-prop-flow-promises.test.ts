@@ -288,6 +288,27 @@ describe('streaming SSR — promises created in an ancestor, unwrapped via props
 		}
 	});
 
+	it('compiles and renders a module whose ONLY slot sites are prop memos', async () => {
+		// The website/example-app CI break: routes are split across modules, so
+		// a module can pass call-valued props while its consumers (use(), hooks)
+		// live elsewhere. Its prop memos are then the module's only slot sites —
+		// the emitted module must still import everything it references (the
+		// tail-slot flush once ran after the import list was built, emitting
+		// _$hookSlots without importing it; module init then threw and SSR
+		// served only the error fallback).
+		const ONLY_PROP_MEMO = `
+			export function Kid(props) @{
+				<i>{props.data as string}</i>
+			}
+			export function Page(p) @{
+				<main><Kid data={p.load('x')} /></main>
+			}
+		`;
+		const mod = evalServer(ONLY_PROP_MEMO, 'prop-memo-only.tsrx');
+		const out = await prerender(mod.Page, { load: (id: string) => 'v-' + id });
+		expect(out.html).toContain('<i>v-x</i>');
+	});
+
 	it('prerender completes the recreated-promise shape', async () => {
 		const mod = evalServer(LOCAL_PROP_FLOW, 'prop-flow-local.tsrx');
 		const { makeCards } = timedCardsFactory();
