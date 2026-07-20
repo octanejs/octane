@@ -9,37 +9,95 @@ import { websiteMdxOptions } from './mdx-options.ts';
 // The playground executes user code in a sandboxed iframe with an OPAQUE
 // origin (src/lib/playground-sandbox.ts). That iframe can't import the site's
 // bundled octane (blob URLs are origin-bound and cross-origin module fetches
-// need CORS), so the parent hands it the runtime as TEXT — which requires a
-// SELF-CONTAINED single-file ESM bundle of the octane client runtime. This
-// plugin builds one with esbuild: served on demand in dev, emitted as a
-// stable-named client asset in the production build.
+// need CORS), so the parent hands it the runtime as TEXT and the iframe turns
+// it into blob modules on its own side of the boundary.
+//
+// The runtime ships as a JSON MANIFEST of esbuild code-split chunks rather
+// than one file: `octane` and `octane/react` are separate entries sharing the
+// octane core through common chunks (bundling `octane/react` standalone would
+// duplicate the core — two runtimes, broken hook/context singletons). React
+// itself stays EXTERNAL: the sandbox's import map resolves the react family to
+// esm.sh, so react is only ever fetched when user code actually imports
+// `octane/react` — pure-octane sessions never touch the network.
 function playgroundRuntime(): Plugin {
-	const RUNTIME_PATH = '/playground-runtime.mjs'; // = RUNTIME_MODULE_PATH in playground-sandbox.ts
+	const MANIFEST_PATH = '/playground-runtime.json'; // = RUNTIME_MANIFEST_PATH in playground-sandbox.ts
 
 	async function bundle(): Promise<string> {
 		const esbuild = await import('esbuild');
-		// Workspace link: website/node_modules/octane → packages/octane, whose
-		// exports map points "." at src/index.ts (raw TS — esbuild handles it).
-		const entry = createRequire(import.meta.url).resolve('octane');
+		const require = createRequire(import.meta.url);
 		const out = await esbuild.build({
-			entryPoints: [entry],
+			// Workspace link: website/node_modules/octane → packages/octane, whose
+			// exports map points entries at raw TS sources — esbuild handles them.
+			entryPoints: {
+				octane: require.resolve('octane'),
+				'octane-react': require.resolve('octane/react'),
+			},
 			bundle: true,
+			splitting: true,
 			format: 'esm',
 			minify: true,
 			write: false,
+			outdir: 'playground-runtime',
+			entryNames: '[name]',
+			chunkNames: 'chunk-[hash]',
+			outExtension: { '.js': '.mjs' },
+			external: [
+				'react',
+				'react-dom',
+				'react-dom/client',
+				'react/jsx-runtime',
+				'react/jsx-dev-runtime',
+			],
 			define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 		});
-		return out.outputFiles[0].text;
+
+		const files: Record<string, string> = {};
+		for (const file of out.outputFiles) {
+			files[file.path.replace(/^.*[/\\]/, '')] = file.text;
+		}
+
+		// The sandbox creates a blob URL per file and splices it into the files
+		// that import it, so files must arrive dependencies-first. Topo-sort the
+		// chunk graph (esbuild inter-chunk specifiers are exactly `./<name>.mjs`).
+		const deps = new Map<string, string[]>();
+		for (const [name, code] of Object.entries(files)) {
+			const imported: string[] = [];
+			for (const match of code.matchAll(/(["'])\.\/([\w.-]+\.mjs)\1/g)) {
+				if (files[match[2]] && !imported.includes(match[2])) imported.push(match[2]);
+			}
+			deps.set(name, imported);
+		}
+		const order: string[] = [];
+		const state = new Map<string, 'visiting' | 'done'>();
+		const visit = (name: string, chain: string[]) => {
+			if (state.get(name) === 'done') return;
+			if (state.get(name) === 'visiting') {
+				throw new Error(
+					`playground runtime chunks import each other cyclically (${[...chain, name].join(' → ')}) — the sandbox's dependencies-first blob ordering cannot represent that`,
+				);
+			}
+			state.set(name, 'visiting');
+			for (const dep of deps.get(name) ?? []) visit(dep, [...chain, name]);
+			state.set(name, 'done');
+			order.push(name);
+		};
+		for (const name of deps.keys()) visit(name, []);
+
+		return JSON.stringify({
+			entries: { octane: 'octane.mjs', 'octane/react': 'octane-react.mjs' },
+			order,
+			files,
+		});
 	}
 
 	return {
 		name: 'octane-playground-runtime',
 		configureServer(server) {
-			server.middlewares.use(RUNTIME_PATH, (_req, res, next) => {
+			server.middlewares.use(MANIFEST_PATH, (_req, res, next) => {
 				// Rebuilt per request — esbuild bundles the runtime in ~15ms, and
 				// this way dev never serves a stale runtime after octane edits.
 				bundle().then((code) => {
-					res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+					res.setHeader('Content-Type', 'application/json; charset=utf-8');
 					res.end(code);
 				}, next);
 			});
@@ -48,7 +106,7 @@ function playgroundRuntime(): Plugin {
 			if (this.environment.name !== 'client') return;
 			this.emitFile({
 				type: 'asset',
-				fileName: RUNTIME_PATH.slice(1),
+				fileName: MANIFEST_PATH.slice(1),
 				source: await bundle(),
 			});
 		},
@@ -97,6 +155,15 @@ export default defineConfig({
 		}),
 	],
 
+	resolve: {
+		// @tsrx/prettier-plugin does `import { doc } from 'prettier'` — Node
+		// prettier's entry. In the browser the equivalent surface (incl. `doc`)
+		// lives in prettier/standalone, so anchor-alias exactly the bare
+		// specifier; `prettier/standalone` and `prettier/plugins/*` pass through
+		// untouched. Nothing else in website/ imports bare `prettier`.
+		alias: [{ find: /^prettier$/, replacement: 'prettier/standalone' }],
+	},
+
 	optimizeDeps: {
 		// Vite's dep scanner can't parse .tsrx, so dependencies reached only
 		// through raw workspace sources or dynamic route imports are pre-declared
@@ -113,6 +180,13 @@ export default defineConfig({
 			'@tsrx/core',
 			'esrap',
 			'esrap/languages/tsx',
+			// Playground module graph + formatter — also dynamic-import-only.
+			'es-module-lexer',
+			'sucrase',
+			'prettier/standalone',
+			'prettier/plugins/typescript',
+			'prettier/plugins/estree',
+			'@tsrx/prettier-plugin',
 			'octane > devalue',
 			'@tanstack/octane-router > @tanstack/history',
 			'@tanstack/octane-router > @tanstack/router-core',

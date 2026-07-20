@@ -7,9 +7,12 @@
  * Bundler adapters are responsible only for translating their own lifecycle and
  * watch APIs to this small surface.
  */
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+// Namespace imports of node builtins — same browser-evaluation contract as
+// vite.js: keep `octane/compiler`'s pure `compile` entry loadable in
+// browser dev servers, where these resolve to an externalized shim.
+import * as nodeFs from 'node:fs';
+import * as nodeModule from 'node:module';
+import * as nodePath from 'node:path';
 import { parseModule } from '@tsrx/core';
 import { compile, hasOnlyLowerableNullishExits, isVoidJsxCodeBlockFunction } from './compile.js';
 import {
@@ -80,8 +83,12 @@ export function cleanModuleId(id) {
 }
 
 function isPathInside(root, file) {
-	const relativeFile = relative(root, file);
-	return relativeFile !== '..' && !relativeFile.startsWith('..' + sep) && !isAbsolute(relativeFile);
+	const relativeFile = nodePath.relative(root, file);
+	return (
+		relativeFile !== '..' &&
+		!relativeFile.startsWith('..' + nodePath.sep) &&
+		!nodePath.isAbsolute(relativeFile)
+	);
 }
 
 function normalizeModulePath(file) {
@@ -96,9 +103,9 @@ function normalizeModulePath(file) {
  */
 export function canonicalModuleId(id, projectRoot) {
 	const file = cleanModuleId(id);
-	if (!projectRoot || !isAbsolute(file)) return normalizeModulePath(file);
-	const root = resolve(projectRoot);
-	const relativeFile = relative(root, file);
+	if (!projectRoot || !nodePath.isAbsolute(file)) return normalizeModulePath(file);
+	const root = nodePath.resolve(projectRoot);
+	const relativeFile = nodePath.relative(root, file);
 	if (!isPathInside(root, file)) return normalizeModulePath(file);
 	return '/' + normalizeModulePath(relativeFile);
 }
@@ -301,9 +308,9 @@ export function findVoidComponentExports(source, id) {
 
 class OctaneBundlerCompiler {
 	constructor(options) {
-		this.root = resolve(options.root ?? process.cwd());
+		this.root = nodePath.resolve(options.root ?? process.cwd());
 		try {
-			this.realRoot = realpathSync(this.root);
+			this.realRoot = nodeFs.realpathSync(this.root);
 		} catch {
 			this.realRoot = this.root;
 		}
@@ -354,7 +361,7 @@ class OctaneBundlerCompiler {
 			this.discoveryCache = null;
 			return;
 		}
-		const changed = resolve(cleanModuleId(path));
+		const changed = nodePath.resolve(cleanModuleId(path));
 		for (const [directory, entry] of this.manifestRuleCache) {
 			if (entry.dependencies.includes(changed) || entry.missingDependencies.includes(changed)) {
 				this.manifestRuleCache.delete(directory);
@@ -369,14 +376,14 @@ class OctaneBundlerCompiler {
 	}
 
 	_nearestOctanePackageRule(fileDir) {
-		const dir = resolve(fileDir);
+		const dir = nodePath.resolve(fileDir);
 		const cached = this.manifestRuleCache.get(dir);
 		if (cached !== undefined) return cached;
 
-		const manifest = join(dir, 'package.json');
+		const manifest = nodePath.join(dir, 'package.json');
 		let pkg = null;
 		try {
-			pkg = JSON.parse(readFileSync(manifest, 'utf8'));
+			pkg = JSON.parse(nodeFs.readFileSync(manifest, 'utf8'));
 		} catch {
 			// An absent/unreadable/invalid manifest does not own the file. Continue
 			// upward, while retaining the path as watch/cache metadata.
@@ -400,15 +407,15 @@ class OctaneBundlerCompiler {
 				...metadata([manifest]),
 			};
 		} else {
-			const parent = dirname(dir);
+			const parent = nodePath.dirname(dir);
 			const inherited =
 				parent === dir ? { rule: null, ...metadata() } : this._nearestOctanePackageRule(parent);
 			result = {
 				rule: inherited.rule,
-				dependencies: existsSync(manifest)
+				dependencies: nodeFs.existsSync(manifest)
 					? [manifest, ...inherited.dependencies]
 					: inherited.dependencies,
-				missingDependencies: existsSync(manifest)
+				missingDependencies: nodeFs.existsSync(manifest)
 					? inherited.missingDependencies
 					: [manifest, ...inherited.missingDependencies],
 			};
@@ -419,24 +426,27 @@ class OctaneBundlerCompiler {
 	}
 
 	_hasManualHookSlots(file, collected) {
-		const lookup = this._nearestOctanePackageRule(dirname(file));
+		const lookup = this._nearestOctanePackageRule(nodePath.dirname(file));
 		addMetadata(collected, lookup);
 		if (lookup.rule === null) return false;
-		const relativeFile = relative(lookup.rule.root, file);
+		const relativeFile = nodePath.relative(lookup.rule.root, file);
 		return lookup.rule.dirs.some((directory) => {
 			const relativeDirectory = directory
 				.replace(/[\\/]+$/, '')
 				.split(/[\\/]/)
-				.join(sep);
+				.join(nodePath.sep);
 			return (
 				relativeDirectory !== '' &&
-				(relativeFile === relativeDirectory || relativeFile.startsWith(relativeDirectory + sep))
+				(relativeFile === relativeDirectory ||
+					relativeFile.startsWith(relativeDirectory + nodePath.sep))
 			);
 		});
 	}
 
 	_isProjectOwnedSource(file) {
-		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
+		const absoluteFile = nodePath.isAbsolute(file)
+			? nodePath.resolve(file)
+			: nodePath.resolve(this.root, file);
 		if (/(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile)) return false;
 		return isPathInside(this.root, absoluteFile) || isPathInside(this.realRoot, absoluteFile);
 	}
@@ -447,8 +457,10 @@ class OctaneBundlerCompiler {
 		// external files must make the same manifest-declared Octane decision as an
 		// installed package instead of being mistaken for application source.
 		if (this._isProjectOwnedSource(file)) return true;
-		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
-		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
+		const absoluteFile = nodePath.isAbsolute(file)
+			? nodePath.resolve(file)
+			: nodePath.resolve(this.root, file);
+		const lookup = this._nearestOctanePackageRule(nodePath.dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		return lookup.rule?.usesOctane === true;
 	}
@@ -553,7 +565,9 @@ class OctaneBundlerCompiler {
 	}
 
 	_profileModuleId(file, collected) {
-		const absoluteFile = isAbsolute(file) ? resolve(file) : resolve(this.root, file);
+		const absoluteFile = nodePath.isAbsolute(file)
+			? nodePath.resolve(file)
+			: nodePath.resolve(this.root, file);
 		const isInstalledPath = /(?:^|[\\/])node_modules(?:[\\/]|$)/.test(absoluteFile);
 		let containingRoot = null;
 		if (!isInstalledPath) {
@@ -565,17 +579,17 @@ class OctaneBundlerCompiler {
 		// Linked and installed source packages need an ID portable across package
 		// managers and machines. Their nearest package manifest supplies both the
 		// public package name and the package-relative source path.
-		const lookup = this._nearestOctanePackageRule(dirname(absoluteFile));
+		const lookup = this._nearestOctanePackageRule(nodePath.dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		if (lookup.rule?.name) {
-			const packagePath = normalizeModulePath(relative(lookup.rule.root, absoluteFile));
+			const packagePath = normalizeModulePath(nodePath.relative(lookup.rule.root, absoluteFile));
 			return `/@package/${encodeURIComponent(lookup.rule.name)}/${packagePath}`;
 		}
 
 		// Never embed an arbitrary absolute host path in profiling metadata. The
 		// basename fallback may collide, but remains useful and deliberately makes
 		// that limitation visible through the reserved external namespace.
-		return `/@external/${basename(absoluteFile)}`;
+		return `/@external/${nodePath.basename(absoluteFile)}`;
 	}
 
 	/**
@@ -617,13 +631,13 @@ class OctaneBundlerCompiler {
 		let projectManifest = null;
 		let candidateRoot = this.root;
 		for (;;) {
-			const candidate = join(candidateRoot, 'package.json');
-			if (existsSync(candidate)) {
+			const candidate = nodePath.join(candidateRoot, 'package.json');
+			if (nodeFs.existsSync(candidate)) {
 				collected.dependencies.add(candidate);
 				projectManifestPath = candidate;
 				projectManifestRoot = candidateRoot;
 				try {
-					projectManifest = JSON.parse(readFileSync(candidate, 'utf8'));
+					projectManifest = JSON.parse(nodeFs.readFileSync(candidate, 'utf8'));
 				} catch {
 					// The nearest manifest owns this root even when it is temporarily
 					// unreadable or invalid. Do not silently inherit a parent package.
@@ -631,7 +645,7 @@ class OctaneBundlerCompiler {
 				break;
 			}
 			collected.missingDependencies.add(candidate);
-			const parent = dirname(candidateRoot);
+			const parent = nodePath.dirname(candidateRoot);
 			if (parent === candidateRoot) break;
 			candidateRoot = parent;
 		}
@@ -653,10 +667,10 @@ class OctaneBundlerCompiler {
 		const viteOptimizeDepsCandidates = new Set(dependencyNames);
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
-			const packageRequire = createRequire(join(issuerRoot, 'package.json'));
+			const packageRequire = nodeModule.createRequire(nodePath.join(issuerRoot, 'package.json'));
 			try {
 				const entry = packageRequire.resolve(name);
-				const lookup = this._nearestOctanePackageRule(dirname(entry));
+				const lookup = this._nearestOctanePackageRule(nodePath.dirname(entry));
 				addMetadata(collected, lookup);
 				if (!lookup.rule?.usesOctane) return;
 				sourceDependencies.add(name);
@@ -668,7 +682,7 @@ class OctaneBundlerCompiler {
 				}
 				let packageRoot = lookup.rule.root;
 				try {
-					packageRoot = realpathSync(packageRoot);
+					packageRoot = nodeFs.realpathSync(packageRoot);
 				} catch {
 					// Keep the resolved/symlink path as the cycle key.
 				}
@@ -682,12 +696,12 @@ class OctaneBundlerCompiler {
 				// satisfy a nested raw-source dependency by hoisting it to the project
 				// root. Any candidate's creation can therefore make this request
 				// resolvable and must invalidate a cached miss.
-				let candidateRoot = resolve(issuerRoot);
+				let candidateRoot = nodePath.resolve(issuerRoot);
 				for (;;) {
 					collected.missingDependencies.add(
-						join(candidateRoot, 'node_modules', name, 'package.json'),
+						nodePath.join(candidateRoot, 'node_modules', name, 'package.json'),
 					);
-					const parent = dirname(candidateRoot);
+					const parent = nodePath.dirname(candidateRoot);
 					if (parent === candidateRoot) break;
 					candidateRoot = parent;
 				}
@@ -713,7 +727,11 @@ class OctaneBundlerCompiler {
 
 	_canonicalModuleId(id) {
 		const file = cleanModuleId(id);
-		if (isAbsolute(file) && !isPathInside(this.root, file) && isPathInside(this.realRoot, file)) {
+		if (
+			nodePath.isAbsolute(file) &&
+			!isPathInside(this.root, file) &&
+			isPathInside(this.realRoot, file)
+		) {
 			return canonicalModuleId(file, this.realRoot);
 		}
 		return canonicalModuleId(file, this.root);
@@ -740,7 +758,10 @@ class OctaneBundlerCompiler {
 		if (file.endsWith('.tsrx')) return true;
 		let code;
 		try {
-			code = readFileSync(isAbsolute(file) ? resolve(file) : resolve(this.root, file), 'utf8');
+			code = nodeFs.readFileSync(
+				nodePath.isAbsolute(file) ? nodePath.resolve(file) : nodePath.resolve(this.root, file),
+				'utf8',
+			);
 		} catch {
 			return false;
 		}
