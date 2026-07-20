@@ -278,7 +278,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 					cleanDistPath: true,
 					dataUriLimit: 0,
 					distPath: { root: outputRoot },
-					filenameHash: false,
+					filename: { js: '[name].[contenthash:6].js' },
 					sourceMap: { css: true, js: 'source-map' },
 				},
 				source: { entry: { main: './src/background.ts' } },
@@ -372,7 +372,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 					expect.objectContaining({ kind: 'main-thread' }),
 					expect.objectContaining({
 						kind: 'background',
-						path: '.rspeedy/main/background.js',
+						path: expect.stringMatching(/^\.rspeedy\/main\/background\.[A-Fa-f0-9]{6}\.js$/),
 					}),
 					expect.objectContaining({ kind: 'css' }),
 				]),

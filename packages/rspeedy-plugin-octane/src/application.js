@@ -15,6 +15,8 @@ import { LYNX_BACKGROUND_LAYER, LYNX_MAIN_THREAD_LAYER } from './layers.js';
 const PLUGIN_NAME = '@octanejs/rspeedy-plugin';
 const DEFAULT_BUNDLE_FILENAME = '[name].[platform].bundle';
 const DEFAULT_FILENAME_HASH = '.[contenthash:8]';
+const TRAILING_FILENAME_HASHES =
+	/((?:\.\[(?:fullhash|chunkhash|contenthash|hash)(?::[^\]]+)?\])+)$/;
 const MAIN_THREAD_SUFFIX = '__octane_main_thread';
 const MAIN_THREAD_ASSET = /main-thread(?:\.[A-Fa-f0-9]+)?\.js$/;
 const ENTRY_METADATA_KEYS = new Set([
@@ -193,10 +195,14 @@ function filenameHash(config, isProd) {
 
 function resolveBackgroundFilename(entryName, config, isProd) {
 	const configured = config?.output?.filename?.js;
-	const asBackgroundFilename = (filename) =>
-		filename.endsWith('.js')
-			? `${filename.slice(0, -3)}/background.js`
-			: `${filename}/background.js`;
+	const asBackgroundFilename = (filename) => {
+		if (!filename.endsWith('.js')) return `${filename}/background.js`;
+		const stem = filename.slice(0, -3);
+		const hashSuffix = stem.match(TRAILING_FILENAME_HASHES)?.[1];
+		return hashSuffix === undefined
+			? `${stem}/background.js`
+			: posix.join(stem.slice(0, -hashSuffix.length), `background${hashSuffix}.js`);
+	};
 	if (typeof configured === 'string') {
 		return asBackgroundFilename(configured.replaceAll('[name]', entryName));
 	}

@@ -429,13 +429,44 @@ describe('@octanejs/rspeedy-plugin', () => {
 		);
 	});
 
-	it('preserves a functional JavaScript filename policy for the background layout', () => {
-		const state = applyPlugin(
+	it('preserves JavaScript filename policies for the background layout', () => {
+		const functional = applyPlugin(
 			undefined,
 			'lynx',
 			{
 				environment: {
-					config: { output: { filename: { js: () => 'assets/custom.js' } } },
+					config: {
+						output: {
+							filename: {
+								js: (pathData: { hashed?: boolean }) =>
+									pathData.hashed ? 'assets/custom.[fullhash:7].js' : 'assets/custom.js',
+							},
+						},
+					},
+				},
+				isDev: false,
+				isProd: true,
+			},
+			{ app: ['./src/App.tsrx'] },
+		);
+		const string = applyPlugin(
+			undefined,
+			'lynx',
+			{
+				environment: {
+					config: { output: { filename: { js: 'assets/[name].[contenthash:6].js' } } },
+				},
+				isDev: false,
+				isProd: true,
+			},
+			{ app: ['./src/App.tsrx'] },
+		);
+		const explicitNoHash = applyPlugin(
+			undefined,
+			'lynx',
+			{
+				environment: {
+					config: { output: { filename: { js: '[name].js' }, filenameHash: true } },
 				},
 				isDev: false,
 				isProd: true,
@@ -443,12 +474,23 @@ describe('@octanejs/rspeedy-plugin', () => {
 			{ app: ['./src/App.tsrx'] },
 		);
 		const filename = (
-			state.entries.get('app')?.at(-1) as {
+			functional.entries.get('app')?.at(-1) as {
 				filename: (pathData: unknown, assetInfo: unknown) => string;
 			}
 		).filename;
 
 		expect(filename({}, {})).toBe('.rspeedy/assets/custom/background.js');
+		expect(filename({ hashed: true }, {})).toBe(
+			'.rspeedy/assets/custom/background.[fullhash:7].js',
+		);
+		expect(string.entries.get('app')?.at(-1)).toEqual(
+			expect.objectContaining({
+				filename: '.rspeedy/assets/app/background.[contenthash:6].js',
+			}),
+		);
+		expect(explicitNoHash.entries.get('app')?.at(-1)).toEqual(
+			expect.objectContaining({ filename: '.rspeedy/app/background.js' }),
+		);
 	});
 
 	it('rejects an authored entry that collides with its generated receiver', () => {
