@@ -134,6 +134,10 @@ export function Header() @{
 			.topnav-inner :global(.wordmark-img) {
 				display: inline-flex;
 				color: var(--text);
+				/* Intent preloading can refresh the inline SVG while a pointer is
+				   pressed. Keep the stable anchor as the hit target so that refresh
+				   cannot cancel the browser's eventual click. */
+				pointer-events: none;
 			}
 			.topnav-inner :global(.wordmark-img svg) {
 				height: 32px;
