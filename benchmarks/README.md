@@ -41,9 +41,11 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 
 Some suites need no preview servers: **news** vite-builds and times each target
 itself (the runner loops its per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, and **lynx-list** are Node-only, and
-**codegen-size** / **bundle-size** / **three-bundle-size** are deterministic
-build/byte checks.
+**ssr-throughput**, **streaming-ssr**, and **lynx-list** are Node-only,
+**ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
+servers per sample — that spawn/listen/first-byte cycle IS the measurement —
+and **codegen-size** / **bundle-size** / **three-bundle-size** are
+deterministic build/byte checks.
 
 ## Regression modes
 
@@ -175,6 +177,9 @@ internally, get their own baseline and guard namespace.
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |
 | `ssr-throughput` | ssr-throughput | none (Node-only) | comparative news SSR + Octane-only stress fixtures |
 | `streaming-ssr` | streaming-ssr | none (Node-only) | streaming targets incl. Preact; Svelte N/A |
+| `ssr-http` | ssr-http | none (boots its own node:http hosts) | raw streaming API over real HTTP: fresh-process import cost, cold spawn→listen→first-byte, warm shell/total/throughput (octane vs React Fizz, streaming-ssr fixtures) |
+| `ssr-workerd` | ssr-workerd | none (boots workerd via miniflare) | streaming SSR inside the real Cloudflare Workers runtime: cold isolate→first-byte, warm shell/total, worker-script bytes (octane vs Fizz edge, plus the vite-plugin + adapter-cloudflare deployment shape) |
+| `tanstack-start` | tanstack-start | none (boots its own production servers) | the real Start app pair, correctness-gated: cold TTFB + warm per-route TTFB/stream/throughput across react, octane-minimal, octane-nitro |
 | `dbmon-deopt` | dbmon | octane-tsrx + octane-deopt | tuned vs plain-.ts cliff |
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
