@@ -35,8 +35,15 @@ const MIME = {
 const server = createServer((req, res) => {
 	const pathname = decodeURIComponent(new URL(req.url, 'http://x').pathname);
 	if (pathname !== '/' && !pathname.includes('..')) {
+		// path.join keeps clientDir as the base even for '/'-prefixed pathnames
+		// (unlike path.resolve), and '..' is rejected post-decode above; the
+		// containment check below makes that invariant self-evident.
 		const file = path.join(clientDir, pathname);
-		if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+		const contained =
+			path.relative(clientDir, file) !== '' &&
+			!path.relative(clientDir, file).startsWith('..') &&
+			!path.isAbsolute(path.relative(clientDir, file));
+		if (contained && fs.existsSync(file) && fs.statSync(file).isFile()) {
 			res.statusCode = 200;
 			res.setHeader('Content-Type', MIME[path.extname(file)] ?? 'application/octet-stream');
 			fs.createReadStream(file).pipe(res);
