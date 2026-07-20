@@ -74,7 +74,10 @@ export function StoriesPage() {
 	});
 	const feed = feedForPath(pathname);
 	// The validated 1-based page from `?page=N` (defaults to 1).
-	const page = useSearch({ select: (s: { page?: number }) => s.page ?? 1 });
+	const page = useSearch({
+		strict: false,
+		select: (s: { page?: number }) => s.page ?? 1,
+	});
 
 	// The id list, cached per feed (won't re-suspend on a page change).
 	const { data: ids } = useSuspenseQuery(storiesQuery(feed));

@@ -2,7 +2,7 @@
 // and the ⌘K dialog wired through the real router.
 import { describe, it, expect, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, waitFor } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import { docs } from '../src/content/docs.ts';
 import { loadSearchIndex, searchDocs } from '../src/lib/docs-search.ts';

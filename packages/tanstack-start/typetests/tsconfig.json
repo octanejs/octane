@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@octanejs/tanstack-router": ["./__fixtures__/tanstack-router.d.ts"],
+      "@octanejs/tanstack-start": ["./__fixtures__/tanstack-start.d.ts"]
+    }
+  },
+  "include": ["./**/*.test.ts", "./__fixtures__/**/*.d.ts"]
+}

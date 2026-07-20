@@ -3,7 +3,7 @@
 // with "Failed to execute 'removeChild' on 'Node'" during teardown.
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, waitFor, cleanup, fireEvent } from '@octanejs/testing-library';
-import { RouterProvider, createMemoryHistory } from '@tanstack/octane-router';
+import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 
 afterEach(cleanup);

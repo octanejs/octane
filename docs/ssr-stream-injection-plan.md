@@ -4,7 +4,7 @@ Status: ALL PHASES IMPLEMENTED (2026-07-19) — `StreamOptions.injection`
 (`StreamInjectionSource`, incl. the `renderComplete()` completion hook) landed
 in `runtime.server.ts` (#169), followed by DOCUMENT MODE (auto
 `<!DOCTYPE html>`, leading styles + hoisted head folded into `<head>`, held
-tail) and the switch of `@octanejs/tanstack-start`'s vendored
+tail) and the switch of `@octanejs/tanstack-router`'s package-owned
 `renderRouterToStream` onto the native API — deleting its
 `transformStreamWithRouter` / `relocateLeadingOctaneStylesToHead` /
 `prependDoctype` usage and restoring out-of-order streaming for document
@@ -23,7 +23,7 @@ a doctype-less `<html>` as "almost certainly a bug in React",
 ReactDOMFizzServer-test.js:237 at canary b740af2), while the buffered
 renderers stay doctype-free, verified against react-dom 19.2.7. Remaining
 follow-up: upstream the native-path `renderRouterToStream` to TanStack.
-Requested by: TanStack team feedback via the `@tanstack/octane-start` integration
+Requested by: TanStack team feedback via the Octane TanStack Start integration
 (2026-07-18).
 
 ## The ask
@@ -60,7 +60,7 @@ transform that:
    finished (`onSerializationFinished`), then emits leftover + pending scripts
    + the held tail. Serialization/lifetime timeouts guard the wait.
 
-On top of that, `@tanstack/octane-router/ssr/renderRouterToStream.ts` runs two
+On top of that, the Octane router's `ssr/renderRouterToStream.ts` runs two
 MORE text-level transforms working around missing octane hooks:
 
 - `relocateLeadingOctaneStylesToHead` — octane emits renderer-owned scoped
@@ -151,7 +151,7 @@ Renderer contract:
 - **Doctype**: emit `<!DOCTYPE html>` automatically when the root element is
   `<html>` (React Fizz parity).
 
-With those, `@tanstack/octane-start`'s stream path reduces to: render with
+With those, `@octanejs/tanstack-router`'s stream path reduces to: render with
 `injection` wired to `serverSsr` (push on `onInjectedHtml`, resolve `done` on
 `onSerializationFinished`, keep their barrier/timeout policy upstream of the
 source), and the entire `transformStreamWithRouter` +

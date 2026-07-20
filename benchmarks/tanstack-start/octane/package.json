@@ -3,19 +3,18 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Octane flavor of the Start benchmark app — the repo's vendored @tanstack/octane-* packages on the native stream-injection path.",
+  "description": "Octane flavor of the Start benchmark app — the repository's @octanejs/tanstack-start package on the native stream-injection path.",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "build:minimal": "vite build --config vite.config.minimal.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
     "start": "node .output/server/index.mjs",
     "start:minimal": "node serve.mjs"
   },
   "dependencies": {
+    "@octanejs/tanstack-router": "workspace:*",
     "@octanejs/tanstack-start": "workspace:*",
-    "@tanstack/octane-router": "workspace:*",
-    "@tanstack/octane-start": "workspace:*",
     "octane": "workspace:*",
     "srvx": "^0.11.22"
   },

@@ -1338,6 +1338,49 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'tanstack-start',
+					include: ['packages/tanstack-start/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/tanstack-start\/plugin\/vite$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-start/src/plugin-vite.js',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-start\/(client|server)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-start/src/$1.js'),
+						},
+						{
+							find: /^@octanejs\/tanstack-start$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-start/src/index.js'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router\/generator-plugin$/,
+							replacement: resolve(
+								import.meta.dirname,
+								'packages/tanstack-router/src/generator-plugin.js',
+							),
+						},
+						{
+							find: /^@octanejs\/tanstack-router$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/tanstack-router\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/tanstack-router/src') + '/$1',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'motion',
 					include: ['packages/motion/tests/**/*.test.ts'],
 					environment: 'jsdom',
@@ -1962,7 +2005,7 @@ export default defineConfig({
 					fileParallelism: false,
 				},
 				// Unit tests compile MDX and TSRX directly. Production SSR, hydration,
-				// routing, and deployment are owned by @tanstack/octane-start; the
+				// routing, and deployment are owned by @octanejs/tanstack-start; the
 				// official router and Octane runtime resolve through website/node_modules.
 				plugins: [octaneMdx(websiteMdxOptions), octane()],
 			},

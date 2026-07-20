@@ -14,6 +14,33 @@ import { replaceEqualDeep } from '@tanstack/router-core';
 import { useRouter, matchContext } from './context';
 import { useStore } from './useStore';
 import { splitSlot, subSlot } from './internal';
+import type {
+	AnyRouter,
+	FromPathOption,
+	RegisteredRouter,
+	ThrowConstraint,
+	ThrowOrOptional,
+	UseLoaderDataResult,
+	UseLoaderDepsResult,
+	UseNavigateResult,
+	UseParamsResult,
+	UseRouteContextOptions,
+	UseRouteContextResult,
+	UseSearchResult,
+} from '@tanstack/router-core';
+import type {
+	UseLoaderDataOptions,
+	UseLoaderDepsOptions,
+	UseLocationBaseOptions,
+	UseLocationResult,
+	UseMatchOptions,
+	UseMatchResult,
+	UseMatchesBaseOptions,
+	UseMatchesResult,
+	UseParamsOptions,
+	UseSearchOptions,
+} from './routeHookTypes';
+import type { StructuralSharingOption } from './structuralSharing';
 
 // Sentinel store + selection for "no match at this id" (upstream's dummyStore).
 const dummyStore = {
@@ -37,6 +64,24 @@ function useStructuralSharing(opts: any, router: any, slot: symbol | undefined) 
 	};
 }
 
+export function useMatch<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string | undefined = undefined,
+	TStrict extends boolean = true,
+	TThrow extends boolean = true,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts: UseMatchOptions<
+		TRouter,
+		TFrom,
+		TStrict,
+		ThrowConstraint<TStrict, TThrow>,
+		TSelected,
+		TStructuralSharing
+	>,
+): ThrowOrOptional<UseMatchResult<TRouter, TFrom, TStrict, TSelected>, TThrow>;
+export function useMatch(opts: any, slot: symbol | undefined): any;
 export function useMatch(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -67,6 +112,24 @@ export function useMatch(...args: any[]): any {
 	return undefined;
 }
 
+export function useParams<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string | undefined = undefined,
+	TStrict extends boolean = true,
+	TThrow extends boolean = true,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts: UseParamsOptions<
+		TRouter,
+		TFrom,
+		TStrict,
+		ThrowConstraint<TStrict, TThrow>,
+		TSelected,
+		TStructuralSharing
+	>,
+): ThrowOrOptional<UseParamsResult<TRouter, TFrom, TStrict, TSelected>, TThrow>;
+export function useParams(opts: any, slot: symbol | undefined): any;
 export function useParams(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -85,6 +148,24 @@ export function useParams(...args: any[]): any {
 	);
 }
 
+export function useSearch<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string | undefined = undefined,
+	TStrict extends boolean = true,
+	TThrow extends boolean = true,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts: UseSearchOptions<
+		TRouter,
+		TFrom,
+		TStrict,
+		ThrowConstraint<TStrict, TThrow>,
+		TSelected,
+		TStructuralSharing
+	>,
+): ThrowOrOptional<UseSearchResult<TRouter, TFrom, TStrict, TSelected>, TThrow>;
+export function useSearch(opts: any, slot: symbol | undefined): any;
 export function useSearch(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -100,6 +181,16 @@ export function useSearch(...args: any[]): any {
 	);
 }
 
+export function useLoaderData<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string | undefined = undefined,
+	TStrict extends boolean = true,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts: UseLoaderDataOptions<TRouter, TFrom, TStrict, TSelected, TStructuralSharing>,
+): UseLoaderDataResult<TRouter, TFrom, TStrict, TSelected>;
+export function useLoaderData(opts: any, slot: symbol | undefined): any;
 export function useLoaderData(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -114,6 +205,15 @@ export function useLoaderData(...args: any[]): any {
 	);
 }
 
+export function useLoaderDeps<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string | undefined = undefined,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts: UseLoaderDepsOptions<TRouter, TFrom, TSelected, TStructuralSharing>,
+): UseLoaderDepsResult<TRouter, TFrom, TSelected>;
+export function useLoaderDeps(opts: any, slot: symbol | undefined): any;
 export function useLoaderDeps(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -127,6 +227,15 @@ export function useLoaderDeps(...args: any[]): any {
 	);
 }
 
+export function useRouteContext<
+	TRouter extends AnyRouter = RegisteredRouter,
+	const TFrom extends string | undefined = undefined,
+	TStrict extends boolean = true,
+	TSelected = unknown,
+>(
+	opts: UseRouteContextOptions<TRouter, TFrom, TStrict, TSelected>,
+): UseRouteContextResult<TRouter, TFrom, TStrict, TSelected>;
+export function useRouteContext(opts: any, slot: symbol | undefined): any;
 export function useRouteContext(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -139,6 +248,15 @@ export function useRouteContext(...args: any[]): any {
 	);
 }
 
+export function useLocation<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts?: UseLocationBaseOptions<TRouter, TSelected, TStructuralSharing> &
+		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+): UseLocationResult<TRouter, TSelected>;
+export function useLocation(opts: any, slot: symbol | undefined): any;
 export function useLocation(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -151,6 +269,15 @@ export function useLocation(...args: any[]): any {
 	);
 }
 
+export function useMatches<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts?: UseMatchesBaseOptions<TRouter, TSelected, TStructuralSharing> &
+		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+): UseMatchesResult<TRouter, TSelected>;
+export function useMatches(opts: any, slot: symbol | undefined): any;
 export function useMatches(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -163,6 +290,15 @@ export function useMatches(...args: any[]): any {
 	);
 }
 
+export function useParentMatches<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts?: UseMatchesBaseOptions<TRouter, TSelected, TStructuralSharing> &
+		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+): UseMatchesResult<TRouter, TSelected>;
+export function useParentMatches(opts: any, slot: symbol | undefined): any;
 export function useParentMatches(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -182,6 +318,15 @@ export function useParentMatches(...args: any[]): any {
 	);
 }
 
+export function useChildMatches<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TSelected = unknown,
+	TStructuralSharing extends boolean = boolean,
+>(
+	opts?: UseMatchesBaseOptions<TRouter, TSelected, TStructuralSharing> &
+		StructuralSharingOption<TRouter, TSelected, TStructuralSharing>,
+): UseMatchesResult<TRouter, TSelected>;
+export function useChildMatches(opts: any, slot: symbol | undefined): any;
 export function useChildMatches(...args: any[]): any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -200,6 +345,11 @@ export function useChildMatches(...args: any[]): any {
 
 // Returns a STABLE navigate function (upstream useCallback([from, router])) that
 // forwards to `router.navigate`, defaulting `from` to the hook's option.
+export function useNavigate<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TDefaultFrom extends string = string,
+>(options?: { from?: FromPathOption<TRouter, TDefaultFrom> }): UseNavigateResult<TDefaultFrom>;
+export function useNavigate(options: any, slot: symbol | undefined): (to: any) => any;
 export function useNavigate(...args: any[]): (to: any) => any {
 	const [user, slot] = splitSlot(args);
 	const opts = user[0] ?? {};
@@ -213,6 +363,7 @@ export function useNavigate(...args: any[]): (to: any) => any {
 
 // True when the current history entry isn't the first (there is somewhere to go
 // back to) — per upstream useCanGoBack (location.state.__TSR_index !== 0).
+export function useCanGoBack(): boolean;
 export function useCanGoBack(...args: any[]): boolean {
 	const [, slot] = splitSlot(args);
 	const router = useRouter();

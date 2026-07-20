@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from '../_helpers';
 import { RouterProvider } from '@octanejs/tanstack-router';
-import { makeLazyRouter, makeAwaitRouter, makeScrollRouter } from '../_fixtures/features.tsrx';
+import {
+	makeLazyRouter,
+	makeAwaitRouter,
+	makeExternalAwaitRouter,
+	makeScrollRouter,
+} from '../_fixtures/features.tsrx';
 
 async function flush() {
 	for (let i = 0; i < 6; i++) {
@@ -32,6 +37,19 @@ describe('@octanejs/tanstack-router — lazy routes / Await / scroll restoration
 		// suspended then resumed (and that render-prop children compile)
 		expect(r.findAll('.await-resolved').length).toBe(1);
 		expect(r.find('.await-resolved').textContent).toBe('streamed');
+		r.unmount();
+	});
+
+	// Per TanStack/router PR #7847 snapshot 753f919e,
+	// packages/octane-router/src/externalHydration.ts.
+	it('Await: treats a frozen router-owned promise as externally hydrated', async () => {
+		const router = makeExternalAwaitRouter();
+		await router.load();
+		const r = mount(RouterProvider as any, { router });
+		await flush();
+
+		expect(r.findAll('.external-await-resolved').length).toBe(1);
+		expect(r.find('.external-await-resolved').textContent).toBe('externally hydrated');
 		r.unmount();
 	});
 

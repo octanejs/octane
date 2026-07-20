@@ -1,10 +1,23 @@
-import type { tanstackStart as vendoredTanstackStart } from '@tanstack/octane-start/plugin/vite';
+import type { TanStackStartViteInputConfig } from '#tanstack-start/plugin-core/vite';
+import type {
+	OctaneRendererBoundaryOptions,
+	OctaneRendererConfigOptions,
+	OctaneRendererRegistryEntry,
+	OctaneRendererRuleOptions,
+	OctaneVitePluginOptions,
+} from 'octane/compiler/vite';
+import type { PluginOption } from 'vite';
 
-export * from '@tanstack/octane-start/plugin/vite';
+export type OctaneRendererDescriptor = Exclude<OctaneRendererRegistryEntry, string>;
+export type OctaneRendererBoundary = OctaneRendererBoundaryOptions;
+export type OctaneRendererRule = OctaneRendererRuleOptions;
+export type OctaneRendererConfig = OctaneRendererConfigOptions;
+export type OctaneCompilerOptions = Omit<OctaneVitePluginOptions, 'ssr'>;
 
-/**
- * The vendored `tanstackStart()` plus the binding's workspace-source
- * optimizeDeps excludes (see plugin-vite.js). Same signature and plugin
- * array shape as upstream.
- */
-export declare const tanstackStart: typeof vendoredTanstackStart;
+export type TanStackOctaneStartViteInputConfig = TanStackStartViteInputConfig & {
+	octane?: OctaneCompilerOptions;
+};
+
+export declare function tanstackStart(
+	options?: TanStackOctaneStartViteInputConfig,
+): Array<PluginOption>;

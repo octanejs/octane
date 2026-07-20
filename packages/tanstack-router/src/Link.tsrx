@@ -10,13 +10,25 @@
 // drops the anchor's disabled attribute; the aria props carry the state).
 import { isChildrenBlock } from 'octane';
 import { useLinkProps } from './link.ts';
+import type { AnyRouter, RegisteredRouter } from '@tanstack/router-core';
+import type { LinkComponentProps, OctaneAnchorProps, UseLinkPropsOptions } from './linkTypes.ts';
 
-// Props are permissive (`any`) at the implementation boundary — upstream's Link
-// implementation is likewise `(props: any)` behind the generic `LinkComponent<'a'>`
-// facade; the full type-safe `to`/`params`/`search` surface is a follow-up.
-export function Link(props: any) @{
-	const { _asChild: AsChild, children, ...rest } = props;
-	const linkProps = useLinkProps(rest);
+// Keep the generic implementation signature visible to `.tsrx` consumers so
+// route-aware `to`/`params`/`search` inference and native anchor event types are
+// available before declaration emit.
+export function Link<TRouter extends AnyRouter = RegisteredRouter, TFrom extends string = string, TTo extends | string
+| undefined = undefined, TMaskFrom extends string = TFrom, TMaskTo extends string = ''>(props: LinkComponentProps<'a', TRouter, TFrom, TTo, TMaskFrom, TMaskTo>) @{
+	const { _asChild: AsChild, children, ...rest } = props as typeof props & {
+			_asChild?: any;
+		};
+	const linkProps = useLinkProps(
+		rest as UseLinkPropsOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>,
+	) as
+		OctaneAnchorProps & {
+			disabled?: boolean;
+			'data-status'?: string;
+			'data-transitioning'?: string;
+		};
 	const { disabled: _disabled, ...aProps } = linkProps;
 
 	const resolvedChildren =
@@ -30,6 +42,6 @@ export function Link(props: any) @{
 	@if (AsChild) {
 		<AsChild {...linkProps}>{resolvedChildren}</AsChild>
 	} @else {
-		<a {...aProps}>{resolvedChildren}</a>
+		<a {...aProps as Record<string, any>}>{resolvedChildren}</a>
 	}
 }

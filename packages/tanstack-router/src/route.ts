@@ -8,9 +8,34 @@
 // `withSlot` and passes the call-site symbol as the trailing argument, which
 // each accessor forwards to the hooks it composes.
 import { BaseRoute, BaseRootRoute, BaseRouteApi, notFound } from '@tanstack/router-core';
-import type { ErrorComponentProps, NotFoundRouteProps } from '@tanstack/router-core';
+import type {
+	AnyContext,
+	AnyRoute,
+	AnyRouter,
+	ConstrainLiteral,
+	ErrorComponentProps,
+	NotFoundError,
+	NotFoundRouteProps,
+	Register,
+	RegisteredRouter,
+	ResolveFullPath,
+	ResolveId,
+	ResolveParams,
+	RootRoute as RootRouteCore,
+	RootRouteId,
+	RootRouteOptions,
+	Route as RouteCore,
+	RouteConstraints,
+	RouteIds,
+	RouteMask,
+	RouteOptions,
+	RouteTypesById,
+	RouterCore,
+	ToMaskOptions,
+	UseNavigateResult,
+} from '@tanstack/router-core';
 import { createElement } from 'octane';
-import type { OctaneNode } from 'octane';
+import type { ComponentBody } from 'octane';
 import {
 	useMatch,
 	useParams,
@@ -23,6 +48,15 @@ import {
 import { useRouter } from './context';
 import { splitSlot, subSlot } from './internal';
 import { Link } from './Link.tsrx';
+import type {
+	UseLoaderDataRoute,
+	UseLoaderDepsRoute,
+	UseMatchRoute,
+	UseParamsRoute,
+	UseRouteContextRoute,
+	UseSearchRoute,
+} from './routeHookTypes';
+import type { LinkComponentRoute } from './linkTypes';
 
 // ── Component types (react-router's route.tsx, on octane renderables) ────────
 // Octane analog of React's `ErrorInfo` (octane reports no component stacks).
@@ -31,7 +65,13 @@ export type ErrorInfo = {
 	digest?: string | null;
 };
 
-export type SyncRouteComponent<TProps> = (props: TProps) => OctaneNode;
+export interface DefaultRouteTypes<TProps> {
+	component: ComponentBody<TProps>;
+}
+
+export interface RouteTypes<TProps> extends DefaultRouteTypes<TProps> {}
+
+export type SyncRouteComponent<TProps> = RouteTypes<TProps>['component'];
 export type AsyncRouteComponent<TProps> = SyncRouteComponent<TProps> & {
 	preload?: () => Promise<void>;
 };
@@ -50,15 +90,15 @@ declare module '@tanstack/router-core' {
 		pendingComponent?: RouteComponent;
 	}
 	interface RootRouteOptionsExtensions {
-		shellComponent?: (props: { children: OctaneNode }) => OctaneNode;
+		shellComponent?: ComponentBody<{ children?: unknown }>;
 	}
 	interface RouterOptionsExtensions {
 		defaultComponent?: RouteComponent;
 		defaultErrorComponent?: ErrorRouteComponent;
 		defaultPendingComponent?: RouteComponent;
 		defaultNotFoundComponent?: NotFoundRouteComponent;
-		Wrap?: (props: { children: OctaneNode }) => OctaneNode;
-		InnerWrap?: (props: { children: OctaneNode }) => OctaneNode;
+		Wrap?: ComponentBody<{ children?: unknown }>;
+		InnerWrap?: ComponentBody<{ children?: unknown }>;
 		defaultOnCatch?: (error: Error, errorInfo: ErrorInfo) => void;
 	}
 }
@@ -114,75 +154,431 @@ function attachRouteHooks(self: any, strictLoaderHooks: boolean): void {
 	};
 }
 
-export class Route extends (BaseRoute as any) {
-	constructor(options?: any) {
+function attachRouteNavigation(self: any): void {
+	self.useNavigate = (...args: any[]) => {
+		const [, slot] = splitSlot(args);
+		return useNavigate({ from: self.fullPath }, subSlot(slot, 'r:n'));
+	};
+	self.Link = (props: Record<string, unknown>) =>
+		createElement(Link as any, { from: self.fullPath, ...props });
+}
+
+export class Route<
+	in out TRegister = unknown,
+	in out TParentRoute extends RouteConstraints['TParentRoute'] = AnyRoute,
+	in out TPath extends RouteConstraints['TPath'] = '/',
+	in out TFullPath extends RouteConstraints['TFullPath'] = ResolveFullPath<TParentRoute, TPath>,
+	in out TCustomId extends RouteConstraints['TCustomId'] = string,
+	in out TId extends RouteConstraints['TId'] = ResolveId<TParentRoute, TCustomId, TPath>,
+	in out TSearchValidator = undefined,
+	in out TParams = ResolveParams<TPath>,
+	in out TRouterContext = AnyContext,
+	in out TRouteContextFn = AnyContext,
+	in out TBeforeLoadFn = AnyContext,
+	in out TLoaderDeps extends Record<string, any> = {},
+	in out TLoaderFn = undefined,
+	in out TChildren = unknown,
+	in out TFileRouteTypes = unknown,
+	in out TSSR = unknown,
+	in out TServerMiddlewares = unknown,
+	in out THandlers = undefined,
+>
+	extends BaseRoute<
+		TRegister,
+		TParentRoute,
+		TPath,
+		TFullPath,
+		TCustomId,
+		TId,
+		TSearchValidator,
+		TParams,
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TChildren,
+		TFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>
+	implements
+		RouteCore<
+			TRegister,
+			TParentRoute,
+			TPath,
+			TFullPath,
+			TCustomId,
+			TId,
+			TSearchValidator,
+			TParams,
+			TRouterContext,
+			TRouteContextFn,
+			TBeforeLoadFn,
+			TLoaderDeps,
+			TLoaderFn,
+			TChildren,
+			TFileRouteTypes,
+			TSSR,
+			TServerMiddlewares,
+			THandlers
+		>
+{
+	declare useMatch: UseMatchRoute<TId>;
+	declare useRouteContext: UseRouteContextRoute<TId>;
+	declare useSearch: UseSearchRoute<TId>;
+	declare useParams: UseParamsRoute<TId>;
+	declare useLoaderDeps: UseLoaderDepsRoute<TId>;
+	declare useLoaderData: UseLoaderDataRoute<TId>;
+	declare useNavigate: () => UseNavigateResult<TFullPath>;
+	declare Link: LinkComponentRoute<TFullPath>;
+
+	/** @deprecated Use the `createRoute` function instead. */
+	constructor(
+		options?: RouteOptions<
+			TRegister,
+			TParentRoute,
+			TId,
+			TCustomId,
+			TFullPath,
+			TPath,
+			TSearchValidator,
+			TParams,
+			TLoaderDeps,
+			TLoaderFn,
+			TRouterContext,
+			TRouteContextFn,
+			TBeforeLoadFn,
+			TSSR,
+			TServerMiddlewares,
+			THandlers
+		>,
+	) {
 		super(options);
 		attachRouteHooks(this, true);
-		(this as any).useNavigate = (...args: any[]) => {
-			const [, slot] = splitSlot(args);
-			return useNavigate({ from: (this as any).fullPath }, subSlot(slot, 'r:n'));
-		};
-		(this as any).Link = (props: any) =>
-			createElement(Link as any, { from: (this as any).fullPath, ...props });
+		attachRouteNavigation(this);
 	}
 }
 
-export class RootRoute extends (BaseRootRoute as any) {
-	constructor(options?: any) {
+export class RootRoute<
+	in out TRegister = unknown,
+	in out TSearchValidator = undefined,
+	in out TRouterContext = {},
+	in out TRouteContextFn = AnyContext,
+	in out TBeforeLoadFn = AnyContext,
+	in out TLoaderDeps extends Record<string, any> = {},
+	in out TLoaderFn = undefined,
+	in out TChildren = unknown,
+	in out TFileRouteTypes = unknown,
+	in out TSSR = unknown,
+	in out TServerMiddlewares = unknown,
+	in out THandlers = undefined,
+>
+	extends BaseRootRoute<
+		TRegister,
+		TSearchValidator,
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TChildren,
+		TFileRouteTypes,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>
+	implements
+		RootRouteCore<
+			TRegister,
+			TSearchValidator,
+			TRouterContext,
+			TRouteContextFn,
+			TBeforeLoadFn,
+			TLoaderDeps,
+			TLoaderFn,
+			TChildren,
+			TFileRouteTypes,
+			TSSR,
+			TServerMiddlewares,
+			THandlers
+		>
+{
+	declare useMatch: UseMatchRoute<RootRouteId>;
+	declare useRouteContext: UseRouteContextRoute<RootRouteId>;
+	declare useSearch: UseSearchRoute<RootRouteId>;
+	declare useParams: UseParamsRoute<RootRouteId>;
+	declare useLoaderDeps: UseLoaderDepsRoute<RootRouteId>;
+	declare useLoaderData: UseLoaderDataRoute<RootRouteId>;
+	declare useNavigate: () => UseNavigateResult<'/'>;
+	declare Link: LinkComponentRoute<'/'>;
+
+	/** @deprecated Use `createRootRoute()` instead. */
+	constructor(
+		options?: RootRouteOptions<
+			TRegister,
+			TSearchValidator,
+			TRouterContext,
+			TRouteContextFn,
+			TBeforeLoadFn,
+			TLoaderDeps,
+			TLoaderFn,
+			TSSR,
+			TServerMiddlewares,
+			THandlers
+		>,
+	) {
 		super(options);
 		attachRouteHooks(this, true);
-		(this as any).useNavigate = (...args: any[]) => {
-			const [, slot] = splitSlot(args);
-			return useNavigate({ from: (this as any).fullPath }, subSlot(slot, 'r:n'));
-		};
-		(this as any).Link = (props: any) =>
-			createElement(Link as any, { from: (this as any).fullPath, ...props });
+		attachRouteNavigation(this);
 	}
 }
 
-export function createRoute(options: any): any {
-	return new (Route as any)(options);
+export function createRoute<
+	TRegister = unknown,
+	TParentRoute extends RouteConstraints['TParentRoute'] = AnyRoute,
+	TPath extends RouteConstraints['TPath'] = '/',
+	TFullPath extends RouteConstraints['TFullPath'] = ResolveFullPath<TParentRoute, TPath>,
+	TCustomId extends RouteConstraints['TCustomId'] = string,
+	TId extends RouteConstraints['TId'] = ResolveId<TParentRoute, TCustomId, TPath>,
+	TSearchValidator = undefined,
+	TParams = ResolveParams<TPath>,
+	TRouteContextFn = AnyContext,
+	TBeforeLoadFn = AnyContext,
+	TLoaderDeps extends Record<string, any> = {},
+	TLoaderFn = undefined,
+	TChildren = unknown,
+	TSSR = unknown,
+	const TServerMiddlewares = unknown,
+	THandlers = undefined,
+>(
+	options: RouteOptions<
+		TRegister,
+		TParentRoute,
+		TId,
+		TCustomId,
+		TFullPath,
+		TPath,
+		TSearchValidator,
+		TParams,
+		TLoaderDeps,
+		TLoaderFn,
+		AnyContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>,
+): Route<
+	TRegister,
+	TParentRoute,
+	TPath,
+	TFullPath,
+	TCustomId,
+	TId,
+	TSearchValidator,
+	TParams,
+	AnyContext,
+	TRouteContextFn,
+	TBeforeLoadFn,
+	TLoaderDeps,
+	TLoaderFn,
+	TChildren,
+	unknown,
+	TSSR,
+	TServerMiddlewares,
+	THandlers
+> {
+	return new Route(options as any);
 }
 
-export function createRootRoute(options?: any): any {
-	return new (RootRoute as any)(options);
+export function createRootRoute<
+	TRegister = Register,
+	TSearchValidator = undefined,
+	TRouterContext = {},
+	TRouteContextFn = AnyContext,
+	TBeforeLoadFn = AnyContext,
+	TLoaderDeps extends Record<string, any> = {},
+	TLoaderFn = undefined,
+	TSSR = unknown,
+	const TServerMiddlewares = unknown,
+	THandlers = undefined,
+>(
+	options?: RootRouteOptions<
+		TRegister,
+		TSearchValidator,
+		TRouterContext,
+		TRouteContextFn,
+		TBeforeLoadFn,
+		TLoaderDeps,
+		TLoaderFn,
+		TSSR,
+		TServerMiddlewares,
+		THandlers
+	>,
+): RootRoute<
+	TRegister,
+	TSearchValidator,
+	TRouterContext,
+	TRouteContextFn,
+	TBeforeLoadFn,
+	TLoaderDeps,
+	TLoaderFn,
+	unknown,
+	unknown,
+	TSSR,
+	TServerMiddlewares,
+	THandlers
+> {
+	return new RootRoute(options);
 }
 
 // `createRootRouteWithContext<TContext>()` is a curried type-only helper that just
 // returns `createRootRoute` — the context is a compile-time concern.
-export function createRootRouteWithContext<_TContext>() {
-	return (options?: any) => createRootRoute(options);
+export function createRootRouteWithContext<TRouterContext extends {}>() {
+	return <
+		TRegister = Register,
+		TRouteContextFn = AnyContext,
+		TBeforeLoadFn = AnyContext,
+		TSearchValidator = undefined,
+		TLoaderDeps extends Record<string, any> = {},
+		TLoaderFn = undefined,
+		TSSR = unknown,
+		TServerMiddlewares = unknown,
+		THandlers = undefined,
+	>(
+		options?: RootRouteOptions<
+			TRegister,
+			TSearchValidator,
+			TRouterContext,
+			TRouteContextFn,
+			TBeforeLoadFn,
+			TLoaderDeps,
+			TLoaderFn,
+			TSSR,
+			TServerMiddlewares,
+			THandlers
+		>,
+	) => createRootRoute(options);
 }
+
+/** @deprecated Use `createRootRouteWithContext` instead. */
+export const rootRouteWithContext = createRootRouteWithContext;
 
 // getRouteApi — route-bound hooks without importing the route (avoids circular
 // imports in code-split files). Port of react-router's RouteApi class.
-export class RouteApi extends (BaseRouteApi as any) {
+export class RouteApi<TId, TRouter extends AnyRouter = RegisteredRouter> extends BaseRouteApi<
+	TId,
+	TRouter
+> {
+	declare useMatch: UseMatchRoute<TId>;
+	declare useRouteContext: UseRouteContextRoute<TId>;
+	declare useSearch: UseSearchRoute<TId>;
+	declare useParams: UseParamsRoute<TId>;
+	declare useLoaderDeps: UseLoaderDepsRoute<TId>;
+	declare useLoaderData: UseLoaderDataRoute<TId>;
+	declare useNavigate: () => UseNavigateResult<RouteTypesById<TRouter, TId>['fullPath']>;
+	declare Link: LinkComponentRoute<RouteTypesById<TRouter, TId>['fullPath']>;
+
 	/** @deprecated Use the `getRouteApi` function instead. */
-	constructor({ id }: { id: any }) {
+	constructor({ id }: { id: TId }) {
 		super({ id });
 		attachRouteHooks(this, false);
-		(this as any).useNavigate = (...args: any[]) => {
+		this.useNavigate = ((...args: any[]) => {
 			const [, slot] = splitSlot(args);
 			const router = useRouter();
 			return useNavigate(
-				{ from: router.routesById[(this as any).id].fullPath },
+				{ from: (router.routesById as any)[this.id as string].fullPath },
 				subSlot(slot, 'r:n'),
 			);
-		};
-		(this as any).notFound = (opts?: any) => notFound({ routeId: (this as any).id, ...opts });
-		(this as any).Link = (props: any) => {
+		}) as typeof this.useNavigate;
+		this.Link = ((props: Record<string, unknown>) => {
 			const router = useRouter();
-			const fullPath = router.routesById[(this as any).id].fullPath;
+			const fullPath = (router.routesById as any)[this.id as string].fullPath;
 			return createElement(Link as any, { from: fullPath, ...props });
-		};
+		}) as unknown as typeof this.Link;
 	}
+
+	notFound = (opts?: NotFoundError) => notFound({ routeId: this.id, ...opts } as NotFoundError);
 }
 
-export function getRouteApi(id: any): any {
-	return new (RouteApi as any)({ id });
+export function getRouteApi<const TId, TRouter extends AnyRouter = RegisteredRouter>(
+	id: ConstrainLiteral<TId, RouteIds<TRouter['routeTree']>>,
+) {
+	return new RouteApi<TId, TRouter>({ id });
 }
 
-// Identity at runtime (the shape is a RouteMask; types constrain it upstream).
-export function createRouteMask(opts: any): any {
-	return opts;
+export function createRouteMask<
+	TRouteTree extends AnyRoute,
+	TFrom extends string,
+	TTo extends string,
+>(
+	opts: { routeTree: TRouteTree } & ToMaskOptions<
+		RouterCore<TRouteTree, 'never', boolean>,
+		TFrom,
+		TTo
+	>,
+): RouteMask<TRouteTree> {
+	return opts as any;
+}
+
+export type AnyRootRoute = RootRoute<any, any, any, any, any, any, any, any, any, any, any, any>;
+
+export class NotFoundRoute<
+	TRegister,
+	TParentRoute extends AnyRootRoute,
+	TRouterContext = AnyContext,
+	TRouteContextFn = AnyContext,
+	TBeforeLoadFn = AnyContext,
+	TSearchValidator = undefined,
+	TLoaderDeps extends Record<string, any> = {},
+	TLoaderFn = undefined,
+	TChildren = unknown,
+	TSSR = unknown,
+	TServerMiddlewares = unknown,
+> extends Route<
+	TRegister,
+	TParentRoute,
+	'/404',
+	'/404',
+	'404',
+	'404',
+	TSearchValidator,
+	{},
+	TRouterContext,
+	TRouteContextFn,
+	TBeforeLoadFn,
+	TLoaderDeps,
+	TLoaderFn,
+	TChildren,
+	unknown,
+	TSSR,
+	TServerMiddlewares
+> {
+	constructor(
+		options: Omit<
+			RouteOptions<
+				TRegister,
+				TParentRoute,
+				string,
+				string,
+				string,
+				string,
+				TSearchValidator,
+				{},
+				TLoaderDeps,
+				TLoaderFn,
+				TRouterContext,
+				TRouteContextFn,
+				TBeforeLoadFn,
+				TSSR,
+				TServerMiddlewares
+			>,
+			'caseSensitive' | 'parseParams' | 'stringifyParams' | 'path' | 'id' | 'params'
+		>,
+	) {
+		super({ ...(options as any), id: '404' });
+	}
 }

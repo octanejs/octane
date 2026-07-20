@@ -5,9 +5,10 @@
 // render-prop, so the consumer's `<Await>{(d) => …}</Await>` stays the public API).
 import { use } from 'octane';
 import type { OctaneNode } from 'octane';
+import { toExternalHydrationThenable } from './externalHydration.ts';
 
 function AwaitInner(props: { promise: Promise<any>; render: (data: any) => OctaneNode }) {
-	const data = use(props.promise);
+	const data = use(toExternalHydrationThenable(props.promise));
 	return props.render(data);
 }
 

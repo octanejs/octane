@@ -1,5 +1,5 @@
 import { hydrateRoot, initializeHydrationEventCapture } from 'octane';
-import { StartClient, hydrateStart } from '@tanstack/octane-start/client';
+import { StartClient, hydrateStart } from '@octanejs/tanstack-start/client';
 
 // Start can await router preparation before it creates the root. Install the
 // lightweight deferred-hydration intent queue first so an interaction with the

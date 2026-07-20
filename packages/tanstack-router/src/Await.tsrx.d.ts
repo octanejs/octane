@@ -1,6 +1,8 @@
-// Type declaration for the .tsrx component (resolved by relative path).
-export declare const Await: (props: {
-	promise: any;
-	children: (data: any) => unknown;
-	fallback?: unknown;
-}) => unknown;
+import type { AwaitOptions } from './useAwaited';
+
+export declare function Await<T>(
+	props: AwaitOptions<T> & {
+		children: (data: T) => unknown;
+		fallback?: unknown;
+	},
+): void;

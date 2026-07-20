@@ -1,1 +1,1 @@
-export * from '@tanstack/octane-start/client-rpc';
+export * from '@tanstack/start-client-core/client-rpc';

@@ -1,4 +1,6 @@
-// The navigation engine (renders nothing) — port of react-router's Transitioner.
+// The navigation engine — port of react-router's Transitioner. It runs as a
+// hook because a rendered sibling would put an SSR marker before a root route's
+// document-level <html> node and outside the #__app hydration range.
 // It (1) supplies `router.startTransition` so every navigation state update rides
 // an octane transition (concurrent navigation: the current page holds while the
 // next route suspends), (2) subscribes to history so back/forward and `Link`
@@ -18,7 +20,7 @@ import { useRouter } from './context.ts';
 import { useStore } from './useStore.ts';
 import { usePrevious } from './utils.ts';
 
-export function Transitioner() @{
+export function useTransitioner() {
 	const router = useRouter();
 	const mountLoadForRouter = useRef({ router, mounted: false });
 	const [isTransitioning, setIsTransitioning] = useState(false);
@@ -32,7 +34,7 @@ export function Transitioner() @{
 	const isPagePending = isLoading || hasPending;
 	const previousIsPagePending = usePrevious(isPagePending);
 
-	router.startTransition = (fn) => {
+	router.startTransition = (fn: () => void) => {
 		setIsTransitioning(true);
 		startTransition(() => {
 			fn();
@@ -47,14 +49,16 @@ export function Transitioner() @{
 	useEffect(() => {
 		const unsub = router.history.subscribe(() => router.load());
 
-		const nextLocation = router.buildLocation({
-			to: router.latestLocation.pathname,
-			search: true,
-			params: true,
-			hash: true,
-			state: true,
-			_includeValidateSearch: true,
-		});
+		const nextLocation = router.buildLocation(
+			{
+				to: router.latestLocation.pathname,
+				search: true,
+				params: true,
+				hash: true,
+				state: true,
+				_includeValidateSearch: true,
+			} as any,
+		);
 		if (
 			trimPathRight(router.latestLocation.publicHref) !== trimPathRight(nextLocation.publicHref)
 		) {
@@ -121,6 +125,4 @@ export function Transitioner() @{
 			});
 		}
 	}, [isAnyPending, previousIsAnyPending, router]);
-
-	<></>
 }

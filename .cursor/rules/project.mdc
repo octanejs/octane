@@ -60,8 +60,9 @@ pnpm rules:generate
 ## Repo Map
 
 This is a pnpm monorepo containing the core `octane` runtime+compiler, the
-`@octanejs/vite-plugin` metaframework (plus its Vercel and Cloudflare deploy
-adapters), the `@octanejs/mcp-server` MCP server, the private
+`@octanejs/vite-plugin` and `@octanejs/tanstack-start` metaframeworks (plus the
+Vercel and Cloudflare deploy adapters), the `@octanejs/mcp-server` MCP server,
+the private
 `@octanejs/evals` evaluation tooling package, and the `@octanejs/*` framework
 bindings. The current workspace package inventory and counts are generated from
 workspace manifests in `docs/packages.md`:
@@ -78,6 +79,10 @@ workspace manifests in `docs/packages.md`:
   deploys it to Vercel (Build Output API), while
   `packages/adapter-cloudflare` emits a module Worker for Cloudflare Workers
   Static Assets.
+- `packages/tanstack-start/` (npm: `@octanejs/tanstack-start`) — the public
+  Octane TanStack Start integration. It owns the Octane-specific Start runtime,
+  Vite/compiler pipeline, and route generator, and uses
+  `@octanejs/tanstack-router` for the renderer binding.
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
 - `packages/octane-evals/` (private workspace package: `@octanejs/evals`) —

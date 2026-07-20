@@ -1,5 +1,5 @@
-import { notFound } from '@tanstack/octane-router';
-import { createServerFn } from '@tanstack/octane-start';
+import { notFound } from '@octanejs/tanstack-router';
+import { createServerFn } from '@octanejs/tanstack-start';
 import { getPost, listPosts } from '../../../shared/posts-data.mjs';
 
 export type PostType = {
@@ -10,7 +10,7 @@ export type PostType = {
 
 export const fetchPost = createServerFn({ method: 'GET' })
 	.validator((postId: string) => postId)
-	.handler(async ({ data: postId }) => {
+	.handler(async ({ data: postId }: { data: string }) => {
 		const post = (await getPost(postId)) as PostType | null;
 		if (!post) {
 			throw notFound();

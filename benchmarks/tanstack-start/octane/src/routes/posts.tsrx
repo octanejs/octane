@@ -1,5 +1,5 @@
 import { useState } from 'octane';
-import { Link, Outlet, createFileRoute } from '@tanstack/octane-router';
+import { Link, Outlet, createFileRoute } from '@octanejs/tanstack-router';
 import { fetchPosts } from '../utils/posts.ts';
 
 export const Route = createFileRoute('/posts')({

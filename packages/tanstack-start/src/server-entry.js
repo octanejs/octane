@@ -1,2 +1,13 @@
-export * from '@tanstack/octane-start/server-entry';
-export { default } from '@tanstack/octane-start/server-entry';
+import { createStartHandler, defaultStreamHandler } from './server.js';
+
+const fetch = createStartHandler(defaultStreamHandler);
+
+export function createServerEntry(entry) {
+	return {
+		async fetch(...args) {
+			return await entry.fetch(...args);
+		},
+	};
+}
+
+export default createServerEntry({ fetch });

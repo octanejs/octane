@@ -188,9 +188,9 @@ export default defineConfig({
 			'prettier/plugins/estree',
 			'@tsrx/prettier-plugin',
 			'octane > devalue',
-			'@tanstack/octane-router > @tanstack/history',
-			'@tanstack/octane-router > @tanstack/router-core',
-			'@tanstack/octane-router > @tanstack/store',
+			'@octanejs/tanstack-router > @tanstack/history',
+			'@octanejs/tanstack-router > @tanstack/router-core',
+			'@octanejs/tanstack-router > @tanstack/store',
 			// The home page's 3D logo section is reached only through a deferred
 			// Hydrate chunk, so the scanner never sees three; pre-declare it (and
 			// the SVGLoader example module) to avoid a mid-session optimize pass.

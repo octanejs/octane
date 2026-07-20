@@ -139,7 +139,7 @@ export interface RootRouteChildren {
   PlaygroundRoute: typeof PlaygroundRoute
 }
 
-declare module '@tanstack/octane-router' {
+declare module '@octanejs/tanstack-router' {
   interface FileRoutesByPath {
     '/': {
       id: '/'
@@ -244,8 +244,8 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.ts'
-import type { createStart } from '@tanstack/octane-start'
-declare module '@tanstack/octane-start' {
+import type { createStart } from '@octanejs/tanstack-start'
+declare module '@octanejs/tanstack-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>

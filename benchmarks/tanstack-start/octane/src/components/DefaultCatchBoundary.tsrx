@@ -1,4 +1,4 @@
-import { ErrorComponent, Link, useLocation, useRouter } from '@tanstack/octane-router';
+import { ErrorComponent, Link, useLocation, useRouter } from '@octanejs/tanstack-router';
 
 export function DefaultCatchBoundary(props: { error: unknown }) @{
 	const router = useRouter();

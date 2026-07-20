@@ -1,1 +1,2 @@
-export * from '@tanstack/octane-start/client';
+export { StartClient } from './runtime/client/StartClient.js';
+export { hydrateStart } from './runtime/client/hydrateStart.js';

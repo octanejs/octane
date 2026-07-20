@@ -1,1 +1,11 @@
-export * from '@tanstack/octane-start';
+export { useServerFn } from './use-server-fn.js';
+export * from '@tanstack/start-client-core';
+export {
+	createClientOnlyFn,
+	createCsrfMiddleware,
+	createIsomorphicFn,
+	createMiddleware,
+	createServerFn,
+	createServerOnlyFn,
+	createStart,
+} from '@tanstack/start-client-core';

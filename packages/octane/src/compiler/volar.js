@@ -146,7 +146,7 @@ function shiftGeneratedOffsets(mappings, offset) {
  * native `@{ … }` template are identifiable on `sourceAst` via
  * `metadata.native_tsrx_body === true`, with the body node's `start`/`end`
  * spanning `@{` through `}`. TanStack's octane route-generator plugin
- * (`@tanstack/octane-router/generator-plugin`) masks route files by that
+ * (`@octanejs/tanstack-router/generator-plugin`) masks route files by that
  * marker before babel-based route transforms parse them. `@tsrx/core` used to
  * stamp it during parsing and now marks only the transformed clone (reachable
  * solely through `metadata.path` back-references), so re-stamp the parse tree

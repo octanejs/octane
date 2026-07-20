@@ -9,7 +9,7 @@
 // decorative rail of ported-library marks (./library-icons.ts) fills the space to
 // the right of the prose; it duplicates the ecosystem list in Proven, so it stays
 // aria-hidden and disappears below the two-column breakpoint.
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 import { LIBRARY_ICONS } from './library-icons.ts';
 
 export function Why() @{
@@ -59,7 +59,9 @@ export function Why() @{
 					{' Signals still win the workloads built for them. Across the checked-in ' +
 						'suites below, Octane keeps pace without asking you to rewire how you ' +
 						'think. '}
-					<Link to="/docs/tsrx-vs-tsx">See what TSRX adds →</Link>
+					<Link to="/docs/$slug" params={{ slug: 'tsrx-vs-tsx' }}>
+						See what TSRX adds →
+					</Link>
 				</blockquote>
 			</div>
 

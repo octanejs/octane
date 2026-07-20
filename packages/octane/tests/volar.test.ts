@@ -409,7 +409,7 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 	});
 
 	it('marks native template bodies on the source AST (route-generator contract)', () => {
-		// TanStack's octane route-generator plugin (@tanstack/octane-router/
+		// The Octane route-generator plugin (@octanejs/tanstack-router/
 		// generator-plugin) masks `@{ … }` template bodies before handing route
 		// files to a babel-based transform. It identifies them on THIS entry
 		// point's `sourceAst` via `metadata.native_tsrx_body` plus the body's

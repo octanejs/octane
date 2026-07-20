@@ -16,14 +16,6 @@
     "jsxImportSource": "octane",
     "skipLibCheck": true
   },
-  "include": ["./src/", "./vendor/"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "tests",
-    "vendor/router-plugin",
-    "vendor/start-plugin-core",
-    "vendor/router-generator",
-    "vendor/**/dist"
-  ]
+  "include": ["./src/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "tests"]
 }

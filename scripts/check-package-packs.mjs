@@ -36,6 +36,7 @@ const octaneSingletonConsumers = new Set([
 	'@octanejs/rspack-plugin',
 	'@octanejs/rspeedy-plugin',
 	'@octanejs/rsbuild-plugin',
+	'@octanejs/tanstack-start',
 	'@octanejs/vite-plugin',
 ]);
 const viteToolRequire = createRequire(
@@ -149,7 +150,7 @@ function validatePackedPackage(pkg, manifest, files) {
 		}
 	}
 	const targets = [];
-	for (const field of ['main', 'module', 'types', 'typings', 'exports', 'bin']) {
+	for (const field of ['main', 'module', 'types', 'typings', 'exports', 'imports', 'bin']) {
 		if (manifest[field] != null) collectStrings(manifest[field], field, targets);
 	}
 	for (const target of targets) {

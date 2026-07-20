@@ -1,55 +1,135 @@
 {
   "name": "@octanejs/tanstack-start",
-  "private": true,
   "version": "0.1.0",
-  "description": "TanStack Start for Octane — first-party binding that fronts the vendored @tanstack/octane-start PR-branch packages",
+  "description": "TanStack Start for Octane, including file-route generation, server functions, SSR streaming, hydration, and Vite integration.",
   "license": "MIT",
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-start"
+  },
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "imports": {
+    "#tanstack-start/package-names": "./src/package-names.js",
+    "#tanstack-start/router-generator": "./src/internal/router-generator/index.js",
+    "#tanstack-start/router-generator/*": "./src/internal/router-generator/*.js",
+    "#tanstack-start/router-plugin": "./src/internal/router-plugin/index.js",
+    "#tanstack-start/router-plugin/*": "./src/internal/router-plugin/*.js",
+    "#tanstack-start/plugin-core": "./src/internal/start-plugin-core/index.js",
+    "#tanstack-start/plugin-core/vite": "./src/internal/start-plugin-core/vite/index.js",
+    "#tanstack-start/plugin-core/*": "./src/internal/start-plugin-core/*.js"
+  },
   "exports": {
     ".": {
       "types": "./src/index.d.ts",
+      "import": "./src/index.js",
       "default": "./src/index.js"
     },
     "./client": {
       "types": "./src/client.d.ts",
+      "import": "./src/client.js",
       "default": "./src/client.js"
     },
     "./server": {
       "types": "./src/server.d.ts",
+      "import": "./src/server.js",
       "default": "./src/server.js"
     },
     "./client-rpc": {
       "types": "./src/client-rpc.d.ts",
+      "import": "./src/client-rpc.js",
       "default": "./src/client-rpc.js"
     },
     "./server-rpc": {
       "types": "./src/server-rpc.d.ts",
+      "import": "./src/server-rpc.js",
       "default": "./src/server-rpc.js"
     },
     "./ssr-rpc": {
       "types": "./src/ssr-rpc.d.ts",
+      "import": "./src/ssr-rpc.js",
       "default": "./src/ssr-rpc.js"
     },
     "./server-only": {
       "types": "./src/server-only.d.ts",
+      "import": "./src/server-only.js",
       "default": "./src/server-only.js"
     },
     "./client-only": {
       "types": "./src/client-only.d.ts",
+      "import": "./src/client-only.js",
       "default": "./src/client-only.js"
     },
     "./plugin/vite": {
       "types": "./src/plugin-vite.d.ts",
+      "import": "./src/plugin-vite.js",
       "default": "./src/plugin-vite.js"
     },
     "./server-entry": {
       "types": "./src/server-entry.d.ts",
+      "import": "./src/server-entry.js",
       "default": "./src/server-entry.js"
     },
     "./package.json": "./package.json"
   },
+  "sideEffects": false,
+  "scripts": {
+    "test": "cd ../.. && vitest run --project tanstack-start"
+  },
   "dependencies": {
-    "@tanstack/octane-start": "workspace:*"
+    "@babel/code-frame": "7.27.1",
+    "@babel/core": "catalog:default",
+    "@babel/template": "^7.27.2",
+    "@babel/types": "^7.28.5",
+    "@octanejs/tanstack-router": "workspace:*",
+    "@tanstack/router-core": "catalog:default",
+    "@tanstack/router-utils": "1.162.2",
+    "@tanstack/start-client-core": "1.170.14",
+    "@tanstack/start-server-core": "1.169.17",
+    "@tanstack/virtual-file-routes": "1.162.0",
+    "chokidar": "^5.0.0",
+    "exsolve": "^1.0.7",
+    "jiti": "^2.7.0",
+    "lightningcss": "^1.32.0",
+    "magic-string": "^0.30.21",
+    "pathe": "^2.0.3",
+    "picomatch": "^4.0.3",
+    "prettier": "catalog:default",
+    "seroval": "^1.5.4",
+    "source-map": "catalog:default",
+    "srvx": "^0.11.9",
+    "tinyglobby": "^0.2.15",
+    "ufo": "^1.5.4",
+    "unplugin": "^3.0.0",
+    "vitefu": "^1.1.1",
+    "xmlbuilder2": "^4.0.3",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "octane": "workspace:*",
@@ -61,6 +141,9 @@
     }
   },
   "devDependencies": {
-    "octane": "workspace:*"
+    "@types/node": "catalog:default",
+    "octane": "workspace:*",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
   }
 }

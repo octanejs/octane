@@ -1,18 +1,18 @@
 import { useState } from 'octane';
-import { Await, createFileRoute } from '@tanstack/octane-router';
-import { createServerFn } from '@tanstack/octane-start';
+import { Await, createFileRoute } from '@octanejs/tanstack-router';
+import { createServerFn } from '@octanejs/tanstack-start';
 
 const DEFER_MS = Number(process.env.BENCH_DEFER_MS || 200);
 
 const personServerFn = createServerFn({ method: 'GET' }).validator(
 	(data: { name: string }) => data,
-).handler(({ data }) => {
+).handler(({ data }: { data: { name: string } }) => {
 	return { name: data.name, randomNumber: 4 };
 });
 
 const slowServerFn = createServerFn({ method: 'GET' }).validator(
 	(data: { name: string }) => data,
-).handler(async ({ data }) => {
+).handler(async ({ data }: { data: { name: string } }) => {
 	await new Promise((r) => setTimeout(r, DEFER_MS));
 	return { name: data.name, randomNumber: 17 };
 });

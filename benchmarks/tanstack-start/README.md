@@ -1,17 +1,18 @@
 # tanstack-start — the same Start app on Octane and React
 
 One application, built and served as **three targets**: `octane-nitro` runs the
-repo's vendored `@tanstack/octane-start` (native `StreamOptions.injection`
-stream path) as its nitro `.output` deployment server; `octane-minimal` is the
-same octane app built **without** nitro (`octane/vite.config.minimal.ts`)
-behind `octane/serve.mjs`; `react` runs `@tanstack/react-start` from npm,
-**pinned to the same release family as the vendored packages** (react-start
-1.168.28, react-router 1.170.18), behind `react/serve.mjs`. The two `serve.mjs`
-hosts are line-for-line mirrors (node:http static fast-path + srvx
-`toNodeHandler`), so `octane-minimal` vs `react` isolates the Octane
-Start/renderer stack and `octane-nitro` vs `octane-minimal` isolates the
-deployment host. A correctness gate proves all targets render and behave as
-the same app; the perf suite then quantifies the differences.
+repository-owned `@octanejs/tanstack-start` package (native
+`StreamOptions.injection` stream path) as its Nitro `.output` deployment
+server; `octane-minimal` is the same Octane app built **without** Nitro
+(`octane/vite.config.minimal.ts`) behind `octane/serve.mjs`; `react` runs
+`@tanstack/react-start` from npm, pinned to the corresponding TanStack release
+family (react-start 1.168.28, react-router 1.170.18), behind
+`react/serve.mjs`. The two `serve.mjs` hosts are line-for-line mirrors
+(node:http static fast-path + srvx `toNodeHandler`), so `octane-minimal` vs
+`react` isolates the Octane Start/renderer stack and `octane-nitro` vs
+`octane-minimal` isolates the deployment host. A correctness gate proves all
+targets render and behave as the same app; the perf suite then quantifies the
+differences.
 
 ## Provenance
 
@@ -127,8 +128,9 @@ changed by this benchmark PR), each gated by an op above:
 
 `serverBundleBytes` caveat: octane's `dist/server` (523KB) reads ~2.7x
 react's (194KB), but the comparison is an accounting asymmetry, not code
-volume — octane's bundle is **self-contained** (the whole runtime + vendored
-Start chain compile in, unminified, only node builtins + srvx external),
+volume — octane's bundle is **self-contained** (the whole runtime and
+repository-owned Start integration compile in, unminified, with only Node
+built-ins and srvx external),
 while react's `dist/server` is app glue that externalizes react, react-dom
 (its production server file alone is 277KB minified), and react-router to
 `node_modules`. Total framework code parsed at boot favors octane — that is
@@ -138,6 +140,6 @@ reverses the numbers outright.
 
 Ratio guards for the stable ops live in `benchmarks/baselines/ratios.json`
 (the known-bad warm gaps get loose "only catch further regression" ceilings —
-fixes should tighten them). Version skew note: the vendored octane chain rides
-router-core 1.171.15 while the react flavor pins react-router 1.170.18 — same
-release family, minor drift.
+fixes should tighten them). Version skew note: the Octane Start integration
+rides router-core 1.171.15 while the react flavor pins react-router 1.170.18 —
+same release family, minor drift.

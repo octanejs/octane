@@ -1,5 +1,5 @@
 // The "proven" stat strip: three numbers that back the claims above.
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 import { BINDING_COUNT } from '../../../content/bindings.ts';
 
 export function Proven() @{
@@ -26,7 +26,7 @@ export function Proven() @{
 			<span class="proven-number">{BINDING_COUNT + ''}</span>
 			<span class="proven-label">
 				{'first-party ecosystem bindings for state, data, routing, UI, forms, charts, 3D, '}
-				<Link to="/docs/bindings">and more</Link>
+				<Link to="/docs/$slug" params={{ slug: 'bindings' }}>and more</Link>
 			</span>
 		</div>
 

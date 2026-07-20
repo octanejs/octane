@@ -1,7 +1,7 @@
-// Renders the navigation engine + the match tree root — port of react-router's
+// Runs the navigation engine and renders the match tree root — port of react-router's
 // Matches.tsx. Structure mirrors upstream:
 //
-//   InnerWrap? > Suspense(root pending) > Transitioner + MatchesInner
+//   useTransitioner + InnerWrap? > Suspense(root pending) > MatchesInner
 //   MatchesInner: matchContext(firstId) > global CatchBoundary? > Match(firstId)
 //
 // The root Suspense is ALWAYS present on the client (fallback is the root
@@ -14,14 +14,14 @@ import { useLayoutEffect, createElement, Suspense } from 'octane';
 import { setupScrollRestoration, rootRouteId } from '@tanstack/router-core';
 import { useStore } from './useStore.ts';
 import { useRouter, matchContext } from './context.ts';
-import { Transitioner } from './Transitioner.tsrx';
+import { useTransitioner } from './Transitioner.tsrx';
 import { Match } from './Match.tsrx';
 import { CatchBoundary, ErrorComponent } from './CatchBoundary.tsrx';
 import { SafeFragment } from './SafeFragment.tsrx';
 
 export function Matches() @{
 	const router = useRouter();
-	const rootRoute = router.routesById[rootRouteId];
+	const rootRoute = (router.routesById as any)[rootRouteId];
 	const PendingComponent =
 		rootRoute.options.pendingComponent ?? router.options.defaultPendingComponent;
 	const pendingElement =
@@ -33,10 +33,10 @@ export function Matches() @{
 	useLayoutEffect(() => {
 		if (router.options.scrollRestoration) setupScrollRestoration(router);
 	}, [router]);
+	useTransitioner();
 
 	<InnerWrap>
 		<Suspense fallback={pendingElement}>
-			<Transitioner />
 			<MatchesInner />
 		</Suspense>
 	</InnerWrap>
@@ -44,8 +44,8 @@ export function Matches() @{
 
 function MatchesInner() @{
 	const router = useRouter();
-	const matchId = useStore(router.stores.firstId, (id) => id);
-	const resetKey = useStore(router.stores.loadedAt, (l) => l);
+	const matchId = useStore(router.stores.firstId, (id: any) => id as string | undefined);
+	const resetKey = useStore(router.stores.loadedAt, (l: any) => l as number | string);
 	const CatchWrap = router.options.disableGlobalCatchBoundary ? SafeFragment : CatchBoundary;
 
 	<matchContext.Provider value={matchId}>

@@ -7,7 +7,7 @@
 // sample itself is an .mdx module on the shared Shiki pipeline, so there is no
 // second copy of the source to drift.
 import { useRef } from 'octane';
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../../../content/home-octanecompat-sample.mdx';
 import { useCopyToClipboard } from '../../../hooks/use-copy.ts';
 import copyUrl from '../../../assets/copy.svg';
@@ -39,7 +39,9 @@ export function ReactCompat() @{
 					{'The one thing that doesn’t cross over: React Server Components. Everything ' +
 						'else — hooks, Suspense, context, SSR — comes along.'}
 				</p>
-				<Link to="/docs/react-compat" class="compat-link">Read the OctaneCompat guide →</Link>
+				<Link to="/docs/$slug" params={{ slug: 'react-compat' }} class="compat-link">
+					Read the OctaneCompat guide →
+				</Link>
 			</div>
 
 			<div class="compat-code">

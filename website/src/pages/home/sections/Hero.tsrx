@@ -2,7 +2,7 @@
 // the live twin of that sample (HeroDemo) running underneath it. The sample is
 // an .mdx module so it rides the same Shiki pipeline as the docs.
 import { useRef } from 'octane';
-import { Link } from '@tanstack/octane-router';
+import { Link } from '@octanejs/tanstack-router';
 import CodeSample from '../../../content/home-sample.mdx';
 import { HeroDemo } from '../../../components/HeroDemo.tsrx';
 import { useCopyToClipboard } from '../../../hooks/use-copy.ts';
@@ -36,8 +36,12 @@ export function Hero() @{
 					'code captures for you.'}
 			</p>
 			<div class="hero-actions">
-				<Link to="/docs/quick-start" class="btn-primary">Get started</Link>
-				<Link to="/docs/differences-from-react" class="btn-ghost">Differences from React</Link>
+				<Link to="/docs/$slug" params={{ slug: 'quick-start' }} class="btn-primary">
+					Get started
+				</Link>
+				<Link to="/docs/$slug" params={{ slug: 'differences-from-react' }} class="btn-ghost">
+					Differences from React
+				</Link>
 			</div>
 		</div>
 		<div class="hero-code">

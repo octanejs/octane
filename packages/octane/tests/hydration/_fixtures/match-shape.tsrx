@@ -108,7 +108,7 @@ export function MatchShape(props: {
 }
 
 // --- Start-shaped document shell -------------------------------------------
-// Mirrors @tanstack/octane-start hydration: the client tree above the document
+// Mirrors @octanejs/tanstack-start hydration: the client tree above the document
 // body hydrates TRANSPARENTLY (the server shell markup lives outside the
 // hydration container), and the owner-stamped passthrough inside the body
 // adopts the first server range within `#__app`.

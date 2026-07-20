@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/octane-router';
+import { createFileRoute } from '@octanejs/tanstack-router';
 import { CustomMessage } from '../components/CustomMessage.tsrx';
 
 export const Route = createFileRoute('/')({

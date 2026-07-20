@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/octane-router';
+import { createFileRoute } from '@octanejs/tanstack-router';
 
 export const Route = createFileRoute('/posts/')({
 	component: PostsIndexComponent,

@@ -13,6 +13,13 @@ import {
 } from '@tanstack/router-core';
 import { createAtom, batch } from '@tanstack/store';
 import { startTransition } from 'octane';
+import type { RouterHistory } from '@tanstack/history';
+import type {
+	AnyRoute,
+	CreateRouterFn,
+	RouterConstructorOptions,
+	TrailingSlashOption,
+} from '@tanstack/router-core';
 
 const isServerEnv = typeof document === 'undefined';
 
@@ -52,8 +59,28 @@ const octaneStoreFactory = (opts: { isServer?: boolean }) => {
 	};
 };
 
-export class Router extends (RouterCore as any) {
-	constructor(options: any) {
+export class Router<
+	in out TRouteTree extends AnyRoute,
+	in out TTrailingSlashOption extends TrailingSlashOption = 'never',
+	in out TDefaultStructuralSharingOption extends boolean = false,
+	in out TRouterHistory extends RouterHistory = RouterHistory,
+	in out TDehydrated extends Record<string, any> = Record<string, any>,
+> extends RouterCore<
+	TRouteTree,
+	TTrailingSlashOption,
+	TDefaultStructuralSharingOption,
+	TRouterHistory,
+	TDehydrated
+> {
+	constructor(
+		options: RouterConstructorOptions<
+			TRouteTree,
+			TTrailingSlashOption,
+			TDefaultStructuralSharingOption,
+			TRouterHistory,
+			TDehydrated
+		>,
+	) {
 		super(options, octaneStoreFactory);
 
 		// router-core starts the resolved-match commit through startViewTransition,
@@ -106,7 +133,7 @@ export class Router extends (RouterCore as any) {
 			activeLoadScopes.add(viewCommits);
 			let hasLoadError = false;
 			let loadError: unknown;
-			let result: unknown;
+			let result: void;
 			try {
 				result = await coreLoad(...args);
 			} catch (error) {
@@ -153,6 +180,4 @@ export class Router extends (RouterCore as any) {
 	}
 }
 
-export function createRouter(options: any): any {
-	return new Router(options);
-}
+export const createRouter: CreateRouterFn = (options) => new Router(options);

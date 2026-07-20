@@ -23,9 +23,9 @@ export function Outlet() @{
 	// pooled store) are present — same invariant upstream asserts with invariant().
 	const parentId = useContext(matchContext)!;
 	const parentStore = router.stores.matchStores.get(parentId)!;
-	const parentRouteId = useStore(parentStore, (m) => m?.routeId as string | undefined);
-	const globalNotFound = useStore(parentStore, (m) => m?.globalNotFound ?? false);
-	const childId = useStore(router.stores.matchesId, (ids) => {
+	const parentRouteId = useStore(parentStore, (m: any) => m?.routeId as string | undefined);
+	const globalNotFound = useStore(parentStore, (m: any) => m?.globalNotFound ?? false as boolean);
+	const childId = useStore(router.stores.matchesId, (ids: Array<string>) => {
 		const i = ids.indexOf(parentId);
 		return i >= 0 ? ids[i + 1] : undefined;
 	});
