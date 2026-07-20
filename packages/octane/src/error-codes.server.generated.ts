@@ -21,11 +21,9 @@ type ServerErrorArguments = {
 	30: [unknown];
 	31: [];
 	32: [unknown];
-	33: [unknown];
 	34: [];
 	35: [unknown];
 	36: [];
-	37: [unknown];
 	38: [];
 	39: [];
 	40: [];
@@ -34,6 +32,8 @@ type ServerErrorArguments = {
 	43: [];
 	44: [];
 	45: [];
+	47: [unknown];
+	48: [unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -108,11 +108,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 					'octane SSR: a use(thenable) did not settle within %sms.',
 					args,
 				);
-			case 33:
-				return formatDevErrorMessage(
-					'octane SSR: exceeded %s suspense passes — a use(thenable) never resolved.',
-					args,
-				);
 			case 34:
 				return formatDevErrorMessage(
 					'octane SSR: a root suspension no longer has resumable work.',
@@ -126,11 +121,6 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 			case 36:
 				return formatDevErrorMessage(
 					'octane SSR: a pending streamed boundary no longer has resumable work; its error escaped to an ancestor that was already flushed.',
-					args,
-				);
-			case 37:
-				return formatDevErrorMessage(
-					'octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved.',
 					args,
 				);
 			case 38:
@@ -152,6 +142,16 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('The readable stream is closed.', args);
 			case 45:
 				return formatDevErrorMessage('Server-rendered use() rejected (function)', args);
+			case 47:
+				return formatDevErrorMessage(
+					'octane SSR: exceeded %s suspense passes — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.',
+					args,
+				);
+			case 48:
+				return formatDevErrorMessage(
+					'octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.',
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}
