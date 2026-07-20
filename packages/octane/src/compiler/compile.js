@@ -8153,6 +8153,58 @@ function isTrivialUseArg(n) {
 	return false;
 }
 
+// Server prop-flow eligibility: an inline component-prop expression whose
+// evaluation CREATES values per pass — a call or `new` reached during render
+// (nested function bodies don't run at render time and are skipped). Two
+// blockers: JSX (lowered later; wrapping the raw node would smuggle it past
+// the lowering passes) and hook-shaped calls (`use` / `use[A-Z]…` / a tracked
+// `use` import alias — their slot/occurrence bookkeeping must execute on the
+// body proper every pass, so they can never sit behind a cache hit).
+function isPropCreationExpr(expr, ctx) {
+	let found = false;
+	let blocked = false;
+	walk(expr);
+	return found && !blocked;
+
+	function isHookishCallee(callee) {
+		if (callee.type === 'Identifier') {
+			return (
+				/^use($|[A-Z])/.test(callee.name) || ctx?._parallelUseAliases?.has(callee.name) === true
+			);
+		}
+		if (callee.type === 'MemberExpression' && !callee.computed) {
+			return callee.property.type === 'Identifier' && /^use($|[A-Z])/.test(callee.property.name);
+		}
+		return false;
+	}
+
+	function walk(n) {
+		if (blocked || !n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n.type === 'string') {
+			if (n.type.startsWith('JSX')) {
+				blocked = true;
+				return;
+			}
+			if (FN_TYPES.has(n.type)) return; // does not run during render
+			if (n.type === 'CallExpression' || n.type === 'NewExpression') {
+				if (n.type === 'CallExpression' && isHookishCallee(n.callee)) {
+					blocked = true;
+					return;
+				}
+				found = true;
+			}
+		}
+		for (const k in n) {
+			if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
+			walk(n[k]);
+		}
+	}
+}
+
 const LOOP_TYPES = new Set([
 	'ForStatement',
 	'ForOfStatement',
@@ -8284,6 +8336,13 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				const isComponent =
 					nameNode && nameNode.type === 'JSXIdentifier' && /^[A-Z]/.test(nameNode.name);
 				if (isComponent) {
+					// Server: creations flowing INTO child props (`<Kid p={make(x)}/>`)
+					// need the same cross-pass identity as use()-site creations — every
+					// streaming wave re-runs this body, and a recreated per-request
+					// promise can never resolve at the descendant's unwrap (identity-
+					// keyed via puBatch). Inline attribute position only: the value has
+					// no other binding, so caching it cannot observe an escape.
+					if (ctx.mode === 'server') node = memoizePropCreations(node);
 					collectWarmChild(node, nameNode.name);
 					return node; // component children render inside the child — don't descend
 				}
@@ -8376,6 +8435,68 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 		return { ...arm, body };
 	}
 
+	// Server Pass A over component ATTRIBUTES: wrap each inline creation
+	// expression in the cross-pass creation cache (`_$puMemo`) so the value —
+	// and any per-request thenables inside it — keeps its identity between
+	// streaming/buffered passes. Deps-keyed exactly like a use()-site memo; a
+	// dependency drift is a clean recreation. The original expression is kept
+	// on the attribute for the warm printer (collectWarmChild below), which
+	// prints the SAME slot through warmMemo so the warm walk and the render
+	// path share one creation instead of racing two.
+	function memoizePropCreations(node) {
+		const attrs = node.openingElement.attributes || [];
+		let changed = false;
+		const nextAttrs = attrs.map((a) => {
+			if (a.type !== 'JSXAttribute' || a.name.type !== 'JSXIdentifier') return a;
+			const key = a.name.name;
+			if (key === 'ref' || key === 'key') return a; // instance-wired — never cached
+			if (!a.value || a.value.type !== 'JSXExpressionContainer') return a;
+			const expr = unwrapTsExpr(a.value.expression);
+			if (!isPropCreationExpr(expr, ctx)) return a;
+			const symVar = allocHookSymbol(
+				ctx,
+				`${componentName}.prop.memo#${ctx.nextHookSymId}`,
+				{
+					componentName,
+					name: 'prop memo',
+					kind: 'useMemo',
+					node: expr,
+				},
+				// Same reservation rule as use() memos: warm caches span component
+				// scopes, so every warmable creation site gets a composable Symbol.
+				true,
+			);
+			const deps = collectDepPaths(expr);
+			const memoAlias = requireRuntimeForContext(ctx, 'puMemo');
+			changed = true;
+			return {
+				...a,
+				value: {
+					type: 'JSXExpressionContainer',
+					expression: {
+						type: 'CallExpression',
+						callee: { type: 'Identifier', name: memoAlias },
+						arguments: [
+							{
+								type: 'ArrowFunctionExpression',
+								params: [],
+								expression: true,
+								async: false,
+								body: expr,
+							},
+							{ type: 'ArrayExpression', elements: deps },
+							{ type: 'Identifier', name: symVar },
+						],
+						optional: false,
+					},
+				},
+				_octanePropMemo: { expr, deps, symVar },
+			};
+		});
+		if (!changed) return node;
+		return { ...node, openingElement: { ...node.openingElement, attributes: nextAttrs } };
+	}
+
 	function collectWarmChild(node, compName) {
 		const attrs = node.openingElement.attributes || [];
 		if ((node.children || []).length > 0) return; // children render inside the child — skip
@@ -8388,7 +8509,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			if (a.value == null) value = { type: 'Literal', value: true, raw: 'true' };
 			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
 			else value = a.value; // Literal
-			props.push({ key, value });
+			props.push({ key, value, memo: a._octanePropMemo });
 		}
 		warmChildren.push({ compName, props, guards: [...guards], locals });
 	}
@@ -8655,7 +8776,11 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 			!paramNames.has(w.compName) &&
 			!(locals && locals.has(w.compName)) &&
 			!(w.locals && w.locals.has(w.compName)) &&
-			w.props.every((p) => isWarmSafeExpr(p.value, paramNames, locals, w.locals)),
+			// A memoized prop is judged by its ORIGINAL creation expression — the
+			// puMemo wrapper only adds compiler-owned module-scope names.
+			w.props.every((p) =>
+				isWarmSafeExpr(p.memo ? p.memo.expr : p.value, paramNames, locals, w.locals),
+			),
 	);
 	if (warmKids.length === 0 && warmMemos.length === 0) return { thunk: null, warmSrc: null };
 	// A component whose only warm edge is recursion back to itself and which has
@@ -8688,6 +8813,29 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		],
 		optional: false,
 	});
+	// A memoized prop prints through the value-returning warmMemo form: at warm
+	// time it CLAIMS the render pass's creation for the same slot (or creates
+	// once, adoptable by the render's puMemo) instead of re-evaluating the raw
+	// expression — the warm walk and the render path share one creation.
+	const warmPropValue = (p) =>
+		p.memo
+			? {
+					type: 'CallExpression',
+					callee: { type: 'Identifier', name: warmMemoAlias },
+					arguments: [
+						{
+							type: 'ArrowFunctionExpression',
+							params: [],
+							expression: true,
+							async: false,
+							body: p.memo.expr,
+						},
+						{ type: 'ArrayExpression', elements: p.memo.deps },
+						{ type: 'Identifier', name: p.memo.symVar },
+					],
+					optional: false,
+				}
+			: p.value;
 	const childCall = (w) => ({
 		type: 'CallExpression',
 		callee: { type: 'Identifier', name: warmChildAlias },
@@ -8698,7 +8846,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 				properties: w.props.map((p) => ({
 					type: 'Property',
 					key: { type: 'Identifier', name: p.key },
-					value: p.value,
+					value: warmPropValue(p),
 					kind: 'init',
 					method: false,
 					shorthand: false,
@@ -8709,7 +8857,8 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		optional: false,
 	});
 
-	if (warmMemos.length > 0) requireRuntimeForContext(ctx, 'warmMemo');
+	if (warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo)))
+		requireRuntimeForContext(ctx, 'warmMemo');
 	if (warmKids.length > 0) requireRuntimeForContext(ctx, 'warmChild');
 
 	// In-body warm thunk: children only — the body's own creations already ran

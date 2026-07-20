@@ -3577,6 +3577,8 @@ export function use<T>(
 	if (RESOLVED !== null) {
 		const entryT = RESOLVED.pu.resolvedT.get(usable as PromiseLike<unknown>);
 		if (entryT !== undefined) {
+			// Livelock-guard consumption mark (armed only after a first strike).
+			RESOLVED.pu.touched?.add(usable as PromiseLike<unknown>);
 			if ('reason' in entryT) {
 				recordHydrationRejection(serial, entryT.reason);
 				throw entryT.reason;
@@ -3776,11 +3778,20 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 	}
 	const res = RESOLVED as ResolvedMap | null;
 	const pu = res !== null ? res.pu : null;
+	// Livelock guard tripped (observeSuspenseWave): keep the status probes below
+	// (they feed resolvedT for settled instances) but register nothing and never
+	// suspend — the first unresolved use() after this call suspends under its
+	// stable string key instead, and key replay completes the render.
+	const disabled = pu !== null && pu.batchDisabled === true;
 	let pending = false;
 	for (let i = 0; i < thenables.length; i++) {
 		const t = thenables[i] as PromiseLike<unknown> | null | undefined;
 		if (t == null || typeof (t as any).then !== 'function') continue;
-		if (pu !== null && pu.resolvedT.has(t)) continue;
+		if (pu !== null && pu.resolvedT.has(t)) {
+			// Livelock-guard consumption mark (armed only after a first strike).
+			pu.touched?.add(t);
+			continue;
+		}
 		// `puBatch` runs before the corresponding use() calls, so it must perform
 		// the same status probe for already-instrumented thenables. Otherwise the
 		// batch suspends before use() can trigger a Flight-style lazy subscription.
@@ -3832,9 +3843,9 @@ export function puBatch(thenables: unknown[], warm?: () => void): void {
 		// pending entry would strand its boundary. Duplicate registrations are
 		// harmless — synthetic keys are unique, and awaiting a promise twice
 		// just records the same outcome twice.
-		if (SUSPENDED !== null) SUSPENDED.push({ promise: t, key: '|pu#' + PU_ID++ });
+		if (!disabled && SUSPENDED !== null) SUSPENDED.push({ promise: t, key: '|pu#' + PU_ID++ });
 	}
-	if (!pending) return;
+	if (!pending || disabled) return;
 	// About to suspend — run the warm walk first (the compiler passes the thunk
 	// on the active component stack): descendant components' independent creations
 	// start AND register with this round via warmMemo, so their data resolves
@@ -3896,11 +3907,14 @@ const WARM_DEPTH_CAP = 64;
  * the render loop so the current round awaits it — that is the whole point: the
  * descendant's data settles before its body runs, and its unwraps then resolve
  * by identity (resolvedT). Speculative: a throwing creation is simply not
- * warmed.
+ * warmed. Returns the claimed/created value so a memoized child PROP printed
+ * into a warmChild plan hands the real value to the descent instead of
+ * re-evaluating its creation (undefined when nothing could be claimed or
+ * created — the descent then just prefetches less).
  */
-export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): void {
+export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHookSlot): unknown {
 	const res = RESOLVED;
-	if (res === null) return;
+	if (res === null) return undefined;
 	const warm = res.pu.warm;
 	let list = warm.get(slot);
 	if (list !== undefined) {
@@ -3908,7 +3922,7 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 			const entry = list[i];
 			if (!puDepsEqual(entry.deps, deps) || CURRENT_PU_WARM_CLAIMS?.has(entry)) continue;
 			CURRENT_PU_WARM_CLAIMS?.add(entry);
-			return; // this concrete occurrence already ran or warmed
+			return entry.value; // this concrete occurrence already ran or warmed
 		}
 	}
 	// A parent plan recurses through the currently-rendering source component as
@@ -3933,16 +3947,19 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 			list = [];
 			warm.set(slot, list);
 		}
-		const entry = { deps, value: undefined, available: false };
+		// available:false — the render pass owns this creation under its own
+		// frame key; the tombstone only blocks a later speculative refetch. The
+		// value still rides along so warm-plan PROP claims can hand it onward.
+		const entry = { deps, value: activeCreation.value, available: false };
 		list.push(entry);
 		CURRENT_PU_WARM_CLAIMS?.add(entry);
-		return;
+		return activeCreation.value;
 	}
 	let value: unknown;
 	try {
 		value = compute();
 	} catch {
-		return;
+		return undefined;
 	}
 	if (list === undefined) {
 		list = [];
@@ -3959,6 +3976,7 @@ export function warmMemo(compute: () => unknown, deps: unknown[], slot: ServerHo
 		if (SUSPENDED !== null)
 			SUSPENDED.push({ promise: value as PromiseLike<unknown>, key: '|pu#' + PU_ID++ });
 	}
+	return value;
 }
 
 /**
@@ -4663,6 +4681,20 @@ type ResolvedMap = Map<string, SuspenseOutcome> & {
 		// a value is adoptable once, while its retained tombstone prevents a later
 		// dependency stratum from speculatively recreating the same request.
 		warm: Map<ServerHookSlot, { deps: unknown[]; value: unknown; available: boolean }[]>;
+		/** Livelock guard tripped (see observeSuspenseWave): puBatch stops
+		 *  registering/suspending for the rest of this render so plain use()
+		 *  string-key replay drives progress instead. */
+		batchDisabled?: boolean;
+		/** observeSuspenseWave state — consecutive recreation strikes + the
+		 *  puMemo creation-cache size at the previous observation. */
+		recreate?: { strikes: number; prevCreated: number };
+		/** Armed by observeSuspenseWave after a first strike: identity-resolved
+		 *  thenables (use() / puBatch resolvedT hits) are recorded here during
+		 *  the next pass so the guard can tell a legitimate waterfall stratum
+		 *  (it CONSUMES the previous wave's outcomes) from ancestor recreation
+		 *  (the settled instances are never referenced again). Undefined —
+		 *  the common case — costs one undefined-check per identity hit. */
+		touched?: Set<PromiseLike<unknown>>;
 	};
 };
 function newResolvedMap(): ResolvedMap {
@@ -5084,6 +5116,101 @@ async function settleFirstOfWave(
 	signal?.throwIfAborted();
 }
 
+// ---------------------------------------------------------------------------
+// Uncached-creation livelock guard.
+//
+// Batch-registered thenables resolve by IDENTITY (resolvedT). A per-request
+// promise CREATED in an ancestor's render and passed down through props is
+// recreated by every full re-pass unless the compiler could cache the
+// creation (puMemo) — each wave then settles instances the next pass never
+// asks about, no boundary ever completes, and the render burns
+// MAX_SUSPENSE_PASSES before erroring. This is the React-trained "uncached
+// promise" shape (React's Fizz renders each boundary once, so there it only
+// duplicates work instead of livelocking). The compiler memoizes inline
+// creations at use() sites and in component-prop position, but shapes it
+// cannot see (locals flowing into props, spreads, foreign-toolchain bodies)
+// still reach the runtime — this guard keeps them terminating.
+//
+// Watched signature, once per settle→re-render cycle: no boundary completed,
+// no new puMemo creation site was reached, no plain use() string key was
+// recorded, and the new pass registers ONLY batch thenables whose identities
+// are disjoint from the previous wave's (a still-pending batch thenable
+// re-registers on every pass by design, so a legitimate slow wave always
+// overlaps). One such cycle can still be a legitimate waterfall level whose
+// unwraps are trivial (un-memoized) references, so the first strike only ARMS
+// consumption tracking: a real dependency stratum CONSUMES the settled wave's
+// outcomes on the very next pass (identity hits in use()/puBatch), while a
+// recreating ancestor never references the settled instances again. A second
+// consecutive strike with zero consumption switches batching off for the rest
+// of the request: puBatch stops registering/suspending, the first unresolved
+// use() below it suspends under its stable frame-scoped STRING key instead,
+// and key replay drives the render to completion — degraded (one newly
+// recorded unwrap key per pass) but correct, matching what un-batched use()
+// has always done for per-pass creations.
+function observeSuspenseWave(
+	resolved: ResolvedMap,
+	settled: SuspendedList,
+	next: SuspendedList,
+	boundaryProgress: boolean,
+): void {
+	const pu = resolved.pu;
+	if (pu.batchDisabled === true) {
+		pu.touched = undefined;
+		return;
+	}
+	let state = pu.recreate;
+	if (state === undefined) state = pu.recreate = { strikes: 0, prevCreated: -1 };
+	const createdGrew = pu.created.size !== state.prevCreated;
+	state.prevCreated = pu.created.size;
+	const touched = pu.touched;
+	pu.touched = undefined;
+	const reset = (): void => {
+		state.strikes = 0;
+	};
+	if (boundaryProgress || createdGrew) return reset();
+	let prevPu: Set<PromiseLike<unknown>> | null = null;
+	for (const { promise, key } of settled) {
+		if (key.charCodeAt(0) === 124 /* '|' */ && key.startsWith('|pu#')) {
+			(prevPu ??= new Set()).add(promise);
+		} else if (resolved.has(key)) {
+			// A plain use() key settled — that site advances next pass.
+			return reset();
+		}
+	}
+	if (prevPu === null) return reset();
+	let sawFresh = false;
+	for (const { promise, key } of next) {
+		if (key.charCodeAt(0) !== 124 || !key.startsWith('|pu#')) continue;
+		// A carried-over (still pending) or already-settled identity is normal
+		// batching at work, not recreation.
+		if (prevPu.has(promise) || pu.resolvedT.has(promise)) return reset();
+		sawFresh = true;
+	}
+	if (!sawFresh) return reset();
+	if (touched !== undefined) {
+		// Tracking was armed by the previous strike: any identity hit against
+		// the settled wave means its outcomes were consumed — a real stratum.
+		for (const promise of prevPu) {
+			if (touched.has(promise)) return reset();
+		}
+	}
+	if (++state.strikes < 2) {
+		pu.touched = new Set(); // arm consumption tracking for the next pass
+		return;
+	}
+	pu.batchDisabled = true;
+	if (process.env.NODE_ENV !== 'production') {
+		console.error(
+			'octane SSR: use() thenables appear to be re-created on every render pass — ' +
+				'promises created during an ancestor render and passed down (e.g. via props) ' +
+				'get a fresh identity each pass, so their boundaries can never resolve by ' +
+				'identity. Create the promise at its use() site, or hoist the creation out ' +
+				'of render (the compiler caches analyzable inline creations automatically). ' +
+				'Falling back to per-site replay for the rest of this render.',
+		);
+	}
+}
+
 // The await-everything render core. Runs full canonical passes interleaved with
 // cheap discovery rounds until nothing suspends, then returns the final pass —
 // so every `use(thenable)` is resolved and the @try success arms are rendered.
@@ -5101,6 +5228,7 @@ async function runBuffered(
 	// (never a module global) so concurrent renders can't share it.
 	const resolved: ResolvedMap = newResolvedMap();
 	let attempt = 0;
+	let lastSettled: SuspendedList | null = null;
 	for (;;) {
 		// Bail before doing pass work if the request already died.
 		signal?.throwIfAborted();
@@ -5116,6 +5244,7 @@ async function runBuffered(
 			throw err;
 		}
 		if (pass.suspended.length === 0) return pass;
+		if (lastSettled !== null) observeSuspenseWave(resolved, lastSettled, pass.suspended, false);
 		// Between full passes, greedily discover deeper waterfall levels with cheap
 		// SUBTREE re-runs (skipping the static bulk) so the NEXT full pass jumps
 		// straight to canonical. A root-level boundary (job.frame.parent === null)
@@ -5126,17 +5255,23 @@ async function runBuffered(
 			// MAX bounds the TOTAL awaits (full-pass- and round-driven) so a
 			// never-resolving or nondeterministic use() can't wedge the loop.
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				const err = new Error(formatServerError(33, MAX_SUSPENSE_PASSES));
+				const err = new Error(formatServerError(47, MAX_SUSPENSE_PASSES));
 				options?.onError?.(err);
 				throw err;
 			}
 			await settleSuspended(pending, resolved, timeoutMs, signal);
+			lastSettled = pending;
 			if (jobs.length === 0 || !jobs.every((j) => j.frame.parent !== null)) break;
 			const round = withStream(null, () => runDiscoveryRound(jobs, resolved, identifierPrefix));
 			if (round.suspended.length === 0) break; // fully discovered → next full pass is canonical
 			pending = round.suspended;
 			jobs = round.deferred;
 		}
+		// Discovery rounds replay suspended subtrees with their CAPTURED props,
+		// so their identity hits are stale-prop consumption, not canonical
+		// progress — discard them so the livelock guard only credits identity
+		// hits made by the next full pass.
+		if (resolved.pu.touched !== undefined) resolved.pu.touched = new Set();
 		// Loop → another full canonical pass with the now-populated cache. If it
 		// still suspends (a nondeterministic render whose keys shift), it simply
 		// makes progress via more full passes, bounded by MAX_SUSPENSE_PASSES.
@@ -6274,9 +6409,11 @@ async function runStream(
 			if (++rootAttempts > MAX_SUSPENSE_PASSES) {
 				throw new Error(formatServerError(35, MAX_SUSPENSE_PASSES));
 			}
-			await settleFirstOfWave(pass.suspended, resolved, timeoutMs, signal);
+			const settledWave = pass.suspended;
+			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
 			({ pass, boundaryKeys: shellBoundaryKeys } = renderFullPass());
 			preShellSuspended = pass.suspended;
+			observeSuspenseWave(resolved, settledWave, pass.suspended, false);
 			signal?.throwIfAborted();
 		}
 		pruneStreamBoundariesAbsentFromShell(stream, shellBoundaryKeys);
@@ -6391,9 +6528,10 @@ async function runStream(
 				throw new Error(formatServerError(36));
 			}
 			if (++attempt > MAX_SUSPENSE_PASSES) {
-				throw new Error(formatServerError(37, MAX_SUSPENSE_PASSES));
+				throw new Error(formatServerError(48, MAX_SUSPENSE_PASSES));
 			}
-			await settleFirstOfWave(suspended, resolved, timeoutMs, signal);
+			const settledWave = suspended;
+			await settleFirstOfWave(settledWave, resolved, timeoutMs, signal);
 			pass = renderFullPass().pass;
 			suspended = pass.suspended;
 			reportRecoverableBoundaryErrors();
@@ -6418,6 +6556,7 @@ async function runStream(
 				}
 			}
 			if (madeProgress) attempt = 0; // a boundary completed — this wave was legitimate
+			observeSuspenseWave(resolved, settledWave, suspended, madeProgress);
 
 			// A nested boundary's template may live inside an enclosing boundary's
 			// not-yet-flushed segment. Build a topological emission order: roots and
