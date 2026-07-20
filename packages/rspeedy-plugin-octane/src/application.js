@@ -283,6 +283,7 @@ export function applyLynxApplication(chain, context, rspeedyConfig, options) {
 			});
 		}
 		if (hmr || liveReload) {
+			// Keep this request bare: Rspeedy aliases it to attach the dev-server connection query.
 			prepend(background, {
 				import: ['@lynx-js/webpack-dev-transport/client'],
 				layer: LYNX_BACKGROUND_LAYER,

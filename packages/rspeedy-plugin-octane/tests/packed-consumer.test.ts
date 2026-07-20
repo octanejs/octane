@@ -210,7 +210,16 @@ try {
 				stdio: ['ignore', 'pipe', 'pipe'],
 				timeout: 120_000,
 			});
-			expect(existsSync(join(developmentOutputRoot, 'main.lynx.bundle'))).toBe(true);
+			const developmentBundlePath = join(developmentOutputRoot, 'main.lynx.bundle');
+			expect(existsSync(developmentBundlePath)).toBe(true);
+			const developmentDecoded = await decodeNativeBundle(readFileSync(developmentBundlePath));
+			const developmentBackground = nativeScriptText(
+				developmentDecoded['background-thread-script'],
+			);
+			expect(developmentBackground).toMatch(/pathname=(?:\/|%2F)rsbuild-hmr/);
+			expect(developmentBackground).toContain('hot=true');
+			expect(developmentBackground).toContain('live-reload=true');
+			expect(developmentBackground).toContain('protocol=ws');
 		} finally {
 			rmSync(temporaryRoot, { recursive: true, force: true });
 		}
