@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/TanStack/tanstack.com/blob/main/tanstack-docs-config.schema.json",
+  "title": "TanStack Docs Config",
+  "description": "Config file for the documentation of a TanStack project.",
+  "type": "object",
+  "required": ["docSearch", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "docSearch": {
+      "description": "Data for Algolia Search.",
+      "type": "object",
+      "required": ["appId", "apiKey", "indexName"],
+      "properties": {
+        "appId": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        },
+        "indexName": {
+          "type": "string"
+        }
+      }
+    },
+    "sections": {
+      "description": "Section groups for the sidebar.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "children"],
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "children": {
+            "description": "Framework-agnostic docs go here.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label", "to"],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                },
+                "badge": {
+                  "type": "string"
+                },
+                "addedAt": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date the page was added (e.g. \"2026-06-01\"). Shows a \"New\" pill in the sidebar for 7 days."
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date",
+                  "description": "Date the page was last meaningfully updated (e.g. \"2026-06-01\"). Shows an \"Updated\" pill in the sidebar for 7 days."
+                }
+              }
+            }
+          },
+          "frameworks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "children": {
+                  "description": "Framework-specific docs go here.",
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["label", "to"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "to": {
+                        "type": "string"
+                      },
+                      "badge": {
+                        "type": "string"
+                      },
+                      "addedAt": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Date the page was added (e.g. \"2026-06-01\"). Shows a \"New\" pill in the sidebar for 7 days."
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "Date the page was last meaningfully updated (e.g. \"2026-06-01\"). Shows an \"Updated\" pill in the sidebar for 7 days."
+                      }
+                    }
+                  }
+                }
+              },
+              "required": ["label", "children"],
+              "additionalProperties": false
+            }
+          },
+          "collapsible": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the section should be collapsible."
+          },
+          "defaultCollapsed": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the section should be collapsed by default."
+          }
+        }
+      }
+    },
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

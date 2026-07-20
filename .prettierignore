@@ -83,3 +83,5 @@ packages/tanstack-ai/tests/_fixtures/*.tsrx
 packages/tanstack-devtools/src/*.tsrx
 packages/tanstack-devtools/src/*.tsrx.d.ts
 packages/tanstack-devtools/tests/_fixtures/*.tsrx
+dist-redact
+.content-collections

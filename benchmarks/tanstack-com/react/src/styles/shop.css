@@ -1,0 +1,166 @@
+/*
+ * Shop theme — scoped to /shop pages via `.shop-scope`.
+ *
+ * Only three things live here:
+ *   1. CSS variable declarations for the light/dark token swap
+ *   2. A `@theme inline` block that exposes those vars to Tailwind so you can
+ *      write `bg-shop-panel`, `text-shop-muted`, `font-shop-display`, etc.
+ *   3. Keyframes used by the live-stock indicator and CTA button.
+ *
+ * Everything else is Tailwind utilities on components — no bespoke class
+ * selectors, no global leakage.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..900;1,9..40,100..900&family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&display=swap');
+
+@theme inline {
+	--color-shop-bg: var(--shop-bg);
+	--color-shop-bg-2: var(--shop-bg-2);
+	--color-shop-panel: var(--shop-panel);
+	--color-shop-panel-2: var(--shop-panel-2);
+	--color-shop-surface: var(--shop-surface);
+	--color-shop-surface-hover: var(--shop-surface-hover);
+	--color-shop-line: var(--shop-line);
+	--color-shop-line-2: var(--shop-line-2);
+	--color-shop-text: var(--shop-text);
+	--color-shop-text-2: var(--shop-text-2);
+	--color-shop-muted: var(--shop-muted);
+	--color-shop-accent: var(--shop-accent);
+	--color-shop-accent-ink: var(--shop-accent-ink);
+	--color-shop-green: #22c993;
+	--color-shop-orange: #ff7a3a;
+
+	--font-shop-display: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+	--font-shop-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Light mode (default) */
+.shop-scope {
+	--shop-bg: #f6f6ec;
+	--shop-bg-2: #ffffff;
+	--shop-panel: #ffffff;
+	--shop-panel-2: #edecea;
+	--shop-surface: #dcdccb;
+	--shop-surface-hover: #d0cfbe;
+	--shop-line: #e6e3db;
+	--shop-line-2: #d4d1c4;
+	--shop-text: #111111;
+	--shop-text-2: #4d4d49;
+	--shop-muted: #8a8471;
+	--shop-accent: #0891b2;
+	--shop-accent-ink: #ffffff;
+
+	background: var(--shop-bg);
+	color: var(--shop-text);
+	font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+html.dark .shop-scope {
+	--shop-bg: #0a0a0a;
+	--shop-bg-2: #121212;
+	--shop-panel: #17171b;
+	--shop-panel-2: #1d1d22;
+	--shop-surface: #1c1c1c;
+	--shop-surface-hover: #252525;
+	--shop-line: #26262c;
+	--shop-line-2: #26262c;
+	--shop-text: #e7e7ea;
+	--shop-text-2: #a8a8b0;
+	--shop-muted: #6f6f79;
+	--shop-accent: #36d3f3;
+	--shop-accent-ink: #001217;
+}
+
+@keyframes shop-cta-gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+	100% {
+		background-position: 0% 50%;
+	}
+}
+
+@keyframes shop-cta-rotate {
+	from {
+		filter: hue-rotate(0deg) brightness(1);
+	}
+	to {
+		filter: hue-rotate(360deg) brightness(1);
+	}
+}
+
+@keyframes shop-pulse {
+	0% {
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-shop-green) 60%, transparent);
+	}
+	70% {
+		box-shadow: 0 0 0 10px color-mix(in srgb, var(--color-shop-green) 0%, transparent);
+	}
+	100% {
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-shop-green) 0%, transparent);
+	}
+}
+
+.shop-product-drawer-shell {
+	container: shop-product-drawer / inline-size;
+}
+
+.shop-product-drawer-layout {
+	min-height: 100%;
+}
+
+.shop-product-option {
+	width: 100%;
+}
+
+@container shop-product-drawer (min-width: 860px) {
+	.shop-product-drawer-layout {
+		display: grid;
+		grid-template-columns: minmax(360px, 1fr) minmax(420px, 640px);
+		align-items: start;
+	}
+
+	.shop-product-drawer-media {
+		position: sticky;
+		top: 0;
+		min-width: 0;
+		min-height: calc(100svh - 48px);
+		background-color: color-mix(in oklab, var(--shop-bg) 40%, transparent);
+		-webkit-backdrop-filter: blur(20px);
+		backdrop-filter: blur(20px);
+		border-right: 1px solid var(--shop-line);
+	}
+
+	.shop-product-drawer-main-image,
+	.shop-product-drawer-thumbs {
+		background-color: transparent;
+		-webkit-backdrop-filter: none;
+		backdrop-filter: none;
+	}
+
+	.shop-product-drawer-details {
+		min-width: 0;
+		width: 100%;
+		max-width: 640px;
+		min-height: calc(100svh - 48px);
+	}
+}
+
+@container shop-product-drawer (min-width: 1120px) {
+	.shop-product-drawer-layout {
+		grid-template-columns: minmax(520px, 1fr) minmax(480px, 640px);
+	}
+
+	.shop-product-option {
+		width: auto;
+		min-width: 240px;
+		flex: 1 1 calc(50% - 1.5rem);
+	}
+
+	.shop-product-quantity {
+		flex: 0 0 auto;
+	}
+}

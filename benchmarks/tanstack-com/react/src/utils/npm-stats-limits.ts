@@ -1,0 +1,3 @@
+export const MAX_NPM_STATS_GROUPS = 32;
+export const MAX_NPM_STATS_PACKAGES_PER_GROUP = 32;
+export const MAX_NPM_STATS_TOTAL_PACKAGES = 32;
