@@ -22,6 +22,7 @@ export const KNOWN_BINDINGS = {
 	'styled-components': '@octanejs/styled-components',
 	'react-router': '@octanejs/remix-router',
 	'react-router-dom': '@octanejs/remix-router',
+	nuqs: '@octanejs/nuqs',
 	'@lexical/react': '@octanejs/lexical',
 	'@tiptap/react': '@octanejs/tiptap',
 	'lucide-react': '@octanejs/lucide',

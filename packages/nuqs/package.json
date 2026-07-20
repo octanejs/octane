@@ -1,0 +1,58 @@
+{
+  "name": "@octanejs/nuqs",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "nuqs for the octane renderer — the nuqs 2.9.1 source ported onto octane's hooks: type-safe search params state (useQueryState/useQueryStates), the framework-agnostic parsers/serializer/loader reused verbatim, plus the React, custom and testing adapters.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/nuqs"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/index.server.ts",
+    "./testing": "./src/testing.ts",
+    "./debug": "./src/debug.ts",
+    "./adapters/react": "./src/adapters/react.ts",
+    "./adapters/custom": "./src/adapters/custom.ts",
+    "./adapters/testing": "./src/adapters/testing.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "catalog:default"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/testing-library": "workspace:*",
+    "@testing-library/jest-dom": "catalog:default",
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "nuqs": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
