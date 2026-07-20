@@ -380,7 +380,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				color: var(--text-secondary);
 			}
 			.bench-plot-note {
-				color: #6e7787;
+				color: var(--text-secondary);
 				font-size: 0.72rem;
 				margin: 0;
 			}

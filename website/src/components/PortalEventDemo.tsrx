@@ -77,7 +77,7 @@ export function PortalEventDemo() @{
 				padding: 0.9rem;
 				border: 1px solid var(--border);
 				border-radius: 0.8rem;
-				background: rgba(15, 17, 22, 0.3);
+				background: var(--surface-inset);
 			}
 			.portal-demo-label {
 				display: block;

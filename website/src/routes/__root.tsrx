@@ -20,6 +20,15 @@ const BASE_STYLES = `
 	/* Surfaces layered over --bg (dark: subtle white tints). */
 	--surface-subtle: rgba(255, 255, 255, 0.03);
 	--surface: rgba(255, 255, 255, 0.06);
+	/* Inset surfaces (form fields, nested content wells): darker than --panel in
+	   BOTH themes, unlike --surface which lightens. Text on these follows --text,
+	   so they must track the theme or the text turns dark-on-dark in light mode. */
+	--field-bg: rgba(22, 24, 29, 0.78);
+	--surface-inset: rgba(22, 24, 29, 0.55);
+	/* Status text (success / error): light tints in dark mode, darkened in light
+	   so they stay legible on light surfaces instead of washing out. */
+	--success-text: #8ae8ae;
+	--danger-text: #ff8797;
 	/* Translucent sticky-header/backdrop fills (a tint of --bg). */
 	--header-bg: rgba(35, 39, 47, 0.85);
 	--header-bg-solid: rgba(35, 39, 47, 0.97);
@@ -47,6 +56,10 @@ const BASE_STYLES = `
 	--border-strong: rgba(0, 0, 0, 0.22);
 	--surface-subtle: rgba(0, 0, 0, 0.025);
 	--surface: rgba(0, 0, 0, 0.04);
+	--field-bg: #ffffff;
+	--surface-inset: rgba(0, 0, 0, 0.03);
+	--success-text: #1e7a45;
+	--danger-text: #c81e37;
 	--header-bg: rgba(255, 255, 255, 0.85);
 	--header-bg-solid: rgba(255, 255, 255, 0.97);
 	--callout-note: #2f5fd0;

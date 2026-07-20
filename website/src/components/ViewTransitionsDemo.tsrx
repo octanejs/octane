@@ -123,7 +123,7 @@ export function ViewTransitionsDemo() @{
 				padding: 1rem;
 				border: 1px solid var(--border);
 				border-radius: 0.8rem;
-				background: rgba(15, 17, 22, 0.3);
+				background: var(--surface-inset);
 			}
 			.vtdemo-block-wide {
 				grid-column: 1 / -1;
@@ -133,7 +133,7 @@ export function ViewTransitionsDemo() @{
 				margin: 0 0 0.75rem;
 			}
 			.vtdemo-btn {
-				background: #ff415a;
+				background: var(--accent);
 				color: var(--on-accent);
 				font-weight: 600;
 				border: none;
@@ -142,7 +142,7 @@ export function ViewTransitionsDemo() @{
 				cursor: pointer;
 			}
 			.vtdemo-btn:hover {
-				background: #ff5d72;
+				background: var(--accent-hover);
 			}
 			.vtdemo-stage {
 				margin-top: 1rem;
@@ -151,7 +151,7 @@ export function ViewTransitionsDemo() @{
 			.vtdemo-card {
 				display: inline-block;
 				background: var(--bg);
-				border: 1px solid #343a46;
+				border: 1px solid var(--border);
 				border-radius: 12px;
 				padding: 1.5rem 2rem;
 			}
@@ -185,18 +185,18 @@ export function ViewTransitionsDemo() @{
 			.vtdemo-tab {
 				background: var(--bg);
 				color: var(--text-secondary);
-				border: 1px solid #343a46;
+				border: 1px solid var(--border);
 				border-radius: 8px;
 				padding: 0.4rem 0.9rem;
 				cursor: pointer;
 			}
 			.vtdemo-tab.active {
 				color: var(--text);
-				border-color: #ff415a;
+				border-color: var(--accent);
 			}
 			.vtdemo-panel {
 				background: var(--bg);
-				border: 1px solid #343a46;
+				border: 1px solid var(--border);
 				border-radius: 12px;
 				padding: 1.5rem;
 			}

@@ -99,7 +99,7 @@ const demoStyles = <style>
 		border: 1px solid var(--border);
 		border-radius: 0.75rem;
 		padding: 0.6rem 0.8rem;
-		background: rgba(22, 24, 29, 0.78);
+		background: var(--field-bg);
 		color: var(--text);
 		font: inherit;
 		font-size: 0.9rem;
@@ -146,7 +146,7 @@ const demoStyles = <style>
 		border: 1px solid var(--border);
 		border-radius: 0.75rem;
 		padding: 0.45rem 0.55rem 0.45rem 0.75rem;
-		background: rgba(22, 24, 29, 0.48);
+		background: var(--surface-inset);
 	}
 	.demo :global(.packing-check) {
 		width: 1.15rem;
@@ -190,7 +190,7 @@ const demoStyles = <style>
 		display: inline-block;
 		min-width: 1.5rem;
 		border: 1px solid var(--border);
-		border-bottom-color: var(--border);
+		border-bottom-color: var(--border-strong);
 		border-radius: 0.35rem;
 		padding: 0.05rem 0.35rem;
 		background: var(--surface);
@@ -206,7 +206,7 @@ const demoStyles = <style>
 		border: 1px solid var(--border);
 		border-radius: 0.875rem;
 		padding: 1rem;
-		background: rgba(22, 24, 29, 0.58);
+		background: var(--surface-inset);
 	}
 	.demo :global(.data-empty),
 	.demo :global(.data-loading),
@@ -220,7 +220,7 @@ const demoStyles = <style>
 		color: var(--text);
 	}
 	.demo :global(.data-error) {
-		color: #ff8797;
+		color: var(--danger-text);
 	}
 	.demo :global(.profile-card) {
 		display: grid;
@@ -236,7 +236,7 @@ const demoStyles = <style>
 		height: 3.25rem;
 		border-radius: 999px;
 		background: rgba(255, 65, 90, 0.16);
-		color: #ff8797;
+		color: var(--danger-text);
 		font-size: 1.1rem;
 		font-weight: 800;
 	}
@@ -302,7 +302,7 @@ const demoStyles = <style>
 		border: 1px solid var(--border);
 		border-radius: 0.85rem;
 		padding: 1rem;
-		background: rgba(22, 24, 29, 0.58);
+		background: var(--surface-inset);
 	}
 	.demo :global(.report-name),
 	.demo :global(.report-detail),
@@ -320,7 +320,7 @@ const demoStyles = <style>
 		font-size: 0.82rem;
 	}
 	.demo :global(.report-metric) {
-		color: #8ae8ae;
+		color: var(--success-text);
 		font-size: 1.8rem;
 		font-weight: 800;
 		letter-spacing: -0.04em;
@@ -341,7 +341,7 @@ const demoStyles = <style>
 		font-size: 0.8rem;
 	}
 	.demo :global(.search-updating) {
-		color: #ff9baa;
+		color: var(--danger-text);
 		font-weight: 750;
 	}
 	.demo :global(.product-results) {
@@ -360,7 +360,7 @@ const demoStyles = <style>
 		border: 1px solid var(--border);
 		border-radius: 0.7rem;
 		padding: 0.7rem 0.8rem;
-		background: rgba(22, 24, 29, 0.5);
+		background: var(--surface-inset);
 		color: var(--text);
 		font-size: 0.84rem;
 	}
@@ -379,10 +379,10 @@ const demoStyles = <style>
 		text-align: center;
 	}
 	.success {
-		color: #8ae8ae;
+		color: var(--success-text);
 	}
 	.error {
-		color: #ff8797;
+		color: var(--danger-text);
 	}
 	@media (max-width: 520px) {
 		.demo :global(.demo-hint) {

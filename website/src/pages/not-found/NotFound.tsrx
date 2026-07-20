@@ -18,7 +18,7 @@ export function NotFound() @{
 			.notfound-code {
 				font-size: 4rem;
 				font-weight: 800;
-				color: #ff5d72;
+				color: var(--accent-text);
 				margin: 0;
 				letter-spacing: -0.04em;
 			}
@@ -30,14 +30,14 @@ export function NotFound() @{
 				margin: 0 0 2rem;
 			}
 			.notfound :global(a.notfound-home) {
-				background: #ff415a;
+				background: var(--accent);
 				color: var(--on-accent);
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;
 			}
 			.notfound :global(a.notfound-home:hover) {
-				background: #ff5d72;
+				background: var(--accent-hover);
 				text-decoration: none;
 			}
 		</style>

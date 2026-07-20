@@ -65,7 +65,7 @@ export function BindingsDirectory() @{
 				border: 1px solid rgba(255, 93, 114, 0.24);
 				border-radius: 999px;
 				background: rgba(255, 65, 90, 0.08);
-				color: #ff9baa;
+				color: var(--danger-text);
 				font-size: 0.7rem;
 				font-weight: 750;
 				letter-spacing: 0.02em;
@@ -110,7 +110,7 @@ export function BindingsDirectory() @{
 				padding: 0.35rem 0.5rem;
 				border: 0;
 				background: transparent;
-				color: #ff8b9b;
+				color: var(--accent-text);
 				font-size: 0.75rem;
 				text-overflow: ellipsis;
 				white-space: nowrap;

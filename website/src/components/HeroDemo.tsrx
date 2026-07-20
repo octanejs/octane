@@ -64,7 +64,7 @@ function Counter(props: { paused: boolean; onLog: (message: string) => void }) @
 				min-width: 1.75rem;
 				padding: 0.05rem 0.4rem;
 				border-radius: 9999px;
-				background: rgba(0, 0, 0, 0.35);
+				background: rgba(0, 0, 0, 0.5);
 				color: #fff;
 				font-family: ui-monospace, Menlo, Consolas, monospace;
 				font-size: 0.8rem;

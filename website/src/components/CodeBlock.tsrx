@@ -183,12 +183,13 @@ export function CodeBlock(props: CodeBlockProps) @{
 				margin-left: auto;
 			}
 			/* Bare has no bar, so the button floats over the top-right of the code and
-			   picks up a panel fill on rest so it stays legible over any token. */
+			   picks up the code panel's own fill on rest so it stays legible over any
+			   token — theme-aware, so it doesn't go dark-on-dark in light mode. */
 			.codeblock-copy-float {
 				position: absolute;
 				top: 0.55rem;
 				right: 0.6rem;
-				background: rgba(22, 24, 29, 0.75);
+				background: var(--code-bg);
 			}
 			.codeblock-copy-icon {
 				width: 15px;
