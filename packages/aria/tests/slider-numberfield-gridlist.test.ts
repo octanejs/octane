@@ -55,8 +55,11 @@ describe('@octanejs/aria — useNumberField', () => {
 		expect(input.getAttribute('role')).toBe(null);
 		expect(input.value).toBe('5');
 		const inc = r.container.querySelector('[data-testid="inc"]') as HTMLElement;
-		// The increment control is labelled and steps the committed value.
-		expect(inc.getAttribute('aria-label')).toBeTruthy();
+		// The stepper labels interpolate the field label ("Increase {fieldLabel}") — a raw
+		// uninterpolated placeholder here means the intl dictionary compile step regressed.
+		expect(inc.getAttribute('aria-label')).toBe('Increase Amount');
+		const dec = r.container.querySelector('[data-testid="dec"]') as HTMLElement;
+		expect(dec.getAttribute('aria-label')).toBe('Decrease Amount');
 		await act(() => inc.click());
 		expect(input.value).toBe('6');
 		r.unmount();
@@ -76,6 +79,51 @@ describe('@octanejs/aria — useGridList / useGridListItem', () => {
 		expect((rows[0] as HTMLElement).getAttribute('aria-selected')).toBe('false');
 		await act(() => (rows[0] as HTMLElement).click());
 		expect((rows[0] as HTMLElement).getAttribute('aria-selected')).toBe('true');
+		r.unmount();
+	});
+
+	it('announces selection changes with interpolated and pluralized messages', async () => {
+		const r = mount(GridListHarness, {});
+		await act(() => {});
+		const rows = r.container.querySelectorAll('[role="row"]');
+		const grid = r.container.querySelector('[role="grid"]') as HTMLElement;
+		// The live announcer is a document-level singleton shared with other tests, so
+		// assert on entries appended after each step rather than absolute region content.
+		const log = () => document.querySelector('[data-live-announcer] [aria-live="assertive"]');
+		let seen = log()?.childElementCount ?? 0;
+		const lastAnnouncement = () => {
+			const el = log();
+			expect(el?.childElementCount ?? 0).toBeGreaterThan(seen);
+			seen = el!.childElementCount;
+			return el!.lastElementChild!.textContent;
+		};
+
+		// Selection is only announced while the collection is focused; clicks alone don't
+		// move DOM focus in jsdom, so focus the first row the way the roving tabindex would.
+		await act(() => (rows[0] as HTMLElement).focus());
+		// Selecting a single row interpolates its text into the {item} placeholder.
+		await act(() => (rows[0] as HTMLElement).click());
+		expect(lastAnnouncement()).toBe('Alpha selected.');
+
+		// A second selection also announces the count — the ICU plural `other` branch,
+		// with `#` formatted through the locale number formatter.
+		await act(() => (rows[1] as HTMLElement).click());
+		expect(lastAnnouncement()).toBe('Bravo selected. 2 items selected.');
+
+		// Deselecting one row exercises the `one` branch.
+		await act(() => (rows[0] as HTMLElement).click());
+		expect(lastAnnouncement()).toBe('Alpha not selected. 1 item selected.');
+
+		// Re-select to two rows, then clear with Escape: a multi-row removal announces only
+		// the count, exercising the exact `=0` branch.
+		await act(() => (rows[0] as HTMLElement).click());
+		expect(lastAnnouncement()).toBe('Alpha selected. 2 items selected.');
+		await act(() =>
+			grid.dispatchEvent(
+				new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+			),
+		);
+		expect(lastAnnouncement()).toBe('No items selected.');
 		r.unmount();
 	});
 });

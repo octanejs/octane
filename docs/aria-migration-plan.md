@@ -1,5 +1,28 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-19, later): Tree/Table follow-up COMPLETE.** The two
+> deferred collection verticals landed: stately grid
+> (`GridCollection`/`useGridState`) + the full stately table area
+> (`TableCollection`/`useTableState`/`useTableColumnResizeState`/
+> `UNSTABLE_useTreeGridState` + the legacy element components); the aria tree
+> hooks (`useTree`/`useTreeItem` + intl) and the full aria table hook area
+> (`useTable` family, `TableKeyboardDelegate`, `useTableColumnResize`, plus the
+> grid hooks it rides on: `useGrid`/`useGridRow`/`useGridCell`/
+> `GridKeyboardDelegate`); RAC `Tree` (+Item/ItemContent/Section/Header/
+> LoadMoreItem + `TreeDropTargetDelegate`, dnd branches inert) and RAC `Table`
+> (+Header/Body/Column/Row/Cell/ColumnResizer/ResizableTableContainer/Footer/
+> LoadMoreItem). 46 files / 362 aria tests; **differentials byte-identical vs
+> real react-aria-components**: three Tree structure states and the fully
+> interactive Table (sort cycling + row selection). Chevron-driven Tree
+> interaction stays behavioral (rig virtual clicks can't reproduce the React
+> side's focus-effect interplay — probed and confirmed as a rig limitation, not
+> a port divergence; octane's result matches upstream's explicit
+> `setFocusedKey(node.key)` intent). **Cross-cutting fix:** intl message
+> interpolation (raw strings vs compiled functions) — table dicts compile
+> simple `{var}` placeholders at module init; a chip tracks the remaining
+> areas. `TableLayout` lands with the Phase-7 Virtualizer. No octane-core
+> changes, no octane bugs.
+
 > **Progress (2026-07-19): Phase 5 COMPLETE (Tree/Table deferred).** The RAC
 > collection components landed over the Phase-4 engine: Autocomplete in full
 > (the deferred aria `useAutocomplete` + stately `useAutocompleteState` ported,
@@ -416,13 +439,14 @@ state, portal'd ARIA wiring); focus-trap/dismiss/scroll-lock behavior tests.
 make interaction state VISIBLE to the HTML-only rig — differential fixtures
 click/hover/focus through the real components on both sides, byte-equal.
 
-### Phase 5 — RAC collection components — COMPLETE 2026-07-19 (Tree/Table deferred)
+### Phase 5 — RAC collection components — COMPLETE 2026-07-19 (incl. the Tree/Table follow-up)
 `Menu`, `ListBox`, `Select`, `ComboBox`, `Autocomplete`, `Tabs`, `TagGroup`,
 `GridList`, `Breadcrumbs` landed with differential fixtures + keyboard/focus
-behavior tests. `Tree` and **`Table` last** (the densest: column resizing,
-sort, selection, drag) are DEFERRED to a follow-up phase — each requires an
-entire unported react-aria hook area (`useTree`/`useTreeItem`; the table grid
-hooks + stately table) and lands with that area.
+behavior tests. The Tree/Table follow-up landed same-day with their hook
+areas: `useTree`/`useTreeItem` + RAC `Tree`; stately grid + stately table +
+the aria table hook area + RAC `Table` (column resizing wired; pixel math is
+layout-driven and covered behaviorally). `TableLayout` lands with the Phase-7
+Virtualizer.
 
 ### Phase 6 — Date/time + color families
 Stately calendar/date/color state + aria `useCalendar`/`useRangeCalendar`,

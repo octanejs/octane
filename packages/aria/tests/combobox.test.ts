@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { act, mount } from '../../octane/tests/_helpers';
-import { ComboBoxHarness } from './_fixtures/combobox.tsx';
+import { ComboBoxHarness, ComboBoxAnnouncementHarness } from './_fixtures/combobox.tsx';
 
 // jsdom does not implement the CSS namespace; useComboBox's Enter/link handling and
 // the listbox harness build `[data-key="…"]` selectors through CSS.escape.
@@ -173,6 +173,44 @@ describe('@octanejs/aria — useComboBox', () => {
 		expect(output(r).getAttribute('data-open')).toBe('false');
 		expect(r.container.querySelector('[role="listbox"]')).toBe(null);
 		expect(el.getAttribute('aria-expanded')).toBe('false');
+		r.unmount();
+	});
+});
+
+describe('@octanejs/aria — combobox screen-reader announcement formatting', () => {
+	// The focusAnnouncement message nests select and plural ICU arguments; it must come
+	// out fully composed, never as raw ICU source.
+	it('composes the group-change announcement from nested select and plural arguments', async () => {
+		const r = mount(ComboBoxAnnouncementHarness, {
+			args: {
+				isGroupChange: true,
+				groupTitle: 'Fruits',
+				groupCount: 2,
+				optionText: 'Apple',
+				isSelected: true,
+			},
+		});
+		await act(() => {});
+		expect(r.container.querySelector('[data-testid="focus-announcement"]')!.textContent).toBe(
+			'Entered group Fruits, with 2 options. Apple, selected',
+		);
+		r.unmount();
+	});
+
+	it('drops the empty select branches when not entering a group', async () => {
+		const r = mount(ComboBoxAnnouncementHarness, {
+			args: {
+				isGroupChange: false,
+				groupTitle: '',
+				groupCount: 0,
+				optionText: 'Apple',
+				isSelected: false,
+			},
+		});
+		await act(() => {});
+		expect(r.container.querySelector('[data-testid="focus-announcement"]')!.textContent).toBe(
+			'Apple',
+		);
 		r.unmount();
 	});
 });

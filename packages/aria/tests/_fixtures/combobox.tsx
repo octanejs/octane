@@ -5,6 +5,8 @@ import { useComboBoxState } from '../../src/stately/combobox/useComboBoxState';
 import { useComboBox } from '../../src/combobox/useComboBox';
 import { useListBox } from '../../src/listbox/useListBox';
 import { useOption } from '../../src/listbox/useOption';
+import { useLocalizedStringFormatter } from '../../src/i18n/useLocalizedStringFormatter';
+import comboboxMessages from '../../src/intl/combobox';
 
 // ---------------------------------------------------------------------------
 // ComboBox: useComboBoxState → useComboBox (text input) + useListBox/useOption
@@ -101,6 +103,24 @@ export function ComboBoxHarness(props: {
 			>
 				{'open:' + openState}
 			</output>
+		</div>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Screen-reader announcement formatting: useComboBox's focus announcements are
+// gated on Apple devices at runtime, so the message composition itself is
+// exercised here through the public formatter over the real vendored combobox
+// dictionary (nested select + plural ICU arguments).
+// ---------------------------------------------------------------------------
+
+export function ComboBoxAnnouncementHarness(props: {
+	args: Record<string, string | number | boolean>;
+}) {
+	const stringFormatter = useLocalizedStringFormatter(comboboxMessages, '@react-aria/combobox');
+	return (
+		<div data-testid="focus-announcement">
+			{stringFormatter.format('focusAnnouncement', props.args) as string}
 		</div>
 	);
 }
