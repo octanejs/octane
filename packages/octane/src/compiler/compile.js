@@ -5504,6 +5504,26 @@ function compileServerComponent(node, ctx) {
 	ctx._pendingWarm = null;
 	const warmTail = warmSrc ? `\n${name}.__warm = ${warmSrc};` : '';
 
+	// Mirror the client emission's hoisting rule (see compileComponent): a
+	// component referenced ABOVE its declaration keeps real function-declaration
+	// hoisting instead of a TDZ `const` binding. Server and client compiles must
+	// agree, or the same route module renders on one side and crashes on the other.
+	const ssrSourceBeforeNode =
+		typeof node.start === 'number' && typeof ctx.mapSource === 'string'
+			? stripNonReferenceText(ctx.mapSource.slice(0, node.start))
+			: '';
+	if (
+		ssrSourceBeforeNode !== '' &&
+		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(ssrSourceBeforeNode) &&
+		fn.startsWith(`function ${name}(`)
+	) {
+		const declPrefix = isDefault ? 'export default ' : isExported ? 'export ' : '';
+		const guardedWarmTail = warmSrc
+			? `\ntypeof ${name} === 'function' && (${name}.__warm = ${warmSrc});`
+			: '';
+		return `${declPrefix}${fn}${guardedWarmTail}`;
+	}
+
 	if (isDefault) return `const ${name} = ${fn};${warmTail}\nexport default ${name};`;
 	if (isExported) return `export const ${name} = ${fn};${warmTail}`;
 	return `const ${name} = ${fn};${warmTail}`;
@@ -7153,6 +7173,19 @@ function applyCssScoping(componentNode, ctx) {
 	return cssHash;
 }
 
+// Strip comments and plain string literals so prose or route paths cannot
+// register as a component reference during the early-reference scan below.
+// Template literals are deliberately LEFT intact: `${Name}` interpolations are
+// real references, and missing one would reintroduce the TDZ crash this
+// hoisting exists to prevent — the residual cost of a name inside template
+// text is only the (correct, merely less tree-shakeable) hoisted form.
+function stripNonReferenceText(source) {
+	return source.replace(
+		/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+		' ',
+	);
+}
+
 // Attach definition metadata through the component's initializer rather than a
 // free-standing module mutation. The call-site annotation is valid because every
 // caller passes a freshly-created compiler function that cannot yet be observed;
@@ -7227,10 +7260,70 @@ function compileComponent(node, ctx, options) {
 	// an object that carries the plan. hmr() forwards `__warm` from the
 	// wrapped fn onto its wrapper for cross-module references. Both assignments
 	// below target this freshly-emitted function, so unused initializers may drop.
-	const warmedFn = ctx._pendingWarm
-		? `/* @__PURE__ */ Object.assign(${fn}, { __warm: ${ctx._pendingWarm} })`
-		: fn;
+	const pendingWarm = ctx._pendingWarm;
 	ctx._pendingWarm = null;
+	const componentInfo = ctx.componentInfo.get(name);
+
+	// Authored `function` declarations HOIST: a module may reference the
+	// component ABOVE its declaration (the canonical TanStack route-file shape,
+	// `createFileRoute(...)({ component: Home })` before `function Home`). The
+	// `const` emission below turns that valid reference into a TDZ crash, so a
+	// component whose name appears earlier in the module keeps a real function
+	// DECLARATION, with the capability stamps applied as follow-up statements —
+	// markSingleRoot and the `__warm`/ABI marks all mutate-and-return the SAME
+	// function object, so the pre-declaration capture observes them before any
+	// render can run. Components without early references keep the `const` +
+	// PURE-initializer form, which bundlers can drop when unused.
+	const sourceBeforeNode =
+		typeof node.start === 'number' && typeof ctx.mapSource === 'string'
+			? stripNonReferenceText(ctx.mapSource.slice(0, node.start))
+			: '';
+	const referencedAboveDeclaration =
+		sourceBeforeNode !== '' &&
+		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(sourceBeforeNode);
+	if (referencedAboveDeclaration && fn.startsWith(`function ${name}(`)) {
+		// Every stamp is `typeof`-guarded: route code-splitters (TanStack's) may
+		// EXTRACT the declaration into its own module and leave these statements
+		// behind — `typeof` on the then-undeclared identifier short-circuits
+		// harmlessly instead of throwing at module evaluation.
+		const guard = `typeof ${name} === 'function' && `;
+		// Exported hoisted components keep declaration-form exports
+		// (`export function` / `export default function`) — hoisted, live-bound,
+		// and free of bare `export { … }` clauses.
+		const declPrefix = isDefault ? 'export default ' : isExported ? 'export ' : '';
+		const statements = [declPrefix + fn];
+		if (pendingWarm) {
+			statements.push(`${guard}Object.assign(${name}, { __warm: ${pendingWarm} });`);
+		}
+		if (hmrWrap && returnedOutput) {
+			statements.push(`${guard}Object.assign(${name}, { __octaneReturnedOutput: true });`);
+		}
+		if (componentInfo?.singleRoot === true) {
+			ctx.runtimeNeeded.add('__s');
+			// Stamp the RAW function so the pre-declaration capture sees the mark…
+			statements.push(`${guard}_$__s(${name});`);
+			// …and when an HMR rebind below replaces the binding with the wrapper,
+			// leave singleRootInitialized unset so the module-tail fallback stamps
+			// the WRAPPER too (hmr() does not forward $$singleRoot). The tail
+			// stamp is dev-only, and route code-splitting runs build-mode only,
+			// so the unguarded tail assignment never meets an extracted binding.
+			if (!(hmrWrap && isExported)) {
+				componentInfo.singleRootInitialized = true;
+			}
+		}
+		if (hmrWrap && isExported) {
+			// `_$hmr` returns a stable wrapper with a DIFFERENT identity; rebinding
+			// keeps later references hot-updatable while the pre-declaration capture
+			// deliberately holds the raw function (edits to such a component fall
+			// back to a full reload — the capture predates the wrapper).
+			statements.push(`${guard}(${name} = _$hmr(${name}));`);
+		}
+		return statements.join('\n');
+	}
+
+	const warmedFn = pendingWarm
+		? `/* @__PURE__ */ Object.assign(${fn}, { __warm: ${pendingWarm} })`
+		: fn;
 	const abiFn =
 		hmrWrap && returnedOutput
 			? `/* @__PURE__ */ Object.assign(${warmedFn}, { __octaneReturnedOutput: true })`
@@ -7244,7 +7337,6 @@ function compileComponent(node, ctx, options) {
 	// returns a wrapper that delegates to whatever fn is currently committed,
 	// and `module.Foo[HMR].update(...)` swaps it on each accept.
 	let valueExpr = hmrWrap && isExported ? `_$hmr(${abiFn})` : abiFn;
-	const componentInfo = ctx.componentInfo.get(name);
 	if (!hmrWrap && componentInfo?.singleRoot === true) {
 		valueExpr = singleRootInitializer(ctx, valueExpr);
 		componentInfo.singleRootInitialized = true;
