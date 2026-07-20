@@ -244,10 +244,16 @@ In production, `vite build` emits both bundles: hashed client assets in
 (exports `handler`/`nodeHandler`, auto-boots under `node`; preview with
 `octane-preview`). The production handler streams through the same engine and
 emits the same hydratable shape as dev — `server.render: 'buffered'` switches
-it to the await-everything `prerender`. A deploy adapter (e.g.
-`@octanejs/adapter-vercel`) can restructure the output for a host:
-`adapter: vercel()` in octane.config.ts emits Vercel's Build Output API under
-`.vercel/output` after the build. Request abort signals reach both render modes;
+it to the await-everything `prerender`. A deploy adapter prepares the output for
+its host. `adapter: vercel()` from `@octanejs/adapter-vercel` emits Vercel's
+Build Output API under `.vercel/output`. `adapter: cloudflare()` from
+`@octanejs/adapter-cloudflare` switches the server bundle to a Worker target and
+emits `dist/server/worker.js`; point a user-owned `wrangler.jsonc` at that entry
+and configure Workers Static Assets with `directory: "./dist/client"`. Keep
+Cloudflare's asset-first default, leave `assets.not_found_handling` unset or
+`"none"` (both `"single-page-application"` and `"404-page"` can bypass SSR),
+and enable `nodejs_compat`. The Worker passes `{ env, ctx }` through
+`Context.platform` for bindings and `waitUntil`. Request abort signals reach both render modes;
 the built-in Node bridge also waits for `drain` and cancels the render when the
 response socket closes. Its HTTP transport negotiates streaming gzip for
 eligible SSR and static text responses while preserving HEAD, partial,

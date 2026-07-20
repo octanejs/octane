@@ -5456,19 +5456,24 @@ interface StreamState {
 // Every boundary id includes a render-unique token. The counter proves
 // uniqueness for every stream produced by this module instance; the realm salt
 // prevents a second bundled copy/server isolate from restarting at the same
-// wire id when their output is composed into one document. IDs deliberately
-// expose no structure the client relies on — discovery order lives separately.
-const STREAM_REALM_SALT = (() => {
+// wire id when their output is composed into one document. Initialize it on the
+// first stream: Workers runtimes forbid random generation during module
+// evaluation. IDs deliberately expose no structure the client relies on —
+// discovery order lives separately.
+let STREAM_REALM_SALT: string | null = null;
+
+function streamRealmSalt(): string {
+	if (STREAM_REALM_SALT !== null) return STREAM_REALM_SALT;
 	const crypto = (globalThis as any).crypto as { randomUUID?: () => string } | undefined;
 	const entropy =
 		crypto?.randomUUID?.().replace(/-/g, '') ??
 		Date.now().toString(36) + Math.random().toString(36).slice(2);
-	return entropy.replace(/[^a-zA-Z0-9_-]/g, '');
-})();
+	return (STREAM_REALM_SALT = entropy.replace(/[^a-zA-Z0-9_-]/g, ''));
+}
 let NEXT_STREAM_TOKEN = 0;
 
 function createStreamToken(): string {
-	return 'os' + STREAM_REALM_SALT + '-' + (NEXT_STREAM_TOKEN++).toString(36);
+	return 'os' + streamRealmSalt() + '-' + (NEXT_STREAM_TOKEN++).toString(36);
 }
 
 // Active streaming render, or null (buffered/sync renders). NOT part of the

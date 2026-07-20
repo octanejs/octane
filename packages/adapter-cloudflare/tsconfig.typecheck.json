@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": false,
+    "paths": {
+      "@octanejs/adapter-cloudflare": ["./types/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*", "types/**/*", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -356,6 +356,8 @@ export function pluginOctane(inlineOptions = {}) {
 				const octaneConfig = /** @type {import('@octanejs/app-core').ResolvedOctaneConfig} */ (
 					initialConfig
 				);
+				const webWorkerServer =
+					productionBuild && octaneConfig.adapter?.serverTarget === 'webworker';
 				const template = path.join(root, 'index.html');
 				if (!fs.existsSync(template)) {
 					throw new Error(
@@ -394,7 +396,7 @@ export function pluginOctane(inlineOptions = {}) {
 							},
 							output: {
 								...targetOutput,
-								target: 'node',
+								target: webWorkerServer ? 'web-worker' : 'node',
 								autoExternal: false,
 								distPath: {
 									root: path.resolve(root, octaneConfig.build.outDir, 'server'),
@@ -403,7 +405,10 @@ export function pluginOctane(inlineOptions = {}) {
 								},
 								filename: { js: '[name].js' },
 								filenameHash: false,
-								module: productionBuild,
+								// Rsbuild rejects its public ESM switch for web-worker targets.
+								// The final Rspack config enables module output below so the
+								// adapter wrapper can import createWebWorkerHandler.
+								module: productionBuild && !webWorkerServer,
 								emitAssets: false,
 								...outputMinify,
 							},
@@ -483,6 +488,8 @@ export function pluginOctane(inlineOptions = {}) {
 						// programmatic `rsbuild.build()` may intentionally keep development
 						// transforms while still requiring production output/finalization.
 						const production = isProductionBuild();
+						const webWorkerServer =
+							production && loaded.config.adapter?.serverTarget === 'webworker';
 						const generator = production ? generateServerEntry : generateServerManifestEntry;
 						return generator({
 							routes: loaded.config.router.routes,
@@ -490,7 +497,10 @@ export function pluginOctane(inlineOptions = {}) {
 							configImportPath: loaded.configPath,
 							rootBoundary: loaded.config.rootBoundary,
 							rpcModulePaths: serverModules.ids,
-							...(production ? { clientAssetMapFile: CLIENT_ASSET_MAP } : { clientAssetMap: {} }),
+							...(webWorkerServer ? { mode: 'webworker' } : null),
+							...(production && !webWorkerServer
+								? { clientAssetMapFile: CLIENT_ASSET_MAP }
+								: { clientAssetMap: {} }),
 							resolveImport: (id) => resolveProjectModule(id, root),
 							configModuleId: localRequire.resolve('@octanejs/app-core/config'),
 							productionModuleId: localRequire.resolve('@octanejs/app-core/production'),
@@ -505,9 +515,13 @@ export function pluginOctane(inlineOptions = {}) {
 				const productionBuild = isProductionBuild();
 				const environment =
 					utils.environment.name === serverEnvironment || utils.isServer ? 'server' : 'client';
+				const webWorkerServer =
+					productionBuild &&
+					environment === 'server' &&
+					initialConfig?.adapter?.serverTarget === 'webworker';
 				if (buildTargetPlan) {
 					config.target = /** @type {any} */ ([
-						environment === 'server' ? 'node' : 'web',
+						environment === 'server' ? (webWorkerServer ? 'webworker' : 'node') : 'web',
 						buildTargetPlan.rspackTarget,
 					]);
 				}
@@ -541,6 +555,26 @@ export function pluginOctane(inlineOptions = {}) {
 				);
 				if (appEnabled && environment === 'server') {
 					config.output ??= {};
+					if (webWorkerServer) {
+						// Rsbuild's web-worker target is script-only at its public config
+						// layer. The generated entry is an importable adapter input, so
+						// retain its named factory export in an ESM Rspack library.
+						config.experiments ??= {};
+						/** @type {any} */ (config.experiments).outputModule = true;
+						config.output.module = true;
+						config.output.chunkFilename = 'chunks/[name].js';
+						config.output.chunkFormat = 'module';
+						config.output.chunkLoading = 'import';
+						config.output.workerChunkLoading = 'import';
+						config.optimization ??= {};
+						config.optimization.minimize = initialConfig?.build.minify ?? true;
+						// Workers with compatibility modules (including Cloudflare's
+						// nodejs_compat) resolve `node:` imports as native ESM. Install
+						// this before Rspack attempts to treat the scheme as browser code.
+						config.plugins ??= [];
+						config.plugins.push(new utils.rspack.ExternalsPlugin('module', /^node:/));
+						config.externalsType = 'module';
+					}
 					config.output.library = { type: productionBuild ? 'module' : 'commonjs2' };
 					if (productionBuild) {
 						config.module ??= {};
