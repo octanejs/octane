@@ -1,10 +1,9 @@
-// One documentation page: render compiled MDX in a readable article, add the
-// navigation supplied by the registry, and keep a local table of contents
-// beside longer guides.
+// One documentation page: render compiled MDX in a readable article and add
+// the previous/next navigation supplied by the registry. The owning DocsLayout
+// renders this document's section navigation inside the shared left sidebar.
 import { Link, useParams } from '@octanejs/tanstack-router';
 import { docs, findDoc } from '../../content/docs.ts';
 import { CodeBlock } from '../../components/CodeBlock.tsrx';
-import { OnThisPage } from '../../components/OnThisPage.tsrx';
 import { useTitle } from '../../hooks/use-title.ts';
 
 function DocTable(props: { children?: unknown; [key: string]: unknown }) @{
@@ -39,7 +38,6 @@ export function DocPage() @{
 	const doc = findDoc(params.slug);
 	useTitle(doc ? 'Octane — ' + doc.title : 'Octane — Docs');
 	const Doc = doc ? doc.component : null;
-	const sections = doc?.sections ?? [];
 	const currentIndex =
 		doc ? docs.indexOf(doc) : -1;
 	const previous =
@@ -47,7 +45,7 @@ export function DocPage() @{
 	const next =
 		currentIndex >= 0 && currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null;
 	<>
-		<div class={['doc-frame', sections.length > 0 && 'has-toc']}>
+		<div class="doc-frame">
 			<article class="prose">
 				@if (Doc) {
 					<>
@@ -86,31 +84,15 @@ export function DocPage() @{
 					</div>
 				}
 			</article>
-			@if (sections.length > 0) {
-				<OnThisPage sections={sections} resetKey={doc?.slug ?? ''} />
-			}
 		</div>
 		<style>
 			.doc-frame {
 				width: 100%;
-				max-width: 68rem;
-				display: grid;
-				grid-template-columns: minmax(0, 48rem);
-				justify-content: start;
-			}
-			.doc-frame.has-toc {
-				grid-template-columns: minmax(0, 48rem) minmax(14rem, 15.5rem);
-				gap: clamp(2rem, 4vw, 3.5rem);
+				max-width: 48rem;
 			}
 			.prose {
 				min-width: 0;
 				max-width: 48rem;
-			}
-			@media (max-width: 1180px) {
-				.doc-frame.has-toc {
-					grid-template-columns: minmax(0, 48rem);
-					gap: 1.5rem;
-				}
 			}
 			.prose :global(.doc-hero) {
 				margin: 0 0 1.75rem;
@@ -152,6 +134,13 @@ export function DocPage() @{
 				letter-spacing: -0.01em;
 				margin: 2.25rem 0 0.65rem;
 				scroll-margin-top: 5.5rem;
+			}
+			@media (max-width: 800px) {
+				/* Clear both the site header and the collapsed sticky docs menu. */
+				.prose :global(h2[id]),
+				.prose :global(h3[id]) {
+					scroll-margin-top: 9rem;
+				}
 			}
 			.prose :global(p) {
 				color: var(--text-body);

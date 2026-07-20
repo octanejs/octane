@@ -11,15 +11,16 @@ import { BenchmarkExplorer } from '../../components/BenchmarkExplorer.tsrx';
 import { OnThisPage } from '../../components/OnThisPage.tsrx';
 import { FRAMEWORK_CARDS, OCTANE_CARDS } from '../../content/benchmarks.ts';
 import { createHomeSummary } from '../../content/home-benchmark.ts';
+import { useAnimatedMobileNavigation } from '../../hooks/use-animated-mobile-navigation.ts';
 import { useTitle } from '../../hooks/use-title.ts';
 
 const OVERVIEW = createHomeSummary(FRAMEWORK_CARDS);
 
-// The scroll-spy rail's targets: one level-2 row per section heading below,
+// The scroll-spy sidebar's targets: one level-2 row per section heading below,
 // with a nested level-3 row for every benchmark card, derived from the same
 // card arrays the sections chart so the rail can never drift from the page.
 // Level-2 ids match the `<h2 id>`s; card ids match the anchored card wrappers
-// (both carry the scroll-margin-top clearing the sticky header). A rail click
+// (both carry the scroll-margin-top clearing the sticky header). A sidebar click
 // moves focus onto its target, so the card wrappers — unlike the self-naming
 // h2s — need role="group" with the card title as their accessible name, or
 // screen-reader users land in the section without hearing which chart it is.
@@ -36,8 +37,37 @@ export const BENCH_SECTIONS: readonly { id: string; title: string; level?: 2 | 3
 
 export function Benchmarks() @{
 	useTitle('Octane — Benchmarks');
+	const { mobileMenuOpen, mobileMenuPanel, toggleMobileNavigation, closeMobileNavigation } =
+		useAnimatedMobileNavigation();
+
 	<div class="benchpage">
 		<div class="benchpage-frame">
+			<aside class="benchpage-sidebar">
+				<button
+					type="button"
+					class="benchpage-sidebar-toggle"
+					aria-expanded={mobileMenuOpen}
+					aria-controls="benchmark-sidebar-nav"
+					onClick={toggleMobileNavigation}
+				>
+					<span>Benchmarks</span>
+					<span class="benchpage-sidebar-icon" aria-hidden="true">+</span>
+				</button>
+				<div class={['benchpage-sidebar-panel', mobileMenuOpen && 'is-open']} ref={mobileMenuPanel}>
+					<div class="benchpage-sidebar-panel-inner">
+						<div id="benchmark-sidebar-nav">
+							<a class="benchpage-sidebar-link" href="/benchmarks" aria-current="page">
+								Benchmarks
+							</a>
+							<OnThisPage
+								sections={BENCH_SECTIONS}
+								resetKey="benchmarks"
+								onNavigate={closeMobileNavigation}
+							/>
+						</div>
+					</div>
+				</div>
+			</aside>
 			<div class="benchpage-main">
 				<header class="benchpage-head">
 					<h1 class="benchpage-title">Benchmarks</h1>
@@ -112,14 +142,13 @@ export function Benchmarks() @{
 					</div>
 				</section>
 			</div>
-			<OnThisPage sections={BENCH_SECTIONS} />
 		</div>
 
 		<style>
 			.benchpage {
 				max-width: 1420px;
 				margin: 0 auto;
-				padding: 3rem 1.5rem 0;
+				padding: 0 1.5rem;
 			}
 			.benchpage-head {
 				max-width: 44rem;
@@ -143,22 +172,113 @@ export function Benchmarks() @{
 				padding: 0.1rem 0.4rem;
 				font-size: 0.9em;
 			}
-			/* Content column + the sticky "On this page" rail. The rail collapses at
-			   the component's own 1180px breakpoint into a static summary card that
-			   grid-row: 1 places above the sections. */
+			/* The benchmark scroll-spy is the page's primary left sidebar, matching
+			   the documentation layout instead of occupying a separate right rail. */
 			.benchpage-frame {
 				display: grid;
-				grid-template-columns: minmax(0, 1fr) minmax(11rem, 12.5rem);
-				gap: clamp(2rem, 3vw, 3rem);
+				grid-template-columns: 220px minmax(0, 1fr);
+				gap: clamp(2rem, 4vw, 4rem);
 				align-items: start;
+			}
+			.benchpage-sidebar {
+				position: sticky;
+				top: 76px;
+				padding-top: 2rem;
+				max-height: calc(100vh - 92px);
+				overflow-y: auto;
+				scrollbar-width: thin;
+			}
+			.benchpage-sidebar-toggle {
+				display: none;
+			}
+			.benchpage-sidebar-link {
+				display: block;
+				padding: 0.45rem 0.75rem;
+				border-radius: 0.75rem;
+				background: rgba(255, 65, 90, 0.14);
+				color: var(--accent-text);
+				font-size: 0.925rem;
+				font-weight: 500;
+			}
+			.benchpage-sidebar-link:hover {
+				color: var(--accent-text);
+				text-decoration: none;
 			}
 			.benchpage-main {
 				min-width: 0;
+				padding-top: 3rem;
 			}
-			@media (max-width: 1180px) {
+			@media (max-width: 800px) {
 				.benchpage-frame {
 					grid-template-columns: minmax(0, 1fr);
-					gap: 1.5rem;
+					gap: 1rem;
+				}
+				.benchpage-sidebar {
+					position: static;
+					max-height: none;
+					margin: 0 -1.5rem;
+					padding: 0.75rem 1.5rem;
+					overflow: hidden;
+					border-bottom: 1px solid var(--border);
+				}
+				.benchpage-sidebar-toggle {
+					display: flex;
+					align-items: center;
+					justify-content: space-between;
+					width: 100%;
+					min-height: 2.5rem;
+					padding: 0;
+					border: 0;
+					background: transparent;
+					color: var(--text);
+					font-size: 0.9rem;
+					font-weight: 750;
+					cursor: pointer;
+				}
+				.benchpage-sidebar-icon {
+					color: var(--accent-text);
+					font-size: 1.15rem;
+					transition: transform 0.2s ease;
+				}
+				.benchpage-sidebar-toggle[aria-expanded='true'] .benchpage-sidebar-icon {
+					transform: rotate(45deg);
+				}
+				.benchpage-sidebar-panel {
+					display: grid;
+					grid-template-rows: 0fr;
+					opacity: 0;
+					visibility: hidden;
+					transition:
+						grid-template-rows 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+						opacity 0.18s ease,
+						visibility 0s 0.22s;
+				}
+				.benchpage-sidebar-panel.is-open {
+					grid-template-rows: 1fr;
+					opacity: 1;
+					visibility: visible;
+					transition-delay: 0s;
+				}
+				.benchpage-sidebar-panel-inner {
+					min-height: 0;
+					overflow: hidden;
+				}
+				.benchpage-sidebar-link {
+					display: none;
+				}
+				.benchpage-sidebar-panel :global(.on-this-page) {
+					margin-top: 0.65rem;
+					padding-top: 0.75rem;
+					border-top: 1px solid var(--border);
+				}
+				.benchpage-main {
+					padding-top: 1.5rem;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.benchpage-sidebar-icon,
+				.benchpage-sidebar-panel {
+					transition: none;
 				}
 			}
 			.benchpage-section {
