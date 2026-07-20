@@ -86,8 +86,21 @@ import {
 	markComponentFlags,
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
+import {
+	isStateModelTransparent,
+	markStateModel,
+	markStateModelMethods,
+	markStateModelTransparent,
+	normalizeRuntimeStateModel,
+	STATE_WRITE_CONTEXT,
+	stateModelOf,
+	STATE_MODEL_CAUSAL,
+	STATE_MODEL_PERMISSIVE,
+	type RuntimeStateModel,
+} from './state-model-runtime.js';
 
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
+export { markStateModel, markStateModelMethods };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
 
@@ -495,6 +508,8 @@ let nextClientRootId = 0;
 
 export interface Block extends Scope {
 	kind: BlockKind;
+	/** True only when `body` is an authored component definition boundary. */
+	stateModelBoundary: boolean;
 	parentBlock: Block | null;
 	parentNode: Node;
 	/** Root-owned useId namespace/counter, shared by every descendant block. */
@@ -719,10 +734,117 @@ let STORE_SYNC_DEPTH = 0;
 // from them even though CURRENT_SCOPE still reflects the eager parent render.
 let EFFECT_EVENT_LIFECYCLE_DEPTH = 0;
 
+// Authored state is read-only while a component renders and while a functional
+// updater/reducer/initializer/memo factory evaluates. These scalar counters are
+// deliberately separate from CURRENT_BLOCK: cleanup and ref work can run while
+// an outer render block is still ambient, and those phases are not part of the
+// first causal-state enforcement epoch. A depth counter (rather than a boolean)
+// also makes a synchronous nested render incapable of laundering its ancestor's
+// causal model.
+const STATE_PHASE_RENDER = 1;
+const STATE_PHASE_INITIALIZER = 2;
+const STATE_PHASE_MEMO = 3;
+const STATE_PHASE_UPDATER = 4;
+const STATE_PHASE_REDUCER = 5;
+class CausalStateModelError extends Error {}
+
+function statePhaseName(phase: number): string {
+	switch (phase) {
+		case STATE_PHASE_INITIALIZER:
+			return 'a state initializer is evaluating';
+		case STATE_PHASE_MEMO:
+			return 'a memo calculation is evaluating';
+		case STATE_PHASE_UPDATER:
+			return 'a functional state updater is evaluating';
+		case STATE_PHASE_REDUCER:
+			return 'a reducer is evaluating';
+		default:
+			return 'a component is rendering';
+	}
+}
+
+function assertCausalStateWriteAllowed(model: RuntimeStateModel, target: Block): void {
+	if (
+		!STATE_WRITE_CONTEXT.active ||
+		STATE_WRITE_CONTEXT.depth === 0 ||
+		(model !== STATE_MODEL_CAUSAL && STATE_WRITE_CONTEXT.sourceModel !== STATE_MODEL_CAUSAL)
+	)
+		return;
+	const source = STATE_WRITE_CONTEXT.source;
+	const name = source?.name || componentName(target);
+	throw new CausalStateModelError(
+		formatClientError(47, statePhaseName(STATE_WRITE_CONTEXT.phase), name),
+	);
+}
+
+function enterForbiddenStateFrame(
+	model: RuntimeStateModel,
+	phase: number,
+	source: Function | null,
+): boolean {
+	if (!STATE_WRITE_CONTEXT.active) return false;
+	STATE_WRITE_CONTEXT.depth++;
+	STATE_WRITE_CONTEXT.sourceModel = model;
+	STATE_WRITE_CONTEXT.phase = phase;
+	STATE_WRITE_CONTEXT.source = source;
+	return true;
+}
+
+function leaveForbiddenStateFrame(
+	entered: boolean,
+	previousModel: RuntimeStateModel,
+	previousPhase: number,
+	previousSource: Function | null,
+): void {
+	if (!entered) return;
+	STATE_WRITE_CONTEXT.sourceModel = previousModel;
+	STATE_WRITE_CONTEXT.phase = previousPhase;
+	STATE_WRITE_CONTEXT.source = previousSource;
+	STATE_WRITE_CONTEXT.depth--;
+}
+
+function evaluateWithStateModel<T>(
+	model: RuntimeStateModel,
+	phase: number,
+	block: Block,
+	fn: () => T,
+): T {
+	if (!STATE_WRITE_CONTEXT.active) return fn();
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousPhase = STATE_WRITE_CONTEXT.phase;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	const entered = enterForbiddenStateFrame(model, phase, block.body);
+	try {
+		return fn();
+	} finally {
+		leaveForbiddenStateFrame(entered, previousModel, previousPhase, previousSource);
+	}
+}
+
+function runWithStateWriteContextSuspended<T>(fn: () => T): T {
+	if (!STATE_WRITE_CONTEXT.active || STATE_WRITE_CONTEXT.depth === 0) return fn();
+	const previousDepth = STATE_WRITE_CONTEXT.depth;
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousPhase = STATE_WRITE_CONTEXT.phase;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	STATE_WRITE_CONTEXT.depth = 0;
+	STATE_WRITE_CONTEXT.sourceModel = STATE_MODEL_PERMISSIVE;
+	STATE_WRITE_CONTEXT.phase = 0;
+	STATE_WRITE_CONTEXT.source = null;
+	try {
+		return fn();
+	} finally {
+		STATE_WRITE_CONTEXT.depth = previousDepth;
+		STATE_WRITE_CONTEXT.sourceModel = previousModel;
+		STATE_WRITE_CONTEXT.phase = previousPhase;
+		STATE_WRITE_CONTEXT.source = previousSource;
+	}
+}
+
 function runEffectLifecycleCallback(callback: Cleanup): void {
 	EFFECT_EVENT_LIFECYCLE_DEPTH++;
 	try {
-		callback();
+		runWithStateWriteContextSuspended(callback);
 	} finally {
 		EFFECT_EVENT_LIFECYCLE_DEPTH--;
 	}
@@ -2453,7 +2575,7 @@ function drainRefDetaches(): void {
 		try {
 			REF_CALLBACK_DEPTH++;
 			try {
-				attachRef(q[i], null, q[i + 1]);
+				runWithStateWriteContextSuspended(() => attachRef(q[i], null, q[i + 1]));
 			} finally {
 				REF_CALLBACK_DEPTH--;
 			}
@@ -2484,7 +2606,7 @@ function drainRefAttaches(): void {
 		try {
 			REF_CALLBACK_DEPTH++;
 			try {
-				r.fn();
+				runWithStateWriteContextSuspended(r.fn);
 			} finally {
 				REF_CALLBACK_DEPTH--;
 			}
@@ -2767,7 +2889,10 @@ function runEffectBody(e: PendingEffect): void {
 			// Spread deps as positional args (see PendingEffect.args). A no-deps
 			// effect has args === undefined, so the body is called with zero args.
 			// eslint-disable-next-line prefer-spread
-			cleanup = e.fn.apply(null, (e.args ?? []) as []);
+			cleanup =
+				!STATE_WRITE_CONTEXT.active || STATE_WRITE_CONTEXT.depth === 0
+					? e.fn.apply(null, (e.args ?? []) as [])
+					: runWithStateWriteContextSuspended(() => e.fn.apply(null, (e.args ?? []) as []));
 		} finally {
 			EFFECT_BODY_DEPTH--;
 		}
@@ -3097,6 +3222,7 @@ class BlockImpl {
 	block: Block;
 	// Metadata.
 	kind: BlockKind;
+	stateModelBoundary: boolean;
 
 	constructor(
 		kind: BlockKind,
@@ -3163,6 +3289,7 @@ class BlockImpl {
 		this.parent = null;
 		this.block = this as unknown as Block;
 		this.kind = kind;
+		this.stateModelBoundary = false;
 	}
 }
 
@@ -3342,6 +3469,27 @@ function renderBlockInner(block: Block): void {
 	let profileDidThrow = false;
 	let profileThrown: unknown;
 	let renderCompleted = false;
+	// Structural block bodies (@if/@for/@try, host/de-opt helpers) are an
+	// implementation detail of their enclosing component and must inherit its
+	// source provenance. Only blocks explicitly created for an authored component
+	// replace the source model at definition boundaries.
+	let previousStateModel: RuntimeStateModel = STATE_MODEL_PERMISSIVE;
+	let previousStatePhase = 0;
+	let previousStateSource: Function | null = null;
+	let enteredStateFrame = false;
+	if (STATE_WRITE_CONTEXT.active) {
+		previousStateModel = STATE_WRITE_CONTEXT.sourceModel;
+		previousStatePhase = STATE_WRITE_CONTEXT.phase;
+		previousStateSource = STATE_WRITE_CONTEXT.source;
+		const renderStateModel = block.stateModelBoundary
+			? stateModelOf(block.body)
+			: previousStateModel;
+		enteredStateFrame = enterForbiddenStateFrame(
+			renderStateModel,
+			STATE_PHASE_RENDER,
+			block.stateModelBoundary ? block.body : previousStateSource,
+		);
+	}
 	try {
 		const out = (block.body as (p: any, s: Scope, e: any) => unknown)(
 			block.props,
@@ -3375,6 +3523,9 @@ function renderBlockInner(block: Block): void {
 		EFFECT_EVENT_RENDER_TARGET = prevEffectEventTarget;
 		EFFECT_EVENT_ACTION_TARGET = prevEffectEventActionTarget;
 		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
+		if (enteredStateFrame) {
+			leaveForbiddenStateFrame(true, previousStateModel, previousStatePhase, previousStateSource);
+		}
 		CURRENT_WARM_EPISODE = prevWarmEpisode;
 		CURRENT_SCOPE = prevScope;
 		CURRENT_BLOCK = prevBlock;
@@ -3701,6 +3852,21 @@ export function componentSlotLite<P>(
 			: null;
 	let profileDidThrow = false;
 	let profileThrown: unknown;
+	let previousStateModel: RuntimeStateModel = STATE_MODEL_PERMISSIVE;
+	let previousStatePhase = 0;
+	let previousStateSource: Function | null = null;
+	let enteredStateFrame = false;
+	if (STATE_WRITE_CONTEXT.active) {
+		previousStateModel = STATE_WRITE_CONTEXT.sourceModel;
+		previousStatePhase = STATE_WRITE_CONTEXT.phase;
+		previousStateSource = STATE_WRITE_CONTEXT.source;
+		const transparent = isStateModelTransparent(comp);
+		enteredStateFrame = enterForbiddenStateFrame(
+			transparent ? previousStateModel : stateModelOf(comp),
+			STATE_PHASE_RENDER,
+			transparent ? previousStateSource : comp,
+		);
+	}
 	try {
 		comp(props, scope, undefined);
 		if (!scope.mounted) scope.mounted = true;
@@ -3711,6 +3877,9 @@ export function componentSlotLite<P>(
 	} finally {
 		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 			__profileEndRender(profileFrame, profileDidThrow, profileThrown);
+		if (enteredStateFrame) {
+			leaveForbiddenStateFrame(true, previousStateModel, previousStatePhase, previousStateSource);
+		}
 		ACTIVE_WARM_PLANS.length = warmPlanCheckpoint;
 		CURRENT_SCOPE = prevScope;
 	}
@@ -4014,9 +4183,54 @@ function missingSlot(name: string): never {
 const slotStack: HookSlot[] = [];
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: HookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	const replaceSource = STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0;
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	if (replaceSource) {
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(fn);
+		STATE_WRITE_CONTEXT.source = fn;
+	}
 	slotStack.push(sym);
 	try {
 		return fn(...args);
+	} finally {
+		slotStack.pop();
+		if (replaceSource) {
+			STATE_WRITE_CONTEXT.sourceModel = previousModel;
+			STATE_WRITE_CONTEXT.source = previousSource;
+		}
+	}
+}
+
+/** Compiler helper for method-style custom hooks; preserves the authored receiver. */
+export function withMethodSlot<T>(
+	sym: HookSlot,
+	receiver: unknown,
+	keyOrLookup: PropertyKey | (() => (...a: any[]) => T),
+	argsFactory: () => any[],
+): T {
+	slotStack.push(sym);
+	try {
+		const fn =
+			typeof keyOrLookup === 'function'
+				? keyOrLookup()
+				: (receiver as Record<PropertyKey, (...a: any[]) => T>)[keyOrLookup];
+		const args = argsFactory();
+		const replaceSource = STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0;
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		if (replaceSource) {
+			STATE_WRITE_CONTEXT.sourceModel = stateModelOf(fn);
+			STATE_WRITE_CONTEXT.source = fn;
+		}
+		try {
+			return fn.apply(receiver, args);
+		} finally {
+			if (replaceSource) {
+				STATE_WRITE_CONTEXT.sourceModel = previousModel;
+				STATE_WRITE_CONTEXT.source = previousSource;
+			}
+		}
 	} finally {
 		slotStack.pop();
 	}
@@ -4064,13 +4278,21 @@ type StateTuple<T> = [T, StateSetter<T>, () => T];
 
 export function useState<T = undefined>(): StateTuple<T | undefined>;
 export function useState<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
-export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTuple<T> {
+export function useState<T>(
+	initial?: T | (() => T),
+	slot?: HookSlot,
+	stateModel?: unknown,
+): StateTuple<T> {
 	// ABI: the compiler appends the slot as the LAST argument, so a zero-arg
 	// `useState()` (state starts undefined — React parity) arrives as
 	// `useState(slot)` with the symbol in the initial-value position. Same
 	// trailing-symbol reinterpretation as resolveHookArgs. Unambiguous: a
 	// symbol-valued initial from compiled code always arrives WITH a slot arg.
-	if (slot === undefined && typeof initial === 'symbol') {
+	if (stateModel === undefined && slot === STATE_MODEL_CAUSAL && typeof initial === 'symbol') {
+		stateModel = slot;
+		slot = initial as unknown as HookSlot;
+		initial = undefined as T;
+	} else if (slot === undefined && typeof initial === 'symbol') {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
 	}
@@ -4078,14 +4300,29 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 	if (slot === undefined) missingSlot('useState');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
+	const cellModel = normalizeRuntimeStateModel(stateModel);
 	let s = scope.hooks?.get(slot) as StateSlot<T> | undefined;
 	if (s === undefined) {
-		const initVal = typeof initial === 'function' ? (initial as () => T)() : (initial as T);
+		const initVal =
+			typeof initial === 'function'
+				? STATE_WRITE_CONTEXT.active
+					? evaluateWithStateModel(cellModel, STATE_PHASE_INITIALIZER, block, initial as () => T)
+					: (initial as () => T)()
+				: (initial as T);
 		s = {
 			value: initVal,
 			setter: (next) => {
+				if (STATE_WRITE_CONTEXT.active) assertCausalStateWriteAllowed(cellModel, block);
 				const previous = stagedTransitionValue(s!);
-				const operation = typeof next === 'function' ? (next as (p: T) => T) : () => next;
+				const operation =
+					typeof next === 'function'
+						? !STATE_WRITE_CONTEXT.active
+							? (next as (p: T) => T)
+							: (value: T): T =>
+									evaluateWithStateModel(cellModel, STATE_PHASE_UPDATER, block, () =>
+										(next as (p: T) => T)(value),
+									)
+						: () => next;
 				const computed = operation(previous);
 				if (Object.is(computed, previous)) return;
 				if (stageTransitionValue(s!, block, operation, computed)) {
@@ -4125,14 +4362,22 @@ type _UseStateAcceptsNoArguments = AssertUseStateType<
 
 /** Compiler-emitted useState variant for a tuple whose third member is observable. */
 export function __useStateWithGetter<T>(initial: T | (() => T), slot?: symbol): StateTuple<T>;
-export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot): StateTuple<T> {
+export function __useStateWithGetter<T>(
+	initial: T | (() => T),
+	slot?: HookSlot,
+	stateModel?: unknown,
+): StateTuple<T> {
 	// Mirror useState's zero-argument trailing-slot ABI before delegating so we
 	// can look the resulting cell up by the same effective slot afterwards.
-	if (slot === undefined && typeof initial === 'symbol') {
+	if (stateModel === undefined && slot === STATE_MODEL_CAUSAL && typeof initial === 'symbol') {
+		stateModel = slot;
+		slot = initial as unknown as HookSlot;
+		initial = undefined as T;
+	} else if (slot === undefined && typeof initial === 'symbol') {
 		slot = initial as unknown as symbol;
 		initial = undefined as T;
 	}
-	const pair = (useState as any)(initial, slot) as StateTuple<T>;
+	const pair = (useState as any)(initial, slot, stateModel) as StateTuple<T>;
 	const resolved = resolveSlot(slot);
 	if (resolved === undefined) missingSlot('useState');
 	const s = CURRENT_SCOPE!.hooks!.get(resolved) as StateSlot<T>;
@@ -4149,6 +4394,7 @@ export function __useStateWithGetter<T>(initial: T | (() => T), slot?: HookSlot)
 
 interface ReducerSlot<S, A> {
 	value: S;
+	model: RuntimeStateModel;
 	dispatch: (action: A) => void;
 	reducer: (state: S, action: A) => S;
 	/** Render-phase actions are reduced by the reducer from the replaying render. */
@@ -4174,6 +4420,7 @@ export function useReducer<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: HookSlot,
+	stateModel?: unknown,
 ): ReducerTuple<S, A> {
 	// The compiler appends the hook slot as the final argument. In Symbol builds,
 	// the React 2-arg form `useReducer(reducer, initialState)` arrives as
@@ -4183,7 +4430,10 @@ export function useReducer<S, A, I = S>(
 	// `(reducer, initialArg, init, slot)`. Disambiguate by which trailing arg
 	// is the symbol.
 	let init: ((arg: I) => S) | undefined;
-	if (typeof initOrSlot === 'symbol') {
+	if (stateModel === undefined && typeof initOrSlot === 'symbol' && slot === STATE_MODEL_CAUSAL) {
+		stateModel = slot;
+		slot = initOrSlot;
+	} else if (typeof initOrSlot === 'symbol') {
 		slot = initOrSlot;
 	} else {
 		init = initOrSlot;
@@ -4192,21 +4442,31 @@ export function useReducer<S, A, I = S>(
 	if (slot === undefined) missingSlot('useReducer');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
+	const requestedModel = normalizeRuntimeStateModel(stateModel);
 	let s = scope.hooks?.get(slot) as ReducerSlot<S, A> | undefined;
 	if (s === undefined) {
 		// React parity: the initial state is `initialArg` used AS-IS. Lazy
 		// initialization happens ONLY when the third `init` argument is supplied
 		// (`init(initialArg)`). A function passed as `initialArg` in the 2-arg form
 		// is stored as the state value verbatim — it is NOT called.
-		const initVal = init !== undefined ? init(initialArg) : (initialArg as unknown as S);
+		const initVal =
+			init !== undefined
+				? STATE_WRITE_CONTEXT.active
+					? evaluateWithStateModel(requestedModel, STATE_PHASE_INITIALIZER, block, () =>
+							init(initialArg),
+						)
+					: init(initialArg)
+				: (initialArg as unknown as S);
 		s = {
 			value: initVal,
+			model: requestedModel,
 			reducer,
 			// React parity: unlike useState's setter, dispatch does NOT eagerly bail
 			// when the reducer returns the same state — a no-op action still renders
 			// the component once (children then bail as usual). Per
 			// ReactHooksWithNoopRenderer-test.js:3889.
 			dispatch: (action) => {
+				if (STATE_WRITE_CONTEXT.active) assertCausalStateWriteAllowed(s!.model, block);
 				// React queues a render-phase reducer action and applies it with the
 				// reducer supplied by the replaying render. Reducing eagerly here uses
 				// the previous pass's reducer when that reducer changes alongside state.
@@ -4219,13 +4479,20 @@ export function useReducer<S, A, I = S>(
 					// rather than nullishness, distinguishes the first result: null and
 					// undefined are both valid reducer states.
 					if (s!.getter !== undefined) {
-						s!.renderPhaseValue = s!.reducer(previous, action);
+						s!.renderPhaseValue = evaluateWithStateModel(s!.model, STATE_PHASE_REDUCER, block, () =>
+							s!.reducer(previous, action),
+						);
 					}
 					scheduleRender(block);
 					return;
 				}
 				const previous = stagedTransitionValue(s!);
-				const operation = (value: S) => s!.reducer(value, action);
+				const operation = !STATE_WRITE_CONTEXT.active
+					? (value: S) => s!.reducer(value, action)
+					: (value: S) =>
+							evaluateWithStateModel(s!.model, STATE_PHASE_REDUCER, block, () =>
+								s!.reducer(value, action),
+							);
 				const computed = operation(previous);
 				if (stageTransitionValue(s!, block, operation, computed, true)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
@@ -4256,7 +4523,12 @@ export function useReducer<S, A, I = S>(
 		const actions = s.renderPhaseActions;
 		if (actions !== undefined) {
 			let value = s.value;
-			for (let i = 0; i < actions.length; i++) value = reducer(value, actions[i]);
+			for (let i = 0; i < actions.length; i++) {
+				const previous = value;
+				value = evaluateWithStateModel(s.model, STATE_PHASE_REDUCER, block, () =>
+					reducer(previous, actions[i]),
+				);
+			}
 			s.value = value;
 			s.renderPhaseActions = undefined;
 			s.renderPhaseValue = undefined;
@@ -4279,9 +4551,20 @@ export function __useReducerWithGetter<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol,
 	slot?: HookSlot,
+	stateModel?: unknown,
 ): ReducerTuple<S, A> {
+	if (stateModel === undefined && typeof initOrSlot === 'symbol' && slot === STATE_MODEL_CAUSAL) {
+		stateModel = slot;
+		slot = initOrSlot;
+	}
 	const resolvedInput = typeof initOrSlot === 'symbol' ? initOrSlot : slot;
-	const pair = (useReducer as any)(reducer, initialArg, initOrSlot, slot) as ReducerTuple<S, A>;
+	const pair = (useReducer as any)(
+		reducer,
+		initialArg,
+		initOrSlot,
+		slot,
+		stateModel,
+	) as ReducerTuple<S, A>;
 	const resolved = resolveSlot(resolvedInput);
 	if (resolved === undefined) missingSlot('useReducer');
 	const s = CURRENT_SCOPE!.hooks!.get(resolved) as ReducerSlot<S, A>;
@@ -4371,17 +4654,32 @@ function resolveHookArgs(
 }
 
 export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
-export function useEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
+export function useEffect(
+	fn: EffectFn,
+	deps?: any[] | null,
+	slot?: HookSlot,
+	_stateModel?: unknown,
+): void {
 	const [d, s] = resolveHookArgs('useEffect', deps, slot);
 	enqueueEffect(s, fn, d, PASSIVE);
 }
 export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
-export function useLayoutEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
+export function useLayoutEffect(
+	fn: EffectFn,
+	deps?: any[] | null,
+	slot?: HookSlot,
+	_stateModel?: unknown,
+): void {
 	const [d, s] = resolveHookArgs('useLayoutEffect', deps, slot);
 	enqueueEffect(s, fn, d, LAYOUT);
 }
 export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: symbol): void;
-export function useInsertionEffect(fn: EffectFn, deps?: any[] | null, slot?: HookSlot): void {
+export function useInsertionEffect(
+	fn: EffectFn,
+	deps?: any[] | null,
+	slot?: HookSlot,
+	_stateModel?: unknown,
+): void {
 	const [d, s] = resolveHookArgs('useInsertionEffect', deps, slot);
 	enqueueEffect(s, fn, d, INSERTION);
 }
@@ -4391,6 +4689,7 @@ export function useMemo<T>(
 	compute: (...deps: any[]) => T,
 	deps?: any[] | null,
 	slot?: HookSlot,
+	stateModel?: unknown,
 ): T {
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
@@ -4424,7 +4723,12 @@ export function useMemo<T>(
 	// a factory written as a pure function of its deps is hoistable. Zero-arg
 	// React-style factories ignore the extra args.
 	// eslint-disable-next-line prefer-spread
-	const value = compute.apply(null, (d ?? []) as []);
+	const model = normalizeRuntimeStateModel(stateModel);
+	const value = STATE_WRITE_CONTEXT.active
+		? evaluateWithStateModel(model, STATE_PHASE_MEMO, scope.block, () =>
+				compute.apply(null, (d ?? []) as []),
+			)
+		: compute.apply(null, (d ?? []) as []);
 	const entry: { deps: any[] | undefined; value: T; warmEpisode?: number } = { deps: d, value };
 	ensureHooks(scope).set(s, entry);
 	if (d !== undefined && recordRealWarmMemo(s, d, entry)) {
@@ -4505,6 +4809,7 @@ export function useImperativeHandle<T>(
 	factory: () => T,
 	deps?: any[] | null,
 	slot?: HookSlot,
+	_stateModel?: unknown,
 ): void {
 	const [resolvedDeps, resolvedSlot] = resolveHookArgs('useImperativeHandle', deps, slot);
 	deps = resolvedDeps;
@@ -4832,6 +5137,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	ctx.defaultValue = defaultValue;
 	ctx.$$version = 0;
 	ctx.Provider = ctx;
+	markStateModelTransparent(ctx);
 	return ctx;
 }
 
@@ -5686,7 +5992,9 @@ function initializeHydrateComponent(): ComponentBody<HydrateProps> {
 	);
 }
 
-export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHydrateComponent();
+export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ markStateModelTransparent(
+	/* @__PURE__ */ initializeHydrateComponent(),
+);
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX component form of
@@ -5701,24 +6009,26 @@ export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHy
 // children as element values (`Octane.JSX.Element`), and the de-opt path
 // renders element descriptors directly.
 export const Suspense: ComponentBody<{ fallback?: unknown; children: unknown }> =
-	/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
-		function Suspense(props, scope) {
-			const block = scope.block;
-			const pendingBody: ComponentBody = (_p, s) => {
-				childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
-			};
-			tryBlock(
-				scope,
-				0,
-				block.parentNode,
-				childrenAsBody(props.children),
-				null,
-				pendingBody,
-				block.endMarker,
-			);
-		},
-		COMPONENT_FLAG_BOUNDARY,
-		'Suspense',
+	/* @__PURE__ */ markStateModelTransparent(
+		/* @__PURE__ */ markComponentFlags<ComponentBody<{ fallback?: unknown; children: unknown }>>(
+			function Suspense(props, scope) {
+				const block = scope.block;
+				const pendingBody: ComponentBody = (_p, s) => {
+					childSlot(s, 1, s.block.parentNode, props.fallback, s.block.endMarker);
+				};
+				tryBlock(
+					scope,
+					0,
+					block.parentNode,
+					childrenAsBody(props.children),
+					null,
+					pendingBody,
+					block.endMarker,
+				);
+			},
+			COMPONENT_FLAG_BOUNDARY,
+			'Suspense',
+		),
 	);
 
 /**
@@ -5743,7 +6053,7 @@ function initializeViewTransitionComponent(): ComponentBody<ViewTransitionProps>
 }
 
 export const ViewTransition: ComponentBody<ViewTransitionProps> =
-	/* @__PURE__ */ initializeViewTransitionComponent();
+	/* @__PURE__ */ markStateModelTransparent(/* @__PURE__ */ initializeViewTransitionComponent());
 
 /**
  * `<ErrorBoundary fallback={…}>…</ErrorBoundary>` — the JSX component form of
@@ -5756,38 +6066,40 @@ export const ErrorBoundary: ComponentBody<{
 	fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
 	// Renderable, not ComponentBody — same reasoning as Suspense above.
 	children: unknown;
-}> = /* @__PURE__ */ markComponentFlags<
-	ComponentBody<{
-		fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
-		children: unknown;
-	}>
->(
-	function ErrorBoundary(props, scope) {
-		const block = scope.block;
-		const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
-			const fb =
-				typeof props.fallback === 'function'
-					? (props.fallback as (e: unknown, r: () => void) => unknown)(
-							catchProps.err,
-							catchProps.reset,
-						)
-					: props.fallback;
-			childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
-		};
-		tryBlock(
-			scope,
-			0,
-			block.parentNode,
-			childrenAsBody(props.children),
-			catchBody,
-			null,
-			block.endMarker,
-			undefined,
-			true,
-		);
-	},
-	COMPONENT_FLAG_BOUNDARY,
-	'ErrorBoundary',
+}> = /* @__PURE__ */ markStateModelTransparent(
+	/* @__PURE__ */ markComponentFlags<
+		ComponentBody<{
+			fallback?: unknown | ((error: unknown, reset: () => void) => unknown);
+			children: unknown;
+		}>
+	>(
+		function ErrorBoundary(props, scope) {
+			const block = scope.block;
+			const catchBody: ComponentBody<{ err: unknown; reset: () => void }> = (catchProps, s) => {
+				const fb =
+					typeof props.fallback === 'function'
+						? (props.fallback as (e: unknown, r: () => void) => unknown)(
+								catchProps.err,
+								catchProps.reset,
+							)
+						: props.fallback;
+				childSlot(s, 1, s.block.parentNode, fb, s.block.endMarker);
+			};
+			tryBlock(
+				scope,
+				0,
+				block.parentNode,
+				childrenAsBody(props.children),
+				catchBody,
+				null,
+				block.endMarker,
+				undefined,
+				true,
+			);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'ErrorBoundary',
+	),
 );
 
 /**
@@ -6797,7 +7109,23 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 			__profileComponentSource(lazyWrapper, comp);
 			profiledComponent = comp;
 		}
-		return comp(lazyResolvedProps(comp, props), scope, extra);
+		if (!STATE_WRITE_CONTEXT.active) {
+			return comp(lazyResolvedProps(comp, props), scope, extra);
+		}
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousPhase = STATE_WRITE_CONTEXT.phase;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		const transparent = isStateModelTransparent(comp);
+		const enteredStateFrame = enterForbiddenStateFrame(
+			transparent ? previousModel : stateModelOf(comp),
+			STATE_PHASE_RENDER,
+			transparent ? previousSource : comp,
+		);
+		try {
+			return comp(lazyResolvedProps(comp, props), scope, extra);
+		} finally {
+			leaveForbiddenStateFrame(enteredStateFrame, previousModel, previousPhase, previousSource);
+		}
 	};
 
 	lazyWrapper = (props: any, scope: Scope, extra: any): unknown => {
@@ -8082,6 +8410,35 @@ function dangerouslySetInnerHTMLOwnsChild(parent: Node, value: unknown): boolean
 const refCleanups = new WeakMap<(el: any) => unknown, WeakMap<object, () => void>>();
 const refLastCleanupTarget = new WeakMap<(el: any) => unknown, object>();
 
+function attachFunctionRef(
+	ref: (el: any) => unknown,
+	el: Element | FragmentInstance | null,
+	prevTarget?: Element | FragmentInstance | null,
+): void {
+	if (el === null) {
+		// Detach: prefer the React-19 cleanup the callback returned when it was
+		// attached to `prevTarget` (falling back to the latest attach's target).
+		const perTarget = refCleanups.get(ref);
+		const target = prevTarget ?? refLastCleanupTarget.get(ref);
+		const cleanup = perTarget !== undefined && target != null ? perTarget.get(target) : undefined;
+		if (cleanup !== undefined) {
+			perTarget!.delete(target as object);
+			if (refLastCleanupTarget.get(ref) === target) refLastCleanupTarget.delete(ref);
+			cleanup();
+		} else {
+			ref(null);
+		}
+	} else {
+		const cleanup = ref(el);
+		if (typeof cleanup === 'function') {
+			let perTarget = refCleanups.get(ref);
+			if (perTarget === undefined) refCleanups.set(ref, (perTarget = new WeakMap()));
+			perTarget.set(el, cleanup as () => void);
+			refLastCleanupTarget.set(ref, el);
+		}
+	}
+}
+
 export function attachRef(
 	ref: any,
 	el: Element | FragmentInstance | null,
@@ -8089,27 +8446,10 @@ export function attachRef(
 ): void {
 	if (ref == null) return;
 	if (typeof ref === 'function') {
-		if (el === null) {
-			// Detach: prefer the React-19 cleanup the callback returned when it was
-			// attached to `prevTarget` (falling back to the latest attach's target).
-			const perTarget = refCleanups.get(ref);
-			const target = prevTarget ?? refLastCleanupTarget.get(ref);
-			const cleanup = perTarget !== undefined && target != null ? perTarget.get(target) : undefined;
-			if (cleanup !== undefined) {
-				perTarget!.delete(target as object);
-				if (refLastCleanupTarget.get(ref) === target) refLastCleanupTarget.delete(ref);
-				cleanup();
-			} else {
-				ref(null);
-			}
+		if (STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0) {
+			runWithStateWriteContextSuspended(() => attachFunctionRef(ref, el, prevTarget));
 		} else {
-			const cleanup = ref(el);
-			if (typeof cleanup === 'function') {
-				let perTarget = refCleanups.get(ref);
-				if (perTarget === undefined) refCleanups.set(ref, (perTarget = new WeakMap()));
-				perTarget.set(el, cleanup as () => void);
-				refLastCleanupTarget.set(ref, el);
-			}
+			attachFunctionRef(ref, el, prevTarget);
 		}
 		return;
 	}
@@ -12897,6 +13237,7 @@ function componentSlotImpl(
 					body,
 					renderProps,
 					outputHandler,
+					typeof identity === 'function' && !isStateModelTransparent(identity),
 				);
 				if (r.suspended || r.error) {
 					transitionSwap.dispose(r.wip);
@@ -12933,6 +13274,7 @@ function componentSlotImpl(
 					body,
 					renderProps,
 					outputHandler,
+					typeof identity === 'function' && !isStateModelTransparent(identity),
 				);
 				transitionSwap.dispose(r.wip);
 				if (r.error) throw r.error;
@@ -12995,6 +13337,7 @@ function componentSlotImpl(
 				undefined,
 				outputHandler,
 			);
+			b.stateModelBoundary = typeof identity === 'function' && !isStateModelTransparent(identity);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -13036,6 +13379,7 @@ function componentSlotImpl(
 				undefined,
 				outputHandler,
 			);
+			b.stateModelBoundary = typeof identity === 'function' && !isStateModelTransparent(identity);
 			if (
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -13185,6 +13529,7 @@ function renderOffscreen(
 	body: ComponentBody,
 	props: any,
 	outputHandler: OutputHandler | null,
+	stateModelBoundary = false,
 	// Block kind for the off-screen block. Only 'root' is behaviorally special, so
 	// this is DOM-shape fidelity (branch commits pass 'control-flow' to mirror their
 	// in-place blocks), not correctness — 'dynamic' works for every non-root caller.
@@ -13214,6 +13559,7 @@ function renderOffscreen(
 		env,
 		outputHandler,
 	);
+	block.stateModelBoundary = stateModelBoundary;
 	if (
 		typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 		__OCTANE_PROFILE_ENABLED__ &&
@@ -15162,6 +15508,9 @@ export function childSlot(
 								comp,
 								props,
 								renderReturnedValue,
+								!isBodyFn &&
+									comp !== (hostElementBody as unknown as ComponentBody) &&
+									!isStateModelTransparent(comp),
 							),
 						)
 					: transitionSwap.render(
@@ -15171,6 +15520,9 @@ export function childSlot(
 							comp,
 							props,
 							renderReturnedValue,
+							!isBodyFn &&
+								comp !== (hostElementBody as unknown as ComponentBody) &&
+								!isStateModelTransparent(comp),
 						);
 			if (r.suspended || r.error) {
 				// Discard the partial; the OLD content was never touched, so it stays live.
@@ -15280,6 +15632,13 @@ export function childSlot(
 			undefined,
 			renderReturnedValue,
 		);
+		if (
+			!isBodyFn &&
+			comp !== (hostElementBody as unknown as ComponentBody) &&
+			!isStateModelTransparent(comp)
+		) {
+			b.stateModelBoundary = true;
+		}
 		if (
 			typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 			__OCTANE_PROFILE_ENABLED__ &&
@@ -15575,7 +15934,13 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	const compare = (comp as any).__compare as ((prev: any, next: any) => boolean) | undefined;
 	// React.memo's optional comparator: returns true when props are equal
 	// (→ skip the render). Falls back to a shallow Object.is comparison.
-	const equal = compare ? compare(block.props, props) : shallowEqualProps(block.props, props);
+	const equal = compare
+		? STATE_WRITE_CONTEXT.active
+			? evaluateWithStateModel(stateModelOf(comp), STATE_PHASE_MEMO, block, () =>
+					compare(block.props, props),
+				)
+			: compare(block.props, props)
+		: shallowEqualProps(block.props, props);
 	if (!equal) return false;
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
@@ -15748,11 +16113,28 @@ function shallowEqualPropsExact(a: any, b: any): boolean {
 export function memo<P>(
 	component: ComponentBody<P>,
 	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
+): ComponentBody<P>;
+export function memo<P>(
+	component: ComponentBody<P>,
+	arePropsEqual?: (prevProps: Readonly<P>, nextProps: Readonly<P>) => boolean,
+	_stateModel?: unknown,
 ): ComponentBody<P> {
 	function memoWrapper(props: P, scope: Scope, extra: any): unknown {
 		// Propagate the wrapped body's return so a folded (return-based) component
 		// memo()'d here still hands its descriptor back to renderBlock to mount.
-		return component(props, scope, extra);
+		if (!STATE_WRITE_CONTEXT.active || isStateModelTransparent(component)) {
+			return component(props, scope, extra);
+		}
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(component);
+		STATE_WRITE_CONTEXT.source = component;
+		try {
+			return component(props, scope, extra);
+		} finally {
+			STATE_WRITE_CONTEXT.sourceModel = previousModel;
+			STATE_WRITE_CONTEXT.source = previousSource;
+		}
 	}
 	(memoWrapper as any).__memo = true;
 	// `createElement(memo(Component), …)` and `lazy(() => ({default:
@@ -15769,6 +16151,9 @@ export function memo<P>(
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileComponentSource(memoWrapper, component);
 	if (arePropsEqual) (memoWrapper as any).__compare = arePropsEqual;
+	if (arguments.length >= 3 && arguments[arguments.length - 1] === STATE_MODEL_CAUSAL) {
+		markStateModel(memoWrapper, STATE_MODEL_CAUSAL);
+	}
 	return memoWrapper as ComponentBody<P>;
 }
 
@@ -15826,6 +16211,9 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 			// module instead of reusing a live scope with the incompatible layout.
 			if ((meta.fn as any).__octaneReturnedOutput !== (nextFn as any).__octaneReturnedOutput)
 				return false;
+			// A policy change invalidates the hook-cell ABI. Reusing the live hook map
+			// would mix old provenance with newly compiled dispatch sites.
+			if (stateModelOf(meta.fn) !== stateModelOf(nextFn)) return false;
 			meta.fn = nextFn;
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileComponentSource(wrapper, meta.fn);
@@ -15858,6 +16246,7 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 		return meta.fn(props as any, scope, extra);
 	}
 	(wrapper as HmrWrapper)[HMR] = meta;
+	markStateModel(wrapper, stateModelOf(fn));
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileComponentSource(wrapper, fn);
 	// Forward the parallel-use fetch plan (docs/suspense-parallel-use-plan.md):
@@ -17348,14 +17737,23 @@ export function useActionState<S>(
 	initialState: S,
 	permalinkOrSlot?: string | symbol,
 	slot?: HookSlot,
+	stateModel?: unknown,
 ): [S, (payload?: any) => void, boolean] {
 	// `permalink` is optional, the compiler appends the slot last. Disambiguate:
 	// a trailing symbol in the 3rd position means no permalink was passed.
-	if (typeof permalinkOrSlot === 'symbol') slot = permalinkOrSlot;
+	if (
+		stateModel === undefined &&
+		typeof permalinkOrSlot === 'symbol' &&
+		slot === STATE_MODEL_CAUSAL
+	) {
+		stateModel = slot;
+		slot = permalinkOrSlot;
+	} else if (typeof permalinkOrSlot === 'symbol') slot = permalinkOrSlot;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useActionState');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
+	const cellModel = normalizeRuntimeStateModel(stateModel);
 	let s = scope.hooks?.get(slot) as ActionStateSlot<S> | undefined;
 	if (s === undefined) {
 		const slotRef: ActionStateSlot<S> = {
@@ -17377,6 +17775,7 @@ export function useActionState<S>(
 			}
 		};
 		const dispatch = ((payload?: any): Promise<S> => {
+			if (STATE_WRITE_CONTEXT.active) assertCausalStateWriteAllowed(cellModel, block);
 			slotRef.pendingCount++;
 			setPending(true);
 			// Sequential queue: each run sees the prior COMPLETED state.
@@ -17526,6 +17925,7 @@ export function useFormStatus(slot?: HookSlot): FormStatus {
 
 interface OptimisticSlot<S, V> {
 	queue: V[];
+	model: RuntimeStateModel;
 	updateFn?: (state: S, value: V) => S;
 	add: (value: V) => void;
 	/**
@@ -17546,14 +17946,23 @@ export function useOptimistic<S, V = S>(
 	passthrough: S,
 	updateFnOrSlot?: ((state: S, value: V) => S) | symbol,
 	slot?: HookSlot,
+	stateModel?: unknown,
 ): [S, (value: V) => void] {
 	let updateFn: ((state: S, value: V) => S) | undefined;
-	if (typeof updateFnOrSlot === 'symbol') slot = updateFnOrSlot;
+	if (
+		stateModel === undefined &&
+		typeof updateFnOrSlot === 'symbol' &&
+		slot === STATE_MODEL_CAUSAL
+	) {
+		stateModel = slot;
+		slot = updateFnOrSlot;
+	} else if (typeof updateFnOrSlot === 'symbol') slot = updateFnOrSlot;
 	else updateFn = updateFnOrSlot;
 	slot = resolveSlot(slot);
 	if (slot === undefined) missingSlot('useOptimistic');
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
+	const requestedModel = normalizeRuntimeStateModel(stateModel);
 	let s = scope.hooks?.get(slot) as OptimisticSlot<S, V> | undefined;
 	if (s === undefined) {
 		const clear = (): void => {
@@ -17569,9 +17978,13 @@ export function useOptimistic<S, V = S>(
 		};
 		const slotRef: OptimisticSlot<S, V> = {
 			queue: [],
+			model: requestedModel,
 			updateFn,
 			armed: false,
 			add: (value: V) => {
+				if (STATE_WRITE_CONTEXT.active) {
+					assertCausalStateWriteAllowed(slotRef.model, block);
+				}
 				slotRef.queue.push(value);
 				if (TRANSITION_PENDING_COUNT > 0) {
 					// Inside an Action: the optimistic value is held until that
@@ -17605,7 +18018,14 @@ export function useOptimistic<S, V = S>(
 	s.updateFn = updateFn;
 	let optimistic = passthrough;
 	for (let i = 0; i < s.queue.length; i++) {
-		optimistic = s.updateFn ? s.updateFn(optimistic, s.queue[i]) : (s.queue[i] as unknown as S);
+		if (s.updateFn) {
+			const previous = optimistic;
+			optimistic = evaluateWithStateModel(s.model, STATE_PHASE_REDUCER, block, () =>
+				s.updateFn!(previous, s.queue[i]),
+			);
+		} else {
+			optimistic = s.queue[i] as unknown as S;
+		}
 	}
 	return [optimistic, s.add];
 }
@@ -18097,6 +18517,7 @@ function renderBranchSlot(
 					body,
 					undefined,
 					null,
+					false,
 					'control-flow',
 					env,
 				);
@@ -20642,6 +21063,8 @@ function makeRoot(
 				undefined,
 				outputHandler,
 			);
+			rootBlock.stateModelBoundary =
+				body !== ROOT_RENDERABLE_BODY && body !== EMPTY_ROOT_BODY && !isStateModelTransparent(body);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
@@ -20850,6 +21273,8 @@ export function hydrateRoot(
 		undefined,
 		renderReturnedValue,
 	);
+	rootBlock.stateModelBoundary =
+		body !== ROOT_RENDERABLE_BODY && body !== EMPTY_ROOT_BODY && !isStateModelTransparent(body);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
 	const idState: RootIdState = {

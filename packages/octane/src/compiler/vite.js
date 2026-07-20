@@ -168,11 +168,54 @@ export function octane(options = {}) {
 	const requireDirective = options.requireDirective === true;
 	let logger = null;
 	const warn = (message) => (logger ?? console).warn(message);
+	let serving = false;
+	let devWatcher = null;
+	const devManifestWatchPaths = new Set();
+	const watchCompilerManifests = (context, dependencies, missingDependencies) => {
+		if (!serving) {
+			for (const dependency of dependencies) context.addWatchFile?.(dependency);
+			return;
+		}
+		let added = null;
+		for (const dependency of dependencies) {
+			if (devManifestWatchPaths.has(dependency)) continue;
+			devManifestWatchPaths.add(dependency);
+			(added ??= []).push(dependency);
+		}
+		for (const dependency of missingDependencies) {
+			if (devManifestWatchPaths.has(dependency)) continue;
+			devManifestWatchPaths.add(dependency);
+			(added ??= []).push(dependency);
+		}
+		if (added !== null) devWatcher?.add(added);
+	};
+	// Manifest metadata selects source ownership and causal provenance. Once a
+	// transformed module observes one of these classification paths, changing it
+	// cannot use ordinary component HMR: existing hook cells would retain their old
+	// model. Track exact existing and prospective manifests so the hot-update hook
+	// can restart every Vite environment and allocate a fresh browser runtime graph.
+	const compilerManifestHotPaths = new Set();
+	const trackCompilerManifest = (manifest) => {
+		const absolute = resolve(cleanModuleId(manifest));
+		if (compilerManifestHotPaths.has(absolute)) return;
+		compilerManifestHotPaths.add(absolute);
+		compilerManifestHotPaths.add(realRoot(absolute));
+	};
+	const trackCompilerManifests = (resolution) => {
+		for (const manifest of resolution.dependencies) {
+			trackCompilerManifest(manifest);
+		}
+		for (const manifest of resolution.missingDependencies) {
+			trackCompilerManifest(manifest);
+		}
+		return resolution;
+	};
 	let compiler = createOctaneCompiler({
 		root: projectRoot,
 		exclude: options.exclude,
 		profile: profileEnabled,
 		renderers: options.renderers,
+		stateModel: options.stateModel,
 		requireDirective,
 		warn,
 	});
@@ -181,11 +224,15 @@ export function octane(options = {}) {
 
 	const resetCompiler = (root) => {
 		projectRoot = resolve(root);
+		compilerManifestHotPaths.clear();
+		devManifestWatchPaths.clear();
+		devWatcher = null;
 		compiler = createOctaneCompiler({
 			root: projectRoot,
 			exclude: options.exclude,
 			profile: profileEnabled,
 			renderers: options.renderers,
+			stateModel: options.stateModel,
 			requireDirective,
 			warn,
 		});
@@ -194,6 +241,17 @@ export function octane(options = {}) {
 	return {
 		name: 'octane',
 		enforce: 'pre',
+		// Adjacent source compilers (for example @octanejs/mdx) consume the
+		// already-resolved per-file policy through this Vite plugin API. Keeping
+		// classification on the same compiler instance preserves manifest caches,
+		// consumer approvals, and watch invalidation across authored file types.
+		api: {
+			octane: {
+				resolveStateModelForSource(id) {
+					return trackCompilerManifests(compiler.resolveStateModelForSource(id));
+				},
+			},
+		},
 		config(config) {
 			assertProfilingDefineAvailable(config.define, profileEnabled);
 			resetCompiler(config.root ?? process.cwd());
@@ -221,6 +279,7 @@ export function octane(options = {}) {
 		},
 		configResolved(config) {
 			logger = config.logger ?? null;
+			serving = config.command === 'serve';
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);
@@ -233,8 +292,30 @@ export function octane(options = {}) {
 			// proof to one-shot production builds where the graph is compiled together.
 			specializeProductionRoots = config.command === 'build' && config.build?.watch == null;
 		},
+		configureServer(server) {
+			devWatcher = server.watcher;
+			if (devManifestWatchPaths.size > 0) devWatcher.add([...devManifestWatchPaths]);
+		},
 		watchChange(id) {
 			compiler.invalidate(id);
+		},
+		hotUpdate: {
+			order: 'pre',
+			async handler({ file, server }) {
+				if (this.environment.name !== 'client') return;
+				const changed = resolve(cleanModuleId(file));
+				if (
+					!compilerManifestHotPaths.has(changed) &&
+					!compilerManifestHotPaths.has(realRoot(changed))
+				) {
+					return;
+				}
+				// `watchChange` normally invalidates first, but keep the guarantee
+				// independent of hook ordering and direct hook invocation in hosts.
+				compiler.invalidate(file);
+				await server.restart();
+				return [];
+			},
 		},
 		generateBundle(_outputOptions, bundle) {
 			if (!emitClientReferenceManifest) return;
@@ -278,7 +359,12 @@ export function octane(options = {}) {
 						: {}),
 				});
 				if (result === null) return null;
-				for (const dependency of result.dependencies) this.addWatchFile?.(dependency);
+				trackCompilerManifests(result);
+				// Vite 8 treats transform-time addWatchFile() calls as authored module
+				// imports during serve. Register exact existing and prospective manifests
+				// directly with the dev watcher there; Rollup still needs addWatchFile()
+				// for existing files in build-watch.
+				watchCompilerManifests(this, result.dependencies, result.missingDependencies);
 				if (result.kind === 'none') return null;
 				const meta = {};
 				if (result.clientReference !== undefined) {

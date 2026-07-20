@@ -6,8 +6,12 @@
  * untouched — vite's asset plugin owns those (its load step already produced
  * `export default "<file text>"`; re-compiling that JS would mangle it).
  */
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
 import { octaneMdx } from '@octanejs/mdx/vite';
+import { octane } from 'octane/compiler/vite';
 
 function plugin(options?: Parameters<typeof octaneMdx>[0]) {
 	const p = octaneMdx(options);
@@ -70,5 +74,197 @@ describe('octaneMdx() id claiming', () => {
 		p.watchChange('/docs/form.mdx');
 		await p.transform.call(context, source, '/docs/form.mdx');
 		expect(warn).toHaveBeenCalledTimes(2);
+	});
+
+	it('watches existing state-model inputs without importing missing manifests', async () => {
+		const p = octaneMdx();
+		const resolveStateModelForSource = vi.fn(() => ({
+			stateModel: 'permissive' as const,
+			dependencies: ['/repo/package.json'],
+			missingDependencies: ['/repo/docs/package.json'],
+		}));
+		p.configResolved({
+			command: 'build',
+			root: '/repo',
+			plugins: [{ name: 'octane', api: { octane: { resolveStateModelForSource } } }],
+		});
+		const addWatchFile = vi.fn();
+
+		await p.transform.call({ addWatchFile }, '# Doc\n', '/repo/docs/Doc.mdx');
+
+		expect(resolveStateModelForSource).toHaveBeenCalledWith('/repo/docs/Doc.mdx');
+		expect(addWatchFile.mock.calls).toEqual([['/repo/package.json']]);
+	});
+
+	it('uses the dev watcher instead of transform imports while serving', async () => {
+		const p = octaneMdx();
+		const resolveStateModelForSource = vi.fn(() => ({
+			stateModel: 'permissive' as const,
+			dependencies: ['/repo/package.json'],
+			missingDependencies: ['/repo/docs/package.json'],
+		}));
+		p.configResolved({
+			command: 'serve',
+			root: '/repo',
+			plugins: [{ name: 'octane', api: { octane: { resolveStateModelForSource } } }],
+		});
+		const watch = vi.fn();
+		p.configureServer({ watcher: { add: watch } });
+		const addWatchFile = vi.fn();
+
+		await p.transform.call({ addWatchFile }, '# Doc\n', '/repo/docs/Doc.mdx');
+
+		expect(watch).toHaveBeenCalledWith(['/repo/package.json', '/repo/docs/package.json']);
+		expect(addWatchFile).not.toHaveBeenCalled();
+		const restart = vi.fn(async () => undefined);
+		expect(
+			await p.hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: '/repo/package.json', server: { restart } },
+			),
+		).toBeUndefined();
+		expect(restart).not.toHaveBeenCalled();
+	});
+
+	it('restarts standalone MDX when a watched policy input changes', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-mdx-state-model-hmr-'));
+		try {
+			const manifest = join(root, 'package.json');
+			const document = join(root, 'docs/Doc.mdx');
+			mkdirSync(join(root, 'docs'), { recursive: true });
+			writeFileSync(manifest, JSON.stringify({ name: 'docs-app', private: true }));
+			const p = octaneMdx();
+			p.configResolved({ command: 'serve', root });
+			const watch = vi.fn();
+			p.configureServer({ watcher: { add: watch } });
+			await p.transform.call({}, '# Doc\n', document);
+			const restart = vi.fn(async () => undefined);
+
+			const update = await p.hotUpdate.handler.call(
+				{ environment: { name: 'client' } },
+				{ file: manifest, server: { restart } },
+			);
+
+			expect(update).toEqual([]);
+			expect(restart).toHaveBeenCalledOnce();
+			expect(watch.mock.calls.flat(2)).toContain(manifest);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('re-publishes causal warnings after a watched policy input changes', async () => {
+		let stateModel: 'causal' | 'permissive' = 'causal';
+		const policyManifest = '/repo/package.json';
+		const p = octaneMdx();
+		p.configResolved({
+			command: 'build',
+			root: '/repo',
+			plugins: [
+				{
+					name: 'octane',
+					api: {
+						octane: {
+							resolveStateModelForSource: () => ({
+								stateModel,
+								dependencies: [policyManifest],
+								missingDependencies: [],
+							}),
+						},
+					},
+				},
+			],
+		});
+		const warn = vi.fn();
+		const context = { warn, addWatchFile: vi.fn() };
+		const source = `import { useEffect, useState } from 'octane'
+
+export function Report() {
+  const [, setCount] = useState(0)
+  useEffect(() => setCount(1), [])
+  return <span />
+}
+
+<Report />
+`;
+		const document = '/repo/docs/Report.mdx';
+
+		await p.transform.call(context, source, document);
+		expect(warn).toHaveBeenCalledTimes(1);
+
+		stateModel = 'permissive';
+		p.watchChange(policyManifest);
+		await p.transform.call(context, source, document);
+		expect(warn).toHaveBeenCalledTimes(1);
+
+		stateModel = 'causal';
+		p.watchChange(policyManifest);
+		await p.transform.call(context, source, document);
+		expect(warn).toHaveBeenCalledTimes(2);
+		expect(warn).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				code: 'OCTANE_CAUSAL_STATE_EFFECT_WRITE',
+				id: document,
+			}),
+		);
+	});
+
+	it('uses the core compiler state-model resolver for app and dependency documents', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-mdx-state-model-'));
+		try {
+			const appDocument = join(root, 'docs/App.mdx');
+			mkdirSync(join(root, 'docs'), { recursive: true });
+			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+
+			const dependencyRoot = join(root, 'node_modules/@vendor/legacy-docs');
+			const dependencyDocument = join(dependencyRoot, 'Guide.mdx');
+			mkdirSync(dependencyRoot, { recursive: true });
+			const dependencyManifest = join(dependencyRoot, 'package.json');
+			writeFileSync(
+				dependencyManifest,
+				JSON.stringify({
+					name: '@vendor/legacy-docs',
+					peerDependencies: { octane: '*' },
+					octane: { stateModel: 'permissive' },
+				}),
+			);
+
+			const compiler = octane({
+				hmr: false,
+				stateModel: {
+					default: 'causal',
+					packages: { '@vendor/legacy-docs': 'permissive' },
+				},
+			});
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+
+			const p = octaneMdx();
+			p.configResolved({ command: 'build', root, plugins: [compiler] });
+			const watchFiles: string[] = [];
+			const context = { addWatchFile: (file: string) => watchFiles.push(file) };
+			const app = await p.transform.call(context, '# App\n', appDocument);
+			const dependency = await p.transform.call(context, '# Legacy\n', dependencyDocument);
+
+			expect(app?.code).toContain('markStateModel');
+			expect(dependency?.code).not.toContain('markStateModel');
+			expect(watchFiles).toContain(dependencyManifest);
+
+			const unapprovedCompiler = octane({
+				hmr: false,
+				stateModel: { default: 'causal' },
+			});
+			await (unapprovedCompiler.config as (config: { root: string }) => unknown)({ root });
+			const unapprovedMdx = octaneMdx();
+			unapprovedMdx.configResolved({
+				command: 'build',
+				root,
+				plugins: [unapprovedCompiler],
+			});
+			await expect(
+				unapprovedMdx.transform.call({}, '# Legacy\n', dependencyDocument),
+			).rejects.toThrow(/permissive dependency code requires consumer approval/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });

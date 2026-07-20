@@ -184,6 +184,124 @@ describe('octane() plugin factory', () => {
 		).toThrow(/childRenderer references unknown renderer "missing"/);
 	});
 
+	it('loads app state-model policy before dependency transforms', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-state-model-'));
+		const dependencyRoot = join(root, 'node_modules/@vendor/legacy-widgets');
+		try {
+			await mkdir(join(dependencyRoot, 'src'), { recursive: true });
+			await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			await writeFile(
+				join(root, 'octane.config.ts'),
+				`export default {
+	compiler: {
+		stateModel: {
+			default: 'causal',
+			packages: { '@vendor/legacy-widgets': 'permissive' },
+		},
+	},
+};
+`,
+			);
+			await writeFile(
+				join(dependencyRoot, 'package.json'),
+				JSON.stringify({
+					name: '@vendor/legacy-widgets',
+					peerDependencies: { octane: '*' },
+					octane: { stateModel: 'permissive' },
+				}),
+			);
+			const source = join(dependencyRoot, 'src/View.tsrx');
+			const code = `export function View() @{ <p>{'legacy'}</p> }`;
+			await writeFile(source, code);
+
+			const [compiler] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const transform = compiler.transform as (code: string, id: string) => unknown;
+			expect(transform.call({ addWatchFile: vi.fn() }, code, source)).not.toBeNull();
+
+			// An inline policy overrides only the state model loaded from app config.
+			const [unapproved] = octane({
+				hmr: false,
+				stateModel: { default: 'causal' },
+			});
+			await (unapproved.config as (config: { root: string }) => unknown)({ root });
+			expect(() =>
+				(unapproved.transform as (code: string, id: string) => unknown).call(
+					{ addWatchFile: vi.fn() },
+					code,
+					source,
+				),
+			).toThrow(/permissive dependency code requires consumer approval/);
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
+	it('restarts the paired compiler for dependency state-model manifest changes', async () => {
+		const root = await mkdtemp(join(tmpdir(), 'octane-vite-state-model-hmr-'));
+		const dependencyRoot = join(root, 'node_modules/@vendor/changing-widgets');
+		const dependencyManifest = join(dependencyRoot, 'package.json');
+		try {
+			await mkdir(join(dependencyRoot, 'src'), { recursive: true });
+			await writeFile(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
+			await writeFile(
+				dependencyManifest,
+				JSON.stringify({
+					name: '@vendor/changing-widgets',
+					peerDependencies: { octane: '*' },
+					octane: { stateModel: 'causal' },
+				}),
+			);
+			const source = join(dependencyRoot, 'src/View.tsrx');
+			const code = `export function View() @{ <p>{'changing'}</p> }`;
+			await writeFile(source, code);
+
+			const [compiler, meta] = octane({ hmr: false });
+			await (compiler.config as (config: { root: string }) => unknown)({ root });
+			const addWatchFile = vi.fn();
+			(
+				compiler.transform as (
+					code: string,
+					id: string,
+				) => {
+					code: string;
+				}
+			).call({ addWatchFile }, code, source);
+			expect(addWatchFile).toHaveBeenCalledWith(dependencyManifest);
+
+			await writeFile(
+				dependencyManifest,
+				JSON.stringify({
+					name: '@vendor/changing-widgets',
+					peerDependencies: { octane: '*' },
+				}),
+			);
+			(compiler.watchChange as (id: string) => void)(dependencyManifest);
+			const restart = vi.fn(async () => undefined);
+			const context = {
+				file: dependencyManifest,
+				modules: [],
+				server: { restart },
+			};
+			const compilerHotUpdate = compiler.hotUpdate as {
+				handler(context: unknown): Promise<unknown>;
+			};
+			expect(
+				await compilerHotUpdate.handler.call({ environment: { name: 'client' } }, context),
+			).toEqual([]);
+
+			const metaHotUpdate = meta.hotUpdate as {
+				handler(context: unknown): Promise<unknown>;
+			};
+			expect(
+				await metaHotUpdate.handler.call({ environment: { name: 'client' } }, context),
+			).toBeUndefined();
+			expect(restart).toHaveBeenCalledOnce();
+		} finally {
+			await rm(root, { recursive: true, force: true });
+		}
+	});
+
 	it('loads app renderer metadata before transforms and restarts for imported config changes', async () => {
 		const root = await mkdtemp(join(tmpdir(), 'octane-vite-renderers-'));
 		const configPath = join(root, 'octane.config.ts');

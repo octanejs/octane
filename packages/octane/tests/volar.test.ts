@@ -80,6 +80,90 @@ describe('compileToVolarMappings', () => {
 		expect(result.errors).toEqual([]);
 	});
 
+	it('keeps default and explicit permissive diagnostics unchanged', () => {
+		const src =
+			"import { useState } from 'octane';\n" +
+			'export function App() @{\n' +
+			'  const [, setValue] = useState(0);\n' +
+			'  setValue(1);\n' +
+			'  <input onChange={() => {}} />\n' +
+			'}\n';
+		const omitted = compileToVolarMappings(src, '/src/App.tsrx');
+		const permissive = compileToVolarMappings(src, '/src/App.tsrx', {
+			stateModel: 'permissive',
+		});
+
+		expect(permissive.diagnostics).toEqual(omitted.diagnostics);
+		expect(omitted.diagnostics).toEqual([
+			expect.objectContaining({ code: 'OCTANE_NATIVE_TEXT_ONCHANGE', severity: 'warning' }),
+		]);
+	});
+
+	it('returns causal errors and report-only effect warnings without throwing', () => {
+		const src =
+			"import { useEffect, useState } from 'octane';\n" +
+			'export function App() @{\n' +
+			'  const [, setValue] = useState(0);\n' +
+			'  setValue(1);\n' +
+			'  useEffect(() => {\n' +
+			'    setValue(2);\n' +
+			'    return () => setValue(3);\n' +
+			'  }, []);\n' +
+			'  <input onChange={() => {}} />\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/App.tsrx', {
+			stateModel: 'causal',
+		});
+
+		expect(result.code).toContain('function App');
+		expect(result.diagnostics.map((diagnostic: any) => diagnostic.code)).toEqual([
+			'OCTANE_CAUSAL_STATE_RENDER_WRITE',
+			'OCTANE_CAUSAL_STATE_EFFECT_WRITE',
+			'OCTANE_CAUSAL_STATE_CLEANUP_WRITE',
+			'OCTANE_NATIVE_TEXT_ONCHANGE',
+		]);
+		expect(result.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: 'OCTANE_CAUSAL_STATE_RENDER_WRITE',
+					severity: 'error',
+					reportOnly: false,
+				}),
+				expect.objectContaining({
+					code: 'OCTANE_CAUSAL_STATE_EFFECT_WRITE',
+					severity: 'warning',
+					reportOnly: true,
+				}),
+				expect.objectContaining({
+					code: 'OCTANE_CAUSAL_STATE_CLEANUP_WRITE',
+					severity: 'warning',
+					reportOnly: true,
+				}),
+			]),
+		);
+	});
+
+	it('classifies hooks imported from the selected renderer runtime', () => {
+		const src =
+			"import { useState } from '@fixture/object-renderer';\n" +
+			'export function Scene() @{\n' +
+			'  const [, setValue] = useState(0);\n' +
+			'  setValue(1);\n' +
+			'  <mesh />\n' +
+			'}\n';
+		const result = compileToVolarMappings(src, '/src/Scene.object.tsrx', {
+			renderers: OBJECT_RENDERERS,
+			stateModel: 'causal',
+		});
+
+		expect(result.diagnostics).toEqual([
+			expect.objectContaining({
+				code: 'OCTANE_CAUSAL_STATE_RENDER_WRITE',
+				severity: 'error',
+			}),
+		]);
+	});
+
 	it('produces mappings entries pointing source → generated positions', () => {
 		const src = "export function Foo() @{ <span>{'hi'}</span> }\n";
 		const result = compileToVolarMappings(src, 'foo.tsrx');

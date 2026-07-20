@@ -237,6 +237,7 @@ export class OctaneRspackPlugin {
 			profile,
 			exclude: this.options.exclude ?? [],
 			renderers: this.options.renderers?.signature,
+			stateModel: this.options.stateModel?.signature,
 			runtime: this.options.runtime,
 			universalRuntime: this.options.universalRuntime,
 			// Ownership flips which modules compile vs pass through — cached
@@ -250,6 +251,7 @@ export class OctaneRspackPlugin {
 			profile,
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
+			...(this.options.stateModel === undefined ? null : { stateModel: this.options.stateModel }),
 			...(this.options.universalRuntime === undefined
 				? null
 				: { universalRuntime: this.options.universalRuntime }),
@@ -272,6 +274,7 @@ export class OctaneRspackPlugin {
 			...(this.options.dev === undefined ? null : { dev: this.options.dev }),
 			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
 			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
+			...(this.options.stateModel === undefined ? null : { stateModel: this.options.stateModel }),
 			...(this.options.universalRuntime === undefined
 				? null
 				: { universalRuntime: this.options.universalRuntime }),

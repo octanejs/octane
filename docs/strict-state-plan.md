@@ -1,31 +1,31 @@
-# Strict state: making authored rendering read-only
+# Causal state: making authored rendering read-only
 
 > Produced 2026-07-17 from a design discussion merging two independent proposals
 > plus review. Line references are against the 2026-07-17 working tree and will
 > drift; function and constant names are the stable anchors.
 >
-> **Status: PROPOSED. Nothing below is implemented.** Today's runtime
-> intentionally supports React's full render-phase-update semantics
-> (`derived-state.test.ts` pins them); this plan does not change those semantics
-> for compat code — it introduces a strict mode alongside them.
+> **Status: ACCEPTED; foundation implemented 2026-07-19.** Configuration,
+> package approval, compiler provenance, hard render/purity diagnostics, and
+> DOM/SSR/universal runtime guards are implemented with a rollout default of
+> `permissive`. Effect setup/cleanup enforcement, callback provenance,
+> replacement primitives, inventory emission, first-party migrations, and the
+> default flip remain staged below. Existing replay and lifecycle behavior
+> remains available under the explicit `permissive` model.
 
 ## 1. Thesis
 
 Octane should make "authored rendering is read-only" a **language invariant
-with production semantics**, not a lint. React's own guidance says rendering
-must be pure and effects should synchronize with external systems, yet its
-lint blesses conditional self-updates during render and carves exceptions for
-layout measurement — compatibility compromises Octane does not need to
-inherit. React Compiler's `validateNoSetStateInRender` (and its experimental
-effects sibling) shows the React team considers these patterns invalid; they
-cannot break the ecosystem over it. A greenfield framework can.
+with production semantics**, not a lint. Conditional self-updates during render
+and state machines spread across effect chains make code harder to reason about,
+introduce discarded work, and create accidental loops. Octane can provide a
+better default while retaining an explicit migration boundary for existing code.
 
 The audience argument is as strong as the correctness one: agent-authored code
-pattern-matches React training data, and the two patterns this plan forbids —
+pattern-matches a large body of existing hook code, and the two patterns this plan forbids —
 setState during render and effect-chain state machines — are the largest
 single source of accidental re-render loops, double-fires, and
 non-deterministic intermediate states in that corpus. Hard errors with
-pattern-specific fix-its redirect an agent in one iteration; a warning is
+phase-specific guidance redirect an agent in one iteration; a warning is
 invisible to a loop that only checks exit codes.
 
 The causal model, which is also the vocabulary the diagnostics teach:
@@ -48,7 +48,11 @@ a second state machine.
 
 ## 2. The invariant and who enforces what
 
-Strictness is defined **dynamically**, by the runtime's execution-context
+This section describes the permanent causal rule. The foundation release enforces
+render and runtime-owned purity frames; lifecycle frames remain report-only until
+the staged work in §8 lands.
+
+Causal enforcement is defined **dynamically**, by the runtime's execution-context
 stack — not syntactically. A function boundary does not prove deferred
 execution:
 
@@ -61,7 +65,7 @@ useEffect(() => {
 ```
 
 All three writes execute while the effect frame is on the stack and are
-illegal in strict code — in development **and production** — regardless of how
+illegal in causal code — in development **and production** — regardless of how
 many function boundaries they pass through. Conversely, static classification
 of "the synchronous body" would miss all of them if the calls were hidden in
 an imported helper. The boundary is a **causal turn**, not a function frame:
@@ -72,9 +76,10 @@ while effect setup/cleanup is on the stack → illegal
 after that stack has returned              → legal causal transition
 ```
 
-Where a callback was *created* is irrelevant; only when it *executes* matters.
+For phase classification, where a callback was *created* is irrelevant; only when
+it *executes* matters.
 Registering callbacks is exactly what effect setup is for, so both of these
-are legal strict code, no wrapper required:
+are legal causal code, no wrapper required:
 
 ```ts
 useEffect(() => {
@@ -98,9 +103,9 @@ Three layers, with distinct jobs:
 
 | Layer                   | Scope                                          | Job                                                                                                                             |
 | ----------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Compiler                | statically provable writes in compiled modules | Fail early with rich, pattern-specific fix-its. The ergonomic layer — **not** the semantic defense.                              |
+| Compiler                | statically provable writes in compiled modules | Fail early with rich, phase-specific guidance. The ergonomic layer — **not** the semantic defense.                               |
 | Runtime phase guard     | every user-callable setter/dispatcher          | **The semantic defense.** Dev + prod, all renderers. Rich diagnostics in dev; compact error code + component name in prod.       |
-| Compat mode             | modules that declare `stateWrites: 'compat'`   | React semantics unchanged: guarded replay, the 25-pass cap, "Too many re-renders", SSR/universal replay loops.                   |
+| State-model boundary    | exact packages resolved as `causal` or `permissive` | Keep existing replay behavior contained to approved permissive packages while causal code receives the new invariant.       |
 
 The guard lives on user-callable setters and dispatchers — never on
 `scheduleRender`, which legitimate internal work (external stores, Suspense,
@@ -108,15 +113,17 @@ actions, hydration, deferred values) also uses. It fires **before evaluating a
 functional updater and before the `Object.is` eager bailout**, so illegal
 writes cannot hide behind same-value sets or run updater side effects first.
 
-## 3. Rule table (strict semantics)
+## 3. Rule table (target causal semantics)
 
 | Context                                                                        | Policy                                                                              |
 | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
 | Render body — component body, `@{ … }` setup, conditional or not               | Hard error                                                                          |
-| `useMemo` / `useCallback` bodies, `useState`/`useReducer` initializers         | Hard error (purity)                                                                 |
+| `useMemo` bodies and `useState`/`useReducer` initializers                       | Hard error (purity)                                                                 |
+| `useCallback` declaration                                                       | Allowed; the callback is judged when it executes                                    |
+| A callback statically proven to execute synchronously from a forbidden phase   | Hard error; for example `useEffect(callback)` or `useEffect(() => callback())`      |
 | Reducers and functional updaters                                               | Hard error, guarded **before** the updater/reducer evaluates                        |
 | `useInsertionEffect` setup                                                     | Hard error                                                                          |
-| Effect setup frames (`useEffect`, `useLayoutEffect`) — any sync call depth     | Hard error (phase 3 flip; see §8)                                                   |
+| Effect setup frames (`useEffect`, `useLayoutEffect`) — any sync call depth     | Hard error (phase 4 flip; see §8)                                                   |
 | Effect cleanup frames — all effect kinds, update and unmount                   | Hard error                                                                          |
 | Callback refs during commit                                                    | Same policy as layout-effect setup; `useLayoutSnapshot` covers measurement (§9 OQ)  |
 | DOM event handlers, actions, form actions                                      | Allowed, batched                                                                    |
@@ -124,63 +131,124 @@ writes cannot hide behind same-value sets or run updater side effects first.
 | Subscription callbacks replayed synchronously during effect setup              | Hard error — still the commit cascade; read the initial value as a snapshot (§2)    |
 | Same-value writes in an illegal context                                        | Still illegal — the guard precedes the eager bailout                                |
 | Runtime-internal scheduling (stores, Suspense, hydration, deferred, actions)   | Unguarded; guards apply only to user dispatchers                                    |
-| Compat cells (§4), in any context                                              | Existing React semantics, unchanged                                                 |
+| Permissive executing source updating a permissive cell (§4)                    | Existing replay and lifecycle behavior                                              |
 
-## 4. Policy provenance and the compat boundary
+## 4. Policy provenance and the permissive boundary
 
-**Declaration is module-level.** A new compiler option joins the existing bag
-(`hmr`, `mode`, `dev`, `autoMemo`, … in `compile.js`): `stateWrites: 'strict' |
-'compat'`. The vite plugin compiles application code strict by default;
-ported packages declare compat in their build config. There is **no inline
-suppression** — no pragma comment, no per-call option. Agents cargo-cult
-suppression comments the way they cargo-cult `eslint-disable`; a whole-module
-policy flip is the right amount of friction and maps to the real use case
-(porting React code, which is file-scoped anyway).
+`stateModel` names the programming model rather than the guarded operation. The
+project shape is an enum default plus an exact-package enum map:
 
-**Policy travels with the hook cell, not the executing block.** This is the
-load-bearing mechanic. A compat hook called from a strict component —
-`packages/base-ui/src/utils/useTransitionStatus.ts` doing render-phase writes
-while a strict app component is the current block — must keep working, or
-compat bindings become unusable from strict apps. So each hook cell captures
-its policy at allocation, from the declared mode of the module whose code
-allocated it:
+```ts
+compiler: {
+	stateModel: {
+		default: 'permissive',
+		packages: {
+			'@vendor/legacy-widgets': 'permissive',
+		},
+	},
+}
+```
 
-- Compiled modules (`.tsrx` / full-compiled `.tsx`): the compiler conveys the
-  bit through the emitted call site (encoding: §9 open question — slot-channel
-  encoding vs. a registration table).
-- Plain-`.ts` manual-slot callers — the semi-public bindings contract
-  (`S`/`subSlot` style) — default to **compat**. This surface is documented as
-  not-for-app-code already (tier 2 in `index.ts`); app code on the paved road
-  never allocates a compat cell by accident.
-- `octane/react` is always compat.
+The rollout begins with `default: 'permissive'` and flips the product default to
+`'causal'` only after the foundation, diagnostics, callback provenance,
+replacement primitives, inventory, and first-party migrations have landed. The
+shape is permanent; this is a migration sequence, not a temporary boolean feature
+flag. Package authors use the same field and values:
 
-A strict cell then refuses illegal writes **everywhere**: client
-(`drainQueue`'s replay only engages compat cells), SSR (the Fizz-style
+```json
+{
+	"octane": {
+		"stateModel": "causal"
+	}
+}
+```
+
+Policy resolution is package-granular. Consumer entries use exact dependency
+package names; there are no path globs, export-level switches, component wrappers,
+inline comments, or per-call suppressions. The application package cannot appear
+in `packages`; its model comes from `default`. A dependency declaring `causal` is
+accepted directly. A dependency declaring `permissive` requires an explicit
+matching consumer approval. A consumer may also classify an undeclared dependency
+as `permissive`, which supports source packages published before manifest
+declarations exist.
+
+**Policy is two-sided whenever the executing source has an attributed definition
+boundary.** Both that source and the target hook cell retain their originating
+model. During any forbidden phase the final composition rule is:
+
+| Executing source | Causal cell | Permissive cell |
+| ---------------- | ----------- | --------------- |
+| Causal           | Throw       | Throw           |
+| Permissive       | Throw       | Existing behavior |
+
+Outside a forbidden phase, ordinary updates remain legal in every combination.
+This prevents a causal caller from laundering a write through a permissive setter,
+and prevents a permissive caller from mutating a causal cell during lifecycle work.
+
+The implemented foundation carries exact definition provenance at compiled
+component and custom-hook entry boundaries, and that model remains active through
+synchronous nested calls. The compiler additionally proves local aliases and
+local call chains.
+
+Runtime-owned pure callbacks need one more ABI before the matrix is complete.
+Today a state initializer, memo calculation, reducer, or functional updater is
+attributed to the hook invocation or cell that owns its execution. That gives
+causal hooks hard purity semantics now, but it does not distinguish a causal
+callback handed to a permissive cell from a permissive callback handed to a
+causal cell. Correct definition attribution through imported callbacks, returned
+functions, opaque setters, `.bind()`, and aggregate values requires a dedicated
+**Callback Provenance ABI**; partially branding only statically obvious callbacks
+would make the guarantee look complete while leaving laundering paths. Static
+diagnostics continue to reject every locally provable causal case in the
+meantime. The callback ABI is a prerequisite for lifecycle enforcement and the
+causal-default flip (§8), not an unrecorded limitation of the final model.
+
+Arbitrary opaque JavaScript callback boundaries remain subject to the separate
+prove-or-stay-silent rule in §5.1. The runtime still enforces the active forbidden
+phase and target-cell policy, but it cannot invent an author identity for a
+callback that has no compiled or runtime-owned provenance boundary.
+
+Compiler-managed call sites encode their model. A source file covered by
+`octane.hookSlots.manual` cannot honestly be labeled causal until that manual ABI
+also carries provenance, so the current compiler rejects that combination; the
+owning dependency may remain at an explicitly approved permissive boundary while
+it migrates. Plain `.ts`/`.js` bindings therefore receive neither an implicit
+causal label nor a permanent exemption. A causal cell then refuses illegal writes
+**everywhere**: client (`drainQueue`'s replay only
+engages permissive cells), SSR (the Fizz-style
 render-phase replay loop in `runtime.server.ts`, `didScheduleRenderPhaseUpdate`
 region), universal rendering (`executeOwner`'s renderCount retry in
 `universal.ts`), and the hydration drain
 (`drainHydrationRenderPhaseUpdates`). One rule table, five surfaces.
 
-**The replay machinery is permanent.** `octane/react`, the ported bindings,
-and the conformance suite keep it load-bearing indefinitely. The permanent
-runtime becomes policy-aware, nothing more:
+**The replay machinery is permanent.** Permissive packages, ported bindings, and
+the conformance suite keep it load-bearing indefinitely. The permanent runtime
+becomes policy-aware, nothing more:
 
 ```
-strict render/effect-frame write → throw
-compat render write              → existing replay semantics
-ordinary callback write          → schedule normally
+causal forbidden-phase write        → throw
+permissive source + permissive cell → existing replay semantics
+ordinary callback write             → schedule normally
 ```
 
-A future strict-only specialized build could elide the replay paths, but that
+A future causal-only specialized build could elide the replay paths, but that
 is not a payoff this plan claims. The honest benefits are: deterministic
-strict application code, no discarded render pass for native reset patterns,
+causal application code, no discarded render pass for native reset patterns,
 identical development and production guarantees, better agent diagnostics,
-simpler reasoning and profiling for strict components, and compat code that
+simpler reasoning and profiling for causal components, and permissive code that
 remains fully supported and separately identifiable. The conformance
 render-phase suite (`conformance/derived-state.test.ts`), the differential
 rig, and the SSR replay tests compile their fixtures with an explicit
-`stateWrites: 'compat'`, the same way `prod-mode-hydrate.test.ts` pins
+`stateModel: 'permissive'`, the same way `prod-mode-hydrate.test.ts` pins
 explicit prod options.
+
+New causal output carries the first numeric state-model ABI marker. Existing
+unmarked output is treated as `permissive`; it is never silently treated as
+causal. Deterministic `legacy-precompiled` inventory reporting remains rollout
+work. Grandfathering expires at the named **Causal State Policy ABI 1**
+(`causal-state-abi-1`) epoch, when unmarked precompiled output requires explicit
+consumer approval. The policy ABI boundary, rather than an unrelated
+package-version milestone, controls the change.
 
 **Current blast radius** (rough lower-bound audit, 2026-07-17): ~25 non-test
 direct render-phase writes and ~76 synchronous effect-body writes across the
@@ -191,39 +259,39 @@ repo, spanning genuinely different cases:
   `useKeyedState([client, query], createState)`.
 - Radix `use-size.ts` mixes an initial layout-effect measurement (→
   `useLayoutSnapshot`) with later `ResizeObserver` callback writes (legal —
-  callbacks are events).
+  later callback notifications are causal boundaries).
 - Lexical `LexicalContentEditable.tsrx` mixes an immediate layout write with
   an editor-subscription callback — same split.
 
-These packages stay compat until (and unless) their migrable cases move to the
+These packages stay permissive until (and unless) their migrable cases move to the
 primitives; nothing forces a migration date.
 
 ## 5. Enforcement mechanics
 
 ### 5.1 Compiler
 
-The pieces mostly exist. The compiler already identifies setters, dispatchers,
-and state getters from tuple position — they are "stability sources" for dep
-inference (`compile.js`, stability-sources block) — and already tracks them
-through local custom hooks (#148) and classifies render-time calls for
-PURE/DEP-PURE decisions. The new work is a phase/effect classification pass
-that tracks known writers through aliases and local helpers and labels each
-call site: render body, memo/initializer/reducer/updater, effect setup,
-cleanup, event handler, or deferred callback.
+The compiler identifies setters, dispatchers, and state getters from tuple
+position — they are "stability sources" for dep inference (`compile.js`,
+stability-sources block) — and tracks them through local custom hooks (#148). The
+foundation's phase/effect classification pass follows known writers through local
+aliases and helpers and labels each call site as render body,
+memo/initializer/reducer/updater, effect setup, cleanup, event handler, or deferred
+callback.
 
-Diagnostics are machine-readable and carry both ends — the setter's
-declaration site and the illegal call site — plus a pattern-specific rewrite:
+Foundation diagnostics are machine-readable and carry both ends — the setter's
+declaration site and the illegal call site — plus phase-specific repair guidance.
+After the replacement primitives land, a more pattern-specific fix-it can say:
 
 ```
-error[strict-state/render-write]: `setSelection` is called while <Gallery> renders.
+error[causal-state/render-write]: `setSelection` is called while <Gallery> renders.
   --> src/Gallery.tsrx:14
    |  declared: src/Gallery.tsrx:6 (useState)
    |
    = Deriving from `items`? `useKeyedState(items, () => null)` resets in the
      same pass — no extra render.
    = Responding to a user action? Call it from the event handler.
-   = Porting React code? Declare `stateWrites: 'compat'` for this module's
-     package (there is no inline suppression).
+   = Measuring after commit? Use `useLayoutSnapshot` rather than copying the
+     measurement through an effect.
 ```
 
 The compiler **proves or stays silent**. It errors only on writes it can
@@ -236,16 +304,27 @@ custom hooks. A closure handed to an opaque callee is never flagged:
 foo.thing(() => setValue(1)); // sync or async invocation? statically unknowable
 ```
 
+`useCallback` does not make its body illegal: creation and memoization do not
+execute that body. A statically proven synchronous invocation does. Therefore
+`useEffect(callback)` and `useEffect(() => callback())` are diagnosed, while
+passing `callback` to a timer or opaque registrar is not diagnosed merely because
+the callback was declared with `useCallback`.
+
 Static analysis cannot know whether `thing` invokes its callback
 synchronously (inside the frame — illegal) or asynchronously (a later turn —
-legal), and guessing in either direction is worse than deferring to the
-runtime guard, which catches the synchronous case identically in dev and
-prod. For the same reason there is **no laundering diagnostic**: deliberate
-deferral via `queueMicrotask`/`setTimeout` is a sanctioned escape hatch (§7),
-not a smell to police at build time. Callback timing is the runtime's
-question, full stop.
+legal), and guessing in either direction is worse than deferring to the runtime
+guard. Once lifecycle enforcement lands, that guard catches the synchronous case
+identically in development and production. During the foundation release, an
+opaque effect call remains outside hard enforcement; only statically proven
+lifecycle writes receive report-only diagnostics. For the same reason there is
+**no laundering diagnostic**: deliberate deferral via
+`queueMicrotask`/`setTimeout` is a sanctioned escape hatch (§7), not a smell to
+police at build time. Callback timing is ultimately the runtime's question.
 
 ### 5.2 Runtime phase stack
+
+This subsection describes the completed lifecycle design. The foundation applies
+the same source/cell composition to render and runtime-owned purity frames only.
 
 The runtime already carries most of the phase truth as scattered counters:
 `EFFECT_BODY_DEPTH`, `REF_CALLBACK_DEPTH`, `STORE_SYNC_DEPTH`
@@ -256,31 +335,43 @@ setup, cleanup, ref callback, updater evaluation, event/action — because raw
 `CURRENT_BLOCK` is ambiguous (cleanup can run while an outer render frame
 remains ambient).
 
-The user-dispatcher path then checks: if the cell is strict and the top frame
-is a lifecycle frame, throw. Before updater evaluation, before the eager
-bailout. Development throws the rich message with source LOC and the same
-pattern suggestions as the compiler; production throws a compact
-`Octane strict-state violation (E##) in <Gallery>` — enforcement is identical
-in both, only verbosity differs (the inverse of the hydration-mismatch split,
-where recovery ships to prod and warnings are dev-only).
+Within one authored definition boundary, the user-dispatcher path checks whether
+any forbidden phase remains active, not only the most recent helper call: **any
+forbidden phase ancestor wins**. A nested transition, event helper, or action
+therefore cannot launder a write out of an enclosing render or effect frame. The
+attributed source follows the nearest true component/custom-hook definition
+boundary; structural runtime wrappers inherit it. Because package policy is
+non-transitive, an approved permissive definition updating its own permissive cell
+retains existing behavior beneath a causal caller, while either a causal source or
+a causal target cell still rejects the write. Until the Callback Provenance ABI
+lands, pure hook callbacks use the owning hook/cell model described in §4. The
+two-sided rule is applied before updater evaluation and before the eager bailout.
+Compiler diagnostics carry authored source locations; runtime development errors
+name the active phase and component. In production, the DOM and server runtimes
+throw `Minified Octane error #47` with those arguments encoded in the diagnostic
+URL. The universal runtime is outside the initial generated error-code catalog and
+currently throws the compact named code `OCTANE_CAUSAL_STATE_WRITE` with the
+component name. Enforcement is identical; only the diagnostic format differs by
+build and runtime surface.
 
 ### 5.3 Renderer parity
 
-The same stack and the same guard run under DOM, SSR, hydration, and
-universal rendering. The server and universal replay loops consult the cell's
-policy: compat cells replay exactly as today; a strict cell dispatching during
-a server render is the same error it would be on the client.
+Every phase enabled at a rollout stage uses the same provenance contract under
+DOM, SSR, hydration, and universal rendering. Each renderer owns its execution
+stack, but they implement the same matrix. Server and universal replay loops
+consult both policies: permissive-to-permissive work replays exactly as today; a
+causal source or causal cell dispatching during server render is the same error it
+would be on the client.
 
 ## 6. Replacement primitives
 
-All are tier-1 exports — "React parity plus deliberately documented Octane
-extensions" (`index.ts` tier comment). Each exists because a forbidden pattern
-has a physically legitimate core that deserves a managed home.
+All are planned tier-1 Octane exports. Each exists because a forbidden pattern has
+a physically legitimate core that deserves a managed home.
 
 ### 6.1 `useKeyedState(key, initializer)`
 
-Replaces: "adjust/reset state when an input changes" — the pattern React
-blesses as a guarded render-phase set, at the cost of a thrown-away render.
+Replaces: "adjust/reset state when an input changes" through a guarded
+render-phase set and its thrown-away render.
 
 ```ts
 const [selection, setSelection, getSelection] = useKeyedState(
@@ -294,8 +385,7 @@ const [selection, setSelection, getSelection] = useKeyedState(
 - On each render the hook compares `key` against the stored key — `Object.is`,
   or element-wise `Object.is` when `key` is an array (dependency-array
   semantics). On change, the initializer re-runs **inline in the same pass**:
-  single-pass, no scheduled retry, no discarded render. This is strictly
-  cheaper than React's blessed pattern, not just cleaner.
+  single-pass, no scheduled retry, no discarded render.
 - A key change starts a new generation: updates queued against the old
   generation are discarded (the reset wins).
 - Between key changes it is exactly `useState`.
@@ -320,9 +410,9 @@ const height = useLayoutSnapshot(() => ref.current?.offsetHeight, {
 - `measure` runs at layout timing after commit (post-mutation, pre-paint).
 - The result is compared with the previous snapshot — `Object.is` by default,
   `options.equal` for rect-like shapes — and only a change schedules the
-  re-render in which the hook returns the new value. The equality guard being
-  **built in** removes the single most common infinite-loop bug in React
-  apps; the convergence budget is bounded with dev source attribution.
+  re-render in which the hook returns the new value. The built-in equality guard
+  removes a common infinite-loop source; the convergence budget is bounded with
+  dev source attribution.
 - First render and SSR return `options.initial` (else `undefined`); `measure`
   never runs on the server.
 - Continuous observation (`ResizeObserver`, scroll) stays in callbacks, which
@@ -336,7 +426,7 @@ Returns `false` on the server and during the first client (hydration) pass,
 `true` after mount — runtime-owned, so no user-visible effect, no
 hydration-mismatch hazard.
 
-### 6.4 Already shipped, part of the same story
+### 6.4 Existing pieces and `useSource`
 
 - The `getState` third tuple member removes "effect copies state into a ref
   for async reads" (`docs/differences-from-react.md`, current-state getters).
@@ -344,7 +434,7 @@ hydration-mismatch hazard.
   data — the largest historical source of effect-chain state machines.
 - `useSyncExternalStore` covers external subscriptions today; a friendlier
   Octane-native `useSource(subscribe, read)` (deliberately not specified here;
-  ships with phase 4) bakes in the causal-turn split from §2 — the initial
+  ships before lifecycle enforcement) bakes in the causal-turn split from §2 — the initial
   value arrives via a synchronous snapshot read, and only post-setup
   notifications are transitions — so sync-replaying stores are correct by
   construction. It is the **preferred abstraction, not required
@@ -352,18 +442,10 @@ hydration-mismatch hazard.
 
 ### 6.5 Naming non-goal
 
-`useEffect` keeps its name on the native surface for now. Renaming to
-`useSynchronize` would steer agent priors before any error fires, but it cuts
-against Octane's core adoption thesis (same hook API), and an agent typing
-`useEffect` into a framework without it gets a *less* instructive error than a
-targeted rule violation with a fix-it. This is empirically decidable: gate C
-(§8) runs three arms in the evals corpus — (a) `useEffect` plus targeted
-diagnostics, (b) both names exported with native docs preferring
-`useSynchronize`, (c) a renamed native surface — measuring first-pass semantic
-correctness, one-iteration recovery, and **evasion mode**: whether agents
-"fix" the error through deferral or suppression rather than the intended
-pattern. The measurement overrules taste, in either direction. Current prior:
-keep `useEffect`.
+`useEffect` keeps its name on the native surface. The causal model is taught by
+the hook's contract and diagnostics rather than by renaming the hook;
+pattern-specific guidance arrives with the replacement primitives. Hook naming is
+independent of the `stateModel` policy.
 
 ## 7. Deferral is the escape hatch
 
@@ -386,16 +468,16 @@ would be the wrong trade, and the compiler stays out of it entirely (§5.1 —
 callback timing is statically unknowable for opaque callees, so there is no
 build-time policing of deferral).
 
-Every strict guarantee survives this: render never observes a write, commit
-lifecycle never observes a write, and a deferred write is scheduled exactly
-like any other callback-turn transition. What deferral gives up is only the
-*earliest possible* diagnosis — an agent or author who reaches for
-`setTimeout` instead of the intended primitive gets working code, not an
-error. The response to that is quality pressure, not prohibition:
+In the completed lifecycle model, every causal guarantee survives this: render
+never observes a write, commit lifecycle never observes a write, and a deferred
+write is scheduled exactly like any other callback-turn transition. What deferral
+gives up is only the *earliest possible* diagnosis — an agent or author who
+reaches for `setTimeout` instead of the intended primitive gets working code, not
+an error. The response to that is quality pressure, not prohibition:
 
 - fix-its and docs route the common cases to the primitives that carry the
   intent (`useKeyedState`, `useLayoutSnapshot`, `useSource`, actions);
-- evals evasion-mode monitoring (gate C's metric, continuous from phase 4)
+- evals evasion-mode monitoring (continuous from the native-default phase)
   watches whether agent output drifts toward deferral *instead of* those
   primitives — a drift is a diagnostics/docs quality signal first.
 
@@ -409,8 +491,9 @@ carries prerequisites (a complete paved road, adoption evidence, a
 context-propagation story such as platform `AsyncContext`) that make it a
 deliberate, evidence-driven step — the ceremony cliff — never a default.
 
-Compat cells are unaffected at every stage — tightening strict semantics
-never re-breaks ported bindings.
+Approved permissive packages are unaffected at every stage when their own code
+updates their own cells; tightening causal semantics never silently changes that
+migration boundary.
 
 ## 8. Rollout and eval gates
 
@@ -419,30 +502,27 @@ The metrics per gate: rule hit-rate in agent output, first-attempt success,
 and **one-iteration recovery** — given the error text alone, does the agent
 land on the intended pattern in the next attempt?
 
-| Phase | Contents                                                                                                                                                              | Gate                                                                       |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| 0     | Report-only compiler diagnostics; classify the repo (CI artifact of every hit); ship the rules + the four-cause vocabulary to `@octanejs/mcp-server` so agents get them **before** the first error. | —                                                                          |
-| 1     | Land `useKeyedState`, `useLayoutSnapshot`, `useHydrated` + codemods; migrate the repo's migrable strict-side cases; bindings declare compat explicitly.                  | Primitives differential-tested; repo classification reaches zero strict-side hits. |
-| 2     | Render-context writes (rows 1–4 of §3) become hard errors in strict code, compiler + runtime, all renderers.                                                            | **Gate A**: evals recovery ≥ baseline; no eval-suite regression.           |
-| 3     | Effect setup/cleanup frame writes become hard errors in strict code.                                                                                                    | **Gate B**: same bar, after phase-1 migrations prove the primitives cover the real cases. |
-| 4     | Ship `useSource`; callback-ref decision (§9); evasion-mode monitoring goes continuous.                                                                                  | Evals evasion-pattern monitoring stays flat.                               |
-| 5     | *(Conditional — may never be taken.)* Declared-boundary tightening per §7. The causal-turn rule is the permanent floor either way.                                       | **Gate D**: paved-road adoption metric; explicit sign-off — this is the ceremony cliff. |
-| C     | (any time) `useEffect` naming eval, three arms per §6.5.                                                                                                                | Measurement decides; record the outcome here.                              |
+| Phase | Contents | Gate |
+| ----- | -------- | ---- |
+| 0 — foundation (implemented) | Add `stateModel`, nearest-manifest resolution, dependency approval, compiler-managed component/custom-hook markers, cache/HMR participation, two-sided component/cell plumbing, cell-owned hard render/purity enforcement, and report-only lifecycle diagnostics. Manual-slot causal source fails explicitly instead of being mislabeled. Keep the project default `permissive`. | Cross-renderer provenance tests; no dispatch hot-path regression. |
+| 1 — guidance and auditability | Publish the rule and four-cause vocabulary to `@octanejs/mcp-server`; emit deterministic package and `legacy-precompiled` inventory; complete the manual-slot ABI and the Callback Provenance ABI for runtime-owned pure/lifecycle callbacks; classify every repository hit; measure first-attempt behavior and one-iteration recovery. | Inventory and diagnostic snapshots are stable across direct compile, Vite, Rspack, Rsbuild, SSR, and production compilation; callback provenance passes both directions of the package matrix without a hot-path regression. |
+| 2 — paved road | Land `useKeyedState`, `useLayoutSnapshot`, `useHydrated`, and `useSource`; add codemods; migrate causal first-party cases; mark and approve packages that still require permissive behavior. | Primitives have behavioral tests in every relevant renderer; repository classification reaches zero unexplained causal hits. |
+| 3 — render eval gate | Validate the implemented render/purity guard against the held-out eval corpus before treating causal as the recommended app setting. | **Gate A:** evals recovery ≥ baseline; no eval-suite regression. |
+| 4 — lifecycle guard | Make effect setup/cleanup writes hard errors for causal code; settle callback refs from audit evidence. | **Gate B:** same bar after phase-2 migrations prove the paved road covers real cases. |
+| 5 — native default | Flip the product default from `permissive` to `causal`; retain exact approved dependency entries. Begin continuous evasion-pattern monitoring. | Repository and held-out app corpus pass without a default-wide permissive override. |
+| ABI — legacy expiry | At `causal-state-abi-1`, require explicit approval for unmarked precompiled output instead of automatic `legacy-precompiled` grandfathering. | Published-package compatibility exercise and actionable approval diagnostics pass. |
+| Conditional | Potential declared-boundary tightening from §7. The causal-turn rule is the permanent floor and this phase may never happen. | **Gate D:** paved-road adoption evidence plus explicit design sign-off. |
 
 Bookkeeping when phases land: an intentional-divergence entry in
-`docs/react-parity-migration-plan.md` (semantics divergence for strict cells,
-policy divergence overall; conformance stays pinned via compat compiles), a
+`docs/react-parity-migration-plan.md` (semantics divergence for causal cells,
+policy divergence overall; conformance stays pinned via permissive compiles), a
 section in `docs/differences-from-react.md`, a changeset (`octane` +
-`@octanejs/vite-plugin`), and the `index.ts` tier-1 comment gains the three
-primitives.
+the affected compiler integrations/bindings), and the `index.ts` tier-1 comment
+gains the four primitives.
 
 ## 9. Open questions
 
-- **Cell-policy encoding**: slot-channel encoding (numeric slots already
-  distinguish compiled call sites from symbol-ranged binding boundaries in
-  prod compiles) vs. an explicit registration table. Needs a perf-neutral
-  answer on the two-item `useState` fast path.
-- **Callback refs**: strict error (measurement belongs to
+- **Callback refs**: causal error (measurement belongs to
   `useLayoutSnapshot`) or event-like allowance (attach *is* a DOM event of
   sorts)? Current lean: error, revisit at phase 4 with audit data.
 - **`useKeyedState` edges**: nested-array keys (flat element-wise only, like
@@ -451,10 +531,13 @@ primitives.
   in the deferred lane?).
 - **`useLayoutSnapshot` equality**: is `Object.is` + user `equal` enough, or
   does a built-in rect comparator earn its place?
-- **Plain-`.ts` app modules**: they default to compat via the manual-slot
-  surface, which is a real (documented) hole in strict coverage. Acceptable
-  as the cost of the bindings contract, or worth a strict variant of the
-  manual-slot API later?
-- **`autoMemo` interaction**: strict purity rules strengthen the soundness
+- **`autoMemo` interaction**: causal purity rules strengthen the soundness
   assumptions of compiler region caching (PR #104) — worth folding into the
   default-on analysis for autoMemo.
+
+Resolved foundation detail: the compiler appends a numeric model after the
+existing hook slot and stamps causal component/custom-hook functions. Unmarked
+functions and cells remain permissive. Pure callbacks inherit the owning
+hook/cell model until the phase-1 Callback Provenance ABI lands. Ordinary two-item
+`useState` destructuring retains its allocation-free tuple path; manual-slot
+causal ABI versioning remains phase-1 auditability work.

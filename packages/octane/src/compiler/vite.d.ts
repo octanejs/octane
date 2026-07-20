@@ -52,6 +52,29 @@ export interface OctaneRendererConfigOptions {
 	rules?: readonly OctaneRendererRuleOptions[];
 }
 
+export type OctaneStateModel = 'causal' | 'permissive';
+
+export interface OctaneStateModelConfigOptions {
+	/** @default 'permissive' during the migration rollout */
+	default?: OctaneStateModel;
+	/** Exact dependencies only; the app package, subpaths, and globs are rejected. */
+	packages?: Readonly<Record<string, OctaneStateModel>>;
+}
+
+export interface OctaneStateModelSourceResolution {
+	stateModel: OctaneStateModel;
+	dependencies: string[];
+	missingDependencies: string[];
+}
+
+export interface OctaneVitePluginApi {
+	octane: {
+		resolveStateModelForSource(id: string): OctaneStateModelSourceResolution;
+	};
+}
+
+export type OctaneVitePlugin = Plugin & { api: OctaneVitePluginApi };
+
 export interface OctaneVitePluginOptions {
 	/** Override HMR code generation. It defaults to on while Vite is serving. */
 	hmr?: boolean;
@@ -76,10 +99,12 @@ export interface OctaneVitePluginOptions {
 	requireDirective?: boolean;
 	/** @experimental Declarative renderer selection for this compiler instance. */
 	renderers?: OctaneRendererConfigOptions;
+	/** State-transition model for app source and exact dependency package boundaries. */
+	stateModel?: OctaneStateModelConfigOptions;
 }
 
 /** The direct Octane compiler integration for Vite. */
-export declare function octane(options?: OctaneVitePluginOptions): Plugin;
+export declare function octane(options?: OctaneVitePluginOptions): OctaneVitePlugin;
 
 /** Discover raw-source Octane dependencies from the nearest owning package manifest. */
 export declare function discoverOctaneSourceDependencies(projectRoot: string): string[];

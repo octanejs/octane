@@ -71,17 +71,27 @@ Options are declarative and cache-stable:
 
 - `hmr` controls browser component handoff;
 - `profile` enables component profiling in the browser environment;
-- `exclude` skips path fragments in the plain `.ts`/`.js` hook-slot pass; and
+- `exclude` skips permissive or alternate-toolchain paths in the plain `.ts`/`.js`
+  hook-slot pass; it cannot suppress the state-model ABI for an Octane-owned
+  causal helper;
+- `stateModel` overrides the app's causal/permissive compiler policy; and
 - `clientEnvironment` / `serverEnvironment` rename the generated environments.
+
+The rollout default is `permissive`. `stateModel.packages` accepts exact
+dependency names, and a dependency manifest declaring
+`octane.stateModel: 'permissive'` requires a matching entry in the consumer's
+`stateModel.packages` map. The application package cannot appear in that map;
+select its model through `stateModel.default`. A dependency with no declaration
+or exact package entry also inherits `stateModel.default`.
 
 App mode currently serves from the root path and uses Rsbuild's default asset
 prefix. Keep `server.base` at `/` and `output.assetPrefix` at `auto` or `/`; for
 a subpath deployment, rewrite that prefix to the app root in the hosting proxy.
 When `octane.config.ts` or one of its imported helpers changes, `rsbuild dev`
 restarts the dev server and applies the complete config atomically. This is
-required for `compiler.renderers`, because renderer selection is part of each
-Rspack compiler's cache and loader identity. Source-module edits continue to
-use the normal HMR or browser-reload path.
+required for `compiler.renderers` and `compiler.stateModel`, because both are
+part of each Rspack compiler's cache and loader identity. Source-module edits
+continue to use the normal HMR or browser-reload path.
 
 The package forwards normalized `compiler.renderers` registry, filename-rule,
 and renderer-boundary metadata through the same Rspack compiler path used by

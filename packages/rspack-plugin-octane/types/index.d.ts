@@ -80,6 +80,21 @@ export interface OctaneResolvedRendererConfig {
 	readonly signature: string;
 }
 
+export type OctaneStateModel = 'causal' | 'permissive';
+
+export interface OctaneStateModelConfigOptions {
+	/** @default 'permissive' during the migration rollout */
+	default?: OctaneStateModel;
+	/** Exact dependencies only; the app package, subpaths, and globs are rejected. */
+	packages?: Readonly<Record<string, OctaneStateModel>>;
+}
+
+export interface OctaneResolvedStateModelConfig {
+	readonly default: OctaneStateModel;
+	readonly packages: Readonly<Record<string, OctaneStateModel>>;
+	readonly signature: string;
+}
+
 export interface OctaneRspackLoaderOptions {
 	/** Project root used to canonicalize module IDs and discover package manifests. */
 	root?: string;
@@ -95,11 +110,16 @@ export interface OctaneRspackLoaderOptions {
 	 * Path fragments excluded from the plain `.ts`/`.js` hook-slot pass. With
 	 * `requireDirective`, excluded paths are exempt from Octane ownership
 	 * entirely — including `.tsrx`/`.tsx` — for projects routing those paths
-	 * through a different tsrx compiler (e.g. `@tsrx/react`).
+	 * through a different tsrx compiler (e.g. `@tsrx/react`). Excluded output
+	 * carries no Octane state-model ABI, so an otherwise Octane-owned causal
+	 * `.ts`/`.js` helper cannot be excluded; classify third-party compatibility
+	 * through `stateModel.packages` instead.
 	 */
 	exclude?: string[];
 	/** @experimental Renderer registry and ordered per-file selection rules. */
 	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
+	/** State-transition model for app source and exact dependency package boundaries. */
+	stateModel?: OctaneStateModelConfigOptions | OctaneResolvedStateModelConfig;
 	/** Compile-only host runtime/thread identity for a universal renderer graph. */
 	universalRuntime?: {
 		readonly runtime: string;

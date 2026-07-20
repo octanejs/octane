@@ -110,6 +110,27 @@ function moveInputFromSvgToDiv() {
 	};
 }
 
+function addGeneratedComponentMapSpread(binding: '_components' | 'MDXLayout') {
+	return () => (tree: unknown) =>
+		walkTree(tree, (node) => {
+			if (node.type !== 'VariableDeclarator') return;
+			const id = node.id as
+				| { type?: string; name?: string; properties?: Array<{ value?: { name?: string } }> }
+				| undefined;
+			const matches =
+				binding === '_components'
+					? id?.type === 'Identifier' && id.name === binding
+					: id?.type === 'ObjectPattern' &&
+						id.properties?.some((property) => property.value?.name === binding);
+			const init = node.init as { type?: string; properties?: unknown[] } | undefined;
+			if (!matches || init?.type !== 'ObjectExpression' || !Array.isArray(init.properties)) return;
+			init.properties.push({
+				type: 'SpreadElement',
+				argument: { type: 'Identifier', name: 'recmaInjectedComponents' },
+			});
+		});
+}
+
 describe('compileMdxSync', () => {
 	it('emits a compiled octane CLIENT module (no JSX, no MDX runtime)', () => {
 		const { code } = compileMdxSync('# hi\n\nsome *text*\n', '/docs/doc.mdx');
@@ -156,6 +177,110 @@ describe('compileMdxSync', () => {
 		const normal = compileMdxSync('# hi\n', '/docs/doc.mdx');
 		const explicitOff = compileMdxSync('# hi\n', '/docs/doc.mdx', { profile: false });
 		expect(explicitOff).toEqual(normal);
+	});
+
+	it('preserves permissive output and forwards the causal state model to client and server', () => {
+		const implicit = compileMdxSync('# hi\n', '/docs/doc.mdx');
+		const permissive = compileMdxSync('# hi\n', '/docs/doc.mdx', {
+			stateModel: 'permissive',
+		});
+		const causal = compileMdxSync('# hi\n', '/docs/doc.mdx', { stateModel: 'causal' });
+		const serverCausal = compileMdxSync('# hi\n', '/docs/doc.mdx', {
+			mode: 'server',
+			stateModel: 'causal',
+		});
+
+		expect(permissive).toEqual(implicit);
+		expect(causal.code).toContain('markStateModel');
+		expect(serverCausal.code).toContain('markStateModel');
+		expect(causal.code).not.toEqual(implicit.code);
+	});
+
+	it('accepts generated provider components and provider-less component maps in causal documents', () => {
+		const named = compileMdxSync('<Thing />\n', '/docs/named.mdx', {
+			stateModel: 'causal',
+		});
+		const providerLess = compileMdxSync('# hi\n', '/docs/provider-less.mdx', {
+			stateModel: 'causal',
+			providerImportSource: null,
+		});
+
+		expect(named.code).toContain('markStateModel');
+		expect(providerLess.code).toContain('markStateModel');
+	});
+
+	it('does not trust generated component bindings after recma changes their origins', () => {
+		for (const binding of ['_components', 'MDXLayout'] as const) {
+			expect(() =>
+				compileMdxSync('# hi\n', `/docs/changed-${binding}.mdx`, {
+					stateModel: 'causal',
+					recmaPlugins: [addGeneratedComponentMapSpread(binding)],
+				}),
+			).toThrow(expect.objectContaining({ code: 'OCTANE_CAUSAL_COMPONENT_ALIAS_UNRESOLVED' }));
+		}
+	});
+
+	it('maps report-only causal diagnostics and their writer declarations to authored MDX', () => {
+		const source = `import { useEffect, useState } from 'octane'
+
+export function Report() {
+  const [, setCount] = useState(0)
+  useEffect(() => setCount(1), [])
+  return <span />
+}
+
+<Report />
+`;
+		const result = compileMdxSync(source, '/docs/report.mdx', { stateModel: 'causal' });
+
+		expect(result.diagnostics).toEqual([
+			expect.objectContaining({
+				code: 'OCTANE_CAUSAL_STATE_EFFECT_WRITE',
+				severity: 'warning',
+				phase: 'effect',
+				reportOnly: true,
+				filename: '/docs/report.mdx',
+				start: expect.objectContaining({ line: 5 }),
+				declaration: expect.objectContaining({
+					hook: 'useState',
+					name: 'setCount',
+					start: expect.objectContaining({ line: 4 }),
+				}),
+				suggestions: [],
+			}),
+		]);
+	});
+
+	it('maps causal-state compile errors back to authored MDX ESM', () => {
+		const source = `import { useState } from 'octane'
+
+export function Bad() {
+  const [, setCount] = useState(0)
+  setCount(1)
+  return <span />
+}
+
+<Bad />
+`;
+		try {
+			compileMdxSync(source, '/docs/bad.mdx', { stateModel: 'causal' });
+			expect.unreachable('expected the causal state model to reject the render write');
+		} catch (error) {
+			const causal = error as {
+				message: string;
+				diagnostics: Array<{
+					code: string;
+					filename: string;
+					start: { line: number; column: number };
+				}>;
+			};
+			expect(causal.diagnostics[0]).toMatchObject({
+				code: 'OCTANE_CAUSAL_STATE_RENDER_WRITE',
+				filename: '/docs/bad.mdx',
+				start: { line: 5, column: 2 },
+			});
+			expect(causal.message).toContain('/docs/bad.mdx:5:3');
+		}
 	});
 
 	it('emits SERVER codegen with mode: server', () => {

@@ -18,7 +18,9 @@ export interface OctaneRsbuildPluginOptions {
 	 * hook-slot pass. With `requireDirective`, excluded paths are exempt from
 	 * Octane ownership entirely — including `.tsrx`/`.tsx` — for projects
 	 * routing those paths through a different tsrx compiler (e.g.
-	 * `@tsrx/react`).
+	 * `@tsrx/react`). Excluded output carries no Octane state-model ABI, so an
+	 * otherwise Octane-owned causal `.ts`/`.js` helper cannot be excluded;
+	 * classify third-party compatibility through `stateModel.packages` instead.
 	 */
 	exclude?: string[];
 	/**
@@ -31,6 +33,8 @@ export interface OctaneRsbuildPluginOptions {
 	 * @default false
 	 */
 	requireDirective?: boolean;
+	/** Override compiler.stateModel for this Rsbuild integration. */
+	stateModel?: import('@octanejs/app-core').StateModelConfigOptions;
 	/** Rsbuild environment name used for the browser bundle. @default 'web' */
 	clientEnvironment?: string;
 	/** Rsbuild environment name used for the Node SSR bundle. @default 'node' */

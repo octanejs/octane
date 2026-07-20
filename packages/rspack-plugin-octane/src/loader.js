@@ -104,6 +104,7 @@ export default function octaneLoader(source, inputSourceMap) {
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
 			...(options.renderers === undefined ? null : { renderers: options.renderers }),
+			...(options.stateModel === undefined ? null : { stateModel: options.stateModel }),
 			...(options.universalRuntime === undefined
 				? null
 				: { universalRuntime: options.universalRuntime }),

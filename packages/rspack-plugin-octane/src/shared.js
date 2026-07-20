@@ -1,4 +1,5 @@
 import { normalizeRendererConfig } from 'octane/compiler/renderers';
+import { normalizeStateModelConfig } from 'octane/compiler/state-model';
 
 const CLIENT_TARGETS = new Set(['web', 'webworker', 'electron-renderer', 'browserslist']);
 
@@ -42,6 +43,7 @@ const LOADER_OPTION_KEYS = new Set([
 	'profile',
 	'exclude',
 	'renderers',
+	'stateModel',
 	'requireDirective',
 	'universalRuntime',
 ]);
@@ -124,6 +126,8 @@ function normalizeOptions(value, plugin) {
 	if (plugin) assertBooleanOption(options, 'transpile');
 	const renderers =
 		options.renderers === undefined ? undefined : normalizeRendererConfig(options.renderers);
+	const stateModel =
+		options.stateModel === undefined ? undefined : normalizeStateModelConfig(options.stateModel);
 	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
 
 	const normalized = {
@@ -134,6 +138,7 @@ function normalizeOptions(value, plugin) {
 		...(options.profile === undefined ? null : { profile: options.profile }),
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
+		...(stateModel === undefined ? null : { stateModel }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),
 		...(options.requireDirective === undefined
 			? null

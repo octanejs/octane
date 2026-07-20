@@ -72,7 +72,24 @@ import {
 	markComponentFlags,
 } from './component-flags.js';
 import { formatServerError } from './error-codes.server.generated.js';
-export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY, normalizeClass };
+import {
+	isStateModelTransparent,
+	markStateModel,
+	markStateModelMethods,
+	markStateModelTransparent,
+	normalizeRuntimeStateModel,
+	STATE_WRITE_CONTEXT,
+	stateModelOf,
+	STATE_MODEL_CAUSAL,
+	type RuntimeStateModel,
+} from './state-model-runtime.js';
+export {
+	EXTERNAL_HYDRATION_PROMISE,
+	HYDRATION_RANGE_BOUNDARY,
+	markStateModel,
+	markStateModelMethods,
+	normalizeClass,
+};
 
 interface SSRScope {
 	parent: SSRScope | null;
@@ -2317,6 +2334,7 @@ function ssrOptionSelected(value: unknown, content: string): string {
 
 interface HookRec {
 	value: unknown;
+	model: RuntimeStateModel;
 	/** Actions queued by render-phase dispatches, folded by the NEXT pass's hook call. */
 	queue: unknown[];
 	/** Stable dispatch identity across the re-render passes (as on the client). */
@@ -2356,11 +2374,76 @@ interface HookPass {
 	occ: Map<ServerHookSlot, number>;
 	/** A dispatch fired during the current pass → re-invoke the body. */
 	update: boolean;
+	/** Previous realm-shared provenance, populated only while causal tracking is active. */
+	previousStateModel?: RuntimeStateModel;
+	previousStatePhase?: number;
+	previousStateSource?: Function | null;
 }
 // The hook pass of the INNERMOST component body currently executing. Installed /
 // restored synchronously around each body invocation, so a captured dispatch can
 // tell "my component, mid-render" (queue) from anything else (inert).
 let HOOK_PASS: HookPass | null = null;
+
+const SERVER_STATE_PHASE_RENDER = 1;
+const SERVER_STATE_PHASE_INITIALIZER = 2;
+const SERVER_STATE_PHASE_MEMO = 3;
+const SERVER_STATE_PHASE_UPDATER = 4;
+const SERVER_STATE_PHASE_REDUCER = 5;
+class ServerCausalStateModelError extends Error {}
+
+function currentServerStateSource(): ServerComponent | null {
+	return (STATE_WRITE_CONTEXT.source as ServerComponent | null) ?? null;
+}
+
+function serverStatePhaseName(): string {
+	switch (STATE_WRITE_CONTEXT.phase) {
+		case SERVER_STATE_PHASE_INITIALIZER:
+			return 'a state initializer is evaluating';
+		case SERVER_STATE_PHASE_MEMO:
+			return 'a memo calculation is evaluating';
+		case SERVER_STATE_PHASE_UPDATER:
+			return 'a functional state updater is evaluating';
+		case SERVER_STATE_PHASE_REDUCER:
+			return 'a reducer is evaluating';
+		default:
+			return 'a component is rendering';
+	}
+}
+
+function assertServerCausalStateWriteAllowed(model: RuntimeStateModel): void {
+	if (
+		!STATE_WRITE_CONTEXT.active ||
+		STATE_WRITE_CONTEXT.depth === 0 ||
+		(model !== STATE_MODEL_CAUSAL && STATE_WRITE_CONTEXT.sourceModel !== STATE_MODEL_CAUSAL)
+	)
+		return;
+	const name = STATE_WRITE_CONTEXT.source?.name || 'Unknown';
+	throw new ServerCausalStateModelError(formatServerError(47, serverStatePhaseName(), name));
+}
+
+function evaluateServerState<T>(
+	model: RuntimeStateModel,
+	phase: number,
+	component: ServerComponent | null,
+	fn: () => T,
+): T {
+	if (!STATE_WRITE_CONTEXT.active) return fn();
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousPhase = STATE_WRITE_CONTEXT.phase;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	STATE_WRITE_CONTEXT.depth++;
+	STATE_WRITE_CONTEXT.sourceModel = model;
+	STATE_WRITE_CONTEXT.phase = phase;
+	STATE_WRITE_CONTEXT.source = component;
+	try {
+		return fn();
+	} finally {
+		STATE_WRITE_CONTEXT.sourceModel = previousModel;
+		STATE_WRITE_CONTEXT.phase = previousPhase;
+		STATE_WRITE_CONTEXT.source = previousSource;
+		STATE_WRITE_CONTEXT.depth--;
+	}
+}
 // Custom-hook call-site path. A base hook reached through withSlot combines
 // every enclosing custom-hook boundary with its own compiler site. This mirrors
 // the client runtime: two calls to the same custom hook stay independent even
@@ -2435,25 +2518,43 @@ function stateHook<S, A>(
 	create: () => S,
 	slot: unknown,
 	withGetter = false,
+	stateModel?: unknown,
 ): [S, (action: A) => void, (() => S)?] {
+	const requestedModel = normalizeRuntimeStateModel(stateModel);
+	const evaluationPhase =
+		reducer === (basicStateReducer as unknown)
+			? SERVER_STATE_PHASE_UPDATER
+			: SERVER_STATE_PHASE_REDUCER;
 	const hp = HOOK_PASS;
 	// Defensive: a hook invoked outside any component body — single-pass shape.
 	if (hp === null) {
-		const value = create();
+		const value = evaluateServerState(
+			requestedModel,
+			SERVER_STATE_PHASE_INITIALIZER,
+			currentServerStateSource(),
+			create,
+		);
 		return withGetter ? [value, NOOP, () => value] : [value, NOOP];
 	}
 	const position = hookPosition(slot)!;
 	const { list, index: n } = position;
 	let rec = list[n] as HookRec | undefined;
 	if (rec === undefined) {
-		const value = create();
+		const value = evaluateServerState(
+			requestedModel,
+			SERVER_STATE_PHASE_INITIALIZER,
+			currentServerStateSource(),
+			create,
+		);
 		if (withGetter) {
 			const r: GetterHookRec = {
 				value,
+				model: requestedModel,
 				pendingValue: value,
 				queue: [],
 				reducer: reducer as (state: unknown, action: unknown) => unknown,
 				dispatch: (action: unknown): void => {
+					assertServerCausalStateWriteAllowed(r.model);
 					// Only while OUR body is the one rendering (Fizz's componentIdentity
 					// gate) — a dispatch invoked after the pass, or from a descendant's
 					// render, is inert on the server.
@@ -2461,7 +2562,12 @@ function stateHook<S, A>(
 					r.queue.push(action);
 					// The compiler-selected third tuple member observes the latest
 					// scheduled value before the bounded re-render pass commits it.
-					r.pendingValue = r.reducer(r.pendingValue, action);
+					r.pendingValue = evaluateServerState(
+						r.model,
+						evaluationPhase,
+						currentServerStateSource(),
+						() => r.reducer(r.pendingValue, action),
+					);
 					hp.update = true;
 				},
 			};
@@ -2469,8 +2575,10 @@ function stateHook<S, A>(
 		} else {
 			const r: HookRec = {
 				value,
+				model: requestedModel,
 				queue: [],
 				dispatch: (action: unknown): void => {
+					assertServerCausalStateWriteAllowed(r.model);
 					if (hp !== HOOK_PASS) return;
 					r.queue.push(action);
 					hp.update = true;
@@ -2486,7 +2594,12 @@ function stateHook<S, A>(
 			} else {
 				let value = rec.value as S;
 				const queue = rec.queue;
-				for (let i = 0; i < queue.length; i++) value = reducer(value, queue[i] as A);
+				for (let i = 0; i < queue.length; i++) {
+					const previous = value;
+					value = evaluateServerState(rec.model, evaluationPhase, currentServerStateSource(), () =>
+						reducer(previous, queue[i] as A),
+					);
+				}
 				rec.value = value;
 				getterRec.pendingValue = value;
 			}
@@ -2494,7 +2607,12 @@ function stateHook<S, A>(
 		} else {
 			let value = rec.value as S;
 			const queue = rec.queue;
-			for (let i = 0; i < queue.length; i++) value = reducer(value, queue[i] as A);
+			for (let i = 0; i < queue.length; i++) {
+				const previous = value;
+				value = evaluateServerState(rec.model, evaluationPhase, currentServerStateSource(), () =>
+					reducer(previous, queue[i] as A),
+				);
+			}
 			rec.queue = [];
 			rec.value = value;
 		}
@@ -2673,6 +2791,55 @@ function invokeComponentBody(
 	}
 }
 
+// Keep the permissive recursion function above byte-for-byte equivalent to the
+// historical hot path. Even extra dead-branch registers shrink the maximum
+// server component depth in V8. Once causal output is present in the realm, this
+// twin installs authored provenance without retaining another helper frame.
+function invokeCausalComponentBody(
+	comp: ServerComponent,
+	props: any,
+	scope: SSRScope,
+	frame: Frame | null,
+): unknown {
+	const prevHP = HOOK_PASS;
+	const hp: HookPass = { hooks: new Map(), occ: new Map(), update: false };
+	const snapshot = captureComponentReplayState(scope, frame);
+	const warmPlanCheckpoint = ACTIVE_PU_WARM_PLANS.length;
+	hp.previousStateModel = STATE_WRITE_CONTEXT.sourceModel;
+	hp.previousStatePhase = STATE_WRITE_CONTEXT.phase;
+	hp.previousStateSource = STATE_WRITE_CONTEXT.source;
+	STATE_WRITE_CONTEXT.depth++;
+	if (!isStateModelTransparent(comp)) {
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(comp);
+		STATE_WRITE_CONTEXT.source = comp;
+	}
+	STATE_WRITE_CONTEXT.phase = SERVER_STATE_PHASE_RENDER;
+	HOOK_PASS = hp;
+	try {
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
+		let out = comp(props ?? {}, scope, undefined);
+		let passes = 1;
+		while (hp.update) {
+			if (++passes > MAX_RENDER_PHASE_PASSES) {
+				throw new Error(formatServerError(9));
+			}
+			hp.update = false;
+			hp.occ = new Map();
+			rewindComponentReplayState(snapshot, scope, frame);
+			ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
+			out = comp(props ?? {}, scope, undefined);
+		}
+		return out;
+	} finally {
+		STATE_WRITE_CONTEXT.sourceModel = hp.previousStateModel;
+		STATE_WRITE_CONTEXT.phase = hp.previousStatePhase;
+		STATE_WRITE_CONTEXT.source = hp.previousStateSource;
+		STATE_WRITE_CONTEXT.depth--;
+		ACTIVE_PU_WARM_PLANS.length = warmPlanCheckpoint;
+		HOOK_PASS = prevHP;
+	}
+}
+
 // Render a component body under an explicit frame, tracking it as the innermost
 // component (so a suspending use() inside it captures it as a discovery job). The
 // output shape is byte-identical to a bare invocation: the body's HTML wrapped in
@@ -2713,7 +2880,9 @@ function renderComponentFramed(
 		// Every component gets an independent replay boundary. A body with no
 		// syntactic calls can still execute user code through a getter, Proxy, or
 		// coercion; that code may call hooks or schedule render-phase updates.
-		const out = invokeComponentBody(comp, props, scope, frame);
+		const out = STATE_WRITE_CONTEXT.active
+			? invokeCausalComponentBody(comp, props, scope, frame)
+			: invokeComponentBody(comp, props, scope, frame);
 		const inner = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, scope);
 		// Wrap the child's output in a hydration block range so the client's
 		// componentSlot can ADOPT it during hydration (its `<!--[-->`/`<!--]-->`
@@ -2929,59 +3098,61 @@ function ssrHydrateAttrs(
  * read browser state, so only a direct strategy descriptor contributes `_a()`
  * attributes and its concrete strategy kind.
  */
-export const Hydrate = /* @__PURE__ */ markComponentFlags(
-	function Hydrate(props: HydrateProps, scope: SSRScope): string {
-		const id = useId();
+export const Hydrate = /* @__PURE__ */ markStateModelTransparent(
+	/* @__PURE__ */ markComponentFlags(
+		function Hydrate(props: HydrateProps, scope: SSRScope): string {
+			const id = useId();
 
-		// The client always creates an HTMLDivElement. Force the same namespace for
-		// SSR children and attribute semantics instead of inheriting SVG/MathML from
-		// the call site. Direct placement in foreign content remains unsupported: an
-		// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
-		return withSsrElementContext(
-			'div',
-			undefined,
-			() =>
-				ssrInNamespace('html', () => {
-					if (!MARKERS) {
-						return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
-					}
+			// The client always creates an HTMLDivElement. Force the same namespace for
+			// SSR children and attribute semantics instead of inheriting SVG/MathML from
+			// the call site. Direct placement in foreign content remains unsupported: an
+			// HTML parser breaks a literal <div> out of <svg>/<math> before hydration.
+			return withSsrElementContext(
+				'div',
+				undefined,
+				() =>
+					ssrInNamespace('html', () => {
+						if (!MARKERS) {
+							return '<div>' + ssrChildrenHtml(props.children, scope) + '</div>';
+						}
 
-					const childIdStart = ID_COUNTER;
-					const serialStart = SERIAL?.length ?? 0;
-					// The outer range belongs to Hydrate itself. ssrTry supplies the nested
-					// Suspense slot/content ranges and makes a suspending child a real stream
-					// boundary. `fallback` remains client-only, so the server pending arm is
-					// intentionally empty.
-					const children = ssrBlock(
-						ssrTry(
-							scope,
-							'jsx-hydrate',
-							(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
-							null,
-							null,
-							'html',
-						),
-					);
-					const idCount = ID_COUNTER - childIdStart;
-					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-					const attrs = ssrHydrateAttrs(id, props.when, idCount);
-					const seedSidecar =
-						childSeeds.length === 0
-							? ''
-							: '<script type="application/json" ' +
-								HYDRATE_SEED_ATTR +
-								NONCE_ATTR +
-								'>' +
-								serializeSuspenseSeedJson(childSeeds) +
-								'</script>';
+						const childIdStart = ID_COUNTER;
+						const serialStart = SERIAL?.length ?? 0;
+						// The outer range belongs to Hydrate itself. ssrTry supplies the nested
+						// Suspense slot/content ranges and makes a suspending child a real stream
+						// boundary. `fallback` remains client-only, so the server pending arm is
+						// intentionally empty.
+						const children = ssrBlock(
+							ssrTry(
+								scope,
+								'jsx-hydrate',
+								(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+								null,
+								null,
+								'html',
+							),
+						);
+						const idCount = ID_COUNTER - childIdStart;
+						const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
+						const attrs = ssrHydrateAttrs(id, props.when, idCount);
+						const seedSidecar =
+							childSeeds.length === 0
+								? ''
+								: '<script type="application/json" ' +
+									HYDRATE_SEED_ATTR +
+									NONCE_ATTR +
+									'>' +
+									serializeSuspenseSeedJson(childSeeds) +
+									'</script>';
 
-					return '<div' + attrs + '>' + children + seedSidecar + '</div>';
-				}),
-			'html',
-		);
-	},
-	COMPONENT_FLAG_BOUNDARY,
-	'Hydrate',
+						return '<div' + attrs + '>' + children + seedSidecar + '</div>';
+					}),
+				'html',
+			);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'Hydrate',
+	),
 );
 
 /**
@@ -2994,23 +3165,25 @@ export const Hydrate = /* @__PURE__ */ markComponentFlags(
  * resolved throws `SSR_SUSPENSE` → the `fallback` renders for this pass and
  * render()'s loop awaits + re-renders; a real error rethrows to an outer boundary.
  */
-export const Suspense = /* @__PURE__ */ markComponentFlags(
-	function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
-		// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
-		// real STREAMING boundary too (registration + template sentinel), with the
-		// identical nested-block byte shape as before for buffered renders. Errors
-		// rethrow to an outer boundary (catchFn = null), matching the old emit.
-		return ssrTry(
-			scope,
-			'jsx-suspense',
-			(_arg, s) => ssrChildrenHtml(props.children, s),
-			(_arg, s) => ssrChild(props.fallback, s),
-			null,
-			FRAME?.namespace ?? 'html',
-		);
-	},
-	COMPONENT_FLAG_BOUNDARY,
-	'Suspense',
+export const Suspense = /* @__PURE__ */ markStateModelTransparent(
+	/* @__PURE__ */ markComponentFlags(
+		function Suspense(props: { fallback?: unknown; children?: unknown }, scope: SSRScope): string {
+			// Routed through ssrTry so a JSX `<Suspense>` in a `.ts` binding tree is a
+			// real STREAMING boundary too (registration + template sentinel), with the
+			// identical nested-block byte shape as before for buffered renders. Errors
+			// rethrow to an outer boundary (catchFn = null), matching the old emit.
+			return ssrTry(
+				scope,
+				'jsx-suspense',
+				(_arg, s) => ssrChildrenHtml(props.children, s),
+				(_arg, s) => ssrChild(props.fallback, s),
+				null,
+				FRAME?.namespace ?? 'html',
+			);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'Suspense',
+	),
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3195,40 +3368,42 @@ function vtSsrStrip(html: string): string {
  * frame, the explicit ssrBlock below is the inner childSlot range), stamped
  * with the Fizz-parity `vt-*` annotations described above.
  */
-export const ViewTransition = /* @__PURE__ */ markComponentFlags(
-	function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
-		VT_SSR_HAS_CANDIDATES = true;
-		const explicit = typeof props.name === 'string';
-		const frame = FRAME;
-		const cand: VtSsrCandidate = {
-			name: explicit
-				? (props.name as string)
-				: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
-			share: vtSsrResolve(props, 'share'),
-			update: vtSsrResolve(props, 'update'),
-			consumed: false,
-		};
-		VT_SSR_STACK.push(cand);
-		const seqBefore = VT_SSR_TRY_SEQ;
-		let inner: string;
-		try {
-			inner = ssrChildrenHtml(props.children, scope);
-		} finally {
-			VT_SSR_STACK.pop();
-		}
-		const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
-		const attrs: Array<[string, string]> = [];
-		if (named) attrs.push(['vt-name', cand.name]);
-		attrs.push(['vt-update', cand.update]);
-		// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
-		// this boundary tops, stripped at emission when unclaimed.
-		attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
-		attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
-		if (named) attrs.push(['vt-share', cand.share]);
-		return ssrBlock(vtSsrAnnotate(inner, attrs));
-	},
-	COMPONENT_FLAG_BOUNDARY,
-	'ViewTransition',
+export const ViewTransition = /* @__PURE__ */ markStateModelTransparent(
+	/* @__PURE__ */ markComponentFlags(
+		function ViewTransition(props: VtSsrProps, scope: SSRScope): string {
+			VT_SSR_HAS_CANDIDATES = true;
+			const explicit = typeof props.name === 'string';
+			const frame = FRAME;
+			const cand: VtSsrCandidate = {
+				name: explicit
+					? (props.name as string)
+					: '_O' + (frame !== null ? framePath(frame).replace(/\//g, '-') : '') + '_',
+				share: vtSsrResolve(props, 'share'),
+				update: vtSsrResolve(props, 'update'),
+				consumed: false,
+			};
+			VT_SSR_STACK.push(cand);
+			const seqBefore = VT_SSR_TRY_SEQ;
+			let inner: string;
+			try {
+				inner = ssrChildrenHtml(props.children, scope);
+			} finally {
+				VT_SSR_STACK.pop();
+			}
+			const named = explicit || VT_SSR_TRY_SEQ !== seqBefore;
+			const attrs: Array<[string, string]> = [];
+			if (named) attrs.push(['vt-name', cand.name]);
+			attrs.push(['vt-update', cand.update]);
+			// Arm candidates — claimed (renamed to vt-enter/vt-exit) by the @try arm
+			// this boundary tops, stripped at emission when unclaimed.
+			attrs.push(['vt-enter-x', vtSsrResolve(props, 'enter')]);
+			attrs.push(['vt-exit-x', vtSsrResolve(props, 'exit')]);
+			if (named) attrs.push(['vt-share', cand.share]);
+			return ssrBlock(vtSsrAnnotate(inner, attrs));
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'ViewTransition',
+	),
 );
 
 /**
@@ -3246,30 +3421,34 @@ export function addTransitionType(_type: string): void {}
  * `<Suspense>`/`@pending` handles it (matching the client ErrorBoundary's explicit
  * suspension propagation). `reset` is a server no-op (no re-render).
  */
-export const ErrorBoundary = /* @__PURE__ */ markComponentFlags(
-	function ErrorBoundary(
-		props: { fallback?: unknown; children?: unknown },
-		scope: SSRScope,
-	): string {
-		return ssrBlock(
-			(() => {
-				try {
-					return withAsyncIdentity('error-boundary', 'content', () =>
-						ssrBlock(ssrChildrenHtml(props.children, scope)),
-					);
-				} catch (e) {
-					if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
-					const fb =
-						typeof props.fallback === 'function'
-							? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
-							: props.fallback;
-					return withAsyncIdentity('error-boundary', 'catch', () => ssrBlock(ssrChild(fb, scope)));
-				}
-			})(),
-		);
-	},
-	COMPONENT_FLAG_BOUNDARY,
-	'ErrorBoundary',
+export const ErrorBoundary = /* @__PURE__ */ markStateModelTransparent(
+	/* @__PURE__ */ markComponentFlags(
+		function ErrorBoundary(
+			props: { fallback?: unknown; children?: unknown },
+			scope: SSRScope,
+		): string {
+			return ssrBlock(
+				(() => {
+					try {
+						return withAsyncIdentity('error-boundary', 'content', () =>
+							ssrBlock(ssrChildrenHtml(props.children, scope)),
+						);
+					} catch (e) {
+						if (ssrIsSuspense(e)) throw e; // let an outer Suspense render its pending arm
+						const fb =
+							typeof props.fallback === 'function'
+								? (props.fallback as (err: unknown, reset: () => void) => unknown)(e, NOOP)
+								: props.fallback;
+						return withAsyncIdentity('error-boundary', 'catch', () =>
+							ssrBlock(ssrChild(fb, scope)),
+						);
+					}
+				})(),
+			);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'ErrorBoundary',
+	),
 );
 
 // ---------------------------------------------------------------------------
@@ -3306,6 +3485,7 @@ export function createContext<T>(defaultValue: T): Context<T> {
 	ctx.$$kind = CONTEXT_TAG;
 	ctx.defaultValue = defaultValue;
 	ctx.Provider = ctx;
+	markStateModelTransparent(ctx);
 	return ctx;
 }
 
@@ -4027,7 +4207,13 @@ function callLazyComponent(mod: any, props: any, scope: SSRScope, extra?: any): 
 	// reads it again without re-running the already-fulfilled loader, matching the
 	// client and React payload semantics.
 	const comp = resolveLazyModule(mod);
-	return comp(lazyResolvedProps(comp, props), scope, extra);
+	const transparent = isStateModelTransparent(comp);
+	return evaluateServerState(
+		transparent ? STATE_WRITE_CONTEXT.sourceModel : stateModelOf(comp),
+		SERVER_STATE_PHASE_RENDER,
+		transparent ? currentServerStateSource() : comp,
+		() => comp(lazyResolvedProps(comp, props), scope, extra),
+	);
 }
 
 /**
@@ -4117,10 +4303,15 @@ export function useState<T>(
 export function useState<T>(
 	initial?: T | (() => T),
 	slot?: ServerHookSlot,
+	stateModel?: unknown,
 ): [T, (next: T | ((value: T) => T)) => void, () => T] {
 	// A compiled zero-argument call is emitted as `useState(slot)`. Mirror the
 	// client trailing-slot ABI so the injected symbol is not mistaken for state.
-	if (slot === undefined && typeof initial === 'symbol') {
+	if (stateModel === undefined && slot === STATE_MODEL_CAUSAL && typeof initial === 'symbol') {
+		stateModel = slot;
+		slot = initial;
+		initial = undefined as T;
+	} else if (slot === undefined && typeof initial === 'symbol') {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -4128,6 +4319,8 @@ export function useState<T>(
 		basicStateReducer as (s: T, a: any) => T,
 		() => (typeof initial === 'function' ? (initial as () => T)() : (initial as T)),
 		slot,
+		false,
+		stateModel,
 	) as [T, (next: any) => void, () => T];
 }
 
@@ -4150,10 +4343,15 @@ export function __useStateWithGetter<T>(
 export function __useStateWithGetter<T>(
 	initial: T | (() => T),
 	slot?: ServerHookSlot,
+	stateModel?: unknown,
 ): [T, (next: any) => void, () => T] {
 	// A compiled zero-argument call is emitted as `__useStateWithGetter(slot)`.
 	// Mirror the public hook's trailing-slot ABI before creating the getter cell.
-	if (slot === undefined && typeof initial === 'symbol') {
+	if (stateModel === undefined && slot === STATE_MODEL_CAUSAL && typeof initial === 'symbol') {
+		stateModel = slot;
+		slot = initial;
+		initial = undefined as T;
+	} else if (slot === undefined && typeof initial === 'symbol') {
 		slot = initial;
 		initial = undefined as T;
 	}
@@ -4162,6 +4360,7 @@ export function __useStateWithGetter<T>(
 		() => (typeof initial === 'function' ? (initial as () => T)() : initial),
 		slot,
 		true,
+		stateModel,
 	) as [T, (next: any) => void, () => T];
 }
 
@@ -4176,13 +4375,24 @@ export function useReducer<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
 	maybeSlot?: ServerHookSlot,
+	stateModel?: unknown,
 ): [S, (action: A) => void, () => S] {
+	if (
+		stateModel === undefined &&
+		typeof initOrSlot === 'symbol' &&
+		maybeSlot === STATE_MODEL_CAUSAL
+	) {
+		stateModel = maybeSlot;
+		maybeSlot = initOrSlot;
+	}
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
 	const slot = maybeSlot !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
 		reducer,
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
 		slot,
+		false,
+		stateModel,
 	) as [S, (action: A) => void, () => S];
 }
 
@@ -4198,7 +4408,16 @@ export function __useReducerWithGetter<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((arg: I) => S) | symbol | string,
 	maybeSlot?: ServerHookSlot,
+	stateModel?: unknown,
 ): [S, (action: A) => void, () => S] {
+	if (
+		stateModel === undefined &&
+		typeof initOrSlot === 'symbol' &&
+		maybeSlot === STATE_MODEL_CAUSAL
+	) {
+		stateModel = maybeSlot;
+		maybeSlot = initOrSlot;
+	}
 	const init = typeof initOrSlot === 'function' ? initOrSlot : undefined;
 	const slot = maybeSlot !== undefined ? maybeSlot : initOrSlot;
 	return stateHook<S, A>(
@@ -4206,6 +4425,7 @@ export function __useReducerWithGetter<S, A, I = S>(
 		() => (init ? init(initialArg) : (initialArg as unknown as S)),
 		slot,
 		true,
+		stateModel,
 	) as [S, (action: A) => void, () => S];
 }
 
@@ -4225,21 +4445,25 @@ export function useMemo<T>(
 	compute: () => T,
 	depsOrSlot?: readonly unknown[] | null | ServerHookSlot,
 	maybeSlot?: ServerHookSlot,
+	stateModel?: unknown,
 ): T {
 	const deps = Array.isArray(depsOrSlot) ? depsOrSlot : null;
 	const slot =
 		maybeSlot ?? (Array.isArray(depsOrSlot) || depsOrSlot === null ? undefined : depsOrSlot);
 	// `null` means recompute every pass. Omitted dependency arrays reach the
 	// runtime as compiler-inferred arrays, preserving Octane's documented API.
-	if (deps === null) return compute();
+	const model = normalizeRuntimeStateModel(stateModel);
+	const run = () =>
+		evaluateServerState(model, SERVER_STATE_PHASE_MEMO, currentServerStateSource(), compute);
+	if (deps === null) return run();
 	const position = hookPosition(slot);
-	if (position === null) return compute();
+	if (position === null) return run();
 	let rec = position.list[position.index] as MemoHookRec | undefined;
 	if (rec === undefined) {
-		rec = { value: compute(), deps: deps.slice() };
+		rec = { value: run(), deps: deps.slice() };
 		position.list[position.index] = rec;
 	} else if (!serverHookDepsEqual(rec.deps, deps)) {
-		rec.value = compute();
+		rec.value = run();
 		rec.deps = deps.slice();
 	}
 	return rec.value as T;
@@ -4322,8 +4546,16 @@ export function useSyncExternalStore<T>(
 export function useActionState<S>(
 	_action: unknown,
 	initialState: S,
+	...compilerArgs: unknown[]
 ): [S, (payload?: any) => void, boolean] {
-	return [initialState, NOOP, false];
+	const hasCausalAbi =
+		compilerArgs[compilerArgs.length - 1] === STATE_MODEL_CAUSAL &&
+		(compilerArgs.length >= 3 ||
+			(compilerArgs.length === 2 &&
+				(typeof compilerArgs[0] === 'symbol' || typeof compilerArgs[0] === 'number')));
+	const model = normalizeRuntimeStateModel(hasCausalAbi ? STATE_MODEL_CAUSAL : undefined);
+	const dispatch = (): void => assertServerCausalStateWriteAllowed(model);
+	return [initialState, dispatch, false];
 }
 
 export interface FormStatus {
@@ -4336,12 +4568,51 @@ export function useFormStatus(): FormStatus {
 	return { pending: false, data: null, method: 'get', action: null };
 }
 
-export function useOptimistic<S, V = S>(state: S): [S, (value: V) => void] {
-	return [state, NOOP];
+export function useOptimistic<S, V = S>(
+	state: S,
+	...compilerArgs: unknown[]
+): [S, (value: V) => void] {
+	const hasCausalAbi =
+		compilerArgs[compilerArgs.length - 1] === STATE_MODEL_CAUSAL &&
+		(compilerArgs.length >= 3 ||
+			(compilerArgs.length === 2 &&
+				(typeof compilerArgs[0] === 'symbol' || typeof compilerArgs[0] === 'number')));
+	const model = normalizeRuntimeStateModel(hasCausalAbi ? STATE_MODEL_CAUSAL : undefined);
+	const dispatch = (): void => assertServerCausalStateWriteAllowed(model);
+	return [state, dispatch];
 }
 
-export function memo<P>(component: P): P {
-	return component;
+export function memo<P>(component: P): P;
+export function memo<P>(component: P, _compare?: unknown, _stateModel?: unknown): P {
+	// Historical SSR memo is an identity operation. Only compiler-marked causal
+	// output pays for a wrapper, so marking it cannot mutate an imported component.
+	if (arguments.length < 3 || arguments[arguments.length - 1] !== STATE_MODEL_CAUSAL) {
+		return component;
+	}
+	const source = component as unknown as ServerComponent;
+	const wrapper = ((props: any, scope: SSRScope, extra?: any): string => {
+		if (!STATE_WRITE_CONTEXT.active || isStateModelTransparent(source)) {
+			return source(props, scope, extra);
+		}
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(source);
+		STATE_WRITE_CONTEXT.source = source;
+		try {
+			return source(props, scope, extra);
+		} finally {
+			STATE_WRITE_CONTEXT.sourceModel = previousModel;
+			STATE_WRITE_CONTEXT.source = previousSource;
+		}
+	}) as unknown as P;
+	Object.defineProperty(wrapper as object, 'defaultProps', {
+		configurable: true,
+		get: () => (source as any).defaultProps,
+		set: (value) => {
+			(source as any).defaultProps = value;
+		},
+	});
+	return markStateModel(wrapper as Function, STATE_MODEL_CAUSAL) as unknown as P;
 }
 
 // Custom-hook wrapper. The compiler emits each hook call reached THROUGH a custom
@@ -4351,9 +4622,54 @@ export function memo<P>(component: P): P {
 // render-pass occurrence that can shift when a conditional call disappears.
 export function withSlot<T>(sym: symbol, fn: (...a: any[]) => T, ...args: any[]): T;
 export function withSlot<T>(sym: ServerHookSlot, fn: (...a: any[]) => T, ...args: any[]): T {
+	const replaceSource = STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0;
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	if (replaceSource) {
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(fn);
+		STATE_WRITE_CONTEXT.source = fn;
+	}
 	HOOK_SLOT_PATH.push(sym);
 	try {
 		return fn(...args);
+	} finally {
+		HOOK_SLOT_PATH.pop();
+		if (replaceSource) {
+			STATE_WRITE_CONTEXT.sourceModel = previousModel;
+			STATE_WRITE_CONTEXT.source = previousSource;
+		}
+	}
+}
+
+/** Compiler helper for method-style custom hooks; preserves the authored receiver. */
+export function withMethodSlot<T>(
+	sym: ServerHookSlot,
+	receiver: unknown,
+	keyOrLookup: PropertyKey | (() => (...a: any[]) => T),
+	argsFactory: () => any[],
+): T {
+	HOOK_SLOT_PATH.push(sym);
+	try {
+		const fn =
+			typeof keyOrLookup === 'function'
+				? keyOrLookup()
+				: (receiver as Record<PropertyKey, (...a: any[]) => T>)[keyOrLookup];
+		const args = argsFactory();
+		const replaceSource = STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0;
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		if (replaceSource) {
+			STATE_WRITE_CONTEXT.sourceModel = stateModelOf(fn);
+			STATE_WRITE_CONTEXT.source = fn;
+		}
+		try {
+			return fn.apply(receiver, args);
+		} finally {
+			if (replaceSource) {
+				STATE_WRITE_CONTEXT.sourceModel = previousModel;
+				STATE_WRITE_CONTEXT.source = previousSource;
+			}
+		}
 	} finally {
 		HOOK_SLOT_PATH.pop();
 	}
@@ -4839,7 +5155,9 @@ function runFullFramedPass(
 		// components: a compiled component returns its HTML string, but a plain
 		// `.ts` root (the shape every @octanejs binding produces) returns a
 		// createElement descriptor that must render through ssrChild.
-		const out = invokeComponentBody(component, props, root, FRAME);
+		const out = STATE_WRITE_CONTEXT.active
+			? invokeCausalComponentBody(component, props, root, FRAME)
+			: invokeComponentBody(component, props, root, FRAME);
 		body = typeof out === 'string' ? out : out == null ? '' : ssrChild(out, root);
 	} catch (err) {
 		// A suspension with no enclosing @try unwinds to here; its thenable is

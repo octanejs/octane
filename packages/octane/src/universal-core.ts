@@ -18,6 +18,24 @@ import {
 	__profileSchedule,
 	__profileTrackComponent,
 } from './profiling.js';
+import {
+	isStateModelTransparent,
+	markStateModel,
+	markStateModelMethods,
+	markStateModelTransparent,
+	normalizeRuntimeStateModel,
+	STATE_WRITE_CONTEXT,
+	stateModelOf,
+	STATE_MODEL_CAUSAL,
+	STATE_MODEL_PERMISSIVE,
+	type RuntimeStateModel,
+} from './state-model-runtime.js';
+
+// Replaced by the package build; keep browser-only renderer consumers from
+// needing Node's ambient types merely to type-check this source module.
+declare const process: { env: { NODE_ENV?: string } };
+
+export { markStateModel, markStateModelMethods };
 
 const UNIVERSAL_PLAN = Symbol.for('octane.universal.plan');
 const UNIVERSAL_VALUE = Symbol.for('octane.universal.value');
@@ -719,6 +737,7 @@ type UniversalVisibility = 'visible' | 'activity-hidden' | 'suspense-hidden';
 interface StateHook<T = unknown> {
 	kind: 'state';
 	value: T;
+	model: RuntimeStateModel;
 	set: (value: T | ((previous: T) => T)) => void;
 	get: () => T;
 }
@@ -726,6 +745,7 @@ interface StateHook<T = unknown> {
 interface ReducerHook<S = unknown, A = unknown> {
 	kind: 'reducer';
 	value: S;
+	model: RuntimeStateModel;
 	reducer: (state: S, action: A) => S;
 	dispatch: (action: A) => void;
 	get: () => S;
@@ -899,6 +919,11 @@ const SCHEDULED_UNIVERSAL_ROOTS = new Set<UniversalRootImpl<any, any>>();
 const PENDING_UNIVERSAL_PASSIVE_ROOTS = new Set<UniversalRootImpl<any, any>>();
 let UNIVERSAL_SYNC_DEPTH = 0;
 let UNIVERSAL_COMMIT_TASK_DEPTH = 0;
+const UNIVERSAL_STATE_PHASE_RENDER = 1;
+const UNIVERSAL_STATE_PHASE_INITIALIZER = 2;
+const UNIVERSAL_STATE_PHASE_MEMO = 3;
+const UNIVERSAL_STATE_PHASE_UPDATER = 4;
+const UNIVERSAL_STATE_PHASE_REDUCER = 5;
 const UNIVERSAL_SYNC_DRAIN_LIMIT = 100;
 let NEXT_HOOK_SLOT = 0;
 let NEXT_OWNER_ID = 1;
@@ -909,6 +934,91 @@ let NEXT_PORTAL_ROOT = 1;
 let NEXT_TRANSPORT_ROOT = 1;
 const EVENT_DISPATCHERS = new Map<number, (payload: unknown) => unknown>();
 const UNIVERSAL_SLOT_STACK: unknown[] = [];
+
+class UniversalCausalStateModelError extends Error {}
+
+function universalStatePhaseName(): string {
+	switch (STATE_WRITE_CONTEXT.phase) {
+		case UNIVERSAL_STATE_PHASE_INITIALIZER:
+			return 'a state initializer is evaluating';
+		case UNIVERSAL_STATE_PHASE_MEMO:
+			return 'a memo calculation is evaluating';
+		case UNIVERSAL_STATE_PHASE_UPDATER:
+			return 'a functional state updater is evaluating';
+		case UNIVERSAL_STATE_PHASE_REDUCER:
+			return 'a reducer is evaluating';
+		default:
+			return 'a component is rendering';
+	}
+}
+
+function assertUniversalCausalStateWriteAllowed(
+	model: RuntimeStateModel,
+	target: UniversalOwnerRecord,
+): void {
+	if (
+		!STATE_WRITE_CONTEXT.active ||
+		STATE_WRITE_CONTEXT.depth === 0 ||
+		(model !== STATE_MODEL_CAUSAL && STATE_WRITE_CONTEXT.sourceModel !== STATE_MODEL_CAUSAL)
+	)
+		return;
+	const component = STATE_WRITE_CONTEXT.source ?? target.component;
+	const name = component?.name || 'Unknown';
+	if (process.env.NODE_ENV === 'production') {
+		throw new UniversalCausalStateModelError(
+			`Octane causal-state violation (OCTANE_CAUSAL_STATE_WRITE) in <${name}>.`,
+		);
+	}
+	throw new UniversalCausalStateModelError(
+		`Octane's causal state model does not allow a state update while ${universalStatePhaseName()} in <${name}>. ` +
+			'Derive render values directly, or move the transition to the event, action, or external-source callback that caused it.',
+	);
+}
+
+function evaluateUniversalState<T>(
+	model: RuntimeStateModel,
+	phase: number,
+	owner: UniversalOwnerRecord | null,
+	fn: () => T,
+	source: Function | null = owner?.component ?? STATE_WRITE_CONTEXT.source,
+): T {
+	if (!STATE_WRITE_CONTEXT.active) return fn();
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousPhase = STATE_WRITE_CONTEXT.phase;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	STATE_WRITE_CONTEXT.depth++;
+	STATE_WRITE_CONTEXT.sourceModel = model;
+	STATE_WRITE_CONTEXT.phase = phase;
+	STATE_WRITE_CONTEXT.source = source;
+	try {
+		return fn();
+	} finally {
+		STATE_WRITE_CONTEXT.sourceModel = previousModel;
+		STATE_WRITE_CONTEXT.phase = previousPhase;
+		STATE_WRITE_CONTEXT.source = previousSource;
+		STATE_WRITE_CONTEXT.depth--;
+	}
+}
+
+function runWithUniversalStateWriteContextSuspended<T>(fn: () => T): T {
+	if (!STATE_WRITE_CONTEXT.active || STATE_WRITE_CONTEXT.depth === 0) return fn();
+	const previousDepth = STATE_WRITE_CONTEXT.depth;
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousPhase = STATE_WRITE_CONTEXT.phase;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	STATE_WRITE_CONTEXT.depth = 0;
+	STATE_WRITE_CONTEXT.sourceModel = STATE_MODEL_PERMISSIVE;
+	STATE_WRITE_CONTEXT.phase = 0;
+	STATE_WRITE_CONTEXT.source = null;
+	try {
+		return fn();
+	} finally {
+		STATE_WRITE_CONTEXT.depth = previousDepth;
+		STATE_WRITE_CONTEXT.sourceModel = previousModel;
+		STATE_WRITE_CONTEXT.phase = previousPhase;
+		STATE_WRITE_CONTEXT.source = previousSource;
+	}
+}
 
 interface RendererRegionBridgeCell {
 	active: boolean;
@@ -1472,7 +1582,7 @@ export const UNIVERSAL_HMR: unique symbol = Symbol.for('octane.universal.hmr');
 interface UniversalHmrMeta {
 	component: UniversalComponent<any>;
 	readonly owners: Set<UniversalOwnerRecord>;
-	update(incoming: UniversalComponent<any>): void;
+	update(incoming: UniversalComponent<any>): boolean;
 }
 
 type UniversalHmrComponent<P> = UniversalComponent<P> & {
@@ -1503,6 +1613,9 @@ export function hmrUniversalComponent<P>(
 					`Universal HMR renderer mismatch: wrapper ${JSON.stringify(renderer)} cannot accept ${JSON.stringify(nextMetadata.id)}.`,
 				);
 			}
+			if (stateModelOf(meta.component) !== stateModelOf(next)) {
+				return false;
+			}
 			meta.component = next;
 			__profileComponentSource(wrapper, next);
 			if ((next as any).__warm === undefined) delete (wrapper as any).__warm;
@@ -1515,6 +1628,7 @@ export function hmrUniversalComponent<P>(
 				__profileSchedule(owner, 'hmr');
 				owner.root.schedule();
 			}
+			return true;
 		},
 	};
 	const wrapper = defineUniversalComponent<P>(
@@ -1527,6 +1641,7 @@ export function hmrUniversalComponent<P>(
 		{ module: metadata.module },
 	) as UniversalHmrComponent<P>;
 	Object.defineProperty(wrapper, UNIVERSAL_HMR, { value: meta });
+	markStateModel(wrapper, stateModelOf(component));
 	__profileComponentSource(wrapper, component);
 	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
 	return wrapper;
@@ -1762,6 +1877,10 @@ function executeOwner(
 	initialRenderCount = 0,
 ): BlueprintNode[] {
 	const attempt = currentAttempt();
+	const sourceComponent = owner.record.component;
+	const transparent = sourceComponent === null || isStateModelTransparent(sourceComponent);
+	const stateModel = transparent ? STATE_WRITE_CONTEXT.sourceModel : stateModelOf(sourceComponent);
+	const stateSource = transparent ? STATE_WRITE_CONTEXT.source : sourceComponent;
 	const warmPlanCheckpoint = ACTIVE_UNIVERSAL_WARM_PLANS.length;
 	let output: BlueprintNode[] = [];
 	for (let renderCount = initialRenderCount; ; renderCount++) {
@@ -1788,7 +1907,13 @@ function executeOwner(
 		let didThrow = false;
 		let thrown: unknown;
 		try {
-			output = build();
+			output = evaluateUniversalState(
+				stateModel,
+				UNIVERSAL_STATE_PHASE_RENDER,
+				owner.record,
+				build,
+				stateSource,
+			);
 		} catch (error) {
 			didThrow = true;
 			thrown = error;
@@ -2963,16 +3088,18 @@ function runCommitTasks(tasks: readonly (() => void)[]): void {
 	let firstError: unknown;
 	UNIVERSAL_COMMIT_TASK_DEPTH++;
 	try {
-		for (const task of tasks) {
-			try {
-				task();
-			} catch (error) {
-				if (!hasError) {
-					hasError = true;
-					firstError = error;
+		runWithUniversalStateWriteContextSuspended(() => {
+			for (const task of tasks) {
+				try {
+					task();
+				} catch (error) {
+					if (!hasError) {
+						hasError = true;
+						firstError = error;
+					}
 				}
 			}
-		}
+		});
 	} finally {
 		UNIVERSAL_COMMIT_TASK_DEPTH--;
 	}
@@ -3101,10 +3228,67 @@ export function hookSlots(count: number): number {
 	return base;
 }
 
-export function withSlot<T>(slot: unknown, fn: (...args: any[]) => T, ...args: any[]): T {
+function withUniversalSlotPath<T>(
+	slot: unknown,
+	fn: (...args: any[]) => T,
+	args: any[],
+	receiver?: unknown,
+): T {
 	UNIVERSAL_SLOT_STACK.push(slot);
 	try {
-		return fn(...args);
+		return receiver === undefined ? fn(...args) : fn.apply(receiver, args);
+	} finally {
+		UNIVERSAL_SLOT_STACK.pop();
+	}
+}
+
+export function withSlot<T>(slot: unknown, fn: (...args: any[]) => T, ...args: any[]): T {
+	const replaceSource = STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0;
+	const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+	const previousSource = STATE_WRITE_CONTEXT.source;
+	if (replaceSource) {
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(fn);
+		STATE_WRITE_CONTEXT.source = fn;
+	}
+	try {
+		return withUniversalSlotPath(slot, fn, args);
+	} finally {
+		if (replaceSource) {
+			STATE_WRITE_CONTEXT.sourceModel = previousModel;
+			STATE_WRITE_CONTEXT.source = previousSource;
+		}
+	}
+}
+
+/** Compiler helper for method-style custom hooks; preserves the authored receiver. */
+export function withMethodSlot<T>(
+	slot: unknown,
+	receiver: unknown,
+	keyOrLookup: PropertyKey | (() => (...args: any[]) => T),
+	argsFactory: () => any[],
+): T {
+	UNIVERSAL_SLOT_STACK.push(slot);
+	try {
+		const fn =
+			typeof keyOrLookup === 'function'
+				? keyOrLookup()
+				: (receiver as Record<PropertyKey, (...args: any[]) => T>)[keyOrLookup];
+		const args = argsFactory();
+		const replaceSource = STATE_WRITE_CONTEXT.active && STATE_WRITE_CONTEXT.depth !== 0;
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		if (replaceSource) {
+			STATE_WRITE_CONTEXT.sourceModel = stateModelOf(fn);
+			STATE_WRITE_CONTEXT.source = fn;
+		}
+		try {
+			return fn.apply(receiver, args);
+		} finally {
+			if (replaceSource) {
+				STATE_WRITE_CONTEXT.sourceModel = previousModel;
+				STATE_WRITE_CONTEXT.source = previousSource;
+			}
+		}
 	} finally {
 		UNIVERSAL_SLOT_STACK.pop();
 	}
@@ -3138,10 +3322,22 @@ function findDraftOwner(record: UniversalOwnerRecord): DraftOwner | null {
 	return null;
 }
 
-function applyStateUpdates<T>(value: T, updates: readonly unknown[]): T {
+function applyStateUpdates<T>(
+	value: T,
+	updates: readonly unknown[],
+	model: RuntimeStateModel,
+	owner: UniversalOwnerRecord,
+): T {
 	let next = value;
 	for (const update of updates) {
-		next = typeof update === 'function' ? (update as (previous: T) => T)(next) : (update as T);
+		if (typeof update === 'function') {
+			const previous = next;
+			next = evaluateUniversalState(model, UNIVERSAL_STATE_PHASE_UPDATER, owner, () =>
+				(update as (previous: T) => T)(previous),
+			);
+		} else {
+			next = update as T;
+		}
 	}
 	return next;
 }
@@ -3155,50 +3351,88 @@ function cloneStateHook<T>(owner: DraftOwner, slot: unknown): StateHook<T> | und
 		owner.clonedHooks.add(slot);
 		const updates = owner.record.updates.get(slot);
 		if (updates !== undefined && updates.length > 0) {
-			hook.value = applyStateUpdates(hook.value, updates);
+			hook.value = applyStateUpdates(hook.value, updates, hook.model, owner.record);
 			owner.appliedUpdates.set(slot, updates.length);
 		}
 	}
 	return hook;
 }
 
-function projectedStateValue<T>(record: UniversalOwnerRecord, slot: unknown, fallback: T): T {
+function projectedStateValue<T>(
+	record: UniversalOwnerRecord,
+	slot: unknown,
+	fallback: T,
+	model: RuntimeStateModel,
+): T {
 	const draft = findDraftOwner(record);
 	const draftHook = draft?.hooks.get(slot) as StateHook<T> | undefined;
 	if (draftHook?.kind === 'state') return draftHook.value;
 	const hook = record.hooks.get(slot) as StateHook<T> | undefined;
 	const value = hook?.kind === 'state' ? hook.value : fallback;
-	return applyStateUpdates(value, record.updates.get(slot) ?? []);
+	return applyStateUpdates(value, record.updates.get(slot) ?? [], model, record);
 }
 
 export function useState<T>(
 	initial: T | (() => T),
 	slot?: unknown,
+	stateModel?: unknown,
 ): [T, (value: T | ((previous: T) => T)) => void, () => T] {
+	if (stateModel === undefined && slot === undefined && typeof initial === 'symbol') {
+		slot = initial;
+		initial = undefined as T;
+	} else if (
+		stateModel === undefined &&
+		slot === STATE_MODEL_CAUSAL &&
+		typeof initial === 'symbol'
+	) {
+		stateModel = slot;
+		slot = initial;
+		initial = undefined as T;
+	}
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
+	const requestedModel = normalizeRuntimeStateModel(stateModel);
 	let hook = cloneStateHook<T>(owner, resolved);
 	if (hook?.kind !== 'state') {
 		const record = owner.record;
-		const initialValue = typeof initial === 'function' ? (initial as () => T)() : initial;
+		const initialValue =
+			typeof initial === 'function'
+				? evaluateUniversalState(
+						requestedModel,
+						UNIVERSAL_STATE_PHASE_INITIALIZER,
+						record,
+						initial as () => T,
+					)
+				: initial;
 		hook = {
 			kind: 'state',
 			value: initialValue,
+			model: requestedModel,
 			set(value) {
+				assertUniversalCausalStateWriteAllowed(requestedModel, record);
 				if (record.disposed) return;
 				const draft = findDraftOwner(record);
 				if (draft !== null) {
 					const live = cloneStateHook<T>(draft, resolved);
 					if (live === undefined) return;
 					const next =
-						typeof value === 'function' ? (value as (previous: T) => T)(live.value) : value;
+						typeof value === 'function'
+							? evaluateUniversalState(requestedModel, UNIVERSAL_STATE_PHASE_UPDATER, record, () =>
+									(value as (previous: T) => T)(live.value),
+								)
+							: value;
 					if (Object.is(next, live.value)) return;
 					live.value = next;
 					draft.needsRender = true;
 					return;
 				}
-				const previous = projectedStateValue(record, resolved, initialValue);
-				const next = typeof value === 'function' ? (value as (previous: T) => T)(previous) : value;
+				const previous = projectedStateValue(record, resolved, initialValue, requestedModel);
+				const next =
+					typeof value === 'function'
+						? evaluateUniversalState(requestedModel, UNIVERSAL_STATE_PHASE_UPDATER, record, () =>
+								(value as (previous: T) => T)(previous),
+							)
+						: value;
 				if (Object.is(next, previous)) return;
 				const updates = record.updates.get(resolved) ?? [];
 				updates.push(value);
@@ -3206,7 +3440,7 @@ export function useState<T>(
 				scheduleOwner(record, resolved);
 			},
 			get() {
-				return projectedStateValue(record, resolved, initialValue);
+				return projectedStateValue(record, resolved, initialValue, requestedModel);
 			},
 		};
 		owner.hooks.set(resolved, hook as UniversalHook);
@@ -3222,20 +3456,37 @@ export function useReducer<S, A, I = S>(
 	initialArg: I,
 	initOrSlot?: ((value: I) => S) | unknown,
 	maybeSlot?: unknown,
+	stateModel?: unknown,
 ): [S, (action: A) => void, () => S] {
+	if (
+		stateModel === undefined &&
+		typeof initOrSlot === 'symbol' &&
+		maybeSlot === STATE_MODEL_CAUSAL
+	) {
+		stateModel = maybeSlot;
+		maybeSlot = initOrSlot;
+	}
 	const init = typeof initOrSlot === 'function' ? (initOrSlot as (value: I) => S) : null;
 	const slot = maybeSlot ?? (init === null ? initOrSlot : undefined);
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
+	const requestedModel = normalizeRuntimeStateModel(stateModel);
 	let hook = owner.hooks.get(resolved) as ReducerHook<S, A> | undefined;
 	if (hook?.kind !== 'reducer') {
 		const record = owner.record;
-		const initialValue = init === null ? (initialArg as unknown as S) : init(initialArg);
+		const initialValue =
+			init === null
+				? (initialArg as unknown as S)
+				: evaluateUniversalState(requestedModel, UNIVERSAL_STATE_PHASE_INITIALIZER, record, () =>
+						init(initialArg),
+					);
 		hook = {
 			kind: 'reducer',
 			value: initialValue,
+			model: requestedModel,
 			reducer,
 			dispatch(action) {
+				assertUniversalCausalStateWriteAllowed(requestedModel, record);
 				if (record.disposed) return;
 				const draft = findDraftOwner(record);
 				if (draft !== null) {
@@ -3246,7 +3497,12 @@ export function useReducer<S, A, I = S>(
 						draft.hooks.set(resolved, live);
 						draft.clonedHooks.add(resolved);
 					}
-					const next = live.reducer(live.value, action);
+					const next = evaluateUniversalState(
+						requestedModel,
+						UNIVERSAL_STATE_PHASE_REDUCER,
+						record,
+						() => live.reducer(live.value, action),
+					);
 					if (Object.is(next, live.value)) return;
 					live.value = next;
 					draft.needsRender = true;
@@ -3264,7 +3520,13 @@ export function useReducer<S, A, I = S>(
 				const committed = record.hooks.get(resolved) as ReducerHook<S, A> | undefined;
 				let value = committed?.kind === 'reducer' ? committed.value : initialValue;
 				for (const update of record.updates.get(resolved) ?? []) {
-					value = (committed?.reducer ?? reducer)(value, update as A);
+					const previous = value;
+					value = evaluateUniversalState(
+						requestedModel,
+						UNIVERSAL_STATE_PHASE_REDUCER,
+						record,
+						() => (committed?.reducer ?? reducer)(previous, update as A),
+					);
 				}
 				return value;
 			},
@@ -3278,7 +3540,15 @@ export function useReducer<S, A, I = S>(
 			owner.clonedHooks.add(resolved);
 			const updates = owner.record.updates.get(resolved);
 			if (updates !== undefined && updates.length > 0) {
-				for (const action of updates) hook.value = reducer(hook.value, action as A);
+				for (const action of updates) {
+					const previous = hook.value;
+					hook.value = evaluateUniversalState(
+						hook.model,
+						UNIVERSAL_STATE_PHASE_REDUCER,
+						owner.record,
+						() => reducer(previous, action as A),
+					);
+				}
 				owner.appliedUpdates.set(resolved, updates.length);
 			}
 		}
@@ -3318,6 +3588,7 @@ export function useInsertionEffect(
 	create: () => void | (() => void),
 	deps?: readonly unknown[] | null,
 	slot?: unknown,
+	_stateModel?: unknown,
 ): void {
 	enqueueUniversalEffect('insertion', create, deps, slot);
 }
@@ -3326,6 +3597,7 @@ export function useLayoutEffect(
 	create: () => void | (() => void),
 	deps?: readonly unknown[] | null,
 	slot?: unknown,
+	_stateModel?: unknown,
 ): void {
 	enqueueUniversalEffect('layout', create, deps, slot);
 }
@@ -3334,11 +3606,17 @@ export function useEffect(
 	create: () => void | (() => void),
 	deps?: readonly unknown[] | null,
 	slot?: unknown,
+	_stateModel?: unknown,
 ): void {
 	enqueueUniversalEffect('passive', create, deps, slot);
 }
 
-export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, slot?: unknown): T {
+export function useMemo<T>(
+	compute: () => T,
+	deps?: readonly unknown[] | null,
+	slot?: unknown,
+	stateModel?: unknown,
+): T {
 	const owner = currentDraftOwner();
 	const resolved = resolveHookSlot(slot);
 	const previous = owner.hooks.get(resolved) as MemoHook<T> | undefined;
@@ -3358,7 +3636,12 @@ export function useMemo<T>(compute: () => T, deps?: readonly unknown[] | null, s
 	const warmed = takeUniversalWarmValue(owner.record.root, resolved, normalized);
 	const value =
 		warmed === NO_WARM_VALUE
-			? (compute as (...args: unknown[]) => T)(...(normalized ?? []))
+			? evaluateUniversalState(
+					normalizeRuntimeStateModel(stateModel),
+					UNIVERSAL_STATE_PHASE_MEMO,
+					owner.record,
+					() => (compute as (...args: unknown[]) => T)(...(normalized ?? [])),
+				)
 			: (warmed as T);
 	owner.hooks.set(resolved, { kind: 'memo', value, deps: normalized });
 	owner.clonedHooks.add(resolved);
@@ -3459,7 +3742,7 @@ export function useSyncExternalStore<T>(
 		slot = serverSnapshotAndSlot[serverSnapshotAndSlot.length - 1];
 	}
 	const base = resolveHookSlot(slot);
-	return withSlot(base, () => {
+	return withUniversalSlotPath(base, () => {
 		const snapshot = getSnapshot();
 		const [, invalidate] = useState(0, 'state');
 		useLayoutEffect(
@@ -3479,7 +3762,7 @@ export function useSyncExternalStore<T>(
 			'subscribe',
 		);
 		return snapshot;
-	});
+	}, []);
 }
 
 export function useDeferredValue<T>(value: T, _initialValue?: T, _slot?: unknown): T {
@@ -3495,15 +3778,27 @@ export function useActionState<State, Payload>(
 	initialState: State,
 	_permalinkOrSlot?: string | unknown,
 	maybeSlot?: unknown,
+	stateModel?: unknown,
 ): [State, (payload: Payload) => void, boolean] {
+	if (
+		stateModel === undefined &&
+		typeof _permalinkOrSlot === 'symbol' &&
+		maybeSlot === STATE_MODEL_CAUSAL
+	) {
+		stateModel = maybeSlot;
+		maybeSlot = _permalinkOrSlot;
+	}
 	const slot = maybeSlot ?? (typeof _permalinkOrSlot === 'string' ? undefined : _permalinkOrSlot);
 	const base = resolveHookSlot(slot);
-	const root = currentDraftOwner().record.root;
-	return withSlot(base, () => {
-		const [state, setState, getState] = useState(initialState, 'state');
-		const [pending, setPending] = useState(false, 'pending');
+	const record = currentDraftOwner().record;
+	const root = record.root;
+	const model = normalizeRuntimeStateModel(stateModel);
+	return withUniversalSlotPath(base, () => {
+		const [state, setState, getState] = useState(initialState, 'state', model);
+		const [pending, setPending] = useState(false, 'pending', model);
 		const dispatch = useCallback(
 			(payload: Payload) => {
+				assertUniversalCausalStateWriteAllowed(model, record);
 				let result: State | Promise<State>;
 				try {
 					result = action(getState(), payload);
@@ -3535,7 +3830,7 @@ export function useActionState<State, Payload>(
 			'dispatch',
 		);
 		return [state, dispatch, pending];
-	});
+	}, []);
 }
 
 /** ES-only fallback for hosts that do not provide the WHATWG FormData global. */
@@ -3594,6 +3889,15 @@ export function useOptimistic<State, Action = State>(
 	const defaultReducer = (_state: State, action: Action) => action as unknown as State;
 	let reducer: (state: State, action: Action) => State = defaultReducer;
 	let slot: unknown;
+	let stateModel: unknown;
+	if (
+		reducerAndSlot[reducerAndSlot.length - 1] === STATE_MODEL_CAUSAL &&
+		(reducerAndSlot.length >= 3 ||
+			(reducerAndSlot.length === 2 &&
+				(typeof reducerAndSlot[0] === 'symbol' || typeof reducerAndSlot[0] === 'number')))
+	) {
+		stateModel = reducerAndSlot.pop();
+	}
 	if (reducerAndSlot.length === 1) {
 		if (typeof reducerAndSlot[0] === 'function') {
 			reducer = reducerAndSlot[0] as (state: State, action: Action) => State;
@@ -3606,7 +3910,13 @@ export function useOptimistic<State, Action = State>(
 		}
 		slot = reducerAndSlot[reducerAndSlot.length - 1];
 	}
-	const [optimistic, dispatch] = useReducer(reducer, passthrough, slot);
+	const [optimistic, dispatch] = (useReducer as any)(
+		reducer,
+		passthrough,
+		undefined,
+		slot,
+		stateModel,
+	) as [State, (action: Action) => void];
 	return [Object.is(optimistic, passthrough) ? passthrough : optimistic, dispatch];
 }
 
@@ -3827,6 +4137,7 @@ export function useImperativeHandle<T>(
 	create: () => T,
 	deps?: readonly unknown[] | null,
 	slot?: unknown,
+	_stateModel?: unknown,
 ): void {
 	useLayoutEffect(
 		() => {
@@ -3876,8 +4187,37 @@ export function requestFormReset(): void {
 export function memo<P>(
 	component: UniversalComponent<P>,
 	_compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
+): UniversalComponent<P>;
+export function memo<P>(
+	component: UniversalComponent<P>,
+	_compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
+	_stateModel?: unknown,
 ): UniversalComponent<P> {
-	return component;
+	// Preserve the universal renderer's historical identity fast path. Causal
+	// compilation opts into a wrapper that can carry independent provenance.
+	if (arguments.length < 3 || arguments[arguments.length - 1] !== STATE_MODEL_CAUSAL) {
+		return component;
+	}
+	const wrapper = ((props: P, context: UniversalRenderContext): UniversalRenderable => {
+		if (!STATE_WRITE_CONTEXT.active || isStateModelTransparent(component)) {
+			return component(props, context);
+		}
+		const previousModel = STATE_WRITE_CONTEXT.sourceModel;
+		const previousSource = STATE_WRITE_CONTEXT.source;
+		STATE_WRITE_CONTEXT.sourceModel = stateModelOf(component);
+		STATE_WRITE_CONTEXT.source = component;
+		try {
+			return component(props, context);
+		} finally {
+			STATE_WRITE_CONTEXT.sourceModel = previousModel;
+			STATE_WRITE_CONTEXT.source = previousSource;
+		}
+	}) as UniversalComponent<P>;
+	Object.defineProperty(wrapper, UNIVERSAL_COMPONENT, {
+		configurable: true,
+		get: () => component[UNIVERSAL_COMPONENT],
+	});
+	return markStateModel(wrapper, STATE_MODEL_CAUSAL);
 }
 
 export function createPortal(children: UniversalRenderable, target: unknown): UniversalPortalValue {

@@ -150,7 +150,10 @@ function configSignature(config) {
 		preHydrate: config.router.preHydrate,
 		rootBoundary: config.rootBoundary,
 		server: config.server,
-		compiler: { renderers: config.compiler.renderers.signature },
+		compiler: {
+			renderers: config.compiler.renderers.signature,
+			stateModel: config.compiler.stateModel.signature,
+		},
 	});
 }
 
@@ -230,6 +233,7 @@ function assertRootPublicPaths(config, clientEnvironment) {
  *   profile?: boolean,
  *   exclude?: string[],
  *   requireDirective?: boolean,
+ *   stateModel?: import('@octanejs/app-core').StateModelConfigOptions,
  *   clientEnvironment?: string,
  *   serverEnvironment?: string,
  * }} [inlineOptions]
@@ -526,6 +530,7 @@ export function pluginOctane(inlineOptions = {}) {
 							? null
 							: { requireDirective: inlineOptions.requireDirective }),
 						renderers: initialConfig?.compiler.renderers,
+						stateModel: inlineOptions.stateModel ?? initialConfig?.compiler.stateModel,
 					}),
 				);
 				config.resolve ??= {};

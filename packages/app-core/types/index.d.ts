@@ -294,6 +294,29 @@ export interface ExperimentalResolvedRendererConfig {
 	readonly signature: string;
 }
 
+/** State-transition behavior selected for Octane-authored modules. */
+export type StateModel = 'causal' | 'permissive';
+
+/**
+ * State-model selection shared by compiler integrations.
+ *
+ * `default` applies to app-owned code and dependencies without a declaration or
+ * exact package entry. `packages` cannot change the model of app-owned source.
+ */
+export interface StateModelConfigOptions {
+	/** @default 'permissive' during the migration rollout */
+	default?: StateModel;
+	/** Exact dependency names; a permissive declaration requires a matching entry. */
+	packages?: Readonly<Record<string, StateModel>>;
+}
+
+/** Canonical state-model configuration used by compiler integrations and cache keys. */
+export interface ResolvedStateModelConfig {
+	readonly default: StateModel;
+	readonly packages: Readonly<Record<string, StateModel>>;
+	readonly signature: string;
+}
+
 export interface OctaneConfigOptions {
 	build?: {
 		/** Output directory for the production build. @default 'dist' */
@@ -305,6 +328,7 @@ export interface OctaneConfigOptions {
 	/** @experimental Compiler-owned configuration shared by all bundler integrations. */
 	compiler?: {
 		renderers?: ExperimentalRendererConfigOptions;
+		stateModel?: StateModelConfigOptions;
 	};
 	router?: {
 		routes: Route[];
@@ -357,6 +381,7 @@ export interface ResolvedOctaneConfig {
 	adapter?: OctaneAdapter;
 	compiler: {
 		renderers: ExperimentalResolvedRendererConfig;
+		stateModel: ResolvedStateModelConfig;
 	};
 	router: {
 		routes: Route[];

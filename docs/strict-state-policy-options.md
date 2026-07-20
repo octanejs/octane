@@ -1,453 +1,304 @@
-# Strict-state policy naming and compatibility options
+# Causal state-model policy decision
 
-> **Status: DECISION MEMO — no option is selected.** Prepared 2026-07-19 as a
-> companion to [`strict-state-plan.md`](./strict-state-plan.md). This memo is for
-> choosing the public configuration vocabulary and the third-party compatibility
-> boundary; it does not reopen the underlying state-phase semantics.
+> **Status: DECIDED.** Recorded 2026-07-19 as the public policy companion to
+> [`strict-state-plan.md`](./strict-state-plan.md). This document fixes the
+> configuration vocabulary, package boundary, authorization model, provenance
+> contract, and rollout order.
+>
+> **Current rollout:** selecting `causal` hard-enforces component render and
+> runtime-owned purity frames. Effect setup/cleanup and other commit callbacks
+> remain runtime-permissive, with statically proven writes reported as warnings,
+> until the replacement primitives, lifecycle guard, and Callback Provenance
+> phases land. The lifecycle rules below describe the permanent target semantics,
+> not enforcement shipped in the foundation release.
 
-## 1. Decision to make
+## 1. Decision
 
-Octane needs one build-time policy with two behaviors:
+The public field is `stateModel`. Its values are:
 
-- **Native behavior:** authored state transitions are allowed at causal boundaries
-  such as events, actions, and later callback turns. They are rejected while render,
-  state/reducer initialization, memo evaluation, reducer/updater evaluation, or
-  effect setup/cleanup is synchronously on the execution stack.
-- **React-compatible behavior:** existing render-phase replay and lifecycle update
-  behavior remains available for code that has not migrated yet.
+- `causal`: authored state transitions occur at causal boundaries. Render and
+  synchronous lifecycle work are read-only.
+- `permissive`: retain the existing render replay and lifecycle-update behavior as
+  an explicit migration boundary.
 
-The policy needs both a project default, so the work can roll out without an atomic
-repository migration, and a narrow way to retain React behavior for third-party
-Octane packages.
-
-The naming decision has three independent parts:
-
-1. What is the configuration property called?
-2. What are the two behaviors called?
-3. Is the API presented as a choice between two models, a positive Octane feature,
-   or a React compatibility exception?
-
-The five proposals below intentionally vary all three.
-
-## 2. Shared contract across every proposal
-
-The choice of spelling must not change these mechanics.
-
-### 2.1 Enforcement
-
-- The runtime is the semantic defense in development and production. The compiler
-  adds earlier, richer diagnostics where execution timing is statically provable.
-- `useCallback` creation is never itself illegal. The compiler follows local aliases
-  and calls and reports only a callback proven to execute synchronously from a
-  forbidden phase. Passing a callback to an opaque subscription remains a runtime
-  question because registration does not prove synchronous invocation.
-- A later timer, observer, subscription notification, async continuation, or
-  deliberate deferral is a legal causal transition.
-- Internal runtime scheduling remains outside the user-dispatcher guard.
-
-### 2.2 Compatibility containment
-
-Compatibility must not leak from a dependency into application-authored code. In a
-forbidden phase, the intended composition rule is:
-
-| Executing code     | Native cell | React-compatible cell |
-| ------------------ | ----------- | --------------------- |
-| Native             | Throw       | Throw                 |
-| React-compatible   | Throw       | Existing behavior     |
-
-Outside a forbidden phase, ordinary updates remain legal in every combination.
-This permits a React-compatible package to manage its own state while preventing a
-native application from laundering a lifecycle write through a setter returned by
-that package.
-
-### 2.3 Third-party packages
-
-The package boundary is the initial compatibility granularity:
-
-- Package authors can declare that their package requires React-compatible
-  behavior in the existing `octane` object in their `package.json`. Whether that
-  declaration is self-authorizing or instead requires consumer approval is an open
-  decision called out below.
-- Applications can approve a dependency explicitly in compiler configuration.
-- Consumer exceptions use exact npm package names. They do not accept filesystem
-  globs, source paths, export subpaths, or inline comments.
-- An exception cannot target the application package itself. A nested workspace
-  package with its own manifest is a separate package, even when it is physically
-  inside the bundler root.
-- Package behavior is non-transitive. Native children and native callbacks passed
-  into a compatible package retain their originating behavior, and a native setter
-  remains native when passed into compatible code.
-- A usage-site `compat(Component)` wrapper is not part of the initial design. It is
-  too late to govern diagnostics in raw dependency source, does not naturally cover
-  imported custom hooks and utilities, and is an easy suppression pattern to copy.
-- The existing compiler `exclude` option is unrelated: it relinquishes compiler and
-  hook-slot ownership, whereas a compatible package must still compile so its
-  policy can be encoded.
-
-The compiler already has a watched nearest-manifest resolver in
-[`bundler.js`](../packages/octane/src/compiler/bundler.js). The implementation should
-extend that resolver rather than matching `node_modules` paths, which are unstable
-across package managers and symlinks.
-
-There are two viable authorization models for package metadata:
-
-1. **Self-declaration:** the package manifest is sufficient to select compatible
-   behavior, and the build inventory makes that decision visible.
-2. **Declaration plus approval:** the package manifest declares a requirement, but
-   the consuming application must also name the package. An unapproved requirement
-   is a build error rather than a silent relaxation.
-
-The second model gives the application stronger control; the first creates less
-installation friction. This choice is independent of the five names. In either
-model, a normal state diagnostic must not suggest adding an exception; migration
-documentation for port authors can describe it separately.
-
-### 2.4 Distribution and auditability
-
-- Full `.tsrx`/`.tsx` compilation and plain `.ts`/`.js` hook slotting resolve the
-  same package policy.
-- Manual-slot packages need the policy encoded in their slot-family ABI rather than
-  being permanently defaulted to compatibility.
-- New precompiled output needs a versioned policy marker. The treatment of older
-  unmarked output—automatic existing behavior reported as `legacy-precompiled`, or
-  an explicit consumer approval—is an open migration decision.
-- Client, SSR, hydration, and universal compilation must resolve the same policy.
-- Builds emit a deterministic inventory containing package name, version, resolved
-  root, and policy origin (`package-declared`, `consumer-exception`, or
-  `legacy-precompiled`). When one npm name resolves to multiple versions or physical
-  roots, every affected instance appears separately. CI can baseline the inventory
-  and reject unexplained growth.
-- Policy configuration participates in compiler cache keys. A change during HMR
-  forces a full reload so existing cells cannot retain stale behavior.
-- Evaluation runs count adding a compatibility exception as evasion rather than a
-  successful repair.
-
-## 3. Proposal A — `stateSemantics`
-
-This presents the setting as a choice between two explicitly named semantic models.
-
-```ts
-export default defineConfig({
-	compiler: {
-		stateSemantics: {
-			default: 'causal',
-			packages: {
-				'@vendor/legacy-widgets': 'react',
-			},
-		},
-	},
-});
-```
-
-Package declaration:
-
-```json
-{
-	"octane": {
-		"stateSemantics": "react"
-	}
-}
-```
-
-Possible diagnostic language:
-
-> This update violates causal state semantics because it executes while the effect
-> setup frame is active.
-
-Advantages:
-
-- Covers setters, dispatchers, reducers, replay, and effect frames without naming
-  one implementation mechanism.
-- `causal` matches the teaching model used by the design: events and later callbacks
-  cause transitions; render and commit lifecycle do not.
-- The enum is symmetric and can be carried unchanged through direct compiler and
-  package-manifest APIs.
-
-Risks:
-
-- `semantics` may sound broader than the phase legality this option actually
-  controls.
-- `causal` is Octane-specific vocabulary that users must learn.
-- The short value `react` could be read as claiming complete React equivalence rather
-  than compatibility for this state behavior alone.
-
-## 4. Proposal B — `stateModel`
-
-This uses framework names instead of introducing a new conceptual value.
+The native configuration after rollout is:
 
 ```ts
 export default defineConfig({
 	compiler: {
 		stateModel: {
-			default: 'octane',
+			default: 'causal',
 			packages: {
-				'@vendor/legacy-widgets': 'react',
+				'@vendor/legacy-widgets': 'permissive',
 			},
 		},
 	},
 });
 ```
 
-Package declaration:
+The first rollout release uses the same permanent shape with
+`default: 'permissive'`. The default flips only after policy plumbing,
+diagnostics, callback provenance, replacement primitives, inventory, and
+first-party migrations are ready. This is not a boolean feature flag that
+disappears after migration.
+
+Package manifests use the same noun and values:
 
 ```json
 {
 	"octane": {
-		"stateModel": "react"
+		"stateModel": "permissive"
 	}
 }
 ```
 
-Possible diagnostic language:
+The post-rollout documentation headline is:
 
-> Octane's state model does not allow an update while effect setup is executing.
+> Octane uses the causal state model. Permissive state behavior exists only as an
+> explicit migration boundary.
 
-Advantages:
+## 2. What `stateModel` controls
 
-- `octane` versus `react` is immediately understandable without learning `causal`.
-- Frames the stricter behavior as the framework's normal model rather than an
-  optional safety level.
-- Short in application configuration and package metadata.
+`stateModel` is intentionally narrow. It selects the phase legality of authored
+state transitions and whether render-phase updates use the existing replay path.
+It does not select storage, equality, batching, priority, hook tuple shape,
+external-store semantics, or every scheduler behavior.
 
-Risks:
+Under `causal`, a user-callable setter or dispatcher is rejected while any of
+these frames is synchronously active:
 
-- `stateModel` can imply that storage, equality, batching, scheduling, or hook tuple
-  shapes also change.
-- Naming the native value `octane` becomes awkward if Octane later supports another
-  renderer or authoring profile with the same phase rules.
-- Framework-name values can age poorly if React changes its own behavior.
+- component render;
+- state or reducer initialization;
+- memo factory evaluation;
+- reducer or functional-updater evaluation;
+- insertion, layout, or passive effect setup;
+- effect cleanup; or
+- any other commit callback classified as lifecycle work.
 
-## 5. Proposal C — `causalState`
+Within one authored definition boundary, the entire active frame chain is
+checked: **any forbidden ancestor wins**. A nested action, transition, helper,
+or event-shaped function cannot hide the enclosing render or lifecycle frame.
+A separately compiled component or custom-hook definition establishes a new
+executing-source boundary, however: package policy is non-transitive, so an
+approved permissive definition updating its own permissive cell retains the
+existing behavior even when a causal caller is rendering it. The target-cell
+half of the rule still prevents that boundary from weakening a causal cell.
 
-This presents the design as one positive Octane feature with compatibility
-exceptions, using a boolean for rollout.
+`useCallback` declaration is legal because it does not execute the callback. A
+callback statically proven to execute synchronously from a forbidden frame is
+illegal, including both of these forms:
 
 ```ts
-export default defineConfig({
-	compiler: {
-		causalState: {
-			enabled: true,
-			exceptions: ['@vendor/legacy-widgets'],
-		},
-	},
-});
+useEffect(callback);
+useEffect(() => callback());
 ```
 
-Package declaration:
+A timer, observer notification, subscription notification, async continuation,
+or deliberate deferral that runs after the forbidden stack has returned is a
+legal causal transition. A subscription callback replayed before effect setup
+returns is still in the forbidden frame and is rejected.
 
-```json
-{
-	"octane": {
-		"causalState": false
-	}
-}
-```
+The guard runs before functional updater evaluation and before same-value eager
+bailout. Runtime-internal scheduling is not routed through the authored-dispatch
+guard.
 
-Possible diagnostic language:
+## 3. Package resolution and authorization
 
-> Causal state forbids this update while the effect setup frame is active.
+The initial granularity is one exact package:
 
-Advantages:
+- `packages` keys are exact npm package names. There are no filesystem globs,
+  source paths, export subpaths, component wrappers, inline pragmas, or per-call
+  suppressions.
+- The application package cannot appear in `packages`, even with the same model as
+  `default`. Its model comes only from `default`.
+- A nested workspace package with its own manifest is a separate package even when
+  it lives beneath the application root.
+- Policy is non-transitive. A dependency's model does not flow into its callers,
+  children, callbacks, or unrelated dependencies.
+- The existing compiler `exclude` option remains an ownership escape for source
+  routed through another TSRX toolchain and for permissive plain helpers. Excluded
+  output carries no Octane state-model ABI, so `exclude` cannot downgrade an
+  otherwise Octane-owned causal `.ts`/`.js` helper. Such a conflict is a build
+  error; third-party compatibility belongs in the exact package map instead.
 
-- Gives the feature a concise, positive name that can also headline documentation
-  and diagnostics.
-- The global rollout switch and third-party exception list are visually obvious.
-- Native application code does not appear to select between Octane and React.
+Authorization is declaration plus consumer approval:
 
-Risks:
+1. A dependency manifest declaring `stateModel: 'causal'` is accepted without a
+   separate approval.
+2. A dependency manifest declaring `stateModel: 'permissive'` requires an exact
+   `packages` entry selecting `permissive`. Without it, the build fails and prints
+   the precise approval entry.
+3. A consumer may explicitly classify a dependency with no declaration as
+   `permissive`. This supports source packages published before the field exists.
+4. A dependency with neither a declaration nor an exact package entry inherits
+   the project `default`.
 
-- `false` in package metadata does not explain which behavior replaces causal state.
-- A permanent `enabled` boolean may make a language invariant look like an optional
-  optimization.
-- The term is unfamiliar and can be mistaken for a state-management architecture
-  rather than an execution-phase rule.
-- The list shape is less extensible if another behavior is ever introduced.
+An exact package entry may select either model and takes precedence over a causal
+declaration or the project default. A permissive declaration is the exception: it
+must have a matching permissive entry, so a contradictory causal entry fails
+rather than silently relabeling the package.
 
-## 6. Proposal D — `stateUpdatePolicy`
+An ordinary state diagnostic never recommends changing the project default or
+adding a permissive package entry. The approval suggestion appears only when a
+dependency has declared that requirement. This keeps migration authorization
+separate from the repair path for application code.
 
-This optimizes for precision and uses fully descriptive values, accepting a more
-verbose public API.
+The compiler extends the watched nearest-manifest resolver in
+[`bundler.js`](../packages/octane/src/compiler/bundler.js). It does not infer
+package identity from `node_modules` paths, which vary across package managers,
+workspaces, and symlinks.
 
-```ts
-export default defineConfig({
-	compiler: {
-		stateUpdatePolicy: {
-			default: 'causal-boundaries',
-			packages: {
-				'@vendor/legacy-widgets': 'react-compatible',
-			},
-		},
-	},
-});
-```
+## 4. Two-sided provenance
 
-Package declaration:
+The state model belongs to both sides of a transition:
 
-```json
-{
-	"octane": {
-		"stateUpdatePolicy": "react-compatible"
-	}
-}
-```
+- the executing source keeps the model of the package that authored it; and
+- each hook cell keeps the model of the package that allocated it.
 
-Possible diagnostic language:
+During a forbidden phase, the final composition rule is:
 
-> The causal-boundaries state update policy rejects updates during effect setup.
+| Executing source | Causal cell | Permissive cell |
+| ---------------- | ----------- | --------------- |
+| Causal           | Throw       | Throw           |
+| Permissive       | Throw       | Existing behavior |
 
-Advantages:
+Outside a forbidden phase, ordinary updates remain legal in every combination.
+The matrix closes both laundering directions: causal code cannot gain permission
+by obtaining a permissive setter, and permissive code cannot lifecycle-update a
+causal cell.
 
-- Clearly scoped to state updates rather than all state behavior.
-- `causal-boundaries` and `react-compatible` are relatively self-explanatory when
-  encountered in configuration without surrounding documentation.
-- `policy` honestly describes a build-time rule applied differently by package.
+Runtime source provenance has a deliberate, honest boundary. The implemented
+foundation knows the definition model at compiled component and custom-hook entry
+points. That source model remains active through synchronous nested calls. The
+compiler additionally follows local aliases and local call chains, so it can
+reject a locally proven nested invocation before runtime.
 
-Risks:
+Initializer, memo, reducer, and functional-updater callbacks currently inherit
+the model of the hook invocation or cell whose runtime executes them. This makes
+causal hooks pure now, but it is not yet callback-author provenance: a causal
+callback handed to a permissive cell follows the permissive cell model, while a
+permissive callback handed to a causal cell follows the causal cell model. A
+versioned **Callback Provenance ABI** must brand callback definitions across
+imports, returned functions, opaque setters, `.bind()`, and aggregate values
+before the full matrix can be claimed. It is required before lifecycle writes
+become errors or `causal` becomes the default. A partial call-site marker is
+explicitly rejected because it would miss exactly the cross-package flows this
+policy is meant to make auditable.
 
-- Long names make configuration, types, diagnostics, and internal identifiers
-  noisy.
-- `state update` can still be confused with transition scheduling and update
-  priority.
-- `policy` sounds administrative rather than like a core programming model.
+This design does not claim general dynamic attribution for arbitrary JavaScript
+callbacks crossing opaque call sites. At such a site the compiler proves or stays
+silent. The runtime still sees any active runtime-owned forbidden ancestor and the
+target cell's model, but it cannot invent an author identity for an arbitrary
+callback that no compiled or runtime-owned boundary identifies. This limitation is
+tracked explicitly rather than hidden behind a claim of complete callback
+provenance.
 
-## 7. Proposal E — `reactCompatibility.stateUpdates`
+The implemented foundation activates exact source provenance for component render
+and custom-hook boundaries, plus cell-owned enforcement for hook purity frames.
+Effect-hook calls already accept the hidden model ABI argument, but the runtime
+does not retain it on effect records yet. Effect setup/cleanup and other
+commit-callback runtime frames remain deliberately unenforced until the lifecycle
+and Callback Provenance phases; their statically proven writes are reported as
+warnings meanwhile.
 
-This leaves the native behavior unnamed and configures only the compatibility
-surface. The default boolean doubles as the rollout flag.
+## 5. Distribution and auditability
 
-```ts
-export default defineConfig({
-	compiler: {
-		reactCompatibility: {
-			stateUpdates: {
-				default: false,
-				packages: ['@vendor/legacy-widgets'],
-			},
-		},
-	},
-});
-```
+- Full `.tsrx`/`.tsx` compilation and plain `.ts`/`.js` hook slotting resolve the
+  same package model.
+- Compiler-managed full and slot-only output encodes the model in its ABI.
+  Manually slotted source selected as causal currently fails compilation rather
+  than being mislabeled; it may remain behind an explicitly approved permissive
+  dependency boundary until the manual ABI is versioned.
+- New causal output carries the first numeric state-model policy marker.
+- Client, SSR, hydration, universal, development, and production compilation
+  resolve the same policy.
+- Configuration participates in compiler cache keys. Vite watches existing
+  classification manifests and also tracks prospective nearer manifest paths. A
+  reported change or creation restarts the dev server, forcing a full reload so
+  existing cells cannot retain stale provenance.
+- A later auditability phase makes builds emit a deterministic inventory with
+  package name, version, resolved root, selected model, declaration origin, and
+  authorization origin. Multiple versions or physical roots appear separately.
 
-Package declaration:
+Unmarked precompiled output is currently classified as `permissive`; deterministic
+`legacy-precompiled` reporting lands with the inventory phase. Grandfathering
+expires at the named **Causal State Policy ABI 1** (`causal-state-abi-1`) epoch. At
+that ABI boundary, unmarked output requires explicit consumer approval. The change
+is tied to a policy marker epoch, not vaguely to the next package major.
 
-```json
-{
-	"octane": {
-		"reactCompatibility": {
-			"stateUpdates": true
-		}
-	}
-}
-```
+The replay machinery remains load-bearing for permissive packages, conformance
+fixtures, and grandfathered output. The completed causal model guarantees
+authored-code determinism and removes unnecessary replay from causal patterns; it
+does not claim that this work deletes replay machinery from the runtime.
 
-Possible diagnostic language:
+## 6. Rollout order
 
-> State updates during effect setup are not supported by Octane. React state-update
-> compatibility is enabled only for declared packages.
+Foundation lands before enforcement:
 
-Advantages:
+1. **Implemented:** add the configuration shape, package resolver, approval
+   errors, compiler-managed component/custom-hook markers, cache behavior,
+   two-sided component/cell plumbing, cell-owned hard render/purity enforcement,
+   and report-only lifecycle diagnostics. Keep `default: 'permissive'`.
+2. Add deterministic inventory, the versioned manual-slot ABI, and the Callback
+   Provenance ABI. Ship causal guidance and replacement primitives, classify
+   repository hits, and migrate first-party code. Approve dependency packages
+   that still need the permissive boundary.
+3. Validate the implemented render/initializer/memo/reducer/updater errors against
+   the eval corpus, then enable effect setup/cleanup errors after the paved road
+   covers observed cases.
+4. Flip the product default to `causal` once callback provenance, first-attempt
+   and one-iteration agent evals, cross-renderer tests, and the first-party
+   inventory pass without a default-wide permissive override.
+5. At `causal-state-abi-1`, end automatic grandfathering for unmarked precompiled
+   output.
 
-- Makes the exceptional behavior explicit while treating the Octane invariant as
-  simply the default language.
-- A third-party package list reads naturally as a compatibility allowlist.
-- Provides a possible home for other narrowly defined React compatibility facets
-  without calling the whole application React-compatible.
+Approving a dependency that declares `permissive` is a legitimate migration action
+and is recorded in the inventory. Changing the application default or adding a
+package exception to evade a diagnostic in application-owned code is an eval
+failure, not a successful repair.
 
-Risks:
+## 7. Naming rationale
 
-- The native model has no reusable public name for documentation and diagnostics.
-- `default: false` is less readable than an enum and becomes `true` during rollout,
-  which is easy to misinterpret.
-- A general `reactCompatibility` namespace may attract unrelated behavior switches
-  and grow into an ill-defined compatibility mode.
-- The nested shape is the most verbose for a single policy.
+`stateModel` is short and teachable: “the causal state model” describes why events
+and later callbacks cause transitions while render and lifecycle work do not. Its
+scope is bounded explicitly in §2 so it does not imply a different storage or
+scheduling implementation.
 
-## 8. Comparison
+`causal` gives the native model a stable concept independent of another framework's
+current behavior. `permissive` says what the alternate path does—it permits the
+existing broader phase behavior—without claiming that it is unsafe in every use or
+that it will disappear on a particular date.
 
-| Proposal | Primary framing | Native term | Compatibility term | Cold-read strength | Main ambiguity |
-| -------- | --------------- | ----------- | ------------------ | ------------------ | -------------- |
-| A. `stateSemantics` | Symmetric semantic models | `causal` | `react` | Balanced | May imply all state semantics |
-| B. `stateModel` | Framework models | `octane` | `react` | Familiar values | May imply storage/scheduling also change |
-| C. `causalState` | Positive feature plus exceptions | enabled | exception / `false` | Concise | Boolean opt-out is underspecified |
-| D. `stateUpdatePolicy` | Explicit policy | `causal-boundaries` | `react-compatible` | Most precise | Verbose and administrative |
-| E. `reactCompatibility.stateUpdates` | Compatibility-only surface | implicit Octane behavior | enabled | Clear exception | Native concept remains unnamed |
+The following alternatives are rejected:
 
-The noun and value vocabulary can be considered separately. For example,
-`stateSemantics` could use `octane | react`, while `stateModel` could use
-`causal | react-compatible`. The team does not need to accept each proposal as an
-indivisible package.
+- `stateWrites` names one operation rather than the programming model and poorly
+  covers reducers, dispatchers, replay, and source provenance.
+- `stateSemantics` sounds broader than the selected phase behavior.
+- `stateUpdatePolicy` is accurate but administrative and verbose.
+- A boolean such as `causalState.enabled` makes a language model look like a lint
+  level and leaves `false` underspecified.
+- Framework-named values couple the vocabulary to a moving external target and
+  make the native model harder to teach in its own terms.
+- `strict`, `safe`/`unsafe`, and `good`/`bad` are either overloaded or too absolute.
+  Diagnostics should explain the concrete causal rule rather than substitute a
+  moral label.
+- `compat` is vague about what compatibility means; `legacy` becomes false for
+  maintained packages; `unrestricted` is inaccurate because runtime constraints
+  still apply.
 
-## 9. Suggested evaluation rubric
+## 8. Diagnostic language
 
-| Criterion | Weight | Question |
-| --------- | -----: | -------- |
-| Semantic precision | 25% | Does the name describe the actual execution boundary without claiming to control unrelated state behavior? |
-| Human and agent comprehension | 20% | From configuration and a diagnostic alone, can someone predict what fails and choose the intended repair? |
-| Long-term truthfulness | 15% | Will the vocabulary remain accurate if React compatibility is supported permanently? |
-| Safe package exception | 15% | Can one exact dependency retain compatibility without weakening its caller, children, callbacks, or unrelated dependencies? |
-| Auditability | 10% | Can CI identify every compatible package instance, version, root, and policy origin? |
-| Cross-toolchain fit | 10% | Can the same shape work in direct compilation, Vite, Rspack, Rsbuild, SSR, hydration, and precompiled output? |
-| Brevity | 5% | Is normal configuration compact without hiding its meaning? |
+A cold-read diagnostic should name the model and the active cause:
 
-Suggested hard disqualifiers:
+> Octane's causal state model does not allow `setSelection` while effect setup is
+> executing. Move user-caused work to the event or action, derive render values
+> directly, read external input through a source, or synchronize outward without
+> copying the result into component state.
 
-- The name collides conceptually with React StrictMode or Octane transitions.
-- The shape requires an inline pragma, component wrapper, or per-call suppression.
-- A package exception propagates transitively into native code.
-- Policy resolution requires package lookup on a render or dispatch hot path.
-- The shape cannot represent both a rollout default and exact dependency
-  exceptions.
+Compiler diagnostics include the setter declaration site, illegal call site,
+active phase, and phase-specific repair guidance. Machine-readable error codes and
+production runtime errors use the same causal vocabulary. They do not offer a
+local suppression or permissive opt-out.
 
-## 10. Names deliberately not proposed
-
-- **`stateWrites`** names the guarded operation rather than the programming model
-  and does not naturally include reducers, dispatchers, or execution provenance.
-- **`strictState`** can be confused with React StrictMode, type strictness, or state
-  immutability.
-- **`renderPurity`** excludes effect setup and cleanup, which are central to the
-  policy.
-- **`lifecycleStateUpdates`** is behaviorally descriptive, but render,
-  initializers, memo factories, reducers, and functional updaters are not all
-  naturally understood as lifecycle code.
-- **`stateTransitions`** collides conceptually with `useTransition` and
-  `startTransition`.
-- **`legacy` / `unsafe` / `permissive`** are value judgments and inaccurately
-  describe current React behavior.
-
-## 11. Questions for the team
-
-1. Should the API name both behaviors symmetrically, or name only the React
-   compatibility exception?
-2. Which native term is clearest on first encounter: `causal`, `octane`,
-   `causal-boundaries`, or an implicit default?
-3. Should the compatibility value be the concise `react` or the narrower
-   `react-compatible`?
-4. Does a boolean rollout switch make the migration easier, or make the invariant
-   look permanently optional?
-5. Is the package boundary sufficient for the first release, or is there a concrete
-   third-party case that truly requires export/component-level selection?
-6. Is package metadata self-authorizing, or must the consuming application approve
-   every declared compatible dependency?
-7. Should a package author declaration and a consumer exception use the same field
-   name and values?
-8. Should unmarked precompiled packages automatically retain current behavior, or
-   require an explicit consumer exception after a major compiler/runtime boundary?
-9. Which wording produces the best diagnostic when read without documentation?
-
-For review, it is useful to vote on the property noun, native value, compatibility
-value, and object shape independently before assembling the final spelling.
-
-## 12. Suggested blind review
-
-Before discussing preferences, show each configuration example without its
-explanatory prose and ask reviewers—human or agent—to predict:
-
-1. Does a setter called directly by an effect throw?
-2. Does the same setter called by a later timer or observer callback throw?
-3. How is one third-party package admitted without weakening application code?
-4. Does a compatible package receive permission to update a native cell during
-   render?
-
-Record first-answer correctness and the explanation each name evokes. This tests
-whether the API teaches the intended model rather than merely sounding attractive
-after the model has already been explained.
+The naming decision is closed. Remaining questions in the main plan concern ABI
+encoding and replacement-primitive details, not the public policy shape or values.

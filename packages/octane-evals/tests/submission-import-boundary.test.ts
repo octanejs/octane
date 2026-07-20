@@ -14,6 +14,24 @@ function outputText(value: unknown): string {
 }
 
 describe('user-app submission import boundary', () => {
+	it('does not expose compiler watch metadata as candidate imports', () => {
+		const reference = join(packageRoot, 'datasets/train/user-apps-v1/tasks/tsrx.counter/reference');
+
+		expect(() =>
+			execFileSync(
+				process.execPath,
+				['scripts/grade-user-app.mjs', '--task', 'tsrx.counter', '--submission', reference],
+				{
+					cwd: packageRoot,
+					env: { ...process.env, OCTANE_EVAL_SANDBOX: '1' },
+					killSignal: 'SIGKILL',
+					stdio: 'pipe',
+					timeout: 20_000,
+				},
+			),
+		).not.toThrow();
+	}, 30_000);
+
 	it('rejects a candidate that imports Vitest into the grader process', () => {
 		const submissionRoot = mkdtempSync(join(tmpdir(), 'octane-eval-malicious-import-'));
 		mkdirSync(join(submissionRoot, 'src'));
