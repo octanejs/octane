@@ -545,6 +545,39 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
+	it('resets a new documentation page to the top without animating from the old section', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools');
+		try {
+			await page.click('.on-this-page a[href="#renderer-targets"]');
+			await page.waitForFunction(
+				() =>
+					location.hash === '#renderer-targets' &&
+					Math.abs(window.scrollY - (document.documentElement.scrollHeight - window.innerHeight)) <
+						2,
+				null,
+				{ timeout: 10_000 },
+			);
+			expect(await page.evaluate(() => scrollY)).toBeGreaterThan(0);
+
+			await page.click('.sidebar-link[href="/docs/quick-start"]');
+			await page.waitForFunction(
+				() =>
+					location.pathname === '/docs/quick-start' &&
+					document.querySelector('.prose h1')?.textContent === 'Quick start',
+				null,
+				{ timeout: 10_000 },
+			);
+
+			// The new document is already at its initial position on its first
+			// rendered frame; it must not animate upward from the old page's anchor.
+			expect(await page.evaluate(() => scrollY)).toBe(0);
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
 	it('the first router event after hydration does not remount the app', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
 			waitForNetworkIdle: true,

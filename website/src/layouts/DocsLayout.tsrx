@@ -1,12 +1,21 @@
 // Docs section shell: sidebar of documents (from the registry) + the routed
 // document via <Outlet/>.
 import { Link, Outlet, useParams } from '@octanejs/tanstack-router';
-import { docGroups, defaultDoc } from '../content/docs.ts';
+import { useState } from 'octane';
+import { OnThisPage } from '../components/OnThisPage.tsrx';
+import { docGroups, defaultDoc, findDoc } from '../content/docs.ts';
 
 export function DocsLayout() @{
-	const closeMobileNavigation = (event: Event) => {
-		const link = event.currentTarget as HTMLAnchorElement;
-		link.closest('details')?.removeAttribute('open');
+	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+	const closeMobileNavigation = () => {
+		if (!mobileMenuOpen) return;
+		setMobileMenuOpen(false);
+		// Section navigation must measure after the collapsing panel stops changing
+		// the document height. A timer also covers browsers that omit transitionend.
+		const reduce =
+			typeof window.matchMedia === 'function' &&
+				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		return new Promise<void>((resolve) => window.setTimeout(resolve, reduce ? 0 : 240));
 	};
 
 	// The Link's own data-status covers `/docs/$slug`, but the bare `/docs` index
@@ -14,65 +23,60 @@ export function DocsLayout() @{
 	// matches and the sidebar reads as inactive. Mark the default doc active there.
 	const params = useParams({ strict: false }) as { slug?: string };
 	const indexActive = (slug: string) => !params.slug && slug === defaultDoc.slug;
+	const activeDoc = findDoc(params.slug);
+	const pageActive = (slug: string) => activeDoc?.slug === slug;
 
 	<div class="docs">
 		<aside class="sidebar">
-			<nav class="sidebar-nav" aria-label="Docs">
-				<p class="sidebar-title">Documentation</p>
-				<div class="sidebar-groups">
-					@for (const group of docGroups; key group.title) {
-						<div class="sidebar-group">
-							<p class="sidebar-heading">
-								{group.title as string}
-							</p>
-							<ul class="sidebar-list">
-								@for (const doc of group.docs; key doc.slug) {
-									<li>
-										<Link
-											to="/docs/$slug"
-											params={{ slug: doc.slug }}
-											class={['sidebar-link', indexActive(doc.slug) && 'is-active']}
-										>
-											{doc.title as string}
-										</Link>
-									</li>
-								}
-							</ul>
+			<button
+				type="button"
+				class="sidebar-mobile-toggle"
+				aria-expanded={mobileMenuOpen}
+				aria-controls="docs-sidebar-nav"
+				onClick={() => setMobileMenuOpen((open) => !open)}
+			>
+				<span>Documentation</span>
+				<span class="sidebar-mobile-icon" aria-hidden="true">+</span>
+			</button>
+			<div class={['sidebar-panel', mobileMenuOpen && 'is-open']}>
+				<div class="sidebar-panel-inner">
+					<nav id="docs-sidebar-nav" class="sidebar-nav" aria-label="Documentation">
+						<p class="sidebar-title">Documentation</p>
+						<div class="sidebar-groups">
+							@for (const group of docGroups; key group.title) {
+								<div class="sidebar-group">
+									<p class="sidebar-heading">
+										{group.title as string}
+									</p>
+									<ul class="sidebar-list">
+										@for (const doc of group.docs; key doc.slug) {
+											<li>
+												<Link
+													to="/docs/$slug"
+													params={{ slug: doc.slug }}
+													class={['sidebar-link', indexActive(doc.slug) && 'is-active']}
+													onClick={() => {
+														void closeMobileNavigation();
+													}}
+												>
+													{doc.title as string}
+												</Link>
+												@if (pageActive(doc.slug) && doc.sections && doc.sections.length > 0) {
+													<OnThisPage
+														sections={doc.sections}
+														resetKey={doc.slug}
+														onNavigate={closeMobileNavigation}
+													/>
+												}
+											</li>
+										}
+									</ul>
+								</div>
+							}
 						</div>
-					}
+					</nav>
 				</div>
-			</nav>
-			<details class="sidebar-mobile">
-				<summary>
-					<span>Documentation</span>
-					<span class="sidebar-mobile-icon" aria-hidden="true">+</span>
-				</summary>
-				<nav aria-label="Docs mobile">
-					<div class="mobile-sidebar-groups">
-						@for (const group of docGroups; key group.title) {
-							<div class="sidebar-group">
-								<p class="sidebar-heading">
-									{group.title as string}
-								</p>
-								<ul class="sidebar-list">
-									@for (const doc of group.docs; key doc.slug) {
-										<li>
-											<Link
-												to="/docs/$slug"
-												params={{ slug: doc.slug }}
-												class={['sidebar-link', indexActive(doc.slug) && 'is-active']}
-												onClick={closeMobileNavigation}
-											>
-												{doc.title as string}
-											</Link>
-										</li>
-									}
-								</ul>
-							</div>
-						}
-					</div>
-				</nav>
-			</details>
+			</div>
 		</aside>
 		<div class="doc-outlet">
 			<Outlet />
@@ -101,7 +105,7 @@ export function DocsLayout() @{
 				overflow-y: auto;
 				scrollbar-width: thin;
 			}
-			.sidebar-mobile {
+			.sidebar-mobile-toggle {
 				display: none;
 			}
 			@media (max-width: 800px) {
@@ -113,43 +117,71 @@ export function DocsLayout() @{
 					overflow: hidden;
 					border-bottom: 1px solid var(--border);
 				}
-				.sidebar-nav {
-					display: none;
-				}
-				.sidebar-mobile {
-					display: block;
-				}
-				.sidebar-mobile summary {
+				.sidebar-mobile-toggle {
 					display: flex;
 					align-items: center;
 					justify-content: space-between;
+					width: 100%;
 					min-height: 2.5rem;
+					padding: 0;
+					border: 0;
+					background: transparent;
 					color: var(--text);
 					font-size: 0.9rem;
 					font-weight: 750;
 					cursor: pointer;
-					list-style: none;
-				}
-				.sidebar-mobile summary::-webkit-details-marker {
-					display: none;
 				}
 				.sidebar-mobile-icon {
 					color: var(--accent-text);
 					font-size: 1.15rem;
-					transition: transform 0.15s;
+					transition: transform 0.2s ease;
 				}
-				.sidebar-mobile[open] .sidebar-mobile-icon {
+				.sidebar-mobile-toggle[aria-expanded='true'] .sidebar-mobile-icon {
 					transform: rotate(45deg);
 				}
-				.sidebar-mobile nav {
+				.sidebar-panel {
+					display: grid;
+					grid-template-rows: 0fr;
+					opacity: 0;
+					visibility: hidden;
+					transition:
+						grid-template-rows 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+						opacity 0.18s ease,
+						visibility 0s 0.22s;
+				}
+				.sidebar-panel.is-open {
+					grid-template-rows: 1fr;
+					opacity: 1;
+					visibility: visible;
+					transition-delay: 0s;
+				}
+				.sidebar-panel-inner {
+					min-height: 0;
+					overflow: hidden;
+				}
+				.sidebar-nav {
 					margin-top: 0.5rem;
 					padding-top: 0.9rem;
 					border-top: 1px solid var(--border);
 				}
-				.mobile-sidebar-groups {
+				.sidebar .sidebar-title {
+					display: none;
+				}
+				.sidebar .sidebar-groups {
 					display: grid;
 					grid-template-columns: repeat(2, minmax(0, 1fr));
 					gap: 1rem;
+				}
+			}
+			@media (prefers-reduced-motion: reduce) {
+				.sidebar-mobile-icon,
+				.sidebar-panel {
+					transition: none;
+				}
+			}
+			@media (max-width: 560px) {
+				.sidebar .sidebar-groups {
+					grid-template-columns: 1fr;
 				}
 			}
 			.sidebar-title {

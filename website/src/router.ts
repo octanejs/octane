@@ -53,6 +53,9 @@ export function getRouter(options: WebsiteRouterOptions = {}) {
 		history: options.history,
 		isServer: options.isServer,
 		scrollRestoration: true,
+		// A route swap replaces the document's content, so its top/reset position
+		// must apply immediately even though same-page anchors scroll smoothly.
+		scrollRestorationBehavior: 'instant',
 		defaultPreload: 'intent',
 		parseSearch: parseWebsiteSearch,
 		stringifySearch: stringifyWebsiteSearch,
