@@ -49,7 +49,7 @@ formatting of the vendored tree was normalized by the repo's Prettier config
 
 ```bash
 pnpm --filter tanstack-com-bench-react build                    # → dist/
-BENCH_REDACT=true pnpm --filter tanstack-com-bench-react build  # → rename to dist-redact/
+BENCH_REDACT=true pnpm --filter tanstack-com-bench-react build  # → dist-redact/
 
 NODE_ENV=production PORT=4200 BENCH_PARTNER_SEED=bench \
 TANSTACK_DOCS_LOCAL=true TANSTACK_LOCAL_REPOS_DIR=$PWD/content/repos \

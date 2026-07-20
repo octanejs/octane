@@ -162,6 +162,9 @@ export default defineConfig({
 		],
 	},
 	build: {
+		// Each flavor owns its output tree — a sequential two-flavor build must
+		// never overwrite the other flavor's artifacts.
+		outDir: shouldUseRedact ? 'dist-redact' : 'dist',
 		minify: 'esbuild',
 		sourcemap: false,
 		reportCompressedSize: false,
