@@ -77,7 +77,7 @@ export function PortalEventDemo() @{
 				padding: 0.9rem;
 				border: 1px solid var(--border);
 				border-radius: 0.8rem;
-				background: rgba(15, 17, 22, 0.3);
+				background: var(--surface-inset);
 			}
 			.portal-demo-label {
 				display: block;
@@ -141,7 +141,7 @@ export function PortalEventDemo() @{
 			}
 			:global(.portal-demo-toast button) {
 				background: transparent;
-				border-color: rgba(255, 255, 255, 0.15);
+				border-color: var(--border);
 				padding: 0.35rem 0.65rem;
 			}
 			.portal-demo-result {

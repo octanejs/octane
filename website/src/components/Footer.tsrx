@@ -112,7 +112,7 @@ export function Footer() @{
 			}
 			.footer-icon:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.06);
+				background: var(--surface);
 				text-decoration: none;
 			}
 			/* Tinted through a mask so the svg follows the link's currentColor on

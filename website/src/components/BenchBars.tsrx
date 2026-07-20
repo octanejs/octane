@@ -254,8 +254,8 @@ export function BenchBars(props: { card: BenchCard }) @{
 		<style>
 			.bench-card {
 				margin: 0;
-				background: #2b3138;
-				border: 1px solid rgba(255, 255, 255, 0.08);
+				background: var(--panel);
+				border: 1px solid var(--border);
 				border-radius: 12px;
 				padding: 1.25rem 1.25rem 0.75rem;
 				display: flex;
@@ -271,12 +271,12 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-card-title {
 				font-weight: 600;
-				color: #f6f7f9;
+				color: var(--text);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.95rem;
 			}
 			.bench-card-desc {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-size: 0.85rem;
 				line-height: 1.45;
 			}
@@ -290,7 +290,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				border: 1px solid transparent;
 				border-radius: 0.5rem;
 				background: transparent;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.78rem;
 				cursor: pointer;
@@ -299,8 +299,8 @@ export function BenchBars(props: { card: BenchCard }) @{
 					color 0.15s;
 			}
 			.bench-op:hover {
-				color: #f6f7f9;
-				background: rgba(255, 255, 255, 0.04);
+				color: var(--text);
+				background: var(--surface-subtle);
 			}
 			.bench-op:focus-visible {
 				outline: 2px solid #ff8296;
@@ -308,7 +308,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-op-on {
 				background: rgba(255, 65, 90, 0.16);
-				color: #f6f7f9;
+				color: var(--text);
 			}
 			/* The plot is one grid: the label column sizes to its longest label (so
 			   the chart hugs the card's left edge instead of a fixed gutter) and the
@@ -327,7 +327,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-row-label {
 				font-size: 0.82rem;
-				color: #f6f7f9;
+				color: var(--text);
 				text-align: right;
 				white-space: nowrap;
 				overflow: hidden;
@@ -337,7 +337,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				position: relative;
 				height: 1.4rem;
 				border-radius: 0 0.35rem 0.35rem 0;
-				background: rgba(255, 255, 255, 0.04);
+				background: var(--surface-subtle);
 			}
 			.bench-fill {
 				position: absolute;
@@ -359,7 +359,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 				transform: translateY(-50%);
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				font-size: 0.75rem;
-				color: #f6f7f9;
+				color: var(--text);
 				white-space: nowrap;
 				transition: left 0.3s ease;
 			}
@@ -377,25 +377,25 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-row-empty .bench-row-label,
 			.bench-muted {
-				color: #99a1b3;
+				color: var(--text-secondary);
 			}
 			.bench-plot-note {
-				color: #6e7787;
+				color: var(--text-secondary);
 				font-size: 0.72rem;
 				margin: 0;
 			}
 			.bench-table {
-				border-top: 1px solid rgba(255, 255, 255, 0.08);
+				border-top: 1px solid var(--border);
 				padding-top: 0.5rem;
 				overflow-x: auto;
 			}
 			.bench-table summary {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-size: 0.8rem;
 				cursor: pointer;
 			}
 			.bench-table summary:hover {
-				color: #f6f7f9;
+				color: var(--text);
 			}
 			.bench-table table {
 				width: 100%;
@@ -408,12 +408,12 @@ export function BenchBars(props: { card: BenchCard }) @{
 			.bench-table td {
 				text-align: right;
 				padding: 0.25rem 0.5rem;
-				color: #f6f7f9;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+				color: var(--text);
+				border-bottom: 1px solid var(--border);
 				white-space: nowrap;
 			}
 			.bench-table thead th {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-weight: 500;
 			}
 			.bench-table thead th:first-child {
@@ -421,7 +421,7 @@ export function BenchBars(props: { card: BenchCard }) @{
 			}
 			.bench-table th[scope='row'] {
 				text-align: left;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-weight: 400;
 			}
 			@media (max-width: 640px) {

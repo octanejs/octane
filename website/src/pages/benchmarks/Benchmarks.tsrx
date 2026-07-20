@@ -132,13 +132,13 @@ export function Benchmarks() @{
 				margin: 0 0 0.75rem;
 			}
 			.benchpage-sub {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font-size: 1.05rem;
 				line-height: 1.6;
 				margin: 0;
 			}
 			.benchpage-sub code {
-				background: #16181d;
+				background: var(--code-bg);
 				border-radius: 6px;
 				padding: 0.1rem 0.4rem;
 				font-size: 0.9em;
@@ -174,7 +174,7 @@ export function Benchmarks() @{
 				scroll-margin-top: 5.5rem;
 			}
 			.benchpage-note {
-				color: #99a1b3;
+				color: var(--text-secondary);
 				max-width: 44rem;
 				line-height: 1.55;
 				margin: 0 0 1.5rem;

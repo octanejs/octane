@@ -70,7 +70,7 @@ export function Features() @{
 				gap: 0.5rem;
 				background:
 					linear-gradient(145deg, rgba(255, 65, 90, 0.055), transparent 42%), var(--panel);
-				border: 1px solid rgba(255, 255, 255, 0.08);
+				border: 1px solid var(--border);
 				border-radius: 1rem;
 				padding: 0.9rem;
 				overflow: hidden;

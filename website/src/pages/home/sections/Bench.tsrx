@@ -59,7 +59,7 @@ export function Bench() @{
 			}
 			.bench-note code {
 				background: var(--code-bg);
-				border: 1px solid rgba(255, 255, 255, 0.08);
+				border: 1px solid var(--border);
 				border-radius: 0.35rem;
 				padding: 0.1rem 0.4rem;
 				font-size: 0.85em;

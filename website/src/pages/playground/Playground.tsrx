@@ -730,14 +730,14 @@ export function Playground() @{
 				font: inherit;
 				font-size: 0.85rem;
 				font-weight: 500;
-				color: #f4eee8;
+				color: var(--text);
 				/* Custom chevron (appearance: none drops the native one) so the
 				   indicator gets breathing room from the right edge. */
 				appearance: none;
 				padding: 0.35rem 2.1rem 0.35rem 0.65rem;
 				border-radius: 8px;
-				border: 1px solid rgba(255, 255, 255, 0.1);
-				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--border);
+				background: var(--surface-subtle);
 				background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2399a1b3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 				background-repeat: no-repeat;
 				background-position: right 0.75rem center;
@@ -750,22 +750,22 @@ export function Playground() @{
 			}
 			.pg-select option,
 			.pg-select optgroup {
-				background: #16181d;
-				color: #f4eee8;
+				background: var(--panel);
+				color: var(--text);
 			}
 			.pg-format {
 				font: inherit;
 				font-size: 0.85rem;
 				font-weight: 500;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				padding: 0.35rem 0.9rem;
 				border-radius: 9999px;
-				border: 1px solid rgba(255, 255, 255, 0.1);
-				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--border);
+				background: var(--surface-subtle);
 				cursor: pointer;
 			}
 			.pg-format:hover:not(:disabled) {
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.pg-format:disabled {
 				opacity: 0.5;
@@ -775,13 +775,13 @@ export function Playground() @{
 				display: inline-flex;
 				padding: 3px;
 				border-radius: 9999px;
-				border: 1px solid rgba(255, 255, 255, 0.1);
-				background: rgba(255, 255, 255, 0.04);
+				border: 1px solid var(--border);
+				background: var(--surface-subtle);
 			}
 			.pg-seg-btn {
 				border: none;
 				background: transparent;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font: inherit;
 				font-size: 0.85rem;
 				font-weight: 500;
@@ -790,10 +790,10 @@ export function Playground() @{
 				cursor: pointer;
 			}
 			.pg-seg-btn:hover:not(:disabled) {
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.pg-seg-btn.active {
-				color: #ff5d72;
+				color: var(--accent-text);
 				background: rgba(255, 65, 90, 0.14);
 			}
 			.pg-seg-btn:disabled {
@@ -804,7 +804,7 @@ export function Playground() @{
 				padding: 0.6rem 1rem;
 				border-top: 1px solid rgba(255, 93, 114, 0.4);
 				background: rgba(255, 65, 90, 0.12);
-				color: #ff8d9d;
+				color: var(--danger-text);
 				font-size: 0.85rem;
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 				white-space: pre-wrap;
@@ -816,7 +816,7 @@ export function Playground() @{
 				padding: 0.6rem 1rem;
 				border-top: 1px solid rgba(245, 183, 65, 0.4);
 				background: rgba(245, 183, 65, 0.1);
-				color: #f6cf7a;
+				color: var(--callout-important);
 				font-size: 0.82rem;
 			}
 			.pg-warnings ul {
@@ -836,7 +836,7 @@ export function Playground() @{
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 			}
 			.pg-warning-location {
-				color: #b8a57c;
+				color: var(--text-secondary);
 			}
 			.pg-grid {
 				display: grid;
@@ -987,8 +987,8 @@ export function Playground() @{
 					gap: 0.25rem;
 					padding: 3px;
 					border-radius: 9999px;
-					border: 1px solid rgba(255, 255, 255, 0.1);
-					background: rgba(35, 39, 47, 0.92);
+					border: 1px solid var(--border);
+					background: var(--header-bg-solid);
 					backdrop-filter: blur(12px);
 					align-self: center;
 					margin: 0.5rem auto;

@@ -407,7 +407,7 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 					padding: 1rem 1.1rem;
 					border: 1px solid var(--border);
 					border-radius: 0.875rem;
-					background: rgba(255, 255, 255, 0.025);
+					background: var(--surface-subtle);
 				}
 				.toc-desktop {
 					display: none;

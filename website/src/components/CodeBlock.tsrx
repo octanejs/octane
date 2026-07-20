@@ -128,7 +128,7 @@ export function CodeBlock(props: CodeBlockProps) @{
 				min-height: 2rem;
 				padding: 0 0.5rem;
 				border-bottom: 1px solid var(--border);
-				background: rgba(255, 255, 255, 0.02);
+				background: var(--surface-subtle);
 			}
 			.codeblock-dot {
 				width: 10px;
@@ -175,20 +175,21 @@ export function CodeBlock(props: CodeBlockProps) @{
 			}
 			.codeblock-copy:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.07);
-				border-color: rgba(255, 255, 255, 0.14);
+				background: var(--surface);
+				border-color: var(--border);
 			}
 			/* In the bar the copy button is pushed to the trailing edge. */
 			.codeblock-copy-bar {
 				margin-left: auto;
 			}
 			/* Bare has no bar, so the button floats over the top-right of the code and
-			   picks up a panel fill on rest so it stays legible over any token. */
+			   picks up the code panel's own fill on rest so it stays legible over any
+			   token — theme-aware, so it doesn't go dark-on-dark in light mode. */
 			.codeblock-copy-float {
 				position: absolute;
 				top: 0.55rem;
 				right: 0.6rem;
-				background: rgba(22, 24, 29, 0.75);
+				background: var(--code-bg);
 			}
 			.codeblock-copy-icon {
 				width: 15px;

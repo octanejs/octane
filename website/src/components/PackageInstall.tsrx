@@ -167,7 +167,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 				min-height: 2rem;
 				padding: 0 0.4rem 0 0.35rem;
 				border-bottom: 1px solid var(--border);
-				background: rgba(255, 255, 255, 0.02);
+				background: var(--surface-subtle);
 			}
 			.pkg-tabs {
 				display: flex;
@@ -231,8 +231,8 @@ export function PackageInstall(props: PackageInstallProps) @{
 			}
 			.pkg-copy:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.07);
-				border-color: rgba(255, 255, 255, 0.14);
+				background: var(--surface);
+				border-color: var(--border);
 			}
 			.pkg-copy-icon {
 				width: 14px;
@@ -260,10 +260,10 @@ export function PackageInstall(props: PackageInstallProps) @{
 			/* Match the surrounding shiki bash fences (github-dark-high-contrast):
 			   the command binary is accented, its arguments stay plain. */
 			.pkg-tok-cmd {
-				color: #ffb757;
+				color: var(--pkg-cmd);
 			}
 			.pkg-tok-arg {
-				color: #addcff;
+				color: var(--pkg-arg);
 			}
 		</style>
 	</div>
