@@ -8180,7 +8180,10 @@ function isPropCreationExpr(expr, ctx) {
 				/^use($|[A-Z])/.test(callee.name) || ctx?._parallelUseAliases?.has(callee.name) === true
 			);
 		}
-		if (callee.type === 'MemberExpression' && !callee.computed) {
+		if (
+			(callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') &&
+			!callee.computed
+		) {
 			return callee.property.type === 'Identifier' && /^use($|[A-Z])/.test(callee.property.name);
 		}
 		return false;
@@ -8198,8 +8201,20 @@ function isPropCreationExpr(expr, ctx) {
 				return;
 			}
 			if (FN_TYPES.has(n.type)) return; // does not run during render
-			if (n.type === 'CallExpression' || n.type === 'NewExpression') {
-				if (n.type === 'CallExpression' && isHookishCallee(n.callee)) {
+			// Same render-time-call inventory as containsRenderCall: plain and
+			// optional calls, constructions, tagged templates, and dynamic
+			// import() (ESTree flavor; the Babel flavor is a CallExpression).
+			if (
+				n.type === 'CallExpression' ||
+				n.type === 'OptionalCallExpression' ||
+				n.type === 'NewExpression' ||
+				n.type === 'TaggedTemplateExpression' ||
+				n.type === 'ImportExpression'
+			) {
+				if (
+					(n.type === 'CallExpression' || n.type === 'OptionalCallExpression') &&
+					isHookishCallee(n.callee)
+				) {
 					blocked = true;
 					return;
 				}

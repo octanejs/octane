@@ -288,6 +288,54 @@ describe('streaming SSR — promises created in an ancestor, unwrapped via props
 		}
 	});
 
+	it('caches optional-call prop creations cross-pass like plain calls', async () => {
+		// `p.makeCards?.()` parses as an OptionalCallExpression — it creates per
+		// evaluation exactly like a plain call and must take the identity-cache
+		// path (exactly-once creation, no recreation warning), not the degraded
+		// livelock-guard fallback.
+		const OPTIONAL_FLOW =
+			CARD_AND_LIST +
+			`
+			export function Page(p) @{
+				<main><List cards={p.makeCards?.()} /></main>
+			}
+		`;
+		const mod = evalServer(OPTIONAL_FLOW, 'prop-flow-optional.tsrx');
+		const { state, makeCards } = timedCardsFactory();
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const { ended, errors } = collect(mod.Page, { makeCards });
+			const html = await ended;
+			expect(errors).toEqual([]);
+			expect(html).toContain('card-0');
+			expect(html).toContain('card-1');
+			expect(html).toContain('card-2');
+			expect(state.creations).toBe(1);
+			expect(errorSpy).not.toHaveBeenCalled();
+		} finally {
+			errorSpy.mockRestore();
+		}
+	});
+
+	it('never caches hook-shaped calls in prop position — plain or optional', () => {
+		// A hook call's slot/occurrence bookkeeping must run on the body proper
+		// every pass, so it can never sit behind a cross-pass cache hit. This is
+		// an authoring-pattern contract the render output cannot distinguish, so
+		// assert the narrowest compile-level property: no creation cache is
+		// emitted for these attributes.
+		const HOOKISH = `
+			export function Kid(props) @{ <i>{props.v as string}</i> }
+			export function Page(p) @{
+				<main>
+					<Kid v={useThing(p)} />
+					<Kid v={p.store?.useSelector()} />
+				</main>
+			}
+		`;
+		const { code } = compile(HOOKISH, 'prop-hookish.tsrx', { mode: 'server' });
+		expect(code).not.toContain('puMemo');
+	});
+
 	it('compiles and renders a module whose ONLY slot sites are prop memos', async () => {
 		// The website/example-app CI break: routes are split across modules, so
 		// a module can pass call-valued props while its consumers (use(), hooks)
