@@ -656,9 +656,6 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 						location.hash === '#rspack' &&
 						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
 							'false' &&
-						document
-							.querySelector('.on-this-page a[href="#rspack"]')
-							?.getAttribute('aria-current') === 'true' &&
 						target.top >= sidebar.bottom + 8 &&
 						target.top <= sidebar.bottom + 30
 					);
@@ -666,6 +663,12 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 				null,
 				{ timeout: 10_000 },
 			);
+			// The clicked row must remain current after the scroll-spy's post-scroll
+			// settle window releases its temporary click lock.
+			await page.waitForTimeout(400);
+			expect(
+				await page.locator('.on-this-page a[href="#rspack"]').getAttribute('aria-current'),
+			).toBe('true');
 			const real = errors.filter((error) => !error.includes('Failed to load resource'));
 			expect(real).toEqual([]);
 		} finally {

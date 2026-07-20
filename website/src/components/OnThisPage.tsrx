@@ -21,16 +21,26 @@ const ACTIVATION_LINE = 100;
 
 // A documentation host can become a sticky row above the content. Derive that
 // state from its rendered position and overlap with the heading rather than
-// duplicating the layout's responsive breakpoint in JavaScript.
+// duplicating the layout's responsive breakpoint in JavaScript. The heading's
+// computed scroll margin is also a lower bound: scrollIntoView deliberately
+// lands there, so that position must count as active.
 function activationLineFor(track: Element | null, heading: Element | null): number {
+	let activationLine = ACTIVATION_LINE;
+	if (heading) {
+		const scrollMarginTop = Number.parseFloat(getComputedStyle(heading).scrollMarginTop);
+		if (Number.isFinite(scrollMarginTop)) {
+			activationLine = Math.max(activationLine, scrollMarginTop);
+		}
+	}
+
 	const host = track?.closest<HTMLElement>('[data-scroll-spy-mobile-host]');
-	if (!host || !heading || getComputedStyle(host).position !== 'sticky') return ACTIVATION_LINE;
+	if (!host || !heading || getComputedStyle(host).position !== 'sticky') return activationLine;
 
 	const hostRect = host.getBoundingClientRect();
 	const headingRect = heading.getBoundingClientRect();
 	const overlapsHeading = hostRect.left < headingRect.right && hostRect.right > headingRect.left;
-	if (overlapsHeading) return Math.max(ACTIVATION_LINE, hostRect.bottom + 12);
-	return ACTIVATION_LINE;
+	if (overlapsHeading) return Math.max(activationLine, hostRect.bottom + 12);
+	return activationLine;
 }
 // How long after the last scroll tick a TOC click is considered settled. Long
 // enough to bridge the gap between smooth-scroll frames (and the delay before
