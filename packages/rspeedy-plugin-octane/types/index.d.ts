@@ -8,7 +8,10 @@ export interface OctaneLynxUniversalRuntime {
 }
 
 export interface OctaneRspeedyPluginOptions {
-	/** Compiler/runtime thread specialization. @default 'background' */
+	/**
+	 * Select one isolated compiler graph for diagnostics and source tests.
+	 * Omit this option to build a complete background-rendered Lynx application.
+	 */
 	thread?: OctaneLynxThread;
 	/** Restrict the plugin to named Rspeedy environments. */
 	environments?: string[];
@@ -30,6 +33,7 @@ export interface OctaneRspeedyPluginOptions {
 
 export const LYNX_BACKGROUND_LAYER: 'octane:background';
 export const LYNX_MAIN_THREAD_LAYER: 'octane:main-thread';
+export const LYNX_TARGET_SDK_VERSION: '3.9';
 export const LYNX_BACKGROUND_RUNTIME: Readonly<{
 	runtime: 'lynx';
 	thread: 'background';
@@ -46,7 +50,21 @@ export interface LynxToolchainPackage {
 
 export function assertLynxToolchain(
 	root: string,
-): Readonly<Record<'@lynx-js/rspeedy' | '@rsbuild/core' | '@rspack/core', LynxToolchainPackage>>;
+): Readonly<
+	Record<
+		| '@lynx-js/css-extract-webpack-plugin'
+		| '@lynx-js/rspeedy'
+		| '@lynx-js/runtime-wrapper-webpack-plugin'
+		| '@lynx-js/tasm'
+		| '@lynx-js/template-webpack-plugin'
+		| '@lynx-js/web-core'
+		| '@lynx-js/webpack-dev-transport'
+		| '@lynx-js/webpack-runtime-globals'
+		| '@rsbuild/core'
+		| '@rspack/core',
+		LynxToolchainPackage
+	>
+>;
 
 export function pluginOctane(options?: OctaneRspeedyPluginOptions): RsbuildPlugin;
 export const octane: typeof pluginOctane;

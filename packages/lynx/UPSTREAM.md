@@ -24,7 +24,7 @@ The renderer-owned declarations in `src/native-types.ts` adapt the public
 The adapted file retains the upstream copyright/license notice and marks the
 Octane-specific module-scoping change.
 
-## Milestone 1–4 package boundary
+## Milestone 1–5 package boundary
 
 The private package scaffold keeps `@lynx-js/types@4.0.0` pinned as the type
 provenance authority, but does not import its `./props` or `./events` entries.
@@ -47,8 +47,9 @@ selector-query, background platform, and cross-thread `ContextProxy` surfaces.
 The adapter, host topology, prop/event/list boundary, query handles, transport
 protocol, and root lifecycle are original Octane code; no Lynx or ReactLynx
 implementation source was copied.
-`@lynx-js/testing-environment@0.3.0` is a development-only behavioral host and
-is not shipped in the renderer graph.
+`@lynx-js/testing-environment@0.3.0` is an optional peer and the implementation
+behind the packaged `@octanejs/lynx/testing` facade. It remains a
+JavaScript-only behavioral host and is not imported by the renderer graph.
 
 The app-owned files under `examples/native-capabilities` use the audited
 generated-spec seam and the current official native-library Autolink
@@ -78,3 +79,6 @@ Rspeedy graph are recorded in
 evidence is tied to published Lynx scripting-runtime documentation and
 production JavaScript builds for both compiler layers. It does not claim that
 the main-thread bytecode or background program executed on a native device.
+Milestone 5's additional CSS, template, encoding, and development-transport
+pins and integrities are recorded in [`audit/toolchain.json`](./audit/toolchain.json)
+and the repository `pnpm-lock.yaml`.

@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Phase 1 Rspeedy compiler integration for Octane Lynx.",
+  "description": "Private Milestone 5 Rspeedy production bundle integration for Octane Lynx.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
@@ -36,6 +36,10 @@
     "test": "vitest run --root ../.. --project rspeedy-plugin"
   },
   "dependencies": {
+    "@lynx-js/css-extract-webpack-plugin": "catalog:lynx",
+    "@lynx-js/runtime-wrapper-webpack-plugin": "catalog:lynx",
+    "@lynx-js/template-webpack-plugin": "catalog:lynx",
+    "@lynx-js/webpack-dev-transport": "catalog:lynx",
     "@octanejs/lynx": "workspace:*",
     "@octanejs/rspack-plugin": "workspace:*"
   },
@@ -47,6 +51,7 @@
   },
   "devDependencies": {
     "@lynx-js/rspeedy": "catalog:lynx",
+    "@lynx-js/tasm": "catalog:lynx",
     "@octanejs/lynx": "workspace:*",
     "@octanejs/rspack-plugin": "workspace:*",
     "@rsbuild/core": "catalog:lynx",

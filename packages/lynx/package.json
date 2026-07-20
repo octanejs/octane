@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 4 source/test implementation of Octane's Lynx native renderer.",
+  "description": "Private Milestone 5 source/build implementation of Octane's Lynx native renderer.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -47,13 +47,19 @@
   },
   "scripts": {
     "test": "vitest run --root ../.. --project lynx",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p typetests/tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.testing.json && tsc --noEmit -p typetests/tsconfig.json"
   },
   "dependencies": {
     "@lynx-js/types": "catalog:lynx"
   },
   "peerDependencies": {
+    "@lynx-js/testing-environment": "catalog:lynx",
     "octane": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@lynx-js/testing-environment": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@lynx-js/testing-environment": "catalog:lynx",
