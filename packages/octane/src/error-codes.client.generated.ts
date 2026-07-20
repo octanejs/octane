@@ -36,6 +36,7 @@ type ClientErrorArguments = {
 	28: [];
 	29: [];
 	46: [unknown, unknown];
+	47: [unknown, unknown];
 };
 
 export function formatClientError<Code extends keyof ClientErrorArguments>(
@@ -174,6 +175,11 @@ export function formatClientError<Code extends keyof ClientErrorArguments>(
 			case 46:
 				return formatDevErrorMessage(
 					'Expected %s listener to be a function, instead got a value of `%s` type.',
+					args,
+				);
+			case 47:
+				return formatDevErrorMessage(
+					"Octane's causal state model does not allow a state update while %s in <%s>. Derive render values directly, or move the transition to the event, action, or external-source callback that caused it.",
 					args,
 				);
 			default:

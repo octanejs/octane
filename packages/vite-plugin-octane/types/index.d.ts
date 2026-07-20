@@ -5,6 +5,7 @@ import type {
 	LoadedOctaneConfig,
 	OctaneConfigOptions,
 	ResolvedOctaneConfig,
+	StateModelConfigOptions,
 } from '@octanejs/app-core';
 
 export * from '@octanejs/app-core';
@@ -19,7 +20,10 @@ export interface OctanePluginOptions {
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
 	 * With `requireDirective`, excluded paths are exempt from Octane ownership
 	 * entirely — including `.tsrx`/`.tsx` — for projects routing those paths
-	 * through a different tsrx compiler (e.g. `@tsrx/react`).
+	 * through a different tsrx compiler (e.g. `@tsrx/react`). Excluded output
+	 * carries no Octane state-model ABI, so an otherwise Octane-owned causal
+	 * `.ts`/`.js` helper cannot be excluded; classify third-party compatibility
+	 * through `stateModel.packages` instead.
 	 */
 	exclude?: string[];
 	/**
@@ -40,6 +44,8 @@ export interface OctanePluginOptions {
 	 * reads `compiler.renderers` from `octane.config.ts` before transforming modules.
 	 */
 	renderers?: ExperimentalRendererConfigOptions;
+	/** Override compiler.stateModel from octane.config.ts for this Vite integration. */
+	stateModel?: StateModelConfigOptions;
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */

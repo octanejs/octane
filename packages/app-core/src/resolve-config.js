@@ -14,6 +14,7 @@
 /** @import { OctaneConfigOptions, ResolvedOctaneConfig } from '@octanejs/app-core' */
 
 import { normalizeRendererConfig } from 'octane/compiler/renderers';
+import { normalizeStateModelConfig } from 'octane/compiler/state-model';
 
 import { DEFAULT_OUTDIR } from './constants.js';
 
@@ -172,6 +173,7 @@ export function resolveOctaneConfig(raw, options = {}) {
 		adapter: raw.adapter,
 		compiler: {
 			renderers: normalizeRendererConfig(raw.compiler?.renderers),
+			stateModel: normalizeStateModelConfig(raw.compiler?.stateModel),
 		},
 		router: {
 			routes: raw.router?.routes ?? [],

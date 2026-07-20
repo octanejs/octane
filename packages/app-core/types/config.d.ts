@@ -29,7 +29,10 @@ export type {
 	RenderRouteOptions,
 	RenderRouteProps,
 	ResolvedOctaneConfig,
+	ResolvedStateModelConfig,
 	RootBoundaryOptions,
 	Route,
 	ServerRouteOptions,
+	StateModel,
+	StateModelConfigOptions,
 } from '@octanejs/app-core';

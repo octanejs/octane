@@ -43,6 +43,13 @@ octane plugin (which claims `.tsrx`/`.tsx`/`.ts`/`.js`) without ordering
 hazards. SSR target selection matches the octane plugin: per-module
 auto-detection, `ssr: true|false` to force.
 
+The paired octane plugin also supplies the effective state model for every
+document. App defaults, exact dependency-package exceptions, manifest
+declarations, and consumer approvals therefore apply to `.mdx`/`.md` without a
+second MDX-specific setting. Direct `compileMdx` / `compileMdxSync` callers can
+pass the already-resolved `stateModel: 'causal' | 'permissive'`; it defaults to
+`'permissive'` during the migration rollout.
+
 Options: `md: false` (leave `.md` alone), `providerImportSource: null` (disable
 the provider wiring), `remarkPlugins` / `rehypePlugins` / `recmaPlugins`,
 `format`, `mdxOptions` (escape hatch). The default remark set is
@@ -89,8 +96,9 @@ the special `wrapper` key is the document layout.
 - `@octanejs/mdx/compile` — `compileMdx` / `compileMdxSync` /
   `defaultRemarkPlugins`, the plugin's pipeline as a library (used by the SSR
   tests, usable for static-site tooling). Results include nonfatal compiler
-  `diagnostics`; JSX warning ranges are mapped back to the authored `.mdx`
-  document. The Vite plugin publishes the same warnings during transforms.
+  `diagnostics`; JSX warnings and causal-state diagnostics are mapped back to
+  the authored `.mdx` document (including thrown causal-state errors). The Vite
+  plugin publishes the same warnings during transforms.
 
 ## SSR + hydration
 

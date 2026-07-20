@@ -42,6 +42,7 @@
     "./compiler": "./src/compiler/index.js",
     "./compiler/bundler": "./src/compiler/bundler.js",
     "./compiler/renderers": "./src/compiler/renderers.js",
+    "./compiler/state-model": "./src/compiler/state-model.js",
     "./compiler/vite": {
       "types": "./src/compiler/vite.d.ts",
       "default": "./src/compiler/vite.js"
@@ -97,6 +98,7 @@
       "./compiler": "./dist/compiler/index.js",
       "./compiler/bundler": "./dist/compiler/bundler.js",
       "./compiler/renderers": "./dist/compiler/renderers.js",
+      "./compiler/state-model": "./dist/compiler/state-model.js",
       "./compiler/vite": {
         "types": "./dist/compiler/vite.d.ts",
         "default": "./dist/compiler/vite.js"

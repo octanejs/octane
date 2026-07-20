@@ -63,6 +63,14 @@ import { SourceMapGenerator } from 'source-map';
  *   filename: string,
  *   start: { offset: number, line: number, column: number },
  *   end: { offset: number, line: number, column: number },
+ *   phase?: 'render' | 'purity' | 'effect' | 'cleanup',
+ *   reportOnly?: boolean,
+ *   declaration?: {
+ *     hook: 'useState' | 'useReducer' | 'useActionState' | 'useOptimistic',
+ *     name: string,
+ *     start: { offset: number, line: number, column: number },
+ *     end: { offset: number, line: number, column: number },
+ *   },
  *   suggestions: Array<{
  *     start: { offset: number, line: number, column: number },
  *     end: { offset: number, line: number, column: number },
@@ -86,6 +94,7 @@ import { SourceMapGenerator } from 'source-map';
  * @property {WeakMap<object, AuthoredJsxAttributeLocation>} attributeLocations
  * @property {string} source
  * @property {string} id
+ * @property {Array<{ owner: string, local: string, members?: boolean }>} causalExternalComponentBindings
  */
 
 /**
@@ -94,6 +103,7 @@ import { SourceMapGenerator } from 'source-map';
  * @property {boolean} [hmr] octane compiler HMR wrapping (client only; the vite plugin wires this to serve mode).
  * @property {boolean} [dev] octane compiler dev metadata (client only; same gate as `hmr`).
  * @property {boolean} [profile] octane compiler profiling metadata (client only).
+ * @property {'causal' | 'permissive'} [stateModel] Effective state-transition model for this document. Default `'permissive'`.
  * @property {string | null} [providerImportSource]
  *   Module the emitted document reads the provider mapping from
  *   (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /
@@ -130,6 +140,7 @@ export async function compileMdx(source, id, options = {}) {
 		attributeLocations: new WeakMap(),
 		source,
 		id,
+		causalExternalComponentBindings: [],
 	};
 	const out = await mdxCompile(
 		{ value: source, path: id },
@@ -152,6 +163,7 @@ export function compileMdxSync(source, id, options = {}) {
 		attributeLocations: new WeakMap(),
 		source,
 		id,
+		causalExternalComponentBindings: [],
 	};
 	const out = mdxCompileSync(
 		{ value: source, path: id },
@@ -195,7 +207,7 @@ function buildMdxOptions(id, options, diagnosticContext) {
 			seedAuthoredJsxAttributeLocations(diagnosticContext),
 			...(options.recmaPlugins ?? []),
 			restoreAuthoredJsxAttributeLocations(diagnosticContext),
-			recmaOctaneAdapter,
+			recmaOctaneAdapter(diagnosticContext, provider),
 		],
 	};
 }
@@ -366,12 +378,25 @@ function restoreAuthoredJsxAttributeLocations(context) {
  */
 function octaneStage(jsxSource, mdxMap, authoredSource, id, options, diagnosticContext) {
 	const mode = options.mode ?? 'client';
-	const out = octaneCompile(jsxSource, id, {
-		mode,
-		hmr: mode === 'client' && !!options.hmr,
-		dev: mode === 'client' && !!options.dev,
-		profile: mode === 'client' && !!options.profile,
-	});
+	let out;
+	try {
+		out = octaneCompile(jsxSource, id, {
+			mode,
+			hmr: mode === 'client' && !!options.hmr,
+			dev: mode === 'client' && !!options.dev,
+			profile: mode === 'client' && !!options.profile,
+			stateModel: options.stateModel,
+			...(options.stateModel === 'causal' &&
+			diagnosticContext.causalExternalComponentBindings.length > 0
+				? {
+						__causalExternalComponentBindings: diagnosticContext.causalExternalComponentBindings,
+					}
+				: null),
+		});
+	} catch (error) {
+		remapCausalCompileError(error, mdxMap, jsxSource, authoredSource, id);
+		throw error;
+	}
 	// Two-stage sourcemap: octane's map targets the INTERMEDIATE JSX text;
 	// @mdx-js/mdx's map (via SourceMapGenerator) targets the original .mdx.
 	// Compose them (most-recent-first) so generated positions trace all the way
@@ -535,6 +560,82 @@ function rangeForAuthoredAttribute(source, starts, attribute) {
 }
 
 /**
+ * Map a compiler range whose token was preserved verbatim through MDX's ESM
+ * output. Requiring both source-map biases to agree prevents generated wrapper
+ * code from borrowing the nearest authored location.
+ *
+ * @param {TraceMap} trace
+ * @param {string} jsxSource
+ * @param {string} source
+ * @param {number[]} starts
+ * @param {{ start: { offset: number, line: number, column: number }, end: { offset: number, line: number, column: number } }} range
+ */
+function exactAuthoredTokenRange(trace, jsxSource, source, starts, range) {
+	const token = jsxSource.slice(range.start.offset, range.end.offset);
+	if (token.length === 0) return null;
+	const lower = mapDiagnosticPosition(trace, source, starts, range.start, GREATEST_LOWER_BOUND);
+	const upper = mapDiagnosticPosition(trace, source, starts, range.start, LEAST_UPPER_BOUND);
+	if (lower === null || upper === null || lower.offset !== upper.offset) return null;
+	if (source.slice(lower.offset, lower.offset + token.length) !== token) return null;
+	return {
+		start: lower,
+		end: positionForOffset(source, starts, lower.offset + token.length),
+	};
+}
+
+/** @param {unknown} error */
+function remapCausalCompileError(error, mdxMap, jsxSource, source, id) {
+	if (error === null || typeof error !== 'object') return;
+	const value = /** @type {{ diagnostics?: unknown, message?: string }} */ (error);
+	if (!Array.isArray(value.diagnostics)) return;
+	const causalDiagnostics = value.diagnostics.filter((diagnostic) =>
+		String(diagnostic?.code).startsWith('OCTANE_CAUSAL_STATE_'),
+	);
+	if (causalDiagnostics.length !== value.diagnostics.length) return;
+	const mapped = remapCausalDiagnostics(causalDiagnostics, mdxMap, jsxSource, source, id);
+	value.diagnostics = mapped;
+	value.message = mapped
+		.map(
+			(diagnostic) =>
+				`${diagnostic.filename}:${diagnostic.start.line}:${diagnostic.start.column + 1} ${diagnostic.message}`,
+		)
+		.join('\n');
+}
+
+function remapCausalDiagnostics(diagnostics, mdxMap, jsxSource, source, id) {
+	const starts = sourceLineStarts(source);
+	const fileStart = positionForOffset(source, starts, 0);
+	const trace = mdxMap ? new TraceMap(JSON.parse(JSON.stringify(mdxMap))) : null;
+	return diagnostics.map((diagnostic) =>
+		remapCausalDiagnostic(diagnostic, trace, jsxSource, source, starts, fileStart, id),
+	);
+}
+
+function remapCausalDiagnostic(diagnostic, trace, jsxSource, source, starts, fileStart, id) {
+	const range = trace
+		? exactAuthoredTokenRange(trace, jsxSource, source, starts, diagnostic)
+		: null;
+	const declarationRange =
+		trace && diagnostic.declaration
+			? exactAuthoredTokenRange(trace, jsxSource, source, starts, diagnostic.declaration)
+			: null;
+	return {
+		...diagnostic,
+		filename: id,
+		...(range ?? { start: fileStart, end: fileStart }),
+		...(diagnostic.declaration
+			? {
+					declaration: {
+						...diagnostic.declaration,
+						...(declarationRange ?? { start: fileStart, end: fileStart }),
+					},
+				}
+			: null),
+		suggestions: [],
+	};
+}
+
+/**
  * @param {CompileMdxResult['diagnostics'] | undefined} diagnostics
  * @param {unknown} mdxMap
  * @param {string} jsxSource
@@ -550,6 +651,9 @@ function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id, authoredAt
 	const trace = mdxMap ? new TraceMap(JSON.parse(JSON.stringify(mdxMap))) : null;
 	const claimedAttributes = new Set();
 	return diagnostics.map((diagnostic) => {
+		if (String(diagnostic.code).startsWith('OCTANE_CAUSAL_STATE_')) {
+			return remapCausalDiagnostic(diagnostic, trace, jsxSource, source, starts, fileStart, id);
+		}
 		const attribute = trace
 			? exactAuthoredAttributeForDiagnostic(
 					trace,
@@ -577,7 +681,7 @@ function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id, authoredAt
 			...diagnostic,
 			filename: id,
 			...range,
-			suggestions: diagnostic.suggestions.flatMap((suggestion) => {
+			suggestions: (diagnostic.suggestions ?? []).flatMap((suggestion) => {
 				const suggestionAttribute = exactAuthoredAttributeForDiagnostic(
 					trace,
 					jsxSource,
@@ -606,12 +710,281 @@ function remapDiagnostics(diagnostics, mdxMap, jsxSource, source, id, authoredAt
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MDX_BODY_NAME = '_createMdxContent';
+const MDX_CONTENT_NAME = 'MDXContent';
+const MDX_COMPONENTS_NAME = '_components';
+const MDX_LAYOUT_NAME = 'MDXLayout';
+const MDX_PROVIDER_NAME = '_provideComponents';
 
-function recmaOctaneAdapter() {
-	/** @param {unknown} tree */
-	return (tree) => {
-		walkReplace(/** @type {EstreeNode} */ (tree), adaptNode);
+/**
+ * Record the component values whose definitions are supplied by the MDX
+ * provider or the document caller. This is deliberately derived from the
+ * post-recma tree: a user transform that changes one of MDX's canonical
+ * binding shapes loses the exception and returns to the core compiler's
+ * fail-closed provenance rule.
+ *
+ * @param {DiagnosticMappingContext} context
+ * @param {string | null} provider
+ */
+function recmaOctaneAdapter(context, provider) {
+	return function recmaOctaneAdapterPlugin() {
+		/** @param {unknown} tree */
+		return (tree) => {
+			const program = /** @type {EstreeNode} */ (tree);
+			walkReplace(program, adaptNode);
+			context.causalExternalComponentBindings = collectMdxExternalComponentBindings(
+				program,
+				provider,
+			);
+		};
 	};
+}
+
+/** @param {unknown} node @param {string} name */
+function isIdentifier(node, name) {
+	return isNode(node) && node.type === 'Identifier' && node.name === name;
+}
+
+/** @param {unknown} node */
+function isEmptyObject(node) {
+	return isNode(node) && node.type === 'ObjectExpression' && node.properties?.length === 0;
+}
+
+/** @param {unknown} node */
+function isPropsComponents(node) {
+	return (
+		isNode(node) &&
+		node.type === 'MemberExpression' &&
+		node.computed === false &&
+		isIdentifier(node.object, 'props') &&
+		isIdentifier(node.property, 'components')
+	);
+}
+
+/** @param {unknown} node */
+function isProviderCall(node) {
+	return (
+		isNode(node) &&
+		node.type === 'CallExpression' &&
+		isIdentifier(node.callee, MDX_PROVIDER_NAME) &&
+		Array.isArray(node.arguments) &&
+		node.arguments.length === 0
+	);
+}
+
+/** @param {unknown} node @param {(argument: unknown) => boolean} predicate */
+function isSpread(node, predicate) {
+	return isNode(node) && node.type === 'SpreadElement' && predicate(node.argument);
+}
+
+/** @param {unknown} node */
+function staticPropertyName(node) {
+	if (!isNode(node) || node.computed === true) return null;
+	if (isNode(node.key) && node.key.type === 'Identifier') return node.key.name;
+	if (
+		isNode(node.key) &&
+		node.key.type === 'Literal' &&
+		(typeof node.key.value === 'string' || typeof node.key.value === 'number')
+	) {
+		return String(node.key.value);
+	}
+	return null;
+}
+
+/** @param {unknown} node */
+function isCanonicalHostDefault(node) {
+	return (
+		isNode(node) &&
+		node.type === 'Property' &&
+		node.kind === 'init' &&
+		node.method !== true &&
+		staticPropertyName(node) === node.value?.value &&
+		isNode(node.value) &&
+		node.value.type === 'Literal' &&
+		typeof node.value.value === 'string'
+	);
+}
+
+/**
+ * Match the map used for markdown host fallbacks:
+ * `{ h1: 'h1', ..._provideComponents(), ...props.components }`.
+ *
+ * @param {unknown} node
+ * @param {boolean} hasProvider
+ */
+function isCanonicalHostComponentMap(node, hasProvider) {
+	if (!isNode(node) || node.type !== 'ObjectExpression' || !Array.isArray(node.properties)) {
+		return false;
+	}
+	const properties = node.properties;
+	const tailLength = hasProvider ? 2 : 1;
+	if (properties.length <= tailLength) return false;
+	const providerIndex = properties.length - 2;
+	if (hasProvider && !isSpread(properties[providerIndex], isProviderCall)) return false;
+	if (!isSpread(properties.at(-1), isPropsComponents)) return false;
+	return properties.slice(0, -tailLength).every(isCanonicalHostDefault);
+}
+
+/**
+ * Match the map used for named MDX components and the optional layout.
+ * Provider-less output uses `props.components || {}` instead of spreads.
+ *
+ * @param {unknown} node
+ * @param {boolean} hasProvider
+ */
+function isCanonicalProvidedComponentMap(node, hasProvider) {
+	if (!hasProvider) {
+		return (
+			isNode(node) &&
+			node.type === 'LogicalExpression' &&
+			node.operator === '||' &&
+			isPropsComponents(node.left) &&
+			isEmptyObject(node.right)
+		);
+	}
+	return (
+		isNode(node) &&
+		node.type === 'ObjectExpression' &&
+		Array.isArray(node.properties) &&
+		node.properties.length === 2 &&
+		isSpread(node.properties[0], isProviderCall) &&
+		isSpread(node.properties[1], isPropsComponents)
+	);
+}
+
+/** @param {unknown} pattern */
+function simpleDestructuredBindings(pattern) {
+	if (!isNode(pattern) || pattern.type !== 'ObjectPattern' || !Array.isArray(pattern.properties)) {
+		return null;
+	}
+	const bindings = [];
+	for (const property of pattern.properties) {
+		if (
+			!isNode(property) ||
+			property.type !== 'Property' ||
+			property.kind !== 'init' ||
+			property.method === true ||
+			staticPropertyName(property) === null ||
+			!isNode(property.value) ||
+			property.value.type !== 'Identifier'
+		) {
+			return null;
+		}
+		bindings.push({ key: staticPropertyName(property), local: property.value.name });
+	}
+	return bindings;
+}
+
+/** @param {unknown} node @param {string} name */
+function isPropsParameter(node, name) {
+	if (!isNode(node)) return false;
+	if (name === MDX_BODY_NAME) return isIdentifier(node, 'props');
+	return (
+		node.type === 'AssignmentPattern' &&
+		isIdentifier(node.left, 'props') &&
+		isEmptyObject(node.right)
+	);
+}
+
+/** @param {EstreeNode} tree @param {string} source */
+function hasCanonicalProviderImport(tree, source) {
+	if (tree.type !== 'Program' || !Array.isArray(tree.body)) return false;
+	return tree.body.some(
+		(statement) =>
+			isNode(statement) &&
+			statement.type === 'ImportDeclaration' &&
+			statement.source?.value === source &&
+			Array.isArray(statement.specifiers) &&
+			statement.specifiers.some(
+				(specifier) =>
+					isNode(specifier) &&
+					specifier.type === 'ImportSpecifier' &&
+					isIdentifier(specifier.local, MDX_PROVIDER_NAME) &&
+					(isIdentifier(specifier.imported, 'useMDXComponents') ||
+						specifier.imported?.value === 'useMDXComponents'),
+			),
+	);
+}
+
+/** @param {EstreeNode} tree @param {string} name */
+function findGeneratedFunction(tree, name) {
+	if (tree.type !== 'Program' || !Array.isArray(tree.body)) return null;
+	for (const statement of tree.body) {
+		const declaration =
+			isNode(statement) && statement.type === 'ExportDefaultDeclaration'
+				? statement.declaration
+				: statement;
+		if (
+			isNode(declaration) &&
+			declaration.type === 'FunctionDeclaration' &&
+			isIdentifier(declaration.id, name) &&
+			Array.isArray(declaration.params) &&
+			declaration.params.length === 1 &&
+			isPropsParameter(declaration.params[0], name) &&
+			isNode(declaration.body) &&
+			declaration.body.type === 'BlockStatement'
+		) {
+			return declaration;
+		}
+	}
+	return null;
+}
+
+/**
+ * @param {EstreeNode} tree
+ * @param {string | null} provider
+ * @returns {Array<{ owner: string, local: string, members?: boolean }>}
+ */
+function collectMdxExternalComponentBindings(tree, provider) {
+	const hasProvider = provider !== null;
+	if (hasProvider && !hasCanonicalProviderImport(tree, provider)) return [];
+	const descriptors = [];
+	const seen = new Set();
+	const add = (owner, local, members = false) => {
+		const key = `${owner}:${local}:${members}`;
+		if (seen.has(key)) return;
+		seen.add(key);
+		descriptors.push(members ? { owner, local, members: true } : { owner, local });
+	};
+
+	for (const owner of [MDX_BODY_NAME, MDX_CONTENT_NAME]) {
+		const fn = findGeneratedFunction(tree, owner);
+		if (fn === null) continue;
+		for (const statement of fn.body.body ?? []) {
+			if (
+				!isNode(statement) ||
+				statement.type !== 'VariableDeclaration' ||
+				statement.kind !== 'const'
+			) {
+				continue;
+			}
+			for (const declaration of statement.declarations ?? []) {
+				if (!isNode(declaration) || declaration.type !== 'VariableDeclarator') continue;
+				if (
+					owner === MDX_BODY_NAME &&
+					isIdentifier(declaration.id, MDX_COMPONENTS_NAME) &&
+					isCanonicalHostComponentMap(declaration.init, hasProvider)
+				) {
+					add(owner, MDX_COMPONENTS_NAME, true);
+					continue;
+				}
+				if (!isCanonicalProvidedComponentMap(declaration.init, hasProvider)) continue;
+				const bindings = simpleDestructuredBindings(declaration.id);
+				if (bindings === null) continue;
+				if (owner === MDX_CONTENT_NAME) {
+					if (
+						bindings.length === 1 &&
+						bindings[0].key === 'wrapper' &&
+						bindings[0].local === MDX_LAYOUT_NAME
+					) {
+						add(owner, MDX_LAYOUT_NAME);
+					}
+					continue;
+				}
+				for (const binding of bindings) add(owner, binding.local);
+			}
+		}
+	}
+	return descriptors;
 }
 
 /** @typedef {{ type: string, [key: string]: unknown }} EstreeNode */

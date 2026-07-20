@@ -2420,9 +2420,12 @@ const UNIVERSAL_COMPILER_RUNTIME_IMPORTS = new Set([
 	'__useReducerWithGetter',
 	'__useStateWithGetter',
 	'hookSlots',
+	'markStateModel',
+	'markStateModelMethods',
 	'useBatch',
 	'warmChild',
 	'warmMemo',
+	'withMethodSlot',
 	'withSlot',
 ]);
 
@@ -2444,6 +2447,35 @@ function retargetRuntimeImport(code, moduleId) {
 		}
 		return imports.join('\n');
 	});
+}
+
+function containsMethodStyleCustomHook(root) {
+	let found = false;
+	const visit = (node) => {
+		if (found || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (
+			node.type === 'CallExpression' &&
+			!node.optional &&
+			node.callee?.type === 'MemberExpression' &&
+			!node.callee.computed &&
+			node.callee.property?.type === 'Identifier' &&
+			/^use[A-Z]/.test(node.callee.property.name) &&
+			node.callee.property.name !== 'useContext'
+		) {
+			found = true;
+			return;
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			visit(value);
+		}
+	};
+	visit(root);
+	return found;
 }
 
 export function retargetRuntimeImportAliases(code, moduleId, aliases) {
@@ -2478,8 +2510,11 @@ function buildUniversalHmrBlock(state) {
 			.map(
 				(component) =>
 					`  if (import.meta.webpackHot.data?.__octaneUniversalComponents?.${component.name}) {\n` +
-					`    import.meta.webpackHot.data.__octaneUniversalComponents.${component.name}[${state.helpers.hmrSymbol}].update(${component.name});\n` +
-					`    ${component.name} = import.meta.webpackHot.data.__octaneUniversalComponents.${component.name};\n` +
+					`    if (!import.meta.webpackHot.data.__octaneUniversalComponents.${component.name}[${state.helpers.hmrSymbol}].update(${component.name})) {\n` +
+					`      import.meta.webpackHot.invalidate();\n` +
+					`    } else {\n` +
+					`      ${component.name} = import.meta.webpackHot.data.__octaneUniversalComponents.${component.name};\n` +
+					`    }\n` +
 					'  }',
 			)
 			.join('\n');
@@ -2496,7 +2531,7 @@ function buildUniversalHmrBlock(state) {
 		.map((component) => {
 			const incoming =
 				component.exportKind === 'default' ? 'module.default' : `module.${component.name}`;
-			return `    ${component.name}[${state.helpers.hmrSymbol}].update(${incoming});`;
+			return `    if (!${component.name}[${state.helpers.hmrSymbol}].update(${incoming})) import.meta.hot.invalidate();`;
 		})
 		.join('\n');
 	return (
@@ -2664,18 +2699,23 @@ export function lowerUniversalRendererRegion(
 	state.helpers.children = allocName(state, `${prefix}Children`);
 	state.helpers.context = allocName(state, `${prefix}Context`);
 	state.helpers.activity = allocName(state, `${prefix}Activity`);
+	const generatedRuntimeImports = [
+		'__useStateWithGetter',
+		'__useReducerWithGetter',
+		'useMemo',
+		'useBatch',
+		'warmMemo',
+		'warmChild',
+		'withSlot',
+		'hookSlots',
+	];
+	if (options.stateModel === 'causal') {
+		if (containsMethodStyleCustomHook(ast)) generatedRuntimeImports.push('withMethodSlot');
+		generatedRuntimeImports.push('markStateModel');
+	}
 	const generatedRuntimeAliases = Object.freeze(
 		Object.fromEntries(
-			[
-				'__useStateWithGetter',
-				'__useReducerWithGetter',
-				'useMemo',
-				'useBatch',
-				'warmMemo',
-				'warmChild',
-				'withSlot',
-				'hookSlots',
-			].map((imported) => [
+			generatedRuntimeImports.map((imported) => [
 				imported,
 				allocName(
 					state,
@@ -2994,8 +3034,11 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 				.map(
 					(component) =>
 						`  if (import.meta.webpackHot.data?.__octaneUniversalComponents?.${component.name}) {\n` +
-						`    import.meta.webpackHot.data.__octaneUniversalComponents.${component.name}[${state.helpers.hmrSymbol}].update(${component.name});\n` +
-						`    ${component.name} = import.meta.webpackHot.data.__octaneUniversalComponents.${component.name};\n` +
+						`    if (!import.meta.webpackHot.data.__octaneUniversalComponents.${component.name}[${state.helpers.hmrSymbol}].update(${component.name})) {\n` +
+						`      import.meta.webpackHot.invalidate();\n` +
+						`    } else {\n` +
+						`      ${component.name} = import.meta.webpackHot.data.__octaneUniversalComponents.${component.name};\n` +
+						`    }\n` +
 						'  }',
 				)
 				.join('\n');
@@ -3011,7 +3054,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 				.map((component) => {
 					const incoming =
 						component.exportKind === 'default' ? 'module.default' : `module.${component.name}`;
-					return `    ${component.name}[${state.helpers.hmrSymbol}].update(${incoming});`;
+					return `    if (!${component.name}[${state.helpers.hmrSymbol}].update(${incoming})) import.meta.hot.invalidate();`;
 				})
 				.join('\n');
 			hmrBlock =

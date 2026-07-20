@@ -71,6 +71,23 @@ describe('declarative options', () => {
 		expect(Object.isFrozen(normalized.rules[0].include)).toBe(true);
 	});
 
+	it('normalizes and deeply freezes state-model package policy', () => {
+		const stateModel = {
+			default: 'causal',
+			packages: { zed: 'permissive', '@scope/alpha': 'causal' },
+		};
+		const options = normalizePluginOptions({ stateModel });
+		stateModel.default = 'permissive';
+		stateModel.packages.zed = 'causal';
+
+		expect(options.stateModel).toMatchObject({
+			default: 'causal',
+			packages: { '@scope/alpha': 'causal', zed: 'permissive' },
+		});
+		expect(Object.isFrozen(options.stateModel)).toBe(true);
+		expect(Object.isFrozen(options.stateModel!.packages)).toBe(true);
+	});
+
 	it('accepts the plugin-only transpile switch', () => {
 		expect(normalizePluginOptions({ transpile: false })).toEqual({ transpile: false });
 		expect(() => normalizeLoaderOptions({ transpile: false })).toThrow(
@@ -99,6 +116,7 @@ describe('declarative options', () => {
 		[{ hmr: 'webpack' }, /hmr/],
 		[{ exclude: 'vendor' }, /exclude/],
 		[{ renderers: { default: 'missing' } }, /default references unknown renderer/],
+		[{ stateModel: { default: 'strict' } }, /must be "causal" or "permissive"/],
 		[{ universalRuntime: { runtime: 'lynx', thread: 'worker' } }, /thread/],
 		[{ universalRuntime: { runtime: 'Lynx', thread: 'background' } }, /runtime/],
 		[{ runtime: '' }, /runtime/],

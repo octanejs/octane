@@ -199,6 +199,7 @@ describe('OctaneRspackPlugin', () => {
 		const boundedObject = createCachedCompiler();
 		const nativeBackground = createCachedCompiler();
 		const nativeMain = createCachedCompiler();
+		const causal = createCachedCompiler();
 
 		new OctaneRspackPlugin().apply(dom as any);
 		new OctaneRspackPlugin({
@@ -230,6 +231,7 @@ describe('OctaneRspackPlugin', () => {
 			runtime: '@octanejs/lynx/renderer',
 			universalRuntime: { runtime: 'lynx', thread: 'main-thread' },
 		}).apply(nativeMain as any);
+		new OctaneRspackPlugin({ stateModel: { default: 'causal' } }).apply(causal as any);
 
 		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
@@ -241,6 +243,7 @@ describe('OctaneRspackPlugin', () => {
 		expect((nativeBackground.options as any).cache.version).not.toBe(
 			(nativeMain.options as any).cache.version,
 		);
+		expect((causal.options as any).cache.version).not.toBe((dom.options as any).cache.version);
 
 		// requireDirective flips which modules compile vs pass through, so a
 		// toggle must never reuse cached transform results.

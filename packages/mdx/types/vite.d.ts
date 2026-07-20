@@ -3,7 +3,10 @@
 // convention as @octanejs/vite-plugin's types/). Keep in lockstep.
 import type { CompileMdxOptions, CompileMdxResult } from './compile.js';
 
-export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' | 'hmr' | 'dev'> {
+export interface OctaneMdxPluginOptions extends Omit<
+	CompileMdxOptions,
+	'mode' | 'hmr' | 'dev' | 'stateModel'
+> {
 	/**
 	 * Force the codegen target for EVERY module — `true` always server, `false`
 	 * always client. Leave unset for per-module auto-detection (standard Vite
@@ -25,8 +28,31 @@ export interface OctaneMdxPluginOptions extends Omit<CompileMdxOptions, 'mode' |
 export interface OctaneMdxPlugin {
 	name: string;
 	enforce: 'pre';
-	configResolved(config: { command: string; root?: string }): void;
+	configResolved(config: {
+		command: string;
+		root?: string;
+		plugins?: Array<{
+			name?: string;
+			api?: {
+				octane?: {
+					resolveStateModelForSource?(id: string): {
+						stateModel: 'causal' | 'permissive';
+						dependencies: string[];
+						missingDependencies: string[];
+					};
+				};
+			};
+		}>;
+	}): void;
+	configureServer(server: { watcher: { add(files: string | string[]): void } }): void;
 	watchChange(id: string): void;
+	hotUpdate: {
+		order: 'pre';
+		handler(
+			this: { environment: { name: string } },
+			options: { file: string; server: { restart(): Promise<void> } },
+		): Promise<[] | undefined>;
+	};
 	transform(
 		this: {
 			addWatchFile?(id: string): void;

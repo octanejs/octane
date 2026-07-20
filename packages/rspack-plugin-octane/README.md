@@ -67,6 +67,25 @@ new OctaneRspackPlugin({
 Options remain serializable data—there are no renderer callbacks—so the same
 configuration is safe to reuse across compiler environments and caches.
 
+The `stateModel` option uses the same exact-package policy as Octane app config:
+
+```js
+new OctaneRspackPlugin({
+	stateModel: {
+		default: 'causal',
+		packages: { '@vendor/legacy-widgets': 'permissive' },
+	},
+});
+```
+
+The rollout default is `permissive`. A dependency manifest that declares
+`octane.stateModel: 'permissive'` requires a matching entry in the consumer's
+`stateModel.packages` map. Use that exact package map for third-party
+compatibility: `exclude` cannot suppress the state-model ABI for an otherwise
+Octane-owned causal `.ts`/`.js` helper. The application package cannot appear in
+`packages`; select its model through `default`. A dependency with no declaration
+or exact package entry also inherits `default`.
+
 Rspack's dev server enables the loader's hot context. If you run a custom dev
 server, add Rspack's `HotModuleReplacementPlugin` as usual.
 

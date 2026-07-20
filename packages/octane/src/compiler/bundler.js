@@ -31,6 +31,11 @@ import {
 	resolveRendererForFile,
 } from './renderers.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
+import {
+	isExactPackageName,
+	normalizePackageStateModel,
+	normalizeStateModelConfig,
+} from './state-model.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
 import {
 	analyzeNativeChangeDiagnostics,
@@ -58,6 +63,11 @@ export {
 	normalizeRendererConfig,
 	resolveRendererForFile,
 } from './renderers.js';
+export {
+	DEFAULT_STATE_MODEL,
+	STATE_MODEL_CONFIG_VERSION,
+	normalizeStateModelConfig,
+} from './state-model.js';
 
 const OCTANE_DEPENDENCY_FIELDS = [
 	'dependencies',
@@ -65,6 +75,52 @@ const OCTANE_DEPENDENCY_FIELDS = [
 	'optionalDependencies',
 	'peerDependencies',
 ];
+
+function packagePathSegments(name) {
+	return isExactPackageName(name) ? name.split('/') : null;
+}
+
+/**
+ * Find an installed package's owning directory without requiring its root
+ * export to exist. Raw-source packages may intentionally expose only named
+ * subpaths, but their root package.json is still the discovery boundary.
+ */
+function resolvePackageLookupDirectory(name, issuerRoot, packageRequire) {
+	const segments = packagePathSegments(name);
+	if (segments !== null) {
+		let candidateRoot = nodePath.resolve(issuerRoot);
+		for (;;) {
+			const manifest = nodePath.join(candidateRoot, 'node_modules', ...segments, 'package.json');
+			if (nodeFs.existsSync(manifest)) {
+				const packageRoot = nodePath.dirname(manifest);
+				try {
+					// Match require.resolve's realpath behavior so dependency/watch
+					// metadata remains canonical on macOS (/var -> /private/var) and
+					// for linked packages.
+					return nodeFs.realpathSync(packageRoot);
+				} catch {
+					return packageRoot;
+				}
+			}
+			const parent = nodePath.dirname(candidateRoot);
+			if (parent === candidateRoot) break;
+			candidateRoot = parent;
+		}
+	}
+
+	// Keep compatibility with resolvers that do not expose a physical
+	// node_modules layout. The manifest subpath is preferable when available;
+	// the package root export is only a final fallback for older behavior.
+	try {
+		return nodePath.dirname(packageRequire.resolve(`${name}/package.json`));
+	} catch {
+		try {
+			return nodePath.dirname(packageRequire.resolve(name));
+		} catch {
+			return null;
+		}
+	}
+}
 
 export const OCTANE_RUNTIME_REQUESTS = Object.freeze({
 	client: 'octane',
@@ -123,6 +179,7 @@ export function resolveOctaneRuntimeRequest(request, environment) {
 function packageUsesOctane(pkg) {
 	return (
 		pkg.name === 'octane' ||
+		pkg.octane?.stateModel !== undefined ||
 		['dependencies', 'optionalDependencies', 'peerDependencies'].some(
 			(field) => typeof pkg[field]?.octane === 'string',
 		)
@@ -323,6 +380,7 @@ class OctaneBundlerCompiler {
 			universalRuntime: normalizeUniversalRuntime(options.universalRuntime),
 		};
 		this.renderers = normalizeRendererConfig(options.renderers);
+		this.stateModel = normalizeStateModelConfig(options.stateModel);
 		// Ownership gate for mixed-toolchain projects (e.g. a React app hosting
 		// Octane islands): when enabled, a project `.tsrx` is Octane's by
 		// extension (nothing else compiles the syntax), and a project
@@ -392,10 +450,18 @@ class OctaneBundlerCompiler {
 		let result;
 		if (pkg !== null) {
 			const manual = pkg.octane?.hookSlots?.manual;
+			let canonicalRoot = dir;
+			try {
+				canonicalRoot = nodeFs.realpathSync(dir);
+			} catch {
+				// The manifest was readable, so this is only a defensive fallback for
+				// unusual virtual filesystems. The resolved path is still stable locally.
+			}
 			result = {
 				rule: {
 					name: typeof pkg.name === 'string' ? pkg.name : null,
 					root: dir,
+					canonicalRoot,
 					dirs: Array.isArray(manual) ? manual : [],
 					runtimeDependencies: [
 						...Object.keys(pkg.dependencies ?? {}),
@@ -403,6 +469,7 @@ class OctaneBundlerCompiler {
 					],
 					viteOptimizeDepsExclusions: packageViteOptimizeDepsExclusions(pkg),
 					usesOctane: packageUsesOctane(pkg),
+					stateModel: pkg.octane?.stateModel,
 				},
 				...metadata([manifest]),
 			};
@@ -423,6 +490,46 @@ class OctaneBundlerCompiler {
 
 		this.manifestRuleCache.set(dir, result);
 		return result;
+	}
+
+	_applicationPackageRule(collected) {
+		const application = this._nearestOctanePackageRule(this.root);
+		if (collected !== undefined) addMetadata(collected, application);
+		const name = application.rule?.name ?? null;
+		if (name !== null && Object.hasOwn(this.stateModel.packages, name)) {
+			const error = new Error(
+				`compiler.stateModel.packages cannot select the application package ${JSON.stringify(name)}. Remove that package entry and use compiler.stateModel.default to select the application's model.`,
+			);
+			error.code = 'OCTANE_APPLICATION_STATE_MODEL_OVERRIDE';
+			throw error;
+		}
+		return application;
+	}
+
+	_isApplicationPackageSource(file, lookup, application) {
+		if (lookup.rule === null || application.rule === null) return false;
+		if (lookup.rule.canonicalRoot !== application.rule.canonicalRoot) return false;
+		// A malformed package nested under node_modules can otherwise inherit the
+		// application's manifest. It is still a dependency boundary, never app code.
+		const absoluteFile = nodePath.isAbsolute(file)
+			? nodePath.resolve(file)
+			: nodePath.resolve(this.root, file);
+		let packageRelative = null;
+		if (isPathInside(application.rule.root, absoluteFile)) {
+			packageRelative = nodePath.relative(application.rule.root, absoluteFile);
+		} else if (isPathInside(application.rule.canonicalRoot, absoluteFile)) {
+			packageRelative = nodePath.relative(application.rule.canonicalRoot, absoluteFile);
+		} else {
+			try {
+				const canonicalFile = nodeFs.realpathSync(absoluteFile);
+				if (isPathInside(application.rule.canonicalRoot, canonicalFile)) {
+					packageRelative = nodePath.relative(application.rule.canonicalRoot, canonicalFile);
+				}
+			} catch {
+				// A virtual/nonexistent ID cannot prove same-package containment.
+			}
+		}
+		return packageRelative !== null && !/(?:^|[\\/])node_modules(?:[\\/]|$)/.test(packageRelative);
 	}
 
 	_hasManualHookSlots(file, collected) {
@@ -463,6 +570,48 @@ class OctaneBundlerCompiler {
 		const lookup = this._nearestOctanePackageRule(nodePath.dirname(absoluteFile));
 		addMetadata(collected, lookup);
 		return lookup.rule?.usesOctane === true;
+	}
+
+	_stateModelForSource(file, filename, collected) {
+		// The package map is a dependency boundary, never a way to weaken the
+		// application's own package. A nested workspace package remains its own
+		// boundary even when its physical root sits below Vite's project root.
+		const absoluteFile = nodePath.isAbsolute(file)
+			? nodePath.resolve(file)
+			: nodePath.resolve(this.root, file);
+		const lookup = this._nearestOctanePackageRule(nodePath.dirname(absoluteFile));
+		addMetadata(collected, lookup);
+		const application = this._applicationPackageRule(collected);
+		if (this._isApplicationPackageSource(file, lookup, application)) {
+			return this.stateModel.default;
+		}
+		if (this._isProjectOwnedSource(file)) {
+			// With no owning manifest, everything below the configured project root is
+			// application source. A nearer manifest is the only way to establish a
+			// nested package boundary.
+			if (application.rule === null && lookup.rule === null) return this.stateModel.default;
+		}
+		const name = lookup.rule?.name ?? null;
+		const declared = normalizePackageStateModel(lookup.rule?.stateModel, name);
+		const configured =
+			name !== null && Object.hasOwn(this.stateModel.packages, name)
+				? this.stateModel.packages[name]
+				: undefined;
+
+		if (declared === 'permissive' && configured !== 'permissive') {
+			const approval =
+				name === null
+					? 'Give the package an exact `name` in package.json, then approve that name in the consuming compiler configuration.'
+					: `Approve it explicitly in the consuming configuration with \`compiler: { stateModel: { packages: { ${JSON.stringify(name)}: "permissive" } } }\`.`;
+			const error = new Error(
+				`${filename} belongs to ${name === null ? 'a dependency' : `dependency ${JSON.stringify(name)}`} that declares \`"octane": { "stateModel": "permissive" }\`, but permissive dependency code requires consumer approval. ${approval}`,
+			);
+			error.code = 'OCTANE_PERMISSIVE_PACKAGE_APPROVAL_REQUIRED';
+			error.filename = filename;
+			throw error;
+		}
+
+		return configured ?? declared ?? this.stateModel.default;
 	}
 
 	_isFullCompileSource(file, collected) {
@@ -612,6 +761,25 @@ class OctaneBundlerCompiler {
 	}
 
 	/**
+	 * Resolve the effective authored-state policy for a source file.
+	 *
+	 * Non-TSRX transforms (notably MDX) use this boundary so package
+	 * declarations, consumer approvals, linked dependencies, and watch metadata
+	 * cannot diverge from the core compiler's classification.
+	 */
+	resolveStateModelForSource(id) {
+		const file = cleanModuleId(id);
+		const collected = {
+			dependencies: new Set(),
+			missingDependencies: new Set(),
+		};
+		return {
+			stateModel: this._stateModelForSource(file, this._canonicalModuleId(file), collected),
+			...finishMetadata(collected),
+		};
+	}
+
+	/**
 	 * Discover installed source packages which consume Octane, recursively
 	 * following runtime dependencies between those packages.
 	 */
@@ -621,6 +789,10 @@ class OctaneBundlerCompiler {
 			dependencies: new Set(),
 			missingDependencies: new Set(),
 		};
+		// Validate application-package overrides only after the bundler has supplied
+		// its definitive root. Vite creates plugins before its config hook resolves
+		// `config.root`, so constructor-time validation would inspect process.cwd().
+		this._applicationPackageRule(collected);
 		// Vite's root is the directory containing index.html, not necessarily the
 		// package root. Multi-entry examples commonly keep one package.json above
 		// sibling roots (for example `jsx/` and `tsrx/`). Walk upward to the nearest
@@ -668,9 +840,9 @@ class OctaneBundlerCompiler {
 		const visitedPackageRoots = new Set();
 		const visit = (name, issuerRoot) => {
 			const packageRequire = nodeModule.createRequire(nodePath.join(issuerRoot, 'package.json'));
-			try {
-				const entry = packageRequire.resolve(name);
-				const lookup = this._nearestOctanePackageRule(nodePath.dirname(entry));
+			const lookupDirectory = resolvePackageLookupDirectory(name, issuerRoot, packageRequire);
+			if (lookupDirectory !== null) {
+				const lookup = this._nearestOctanePackageRule(lookupDirectory);
 				addMetadata(collected, lookup);
 				if (!lookup.rule?.usesOctane) return;
 				sourceDependencies.add(name);
@@ -691,7 +863,7 @@ class OctaneBundlerCompiler {
 				for (const dependency of lookup.rule.runtimeDependencies) {
 					visit(dependency, lookup.rule.root);
 				}
-			} catch {
+			} else {
 				// Match Node's upward node_modules search: package managers commonly
 				// satisfy a nested raw-source dependency by hoisting it to the project
 				// root. Any candidate's creation can therefore make this request
@@ -867,6 +1039,7 @@ class OctaneBundlerCompiler {
 			validateRendererModuleSource(code, filename, renderer);
 		}
 		if (fullCompile) {
+			const stateModel = this._stateModelForSource(file, filename, collected);
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const clientReference =
 				renderer.server === 'client-only' ? createClientReference(renderer.id, filename) : null;
@@ -879,6 +1052,7 @@ class OctaneBundlerCompiler {
 					renderer,
 					clientReference,
 					clientOnlyExports: stub.exports,
+					stateModel,
 					...finishMetadata(collected),
 				};
 			}
@@ -918,6 +1092,7 @@ class OctaneBundlerCompiler {
 				dev,
 				profile,
 				profileFilename,
+				stateModel,
 				...(universalRuntime === undefined ? null : { universalRuntime }),
 				// Keep the established DOM compiler call byte-for-byte equivalent. A
 				// renderer descriptor is an orthogonal compiler input only for the
@@ -944,6 +1119,7 @@ class OctaneBundlerCompiler {
 				map: out.map,
 				diagnostics: out.diagnostics,
 				kind: 'compile',
+				stateModel,
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
@@ -966,49 +1142,114 @@ class OctaneBundlerCompiler {
 		}
 
 		if (plainHelperSource) {
-			if (/\/\/\s*octane-no-slot\b/.test(code)) return null;
-			if (this.exclude.some((path) => file.includes(path))) {
-				// Same conflict diagnostic as the full-compile gate: an ownership
-				// pragma inside an excluded path must not fail silent.
-				if (this.requireDirective) {
-					this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
-				}
-				return null;
-			}
-			if (!/from\s*['"]octane['"]/.test(code)) return null;
+			const importsOctane = /from\s*['"]octane['"]/.test(code);
+			const noSlot = /\/\/\s*octane-no-slot\b/.test(code);
+			const excluded = this.exclude.some((path) => file.includes(path));
 			if (!this._isInstalledOctaneSource(file, collected)) {
-				return this._passThrough(code, collected);
+				return !excluded && importsOctane ? this._passThrough(code, collected) : null;
 			}
 			// Hook slotting is an Octane-ownership rewrite, so the ownership
 			// gate applies to it exactly as to full compilation: an unmarked
 			// project module stays with the host pipeline (with the forgotten-
 			// pragma diagnostic), a pragma-marked one gets its hook slots.
 			if (this.requireDirective && !pragmaOwned && this._isProjectOwnedSource(file)) {
-				this._warnUnmarkedOctaneImport(code, filename);
-				return this._passThrough(code, collected);
+				if (importsOctane && !excluded) this._warnUnmarkedOctaneImport(code, filename);
+				return null;
 			}
-			if (this._hasManualHookSlots(file, collected)) {
-				return this._passThrough(code, collected);
+			const stateModel = this._stateModelForSource(file, filename, collected);
+			if (excluded && stateModel !== 'causal') {
+				if (this.requireDirective) {
+					this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
+				}
+				return null;
 			}
+			// Causal provenance is definition-owned, so a plain custom-hook module
+			// cannot escape stamping merely by importing only another custom hook (or
+			// by accepting a setter) instead of importing a base hook from `octane`.
+			// Permissive source preserves the historical direct-import eligibility gate.
+			if (!importsOctane && stateModel !== 'causal') return null;
 			const profileFilename = profile ? this._profileModuleId(file, collected) : undefined;
 			const specializeVoidRoot =
 				environment === 'client' && hmr === false && dev === false && profile === false;
-			const out = slotHooks(code, filename, {
-				environment,
-				hmr: !!hmr,
-				profile,
-				profileFilename,
-				...(specializeVoidRoot
-					? {
-							isVoidComponentImport: options.isVoidComponentImport,
-						}
-					: {}),
-			});
+			let slotsCompiled = false;
+			let slotsOutput;
+			const compileSlots = () => {
+				if (slotsCompiled) return slotsOutput;
+				slotsCompiled = true;
+				slotsOutput = slotHooks(code, filename, {
+					environment,
+					hmr: !!hmr,
+					profile,
+					profileFilename,
+					stateModel,
+					...(specializeVoidRoot
+						? {
+								isVoidComponentImport: options.isVoidComponentImport,
+							}
+						: {}),
+				});
+				return slotsOutput;
+			};
+			if (excluded) {
+				// `exclude` remains an ownership escape for permissive helpers and for
+				// full-source modules routed through another TSRX toolchain. It cannot
+				// silently turn an otherwise Octane-owned causal helper into unmarked
+				// output when the causal slot pass proves component/custom-hook
+				// provenance work. An unused or type-only import does not need that ABI.
+				if (compileSlots() === null) {
+					if (this.requireDirective) {
+						this._warnExcludedPragmaConflict(file, filename, pragmaOwned);
+					}
+					return null;
+				}
+				const error = new Error(
+					`${filename} matches compiler.exclude, so Octane cannot emit the causal-state provenance ABI required by this Octane-owned plain module. Remove the exclusion and let Octane slot the file. For third-party compatibility, declare and explicitly approve the owning package as permissive instead of excluding its path.`,
+				);
+				error.code = 'OCTANE_CAUSAL_EXCLUDE_UNSUPPORTED';
+				error.filename = filename;
+				throw error;
+			}
+			if (noSlot) {
+				// Probe causal definition instrumentation before honoring the historical
+				// opt-out. An unrelated plain module still passes through untouched, while
+				// a custom-hook/component definition cannot silently lose its source model.
+				if (stateModel !== 'causal' || compileSlots() === null) return null;
+				const error = new Error(
+					`${filename} uses // octane-no-slot, so the compiler cannot emit the causal-state provenance ABI for it. Remove the opt-out and let Octane slot the file, or keep the owning dependency at an explicitly approved permissive boundary while it migrates.`,
+				);
+				error.code = 'OCTANE_CAUSAL_NO_SLOT_UNSUPPORTED';
+				error.filename = filename;
+				throw error;
+			}
+			// From here the module is Octane-owned even when nothing gets
+			// rewritten (manual slots, or no hooks to slot).
+			if (this._hasManualHookSlots(file, collected)) {
+				if (stateModel === 'causal') {
+					// A direct base-hook import has always made this an Octane helper. For
+					// newly admitted no-import source, reject only when there is causal ABI
+					// work to suppress, so unrelated utilities in a manual directory remain
+					// outside the compiler's ownership boundary.
+					if (!importsOctane && compileSlots() === null) {
+						return this._passThrough(code, collected);
+					}
+					const error = new Error(
+						`${filename} is covered by an octane.hookSlots.manual declaration, so the compiler cannot emit the causal-state provenance ABI for it. Remove the manual-slot declaration and let Octane slot the file, or keep the owning dependency at the explicitly approved permissive boundary while it migrates.`,
+					);
+					error.code = 'OCTANE_CAUSAL_MANUAL_SLOTS_UNSUPPORTED';
+					error.filename = filename;
+					throw error;
+				}
+				return { ...this._passThrough(code, collected), stateModel };
+			}
+			const out = compileSlots();
 			if (out === null) return this._passThrough(code, collected);
+			this._forwardCompileDiagnostics(out.diagnostics);
 			return {
 				code: out.code,
 				map: out.map,
+				diagnostics: out.diagnostics,
 				kind: 'slots',
+				stateModel,
 				...finishMetadata(collected),
 			};
 		}

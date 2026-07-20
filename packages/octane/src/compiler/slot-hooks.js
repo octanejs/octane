@@ -17,6 +17,14 @@
 import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
 import { analyzeHookDependencies } from './hook-deps.js';
+import {
+	analyzeCausalStateDiagnostics,
+	assertNoCausalStateErrors,
+} from './causal-state-diagnostics.js';
+import {
+	analyzeCausalComponentAliases,
+	assertNoUnresolvedCausalComponentAliases,
+} from './causal-state-aliases.js';
 
 // Build a cheap import-presence gate. Precise call identity is annotated by the
 // lexical scope analysis in analyzeHookDependencies below; this gate only avoids
@@ -231,6 +239,436 @@ const STATE_GETTER_HELPERS = {
 	useState: '__useStateWithGetter',
 	useReducer: '__useReducerWithGetter',
 };
+
+const CAUSAL_STATE_MODEL_HOOKS = new Set([
+	'useState',
+	'useReducer',
+	'useEffect',
+	'useLayoutEffect',
+	'useInsertionEffect',
+	'useImperativeHandle',
+	'useMemo',
+	'useActionState',
+	'useOptimistic',
+]);
+
+function effectiveStateModel(options) {
+	const stateModel = options?.stateModel ?? 'permissive';
+	if (stateModel !== 'causal' && stateModel !== 'permissive') {
+		throw new Error(
+			`Unknown state model ${JSON.stringify(stateModel)} — expected 'causal' or 'permissive'.`,
+		);
+	}
+	return stateModel;
+}
+
+function causalStateArgument(stateModel, hook) {
+	return stateModel === 'causal' && CAUSAL_STATE_MODEL_HOOKS.has(hook) ? ', 1' : '';
+}
+
+function ensureCausalStateMarker(st) {
+	if (st.causalStateMarkerName === null) {
+		st.causalStateMarkerName = allocSlotName(st, '_$markStateModel');
+	}
+	return st.causalStateMarkerName;
+}
+
+function ensureCausalStateMethodsMarker(st) {
+	if (st.causalStateMethodsMarkerName === null) {
+		st.causalStateMethodsMarkerName = allocSlotName(st, '_$markStateModelMethods');
+	}
+	return st.causalStateMethodsMarkerName;
+}
+
+function causalFunctionProducesJsx(node) {
+	if (!isFunctionNode(node)) return false;
+	if (node.body?.type === 'JSXCodeBlock') return true;
+	const containsOutput = (value, root = true) => {
+		if (!value || typeof value !== 'object') return false;
+		if (Array.isArray(value)) return value.some((child) => containsOutput(child, false));
+		if (
+			value.type === 'JSXElement' ||
+			value.type === 'JSXFragment' ||
+			value.type === 'Element' ||
+			value.type === 'Fragment'
+		) {
+			return true;
+		}
+		if (!root && isFunctionNode(value)) return false;
+		for (const key in value) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' || key === 'metadata')
+				continue;
+			if (containsOutput(value[key], false)) return true;
+		}
+		return false;
+	};
+	if (node.type === 'ArrowFunctionExpression' && node.expression) {
+		return containsOutput(node.body, false);
+	}
+	if (node.body?.type !== 'BlockStatement') return false;
+	let found = false;
+	const visit = (value) => {
+		if (found || !value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) visit(child);
+			return;
+		}
+		if (value !== node.body && isFunctionNode(value)) return;
+		if (value.type === 'ReturnStatement' && containsOutput(value.argument, false)) {
+			found = true;
+			return;
+		}
+		for (const key in value) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end' || key === 'metadata')
+				continue;
+			visit(value[key]);
+		}
+	};
+	visit(node.body);
+	return found;
+}
+
+function causalFunctionReturnsFunction(node) {
+	const returnedFunction = (value) => {
+		const expression = unwrapParallelUseValue(value);
+		if (!expression) return false;
+		if (expression.type === 'FunctionExpression' || expression.type === 'ArrowFunctionExpression') {
+			return true;
+		}
+		if (expression.type === 'ConditionalExpression') {
+			return returnedFunction(expression.consequent) || returnedFunction(expression.alternate);
+		}
+		if (expression.type === 'LogicalExpression') {
+			return returnedFunction(expression.left) || returnedFunction(expression.right);
+		}
+		if (expression.type === 'SequenceExpression') {
+			return returnedFunction(expression.expressions?.at(-1));
+		}
+		return false;
+	};
+	if (node.type === 'ArrowFunctionExpression' && node.expression) {
+		return returnedFunction(node.body);
+	}
+	if (node.body?.type !== 'BlockStatement') return false;
+	let found = false;
+	const visit = (value) => {
+		if (found || !value || typeof value !== 'object') return;
+		if (Array.isArray(value)) {
+			for (const child of value) visit(child);
+			return;
+		}
+		if (value !== node.body && isFunctionNode(value)) return;
+		if (value.type === 'ReturnStatement' && returnedFunction(value.argument)) {
+			found = true;
+			return;
+		}
+		for (const key in value) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+			visit(value[key]);
+		}
+	};
+	visit(node.body);
+	return found;
+}
+
+function causalDefinitionName(name) {
+	return (
+		typeof name === 'string' &&
+		(/^use[A-Z]/.test(name) || (/^[A-Z]/.test(name) && !name.includes('-')))
+	);
+}
+
+function staticDefinitionPropertyName(property) {
+	if (!property || property.type === 'SpreadElement') return null;
+	if (
+		!property.computed &&
+		(property.key?.type === 'Identifier' || property.key?.type === 'PrivateIdentifier')
+	) {
+		return property.key.name;
+	}
+	if (
+		property.key?.type === 'Literal' &&
+		(typeof property.key.value === 'string' || typeof property.key.value === 'number')
+	) {
+		return String(property.key.value);
+	}
+	return null;
+}
+
+function unsupportedCausalClassHook(st, node, name) {
+	const error = new Error(
+		`${st.filename}:${node.loc?.start?.line ?? 1}:${(node.loc?.start?.column ?? 0) + 1} ` +
+			`class method ${JSON.stringify(name)} is a custom-hook definition, but causal state provenance cannot yet be attached to prototype methods without changing their descriptor identity. Move the hook to a module function or object-function property, or keep the owning dependency at an explicitly approved permissive boundary while it migrates.`,
+	);
+	error.code = 'OCTANE_CAUSAL_CLASS_HOOK_UNSUPPORTED';
+	error.filename = st.filename;
+	throw error;
+}
+
+function unsupportedCausalObjectMethod(st, node, name, reason) {
+	const error = new Error(
+		`${st.filename}:${node.loc?.start?.line ?? 1}:${(node.loc?.start?.column ?? 0) + 1} ` +
+			`Octane cannot preserve causal provenance for object method ${JSON.stringify(name ?? '<computed>')} because ${reason}. Use a static key whose final own definition is unambiguous, move the definition to a module function, or keep the owning dependency at an explicitly approved permissive boundary while it migrates.`,
+	);
+	error.code = 'OCTANE_CAUSAL_OBJECT_METHOD_UNSUPPORTED';
+	error.filename = st.filename;
+	throw error;
+}
+
+function collectCausalDefinitionEdits(ast, st) {
+	const exportedNames = new Set();
+	for (const statement of ast.body || []) {
+		if (statement.type !== 'ExportNamedDeclaration') continue;
+		const declaration = statement.declaration;
+		if (declaration?.type === 'VariableDeclaration') {
+			for (const item of declaration.declarations || []) {
+				if (item.id?.type === 'Identifier' && causalDefinitionName(item.id.name)) {
+					exportedNames.add(item.id.name);
+				}
+			}
+		}
+		for (const specifier of statement.specifiers || []) {
+			const exported = specifier.exported?.name ?? specifier.exported?.value;
+			if (
+				specifier.local?.name &&
+				(exported === 'default' || (typeof exported === 'string' && /^[A-Z]/.test(exported)))
+			) {
+				exportedNames.add(specifier.local.name);
+			}
+		}
+	}
+
+	const wrapped = new WeakSet();
+	const causalObjectMethods = new WeakMap();
+	const shouldMark = (node, hint) => {
+		const name = hint?.name ?? node.id?.name;
+		if (typeof name === 'string' && /^use[A-Z]/.test(name)) return true;
+		if (hint?.directlyReturnsFunction === true || causalFunctionReturnsFunction(node)) return false;
+		return (
+			causalFunctionProducesJsx(node) ||
+			st.causalStateForcedFunctions?.has(node) === true ||
+			hint?.force === true ||
+			causalDefinitionName(name)
+		);
+	};
+	const wrapExpression = (node, hint) => {
+		if (wrapped.has(node)) return;
+		wrapped.add(node);
+		const marker = ensureCausalStateMarker(st);
+		st.edits.push({ pos: node.start, text: `/* @__PURE__ */ ${marker}(` });
+		const nameHint =
+			node.id == null && typeof hint?.inferredName === 'string'
+				? `, ${JSON.stringify(hint.inferredName)}`
+				: '';
+		st.edits.push({ pos: node.end, text: `, 1${nameHint})` });
+	};
+	const markDeclaration = (node, name, registrations) => {
+		const marker = ensureCausalStateMarker(st);
+		const text = `${name} = /* @__PURE__ */ ${marker}(${name}, 1);`;
+		if (registrations !== null) registrations.push(text);
+		else st.edits.push({ pos: node.end, text: `; ${text}` });
+	};
+	const markObjectMethod = (property) => {
+		if (property.kind !== 'init') return;
+		const name = staticDefinitionPropertyName(property);
+		if (name === null) {
+			unsupportedCausalObjectMethod(st, property, name, 'its computed key is not statically known');
+		}
+		causalObjectMethods.set(property, name);
+		wrapped.add(property.value);
+	};
+
+	const visitStatementList = (statements, fallback) => {
+		const registrations = [];
+		for (const statement of statements || []) visit(statement, null, null, registrations);
+		if (registrations.length === 0) return;
+		let position = fallback;
+		for (const statement of statements || []) {
+			const directive =
+				statement.directive != null ||
+				(statement.type === 'ExpressionStatement' &&
+					statement.expression?.type === 'Literal' &&
+					typeof statement.expression.value === 'string');
+			if (statement.type === 'ImportDeclaration' || directive) continue;
+			position = statement.start;
+			break;
+		}
+		st.edits.push({ pos: position, text: registrations.join(' ') + ' ' });
+	};
+
+	const visit = (node, hint = null, property = null, registrations = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'Program') {
+			visitStatementList(node.body || [], node.end);
+			return;
+		}
+		if (node.type === 'BlockStatement' || node.type === 'JSXCodeBlock') {
+			visitStatementList(node.body || [], Math.max(node.start, node.end - 1));
+			if (node.render) visit(node.render);
+			return;
+		}
+		if (node.type === 'ExportNamedDeclaration') {
+			visit(node.declaration, null, null, registrations);
+			return;
+		}
+		if (node.type === 'ExportDefaultDeclaration') {
+			visit(
+				node.declaration,
+				{
+					name: node.declaration?.id?.name ?? 'default',
+					inferredName: 'default',
+					force: true,
+				},
+				null,
+				registrations,
+			);
+			return;
+		}
+		if (node.type === 'VariableDeclaration') {
+			for (const declaration of node.declarations || []) {
+				const name = declaration.id?.type === 'Identifier' ? declaration.id.name : null;
+				visit(declaration.init, {
+					name,
+					inferredName: name,
+					force: name !== null && exportedNames.has(name),
+				});
+			}
+			return;
+		}
+		if (node.type === 'FunctionDeclaration') {
+			for (const parameter of node.params || []) visit(parameter);
+			visit(node.body);
+			if (!node.body || !shouldMark(node, hint)) return;
+			if (node.id?.name) markDeclaration(node, node.id.name, registrations);
+			else wrapExpression(node, hint);
+			return;
+		}
+		if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+			const directlyReturnsFunction = causalFunctionReturnsFunction(node);
+			for (const parameter of node.params || []) visit(parameter);
+			visit(node.body);
+			// Accessors and class methods require their function node in-place for valid
+			// syntax. Nested callable values were still visited above; class custom-hook
+			// methods are rejected explicitly by the MethodDefinition branch below.
+			if (hint?.suppressSelf === true) return;
+			if (!shouldMark(node, { ...hint, directlyReturnsFunction })) return;
+			if (property?.method === true) {
+				markObjectMethod(property);
+			} else wrapExpression(node, hint);
+			return;
+		}
+		if (node.type === 'ObjectExpression') {
+			for (const property of node.properties || []) visit(property, hint);
+			const finalKeys = [];
+			const seenStaticKeys = new Set();
+			let mayOverrideEarlier = false;
+			for (let index = (node.properties?.length ?? 0) - 1; index >= 0; index--) {
+				const property = node.properties[index];
+				const key = staticDefinitionPropertyName(property);
+				const markedKey = causalObjectMethods.get(property);
+				if (markedKey !== undefined && !seenStaticKeys.has(markedKey)) {
+					if (mayOverrideEarlier) {
+						unsupportedCausalObjectMethod(
+							st,
+							property,
+							markedKey,
+							'a later spread or dynamic property may replace it',
+						);
+					}
+					finalKeys.push(markedKey);
+				}
+				if (key === null) mayOverrideEarlier = true;
+				else seenStaticKeys.add(key);
+			}
+			if (finalKeys.length !== 0) {
+				const marker = ensureCausalStateMethodsMarker(st);
+				st.edits.push({ pos: node.start, text: `/* @__PURE__ */ ${marker}(` });
+				st.edits.push({
+					pos: node.end,
+					text: `, 1, ${finalKeys.reverse().map(JSON.stringify).join(', ')})`,
+				});
+			}
+			return;
+		}
+		if (node.type === 'Property') {
+			if (node.computed) visit(node.key);
+			const name = staticDefinitionPropertyName(node);
+			visit(
+				node.value,
+				node.kind === 'init' ? { name, inferredName: name } : { suppressSelf: true },
+				node,
+			);
+			return;
+		}
+		if (node.type === 'MethodDefinition' || node.type === 'ClassMethod') {
+			if (node.computed) visit(node.key);
+			const name = staticDefinitionPropertyName(node);
+			if (node.kind !== 'get' && node.kind !== 'set' && /^use[A-Z]/.test(name ?? '')) {
+				unsupportedCausalClassHook(st, node, name);
+			}
+			visit(node.value, { suppressSelf: true });
+			return;
+		}
+		if (node.type === 'PropertyDefinition' || node.type === 'ClassProperty') {
+			if (node.computed) visit(node.key);
+			const name = staticDefinitionPropertyName(node);
+			visit(node.value, { name, inferredName: name });
+			return;
+		}
+		if (node.type === 'ConditionalExpression') {
+			visit(node.test);
+			const branchHint = hint === null ? null : { ...hint, inferredName: undefined };
+			visit(node.consequent, branchHint);
+			visit(node.alternate, branchHint);
+			return;
+		}
+		if (node.type === 'LogicalExpression') {
+			const branchHint = hint === null ? null : { ...hint, inferredName: undefined };
+			visit(node.left, branchHint);
+			visit(node.right, branchHint);
+			return;
+		}
+		if (node.type === 'SequenceExpression') {
+			const finalHint = hint === null ? null : { ...hint, inferredName: undefined };
+			for (let index = 0; index < (node.expressions?.length ?? 0); index++) {
+				visit(node.expressions[index], index === node.expressions.length - 1 ? finalHint : null);
+			}
+			return;
+		}
+		if (
+			node.type === 'TSAsExpression' ||
+			node.type === 'TSTypeAssertion' ||
+			node.type === 'TSNonNullExpression' ||
+			node.type === 'TSSatisfiesExpression' ||
+			node.type === 'ParenthesizedExpression' ||
+			node.type === 'ChainExpression'
+		) {
+			visit(node.expression, hint);
+			return;
+		}
+		if (node.type === 'CallExpression') {
+			visit(node.callee);
+			const renderEntry =
+				node.callee?.type === 'MemberExpression' &&
+				!node.callee.computed &&
+				node.callee.property?.type === 'Identifier' &&
+				node.callee.property.name === 'render';
+			for (let index = 0; index < (node.arguments?.length ?? 0); index++) {
+				visit(node.arguments[index], renderEntry && index === 0 ? { force: true } : null);
+			}
+			return;
+		}
+		for (const key in node) {
+			if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+			visit(node[key]);
+		}
+	};
+	visit(ast);
+}
 
 function collectIdentifierNames(root) {
 	const names = new Set();
@@ -795,7 +1233,7 @@ function emitParallelUseRun(run, owner, st) {
 			const memoHelper = requireParallelHelper(st, memoName);
 			const slot = allocHookSymbol(st, owner, 'use() memo', 'useMemo', entry.call);
 			const deps = entry.dependencies.map((dependency) => dependency.text).join(', ');
-			creation = `${memoHelper}(() => (${creation}), [${deps}], ${slot})`;
+			creation = `${memoHelper}(() => (${creation}), [${deps}], ${slot}${causalStateArgument(st.stateModel, memoName)})`;
 		}
 		declarations.push(`const ${temp} = ${creation};`);
 		st.edits.push({ pos: entry.arg.start, end: entry.arg.end, text: temp });
@@ -933,6 +1371,7 @@ function walk(node, owner, st) {
 					? node.callee.name
 					: `${node.callee?.object?.name || 'octane'}.${imported}`;
 			const sym = allocHookSymbol(st, owner, local, imported, node);
+			const stateModelArg = causalStateArgument(st.stateModel, imported);
 			const inferred = st.inferred.get(node);
 			if (inferred !== undefined) {
 				// The dependency callback is already the final user argument. Insert
@@ -944,21 +1383,21 @@ function walk(node, owner, st) {
 					.join(', ');
 				st.edits.push({
 					pos: node.arguments[node.arguments.length - 1].end,
-					text: `, [${deps}], ${sym}`,
+					text: `, [${deps}], ${sym}${stateModelArg}`,
 				});
 			} else if (node.arguments.length === 0) {
 				// `useId()` → `useId(_h$N)`. Symbols remain self-identifying when
 				// optional user arguments are omitted.
 				st.edits.push({
 					pos: node.end - 1,
-					text: sym,
+					text: sym + stateModelArg,
 				});
 			} else {
 				// `useState(0)` → `useState(0, _h$N)` — insert AFTER the last arg's end so
 				// trailing commas / whitespace before `)` stay valid.
 				st.edits.push({
 					pos: node.arguments[node.arguments.length - 1].end,
-					text: ', ' + sym,
+					text: ', ' + sym + stateModelArg,
 				});
 			}
 			if (st.getterCalls.has(node) && STATE_GETTER_HELPERS[imported]) {
@@ -989,14 +1428,15 @@ function walk(node, owner, st) {
  *
  * @param {string} source raw module text
  * @param {string} id     module id (embedded in the stable Symbol.for key)
- * @param {{ environment?: 'client' | 'server', hmr?: boolean, profile?: boolean, profileFilename?: string, isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
+ * @param {{ environment?: 'client' | 'server', hmr?: boolean, profile?: boolean, profileFilename?: string, stateModel?: 'causal' | 'permissive', isVoidComponentImport?: (request: string, imported: string) => boolean }} [options] `hmr: true` (dev serve) emits
  *   `Symbol.for(stableKey)` so a re-imported module resolves the same hook
  *   slots (state survives HMR); off (ordinary prod builds and SSR) emits
  *   runtime-ranged Symbols. Profiling retains short described Symbols because
  *   hook metadata is keyed by Symbol identity.
- * @returns {{ code: string, map: null } | null}
+ * @returns {{ code: string, map: null, diagnostics: readonly unknown[] } | null}
  */
 export function slotHooks(source, id, options) {
+	const stateModel = effectiveStateModel(options);
 	const environment = options?.environment ?? 'client';
 	if (environment !== 'client' && environment !== 'server') {
 		throw new Error(
@@ -1009,13 +1449,17 @@ export function slotHooks(source, id, options) {
 	} catch {
 		return null; // let the normal pipeline surface the parse error
 	}
+	const causalStateAnalysis =
+		stateModel === 'causal'
+			? analyzeCausalStateDiagnostics(ast, source, id, { onlyImported: true })
+			: null;
+	if (causalStateAnalysis !== null) assertNoCausalStateErrors(causalStateAnalysis);
 	const importInfo = octaneHookLocals(ast);
 	const canSpecializeRoot =
 		!options?.hmr &&
 		!options?.profile &&
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
-	if (!importInfo.importsHook && !canSpecializeRoot) return null;
 	const inferred = importInfo.importsHook
 		? analyzeHookDependencies(ast, {
 				filename: id,
@@ -1034,6 +1478,7 @@ export function slotHooks(source, id, options) {
 		hmr: !!(options && options.hmr),
 		profile: !!(options && options.profile),
 		environment,
+		stateModel,
 		hash: hookSlotHash(id),
 		nextId: 0,
 		nextPuId: 0,
@@ -1044,7 +1489,16 @@ export function slotHooks(source, id, options) {
 		slotBaseName: null,
 		hookSlotsName: null,
 		voidRootName: null,
+		causalStateMarkerName: null,
+		causalStateMethodsMarkerName: null,
+		causalStateForcedFunctions: null,
 	};
+	if (stateModel === 'causal') {
+		const aliases = analyzeCausalComponentAliases(ast);
+		assertNoUnresolvedCausalComponentAliases(aliases, id);
+		st.causalStateForcedFunctions = aliases.forcedFunctions;
+		collectCausalDefinitionEdits(ast, st);
+	}
 	if (!st.hmr && !st.profile) st.slotBaseName = allocSlotName(st, '_hs$');
 	if (importInfo.importsHook) {
 		collectParallelUseEdits(ast, st);
@@ -1053,7 +1507,11 @@ export function slotHooks(source, id, options) {
 	if (canSpecializeRoot) {
 		collectVoidRootEdits(ast, st, options.isVoidComponentImport);
 	}
-	if (st.edits.length === 0) return null;
+	if (st.edits.length === 0) {
+		return causalStateAnalysis?.reports.length
+			? { code: source, map: null, diagnostics: causalStateAnalysis.reports }
+			: null;
+	}
 
 	// Apply insertions right-to-left so earlier offsets stay valid.
 	st.edits.sort((a, b) => b.pos - a.pos);
@@ -1071,6 +1529,12 @@ export function slotHooks(source, id, options) {
 	const helperSpecifiers = [...st.getterHelpers].map(
 		([hook, local]) => `${STATE_GETTER_HELPERS[hook]} as ${local}`,
 	);
+	if (st.causalStateMarkerName !== null) {
+		helperSpecifiers.push(`markStateModel as ${st.causalStateMarkerName}`);
+	}
+	if (st.causalStateMethodsMarkerName !== null) {
+		helperSpecifiers.push(`markStateModelMethods as ${st.causalStateMethodsMarkerName}`);
+	}
 	if (st.voidRootName !== null) {
 		helperSpecifiers.push(`__createVoidRoot as ${st.voidRootName}`);
 	}
@@ -1104,5 +1568,5 @@ export function slotHooks(source, id, options) {
 	const block =
 		helperImport + serverHelperImport + profileImport + slotBase + st.decls.join('\n') + '\n';
 	code = code.endsWith('\n') ? code + block : code + '\n' + block;
-	return { code, map: null };
+	return { code, map: null, diagnostics: causalStateAnalysis?.reports ?? [] };
 }

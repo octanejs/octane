@@ -11,6 +11,10 @@ export const options = {
 	profile: false,
 	requireDirective: true,
 	exclude: ['/host-owned/'],
+	stateModel: {
+		default: 'causal',
+		packages: { '@vendor/legacy-widgets': 'permissive' },
+	},
 	renderers: {
 		registry: {
 			object: {
@@ -33,6 +37,13 @@ export const discovered: string[] = discoverOctaneSourceDependencies(process.cwd
 
 // @ts-expect-error — compiler options are a closed public surface.
 octane({ handWrittenViteShim: true });
+
+octane({
+	stateModel: {
+		// @ts-expect-error — state models are a closed public union.
+		default: 'strict',
+	},
+});
 
 octane({
 	renderers: {

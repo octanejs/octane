@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 47,
+  "nextCode": 48,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -276,6 +276,12 @@
       "message": "Expected %s listener to be a function, instead got a value of `%s` type.",
       "argumentCount": 2,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "47": {
+      "message": "Octane's causal state model does not allow a state update while %s in <%s>. Derive render values directly, or move the transition to the event, action, or external-source callback that caused it.",
+      "argumentCount": 2,
+      "runtime": ["client", "server"],
       "status": "active"
     }
   }

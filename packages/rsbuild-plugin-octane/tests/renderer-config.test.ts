@@ -50,7 +50,13 @@ function writeProject(root: string, withRoute: boolean) {
 import { renderers } from './renderer.config.ts';
 
 export default defineConfig({
-	compiler: { renderers },
+	compiler: {
+		renderers,
+		stateModel: {
+			default: 'causal',
+			packages: { '@vendor/legacy-widgets': 'permissive' },
+		},
+	},
 	router: { routes: ${withRoute ? "[new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })]" : '[]'} },
 });
 `,
@@ -91,6 +97,10 @@ describe('Rsbuild renderer configuration', () => {
 
 			expect(plugins).toHaveLength(withRoute ? 2 : 1);
 			for (const plugin of plugins) {
+				expect(plugin.options.stateModel).toMatchObject({
+					default: 'causal',
+					packages: { '@vendor/legacy-widgets': 'permissive' },
+				});
 				expect(plugin.options.renderers).toMatchObject({
 					default: 'dom',
 					registry: {

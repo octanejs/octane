@@ -22,6 +22,17 @@ export interface CompileMdxDiagnostic {
 	filename: string;
 	start: CompileMdxDiagnosticPosition;
 	end: CompileMdxDiagnosticPosition;
+	/** Present for causal-state diagnostics. */
+	phase?: 'render' | 'purity' | 'effect' | 'cleanup';
+	/** True while the diagnosed phase remains warning-only during rollout. */
+	reportOnly?: boolean;
+	/** State-writer declaration mapped back to the authored document. */
+	declaration?: {
+		hook: 'useState' | 'useReducer' | 'useActionState' | 'useOptimistic';
+		name: string;
+		start: CompileMdxDiagnosticPosition;
+		end: CompileMdxDiagnosticPosition;
+	};
 	suggestions: Array<{
 		start: CompileMdxDiagnosticPosition;
 		end: CompileMdxDiagnosticPosition;
@@ -38,6 +49,8 @@ export interface CompileMdxOptions {
 	dev?: boolean;
 	/** octane compiler profiling metadata (client only). */
 	profile?: boolean;
+	/** Effective state-transition model for this document. Default `'permissive'`. */
+	stateModel?: 'causal' | 'permissive';
 	/**
 	 * Module the emitted document reads the provider mapping from
 	 * (`useMDXComponents`). Defaults per mode — `'@octanejs/mdx'` (client) /

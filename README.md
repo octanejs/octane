@@ -154,6 +154,36 @@ Without `octane.config.ts`, the plugin compiles a normal client-only SPA and
 preserves Vite's standard HTML handling. Add an Octane config with routes to
 activate routing, streaming SSR, hydration, and client/server production builds.
 
+The causal state model is available as an opt-in rollout. It makes render and
+hook-purity phases read-only in both development and production. Updates from
+events, actions, and later callbacks remain legal after the read-only phase has
+returned:
+
+```ts
+// octane.config.ts
+import { defineConfig } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+  compiler: {
+    stateModel: {
+      default: 'causal',
+      packages: {
+        '@vendor/legacy-widgets': 'permissive',
+      },
+    },
+  },
+});
+```
+
+Package entries are exact dependency names. A dependency that declares
+`"octane": { "stateModel": "permissive" }` must also be approved by the
+consumer with a matching `compiler.stateModel.packages` entry. The application
+package cannot appear in `packages`; its model comes from `default`, as does a
+dependency with no declaration or exact package entry. The rollout default
+remains `'permissive'`, and effect setup/cleanup findings are report-only until
+the replacement primitives and Callback Provenance ABI land. See the
+[causal-state plan](docs/strict-state-plan.md).
+
 Octane also supports Rspack and Rsbuild 2.x. Use the low-level Rspack plugin
 when you own the application shell and entries yourself:
 

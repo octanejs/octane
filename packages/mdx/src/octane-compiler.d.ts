@@ -13,6 +13,14 @@ declare module 'octane/compiler' {
 		filename: string;
 		start: CompileDiagnosticPosition;
 		end: CompileDiagnosticPosition;
+		phase?: 'render' | 'purity' | 'effect' | 'cleanup';
+		reportOnly?: boolean;
+		declaration?: {
+			hook: 'useState' | 'useReducer' | 'useActionState' | 'useOptimistic';
+			name: string;
+			start: CompileDiagnosticPosition;
+			end: CompileDiagnosticPosition;
+		};
 		suggestions: Array<{
 			start: CompileDiagnosticPosition;
 			end: CompileDiagnosticPosition;
@@ -27,6 +35,7 @@ declare module 'octane/compiler' {
 			hmr?: boolean;
 			dev?: boolean;
 			profile?: boolean;
+			stateModel?: 'causal' | 'permissive';
 		},
 	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 	export function __analyzeNativeChangeDiagnostics(

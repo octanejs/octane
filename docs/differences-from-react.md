@@ -60,6 +60,24 @@ can be observed, preserving the existing runtime path and allocation profile for
 ordinary two-item destructuring. Escaped or ambiguous tuples conservatively
 receive the complete three-item shape.
 
+## Causal state model (opt-in rollout)
+
+`compiler.stateModel.default: 'causal'` makes authored rendering read-only.
+State writes during component render, state/reducer initialization, memo
+calculation, reducer execution, or functional-updater execution are hard errors
+in development and production. The guard runs before updater/reducer user code
+and before same-value bailout. Event, action, observer, timer, subscription, and
+other later-callback transitions remain legal after the active read-only phase
+has returned.
+
+This intentionally rejects guarded render-update patterns that another hook
+runtime may accept. The rollout default is currently `'permissive'`, which keeps
+Octane's existing bounded render-replay behavior for applications and approved
+dependency packages. Effect setup/cleanup findings are warnings in this first
+enforcement stage; they become hard errors only after the replacement primitives
+and Callback Provenance ABI in
+[the causal-state plan](./strict-state-plan.md) land.
+
 ## Native event objects, no synthetic event layer
 
 Event propagation itself matches React and is **not a divergence**. Ordinary

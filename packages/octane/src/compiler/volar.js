@@ -29,6 +29,7 @@ import {
 	dedupeMappings,
 	parseModule,
 } from '@tsrx/core';
+import { analyzeCausalStateDiagnostics } from './causal-state-diagnostics.js';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
 import {
@@ -156,7 +157,7 @@ function shiftGeneratedOffsets(mappings, offset) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown }} [options]
+ * @param {{ loose?: boolean, renderers?: unknown, stateModel?: 'causal' | 'permissive' }} [options]
  * @returns {import('@tsrx/core/types').VolarMappingsResult & { diagnostics: readonly unknown[] }}
  */
 export function compileToVolarMappings(source, filename, options) {
@@ -174,12 +175,29 @@ export function compileToVolarMappings(source, filename, options) {
 	});
 	const rendererConfig = normalizeRendererConfig(options?.renderers);
 	const renderer = resolveRendererForFile(rendererConfig, filename ?? 'untitled.tsrx');
-	const diagnostics = analyzeNativeChangeDiagnostics(ast, source, filename, {
+	const nativeDiagnostics = analyzeNativeChangeDiagnostics(ast, source, filename, {
 		dom: renderer.target === 'dom',
 		renderer,
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	}).diagnostics;
+	// Volar must keep producing virtual TSX when causal analysis finds a hard
+	// authored-code error. Build compilation throws for those findings; editors
+	// receive the same structured diagnostic and remain usable for the fix.
+	const causalDiagnostics =
+		options?.stateModel === 'causal'
+			? analyzeCausalStateDiagnostics(ast, source, filename, {
+					hookRuntimeModules: [renderer.module],
+				}).diagnostics
+			: [];
+	const diagnostics =
+		causalDiagnostics.length === 0
+			? nativeDiagnostics
+			: [...nativeDiagnostics, ...causalDiagnostics].sort(
+					(left, right) =>
+						(left.start?.offset ?? 0) - (right.start?.offset ?? 0) ||
+						String(left.code).localeCompare(String(right.code)),
+				);
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
 	// before the typeOnly print. The lowering is copy-on-write inside

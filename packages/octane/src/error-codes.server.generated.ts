@@ -34,6 +34,7 @@ type ServerErrorArguments = {
 	43: [];
 	44: [];
 	45: [];
+	47: [unknown, unknown];
 };
 
 export function formatServerError<Code extends keyof ServerErrorArguments>(
@@ -152,6 +153,11 @@ export function formatServerError<Code extends keyof ServerErrorArguments>(
 				return formatDevErrorMessage('The readable stream is closed.', args);
 			case 45:
 				return formatDevErrorMessage('Server-rendered use() rejected (function)', args);
+			case 47:
+				return formatDevErrorMessage(
+					"Octane's causal state model does not allow a state update while %s in <%s>. Derive render values directly, or move the transition to the event, action, or external-source callback that caused it.",
+					args,
+				);
 			default:
 				return formatUnknownDevErrorMessage(code);
 		}

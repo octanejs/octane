@@ -10,6 +10,13 @@ Bundler-neutral app primitives shared by Octane's Vite and Rsbuild integrations.
 - `@octanejs/app-core/html`, `/production`, and `/node` provide streaming HTML composition, the production Fetch handler, and the optional Node HTTP bridge.
 - `@octanejs/app-core/codegen` generates client hydration entries, template-free server manifests, and production server entries. Runtime module IDs, integration module IDs, generated-file directories, and application import specifiers are explicit inputs so generators remain usable across bundlers and renderer targets.
 
+The shared `compiler.stateModel` config uses a `causal` or `permissive` default
+plus an exact dependency-package map. The application package cannot appear in
+that map; its model comes from `default`, as does a dependency with no declaration
+or exact package entry. A dependency manifest declaring
+`octane.stateModel: 'permissive'` must have a matching entry in the consumer's
+`compiler.stateModel.packages` map. The rollout default is `permissive`.
+
 Development integrations should inject their native module runner into `loadOctaneConfigWithMetadata`. The neutral evaluator is intended for configuration/build discovery: it bundles static JS, TS, and server-compiled TSRX helpers, while preserving dynamic application imports as lazy watched references so config loading never traverses renderer-only asset graphs.
 
 ```js
