@@ -1,0 +1,7 @@
+/* Minimal shared stylesheet — identical for both flavors. Utility class names
+   in the markup are kept from upstream but deliberately unstyled: styling is
+   not part of what this benchmark measures. */
+body {
+	font-family: system-ui, sans-serif;
+	margin: 0;
+}

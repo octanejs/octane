@@ -1,6 +1,7 @@
 node_modules
 dist
 build
+.output
 *.tsbuildinfo
 # Vendored TanStack Start packages ship PREBUILT dist (consumed as-is, no build
 # step in this repo) — exempt them from the global dist ignore or installs from

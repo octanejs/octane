@@ -407,4 +407,51 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		);
 		expect(fnDecl?.declaration?.id?.name).toBe('Foo');
 	});
+
+	it('marks native template bodies on the source AST (route-generator contract)', () => {
+		// TanStack's octane route-generator plugin (@tanstack/octane-router/
+		// generator-plugin) masks `@{ … }` template bodies before handing route
+		// files to a babel-based transform. It identifies them on THIS entry
+		// point's `sourceAst` via `metadata.native_tsrx_body` plus the body's
+		// source offsets — a published consumer contract of the volar surface.
+		const source =
+			'export function About() @{\n\t<p>hi</p>\n}\n' +
+			'const Fn = function () @{\n\t<p>fn</p>\n}\nvoid Fn;\n';
+		const { sourceAst } = compileToVolarMappings(source, 'routes/about.tsrx');
+
+		const marked: Array<{ start: number; end: number }> = [];
+		const seen = new WeakSet<object>();
+		const visit = (value: unknown): void => {
+			if (!value || typeof value !== 'object' || seen.has(value)) return;
+			seen.add(value);
+			if (Array.isArray(value)) {
+				for (const item of value) visit(item);
+				return;
+			}
+			const node = value as {
+				metadata?: { native_tsrx_body?: boolean };
+				body?: { start?: unknown; end?: unknown };
+			};
+			if (node.metadata?.native_tsrx_body === true) {
+				expect(typeof node.body?.start).toBe('number');
+				expect(typeof node.body?.end).toBe('number');
+				marked.push({ start: node.body!.start as number, end: node.body!.end as number });
+			}
+			for (const [key, child] of Object.entries(node)) {
+				if (key !== 'metadata' && key !== 'loc') visit(child);
+			}
+		};
+		visit(sourceAst);
+
+		// Both the exported declaration and the function expression are found
+		// WITHOUT descending through metadata back-references, and their body
+		// spans cover the authored `{ … }` region (maskable in place).
+		expect(marked).toHaveLength(2);
+		for (const span of marked) {
+			// The span opens at the `@` sigil and closes at the template's `}` —
+			// the exact shape the masker rewrites in place (`@{` → ` {`).
+			expect(source.slice(span.start, span.start + 2)).toBe('@{');
+			expect(source[span.end - 1]).toBe('}');
+		}
+	});
 });
