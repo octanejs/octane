@@ -1634,7 +1634,9 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 			deps.push(name);
 		}
 		modified = true;
-		ctx.runtimeNeeded.add('useCallback');
+		// No eager runtimeNeeded.add here: surviving generated calls re-add the
+		// import in rewriteHookCalls' generated-callee branch, and calls consumed
+		// by the inline hook-memo tier never need it.
 		return {
 			...decl,
 			init: {
@@ -4061,7 +4063,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -4451,6 +4453,12 @@ export function compile(source, filename, options) {
 	// a stale-UI report can be bisected memoizer-vs-elsewhere in one line.
 	const autoMemoEnabled =
 		options?.autoMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+	// Like `autoMemo: false`, `inlineHookMemo: false` is a diagnostic escape
+	// hatch only: it re-routes useMemo/useCallback and parallel-use creations
+	// back through the runtime-callback form so a miscompare can be bisected
+	// inline-cache-vs-elsewhere in one line.
+	const inlineHookMemoEnabled =
+		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -4483,6 +4491,12 @@ export function compile(source, filename, options) {
 		currentAutoMemoCacheName: null, // collision-free local bound to the body's cache array
 		currentAutoMemoCommittedName: null, // committed cache snapshot (copy-on-write source)
 		nextAutoMemoCacheId: 0, // unique non-index slots property per compiled render function
+		inlineHookMemo: inlineHookMemoEnabled, // de-callbacked useMemo/useCallback + pu creations
+		_puInlineLowering: false, // true only while a body pipeline ends in inlineHookMemoPass
+		currentHookMemoOffset: 0, // flat hook-memo cell offset for the body being emitted
+		currentHookMemoCacheProperty: null, // per-body `_k$N` slots property for the cell array
+		currentHookMemoNames: null, // lazily allocated { cache, result, label, temps[] } locals
+		nextHookMemoCacheId: 0, // unique non-index slots property per compiled render function
 		currentInvariantLocals: null, // Set<string> of component-lifetime-stable local values
 		currentEventInvariantLocals: null, // Set<string> safe to retain in native event slots
 		currentProfileComponentId: null,
@@ -5626,6 +5640,10 @@ function ssrCompileBody(
 	if (isTopBody) {
 		const creations = [];
 		const warmChildren = [];
+		// Pass A′ mirror (see the client pipeline): use()-fed const chains
+		// memoize at their declarations via `_$puMemo`, closing the same
+		// per-pass recreation hole for the setup-const authoring shape.
+		workingStatements = memoizeUseFedCreations(workingStatements, jsxNodes, ctx, name, creations);
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -7384,6 +7402,12 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentAutoMemoOffset = 0;
 	ctx.currentAutoMemoCacheName = autoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = autoMemoCommittedName;
+	const prevHookMemoOffset = ctx.currentHookMemoOffset;
+	const prevHookMemoCacheProperty = ctx.currentHookMemoCacheProperty;
+	const prevHookMemoNames = ctx.currentHookMemoNames;
+	ctx.currentHookMemoOffset = 0;
+	ctx.currentHookMemoCacheProperty = `_k$${ctx.nextHookMemoCacheId++}`;
+	ctx.currentHookMemoNames = null;
 	const params = node.params.map((p) => printNode(p)).join(', ');
 
 	// Body splitting. Two shapes to handle:
@@ -7456,10 +7480,23 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// transformed), the warm plan is derived from that same analysis, and Pass B
 	// hoists+batches. Sub-bodies (hoisted @try/@if arms via hoistBodyHelper's
 	// legacy path) arrive pre-memoized and run Pass B only.
+	// This pipeline ends in inlineHookMemoPass (production client, non-universal
+	// — universal units resolve their runtime imports through their own alias
+	// maps and keep the runtime-callback forms). The flag routes Pass A's
+	// _$useMemo import registration through the deferred path so fully-lowered
+	// modules don't carry a dead specifier.
+	const prevPuInlineLowering = ctx._puInlineLowering;
+	const inlineLowering =
+		ctx.inlineHookMemo && ctx.mode !== 'server' && ctx._universalRuntimeUnit == null;
+	ctx._puInlineLowering = inlineLowering;
 	let warmThunk = null;
 	if (options && options.autoCallback) {
 		const creations = [];
 		const warmChildren = [];
+		// Pass A′ first: use()-fed const chains memoize at their declarations,
+		// so Pass A then sees their trivial identifier arguments as already
+		// stable and the warm plan includes the chain heads.
+		workingStatements = memoizeUseFedCreations(workingStatements, jsxNodes, ctx, name, creations);
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -7467,6 +7504,23 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		ctx._pendingWarm = warm.warmSrc;
 	}
 	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
+
+	// De-callback the hook memo tier (production client compile). Authored and
+	// auto-generated useMemo/useCallback declarations become inline flat-cache
+	// regions (zero allocations on a dependency hit); Pass A parallel-use
+	// creations become closure-free puTake/puPub calls that keep their Symbol
+	// slot entries warm-visible in scope.hooks. Runs BEFORE rewriteHookCalls so
+	// consumed hook calls are never slotted (and add no runtime import); the
+	// authored tier is limited to proven render-scope bodies (localHookSlots),
+	// exactly the numeric-slot proof.
+	if (inlineLowering) {
+		workingStatements = inlineHookMemoPass(
+			workingStatements,
+			ctx,
+			options?.localHookSlots === true,
+		);
+	}
+	ctx._puInlineLowering = prevPuInlineLowering;
 
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
@@ -7569,6 +7623,19 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			`  let ${autoMemoCacheName} = ${autoMemoCommittedName} === undefined ? [] : ${autoMemoCommittedName};`,
 		);
 	}
+	// Hook-memo cell array (inline useMemo/useCallback regions). Unlike the
+	// autoMemo cache above this is NOT transactional: cells publish immediately
+	// so values — promise identity in particular — survive a mid-body suspension
+	// exactly like the runtime hooks map they replace. Pre-sized + filled so the
+	// array stays packed under conditional sites.
+	const hookMemoSize = ctx.currentHookMemoOffset;
+	if (hookMemoSize > 0) {
+		const hkName = hookMemoNames(ctx).cache;
+		lines.push(
+			`  let ${hkName} = __s.slots.${ctx.currentHookMemoCacheProperty};`,
+			`  if (${hkName} === undefined) __s.slots.${ctx.currentHookMemoCacheProperty} = ${hkName} = new Array(${hookMemoSize}).fill(undefined);`,
+		);
+	}
 	// Closure-dep snapshot prologue (raw JS string). Used by impure for-of item
 	// bodies that close over parent locals but have no hooks / no component
 	// calls / no control flow — they can short-circuit when every captured
@@ -7629,6 +7696,9 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
+	ctx.currentHookMemoOffset = prevHookMemoOffset;
+	ctx.currentHookMemoCacheProperty = prevHookMemoCacheProperty;
+	ctx.currentHookMemoNames = prevHookMemoNames;
 	return `function ${name}(${sig}) {\n${needsBlock ? '  const __block = __s.block;\n' : ''}${bodyCode}\n}`;
 }
 
@@ -8306,38 +8376,278 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 	function rewriteUseCall(call) {
 		const arg = unwrapTsExpr(call.arguments[0]);
 		if (isTrivialUseArg(arg)) return call;
-		const symVar = allocHookSymbol(
-			ctx,
-			`${componentName}.use.memo#${ctx.nextHookSymId}`,
-			{
-				componentName,
-				name: 'use() memo',
-				kind: 'useMemo',
-				node: call,
-			},
-			// Warm caches span component scopes. A scope-local numeric slot can
-			// therefore alias an adjacent component's equally-numbered use() memo
-			// when a parent warms both children into one cache. Reserve a globally
-			// composable Symbol for every warmable creation site.
-			true,
-		);
-		const deps = collectDepPaths(arg);
-		// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
-		// SSRScope per pass makes client useMemo semantics useless there).
-		const memoHelper = ctx.mode === 'server' ? 'puMemo' : 'useMemo';
-		const memoAlias = requireRuntimeForContext(ctx, memoHelper);
-		creations.push({ symVar, expr: arg, deps, guards: [...guards], locals });
-		const memoCall = {
-			type: 'CallExpression',
-			callee: { type: 'Identifier', name: memoAlias },
-			arguments: [
-				{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: arg },
-				{ type: 'ArrayExpression', elements: deps },
-				{ type: 'Identifier', name: symVar },
-			],
-			optional: false,
-		};
+		const memoCall = makeCreationMemoCall(ctx, componentName, arg, guards, locals, creations, call);
 		return { ...call, arguments: [memoCall, ...call.arguments.slice(1)] };
+	}
+}
+
+// One slot-keyed creation memo (`_$useMemo(() => <expr>, [deps], _h$N)` on the
+// client, `_$puMemo(…)` on the server): the shared construction behind Pass
+// A's use()-argument memoization and the taint pass's use()-fed local-const
+// chains. Registers the creation for the warm plan.
+function makeCreationMemoCall(
+	ctx,
+	componentName,
+	expr,
+	guards,
+	locals,
+	creations,
+	siteNode,
+	coarsenDepRoots = null,
+) {
+	const symVar = allocHookSymbol(
+		ctx,
+		`${componentName}.use.memo#${ctx.nextHookSymId}`,
+		{
+			componentName,
+			name: 'use() memo',
+			kind: 'useMemo',
+			node: siteNode,
+		},
+		// Warm caches span component scopes. A scope-local numeric slot can
+		// therefore alias an adjacent component's equally-numbered use() memo
+		// when a parent warms both children into one cache. Reserve a globally
+		// composable Symbol for every warmable creation site.
+		true,
+	);
+	let deps = collectDepPaths(expr);
+	// Chain-local roots must dep on the LOCAL'S identity, not a one-level
+	// member path: `userPromise.then(…)` would otherwise dep on
+	// `userPromise.then` — Promise.prototype.then, identical across every
+	// promise — and the derived creation would never refresh when its upstream
+	// promise does. Coarsen member deps rooted at render-created locals to the
+	// bare identifier (dedup follows).
+	if (coarsenDepRoots !== null) {
+		const seen = new Set();
+		const coarsened = [];
+		for (const dep of deps) {
+			const next =
+				dep.type === 'MemberExpression' && coarsenDepRoots.has(dep.object.name)
+					? { type: 'Identifier', name: dep.object.name }
+					: dep;
+			const key =
+				next.type === 'Identifier' ? next.name : `${next.object.name}.${next.property.name}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			coarsened.push(next);
+		}
+		deps = coarsened;
+	}
+	// Server mirror: `puMemo` — keyed CROSS-PASS creation cache (a fresh
+	// SSRScope per pass makes client useMemo semantics useless there).
+	const memoHelper = ctx.mode === 'server' ? 'puMemo' : 'useMemo';
+	// When this body's pipeline ends in inlineHookMemoPass, most client sites
+	// are later lowered to puTake/puPub and never call _$useMemo — defer the
+	// import registration to the surviving sites (lowerPuMemoDecl re-adds
+	// it) so fully-lowered modules don't carry a dead specifier. rtAlias is
+	// deterministic, so the callee name is safe to mint before the decision.
+	// Pipelines that never lower (universal pass, server) keep the eager
+	// path — deferring there would emit a call with no import.
+	const memoAlias =
+		ctx._puInlineLowering === true
+			? rtAlias(memoHelper)
+			: requireRuntimeForContext(ctx, memoHelper);
+	creations.push({ symVar, expr, deps, guards: [...guards], locals });
+	return {
+		type: 'CallExpression',
+		callee: { type: 'Identifier', name: memoAlias },
+		arguments: [
+			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: expr },
+			{ type: 'ArrayExpression', elements: deps },
+			{ type: 'Identifier', name: symVar },
+		],
+		optional: false,
+		// Marks a compiler-minted creation memo so the inline hook-memo tier
+		// can later lower the `const x = _$useMemo(…)` statement form to the
+		// closure-free puTake/puPub ABI (production client compile).
+		_octanePuMemo: true,
+	};
+}
+
+// ── Pass A′: memoize use()-fed local-const creation chains ─────────────────
+//
+// The natural authoring shape
+//
+//   const userPromise = fetchUser(id);
+//   const thumbnailPromise = userPromise.then((u) => u.thumbnail());
+//   <Renderer thumbnail={use(thumbnailPromise)} />
+//
+// leaves `use()` with a trivial identifier argument, so Pass A can't memoize
+// the creation — every render (and every suspend-replay) re-runs `fetchUser`,
+// the runtime's resume-replay leniency drops the fresh promise but not the
+// duplicate network request, and the chain is invisible to the warm plan.
+//
+// This pre-pass taints local consts that (transitively) feed a use()
+// argument and memoizes each creation-bearing tainted declaration with the
+// SAME slot-keyed machinery as Pass A — each keeps its own Symbol slot, so
+// derived links key on their upstream promise's stable identity
+// (`[userPromise]`) and the whole chain holds across renders and replays.
+// True data dependencies stay sequential; the chain's head becomes warmable
+// when its inputs are warm-safe (derived links reference non-param locals and
+// are excluded by the existing warm-safety filter automatically).
+//
+// Deliberately NOT collapsed into one region when an intermediate is used
+// only once (React Compiler's shape): substituting an init across statements
+// can move its evaluation past interleaved side effects; per-declaration
+// memos are order-preserving and cost one extra cell region.
+//
+// Scope (v1): `const`, single declarator, Identifier id, at body statement
+// level or inside plain if/blocks (same recursion and guard tracking as Pass
+// A; loops and nested functions excluded). `let` is skipped — reassignment
+// makes the taint unsound. Eligibility of the init reuses
+// isPropCreationExpr: a call/new reached during render, no JSX, no
+// hook-shaped calls.
+
+function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) {
+	// 1. Seed roots: free identifiers of EVERY use() argument, trivial or not
+	//    — a non-trivial argument's memo will list these as deps, so a
+	//    render-created dep would otherwise defeat that memo every render.
+	const seedRoots = new Set();
+	collectUseArgumentRoots(stmts, ctx, seedRoots);
+	collectUseArgumentRoots(jsxNodes, ctx, seedRoots);
+	if (seedRoots.size === 0) return stmts;
+
+	// 2. Candidates, in declaration order with their guard chains, plus the
+	//    full body-local binding-name set for dependency coarsening.
+	const candidates = [];
+	const localNames = new Set();
+	collectCandidates(stmts, []);
+	if (candidates.length === 0) return stmts;
+
+	// 3. Upstream taint closure: a tainted const taints everything its init
+	//    references. Iterate to fixpoint (chains are declaration-ordered, so
+	//    one reverse sweep converges; the loop is a cheap safety net).
+	const tainted = new Set();
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (let i = candidates.length - 1; i >= 0; i--) {
+			const candidate = candidates[i];
+			if (tainted.has(candidate)) continue;
+			if (!seedRoots.has(candidate.name)) continue;
+			tainted.add(candidate);
+			changed = true;
+			for (const free of collectFreeIdentifiers(candidate.init, [])) seedRoots.add(free);
+		}
+	}
+	if (tainted.size === 0) return stmts;
+
+	// 4. Rewrite eligible tainted declarations in place. Member deps rooted at
+	//    ANY body-local binding coarsen to that local's identity (see
+	//    makeCreationMemoCall): a one-level member path rooted at a
+	//    render-created local is not a safe change witness — `basePromise.then`
+	//    is Promise.prototype.then, identical across every promise, so a
+	//    derived creation would go permanently stale when its unmemoized
+	//    upstream changes. Params keep the precise member path (`props.id` is
+	//    exactly the wanted shape). Coarsening to a per-render local means the
+	//    memo recomputes each render — today's behavior, never staler.
+	const memoized = [];
+	for (const candidate of candidates) {
+		if (!tainted.has(candidate)) continue;
+		if (!isPropCreationExpr(candidate.init, ctx)) continue;
+		memoized.push(candidate);
+	}
+	const rewrites = new Map();
+	for (const candidate of memoized) {
+		rewrites.set(
+			candidate.stmt,
+			makeCreationMemoCall(
+				ctx,
+				componentName,
+				candidate.init,
+				candidate.guards,
+				null,
+				creations,
+				candidate.stmt,
+				localNames,
+			),
+		);
+	}
+	if (rewrites.size === 0) return stmts;
+	return rewriteStatements(stmts);
+
+	function collectCandidates(list, guards) {
+		for (const stmt of list) {
+			if (!stmt || typeof stmt !== 'object') continue;
+			if (stmt.type === 'VariableDeclaration') {
+				// Every body-local binding (const OR let, any pattern) joins the
+				// coarsening set below — a member path rooted at a render-created
+				// local is never a safe dependency witness.
+				for (const d of stmt.declarations || []) collectPatternNames(d.id, localNames);
+				if (stmt.kind !== 'const') continue;
+				const decl = stmt.declarations?.length === 1 ? stmt.declarations[0] : null;
+				if (decl && decl.id?.type === 'Identifier' && decl.init) {
+					const init = unwrapTsExpr(decl.init);
+					candidates.push({ name: decl.id.name, init, stmt, guards: [...guards] });
+				}
+				continue;
+			}
+			if (stmt.type === 'IfStatement') {
+				const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+				if (stmt.consequent?.type === 'BlockStatement') {
+					collectCandidates(stmt.consequent.body, [...guards, stmt.test]);
+				}
+				if (stmt.alternate?.type === 'BlockStatement') {
+					collectCandidates(stmt.alternate.body, [...guards, not(stmt.test)]);
+				}
+				continue;
+			}
+			if (stmt.type === 'BlockStatement') collectCandidates(stmt.body, guards);
+		}
+	}
+
+	function rewriteStatements(list) {
+		return list.map((stmt) => {
+			if (!stmt || typeof stmt !== 'object') return stmt;
+			const memoCall = rewrites.get(stmt);
+			if (memoCall !== undefined) {
+				return { ...stmt, declarations: [{ ...stmt.declarations[0], init: memoCall }] };
+			}
+			if (stmt.type === 'IfStatement') {
+				return {
+					...stmt,
+					consequent:
+						stmt.consequent?.type === 'BlockStatement'
+							? { ...stmt.consequent, body: rewriteStatements(stmt.consequent.body) }
+							: stmt.consequent,
+					alternate:
+						stmt.alternate?.type === 'BlockStatement'
+							? { ...stmt.alternate, body: rewriteStatements(stmt.alternate.body) }
+							: stmt.alternate,
+				};
+			}
+			if (stmt.type === 'BlockStatement') return { ...stmt, body: rewriteStatements(stmt.body) };
+			return stmt;
+		});
+	}
+}
+
+// Deep scan (nested functions and render-tree nodes included — a consumer
+// anywhere makes stability load-bearing) for `use(<arg>)` arguments' free
+// identifier roots.
+function collectUseArgumentRoots(root, ctx, into) {
+	walk(root);
+
+	function walk(n) {
+		if (n == null || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const child of n) walk(child);
+			return;
+		}
+		if (
+			n.type === 'CallExpression' &&
+			n.callee?.type === 'Identifier' &&
+			(n.callee.name === 'use' ||
+				n._octaneImportedHook === 'use' ||
+				ctx?._parallelUseAliases?.has(n.callee.name) === true) &&
+			n.arguments?.length >= 1
+		) {
+			for (const free of collectFreeIdentifiers(n.arguments[0], [])) into.add(free);
+		}
+		for (const key in n) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
+			walk(n[key]);
+		}
 	}
 }
 
@@ -9233,6 +9543,503 @@ function markHookSlotLocality(root, enabled) {
 		}
 	};
 	walk(root, 0);
+}
+
+// ===========================================================================
+// Inline hook-memo tier (production client compile — docs/decallback-memo.md)
+// ===========================================================================
+//
+// De-callbacks `const x = useMemo(fn, deps)` / `const x = useCallback(fn,
+// deps)` declarations in proven render-scope bodies: instead of allocating an
+// arrow + a deps array every render and paying a hooks-map lookup, each site
+// becomes an inline region over a per-body flat cell array stored as a
+// non-index property on `__s.slots` (`_k$N`, the same trick as autoMemo's
+// `_m$N` — named properties don't disturb the slots array's packed elements
+// kind). Layout per site: [initFlag, dep0..depK-1, value].
+//
+// Unlike the autoMemo region cache this one publishes IMMEDIATELY (no
+// copy-on-write, no commit swap): the runtime hooks map these regions replace
+// also publishes mid-render, and values must survive a later suspension in the
+// same body — a user-authored `useMemo(() => fetch(id), [id])` must keep its
+// promise identity across replay attempts. Publish order preserves the
+// runtime's throw contract: the value cell is written first and the dep cells
+// + init flag only after, so a throwing compute leaves the previous entry
+// fully usable (old deps AND old value).
+//
+// Dependency compares are Object.is — byte-for-byte React/`depsChanged`
+// semantics (NaN, ±0) in both compile modes.
+//
+// Numeric-slot authored memos are unaddressable by the parallel-use warm
+// system (warm caches key by globally composable Symbols only), so dropping
+// their recordRealWarmMemo/adoptWarmValue interaction is observably
+// equivalent. Parallel-use creations themselves (Symbol slots) are NOT
+// handled here — they must stay visible in scope.hooks for warm adoption and
+// get their own closure-free lowering.
+//
+// Kept on the runtime-callback path (correctness first): dev/HMR/profile
+// compiles, server mode, custom-hook-context bodies (no localHookSlots
+// proof), non-declaration positions, multi-declarator/destructured
+// declarations, deps that aren't a literal array (identifier/spread/elision),
+// omitted-deps calls inference declined, positional-deps factories
+// (params.length > 0), async/generator factories, factories containing
+// hook-shaped calls, and block bodies with own-scope `var`/function
+// declarations (their hoisting would leak into the component body).
+
+function hookMemoNames(ctx) {
+	let names = ctx.currentHookMemoNames;
+	if (names === null) {
+		ctx.currentHookMemoNames = names = {
+			cache: allocCompilerName(ctx, '__hk'),
+			result: allocCompilerName(ctx, '__hkr'),
+			label: allocCompilerName(ctx, '__hkl'),
+			temps: [],
+		};
+	}
+	return names;
+}
+
+function hookMemoTemp(ctx, index) {
+	const names = hookMemoNames(ctx);
+	while (names.temps.length <= index) {
+		names.temps.push(allocCompilerName(ctx, `__hkd${names.temps.length}`));
+	}
+	return names.temps[index];
+}
+
+// Hook-shaped call anywhere inside (including nested functions) — mirrors the
+// conservative gate of the parallel-use pipeline: a consumed factory must
+// never carry a call whose slot/occurrence bookkeeping belongs to the render
+// pass, and `use[A-Z]` names are reserved for hooks by convention.
+function containsHookShapedCall(root) {
+	let found = false;
+	walk(root);
+	return found;
+
+	function walk(n) {
+		if (found || n == null || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const child of n) walk(child);
+			return;
+		}
+		if (n.type === 'CallExpression') {
+			if (
+				typeof n._octaneImportedHook === 'string' ||
+				typeof n._octaneHookRuntimeImportedHook === 'string'
+			) {
+				found = true;
+				return;
+			}
+			const callee = unwrapTsExpr(n.callee);
+			if (
+				callee?.type === 'Identifier' &&
+				(callee.name === 'use' || /^use[A-Z]/.test(callee.name))
+			) {
+				found = true;
+				return;
+			}
+			if (
+				callee?.type === 'MemberExpression' &&
+				!callee.computed &&
+				callee.property?.type === 'Identifier' &&
+				(callee.property.name === 'use' || /^use[A-Z]/.test(callee.property.name))
+			) {
+				found = true;
+				return;
+			}
+		}
+		for (const key in n) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
+			walk(n[key]);
+		}
+	}
+}
+
+// Own-scope hazards for inlining a block body into the component function:
+// `var` hoists out of the inserted block and a FunctionDeclaration hoists
+// within it differently than within its original function scope.
+function blockBodyInlineSafe(body) {
+	let safe = true;
+	walk(body);
+	return safe;
+
+	function walk(n) {
+		if (!safe || n == null || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const child of n) walk(child);
+			return;
+		}
+		if (n.type === 'FunctionDeclaration') {
+			safe = false;
+			return;
+		}
+		if (FN_TYPES.has(n.type)) return;
+		if (n.type === 'VariableDeclaration' && n.kind === 'var') {
+			safe = false;
+			return;
+		}
+		for (const key in n) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
+			walk(n[key]);
+		}
+	}
+}
+
+// Rewrite the factory block body's OWN-scope `return` statements into
+// result-assign + labeled break so early returns survive inlining. Nested
+// functions keep their returns.
+function replaceOwnReturns(node, names) {
+	return walk(node);
+
+	function walk(n) {
+		if (n == null || typeof n !== 'object') return n;
+		if (Array.isArray(n)) return n.map(walk);
+		if (!n.type) return n;
+		if (FN_TYPES.has(n.type)) return n;
+		if (n.type === 'ReturnStatement') {
+			return {
+				type: 'BlockStatement',
+				body: [
+					hkExprStmt(
+						hkAssign(
+							{ type: 'Identifier', name: names.result },
+							n.argument ?? { type: 'Identifier', name: 'undefined' },
+						),
+					),
+					{ type: 'BreakStatement', label: { type: 'Identifier', name: names.label } },
+				],
+			};
+		}
+		const out = {};
+		for (const key in n) {
+			const value = n[key];
+			out[key] = value !== null && typeof value === 'object' && key !== 'loc' ? walk(value) : value;
+		}
+		return out;
+	}
+}
+
+function hkNumLit(value) {
+	return { type: 'Literal', value, raw: String(value) };
+}
+
+function hkAssign(left, right) {
+	return { type: 'AssignmentExpression', operator: '=', left, right };
+}
+
+function hkExprStmt(expression) {
+	return { type: 'ExpressionStatement', expression };
+}
+
+function hkObjectIs(a, b) {
+	return {
+		type: 'CallExpression',
+		callee: {
+			type: 'MemberExpression',
+			object: { type: 'Identifier', name: 'Object' },
+			property: { type: 'Identifier', name: 'is' },
+			computed: false,
+			optional: false,
+		},
+		arguments: [a, b],
+		optional: false,
+	};
+}
+
+// `const x = useMemo(fn, deps)` / `useCallback(fn, deps)` with trustworthy
+// hook provenance (same rules as rewriteHookCalls' isBuiltin) at declaration
+// statement position. Returns null for every shape the inline tier declines.
+function authoredHookMemoOf(stmt) {
+	if (stmt.type !== 'VariableDeclaration' || stmt.declarations?.length !== 1) return null;
+	const decl = stmt.declarations[0];
+	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return null;
+	const call = unwrapTsExpr(decl.init);
+	if (call?.type !== 'CallExpression' || call.optional) return null;
+	const callee = call.callee;
+	if (callee?.type !== 'Identifier') return null;
+	const imported = call._octaneImportedHook ?? call._octaneHookRuntimeImportedHook;
+	const name = imported ?? callee.name;
+	if (name !== 'useMemo' && name !== 'useCallback') return null;
+	if (
+		callee._octaneGenerated !== true &&
+		imported === undefined &&
+		call._octaneUnboundCallee !== true
+	) {
+		return null;
+	}
+	if (call.arguments.length !== 2) return null;
+	if (call.arguments.some((a) => a.type === 'SpreadElement')) return null;
+	const fn = unwrapTsExpr(call.arguments[0]);
+	if (fn?.type !== 'ArrowFunctionExpression' && fn?.type !== 'FunctionExpression') return null;
+	const depsNode = unwrapTsExpr(call.arguments[1]);
+	let deps = null;
+	if (depsNode?.type === 'ArrayExpression') {
+		const elements = depsNode.elements || [];
+		for (const el of elements) {
+			if (el == null || el.type === 'SpreadElement') return null;
+		}
+		deps = elements;
+	} else if (!(depsNode?.type === 'Literal' && depsNode.value === null)) {
+		return null;
+	}
+	if (name === 'useMemo') {
+		if (fn.async || fn.generator || (fn.params?.length ?? 0) > 0) return null;
+		if (containsHookShapedCall(fn.body)) return null;
+		if (fn.body.type === 'BlockStatement' && !blockBodyInlineSafe(fn.body)) return null;
+	}
+	return { name, decl, kind: stmt.kind, fn, deps };
+}
+
+// Compute statements writing the site's result into `target` (an expression
+// node builder result). Expression-body useMemo assigns directly; block bodies
+// route through the per-body result local + label so early returns work; a
+// useCallback caches the factory itself.
+function hookMemoComputeStatements(entry, ctx, target) {
+	const { name, fn } = entry;
+	if (name === 'useCallback') return [hkExprStmt(hkAssign(target, fn))];
+	if (fn.body.type !== 'BlockStatement') return [hkExprStmt(hkAssign(target, fn.body))];
+	const names = hookMemoNames(ctx);
+	return [
+		{
+			type: 'VariableDeclaration',
+			kind: 'let',
+			declarations: [
+				{
+					type: 'VariableDeclarator',
+					id: { type: 'Identifier', name: names.result },
+					init: null,
+				},
+			],
+		},
+		{
+			type: 'LabeledStatement',
+			label: { type: 'Identifier', name: names.label },
+			body: replaceOwnReturns(fn.body, names),
+		},
+		hkExprStmt(hkAssign(target, { type: 'Identifier', name: names.result })),
+	];
+}
+
+// Lower a Pass-B-hoisted parallel-use creation (`const __pu$N =
+// _$useMemo(() => make(...), [deps], _h$X)`, stamped `_octanePuMemo`) to the
+// closure-free take/publish ABI. The creation's scope.hooks entry (Symbol
+// slot) is preserved by the runtime helpers, so warm adoption, episode
+// stamping, and activeMemoMatch dedup are untouched — only the per-render
+// arrow + deps-array allocations disappear. Above four dependencies the
+// runtime `_$useMemo` form is kept (no arity helper; the shape is rare).
+function lowerPuMemoDecl(stmt, ctx) {
+	if (stmt.type !== 'VariableDeclaration' || stmt.declarations?.length !== 1) return null;
+	const decl = stmt.declarations[0];
+	if (!decl || decl.id?.type !== 'Identifier') return null;
+	const call = decl.init;
+	if (call == null || call._octanePuMemo !== true) return null;
+	const [arrow, depsArr, slotId] = call.arguments;
+	const deps = depsArr.elements || [];
+	if (deps.length > 4) {
+		// Surviving runtime-form site: register the deferred _$useMemo import
+		// (see rewriteUseCall's deferred registration).
+		requireRuntimeForContext(ctx, 'useMemo');
+		return null;
+	}
+	const takeAlias = requireRuntimeForContext(ctx, `puTake${deps.length}`);
+	const pubAlias = requireRuntimeForContext(ctx, 'puPub');
+	const missAlias = requireRuntimeForContext(ctx, 'puMiss');
+	const temp = (i) => ({ type: 'Identifier', name: hookMemoTemp(ctx, i) });
+	const body = [];
+	if (deps.length > 0) {
+		body.push({
+			type: 'VariableDeclaration',
+			kind: 'const',
+			declarations: deps.map((dep, i) => ({
+				type: 'VariableDeclarator',
+				id: temp(i),
+				init: dep,
+			})),
+		});
+	}
+	body.push(
+		hkExprStmt(
+			hkAssign(
+				{ ...decl.id },
+				{
+					type: 'CallExpression',
+					callee: { type: 'Identifier', name: takeAlias },
+					arguments: [{ ...slotId }, ...deps.map((_, i) => temp(i))],
+					optional: false,
+				},
+			),
+		),
+	);
+	body.push({
+		type: 'IfStatement',
+		test: {
+			type: 'BinaryExpression',
+			operator: '===',
+			left: { ...decl.id },
+			right: { type: 'Identifier', name: missAlias },
+		},
+		consequent: hkExprStmt(
+			hkAssign(
+				{ ...decl.id },
+				{
+					type: 'CallExpression',
+					callee: { type: 'Identifier', name: pubAlias },
+					arguments: [{ ...slotId }, arrow.body, ...deps.map((_, i) => temp(i))],
+					optional: false,
+				},
+			),
+		),
+		alternate: null,
+	});
+	return [
+		{
+			type: 'VariableDeclaration',
+			kind: 'let',
+			declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
+		},
+		{ type: 'BlockStatement', body },
+	];
+}
+
+function lowerAuthoredHookMemo(stmt, ctx) {
+	const entry = authoredHookMemoOf(stmt);
+	if (entry === null) return null;
+	const { name, decl, kind, fn, deps } = entry;
+	// Explicit `null` deps: recompute every render — no cache at all. A
+	// useCallback degenerates to the factory itself; a useMemo evaluates
+	// inline (via the shared block machinery when the body is a block).
+	if (deps === null) {
+		if (name === 'useCallback' || fn.body.type !== 'BlockStatement') {
+			const init = name === 'useCallback' ? fn : fn.body;
+			return [{ ...stmt, declarations: [{ ...decl, init }] }];
+		}
+		return [
+			{
+				type: 'VariableDeclaration',
+				kind: 'let',
+				declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
+			},
+			{
+				type: 'BlockStatement',
+				body: [...hookMemoComputeStatements(entry, ctx, { ...decl.id })],
+			},
+		];
+	}
+	const names = hookMemoNames(ctx);
+	const base = ctx.currentHookMemoOffset;
+	const k = deps.length;
+	ctx.currentHookMemoOffset = base + k + 2;
+	const cellRef = (i) => ({
+		type: 'MemberExpression',
+		object: { type: 'Identifier', name: names.cache },
+		property: hkNumLit(i),
+		computed: true,
+		optional: false,
+	});
+	const valueCell = () => cellRef(base + 1 + k);
+	const body = [];
+	if (k > 0) {
+		body.push({
+			type: 'VariableDeclaration',
+			kind: 'const',
+			declarations: deps.map((dep, i) => ({
+				type: 'VariableDeclarator',
+				id: { type: 'Identifier', name: hookMemoTemp(ctx, i) },
+				init: dep,
+			})),
+		});
+	}
+	let missTest = {
+		type: 'BinaryExpression',
+		operator: '!==',
+		left: cellRef(base),
+		right: { type: 'Literal', value: true, raw: 'true' },
+	};
+	for (let i = 0; i < k; i++) {
+		missTest = {
+			type: 'LogicalExpression',
+			operator: '||',
+			left: missTest,
+			right: {
+				type: 'UnaryExpression',
+				operator: '!',
+				prefix: true,
+				argument: hkObjectIs(cellRef(base + 1 + i), {
+					type: 'Identifier',
+					name: hookMemoTemp(ctx, i),
+				}),
+			},
+		};
+	}
+	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
+	for (let i = 0; i < k; i++) {
+		missBody.push(
+			hkExprStmt(
+				hkAssign(cellRef(base + 1 + i), { type: 'Identifier', name: hookMemoTemp(ctx, i) }),
+			),
+		);
+	}
+	missBody.push(hkExprStmt(hkAssign(cellRef(base), { type: 'Literal', value: true, raw: 'true' })));
+	body.push({
+		type: 'IfStatement',
+		test: missTest,
+		consequent: { type: 'BlockStatement', body: missBody },
+		alternate: null,
+	});
+	body.push(hkExprStmt(hkAssign({ ...decl.id }, valueCell())));
+	return [
+		{
+			type: 'VariableDeclaration',
+			kind: 'let',
+			declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
+		},
+		{ type: 'BlockStatement', body },
+	];
+}
+
+// The statement walker: recurses into conditional blocks (conditional hooks
+// are supported — each site's init-flag cell handles a not-yet-run region) but
+// never into loops or nested functions, mirroring parallelUseMemoizePass.
+// `authoredTier` is the localHookSlots proof: only bodies whose base hooks
+// would get numeric slots inline authored useMemo/useCallback.
+function inlineHookMemoPass(stmts, ctx, authoredTier) {
+	const out = [];
+	for (const stmt of stmts) {
+		for (const lowered of walkStmt(stmt)) out.push(lowered);
+	}
+	return out;
+
+	function walkStmt(stmt) {
+		if (!stmt || typeof stmt !== 'object' || !stmt.type) return [stmt];
+		if (LOOP_TYPES.has(stmt.type) || FN_TYPES.has(stmt.type)) return [stmt];
+		if (stmt.type === 'IfStatement') {
+			// `else if` chains keep their sites reachable: an IfStatement
+			// alternate re-enters walkStmt (always a 1-element array).
+			const alternate =
+				stmt.alternate == null
+					? stmt.alternate
+					: stmt.alternate.type === 'IfStatement'
+						? walkStmt(stmt.alternate)[0]
+						: walkBlock(stmt.alternate);
+			return [{ ...stmt, consequent: walkBlock(stmt.consequent), alternate }];
+		}
+		if (stmt.type === 'BlockStatement') {
+			return [{ ...stmt, body: inlineHookMemoPass(stmt.body, ctx, authoredTier) }];
+		}
+		const pu = lowerPuMemoDecl(stmt, ctx);
+		if (pu !== null) return pu;
+		if (authoredTier) {
+			const lowered = lowerAuthoredHookMemo(stmt, ctx);
+			if (lowered !== null) return lowered;
+		}
+		return [stmt];
+	}
+
+	function walkBlock(node) {
+		// A guarded single statement can't be a lexical declaration; only real
+		// blocks can contain sites.
+		if (!node || node.type !== 'BlockStatement') return node;
+		return { ...node, body: inlineHookMemoPass(node.body, ctx, authoredTier) };
+	}
 }
 
 function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
