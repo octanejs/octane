@@ -67,9 +67,10 @@ function signature(html) {
 }
 
 const { octane, react, stop } = await serveBoth({ BENCH_DEFER_MS: '40' });
-const octaneMinimal = await startFlavor('octane-minimal', { BENCH_DEFER_MS: '40' });
 let failures = 0;
+let octaneMinimal;
 try {
+	octaneMinimal = await startFlavor('octane-minimal', { BENCH_DEFER_MS: '40' });
 	for (const route of ROUTES) {
 		const [octaneHtml, minimalHtml, reactHtml] = await Promise.all(
 			[octane, octaneMinimal, react].map((flavor) =>
@@ -106,7 +107,7 @@ try {
 	}
 } finally {
 	stop();
-	octaneMinimal.stop();
+	octaneMinimal?.stop();
 }
 if (failures > 0) {
 	console.error(`${failures} route(s) diverged`);
