@@ -1,5 +1,7 @@
 import { createRequire } from 'node:module';
-const { chromium } = createRequire(process.cwd() + '/package.json')('@playwright/test');
+// Resolve Playwright relative to THIS file, not the invoking cwd, so the probe
+// runs from anywhere in the repo (mirrors remount-dev-probe.mjs).
+const { chromium } = createRequire(new URL('./package.json', import.meta.url))('@playwright/test');
 import { serveBoth } from './serve-both.mjs';
 
 const { octane, react, stop } = await serveBoth({ BENCH_DEFER_MS: '30' });
