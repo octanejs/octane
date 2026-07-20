@@ -36,6 +36,8 @@ packages:
   - benchmarks/weather-app/*
   - benchmarks/chat-stream
   - benchmarks/chat-stream/*
+  - benchmarks/tanstack-start
+  - benchmarks/tanstack-start/*
   - playground/*
   - examples/*
   - website
