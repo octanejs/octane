@@ -1,4 +1,4 @@
-import type { Register } from '@octanejs/tanstack-router';
+import type { Register } from '@octanejs/tanstack-start';
 import type { RequestHandler } from './server.js';
 
 export type ServerEntry = {
