@@ -1,0 +1,143 @@
+---
+title: DevTools
+---
+
+<div className="doc-hero">
+	<p className="doc-eyebrow">See the running app</p>
+	<h1>DevTools</h1>
+	<p className="doc-lede">
+		{
+			'An in-page panel with the live component tree, per-hook state, render performance, and one-click agent prompts — compiled entirely away outside the dev server you opt into.'
+		}
+	</p>
+</div>
+
+Octane DevTools is a dev-server specialization. The compiler keeps component
+and hook source identity, the runtime installs a reflection bridge at
+`globalThis.__OCTANE_DEVTOOLS__`, and the `@octanejs/devtools` panel — itself
+an Octane app in an isolated shadow-DOM root — renders what the bridge sees.
+Everything is behind an explicit opt-in, and builds never contain any of it.
+
+<h2 id="enable-devtools">Enable devtools</h2>
+
+Devtools is **off by default**. Set `devtools: true` on the Vite integration
+and install the panel package:
+
+```bash
+pnpm add -D @octanejs/devtools
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { octane } from '@octanejs/vite-plugin';
+
+export default defineConfig({
+	plugins: [octane({ devtools: true })],
+});
+```
+
+The flag only takes effect in serve mode. A production or preview build made
+from the same config compiles the bridge, its metadata, and every runtime
+instrumentation branch away — output is byte-identical to a build that never
+mentioned devtools. Enabling devtools implies profiling metadata in dev, so
+the Performance tab and Chrome custom tracks work without extra flags.
+
+Apps that use the low-level compiler plugin directly (no metaframework)
+compose the standalone dev-server plugin themselves — the compiler flag emits
+the runtime bridge, `octaneDevtools()` injects the panel and serves the
+snapshot endpoint:
+
+```ts
+// vite.config.ts — compiler-only setup
+import { defineConfig } from 'vite';
+import { octane } from 'octane/compiler/vite';
+import { octaneDevtools } from '@octanejs/devtools/vite';
+
+export default defineConfig({
+	plugins: [octane({ devtools: true }), octaneDevtools()],
+});
+```
+
+`@octanejs/vite-plugin` composes exactly this plugin for you, so its single
+`devtools: true` remains the recommended path.
+
+<h2 id="the-panel">The panel</h2>
+
+A floating **⚡ Octane** button appears in the corner of the page and toggles
+the docked panel:
+
+- **Components** — the live tree (components, `@if`/`@for`/`@switch` blocks,
+  portals, keyed list items), searchable, with hover-highlight over the real
+  DOM. Selecting a component shows its live props, its hooks in call order —
+  kind, current value, dependencies, cleanup state, and the exact authored
+  `file:line:column` — plus click-to-open-in-editor via the Vite dev server.
+  `useDebugValue` calls in custom hooks light up here too: each record shows
+  its owning hook, source position, and value, and the optional `format`
+  function runs only when inspected, exactly as in React.
+- **Performance** — profiler-backed render counts, bailouts, self and
+  inclusive times, schedule-to-render delay, and dominant render causes per
+  component; export a Chrome trace or clear and re-record. Boot (mount-phase)
+  timings appear as each component's first attempt.
+- **Timeline** — recent runtime events: commits, HMR swaps, root changes, and
+  (when enabled) per-effect timings with phase and duration.
+- **Settings** — recording toggles, effect telemetry, and full-snapshot
+  export.
+
+<h2 id="panel-plugins">Panel plugins</h2>
+
+Libraries and applications can add their own tabs. A plugin is an id, a tab
+label, and an Octane component that receives the live bridge; registration is
+observable, so tabs registered after the panel mounted still appear, and
+re-registering an id replaces it in place (HMR-friendly):
+
+```ts
+import { registerDevtoolsPanelPlugin } from '@octanejs/devtools';
+import { QueryCachePanel } from './QueryCachePanel.tsrx';
+
+const unregister = registerDevtoolsPanelPlugin({
+	id: 'tanstack-query',
+	label: 'Query',
+	component: QueryCachePanel, // receives { hook: OctaneDevtools }
+});
+```
+
+The component renders inside the panel's shadow root while its tab is active
+and can use the bridge (`hook.getTree()`, `hook.subscribe(…)`, …) alongside
+its own library state. This is the intended integration point for
+`@octanejs/*` binding devtools.
+
+<h2 id="agent-prompts">Agent prompts</h2>
+
+Every inspector and the Performance tab carry **Copy agent prompt** actions.
+The panel snapshots the live tree, state, profiler summary, and recent
+events, and generates a self-contained markdown prompt: the selected
+component with its authored source position, its hook state, the render-cause
+evidence, and the Octane conventions an agent must respect (slot-keyed hooks,
+inferred dependency arrays, native `onInput` semantics). Describe the issue
+in a sentence, copy, and paste it to your agent — the prompt carries
+everything else.
+
+<h2 id="agent-access">Direct agent access (MCP)</h2>
+
+With devtools enabled, the dev server exposes the same data over HTTP:
+
+```bash
+curl http://localhost:5173/__octane_devtools/snapshot
+```
+
+`@octanejs/mcp-server` wraps this as the `octane_devtools_snapshot` tool, so
+an agent connected to the MCP server can read the running app's component
+tree, live hook state, and performance summary without any copy-paste. The
+snapshot is served by the connected browser tab over the dev websocket; open
+the app in a browser first.
+
+<h2 id="cost-and-privacy">Cost and privacy</h2>
+
+Without the opt-in, compiled output carries no devtools branches — the
+reserved `__OCTANE_DEVTOOLS_ENABLED__` constant erases them, exactly like
+profiling's. With devtools on, steady-state overhead is one recorded event
+per commit; per-effect timing stays off until the Timeline enables it, and
+tree walks run only when the panel is open or a snapshot is requested. Live
+props and hook values never leave the page unless you copy a prompt or
+request a snapshot; serialized values are depth- and size-bounded.

@@ -1,0 +1,59 @@
+{
+  "name": "@octanejs/devtools",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "In-page developer tools for the octane renderer — component tree, live hook state, render performance, and agent-ready diagnostics over the octane/devtools bridge.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/octane-devtools"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./panel": "./src/panel/mount.ts",
+    "./vite": {
+      "types": "./src/vite.d.ts",
+      "default": "./src/vite.js"
+    }
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "octane": "workspace:*",
+    "vite": "^8.0.16"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@tsrx/react": "catalog:default",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "react": "catalog:default",
+    "react-dom": "catalog:default",
+    "vite": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}
