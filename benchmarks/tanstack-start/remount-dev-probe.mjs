@@ -1,11 +1,13 @@
 import { createRequire } from 'node:module';
-const { chromium } = createRequire(
-	'/Users/trueadm/Projects/octane-tanstack-bench/benchmarks/tanstack-start/package.json',
-)('@playwright/test');
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { chromium } = createRequire(path.join(__dirname, 'package.json'))('@playwright/test');
 import { spawn } from 'node:child_process';
 
 const child = spawn('pnpm', ['dev', '--port', '4177'], {
-	cwd: '/Users/trueadm/Projects/octane-tanstack-bench/benchmarks/tanstack-start/octane',
+	cwd: path.join(__dirname, 'octane'),
 	env: { ...process.env, BENCH_DEFER_MS: '30' },
 	stdio: 'ignore',
 	detached: true,

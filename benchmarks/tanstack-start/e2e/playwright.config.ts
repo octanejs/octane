@@ -1,27 +1,12 @@
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'node:net';
 import { defineConfig, devices } from '@playwright/test';
+// @ts-expect-error untyped harness helper shared with compare.mjs/run tooling
+import { getFreePort } from '../serve-both.mjs';
 
 // One spec, two projects: identical journeys must pass against BOTH flavors'
 // production servers. OS-assigned loopback ports (allocated here, handed to
 // the webServer commands) keep the suite collision-free beside other suites.
 const root = fileURLToPath(new URL('..', import.meta.url));
-
-function getFreePort(): Promise<number> {
-	return new Promise((resolve, reject) => {
-		const probe = createServer();
-		probe.once('error', reject);
-		probe.listen(0, '127.0.0.1', () => {
-			const address = probe.address();
-			if (address === null || typeof address === 'string') {
-				probe.close();
-				reject(new Error('no port'));
-				return;
-			}
-			probe.close((error) => (error ? reject(error) : resolve(address.port)));
-		});
-	});
-}
 
 const octanePort = Number(process.env.BENCH_OCTANE_PORT || (await getFreePort()));
 const reactPort = Number(process.env.BENCH_REACT_PORT || (await getFreePort()));
