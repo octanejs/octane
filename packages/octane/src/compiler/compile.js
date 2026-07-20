@@ -5510,7 +5510,7 @@ function compileServerComponent(node, ctx) {
 	// agree, or the same route module renders on one side and crashes on the other.
 	const ssrSourceBeforeNode =
 		typeof node.start === 'number' && typeof ctx.mapSource === 'string'
-			? ctx.mapSource.slice(0, node.start).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')
+			? stripNonReferenceText(ctx.mapSource.slice(0, node.start))
 			: '';
 	if (
 		ssrSourceBeforeNode !== '' &&
@@ -7173,6 +7173,19 @@ function applyCssScoping(componentNode, ctx) {
 	return cssHash;
 }
 
+// Strip comments and plain string literals so prose or route paths cannot
+// register as a component reference during the early-reference scan below.
+// Template literals are deliberately LEFT intact: `${Name}` interpolations are
+// real references, and missing one would reintroduce the TDZ crash this
+// hoisting exists to prevent — the residual cost of a name inside template
+// text is only the (correct, merely less tree-shakeable) hoisted form.
+function stripNonReferenceText(source) {
+	return source.replace(
+		/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+		' ',
+	);
+}
+
 // Attach definition metadata through the component's initializer rather than a
 // free-standing module mutation. The call-site annotation is valid because every
 // caller passes a freshly-created compiler function that cannot yet be observed;
@@ -7263,9 +7276,7 @@ function compileComponent(node, ctx, options) {
 	// PURE-initializer form, which bundlers can drop when unused.
 	const sourceBeforeNode =
 		typeof node.start === 'number' && typeof ctx.mapSource === 'string'
-			? // Comments routinely mention component names (docblocks above the
-				// declaration) — strip them so prose can't force the hoisted form.
-				ctx.mapSource.slice(0, node.start).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')
+			? stripNonReferenceText(ctx.mapSource.slice(0, node.start))
 			: '';
 	const referencedAboveDeclaration =
 		sourceBeforeNode !== '' &&
@@ -7289,8 +7300,16 @@ function compileComponent(node, ctx, options) {
 		}
 		if (componentInfo?.singleRoot === true) {
 			ctx.runtimeNeeded.add('__s');
+			// Stamp the RAW function so the pre-declaration capture sees the mark…
 			statements.push(`${guard}_$__s(${name});`);
-			componentInfo.singleRootInitialized = true;
+			// …and when an HMR rebind below replaces the binding with the wrapper,
+			// leave singleRootInitialized unset so the module-tail fallback stamps
+			// the WRAPPER too (hmr() does not forward $$singleRoot). The tail
+			// stamp is dev-only, and route code-splitting runs build-mode only,
+			// so the unguarded tail assignment never meets an extracted binding.
+			if (!(hmrWrap && isExported)) {
+				componentInfo.singleRootInitialized = true;
+			}
 		}
 		if (hmrWrap && isExported) {
 			// `_$hmr` returns a stable wrapper with a DIFFERENT identity; rebinding
