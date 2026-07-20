@@ -28,6 +28,7 @@ import {
 export { discoverOctaneSourceDependencies };
 
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
+const DEVTOOLS_DEFINE = '__OCTANE_DEVTOOLS_ENABLED__';
 const VOID_EXPORTS_META = 'octane:void-component-exports';
 const CLIENT_REFERENCE_META = 'octane:client-reference';
 
@@ -133,20 +134,28 @@ async function loadClientOnlyImports(context, compiler, code, importer) {
 	);
 }
 
-function assertProfilingDefineAvailable(definitions, enabled) {
+function assertReservedDefineAvailable(definitions, define, enabled, option) {
 	if (
 		definitions === null ||
 		typeof definitions !== 'object' ||
-		!Object.prototype.hasOwnProperty.call(definitions, PROFILE_DEFINE)
+		!Object.prototype.hasOwnProperty.call(definitions, define)
 	) {
 		return;
 	}
-	const value = definitions[PROFILE_DEFINE];
+	const value = definitions[define];
 	if (value !== enabled && value !== JSON.stringify(enabled)) {
 		throw new TypeError(
-			`octane/compiler/vite: ${PROFILE_DEFINE} is reserved by Octane and conflicts with \`profile: ${enabled}\`. Remove the custom Vite define and configure profiling through octane().`,
+			`octane/compiler/vite: ${define} is reserved by Octane and conflicts with \`${option}: ${enabled}\`. Remove the custom Vite define and configure it through octane().`,
 		);
 	}
+}
+
+function assertProfilingDefineAvailable(definitions, enabled) {
+	assertReservedDefineAvailable(definitions, PROFILE_DEFINE, enabled, 'profile');
+}
+
+function assertDevtoolsDefineAvailable(definitions, enabled) {
+	assertReservedDefineAvailable(definitions, DEVTOOLS_DEFINE, enabled, 'devtools');
 }
 
 export function octane(options = {}) {
@@ -163,7 +172,15 @@ export function octane(options = {}) {
 	let emitClientReferenceManifest = options.ssr !== true;
 	// Profiling is intentionally independent of serve/HMR. `ssr: true` is the
 	// adapter's explicit server-only override, where client profiling must stay off.
-	const profileEnabled = options.profile === true && options.ssr !== true;
+	const profileRequested = options.profile === true && options.ssr !== true;
+	// Devtools is a dev-server-only opt-in: it resolves against the command in
+	// config() and stays off (define false, no metadata) for every build, so a
+	// shared `octane({ devtools: true })` config ships clean production output.
+	const devtoolsRequested = options.devtools === true && options.ssr !== true;
+	let devtoolsEnabled = false;
+	// Devtools implies profile metadata + recording: the inspector names
+	// components/hooks and reads render timings through the profiler registries.
+	let profileEnabled = profileRequested;
 	let projectRoot = nodePath.resolve(process.cwd());
 	// The mixed-toolchain ownership gate: with `requireDirective: true`, a
 	// project `.tsrx` is Octane's by extension, and Octane compiles a project
@@ -200,8 +217,11 @@ export function octane(options = {}) {
 	return {
 		name: 'octane',
 		enforce: 'pre',
-		config(config) {
+		config(config, env) {
+			devtoolsEnabled = devtoolsRequested && env?.command === 'serve';
+			profileEnabled = profileRequested || devtoolsEnabled;
 			assertProfilingDefineAvailable(config.define, profileEnabled);
+			assertDevtoolsDefineAvailable(config.define, devtoolsEnabled);
 			resetCompiler(config.root ?? process.cwd());
 			const discovery = compiler.discoverSourceDependencies();
 			const sourceDependencies = discovery.packages;
@@ -214,6 +234,7 @@ export function octane(options = {}) {
 				// production optimizer never has to preserve a runtime feature check.
 				define: {
 					__OCTANE_PROFILE_ENABLED__: JSON.stringify(profileEnabled),
+					__OCTANE_DEVTOOLS_ENABLED__: JSON.stringify(devtoolsEnabled),
 				},
 				// Raw Octane dependencies must reach this plugin, never esbuild's dep
 				// prebundle or Node's SSR external loader. A raw package can also declare
@@ -238,6 +259,7 @@ export function octane(options = {}) {
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);
+			assertDevtoolsDefineAvailable(config.define, devtoolsEnabled);
 			if (realRoot(nodePath.resolve(config.root)) !== realRoot(projectRoot))
 				resetCompiler(config.root);
 			if (hmrEnabled === undefined) hmrEnabled = config.command === 'serve';

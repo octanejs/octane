@@ -136,6 +136,21 @@ export const docsMeta: DocMeta[] = [
 		],
 	},
 	{
+		slug: 'devtools',
+		title: 'DevTools',
+		description:
+			'Inspect the live component tree, hook state, and render performance in-page, with one-click agent prompts.',
+		group: 'Explore',
+		sections: [
+			{ id: 'enable-devtools', title: 'Enable devtools' },
+			{ id: 'the-panel', title: 'The panel' },
+			{ id: 'panel-plugins', title: 'Panel plugins' },
+			{ id: 'agent-prompts', title: 'Agent prompts' },
+			{ id: 'agent-access', title: 'Direct agent access (MCP)' },
+			{ id: 'cost-and-privacy', title: 'Cost and privacy' },
+		],
+	},
+	{
 		slug: 'bindings',
 		title: 'Bindings',
 		description: `Browse all ${BINDING_COUNT} Octane bindings for state, data, routing, UI, forms, and more.`,

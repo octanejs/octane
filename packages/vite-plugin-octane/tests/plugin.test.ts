@@ -10,6 +10,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { createServer } from 'vite';
 import type { RenderBuiltAssetUrl, UserConfig } from 'vite';
 import { octane, isViteOwnedUrl, resolveOctaneConfig, RenderRoute } from '../src/index.js';
+
+// octane() returns PluginOption[] (the devtools entry may be a promise);
+// these tests exercise the two leading concrete plugins' hooks directly.
+function octanePlugins(options?: Parameters<typeof octane>[0]): Record<string, any>[] {
+	return octane(options) as unknown as Record<string, any>[];
+}
 import { RESOLVED_ADAPTER_BROWSER_STUB_ID } from '../src/project-codegen.js';
 import { createClientAssetMap } from '../src/client-assets.js';
 import type { Component } from '@octanejs/vite-plugin';
@@ -151,7 +157,7 @@ describe('octane() plugin factory', () => {
 	});
 
 	it('forwards `exclude` to the bundled compiler (hook-slotting skip)', () => {
-		const [compiler] = octane({ exclude: ['/packages/tanstack-router/src/'] });
+		const [compiler] = octanePlugins({ exclude: ['/packages/tanstack-router/src/'] });
 		// Vite calls config() before transforms; pin the synthetic project root so
 		// linked paths outside it are correctly treated as external packages.
 		(compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
@@ -167,7 +173,7 @@ describe('octane() plugin factory', () => {
 	});
 
 	it('forwards inline renderer rules to the bundled compiler', () => {
-		const [compiler] = octane({
+		const [compiler] = octanePlugins({
 			hmr: false,
 			renderers: {
 				registry: { object: 'octane/universal' },
@@ -235,7 +241,7 @@ export default { compiler: { renderers } };
 			);
 			const watchedRendererConfigPath = await realpath(rendererConfigPath);
 
-			const [compiler, meta] = octane({ hmr: false });
+			const [compiler, meta] = octanePlugins({ hmr: false });
 			await (compiler.config as (config: { root: string }) => unknown)({ root });
 			const transform = compiler.transform as (code: string, id: string) => { code: string };
 			const appConfigured = transform.call(
@@ -265,7 +271,7 @@ export default { compiler: { renderers } };
 			);
 			expect(restart).toHaveBeenCalledOnce();
 
-			const [inlineCompiler] = octane({
+			const [inlineCompiler] = octanePlugins({
 				hmr: false,
 				renderers: {
 					registry: { inline: 'octane/universal' },
@@ -287,7 +293,7 @@ export default { compiler: { renderers } };
 	});
 
 	it("keeps Vite's SPA default without app config and uses 'custom' for routed apps", async () => {
-		const [, meta] = octane();
+		const [, meta] = octanePlugins();
 		const config = meta.config as (
 			userConfig: object,
 			env: object,
@@ -337,7 +343,7 @@ export default { compiler: { renderers } };
 };
 `,
 			);
-			const [, meta] = octane();
+			const [, meta] = octanePlugins();
 			const config = meta.config as (
 				userConfig: UserConfig,
 				env: { command: 'build'; mode: string },
@@ -533,7 +539,7 @@ describe('resolveOctaneConfig', () => {
 });
 
 describe('server-only adapter browser stub', () => {
-	const [, meta] = octane();
+	const [, meta] = octanePlugins();
 	const resolveId = meta.resolveId as (
 		id: string,
 		importer?: string,

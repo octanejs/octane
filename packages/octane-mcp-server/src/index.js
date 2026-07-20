@@ -101,6 +101,7 @@ export function areaForPath(path) {
 	if (/^packages\/adapter-[^/]+\//.test(path)) return 'deploy-adapter';
 	if (path.startsWith('packages/octane-evals/')) return 'evals';
 	if (path.startsWith('packages/octane-mcp-server/')) return 'mcp-server';
+	if (path.startsWith('packages/octane-devtools/')) return 'devtools';
 	const packageMatch = path.match(/^packages\/([^/]+)\//);
 	if (packageMatch && KNOWN_BINDING_PACKAGE_DIRS.has(packageMatch[1])) {
 		return 'ecosystem-binding';
@@ -141,6 +142,11 @@ export function validationFor(paths, taskKind) {
 	if (areas.has('mcp-server')) {
 		commands.add(
 			'./node_modules/.bin/vitest run packages/octane-mcp-server --project octane-mcp-server',
+		);
+	}
+	if (areas.has('devtools')) {
+		commands.add(
+			'./node_modules/.bin/vitest run packages/octane-devtools/tests --project octane-devtools',
 		);
 	}
 	if (areas.has('evals')) {
@@ -468,6 +474,71 @@ function registerUserTools(server, repoRoot, repoMode) {
 		},
 		async () => text(JSON.stringify(KNOWN_BINDINGS, null, 2)),
 	);
+
+	server.registerTool(
+		'octane_devtools_snapshot',
+		{
+			title: 'Live Octane devtools snapshot',
+			description:
+				'Fetch the live component tree, hook state, render performance summary, and recent runtime events from a running Octane dev server started with octane({ devtools: true }) — the same data the in-page devtools panel shows, as JSON. Requires the app to be open in a browser connected to that dev server. Use this to diagnose live state and performance issues without asking the developer to copy anything.',
+			inputSchema: {
+				origin: z
+					.string()
+					.default('http://localhost:5173')
+					.describe('Dev server origin, e.g. http://localhost:5173.'),
+				includeState: z
+					.boolean()
+					.default(true)
+					.describe('Capture serialized props/hook values per component node.'),
+				maxDetailedNodes: z.number().int().positive().optional(),
+				eventLimit: z.number().int().nonnegative().optional(),
+				timeoutMs: z.number().int().positive().default(10_000),
+			},
+		},
+		async (input) => text(await fetchDevtoolsSnapshot(input)),
+	);
+}
+
+/**
+ * Fetch a live devtools snapshot from an Octane dev server's
+ * `/__octane_devtools/snapshot` relay. Always resolves to a JSON string —
+ * transport and HTTP failures become `{ error }` documents so agents get an
+ * actionable message instead of a thrown tool error.
+ */
+export async function fetchDevtoolsSnapshot({
+	origin = 'http://localhost:5173',
+	includeState = true,
+	maxDetailedNodes,
+	eventLimit,
+	timeoutMs = 10_000,
+} = {}) {
+	const url = new URL('/__octane_devtools/snapshot', origin);
+	if (includeState === false) url.searchParams.set('includeState', 'false');
+	if (maxDetailedNodes !== undefined) {
+		url.searchParams.set('maxDetailedNodes', String(maxDetailedNodes));
+	}
+	if (eventLimit !== undefined) url.searchParams.set('eventLimit', String(eventLimit));
+	let response;
+	try {
+		response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+	} catch (error) {
+		return JSON.stringify(
+			{
+				error: `Could not reach ${url.href}: ${error?.message ?? error}. Is the Octane dev server running with devtools: true?`,
+			},
+			null,
+			2,
+		);
+	}
+	const body = await response.text();
+	if (!response.ok) {
+		return JSON.stringify(
+			{ error: `Snapshot request failed (HTTP ${response.status}).`, detail: body },
+			null,
+			2,
+		);
+	}
+	return body;
 }
 
 function registerRepoTools(server, repoRoot) {

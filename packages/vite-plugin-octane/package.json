@@ -50,14 +50,21 @@
     "@ripple-ts/adapter": "catalog:default"
   },
   "peerDependencies": {
+    "@octanejs/devtools": "workspace:*",
     "octane": "workspace:*",
     "vite": "^8.0.16"
   },
   "devDependencies": {
+    "@octanejs/devtools": "workspace:*",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
     "playwright": "catalog:default",
     "type-fest": "catalog:default",
     "vite": "catalog:default"
+  },
+  "peerDependenciesMeta": {
+    "@octanejs/devtools": {
+      "optional": true
+    }
   }
 }

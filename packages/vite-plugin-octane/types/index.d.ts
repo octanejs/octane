@@ -1,4 +1,4 @@
-import type { Plugin, ViteDevServer } from 'vite';
+import type { Plugin, PluginOption, ViteDevServer } from 'vite';
 import type {
 	ConfigModuleRunner,
 	ExperimentalRendererConfigOptions,
@@ -14,6 +14,17 @@ export interface OctanePluginOptions {
 	hmr?: boolean;
 	/** Enable component profiling in client transforms. */
 	profile?: boolean;
+	/**
+	 * Enable Octane DevTools for this dev server: the compiler emits the
+	 * runtime bridge (`globalThis.__OCTANE_DEVTOOLS__`), and the standalone
+	 * `@octanejs/devtools/vite` plugin — composed automatically, requires
+	 * `@octanejs/devtools` installed — injects the panel and serves the
+	 * `/__octane_devtools/snapshot` endpoint agents/MCP read. Serve-mode only
+	 * — builds compile all of it away, so a shared config ships clean
+	 * production output. Implies profiling metadata in dev.
+	 * @default false
+	 */
+	devtools?: boolean;
 	/**
 	 * Path fragments the compiler's plain `.ts`/`.js` hook-slotting pass must
 	 * skip. Prefer package manifest `octane.hookSlots.manual` declarations.
@@ -43,7 +54,7 @@ export interface OctanePluginOptions {
 }
 
 /** The Octane compiler plugin plus Vite app/metaframework integration. */
-export function octane(options?: OctanePluginOptions): Plugin[];
+export function octane(options?: OctanePluginOptions): PluginOption[];
 
 /** Return whether a dev request belongs to Vite rather than an app route. */
 export function isViteOwnedUrl(url: URL, fileRoots?: string[]): boolean;

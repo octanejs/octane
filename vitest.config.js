@@ -386,6 +386,30 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'octane-devtools',
+					include: ['packages/octane-devtools/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				// `devtools: true` is the point of this project: vitest runs the compiler
+				// plugin in serve mode, so the reserved defines flip on and the octane
+				// runtime under test carries the live devtools bridge + profile metadata.
+				plugins: [octane({ devtools: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane-devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/devtools\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane-devtools/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'zustand',
 					include: ['packages/zustand/tests/**/*.test.ts'],
 					environment: 'jsdom',

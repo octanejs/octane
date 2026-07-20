@@ -16,6 +16,7 @@ import {
 
 const PLUGIN_NAME = 'OctaneRspackPlugin';
 const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
+const DEVTOOLS_DEFINE = '__OCTANE_DEVTOOLS_ENABLED__';
 const PLUGIN_VERSION = createRequire(import.meta.url)('../package.json').version;
 const loaderPath = fileURLToPath(new URL('./loader.js', import.meta.url));
 const OCTANE_RULE = /\.(?:tsrx|tsx|ts|js)$/i;
@@ -203,7 +204,7 @@ function defineMatchesBoolean(value, expected) {
 	return value === expected || value === JSON.stringify(expected);
 }
 
-function assertProfilingDefineAvailable(compiler, enabled) {
+function assertReservedDefineAvailable(compiler, define, enabled, conflict) {
 	for (const plugin of compiler.options.plugins ?? []) {
 		// Rspack's DefinePlugin keeps its constructor argument in `_args`. Inspecting
 		// the configured plugin list catches conflicts regardless of apply order;
@@ -213,16 +214,34 @@ function assertProfilingDefineAvailable(compiler, enabled) {
 		if (
 			definitions === null ||
 			typeof definitions !== 'object' ||
-			!Object.prototype.hasOwnProperty.call(definitions, PROFILE_DEFINE)
+			!Object.prototype.hasOwnProperty.call(definitions, define)
 		) {
 			continue;
 		}
-		if (!defineMatchesBoolean(definitions[PROFILE_DEFINE], enabled)) {
+		if (!defineMatchesBoolean(definitions[define], enabled)) {
 			throw new TypeError(
-				`@octanejs/rspack-plugin: ${PROFILE_DEFINE} is reserved by Octane and conflicts with \`profile: ${enabled}\`. Remove the custom DefinePlugin entry and configure profiling through OctaneRspackPlugin.`,
+				`@octanejs/rspack-plugin: ${define} is reserved by Octane and ${conflict}. Remove the custom DefinePlugin entry.`,
 			);
 		}
 	}
+}
+
+function assertProfilingDefineAvailable(compiler, enabled) {
+	assertReservedDefineAvailable(
+		compiler,
+		PROFILE_DEFINE,
+		enabled,
+		`conflicts with \`profile: ${enabled}\` — configure profiling through OctaneRspackPlugin instead`,
+	);
+	// The Vite metaframework owns the dev-server devtools story (panel injection
+	// + snapshot relay); Rspack bundles pin the constant false so the runtime's
+	// devtools branches — and their profiling imports — erase from every build.
+	assertReservedDefineAvailable(
+		compiler,
+		DEVTOOLS_DEFINE,
+		false,
+		'pinned false here: Octane DevTools is not yet supported on the Rspack/Rsbuild integrations (use the Vite integration for devtools)',
+	);
 }
 
 function installProfilingDefine(compiler, enabled) {
@@ -232,7 +251,10 @@ function installProfilingDefine(compiler, enabled) {
 			'@octanejs/rspack-plugin: this Rspack compiler does not expose webpack.DefinePlugin.',
 		);
 	}
-	new DefinePlugin({ [PROFILE_DEFINE]: JSON.stringify(enabled) }).apply(compiler);
+	new DefinePlugin({
+		[PROFILE_DEFINE]: JSON.stringify(enabled),
+		[DEVTOOLS_DEFINE]: 'false',
+	}).apply(compiler);
 }
 
 function hasHotModuleReplacement(compiler) {

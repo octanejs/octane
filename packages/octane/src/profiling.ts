@@ -353,6 +353,26 @@ export function __profileHasComponentMetadata(component: Function): boolean {
 	return registeredMetadataFor(component) !== undefined;
 }
 
+/** Runtime ABI: the profiler's clock, shared so bridge events align with profile timings. */
+export function __profileNow(): number {
+	return now();
+}
+
+/** Runtime ABI: registered (or synthesized fallback) metadata for a component function. */
+export function __profileMetadataFor(component: Function): ComponentProfileMetadata {
+	return metadataFor(component);
+}
+
+/** Runtime ABI: compiler hook metadata for a slot symbol, when registered. */
+export function __profileHookMetadataFor(slot: symbol): HookProfileMetadata | undefined {
+	return hookMetadata.get(slot);
+}
+
+/** Runtime ABI: the component tracked for a render scope/block, if any. */
+export function __profileTrackedComponentFor(subject: object): Function | undefined {
+	return trackedComponents.get(subject);
+}
+
 /** Runtime ABI: associate a component-owned render scope without changing its shape. */
 export function __profileTrackComponent(subject: object, component: Function | null): void {
 	if (component === null) trackedComponents.delete(subject);

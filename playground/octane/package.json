@@ -18,6 +18,7 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@octanejs/devtools": "workspace:*",
     "typescript": "catalog:default",
     "vite": "catalog:default"
   }

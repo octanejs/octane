@@ -17,6 +17,7 @@ const SPECIAL_ROLES = new Map([
 	// binding, so it stays outside the binding status/catalog contract.
 	['@octanejs/tanstack-start', 'metaframework'],
 	['@octanejs/mcp-server', 'agent tooling'],
+	['@octanejs/devtools', 'developer tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
 ]);
 

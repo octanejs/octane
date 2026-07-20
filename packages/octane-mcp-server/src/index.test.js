@@ -12,6 +12,7 @@ import {
 	BUNDLED_SKILLS,
 	createServer,
 	engineeringPlanFor,
+	fetchDevtoolsSnapshot,
 	isOctaneRepo,
 	runCommand,
 	scaffoldReactPort,
@@ -29,6 +30,7 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(areaForPath('packages/zustand/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/radix/src/index.ts')).toBe('ecosystem-binding');
 		expect(areaForPath('packages/octane-mcp-server/src/index.js')).toBe('mcp-server');
+		expect(areaForPath('packages/octane-devtools/src/panel/mount.ts')).toBe('devtools');
 		expect(areaForPath('packages/adapter-vercel/src/index.ts')).toBe('deploy-adapter');
 		expect(areaForPath('packages/adapter-cloudflare/src/index.js')).toBe('deploy-adapter');
 		expect(areaForPath('packages/octane-evals/tools/run.mjs')).toBe('evals');
@@ -225,5 +227,40 @@ describe('@octanejs/mcp-server helpers', () => {
 		expect(result.code).toBe(0);
 		expect(result.stdout).toContain('ok');
 		await expect(readFile(join(repoRoot, 'ported.test.ts'), 'utf8')).resolves.toBe('generated');
+	});
+});
+
+describe('fetchDevtoolsSnapshot', () => {
+	it('fetches the snapshot JSON and forwards query options', async () => {
+		const { createServer } = await import('node:http');
+		/** @type {URL[]} */
+		const seen = [];
+		const server = createServer((req, res) => {
+			seen.push(new URL(req.url ?? '/', 'http://localhost'));
+			res.setHeader('content-type', 'application/json');
+			res.end(JSON.stringify({ source: 'octane-devtools', componentCount: 4 }));
+		});
+		await new Promise((ready) => server.listen(0, '127.0.0.1', ready));
+		const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
+		try {
+			const body = await fetchDevtoolsSnapshot({
+				origin: `http://127.0.0.1:${port}`,
+				includeState: false,
+				eventLimit: 7,
+			});
+			expect(JSON.parse(body)).toEqual({ source: 'octane-devtools', componentCount: 4 });
+			expect(seen[0].pathname).toBe('/__octane_devtools/snapshot');
+			expect(seen[0].searchParams.get('includeState')).toBe('false');
+			expect(seen[0].searchParams.get('eventLimit')).toBe('7');
+		} finally {
+			await new Promise((closed) => server.close(closed));
+		}
+	});
+
+	it('returns an actionable error document when the dev server is unreachable', async () => {
+		const body = await fetchDevtoolsSnapshot({ origin: 'http://127.0.0.1:1', timeoutMs: 2000 });
+		const parsed = JSON.parse(body);
+		expect(parsed.error).toContain('Could not reach');
+		expect(parsed.error).toContain('devtools: true');
 	});
 });

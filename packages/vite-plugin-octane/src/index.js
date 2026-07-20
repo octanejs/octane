@@ -214,8 +214,8 @@ function collect_hydrate_module_paths(config) {
  * `handler`/`nodeHandler` module; webworker-target adapters get an importable
  * `createWebWorkerHandler` factory for their deployment wrapper.
  *
- * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
- * @returns {Plugin[]}
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
+ * @returns {import('vite').PluginOption[]}
  */
 export function octane(inlineOptions = {}) {
 	/** @type {ResolvedConfig} */
@@ -874,6 +874,7 @@ export function octane(inlineOptions = {}) {
 	 * @type {{
 	 *   hmr?: boolean,
 	 *   profile?: boolean,
+	 *   devtools?: boolean,
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -882,6 +883,7 @@ export function octane(inlineOptions = {}) {
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
+	if (inlineOptions.devtools !== undefined) compilerOptions.devtools = inlineOptions.devtools;
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {
 		compilerOptions.requireDirective = inlineOptions.requireDirective;
@@ -921,7 +923,32 @@ export function octane(inlineOptions = {}) {
 		};
 	}
 	// The compiler plugin is untyped JS (its `enforce` infers as `string`).
-	return [compilerPlugin, metaPlugin];
+	/** @type {import('vite').PluginOption[]} */
+	const plugins = [compilerPlugin, metaPlugin];
+	if (inlineOptions.devtools === true) {
+		// The dev-server half (panel injection + snapshot relay) lives in the
+		// standalone @octanejs/devtools/vite plugin — compose it lazily so the
+		// devtools package stays an optional dev dependency. Vite awaits
+		// promised plugin entries; both the real plugin and the missing-package
+		// stub are `apply: 'serve'`, so builds neither run them nor warn.
+		plugins.push(
+			import('@octanejs/devtools/vite')
+				.then((mod) => mod.octaneDevtools())
+				.catch(() => ({
+					name: '@octanejs/vite-plugin:devtools-missing',
+					apply: /** @type {const} */ ('serve'),
+					/** @param {ResolvedConfig} config */
+					configResolved(config) {
+						(config.logger ?? console).warn(
+							'[@octanejs/vite-plugin] devtools: true also needs @octanejs/devtools installed ' +
+								'as a dev dependency — the in-page panel and the /__octane_devtools/snapshot ' +
+								'endpoint are disabled until it is.',
+						);
+					},
+				})),
+		);
+	}
+	return plugins;
 }
 
 // Mainly to enforce types / DX.

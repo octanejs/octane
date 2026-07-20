@@ -11,6 +11,7 @@ import DifferencesFromReact from './docs/differences-from-react.mdx';
 import ReactCompat from './docs/react-compat.mdx';
 import Bindings from './docs/bindings.mdx';
 import Profiling from './docs/profiling.mdx';
+import Devtools from './docs/devtools.mdx';
 import { docsMeta, type DocMeta, type DocSection } from './docs-meta.ts';
 
 export type { DocSection };
@@ -27,6 +28,7 @@ const components: Record<string, DocEntry['component']> = {
 	'differences-from-react': DifferencesFromReact,
 	'react-compat': ReactCompat,
 	profiling: Profiling,
+	devtools: Devtools,
 	bindings: Bindings,
 };
 

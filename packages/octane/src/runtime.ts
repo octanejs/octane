@@ -49,11 +49,32 @@ import {
 	__profileComponentSource,
 	__profileEndRender,
 	__profileHasComponentMetadata,
+	__profileHookMetadataFor,
+	__profileMetadataFor,
 	__profileResolveHook,
 	__profileSchedule,
 	__profileTrackComponent,
+	__profileTrackedComponentFor,
 	type ProfileFrame,
 } from './profiling.js';
+import {
+	__devtoolsCommit,
+	__devtoolsDebugValue,
+	__devtoolsDebugValuesFor,
+	__devtoolsEffectEnd,
+	__devtoolsEffectStart,
+	__devtoolsHmr,
+	__devtoolsInstallRuntime,
+	__devtoolsMetaSource,
+	__devtoolsRegisterRoot,
+	__devtoolsRenderStarted,
+	__devtoolsUnregisterRoot,
+	type DevtoolsEffectPhase,
+	type DevtoolsHookInfo,
+	type DevtoolsInstanceDetail,
+	type DevtoolsSourceLocation,
+	type DevtoolsTreeNode,
+} from './devtools.js';
 import type {
 	HydrateProps,
 	HydrationPrefetchFunction,
@@ -98,6 +119,7 @@ import {
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 
 declare const __OCTANE_PROFILE_ENABLED__: boolean;
+declare const __OCTANE_DEVTOOLS_ENABLED__: boolean;
 
 let PROFILE_COMPONENT_OVERRIDE: { target: Function; component: Function | null } | null = null;
 
@@ -1778,8 +1800,19 @@ function warnCrossComponentRenderUpdate(target: Block, source: Block): void {
 	);
 }
 
+/** Roots with work scheduled since the last commit — attributes devtools commit events. */
+let DEVTOOLS_TOUCHED_ROOTS: Set<Block> | null = null;
+
+function devtoolsTouchRoot(block: Block): void {
+	let root = block;
+	while (root.parentBlock !== null) root = root.parentBlock;
+	(DEVTOOLS_TOUCHED_ROOTS ??= new Set()).add(root);
+}
+
 function scheduleRender(block: Block): void {
 	if (block.disposed) return;
+	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+		devtoolsTouchRoot(block);
 	// Test-env warning: a state update happened with no flushSync or act()
 	// scope around it. The test will likely assert on stale DOM and fail
 	// confusingly; surface the cause directly.
@@ -2588,6 +2621,15 @@ function commitEffects(): void {
 	) {
 		schedulePassiveFlush();
 	}
+	// Devtools refresh signal: the panel re-walks the tree lazily on commit
+	// instead of the runtime emitting per-mount/unmount events. The roots the
+	// drained work belonged to attribute the commit, letting the bridge drop
+	// commits caused only by the panel's own (internal) root.
+	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+		const touched = DEVTOOLS_TOUCHED_ROOTS;
+		DEVTOOLS_TOUCHED_ROOTS = null;
+		__devtoolsCommit(touched);
+	}
 }
 
 /** Arm the post-paint passive drain. Callers check `passiveScheduled` first. */
@@ -2784,6 +2826,11 @@ function compareEffectPostOrder(a: PendingEffect, b: PendingEffect): number {
 	return comparePostOrder(a.scope.block, a.seq, b.scope.block, b.seq);
 }
 
+/** The runtime owns its numeric phase encoding; the bridge only sees names. */
+function devtoolsEffectPhaseName(phase: Phase): DevtoolsEffectPhase {
+	return phase === INSERTION ? 'insertion' : phase === LAYOUT ? 'layout' : 'passive';
+}
+
 /** Fire (and clear) the CURRENT cleanup of the slot behind a queued effect. */
 function fireEffectCleanup(e: PendingEffect): void {
 	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
@@ -2804,6 +2851,10 @@ function fireEffectCleanup(e: PendingEffect): void {
 /** Run a queued effect's body and stash its returned cleanup on the slot. */
 function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
+	const devtoolsStartedAt =
+		typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__
+			? __devtoolsEffectStart()
+			: -1;
 	try {
 		EFFECT_BODY_DEPTH++;
 		try {
@@ -2813,6 +2864,14 @@ function runEffectBody(e: PendingEffect): void {
 			cleanup = e.fn.apply(null, (e.args ?? []) as []);
 		} finally {
 			EFFECT_BODY_DEPTH--;
+			if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+				__devtoolsEffectEnd(
+					e.scope,
+					e.scope.block,
+					e.slot,
+					devtoolsEffectPhaseName(e.phase),
+					devtoolsStartedAt,
+				);
 		}
 	} catch (err) {
 		if (err instanceof MaximumUpdateDepthError) throw err;
@@ -3333,6 +3392,8 @@ function renderBlockInner(block: Block): void {
 	// redundant standalone render (it checks `pending` before rendering). Cleared
 	// at the TOP so a re-entrant setState during this render re-queues correctly.
 	block.pending = false;
+	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+		__devtoolsRenderStarted(block);
 	// Reset the per-render `use(thenable)` call-order counter. Cached entries
 	// in __thenables persist ONLY across the failed attempts of ONE suspension
 	// episode: earlier use() calls return synchronously on replay-after-resolve
@@ -3736,6 +3797,8 @@ export function componentSlotLite<P>(
 	const prevScope = CURRENT_SCOPE;
 	const warmPlanCheckpoint = ACTIVE_WARM_PLANS.length;
 	CURRENT_SCOPE = scope;
+	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+		__devtoolsRenderStarted(scope);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(scope, comp);
 	const profileFrame: ProfileFrame | null =
@@ -4522,12 +4585,31 @@ export function useRef<T>(initial: T, slot?: HookSlot): { current: T } {
 
 /**
  * React's `useDebugValue(value, format?)` — a devtools-only label for custom
- * hooks. Octane has no devtools inspector, so it is a no-op; exported so custom
- * hooks ported from React run unchanged. Accepts (and ignores) the compiler's
- * trailing compiler slot like every other hook.
+ * hooks. In a devtools-enabled build the value is recorded per resolved
+ * call-site slot on the rendering scope and surfaced by the inspector (the
+ * `format` function runs only at inspect time, matching React); records are
+ * dropped at the scope's next render start, so a call that stops executing
+ * stops being reported. Everywhere else it is a no-op; exported so custom
+ * hooks ported from React run unchanged. Accepts the compiler's trailing slot
+ * like every other hook. A slotless call resolves through the enclosing
+ * custom-hook path when one exists (multiple slotless calls in one
+ * hand-written hook then share that identity — last write wins); with no path
+ * either, there is no stable identity and the call stays unrecorded.
  */
-export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: symbol): void;
-export function useDebugValue(_value?: unknown, _format?: unknown, _slot?: HookSlot): void {}
+export function useDebugValue(value?: unknown, format?: unknown, slot?: symbol): void;
+export function useDebugValue(value?: unknown, format?: unknown, slot?: HookSlot): void {
+	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+		// ABI: a format-less compiled call arrives as `useDebugValue(value, slot)`
+		// — the same trailing-symbol reinterpretation as useState.
+		if (slot === undefined && typeof format === 'symbol') {
+			slot = format as unknown as symbol;
+			format = undefined;
+		}
+		slot = resolveSlot(slot);
+		if (slot === undefined || CURRENT_SCOPE === null) return;
+		__devtoolsDebugValue(CURRENT_SCOPE, slot, value, format);
+	}
+}
 
 /**
  * React's `useImperativeHandle(ref, factory, deps)` — exposes an imperative
@@ -16476,6 +16558,8 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 					__profileSchedule(b, 'hmr');
 				scheduleRender(b);
 			}
+			if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+				__devtoolsHmr(meta.fn as unknown as Function);
 			return true;
 		},
 	};
@@ -21065,6 +21149,441 @@ function coalesceHydratedRanges(
 }
 
 // ---------------------------------------------------------------------------
+// Devtools reflection — build-specialized (see src/devtools.ts)
+//
+// Implemented here because walking the live tree requires the Scope/Block
+// internals (children + _slots discriminants — the same shapes unmountScope
+// and refreshContextConsumers enumerate). Every function below is referenced
+// only from the __OCTANE_DEVTOOLS_ENABLED__-gated install at the end of the
+// section, so normal builds tree-shake the whole layer.
+// ---------------------------------------------------------------------------
+
+function devtoolsSourceFor(component: Function | null): DevtoolsSourceLocation | null {
+	return component === null ? null : __devtoolsMetaSource(__profileMetadataFor(component));
+}
+
+function devtoolsKeyLabel(key: unknown): string | null {
+	if (key === null || key === undefined) return null;
+	try {
+		return String(key);
+	} catch {
+		return '<key>';
+	}
+}
+
+/** Resolve a block's display identity: component label + source, or a host tag. */
+function devtoolsBlockIdentity(block: Block): {
+	label: string;
+	source: DevtoolsSourceLocation | null;
+	component: Function | null;
+} {
+	const body = block.body;
+	if (body === (hostStringTagBody as unknown as ComponentBody)) {
+		const tag = (block.props as ElementDescriptor | null)?.type;
+		return {
+			label: typeof tag === 'string' ? `<${tag}>` : '<host>',
+			source: null,
+			component: null,
+		};
+	}
+	if (body === (hostElementBody as unknown as ComponentBody)) {
+		const tag = block.deoptNode !== null ? block.deoptNode.nodeName.toLowerCase() : 'host';
+		return { label: `<${tag}>`, source: null, component: null };
+	}
+	const component = __profileTrackedComponentFor(block) ?? (body as unknown as Function);
+	return {
+		label: __profileMetadataFor(component).name,
+		source: devtoolsSourceFor(component),
+		component,
+	};
+}
+
+function devtoolsNodeForBlock(
+	block: Block,
+	structuralLabel: string | null,
+	key: unknown,
+	idFor: (subject: object) => number,
+): DevtoolsTreeNode | null {
+	if (block.disposed) return null;
+	const structural = structuralLabel !== null && block.kind !== 'dynamic' && block.kind !== 'root';
+	const identity = structural ? null : devtoolsBlockIdentity(block);
+	return {
+		id: idFor(block),
+		type:
+			block.kind === 'root'
+				? 'root'
+				: block.kind === 'portal'
+					? 'portal'
+					: structural
+						? structuralLabel === 'item'
+							? 'list-item'
+							: 'control-flow'
+						: 'component',
+		label: identity !== null ? identity.label : structuralLabel!,
+		lite: false,
+		key: devtoolsKeyLabel(key),
+		source: identity !== null ? identity.source : null,
+		hookCount: block.hooks?.size ?? 0,
+		pending: block.pending === true,
+		inactive: block.inactive === true,
+		children: devtoolsChildrenOfScope(block, idFor),
+	};
+}
+
+const DEVTOOLS_STRUCTURAL_LABELS: Record<string, string> = {
+	ifBlockSlot: '@if',
+	switchBlockSlot: '@switch',
+	trySlotSlot: '@try',
+	activityBlockSlot: '<Activity>',
+	hydrateBlockSlot: '<Hydrate>',
+	portalSlotSlot: 'Portal',
+	componentSlotSlot: 'component',
+	childSlot: 'child',
+};
+
+type DevtoolsBlockVisitor = (block: Block, structuralLabel: string | null, key: unknown) => void;
+
+/**
+ * Enumerate every child Block stashed on one slot value — the single owner of
+ * the slot-shape discrimination shared by the tree walk and the picker's find
+ * walk (the same shapes unmountScope tears down). `visitList` fires once per
+ * keyed-list slot BEFORE its item/@empty blocks, so the tree walk can group
+ * them under a synthetic `@for` container; the find walk passes no
+ * `visitList` and sees a flat stream of blocks.
+ */
+function devtoolsEachSlotBlock(
+	val: any,
+	visit: DevtoolsBlockVisitor,
+	visitList?: (forSlot: object) => void,
+): void {
+	const k = val.__kind as string;
+	if (k === 'forBlockSlot') {
+		devtoolsVisitListBlocks(val, visit, visitList);
+	} else if (k === 'childSlot') {
+		if (val.block) visit(val.block, null, null);
+		if (val.portal && val.portal.block) visit(val.portal.block, 'Portal', null);
+		if (val.forSlot) devtoolsVisitListBlocks(val.forSlot, visit, visitList);
+	} else if (val.block) {
+		visit(val.block, k === 'componentSlotSlot' ? null : (DEVTOOLS_STRUCTURAL_LABELS[k] ?? k), null);
+	}
+}
+
+function devtoolsVisitListBlocks(
+	forSlot: any,
+	visit: DevtoolsBlockVisitor,
+	visitList?: (forSlot: object) => void,
+): void {
+	visitList?.(forSlot);
+	for (let b: Block | null = forSlot.head; b !== null; b = b.nextSibling) visit(b, 'item', b.key);
+	if (forSlot.emptyBlock) visit(forSlot.emptyBlock, '@empty', null);
+}
+
+function devtoolsChildrenOfScope(
+	scope: Scope,
+	idFor: (subject: object) => number,
+): DevtoolsTreeNode[] {
+	const out: DevtoolsTreeNode[] = [];
+	devtoolsCollectScopeChildren(scope, idFor, out);
+	return out;
+}
+
+function devtoolsCollectScopeChildren(
+	scope: Scope,
+	idFor: (subject: object) => number,
+	out: DevtoolsTreeNode[],
+): void {
+	// Lite components and plain child scopes (withScope). A scope with a tracked
+	// component is an inlined component instance; anything else is transparent.
+	const children = scope.children;
+	for (let i = 0; i < children.length; i++) {
+		const child = children[i].scope;
+		const tracked = __profileTrackedComponentFor(child);
+		if (tracked !== undefined) {
+			out.push({
+				id: idFor(child),
+				type: 'component',
+				label: __profileMetadataFor(tracked).name,
+				lite: true,
+				key: null,
+				source: devtoolsSourceFor(tracked),
+				hookCount: child.hooks?.size ?? 0,
+				pending: false,
+				inactive: false,
+				children: devtoolsChildrenOfScope(child, idFor),
+			});
+		} else {
+			devtoolsCollectScopeChildren(child, idFor, out);
+		}
+	}
+	const slots = scope._slots;
+	if (slots !== null) {
+		for (let i = 0; i < slots.length; i++) {
+			// Keyed-list blocks group under a synthetic `@for` container; every
+			// other block lands directly in `out`.
+			let listNode: DevtoolsTreeNode | null = null;
+			devtoolsEachSlotBlock(
+				slots[i],
+				(block, structuralLabel, key) => {
+					const node = devtoolsNodeForBlock(block, structuralLabel, key, idFor);
+					if (node !== null) (listNode !== null ? listNode.children : out).push(node);
+				},
+				(forSlot) => {
+					listNode = {
+						id: idFor(forSlot),
+						type: 'control-flow',
+						label: '@for',
+						lite: false,
+						key: null,
+						source: null,
+						hookCount: 0,
+						pending: false,
+						inactive: false,
+						children: [],
+					};
+					out.push(listNode);
+				},
+			);
+		}
+	}
+}
+
+function devtoolsBuildRootNode(root: object, idFor: (subject: object) => number): DevtoolsTreeNode {
+	const block = root as Block;
+	const node = devtoolsNodeForBlock(block, null, null, idFor);
+	return (
+		node ?? {
+			id: idFor(block),
+			type: 'root',
+			label: 'root',
+			lite: false,
+			key: null,
+			source: null,
+			hookCount: 0,
+			pending: false,
+			inactive: false,
+			children: [],
+		}
+	);
+}
+
+function devtoolsHookInfos(scope: Scope): DevtoolsHookInfo[] {
+	const hooks = scope.hooks;
+	if (hooks === null) return [];
+	const out: DevtoolsHookInfo[] = [];
+	let order = 0;
+	// Map insertion order is the first-render call order of the hooks.
+	for (const [slot, cell] of hooks) {
+		const meta = typeof slot === 'symbol' ? __profileHookMetadataFor(slot) : undefined;
+		const c = cell as any;
+		let kind = meta?.kind ?? '';
+		let value: unknown;
+		let deps: unknown;
+		let hasCleanup: boolean | undefined;
+		if (c !== null && typeof c === 'object') {
+			if (c.effect === true) {
+				if (kind === '') kind = 'effect';
+				deps = c.deps;
+				hasCleanup = c.cleanup !== undefined;
+			} else if (typeof c.setter === 'function') {
+				if (kind === '') kind = 'useState';
+				value = c.value;
+			} else if (typeof c.dispatch === 'function') {
+				if (kind === '') kind = 'useReducer';
+				value = c.value;
+			} else if ('deps' in c && 'value' in c) {
+				if (kind === '') kind = 'useMemo';
+				value = c.value;
+				deps = c.deps;
+			} else if ('current' in c) {
+				if (kind === '') kind = 'useRef';
+				value = c.current;
+			} else {
+				if (kind === '') kind = 'hook';
+				value = c;
+			}
+		} else {
+			if (kind === '') kind = 'hook';
+			value = cell;
+		}
+		out.push({
+			order: order++,
+			slot: typeof slot === 'symbol' ? (slot.description ?? 'symbol') : String(slot),
+			kind,
+			name: meta?.name ?? kind,
+			source: meta !== undefined ? __devtoolsMetaSource(meta) : null,
+			value,
+			...(deps !== undefined ? { deps } : null),
+			...(hasCleanup !== undefined ? { hasCleanup } : null),
+		});
+	}
+	return out;
+}
+
+function devtoolsInspect(subject: object, id: number): DevtoolsInstanceDetail | null {
+	if ((subject as any).__kind !== undefined) {
+		// Structural slot subject (the `@for` container node).
+		return {
+			id,
+			type: 'control-flow',
+			label: '@for',
+			source: null,
+			props: undefined,
+			hooks: [],
+			debugValues: [],
+			domNodeCount: 0,
+		};
+	}
+	const scope = subject as Scope;
+	const block = (scope as Block).kind !== undefined ? (scope as Block) : null;
+	if (block !== null && block.disposed) return null;
+	let label: string;
+	let source: DevtoolsSourceLocation | null;
+	let type: DevtoolsInstanceDetail['type'];
+	if (block !== null) {
+		const identity = devtoolsBlockIdentity(block);
+		label = identity.label;
+		source = identity.source;
+		type = block.kind === 'root' ? 'root' : block.kind === 'portal' ? 'portal' : 'component';
+	} else {
+		const tracked = __profileTrackedComponentFor(scope);
+		label = tracked !== undefined ? __profileMetadataFor(tracked).name : '<scope>';
+		source = devtoolsSourceFor(tracked ?? null);
+		type = 'component';
+	}
+	return {
+		id,
+		type,
+		label,
+		source,
+		props: block !== null ? block.props : undefined,
+		hooks: devtoolsHookInfos(scope),
+		debugValues: __devtoolsDebugValuesFor(scope),
+		domNodeCount: devtoolsCountDomNodes(subject),
+	};
+}
+
+/** Allocation-free twin of devtoolsDomNodes for the count-only inspect field. */
+function devtoolsCountDomNodes(subject: object): number {
+	if ((subject as any).__kind !== undefined) return 0;
+	const block = subject as Block;
+	if (block.kind === undefined || block.disposed) return 0;
+	if (block.deoptNode !== null) return 1;
+	let count = 0;
+	if (block.kind === 'root') {
+		for (let n = block.parentNode.firstChild; n !== null; n = n.nextSibling) {
+			if (n.nodeType !== 8) count++;
+		}
+		return count;
+	}
+	const start = block.startMarker;
+	const end = block.endMarker;
+	if (start === null || end === null) return 0;
+	if (start === end) return start.nodeType === 8 ? 0 : 1;
+	for (let n = start.nextSibling; n !== null && n !== end; n = n.nextSibling) {
+		if (n.nodeType !== 8) count++;
+	}
+	return count;
+}
+
+function devtoolsDomNodes(subject: object): Node[] {
+	if ((subject as any).__kind !== undefined) return [];
+	const block = subject as Block;
+	if (block.kind === undefined) return []; // lite scope — no owned range
+	if (block.disposed) return [];
+	if (block.deoptNode !== null) return [block.deoptNode];
+	if (block.kind === 'root') {
+		const out: Node[] = [];
+		for (let n = block.parentNode.firstChild; n !== null; n = n.nextSibling) {
+			if (n.nodeType !== 8) out.push(n);
+		}
+		return out;
+	}
+	const start = block.startMarker;
+	const end = block.endMarker;
+	if (start === null || end === null) return [];
+	// singleRoot: the block's lone element self-delimits (start === end === it).
+	if (start === end) return start.nodeType === 8 ? [] : [start];
+	const out: Node[] = [];
+	for (let n = start.nextSibling; n !== null && n !== end; n = n.nextSibling) {
+		if (n.nodeType !== 8) out.push(n);
+	}
+	return out;
+}
+
+/**
+ * Does this block's managed DOM contain `target`? The allocation-free twin of
+ * devtoolsDomNodes: checks the de-opt node, the self-delimiting single-root
+ * element, or the siblings between the block's markers directly, and
+ * short-circuits on the first hit. `Element.contains` is a native subtree
+ * check, so per-block cost is a handful of pointer reads plus one native call
+ * per top-level range node.
+ */
+function devtoolsBlockOwnsNode(block: Block, target: Node): boolean {
+	if (block.disposed) return false;
+	const deopt = block.deoptNode;
+	if (deopt !== null) {
+		return deopt === target || (deopt.nodeType === 1 && (deopt as Element).contains(target));
+	}
+	if (block.kind === 'root') {
+		return block.parentNode !== target && block.parentNode.contains(target);
+	}
+	const start = block.startMarker;
+	const end = block.endMarker;
+	if (start === null || end === null) return false;
+	if (start === end) {
+		// singleRoot: the block's lone element self-delimits.
+		return start === target || (start.nodeType === 1 && (start as Element).contains(target));
+	}
+	for (let n = start.nextSibling; n !== null && n !== end; n = n.nextSibling) {
+		if (n === target) return true;
+		if (n.nodeType === 1 && (n as Element).contains(target)) return true;
+	}
+	return false;
+}
+
+/**
+ * Reverse lookup for the panel's element picker: depth-first over the same
+ * shapes as the tree walk, keeping the LAST (deepest) subject whose managed
+ * range contains the target. Every branch is descended regardless of its own
+ * match — lite scopes own no range, and portal content can live outside its
+ * ancestors' ranges (even inside another component's subtree), so ancestor
+ * containment must never prune the search. The walk allocates nothing, the
+ * bridge caches the result per target between commits, and the panel only
+ * queries once per distinct hovered element — so picker-mode hover cost is
+ * one cheap tree pass per new element, and zero when the picker is off.
+ */
+function devtoolsFindByDomNode(root: object, target: Node): object | null {
+	let best: object | null = null;
+	// Record before descending: a deeper match found afterwards overwrites, so
+	// the deepest containing subject wins. Two closures per query total; the
+	// per-node walk allocates nothing.
+	const visitBlock = (block: Block): void => {
+		if (block.disposed) return;
+		if (devtoolsBlockOwnsNode(block, target)) best = block;
+		visitScope(block);
+	};
+	const visitScope = (scope: Scope): void => {
+		const children = scope.children;
+		for (let i = 0; i < children.length; i++) visitScope(children[i].scope);
+		const slots = scope._slots;
+		if (slots !== null) {
+			for (let i = 0; i < slots.length; i++) devtoolsEachSlotBlock(slots[i], visitBlock);
+		}
+	};
+	visitBlock(root as Block);
+	return best;
+}
+
+if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+	__devtoolsInstallRuntime({
+		buildRootNode: devtoolsBuildRootNode,
+		inspect: devtoolsInspect,
+		domNodes: devtoolsDomNodes,
+		findByDomNode: devtoolsFindByDomNode,
+	});
+}
+
+// ---------------------------------------------------------------------------
 // Public root API — React-DOM parity
 // ---------------------------------------------------------------------------
 
@@ -21299,6 +21818,8 @@ function makeRoot(
 			}
 			if (rootBlock) {
 				DOM_ROOT_DISPOSERS.delete(rootBlock);
+				if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+					__devtoolsUnregisterRoot(rootBlock);
 				unmountBlock(rootBlock);
 				rootBlock = null;
 				currentBody = null;
@@ -21318,6 +21839,12 @@ function makeRoot(
 			);
 			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 				__profileTrackComponent(rootBlock, body);
+			if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+				__devtoolsRegisterRoot(rootBlock, container);
+				// Initial renders bypass scheduleRender — attribute their commit here
+				// so an internal (panel) root's mount commit is suppressed too.
+				devtoolsTouchRoot(rootBlock);
+			}
 			rootBlock.idState = idState;
 			registerRootDisposer(rootBlock);
 			currentBody = body;
@@ -21387,6 +21914,8 @@ function makeRoot(
 			try {
 				if (rootBlock) {
 					DOM_ROOT_DISPOSERS.delete(rootBlock);
+					if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+						__devtoolsUnregisterRoot(rootBlock);
 					// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
 					// Block in the tree). Run cleanups + scope teardown only, then clear
 					// the container in one shot. Portals self-detach during the recursive
@@ -21526,6 +22055,10 @@ export function hydrateRoot(
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
+	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+		__devtoolsRegisterRoot(rootBlock, container);
+		devtoolsTouchRoot(rootBlock);
+	}
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',
 		next: 0,
@@ -21603,6 +22136,11 @@ export function hydrateRoot(
 		// host retry binds a FRESH root (§5 rule 9 — adoption is abandoned, the
 		// retry client-remounts). Unowned hydration failures keep their existing
 		// behavior and rethrow untouched.
+		// Either exit abandons this root block, and no returned handle can ever
+		// unmount it — release its devtools registration here or it ghosts in
+		// the bridge's live-root set for the page lifetime.
+		if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+			__devtoolsUnregisterRoot(rootBlock);
 		if (rendererRegionOwnerForBlock(rootBlock) === null) throw error;
 		try {
 			handleRenderError(rootBlock, error);

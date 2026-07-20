@@ -62,6 +62,13 @@ export interface OctaneVitePluginOptions {
 	/** Enable component profiling metadata in client transforms. */
 	profile?: boolean;
 	/**
+	 * Enable the Octane devtools bridge (`globalThis.__OCTANE_DEVTOOLS__`) for
+	 * this dev server. Serve-mode only: builds always compile devtools (and its
+	 * implied profiling metadata) away, so a shared config stays production-clean.
+	 * @default false
+	 */
+	devtools?: boolean;
+	/**
 	 * Path fragments excluded from Octane's plain `.ts`/`.js` hook-slot pass.
 	 * Prefer package manifest `octane.hookSlots.manual` declarations for bindings.
 	 */

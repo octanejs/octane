@@ -26,6 +26,7 @@ Always prefer current source over summaries:
 - The framework-binding rows in `docs/packages.md` — the generated inventory of Octane ports for React ecosystem libraries (parity varies; see `docs/bindings-status.md` and each package README).
 - `packages/adapter-vercel/` (`@octanejs/adapter-vercel`) — Vercel deploy adapter for the vite-plugin build output.
 - `packages/octane-mcp-server/` (`@octanejs/mcp-server`) — MCP server: user-facing bridge/migration/SSR skills plus repo automation tools.
+- `packages/octane-devtools/` (`@octanejs/devtools`) — in-page devtools panel over the `octane/devtools` runtime bridge (live tree, hook state, performance, agent prompt export); dev-server opt-in via `octane({ devtools: true })`.
 - `benchmarks/` — unified perf harnesses under `benchmarks/bench.mjs` (js-framework, dbmon, news, signal-favoring, recursive-context, async-waterfall, SSR/streaming, size suites, …).
 - `website/` — the octanejs.dev app (docs, playground, benchmarks pages).
 - `examples/`, `playground/` — runnable apps and manual validation.
