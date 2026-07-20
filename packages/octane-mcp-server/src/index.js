@@ -54,6 +54,8 @@ export const BENCHMARK_SUITES = [
 	'react-hosted-islands',
 	'ssr-throughput',
 	'streaming-ssr',
+	'ssr-http',
+	'tanstack-start',
 	'dbmon-deopt',
 	'js-framework-deopt',
 	'async-waterfall',

@@ -812,5 +812,77 @@
     "reference": "eager-list-model",
     "maxRatio": 0.02,
     "note": "Deterministic source-level allocation gate: a 12-cell visible window over 1,000 logical rows currently allocates 0.012x as many physical cell roots as an eager one-cell-per-row model. The 0.02 ceiling catches loss of bounded native recycling without relying on timing."
+  },
+  {
+    "suite": "ssr-http",
+    "op": "import_renderer",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.6,
+    "note": "Fresh-process parse+eval of the built server entry: octane's bundled runtime.server imports ~6x FASTER than react-dom/server (0.17x on 2026-07-20). 0.6 protects that cold-start advantage while leaving room for runtime growth."
+  },
+  {
+    "suite": "ssr-http",
+    "op": "cold_spawn_to_first_byte",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.3,
+    "note": "Raw-renderer cold TTFB behind identical node:http hosts: octane measured 0.89x react on 2026-07-20 (41.6ms vs 47.0ms). A breach means a renderer-side cold-start regression, not host noise."
+  },
+  {
+    "suite": "ssr-http",
+    "op": "http_shell_staggered",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.6,
+    "note": "Warm shell first-byte over HTTP on the streaming page: parity with Fizz (1.02x at ~0.37ms, rme ~15%) on 2026-07-20. Guards the render-whole-shell-before-first-write design from regressing further; sub-ms op, hence generous headroom."
+  },
+  {
+    "suite": "ssr-http",
+    "op": "http_total_allfast",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.7,
+    "note": "Warm sequential HTTP request total on the all-fast page (throughput inverse): 1.10x react on 2026-07-20 with high sub-2ms variance. Catches a per-request streaming-engine cliff (per-wave re-render bookkeeping) without pinning noisy sub-ms deltas."
+  },
+  {
+    "suite": "tanstack-start",
+    "op": "cold_spawn_to_first_byte",
+    "target": "octane-minimal",
+    "reference": "react",
+    "maxRatio": 1.2,
+    "note": "Start-app cold TTFB behind line-for-line identical minimal hosts: octane measured 0.65x react on 2026-07-20 (60ms vs 93ms spawn-to-first-byte). Guards the app-layer cold-start advantage."
+  },
+  {
+    "suite": "tanstack-start",
+    "op": "warm_ttfb_posts",
+    "target": "octane-minimal",
+    "reference": "react",
+    "maxRatio": 3.5,
+    "note": "KNOWN GAP under active investigation: warmed /posts first-byte measured 2.57x react on 2026-07-20 (1.85ms vs 0.72ms) — the octane Start SSR stack, not the host (nitro-vs-minimal ~1x) and not the raw renderer (ssr-http shell is at parity). The 3.5 ceiling only catches further regression; renderer/Start fixes should TIGHTEN this guard."
+  },
+  {
+    "suite": "tanstack-start",
+    "op": "warm_ttfb_deferred",
+    "target": "octane-minimal",
+    "reference": "react",
+    "maxRatio": 2.5,
+    "note": "KNOWN GAP: warmed /deferred shell first-byte measured 1.57x react on 2026-07-20 (1.57ms vs 1.00ms). Both flavors beat the 40ms defer floor (genuinely streaming); the gap is pre-shell work. Tighten alongside warm_ttfb_posts."
+  },
+  {
+    "suite": "tanstack-start",
+    "op": "warm_seq_request_home",
+    "target": "octane-minimal",
+    "reference": "react",
+    "maxRatio": 3.5,
+    "note": "KNOWN GAP: warmed sequential ms/request on / measured 2.37x react on 2026-07-20 (695 vs 1650 req/s) — per-request overhead in the octane Start SSR path. The 3.5 ceiling only catches further regression; fixes should TIGHTEN it."
+  },
+  {
+    "suite": "tanstack-start",
+    "op": "cold_spawn_to_first_byte",
+    "target": "octane-nitro",
+    "reference": "octane-minimal",
+    "maxRatio": 1.6,
+    "note": "Host-overhead guard, renderer-independent: the nitro deployment output vs the identical app behind the minimal host measured 1.13x on 2026-07-20. A breach is a nitro/deployment regression, not an octane one."
   }
 ]

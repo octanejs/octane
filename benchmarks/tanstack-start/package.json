@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Harness for the Start benchmark pair: correctness gate (compare + shared Playwright spec) and the perf suite.",
   "scripts": {
-    "build": "pnpm --filter tanstack-start-bench-octane build && pnpm --filter tanstack-start-bench-react build",
+    "build": "pnpm --filter tanstack-start-bench-octane build && pnpm --filter tanstack-start-bench-octane build:minimal && pnpm --filter tanstack-start-bench-react build",
     "compare": "node compare.mjs",
     "test:e2e": "playwright test --config e2e/playwright.config.ts"
   },
