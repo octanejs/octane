@@ -247,11 +247,16 @@ describe('website routes', () => {
 				expect(figure.querySelector('details.bench-table table')).toBeTruthy();
 			}
 		}
-		// The scroll-spy rail lists every section plus a nested row per benchmark
-		// card, and each link's anchor target exists in the document: a section
-		// heading for level-2 rows, an anchored card wrapper for level-3 rows.
+		// The left sidebar scroll-spy lists every section plus a nested row per
+		// benchmark card, and each link's anchor target exists in the document: a
+		// section heading for level-2 rows, an anchored card wrapper for level-3 rows.
 		const toc = container.querySelector('nav[aria-label="On this page"]')!;
 		expect(toc).toBeTruthy();
+		expect(container.querySelector('.benchpage-sidebar')?.contains(toc)).toBe(true);
+		expect(container.querySelector('.benchpage-main')?.contains(toc)).toBe(false);
+		const mobileToggle = container.querySelector('.benchpage-sidebar-toggle');
+		expect(container.querySelectorAll('.benchpage-sidebar-toggle')).toHaveLength(1);
+		expect(mobileToggle?.textContent).toContain('Benchmarks');
 		expect(BENCH_SECTIONS.length).toBe(3 + FRAMEWORK_CARDS.length + OCTANE_CARDS.length);
 		for (const section of BENCH_SECTIONS) {
 			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
@@ -284,12 +289,14 @@ describe('website routes', () => {
 		expect(container.querySelector('.prose .doc-lede')?.textContent?.trim()).toBeTruthy();
 		expect(doc.sections?.length).toBeGreaterThan(0);
 		const toc = container.querySelector('nav[aria-label="On this page"]')!;
+		const sidebar = container.querySelector('.sidebar-nav')!;
+		expect(sidebar.contains(toc)).toBe(true);
+		expect(container.querySelector('.doc-frame')?.contains(toc)).toBe(false);
 		for (const section of doc.sections ?? []) {
 			expect(findLink(toc, `#${section.id}`)?.textContent).toContain(section.title);
 			const tag = section.level === 3 ? 'h3' : 'h2';
 			expect(container.querySelector(`${tag}#${section.id}`)).toBeTruthy();
 		}
-		const sidebar = container.querySelector('.sidebar-nav')!;
 		const sidebarLinks = Array.from(sidebar.querySelectorAll<HTMLAnchorElement>('a.sidebar-link'));
 		expect(sidebarLinks).toHaveLength(docs.length);
 		expect(sidebar.querySelectorAll('.sidebar-group')).toHaveLength(docGroups.length);

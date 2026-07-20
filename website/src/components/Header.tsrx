@@ -89,7 +89,7 @@ export function Header() @{
 				max-width: 1420px;
 				margin: 0 auto;
 				padding: 0 1.5rem;
-				height: 60px;
+				height: var(--topnav-height);
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
@@ -134,6 +134,10 @@ export function Header() @{
 			.topnav-inner :global(.wordmark-img) {
 				display: inline-flex;
 				color: var(--text);
+				/* Intent preloading can refresh the inline SVG while a pointer is
+				   pressed. Keep the stable anchor as the hit target so that refresh
+				   cannot cancel the browser's eventual click. */
+				pointer-events: none;
 			}
 			.topnav-inner :global(.wordmark-img svg) {
 				height: 32px;
@@ -200,7 +204,7 @@ export function Header() @{
 				.navlinks {
 					display: none;
 					position: absolute;
-					top: 60px;
+					top: var(--topnav-height);
 					left: 0;
 					right: 0;
 					flex-direction: column;

@@ -1,10 +1,9 @@
-// The "On this page" scrollspy rail shared by longer pages (docs, benchmarks):
-// a sticky desktop timeline with a sliding accent indicator plus a collapsible
-// mobile summary. The host page renders its own headings (each id must exist in
-// the document with a scroll-margin-top clearing the sticky header) and passes
-// them as `sections`; `resetKey` scopes the active highlight to one page
-// identity so a client navigation between hosts that share a section id cannot
-// light the new rail before the new page's own scroll-spy has run.
+// The nested scroll-spy shared by longer pages (docs, benchmarks). Its host owns
+// the responsive sidebar shell; this component owns the animated section list,
+// active indicator, scrolling, and focus handoff. Each section id must exist in
+// the document on a target with enough scroll-margin-top to clear the sticky
+// header. `resetKey` scopes the highlight to one page identity so a client
+// navigation between hosts that share an id cannot briefly light the new list.
 import { useEffect, useLayoutEffect, useRef, useState } from 'octane';
 
 export interface TocSection {
@@ -19,6 +18,30 @@ export interface TocSection {
 // crossed this line under the sticky header (~60px) plus a little breathing
 // room. Shared by live tracking and the click-settle check below.
 const ACTIVATION_LINE = 100;
+
+// A documentation host can become a sticky row above the content. Derive that
+// state from its rendered position and overlap with the heading rather than
+// duplicating the layout's responsive breakpoint in JavaScript. The heading's
+// computed scroll margin is also a lower bound: scrollIntoView deliberately
+// lands there, so that position must count as active.
+function activationLineFor(track: Element | null, heading: Element | null): number {
+	let activationLine = ACTIVATION_LINE;
+	if (heading) {
+		const scrollMarginTop = Number.parseFloat(getComputedStyle(heading).scrollMarginTop);
+		if (Number.isFinite(scrollMarginTop)) {
+			activationLine = Math.max(activationLine, scrollMarginTop);
+		}
+	}
+
+	const host = track?.closest<HTMLElement>('[data-scroll-spy-mobile-host]');
+	if (!host || !heading || getComputedStyle(host).position !== 'sticky') return activationLine;
+
+	const hostRect = host.getBoundingClientRect();
+	const headingRect = heading.getBoundingClientRect();
+	const overlapsHeading = hostRect.left < headingRect.right && hostRect.right > headingRect.left;
+	if (overlapsHeading) return Math.max(activationLine, hostRect.bottom + 12);
+	return activationLine;
+}
 // How long after the last scroll tick a TOC click is considered settled. Long
 // enough to bridge the gap between smooth-scroll frames (and the delay before
 // the first one); short enough that live tracking resumes promptly.
@@ -33,21 +56,13 @@ function isAtPageBottom(): boolean {
 		window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
 }
 
-export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: string }) @{
+export function OnThisPage(props: {
+	sections: readonly TocSection[];
+	resetKey?: string;
+	onNavigate?: () => void | Promise<void>;
+}) @{
 	const sections = props.sections;
 	const resetKey = props.resetKey ?? '';
-	// Mobile TOC clicks collapse the summary card FIRST — it sits above the
-	// sections (grid-row: 1), so scrollToSection below must measure the
-	// post-collapse layout — then run the same scroll-and-focus path as the
-	// desktop rail: some targets (the benchmarks card anchors) are non-focusable
-	// wrappers whose aria-label is only announced when focus actually moves, so
-	// leaving mobile clicks to native hash navigation would land screen-reader
-	// users there without hearing which chart they reached.
-	const mobileTocClick = (event: MouseEvent, id: string) => {
-		const link = event.currentTarget as HTMLAnchorElement;
-		link.closest('details')?.removeAttribute('open');
-		scrollToSection(event, id);
-	};
 
 	// The active section id is stored WITH the reset key that measured it, and
 	// only counts for that key: a client navigation to another host page that
@@ -78,6 +93,18 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 	const clickLock = useRef<string | null>(null);
 	const clickTimer = useRef(0);
 	const measureRef = useRef<(() => void) | null>(null);
+	// Closing a responsive host can defer a section jump. Give each request an
+	// ownership token and invalidate it when this TOC changes page or unmounts, so
+	// a stale promise cannot focus old DOM or append its hash to the winning route.
+	const navigationSequence = useRef(0);
+	const currentResetKey = useRef(resetKey);
+	currentResetKey.current = resetKey;
+	useEffect(
+		() => () => {
+			navigationSequence.current++;
+		},
+		[resetKey],
+	);
 	const armClickRelease = () => {
 		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
 		clickTimer.current = window.setTimeout(() => {
@@ -88,12 +115,13 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 				id !== null ? document.getElementById(id) : null;
 			if (heading) {
 				const top = heading.getBoundingClientRect().top;
+				const activationLine = activationLineFor(tocTrack.current, heading);
 				// scrollIntoView lands the heading just under the sticky header
-				// (scroll-margin-top ≈ 88px, line = 100), so a small tolerance on
-				// the line covers rounding; the bottom clause accepts any visible
-				// resting spot when the page ran out of scroll room.
+				// (and, on mobile docs, its sticky disclosure), so a small tolerance
+				// on the activation line covers rounding; the bottom clause accepts
+				// any visible resting spot when the page ran out of scroll room.
 				const landed =
-					top >= -2 && (top <= ACTIVATION_LINE + 4 || isAtPageBottom() && top < window.innerHeight);
+					top >= -2 && (top <= activationLine + 4 || isAtPageBottom() && top < window.innerHeight);
 				if (landed) return;
 			}
 			// The reader ended up elsewhere — resume live tracking right away
@@ -125,9 +153,10 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 				armClickRelease();
 				return;
 			}
+			const activationLine = activationLineFor(tocTrack.current, headings[0]);
 			let current = headings[0].id;
 			for (const heading of headings) {
-				if (heading.getBoundingClientRect().top <= ACTIVATION_LINE) current = heading.id;
+				if (heading.getBoundingClientRect().top <= activationLine) current = heading.id;
 				else break;
 			}
 			// At the very bottom of a scrollable page, force the final section: a
@@ -172,12 +201,11 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 	// slid from there. On the first reveal of a track the transform/height
 	// transitions are suppressed for one placement, so the bar fades in already
 	// sitting on the active row instead of animating in from the old value.
-	// Geometry can also shift with NO activeId change — the desktop rail is
-	// display:none under 1180px (measuring 0×0), so widening the viewport back
-	// must remeasure, as must title rewraps and font swaps — hence the
-	// ResizeObserver on both the track (overall layout) and the link (its own
-	// box). resetKey is a dependency so a route change re-targets the new
-	// track/link nodes even when the new page's active id is identical.
+	// Geometry can also shift with NO activeId change when a title rewraps, a
+	// font swaps, or the responsive sidebar opens. The ResizeObserver therefore
+	// watches both the track (overall layout) and link (its own box). resetKey is
+	// a dependency so a route change re-targets the new nodes even when the new
+	// page's active id is identical.
 	useLayoutEffect(() => {
 		const track = tocTrack.current;
 		if (!track) return;
@@ -194,18 +222,16 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 			track.style.setProperty('--indicator-h', link.offsetHeight + 'px');
 		};
 		const place = () => {
-			// While the desktop rail is display:none (≤1180px) every offset reads
-			// 0×0 — writing those would make the indicator slide down from the top
-			// when the rail re-appears. Skip; the ResizeObserver fires again with
-			// real numbers the moment the rail becomes visible.
+			// A host may temporarily hide the list while its mobile disclosure is
+			// closed. Skip zero-sized passes; the observer fires again once the
+			// track has measurable rows.
 			if (link.offsetHeight === 0) return;
 			if (track.dataset.placed === undefined) {
 				// First successful placement for this track: keep only the opacity
 				// transition so position and size snap (the bar fades in already on
 				// its row); the full transition list is restored after a forced style
 				// flush so later moves animate again. Marking placed only here — not
-				// on a skipped hidden pass — means a page opened narrow still snaps
-				// on its eventual first reveal.
+				// on a skipped hidden pass — keeps the eventual first reveal stable.
 				const indicator = track.querySelector<HTMLElement>('.toc-indicator');
 				if (indicator) {
 					indicator.style.transitionProperty = 'opacity';
@@ -238,93 +264,84 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 		const heading = document.getElementById(id);
 		if (!heading) return;
 		event.preventDefault();
-		const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		// Claim the target before scrolling so the spy holds it through the smooth
-		// animation; the settle timer (re-armed by every scroll tick) then judges
-		// the outcome once scrolling stops. This initial arm covers the no-scroll
-		// case where the target is already in position and no tick ever fires.
-		clickLock.current = id;
-		armClickRelease();
-		heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
-		heading.setAttribute('tabindex', '-1');
-		heading.focus({ preventScroll: true });
-		history.replaceState(null, '', '#' + id);
-		setActiveId(id);
+		const navigation = ++navigationSequence.current;
+		const navigationResetKey = resetKey;
+		const navigate = () => {
+			if (
+				navigation !== navigationSequence.current ||
+					currentResetKey.current !== navigationResetKey ||
+					!heading.isConnected ||
+					document.getElementById(id) !== heading
+			) return;
+			const reduce =
+				typeof window.matchMedia === 'function' &&
+					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			// Claim the target before scrolling so the spy holds it through the
+			// smooth animation; the settle timer (re-armed by every scroll tick)
+			// then judges the outcome once scrolling stops. This initial arm covers
+			// the no-scroll case where the target is already in position.
+			clickLock.current = id;
+			armClickRelease();
+			heading.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+			heading.setAttribute('tabindex', '-1');
+			heading.focus({ preventScroll: true });
+			history.replaceState(null, '', '#' + id);
+			setActiveId(id);
+		};
+		// A mobile host returns a promise that settles after its disclosure closes,
+		// so the overlay cannot obscure the focused target. Desktop hosts close
+		// synchronously and take the immediate path.
+		const collapsed = props.onNavigate?.();
+		if (collapsed instanceof Promise) void collapsed.then(navigate);
+		else navigate();
 	};
 
-	<aside class="on-this-page">
-		<nav class="toc-desktop" aria-label="On this page">
-			<p class="toc-heading">On this page</p>
-			<div class={['toc-track', activeId !== '' && 'is-active']} ref={tocTrack}>
-				<span class="toc-indicator" aria-hidden="true"></span>
-				<ul class="toc-list">
-					@for (const section of sections; key section.id) {
-						<li class="toc-item" data-level={section.level === 3 ? '3' : '2'}>
-							<a
-								href={'#' + section.id}
-								class="toc-link"
-								data-id={section.id}
-								aria-current={activeId === section.id ? 'true' : undefined}
-								onClick={(event: MouseEvent) => scrollToSection(event, section.id)}
-							>
-								<span class="toc-link-text">
-									{section.title as string}
-								</span>
-							</a>
-						</li>
-					}
-				</ul>
+	<nav class="on-this-page" aria-label="On this page">
+		<div class="toc-reveal">
+			<div class="toc-reveal-inner">
+				<div class={['toc-track', activeId !== '' && 'is-active']} ref={tocTrack}>
+					<span class="toc-indicator" aria-hidden="true"></span>
+					<ul class="toc-list">
+						@for (const section of sections; key section.id) {
+							<li class="toc-item" data-level={section.level === 3 ? '3' : '2'}>
+								<a
+									href={'#' + section.id}
+									class="toc-link"
+									data-id={section.id}
+									aria-current={activeId === section.id ? 'true' : undefined}
+									onClick={(event: MouseEvent) => scrollToSection(event, section.id)}
+								>
+									<span class="toc-link-text">
+										{section.title as string}
+									</span>
+								</a>
+							</li>
+						}
+					</ul>
+				</div>
 			</div>
-		</nav>
-		<details class="toc-mobile">
-			<summary>On this page</summary>
-			<nav aria-label="On this page mobile">
-				<ul class="toc-list-mobile">
-					@for (const section of sections; key section.id) {
-						<li data-level={section.level === 3 ? '3' : '2'}>
-							<a
-								href={'#' + section.id}
-								aria-current={activeId === section.id ? 'true' : undefined}
-								onClick={(event: MouseEvent) => mobileTocClick(event, section.id)}
-							>
-								{section.title as string}
-							</a>
-						</li>
-					}
-				</ul>
-			</nav>
-		</details>
+		</div>
 		<style>
 			.on-this-page {
-				position: sticky;
-				top: 88px;
-				align-self: start;
-				max-height: calc(100vh - 108px);
-				overflow-y: auto;
-				overflow-x: hidden;
-				scrollbar-width: thin;
-				/* Settle in just after the article on first paint. `backwards` fills
-				   only the 0.05s delay (start hidden) and releases every animated
-				   property once done — a retained transform (fill `both`/`forwards`)
-				   would make this sticky element its own containing block and can
-				   break position: sticky while scrolling, notably in Firefox. The
-				   base style already IS the end state, so nothing needs retaining. */
-				animation: toc-enter 0.5s 0.05s ease backwards;
+				margin: 0.2rem 0.45rem 0.55rem 0.75rem;
 			}
-			@keyframes toc-enter {
+			/* The active page mounts this list under its top-level sidebar row. A
+			   one-track grid lets the submenu open to its natural height without
+			   measuring or pinning it in JavaScript. */
+			.toc-reveal {
+				display: grid;
+				grid-template-rows: 1fr;
+				animation: toc-reveal 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+			}
+			.toc-reveal-inner {
+				min-height: 0;
+				overflow: hidden;
+			}
+			@keyframes toc-reveal {
 				from {
 					opacity: 0;
-					transform: translateY(6px);
+					grid-template-rows: 0fr;
 				}
-			}
-			.toc-heading {
-				margin: 0 0 0.85rem;
-				padding-left: 1.15rem;
-				color: var(--text-secondary);
-				font-size: 0.7rem;
-				font-weight: 700;
-				letter-spacing: 0.08em;
-				text-transform: uppercase;
 			}
 			/* The rail is a timeline: a hairline guide runs its full height, and both
 			   the sliding accent indicator and the links sit against it. */
@@ -369,16 +386,16 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 			}
 			.toc-link {
 				display: block;
-				padding: 0.34rem 0 0.34rem 1.15rem;
+				padding: 0.3rem 0 0.3rem 1rem;
 				color: var(--text-secondary);
-				font-size: 0.82rem;
+				font-size: 0.8rem;
 				line-height: 1.4;
 				transition: color 0.18s ease;
 			}
 			/* Nested (h3) rows indent further from the guide and sit a touch quieter. */
 			.toc-item[data-level='3'] .toc-link {
-				padding-left: 2.1rem;
-				font-size: 0.78rem;
+				padding-left: 1.75rem;
+				font-size: 0.76rem;
 			}
 			.toc-link:hover {
 				color: var(--text);
@@ -387,11 +404,8 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 			.toc-link[aria-current='true'] {
 				color: var(--text);
 			}
-			.toc-mobile {
-				display: none;
-			}
 			@media (prefers-reduced-motion: reduce) {
-				.on-this-page {
+				.toc-reveal {
 					animation: none;
 				}
 				.toc-indicator,
@@ -399,88 +413,6 @@ export function OnThisPage(props: { sections: readonly TocSection[]; resetKey?: 
 					transition: none;
 				}
 			}
-			@media (max-width: 1180px) {
-				.on-this-page {
-					position: static;
-					grid-row: 1;
-					max-height: none;
-					padding: 1rem 1.1rem;
-					border: 1px solid var(--border);
-					border-radius: 0.875rem;
-					background: var(--surface-subtle);
-				}
-				.toc-desktop {
-					display: none;
-				}
-				.toc-mobile {
-					display: block;
-				}
-				.toc-mobile summary {
-					position: relative;
-					padding-right: 1.5rem;
-					color: var(--text);
-					font-size: 0.82rem;
-					font-weight: 750;
-					cursor: pointer;
-					list-style: none;
-				}
-				.toc-mobile summary::-webkit-details-marker {
-					display: none;
-				}
-				.toc-mobile summary::after {
-					content: '+';
-					position: absolute;
-					right: 0;
-					top: 50%;
-					color: var(--accent-text);
-					font-size: 1rem;
-					transform: translateY(-50%);
-				}
-				.toc-mobile[open] summary::after {
-					content: '−';
-				}
-				.toc-mobile nav {
-					margin-top: 0.75rem;
-					padding-top: 0.65rem;
-					border-top: 1px solid var(--border);
-				}
-				.toc-list-mobile {
-					display: grid;
-					grid-template-columns: repeat(2, minmax(0, 1fr));
-					gap: 0 1rem;
-					list-style: none;
-					margin: 0;
-					padding: 0;
-				}
-				.toc-list-mobile li {
-					margin: 0;
-				}
-				/* Nested rows read as children of the heading above them. */
-				.toc-list-mobile li[data-level='3'] a {
-					padding-left: 1rem;
-					font-size: 0.78rem;
-				}
-				.toc-list-mobile a {
-					display: block;
-					padding: 0.28rem 0;
-					color: var(--text-secondary);
-					font-size: 0.8rem;
-					line-height: 1.35;
-					transition: color 0.15s;
-				}
-				.toc-list-mobile a:hover {
-					color: var(--accent-text);
-					text-decoration: none;
-				}
-				.toc-list-mobile a[aria-current='true'] {
-					color: var(--accent-text);
-				}
-			}
-			@media (max-width: 560px) {
-				.toc-list-mobile {
-					grid-template-columns: 1fr;
-				}
-			}
 		</style>
-	</aside>
+	</nav>
 }
