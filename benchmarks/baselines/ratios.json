@@ -884,5 +884,37 @@
     "reference": "octane-minimal",
     "maxRatio": 1.6,
     "note": "Host-overhead guard, renderer-independent: the nitro deployment output vs the identical app behind the minimal host measured 1.13x on 2026-07-20. A breach is a nitro/deployment regression, not an octane one."
+  },
+  {
+    "suite": "ssr-workerd",
+    "op": "worker_script_gzip_bytes",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 0.6,
+    "note": "Fully-bundled Worker script (gzip): octane's server runtime bundles to 0.36x react+react-dom's size (31KB vs 87KB on 2026-07-20). Script size drives Workers isolate cold start; 0.6 protects the advantage. Deterministic size op."
+  },
+  {
+    "suite": "ssr-workerd",
+    "op": "cold_spawn_to_first_byte",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.2,
+    "note": "Cold workerd process + isolate + script parse to first body byte behind identical minimal Workers: octane measured 0.72x react on 2026-07-20 (36ms vs 50ms via miniflare). Guards the renderer's Workers cold-start advantage."
+  },
+  {
+    "suite": "ssr-workerd",
+    "op": "workerd_total_allfast",
+    "target": "octane-tsrx",
+    "reference": "react",
+    "maxRatio": 1.5,
+    "note": "Warm all-fast request total through workerd (throughput inverse): parity on 2026-07-20 (~2.1ms, ~465 req/s both). Catches a per-request cliff in the web-streams path under workerd's scheduler; sub-ms shell ops stay unguarded (noisy)."
+  },
+  {
+    "suite": "ssr-workerd",
+    "op": "cold_spawn_to_first_byte",
+    "target": "octane-app",
+    "reference": "octane-tsrx",
+    "maxRatio": 1.5,
+    "note": "Metaframework-overhead guard: the vite-plugin + adapter-cloudflare worker vs the raw octane worker measured 1.06x cold on 2026-07-20 (38ms vs 36ms). A breach means the app-core/adapter layer grew a workerd cold-start cost, independent of the renderer."
   }
 ]

@@ -55,6 +55,7 @@ export const BENCHMARK_SUITES = [
 	'ssr-throughput',
 	'streaming-ssr',
 	'ssr-http',
+	'ssr-workerd',
 	'tanstack-start',
 	'dbmon-deopt',
 	'js-framework-deopt',

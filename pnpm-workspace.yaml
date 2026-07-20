@@ -24,6 +24,8 @@ packages:
   - benchmarks/streaming-ssr
   - benchmarks/streaming-ssr/*
   - benchmarks/ssr-http
+  - benchmarks/ssr-workerd
+  - benchmarks/ssr-workerd/*
   - benchmarks/codegen-size
   - benchmarks/bundle-size
   - benchmarks/three
