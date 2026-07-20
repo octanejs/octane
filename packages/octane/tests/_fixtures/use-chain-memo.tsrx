@@ -88,6 +88,30 @@ export function SwitchingChainHost({
 	}
 }
 
+// A @for arm binds its own `item`; use(item.promise) must NOT taint the
+// unrelated same-named body const into memoization — `build()` re-runs every
+// render exactly as an unmemoized creation should.
+export function ShadowedLoopHost({
+	log,
+	build,
+	rows,
+}: {
+	log: (entry: string) => void;
+	build: () => { n: number };
+	rows: { id: number; promise: Promise<string> }[];
+}) @{
+	const [tick, setTick] = useState(0);
+	const item = build();
+	log('built:' + item.n);
+	<div>
+		<button id="tick" onClick={() => setTick(tick + 1)}>t</button>
+		<span>{'t=' + tick}</span>
+		@for (const item of rows; key item.id) {
+			<p>{'v=' + use(item.promise)}</p>
+		}
+	</div>
+}
+
 export function ChainHost({
 	fetchUser,
 	id,

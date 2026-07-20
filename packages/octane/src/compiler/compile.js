@@ -8503,8 +8503,8 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 	//    — a non-trivial argument's memo will list these as deps, so a
 	//    render-created dep would otherwise defeat that memo every render.
 	const seedRoots = new Set();
-	collectUseArgumentRoots(stmts, ctx, seedRoots);
-	collectUseArgumentRoots(jsxNodes, ctx, seedRoots);
+	collectUseArgumentRoots(stmts, ctx, seedRoots, false);
+	collectUseArgumentRoots(jsxNodes, ctx, seedRoots, true);
 	if (seedRoots.size === 0) return stmts;
 
 	// 2. Candidates, in declaration order with their guard chains, plus the
@@ -8625,13 +8625,23 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations) 
 // Deep scan (nested functions and render-tree nodes included — a consumer
 // anywhere makes stability load-bearing) for `use(<arg>)` arguments' free
 // identifier roots.
-function collectUseArgumentRoots(root, ctx, into) {
-	walk(root);
+function collectUseArgumentRoots(root, ctx, into, startInRenderTree = false) {
+	walk(root, EMPTY_BOUND_SET, startInRenderTree);
 
-	function walk(n) {
+	// `bound` carries every name introduced by a scope the candidate collector
+	// cannot reach: nested-function params + internal declarations, loop
+	// bindings (including `@for` items — a ForOfStatement with a JSX body),
+	// catch params, and — inside the render tree — any block's declarations
+	// (directive-arm consts are never setup candidates). A use() argument's
+	// free identifiers are resolved AGAINST that set before seeding, so a
+	// shadowing inner binding can't taint an unrelated same-named body const
+	// into memoization (which would wrongly stop it recreating per render).
+	// Over-binding is the safe direction: a dropped seed just leaves that
+	// chain unmemoized — today's behavior.
+	function walk(n, bound, inRenderTree) {
 		if (n == null || typeof n !== 'object') return;
 		if (Array.isArray(n)) {
-			for (const child of n) walk(child);
+			for (const child of n) walk(child, bound, inRenderTree);
 			return;
 		}
 		if (
@@ -8642,12 +8652,93 @@ function collectUseArgumentRoots(root, ctx, into) {
 				ctx?._parallelUseAliases?.has(n.callee.name) === true) &&
 			n.arguments?.length >= 1
 		) {
-			for (const free of collectFreeIdentifiers(n.arguments[0], [])) into.add(free);
+			for (const free of collectFreeIdentifiers(n.arguments[0], bound)) into.add(free);
 		}
+		if (FN_TYPES.has(n.type)) {
+			const inner = new Set(bound);
+			for (const param of n.params || []) collectPatternNames(param, inner);
+			collectScopeDeclaredNames(n.body, inner);
+			walk(n.body, inner, inRenderTree);
+			return;
+		}
+		if (LOOP_TYPES.has(n.type)) {
+			const inner = new Set(bound);
+			collectScopeDeclaredNames(n, inner);
+			for (const key in n) {
+				if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane'))
+					continue;
+				walk(n[key], inner, inRenderTree);
+			}
+			return;
+		}
+		if (n.type === 'CatchClause') {
+			const inner = new Set(bound);
+			if (n.param) collectPatternNames(n.param, inner);
+			collectScopeDeclaredNames(n.body, inner);
+			walk(n.body, inner, inRenderTree);
+			return;
+		}
+		if (n.type === 'JSXForExpression') {
+			// The @for directive binds its item/index on the node itself (left /
+			// index), scoping key + body — the iterable and @empty arm stay in
+			// the outer scope.
+			const inner = new Set(bound);
+			if (n.left?.type === 'VariableDeclaration') {
+				for (const decl of n.left.declarations || []) collectPatternNames(decl.id, inner);
+			} else if (n.left) {
+				collectPatternNames(n.left, inner);
+			}
+			if (n.index) collectPatternNames(n.index, inner);
+			walk(n.right, bound, true);
+			walk(n.key, inner, true);
+			walk(n.body, inner, true);
+			walk(n.empty, bound, true);
+			return;
+		}
+		if (inRenderTree && n.type === 'BlockStatement') {
+			const inner = new Set(bound);
+			collectScopeDeclaredNames(n, inner);
+			for (const child of n.body || []) walk(child, inner, true);
+			return;
+		}
+		// JSX reached at a setup VALUE position (`const el = <div>{use(x)}</div>`)
+		// flips into render-tree binding rules from that node down.
+		const nextInRenderTree =
+			inRenderTree ||
+			(typeof n.type === 'string' &&
+				(n.type.startsWith('JSX') || n.type === 'Element' || n.type === 'Tsrx'));
 		for (const key in n) {
 			if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
-			walk(n[key]);
+			walk(n[key], bound, nextInRenderTree);
 		}
+	}
+}
+
+const EMPTY_BOUND_SET = new Set();
+
+// Every declaration name reachable in `node` without crossing a function
+// boundary of its own accord — a conservative overapproximation used to bind
+// out inner-scope names in collectUseArgumentRoots (nested functions re-bind
+// their params when entered).
+function collectScopeDeclaredNames(node, into) {
+	if (node == null || typeof node !== 'object') return;
+	if (Array.isArray(node)) {
+		for (const child of node) collectScopeDeclaredNames(child, into);
+		return;
+	}
+	if (node.type === 'VariableDeclaration') {
+		for (const decl of node.declarations || []) collectPatternNames(decl.id, into);
+	} else if (node.type === 'FunctionDeclaration' || node.type === 'ClassDeclaration') {
+		if (node.id?.type === 'Identifier') into.add(node.id.name);
+		if (node.type === 'FunctionDeclaration') return; // its internals bind on entry
+	} else if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') {
+		return; // internals bind on entry
+	} else if (node.type === 'CatchClause' && node.param) {
+		collectPatternNames(node.param, into);
+	}
+	for (const key in node) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key.startsWith('_octane')) continue;
+		collectScopeDeclaredNames(node[key], into);
 	}
 }
 

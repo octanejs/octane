@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount } from './_helpers';
-import { ChainHost, PropChainHost, SwitchingChainHost } from './_fixtures/use-chain-memo.tsrx';
+import {
+	ChainHost,
+	PropChainHost,
+	ShadowedLoopHost,
+	SwitchingChainHost,
+} from './_fixtures/use-chain-memo.tsrx';
 
 // Pass A′ (use()-fed const chain memoization) behavioral contract. Runs under
 // both vitest projects: `octane` exercises the runtime `_$useMemo` form,
@@ -107,6 +112,28 @@ describe('use()-fed const chain memoization', () => {
 		});
 		await act(() => {});
 		expect(r.html()).toContain('v=B');
+		r.unmount();
+	});
+
+	it('a shadowing @for item binding does not taint a same-named body const', () => {
+		// use(item.promise) inside the @for arm refers to the ARM's `item`; the
+		// unrelated body const `item = build()` must keep recreating per render
+		// (memoizing it would freeze `built:` at 1).
+		let n = 0;
+		const build = () => ({ n: ++n });
+		const fulfilled = (value: string): Promise<string> =>
+			({ then: () => {}, status: 'fulfilled', value }) as unknown as Promise<string>;
+		const log: string[] = [];
+		const r = mount(ShadowedLoopHost, {
+			log: (entry: string) => log.push(entry),
+			build,
+			rows: [{ id: 1, promise: fulfilled('X') }],
+		});
+		expect(r.html()).toContain('v=X');
+		expect(log).toEqual(['built:1']);
+		r.click('#tick');
+		expect(log).toEqual(['built:1', 'built:2']);
+		expect(r.html()).toContain('t=1');
 		r.unmount();
 	});
 
