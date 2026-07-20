@@ -137,7 +137,7 @@ pre.shiki {
 // Octane never renders it — so it does not participate in hydration. Placed
 // AFTER the theme-color <meta> below so it already exists to update; still in
 // <head>, so it runs before the body paints.
-const THEME_INIT = `(function(){try{var s=localStorage.getItem('octane-theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
+const THEME_INIT = `(function(){var s=null;try{s=localStorage.getItem('octane-theme');}catch(e){}try{var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
 
 function RootDocument(props: { children?: unknown }) @{
 	<Html lang="en">
