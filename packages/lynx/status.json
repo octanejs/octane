@@ -3,22 +3,22 @@
     "package": "@lynx-js/react",
     "version": "0.123.0 (b6b809cd)"
   },
-  "surface": "Private Milestones 3–4 source/test implementation: the first native element/prop/event/ref slice; Lynx-specific callback-demanded list cells with item-key identity, reuse pools, and physical ref attachment; root-scoped serializable native-resource handles; augmentable init/global/Native Module types and background platform hooks; and separate background/main-thread compiler presets. No production .lynx.bundle, native allocation, scrolling, lifecycle, Native Module, custom-element, or device claim is made.",
+  "surface": "Private Milestones 3–5 source/test/build implementation: the native element/prop/event/ref slice; callback-demanded list cells; serializable native-resource handles; background platform hooks; separate thread compiler presets; a production Rspeedy application mode that pairs each authored background graph with a generated main receiver and emits a .lynx.bundle verified by decoding; and a facade over the official JavaScript testing environment. No Lynx Web, native allocation, scrolling, lifecycle, Native Module, custom-element, Android, or iOS execution claim is made.",
   "divergences": [
     "The package adapts an audited @lynx-js/types@4.0.0 props/events slice into renderer-owned module declarations because the upstream events entry transitively loads global Element/JSX augmentation.",
     "Background refs receive cloned acknowledgement-gated asynchronous handles, never live main-thread Element PAPI objects or synchronous layout.",
     "A recycled list item remains a logical Octane subtree while its physical native cell is absent. Refs detach and reattach through the optional universal host-attachment capability; viewport recycling alone does not run component or effect cleanup.",
     "Background event handlers receive detached data-only payloads without live event methods or native instances.",
-    "Main-thread receiver installation is explicit in this private source phase; automatic Rspeedy production bootstrap is deferred to Milestone 5.",
+    "Rspeedy application mode generates and installs a main-thread receiver, but that receiver only applies transported background commits. It does not render the application, provide main-thread first paint, or adopt a first tree; those remain Milestone 6.",
     "Platform APIs are background-only; the main-thread compiler preset rejects @octanejs/lynx/platform imports and statically visible NativeModules access. createLynxRoot() separately verifies the public background-only lynx.getJSModule() surface at runtime. The reload export only requests lynx.reload(); it is not a framework reload receiver.",
     "Nested lists, portals, Lynx Suspense proof, lazy bundles, gestures, animations, full boolean-defer parity, and defer.unmountRecycled semantics are excluded from the initial Milestone 4 surface."
   ],
   "ssr": "Unsupported. Lynx first-screen adoption is a native runtime protocol, not HTML SSR or Octane hydration.",
-  "verified": "2026-07-19",
+  "verified": "2026-07-20",
   "notes": [
     "Milestone 0 remains blocked on public lifecycle/event hooks, reload/background teardown, Web execution, and the Android/iOS engine matrix; this private implementation is not a technical preview.",
     "Native __AddEvent token registration is public, but the production background callback receiver remains the private lynxCoreInject.tt.publishEvent hook; dispatchNativeEvent* is a source/test bridge only.",
-    "Milestone 3 implements the host boundary for class strings, inline styles, CSS IDs/scopes, and bundled URL strings. CSS import/CSS Module extraction, stylesheet/template sections, and asset bundling remain Milestone 5 work.",
+    "Milestone 5 connects CSS imports, CSS Modules, stylesheet/template sections, assets, source/debug output, runtime wrapping, and native encoding through the pinned framework-neutral Rspeedy packages. This is build evidence, not native style, asset-loading, or source-map execution evidence.",
     "Octane submits a complete next dataset bag through __SetDataset. @lynx-js/testing-environment@0.3.0 implements that operation with Object.assign, so key deletion is adapter-call evidence only until a real-engine lane proves it.",
     "The public types expose createSelectorQuery().select(string), while selectUniqueID is commented out. Octane therefore uses generation-scoped [octane-ref] selectors; the testing environment proves selection/setNativeProps only, so invoke/fields/path/measure, selector support, and layout results require real-engine evidence.",
     "The official JavaScript environment models a 1,000-item logical list, callback-demanded materialization, native cell identity reuse, reorder, attachment ordering, and inert callbacks after teardown. It cannot establish Android/iOS native allocation, scrolling, layout, steady-state memory, or lifecycle behavior.",
@@ -28,8 +28,11 @@
     "The app-owned Android/iOS Native Module and custom-element files under examples/native-capabilities are illustrative, excluded from package files, and not compiled or device-verified.",
     "Boolean list-item defer metadata is accepted and forwarded, but all initial Octane list cells are callback-demanded regardless of that prop; this is not full ReactLynx defer behavior. ReactLynx's defer={{ unmountRecycled: true }} lifecycle behavior is not implemented.",
     "Nested <list> hosts are rejected during batch preparation in the initial contract rather than entering a partially supported recycling path.",
-    "Milestones 3–4 formal exits remain unmet until equivalent pinned ReactLynx fixtures and native capability samples are compared through public observations on Explorer, Android, and iOS.",
-    "Production testing and .lynx.bundle integration remain Milestone 5 work."
+    "Milestones 3–5 formal exits remain unmet until equivalent pinned ReactLynx fixtures and native capability samples are compared through public observations on Lynx Web, Explorer, Android, and iOS.",
+    "Omitting the Rspeedy plugin's thread option is the production application source/build path. Explicit background and main-thread options remain isolated compiler-graph diagnostics.",
+    "@octanejs/lynx/testing re-exports the pinned JavaScript testing environment's public classes and install/tree/event helpers. Its availability explicitly excludes native and device execution.",
+    "The exact private compatibility set is Lynx SDK 3.9.0 (target 3.9), Rspeedy 0.16.0, Rsbuild 2.1.4, Rspack 2.1.3, template plugin 0.13.0, CSS extract plugin 0.9.0, runtime wrapper 0.2.2, dev transport 0.3.0, runtime globals 0.0.7, tasm 0.0.39, testing environment 0.3.0, Lynx types 4.0.0, and the blocked Web control @lynx-js/web-core@0.22.2.",
+    "The source/build milestone does not establish Lynx Web or device startup, runtime event delivery, reload/teardown, device error capture, source-map resolution in an engine, or stale-free HMR. The private packages are not a technical preview."
   ],
   "docs": [
     "docs/lynx-native-renderer-plan.md",

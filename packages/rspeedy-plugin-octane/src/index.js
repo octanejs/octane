@@ -1,4 +1,5 @@
 export { octane, pluginOctane } from './plugin.js';
+export { LYNX_TARGET_SDK_VERSION } from './application.js';
 export {
 	LYNX_BACKGROUND_LAYER,
 	LYNX_BACKGROUND_RUNTIME,

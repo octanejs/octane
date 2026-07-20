@@ -13,7 +13,7 @@ const packageJson = JSON.parse(
 	exports: Record<string, string>;
 };
 
-describe('@octanejs/lynx Milestone 4 public surface', () => {
+describe('@octanejs/lynx Milestone 5 public surface', () => {
 	it('keeps every required package subpath private and addressable', () => {
 		expect(packageJson.private).toBe(true);
 		expect(packageJson.version).toBe('0.0.0');
@@ -40,8 +40,13 @@ describe('@octanejs/lynx Milestone 4 public surface', () => {
 			technicalPreviewMilestone: 5,
 		});
 		expect(testingApi.lynxTestingAvailability).toMatchObject({
-			available: false,
+			available: true,
 			plannedMilestone: 5,
+			implementedMilestone: 5,
+			sourceTests: true,
+			execution: 'javascript-host-emulation',
+			nativeExecution: false,
+			deviceExecution: false,
 		});
 		expect(rootApi.root.renderer).toBe('lynx');
 		expect(rootApi.createLynxRoot).toBeTypeOf('function');
@@ -52,6 +57,10 @@ describe('@octanejs/lynx Milestone 4 public surface', () => {
 		expect(platformApi.getNativeModules).toBeTypeOf('function');
 		expect(platformApi.reload).toBeTypeOf('function');
 		expect(platformApi).not.toHaveProperty('getInitData');
-		expect(testingApi).not.toHaveProperty('createRoot');
+		expect(testingApi.LynxTestingEnv).toBeTypeOf('function');
+		expect(testingApi.installLynxTestingEnv).toBeTypeOf('function');
+		expect(testingApi.uninstallLynxTestingEnv).toBeTypeOf('function');
+		expect(testingApi.initElementTree).toBeTypeOf('function');
+		expect(testingApi.GlobalEventEmitter).toBeTypeOf('function');
 	});
 });
