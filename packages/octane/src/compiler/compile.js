@@ -5126,6 +5126,11 @@ export function compile(source, filename, options) {
 		})
 		.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
+	// No tail slots exist on the client today (prop memos are server-only), but
+	// flush before assembly so a future client-side tail site cannot trip the
+	// joinHoistedHelpers assertion — imports are built after this join, so the
+	// timing is safe here.
+	flushTailHookSymbols(ctx);
 	const helpers = joinHoistedHelpers(ctx);
 	const helpersBlock = helpers ? helpers + '\n\n' : '';
 
@@ -5424,6 +5429,9 @@ function compileServer(source, filename, options, styleRemap = null) {
 		}
 	}
 
+	// Assign deferred (server-only) slot ids BEFORE the import list is built:
+	// the flush may register `hookSlots` as a needed runtime import.
+	flushTailHookSymbols(ctx);
 	const runtimeImport = buildRuntimeImport(ctx, 'octane/server');
 	const joinedHelpers = joinHoistedHelpers(ctx);
 	const helpers = joinedHelpers ? joinedHelpers + '\n\n' : '';
@@ -8153,6 +8161,73 @@ function isTrivialUseArg(n) {
 	return false;
 }
 
+// Server prop-flow eligibility: an inline component-prop expression whose
+// evaluation CREATES values per pass — a call or `new` reached during render
+// (nested function bodies don't run at render time and are skipped). Two
+// blockers: JSX (lowered later; wrapping the raw node would smuggle it past
+// the lowering passes) and hook-shaped calls (`use` / `use[A-Z]…` / a tracked
+// `use` import alias — their slot/occurrence bookkeeping must execute on the
+// body proper every pass, so they can never sit behind a cache hit).
+function isPropCreationExpr(expr, ctx) {
+	let found = false;
+	let blocked = false;
+	walk(expr);
+	return found && !blocked;
+
+	function isHookishCallee(callee) {
+		if (callee.type === 'Identifier') {
+			return (
+				/^use($|[A-Z])/.test(callee.name) || ctx?._parallelUseAliases?.has(callee.name) === true
+			);
+		}
+		if (
+			(callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') &&
+			!callee.computed
+		) {
+			return callee.property.type === 'Identifier' && /^use($|[A-Z])/.test(callee.property.name);
+		}
+		return false;
+	}
+
+	function walk(n) {
+		if (blocked || !n || typeof n !== 'object') return;
+		if (Array.isArray(n)) {
+			for (const x of n) walk(x);
+			return;
+		}
+		if (typeof n.type === 'string') {
+			if (n.type.startsWith('JSX')) {
+				blocked = true;
+				return;
+			}
+			if (FN_TYPES.has(n.type)) return; // does not run during render
+			// Same render-time-call inventory as containsRenderCall: plain and
+			// optional calls, constructions, tagged templates, and dynamic
+			// import() (ESTree flavor; the Babel flavor is a CallExpression).
+			if (
+				n.type === 'CallExpression' ||
+				n.type === 'OptionalCallExpression' ||
+				n.type === 'NewExpression' ||
+				n.type === 'TaggedTemplateExpression' ||
+				n.type === 'ImportExpression'
+			) {
+				if (
+					(n.type === 'CallExpression' || n.type === 'OptionalCallExpression') &&
+					isHookishCallee(n.callee)
+				) {
+					blocked = true;
+					return;
+				}
+				found = true;
+			}
+		}
+		for (const k in n) {
+			if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
+			walk(n[k]);
+		}
+	}
+}
+
 const LOOP_TYPES = new Set([
 	'ForStatement',
 	'ForOfStatement',
@@ -8284,6 +8359,13 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 				const isComponent =
 					nameNode && nameNode.type === 'JSXIdentifier' && /^[A-Z]/.test(nameNode.name);
 				if (isComponent) {
+					// Server: creations flowing INTO child props (`<Kid p={make(x)}/>`)
+					// need the same cross-pass identity as use()-site creations — every
+					// streaming wave re-runs this body, and a recreated per-request
+					// promise can never resolve at the descendant's unwrap (identity-
+					// keyed via puBatch). Inline attribute position only: the value has
+					// no other binding, so caching it cannot observe an escape.
+					if (ctx.mode === 'server') node = memoizePropCreations(node);
 					collectWarmChild(node, nameNode.name);
 					return node; // component children render inside the child — don't descend
 				}
@@ -8376,6 +8458,66 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 		return { ...arm, body };
 	}
 
+	// Server Pass A over component ATTRIBUTES: wrap each inline creation
+	// expression in the cross-pass creation cache (`_$puMemo`) so the value —
+	// and any per-request thenables inside it — keeps its identity between
+	// streaming/buffered passes. Deps-keyed exactly like a use()-site memo; a
+	// dependency drift is a clean recreation. The original expression is kept
+	// on the attribute for the warm printer (collectWarmChild below), which
+	// prints the SAME slot through warmMemo so the warm walk and the render
+	// path share one creation instead of racing two.
+	function memoizePropCreations(node) {
+		const attrs = node.openingElement.attributes || [];
+		let changed = false;
+		const nextAttrs = attrs.map((a) => {
+			if (a.type !== 'JSXAttribute' || a.name.type !== 'JSXIdentifier') return a;
+			const key = a.name.name;
+			if (key === 'ref' || key === 'key') return a; // instance-wired — never cached
+			if (!a.value || a.value.type !== 'JSXExpressionContainer') return a;
+			const expr = unwrapTsExpr(a.value.expression);
+			if (!isPropCreationExpr(expr, ctx)) return a;
+			// Tail-allocated (see allocTailHookSymbol): this slot exists only in
+			// the server compile, and taking an inline id here would shift every
+			// later shared site's id relative to the client compile. Composable
+			// Symbol for the same reason as use() memos: warm caches span
+			// component scopes.
+			const symVar = allocTailHookSymbol(ctx, `${componentName}.prop.memo`, {
+				componentName,
+				name: 'prop memo',
+				kind: 'useMemo',
+				node: expr,
+			});
+			const deps = collectDepPaths(expr);
+			const memoAlias = requireRuntimeForContext(ctx, 'puMemo');
+			changed = true;
+			return {
+				...a,
+				value: {
+					type: 'JSXExpressionContainer',
+					expression: {
+						type: 'CallExpression',
+						callee: { type: 'Identifier', name: memoAlias },
+						arguments: [
+							{
+								type: 'ArrowFunctionExpression',
+								params: [],
+								expression: true,
+								async: false,
+								body: expr,
+							},
+							{ type: 'ArrayExpression', elements: deps },
+							{ type: 'Identifier', name: symVar },
+						],
+						optional: false,
+					},
+				},
+				_octanePropMemo: { expr, deps, symVar },
+			};
+		});
+		if (!changed) return node;
+		return { ...node, openingElement: { ...node.openingElement, attributes: nextAttrs } };
+	}
+
 	function collectWarmChild(node, compName) {
 		const attrs = node.openingElement.attributes || [];
 		if ((node.children || []).length > 0) return; // children render inside the child — skip
@@ -8388,7 +8530,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			if (a.value == null) value = { type: 'Literal', value: true, raw: 'true' };
 			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
 			else value = a.value; // Literal
-			props.push({ key, value });
+			props.push({ key, value, memo: a._octanePropMemo });
 		}
 		warmChildren.push({ compName, props, guards: [...guards], locals });
 	}
@@ -8655,7 +8797,11 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 			!paramNames.has(w.compName) &&
 			!(locals && locals.has(w.compName)) &&
 			!(w.locals && w.locals.has(w.compName)) &&
-			w.props.every((p) => isWarmSafeExpr(p.value, paramNames, locals, w.locals)),
+			// A memoized prop is judged by its ORIGINAL creation expression — the
+			// puMemo wrapper only adds compiler-owned module-scope names.
+			w.props.every((p) =>
+				isWarmSafeExpr(p.memo ? p.memo.expr : p.value, paramNames, locals, w.locals),
+			),
 	);
 	if (warmKids.length === 0 && warmMemos.length === 0) return { thunk: null, warmSrc: null };
 	// A component whose only warm edge is recursion back to itself and which has
@@ -8688,6 +8834,29 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		],
 		optional: false,
 	});
+	// A memoized prop prints through the value-returning warmMemo form: at warm
+	// time it CLAIMS the render pass's creation for the same slot (or creates
+	// once, adoptable by the render's puMemo) instead of re-evaluating the raw
+	// expression — the warm walk and the render path share one creation.
+	const warmPropValue = (p) =>
+		p.memo
+			? {
+					type: 'CallExpression',
+					callee: { type: 'Identifier', name: warmMemoAlias },
+					arguments: [
+						{
+							type: 'ArrowFunctionExpression',
+							params: [],
+							expression: true,
+							async: false,
+							body: p.memo.expr,
+						},
+						{ type: 'ArrayExpression', elements: p.memo.deps },
+						{ type: 'Identifier', name: p.memo.symVar },
+					],
+					optional: false,
+				}
+			: p.value;
 	const childCall = (w) => ({
 		type: 'CallExpression',
 		callee: { type: 'Identifier', name: warmChildAlias },
@@ -8698,7 +8867,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 				properties: w.props.map((p) => ({
 					type: 'Property',
 					key: { type: 'Identifier', name: p.key },
-					value: p.value,
+					value: warmPropValue(p),
 					kind: 'init',
 					method: false,
 					shorthand: false,
@@ -8709,7 +8878,8 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		optional: false,
 	});
 
-	if (warmMemos.length > 0) requireRuntimeForContext(ctx, 'warmMemo');
+	if (warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo)))
+		requireRuntimeForContext(ctx, 'warmMemo');
 	if (warmKids.length > 0) requireRuntimeForContext(ctx, 'warmChild');
 
 	// In-body warm thunk: children only — the body's own creations already ran
@@ -10287,6 +10457,15 @@ function ensureHookSlotBase(ctx) {
 }
 
 function joinHoistedHelpers(ctx) {
+	if (ctx._pendingTailHookSlots !== undefined) {
+		// Flushing here would be too late for the server pipeline: its runtime
+		// import list is built BEFORE the helpers join, and a flush-time
+		// ensureHookSlotBase would register `hookSlots` after the imports were
+		// printed — the emitted module then references _$hookSlots without
+		// importing it (broke every prod module whose only slot sites were prop
+		// memos). Each pipeline flushes explicitly before assembling imports.
+		throw new Error('octane compiler: tail hook slots were not flushed before module assembly.');
+	}
 	return ctx.hoistedHelpers
 		.map((helper) => {
 			if (helper === HOOK_SLOT_BASE_HELPER) {
@@ -10300,9 +10479,35 @@ function joinHoistedHelpers(ctx) {
 		.join('\n');
 }
 
-function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false) {
+// Server-only slots (prop memos) must not perturb the shared hook-symbol
+// sequence: the client compile never allocates them, and the two compiles of
+// one module should agree on every shared site's id. Nothing crosses the
+// SSR/client boundary by slot id (hydration seeds are consumed by positional
+// cursor), so this is a symmetry invariant, not a wire contract — but it keeps
+// numeric hook slots, HMR stable keys, and profile indices identical across
+// modes for every site that exists in both. The NAME is allocated eagerly (the
+// rewritten AST needs it); the id is assigned at module finalize
+// (joinHoistedHelpers), after every shared site has claimed its id, so
+// server-only slots take the tail of the module's range.
+function allocTailHookSymbol(ctx, debugName, profile = null) {
+	const pending = (ctx._pendingTailHookSlots ??= []);
+	const name = allocCompilerName(ctx, `_pm$${pending.length}`);
+	pending.push({ name, debugName, profile });
+	return name;
+}
+
+function flushTailHookSymbols(ctx) {
+	const pending = ctx._pendingTailHookSlots;
+	if (pending === undefined) return;
+	ctx._pendingTailHookSlots = undefined;
+	for (const p of pending) {
+		allocHookSymbol(ctx, `${p.debugName}#${ctx.nextHookSymId}`, p.profile, true, p.name);
+	}
+}
+
+function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, presetName = null) {
 	const id = ctx.nextHookSymId++;
-	const name = allocCompilerName(ctx, `_h$${id}`);
+	const name = presetName ?? allocCompilerName(ctx, `_h$${id}`);
 	let symbolExpr;
 	if (ctx.hmr) {
 		// HMR (dev serve): Symbol.for(stableKey) so re-imports produce the SAME
