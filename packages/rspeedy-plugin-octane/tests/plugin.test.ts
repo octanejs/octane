@@ -1,6 +1,7 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
@@ -14,6 +15,7 @@ import {
 } from '../src/index.js';
 
 const temporaryRoots: string[] = [];
+const testRequire = createRequire(import.meta.url);
 
 type BundlerChainCallback = (chain: unknown, context: unknown) => void;
 
@@ -45,6 +47,12 @@ function createToolchainRoot(): string {
 	writePackage(root, '@lynx-js/rspeedy', '0.16.0');
 	writePackage(root, '@rsbuild/core', '2.1.4');
 	writePackage(root, '@rspack/core', '2.1.3');
+	const devTransport = dirname(
+		dirname(dirname(testRequire.resolve('@lynx-js/webpack-dev-transport/client'))),
+	);
+	const devTransportLink = packageDirectory(root, '@lynx-js/webpack-dev-transport');
+	mkdirSync(dirname(devTransportLink), { recursive: true });
+	symlinkSync(devTransport, devTransportLink, 'dir');
 	return root;
 }
 
@@ -152,7 +160,7 @@ function applyPlugin(
 			},
 		});
 	}
-	return state;
+	return { ...state, root };
 }
 
 afterEach(() => {
@@ -243,6 +251,10 @@ describe('@octanejs/rspeedy-plugin', () => {
 				import: [expect.stringMatching(/main-thread-entry\.js$/)],
 				layer: LYNX_MAIN_THREAD_LAYER,
 			}),
+		);
+		const appRequire = createRequire(join(state.root, 'package.json'));
+		expect(realpathSync(appRequire.resolve('@lynx-js/webpack-dev-transport/client'))).toBe(
+			realpathSync(testRequire.resolve('@lynx-js/webpack-dev-transport/client')),
 		);
 		expect(JSON.stringify([...state.entries.values()])).not.toMatch(
 			/@lynx-js\/react|react-refresh/i,
