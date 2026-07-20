@@ -39,6 +39,8 @@ packages:
   - benchmarks/chat-stream/*
   - benchmarks/tanstack-start
   - benchmarks/tanstack-start/*
+  - benchmarks/tanstack-com
+  - benchmarks/tanstack-com/*
   - playground/*
   - examples/*
   - website
