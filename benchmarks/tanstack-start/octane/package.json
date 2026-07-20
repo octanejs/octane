@@ -1,0 +1,25 @@
+{
+  "name": "tanstack-start-bench-octane",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Octane flavor of the Start benchmark app — the repo's vendored @tanstack/octane-* packages on the native stream-injection path.",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@octanejs/tanstack-start": "workspace:*",
+    "@tanstack/octane-router": "workspace:*",
+    "@tanstack/octane-start": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:default",
+    "nitro": "^3.0.260311-beta",
+    "typescript": "catalog:default",
+    "vite": "catalog:default"
+  }
+}
