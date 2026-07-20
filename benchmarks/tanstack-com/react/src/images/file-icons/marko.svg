@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -583 2560 2560">
+  <style>stop:not([stop-color]){stop-color:inherit}</style>
+  <path fill="#8dc220" d="M1281 0h361l-427 697H854z"/>
+  <path fill="url(#a)" d="M427 0h361L361 697l427 697H427L0 698z"/>
+  <linearGradient id="a" x2="0" y2="1">
+    <stop offset=".685" stop-color="#44bfef"/>
+    <stop offset="1" stop-color="#2073ba"/>
+  </linearGradient>
+  <path fill="#00ac71" d="M854 697h361L788 0H427z"/>
+  <path fill="url(#b)" d="M1642 0h-361l428 697-428 697h361l428-697z"/>
+  <linearGradient id="b" x2="0" y2="1" stop-color="#f9bc00">
+    <stop offset=".5"/>
+    <stop offset=".5" stop-color="#e95506"/>
+    <stop offset=".833"/>
+  </linearGradient>
+  <path fill="url(#c)" d="M1493 246h-361L855 698h361z"/>
+  <linearGradient id="c" x2="0" y2="1" stop-color="#8ac23e">
+    <stop offset="0" stop-opacity="0"/>
+    <stop offset="1"/>
+  </linearGradient>
+  <path fill="url(#d)" d="M1005 452h361L1642 0h-361z"/>
+  <linearGradient id="d" x2="0" y2="1" stop-color="#698932">
+    <stop offset="0"/>
+    <stop offset="1" stop-opacity="0"/>
+  </linearGradient>
+  <path fill="url(#e)" d="M1919 452h-361L1281 0h361z"/>
+  <linearGradient id="e" x2="0" y2="1" stop-color="#ffed01">
+    <stop offset="0"/>
+    <stop offset="1" stop-opacity="0"/>
+  </linearGradient>
+  <path fill="url(#f)" d="M150 452h361L788 0H427z"/>
+  <linearGradient id="f" x2="0" y2="1" stop-color="#00828b">
+    <stop offset="0"/>
+    <stop offset=".833" stop-opacity="0"/>
+  </linearGradient>
+  <path fill="url(#g)" d="M638 246H277L0 698h361z"/>
+  <linearGradient id="g" x2="0" y2="1" stop-color="#88d0f1">
+    <stop offset="0" stop-opacity="0"/>
+    <stop offset="1"/>
+  </linearGradient>
+  <path fill="url(#h)" d="M1065 452H704L427 0h361z"/>
+  <linearGradient id="h" x2="0" y2="1" stop-color="#8ed0e1">
+    <stop offset="0"/>
+    <stop offset="1" stop-opacity="0"/>
+  </linearGradient>
+  <path fill="url(#i)" d="M2132 0h-361l427 697-428 697h361l428-697z"/>
+  <linearGradient id="i" x2="0" y2="1" stop-color="#df1b1c">
+    <stop offset="0" stop-color="#e02a89"/>
+    <stop offset=".31"/>
+    <stop offset=".5"/>
+    <stop offset=".5" stop-color="#7f1e4f"/>
+    <stop offset=".833"/>
+  </linearGradient>
+</svg>

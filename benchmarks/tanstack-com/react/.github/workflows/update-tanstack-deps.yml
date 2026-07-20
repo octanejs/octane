@@ -1,0 +1,64 @@
+name: Update TanStack Dependencies
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run weekly on Sundays at 10:00 AM UTC
+    - cron: "0 10 * * 0"
+
+jobs:
+  update-deps:
+    name: Update TanStack Dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          # This scheduled job commits dependency updates back to the branch.
+          persist-credentials: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install Packages
+        run: pnpm install --frozen-lockfile
+
+      - name: Update TanStack Dependencies
+        run: pnpm up "@tanstack/*" --latest
+
+      - name: Check for Changes
+        id: git-check
+        run: |
+          git status --porcelain .
+          if [[ -z $(git status --porcelain .) ]]; then
+            echo "No changes detected"
+            echo "changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes detected"
+            echo "changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Lint
+        if: steps.git-check.outputs.changes == 'true'
+        run: pnpm lint
+
+      - name: Run Build
+        if: steps.git-check.outputs.changes == 'true'
+        run: pnpm build
+
+      - name: Commit and Push Changes
+        if: steps.git-check.outputs.changes == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "chore: update @tanstack/* dependencies"
+          git push

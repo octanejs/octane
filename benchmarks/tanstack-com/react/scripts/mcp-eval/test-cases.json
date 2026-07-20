@@ -1,0 +1,1915 @@
+{
+  "$schema": "./test-cases.schema.json",
+  "version": "1.0.0",
+  "description": "MCP documentation discoverability test cases",
+  "testCases": [
+    {
+      "id": "router-query-ssr-integration",
+      "question": "In TanStack Start, how do I prefetch data for a route that uses both a loader and TanStack Query, ensuring the data is dehydrated to the client without double-fetching?",
+      "difficulty": "hard",
+      "tags": ["start", "router", "query", "ssr", "integration"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "integrations/query",
+          "required": true,
+          "reason": "This is THE official integration guide"
+        }
+      ],
+      "idealSearchQueries": ["query integration", "router query ssr", "react-router-ssr-query"],
+      "badSearchQueries": ["prefetch dehydrate SSR", "loader prefetch dehydrate"],
+      "correctAnswerMustInclude": [
+        "@tanstack/react-router-ssr-query",
+        "setupRouterSsrQueryIntegration"
+      ],
+      "notes": "The integration package handles all dehydration/hydration automatically. Manual setup is possible but not recommended."
+    },
+    {
+      "id": "createfileroute-basic",
+      "question": "How do I create a file-based route in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "basics"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/api/router/createFileRouteFunction",
+          "required": true,
+          "reason": "Primary API reference"
+        }
+      ],
+      "idealSearchQueries": ["createFileRoute"],
+      "correctAnswerMustInclude": ["createFileRoute", "export const Route"]
+    },
+    {
+      "id": "query-usequery-basic",
+      "question": "How do I fetch data with TanStack Query in React?",
+      "difficulty": "easy",
+      "tags": ["query", "basics", "react"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/queries",
+          "required": true,
+          "reason": "Primary guide for queries"
+        }
+      ],
+      "idealSearchQueries": ["queries guide", "query basics"],
+      "badSearchQueries": ["useQuery"],
+      "correctAnswerMustInclude": ["useQuery", "queryKey", "queryFn"],
+      "notes": "Searching 'useQuery' returns the API reference, not the guide. Search for 'queries guide' instead."
+    },
+    {
+      "id": "start-server-functions",
+      "question": "How do I create a server function in TanStack Start that can be called from the client?",
+      "difficulty": "medium",
+      "tags": ["start", "server-functions"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/server-functions",
+          "required": true,
+          "reason": "Primary server functions guide"
+        }
+      ],
+      "idealSearchQueries": ["server function", "createServerFn"],
+      "correctAnswerMustInclude": ["createServerFn"]
+    },
+    {
+      "id": "router-search-params-validation",
+      "question": "How do I validate and type search params in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "search-params", "validation", "typescript"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/search-params",
+          "required": true,
+          "reason": "Primary search params guide"
+        }
+      ],
+      "idealSearchQueries": ["search params validation", "validateSearch"],
+      "correctAnswerMustInclude": ["validateSearch"]
+    },
+    {
+      "id": "table-column-definitions",
+      "question": "How do I define columns for TanStack Table?",
+      "difficulty": "easy",
+      "tags": ["table", "basics"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/column-defs",
+          "required": true,
+          "reason": "Primary column definitions guide"
+        }
+      ],
+      "idealSearchQueries": ["column definitions", "createColumnHelper"],
+      "correctAnswerMustInclude": ["columnHelper", "accessorKey"]
+    },
+    {
+      "id": "form-validation-zod",
+      "question": "How do I use Zod validation with TanStack Form?",
+      "difficulty": "medium",
+      "tags": ["form", "validation", "zod"],
+      "expectedDocs": [
+        {
+          "library": "form",
+          "path": "framework/react/guides/validation",
+          "required": true,
+          "reason": "Validation guide covering Zod"
+        }
+      ],
+      "idealSearchQueries": ["form zod validation", "form validation"],
+      "correctAnswerMustInclude": ["zod", "validators"]
+    },
+    {
+      "id": "virtual-dynamic-row-heights",
+      "question": "How do I handle dynamic/variable row heights in TanStack Virtual?",
+      "difficulty": "medium",
+      "tags": ["virtual", "dynamic-sizing"],
+      "expectedDocs": [
+        {
+          "library": "virtual",
+          "path": "api/virtualizer",
+          "required": true,
+          "reason": "API docs for measureElement and estimateSize"
+        },
+        {
+          "library": "virtual",
+          "path": "framework/react/examples/dynamic",
+          "required": false,
+          "reason": "Example showing dynamic sizing"
+        }
+      ],
+      "idealSearchQueries": ["dynamic size virtualizer", "measureElement"],
+      "correctAnswerMustInclude": ["estimateSize", "measureElement"]
+    },
+    {
+      "id": "query-mutations",
+      "question": "How do I update data on the server with TanStack Query?",
+      "difficulty": "easy",
+      "tags": ["query", "mutations"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/mutations",
+          "required": true,
+          "reason": "Primary mutations guide"
+        }
+      ],
+      "idealSearchQueries": ["mutation", "useMutation"],
+      "correctAnswerMustInclude": ["useMutation", "mutate"]
+    },
+    {
+      "id": "router-loaderDeps",
+      "question": "How do I make a TanStack Router loader depend on search params so it reloads when they change?",
+      "difficulty": "medium",
+      "tags": ["router", "loaders", "search-params"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/data-loading",
+          "required": true,
+          "reason": "Data loading guide covers loaderDeps"
+        }
+      ],
+      "idealSearchQueries": ["loaderDeps", "loader search params"],
+      "correctAnswerMustInclude": ["loaderDeps"]
+    },
+
+    {
+      "id": "query-optimistic-updates",
+      "question": "How do I implement optimistic updates with TanStack Query so the UI updates immediately before the server responds?",
+      "difficulty": "medium",
+      "tags": ["query", "mutations", "optimistic"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/optimistic-updates",
+          "required": true,
+          "reason": "Dedicated optimistic updates guide"
+        }
+      ],
+      "idealSearchQueries": ["optimistic updates", "optimistic mutation"],
+      "correctAnswerMustInclude": ["onMutate", "onError", "onSettled"]
+    },
+    {
+      "id": "query-infinite-scroll",
+      "question": "How do I implement infinite scrolling with TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "pagination", "infinite"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/infinite-queries",
+          "required": true,
+          "reason": "Infinite queries guide"
+        }
+      ],
+      "idealSearchQueries": ["infinite query", "useInfiniteQuery"],
+      "correctAnswerMustInclude": ["useInfiniteQuery", "getNextPageParam", "fetchNextPage"]
+    },
+    {
+      "id": "query-cache-invalidation",
+      "question": "How do I invalidate and refetch queries after a mutation in TanStack Query?",
+      "difficulty": "easy",
+      "tags": ["query", "cache", "invalidation"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/invalidations-from-mutations",
+          "required": true,
+          "reason": "Guide on invalidating queries from mutations"
+        }
+      ],
+      "idealSearchQueries": ["invalidate queries", "invalidateQueries mutation"],
+      "correctAnswerMustInclude": ["invalidateQueries", "queryClient"]
+    },
+    {
+      "id": "query-dependent-queries",
+      "question": "How do I make one query depend on the result of another query in TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "dependent", "serial"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/dependent-queries",
+          "required": true,
+          "reason": "Dependent queries guide"
+        }
+      ],
+      "idealSearchQueries": ["dependent queries", "enabled option"],
+      "correctAnswerMustInclude": ["enabled"]
+    },
+    {
+      "id": "query-prefetching",
+      "question": "How do I prefetch data before a user navigates to a page with TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "prefetch", "performance"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/prefetching",
+          "required": true,
+          "reason": "Prefetching guide"
+        }
+      ],
+      "idealSearchQueries": ["prefetch query", "prefetchQuery"],
+      "correctAnswerMustInclude": ["prefetchQuery"]
+    },
+    {
+      "id": "query-suspense",
+      "question": "How do I use TanStack Query with React Suspense?",
+      "difficulty": "medium",
+      "tags": ["query", "suspense", "react"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/suspense",
+          "required": true,
+          "reason": "Suspense guide"
+        }
+      ],
+      "idealSearchQueries": ["suspense guide", "suspense query guide"],
+      "badSearchQueries": ["useSuspenseQuery"],
+      "correctAnswerMustInclude": ["useSuspenseQuery"],
+      "notes": "Searching 'useSuspenseQuery' returns API reference first. Once Algolia pageRank fix is deployed, guide should rank higher."
+    },
+    {
+      "id": "query-devtools",
+      "question": "How do I set up TanStack Query DevTools to debug my queries?",
+      "difficulty": "easy",
+      "tags": ["query", "devtools", "debugging"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/devtools",
+          "required": true,
+          "reason": "DevTools setup guide"
+        }
+      ],
+      "idealSearchQueries": ["query devtools", "ReactQueryDevtools"],
+      "correctAnswerMustInclude": ["ReactQueryDevtools"]
+    },
+
+    {
+      "id": "router-code-splitting",
+      "question": "How do I implement code splitting and lazy loading routes in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "code-splitting", "lazy", "performance"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/code-splitting",
+          "required": true,
+          "reason": "Code splitting guide"
+        }
+      ],
+      "idealSearchQueries": ["code splitting", "lazy route"],
+      "correctAnswerMustInclude": ["lazyRouteComponent", "lazy"]
+    },
+    {
+      "id": "router-navigation-blocking",
+      "question": "How do I prevent navigation when a form has unsaved changes in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "navigation", "blocking", "forms"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/navigation-blocking",
+          "required": true,
+          "reason": "Navigation blocking guide"
+        }
+      ],
+      "idealSearchQueries": ["navigation blocking", "useBlocker"],
+      "correctAnswerMustInclude": ["useBlocker"]
+    },
+    {
+      "id": "router-authenticated-routes",
+      "question": "How do I protect routes that require authentication in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "auth", "protected-routes"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/authenticated-routes",
+          "required": true,
+          "reason": "Authenticated routes guide"
+        }
+      ],
+      "idealSearchQueries": ["authenticated routes", "protected routes", "auth redirect"],
+      "correctAnswerMustInclude": ["beforeLoad", "redirect"]
+    },
+    {
+      "id": "router-not-found",
+      "question": "How do I handle 404 not found pages in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "404", "not-found"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/not-found-errors",
+          "required": true,
+          "reason": "Not found errors guide"
+        }
+      ],
+      "idealSearchQueries": ["not found", "404", "notFoundComponent"],
+      "correctAnswerMustInclude": ["notFoundComponent"]
+    },
+    {
+      "id": "router-path-params",
+      "question": "How do I access dynamic path parameters like /posts/$postId in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "params", "dynamic-routes"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/path-params",
+          "required": true,
+          "reason": "Path params guide"
+        }
+      ],
+      "idealSearchQueries": ["path params", "useParams", "route params"],
+      "correctAnswerMustInclude": ["useParams", "$"]
+    },
+    {
+      "id": "router-preloading",
+      "question": "How do I preload route data on hover in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "preload", "performance"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/preloading",
+          "required": true,
+          "reason": "Preloading guide"
+        }
+      ],
+      "idealSearchQueries": ["preload route", "preloading"],
+      "correctAnswerMustInclude": ["preload"]
+    },
+    {
+      "id": "router-devtools",
+      "question": "How do I set up TanStack Router DevTools?",
+      "difficulty": "easy",
+      "tags": ["router", "devtools", "debugging"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/devtools",
+          "required": true,
+          "reason": "DevTools guide"
+        }
+      ],
+      "idealSearchQueries": ["router devtools", "TanStackRouterDevtools"],
+      "correctAnswerMustInclude": ["TanStackRouterDevtools"]
+    },
+
+    {
+      "id": "table-sorting",
+      "question": "How do I implement column sorting in TanStack Table?",
+      "difficulty": "easy",
+      "tags": ["table", "sorting"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/sorting",
+          "required": true,
+          "reason": "Sorting guide"
+        }
+      ],
+      "idealSearchQueries": ["table sorting", "getSortedRowModel"],
+      "correctAnswerMustInclude": ["getSortedRowModel", "sorting"]
+    },
+    {
+      "id": "table-filtering",
+      "question": "How do I add filtering to TanStack Table?",
+      "difficulty": "medium",
+      "tags": ["table", "filtering"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/column-filtering",
+          "required": true,
+          "reason": "Column filtering guide"
+        }
+      ],
+      "idealSearchQueries": ["table filtering", "getFilteredRowModel"],
+      "correctAnswerMustInclude": ["getFilteredRowModel", "columnFilters"]
+    },
+    {
+      "id": "table-pagination",
+      "question": "How do I implement pagination in TanStack Table?",
+      "difficulty": "easy",
+      "tags": ["table", "pagination"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/pagination",
+          "required": true,
+          "reason": "Pagination guide"
+        }
+      ],
+      "idealSearchQueries": ["table pagination", "getPaginationRowModel"],
+      "correctAnswerMustInclude": ["getPaginationRowModel", "pageIndex", "pageSize"]
+    },
+    {
+      "id": "table-row-selection",
+      "question": "How do I enable row selection with checkboxes in TanStack Table?",
+      "difficulty": "medium",
+      "tags": ["table", "selection"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/row-selection",
+          "required": true,
+          "reason": "Row selection guide"
+        }
+      ],
+      "idealSearchQueries": ["row selection", "table checkbox"],
+      "correctAnswerMustInclude": ["rowSelection", "enableRowSelection"]
+    },
+    {
+      "id": "table-virtualization",
+      "question": "How do I virtualize a large table with TanStack Table and TanStack Virtual?",
+      "difficulty": "hard",
+      "tags": ["table", "virtual", "performance"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "framework/react/examples/virtualized-rows",
+          "required": true,
+          "reason": "Virtualized rows example"
+        }
+      ],
+      "idealSearchQueries": ["table virtualization", "virtualized rows"],
+      "correctAnswerMustInclude": ["useVirtualizer", "virtualRows"]
+    },
+    {
+      "id": "table-server-side",
+      "question": "How do I implement server-side pagination and sorting with TanStack Table?",
+      "difficulty": "hard",
+      "tags": ["table", "server-side", "pagination"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/pagination",
+          "required": true,
+          "reason": "Pagination guide covers manual mode"
+        }
+      ],
+      "idealSearchQueries": ["server side table", "manual pagination"],
+      "correctAnswerMustInclude": ["manualPagination", "pageCount"]
+    },
+
+    {
+      "id": "form-field-arrays",
+      "question": "How do I handle dynamic arrays of fields in TanStack Form?",
+      "difficulty": "medium",
+      "tags": ["form", "arrays", "dynamic"],
+      "expectedDocs": [
+        {
+          "library": "form",
+          "path": "framework/react/guides/arrays",
+          "required": true,
+          "reason": "Array fields guide"
+        }
+      ],
+      "idealSearchQueries": ["form arrays", "field array"],
+      "correctAnswerMustInclude": ["pushValue", "removeValue"]
+    },
+    {
+      "id": "form-async-validation",
+      "question": "How do I implement async validation that checks the server in TanStack Form?",
+      "difficulty": "medium",
+      "tags": ["form", "validation", "async"],
+      "expectedDocs": [
+        {
+          "library": "form",
+          "path": "framework/react/guides/dynamic-validation",
+          "required": true,
+          "reason": "Dynamic validation guide covers async validation"
+        }
+      ],
+      "idealSearchQueries": ["async validation", "async form validation"],
+      "correctAnswerMustInclude": ["async"]
+    },
+    {
+      "id": "form-submission",
+      "question": "How do I handle form submission with TanStack Form?",
+      "difficulty": "easy",
+      "tags": ["form", "submit"],
+      "expectedDocs": [
+        {
+          "library": "form",
+          "path": "framework/react/guides/basic-concepts",
+          "required": true,
+          "reason": "Basic concepts covers submission"
+        }
+      ],
+      "idealSearchQueries": ["form submit", "handleSubmit form"],
+      "correctAnswerMustInclude": ["onSubmit", "handleSubmit"]
+    },
+
+    {
+      "id": "virtual-horizontal-scroll",
+      "question": "How do I create a horizontal virtualized list with TanStack Virtual?",
+      "difficulty": "easy",
+      "tags": ["virtual", "horizontal"],
+      "expectedDocs": [
+        {
+          "library": "virtual",
+          "path": "api/virtualizer",
+          "required": true,
+          "reason": "API docs cover horizontal option"
+        }
+      ],
+      "idealSearchQueries": ["horizontal virtual", "horizontal virtualizer"],
+      "correctAnswerMustInclude": ["horizontal"]
+    },
+    {
+      "id": "virtual-window-scroll",
+      "question": "How do I virtualize a list that uses window scrolling instead of a container?",
+      "difficulty": "medium",
+      "tags": ["virtual", "window-scroll"],
+      "expectedDocs": [
+        {
+          "library": "virtual",
+          "path": "framework/react/react-virtual",
+          "required": true,
+          "reason": "React Virtual docs cover useWindowVirtualizer"
+        }
+      ],
+      "idealSearchQueries": ["useWindowVirtualizer", "window virtualizer"],
+      "correctAnswerMustInclude": ["useWindowVirtualizer"]
+    },
+    {
+      "id": "virtual-grid",
+      "question": "How do I create a virtualized grid with TanStack Virtual?",
+      "difficulty": "medium",
+      "tags": ["virtual", "grid"],
+      "expectedDocs": [
+        {
+          "library": "virtual",
+          "path": "api/virtualizer",
+          "required": true,
+          "reason": "Virtualizer API covers grid setup"
+        }
+      ],
+      "idealSearchQueries": ["virtualizer grid", "virtual rows columns"],
+      "correctAnswerMustInclude": ["virtualizer"]
+    },
+
+    {
+      "id": "start-deployment-vercel",
+      "question": "How do I deploy a TanStack Start app to Vercel?",
+      "difficulty": "easy",
+      "tags": ["start", "deployment", "vercel"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/hosting",
+          "required": true,
+          "reason": "Hosting guide contains Vercel section"
+        }
+      ],
+      "idealSearchQueries": ["hosting vercel", "deploy start"],
+      "correctAnswerMustInclude": ["vercel"]
+    },
+    {
+      "id": "start-deployment-netlify",
+      "question": "How do I deploy a TanStack Start app to Netlify?",
+      "difficulty": "easy",
+      "tags": ["start", "deployment", "netlify"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/hosting",
+          "required": true,
+          "reason": "Hosting guide contains Netlify section"
+        }
+      ],
+      "idealSearchQueries": ["hosting netlify", "deploy start"],
+      "correctAnswerMustInclude": ["netlify"]
+    },
+    {
+      "id": "start-middleware",
+      "question": "How do I add middleware to TanStack Start for things like authentication?",
+      "difficulty": "medium",
+      "tags": ["start", "middleware", "auth"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/middleware",
+          "required": true,
+          "reason": "Middleware guide"
+        }
+      ],
+      "idealSearchQueries": ["start middleware", "createMiddleware"],
+      "correctAnswerMustInclude": ["middleware"]
+    },
+    {
+      "id": "start-api-routes",
+      "question": "How do I create API routes in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "api", "routes"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/server-routes",
+          "required": true,
+          "reason": "Server routes guide covers API routes"
+        }
+      ],
+      "idealSearchQueries": ["server routes", "api routes"],
+      "correctAnswerMustInclude": ["server", "routes"]
+    },
+    {
+      "id": "start-static-prerendering",
+      "question": "How do I statically prerender pages at build time in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "static", "prerender", "ssg"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/static-prerendering",
+          "required": true,
+          "reason": "Static prerendering guide"
+        }
+      ],
+      "idealSearchQueries": ["static prerender", "prerender start"],
+      "correctAnswerMustInclude": ["prerender"]
+    },
+
+    {
+      "id": "store-basics",
+      "question": "How do I create and use a store with TanStack Store?",
+      "difficulty": "easy",
+      "tags": ["store", "basics"],
+      "expectedDocs": [
+        {
+          "library": "store",
+          "path": "framework/react/quick-start",
+          "required": true,
+          "reason": "Quick start guide"
+        }
+      ],
+      "idealSearchQueries": ["store quick start", "useStore"],
+      "correctAnswerMustInclude": ["Store", "useStore"]
+    },
+    {
+      "id": "store-derived",
+      "question": "How do I create derived state from a TanStack Store?",
+      "difficulty": "medium",
+      "tags": ["store", "derived", "computed"],
+      "expectedDocs": [
+        {
+          "library": "store",
+          "path": "reference/classes/Derived",
+          "required": true,
+          "reason": "Derived class reference"
+        }
+      ],
+      "idealSearchQueries": ["derived", "Derived store"],
+      "correctAnswerMustInclude": ["Derived"]
+    },
+
+    {
+      "id": "query-vue-basics",
+      "question": "How do I use TanStack Query with Vue?",
+      "difficulty": "easy",
+      "tags": ["query", "vue", "basics"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/vue/overview",
+          "required": true,
+          "reason": "Vue overview"
+        }
+      ],
+      "idealSearchQueries": ["vue query", "tanstack query vue"],
+      "correctAnswerMustInclude": ["useQuery", "VueQueryPlugin"]
+    },
+    {
+      "id": "query-solid-basics",
+      "question": "How do I use TanStack Query with SolidJS?",
+      "difficulty": "easy",
+      "tags": ["query", "solid", "basics"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/solid/overview",
+          "required": true,
+          "reason": "Solid overview"
+        }
+      ],
+      "idealSearchQueries": ["solid query", "tanstack query solid"],
+      "correctAnswerMustInclude": ["createQuery", "QueryClientProvider"]
+    },
+    {
+      "id": "router-vue-basics",
+      "question": "How do I use TanStack Router with Vue?",
+      "difficulty": "easy",
+      "tags": ["router", "vue", "basics"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/overview",
+          "required": true,
+          "reason": "Router overview (Vue support is experimental)"
+        }
+      ],
+      "idealSearchQueries": ["router overview", "tanstack router"],
+      "correctAnswerMustInclude": ["router"],
+      "notes": "Vue support for Router is experimental and docs may be limited"
+    },
+
+    {
+      "id": "query-testing",
+      "question": "How do I test components that use TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "testing"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/testing",
+          "required": true,
+          "reason": "Testing guide"
+        }
+      ],
+      "idealSearchQueries": ["testing query", "test useQuery"],
+      "correctAnswerMustInclude": ["QueryClientProvider", "test"]
+    },
+    {
+      "id": "query-typescript",
+      "question": "How do I properly type TanStack Query hooks with TypeScript?",
+      "difficulty": "medium",
+      "tags": ["query", "typescript"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/typescript",
+          "required": true,
+          "reason": "TypeScript guide"
+        }
+      ],
+      "idealSearchQueries": ["query typescript", "type useQuery"],
+      "correctAnswerMustInclude": ["TypeScript", "TData", "TError"]
+    },
+
+    {
+      "id": "router-scroll-restoration",
+      "question": "How do I handle scroll position restoration in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "scroll"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/scroll-restoration",
+          "required": true,
+          "reason": "Scroll restoration guide"
+        }
+      ],
+      "idealSearchQueries": ["scroll restoration", "ScrollRestoration"],
+      "correctAnswerMustInclude": ["ScrollRestoration", "scroll"]
+    },
+    {
+      "id": "router-error-handling",
+      "question": "How do I handle route errors and show error boundaries in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "errors"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/data-loading",
+          "required": true,
+          "reason": "Data loading covers error handling"
+        }
+      ],
+      "idealSearchQueries": ["router error boundary", "errorComponent"],
+      "correctAnswerMustInclude": ["errorComponent", "onError"]
+    },
+    {
+      "id": "router-pending-ui",
+      "question": "How do I show loading states during navigation in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "loading", "pending"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/data-loading",
+          "required": true,
+          "reason": "Data loading covers pending states"
+        }
+      ],
+      "idealSearchQueries": ["pending component", "loading navigation"],
+      "correctAnswerMustInclude": ["pendingComponent"]
+    },
+
+    {
+      "id": "start-forms",
+      "question": "How do I handle form submissions with server actions in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "forms", "server-actions"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/server-functions",
+          "required": true,
+          "reason": "Server functions cover form handling"
+        }
+      ],
+      "idealSearchQueries": ["server functions", "createServerFn"],
+      "correctAnswerMustInclude": ["createServerFn"]
+    },
+    {
+      "id": "start-head-meta",
+      "question": "How do I set page titles and meta tags in TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "meta", "seo"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/document-head-management",
+          "required": true,
+          "reason": "Document head management guide"
+        }
+      ],
+      "idealSearchQueries": ["document head", "meta title"],
+      "correctAnswerMustInclude": ["head"]
+    },
+
+    {
+      "id": "query-enabled-button-click",
+      "question": "How do I trigger a query only when a button is clicked instead of on component mount?",
+      "difficulty": "medium",
+      "tags": ["query", "enabled", "manual-fetch"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/disabling-queries",
+          "required": true,
+          "reason": "Disabling queries guide covers enabled option and refetch"
+        }
+      ],
+      "idealSearchQueries": ["disable query", "enabled false", "manual query"],
+      "correctAnswerMustInclude": ["enabled", "refetch"],
+      "notes": "Mined from Stack Overflow - score 227. Very common question about lazy/on-demand queries."
+    },
+    {
+      "id": "query-stale-cache-time",
+      "question": "What is the difference between staleTime and gcTime (cacheTime) in TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "cache", "stale"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/caching",
+          "required": true,
+          "reason": "Caching guide explains staleTime and gcTime"
+        }
+      ],
+      "idealSearchQueries": ["staleTime gcTime", "caching query", "cache time"],
+      "correctAnswerMustInclude": ["staleTime", "gcTime"],
+      "notes": "Mined from Stack Overflow - score 71. Common confusion about cache timing options."
+    },
+    {
+      "id": "query-conditional-enabled",
+      "question": "How do I conditionally run a query based on some state or prop in TanStack Query?",
+      "difficulty": "easy",
+      "tags": ["query", "enabled", "conditional"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/dependent-queries",
+          "required": true,
+          "reason": "Dependent queries guide covers enabled option"
+        }
+      ],
+      "idealSearchQueries": ["dependent queries", "enabled query", "conditional query"],
+      "correctAnswerMustInclude": ["enabled"],
+      "notes": "Mined from Stack Overflow - score 68. Very common pattern for conditional fetching."
+    },
+    {
+      "id": "query-callbacks-deprecated",
+      "question": "The onSuccess, onError, and onSettled callbacks are deprecated in TanStack Query. What should I use instead?",
+      "difficulty": "medium",
+      "tags": ["query", "callbacks", "migration"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/migrating-to-v5",
+          "required": true,
+          "reason": "Migration guide covers callback changes"
+        }
+      ],
+      "idealSearchQueries": ["migrate v5", "onSuccess deprecated", "query callbacks"],
+      "correctAnswerMustInclude": ["useEffect"],
+      "notes": "Mined from Stack Overflow - score 54. Important migration question for v5 users."
+    },
+    {
+      "id": "query-provider-error",
+      "question": "I'm getting 'No QueryClient set, use QueryClientProvider to set one'. How do I fix this?",
+      "difficulty": "easy",
+      "tags": ["query", "setup", "error"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/quick-start",
+          "required": true,
+          "reason": "Quick start shows proper QueryClientProvider setup"
+        }
+      ],
+      "idealSearchQueries": ["QueryClientProvider", "quick start query"],
+      "correctAnswerMustInclude": ["QueryClientProvider", "QueryClient"],
+      "notes": "Mined from Stack Overflow - score 113. Common setup error for new users."
+    },
+    {
+      "id": "table-default-sorting",
+      "question": "How do I set a default/initial sort order when the table first loads in TanStack Table?",
+      "difficulty": "easy",
+      "tags": ["table", "sorting", "initial-state"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/sorting",
+          "required": true,
+          "reason": "Sorting guide covers initial sorting state"
+        }
+      ],
+      "idealSearchQueries": ["initial sorting", "default sort table"],
+      "correctAnswerMustInclude": ["sorting", "initialState"],
+      "notes": "Mined from Stack Overflow - score 50. Common question about initial table state."
+    },
+    {
+      "id": "table-column-visibility",
+      "question": "How do I hide or show columns dynamically in TanStack Table?",
+      "difficulty": "easy",
+      "tags": ["table", "columns", "visibility"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/column-visibility",
+          "required": true,
+          "reason": "Column visibility guide"
+        }
+      ],
+      "idealSearchQueries": ["column visibility", "hide column table"],
+      "correctAnswerMustInclude": ["columnVisibility"],
+      "notes": "Mined from GitHub - score 54. Users often confused about show/hide columns."
+    },
+    {
+      "id": "table-row-click-handler",
+      "question": "How do I handle row click events and select a row when clicked in TanStack Table?",
+      "difficulty": "medium",
+      "tags": ["table", "selection", "events"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "guide/row-selection",
+          "required": true,
+          "reason": "Row selection guide"
+        }
+      ],
+      "idealSearchQueries": ["row selection", "row click table"],
+      "correctAnswerMustInclude": ["rowSelection", "onClick"],
+      "notes": "Mined from Stack Overflow - score 65. Common interaction pattern."
+    },
+    {
+      "id": "virtual-scroll-to-index",
+      "question": "How do I programmatically scroll to a specific item/index in TanStack Virtual?",
+      "difficulty": "medium",
+      "tags": ["virtual", "scroll", "navigation"],
+      "expectedDocs": [
+        {
+          "library": "virtual",
+          "path": "api/virtualizer",
+          "required": true,
+          "reason": "Virtualizer API covers scrollToIndex"
+        }
+      ],
+      "idealSearchQueries": ["scrollToIndex", "scroll to item virtual"],
+      "correctAnswerMustInclude": ["scrollToIndex"],
+      "notes": "Common need for navigating virtualized lists programmatically."
+    },
+    {
+      "id": "query-parallel-queries",
+      "question": "How do I run multiple queries in parallel with TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "parallel", "multiple"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/parallel-queries",
+          "required": true,
+          "reason": "Parallel queries guide"
+        }
+      ],
+      "idealSearchQueries": ["parallel queries", "useQueries"],
+      "correctAnswerMustInclude": ["useQueries"],
+      "notes": "Common pattern for fetching multiple resources at once."
+    },
+    {
+      "id": "query-placeholder-data",
+      "question": "How do I show placeholder or initial data while my query is loading in TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["query", "placeholder", "loading"],
+      "expectedDocs": [
+        {
+          "library": "query",
+          "path": "framework/react/guides/placeholder-query-data",
+          "required": true,
+          "reason": "Placeholder query data guide"
+        }
+      ],
+      "idealSearchQueries": ["placeholder data", "initialData query"],
+      "correctAnswerMustInclude": ["placeholderData"],
+      "notes": "Important UX pattern for perceived performance."
+    },
+    {
+      "id": "router-link-active-state",
+      "question": "How do I style the active link differently when on that route in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "link", "active", "styling"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/api/router/ActiveLinkOptionsType",
+          "required": true,
+          "reason": "ActiveLinkOptionsType API covers activeProps and inactiveProps"
+        }
+      ],
+      "idealSearchQueries": ["Link active", "activeProps router"],
+      "correctAnswerMustInclude": ["activeProps", "Link"],
+      "notes": "Common navigation styling pattern."
+    },
+
+    {
+      "id": "router-layout-routes",
+      "question": "How do I create layout routes that wrap child routes with shared UI in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "layout", "nested"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/routing/routing-concepts",
+          "required": true,
+          "reason": "Routing concepts covers layout routes and Outlet"
+        }
+      ],
+      "idealSearchQueries": ["layout routes", "Outlet router"],
+      "correctAnswerMustInclude": ["Outlet", "layout"]
+    },
+    {
+      "id": "router-pathless-layout",
+      "question": "How do I create a pathless layout route that groups routes without adding to the URL path?",
+      "difficulty": "medium",
+      "tags": ["router", "layout", "pathless"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/routing/routing-concepts",
+          "required": true,
+          "reason": "Routing concepts covers pathless layout routes with underscore prefix"
+        }
+      ],
+      "idealSearchQueries": ["pathless layout", "route grouping"],
+      "correctAnswerMustInclude": ["_"]
+    },
+    {
+      "id": "router-route-context",
+      "question": "How do I pass data through route context to child routes in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "context", "data"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/api/router/createRootRouteWithContextFunction",
+          "required": true,
+          "reason": "createRootRouteWithContext for typed context"
+        }
+      ],
+      "idealSearchQueries": ["route context", "createRootRouteWithContext"],
+      "correctAnswerMustInclude": ["context"]
+    },
+    {
+      "id": "router-use-navigate",
+      "question": "How do I programmatically navigate to a route in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "navigation", "programmatic"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/api/router/useNavigateHook",
+          "required": true,
+          "reason": "useNavigate hook API"
+        }
+      ],
+      "idealSearchQueries": ["useNavigate", "programmatic navigation"],
+      "correctAnswerMustInclude": ["useNavigate"]
+    },
+    {
+      "id": "router-catch-all-splat",
+      "question": "How do I create a catch-all or splat route that matches any path in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "splat", "catch-all"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/routing/routing-concepts",
+          "required": true,
+          "reason": "Routing concepts covers splat routes"
+        }
+      ],
+      "idealSearchQueries": ["splat route", "catch all route"],
+      "correctAnswerMustInclude": ["$"]
+    },
+    {
+      "id": "router-file-based-routing",
+      "question": "How does file-based routing work in TanStack Router?",
+      "difficulty": "easy",
+      "tags": ["router", "file-based", "basics"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/routing/file-based-routing",
+          "required": true,
+          "reason": "File-based routing guide"
+        }
+      ],
+      "idealSearchQueries": ["file based routing", "route file"],
+      "correctAnswerMustInclude": ["routes", "file"]
+    },
+    {
+      "id": "router-navigate-search-params",
+      "question": "How do I navigate while preserving or modifying search params in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "navigation", "search-params"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/search-params",
+          "required": true,
+          "reason": "Search params guide covers navigation with search"
+        }
+      ],
+      "idealSearchQueries": ["search params navigation", "navigate search"],
+      "correctAnswerMustInclude": ["search"]
+    },
+    {
+      "id": "router-redirect-beforeload",
+      "question": "How do I redirect users in TanStack Router before the route loads?",
+      "difficulty": "medium",
+      "tags": ["router", "redirect", "beforeLoad"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/authenticated-routes",
+          "required": true,
+          "reason": "Authenticated routes guide shows redirect pattern"
+        }
+      ],
+      "idealSearchQueries": ["redirect beforeLoad", "redirect router"],
+      "correctAnswerMustInclude": ["redirect", "beforeLoad"]
+    },
+    {
+      "id": "router-route-masking",
+      "question": "How do I show a different URL in the browser than the actual route in TanStack Router?",
+      "difficulty": "hard",
+      "tags": ["router", "masking", "url"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/route-masking",
+          "required": true,
+          "reason": "Route masking guide"
+        }
+      ],
+      "idealSearchQueries": ["route masking", "mask url"],
+      "correctAnswerMustInclude": ["mask"]
+    },
+    {
+      "id": "router-ssr-streaming",
+      "question": "How does SSR and streaming work in TanStack Router?",
+      "difficulty": "hard",
+      "tags": ["router", "ssr", "streaming"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/ssr",
+          "required": true,
+          "reason": "SSR guide covers streaming"
+        }
+      ],
+      "idealSearchQueries": ["ssr router guide", "server side rendering"],
+      "correctAnswerMustInclude": ["SSR", "streaming"]
+    },
+    {
+      "id": "router-external-data-loading",
+      "question": "How do I use TanStack Router with an external data fetching library like TanStack Query?",
+      "difficulty": "medium",
+      "tags": ["router", "query", "integration", "data"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/external-data-loading",
+          "required": true,
+          "reason": "External data loading guide"
+        }
+      ],
+      "idealSearchQueries": ["external data loading", "router query integration"],
+      "correctAnswerMustInclude": ["external", "data"]
+    },
+
+    {
+      "id": "start-execution-model",
+      "question": "How do I understand where my code runs in TanStack Start (server vs client)?",
+      "difficulty": "medium",
+      "tags": ["start", "ssr", "execution"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/execution-model",
+          "required": true,
+          "reason": "Execution model guide explains server/client code"
+        }
+      ],
+      "idealSearchQueries": ["execution model", "server client start"],
+      "correctAnswerMustInclude": ["server", "client"]
+    },
+    {
+      "id": "start-server-only-code",
+      "question": "How do I ensure code only runs on the server in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "server", "code-patterns"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/code-execution-patterns",
+          "required": true,
+          "reason": "Code execution patterns guide"
+        }
+      ],
+      "idealSearchQueries": ["server only code", "code execution patterns"],
+      "correctAnswerMustInclude": ["server"]
+    },
+    {
+      "id": "start-authentication",
+      "question": "How do I implement authentication in TanStack Start?",
+      "difficulty": "hard",
+      "tags": ["start", "auth", "security"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/authentication",
+          "required": true,
+          "reason": "Authentication guide"
+        }
+      ],
+      "idealSearchQueries": ["authentication start", "auth tanstack start"],
+      "correctAnswerMustInclude": ["auth"]
+    },
+    {
+      "id": "start-auth-overview",
+      "question": "What authentication options are available for TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "auth", "overview"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/authentication-overview",
+          "required": true,
+          "reason": "Authentication overview with partner solutions"
+        }
+      ],
+      "idealSearchQueries": ["authentication overview", "clerk workos start"],
+      "correctAnswerMustInclude": ["Clerk", "WorkOS"]
+    },
+    {
+      "id": "start-streaming-server-functions",
+      "question": "How do I stream data from a server function in TanStack Start?",
+      "difficulty": "hard",
+      "tags": ["start", "streaming", "server-functions"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/server-functions",
+          "required": true,
+          "reason": "Server functions guide covers streaming"
+        }
+      ],
+      "idealSearchQueries": ["streaming server function", "stream data start"],
+      "correctAnswerMustInclude": ["stream"]
+    },
+    {
+      "id": "start-tailwind",
+      "question": "How do I set up Tailwind CSS with TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "tailwind", "css"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/tailwind-integration",
+          "required": true,
+          "reason": "Tailwind CSS integration guide"
+        }
+      ],
+      "idealSearchQueries": ["tailwind start", "css tailwind tanstack"],
+      "correctAnswerMustInclude": ["tailwind"]
+    },
+    {
+      "id": "start-database",
+      "question": "How do I connect to a database in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "database", "data"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/databases",
+          "required": true,
+          "reason": "Databases guide"
+        }
+      ],
+      "idealSearchQueries": ["database start", "drizzle prisma start"],
+      "correctAnswerMustInclude": ["database"]
+    },
+    {
+      "id": "start-migrate-nextjs",
+      "question": "How do I migrate from Next.js to TanStack Start?",
+      "difficulty": "hard",
+      "tags": ["start", "migration", "nextjs"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/migrate-from-next-js",
+          "required": true,
+          "reason": "Next.js migration guide"
+        }
+      ],
+      "idealSearchQueries": ["migrate nextjs", "next.js to start"],
+      "correctAnswerMustInclude": ["migrate", "Next"]
+    },
+    {
+      "id": "start-build-from-scratch",
+      "question": "How do I build a TanStack Start project from scratch without using a template?",
+      "difficulty": "medium",
+      "tags": ["start", "setup", "manual"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/build-from-scratch",
+          "required": true,
+          "reason": "Build from scratch guide"
+        }
+      ],
+      "idealSearchQueries": ["build from scratch", "manual setup start"],
+      "correctAnswerMustInclude": ["scratch"]
+    },
+    {
+      "id": "start-rendering-markdown",
+      "question": "How do I render markdown content in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "markdown", "content"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/rendering-markdown",
+          "required": true,
+          "reason": "Rendering markdown guide"
+        }
+      ],
+      "idealSearchQueries": ["render markdown", "markdown start"],
+      "correctAnswerMustInclude": ["markdown"]
+    },
+    {
+      "id": "start-cloudflare-workers",
+      "question": "How do I deploy TanStack Start to Cloudflare Workers?",
+      "difficulty": "medium",
+      "tags": ["start", "deployment", "cloudflare"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/hosting",
+          "required": true,
+          "reason": "Hosting guide covers Cloudflare Workers"
+        }
+      ],
+      "idealSearchQueries": ["cloudflare workers", "deploy cloudflare start"],
+      "correctAnswerMustInclude": ["cloudflare"]
+    },
+    {
+      "id": "start-vs-nextjs",
+      "question": "How does TanStack Start compare to Next.js?",
+      "difficulty": "easy",
+      "tags": ["start", "comparison", "nextjs"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/comparison",
+          "required": true,
+          "reason": "Comparison guide"
+        }
+      ],
+      "idealSearchQueries": ["start vs nextjs", "comparison next"],
+      "correctAnswerMustInclude": ["Next"]
+    },
+    {
+      "id": "router-providers-location",
+      "question": "Where do I put providers like QueryClientProvider in TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "router", "providers", "setup"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "integrations/query",
+          "required": true,
+          "reason": "Query integration guide shows provider setup"
+        }
+      ],
+      "idealSearchQueries": ["query integration setup", "QueryClientProvider router"],
+      "correctAnswerMustInclude": ["provider"],
+      "notes": "Mined from Stack Overflow. Common setup question."
+    },
+    {
+      "id": "router-routetree-gen-error",
+      "question": "I'm getting 'Cannot find module routeTree.gen' error. How do I fix it?",
+      "difficulty": "easy",
+      "tags": ["router", "setup", "error"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/faq",
+          "required": true,
+          "reason": "FAQ covers routeTree.gen questions"
+        }
+      ],
+      "idealSearchQueries": ["routeTree.gen", "route tree faq"],
+      "correctAnswerMustInclude": ["routeTree"],
+      "notes": "Mined from Stack Overflow. Common setup error."
+    },
+    {
+      "id": "router-exclude-layout",
+      "question": "How do I exclude specific routes from a parent layout in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "layout", "nested"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/routing/routing-concepts",
+          "required": true,
+          "reason": "Routing concepts covers non-nested routes"
+        }
+      ],
+      "idealSearchQueries": ["non-nested routes", "exclude layout"],
+      "correctAnswerMustInclude": ["_"],
+      "notes": "Mined from Stack Overflow. Users want to break out of layouts."
+    },
+    {
+      "id": "router-dynamic-nested-routes",
+      "question": "How do I create dynamic nested routes like /users/$userId/posts/$postId in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "dynamic", "nested", "params"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/routing/routing-concepts",
+          "required": true,
+          "reason": "Routing concepts covers dynamic route segments"
+        }
+      ],
+      "idealSearchQueries": ["dynamic route segments", "routing concepts"],
+      "correctAnswerMustInclude": ["$"]
+    },
+    {
+      "id": "router-search-params-no-rerender",
+      "question": "How do I update search params without causing a full page re-render in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "search-params", "performance"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/search-params",
+          "required": true,
+          "reason": "Search params guide covers shallow navigation"
+        }
+      ],
+      "idealSearchQueries": ["search params shallow", "update search no rerender"],
+      "correctAnswerMustInclude": ["search"],
+      "notes": "Mined from Stack Overflow. Common performance concern."
+    },
+    {
+      "id": "router-link-typesafe-wrapper",
+      "question": "How do I wrap TanStack Router's Link component while keeping type safety?",
+      "difficulty": "hard",
+      "tags": ["router", "typescript", "link"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/custom-link",
+          "required": true,
+          "reason": "Custom link guide covers createLink"
+        }
+      ],
+      "idealSearchQueries": ["custom link", "createLink wrapper"],
+      "correctAnswerMustInclude": ["createLink"],
+      "notes": "Mined from Stack Overflow. TypeScript users want custom Link components."
+    },
+    {
+      "id": "router-error-boundary-disable",
+      "question": "How do I disable or customize the error boundary in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "errors", "error-boundary"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/guide/data-loading",
+          "required": true,
+          "reason": "Data loading covers error handling"
+        }
+      ],
+      "idealSearchQueries": ["error boundary router", "errorComponent"],
+      "correctAnswerMustInclude": ["errorComponent"],
+      "notes": "Mined from Stack Overflow. Users want custom error handling."
+    },
+    {
+      "id": "router-generate-href",
+      "question": "How do I generate a URL/href string for a route without navigating in TanStack Router?",
+      "difficulty": "medium",
+      "tags": ["router", "url", "href"],
+      "expectedDocs": [
+        {
+          "library": "router",
+          "path": "framework/react/api/router/RouterType",
+          "required": true,
+          "reason": "Router API covers buildLocation"
+        }
+      ],
+      "idealSearchQueries": ["buildLocation", "generate href router"],
+      "correctAnswerMustInclude": ["buildLocation"],
+      "notes": "Mined from Stack Overflow. Need URLs for sharing/copying."
+    },
+    {
+      "id": "start-server-fn-validation",
+      "question": "How do I validate input data in a TanStack Start server function?",
+      "difficulty": "medium",
+      "tags": ["start", "server-functions", "validation"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/server-functions",
+          "required": true,
+          "reason": "Server functions guide covers validation"
+        }
+      ],
+      "idealSearchQueries": ["server function validation", "validate server fn"],
+      "correctAnswerMustInclude": ["validator", "zod"]
+    },
+    {
+      "id": "start-env-variables",
+      "question": "How do I use environment variables in TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "env", "config"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/environment-variables",
+          "required": true,
+          "reason": "Environment variables guide"
+        }
+      ],
+      "idealSearchQueries": ["environment variables", "env tanstack start"],
+      "correctAnswerMustInclude": ["env", "VITE"]
+    },
+
+    {
+      "id": "partner-database-recommendation",
+      "question": "What database should I use with TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "database", "partner", "ecosystem"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/databases",
+          "required": true,
+          "reason": "Databases guide with partner recommendations"
+        }
+      ],
+      "idealSearchQueries": ["database start", "databases guide"],
+      "correctAnswerMustInclude": ["Neon", "Convex"],
+      "notes": "Partner discovery test. Should surface recommended database partners."
+    },
+    {
+      "id": "partner-auth-recommendation",
+      "question": "What authentication solution should I use with TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "auth", "partner", "ecosystem"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/authentication-overview",
+          "required": true,
+          "reason": "Authentication overview with partner solutions"
+        }
+      ],
+      "idealSearchQueries": ["authentication overview", "auth start"],
+      "correctAnswerMustInclude": ["Clerk", "WorkOS"],
+      "notes": "Partner discovery test. Should surface recommended auth partners."
+    },
+    {
+      "id": "partner-hosting-recommendation",
+      "question": "Where should I deploy my TanStack Start application?",
+      "difficulty": "easy",
+      "tags": ["start", "hosting", "deployment", "partner", "ecosystem"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/hosting",
+          "required": true,
+          "reason": "Hosting guide with deployment partners"
+        }
+      ],
+      "idealSearchQueries": ["hosting start", "deploy start"],
+      "correctAnswerMustInclude": ["Cloudflare", "Netlify"],
+      "notes": "Partner discovery test. Should surface recommended hosting partners."
+    },
+    {
+      "id": "partner-table-upgrade",
+      "question": "I need more advanced features than TanStack Table provides. What should I use?",
+      "difficulty": "medium",
+      "tags": ["table", "partner", "ecosystem", "data-grid"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "introduction",
+          "required": true,
+          "reason": "Table introduction mentions AG Grid partnership"
+        }
+      ],
+      "idealSearchQueries": ["table ag grid", "enterprise data grid"],
+      "correctAnswerMustInclude": ["AG Grid"],
+      "notes": "Partner discovery test. AG Grid is the enterprise upgrade path for Table users."
+    },
+    {
+      "id": "partner-neon-setup",
+      "question": "How do I connect Neon database to my TanStack Start app?",
+      "difficulty": "medium",
+      "tags": ["start", "database", "neon", "partner"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/databases",
+          "required": true,
+          "reason": "Databases guide covers Neon setup"
+        }
+      ],
+      "idealSearchQueries": ["neon database", "neon start"],
+      "correctAnswerMustInclude": ["Neon", "PostgreSQL"],
+      "notes": "Partner-specific test. Users searching for specific partner integration."
+    },
+    {
+      "id": "partner-clerk-setup",
+      "question": "How do I add Clerk authentication to TanStack Start?",
+      "difficulty": "medium",
+      "tags": ["start", "auth", "clerk", "partner"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/authentication-overview",
+          "required": true,
+          "reason": "Auth overview links to Clerk integration"
+        }
+      ],
+      "idealSearchQueries": ["clerk authentication", "clerk start"],
+      "correctAnswerMustInclude": ["Clerk"],
+      "notes": "Partner-specific test. Users searching for specific partner integration."
+    },
+    {
+      "id": "partner-error-monitoring",
+      "question": "How do I set up error monitoring for my TanStack app?",
+      "difficulty": "medium",
+      "tags": ["start", "monitoring", "sentry", "partner", "ecosystem"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/error-handling",
+          "required": false,
+          "reason": "Error handling may mention monitoring solutions"
+        }
+      ],
+      "idealSearchQueries": ["error monitoring", "sentry start"],
+      "correctAnswerMustInclude": ["Sentry"],
+      "notes": "Partner discovery test. Sentry is the error monitoring partner."
+    },
+    {
+      "id": "partner-cms-recommendation",
+      "question": "What CMS should I use with TanStack Start for content management?",
+      "difficulty": "medium",
+      "tags": ["start", "cms", "strapi", "partner", "ecosystem"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/rendering-markdown",
+          "required": false,
+          "reason": "Content/markdown guide may reference CMS options"
+        }
+      ],
+      "idealSearchQueries": ["cms start", "headless cms tanstack"],
+      "correctAnswerMustInclude": ["Strapi"],
+      "notes": "Partner discovery test. Strapi is the CMS partner."
+    },
+
+    {
+      "id": "ecosystem-postgres-alias",
+      "question": "I need a postgres database for my TanStack Start app",
+      "difficulty": "easy",
+      "tags": ["start", "database", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/databases",
+          "required": true,
+          "reason": "Databases guide"
+        }
+      ],
+      "idealSearchQueries": ["databases guide"],
+      "correctAnswerMustInclude": ["Neon"],
+      "notes": "Tests category alias resolution. 'postgres' should resolve to 'database' category. MCP tool: get_ecosystem_recommendations({ category: 'postgres' })"
+    },
+    {
+      "id": "ecosystem-login-alias",
+      "question": "How do I add login functionality to my app?",
+      "difficulty": "easy",
+      "tags": ["start", "auth", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/authentication-overview",
+          "required": true,
+          "reason": "Auth overview"
+        }
+      ],
+      "idealSearchQueries": ["authentication overview"],
+      "correctAnswerMustInclude": ["Clerk", "WorkOS"],
+      "notes": "Tests category alias resolution. 'login' should resolve to 'auth' category. MCP tool: get_ecosystem_recommendations({ category: 'login' })"
+    },
+    {
+      "id": "ecosystem-serverless-alias",
+      "question": "What serverless hosting options work with TanStack Start?",
+      "difficulty": "easy",
+      "tags": ["start", "deployment", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/hosting",
+          "required": true,
+          "reason": "Hosting guide"
+        }
+      ],
+      "idealSearchQueries": ["hosting guide"],
+      "correctAnswerMustInclude": ["Cloudflare", "Netlify"],
+      "notes": "Tests category alias resolution. 'serverless' should resolve to 'deployment' category. MCP tool: get_ecosystem_recommendations({ category: 'serverless' })"
+    },
+    {
+      "id": "ecosystem-error-tracking-alias",
+      "question": "I need error tracking for production",
+      "difficulty": "easy",
+      "tags": ["start", "monitoring", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/observability",
+          "required": false,
+          "reason": "Observability guide"
+        }
+      ],
+      "idealSearchQueries": ["observability", "error monitoring"],
+      "correctAnswerMustInclude": ["Sentry"],
+      "notes": "Tests category alias resolution. 'error tracking' should resolve to 'monitoring' category. MCP tool: get_ecosystem_recommendations({ category: 'error-tracking' })"
+    },
+    {
+      "id": "ecosystem-library-filter",
+      "question": "What ecosystem integrations are available for TanStack Table?",
+      "difficulty": "easy",
+      "tags": ["table", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "table",
+          "path": "introduction",
+          "required": true,
+          "reason": "Table introduction"
+        }
+      ],
+      "idealSearchQueries": ["table introduction"],
+      "correctAnswerMustInclude": ["AG Grid"],
+      "notes": "Tests library filter. MCP tool: get_ecosystem_recommendations({ library: 'table' })"
+    },
+    {
+      "id": "ecosystem-sso-enterprise",
+      "question": "I need SSO and enterprise authentication features",
+      "difficulty": "medium",
+      "tags": ["start", "auth", "enterprise", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/authentication-overview",
+          "required": true,
+          "reason": "Auth overview with WorkOS for enterprise"
+        }
+      ],
+      "idealSearchQueries": ["authentication overview", "workos sso"],
+      "correctAnswerMustInclude": ["WorkOS"],
+      "notes": "Tests SSO/enterprise auth. 'sso' alias should resolve to 'auth'. WorkOS specifically handles enterprise features."
+    },
+    {
+      "id": "ecosystem-realtime-database",
+      "question": "I need a real-time database with live queries",
+      "difficulty": "medium",
+      "tags": ["start", "database", "realtime", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "start",
+          "path": "framework/react/guide/databases",
+          "required": true,
+          "reason": "Databases guide"
+        }
+      ],
+      "idealSearchQueries": ["databases guide", "convex realtime"],
+      "correctAnswerMustInclude": ["Convex"],
+      "notes": "Tests real-time database needs. Convex specifically offers real-time features."
+    },
+    {
+      "id": "ecosystem-rate-limiting",
+      "question": "How do I add rate limiting to my API?",
+      "difficulty": "medium",
+      "tags": ["api", "rate-limiting", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "pacer",
+          "path": "overview",
+          "required": false,
+          "reason": "Pacer overview for rate limiting"
+        }
+      ],
+      "idealSearchQueries": ["rate limiting", "pacer"],
+      "correctAnswerMustInclude": ["Unkey"],
+      "notes": "Tests API/rate-limiting category. Unkey is the API management partner."
+    },
+    {
+      "id": "ecosystem-offline-sync",
+      "question": "I need offline-first sync capabilities for my app",
+      "difficulty": "medium",
+      "tags": ["db", "database", "sync", "ecosystem", "mcp-tool"],
+      "expectedDocs": [
+        {
+          "library": "db",
+          "path": "overview",
+          "required": false,
+          "reason": "TanStack DB overview"
+        }
+      ],
+      "idealSearchQueries": ["tanstack db", "sync"],
+      "correctAnswerMustInclude": ["Electric", "PowerSync"],
+      "notes": "Tests sync/offline capabilities. Electric and PowerSync are TanStack DB partners."
+    }
+  ]
+}

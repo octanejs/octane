@@ -1,0 +1,42 @@
+name: Docs Links
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  docs-links:
+    name: Docs Links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Tools
+        uses: tanstack/config/.github/setup@e4b48f16568324f76f467aa4c2aac2f05db632c3 # main
+
+      - name: Check docs menu links
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          pnpm docs:links:check -- --json docs-menu-link-report.json
+          status=$?
+
+          if [ -f docs-menu-link-report.json ]; then
+            {
+              echo "### Docs menu link report"
+              echo
+              echo '```json'
+              cat docs-menu-link-report.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          exit $status

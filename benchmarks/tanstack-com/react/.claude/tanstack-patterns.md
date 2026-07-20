@@ -1,0 +1,1 @@
+../.agents/tanstack-patterns.md

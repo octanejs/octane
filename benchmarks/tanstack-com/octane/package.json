@@ -1,0 +1,28 @@
+{
+  "name": "tanstack-com-bench-octane",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "tanstack.com shell ported to Octane on @octanejs/tanstack-start (Phase 2c of the tanstack-com benchmark).",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build",
+    "typecheck": "tsrx-tsc --noEmit -p tsconfig.json",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/tanstack-router": "workspace:*",
+    "@octanejs/tanstack-start": "workspace:*",
+    "@octanejs/lucide": "workspace:*",
+    "@octanejs/zustand": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "tailwindcss": "^4.2.2",
+    "vite": "catalog:default",
+    "@tailwindcss/typography": "^0.5.19",
+    "nitro": "^3.0.260311-beta"
+  }
+}

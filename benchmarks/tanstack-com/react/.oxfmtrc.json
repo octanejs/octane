@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "printWidth": 80,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "**/api",
+    "**/build",
+    "**/public",
+    "pnpm-lock.yaml",
+    "routeTree.gen.ts",
+    "src/blog/tanstack-db-0.1-the-embedded-client-database-for-tanstack-query.md",
+    ".content-collections",
+    ".claude",
+    "dist/**",
+    ".output/**"
+  ]
+}
