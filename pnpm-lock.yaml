@@ -2238,6 +2238,66 @@ importers:
         specifier: catalog:default
         version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
 
+  benchmarks/ssr-workerd:
+    dependencies:
+      miniflare:
+        specifier: catalog:default
+        version: 4.20260714.0
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/ssr-workerd/octane:
+    dependencies:
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/ssr-workerd/octane-app:
+    dependencies:
+      '@octanejs/adapter-cloudflare':
+        specifier: workspace:*
+        version: link:../../../packages/adapter-cloudflare
+      '@octanejs/vite-plugin':
+        specifier: workspace:*
+        version: link:../../../packages/vite-plugin-octane
+      octane:
+        specifier: workspace:*
+        version: link:../../../packages/octane
+    devDependencies:
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+
+  benchmarks/ssr-workerd/react:
+    dependencies:
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.44(react@19.2.7)
+      '@tsrx/vite-plugin-react':
+        specifier: catalog:default
+        version: 0.0.75(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0))
+      vite:
+        specifier: catalog:default
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(yaml@2.9.0)
+
   benchmarks/streaming-ssr:
     dependencies:
       '@solidjs/web':

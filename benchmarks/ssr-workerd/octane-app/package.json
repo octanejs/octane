@@ -1,0 +1,15 @@
+{
+  "name": "octane-app-ssr-workerd-fixture",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "ssr-workerd bench fixture: the streaming-ssr page deployed the way a real Octane app reaches Cloudflare — @octanejs/vite-plugin + @octanejs/adapter-cloudflare producing dist/server/worker.js. Octane-only target; its delta vs the raw octane worker is the metaframework layer's workerd overhead.",
+  "dependencies": {
+    "@octanejs/adapter-cloudflare": "workspace:*",
+    "@octanejs/vite-plugin": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

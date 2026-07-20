@@ -329,6 +329,21 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Streaming SSR inside REAL workerd (the Cloudflare Workers runtime) via
+		// miniflare: cold isolate spawn→ready→first-byte, warm shell/total, and
+		// the deploy-relevant worker-script bytes. Three targets: octane vs
+		// React Fizz edge behind identical minimal module Workers (renderer
+		// comparison), plus octane-app — the @octanejs/vite-plugin +
+		// @octanejs/adapter-cloudflare deployment shape (octane-only; its delta
+		// vs octane-tsrx is the metaframework layer). Cold spawns dominate wall
+		// time, so normal stays small.
+		name: 'ssr-workerd',
+		cwd: 'ssr-workerd',
+		servers: [],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// The REAL TanStack Start app pair (correctness-gated by compare.mjs +
 		// the shared Playwright spec), measured over HTTP as three targets:
 		// react (srvx minimal host), octane-minimal (identical minimal host), and
