@@ -1,0 +1,17 @@
+{
+  "name": "octane-ssr-workerd-bench",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Streaming SSR inside real workerd (Cloudflare Workers runtime) via miniflare: cold isolate start, warm streaming TTFB, and worker-script bytes for octane renderToReadableStream vs React Fizz edge, sharing the streaming-ssr fixtures.",
+  "scripts": {
+    "bench": "node run.mjs",
+    "bench:smoke": "node run.mjs 3"
+  },
+  "dependencies": {
+    "miniflare": "catalog:default",
+    "vite": "catalog:default",
+    "react": "catalog:default",
+    "react-dom": "catalog:default"
+  }
+}

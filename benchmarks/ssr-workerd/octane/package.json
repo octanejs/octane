@@ -1,0 +1,13 @@
+{
+  "name": "octane-ssr-workerd-fixture",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "ssr-workerd bench fixture: the streaming-ssr octane page behind a module Worker calling renderToReadableStream. Worker-only: no client build, no dev server.",
+  "dependencies": {
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "catalog:default"
+  }
+}

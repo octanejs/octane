@@ -316,6 +316,48 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Raw streaming API over REAL HTTP, cold and warm: fresh-process import
+		// cost, spawn→listen→first-byte cold TTFB, and warm shell/total/throughput
+		// for octane renderToPipeableStream vs React Fizz behind one identical
+		// minimal node:http host (streaming-ssr's fixtures). The renderer link of
+		// the SSR attribution chain; the app link is the tanstack-start suite.
+		// Iterations are cold spawns per target, so normal stays small.
+		name: 'ssr-http',
+		cwd: 'ssr-http',
+		servers: [],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// Streaming SSR inside REAL workerd (the Cloudflare Workers runtime) via
+		// miniflare: cold isolate spawn→ready→first-byte, warm shell/total, and
+		// the deploy-relevant worker-script bytes. Three targets: octane vs
+		// React Fizz edge behind identical minimal module Workers (renderer
+		// comparison), plus octane-app — the @octanejs/vite-plugin +
+		// @octanejs/adapter-cloudflare deployment shape (octane-only; its delta
+		// vs octane-tsrx is the metaframework layer). Cold spawns dominate wall
+		// time, so normal stays small.
+		name: 'ssr-workerd',
+		cwd: 'ssr-workerd',
+		servers: [],
+		iter: { normal: 10, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
+		// The REAL TanStack Start app pair (correctness-gated by compare.mjs +
+		// the shared Playwright spec), measured over HTTP as three targets:
+		// react (srvx minimal host), octane-minimal (identical minimal host), and
+		// octane-nitro (the nitro deployment output). Cold spawn→first-byte and
+		// warmed per-route TTFB/stream/throughput; minimal-vs-react isolates the
+		// Octane Start stack, nitro-vs-minimal isolates the host. Cold spawns
+		// dominate wall time, so normal stays small.
+		name: 'tanstack-start',
+		cwd: 'tanstack-start',
+		servers: [],
+		iter: { normal: 7, quick: 2 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// De-opt cliff (dbmon): tuned .tsrx fixture vs the plain-.ts createElement
 		// twin, driven through dbmon's own harness via a TARGETS pairing.
 		name: 'dbmon-deopt',

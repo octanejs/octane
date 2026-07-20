@@ -1,11 +1,12 @@
-// Correctness gate: the two flavors must render the SAME application.
-// Fetches every benchmark route from both production servers, strips each
-// framework's own dialect (hydration comment markers, framework scripts and
-// data payloads, renderer-owned attributes), and asserts the remaining
-// user-visible structure — element tree, framework-agnostic attributes, and
-// text — matches node for node. Run before any perf number is trusted.
+// Correctness gate: every octane flavor must render the SAME application as
+// react. Fetches every benchmark route from the production servers
+// (octane-nitro, octane-minimal, react), strips each framework's own dialect
+// (hydration comment markers, framework scripts and data payloads,
+// renderer-owned attributes), and asserts the remaining user-visible
+// structure — element tree, framework-agnostic attributes, and text — matches
+// node for node. Run before any perf number is trusted.
 import { JSDOM } from 'jsdom';
-import { serveBoth } from './serve-both.mjs';
+import { serveBoth, startFlavor } from './serve-both.mjs';
 
 const ROUTES = ['/', '/posts', '/posts/3', '/posts/i-do-not-exist', '/deferred'];
 
@@ -67,36 +68,46 @@ function signature(html) {
 
 const { octane, react, stop } = await serveBoth({ BENCH_DEFER_MS: '40' });
 let failures = 0;
+let octaneMinimal;
 try {
+	octaneMinimal = await startFlavor('octane-minimal', { BENCH_DEFER_MS: '40' });
 	for (const route of ROUTES) {
-		const [octaneHtml, reactHtml] = await Promise.all(
-			[octane, react].map((flavor) =>
+		const [octaneHtml, minimalHtml, reactHtml] = await Promise.all(
+			[octane, octaneMinimal, react].map((flavor) =>
 				fetch(flavor.baseURL + route, { signal: AbortSignal.timeout(20_000) }).then((r) =>
 					r.text(),
 				),
 			),
 		);
-		const octaneSig = signature(octaneHtml);
 		const reactSig = signature(reactHtml);
-		if (octaneSig === reactSig) {
-			console.log(`✓ ${route} — structures match (${octaneSig.split('\n').length} nodes/lines)`);
-		} else {
-			failures += 1;
-			console.error(`✗ ${route} — STRUCTURE MISMATCH`);
-			const octaneLines = octaneSig.split('\n');
-			const reactLines = reactSig.split('\n');
-			for (let i = 0; i < Math.max(octaneLines.length, reactLines.length); i += 1) {
-				if (octaneLines[i] !== reactLines[i]) {
-					console.error(`  first divergence at line ${i}:`);
-					console.error(`    octane: ${octaneLines[i] ?? '(end)'}`);
-					console.error(`    react:  ${reactLines[i] ?? '(end)'}`);
-					break;
+		for (const [label, html] of [
+			['octane-nitro', octaneHtml],
+			['octane-minimal', minimalHtml],
+		]) {
+			const octaneSig = signature(html);
+			if (octaneSig === reactSig) {
+				console.log(
+					`✓ ${route} [${label}] — structures match (${octaneSig.split('\n').length} nodes/lines)`,
+				);
+			} else {
+				failures += 1;
+				console.error(`✗ ${route} [${label}] — STRUCTURE MISMATCH`);
+				const octaneLines = octaneSig.split('\n');
+				const reactLines = reactSig.split('\n');
+				for (let i = 0; i < Math.max(octaneLines.length, reactLines.length); i += 1) {
+					if (octaneLines[i] !== reactLines[i]) {
+						console.error(`  first divergence at line ${i}:`);
+						console.error(`    ${label}: ${octaneLines[i] ?? '(end)'}`);
+						console.error(`    react:  ${reactLines[i] ?? '(end)'}`);
+						break;
+					}
 				}
 			}
 		}
 	}
 } finally {
 	stop();
+	octaneMinimal?.stop();
 }
 if (failures > 0) {
 	console.error(`${failures} route(s) diverged`);

@@ -7,14 +7,17 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
+    "build:minimal": "vite build --config vite.config.minimal.ts",
     "typecheck": "tsc --noEmit",
-    "start": "node .output/server/index.mjs"
+    "start": "node .output/server/index.mjs",
+    "start:minimal": "node serve.mjs"
   },
   "dependencies": {
     "@octanejs/tanstack-start": "workspace:*",
     "@tanstack/octane-router": "workspace:*",
     "@tanstack/octane-start": "workspace:*",
-    "octane": "workspace:*"
+    "octane": "workspace:*",
+    "srvx": "^0.11.22"
   },
   "devDependencies": {
     "@types/node": "catalog:default",
