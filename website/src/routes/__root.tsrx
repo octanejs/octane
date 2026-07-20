@@ -32,6 +32,7 @@ const BASE_STYLES = `
 	/* Translucent sticky-header/backdrop fills (a tint of --bg). */
 	--header-bg: rgba(35, 39, 47, 0.85);
 	--header-bg-solid: rgba(35, 39, 47, 0.97);
+	--topnav-height: 60px;
 	/* Doc callout accent glyphs (note/important/tip). */
 	--callout-note: #a9c2ff;
 	--callout-important: #ffc56d;

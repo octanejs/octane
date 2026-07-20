@@ -135,6 +135,13 @@ export function DocPage() @{
 				margin: 2.25rem 0 0.65rem;
 				scroll-margin-top: 5.5rem;
 			}
+			@media (max-width: 800px) {
+				/* Clear both the site header and the collapsed sticky docs menu. */
+				.prose :global(h2[id]),
+				.prose :global(h3[id]) {
+					scroll-margin-top: 9rem;
+				}
+			}
 			.prose :global(p) {
 				color: var(--text-body);
 				margin: 0 0 1.1rem;

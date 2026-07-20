@@ -578,6 +578,101 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
+	it('keeps the mobile docs menu anchored and scrollable when expanded', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools', {
+			waitForNetworkIdle: true,
+		});
+		try {
+			await page.setViewportSize({ width: 390, height: 667 });
+			await page.evaluate(
+				() =>
+					new Promise<void>((resolve) =>
+						requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+					),
+			);
+
+			await page.evaluate(() => window.scrollTo({ top: 900, behavior: 'instant' }));
+			const closed = await page.evaluate(() => {
+				const header = document.querySelector<HTMLElement>('.topnav')!;
+				const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
+				return {
+					expanded: document.querySelector('.sidebar-mobile-toggle')!.getAttribute('aria-expanded'),
+					headerBottom: header.getBoundingClientRect().bottom,
+					position: getComputedStyle(sidebar).position,
+					sidebarTop: sidebar.getBoundingClientRect().top,
+				};
+			});
+			expect(closed.expanded).toBe('false');
+			expect(closed.position).toBe('sticky');
+			expect(Math.abs(closed.sidebarTop - closed.headerBottom)).toBeLessThanOrEqual(2);
+
+			await page.click('.sidebar-mobile-toggle');
+			await page.waitForFunction(
+				() => {
+					const header = document.querySelector('.topnav')!.getBoundingClientRect();
+					const sidebar = document.querySelector<HTMLElement>('.sidebar')!;
+					const panel = document.querySelector('.sidebar-panel')!.getBoundingClientRect();
+					const panelInner = document.querySelector<HTMLElement>('.sidebar-panel-inner')!;
+					const sidebarRect = sidebar.getBoundingClientRect();
+					const panelMaxHeight = Number.parseFloat(getComputedStyle(panelInner).maxHeight);
+					return (
+						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
+							'true' &&
+						getComputedStyle(sidebar).position === 'sticky' &&
+						Math.abs(sidebarRect.top - header.bottom) <= 2 &&
+						Math.abs(panel.top - sidebarRect.bottom) <= 2 &&
+						panel.bottom <= innerHeight + 1 &&
+						getComputedStyle(panelInner).overflowY === 'auto' &&
+						panelInner.clientHeight >= panelMaxHeight - 2 &&
+						panelInner.scrollHeight > panelInner.clientHeight
+					);
+				},
+				null,
+				{ timeout: 10_000 },
+			);
+			expect(await page.evaluate(() => scrollY)).toBe(900);
+
+			await page.evaluate(() => window.scrollTo({ top: 1200, behavior: 'instant' }));
+			const anchoredOpen = await page.evaluate(() => {
+				const header = document.querySelector('.topnav')!.getBoundingClientRect();
+				const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect();
+				const panel = document.querySelector('.sidebar-panel')!.getBoundingClientRect();
+				return {
+					headerBottom: header.bottom,
+					sidebarTop: sidebar.top,
+					sidebarBottom: sidebar.bottom,
+					panelTop: panel.top,
+				};
+			});
+			expect(Math.abs(anchoredOpen.sidebarTop - anchoredOpen.headerBottom)).toBeLessThanOrEqual(2);
+			expect(Math.abs(anchoredOpen.panelTop - anchoredOpen.sidebarBottom)).toBeLessThanOrEqual(2);
+
+			await page.click('.on-this-page a[href="#rspack"]');
+			await page.waitForFunction(
+				() => {
+					const sidebar = document.querySelector('.sidebar')!.getBoundingClientRect();
+					const target = document.querySelector('#rspack')!.getBoundingClientRect();
+					return (
+						location.hash === '#rspack' &&
+						document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
+							'false' &&
+						document
+							.querySelector('.on-this-page a[href="#rspack"]')
+							?.getAttribute('aria-current') === 'true' &&
+						target.top >= sidebar.bottom + 8 &&
+						target.top <= sidebar.bottom + 30
+					);
+				},
+				null,
+				{ timeout: 10_000 },
+			);
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
 	it('the first router event after hydration does not remount the app', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
 			waitForNetworkIdle: true,

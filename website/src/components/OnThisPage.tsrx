@@ -18,6 +18,20 @@ export interface TocSection {
 // crossed this line under the sticky header (~60px) plus a little breathing
 // room. Shared by live tracking and the click-settle check below.
 const ACTIVATION_LINE = 100;
+
+// A documentation host can become a sticky row above the content. Derive that
+// state from its rendered position and overlap with the heading rather than
+// duplicating the layout's responsive breakpoint in JavaScript.
+function activationLineFor(track: Element | null, heading: Element | null): number {
+	const host = track?.closest<HTMLElement>('[data-scroll-spy-mobile-host]');
+	if (!host || !heading || getComputedStyle(host).position !== 'sticky') return ACTIVATION_LINE;
+
+	const hostRect = host.getBoundingClientRect();
+	const headingRect = heading.getBoundingClientRect();
+	const overlapsHeading = hostRect.left < headingRect.right && hostRect.right > headingRect.left;
+	if (overlapsHeading) return Math.max(ACTIVATION_LINE, hostRect.bottom + 12);
+	return ACTIVATION_LINE;
+}
 // How long after the last scroll tick a TOC click is considered settled. Long
 // enough to bridge the gap between smooth-scroll frames (and the delay before
 // the first one); short enough that live tracking resumes promptly.
@@ -79,12 +93,13 @@ export function OnThisPage(props: {
 				id !== null ? document.getElementById(id) : null;
 			if (heading) {
 				const top = heading.getBoundingClientRect().top;
+				const activationLine = activationLineFor(tocTrack.current, heading);
 				// scrollIntoView lands the heading just under the sticky header
-				// (scroll-margin-top ≈ 88px, line = 100), so a small tolerance on
-				// the line covers rounding; the bottom clause accepts any visible
-				// resting spot when the page ran out of scroll room.
+				// (and, on mobile docs, its sticky disclosure), so a small tolerance
+				// on the activation line covers rounding; the bottom clause accepts
+				// any visible resting spot when the page ran out of scroll room.
 				const landed =
-					top >= -2 && (top <= ACTIVATION_LINE + 4 || isAtPageBottom() && top < window.innerHeight);
+					top >= -2 && (top <= activationLine + 4 || isAtPageBottom() && top < window.innerHeight);
 				if (landed) return;
 			}
 			// The reader ended up elsewhere — resume live tracking right away
@@ -116,9 +131,10 @@ export function OnThisPage(props: {
 				armClickRelease();
 				return;
 			}
+			const activationLine = activationLineFor(tocTrack.current, headings[0]);
 			let current = headings[0].id;
 			for (const heading of headings) {
-				if (heading.getBoundingClientRect().top <= ACTIVATION_LINE) current = heading.id;
+				if (heading.getBoundingClientRect().top <= activationLine) current = heading.id;
 				else break;
 			}
 			// At the very bottom of a scrollable page, force the final section: a
@@ -242,8 +258,8 @@ export function OnThisPage(props: {
 			history.replaceState(null, '', '#' + id);
 			setActiveId(id);
 		};
-		// A mobile host returns a promise that settles after its height animation,
-		// so scrollIntoView measures the collapsed page. Desktop hosts close
+		// A mobile host returns a promise that settles after its disclosure closes,
+		// so the overlay cannot obscure the focused target. Desktop hosts close
 		// synchronously and take the immediate path.
 		const collapsed = props.onNavigate?.();
 		if (collapsed instanceof Promise) void collapsed.then(navigate);

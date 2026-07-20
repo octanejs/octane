@@ -10,8 +10,8 @@ export function DocsLayout() @{
 	const closeMobileNavigation = () => {
 		if (!mobileMenuOpen) return;
 		setMobileMenuOpen(false);
-		// Section navigation must measure after the collapsing panel stops changing
-		// the document height. A timer also covers browsers that omit transitionend.
+		// Reveal the target only after the overlay has closed. A timer also covers
+		// browsers that omit transitionend.
 		const reduce =
 			typeof window.matchMedia === 'function' &&
 				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -27,7 +27,7 @@ export function DocsLayout() @{
 	const pageActive = (slug: string) => activeDoc?.slug === slug;
 
 	<div class="docs">
-		<aside class="sidebar">
+		<aside class="sidebar" data-scroll-spy-mobile-host>
 			<button
 				type="button"
 				class="sidebar-mobile-toggle"
@@ -110,11 +110,14 @@ export function DocsLayout() @{
 			}
 			@media (max-width: 800px) {
 				.sidebar {
-					position: static;
+					position: sticky;
+					top: var(--topnav-height);
+					z-index: 9;
 					max-height: none;
 					margin: 0 -1.5rem;
 					padding: 0.75rem 1.5rem;
-					overflow: hidden;
+					overflow: visible;
+					background: var(--bg);
 					border-bottom: 1px solid var(--border);
 				}
 				.sidebar-mobile-toggle {
@@ -140,10 +143,17 @@ export function DocsLayout() @{
 					transform: rotate(45deg);
 				}
 				.sidebar-panel {
+					position: absolute;
+					top: 100%;
+					left: 0;
+					right: 0;
 					display: grid;
 					grid-template-rows: 0fr;
 					opacity: 0;
 					visibility: hidden;
+					background: var(--header-bg-solid);
+					backdrop-filter: blur(12px);
+					border-bottom: 1px solid var(--border);
 					transition:
 						grid-template-rows 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
 						opacity 0.18s ease,
@@ -157,12 +167,18 @@ export function DocsLayout() @{
 				}
 				.sidebar-panel-inner {
 					min-height: 0;
+					max-height: calc(100dvh - var(--topnav-height) - 5rem);
 					overflow: hidden;
 				}
+				.sidebar-panel.is-open .sidebar-panel-inner {
+					overflow-y: auto;
+					overscroll-behavior: contain;
+					scrollbar-width: thin;
+				}
 				.sidebar-nav {
-					margin-top: 0.5rem;
-					padding-top: 0.9rem;
-					border-top: 1px solid var(--border);
+					margin-top: 0;
+					padding: 0.9rem 1.5rem 0.75rem;
+					border-top: 0;
 				}
 				.sidebar .sidebar-title {
 					display: none;
