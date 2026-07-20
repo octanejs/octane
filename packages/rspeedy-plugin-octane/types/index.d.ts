@@ -20,7 +20,11 @@ export interface OctaneRspeedyPluginOptions {
 	profile?: boolean;
 	/** Exclude path fragments from Octane ownership. */
 	exclude?: string[];
-	/** Require project modules to opt in with the `use octane` directive. */
+	/**
+	 * Require project `.tsx`/`.ts`/`.js` modules to opt in with a leading
+	 * `@jsxImportSource octane` pragma comment; `.tsrx` stays Octane's by
+	 * extension and needs no marker.
+	 */
 	requireDirective?: boolean;
 }
 

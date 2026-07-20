@@ -992,57 +992,136 @@ export function App() @{ <Boundary fallback={async (error) => String(error)}><sp
 });
 
 describe('requireDirective ownership gate', () => {
-	const DIRECTIVE_COMPONENT = "'use octane';\n" + COMPONENT;
 	const REACT_TSX =
 		"import * as React from 'react';\n" +
 		'export function Host() {\n' +
 		'  return <p className="host">{\'react\'}</p>;\n' +
 		'}\n';
 
-	it('compiles only directive-carrying project modules when enabled', () => {
+	it('owns project .tsrx by extension and .tsx/.ts/.js behind the pragma', () => {
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),
 			requireDirective: true,
 		});
-		// Directive-carrying .tsrx compiles; the directive never ships.
-		const island = compiler.transform(DIRECTIVE_COMPONENT, '/project/src/Island.tsrx');
-		expect(island?.kind).toBe('compile');
-		expect(island?.code).not.toContain('use octane');
-		// Octane-in-.tsx authoring survives behind the directive.
+		// A project .tsrx needs no marker at all: in an Octane pipeline nothing
+		// else compiles the syntax, so the extension itself is the ownership.
+		expect(compiler.transform(COMPONENT, '/project/src/Island.tsrx')?.kind).toBe('compile');
+		// Octane-in-.tsx authoring opts in with the leading pragma.
 		const octaneTsx = compiler.transform(
-			"'use octane';\nexport function App() @{\n  <p>{'oct'}</p>\n}\n",
+			"/** @jsxImportSource octane */\nexport function App() @{\n  <p>{'oct'}</p>\n}\n",
 			'/project/src/App.tsx',
 		);
 		expect(octaneTsx?.kind).toBe('compile');
-		// An undirected project .tsx belongs to the host toolchain, untouched.
-		expect(compiler.transform(REACT_TSX, '/project/src/Host.tsx')).toBeNull();
-		// An undirected project .tsrx has no other compiler — hard error.
-		expect(() => compiler.transform(COMPONENT, '/project/src/Bad.tsrx')).toThrow(
-			/has no 'use octane' module directive/,
+		// The line-comment pragma spelling TS also honors works the same.
+		const lineTsx = compiler.transform(
+			"// @jsxImportSource octane\nexport function App() @{\n  <p>{'line'}</p>\n}\n",
+			'/project/src/LineApp.tsx',
 		);
+		expect(lineTsx?.kind).toBe('compile');
+		// An unmarked project .tsx belongs to the host toolchain, untouched.
+		expect(compiler.transform(REACT_TSX, '/project/src/Host.tsx')).toBeNull();
+		// A plain project .ts opts into octane hook slotting with the same
+		// pragma. TypeScript ignores the pragma in a JSX-less module, so
+		// there it acts purely as the Octane ownership marker.
+		const pragmaTs = compiler.transform(
+			'/** @jsxImportSource octane */\n' + HOOK,
+			'/project/src/useCount.ts',
+		);
+		expect(pragmaTs?.kind).toBe('slots');
 	});
 
-	it('gates hook slotting and reports likely-forgotten directives once', () => {
+	it('does not let a foreign @jsxImportSource pragma claim a file', () => {
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+		});
+		// A React-owned .tsx declaring its own pragma behaves exactly like an
+		// unmarked file: host toolchain, untouched.
+		expect(
+			compiler.transform('/** @jsxImportSource react */\n' + REACT_TSX, '/project/src/Host.tsx'),
+		).toBeNull();
+		expect(
+			compiler.transform(
+				'/** @jsxImportSource @emotion/react */\n' + REACT_TSX,
+				'/project/src/Styled.tsx',
+			),
+		).toBeNull();
+		// The pragma must be LEADING trivia — after the first statement it is
+		// no longer TS's pragma position and claims nothing.
+		expect(
+			compiler.transform(
+				"'use strict';\n/** @jsxImportSource octane */\n" + REACT_TSX,
+				'/project/src/Late.tsx',
+			),
+		).toBeNull();
+		// A .tsrx stays Octane's by extension regardless of any pragma.
+		expect(
+			compiler.transform('/** @jsxImportSource react */\n' + COMPONENT, '/project/src/Odd.tsrx')
+				?.kind,
+		).toBe('compile');
+		// A foreign pragma on a plain .ts claims nothing either — the module
+		// stays with the host toolchain, unslotted.
+		expect(
+			compiler.transform('/** @jsxImportSource react */\n' + HOOK, '/project/src/useReact.ts'),
+		).toBeNull();
+	});
+
+	it("claims files whose pragma names a registered renderer's intrinsics module", () => {
+		const compiler = createOctaneCompiler({
+			root: resolve('/project'),
+			requireDirective: true,
+			renderers: {
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						server: 'client-only',
+						intrinsics: '@octanejs/three/intrinsics',
+					},
+				},
+				rules: [{ include: '**/*.three.tsx', renderer: 'three' }],
+			},
+		});
+		const scene =
+			'/** @jsxImportSource @octanejs/three/intrinsics */\n' +
+			'export function Scene() @{ <node /> }\n';
+		const out = compiler.transform(scene, '/project/src/Scene.three.tsx');
+		expect(out?.kind).toBe('compile');
+		expect(out?.renderer).toMatchObject({ id: 'three' });
+		// An UNREGISTERED intrinsics-looking module stays foreign: the .tsx is
+		// unmarked and passes through to the host toolchain.
+		expect(
+			compiler.transform(
+				'/** @jsxImportSource @octanejs/other/intrinsics */\n' + REACT_TSX,
+				'/project/src/Other.tsx',
+			),
+		).toBeNull();
+	});
+
+	it('gates hook slotting and reports likely-forgotten pragmas once', () => {
 		const warnings: string[] = [];
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),
 			requireDirective: true,
 			warn: (message: string) => warnings.push(message),
 		});
-		// Undirected octane-importing .ts: untouched, one diagnostic.
+		// An unmarked octane-importing project .ts stays with the host
+		// toolchain: untouched, one diagnostic with the same add-the-pragma
+		// guidance an unmarked .tsx gets.
 		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
 		expect(compiler.transform(HOOK, '/project/src/useCount.ts')).toBeNull();
 		expect(warnings).toHaveLength(1);
 		expect(warnings[0]).toContain('/src/useCount.ts');
-		expect(warnings[0]).toContain("'use octane'");
-		// The directive turns slotting back on, and is stripped from output.
-		const directed = compiler.transform("'use octane';\n" + HOOK, '/project/src/useDirected.ts');
+		expect(warnings[0]).toContain('/** @jsxImportSource octane */');
+		// The pragma turns slotting back on.
+		const directed = compiler.transform(
+			'/** @jsxImportSource octane */\n' + HOOK,
+			'/project/src/useDirected.ts',
+		);
 		expect(directed?.kind).toBe('slots');
-		expect(directed?.code).not.toContain('use octane');
 	});
 
-	it('keeps manifest-declared packages exempt from the directive gate', () => {
-		const root = mkdtempSync(join(tmpdir(), 'octane-directive-manifest-'));
+	it('keeps manifest-declared packages exempt from the ownership gate', () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-ownership-manifest-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
 			const packageRoot = join(root, 'node_modules/raw-octane');
@@ -1053,7 +1132,7 @@ describe('requireDirective ownership gate', () => {
 			);
 			const compiler = createOctaneCompiler({ root, requireDirective: true });
 			// Installed packages made their Octane decision in their manifest —
-			// no directive required, exactly as without the gate.
+			// no pragma required, exactly as without the gate.
 			expect(
 				compiler.transform(
 					`export function App() { return <p>{'raw'}</p>; }`,
@@ -1063,46 +1142,20 @@ describe('requireDirective ownership gate', () => {
 			expect(compiler.transform(COMPONENT, join(packageRoot, 'src/Island.tsrx'))?.kind).toBe(
 				'compile',
 			);
+			// Installed-package .ts hook modules keep their hook slotting with
+			// no pragma — the manifest is the per-package decision.
+			expect(compiler.transform(HOOK, join(packageRoot, 'src/useCount.ts'))?.kind).toBe('slots');
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
 	});
 
-	it('tolerates and strips the directive when the gate is off', () => {
-		const compiler = createOctaneCompiler({ root: resolve('/project') });
-		const island = compiler.transform(DIRECTIVE_COMPONENT, '/project/src/Island.tsrx');
-		expect(island?.kind).toBe('compile');
-		expect(island?.code).not.toContain('use octane');
-		const slotted = compiler.transform("'use octane';\n" + HOOK, '/project/src/useCount.ts');
-		expect(slotted?.kind).toBe('slots');
-		expect(slotted?.code).not.toContain('use octane');
-	});
-
-	it('keeps the directive out of Octane-owned pass-through results', () => {
-		// A directed module with nothing to rewrite (no hooks to slot) is still
-		// Octane output: whatever code the result carries omits the build-time
-		// directive, matching compiled and slotted modules.
-		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
-		const untouched = compiler.transform(
-			"'use octane';\nimport { createRoot } from 'octane';\nexport const boot = createRoot;\n",
-			'/project/src/boot.ts',
-		);
-		expect(untouched?.code ?? '').not.toContain('use octane');
-	});
-
-	it('recognizes the directive after comments and other directives', () => {
-		const compiler = createOctaneCompiler({ root: resolve('/project'), requireDirective: true });
-		const source = '// island\n/* mixed */\n"use client";\n\'use octane\';\n' + COMPONENT;
-		const out = compiler.transform(source, '/project/src/Island.tsrx');
-		expect(out?.kind).toBe('compile');
-		expect(out?.code).not.toContain('use octane');
-	});
-
 	it('lets exclude route .tsrx paths to another tsrx compiler', () => {
 		// tsrx syntax can target other renderers (@tsrx/react); a project
 		// routing part of its .tsrx through a different tsrx compiler lists
-		// those paths in `exclude`, and Octane never claims them — no error,
-		// no compile, no directive requirement.
+		// those paths in `exclude`, and Octane never claims them — no compile,
+		// and NO conflict warning: extension ownership plus exclusion is the
+		// intended routing pattern, not a contradiction.
 		const warnings: string[] = [];
 		const compiler = createOctaneCompiler({
 			root: resolve('/project'),
@@ -1111,34 +1164,43 @@ describe('requireDirective ownership gate', () => {
 			warn: (message: string) => warnings.push(message),
 		});
 		expect(compiler.transform(COMPONENT, '/project/src/react-app/View.tsrx')).toBeNull();
-		// The exclusion wins even over a directive, with a diagnostic naming
-		// the conflict instead of a silent no-op.
+		expect(warnings).toHaveLength(0);
+		// An explicit octane pragma in an excluded path IS a conflict, named
+		// instead of resolving as a silent no-op.
 		expect(
-			compiler.transform(DIRECTIVE_COMPONENT, '/project/src/react-app/Island.tsrx'),
+			compiler.transform(
+				"/** @jsxImportSource octane */\nexport function App() @{ <p>{'x'}</p> }\n",
+				'/project/src/react-app/Island.tsx',
+			),
 		).toBeNull();
-		expect(warnings.some((message) => message.includes('/src/react-app/Island.tsrx'))).toBe(true);
+		expect(warnings.some((message) => message.includes('/src/react-app/Island.tsx'))).toBe(true);
 		expect(warnings.some((message) => message.includes('exclu'))).toBe(true);
 		// The same conflict diagnostic covers the .ts/.js hook-slot exclusion.
 		expect(
-			compiler.transform("'use octane';\n" + HOOK, '/project/src/react-app/util.ts'),
+			compiler.transform(
+				'/** @jsxImportSource octane */\n' + HOOK,
+				'/project/src/react-app/util.ts',
+			),
 		).toBeNull();
 		expect(warnings.some((message) => message.includes('/src/react-app/util.ts'))).toBe(true);
-		// Outside the excluded paths the gate is unchanged.
-		expect(() => compiler.transform(COMPONENT, '/project/src/islands/Bad.tsrx')).toThrow(
-			/has no 'use octane' module directive/,
-		);
+		// An UNMARKED excluded octane-importing .ts is a silent pass — no
+		// ownership claim, nothing to conflict with.
+		expect(compiler.transform(HOOK, '/project/src/react-app/plain.ts')).toBeNull();
+		expect(warnings.some((message) => message.includes('/src/react-app/plain.ts'))).toBe(false);
+		// Outside the excluded paths a project .tsrx compiles unconditionally.
+		expect(compiler.transform(COMPONENT, '/project/src/islands/Fine.tsrx')?.kind).toBe('compile');
 	});
 });
 
 describe('requireDirective and client-only classification', () => {
 	it('classifies client references with the same ownership gate as transforms', () => {
-		const root = mkdtempSync(join(tmpdir(), 'octane-directive-client-only-'));
+		const root = mkdtempSync(join(tmpdir(), 'octane-ownership-client-only-'));
 		try {
 			writeFileSync(join(root, 'package.json'), JSON.stringify({ name: 'app', private: true }));
 			mkdirSync(join(root, 'src/scenes'), { recursive: true });
 			const reactScene =
 				"import * as React from 'react';\nexport function Scene() { return <p/>; }\n";
-			const octaneScene = "'use octane';\nexport function Scene() @{ <node /> }\n";
+			const octaneScene = '/** @jsxImportSource octane */\nexport function Scene() @{ <node /> }\n';
 			const reactFile = join(root, 'src/scenes/ReactScene.tsx');
 			const octaneFile = join(root, 'src/scenes/OctaneScene.tsx');
 			writeFileSync(reactFile, reactScene);
@@ -1151,7 +1213,7 @@ describe('requireDirective and client-only classification', () => {
 					rules: [{ include: 'src/scenes/**', renderer: 'object' }],
 				},
 			});
-			// An undirected project module matched by a client-only renderer rule
+			// An unmarked project module matched by a client-only renderer rule
 			// is NOT Octane's: importers must not receive a client reference for
 			// a module whose own transform passes through to the host toolchain.
 			expect(compiler.clientReferenceForFile(reactFile)).toBeNull();
@@ -1159,12 +1221,17 @@ describe('requireDirective and client-only classification', () => {
 				environment: 'server',
 			});
 			expect(serverTransform).toBeNull();
-			// The directed module keeps full client-only behavior: reference and
-			// server stub agree on identity.
+			// The pragma-marked module keeps full client-only behavior:
+			// reference and server stub agree on identity.
 			const reference = compiler.clientReferenceForFile(octaneFile);
 			expect(reference).toMatchObject({ renderer: 'object' });
 			const stub = compiler.transform(octaneScene, octaneFile, { environment: 'server' });
 			expect(stub).toMatchObject({ kind: 'client-only-stub', clientReference: reference });
+			// A project .tsrx is classified Octane's by extension alone.
+			const tsrxScene = 'export function Scene() @{ <node /> }\n';
+			const tsrxFile = join(root, 'src/scenes/ExtensionScene.tsrx');
+			writeFileSync(tsrxFile, tsrxScene);
+			expect(compiler.clientReferenceForFile(tsrxFile)).toMatchObject({ renderer: 'object' });
 			// A host-owned .ts under the client-only include is not Octane's
 			// either: classification and transform BOTH pass it through instead
 			// of one throwing the narrow-the-rule config error.

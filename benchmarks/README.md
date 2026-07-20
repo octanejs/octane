@@ -41,8 +41,9 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 
 Some suites need no preview servers: **news** vite-builds and times each target
 itself (the runner loops its per-target invocations and merges them),
-**ssr-throughput** and **streaming-ssr** are Node-only, and **codegen-size** /
-**bundle-size** / **three-bundle-size** are deterministic build/byte checks.
+**ssr-throughput**, **streaming-ssr**, and **lynx-list** are Node-only, and
+**codegen-size** / **bundle-size** / **three-bundle-size** are deterministic
+build/byte checks.
 
 ## Regression modes
 
@@ -178,6 +179,7 @@ internally, get their own baseline and guard namespace.
 | `js-framework-deopt` | js-framework | octane-tsrx + naive triplet | tuned vs naive-authoring cliff |
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
+| `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |

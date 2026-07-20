@@ -1,4 +1,3 @@
-'use octane';
 // Async island: two parallel use() reads (recommendations + rating) behind a
 // local @try/@pending — and deliberately NO @catch. The current
 // recommendations resource lives in island STATE and reaches use() through a

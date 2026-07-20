@@ -131,6 +131,7 @@ export {
 	evt2u,
 	evtN,
 	evtNu,
+	devEventListener,
 	htext,
 	htextSwap,
 	child,

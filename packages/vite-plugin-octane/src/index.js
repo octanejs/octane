@@ -739,6 +739,10 @@ export function octane(inlineOptions = {}) {
 			await viteBuild({
 				root,
 				appType: 'custom',
+				// Vite deliberately preserves process.env references in SSR/library
+				// output. Pin build intent here so Rollup can remove Octane's complete
+				// development error table even when the server bundle is not minified.
+				define: { 'process.env.NODE_ENV': JSON.stringify('production') },
 				plugins: [virtualEntryPlugin],
 				resolve: {
 					alias: [

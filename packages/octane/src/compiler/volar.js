@@ -30,6 +30,7 @@ import {
 	parseModule,
 } from '@tsrx/core';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
+import { jsxImportSourcePragmaModule } from './pragma.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -95,8 +96,6 @@ const OCTANE_PLATFORM = {
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
 
-const JSX_IMPORT_SOURCE_PRAGMA = /@jsxImportSource\s+([^\s*]+)/;
-
 /**
  * Does the parsed file carry an authored `@jsxImportSource` pragma in its
  * LEADING comments (the position TS reads pragmas from)? Decided on the parse
@@ -111,7 +110,7 @@ function hasAuthoredLeadingPragma(ast, comments) {
 	return comments.some(
 		(comment) =>
 			(firstStatementStart == null || comment.end <= firstStatementStart) &&
-			JSX_IMPORT_SOURCE_PRAGMA.test(comment.value),
+			jsxImportSourcePragmaModule(comment.value) !== null,
 	);
 }
 

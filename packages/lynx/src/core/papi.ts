@@ -3,6 +3,49 @@ import { LYNX_NODES_REF_ATTRIBUTE } from './nodes-ref.js';
 /** Opaque Element PAPI reference owned by the Lynx main thread. */
 export type LynxElementRef = object;
 
+/** Native list callback invoked when Lynx requests one logical cell. */
+export type LynxListComponentAtIndex<Node extends LynxElementRef = LynxElementRef> = (
+	list: Node,
+	listId: number,
+	index: number,
+	operationId?: number,
+	enableReuseNotification?: boolean,
+) => number;
+
+/** Batched variant used by newer Lynx engines. */
+export type LynxListComponentAtIndexes<Node extends LynxElementRef = LynxElementRef> = (
+	list: Node,
+	listId: number,
+	indexes: readonly number[],
+	operationIds: readonly number[],
+	enableReuseNotification?: boolean,
+	asyncFlush?: boolean,
+) => void;
+
+/** Native list callback invoked when a physical cell may enter the reuse pool. */
+export type LynxListEnqueueComponent<Node extends LynxElementRef = LynxElementRef> = (
+	list: Node,
+	listId: number,
+	sign: number,
+) => void;
+
+/** The public Element PAPI list slice, kept optional until a list is authored. */
+export interface LynxListPAPI<Node extends LynxElementRef = LynxElementRef> {
+	create(
+		parentComponentUniqueId: number,
+		componentAtIndex: LynxListComponentAtIndex<Node>,
+		enqueueComponent: LynxListEnqueueComponent<Node>,
+		componentAtIndexes: LynxListComponentAtIndexes<Node>,
+	): Node;
+	updateCallbacks(
+		list: Node,
+		componentAtIndex: LynxListComponentAtIndex<Node>,
+		enqueueComponent: LynxListEnqueueComponent<Node>,
+		componentAtIndexes: LynxListComponentAtIndexes<Node>,
+	): void;
+	updateComponents(list: Node, components: readonly string[]): void;
+}
+
 /**
  * Structural slice of the public Element PAPI used by the Milestone 3 host.
  *
@@ -18,6 +61,20 @@ export interface LynxElementPAPIGlobals<Node extends LynxElementRef = LynxElemen
 	__CreateText(parentComponentUniqueId: number): Node;
 	__CreateRawText(text: string): Node;
 	__CreateImage(parentComponentUniqueId: number): Node;
+	__CreateList?(
+		parentComponentUniqueId: number,
+		componentAtIndex: LynxListComponentAtIndex<Node>,
+		enqueueComponent: LynxListEnqueueComponent<Node>,
+		options?: Readonly<Record<string, unknown>>,
+		componentAtIndexes?: LynxListComponentAtIndexes<Node>,
+	): Node;
+	__UpdateListCallbacks?(
+		list: Node,
+		componentAtIndex: LynxListComponentAtIndex<Node>,
+		enqueueComponent: LynxListEnqueueComponent<Node>,
+		componentAtIndexes?: LynxListComponentAtIndexes<Node>,
+	): void;
+	__UpdateListComponents?(list: Node, components: readonly string[]): void;
 	__GetElementUniqueID(node: Node): number;
 	__GetParent?(node: Node): Node | null | undefined;
 	__ElementIsEqual?(first: Node, second: Node): boolean;
@@ -31,13 +88,15 @@ export interface LynxElementPAPIGlobals<Node extends LynxElementRef = LynxElemen
 	__SetDataset(node: Node, value: Readonly<Record<string, unknown>>): void;
 	__AddEvent(node: Node, kind: string, name: string, listener: string | undefined): void;
 	__SetID(node: Node, id: string | null): void;
-	__FlushElementTree(node?: Node): void;
+	__FlushElementTree(node?: Node, options?: Readonly<Record<string, unknown>>): void;
 }
 
 /** Normalized, dependency-injected Element PAPI used by the root-scoped host. */
 export interface LynxElementPAPI<Node extends LynxElementRef = LynxElementRef> {
 	createPage(componentId: string, cssId: number): Node;
 	createElement(type: string, parentComponentUniqueId: number, text: string): Node;
+	/** Present when the runtime publishes the native list callback API. */
+	readonly list?: LynxListPAPI<Node>;
 	getUniqueId(node: Node): number;
 	isChild(parent: Node, child: Node): boolean;
 	insertBefore(parent: Node, child: Node, before: Node | null): void;
@@ -51,7 +110,7 @@ export interface LynxElementPAPI<Node extends LynxElementRef = LynxElementRef> {
 	setDataset(node: Node, value: Readonly<Record<string, unknown>>): void;
 	setEvent(node: Node, kind: string, name: string, listener: string | undefined): void;
 	setId(node: Node, id: string | null): void;
-	flush(page: Node): void;
+	flush(node: Node, options?: Readonly<Record<string, unknown>>): void;
 }
 
 function requireFunction<
@@ -82,6 +141,57 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 	const createText = requireFunction<Node, '__CreateText'>(target, '__CreateText');
 	const createRawText = requireFunction<Node, '__CreateRawText'>(target, '__CreateRawText');
 	const createImage = requireFunction<Node, '__CreateImage'>(target, '__CreateImage');
+	const listGlobals = target as LynxElementPAPIGlobals<Node>;
+	const createListValue = listGlobals.__CreateList;
+	const updateListCallbacksValue = listGlobals.__UpdateListCallbacks;
+	const updateListComponentsValue = listGlobals.__UpdateListComponents;
+	const listFunctionCount = [
+		createListValue,
+		updateListCallbacksValue,
+		updateListComponentsValue,
+	].filter((value) => typeof value === 'function').length;
+	if (listFunctionCount !== 0 && listFunctionCount !== 3) {
+		throw new Error(
+			'Octane Lynx requires __CreateList, __UpdateListCallbacks, and __UpdateListComponents together.',
+		);
+	}
+	const list =
+		listFunctionCount === 3
+			? Object.freeze({
+					create(
+						parentComponentUniqueId: number,
+						componentAtIndex: LynxListComponentAtIndex<Node>,
+						enqueueComponent: LynxListEnqueueComponent<Node>,
+						componentAtIndexes: LynxListComponentAtIndexes<Node>,
+					) {
+						return createListValue!.call(
+							target,
+							parentComponentUniqueId,
+							componentAtIndex,
+							enqueueComponent,
+							{},
+							componentAtIndexes,
+						);
+					},
+					updateCallbacks(
+						listNode: Node,
+						componentAtIndex: LynxListComponentAtIndex<Node>,
+						enqueueComponent: LynxListEnqueueComponent<Node>,
+						componentAtIndexes: LynxListComponentAtIndexes<Node>,
+					) {
+						updateListCallbacksValue!.call(
+							target,
+							listNode,
+							componentAtIndex,
+							enqueueComponent,
+							componentAtIndexes,
+						);
+					},
+					updateComponents(listNode: Node, components: readonly string[]) {
+						updateListComponentsValue!.call(target, listNode, components);
+					},
+				})
+			: undefined;
 	const getUniqueId = requireFunction<Node, '__GetElementUniqueID'>(target, '__GetElementUniqueID');
 	const getParentValue = (target as LynxElementPAPIGlobals<Node>).__GetParent;
 	const elementIsEqualValue = (target as LynxElementPAPIGlobals<Node>).__ElementIsEqual;
@@ -116,6 +226,7 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 	const flush = requireFunction<Node, '__FlushElementTree'>(target, '__FlushElementTree');
 
 	const papi: LynxElementPAPI<Node> = {
+		...(list === undefined ? null : { list }),
 		createPage(componentId, cssId) {
 			return createPage(componentId, cssId);
 		},
@@ -192,8 +303,8 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 			// testing environment models this operation as a DOM assignment.
 			setId(node, id);
 		},
-		flush(page) {
-			flush(page);
+		flush(node, options) {
+			flush(node, options);
 		},
 	};
 	return Object.freeze(papi);

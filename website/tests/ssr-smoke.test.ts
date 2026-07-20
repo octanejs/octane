@@ -73,7 +73,7 @@ beforeAll(async () => {
 		const build = spawn('pnpm', ['exec', 'vite', 'build'], {
 			cwd: websiteRoot,
 			stdio: 'ignore',
-			env: { ...process.env, NITRO_PRESET: 'node-server' },
+			env: { ...process.env, NODE_ENV: 'production', NITRO_PRESET: 'node-server' },
 		});
 		build.once('error', reject);
 		build.once('exit', (code) => {
@@ -86,7 +86,12 @@ beforeAll(async () => {
 	server = spawn(process.execPath, [serverEntry], {
 		cwd: websiteRoot,
 		stdio: 'ignore',
-		env: { ...process.env, HOST: '127.0.0.1', PORT: String(port) },
+		env: {
+			...process.env,
+			NODE_ENV: 'production',
+			HOST: '127.0.0.1',
+			PORT: String(port),
+		},
 	});
 	await waitForServer(server, origin + '/');
 }, 240_000);
@@ -104,7 +109,7 @@ afterAll(async () => {
 describe('built Start server', () => {
 	it('produced Nitro server and public asset output', () => {
 		expect(fs.existsSync(serverEntry)).toBe(true);
-		expect(fs.existsSync(path.join(websiteRoot, '.output/public/playground-runtime.mjs'))).toBe(
+		expect(fs.existsSync(path.join(websiteRoot, '.output/public/playground-runtime.json'))).toBe(
 			true,
 		);
 	});
@@ -157,6 +162,7 @@ describe('built Start server', () => {
 			'This link contains shared code.',
 			'Every suite at a glance',
 			'Configure Vite, Rspack, or Rsbuild for Octane apps.',
+			'Objects are not valid as an Octane child (found: %s).',
 		];
 
 		for (const sentinel of routeOnlySentinels) {
@@ -232,5 +238,18 @@ describe('built Start server', () => {
 		expect(response.status).toBe(404);
 		expect(classCount(html, 'notfound')).toBeGreaterThan(0);
 		expect(classCount(html, 'notfound-home')).toBeGreaterThan(0);
+	});
+
+	it('decodes known errors as escaped text and returns a real 404 for unknown codes', async () => {
+		const argument = '<strong>diagnostic value</strong>';
+		const known = await get('/errors/3?args%5B%5D=' + encodeURIComponent(argument));
+		expect(known.response.status).toBe(200);
+		expect(classCount(known.html, 'error-decoder')).toBeGreaterThan(0);
+		expect(known.html).toContain('&lt;strong&gt;diagnostic value&lt;/strong&gt;');
+		expect(known.html).not.toContain('<strong>diagnostic value</strong>');
+
+		const unknown = await get('/errors/999999');
+		expect(unknown.response.status).toBe(404);
+		expect(classCount(unknown.html, 'notfound')).toBeGreaterThan(0);
 	});
 });

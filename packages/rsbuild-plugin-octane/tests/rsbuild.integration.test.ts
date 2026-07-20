@@ -421,6 +421,7 @@ export function App() @{
 		const clientRoot = join(root, 'build/client');
 		const serverRoot = join(root, 'build/server');
 		const clientCode = readJavaScript(clientRoot);
+		const serverCode = readJavaScript(serverRoot);
 		expect(existsSync(join(clientRoot, 'index.html'))).toBe(false);
 		expect(existsSync(join(serverRoot, 'entry.js'))).toBe(true);
 		expect(existsSync(join(serverRoot, 'index.html'))).toBe(true);
@@ -428,6 +429,11 @@ export function App() @{
 		// Production browser output must not depend on Node's absent `process`
 		// global when Octane selects its production runtime branches.
 		expect(clientCode).not.toContain('process.env.NODE_ENV');
+		// The integration pins production mode for the Node graph so this fold does
+		// not depend on minification (the fixture opts out for both environments).
+		expect(serverCode).not.toContain('process.env.NODE_ENV');
+		expect(serverCode).not.toContain('octane SSR: pipe() may only be called once.');
+		expect(serverCode).toContain('https://octanejs.dev/errors/');
 
 		const html = readFileSync(join(serverRoot, 'index.html'), 'utf8');
 		expect(html).toContain('data-octane-hydrate');
