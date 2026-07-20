@@ -66,7 +66,7 @@ function collect(component: any, props?: any) {
 		},
 		end,
 	});
-	return { ended, errors };
+	return { ended, errors, chunks };
 }
 
 // Card/List are shared by every Page shape below: the grandchild unwraps a
@@ -312,6 +312,71 @@ describe('streaming SSR — promises created in an ancestor, unwrapped via props
 			expect(html).toContain('card-2');
 			expect(state.creations).toBe(1);
 			expect(errorSpy).not.toHaveBeenCalled();
+		} finally {
+			errorSpy.mockRestore();
+		}
+	});
+
+	it('degrades recreated sites even while a slow stable fetch is still pending', async () => {
+		// Mixed tree: a stable (use-site memoized) fetch that stays in flight
+		// beside prop-flowed promises recreated every pass. The recreated sites
+		// manufacture fast no-boundary waves the whole time the stable fetch
+		// pends; its carried-over registration must not clear the recreation
+		// evidence each pass, or the render burns MAX_SUSPENSE_PASSES before
+		// the stable work ever lands. The slow fetch is only resolved AFTER the
+		// recreated cards' content reaches the wire — impossible unless the
+		// guard tripped while the fetch was still pending.
+		const MIXED =
+			CARD_AND_LIST +
+			`
+			export function Slow(props) @{
+				<div>
+					@try {
+						const v = use(props.fetchSlow());
+						<b class="slow">{v as string}</b>
+					} @pending {
+						<i>s</i>
+					}
+				</div>
+			}
+			export function Page(p) @{
+				const cards = p.makeCards();
+				<main>
+					<Slow fetchSlow={p.fetchSlow} />
+					<List cards={cards} />
+				</main>
+			}
+		`;
+		const mod = evalServer(MIXED, 'prop-flow-mixed.tsrx');
+		const { makeCards } = timedCardsFactory();
+		let resolveSlow!: (v: string) => void;
+		const slow = new Promise<string>((resolve) => {
+			resolveSlow = resolve;
+		});
+		let fetches = 0;
+		const fetchSlow = () => {
+			fetches++;
+			return slow;
+		};
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const { ended, errors, chunks } = collect(mod.Page, { makeCards, fetchSlow });
+			// Release the stable fetch only once every recreated card is on the
+			// wire — the guard must have degraded those sites by then.
+			const deadline = Date.now() + 5000;
+			while (!chunks.join('').includes('card-2')) {
+				if (Date.now() > deadline) throw new Error('recreated cards never flushed');
+				await new Promise((resolve) => setTimeout(resolve, 5));
+			}
+			resolveSlow('slow-data');
+			const html = await ended;
+			expect(errors).toEqual([]);
+			expect(html).toContain('card-0');
+			expect(html).toContain('card-1');
+			expect(html).toContain('card-2');
+			expect(html).toContain('slow-data');
+			// The stable creation stayed memoized throughout the degradation.
+			expect(fetches).toBe(1);
 		} finally {
 			errorSpy.mockRestore();
 		}

@@ -5133,20 +5133,27 @@ async function settleFirstOfWave(
 //
 // Watched signature, once per settle→re-render cycle: no boundary completed,
 // no new puMemo creation site was reached, no plain use() string key was
-// recorded, and the new pass registers ONLY batch thenables whose identities
-// are disjoint from the previous wave's (a still-pending batch thenable
-// re-registers on every pass by design, so a legitimate slow wave always
-// overlaps). One such cycle can still be a legitimate waterfall level whose
-// unwraps are trivial (un-memoized) references, so the first strike only ARMS
-// consumption tracking: a real dependency stratum CONSUMES the settled wave's
-// outcomes on the very next pass (identity hits in use()/puBatch), while a
-// recreating ancestor never references the settled instances again. A second
-// consecutive strike with zero consumption switches batching off for the rest
-// of the request: puBatch stops registering/suspending, the first unresolved
-// use() below it suspends under its stable frame-scoped STRING key instead,
-// and key replay drives the render to completion — degraded (one newly
-// recorded unwrap key per pass) but correct, matching what un-batched use()
-// has always done for per-pass creations.
+// recorded, and the new pass registers FRESH batch thenables (identities
+// disjoint from the previous wave's). Carried-over registrations — a
+// still-pending batch thenable re-registers on every pass by design — are
+// normal batching at work, but they must only be EXCLUDED from the fresh set,
+// never treated as a wave-wide veto: a slow stable fetch pending beside
+// recreated sites would otherwise clear the evidence every pass while the
+// recreated sites manufacture fast no-boundary waves straight into the
+// MAX_SUSPENSE_PASSES error. One qualifying cycle can still be a legitimate
+// waterfall level whose unwraps are trivial (un-memoized) references, so the
+// first strike only ARMS consumption tracking: a real dependency stratum
+// CONSUMES the settled wave's outcomes on the very next pass (identity hits
+// in use()/puBatch), while a recreating ancestor never references the settled
+// instances again. A second consecutive strike with zero consumption switches
+// batching off for the rest of the request: puBatch stops
+// registering/suspending, the first unresolved use() below it suspends under
+// its stable frame-scoped STRING key instead, and key replay drives the
+// render to completion — degraded (one newly recorded unwrap key per pass)
+// but correct, matching what un-batched use() has always done for per-pass
+// creations. (Still-pending stable work is unaffected by the switch: its
+// use() suspends with the SAME thenable under a string key and resolves on
+// settle exactly as un-batched code always has.)
 function observeSuspenseWave(
 	resolved: ResolvedMap,
 	settled: SuspendedList,
@@ -5181,10 +5188,12 @@ function observeSuspenseWave(
 	let sawFresh = false;
 	for (const { promise, key } of next) {
 		if (key.charCodeAt(0) !== 124 || !key.startsWith('|pu#')) continue;
-		// A carried-over (still pending) or already-settled identity is normal
-		// batching at work, not recreation.
-		if (prevPu.has(promise) || pu.resolvedT.has(promise)) return reset();
+		// Carried-over (still pending) and already-settled identities are not
+		// recreation — but they are also not progress, so they merely don't
+		// count as fresh (see the mixed-recreation note above).
+		if (prevPu.has(promise) || pu.resolvedT.has(promise)) continue;
 		sawFresh = true;
+		break;
 	}
 	if (!sawFresh) return reset();
 	if (touched !== undefined) {
