@@ -111,8 +111,6 @@ export function PlainClickApp() @{
 		<button
 			onClick={() => startTransition(() => setCount((value) => value + 1))}
 		>{'Increment'}</button>
-		<div>
-			{'Count: ' + count}
-		</div>
+		<div>{'Count: ' + count}</div>
 	</>
 }

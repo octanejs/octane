@@ -70,9 +70,7 @@ export function BatchCatch(props) @{
 		} @pending {
 			<div class="fallback">{'w'}</div>
 		} @catch (err) {
-			<div class="err">
-				{'caught:' + err.message}
-			</div>
+			<div class="err">{'caught:' + err.message}</div>
 		}
 	</>
 }

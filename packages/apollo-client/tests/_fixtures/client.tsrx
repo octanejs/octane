@@ -107,9 +107,7 @@ export function QueryApp(props: { client: any }) @{
 function SuspenseQueryPanel() @{
 	const result = useSuspenseQuery(GET_VALUE, { fetchPolicy: 'network-only' });
 	const value = (result.data as { value?: string } | undefined)?.value;
-	<output id="suspense-query-result">
-		{'data:' + (value || '-')}
-	</output>
+	<output id="suspense-query-result">{'data:' + (value || '-')}</output>
 }
 
 export function SuspenseQueryApp(props: { client: any }) @{
@@ -123,9 +121,7 @@ export function SuspenseQueryApp(props: { client: any }) @{
 function SkippedSuspenseQueryPanel() @{
 	const result = useSuspenseQuery(GET_VALUE, skipToken);
 	const value = (result.data as { value?: string } | undefined)?.value;
-	<output id="skipped-suspense-query-result">
-		{'data:' + (value || '-')}
-	</output>
+	<output id="skipped-suspense-query-result">{'data:' + (value || '-')}</output>
 }
 
 export function SkippedSuspenseQueryApp(props: { client: any }) @{
@@ -290,9 +286,7 @@ function MockedQueryPanel(props: { label?: string }) @{
 	const result = useQuery(GET_MOCKED_VALUE);
 	const value = (result.data as { mockedValue?: string } | undefined)?.mockedValue;
 	<section id="mocked-provider-panel">
-		<output id="mocked-provider-label">
-			{props.label || '-'}
-		</output>
+		<output id="mocked-provider-label">{props.label || '-'}</output>
 		<output id="mocked-provider-result">
 			{result.loading
 				? 'loading'

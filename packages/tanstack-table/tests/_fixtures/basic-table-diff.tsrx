@@ -17,9 +17,7 @@ const dataB = [
 ];
 
 function EmCell(props: any) @{
-	<em>
-		{'v:' + props.getValue()}
-	</em>
+	<em>{'v:' + props.getValue()}</em>
 }
 
 const columns = [

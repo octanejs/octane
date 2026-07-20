@@ -58,9 +58,7 @@ export function App() @{
 	<main>
 		<h1>Inbox</h1>
 		@if (selected) {
-			<p role="status">
-				{'Selected: ' + selected.title}
-			</p>
+			<p role="status">{'Selected: ' + selected.title}</p>
 		} @else {
 			<p role="status">No message selected</p>
 		}

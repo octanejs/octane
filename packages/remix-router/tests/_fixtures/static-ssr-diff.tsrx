@@ -33,9 +33,7 @@ function Home() @{
 
 function DataView() @{
 	const data = useLoaderData();
-	<p>
-		{'value=' + data.value}
-	</p>
+	<p>{'value=' + data.value}</p>
 }
 
 function Boom() @{

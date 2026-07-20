@@ -13,8 +13,6 @@ export function Counter(props) @{
 		}); // the compiler infers [count]
 	}
 
-	<button onClick={() => setCount(count + 1)}>
-		{'Count: ' + count}
-	</button>
+	<button onClick={() => setCount(count + 1)}>{'Count: ' + count}</button>
 }
 ```

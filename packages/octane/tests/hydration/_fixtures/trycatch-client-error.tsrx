@@ -8,9 +8,7 @@ import { useState } from 'octane';
 function Inner(props) @{
 	if (props.boom) throw new Error('boom');
 	const [n, setN] = useState(0);
-	<button id="ok" onClick={() => setN(n + 1)}>
-		{'ok:' + n}
-	</button>
+	<button id="ok" onClick={() => setN(n + 1)}>{'ok:' + n}</button>
 }
 
 export function Page(props) @{
@@ -20,9 +18,7 @@ export function Page(props) @{
 			<Inner boom={props.boom} />
 		} @catch (err, reset) {
 			<div class="err">
-				<span class="msg">
-					{'caught:' + err.message}
-				</span>
+				<span class="msg">{'caught:' + err.message}</span>
 				<button class="retry" onClick={() => reset()}>
 					retry
 				</button>
@@ -59,9 +55,7 @@ export function RouterShape(props) @{
 			}
 		} @catch (err, reset) {
 			<div class="outer-err">
-				<span class="msg">
-					{'outer:' + err.message}
-				</span>
+				<span class="msg">{'outer:' + err.message}</span>
 				<button class="retry" onClick={() => reset()}>
 					retry
 				</button>
@@ -82,16 +76,12 @@ export function NestedPage(props) @{
 				@try {
 					<Inner boom={props.boom} />
 				} @catch (err) {
-					<div class="inner-err">
-						{'inner:' + err.message}
-					</div>
+					<div class="inner-err">{'inner:' + err.message}</div>
 				}
 				<span id="outer-tail">tail</span>
 			</section>
 		} @catch (err) {
-			<div class="outer-err">
-				{'outer:' + err.message}
-			</div>
+			<div class="outer-err">{'outer:' + err.message}</div>
 		}
 		<p id="after">after</p>
 	</div>

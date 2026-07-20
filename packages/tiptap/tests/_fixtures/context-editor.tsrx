@@ -38,9 +38,7 @@ function LegacyProbe(props) @{
 		}
 	}, [editor, props.onEditor]);
 
-	<span data-provider-piece="child">
-		{editor?.getText() ?? 'deferred'}
-	</span>
+	<span data-provider-piece="child">{editor?.getText() ?? 'deferred'}</span>
 }
 
 export function LegacyProvider(props) @{

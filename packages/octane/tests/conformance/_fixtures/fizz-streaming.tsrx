@@ -380,17 +380,13 @@ export function DescendantGetterUpdate() @{
 		},
 	};
 	<div id="getter-update">
-		<span id="getter-parent-count">
-			{'Count: ' + count}
-		</span>
+		<span id="getter-parent-count">{'Count: ' + count}</span>
 		<GetterReader model={model} />
 	</div>
 }
 
 function GetterHookReader(props) @{
-	<span id="getter-hook-value">
-		{'Value: ' + props.model.value}
-	</span>
+	<span id="getter-hook-value">{'Value: ' + props.model.value}</span>
 }
 
 export function GetterHookReplay() @{
@@ -411,9 +407,7 @@ function defaultParameterState() {
 }
 
 function DefaultParameterReader({ value = defaultParameterState() }) @{
-	<span id="default-parameter-value">
-		{'Value: ' + value}
-	</span>
+	<span id="default-parameter-value">{'Value: ' + value}</span>
 }
 
 export function DefaultParameterReplay() @{

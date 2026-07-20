@@ -24,7 +24,5 @@ export function EventIsland(props) @{
 }
 
 export function CounterEventIsland(props) @{
-	<button class="evt-count" onClick={() => props.onIncrement()}>
-		{'count:' + props.count}
-	</button>
+	<button class="evt-count" onClick={() => props.onIncrement()}>{'count:' + props.count}</button>
 }

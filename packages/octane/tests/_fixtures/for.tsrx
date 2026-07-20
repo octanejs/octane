@@ -141,9 +141,7 @@ export function DepPureList() @{
 		<button id="rerender" onClick={() => setN((n) => n + 1)}>{'go'}</button>
 		<ul>
 			@for (const item of items; key item.id) {
-				<li class="dp-row" data-m={marker}>
-					{'row' + item.id + ':' + EXTERNAL}
-				</li>
+				<li class="dp-row" data-m={marker}>{'row' + item.id + ':' + EXTERNAL}</li>
 			}
 		</ul>
 	</div>

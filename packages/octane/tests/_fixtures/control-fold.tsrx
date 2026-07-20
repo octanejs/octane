@@ -7,9 +7,7 @@ export function RetToggle(props) {
 	const [n, setN] = useState(0);
 	return <div>
 		@if (props.on) {
-			<button id="hit" onClick={() => setN(n + 1)}>
-				{'on:' + n}
-			</button>
+			<button id="hit" onClick={() => setN(n + 1)}>{'on:' + n}</button>
 		} @else {
 			<span class="off">off</span>
 		}
@@ -22,9 +20,7 @@ export function AtToggle(props) @{
 	const [n, setN] = useState(0);
 	<div>
 		@if (props.on) {
-			<button id="hit" onClick={() => setN(n + 1)}>
-				{'on:' + n}
-			</button>
+			<button id="hit" onClick={() => setN(n + 1)}>{'on:' + n}</button>
 		} @else {
 			<span class="off">off</span>
 		}
@@ -62,9 +58,7 @@ export function ReturnedMailbox(props) {
 
 function DeliverySummary(props) {
 	if (props.failed) throw new Error('summary unavailable');
-	return <p id="delivery-summary">
-		{'Ready: ' + props.total}
-	</p>;
+	return <p id="delivery-summary">{'Ready: ' + props.total}</p>;
 }
 
 // Multiple root directives share the same returned-fragment renderer. This
@@ -104,9 +98,7 @@ const MailboxContext = createContext('unknown');
 
 function CurrentMailbox() {
 	const mailbox = use(MailboxContext);
-	return <strong id="current-mailbox">
-		{'Current: ' + mailbox}
-	</strong>;
+	return <strong id="current-mailbox">{'Current: ' + mailbox}</strong>;
 }
 
 // Component children are still template authoring: a Provider inside the

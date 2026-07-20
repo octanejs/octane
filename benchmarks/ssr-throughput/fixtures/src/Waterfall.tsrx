@@ -18,38 +18,28 @@ export function Chain(props: { level: number; depth: number; prev: number }) @{
 		@try {
 			const value = use(step(props.level, props.prev));
 			<div class="resolved">
-				<span class="value">
-					{'level ' + props.level + ' = ' + value}
-				</span>
+				<span class="value">{'level ' + props.level + ' = ' + value}</span>
 				@if (props.level < props.depth) {
 					<Chain level={props.level + 1} depth={props.depth} prev={value} />
 				}
 			</div>
 		} @pending {
-			<p class="waiting">
-				{'WATERFALL-PENDING level ' + props.level}
-			</p>
+			<p class="waiting">{'WATERFALL-PENDING level ' + props.level}</p>
 		}
 	</section>
 }
 
 export function WaterfallApp(props: { depth: number }) @{
 	<div class="page">
-		<h1 class="head">
-			{'SSR waterfall - depth ' + props.depth}
-		</h1>
+		<h1 class="head">{'SSR waterfall - depth ' + props.depth}</h1>
 		<ul class="bulk">
 			@for (const r of ROWS; key r.id) {
 				<li class="row">
-					<span class="rid">
-						{'#' + r.id}
-					</span>
+					<span class="rid">{'#' + r.id}</span>
 					<span class="label">
 						{r.label as string}
 					</span>
-					<em class="score">
-						{'score ' + r.score}
-					</em>
+					<em class="score">{'score ' + r.score}</em>
 				</li>
 			}
 		</ul>

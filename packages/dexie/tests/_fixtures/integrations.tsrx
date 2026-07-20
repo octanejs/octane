@@ -50,7 +50,5 @@ export function SequentialSuspendingValues({
 
 export function PermissionReader({ db, table, obj }: { db: any; table: string; obj: any }) @{
 	const permissions = usePermissions(db, table, obj);
-	<div id="permission">
-		{'add=' + (permissions?.add(table) ?? false)}
-	</div>
+	<div id="permission">{'add=' + (permissions?.add(table) ?? false)}</div>
 }

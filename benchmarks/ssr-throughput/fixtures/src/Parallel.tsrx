@@ -26,9 +26,7 @@ export function ParallelBody(props: { k: number }) @{
 			const v8 = use(parStep(8, props.k >= 8));
 			const sum = v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8;
 			<div class="resolved">
-				<span class="sum">
-					{'sum = ' + sum}
-				</span>
+				<span class="sum">{'sum = ' + sum}</span>
 			</div>
 		} @pending {
 			<p class="waiting">PARALLEL-PENDING</p>
@@ -44,9 +42,7 @@ export function ParallelBody(props: { k: number }) @{
 export function NestedLevel(props: { level: number; depth: number }) @{
 	const v = use(parStep(props.level, true));
 	<div class="nlvl">
-		<span class="nval">
-			{'L' + props.level + '=' + v}
-		</span>
+		<span class="nval">{'L' + props.level + '=' + v}</span>
 		@if (props.level < props.depth) {
 			<NestedLevel level={props.level + 1} depth={props.depth} />
 		}
@@ -55,9 +51,7 @@ export function NestedLevel(props: { level: number; depth: number }) @{
 
 export function NestedApp(props: { depth: number }) @{
 	<div class="page">
-		<h1 class="head">
-			{'SSR nested parallel - depth ' + props.depth}
-		</h1>
+		<h1 class="head">{'SSR nested parallel - depth ' + props.depth}</h1>
 		@try {
 			<NestedLevel level={1} depth={props.depth} />
 		} @pending {
@@ -68,15 +62,11 @@ export function NestedApp(props: { depth: number }) @{
 
 export function ParallelApp(props: { k: number }) @{
 	<div class="page">
-		<h1 class="head">
-			{'SSR parallel - k ' + props.k + ' x ' + PAR_LATENCY_MS + 'ms'}
-		</h1>
+		<h1 class="head">{'SSR parallel - k ' + props.k + ' x ' + PAR_LATENCY_MS + 'ms'}</h1>
 		<ul class="bulk">
 			@for (const r of ROWS; key r.id) {
 				<li class="row">
-					<span class="rid">
-						{'#' + r.id}
-					</span>
+					<span class="rid">{'#' + r.id}</span>
 					<span class="label">
 						{r.label as string}
 					</span>

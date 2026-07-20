@@ -34,9 +34,7 @@ export function SpanButton() {
 		{ elementType: 'span', onPress: () => setLog((l: string) => l + 'p') },
 		ref,
 	);
-	return <span id="span-btn" ref={ref} {...buttonProps}>
-		{'log:' + log}
-	</span>;
+	return <span id="span-btn" ref={ref} {...buttonProps}>{'log:' + log}</span>;
 }
 
 export function ToggleButtonSpec() {
@@ -97,9 +95,7 @@ export function RadioGroupSpec() {
 		<span {...labelProps}>Pick</span>
 		<RadioOption value="a" state={state} />
 		<RadioOption value="b" state={state} />
-		<span>
-			{'val:' + (state.selectedValue ?? 'none')}
-		</span>
+		<span>{'val:' + (state.selectedValue ?? 'none')}</span>
 	</div>;
 }
 
@@ -119,9 +115,7 @@ export function TextFieldSpec() {
 		<label {...labelProps}>Name</label>
 		<input id="tf" ref={ref} {...inputProps} />
 		<div {...descriptionProps}>Your full name</div>
-		<span>
-			{'val:' + value}
-		</span>
+		<span>{'val:' + value}</span>
 	</div>;
 }
 

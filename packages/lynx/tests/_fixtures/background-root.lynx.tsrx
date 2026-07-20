@@ -6,9 +6,7 @@ function KeyedRow(props) @{
 	const label = use(LabelContext);
 
 	<view id={'row-' + props.item.id} ref={(handle) => props.captureRow(props.item.id, handle)}>
-		<text>
-			{label + ':' + props.item.value}
-		</text>
+		<text>{label + ':' + props.item.value}</text>
 	</view>
 }
 
@@ -41,9 +39,7 @@ export function BackgroundRootFixture(props) @{
 	<LabelContext.Provider value={props.label}>
 		<>
 			<view id="counter" ref={props.counterRef}>
-				<text>
-					{'Count: ' + count}
-				</text>
+				<text>{'Count: ' + count}</text>
 			</view>
 			@if (props.showDetails) {
 				<view id="details">

@@ -22,9 +22,7 @@ export function HostedIslandEnvelope(props) @{
 
 function Counter(props) @{
 	const [count, setCount] = useState(0);
-	<button class="count" onClick={() => setCount(count + 1)}>
-		{'count:' + count}
-	</button>
+	<button class="count" onClick={() => setCount(count + 1)}>{'count:' + count}</button>
 }
 
 export function GreetingIsland(props) @{
@@ -35,32 +33,24 @@ export function GreetingIsland(props) @{
 		};
 	}, [props.name]);
 	<section class="island">
-		<h2 class="greeting">
-			{'Hello ' + props.name}
-		</h2>
+		<h2 class="greeting">{'Hello ' + props.name}</h2>
 		<Counter />
 	</section>
 }
 
 export function BadgeIsland(props) @{
-	<p class="badge">
-		{'badge:' + props.label}
-	</p>
+	<p class="badge">{'badge:' + props.label}</p>
 }
 
 /** Reads the mirror context with no local provider — every read must reach the owner bridge. */
 export function ThemedIsland() @{
 	const theme = use(MirrorTheme);
-	<p class="themed">
-		{'theme:' + theme}
-	</p>
+	<p class="themed">{'theme:' + theme}</p>
 }
 
 function ThemedLeafBody() @{
 	const theme = use(MirrorTheme);
-	<p class="memo-themed">
-		{'memo-theme:' + theme}
-	</p>
+	<p class="memo-themed">{'memo-theme:' + theme}</p>
 }
 
 /**
@@ -78,9 +68,7 @@ export function MemoThemedIsland() @{
 export function TwoContextIsland() @{
 	const theme = use(MirrorTheme);
 	const locale = use(MirrorLocale);
-	<p class="two-ctx">
-		{'theme:' + theme + ' locale:' + locale}
-	</p>
+	<p class="two-ctx">{'theme:' + theme + ' locale:' + locale}</p>
 }
 
 /** Suspends at the hosted root with NO local boundary — must escape to React. */
@@ -142,9 +130,7 @@ export function LocallyGuardedIsland(props) @{
 		} @pending {
 			<p class="local-pending">{'local pending'}</p>
 		} @catch (error) {
-			<p class="local-caught">
-				{'caught:' + (error as Error).message}
-			</p>
+			<p class="local-caught">{'caught:' + (error as Error).message}</p>
 		}
 	</div>
 }
@@ -180,9 +166,7 @@ export function NotifyIsland(props) @{
 /** Logs every BODY execution — observes the §10 unchanged-parent-rerender bail. */
 export function RenderLogIsland(props) @{
 	props.log('render:' + props.label);
-	<p class="render-log">
-		{'label:' + props.label}
-	</p>
+	<p class="render-log">{'label:' + props.label}</p>
 }
 
 /** Exposes the island's Octane useId so identifier stability/distinctness is observable. */
@@ -199,9 +183,7 @@ export function EffectFaultIsland(props) @{
 	useEffect(() => {
 		if (props.passiveBoom) throw new Error('island passive setup exploded');
 	}, [props.passiveBoom]);
-	<p class="effect-fault">
-		{'armed:' + props.label}
-	</p>
+	<p class="effect-fault">{'armed:' + props.label}</p>
 }
 
 /** Octane-local state PLUS a root-escaping suspension — prior-content episodes. */
@@ -209,9 +191,7 @@ export function StatefulSuspendingIsland(props) @{
 	const [count, setCount] = useState(0);
 	const value = use(props.resource);
 	<div class="ss-island">
-		<button class="ss-count" onClick={() => setCount(count + 1)}>
-			{'count:' + count}
-		</button>
+		<button class="ss-count" onClick={() => setCount(count + 1)}>{'count:' + count}</button>
 		<p class="ss-value">
 			{'value:' + value as string}
 		</p>

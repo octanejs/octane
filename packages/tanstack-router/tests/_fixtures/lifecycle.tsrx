@@ -36,15 +36,11 @@ function BoomPage() @{
 }
 
 function RouteError(props) @{
-	<p class="route-error">
-		{'route error: ' + props.error.message}
-	</p>
+	<p class="route-error">{'route error: ' + props.error.message}</p>
 }
 
 function DefaultError(props) @{
-	<p class="default-error">
-		{'default error: ' + props.error.message}
-	</p>
+	<p class="default-error">{'default error: ' + props.error.message}</p>
 }
 
 // Loader-driven pending: the loader hangs on a deferred the test resolves.

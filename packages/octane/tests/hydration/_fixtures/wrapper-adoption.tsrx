@@ -41,9 +41,7 @@ export function KeyedReturnWrapper(props: { itemKey?: string }) {
 }
 
 function BranchLeaf(props: { count: number; onClick: () => void }) {
-	return <button class="branch-button" onClick={props.onClick}>
-		{'branch:' + props.count}
-	</button>;
+	return <button class="branch-button" onClick={props.onClick}>{'branch:' + props.count}</button>;
 }
 
 function BranchMiddle(props: { count: number; onClick: () => void }) {

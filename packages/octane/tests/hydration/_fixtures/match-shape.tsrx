@@ -64,9 +64,7 @@ function MatchInner(props: { log: string[] }) @{
 		props.log.push('mount:inner');
 		return () => props.log.push('unmount:inner');
 	}, []);
-	<button class="inner-button" onClick={() => setCount(count + 1)}>
-		{'inner:' + count}
-	</button>
+	<button class="inner-button" onClick={() => setCount(count + 1)}>{'inner:' + count}</button>
 }
 
 export function MatchShape(props: {

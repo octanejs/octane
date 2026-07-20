@@ -17,9 +17,7 @@ export function NavApp() @{
 				<aside class="strip">{'strip'}</aside>
 			</>
 		} @else {
-			<p class="docs">
-				{'docs ' + blurs}
-			</p>
+			<p class="docs">{'docs ' + blurs}</p>
 		}
 		<button class="go" onClick={() => setPage('docs')}>{'go'}</button>
 	</div>

@@ -41,9 +41,7 @@ function ReturnedOpaque() {
 }
 
 function ReturnedValue(props) {
-	return <p id="auto-returned">
-		{'returned ' + props.value}
-	</p>;
+	return <p id="auto-returned">{'returned ' + props.value}</p>;
 }
 
 export function AutoMemoApp() @{

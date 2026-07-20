@@ -58,9 +58,7 @@ function EqualityA(props) @{
 	useLayoutEffect(() => {
 		props.probe.value = 'A' + selection.value;
 	}, null);
-	<span id="equality-a">
-		{'A' + selection.value}
-	</span>
+	<span id="equality-a">{'A' + selection.value}</span>
 }
 
 function EqualityB(props) @{
@@ -74,9 +72,7 @@ function EqualityB(props) @{
 	useLayoutEffect(() => {
 		props.probe.value = 'B' + selection.value;
 	}, null);
-	<span id="equality-b">
-		{'B' + selection.value}
-	</span>
+	<span id="equality-b">{'B' + selection.value}</span>
 }
 
 export function EqualityPair(props) @{

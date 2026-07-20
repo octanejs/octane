@@ -11,12 +11,8 @@ export function UnmemoizedObject(props) @{
 	props.log('Original: ' + props.value);
 	props.log('Deferred: ' + deferredValue);
 	<div>
-		<div id="original">
-			{'Original: ' + props.value}
-		</div>
-		<div id="deferred">
-			{'Deferred: ' + deferredValue}
-		</div>
+		<div id="original">{'Original: ' + props.value}</div>
+		<div id="deferred">{'Deferred: ' + deferredValue}</div>
 	</div>
 }
 
@@ -38,12 +34,8 @@ export function RenderPhaseDeferred(props) @{
 	}
 	const deferredValue = useDeferredValue(value);
 	<div>
-		<div id="original">
-			{'Original: ' + value}
-		</div>
-		<div id="deferred">
-			{'Deferred: ' + deferredValue}
-		</div>
+		<div id="original">{'Original: ' + value}</div>
+		<div id="deferred">{'Deferred: ' + deferredValue}</div>
 	</div>
 }
 

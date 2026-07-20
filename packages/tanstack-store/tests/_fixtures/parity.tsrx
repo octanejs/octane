@@ -20,9 +20,7 @@ const { StoreProvider, useStoreContext } = createStoreContext<
 function ContextReader() @{
 	const { atom } = useStoreContext();
 	const value = useSelector(atom);
-	<span id="context">
-		{'context=' + value}
-	</span>
+	<span id="context">{'context=' + value}</span>
 }
 
 function Values() @{

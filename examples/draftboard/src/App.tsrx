@@ -547,9 +547,7 @@ export function App() @{
 					<h1>
 						{document?.title ?? (boardId === 'launch' ? 'Launch narrative' : 'Blank exploration')}
 					</h1>
-					<p class="collaborators">
-						{document?.updatedBy ?? 'Opening board'}
-					</p>
+					<p class="collaborators">{document?.updatedBy ?? 'Opening board'}</p>
 				</div>
 				<div class="topbar-actions">
 					<div

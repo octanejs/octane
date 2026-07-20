@@ -56,9 +56,7 @@ export function PhaseLogger() @{
 	useEffect(() => {
 		_log.push('effect:' + n);
 	}, null);
-	<span id="phase">
-		{'v' + n}
-	</span>
+	<span id="phase">{'v' + n}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -78,16 +76,12 @@ export function bumpTransitionCell(n: number) {
 function UrgentCell() @{
 	const [n, setN] = useState(0);
 	_setUrgentCell = setN;
-	<span id="lane-urgent">
-		{'U' + n}
-	</span>
+	<span id="lane-urgent">{'U' + n}</span>
 }
 function TransitionCell() @{
 	const [n, setN] = useState(0);
 	_setTransitionCell = setN;
-	<span id="lane-transition">
-		{'T' + n}
-	</span>
+	<span id="lane-transition">{'T' + n}</span>
 }
 export function LaneCells() @{
 	<div>

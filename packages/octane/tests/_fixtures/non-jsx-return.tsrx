@@ -84,9 +84,7 @@ export function MixedList(props) @{
 
 	<ul class="mixed-list">
 		@for (const item of props.items; key item.id) {
-			<li>
-				{prefix + ':' + item.label}
-			</li>
+			<li>{prefix + ':' + item.label}</li>
 		}
 	</ul>
 }

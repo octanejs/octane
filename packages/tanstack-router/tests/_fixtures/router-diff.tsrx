@@ -37,9 +37,7 @@ function AboutPage() @{
 
 function ItemPage() @{
 	const params = useParams({ strict: false });
-	<h1 class="item">
-		{'Item ' + params.id}
-	</h1>
+	<h1 class="item">{'Item ' + params.id}</h1>
 }
 
 function NotFoundPage() @{

@@ -8,16 +8,12 @@ import { Await, useAsyncError, useAsyncValue, useLoaderData } from '@octanejs/re
 
 export function AwaitValueProbe() @{
 	const value = useAsyncValue();
-	<p class="value">
-		{'got:' + String(value)}
-	</p>
+	<p class="value">{'got:' + String(value)}</p>
 }
 
 export function AwaitErrorProbe() @{
 	const error = useAsyncError() as any;
-	<p class="await-err">
-		{'err:' + error.message}
-	</p>
+	<p class="await-err">{'err:' + error.message}</p>
 }
 
 // Children form, with an Await-level errorElement.
@@ -40,9 +36,7 @@ export function AwaitRenderPropPage() @{
 	<div>
 		@try {
 			<Await resolve={data.msg}>
-				{(value: any) => <p class="value">
-					{'rp:' + String(value)}
-				</p>}
+				{(value: any) => <p class="value">{'rp:' + String(value)}</p>}
 			</Await>
 		} @pending {
 			<p class="fallback">{'loading'}</p>

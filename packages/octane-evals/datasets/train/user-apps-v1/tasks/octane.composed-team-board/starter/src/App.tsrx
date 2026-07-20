@@ -16,12 +16,8 @@ export function MemberCard(props: {
 		<output aria-label={'Applause ' + props.member.name}>
 			{props.applause as string}
 		</output>
-		<button>
-			{'Show details ' + props.member.name}
-		</button>
-		<button>
-			{'Applaud twice ' + props.member.name}
-		</button>
+		<button>{'Show details ' + props.member.name}</button>
+		<button>{'Applaud twice ' + props.member.name}</button>
 	</article>
 }
 

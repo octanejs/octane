@@ -5,9 +5,7 @@ import { useState } from 'octane';
 // a renderable childSlot — so the cast is unnecessary.
 export function ConcatCount() @{
 	const [n, setN] = useState(0);
-	<button onClick={() => setN(n + 1)}>
-		{'Count: ' + n}
-	</button>
+	<button onClick={() => setN(n + 1)}>{'Count: ' + n}</button>
 }
 
 // A BARE identifier hole `{label}` with NO cast: `label` is a setup `const` bound

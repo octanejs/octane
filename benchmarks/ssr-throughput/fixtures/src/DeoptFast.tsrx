@@ -46,9 +46,7 @@ export function Card(props: { c: CardData }) @{
 
 export function DeoptPageFast() @{
 	<main class="grid">
-		<h1 class="head">
-			{'Deopt page - ' + CARDS.length + ' cards'}
-		</h1>
+		<h1 class="head">{'Deopt page - ' + CARDS.length + ' cards'}</h1>
 		@for (const c of CARDS; key c.id) {
 			<Card c={c} />
 		}

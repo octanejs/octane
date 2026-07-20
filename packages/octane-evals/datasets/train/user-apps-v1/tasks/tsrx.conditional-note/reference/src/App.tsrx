@@ -25,9 +25,7 @@ export function App(props: AppProps) {
 			value={note}
 			onInput={(event: Event) => setNote((event.target as HTMLTextAreaElement).value)}
 		/>
-		<output aria-label="Character count">
-			{note.length + ' / 80'}
-		</output>
+		<output aria-label="Character count">{note.length + ' / 80'}</output>
 		<button disabled={trimmed === ''} onClick={() => props.onSave(trimmed)}>{'Save note'}</button>
 	</main>;
 }

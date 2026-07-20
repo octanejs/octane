@@ -22,9 +22,7 @@ export function UniversalBoundaryFixture(props) @{
 					<ThrowAfterPrepare fail={props.failAfterPrepare} />
 				</>
 			} @catch (error) {
-				<span class="caught">
-					{'caught: ' + error.message}
-				</span>
+				<span class="caught">{'caught: ' + error.message}</span>
 			}
 		</UniversalTheme.Provider>
 	</>

@@ -615,9 +615,7 @@ function IssueDialog(props: IssueDialogProps) @{
 		<header class="dialog-header">
 			<div>
 				<p class="eyebrow">Issue detail</p>
-				<p class="dialog-key">
-					{props.issue?.id ?? props.requestedId}
-				</p>
+				<p class="dialog-key">{props.issue?.id ?? props.requestedId}</p>
 			</div>
 			<button
 				type="button"
