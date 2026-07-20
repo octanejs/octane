@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as RT from 'octane/server';
 import { prerender } from 'octane/static';
+import { hydrateRoot, flushSync } from '../src/index.js';
+// CLIENT-compiled side of the hydration fixture (normal .tsrx import path).
+import { SeedPage } from './_fixtures/ssr-prop-flow-hydrate.tsrx';
 
 // Per-request promises CREATED in an ancestor's render and passed down through
 // child JSX props to descendant use() sites (the React-trained "uncached
@@ -15,13 +20,27 @@ function evalModule(code: string, file: string): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
+	// Keep declarations as declarations (a function-expression rewrite would
+	// unbind the name for sibling components that reference it) and attach the
+	// exports at the end.
+	const exported: string[] = [];
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
-		(_m: string, asyncKeyword: string | undefined, name: string) =>
-			`__exports.${name} = ${asyncKeyword ?? ''}function ${name}`,
+		(_m: string, asyncKeyword: string | undefined, name: string) => {
+			exported.push(name);
+			return `${asyncKeyword ?? ''}function ${name}`;
+		},
 	);
-	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
-	const fn = new Function('__rt', '__exports', code + `\nreturn __exports;\n//# sourceURL=${file}`);
+	code = code.replace(/export const (\w+) =/g, (_m: string, name: string) => {
+		exported.push(name);
+		return `const ${name} =`;
+	});
+	const footer = exported.map((name) => `__exports.${name} = ${name};`).join('\n');
+	const fn = new Function(
+		'__rt',
+		'__exports',
+		code + `\n${footer}\nreturn __exports;\n//# sourceURL=${file}`,
+	);
 	return fn(RT, {});
 }
 
@@ -224,6 +243,49 @@ describe('streaming SSR — promises created in an ancestor, unwrapped via props
 			expect(warned).toBe(false);
 		} finally {
 			errorSpy.mockRestore();
+		}
+	});
+
+	it('hydrates the memoized prop-flow shape — seeds adopt positionally despite server-only prop-memo slots', async () => {
+		// The server compile allocates a prop-memo slot the client compile never
+		// sees, shifting later server slot ids relative to the client's. That
+		// divergence must be invisible across the boundary: seeds serialize in
+		// use()-call order and the client consumes them by positional cursor,
+		// never by slot identity. Server-render the fixture, hydrate the
+		// CLIENT-compiled module over it, and require full adoption — no
+		// re-suspend, no rebuild, no mismatch warning — plus live state after.
+		const fixture = join(
+			process.cwd(),
+			'packages/octane/tests/_fixtures/ssr-prop-flow-hydrate.tsrx',
+		);
+		const server = evalServer(readFileSync(fixture, 'utf8'), 'ssr-prop-flow-hydrate.tsrx');
+		const load = (id: string) => Promise.resolve('v-' + id);
+		const { html } = await prerender(server.SeedPage, { load });
+		expect(html).toContain('v-x:L:0');
+
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			container.innerHTML = html;
+			const button = container.querySelector('#card') as HTMLElement;
+			const textNode = button.firstChild;
+			const root = hydrateRoot(container, SeedPage as any, { load });
+			flushSync(() => {});
+			// Adopted, not rebuilt: same element and text node, seed consumed.
+			expect(container.querySelector('#card')).toBe(button);
+			expect(button.firstChild).toBe(textNode);
+			expect(button.textContent).toBe('v-x:L:0');
+			expect(container.querySelector('script[data-octane-suspense]')).toBeNull();
+			expect(errorSpy).not.toHaveBeenCalled();
+			// Hooks are live post-hydration (state cells resolved on client slots).
+			button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+			flushSync(() => {});
+			expect(button.textContent).toBe('v-x:L:1');
+			root.unmount();
+		} finally {
+			errorSpy.mockRestore();
+			container.remove();
 		}
 	});
 
