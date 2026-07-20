@@ -9,13 +9,65 @@ const BASE_STYLES = `
 	--panel: #2b3138;
 	--code-bg: #16181d;
 	--text: #f4eee8;
+	--text-body: #d5d9e0;
 	--text-secondary: #99a1b3;
 	--accent: #ff415a;
 	--accent-hover: #ff5d72;
 	--accent-text: #ff5d72;
 	--on-accent: #16181d;
 	--border: rgba(255, 255, 255, 0.1);
+	--border-strong: rgba(255, 255, 255, 0.22);
+	/* Surfaces layered over --bg (dark: subtle white tints). */
+	--surface-subtle: rgba(255, 255, 255, 0.03);
+	--surface: rgba(255, 255, 255, 0.06);
+	/* Inset surfaces (form fields, nested content wells): darker than --panel in
+	   BOTH themes, unlike --surface which lightens. Text on these follows --text,
+	   so they must track the theme or the text turns dark-on-dark in light mode. */
+	--field-bg: rgba(22, 24, 29, 0.78);
+	--surface-inset: rgba(22, 24, 29, 0.55);
+	/* Status text (success / error): light tints in dark mode, darkened in light
+	   so they stay legible on light surfaces instead of washing out. */
+	--success-text: #8ae8ae;
+	--danger-text: #ff8797;
+	/* Translucent sticky-header/backdrop fills (a tint of --bg). */
+	--header-bg: rgba(35, 39, 47, 0.85);
+	--header-bg-solid: rgba(35, 39, 47, 0.97);
+	/* Doc callout accent glyphs (note/important/tip). */
+	--callout-note: #a9c2ff;
+	--callout-important: #ffc56d;
+	--callout-tip: #7ee2a7;
+	/* Hand-highlighted install-command tokens (match the shiki bash fences). */
+	--pkg-cmd: #ffb757;
+	--pkg-arg: #addcff;
 	color-scheme: dark;
+}
+:root[data-theme='light'] {
+	--bg: #ffffff;
+	--panel: #f4f5f7;
+	--code-bg: #f6f8fa;
+	--text: #1c2027;
+	--text-body: #363c47;
+	--text-secondary: #5c6473;
+	--accent: #ff415a;
+	--accent-hover: #c81e37;
+	--accent-text: #d81f38;
+	--on-accent: #ffffff;
+	--border: rgba(0, 0, 0, 0.12);
+	--border-strong: rgba(0, 0, 0, 0.22);
+	--surface-subtle: rgba(0, 0, 0, 0.025);
+	--surface: rgba(0, 0, 0, 0.04);
+	--field-bg: #ffffff;
+	--surface-inset: rgba(0, 0, 0, 0.03);
+	--success-text: #1e7a45;
+	--danger-text: #c81e37;
+	--header-bg: rgba(255, 255, 255, 0.85);
+	--header-bg-solid: rgba(255, 255, 255, 0.97);
+	--callout-note: #2f5fd0;
+	--callout-important: #a86400;
+	--callout-tip: #1e7a45;
+	--pkg-cmd: #953800;
+	--pkg-arg: #0550ae;
+	color-scheme: light;
 }
 * {
 	box-sizing: border-box;
@@ -65,12 +117,39 @@ pre.shiki {
 	line-height: 1.7;
 	tab-size: 2;
 }
+/* Shiki dual-theme tokens (defaultColor: false — see mdx-options.ts). Dark is
+   the default token set; light overrides it under [data-theme='light']. */
+.shiki,
+.shiki span {
+	color: var(--shiki-dark);
+}
+:root[data-theme='light'] .shiki,
+:root[data-theme='light'] .shiki span {
+	color: var(--shiki-light);
+}
 `;
+
+// Runs before first paint (and before hydration) so the theme is correct with
+// no flash: honor a saved choice, else fall back to the OS preference, and align
+// the address-bar theme-color to it (the SSR meta is the dark default). The
+// server can't know the theme, so it renders the dark default and this
+// reconciles on the client. `data-theme` is owned entirely by the client —
+// Octane never renders it — so it does not participate in hydration. Placed
+// AFTER the theme-color <meta> below so it already exists to update; still in
+// <head>, so it runs before the body paints.
+const THEME_INIT = `(function(){var s=null;try{s=localStorage.getItem('octane-theme');}catch(e){}try{var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
 
 function RootDocument(props: { children?: unknown }) @{
 	<Html lang="en">
 		<Head>
 			<HeadContent />
+			{/* theme-color is owned by the client (the pre-paint script and toggle
+    mutate it), so it lives here in the shell — NOT in the route head()
+    config. A router-managed tag is recreated from head() on every client
+    navigation, which would reset it to the dark default; a static shell
+    tag persists, so the light value survives route changes. */}
+			<meta name="theme-color" content="#23272f" />
+			<script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
 		</Head>
 		<Body>
 			{props.children}
@@ -90,10 +169,6 @@ export const Route = createRootRoute({
 			{
 				name: 'description',
 				content: 'Octane — React\'s programming model, compiled ahead of time. No VDOM, no rules of hooks.',
-			},
-			{
-				name: 'theme-color',
-				content: '#23272f',
 			},
 			{ title: DEFAULT_TITLE },
 			{

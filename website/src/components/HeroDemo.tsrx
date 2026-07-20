@@ -64,7 +64,7 @@ function Counter(props: { paused: boolean; onLog: (message: string) => void }) @
 				min-width: 1.75rem;
 				padding: 0.05rem 0.4rem;
 				border-radius: 9999px;
-				background: rgba(0, 0, 0, 0.35);
+				background: rgba(0, 0, 0, 0.5);
 				color: #fff;
 				font-family: ui-monospace, Menlo, Consolas, monospace;
 				font-size: 0.8rem;
@@ -100,8 +100,8 @@ export function HeroDemo() @{
 				align-items: center;
 				gap: 0.75rem;
 				padding: 0.75rem 1rem;
-				border-top: 1px solid rgba(255, 255, 255, 0.08);
-				background: rgba(255, 255, 255, 0.02);
+				border-top: 1px solid var(--border);
+				background: var(--surface-subtle);
 			}
 			.demo-badge {
 				flex: none;

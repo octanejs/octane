@@ -127,11 +127,11 @@ export function Hero() @{
 				font-weight: 600;
 				padding: 0.7rem 1.4rem;
 				border-radius: 9999px;
-				border: 1px solid rgba(255, 255, 255, 0.15);
+				border: 1px solid var(--border);
 				transition: background 0.15s;
 			}
 			.hero-actions :global(a.btn-ghost:hover) {
-				background: rgba(255, 255, 255, 0.06);
+				background: var(--surface);
 				text-decoration: none;
 			}
 			.hero-code {
@@ -146,7 +146,7 @@ export function Hero() @{
 				align-items: center;
 				gap: 0.4rem;
 				padding: 0.6rem 1rem;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+				border-bottom: 1px solid var(--border);
 			}
 			.dot {
 				width: 10px;
@@ -189,8 +189,8 @@ export function Hero() @{
 			}
 			.code-copy:hover {
 				color: var(--text);
-				background: rgba(255, 255, 255, 0.07);
-				border-color: rgba(255, 255, 255, 0.14);
+				background: var(--surface);
+				border-color: var(--border);
 			}
 			.code-copy-icon {
 				width: 15px;
