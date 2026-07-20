@@ -82,7 +82,20 @@ export function NuqsTestingAdapter({
 	// Simulate a central location.search in memory
 	// for the getSearchParamsSnapshot to be referentially stable.
 	const locationSearchRef = useRef(renderedInitialSearchParams);
-	if (resetUrlUpdateQueueOnMount) {
+	// Reset the shared update queue ONCE per mount, during the first render, so a
+	// previous test's leftover queued updates can't leak into this tree's initial
+	// parse. It must run during render (not a mount effect): child useQueryStates
+	// reads the queue via useQueuedQueries during its OWN first render, which
+	// happens after this provider renders — an effect would run too late and the
+	// first child render would parse a dirty queue. The ref guard keeps it to the
+	// first render only, so re-renders (e.g. hasMemory's setSearchParams after a
+	// flush) don't re-abort the queue and drop in-flight/follow-up URL writes.
+	// DIVERGENCE FROM nuqs: upstream runs resetQueues() on every render; the guard
+	// is octane-side only and is safe because octane has no StrictMode
+	// double-invoke of render, so the reset still fires exactly once on mount.
+	const didResetQueueRef = useRef(false);
+	if (resetUrlUpdateQueueOnMount && !didResetQueueRef.current) {
+		didResetQueueRef.current = true;
 		resetQueues();
 	}
 	const [searchParams, setSearchParams] = useState(
