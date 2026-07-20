@@ -1,5 +1,40 @@
 # octane
 
+## 0.1.12
+
+### Patch Changes
+
+- a88f9ea: Add a Cloudflare Workers adapter for full-stack Octane apps. Vite and Rsbuild
+  can now emit a Worker-targeted server bundle and a streaming module Worker for
+  Workers Static Assets, with Cloudflare bindings and execution context available
+  through request-scoped middleware and server-route context.
+
+  Initialize streaming SSR token entropy on the first render so module evaluation
+  remains valid in runtimes that prohibit random generation in global scope.
+
+- 443bba7: Compiler: components referenced above their declaration (the canonical TanStack route-file shape — `createFileRoute(...)({ component: Home })` before `function Home() @{…}`) now compile to real hoisted function declarations instead of TDZ `const` bindings, in both client and server modes; capability stamps are emitted as `typeof`-guarded follow-up statements so route code-splitters that extract the declaration cannot strand them. Also restores the `compileToVolarMappings` sourceAst contract (`metadata.native_tsrx_body` on native template bodies) that TanStack's octane route-generator masker consumes — route-tree generation over `.tsrx` files works again without a committed `routeTree.gen.ts`.
+- d388e80: Controlled `<select>` picks made through the real browser UI (popup, keyboard typeahead) no longer revert before their `change` handler runs. The browser dispatches a pick's native `input` and `change` in separate tasks; octane's controlled restore ran in the microtask between them and snapped the selection back, so `onChange` always read the old value. The pick is now marked in flight on `input`, the `change` dispatch performs the after-handlers restore, and a task fallback still settles a sequence whose `change` never completes (stopped propagation, synthetic lone `input`).
+- 2f2a204: Add an optional universal host-attachment capability so renderer-managed
+  physical recycling can detach and reattach ordinary refs without exposing a
+  renderer-specific collection protocol.
+- 0223241: Add renderer-gated host `className` aliasing, safe ordered prop-spread assembly,
+  explicit raw-text host topology validation, and prevalidated multi-listener
+  event delivery for transported universal renderers.
+- f9234f6: Add Octane-owned production error codes with full development messages, compact
+  documentation links in optimized builds, and progressive React-inspired developer
+  diagnostics. Production Vite and Rsbuild server bundles now fold the runtime mode
+  at build time so complete development diagnostics are removed without relying on
+  server minification.
+- fa11116: Fix the streaming/buffered SSR livelock for promises created in an ancestor render and passed down through props to descendant `use()` sites (the React "uncached promise" shape). The server compiler now caches inline creations in component-prop position across suspense passes (`<Kid p={make(x)}/>`), warm plans share that same creation instead of racing a second one, and a runtime livelock guard detects non-analyzable recreation shapes and degrades to per-site replay instead of burning 50 render passes and serving only `@pending` fallbacks. The max-pass SSR errors now hint at the recreated-promise cause.
+- ec7ffbf: Mixed-toolchain ownership (`requireDirective: true`) is now marked by the `@jsxImportSource` pragma instead of the removed `'use octane'` directive: a project `.tsrx` is Octane's by extension and needs no marker; every other project module — `.tsx`, `.ts`, or `.js` — is Octane's only when it opens with a leading `/** @jsxImportSource octane */` pragma comment (full compilation for `.tsx`, octane hook slotting for plain `.ts`/`.js`, so custom octane hooks can live in pragma-marked `.ts` modules). In a `.tsx` the pragma is the same comment TypeScript reads for per-file JSX typing, so one marker both types the file and routes it to Octane's bundler integrations (Vite, Rspack, Rsbuild); in a JSX-less `.ts`/`.js` module TypeScript ignores the pragma, so there it acts purely as the ownership marker. A pragma naming a registered renderer's intrinsics module (e.g. `@octanejs/three/intrinsics`) claims the file the same way; a pragma pointing at a foreign source (`react`, `@emotion/react`, …) claims nothing. Unmarked project modules pass through to the host toolchain, with a once-per-file warning when they import from `octane`; installed octane packages keep their manifest-driven ownership, hook slotting included.
+- 25d266b: Keep a return slot mounted through the passthrough-hydration componentSlot
+  route on that route while the returned component identity is unchanged. The
+  first post-hydration re-render previously flipped the slot to the childSlot
+  regime and disposed it, remounting the entire adopted subtree — visible in
+  TanStack Start apps as the whole page tearing down (losing all component
+  state) on the first router event after hydration.
+- d388e80: `octane/compiler` is now safe to import from browser dev servers again: the Node-only tooling siblings the entry re-exports (`vite.js`, `bundler.js`) switched their `node:fs`/`node:path`/`node:crypto`/`node:module` imports from named to namespace form, so evaluating them against a bundler's externalized `node:*` shim no longer throws at module load. The pure `compile` entry (used by the website playground to compile in-page) works in dev-served module graphs, not just tree-shaken production bundles. No behavior change in Node.
+
 ## 0.1.11
 
 ### Patch Changes
