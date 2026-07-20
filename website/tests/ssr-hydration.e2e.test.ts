@@ -578,6 +578,42 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
+	it('cancels a deferred mobile section jump when another docs page wins', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools', {
+			waitForNetworkIdle: true,
+		});
+		try {
+			await page.setViewportSize({ width: 390, height: 667 });
+			await page.click('.sidebar-mobile-toggle');
+			await page.waitForFunction(
+				() =>
+					document.querySelector('.sidebar-mobile-toggle')?.getAttribute('aria-expanded') ===
+						'true' &&
+					getComputedStyle(document.querySelector('.sidebar-panel')!).visibility === 'visible',
+			);
+
+			await page.click('.on-this-page a[href="#rspack"]');
+			await page.click('.sidebar-link[href="/docs/quick-start"]');
+			await page.waitForFunction(
+				() =>
+					location.pathname === '/docs/quick-start' &&
+					document.querySelector('.prose h1')?.textContent === 'Quick start',
+				null,
+				{ timeout: 10_000 },
+			);
+
+			// Let the superseded panel-close promise settle. It must not append the
+			// old page's section hash or move the replacement document afterward.
+			await page.waitForTimeout(400);
+			expect(await page.evaluate(() => location.hash)).toBe('');
+			expect(await page.evaluate(() => scrollY)).toBe(0);
+			const real = errors.filter((error) => !error.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
 	it('keeps the mobile docs menu anchored and scrollable when expanded', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/docs/build-tools', {
 			waitForNetworkIdle: true,

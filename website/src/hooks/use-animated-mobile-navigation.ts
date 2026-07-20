@@ -8,6 +8,12 @@ function waitForPanelToClose(panel: HTMLElement): Promise<void> {
 		// State commits after the event handler returns. Read the animation list on
 		// the next frame, once removing `is-open` has created the closing transitions.
 		requestAnimationFrame(() => {
+			// Vitest runs Vite in test mode, where jsdom has no Web Animations API.
+			// Vite replaces this check at build time and removes it in production.
+			if (import.meta.env.MODE === 'test') {
+				resolve();
+				return;
+			}
 			const animations = panel.getAnimations();
 			if (animations.length === 0) {
 				resolve();

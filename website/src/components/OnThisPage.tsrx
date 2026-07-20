@@ -93,6 +93,18 @@ export function OnThisPage(props: {
 	const clickLock = useRef<string | null>(null);
 	const clickTimer = useRef(0);
 	const measureRef = useRef<(() => void) | null>(null);
+	// Closing a responsive host can defer a section jump. Give each request an
+	// ownership token and invalidate it when this TOC changes page or unmounts, so
+	// a stale promise cannot focus old DOM or append its hash to the winning route.
+	const navigationSequence = useRef(0);
+	const currentResetKey = useRef(resetKey);
+	currentResetKey.current = resetKey;
+	useEffect(
+		() => () => {
+			navigationSequence.current++;
+		},
+		[resetKey],
+	);
 	const armClickRelease = () => {
 		if (clickTimer.current !== 0) clearTimeout(clickTimer.current);
 		clickTimer.current = window.setTimeout(() => {
@@ -252,7 +264,15 @@ export function OnThisPage(props: {
 		const heading = document.getElementById(id);
 		if (!heading) return;
 		event.preventDefault();
+		const navigation = ++navigationSequence.current;
+		const navigationResetKey = resetKey;
 		const navigate = () => {
+			if (
+				navigation !== navigationSequence.current ||
+					currentResetKey.current !== navigationResetKey ||
+					!heading.isConnected ||
+					document.getElementById(id) !== heading
+			) return;
 			const reduce =
 				typeof window.matchMedia === 'function' &&
 					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
