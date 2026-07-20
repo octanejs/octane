@@ -163,8 +163,8 @@ catalogs:
     '@vitest/coverage-istanbul': 4.1.9
     '@vitest/coverage-v8': 4.1.9
     '@tsrx/core': ^0.1.44
-    '@tsrx/prettier-plugin': ^0.3.103
-    '@tsrx/typescript-plugin': ^0.3.103
+    '@tsrx/prettier-plugin': ^0.3.104
+    '@tsrx/typescript-plugin': ^0.3.104
     '@tsrx/ripple': ^0.1.45
     '@tsrx/react': ^0.2.44
     '@tsrx/solid': ^0.1.44
