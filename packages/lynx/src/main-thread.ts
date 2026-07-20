@@ -9,10 +9,12 @@ import {
 	createLynxHostContainer,
 	createLynxHostDriver,
 	disposeLynxHostContainer,
+	isLynxHostAttached,
 	prepareLynxHostBatch,
 	resolveLynxHostNativeEvent,
 	type LynxHostContainer,
 	type LynxHostDriver,
+	type LynxHostAttachmentDelta,
 	type LynxHostHandle,
 	type LynxPreparedHostBatch,
 } from './core/host-driver.js';
@@ -34,6 +36,8 @@ import {
 	type LynxContextProxyEvent,
 	type LynxDisposeAcknowledgement,
 	type LynxDisposeMessage,
+	type LynxHostAttachmentMessage,
+	type LynxHostFaultMessage,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
 	type LynxPublicHandleDelta,
@@ -140,12 +144,13 @@ function resolveContext(
 	return getJSContext.call(target.lynx);
 }
 
-function publicHandleUpsert(handle: LynxHostHandle): LynxPublicHandleDelta {
+function publicHandleUpsert(handle: LynxHostHandle, attached: boolean): LynxPublicHandleDelta {
 	return Object.freeze({
 		op: 'upsert',
 		id: handle.id,
 		type: handle.type,
 		generation: handle.generation,
+		attached,
 		snapshot: handle as unknown as UniversalSerializableValue,
 	});
 }
@@ -168,13 +173,21 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 				}),
 			);
 		} else {
-			handles.set(delta.handle.id, publicHandleUpsert(delta.handle));
+			handles.set(
+				delta.handle.id,
+				publicHandleUpsert(delta.handle, isLynxHostAttached(container, delta.handle.id)),
+			);
 		}
 	}
 	for (const command of batch.commands) {
 		if (command.op !== 'update' || handles.has(command.id)) continue;
 		const handle = driver.getPublicInstance(container, command.id);
-		if (handle !== null) handles.set(command.id, publicHandleUpsert(handle));
+		if (handle !== null) {
+			handles.set(
+				command.id,
+				publicHandleUpsert(handle, isLynxHostAttached(container, command.id)),
+			);
+		}
 	}
 	return Object.freeze([...handles.values()]);
 }
@@ -225,6 +238,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let commitInProgress = false;
 	const queuedCommits: LynxCommitMessage[] = [];
 	const queuedNativeEvents: Array<readonly LynxQueuedNativeEventDelivery[]> = [];
+	const queuedHostAttachments: Array<{
+		readonly version: number;
+		readonly deltas: readonly LynxHostAttachmentDelta[];
+	}> = [];
 
 	const report = (value: unknown, fallback = 'Octane Lynx main-thread receiver failed.') => {
 		const error = normalizedError(value, fallback);
@@ -329,8 +346,71 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 	};
 
+	const deliverHostAttachments = (
+		version: number,
+		deltas: readonly LynxHostAttachmentDelta[],
+	): void => {
+		if (deltas.length === 0) return;
+		if (active === null || active.acceptedVersion !== version) {
+			throw new Error('Octane Lynx received a stale or foreign list attachment batch.');
+		}
+		const changes = deltas.filter((delta) => {
+			const handle = driver.getPublicInstance(active!.container, delta.id);
+			return handle !== null && handle.generation === delta.generation;
+		});
+		if (changes.length === 0) return;
+		const message: LynxHostAttachmentMessage = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: active.root,
+			version,
+			type: 'host-attachment',
+			changes: Object.freeze(
+				changes.map((delta) =>
+					Object.freeze({
+						id: delta.id,
+						generation: delta.generation,
+						attached: delta.attached,
+					}),
+				),
+			),
+		};
+		dispatch(message);
+	};
+
+	const submitHostAttachments = (
+		version: number,
+		deltas: readonly LynxHostAttachmentDelta[],
+	): void => {
+		if (closed) return;
+		if (commitInProgress) {
+			queuedHostAttachments.push({ version, deltas });
+			return;
+		}
+		try {
+			deliverHostAttachments(version, deltas);
+		} catch (error) {
+			failAcceptedRoot(version, error);
+		}
+	};
+
+	const drainHostAttachments = (): boolean => {
+		const record = active;
+		for (const queued of queuedHostAttachments.splice(0)) {
+			try {
+				deliverHostAttachments(queued.version, queued.deltas);
+			} catch (error) {
+				failAcceptedRoot(queued.version, error);
+				return false;
+			}
+			if (active !== record) return false;
+		}
+		return true;
+	};
+
 	const reject = (identity: UniversalTransportIdentity, error: unknown): void => {
 		queuedNativeEvents.length = 0;
+		queuedHostAttachments.length = 0;
 		try {
 			dispatch({
 				...identity,
@@ -357,6 +437,39 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		if (disposedRoots.size > MAX_DISPOSED_ROOT_TOMBSTONES) {
 			const oldest = disposedRoots.keys().next().value;
 			if (oldest !== undefined) disposedRoots.delete(oldest);
+		}
+	};
+
+	const failAcceptedRoot = (version: number, value: unknown): void => {
+		const error = report(value, 'Octane Lynx accepted host callback failed.');
+		const record = active;
+		if (record === null || record.acceptedVersion !== version) {
+			report(new Error('Octane Lynx received a stale or foreign accepted host callback fault.'));
+			return;
+		}
+		queuedNativeEvents.length = 0;
+		queuedHostAttachments.length = 0;
+		const message: LynxHostFaultMessage = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: record.root,
+			version,
+			type: 'host-fault',
+			error: wireError(error, 'Octane Lynx accepted host callback failed.'),
+		};
+		try {
+			dispatch(message);
+		} catch (dispatchError) {
+			report(dispatchError, 'Octane Lynx could not dispatch an accepted host callback fault.');
+		}
+		// ContextProxy delivery can be asynchronous. Do not leave a known-faulted
+		// native tree live while waiting for background to request terminal dispose.
+		if (active === record) {
+			const cleanup = disposeRecord(record);
+			if (cleanup.complete) {
+				rememberDisposed(record.root, record.acceptedVersion);
+				active = null;
+			}
 		}
 	};
 
@@ -430,6 +543,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					container: createLynxHostContainer(papi, {
 						root: message.root,
 						page,
+						onAttachments: submitHostAttachments,
+						onCallbackFault: failAcceptedRoot,
 					}),
 					acceptedVersion: 0,
 				};
@@ -493,6 +608,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		if (!applyFailed) {
+			if (!drainHostAttachments()) return;
 			drainNativeEvents();
 			try {
 				dispatch({ ...identity, type: 'complete' });
@@ -504,6 +620,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		queuedNativeEvents.length = 0;
+		queuedHostAttachments.length = 0;
 		try {
 			dispatch({
 				...identity,
@@ -540,6 +657,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			// observing that failure during some unrelated future request.
 			queuedCommits.length = 0;
 			queuedNativeEvents.length = 0;
+			queuedHostAttachments.length = 0;
 			throw error;
 		} finally {
 			commitInProgress = false;
@@ -548,6 +666,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 
 	const handleDispose = (message: LynxDisposeMessage | LynxTerminalDisposeMessage): void => {
 		queuedNativeEvents.length = 0;
+		queuedHostAttachments.length = 0;
 		const terminal = message.type === 'terminal-dispose';
 		const acknowledge = () => {
 			const acknowledgement: LynxDisposeAcknowledgement = {
@@ -674,6 +793,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		},
 		close() {
 			queuedNativeEvents.length = 0;
+			queuedHostAttachments.length = 0;
 			if (!closed) {
 				closed = true;
 				try {

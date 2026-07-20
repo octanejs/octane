@@ -145,6 +145,21 @@ afterEach(async () => {
 });
 
 describe.sequential('@octanejs/lynx background root in the official JS environment', () => {
+	it('rejects a main-thread target that exposes only common Lynx APIs', () => {
+		const context = {} as LynxContextProxy;
+		expect(() =>
+			createLynxRoot({
+				target: {
+					lynx: {
+						getCoreContext: () => context,
+					},
+				},
+				context,
+				scheduleMicrotask: (callback) => callback(),
+			}),
+		).toThrow('Octane Lynx roots are available only in the Lynx background runtime.');
+	});
+
 	it('applies the Lynx-only className alias in authored host order', async () => {
 		const { dom } = installEnvironment();
 		backgroundRoot = createLynxRoot();

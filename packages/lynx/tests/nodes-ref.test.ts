@@ -112,7 +112,11 @@ const IDENTITY: LynxNodesRefIdentity = {
 };
 
 function createBinding(harness: ReturnType<typeof createNativeHarness>) {
-	let state: LynxNodesRefState | null = { ...IDENTITY, active: true };
+	let state: LynxNodesRefState | null = {
+		...IDENTITY,
+		active: true,
+		attachmentEpoch: 1,
+	};
 	const binding = createLynxNodesRef({
 		identity: IDENTITY,
 		createSelectorQuery: harness.createSelectorQuery,
@@ -241,6 +245,7 @@ describe('Lynx background NodesRef adapter', () => {
 			generation: IDENTITY.generation + 1,
 			selector: '#octane-lynx-7-11-4',
 			active: true,
+			attachmentEpoch: 1,
 		});
 		harness.invokes[0].options.success({ focused: true });
 		await expect(stalePromise).rejects.toMatchObject({ code: 'stale' });
@@ -260,6 +265,37 @@ describe('Lynx background NodesRef adapter', () => {
 		expect(await inFlight).toBe(reason);
 		expect(fresh.binding.handle.active).toBe(false);
 		freshHarness.invokes[0].options.success({ ignored: true });
+	});
+
+	it('invalidates pending work on detach and rejects results from an earlier attachment epoch', async () => {
+		const harness = createNativeHarness();
+		const context = createBinding(harness);
+		const detached = context.binding.handle.invoke('readCell');
+		let detachedOutcome: unknown = 'pending';
+		void detached.then(
+			(value) => (detachedOutcome = value),
+			(error: unknown) => (detachedOutcome = error),
+		);
+
+		context.setState({ ...IDENTITY, active: false, attachmentEpoch: 2 });
+		context.binding.invalidateAttachment();
+		await Promise.resolve();
+		expect(detachedOutcome).toMatchObject({ code: 'inactive' });
+
+		context.setState({ ...IDENTITY, active: true, attachmentEpoch: 3 });
+		const detachedError = detachedOutcome;
+		harness.invokes[0].options.success({ cell: 'stale-after-reattach' });
+		await Promise.resolve();
+		expect(detachedOutcome).toBe(detachedError);
+		const earlierEpoch = context.binding.handle.invoke('readCell');
+		context.setState({ ...IDENTITY, active: true, attachmentEpoch: 5 });
+		harness.invokes[1].options.success({ cell: 'stale-epoch' });
+		await expect(earlierEpoch).rejects.toMatchObject({ code: 'stale' });
+
+		const current = context.binding.handle.invoke('readCell');
+		harness.invokes[2].options.success({ cell: 'current' });
+		await expect(current).resolves.toEqual({ cell: 'current' });
+		expect(harness.selectors).toEqual(Array(3).fill(IDENTITY.selector));
 	});
 
 	it('rejects non-data input, invalid native results, and native status failures', async () => {

@@ -18,7 +18,11 @@ import {
 	createLynxClientDriver,
 	type LynxPublicHandle,
 } from '../src/core/client-driver.js';
-import { createLynxNodesRefSelector } from '../src/core/nodes-ref.js';
+import {
+	createLynxNodesRefSelector,
+	type LynxNativeInvokeOptions,
+	type LynxNativeNodesRef,
+} from '../src/core/nodes-ref.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
@@ -147,6 +151,7 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 					id: command.id,
 					type: command.type,
 					generation,
+					attached: true,
 					snapshot: handleSnapshot(commit.root, command.id, command.type, generation, {
 						props: command.props,
 					}),
@@ -157,6 +162,7 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 					id: command.id,
 					type: types.get(command.id)!,
 					generation: generations.get(command.id)!,
+					attached: true,
 					snapshot: handleSnapshot(
 						commit.root,
 						command.id,
@@ -174,6 +180,7 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 					id: command.id,
 					type: command.type,
 					generation,
+					attached: true,
 					snapshot: handleSnapshot(commit.root, command.id, command.type, generation, {
 						props: command.props,
 					}),
@@ -252,6 +259,7 @@ describe('@octanejs/lynx transported protocol', () => {
 						id: 1,
 						type: 'view',
 						generation: 1,
+						attached: true,
 						snapshot: handleSnapshot(1, 1, 'view', 1, { value: 1 }),
 					},
 				],
@@ -302,6 +310,7 @@ describe('@octanejs/lynx transported protocol', () => {
 						id: 1,
 						type: 'view',
 						generation: 1,
+						attached: true,
 						snapshot: { ...(handleSnapshot(1, 1, 'view', 1) as object), root: 99 },
 					},
 				],
@@ -310,10 +319,254 @@ describe('@octanejs/lynx transported protocol', () => {
 		expect(
 			validateLynxBackgroundInboundMessage({
 				...identity(1, 1),
+				type: 'host-fault',
+				error: { name: 'Error', message: 'callback failed' },
+			}),
+		).toMatchObject({ type: 'host-fault' });
+		expect(
+			validateLynxBackgroundInboundMessage({
+				...identity(1, 1),
 				type: 'dispose-retry',
 				error: { name: 'Error', message: 'retry cleanup' },
 			}),
 		).toMatchObject({ type: 'dispose-retry' });
+	});
+
+	it('terminally closes only the exact accepted root for an unsolicited host fault', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const container = createLynxClientContainer();
+		const transport = createLynxBackgroundTransport(context, container);
+		const root = createUniversalRoot(container, createLynxClientDriver(), { transport });
+		transport.bindRoot(root);
+		const refs: Array<LynxPublicHandle | null> = [];
+		const Scene = defineUniversalComponent(LYNX_TRANSPORT_RENDERER, () =>
+			universalValue(plan, [
+				universalProps([['set', 'ref', (value: LynxPublicHandle | null) => refs.push(value)]]),
+			]),
+		);
+		const applying = root.renderAsync(Scene, undefined);
+		await flushMicrotasks();
+		main.acknowledge(main.commits[0]!, 'complete');
+		await applying;
+		const accepted = commitIdentity(main.commits[0]!);
+		const handle = container.getPublicHandle(1)!;
+		expect(refs).toEqual([handle]);
+
+		context.sendToBackground({
+			...accepted,
+			version: accepted.version + 1,
+			type: 'host-fault',
+			error: { name: 'Error', message: 'stale callback failure' },
+		});
+		expect(transport.closedReason()).toBeNull();
+		expect(handle.active).toBe(true);
+		expect(refs).toEqual([handle]);
+		expect(transport.diagnostics().at(-1)?.message).toMatch(/stale or foreign host fault/);
+
+		context.sendToBackground({
+			...accepted,
+			type: 'host-fault',
+			error: { name: 'ListCallbackError', message: 'accepted callback failure' },
+		});
+		expect(transport.closedReason()).toMatchObject({
+			name: 'ListCallbackError',
+			message: 'accepted callback failure',
+		});
+		expect(handle.active).toBe(false);
+		expect(refs).toEqual([handle, null]);
+		expect(
+			context.events.some(
+				(event) =>
+					event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
+					(event.data as { readonly type?: unknown }).type === 'terminal-dispose',
+			),
+		).toBe(true);
+		const nextBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: accepted.version + 1,
+			commands: [],
+		};
+		expect(() =>
+			transport.prepareBatch(container, nextBatch, {
+				...accepted,
+				version: accepted.version + 1,
+			}),
+		).toThrow('accepted callback failure');
+	});
+
+	it('retains cleanup reception until asynchronous terminal-dispose retries are acknowledged', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const container = createLynxClientContainer();
+		const transport = createLynxBackgroundTransport(context, container);
+		await transport.ready;
+		const mountBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [{ op: 'create', id: 1, type: 'view', props: {} }],
+		};
+		const applying = transport.prepareBatch(container, mountBatch, identity(73, 1)).apply(() => {});
+		await flushMicrotasks();
+		const mount = main.commits[0]!;
+		main.acknowledge(mount, 'complete');
+		await applying;
+
+		const terminalAttempts: UniversalTransportIdentity[] = [];
+		context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
+			const message = validateLynxBackgroundOutboundMessage(event.data);
+			if (message.type !== 'terminal-dispose') return;
+			terminalAttempts.push(commitIdentity(mount));
+			void Promise.resolve().then(() => {
+				context.sendToBackground(
+					terminalAttempts.length < 3
+						? {
+								...commitIdentity(mount),
+								type: 'dispose-retry',
+								error: { name: 'Error', message: 'transient native cleanup failure' },
+							}
+						: { ...commitIdentity(mount), type: 'dispose-ack' },
+				);
+			});
+		});
+
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'host-fault',
+			error: { name: 'ListCallbackError', message: 'accepted async callback failure' },
+		});
+		expect(transport.closedReason()).toMatchObject({
+			name: 'ListCallbackError',
+			message: 'accepted async callback failure',
+		});
+		expect(container.getPublicHandle(1)).toBeNull();
+
+		await flushMicrotasks(10);
+		expect(terminalAttempts).toHaveLength(3);
+		expect(
+			transport
+				.diagnostics()
+				.filter((error) => error.message === 'transient native cleanup failure'),
+		).toHaveLength(2);
+		const diagnosticsAfterAck = transport.diagnostics().length;
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'dispose-retry',
+			error: { name: 'Error', message: 'late cleanup retry' },
+		});
+		expect(transport.diagnostics()).toHaveLength(diagnosticsAfterAck);
+	});
+
+	it.each(['host-fault', 'host-attachment'] as const)(
+		'fail-stops an exact accepted malformed %s while ignoring a stale one',
+		async (type) => {
+			const context = new FakeContextProxy();
+			const main = installMainHarness(context);
+			const container = createLynxClientContainer();
+			const transport = createLynxBackgroundTransport(context, container);
+			await transport.ready;
+			const mountBatch: UniversalHostBatch = {
+				renderer: LYNX_TRANSPORT_RENDERER,
+				version: 1,
+				commands: [{ op: 'create', id: 1, type: 'view', props: {} }],
+			};
+			const applying = transport
+				.prepareBatch(container, mountBatch, identity(74, 1))
+				.apply(() => {});
+			await flushMicrotasks();
+			const mount = main.commits[0]!;
+			main.acknowledge(mount, 'complete');
+			await applying;
+			const malformed =
+				type === 'host-fault'
+					? { type, error: { name: 'Error' } }
+					: {
+							type,
+							changes: [{ id: 1, generation: 1, attached: 'yes' }],
+						};
+
+			context.sendToBackground({
+				...identity(mount.root, mount.version + 1),
+				...malformed,
+			});
+			expect(transport.closedReason()).toBeNull();
+			expect(container.getPublicHandle(1)?.active).toBe(true);
+			expect(
+				context.events.filter(
+					(event) =>
+						event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
+						(event.data as { readonly type?: unknown }).type === 'terminal-dispose',
+				),
+			).toHaveLength(0);
+
+			context.sendToBackground({ ...commitIdentity(mount), ...malformed });
+			expect(transport.closedReason()).toBeInstanceOf(TypeError);
+			expect(container.getPublicHandle(1)).toBeNull();
+			expect(
+				context.events.filter(
+					(event) =>
+						event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
+						(event.data as { readonly type?: unknown }).type === 'terminal-dispose',
+				),
+			).toHaveLength(1);
+			context.sendToBackground({ ...commitIdentity(mount), type: 'dispose-ack' });
+		},
+	);
+
+	it('terminally closes when an exact host attachment subscriber throws', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const container = createLynxClientContainer();
+		const transport = createLynxBackgroundTransport(context, container);
+		await transport.ready;
+		const mountBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [{ op: 'create', id: 1, type: 'view', props: {} }],
+		};
+		const applying = transport.prepareBatch(container, mountBatch, identity(72, 1)).apply(() => {});
+		await flushMicrotasks();
+		const mount = main.commits[0]!;
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'ack',
+			handles: [
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 1,
+					attached: false,
+					snapshot: handleSnapshot(72, 1, 'view', 1),
+				},
+			],
+		});
+		context.sendToBackground({ ...commitIdentity(mount), type: 'complete' });
+		await applying;
+		const failure = new Error('attachment subscriber failed');
+		createLynxClientDriver().attachments!.subscribe(container, () => {
+			throw failure;
+		});
+
+		context.sendToBackground({
+			...identity(72, 2),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: true }],
+		});
+		expect(transport.closedReason()).toBeNull();
+		expect(container.getPublicHandle(1)?.attached).toBe(false);
+		expect(transport.diagnostics().at(-1)?.message).toMatch(/stale or foreign host attachment/);
+
+		context.sendToBackground({
+			...identity(72, 1),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: true }],
+		});
+		expect(transport.closedReason()).toBe(failure);
+		expect(container.getPublicHandle(1)).toBeNull();
+		expect(
+			context.events.map((event) => [event.type, (event.data as { readonly type?: unknown }).type]),
+		).toContainEqual([LYNX_BACKGROUND_TO_MAIN_EVENT, 'terminal-dispose']);
 	});
 
 	it('waits for named-event readiness, publishes handles at ACK, and preserves update identity', async () => {
@@ -414,6 +667,185 @@ describe('@octanejs/lynx transported protocol', () => {
 		expect(refs).toEqual([first, null, replacement]);
 		expect(context.events.every((event) => event.type !== 'message')).toBe(true);
 		expect(context.postMessage).not.toHaveBeenCalled();
+	});
+
+	it('gates list refs and public queries on generation-scoped physical attachment', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const selectors: string[] = [];
+		const invokes: LynxNativeInvokeOptions[] = [];
+		const nativeRef: LynxNativeNodesRef = {
+			invoke(options) {
+				invokes.push(options);
+				return { exec() {} };
+			},
+			fields() {
+				throw new Error('Unexpected fields query.');
+			},
+			path() {
+				throw new Error('Unexpected path query.');
+			},
+			setNativeProps() {
+				throw new Error('Unexpected native props query.');
+			},
+		};
+		const container = createLynxClientContainer({
+			createSelectorQuery: () => ({
+				select(selector) {
+					selectors.push(selector);
+					return nativeRef;
+				},
+			}),
+		});
+		const transport = createLynxBackgroundTransport(context, container);
+		const root = createUniversalRoot(container, createLynxClientDriver(), { transport });
+		transport.bindRoot(root);
+		const refs: Array<LynxPublicHandle | null> = [];
+		const Scene = defineUniversalComponent(LYNX_TRANSPORT_RENDERER, (props: { value: number }) =>
+			universalValue(plan, [
+				universalProps([
+					['set', 'value', props.value],
+					['set', 'ref', (value: LynxPublicHandle | null) => refs.push(value)],
+				]),
+			]),
+		);
+
+		const rendering = root.renderAsync(Scene, { value: 1 });
+		await flushMicrotasks();
+		const mount = main.commits[0];
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'ack',
+			handles: [
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 1,
+					attached: false,
+					snapshot: handleSnapshot(mount.root, 1, 'view', 1),
+				},
+			],
+		});
+		context.sendToBackground({ ...commitIdentity(mount), type: 'complete' });
+		await rendering;
+		const handle = container.getPublicHandle(1)!;
+		expect(handle.active).toBe(true);
+		expect(handle.attached).toBe(false);
+		expect(refs).toEqual([]);
+		await expect(handle.invoke('readCell')).rejects.toMatchObject({ code: 'inactive' });
+		expect(selectors).toEqual([]);
+
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: true }],
+		});
+		expect(handle.attached).toBe(true);
+		expect(refs).toEqual([handle]);
+
+		const sameAttachment = handle.invoke<{ cell: string }>('readCell');
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: true }],
+		});
+		invokes[0].success({ cell: 'same-attachment' });
+		await expect(sameAttachment).resolves.toEqual({ cell: 'same-attachment' });
+		expect(refs).toEqual([handle]);
+
+		const pending = handle.invoke('readCell');
+		let pendingOutcome: unknown = 'pending';
+		void pending.then(
+			(value) => (pendingOutcome = value),
+			(error: unknown) => (pendingOutcome = error),
+		);
+
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: false }],
+		});
+		expect(handle.attached).toBe(false);
+		expect(refs).toEqual([handle, null]);
+		await Promise.resolve();
+		expect(pendingOutcome).toMatchObject({ code: 'inactive' });
+
+		context.sendToBackground({
+			...commitIdentity(mount),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: true }],
+		});
+		expect(handle.attached).toBe(true);
+		expect(handle.generation).toBe(1);
+		expect(refs).toEqual([handle, null, handle]);
+		const detachedError = pendingOutcome;
+		invokes[1].success({ cell: 'stale' });
+		await Promise.resolve();
+		expect(pendingOutcome).toBe(detachedError);
+
+		const current = handle.invoke<{ cell: string }>('readCell');
+		invokes[2].success({ cell: 'current' });
+		await expect(current).resolves.toEqual({ cell: 'current' });
+
+		const retained = handle.invoke('readCell');
+		let retainedOutcome: unknown = 'pending';
+		void retained.then(
+			(value) => (retainedOutcome = value),
+			(error: unknown) => (retainedOutcome = error),
+		);
+		const updating = root.renderAsync(Scene, { value: 2 });
+		await flushMicrotasks();
+		const update = main.commits[1];
+		context.sendToBackground({
+			...commitIdentity(update),
+			type: 'ack',
+			handles: [
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 1,
+					attached: false,
+					snapshot: handleSnapshot(update.root, 1, 'view', 1, { value: 2 }),
+				},
+			],
+		});
+		context.sendToBackground({ ...commitIdentity(update), type: 'complete' });
+		await updating;
+		await Promise.resolve();
+		expect(retainedOutcome).toMatchObject({ code: 'inactive' });
+		expect(handle.attached).toBe(false);
+		expect(handle.generation).toBe(1);
+
+		context.sendToBackground({
+			...commitIdentity(update),
+			type: 'host-attachment',
+			changes: [{ id: 1, generation: 1, attached: true }],
+		});
+		const retainedError = retainedOutcome;
+		invokes[3].success({ cell: 'stale-retained-ack' });
+		await Promise.resolve();
+		expect(retainedOutcome).toBe(retainedError);
+		expect(refs).toEqual([handle, null, handle, null, handle]);
+
+		const afterUpdate = handle.invoke<{ cell: string }>('readCell');
+		invokes[4].success({ cell: 'after-update' });
+		await expect(afterUpdate).resolves.toEqual({ cell: 'after-update' });
+		expect(selectors).toEqual(Array(5).fill(createLynxNodesRefSelector(mount.root, 1, 1)));
+
+		const unmounting = root.unmountAsync();
+		await flushMicrotasks();
+		const unmount = main.commits[2];
+		context.sendToBackground({
+			...commitIdentity(unmount),
+			type: 'ack',
+			handles: [{ op: 'remove', id: 1, generation: 1 }],
+		});
+		context.sendToBackground({ ...commitIdentity(unmount), type: 'complete' });
+		await unmounting;
+		expect(handle.active).toBe(false);
+		transport.close();
 	});
 
 	it('publishes accepted identity before a layout callback dispatches an event', async () => {
@@ -616,6 +1048,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					id: 1,
 					type: 'view',
 					generation: 2,
+					attached: true,
 					snapshot: handleSnapshot(88, 1, 'view', 2, { value: 1 }),
 				},
 			],
@@ -637,6 +1070,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					id: 1,
 					type: 'view',
 					generation: 4,
+					attached: true,
 					snapshot: handleSnapshot(88, 1, 'view', 4, { value: 3 }),
 				},
 			],
@@ -680,6 +1114,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					id: 1,
 					type: 'view',
 					generation: 4,
+					attached: true,
 					snapshot: handleSnapshot(88, 1, 'view', 4, { value: 5 }),
 				},
 			],

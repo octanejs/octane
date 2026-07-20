@@ -1,6 +1,9 @@
 import { resolve } from 'node:path';
 
-import { lynxRspeedyRenderers } from '@octanejs/lynx/config';
+import {
+	lynxRspeedyBackgroundRenderers,
+	lynxRspeedyMainThreadRenderers,
+} from '@octanejs/lynx/config';
 import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 
 import { applyLynxEntryLayer, resolveLynxLayer } from './layers.js';
@@ -43,6 +46,8 @@ function normalizeOptions(value) {
 	return Object.freeze({
 		...layer,
 		thread,
+		renderers:
+			thread === 'main-thread' ? lynxRspeedyMainThreadRenderers : lynxRspeedyBackgroundRenderers,
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.hmr === undefined ? null : { hmr: options.hmr }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
@@ -88,7 +93,7 @@ export function pluginOctane(value) {
 				chain.plugin(`${PLUGIN_NAME}:compiler`).use(OctaneRspackPlugin, [
 					{
 						environment: 'client',
-						renderers: lynxRspeedyRenderers,
+						renderers: options.renderers,
 						runtime: '@octanejs/lynx/renderer',
 						universalRuntime: options.universalRuntime,
 						...(options.dev === undefined ? null : { dev: options.dev }),

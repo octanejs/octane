@@ -5,11 +5,12 @@ ReactLynx-to-Octane migration:
 
 - the immutable Milestone 0 audit and React-free framework probe; and
 - the private Milestone 1 compiler/package scaffold plus the source-level
-  Milestones 2–3 background renderer and host boundary.
+  Milestones 2–4 background renderer, host boundary, native list, and platform
+  API boundary.
 
 The package is `0.0.0`, marked `private`, and is not a native renderer release.
 
-## Milestone 3 source surface
+## Milestones 3–4 source surface
 
 The package now contains:
 
@@ -33,6 +34,21 @@ The package now contains:
 - generation-scoped asynchronous `invoke`, `measure`, `fields`, `path`, and
   `setNativeProps` handles;
 - retained Activity visibility with event disconnect/reconnect and no ref churn;
+- Lynx-specific logical list descriptors backed by public list PAPI callbacks,
+  callback-demanded physical cells, `item-key` identity, `reuse-identifier`
+  pools, reorder updates, and teardown-safe late callbacks;
+- physical attach/detach delivery through an optional universal capability, so
+  background refs follow recycled native presence without exposing the list
+  protocol to other renderers;
+- root-scoped serializable handles from `createLynxNativeResource()` for
+  application-owned custom-element resources;
+- augmentable init-data, global-props, and Native Module types plus background
+  hooks for data/global-event updates, typed global access, public reload
+  requests, and error reporting;
+- separate main/background renderer presets, with compile-time rejection of
+  statically visible `NativeModules` and `@octanejs/lynx/platform` use in the
+  main-thread specialization; `createLynxRoot()` separately verifies the public
+  background-only `lynx.getJSModule()` surface at runtime;
 - renderer-local declarations for `page`, `view`, `text`, `raw-text`, `image`,
   `scroll-view`, `input`, `textarea`, `list`, and `list-item`;
 - explicit custom-native-element augmentation through
@@ -41,8 +57,17 @@ The package now contains:
 The official `@lynx-js/testing-environment` lane mounts compiled `.lynx.tsrx`,
 updates state/context/conditionals, preserves keyed host identity while
 reordering, exposes refs before layout effects, handles an injected post-ACK
-PAPI fault once, and unmounts asynchronously. That is deterministic JavaScript
-host evidence, not native layout, paint, device, or performance evidence.
+PAPI fault once, and unmounts asynchronously. The Milestone 4 lane additionally
+models 1,000 logical list items, materializes cells only when the public test
+environment requests an index, reuses native cell identity, and makes late list
+callbacks inert. That is deterministic JavaScript host evidence, not native
+layout, paint, allocation, scrolling, device, or performance evidence.
+
+The Node-only `lynx-list` benchmark adds a deterministic source-level operation
+gate: a 12-cell visible window over 1,000 logical items allocates 12 fake-PAPI
+cell roots, reuses them for the other 988 items, and leaves zero cells after
+teardown. Its ratio guard compares that with a 1,000-cell eager model. This is
+not a native-memory or timing result.
 
 The Milestone 3 host boundary is implemented in private source and tests. It
 accepts class strings, inline styles, complete dataset bags, CSS scope metadata,
@@ -60,8 +85,37 @@ models `__SetDataset` with `Object.assign`, so it cannot observe deletion of
 omitted keys, and it implements selector-query `setNativeProps` while `invoke`,
 `fields`, and `path` throw. Selector compatibility, measurement/layout results,
 form/scroll behavior, and cleanup therefore still require Explorer, Android,
-and iOS evidence. Platform APIs remain Milestone 4 work; packaged testing
-helpers and production Rspeedy assembly remain Milestone 5 work.
+and iOS evidence. The platform subpath now implements source/test-only
+background hooks. Init data is seeded from public `__presetData` and prefers
+the framework-maintained current `__initData` snapshot when present, so source
+tests cover reset key removal and an update between render and layout
+subscription. Installing and proving the native update receiver that maintains
+that snapshot remains a formal gate. The `reload()` API forwards a public
+request; it is not the missing framework reload receiver. No public
+page-destroy receiver has been installed. Packaged testing helpers and
+production Rspeedy assembly remain Milestone 5 work.
+
+## Milestone 4 exclusions and examples
+
+The initial Milestone 4 surface rejects nested `<list>` hosts and does not claim
+Lynx host proof for portals, Suspense, lazy bundles, gestures, or animations.
+Boolean `defer` is accepted and forwarded as list metadata, but all cells are
+callback-demanded regardless of that prop, so this is not full ReactLynx
+`defer` semantics. ReactLynx's `defer={{ unmountRecycled: true }}` lifecycle
+behavior is also not implemented: recycling clears physical refs without
+unmounting the logical Octane subtree.
+
+`reuse-identifier` accepts strings. Omitting it or passing an empty string uses
+the default native reuse pool; logical identity still comes from the mandatory
+unique `item-key` and Octane key.
+
+The repository's
+[`examples/native-capabilities`](https://github.com/octanejs/octane/tree/main/packages/lynx/examples/native-capabilities)
+directory contains app-owned Android and iOS Native Module and custom-element
+skeletons plus Octane type augmentation and authoring code. They are excluded
+from the package's published files and have not been compiled or executed on
+Android or iOS. They document the integration boundary; they are not release or
+device evidence.
 
 The supported package subpaths are:
 
@@ -112,10 +166,11 @@ implemented. Explorer, Android, and iOS execution were unavailable on the
 capture host. These remain explicit gates. The package scaffold does not waive
 them and must not be described as a preview or production renderer.
 
-Milestone 3's host-side private source and official-JavaScript implementation is
-complete, but its formal exit remains unmet. The unresolved Milestone 0 native
-event/lifecycle/reload hooks, Web failure, Android/iOS evidence, real selector
-query/layout behavior, and pinned ReactLynx differential remain gates.
+Milestones 3–4 have host-side private source and official-JavaScript
+implementations, but their formal exits remain unmet. The unresolved Milestone
+0 native event/lifecycle/reload hooks, Web failure, Android/iOS evidence, real
+selector-query/layout/list allocation behavior, app-native module/element
+execution, and pinned ReactLynx differential remain gates.
 
 ## What the Phase 0 probe proves
 
@@ -126,7 +181,7 @@ query/layout behavior, and pinned ReactLynx differential remain gates.
 - Complete batches are validated before PAPI mutation, and accepted batches
   cross one explicit flush boundary before acknowledgement.
 - Production native and Web bundles contain no ReactLynx or Preact runtime.
-- The Milestone 3 receiver uses named public `ContextProxy` events rather than
+- The Milestone 3–4 receiver uses named public `ContextProxy` events rather than
   the probe's `postMessage` fallback and keeps live Element PAPI objects wholly
   on the main thread.
 
@@ -144,7 +199,8 @@ See:
 - [`audit/phase-0-evidence.json`](./audit/phase-0-evidence.json) for captured
   results and blocked device/runtime gates.
 - [`audit/runtime-compatibility.json`](./audit/runtime-compatibility.json) for
-  checked Milestone 1 syntax/built-in assumptions and their qualifications.
+  checked Milestone 1–4 syntax, built-in, and runtime-graph assumptions and
+  their qualifications.
 - [`UPSTREAM.md`](./UPSTREAM.md) for provenance and reuse policy.
 
 ## Reproduce the Phase 0 evidence

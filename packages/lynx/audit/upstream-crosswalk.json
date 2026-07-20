@@ -211,7 +211,7 @@
           "useState",
           "useSyncExternalStore"
         ],
-        "reason": "Existing Octane component/hook semantics or a renderer-owned Lynx platform API."
+        "reason": "Existing Octane component/hook semantics or a renderer-owned Lynx platform API. The Milestone 4 source implements the init/global/global-event hooks through public background APIs; native update ordering and lifecycle integration remain device gates."
       },
       {
         "classification": "intentional-divergence",
@@ -350,7 +350,24 @@
       {
         "classification": "port",
         "milestone": 4,
-        "members": ["ListItemProps.defer", "ListItemProps.reuse-identifier"]
+        "members": ["ListItemProps.reuse-identifier (string; empty selects the default pool)"]
+      },
+      {
+        "classification": "intentional-divergence",
+        "members": ["ListItemProps.reuse-identifier (number or null)"],
+        "reason": "The initial Octane Lynx host requires a string reuse-pool partition instead of accepting every React Key form. Omission or an empty string selects the default pool."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 6,
+        "members": ["ListItemProps.defer (boolean ReactLynx semantics)"],
+        "reason": "The prop is accepted and forwarded as list metadata, but every item in the initial background-rendered Octane host is callback-demanded regardless of it; ReactLynx's eager-main versus deferred-background distinction requires the Milestone 6 dual-thread renderer."
+      },
+      {
+        "classification": "deferred",
+        "milestone": 9,
+        "members": ["ListItemProps.defer.unmountRecycled"],
+        "reason": "The initial list host detaches physical refs on recycle but retains the logical Octane subtree; viewport recycling does not yet run component/effect cleanup."
       },
       {
         "classification": "deferred",

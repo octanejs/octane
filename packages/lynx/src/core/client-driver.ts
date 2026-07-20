@@ -1,6 +1,8 @@
 import type {
+	UniversalHostAttachmentBatch,
 	UniversalHostBatch,
 	UniversalHostDriver,
+	UniversalHostPropCodecContext,
 	UniversalSerializableValue,
 	UniversalTransportIdentity,
 } from 'octane/universal/native';
@@ -8,9 +10,11 @@ import {
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
 	type LynxPublicHandleDelta,
+	type LynxHostAttachmentChange,
 } from './protocol.js';
 import { planLynxHostPropPatch } from './host-props.js';
 import { parseLynxNativeEventProp } from './native-events.js';
+import { isLynxNativeResource } from '../resource.js';
 import {
 	createLynxNodesRef,
 	createLynxNodesRefSelector,
@@ -30,6 +34,8 @@ export interface LynxPublicHandle {
 	readonly type: string;
 	readonly generation: number;
 	readonly active: boolean;
+	/** Physical Element presence; false while a native list cell is recycled. */
+	readonly attached: boolean;
 	readonly snapshot: UniversalSerializableValue;
 	invoke<Result extends UniversalSerializableValue = UniversalSerializableValue>(
 		method: string,
@@ -43,11 +49,21 @@ export interface LynxPublicHandle {
 
 interface MutableHandleState {
 	active: boolean;
+	attached: boolean;
+	attachmentEpoch: number;
 	snapshot: UniversalSerializableValue;
 	readonly binding: LynxNodesRefBinding;
 }
 
 const HANDLE_STATE = new WeakMap<LynxPublicHandle, MutableHandleState>();
+
+function nextAttachmentEpoch(state: MutableHandleState, attached: boolean): number {
+	if (state.attached === attached) return state.attachmentEpoch;
+	if (state.attachmentEpoch === Number.MAX_SAFE_INTEGER) {
+		throw new Error('Octane Lynx physical attachment epoch is exhausted.');
+	}
+	return state.attachmentEpoch + 1;
+}
 
 function createPublicHandle(
 	root: number,
@@ -65,7 +81,15 @@ function createPublicHandle(
 		readState() {
 			const current = HANDLE_STATE.get(handle);
 			if (current === undefined) return null;
-			return { root, id, type, generation, selector, active: current.active };
+			return {
+				root,
+				id,
+				type,
+				generation,
+				selector,
+				active: current.active && current.attached,
+				attachmentEpoch: current.attachmentEpoch,
+			};
 		},
 	});
 	const facade: LynxPublicHandle = {
@@ -76,6 +100,9 @@ function createPublicHandle(
 		generation,
 		get active(): boolean {
 			return HANDLE_STATE.get(handle)!.active;
+		},
+		get attached(): boolean {
+			return HANDLE_STATE.get(handle)!.attached;
 		},
 		get snapshot(): UniversalSerializableValue {
 			return HANDLE_STATE.get(handle)!.snapshot;
@@ -100,7 +127,13 @@ function createPublicHandle(
 		},
 	};
 	handle = Object.freeze(facade);
-	HANDLE_STATE.set(handle, { active: false, snapshot, binding });
+	HANDLE_STATE.set(handle, {
+		active: false,
+		attached: false,
+		attachmentEpoch: 0,
+		snapshot,
+		binding,
+	});
 	return handle;
 }
 
@@ -108,6 +141,7 @@ interface LynxClientContainerState {
 	handles: Map<number, LynxPublicHandle>;
 	readonly generations: Map<number, number>;
 	readonly createSelectorQuery: LynxCreateSelectorQuery;
+	readonly attachmentSubscribers: Set<(batch: UniversalHostAttachmentBatch) => void>;
 }
 
 const CONTAINER_STATE = new WeakMap<LynxClientContainer, LynxClientContainerState>();
@@ -144,6 +178,7 @@ export function createLynxClientContainer(
 		handles: new Map(),
 		generations: new Map(),
 		createSelectorQuery,
+		attachmentSubscribers: new Set(),
 	});
 	return container;
 }
@@ -354,7 +389,13 @@ export function prepareLynxHandleDeltas(
 			);
 			createdHandles.add(handle);
 			stageGeneration(delta.id, delta.generation);
-			nextStates.set(handle, { ...HANDLE_STATE.get(handle)!, active: true });
+			const current = HANDLE_STATE.get(handle)!;
+			nextStates.set(handle, {
+				...current,
+				active: true,
+				attached: delta.attached,
+				attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
+			});
 			stagedHandles.set(delta.id, handle);
 			continue;
 		}
@@ -382,17 +423,26 @@ export function prepareLynxHandleDeltas(
 			);
 			createdHandles.add(handle);
 			stageGeneration(delta.id, delta.generation);
-			nextStates.set(handle, { ...HANDLE_STATE.get(handle)!, active: true });
+			const current = HANDLE_STATE.get(handle)!;
+			nextStates.set(handle, {
+				...current,
+				active: true,
+				attached: delta.attached,
+				attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
+			});
 			stagedHandles.set(delta.id, handle);
 			continue;
 		}
 		if (delta.type !== finalType || delta.generation !== previous.generation) {
 			throw new Error(`Octane Lynx acknowledgement changes retained handle ${delta.id}.`);
 		}
-		priorStates.set(previous, { ...HANDLE_STATE.get(previous)! });
+		const current = HANDLE_STATE.get(previous)!;
+		priorStates.set(previous, { ...current });
 		nextStates.set(previous, {
-			...HANDLE_STATE.get(previous)!,
+			...current,
 			active: true,
+			attached: delta.attached,
+			attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
 			snapshot: cloneSnapshot(delta.snapshot),
 		});
 	}
@@ -415,12 +465,18 @@ export function prepareLynxHandleDeltas(
 				if (finalHandle(handle.id) !== handle) {
 					const current = HANDLE_STATE.get(handle)!;
 					current.active = false;
+					current.attached = false;
 					current.binding.invalidate(
 						new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was replaced.`),
 					);
 				}
 			}
-			for (const [handle, next] of nextStates) Object.assign(HANDLE_STATE.get(handle)!, next);
+			for (const [handle, next] of nextStates) {
+				const current = HANDLE_STATE.get(handle)!;
+				const detached = current.attached && !next.attached;
+				Object.assign(current, next);
+				if (detached) current.binding.invalidateAttachment();
+			}
 			for (const [id, handle] of stagedHandles) {
 				if (handle === null) originalHandles.delete(id);
 				else originalHandles.set(id, handle);
@@ -436,11 +492,16 @@ export function prepareLynxHandleDeltas(
 				else originalHandles.set(id, previous);
 			}
 			for (const [handle, previous] of priorStates) {
-				Object.assign(HANDLE_STATE.get(handle)!, previous);
+				const current = HANDLE_STATE.get(handle)!;
+				const detached = current.attached && !previous.attached;
+				const attachmentEpoch = nextAttachmentEpoch(current, previous.attached);
+				Object.assign(current, previous, { attachmentEpoch });
+				if (detached) current.binding.invalidateAttachment();
 			}
 			for (const handle of createdHandles) {
 				const current = HANDLE_STATE.get(handle)!;
 				current.active = false;
+				current.attached = false;
 				current.binding.invalidate(
 					new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was rolled back.`),
 				);
@@ -456,14 +517,123 @@ export function prepareLynxHandleDeltas(
 /** @internal Releases query handles when their background transport closes. */
 export function invalidateLynxClientContainer(container: LynxClientContainer): void {
 	const state = containerState(container);
-	for (const handle of state.handles.values()) {
-		const current = HANDLE_STATE.get(handle)!;
+	const handles = [...state.handles.values()];
+	const subscribers = [...state.attachmentSubscribers];
+	const detached: number[] = [];
+	let hasError = false;
+	let firstError: unknown;
+	const capture = (work: () => void) => {
+		try {
+			work();
+		} catch (error) {
+			if (!hasError) {
+				hasError = true;
+				firstError = error;
+			}
+		}
+	};
+	for (const handle of handles) {
+		const current = HANDLE_STATE.get(handle);
+		if (current === undefined) {
+			if (!hasError) {
+				hasError = true;
+				firstError = new Error(
+					`Octane Lynx handle ${handle.id}:${handle.generation} lost its client state.`,
+				);
+			}
+			continue;
+		}
+		if (current.active && current.attached) {
+			capture(() => {
+				current.attachmentEpoch = nextAttachmentEpoch(current, false);
+			});
+			current.attached = false;
+			detached.push(handle.id);
+			capture(() => current.binding.invalidateAttachment());
+		}
 		current.active = false;
-		current.binding.invalidate(
-			new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was disposed.`),
+		current.attached = false;
+		capture(() =>
+			current.binding.invalidate(
+				new Error(`Octane Lynx handle ${handle.id}:${handle.generation} was disposed.`),
+			),
 		);
 	}
 	state.handles = new Map();
+	try {
+		if (detached.length !== 0) {
+			const batch = Object.freeze({
+				detached: Object.freeze(detached),
+				attached: Object.freeze([] as number[]),
+			});
+			for (const subscriber of subscribers) capture(() => subscriber(batch));
+		}
+	} finally {
+		state.attachmentSubscribers.clear();
+	}
+	if (hasError) throw firstError;
+}
+
+/** Apply one generation-gated native list attachment message and notify refs. */
+export function applyLynxHostAttachments(
+	container: LynxClientContainer,
+	changes: readonly LynxHostAttachmentChange[],
+): UniversalHostAttachmentBatch {
+	if (!Array.isArray(changes)) {
+		throw new TypeError('Octane Lynx host attachment changes must be an array.');
+	}
+	const state = containerState(container);
+	const staged: Array<{
+		readonly handle: LynxPublicHandle;
+		readonly attached: boolean;
+		readonly attachmentEpoch: number;
+	}> = [];
+	const seen = new Set<number>();
+	for (const change of changes) {
+		if (change === null || typeof change !== 'object' || Array.isArray(change)) {
+			throw new TypeError('Octane Lynx host attachment change must be an object.');
+		}
+		if (seen.has(change.id)) {
+			throw new Error(`Octane Lynx host attachment repeats handle ${change.id}.`);
+		}
+		seen.add(change.id);
+		const handle = state.handles.get(change.id);
+		if (
+			handle === undefined ||
+			!handle.active ||
+			handle.generation !== change.generation ||
+			typeof change.attached !== 'boolean'
+		) {
+			throw new Error(
+				`Octane Lynx host attachment targets stale or invalid handle ${change.id}:${change.generation}.`,
+			);
+		}
+		const current = HANDLE_STATE.get(handle)!;
+		if (current.attached !== change.attached) {
+			staged.push({
+				handle,
+				attached: change.attached,
+				attachmentEpoch: nextAttachmentEpoch(current, change.attached),
+			});
+		}
+	}
+	const detached: number[] = [];
+	const attached: number[] = [];
+	for (const change of staged) {
+		const current = HANDLE_STATE.get(change.handle)!;
+		current.attached = change.attached;
+		current.attachmentEpoch = change.attachmentEpoch;
+		if (!change.attached) current.binding.invalidateAttachment();
+		(change.attached ? attached : detached).push(change.handle.id);
+	}
+	const batch = Object.freeze({
+		detached: Object.freeze(detached),
+		attached: Object.freeze(attached),
+	});
+	if (detached.length !== 0 || attached.length !== 0) {
+		for (const subscriber of [...state.attachmentSubscribers]) subscriber(batch);
+	}
+	return batch;
 }
 
 const DISCRETE_EVENTS = new Set([
@@ -485,6 +655,40 @@ export function createLynxClientDriver(): UniversalHostDriver<
 	const driver: UniversalHostDriver<LynxClientContainer, LynxPublicHandle> = {
 		id: LYNX_TRANSPORT_RENDERER,
 		capabilities: Object.freeze({ text: 'host' as const, visibility: true }),
+		attachments: Object.freeze({
+			subscribe(
+				container: LynxClientContainer,
+				onChange: (batch: UniversalHostAttachmentBatch) => void,
+			) {
+				if (typeof onChange !== 'function') {
+					throw new TypeError('Octane Lynx host attachment subscriber must be a function.');
+				}
+				const state = containerState(container);
+				state.attachmentSubscribers.add(onChange);
+				let active = true;
+				return Object.freeze({
+					isAttached(id: number) {
+						return state.handles.get(id)?.attached ?? false;
+					},
+					unsubscribe() {
+						if (!active) return;
+						active = false;
+						state.attachmentSubscribers.delete(onChange);
+					},
+				});
+			},
+		}),
+		props: Object.freeze({
+			encode(context: UniversalHostPropCodecContext<LynxClientContainer>) {
+				if (isLynxNativeResource(context.value)) {
+					return {
+						kind: 'resource' as const,
+						handle: context.createResourceHandle(context.value.id),
+					};
+				}
+				return { kind: 'value' as const, value: context.value as never };
+			},
+		}),
 		events: Object.freeze({
 			classify(name: string) {
 				const binding = parseLynxNativeEventProp(name);

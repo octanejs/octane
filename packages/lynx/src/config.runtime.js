@@ -49,7 +49,7 @@ const LYNX_STANDARD_PROPS = [
 	'global-bind*',
 ];
 
-const LYNX_VALIDATION = {
+const LYNX_BACKGROUND_VALIDATION = {
 	textHosts: ['raw-text'],
 	textParents: ['text'],
 	forbiddenGlobals: [
@@ -155,6 +155,8 @@ const LYNX_VALIDATION = {
 			'preload-buffer-count',
 			'experimental-search-ref-anchor-strategy',
 			'scroll-bar-enable',
+			'need-layout-complete-info',
+			'layout-id',
 		],
 		'list-item': [
 			'item-key',
@@ -163,23 +165,81 @@ const LYNX_VALIDATION = {
 			'full-span',
 			'estimated-main-axis-size-px',
 			'recyclable',
+			'reuse-identifier',
+			'defer',
 		],
 	},
 };
 
-export const lynxRenderer = {
+const LYNX_MAIN_THREAD_VALIDATION = {
+	textHosts: ['raw-text'],
+	textParents: ['text'],
+	forbiddenGlobals: [
+		'customElements',
+		'document',
+		'Element',
+		'FinalizationRegistry',
+		'HTMLElement',
+		'localStorage',
+		'MutationObserver',
+		'navigator',
+		'NativeModules',
+		'Node',
+		'queueMicrotask',
+		'sessionStorage',
+		'structuredClone',
+		'WeakRef',
+		'window',
+	],
+	forbiddenImports: [
+		'@lynx-js/react',
+		'@octanejs/testing-library',
+		'@octanejs/lynx/platform',
+		'octane/hydration',
+		'octane/react',
+		'octane/server',
+		'octane/static',
+		'preact',
+		'react',
+		'react-dom',
+	],
+	hostProps: LYNX_BACKGROUND_VALIDATION.hostProps,
+};
+
+/** Background-thread renderer where Lynx platform APIs and Native Modules are legal. */
+export const lynxBackgroundRenderer = {
 	module: '@octanejs/lynx/renderer',
 	target: 'universal',
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
 	capabilities: ['class-name-alias', 'visibility'],
-	validation: LYNX_VALIDATION,
+	validation: LYNX_BACKGROUND_VALIDATION,
 };
 
-export const lynxRendererRegistry = {
-	[LYNX_RENDERER_ID]: lynxRenderer,
+/** Main-thread renderer that rejects APIs owned by the background runtime. */
+export const lynxMainThreadRenderer = {
+	module: '@octanejs/lynx/renderer',
+	target: 'universal',
+	server: 'unsupported',
+	intrinsics: '@octanejs/lynx/intrinsics',
+	text: 'host',
+	capabilities: ['class-name-alias', 'visibility'],
+	validation: LYNX_MAIN_THREAD_VALIDATION,
 };
+
+/** Compatibility name for standalone Lynx authoring, which defaults to background. */
+export const lynxRenderer = lynxBackgroundRenderer;
+
+export const lynxBackgroundRendererRegistry = {
+	[LYNX_RENDERER_ID]: lynxBackgroundRenderer,
+};
+
+export const lynxMainThreadRendererRegistry = {
+	[LYNX_RENDERER_ID]: lynxMainThreadRenderer,
+};
+
+export const lynxRendererRegistry = lynxBackgroundRendererRegistry;
 
 export const lynxRendererRules = [
 	{
@@ -193,11 +253,20 @@ export const lynxRenderers = {
 	rules: lynxRendererRules,
 };
 
-/** Native-app preset used by Rspeedy, where every TSRX file targets Lynx. */
-export const lynxRspeedyRenderers = {
-	registry: lynxRendererRegistry,
+/** Background native-app preset used by Rspeedy. */
+export const lynxRspeedyBackgroundRenderers = {
+	registry: lynxBackgroundRendererRegistry,
 	default: LYNX_RENDERER_ID,
 };
+
+/** Main-thread native-app preset used by Rspeedy. */
+export const lynxRspeedyMainThreadRenderers = {
+	registry: lynxMainThreadRendererRegistry,
+	default: LYNX_RENDERER_ID,
+};
+
+/** Compatibility preset for Rspeedy applications, which default to background. */
+export const lynxRspeedyRenderers = lynxRspeedyBackgroundRenderers;
 
 /** Short compatibility name for app config files. */
 export const renderers = lynxRenderers;

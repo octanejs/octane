@@ -58,6 +58,7 @@ export const BENCHMARK_SUITES = [
 	'js-framework-deopt',
 	'async-waterfall',
 	'async-composition',
+	'lynx-list',
 	'codegen-size',
 	'bundle-size',
 	'three-renderer',

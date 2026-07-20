@@ -9,6 +9,7 @@ import {
 	type UniversalTransportIdentity,
 } from 'octane/universal/native';
 import {
+	applyLynxHostAttachments,
 	invalidateLynxClientContainer,
 	prepareLynxHandleDeltas,
 	type LynxClientContainer,
@@ -27,6 +28,8 @@ import {
 	type LynxContextProxyEvent,
 	type LynxDisposeAcknowledgement,
 	type LynxDisposeRetryMessage,
+	type LynxHostAttachmentMessage,
+	type LynxHostFaultMessage,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
 	type LynxTransportAcknowledgement,
@@ -184,7 +187,9 @@ export function createLynxBackgroundTransport(
 	let disposeRetryQueued = false;
 	let dispatchingCommit: PendingCommit | null = null;
 	let terminalDisposeIdentity: UniversalTransportIdentity | null = null;
-	let terminalRetryError: Error | null = null;
+	let terminalDisposeAttempts = 0;
+	let terminalDisposeRetryQueued = false;
+	let receiverAttached = false;
 	let preparationCount = 0;
 	let logicalTeardownEnabled = false;
 
@@ -238,14 +243,19 @@ export function createLynxBackgroundTransport(
 		return entry;
 	};
 
-	const closeInternal = (error: Error, preserveDisposeResolution: boolean) => {
-		if (closedError !== null) return;
-		closedError = error;
+	const detachReceiver = (): void => {
+		if (!receiverAttached) return;
+		receiverAttached = false;
 		try {
 			context.removeEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, receive);
 		} catch (removeError) {
 			report(removeError, 'Octane Lynx failed to remove its transport listener.');
 		}
+	};
+
+	const closeClientState = (error: Error, preserveDisposeResolution: boolean): boolean => {
+		if (closedError !== null) return false;
+		closedError = error;
 		readyDeferred.reject(error);
 		for (const entry of [...pending.values()]) closeEntry(entry, error);
 		if (!preserveDisposeResolution) disposeDeferred?.reject(error);
@@ -254,27 +264,68 @@ export function createLynxBackgroundTransport(
 		} catch (invalidationError) {
 			report(invalidationError, 'Octane Lynx failed to invalidate its public handles.');
 		}
+		return true;
 	};
+
+	const closeInternal = (error: Error, preserveDisposeResolution: boolean) => {
+		if (!closeClientState(error, preserveDisposeResolution)) return;
+		detachReceiver();
+	};
+
+	const finishTerminalDispose = (): void => {
+		terminalDisposeIdentity = null;
+		terminalDisposeRetryQueued = false;
+		detachReceiver();
+	};
+
+	function queueTerminalDisposeRetry(error: Error): void {
+		if (terminalDisposeIdentity === null) return;
+		if (terminalDisposeAttempts >= MAX_DISPOSE_ATTEMPTS) {
+			report(error, 'Octane Lynx terminal cleanup exhausted its retry budget.');
+			finishTerminalDispose();
+			return;
+		}
+		if (terminalDisposeRetryQueued) return;
+		terminalDisposeRetryQueued = true;
+		void Promise.resolve().then(() => {
+			terminalDisposeRetryQueued = false;
+			sendTerminalDisposeRequest();
+		});
+	}
+
+	function sendTerminalDisposeRequest(): void {
+		const identity = terminalDisposeIdentity;
+		if (identity === null) return;
+		terminalDisposeAttempts++;
+		try {
+			const message = validateLynxBackgroundOutboundMessage({
+				...identity,
+				type: 'terminal-dispose',
+			});
+			context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: message });
+		} catch (disposeError) {
+			queueTerminalDisposeRetry(
+				report(
+					disposeError,
+					`Octane Lynx terminal cleanup attempt ${terminalDisposeAttempts} could not be delivered.`,
+				),
+			);
+		}
+	}
 
 	const terminalCloseAfterHostAcceptance = (
 		identity: UniversalTransportIdentity,
 		error: Error,
 	): void => {
 		if (closedError !== null) return;
-		terminalDisposeIdentity = frozenIdentity(identity);
-		for (let attempt = 1; attempt <= MAX_DISPOSE_ATTEMPTS; attempt++) {
-			terminalRetryError = null;
-			try {
-				dispatch({ ...identity, type: 'terminal-dispose' });
-			} catch (disposeError) {
-				terminalRetryError = report(
-					disposeError,
-					`Octane Lynx terminal cleanup attempt ${attempt} could not be delivered.`,
-				);
-			}
-			if (terminalDisposeIdentity === null || terminalRetryError === null) break;
-		}
-		closeInternal(error, false);
+		const terminalIdentity = frozenIdentity(identity);
+		terminalDisposeIdentity = terminalIdentity;
+		terminalDisposeAttempts = 0;
+		terminalDisposeRetryQueued = false;
+		// Reject logical work and invalidate handles immediately, while retaining
+		// only the inbound listener needed for asynchronous cleanup ACK/retry.
+		closeClientState(error, false);
+		sendTerminalDisposeRequest();
 	};
 
 	const handleReady = (message: LynxMainReadyReply) => {
@@ -343,6 +394,8 @@ export function createLynxBackgroundTransport(
 		}
 		if (
 			message.type === 'event' ||
+			message.type === 'host-attachment' ||
+			message.type === 'host-fault' ||
 			message.type === 'dispose-ack' ||
 			message.type === 'dispose-retry' ||
 			message.type === 'main-ready'
@@ -408,6 +461,37 @@ export function createLynxBackgroundTransport(
 		}
 	};
 
+	const handleHostAttachment = (message: LynxHostAttachmentMessage): void => {
+		if (accepted === null || !sameLynxTransportIdentity(accepted, message)) {
+			report(
+				new Error(
+					`Octane Lynx transport received a stale or foreign host attachment ${message.version}.`,
+				),
+			);
+			return;
+		}
+		try {
+			applyLynxHostAttachments(container, message.changes);
+		} catch (error) {
+			terminalCloseAfterHostAcceptance(
+				message,
+				report(error, 'Octane Lynx transported host attachment failed.'),
+			);
+		}
+	};
+
+	const handleHostFault = (message: LynxHostFaultMessage): void => {
+		if (accepted === null || !sameLynxTransportIdentity(accepted, message)) {
+			report(
+				new Error(
+					`Octane Lynx transport received a stale or foreign host fault ${message.version}.`,
+				),
+			);
+			return;
+		}
+		terminalCloseAfterHostAcceptance(message, remoteError(message.error));
+	};
+
 	function queueDisposeRetry(error: Error): void {
 		if (disposeDeferred === null || disposeDeferred.settled || closedError !== null) return;
 		if (disposeAttempts >= MAX_DISPOSE_ATTEMPTS) {
@@ -443,7 +527,7 @@ export function createLynxBackgroundTransport(
 			terminalDisposeIdentity !== null &&
 			sameLynxTransportIdentity(terminalDisposeIdentity, message)
 		) {
-			terminalDisposeIdentity = null;
+			finishTerminalDispose();
 			return;
 		}
 		const deferred = disposeDeferred;
@@ -467,7 +551,12 @@ export function createLynxBackgroundTransport(
 			terminalDisposeIdentity !== null &&
 			sameLynxTransportIdentity(terminalDisposeIdentity, message)
 		) {
-			terminalRetryError = remoteError(message.error);
+			queueTerminalDisposeRetry(
+				report(
+					remoteError(message.error),
+					'Octane Lynx main thread requested terminal cleanup retry.',
+				),
+			);
 			return;
 		}
 		if (
@@ -497,6 +586,17 @@ export function createLynxBackgroundTransport(
 		}
 		if (
 			(raw.type === 'dispose-ack' || raw.type === 'dispose-retry') &&
+			terminalDisposeIdentity !== null &&
+			raw.protocol === terminalDisposeIdentity.protocol &&
+			raw.renderer === terminalDisposeIdentity.renderer &&
+			raw.root === terminalDisposeIdentity.root &&
+			raw.version === terminalDisposeIdentity.version
+		) {
+			queueTerminalDisposeRetry(error);
+			return;
+		}
+		if (
+			(raw.type === 'dispose-ack' || raw.type === 'dispose-retry') &&
 			disposeDeferred !== null &&
 			!disposeDeferred.settled &&
 			disposeIdentity !== null &&
@@ -506,6 +606,20 @@ export function createLynxBackgroundTransport(
 			raw.version === disposeIdentity.version
 		) {
 			queueDisposeRetry(error);
+			return;
+		}
+		if (
+			(raw.type === 'host-fault' || raw.type === 'host-attachment') &&
+			accepted !== null &&
+			raw.protocol === accepted.protocol &&
+			raw.renderer === accepted.renderer &&
+			raw.root === accepted.root &&
+			raw.version === accepted.version
+		) {
+			// These unsolicited messages are emitted only for an already-mutated
+			// accepted root. A malformed exact identity is therefore fail-stop; a
+			// stale or foreign identity remains diagnostic-only.
+			terminalCloseAfterHostAcceptance(accepted, error);
 			return;
 		}
 		if (!Number.isSafeInteger(raw.version)) return;
@@ -534,7 +648,7 @@ export function createLynxBackgroundTransport(
 	};
 
 	function receive(event: LynxContextProxyEvent): void {
-		if (closedError !== null) return;
+		if (closedError !== null && terminalDisposeIdentity === null) return;
 		let message: LynxBackgroundInboundMessage;
 		try {
 			message = validateLynxBackgroundInboundMessage(event.data);
@@ -543,12 +657,25 @@ export function createLynxBackgroundTransport(
 			rejectExpectedMalformed(event.data, normalized);
 			return;
 		}
+		if (closedError !== null) {
+			if (message.type === 'dispose-ack') handleDisposeAcknowledgement(message);
+			else if (message.type === 'dispose-retry') handleDisposeRetry(message);
+			return;
+		}
 		if (message.type === 'main-ready') {
 			handleReady(message);
 			return;
 		}
 		if (message.type === 'event') {
 			handleEvent(message);
+			return;
+		}
+		if (message.type === 'host-attachment') {
+			handleHostAttachment(message);
+			return;
+		}
+		if (message.type === 'host-fault') {
+			handleHostFault(message);
 			return;
 		}
 		if (message.type === 'dispose-ack') {
@@ -563,6 +690,7 @@ export function createLynxBackgroundTransport(
 	}
 
 	context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, receive);
+	receiverAttached = true;
 	const request: LynxMainReadyRequest = {
 		protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
 		renderer: LYNX_TRANSPORT_RENDERER,

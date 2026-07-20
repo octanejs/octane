@@ -17,6 +17,7 @@ import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
 interface LynxBackgroundGlobals {
 	readonly lynx?: {
 		getCoreContext?(): LynxContextProxy;
+		getJSModule?(name: string): unknown;
 		queueMicrotask?(callback: () => void): void;
 		createSelectorQuery?: LynxCreateSelectorQuery;
 	};
@@ -54,7 +55,11 @@ function readBackgroundGlobals(target: object): LynxBackgroundGlobals {
 	if (target === null || typeof target !== 'object') {
 		throw new TypeError('Octane Lynx root target must be a background-thread global object.');
 	}
-	return target as LynxBackgroundGlobals;
+	const globals = target as LynxBackgroundGlobals;
+	if (typeof globals.lynx?.getJSModule !== 'function') {
+		throw new Error('Octane Lynx roots are available only in the Lynx background runtime.');
+	}
+	return globals;
 }
 
 function resolveContext(

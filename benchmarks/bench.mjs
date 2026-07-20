@@ -401,6 +401,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Native Lynx list virtualization (Node-only): drives the real host through
+		// a fake Element PAPI and reports deterministic physical-cell counts for a
+		// bounded visible window over 1,000 logical rows. No device timing claim.
+		name: 'lynx-list',
+		cwd: 'lynx-list',
+		servers: [],
+		iter: { normal: 3, quick: 1 },
+		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
+	},
+	{
 		// Compiled-output size (Node-only, seconds-fast): compiles a fixed
 		// .tsrx/.tsx corpus through octane/compiler with prod settings and reports
 		// raw/minified/gzip bytes as `source` vs `compiled` targets — the per-commit

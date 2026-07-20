@@ -18,8 +18,21 @@ import {
 	planLynxHostPropPatch,
 	type LynxHostPropPatch,
 } from './host-props.js';
+import {
+	createLynxListItemDescriptor,
+	lynxListReuseKey,
+	planLynxListUpdate,
+	type LynxListItemDescriptor,
+	type LynxListUpdateInfo,
+} from './list.js';
 import { createLynxNodesRefSelector } from './nodes-ref.js';
-import type { LynxElementPAPI, LynxElementRef } from './papi.js';
+import type {
+	LynxElementPAPI,
+	LynxElementRef,
+	LynxListComponentAtIndex,
+	LynxListComponentAtIndexes,
+	LynxListEnqueueComponent,
+} from './papi.js';
 
 const LYNX_HOST_STATE: unique symbol = Symbol('octane.lynx.host-state');
 
@@ -48,6 +61,13 @@ export type LynxHostHandleDelta =
 			readonly generation: number;
 	  };
 
+/** Physical attachment transition emitted by native list enter/leave callbacks. */
+export interface LynxHostAttachmentDelta {
+	readonly id: number;
+	readonly generation: number;
+	readonly attached: boolean;
+}
+
 interface LynxHostRecord<Node extends LynxElementRef> {
 	node: Node | null;
 	type: string;
@@ -59,6 +79,52 @@ interface LynxHostRecord<Node extends LynxElementRef> {
 	handle: LynxHostHandle;
 }
 
+interface LynxPhysicalTree<Node extends LynxElementRef> {
+	node: Node;
+	type: string;
+	props: Readonly<Record<string, unknown>>;
+	visible: boolean;
+	logicalId: number;
+	children: LynxPhysicalTree<Node>[];
+}
+
+interface LynxPhysicalListCell<Node extends LynxElementRef> {
+	sign: number;
+	tree: LynxPhysicalTree<Node>;
+	item: LynxListItemDescriptor;
+	logicalItemId: number | null;
+	/** The logical item moved before native delivered the old sign's enqueue callback. */
+	awaitingEnqueue: boolean;
+}
+
+interface LynxListMaterialization<Node extends LynxElementRef> {
+	readonly sign: number;
+	readonly tree: LynxPhysicalTree<Node>;
+	readonly item: LynxListItemDescriptor;
+	/** True only when a physical cell crosses logical item ownership. */
+	readonly reuseNotification: boolean;
+	readonly detachments: LynxHostAttachmentDelta[];
+	readonly attachments: LynxHostAttachmentDelta[];
+}
+
+interface LynxNativeListState<Node extends LynxElementRef> {
+	readonly hostId: number;
+	readonly node: Node;
+	readonly componentAtIndex: LynxListComponentAtIndex<Node>;
+	readonly componentAtIndexes: LynxListComponentAtIndexes<Node>;
+	readonly enqueueComponent: LynxListEnqueueComponent<Node>;
+	items: readonly LynxListItemDescriptor[];
+	readonly cellsBySign: Map<number, LynxPhysicalListCell<Node>>;
+	readonly attachedByItem: Map<number, LynxPhysicalListCell<Node>>;
+	readonly retainedByItem: Map<number, LynxPhysicalListCell<Node>>;
+	readonly recyclePools: Map<string, LynxPhysicalListCell<Node>[]>;
+	createdCells: number;
+	reusedCells: number;
+	enterCount: number;
+	leaveCount: number;
+	disposed: boolean;
+}
+
 interface LynxHostState<Node extends LynxElementRef> {
 	readonly papi: LynxElementPAPI<Node>;
 	records: Map<number, LynxHostRecord<Node>>;
@@ -68,10 +134,14 @@ interface LynxHostState<Node extends LynxElementRef> {
 	readonly ownedPageRoots: Set<Node>;
 	/** Physical listener journal retained until native removal succeeds. */
 	readonly nativeEvents: Map<Node, Map<string, LynxNativeEventRegistration>>;
+	readonly lists: Map<number, LynxNativeListState<Node>>;
+	readonly onAttachments?: (version: number, deltas: readonly LynxHostAttachmentDelta[]) => void;
+	readonly onCallbackFault?: (version: number, error: unknown) => void;
 	acceptedVersion: number;
 	disposed: boolean;
 	disposing: boolean;
 	faulted: boolean;
+	applying: boolean;
 	cleanupNeedsFlush: boolean;
 }
 
@@ -96,6 +166,10 @@ export interface CreateLynxHostContainerOptions<Node extends LynxElementRef = Ly
 	readonly componentId?: string;
 	readonly cssId?: number;
 	readonly page?: Node;
+	/** Main-thread bridge for callback-driven list ref/query attachment state. */
+	readonly onAttachments?: (version: number, deltas: readonly LynxHostAttachmentDelta[]) => void;
+	/** Accepted-root fault bridge for native callbacks that run after a commit settles. */
+	readonly onCallbackFault?: (version: number, error: unknown) => void;
 }
 
 export interface LynxPreparedHostBatch extends UniversalPreparedHostBatch {
@@ -124,6 +198,13 @@ export interface LynxHostCleanupResult {
 	readonly remainingRoots: number;
 	readonly flushed: boolean;
 	readonly errors: readonly Error[];
+}
+
+interface LynxPreparedListUpdate {
+	readonly hostId: number;
+	readonly previous: readonly LynxListItemDescriptor[];
+	readonly next: readonly LynxListItemDescriptor[];
+	readonly update: LynxListUpdateInfo;
 }
 
 type LynxApplyOperation<Node extends LynxElementRef> =
@@ -480,6 +561,662 @@ function installNativeEvents<Node extends LynxElementRef>(
 	}
 }
 
+function hasListUpdate(update: LynxListUpdateInfo): boolean {
+	return (
+		update.insertAction.length !== 0 ||
+		update.removeAction.length !== 0 ||
+		update.updateAction.length !== 0
+	);
+}
+
+function sameListItems(
+	first: readonly LynxListItemDescriptor[],
+	second: readonly LynxListItemDescriptor[],
+): boolean {
+	if (first.length !== second.length) return false;
+	for (let index = 0; index < first.length; index++) {
+		const a = first[index]!;
+		const b = second[index]!;
+		if (
+			a.id !== b.id ||
+			a.itemKey !== b.itemKey ||
+			a.reuseIdentifier !== b.reuseIdentifier ||
+			a.recyclable !== b.recyclable ||
+			a.defer !== b.defer
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function directListItem<Node extends LynxElementRef>(
+	getRecord: (id: number) => LynxHostRecord<Node> | undefined,
+	id: number,
+): { readonly listId: number; readonly itemId: number } | null {
+	let current = getRecord(id);
+	const visited = new Set<number>();
+	while (current !== undefined && typeof current.parent === 'number') {
+		if (visited.has(current.handle.id)) throw hostError('list ancestry contains a cycle.');
+		visited.add(current.handle.id);
+		const parent = getRecord(current.parent);
+		if (parent === undefined) return null;
+		if (parent.type === 'list') {
+			return current.type === 'list-item'
+				? Object.freeze({ listId: parent.handle.id, itemId: current.handle.id })
+				: null;
+		}
+		current = parent;
+	}
+	return null;
+}
+
+function listItems<Node extends LynxElementRef>(
+	getRecord: (id: number) => LynxHostRecord<Node> | undefined,
+	listId: number,
+): readonly LynxListItemDescriptor[] {
+	const list = getRecord(listId);
+	if (list === undefined || list.type !== 'list') return Object.freeze([]);
+	const items = list.children.map((id) => {
+		const record = getRecord(id);
+		if (record === undefined) throw hostError(`<list> ${listId} references unknown child ${id}.`);
+		return createLynxListItemDescriptor(id, record.type, record.props);
+	});
+	// The planner owns native item-key uniqueness validation.
+	planLynxListUpdate([], items);
+	return Object.freeze(items);
+}
+
+function emitAttachments<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	deltas: LynxHostAttachmentDelta[],
+	version = state.acceptedVersion,
+): void {
+	if (deltas.length === 0 || state.disposed || state.disposing) return;
+	// Keep one transition per logical host in this phase. Detach and attach
+	// phases are emitted separately so NodesRef observes an attachment epoch.
+	const seen = new Set<number>();
+	const normalized: LynxHostAttachmentDelta[] = [];
+	for (let index = deltas.length - 1; index >= 0; index--) {
+		const delta = deltas[index]!;
+		if (seen.has(delta.id)) continue;
+		seen.add(delta.id);
+		normalized.push(delta);
+	}
+	normalized.reverse();
+	state.onAttachments?.(version, Object.freeze(normalized));
+}
+
+function physicalChildren<Node extends LynxElementRef>(
+	record: LynxHostRecord<Node>,
+): readonly number[] {
+	// Native lists own their direct cells through callbacks rather than ordinary
+	// Element PAPI insertion. Descendants inside each cell remain ordinary hosts.
+	return record.type === 'list' ? [] : record.children;
+}
+
+function createPhysicalTree<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	container: LynxHostContainer<Node>,
+	id: number,
+): LynxPhysicalTree<Node> {
+	const record = state.records.get(id);
+	if (record === undefined) throw hostError(`native list requested missing host ${id}.`);
+	const node =
+		record.type === 'list'
+			? createNativeListNode(state, container, record)
+			: state.papi.createElement(
+					record.type,
+					container.pageComponentUniqueId,
+					textValue(record.props),
+				);
+	state.ownedNodes.add(node);
+	record.node = node;
+	installNodesRefSelector(state.papi, node, record.handle);
+	applyProps(
+		state.papi,
+		node,
+		record.type,
+		{},
+		record.props,
+		planLynxHostPropPatch(record.type, {}, record.props),
+		true,
+		record.visible,
+	);
+	if (record.visible) {
+		installNativeEvents(state, node, container.root, id, record.handle.generation, record.events);
+	}
+	const children: LynxPhysicalTree<Node>[] = [];
+	for (const childId of physicalChildren(record)) {
+		const child = createPhysicalTree(state, container, childId);
+		state.papi.insertBefore(node, child.node, null);
+		children.push(child);
+	}
+	return {
+		node,
+		type: record.type,
+		props: record.props,
+		visible: record.visible,
+		logicalId: id,
+		children,
+	};
+}
+
+function disposeNativeListState<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	hostId: number,
+): void {
+	const list = state.lists.get(hostId);
+	if (list === undefined || list.disposed) return;
+	const listPAPI = state.papi.list;
+	if (listPAPI !== undefined) {
+		listPAPI.updateCallbacks(
+			list.node,
+			() => -1,
+			() => {},
+			() => {},
+		);
+	}
+	list.disposed = true;
+	state.lists.delete(hostId);
+	for (const cell of list.cellsBySign.values()) disposePhysicalTree(state, cell.tree);
+	list.cellsBySign.clear();
+	list.attachedByItem.clear();
+	list.retainedByItem.clear();
+	list.recyclePools.clear();
+}
+
+function disposePhysicalTree<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	tree: LynxPhysicalTree<Node>,
+): void {
+	for (const child of tree.children) disposePhysicalTree(state, child);
+	if (tree.type === 'list') disposeNativeListState(state, tree.logicalId);
+	removeAllNativeEvents(state, tree.node);
+	const record = state.records.get(tree.logicalId);
+	if (record?.node === tree.node) record.node = null;
+	state.ownedNodes.delete(tree.node);
+}
+
+function capturePhysicalTree<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	id: number,
+): LynxPhysicalTree<Node> {
+	const record = state.records.get(id);
+	if (record === undefined || record.node === null) {
+		throw hostError(`attached native list cell lost logical host ${id}.`);
+	}
+	return {
+		node: record.node,
+		type: record.type,
+		props: record.props,
+		visible: record.visible,
+		logicalId: id,
+		children: physicalChildren(record).map((childId) => capturePhysicalTree(state, childId)),
+	};
+}
+
+function clearPhysicalTreeAttachment<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	tree: LynxPhysicalTree<Node>,
+	deltas: LynxHostAttachmentDelta[],
+): void {
+	const record = state.records.get(tree.logicalId);
+	if (record !== undefined) {
+		deltas.push(
+			Object.freeze({
+				id: tree.logicalId,
+				generation: record.handle.generation,
+				attached: false,
+			}),
+		);
+	}
+	removeAllNativeEvents(state, tree.node);
+	if (tree.type !== '#text' && tree.type !== 'raw-text') state.papi.setRefSelector(tree.node, '');
+	if (record?.node === tree.node) record.node = null;
+	for (const child of tree.children) clearPhysicalTreeAttachment(state, child, deltas);
+}
+
+function collectPhysicalTreeAttachment<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	tree: LynxPhysicalTree<Node>,
+	deltas: LynxHostAttachmentDelta[],
+): void {
+	for (const child of tree.children) collectPhysicalTreeAttachment(state, child, deltas);
+	const record = state.records.get(tree.logicalId);
+	if (record === undefined) return;
+	deltas.push(
+		Object.freeze({
+			id: tree.logicalId,
+			generation: record.handle.generation,
+			attached: true,
+		}),
+	);
+}
+
+function collectPhysicalTreeIds<Node extends LynxElementRef>(
+	tree: LynxPhysicalTree<Node>,
+	output: Set<number>,
+): void {
+	output.add(tree.logicalId);
+	for (const child of tree.children) collectPhysicalTreeIds(child, output);
+}
+
+function rebindPhysicalTree<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	container: LynxHostContainer<Node>,
+	tree: LynxPhysicalTree<Node>,
+	desiredId: number,
+): LynxPhysicalTree<Node> {
+	const desired = state.records.get(desiredId);
+	if (desired === undefined) throw hostError(`native list requested missing host ${desiredId}.`);
+	const patch = planLynxHostPropPatch(desired.type, tree.props, desired.props);
+	if (
+		tree.type !== desired.type ||
+		patch.requiresRecreate ||
+		(tree.type === 'list' && tree.logicalId !== desiredId)
+	) {
+		const replacement = createPhysicalTree(state, container, desiredId);
+		state.papi.replace(replacement.node, tree.node);
+		disposePhysicalTree(state, tree);
+		return replacement;
+	}
+
+	const previousRecord = state.records.get(tree.logicalId);
+	if (previousRecord?.node === tree.node && tree.logicalId !== desiredId)
+		previousRecord.node = null;
+	removeAllNativeEvents(state, tree.node);
+	desired.node = tree.node;
+	installNodesRefSelector(state.papi, tree.node, desired.handle);
+	applyProps(
+		state.papi,
+		tree.node,
+		desired.type,
+		tree.props,
+		desired.props,
+		patch,
+		false,
+		desired.visible,
+	);
+	if (!desired.visible) state.papi.setAttribute(tree.node, 'hidden', true);
+	else {
+		installNativeEvents(
+			state,
+			tree.node,
+			container.root,
+			desiredId,
+			desired.handle.generation,
+			desired.events,
+		);
+	}
+
+	const desiredChildren = physicalChildren(desired);
+	const common = Math.min(tree.children.length, desiredChildren.length);
+	for (let index = 0; index < common; index++) {
+		tree.children[index] = rebindPhysicalTree(
+			state,
+			container,
+			tree.children[index]!,
+			desiredChildren[index]!,
+		);
+	}
+	while (tree.children.length > desiredChildren.length) {
+		const child = tree.children.pop()!;
+		state.papi.remove(tree.node, child.node);
+		disposePhysicalTree(state, child);
+	}
+	for (let index = common; index < desiredChildren.length; index++) {
+		const child = createPhysicalTree(state, container, desiredChildren[index]!);
+		state.papi.insertBefore(tree.node, child.node, null);
+		tree.children.push(child);
+	}
+	tree.type = desired.type;
+	tree.props = desired.props;
+	tree.visible = desired.visible;
+	tree.logicalId = desiredId;
+	return tree;
+}
+
+function poolListCell<Node extends LynxElementRef>(
+	list: LynxNativeListState<Node>,
+	cell: LynxPhysicalListCell<Node>,
+): void {
+	cell.awaitingEnqueue = false;
+	const key = lynxListReuseKey(cell.item);
+	let pool = list.recyclePools.get(key);
+	if (pool === undefined) list.recyclePools.set(key, (pool = []));
+	pool.push(cell);
+}
+
+function destroyListCell<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	list: LynxNativeListState<Node>,
+	cell: LynxPhysicalListCell<Node>,
+): void {
+	if (state.papi.isChild(list.node, cell.tree.node)) {
+		state.papi.remove(list.node, cell.tree.node);
+	}
+	list.cellsBySign.delete(cell.sign);
+	cell.awaitingEnqueue = false;
+	disposePhysicalTree(state, cell.tree);
+}
+
+function detachListCell<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	list: LynxNativeListState<Node>,
+	cell: LynxPhysicalListCell<Node>,
+	mode: 'await-enqueue' | 'destroy' | 'retain' | 'reuse',
+	version?: number,
+	attachmentDeltas?: LynxHostAttachmentDelta[],
+): void {
+	const itemId = cell.logicalItemId;
+	if (itemId === null) return;
+	list.leaveCount += 1;
+	cell.tree = capturePhysicalTree(state, itemId);
+	const deltas = attachmentDeltas ?? [];
+	clearPhysicalTreeAttachment(state, cell.tree, deltas);
+	if (list.attachedByItem.get(itemId) === cell) list.attachedByItem.delete(itemId);
+	cell.logicalItemId = null;
+	if (mode === 'await-enqueue') cell.awaitingEnqueue = true;
+	else if (mode === 'retain') {
+		cell.awaitingEnqueue = false;
+		list.retainedByItem.set(itemId, cell);
+	} else if (mode === 'reuse') poolListCell(list, cell);
+	else destroyListCell(state, list, cell);
+	if (attachmentDeltas === undefined) emitAttachments(state, deltas, version);
+}
+
+function materializeListItem<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	container: LynxHostContainer<Node>,
+	list: LynxNativeListState<Node>,
+	index: number,
+): LynxListMaterialization<Node> {
+	const item = list.items[index];
+	if (item === undefined) throw hostError(`native list requested out-of-range item ${index}.`);
+	const detachments: LynxHostAttachmentDelta[] = [];
+	const attachments: LynxHostAttachmentDelta[] = [];
+	const attached = list.attachedByItem.get(item.id);
+	if (attached !== undefined) {
+		// Lynx may ask for the moved logical item before enqueueing its old
+		// physical sign. Keep that old tree alive until enqueue, but move logical
+		// ownership to a different physical cell immediately.
+		detachListCell(state, list, attached, 'await-enqueue', undefined, detachments);
+	}
+	list.enterCount += 1;
+
+	let cell = list.retainedByItem.get(item.id);
+	let reuseNotification = false;
+	if (cell !== undefined) list.retainedByItem.delete(item.id);
+	if (cell === undefined && item.recyclable) {
+		const reuseKey = lynxListReuseKey(item);
+		const pool = list.recyclePools.get(reuseKey);
+		cell = pool?.pop();
+		if (pool?.length === 0) list.recyclePools.delete(reuseKey);
+		reuseNotification = cell !== undefined && cell.item.id !== item.id;
+	}
+	if (cell === undefined) {
+		const tree = createPhysicalTree(state, container, item.id);
+		state.papi.insertBefore(list.node, tree.node, null);
+		const sign = state.papi.getUniqueId(tree.node);
+		if (!Number.isSafeInteger(sign) || sign <= 0 || list.cellsBySign.has(sign)) {
+			throw hostError('Element PAPI returned an invalid or duplicate native list cell sign.');
+		}
+		cell = { sign, tree, item, logicalItemId: item.id, awaitingEnqueue: false };
+		list.cellsBySign.set(sign, cell);
+		list.createdCells += 1;
+	} else {
+		const previousSign = cell.sign;
+		cell.tree = rebindPhysicalTree(state, container, cell.tree, item.id);
+		const nextSign = state.papi.getUniqueId(cell.tree.node);
+		if (!Number.isSafeInteger(nextSign) || nextSign <= 0) {
+			throw hostError('Element PAPI returned an invalid native list cell sign after reuse.');
+		}
+		if (nextSign !== previousSign) {
+			if (list.cellsBySign.has(nextSign)) {
+				throw hostError('Element PAPI returned a duplicate native list cell sign after reuse.');
+			}
+			list.cellsBySign.delete(previousSign);
+			list.cellsBySign.set(nextSign, cell);
+			cell.sign = nextSign;
+		}
+		cell.item = item;
+		cell.logicalItemId = item.id;
+		cell.awaitingEnqueue = false;
+		list.reusedCells += 1;
+	}
+	list.attachedByItem.set(item.id, cell);
+	collectPhysicalTreeAttachment(state, cell.tree, attachments);
+	return {
+		sign: cell.sign,
+		tree: cell.tree,
+		item,
+		reuseNotification,
+		detachments,
+		attachments,
+	};
+}
+
+function invokeNativeListCallback<Node extends LynxElementRef, Result>(
+	state: LynxHostState<Node>,
+	fallback: Result,
+	callback: () => Result,
+): Result {
+	if (state.disposed || state.disposing || state.faulted) return fallback;
+	try {
+		const result = callback();
+		return state.disposed || state.disposing || state.faulted ? fallback : result;
+	} catch (error) {
+		// Reentrant native callbacks during apply belong to the accepted commit
+		// boundary, whose caller publishes the ordinary ACK + fault sequence.
+		if (state.applying) throw error;
+		if (!state.disposed && !state.disposing && !state.faulted) {
+			state.faulted = true;
+			state.cleanupNeedsFlush = true;
+			try {
+				state.onCallbackFault?.(state.acceptedVersion, error);
+			} catch {
+				// The owner is responsible for diagnosing delivery failures. The host
+				// must remain fail-stop even if that diagnostic path itself fails.
+			}
+		}
+		return fallback;
+	}
+}
+
+function createNativeListNode<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	container: LynxHostContainer<Node>,
+	record: LynxHostRecord<Node>,
+): Node {
+	const listPAPI = state.papi.list;
+	if (listPAPI === undefined) {
+		throw hostError(
+			'<list> requires __CreateList, __UpdateListCallbacks, and __UpdateListComponents.',
+		);
+	}
+	let listState: LynxNativeListState<Node> | undefined;
+	const componentAtIndex: LynxListComponentAtIndex<Node> = (
+		_list,
+		_listId,
+		index,
+		operationId,
+		enableReuseNotification,
+	) =>
+		invokeNativeListCallback(state, -1, () => {
+			if (listState === undefined || listState.disposed) return -1;
+			const result = materializeListItem(state, container, listState, index);
+			state.papi.flush(result.tree.node, {
+				triggerLayout: true,
+				...(operationId === undefined ? null : { operationID: operationId }),
+				elementID: result.sign,
+				listID: state.papi.getUniqueId(listState.node),
+				...(result.reuseNotification && enableReuseNotification
+					? {
+							listReuseNotification: {
+								listElement: listState.node,
+								itemKey: result.item.itemKey,
+							},
+						}
+					: null),
+			});
+			emitAttachments(state, result.detachments);
+			emitAttachments(state, result.attachments);
+			return result.sign;
+		});
+	const enqueueComponent: LynxListEnqueueComponent<Node> = (_list, _listId, sign) => {
+		invokeNativeListCallback(state, undefined, () => {
+			if (listState === undefined || listState.disposed) return;
+			const cell = listState.cellsBySign.get(sign);
+			if (cell === undefined) return;
+			if (cell.awaitingEnqueue) {
+				if (cell.item.recyclable) poolListCell(listState, cell);
+				else destroyListCell(state, listState, cell);
+				return;
+			}
+			if (cell.logicalItemId === null) return;
+			detachListCell(state, listState, cell, cell.item.recyclable ? 'reuse' : 'retain');
+		});
+	};
+	const componentAtIndexes: LynxListComponentAtIndexes<Node> = (
+		_list,
+		_listId,
+		indexes,
+		operationIds,
+		enableReuseNotification,
+		asyncFlush,
+	) => {
+		invokeNativeListCallback(state, undefined, () => {
+			if (listState === undefined || listState.disposed) return;
+			const results = indexes.map((index) =>
+				materializeListItem(state, container, listState!, index),
+			);
+			if (asyncFlush) {
+				for (const result of results) {
+					state.papi.flush(result.tree.node, {
+						asyncFlush: true,
+						...(result.reuseNotification && enableReuseNotification
+							? {
+									listReuseNotification: {
+										listElement: listState.node,
+										itemKey: result.item.itemKey,
+									},
+								}
+							: null),
+					});
+				}
+			}
+			state.papi.flush(listState.node, {
+				triggerLayout: true,
+				operationIDs: operationIds,
+				elementIDs: results.map((result) => result.sign),
+				listID: state.papi.getUniqueId(listState.node),
+			});
+			const detachments: LynxHostAttachmentDelta[] = [];
+			const attachments: LynxHostAttachmentDelta[] = [];
+			for (const result of results) {
+				detachments.push(...result.detachments);
+				attachments.push(...result.attachments);
+			}
+			emitAttachments(state, detachments);
+			emitAttachments(state, attachments);
+		});
+	};
+	const node = listPAPI.create(
+		container.pageComponentUniqueId,
+		componentAtIndex,
+		enqueueComponent,
+		componentAtIndexes,
+	);
+	listState = {
+		hostId: record.handle.id,
+		node,
+		componentAtIndex,
+		componentAtIndexes,
+		enqueueComponent,
+		items: Object.freeze([]),
+		cellsBySign: new Map(),
+		attachedByItem: new Map(),
+		retainedByItem: new Map(),
+		recyclePools: new Map(),
+		createdCells: 0,
+		reusedCells: 0,
+		enterCount: 0,
+		leaveCount: 0,
+		disposed: false,
+	};
+	state.lists.set(record.handle.id, listState);
+	const initialItems = listItems((id) => state.records.get(id), record.handle.id);
+	listState.items = initialItems;
+	listPAPI.updateComponents(
+		node,
+		Object.freeze(initialItems.map((item) => `${item.type}:${item.reuseIdentifier}`)),
+	);
+	const initialUpdate = planLynxListUpdate([], initialItems);
+	if (hasListUpdate(initialUpdate))
+		state.papi.setAttribute(node, 'update-list-info', initialUpdate);
+	return node;
+}
+
+function applyListUpdate<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	update: LynxPreparedListUpdate,
+): void {
+	const list = state.lists.get(update.hostId);
+	if (list === undefined) {
+		if (!state.records.has(update.hostId) || state.records.get(update.hostId)?.node === null)
+			return;
+		throw hostError(`<list> ${update.hostId} has no native list state.`);
+	}
+	if (sameListItems(list.items, update.next)) return;
+	list.items = update.next;
+	const nextById = new Map(update.next.map((item) => [item.id, item]));
+	for (const cell of list.attachedByItem.values()) {
+		const item = cell.logicalItemId === null ? undefined : nextById.get(cell.logicalItemId);
+		if (item !== undefined) cell.item = item;
+	}
+	for (const [itemId, cell] of list.retainedByItem) {
+		const item = nextById.get(itemId);
+		if (item !== undefined) cell.item = item;
+	}
+	for (const cell of list.cellsBySign.values()) {
+		if (!cell.awaitingEnqueue) continue;
+		const item = nextById.get(cell.tree.logicalId);
+		if (item !== undefined) cell.item = item;
+		else destroyListCell(state, list, cell);
+	}
+	// Pooled cells retain the metadata that selected their partition. Rekey
+	// cells whose logical item is still live, and destroy cells whose item was
+	// removed or became explicitly non-recyclable.
+	const pooledCells: LynxPhysicalListCell<Node>[] = [];
+	for (const pool of list.recyclePools.values()) pooledCells.push(...pool);
+	list.recyclePools.clear();
+	for (const cell of pooledCells) {
+		const item = nextById.get(cell.tree.logicalId);
+		if (item === undefined) {
+			destroyListCell(state, list, cell);
+			continue;
+		}
+		cell.item = item;
+		if (cell.item.recyclable) poolListCell(list, cell);
+		else destroyListCell(state, list, cell);
+	}
+	const listPAPI = state.papi.list!;
+	listPAPI.updateComponents(
+		list.node,
+		Object.freeze(update.next.map((item) => `${item.type}:${item.reuseIdentifier}`)),
+	);
+	listPAPI.updateCallbacks(
+		list.node,
+		list.componentAtIndex,
+		list.enqueueComponent,
+		list.componentAtIndexes,
+	);
+	if (hasListUpdate(update.update)) {
+		state.papi.setAttribute(list.node, 'update-list-info', update.update);
+	}
+}
+
 export function createLynxHostContainer<Node extends LynxElementRef>(
 	papi: LynxElementPAPI<Node>,
 	options: CreateLynxHostContainerOptions<Node>,
@@ -502,10 +1239,14 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		ownedNodes: new Set(),
 		ownedPageRoots: new Set(),
 		nativeEvents: new Map(),
+		lists: new Map(),
+		onAttachments: options.onAttachments,
+		onCallbackFault: options.onCallbackFault,
 		acceptedVersion: 0,
 		disposed: false,
 		disposing: false,
 		faulted: false,
+		applying: false,
 		cleanupNeedsFlush: false,
 	};
 	return Object.freeze({
@@ -889,6 +1630,40 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		throw hostError('post-fault teardown must remove every remaining host in one batch.');
 	}
 
+	const finalIds = new Set<number>();
+	for (const id of state.records.keys()) {
+		if (!deletedRecords.has(id)) finalIds.add(id);
+	}
+	for (const id of stagedRecords.keys()) {
+		if (!deletedRecords.has(id)) finalIds.add(id);
+	}
+	const listIds = new Set<number>();
+	for (const [id, record] of state.records) {
+		if (record.type === 'list') listIds.add(id);
+	}
+	for (const id of finalIds) {
+		const record = getRecord(id)!;
+		if (record.type === 'list') listIds.add(id);
+		if (record.type === 'list' && directListItem(getRecord, id) !== null) {
+			throw hostError('nested <list> hosts are not supported by the initial recycling contract.');
+		}
+		if (record.type === 'list-item' && typeof record.parent === 'number') {
+			const parent = getRecord(record.parent);
+			if (parent?.type !== 'list') {
+				throw hostError(`<list-item> ${id} must be placed directly under a <list>.`);
+			}
+		}
+	}
+	const listUpdates: LynxPreparedListUpdate[] = [];
+	for (const hostId of listIds) {
+		const previous = listItems((id) => state.records.get(id), hostId);
+		const next = listItems(getRecord, hostId);
+		const update = planLynxListUpdate(previous, next);
+		if (hasListUpdate(update) || previous.length !== next.length || !getRecord(hostId)) {
+			listUpdates.push(Object.freeze({ hostId, previous, next, update }));
+		}
+	}
+
 	for (const id of handleOrder) {
 		const previous = state.records.get(id)?.handle;
 		const next = getRecord(id)?.handle;
@@ -931,189 +1706,270 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				);
 			}
 			status = 'applying';
-			mutationStarted = true;
-			for (const id of deletedRecords) state.records.delete(id);
-			for (const [id, record] of stagedRecords) state.records.set(id, record);
-			if (stagedRootChildren !== null) state.rootChildren = stagedRootChildren;
-			for (const [id, generation] of stagedGenerations) {
-				state.generations.set(id, generation);
-			}
-			state.acceptedVersion = batch.version;
-			if (logicalTeardown) {
-				status = 'applied';
-				return;
-			}
-			const activeNodes = new Map(initialNodes);
+			state.applying = true;
 			try {
-				let applicationFailed = false;
-				let applicationError: unknown;
+				mutationStarted = true;
+				const retiredPhysicalIds = new Set<number>();
+				let preApplicationFailed = false;
+				let preApplicationError: unknown;
+				if (!logicalTeardown) {
+					try {
+						for (const update of listUpdates) {
+							const list = state.lists.get(update.hostId);
+							if (list === undefined) continue;
+							const nextIds = new Set(update.next.map((item) => item.id));
+							for (const cell of [...list.attachedByItem.values()]) {
+								if (cell.logicalItemId !== null && !nextIds.has(cell.logicalItemId)) {
+									collectPhysicalTreeIds(cell.tree, retiredPhysicalIds);
+									detachListCell(
+										state,
+										list,
+										cell,
+										getRecord(update.hostId) !== undefined && cell.item.recyclable
+											? 'reuse'
+											: 'destroy',
+										batch.version,
+									);
+								}
+							}
+							for (const [itemId, cell] of [...list.retainedByItem]) {
+								if (nextIds.has(itemId)) continue;
+								list.retainedByItem.delete(itemId);
+								if (state.papi.isChild(list.node, cell.tree.node)) {
+									state.papi.remove(list.node, cell.tree.node);
+								}
+								list.cellsBySign.delete(cell.sign);
+								disposePhysicalTree(state, cell.tree);
+							}
+						}
+					} catch (error) {
+						preApplicationFailed = true;
+						preApplicationError = error;
+					}
+				}
+				for (const id of deletedRecords) state.records.delete(id);
+				for (const [id, record] of stagedRecords) state.records.set(id, record);
+				if (stagedRootChildren !== null) state.rootChildren = stagedRootChildren;
+				for (const [id, generation] of stagedGenerations) {
+					state.generations.set(id, generation);
+				}
+				state.acceptedVersion = batch.version;
+				if (logicalTeardown) {
+					status = 'applied';
+					return;
+				}
+				const activeNodes = new Map(initialNodes);
 				try {
-					for (const operation of operations) {
-						if (operation.op === 'create') {
-							const node = state.papi.createElement(
-								operation.type,
-								container.pageComponentUniqueId,
-								textValue(operation.props),
-							);
-							state.ownedNodes.add(node);
-							activeNodes.set(operation.id, node);
-							operation.record.node = node;
-							installNodesRefSelector(state.papi, node, operation.handle);
-							applyProps(
-								state.papi,
-								node,
-								operation.type,
-								{},
-								operation.props,
-								operation.patch,
-								true,
-								operation.visible,
-							);
-						} else if (operation.op === 'update') {
-							applyProps(
-								state.papi,
-								nodeFor(activeNodes, operation.id, 'update'),
-								operation.type,
-								operation.previous,
-								operation.next,
-								operation.patch,
-								false,
-								operation.visible,
-							);
-						} else if (operation.op === 'recreate') {
-							const previous = nodeFor(activeNodes, operation.id, 'recreate');
-							const replacement = state.papi.createElement(
-								operation.type,
-								container.pageComponentUniqueId,
-								textValue(operation.props),
-							);
-							state.ownedNodes.add(replacement);
-							activeNodes.set(operation.id, replacement);
-							operation.record.node = replacement;
-							installNodesRefSelector(state.papi, replacement, operation.handle);
-							applyProps(
-								state.papi,
-								replacement,
-								operation.type,
-								{},
-								operation.props,
-								operation.patch,
-								true,
-								operation.visible,
-							);
-							if (!operation.visible) state.papi.setAttribute(replacement, 'hidden', true);
-							if (operation.visible) {
-								installNativeEvents(
-									state,
-									replacement,
-									container.root,
-									operation.id,
-									operation.generation,
-									operation.events,
-								);
-							}
-							for (const childId of operation.children) {
-								state.papi.insertBefore(
-									replacement,
-									nodeFor(activeNodes, childId, 'recreate child'),
-									null,
-								);
-							}
-							if (operation.parent !== undefined) {
-								if (operation.parent === null) state.ownedPageRoots.add(replacement);
-								state.papi.replace(replacement, previous);
-								if (operation.parent === null) state.ownedPageRoots.delete(previous);
-							}
-							removeAllNativeEvents(state, previous);
-							state.ownedNodes.delete(previous);
-						} else if (operation.op === 'insert' || operation.op === 'move') {
-							const node = nodeFor(activeNodes, operation.id, operation.op);
-							const parent =
-								operation.parent === null
-									? container.page
-									: nodeFor(activeNodes, operation.parent, `${operation.op} parent`);
-							const before =
-								operation.before === null
-									? null
-									: nodeFor(activeNodes, operation.before, `${operation.op} before`);
-							if (operation.parent === null) state.ownedPageRoots.add(node);
-							state.papi.insertBefore(parent, node, before);
-							if (operation.previousParent === null && operation.parent !== null) {
-								state.ownedPageRoots.delete(node);
-							}
-						} else if (operation.op === 'remove') {
-							const node = nodeFor(activeNodes, operation.id, 'remove');
-							const parent =
-								operation.parent === null
-									? container.page
-									: nodeFor(activeNodes, operation.parent, 'remove parent');
-							state.papi.remove(parent, node);
-							if (operation.parent === null) state.ownedPageRoots.delete(node);
-						} else if (operation.op === 'visibility') {
-							const node = nodeFor(activeNodes, operation.id, 'visibility');
-							if (operation.state === 'hidden') removeAllNativeEvents(state, node);
-							state.papi.setAttribute(
-								node,
-								'hidden',
-								operation.state === 'hidden' ? true : operation.authoredHidden,
-							);
-							if (operation.state === 'visible') {
-								installNativeEvents(
-									state,
+					let applicationFailed = preApplicationFailed;
+					let applicationError: unknown = preApplicationError;
+					try {
+						if (applicationFailed) throw applicationError;
+						for (const operation of operations) {
+							if (retiredPhysicalIds.has(operation.id)) continue;
+							if (operation.op === 'create') {
+								const membership = directListItem((id) => state.records.get(id), operation.id);
+								if (
+									membership !== null &&
+									!state.lists.get(membership.listId)?.attachedByItem.has(membership.itemId)
+								) {
+									continue;
+								}
+								const node =
+									operation.type === 'list'
+										? createNativeListNode(state, container, operation.record)
+										: state.papi.createElement(
+												operation.type,
+												container.pageComponentUniqueId,
+												textValue(operation.props),
+											);
+								state.ownedNodes.add(node);
+								activeNodes.set(operation.id, node);
+								operation.record.node = node;
+								installNodesRefSelector(state.papi, node, operation.handle);
+								applyProps(
+									state.papi,
 									node,
-									container.root,
-									operation.id,
-									operation.generation,
-									operation.events,
-								);
-							}
-						} else if (operation.op === 'event') {
-							const node = nodeFor(activeNodes, operation.id, 'event');
-							if (!operation.visible || operation.next === null) {
-								removeNativeEvent(state, node, operation.type);
-							} else {
-								installNativeEvent(
-									state,
-									node,
-									container.root,
-									operation.id,
-									operation.generation,
 									operation.type,
-									operation.next,
+									{},
+									operation.props,
+									operation.patch,
+									true,
+									operation.visible,
 								);
+							} else if (operation.op === 'update') {
+								if (!activeNodes.has(operation.id)) continue;
+								applyProps(
+									state.papi,
+									nodeFor(activeNodes, operation.id, 'update'),
+									operation.type,
+									operation.previous,
+									operation.next,
+									operation.patch,
+									false,
+									operation.visible,
+								);
+							} else if (operation.op === 'recreate') {
+								if (!activeNodes.has(operation.id)) continue;
+								const previous = nodeFor(activeNodes, operation.id, 'recreate');
+								if (operation.type === 'list') disposeNativeListState(state, operation.id);
+								const replacement =
+									operation.type === 'list'
+										? createNativeListNode(state, container, operation.record)
+										: state.papi.createElement(
+												operation.type,
+												container.pageComponentUniqueId,
+												textValue(operation.props),
+											);
+								state.ownedNodes.add(replacement);
+								activeNodes.set(operation.id, replacement);
+								operation.record.node = replacement;
+								installNodesRefSelector(state.papi, replacement, operation.handle);
+								applyProps(
+									state.papi,
+									replacement,
+									operation.type,
+									{},
+									operation.props,
+									operation.patch,
+									true,
+									operation.visible,
+								);
+								if (!operation.visible) state.papi.setAttribute(replacement, 'hidden', true);
+								if (operation.visible) {
+									installNativeEvents(
+										state,
+										replacement,
+										container.root,
+										operation.id,
+										operation.generation,
+										operation.events,
+									);
+								}
+								for (const childId of operation.children) {
+									state.papi.insertBefore(
+										replacement,
+										nodeFor(activeNodes, childId, 'recreate child'),
+										null,
+									);
+								}
+								if (operation.parent !== undefined) {
+									if (operation.parent === null) state.ownedPageRoots.add(replacement);
+									state.papi.replace(replacement, previous);
+									if (operation.parent === null) state.ownedPageRoots.delete(previous);
+								}
+								removeAllNativeEvents(state, previous);
+								state.ownedNodes.delete(previous);
+							} else if (operation.op === 'insert' || operation.op === 'move') {
+								const parentRecord =
+									typeof operation.parent === 'number'
+										? state.records.get(operation.parent)
+										: undefined;
+								if (parentRecord?.type === 'list') continue;
+								if (!activeNodes.has(operation.id)) continue;
+								const node = nodeFor(activeNodes, operation.id, operation.op);
+								const parent =
+									operation.parent === null
+										? container.page
+										: nodeFor(activeNodes, operation.parent, `${operation.op} parent`);
+								const before =
+									operation.before === null
+										? null
+										: nodeFor(activeNodes, operation.before, `${operation.op} before`);
+								if (operation.parent === null) state.ownedPageRoots.add(node);
+								state.papi.insertBefore(parent, node, before);
+								if (operation.previousParent === null && operation.parent !== null) {
+									state.ownedPageRoots.delete(node);
+								}
+							} else if (operation.op === 'remove') {
+								const parentRecord =
+									typeof operation.parent === 'number'
+										? state.records.get(operation.parent)
+										: undefined;
+								if (parentRecord?.type === 'list' || !activeNodes.has(operation.id)) continue;
+								const node = nodeFor(activeNodes, operation.id, 'remove');
+								const parent =
+									operation.parent === null
+										? container.page
+										: nodeFor(activeNodes, operation.parent, 'remove parent');
+								state.papi.remove(parent, node);
+								if (operation.parent === null) state.ownedPageRoots.delete(node);
+							} else if (operation.op === 'visibility') {
+								if (!activeNodes.has(operation.id)) continue;
+								const node = nodeFor(activeNodes, operation.id, 'visibility');
+								if (operation.state === 'hidden') removeAllNativeEvents(state, node);
+								state.papi.setAttribute(
+									node,
+									'hidden',
+									operation.state === 'hidden' ? true : operation.authoredHidden,
+								);
+								if (operation.state === 'visible') {
+									installNativeEvents(
+										state,
+										node,
+										container.root,
+										operation.id,
+										operation.generation,
+										operation.events,
+									);
+								}
+							} else if (operation.op === 'event') {
+								if (!activeNodes.has(operation.id)) continue;
+								const node = nodeFor(activeNodes, operation.id, 'event');
+								if (!operation.visible || operation.next === null) {
+									removeNativeEvent(state, node, operation.type);
+								} else {
+									installNativeEvent(
+										state,
+										node,
+										container.root,
+										operation.id,
+										operation.generation,
+										operation.type,
+										operation.next,
+									);
+								}
+							} else if (operation.op === 'destroy') {
+								const node = activeNodes.get(operation.id);
+								if (node !== undefined) {
+									if (state.lists.has(operation.id)) disposeNativeListState(state, operation.id);
+									removeAllNativeEvents(state, node);
+									state.ownedNodes.delete(node);
+								}
+								activeNodes.delete(operation.id);
 							}
-						} else if (operation.op === 'destroy') {
-							const node = activeNodes.get(operation.id);
-							if (node !== undefined) {
-								removeAllNativeEvents(state, node);
-								state.ownedNodes.delete(node);
-							}
-							activeNodes.delete(operation.id);
+						}
+						for (const update of listUpdates) {
+							if (state.records.has(update.hostId)) applyListUpdate(state, update);
+							else disposeNativeListState(state, update.hostId);
+						}
+					} catch (error) {
+						if (!applicationFailed) {
+							applicationFailed = true;
+							applicationError = error;
 						}
 					}
-				} catch (error) {
-					applicationFailed = true;
-					applicationError = error;
-				}
-				try {
-					state.papi.flush(container.page);
-					state.cleanupNeedsFlush = false;
-				} catch (error) {
-					// The logical batch is already accepted, including root removals and
-					// destroys. Preserve the flush obligation for terminal disposal.
-					state.cleanupNeedsFlush = true;
-					if (!applicationFailed) {
-						applicationFailed = true;
-						applicationError = error;
+					try {
+						state.papi.flush(container.page);
+						state.cleanupNeedsFlush = false;
+					} catch (error) {
+						// The logical batch is already accepted, including root removals and
+						// destroys. Preserve the flush obligation for terminal disposal.
+						state.cleanupNeedsFlush = true;
+						if (!applicationFailed) {
+							applicationFailed = true;
+							applicationError = error;
+						}
 					}
+					if (applicationFailed) throw applicationError;
+					status = 'applied';
+				} catch (error) {
+					state.faulted = true;
+					status = 'faulted';
+					fault = error;
+					throw error;
 				}
-				if (applicationFailed) throw applicationError;
-				status = 'applied';
-			} catch (error) {
-				state.faulted = true;
-				status = 'faulted';
-				fault = error;
-				throw error;
+			} finally {
+				state.applying = false;
 			}
 		},
 		abort() {
@@ -1154,6 +2010,56 @@ export function getLynxHostEventListener<Node extends LynxElementRef>(
 	type: string,
 ): UniversalEventListenerDescriptor | null {
 	return container[LYNX_HOST_STATE].records.get(id)?.events.get(type) ?? null;
+}
+
+/** True only while a logical host currently owns a physical Element PAPI node. */
+export function isLynxHostAttached<Node extends LynxElementRef>(
+	container: LynxHostContainer<Node>,
+	id: number,
+): boolean {
+	const state = container[LYNX_HOST_STATE];
+	const record = state.records.get(id);
+	return (
+		!state.disposed &&
+		!state.disposing &&
+		!state.faulted &&
+		record?.node != null &&
+		isRootConnected((hostId) => state.records.get(hostId), id)
+	);
+}
+
+export interface LynxListDiagnostics {
+	readonly hostId: number;
+	readonly logicalItems: number;
+	readonly physicalCells: number;
+	readonly attachedCells: number;
+	readonly pooledCells: number;
+	readonly createdCells: number;
+	readonly reusedCells: number;
+	readonly enterCount: number;
+	readonly leaveCount: number;
+}
+
+/** Deterministic source-level counters for tests and the list allocation benchmark. */
+export function getLynxListDiagnostics<Node extends LynxElementRef>(
+	container: LynxHostContainer<Node>,
+	hostId: number,
+): LynxListDiagnostics | null {
+	const list = container[LYNX_HOST_STATE].lists.get(hostId);
+	if (list === undefined || list.disposed) return null;
+	let pooledCells = 0;
+	for (const pool of list.recyclePools.values()) pooledCells += pool.length;
+	return Object.freeze({
+		hostId,
+		logicalItems: list.items.length,
+		physicalCells: list.cellsBySign.size,
+		attachedCells: list.attachedByItem.size,
+		pooledCells,
+		createdCells: list.createdCells,
+		reusedCells: list.reusedCells,
+		enterCount: list.enterCount,
+		leaveCount: list.leaveCount,
+	});
 }
 
 export interface LynxResolvedNativeEvent {
@@ -1215,6 +2121,14 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 	state.disposing = true;
 	const roots = [...state.ownedPageRoots];
 	const errors: Error[] = [];
+	for (const listId of [...state.lists.keys()]) {
+		try {
+			disposeNativeListState(state, listId);
+			state.cleanupNeedsFlush = true;
+		} catch (error) {
+			errors.push(normalizeCleanupError(error));
+		}
+	}
 	for (const [node, events] of [...state.nativeEvents]) {
 		for (const type of [...events.keys()]) {
 			try {
@@ -1267,10 +2181,14 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 		}
 	}
 	const complete =
-		state.ownedPageRoots.size === 0 && state.nativeEvents.size === 0 && !state.cleanupNeedsFlush;
+		state.ownedPageRoots.size === 0 &&
+		state.nativeEvents.size === 0 &&
+		state.lists.size === 0 &&
+		!state.cleanupNeedsFlush;
 	if (complete) {
 		state.ownedNodes.clear();
 		state.nativeEvents.clear();
+		state.lists.clear();
 		state.records.clear();
 		state.rootChildren.length = 0;
 		state.generations.clear();
