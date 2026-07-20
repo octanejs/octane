@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { act, mount } from './_helpers';
 import {
+	BracelessVarChainHost,
 	BranchChainHost,
 	ChainHost,
 	NestedBranchChainHost,
@@ -158,6 +159,21 @@ describe('use()-fed const chain memoization', () => {
 		expect(r.html()).toContain('label=Ux');
 		// Replaying through both guards must reuse the declaration memo.
 		expect(calls).toEqual(['x']);
+		r.unmount();
+	});
+
+	it('tracks a local declared by a direct braceless conditional arm', async () => {
+		const fetchUser = (id: string) => Promise.resolve({ v: id.toUpperCase() });
+		const r = mount(BracelessVarChainHost, { fetchUser, id: 'a' });
+		await act(() => {});
+		expect(r.html()).toContain('v=A');
+		await act(() => {
+			r.root.render(BracelessVarChainHost, { fetchUser, id: 'b' });
+		});
+		await act(() => {});
+		// `base.then` is the same prototype method for every promise; the
+		// derived memo must instead key on the direct arm's local identity.
+		expect(r.html()).toContain('v=B');
 		r.unmount();
 	});
 

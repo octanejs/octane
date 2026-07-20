@@ -163,6 +163,33 @@ export function NestedBranchChainHost({
 	}
 }
 
+function BracelessVarChainReader({
+	fetchUser,
+	id,
+}: {
+	fetchUser: (id: string) => Promise<{ v: string }>;
+	id: string;
+}) @{
+	if (id !== '') var base = fetchUser(id);
+	if (base === undefined) throw new Error('id is required');
+	const derived = base.then((value) => value.v);
+	<p>{'v=' + use(derived)}</p>
+}
+
+export function BracelessVarChainHost({
+	fetchUser,
+	id,
+}: {
+	fetchUser: (id: string) => Promise<{ v: string }>;
+	id: string;
+}) @{
+	@try {
+		<BracelessVarChainReader fetchUser={fetchUser} id={id} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
 // A setup block shadows `item` and use()s the inner binding; the unrelated
 // outer `const item = build()` must keep recreating per render (name-based
 // tainting must not freeze it).

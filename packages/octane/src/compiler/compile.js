@@ -8651,7 +8651,9 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 
 	// An `else if` alternate — or a nested braceless consequent — is another
 	// IfStatement, not a block. Recurse every conditional arm so its consts are
-	// collected with the complete guard chain.
+	// collected with the complete guard chain. Route other direct arms through
+	// the ordinary collector too: a braceless `var` declaration is a body-local
+	// binding whose identity must coarsen downstream member dependencies.
 	function collectIfCandidates(stmt, guards) {
 		const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
 		collectIfArm(stmt.consequent, [...guards, stmt.test]);
@@ -8661,6 +8663,7 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 	function collectIfArm(stmt, guards) {
 		if (stmt?.type === 'BlockStatement') collectCandidates(stmt.body, guards);
 		else if (stmt?.type === 'IfStatement') collectIfCandidates(stmt, guards);
+		else collectCandidates([stmt], guards);
 	}
 
 	function rewriteStatements(list) {
