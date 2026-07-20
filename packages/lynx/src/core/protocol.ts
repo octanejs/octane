@@ -59,6 +59,7 @@ export interface LynxPublicHandleUpsert {
 	readonly id: number;
 	readonly type: string;
 	readonly generation: number;
+	readonly attached: boolean;
 	readonly snapshot: UniversalSerializableValue;
 }
 
@@ -72,6 +73,24 @@ export type LynxPublicHandleDelta = LynxPublicHandleUpsert | LynxPublicHandleRem
 
 export interface LynxTransportAcknowledgement extends UniversalTransportAcknowledgement {
 	readonly handles: readonly LynxPublicHandleDelta[];
+}
+
+export interface LynxHostAttachmentChange {
+	readonly id: number;
+	readonly generation: number;
+	readonly attached: boolean;
+}
+
+/** Callback-driven physical list attachment update after the owning commit ACK. */
+export interface LynxHostAttachmentMessage extends UniversalTransportIdentity {
+	readonly type: 'host-attachment';
+	readonly changes: readonly LynxHostAttachmentChange[];
+}
+
+/** Unsolicited accepted-root fault from a native callback after commit settlement. */
+export interface LynxHostFaultMessage extends UniversalTransportIdentity {
+	readonly type: 'host-fault';
+	readonly error: UniversalTransportError;
 }
 
 export interface LynxDisposeMessage extends UniversalTransportIdentity {
@@ -106,6 +125,8 @@ export type LynxBackgroundInboundMessage =
 	| UniversalTransportRejectMessage
 	| UniversalTransportFaultMessage
 	| UniversalTransportEventMessage
+	| LynxHostAttachmentMessage
+	| LynxHostFaultMessage
 	| LynxDisposeAcknowledgement
 	| LynxDisposeRetryMessage;
 
@@ -348,10 +369,11 @@ function assertHandleDelta(
 	const label = `ack.handles[${index}]`;
 	const delta = record(value, label);
 	if (delta.op === 'upsert') {
-		exactKeys(delta, ['op', 'id', 'type', 'generation', 'snapshot'], label);
+		exactKeys(delta, ['op', 'id', 'type', 'generation', 'attached', 'snapshot'], label);
 		positiveInteger(delta.id, `${label}.id`);
 		nonEmptyString(delta.type, `${label}.type`);
 		positiveInteger(delta.generation, `${label}.generation`);
+		if (typeof delta.attached !== 'boolean') fail(`${label}.attached`, 'must be a boolean.');
 		assertWireValue(delta.snapshot, `${label}.snapshot`);
 		assertSnapshotIdentity(delta.snapshot, delta, identity, label);
 		return;
@@ -434,6 +456,11 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 		assertRemoteError(message.error, `${message.type}.error`);
 		return message as unknown as UniversalTransportRejectMessage | UniversalTransportFaultMessage;
 	}
+	if (message.type === 'host-fault') {
+		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'error'], 'host-fault');
+		assertRemoteError(message.error, 'host-fault.error');
+		return message as unknown as LynxHostFaultMessage;
+	}
 	if (message.type === 'event') {
 		exactKeys(
 			message,
@@ -455,6 +482,31 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 			assertWireValue(delivery.payload, `event.deliveries[${index}].payload`);
 		}
 		return message as unknown as UniversalTransportEventMessage;
+	}
+	if (message.type === 'host-attachment') {
+		exactKeys(
+			message,
+			['protocol', 'renderer', 'root', 'version', 'type', 'changes'],
+			'host-attachment',
+		);
+		if (!Array.isArray(message.changes)) {
+			fail('host-attachment.changes', 'must be an array.');
+		}
+		const seen = new Set<number>();
+		for (let index = 0; index < message.changes.length; index++) {
+			const change = record(message.changes[index], `host-attachment.changes[${index}]`);
+			exactKeys(change, ['id', 'generation', 'attached'], `host-attachment.changes[${index}]`);
+			positiveInteger(change.id, `host-attachment.changes[${index}].id`);
+			positiveInteger(change.generation, `host-attachment.changes[${index}].generation`);
+			if (typeof change.attached !== 'boolean') {
+				fail(`host-attachment.changes[${index}].attached`, 'must be a boolean.');
+			}
+			if (seen.has(change.id)) {
+				fail(`host-attachment.changes[${index}].id`, 'must be unique within one batch.');
+			}
+			seen.add(change.id);
+		}
+		return message as unknown as LynxHostAttachmentMessage;
 	}
 	if (message.type === 'dispose-ack') {
 		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type'], 'dispose-ack');

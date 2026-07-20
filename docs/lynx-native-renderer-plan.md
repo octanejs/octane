@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestone 3 host-side private source/test implementation complete but formal exit blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–4 have private source/test implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-18**
 
@@ -9,6 +9,8 @@ Milestone 1 evidence date: **2026-07-19**
 Milestone 2 source/test evidence date: **2026-07-19**
 
 Milestone 3 source/test evidence date: **2026-07-19**
+
+Milestone 4 source/test evidence date: **2026-07-19**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -461,12 +463,25 @@ surface:
 - `useInitData()` and init-data change subscription;
 - `useGlobalProps()` and global-props change subscription;
 - `useLynxGlobalEventListener()`;
-- `markFirstScreenSyncReady()` when manual handoff is supported; and
 - typed access to the existing Lynx `lynx`, `NativeModules`, and platform
   globals through `@lynx-js/types`.
 
+The private Milestone 4 source implements those background data hooks, the
+global-event hook, typed `lynx`/`NativeModules` access, `reportError()`, and a
+request-only `reload()` wrapper over the public background API. Init-data hooks
+seed from public `__presetData` and consume the framework-maintained current
+`__initData` snapshot when available; tests cover RESET key removal and the
+render-to-layout subscription race. The native update receiver that maintains
+that current snapshot is still uninstalled and remains part of the formal
+device gate. The source also does not install a framework reload or page-destroy
+receiver. `markFirstScreenSyncReady()` remains deferred until Milestone 6's
+dual-thread adoption protocol exists.
+
 Native Modules stay background-thread-only. The compiler diagnoses statically
-visible Native Module access from main-thread functions or first-render code.
+visible Native Module access and `@octanejs/lynx/platform` imports from
+main-thread functions or first-render code. `createLynxRoot()` separately checks
+the public background-only `lynx.getJSModule()` surface before connecting its
+transport.
 Custom native elements remain host-registered Android/iOS/Harmony code; the
 renderer provides types, authoring examples, and element transport, not a
 second native module registry.
@@ -478,14 +493,42 @@ recycling, list keys, item types, ref attach/detach, and visibility callbacks
 form a distinct host contract.
 
 Do not force list recycling through generic `insert`/`move` commands if that
-causes eager native item allocation. Milestone 4 must determine the smallest
-renderer-neutral collection capability, or keep a Lynx-namespaced encoded prop/
-resource contract if no cross-renderer abstraction is justified. The Octane
-`@for (...; key ...)` identity remains the logical source of truth.
+causes eager native item allocation. Milestone 4 keeps item virtualization in
+the Lynx host because the public `__CreateList`, `__UpdateListComponents`, and
+`__UpdateListCallbacks` contract is renderer-specific. The host stores logical
+`list-item` descriptors, materializes a physical cell only when Lynx requests
+an index, and partitions reuse by `reuse-identifier`. The Octane
+`@for (...; key ...)` identity and the mandatory unique `item-key` remain the
+logical source of truth. Nested `<list>` hosts are rejected during batch
+preparation in the initial contract rather than entering a partially supported
+recycling path.
 
-The release oracle includes large-list memory, survivor identity, recycling,
-reorder, event routing after reuse, and ref cleanup. A `scroll-view` fallback is
-not list parity.
+`reuse-identifier` accepts strings. Omitting it or passing an empty string
+selects the default reuse pool; it is not an alias for Octane's logical key.
+
+Only physical host attachment is generalized. An optional universal host
+capability reports attach/detach changes so normal refs are installed when a
+recycled tree becomes physical and cleared when Lynx recycles it. Drivers that
+do not implement the capability keep the existing always-attached behavior.
+This capability does not expose list operations or synchronous native layout.
+
+The source/test lane covers a 1,000-item logical list with demand
+materialization, native cell identity reuse, reorder, attachment ordering, and
+inert callbacks after teardown in the official JavaScript environment. A
+deterministic fake-PAPI benchmark holds a 12-cell visible window to 12 physical
+cell roots versus 1,000 in its eager reference, records 988 reuses and zero
+remaining cells after teardown, and protects that source-level allocation ratio
+at 0.02 or below. That is not Android/iOS native allocation, scrolling, layout,
+steady-state memory, or timing evidence. A `scroll-view` fallback is not list
+parity.
+
+Boolean `defer` is accepted and forwarded as list metadata, but it does not
+cause callback-demanded materialization: every item in this initial
+background-rendered host is callback-demanded regardless of that prop. This is
+not full ReactLynx `defer` parity. Its
+`defer={{ unmountRecycled: true }}` lifecycle mode is also excluded initially:
+a recycled cell detaches refs but does not unmount the logical Octane subtree
+or run component/effect cleanup merely because it left the native viewport.
 
 ### Suspense, Activity, lazy bundles, and portals
 
@@ -663,10 +706,32 @@ contract. No test uses private snapshot fields or command order as its oracle.
 
 ### Milestone 4 — lists, page APIs, and native capability boundary (2–4 engineer-weeks)
 
+> **Progress (2026-07-19): private source/test implementation complete for the
+> selected initial surface; formal exit blocked.** The Lynx-specific list host
+> uses public list callbacks to materialize and recycle physical cells on
+> demand, preserves logical keyed identity, and routes physical attach/detach
+> through an optional universal ref capability. Host-side tests exercise 1,000
+> logical items, reuse, reorder, ref attachment messages, teardown, and
+> root-scoped resource handles. A semantic-checksummed source-level benchmark
+> guards a 12-cell window against an eager 1,000-cell reference. The background
+> platform hooks cover init data, global props/events, typed Native Modules,
+> reload requests, and error reporting; the compiler rejects statically visible
+> platform imports and Native Module access in main-thread specialization, while
+> `createLynxRoot()` runtime-checks background ownership through the public
+> `lynx.getJSModule()` surface. App-owned Android/iOS module and custom
+> element examples document the intended seam but have not run on devices.
+> Formal exit remains blocked on Android/iOS allocation, scroll, module,
+> element, lifecycle, and teardown evidence; a public native event, destroy,
+> and reload receiver; and the existing Milestone 0 gates. The initial slice
+> excludes nested lists, portals, Lynx Suspense proof, lazy bundles, gestures,
+> animations, full boolean-`defer` parity, and `defer.unmountRecycled`
+> semantics.
+
 - Implement native list item types, keys, recycling, native callbacks, attach/
   detach refs, item reuse, reorder, and destruction.
 - Add init data, global props, global events, page reload/destroy, lifecycle and
-  error reporting.
+  error reporting. A public reload request is not evidence for the still-missing
+  framework reload/destroy receiver.
 - Type Native Modules and diagnose thread misuse. Add one Android and one iOS
   native module example plus one custom native element fixture; do not ship
   application-native code inside the renderer.
@@ -708,6 +773,9 @@ React/Preact. Publish only as a **background-rendered technical preview**.
 - Implement serializable first-tree snapshots, logical ID seeding/mapping,
   background adoption, event buffering/replay, manual/automatic sync timing,
   mismatch repair/diagnostics, reload, and teardown.
+- Give boolean list-item `defer` its ReactLynx eager-main versus
+  deferred-background meaning, if native evidence supports retaining that API;
+  Milestone 4 only forwards the metadata.
 - Ensure only the background runtime publishes effects, refs, state ownership,
   and later updates.
 - Test early returns, conditional hooks, context, keyed lists, errors,
@@ -764,6 +832,9 @@ runtimes.
 - Promote Android and iOS device tests to release-required status.
 - Establish semantic-checksummed performance and bundle-size ratio guards for
   preview and IFR modes.
+- Decide and implement or permanently diverge from ReactLynx's
+  `defer.unmountRecycled` component/effect cleanup semantics with native
+  recycling evidence.
 - Complete API review, public docs, migration diagnostics/tooling, pack checks,
   license/NOTICE review, status metadata, generated package/binding inventory,
   and patch changesets.

@@ -401,6 +401,37 @@ export interface UniversalHostUpdateCapability {
 	): UniversalHostUpdateKind;
 }
 
+/**
+ * Hosts whose physical instances are recycled independently from the logical
+ * tree report attachment changes through this ordered, root-scoped batch.
+ * The core validates current state through the registration before touching a
+ * ref, so duplicate and stale notifications are harmless.
+ */
+export interface UniversalHostAttachmentBatch {
+	/** Logical host IDs that became unavailable; refs detach parent-first. */
+	readonly detached: readonly number[];
+	/**
+	 * Logical host IDs that became available; refs attach child-first. An ID
+	 * present in both arrays represents physical replacement in one batch.
+	 */
+	readonly attached: readonly number[];
+}
+
+export interface UniversalHostAttachmentRegistration {
+	/** Return the current physical state, including changes newer than a queued batch. */
+	isAttached(id: number): boolean;
+	/** Release this root's subscription. Called once when construction fails or the root unmounts. */
+	unsubscribe(): void;
+}
+
+export interface UniversalHostAttachmentCapability<Container = unknown> {
+	/** Install one root-scoped physical attachment subscription for `container`. */
+	subscribe(
+		container: Container,
+		onChange: (batch: UniversalHostAttachmentBatch) => void,
+	): UniversalHostAttachmentRegistration;
+}
+
 export type UniversalHostCommand =
 	| {
 			readonly op: 'create';
@@ -562,6 +593,7 @@ export interface UniversalAsyncPreparedHostBatch {
 export interface UniversalHostDriver<Container = unknown, PublicInstance = unknown> {
 	readonly id: string;
 	readonly capabilities?: UniversalHostCapabilities;
+	readonly attachments?: UniversalHostAttachmentCapability<Container>;
 	readonly events?: UniversalEventCapability;
 	readonly lifecycles?: UniversalHostCallbackCapability;
 	readonly localCallbacks?: UniversalHostCallbackCapability;
@@ -4381,6 +4413,49 @@ function deactivateEffectEventCells(cells: readonly EffectEventCell[]): void {
 	for (const cell of cells) cell.active = false;
 }
 
+function snapshotHostAttachmentIds(value: readonly number[], label: string): readonly number[] {
+	if (!Array.isArray(value)) {
+		throw new TypeError(`Universal host attachment ${label} must be an array.`);
+	}
+	const ids: number[] = [];
+	const seen = new Set<number>();
+	for (const id of value) {
+		if (!Number.isSafeInteger(id) || id <= 0) {
+			throw new TypeError(`Universal host attachment ${label} IDs must be positive safe integers.`);
+		}
+		if (!seen.has(id)) {
+			seen.add(id);
+			ids.push(id);
+		}
+	}
+	return Object.freeze(ids);
+}
+
+function snapshotHostAttachmentBatch(
+	batch: UniversalHostAttachmentBatch,
+): UniversalHostAttachmentBatch {
+	if (batch === null || typeof batch !== 'object' || Array.isArray(batch)) {
+		throw new TypeError('A universal host attachment batch must be an object.');
+	}
+	return Object.freeze({
+		detached: snapshotHostAttachmentIds(batch.detached, 'detached'),
+		attached: snapshotHostAttachmentIds(batch.attached, 'attached'),
+	});
+}
+
+function logicalRecordDepth(record: LogicalRecord): number {
+	let depth = 0;
+	for (let parent = record.parent; parent !== null; parent = parent.parent) depth++;
+	return depth;
+}
+
+interface UniversalHostAttachmentState {
+	registration: UniversalHostAttachmentRegistration | null;
+	readonly records: Map<number, LogicalRecord>;
+	readonly pending: UniversalHostAttachmentBatch[];
+	flushScheduled: boolean;
+}
+
 class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any> {
 	readonly renderer: string;
 	private readonly rootRecord: LogicalRecord;
@@ -4418,6 +4493,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private eventScopeHandlers: ReadonlyMap<number, CommittedEvent> | null = null;
 	private passiveScheduled = false;
 	private readonly passiveTasks: (() => void)[] = [];
+	private hostAttachments: UniversalHostAttachmentState | null = null;
 
 	constructor(
 		private readonly container: Container,
@@ -4453,6 +4529,218 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			parent: null,
 			children: [],
 		};
+		this.initializeHostAttachments();
+	}
+
+	private initializeHostAttachments(): void {
+		const capability = this.driver.attachments;
+		if (capability === undefined) return;
+		if (typeof capability.subscribe !== 'function') {
+			throw new TypeError('A universal host attachment capability must provide subscribe().');
+		}
+		const state: UniversalHostAttachmentState = {
+			registration: null,
+			records: new Map(),
+			pending: [],
+			flushScheduled: false,
+		};
+		this.hostAttachments = state;
+		let registration: unknown;
+		try {
+			registration = capability.subscribe(this.container, (batch) =>
+				this.receiveHostAttachmentBatch(batch),
+			);
+			if (registration === null || typeof registration !== 'object') {
+				throw new TypeError('A universal host attachment subscription must return a registration.');
+			}
+			const candidate = registration as Partial<UniversalHostAttachmentRegistration>;
+			if (typeof candidate.isAttached !== 'function') {
+				throw new TypeError('A universal host attachment registration must provide isAttached().');
+			}
+			if (typeof candidate.unsubscribe !== 'function') {
+				throw new TypeError('A universal host attachment registration must provide unsubscribe().');
+			}
+			state.registration = candidate as UniversalHostAttachmentRegistration;
+			this.flushPendingHostAttachmentBatches();
+		} catch (error) {
+			this.hostAttachments = null;
+			try {
+				const unsubscribe = (registration as Partial<UniversalHostAttachmentRegistration> | null)
+					?.unsubscribe;
+				if (typeof unsubscribe === 'function') {
+					unsubscribe.call(registration);
+				}
+			} catch {
+				// Preserve the construction failure that made this registration unusable.
+			}
+			throw error;
+		}
+	}
+
+	private receiveHostAttachmentBatch(batch: UniversalHostAttachmentBatch): void {
+		const state = this.hostAttachments;
+		if (state === null || this.unmounted) return;
+		const snapshot = snapshotHostAttachmentBatch(batch);
+		if (snapshot.detached.length === 0 && snapshot.attached.length === 0) return;
+		state.pending.push(snapshot);
+		if (state.registration === null || this.unmounting) return;
+		if (
+			CURRENT_ATTEMPT !== null ||
+			UNIVERSAL_COMMIT_TASK_DEPTH > 0 ||
+			this.pending?.isAwaitingTransportAcknowledgement()
+		) {
+			this.queueHostAttachmentFlush();
+			return;
+		}
+		this.flushPendingHostAttachmentBatches();
+	}
+
+	private queueHostAttachmentFlush(): void {
+		const state = this.hostAttachments;
+		if (
+			state === null ||
+			state.flushScheduled ||
+			state.pending.length === 0 ||
+			this.unmounted ||
+			this.unmounting
+		) {
+			return;
+		}
+		state.flushScheduled = true;
+		this.__scheduleMicrotask(() => {
+			state.flushScheduled = false;
+			if (this.hostAttachments !== state || this.unmounted) {
+				state.pending.splice(0);
+				return;
+			}
+			if (this.unmounting || this.pending?.isAwaitingTransportAcknowledgement()) return;
+			this.flushPendingHostAttachmentBatches();
+		});
+	}
+
+	private readHostAttachment(id: number): boolean {
+		const registration = this.hostAttachments?.registration ?? null;
+		if (registration === null) return true;
+		const attached = registration.isAttached(id);
+		if (typeof attached !== 'boolean') {
+			throw new TypeError('Universal host attachment isAttached() must return a boolean.');
+		}
+		return attached;
+	}
+
+	private attachHostRef(record: LogicalRecord): void {
+		if (this.hostAttachments?.registration == null || this.unmounted) return;
+		if (!this.readHostAttachment(record.id)) return;
+		const value = this.driver.getPublicInstance(this.container, record.id);
+		// A recycling-aware driver must not publish a ref until both its attachment
+		// state and public instance agree.
+		if (value === null) return;
+		attachRef(record, value);
+	}
+
+	private processHostAttachmentBatch(
+		batch: UniversalHostAttachmentBatch,
+		forcedDetaches?: ReadonlySet<number>,
+	): void {
+		const state = this.hostAttachments;
+		if (state === null || state.registration === null) return;
+		const records = state.records;
+		const ordered = (ids: readonly number[], childFirst: boolean): LogicalRecord[] =>
+			ids
+				.map((id, index) => {
+					const record = records.get(id);
+					return {
+						record,
+						index,
+						depth: record === undefined ? 0 : logicalRecordDepth(record),
+					};
+				})
+				.filter(
+					(entry): entry is { record: LogicalRecord; index: number; depth: number } =>
+						entry.record?.kind === 'host',
+				)
+				.sort((left, right) => {
+					const depth = left.depth - right.depth;
+					return (childFirst ? -depth : depth) || left.index - right.index;
+				})
+				.map((entry) => entry.record);
+		const tasks: (() => void)[] = [];
+		for (const record of ordered(batch.detached, false)) {
+			tasks.push(() => {
+				if (
+					this.unmounted ||
+					records.get(record.id) !== record ||
+					!record.refAttached ||
+					(this.readHostAttachment(record.id) && !forcedDetaches?.has(record.id))
+				) {
+					return;
+				}
+				runOwnedCommit(record.owner, () => detachRef(record));
+			});
+		}
+		for (const record of ordered(batch.attached, true)) {
+			tasks.push(() => {
+				if (
+					this.unmounted ||
+					records.get(record.id) !== record ||
+					record.ref == null ||
+					record.refAttached ||
+					record.visibility === 'suspense-hidden' ||
+					!this.readHostAttachment(record.id)
+				) {
+					return;
+				}
+				runOwnedCommit(record.owner, () => this.attachHostRef(record));
+			});
+		}
+		runCommitTasks(tasks);
+	}
+
+	private flushPendingHostAttachmentBatches(): void {
+		const state = this.hostAttachments;
+		if (
+			state === null ||
+			state.pending.length === 0 ||
+			state.registration === null ||
+			this.unmounted ||
+			this.unmounting ||
+			this.pending?.isAwaitingTransportAcknowledgement()
+		) {
+			return;
+		}
+		const batches = state.pending.splice(0);
+		const forcedDetaches = batches.map(() => new Set<number>());
+		const laterAttachments = new Set<number>();
+		// When detach + reattach happen while a commit acknowledgement gates ref
+		// work, the current state is already attached by the time we drain. Preserve
+		// one cleanup/attach cycle for that physical replacement instead of treating
+		// the earlier detach as stale.
+		for (let index = batches.length - 1; index >= 0; index--) {
+			const batch = batches[index]!;
+			for (const id of batch.attached) laterAttachments.add(id);
+			for (const id of batch.detached) {
+				if (laterAttachments.has(id)) forcedDetaches[index]!.add(id);
+			}
+		}
+		// A failing user ref must not strand later physical notifications that were
+		// already accepted into this flush.
+		runCommitTasks(
+			batches.map(
+				(batch, index) => () => this.processHostAttachmentBatch(batch, forcedDetaches[index]),
+			),
+		);
+	}
+
+	private disposeHostAttachments(): void {
+		const state = this.hostAttachments;
+		if (state === null) return;
+		const registration = state.registration;
+		this.hostAttachments = null;
+		state.registration = null;
+		state.records.clear();
+		state.pending.splice(0);
+		state.flushScheduled = false;
+		registration?.unsubscribe();
 	}
 
 	/** @internal Shared with the DOM-owned boundary facade. */
@@ -5007,6 +5295,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 
 	private resumeAfterRejectedUnmount(): void {
 		this.unmounting = false;
+		if (this.hostAttachments !== null) this.queueHostAttachmentFlush();
 		if (this.scheduled) this.queueScheduledWork();
 		const replay = this.queuedReplay;
 		if (replay === null || !replay.active) return;
@@ -6435,6 +6724,12 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			identity,
 			() => {
 				applyLogicalTopology();
+				if (this.hostAttachments !== null) {
+					for (const record of removedHosts) this.hostAttachments.records.delete(record.id);
+					for (const draft of hostDrafts) {
+						this.hostAttachments.records.set(draft.record.id, draft.record);
+					}
+				}
 				if ((treeFeatures & UNIVERSAL_TREE_EVENT) !== 0) {
 					for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
 					this.publishedListeners.clear();
@@ -6555,13 +6850,21 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			},
 			() => {
 				const tasks: (() => void)[] = [];
-				for (const draft of refAttaches) {
-					const record = draft.record;
-					tasks.push(() =>
-						runOwnedCommit(record.owner, () =>
-							attachRef(record, this.driver.getPublicInstance(this.container, record.id)),
-						),
-					);
+				if (this.driver.attachments === undefined) {
+					for (const draft of refAttaches) {
+						const record = draft.record;
+						tasks.push(() =>
+							runOwnedCommit(record.owner, () =>
+								attachRef(record, this.driver.getPublicInstance(this.container, record.id)),
+							),
+						);
+					}
+				} else {
+					for (const draft of refAttaches) {
+						const record = draft.record;
+						tasks.push(() => runOwnedCommit(record.owner, () => this.attachHostRef(record)));
+					}
+					tasks.push(() => this.flushPendingHostAttachmentBatches());
 				}
 				for (const { owner, next, changed } of effectChanges) {
 					if (changed && next.phase === 'layout' && owner.visibility === 'visible') {
@@ -6614,7 +6917,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	finish(transaction: UniversalTransactionImpl<Container, PublicInstance>): void {
-		if (this.pending === transaction) this.pending = null;
+		if (this.pending === transaction) {
+			this.pending = null;
+			if (this.hostAttachments !== null) this.queueHostAttachmentFlush();
+		}
 	}
 
 	unmount(): void {
@@ -6877,6 +7183,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 				this.suspended?.abort();
 				this.cancelSuspendedReplays();
+				let attachmentUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
+				if (this.hostAttachments !== null) {
+					try {
+						this.disposeHostAttachments();
+					} catch (error) {
+						attachmentUnsubscribeError = error;
+					}
+				}
 				this.rootRecord.children = [];
 				let portalReleaseError: unknown = NO_PENDING_PASSIVE_ERROR;
 				for (const registration of portalRegistrations) {
@@ -6933,6 +7247,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					});
 				}
 				const syncTasks = [...insertionTasks, ...layoutTasks, ...refTasks];
+				if (attachmentUnsubscribeError !== NO_PENDING_PASSIVE_ERROR) {
+					syncTasks.unshift(() => {
+						throw attachmentUnsubscribeError;
+					});
+				}
 				if (acceptedHostError !== NO_PENDING_PASSIVE_ERROR) {
 					syncTasks.unshift(() => {
 						throw acceptedHostError;

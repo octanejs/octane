@@ -85,11 +85,13 @@ export function octaneMdx(options = {}) {
 			return path;
 		}
 	};
+	const pathAliases = (path) => {
+		const absolute = resolve(path);
+		const canonical = realPath(absolute);
+		return canonical === absolute ? [absolute] : [absolute, canonical];
+	};
 	const trackStateModelManifest = (manifest) => {
-		const absolute = resolve(manifest);
-		if (stateModelManifestHotPaths.has(absolute)) return;
-		stateModelManifestHotPaths.add(absolute);
-		stateModelManifestHotPaths.add(realPath(absolute));
+		for (const path of pathAliases(manifest)) stateModelManifestHotPaths.add(path);
 	};
 	const watchManifests = (context, dependencies, missingDependencies = []) => {
 		if (!serving) {
@@ -140,11 +142,18 @@ export function octaneMdx(options = {}) {
 		},
 		watchChange(id) {
 			const file = id.split('?')[0];
+			const changedPaths = new Set(pathAliases(file));
 			localCompiler.invalidate(file);
 			warnedByFile.delete(file);
 			stateModelDependenciesByFile.delete(file);
 			for (const [document, dependencies] of stateModelDependenciesByFile) {
-				if (dependencies.has(file)) warnedByFile.delete(document);
+				for (const dependency of dependencies) {
+					// Canonicalization belongs on this cold watcher boundary, not the
+					// per-document transform path where it would add synchronous FS work.
+					if (!pathAliases(dependency).some((path) => changedPaths.has(path))) continue;
+					warnedByFile.delete(document);
+					break;
+				}
 			}
 		},
 		hotUpdate: {

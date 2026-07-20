@@ -6,7 +6,7 @@
  * untouched — vite's asset plugin owns those (its load step already produced
  * `export default "<file text>"`; re-compiling that JS would mangle it).
  */
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, vi } from 'vitest';
@@ -153,31 +153,39 @@ describe('octaneMdx() id claiming', () => {
 		}
 	});
 
-	it('re-publishes causal warnings after a watched policy input changes', async () => {
-		let stateModel: 'causal' | 'permissive' = 'causal';
-		const policyManifest = '/repo/package.json';
-		const p = octaneMdx();
-		p.configResolved({
-			command: 'build',
-			root: '/repo',
-			plugins: [
-				{
-					name: 'octane',
-					api: {
-						octane: {
-							resolveStateModelForSource: () => ({
-								stateModel,
-								dependencies: [policyManifest],
-								missingDependencies: [],
-							}),
+	it('re-publishes causal warnings when a watched policy input changes through a symlink', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'octane-mdx-policy-watch-'));
+		try {
+			const policyRoot = join(root, 'policy');
+			const policyAlias = join(root, 'policy-alias');
+			mkdirSync(policyRoot);
+			symlinkSync(policyRoot, policyAlias, 'dir');
+			const policyManifest = join(policyRoot, 'package.json');
+			writeFileSync(policyManifest, '{}');
+			const watchedPolicyManifest = join(policyAlias, 'package.json');
+			let stateModel: 'causal' | 'permissive' = 'causal';
+			const p = octaneMdx();
+			p.configResolved({
+				command: 'build',
+				root,
+				plugins: [
+					{
+						name: 'octane',
+						api: {
+							octane: {
+								resolveStateModelForSource: () => ({
+									stateModel,
+									dependencies: [policyManifest],
+									missingDependencies: [],
+								}),
+							},
 						},
 					},
-				},
-			],
-		});
-		const warn = vi.fn();
-		const context = { warn, addWatchFile: vi.fn() };
-		const source = `import { useEffect, useState } from 'octane'
+				],
+			});
+			const warn = vi.fn();
+			const context = { warn, addWatchFile: vi.fn() };
+			const source = `import { useEffect, useState } from 'octane'
 
 export function Report() {
   const [, setCount] = useState(0)
@@ -187,26 +195,29 @@ export function Report() {
 
 <Report />
 `;
-		const document = '/repo/docs/Report.mdx';
+			const document = join(root, 'docs/Report.mdx');
 
-		await p.transform.call(context, source, document);
-		expect(warn).toHaveBeenCalledTimes(1);
+			await p.transform.call(context, source, document);
+			expect(warn).toHaveBeenCalledTimes(1);
 
-		stateModel = 'permissive';
-		p.watchChange(policyManifest);
-		await p.transform.call(context, source, document);
-		expect(warn).toHaveBeenCalledTimes(1);
+			stateModel = 'permissive';
+			p.watchChange(watchedPolicyManifest);
+			await p.transform.call(context, source, document);
+			expect(warn).toHaveBeenCalledTimes(1);
 
-		stateModel = 'causal';
-		p.watchChange(policyManifest);
-		await p.transform.call(context, source, document);
-		expect(warn).toHaveBeenCalledTimes(2);
-		expect(warn).toHaveBeenLastCalledWith(
-			expect.objectContaining({
-				code: 'OCTANE_CAUSAL_STATE_EFFECT_WRITE',
-				id: document,
-			}),
-		);
+			stateModel = 'causal';
+			p.watchChange(watchedPolicyManifest);
+			await p.transform.call(context, source, document);
+			expect(warn).toHaveBeenCalledTimes(2);
+			expect(warn).toHaveBeenLastCalledWith(
+				expect.objectContaining({
+					code: 'OCTANE_CAUSAL_STATE_EFFECT_WRITE',
+					id: document,
+				}),
+			);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 
 	it('uses the core compiler state-model resolver for app and dependency documents', async () => {
