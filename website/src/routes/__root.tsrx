@@ -135,7 +135,7 @@ pre.shiki {
 // server can't know the theme, so it renders the dark default and this
 // reconciles on the client. `data-theme` is owned entirely by the client —
 // Octane never renders it — so it does not participate in hydration. Placed
-// AFTER HeadContent so the theme-color <meta> already exists to update; still in
+// AFTER the theme-color <meta> below so it already exists to update; still in
 // <head>, so it runs before the body paints.
 const THEME_INIT = `(function(){try{var s=localStorage.getItem('octane-theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');document.documentElement.setAttribute('data-theme',t);var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',t==='light'?'#ffffff':'#23272f');}catch(e){}})();`;
 
@@ -143,6 +143,12 @@ function RootDocument(props: { children?: unknown }) @{
 	<Html lang="en">
 		<Head>
 			<HeadContent />
+			{/* theme-color is owned by the client (the pre-paint script and toggle
+    mutate it), so it lives here in the shell — NOT in the route head()
+    config. A router-managed tag is recreated from head() on every client
+    navigation, which would reset it to the dark default; a static shell
+    tag persists, so the light value survives route changes. */}
+			<meta name="theme-color" content="#23272f" />
 			<script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
 		</Head>
 		<Body>
@@ -163,10 +169,6 @@ export const Route = createRootRoute({
 			{
 				name: 'description',
 				content: 'Octane — React\'s programming model, compiled ahead of time. No VDOM, no rules of hooks.',
-			},
-			{
-				name: 'theme-color',
-				content: '#23272f',
 			},
 			{ title: DEFAULT_TITLE },
 			{
