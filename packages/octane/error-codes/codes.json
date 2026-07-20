@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "nextCode": 47,
+  "nextCode": 49,
   "codes": {
     "1": {
       "message": "Maximum update depth exceeded. Octane limits the number of nested updates to prevent infinite loops.",
@@ -198,7 +198,7 @@
       "message": "octane SSR: exceeded %s suspense passes — a use(thenable) never resolved.",
       "argumentCount": 1,
       "runtime": ["server"],
-      "status": "active"
+      "status": "retired"
     },
     "34": {
       "message": "octane SSR: a root suspension no longer has resumable work.",
@@ -222,7 +222,7 @@
       "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved.",
       "argumentCount": 1,
       "runtime": ["server"],
-      "status": "active"
+      "status": "retired"
     },
     "38": {
       "message": "The stream destination closed.",
@@ -276,6 +276,18 @@
       "message": "Expected %s listener to be a function, instead got a value of `%s` type.",
       "argumentCount": 2,
       "runtime": ["client"],
+      "status": "active"
+    },
+    "47": {
+      "message": "octane SSR: exceeded %s suspense passes — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
+      "argumentCount": 1,
+      "runtime": ["server"],
+      "status": "active"
+    },
+    "48": {
+      "message": "octane SSR: %s consecutive streaming passes completed no boundary — a use(thenable) never resolved. If promises are re-created on every render pass (e.g. created in an ancestor render and passed down through props), create them at their use() site or hoist them out of render.",
+      "argumentCount": 1,
+      "runtime": ["server"],
       "status": "active"
     }
   }
