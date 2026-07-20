@@ -23,6 +23,8 @@ export interface LynxNodesRefIdentity {
 /** Current client-driver state for the captured identity. */
 export interface LynxNodesRefState extends LynxNodesRefIdentity {
 	readonly active: boolean;
+	/** Monotonic identity for the currently attached physical cell. */
+	readonly attachmentEpoch: number;
 }
 
 export type LynxNodesRefErrorCode = 'inactive' | 'native' | 'stale';
@@ -146,6 +148,8 @@ export interface CreateLynxNodesRefOptions {
  */
 export interface LynxNodesRefBinding {
 	readonly handle: LynxNodesRef;
+	/** Reject work owned by a detached cell without invalidating the logical handle. */
+	invalidateAttachment(): void;
 	invalidate(reason?: unknown): void;
 }
 
@@ -176,6 +180,12 @@ function normalizedError(value: unknown, fallback: string): Error {
 function positiveSafeInteger(value: unknown, label: string): asserts value is number {
 	if (!Number.isSafeInteger(value) || (value as number) <= 0) {
 		throw new TypeError(`Octane Lynx NodesRef ${label} must be a positive safe integer.`);
+	}
+}
+
+function nonNegativeSafeInteger(value: unknown, label: string): asserts value is number {
+	if (!Number.isSafeInteger(value) || (value as number) < 0) {
+		throw new TypeError(`Octane Lynx NodesRef ${label} must be a non-negative safe integer.`);
 	}
 }
 
@@ -422,10 +432,11 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 			`Octane Lynx NodesRef ${expected.id}:${expected.generation} is inactive.`,
 		);
 
-	const currentSelector = (): string => {
+	const currentState = (attachmentEpoch: number | null = null): LynxNodesRefState => {
 		if (invalidated !== null) throw invalidated;
 		const state = readState();
 		if (state === null || state.active !== true) throw inactiveError();
+		nonNegativeSafeInteger(state.attachmentEpoch, 'state.attachmentEpoch');
 		if (
 			state.root !== expected.root ||
 			state.id !== expected.id ||
@@ -438,7 +449,13 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 				`Octane Lynx NodesRef ${expected.id}:${expected.generation} no longer owns its selector.`,
 			);
 		}
-		return expected.selector;
+		if (attachmentEpoch !== null && state.attachmentEpoch !== attachmentEpoch) {
+			throw new LynxNodesRefError(
+				'stale',
+				`Octane Lynx NodesRef ${expected.id}:${expected.generation} changed physical attachment while an operation was pending.`,
+			);
+		}
+		return state;
 	};
 
 	const select = (selector: string): LynxNativeNodesRef => {
@@ -463,6 +480,7 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 		new Promise<Value>((resolve, reject) => {
 			let dispatching = true;
 			let settled = false;
+			let attachmentEpoch: number | null = null;
 			let callbackOutcome: OperationOutcome<Value> | null = null;
 			let forcedError: Error | null = null;
 
@@ -480,7 +498,7 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 					return;
 				}
 				try {
-					currentSelector();
+					currentState(attachmentEpoch);
 				} catch (error) {
 					finish({
 						ok: false,
@@ -500,9 +518,10 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 			pending.add(operation);
 
 			try {
-				const selector = currentSelector();
+				const state = currentState();
+				attachmentEpoch = state.attachmentEpoch;
 				start(
-					selector,
+					state.selector,
 					(value) => publish({ ok: true, value }),
 					(error) => publish({ ok: false, error }),
 				);
@@ -516,7 +535,7 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 				return;
 			}
 			try {
-				currentSelector();
+				currentState(attachmentEpoch);
 			} catch (error) {
 				finish({
 					ok: false,
@@ -534,7 +553,7 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 		generation: expected.generation,
 		get active() {
 			try {
-				currentSelector();
+				currentState();
 				return true;
 			} catch {
 				return false;
@@ -692,6 +711,10 @@ export function createLynxNodesRef(options: CreateLynxNodesRefOptions): LynxNode
 
 	const binding: LynxNodesRefBinding = {
 		handle,
+		invalidateAttachment() {
+			const error = inactiveError();
+			for (const operation of [...pending]) operation.reject(error);
+		},
 		invalidate(reason) {
 			if (invalidated !== null) return;
 			invalidated =

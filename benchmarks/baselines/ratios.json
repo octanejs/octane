@@ -804,5 +804,13 @@
     "reference": "islands-1",
     "maxRatio": 1.05,
     "note": "Exactly one owner-bridge binding per hosted root regardless of island count (currently 1.0x). Growth means duplicated bindings or a leaked rebind per render."
+  },
+  {
+    "suite": "lynx-list",
+    "op": "physical_cells",
+    "target": "octane-lynx",
+    "reference": "eager-list-model",
+    "maxRatio": 0.02,
+    "note": "Deterministic source-level allocation gate: a 12-cell visible window over 1,000 logical rows currently allocates 0.012x as many physical cell roots as an eager one-cell-per-row model. The 0.02 ceiling catches loss of bounded native recycling without relying on timing."
   }
 ]

@@ -235,6 +235,24 @@ function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	return '';
 }
 
+// DEV must observe invalid boolean literals instead of folding them out before
+// the host validator runs. Production still takes bakeStaticAttr's zero-binding
+// path, so this diagnostic has no shipped runtime cost.
+function needsDevStaticAttrValidation(attrName, lv, tag, namespace = 'html') {
+	if (typeof lv !== 'boolean' || attrName === 'class' || attrName === 'style') return false;
+	const isCustom =
+		(namespace === 'html' || namespace === 'opaque') && tag !== undefined && tag.includes('-');
+	if (isCustom || attrName.startsWith('aria-') || attrName.startsWith('data-')) return false;
+	const lower = attrName.toLowerCase();
+	return !(
+		isEnumeratedBooleanAttr(lower) ||
+		BOOLEAN_ATTR_PROPS.has(lower) ||
+		MUST_USE_PROPERTY_PROPS.has(lower) ||
+		lower === 'download' ||
+		lower === 'capture'
+	);
+}
+
 // React contract: a `<textarea>` with a `value`/`defaultValue` prop OWNS its
 // content — children would fight the prop (React throws for defaultValue +
 // children and warns for value + children). Compile-time error on both emit
@@ -6160,9 +6178,18 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			continue;
 		}
 
-		// Boolean attribute (no value) → present.
+		// JSX shorthand is the literal value `true`. Preserve the zero-binding
+		// production path, but let invalid DEV values reach the host validator.
 		if (val == null) {
-			lit += ' ' + attrName;
+			if (ctx.dev && needsDevStaticAttrValidation(attrName, true, tag, selfNs)) {
+				flush();
+				ctx.runtimeNeeded.add('ssrAttr');
+				parts.push(
+					`_$ssrAttr(${JSON.stringify(attrName)}, true, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
+				);
+			} else {
+				lit += bakeStaticAttr(attrName, true, tag, selfNs);
+			}
 			continue;
 		}
 
@@ -6190,7 +6217,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// Static literal (and not after a spread) → inline into the tag.
 		// bakeStaticAttr applies the shared React-parity value tables (client
 		// bake stays byte-identical — hydration parity).
-		if (!isAfterSpread && inner.type === 'Literal') {
+		if (
+			!isAfterSpread &&
+			inner.type === 'Literal' &&
+			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, selfNs))
+		) {
 			lit += bakeStaticAttr(attrName, inner.value, tag, selfNs);
 			continue;
 		}
@@ -11571,6 +11602,7 @@ function planJsx(
 			ctx.runtimeNeeded.add('markNativeChangeDiagnosticStatic');
 		}
 		if (b.kind === 'nativeChangeRuntime') ctx.runtimeNeeded.add('queueNativeChangeDiagnostic');
+		if (b.kind === 'event' && b.dev) ctx.runtimeNeeded.add('devEventListener');
 		if (b.kind === 'event-bundle') {
 			// 3b: mount builds the descriptor via evtN. Lifetime-stable bundles skip
 			// the update helper but still share the compact mount helper call.
@@ -12469,9 +12501,12 @@ function emitBindingMount(b, elVar, bag) {
     }`;
 		}
 		case 'event': {
-			if (b.mountOnly) return `    ${elVar}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
+			const value = b.dev
+				? `_$devEventListener(${JSON.stringify(b.name)}, (${b.expr}))`
+				: `(${b.expr})`;
+			if (b.mountOnly) return `    ${elVar}[${JSON.stringify(b.slotKey)}] = ${value};`;
 			return `    ${bag.local(`_el$${b.id}`)} = ${elVar};
-    ${elVar}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
+    ${elVar}[${JSON.stringify(b.slotKey)}] = ${value};`;
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
@@ -12655,7 +12690,10 @@ function emitBindingUpdate(b, bag) {
 			return `    { const _v = ${E}; if (${F('_sp')} !== _v) { _$setSpread(${F('_el')}, _v, ${F('_sp')}, __s${flags}); ${F('_sp')} = _v; } }`;
 		}
 		case 'event': {
-			return `    ${F('_el')}[${JSON.stringify(b.slotKey)}] = (${b.expr});`;
+			const value = b.dev
+				? `_$devEventListener(${JSON.stringify(b.name)}, (${b.expr}))`
+				: `(${b.expr})`;
+			return `    ${F('_el')}[${JSON.stringify(b.slotKey)}] = ${value};`;
 		}
 		case 'formAction': {
 			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setFormAction(${F('_el')}, ${JSON.stringify(b.name)}, _v, ${F('_prev')}); ${F('_prev')} = _v; } }`;
@@ -13281,24 +13319,25 @@ function emitElementHtml(
 			continue;
 		}
 
+		let inner;
 		if (val == null) {
-			if (isAfterSpread || classBeforeSpread) {
-				// Boolean attr after spread → emit as `true` binding.
-				bindings.push({
-					id: bindings.length,
-					kind: attrName === 'class' ? 'class' : 'attr',
-					name: attrName,
-					expr: 'true',
-					path,
-					ns: hostNs,
-					fresh: false,
-				});
+			// JSX shorthand is `true`, not an instruction to serialize an empty
+			// attribute. Events and source-ordered writers need the ordinary binding
+			// path; valid static attrs still bake with their real boolean semantics.
+			if (
+				isEventAttrName(attrName) ||
+				isAfterSpread ||
+				classBeforeSpread ||
+				(ctx.dev && needsDevStaticAttrValidation(attrName, true, tag, hostNs))
+			) {
+				inner = { type: 'Literal', value: true, raw: 'true' };
 			} else {
-				attrHtml += ` ${attrName}`;
+				attrHtml += bakeStaticAttr(attrName, true, tag, hostNs);
+				continue;
 			}
-			continue;
+		} else {
+			inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 		}
-		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 		// `{style ('cls')}` in attribute position — resolve to a class string
 		// (literal or runtime concat) before any further handling.
 		inner = resolveStyleExpr(inner, cssHash);
@@ -13326,7 +13365,13 @@ function emitElementHtml(
 		// bakeStaticAttr applies the shared React-parity value tables (aria-*/
 		// enumerated/data-* booleans stringify, boolean attrs canonicalize to
 		// `attr=""`/absent, booleans on non-boolean attrs drop).
-		if (inner.type === 'Literal' && !isAfterSpread && !classBeforeSpread) {
+		if (
+			inner.type === 'Literal' &&
+			!isEventAttrName(attrName) &&
+			!isAfterSpread &&
+			!classBeforeSpread &&
+			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, hostNs))
+		) {
 			attrHtml += bakeStaticAttr(attrName, inner.value, tag, hostNs);
 			continue;
 		}
@@ -13380,11 +13425,13 @@ function emitElementHtml(
 				bindings.push({
 					id: bindings.length,
 					kind: 'event',
+					name: attrName,
 					expr,
 					path,
 					eventName,
 					slotKey,
 					ns: hostNs,
+					dev: ctx.dev,
 					mountOnly: isEventHandlerInvariantExpr(inner, ctx),
 				});
 			}

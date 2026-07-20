@@ -3,13 +3,15 @@
     "package": "@lynx-js/react",
     "version": "0.123.0 (b6b809cd)"
   },
-  "surface": "Private Milestone 3 source/test implementation: legal raw-text validation; deliberate PAPI routing for attribute removal, class/className composition, complete datasets, inline styles, CSS-scope metadata, and URL/data-URI image assets; background bind/catch/capture/global-bind event registration and acknowledgement-gated dispatch; asynchronous generation-scoped NodesRef handles; retained visibility; and host creation for the first native element slice. No production .lynx.bundle or native-device claim is made.",
+  "surface": "Private Milestones 3–4 source/test implementation: the first native element/prop/event/ref slice; Lynx-specific callback-demanded list cells with item-key identity, reuse pools, and physical ref attachment; root-scoped serializable native-resource handles; augmentable init/global/Native Module types and background platform hooks; and separate background/main-thread compiler presets. No production .lynx.bundle, native allocation, scrolling, lifecycle, Native Module, custom-element, or device claim is made.",
   "divergences": [
     "The package adapts an audited @lynx-js/types@4.0.0 props/events slice into renderer-owned module declarations because the upstream events entry transitively loads global Element/JSX augmentation.",
     "Background refs receive cloned acknowledgement-gated asynchronous handles, never live main-thread Element PAPI objects or synchronous layout.",
+    "A recycled list item remains a logical Octane subtree while its physical native cell is absent. Refs detach and reattach through the optional universal host-attachment capability; viewport recycling alone does not run component or effect cleanup.",
     "Background event handlers receive detached data-only payloads without live event methods or native instances.",
     "Main-thread receiver installation is explicit in this private source phase; automatic Rspeedy production bootstrap is deferred to Milestone 5.",
-    "Platform and public testing-helper runtime APIs remain absent instead of being represented by throwing or inert compatibility stubs."
+    "Platform APIs are background-only; the main-thread compiler preset rejects @octanejs/lynx/platform imports and statically visible NativeModules access. createLynxRoot() separately verifies the public background-only lynx.getJSModule() surface at runtime. The reload export only requests lynx.reload(); it is not a framework reload receiver.",
+    "Nested lists, portals, Lynx Suspense proof, lazy bundles, gestures, animations, full boolean-defer parity, and defer.unmountRecycled semantics are excluded from the initial Milestone 4 surface."
   ],
   "ssr": "Unsupported. Lynx first-screen adoption is a native runtime protocol, not HTML SSR or Octane hydration.",
   "verified": "2026-07-19",
@@ -19,14 +21,22 @@
     "Milestone 3 implements the host boundary for class strings, inline styles, CSS IDs/scopes, and bundled URL strings. CSS import/CSS Module extraction, stylesheet/template sections, and asset bundling remain Milestone 5 work.",
     "Octane submits a complete next dataset bag through __SetDataset. @lynx-js/testing-environment@0.3.0 implements that operation with Object.assign, so key deletion is adapter-call evidence only until a real-engine lane proves it.",
     "The public types expose createSelectorQuery().select(string), while selectUniqueID is commented out. Octane therefore uses generation-scoped [octane-ref] selectors; the testing environment proves selection/setNativeProps only, so invoke/fields/path/measure, selector support, and layout results require real-engine evidence.",
-    "Milestone 3 formal exit remains unmet until equivalent pinned ReactLynx fixtures are compared through public observations on Explorer, Android, and iOS.",
-    "Platform capabilities remain Milestone 4; production testing and .lynx.bundle integration remain Milestone 5."
+    "The official JavaScript environment models a 1,000-item logical list, callback-demanded materialization, native cell identity reuse, reorder, attachment ordering, and inert callbacks after teardown. It cannot establish Android/iOS native allocation, scrolling, layout, steady-state memory, or lifecycle behavior.",
+    "The deterministic Node-only allocation gate records 12 physical fake-PAPI cells for a 12-row visible window over 1,000 logical items, 988 reuses, zero remaining cells after teardown, and a 0.012 eager-allocation ratio. It is not a native memory or timing measurement.",
+    "Init-data source tests seed from public __presetData and consume the pinned framework-maintained current __initData snapshot to cover RESET key removal and the render-to-layout subscription race. Octane does not yet install or claim the native update receiver that maintains that snapshot.",
+    "Init-data and global-props updates, global listener replacement, Native Module typing, public reload requests, and error reporting have source/unit evidence only. Public native event delivery, page destroy, and framework reload/background teardown receivers remain blocked contracts.",
+    "The app-owned Android/iOS Native Module and custom-element files under examples/native-capabilities are illustrative, excluded from package files, and not compiled or device-verified.",
+    "Boolean list-item defer metadata is accepted and forwarded, but all initial Octane list cells are callback-demanded regardless of that prop; this is not full ReactLynx defer behavior. ReactLynx's defer={{ unmountRecycled: true }} lifecycle behavior is not implemented.",
+    "Nested <list> hosts are rejected during batch preparation in the initial contract rather than entering a partially supported recycling path.",
+    "Milestones 3–4 formal exits remain unmet until equivalent pinned ReactLynx fixtures and native capability samples are compared through public observations on Explorer, Android, and iOS.",
+    "Production testing and .lynx.bundle integration remain Milestone 5 work."
   ],
   "docs": [
     "docs/lynx-native-renderer-plan.md",
     "packages/lynx/UPSTREAM.md",
     "packages/lynx/audit/framework-contracts.md",
     "packages/lynx/audit/runtime-compatibility.json",
-    "packages/lynx/audit/phase-0-evidence.json"
+    "packages/lynx/audit/phase-0-evidence.json",
+    "packages/lynx/examples/native-capabilities/README.md"
   ]
 }

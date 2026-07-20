@@ -17,6 +17,7 @@ import { getOctaneRspackBuildInfo, OctaneRspackPlugin } from '../src/index.js';
 const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const profilerGlobal = '__OCTANE_PROFILER__';
 const runGlobal = '__octane_rspack_profile_bundle_runs__';
+const productionErrorGlobal = '__octane_rspack_production_error__';
 
 function write(root: string, relativePath: string, content: string) {
 	const file = join(root, relativePath);
@@ -182,6 +183,7 @@ export function App() @{
 	afterEach(() => {
 		Reflect.deleteProperty(globalThis, profilerGlobal);
 		Reflect.deleteProperty(globalThis, runGlobal);
+		Reflect.deleteProperty(globalThis, productionErrorGlobal);
 		rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
@@ -206,10 +208,16 @@ export function ProfileBundleProbe() @{
 		write(
 			root,
 			'src/index.js',
-			`import { ProfileBundleProbe } from './ProfileBundleProbe.tsrx';
+			`import { Children } from 'octane';
+import { ProfileBundleProbe } from './ProfileBundleProbe.tsrx';
 
 globalThis.${runGlobal} = (globalThis.${runGlobal} || 0) + 1;
 export { ProfileBundleProbe };
+try {
+	Children.only(null);
+} catch (error) {
+	globalThis.${productionErrorGlobal} = error instanceof Error ? error.message : String(error);
+}
 ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 `,
 		);
@@ -412,18 +420,25 @@ export function App() @{ const live = Scene as unknown; <Canvas><Scene /></Canva
 		expect(bundle).toContain('__webpack_require__.hmrD');
 	}, 30_000);
 
-	it('erases profiling from normal production bundles', async () => {
+	it('erases profiling and full diagnostics from a real production bundle', async () => {
 		const normal = await buildRealRuntime(false);
 		for (const marker of [
 			'__OCTANE_PROFILER__',
 			'octane.component',
 			'/src/ProfileBundleProbe.tsrx#ProfileBundleProbe',
+			'Children.only expected to receive a single element child.',
+			'Unknown Octane error code',
+			'process.env.NODE_ENV',
 		]) {
 			expect(normal.code).not.toContain(marker);
 		}
+		expect(normal.code).toContain('https://octanejs.dev/errors/');
 		await import(`${pathToFileURL(normal.file).href}?normal`);
 		expect((globalThis as any)[runGlobal]).toBe(1);
 		expect((globalThis as any)[profilerGlobal]).toBeUndefined();
+		expect((globalThis as any)[productionErrorGlobal]).toMatch(
+			/^Minified Octane error #2; visit https:\/\/octanejs\.dev\/errors\/2 /,
+		);
 	}, 30_000);
 
 	it('executes the profiled runtime', async () => {

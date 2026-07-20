@@ -31,6 +31,8 @@ const ROUTES = [
 	'/docs/react-compat',
 	'/docs/profiling',
 	'/docs/bindings',
+	'/errors',
+	'/errors/3?args%5B%5D=%22quoted%22',
 	'/benchmarks',
 	'/playground',
 ];
@@ -543,6 +545,46 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 		}
 	}, 30_000);
 
+	it('the first router event after hydration does not remount the app', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${DEV_PORT}`, '/', {
+			waitForNetworkIdle: true,
+		});
+		try {
+			// Let hydrateStart's post-networkidle tail (router match commit +
+			// hydrateRoot) finish before firing the event.
+			await page.waitForTimeout(500);
+			// A hash replaceState is the smallest router event: it reloads and bumps
+			// the router's loadedAt without changing matches. The hydrated tree must
+			// update in place — a remount would replace every DOM node (and lose all
+			// component state) on the first interaction after page load.
+			const survived = await page.evaluate(async () => {
+				const router = (window as any).__TSR_ROUTER__;
+				const before = router.stores.loadedAt.get() as number;
+				const header = document.querySelector('header');
+				const main = document.querySelector('main');
+				history.replaceState(history.state, '', '#post-hydration');
+				// Positive control: the router must actually process the event —
+				// without this the assertion could pass vacuously (event fired
+				// before the router subscribed to history).
+				const deadline = Date.now() + 5000;
+				while (router.stores.loadedAt.get() === before && Date.now() < deadline) {
+					await new Promise((resolve) => setTimeout(resolve, 25));
+				}
+				await new Promise((resolve) => setTimeout(resolve, 100));
+				return {
+					processed: router.stores.loadedAt.get() !== before,
+					header: document.querySelector('header') === header,
+					main: document.querySelector('main') === main,
+				};
+			});
+			expect(survived).toEqual({ processed: true, header: true, main: true });
+			const real = errors.filter((e) => !e.includes('Failed to load resource'));
+			expect(real).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
 	// Editing a route and the router invalidates both the client and SSR module
 	// graphs. A full reload on that hot server must still hydrate through one
 	// current router graph. Keep this last: Vite's cache-busting timestamps stay
@@ -595,7 +637,7 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 describe.sequential('website production build → hydration (Nitro Vercel preview)', () => {
 	let server: ChildProcess;
 	let PREVIEW_PORT: number;
-	const vercelEnv = { NITRO_PRESET: 'vercel' };
+	const vercelEnv = { NODE_ENV: 'production', NITRO_PRESET: 'vercel' };
 	const outputDir = join(WEBSITE, '.vercel/output');
 
 	beforeAll(async () => {
@@ -648,7 +690,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		expect(assetsIndex).toBeGreaterThanOrEqual(0);
 		expect(filesystemIndex).toBeGreaterThan(assetsIndex);
 		expect(serverFallbackIndex).toBeGreaterThan(filesystemIndex);
-		expect(existsSync(join(outputDir, 'static/playground-runtime.mjs'))).toBe(true);
+		expect(existsSync(join(outputDir, 'static/playground-runtime.json'))).toBe(true);
 		expect(existsSync(join(outputDir, 'functions/__server.func/index.mjs'))).toBe(true);
 
 		const functionConfig = JSON.parse(
@@ -718,7 +760,11 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 
 	it('playground shows compiler warnings without treating runnable code as an error', async () => {
 		const source = `export function App() @{ <input onChange={() => {}} /> }`;
-		const hash = encodePlaygroundHash(source, 'tsrx');
+		const hash = encodePlaygroundHash({
+			lang: 'tsrx',
+			entry: 'App.tsrx',
+			files: [{ name: 'App.tsrx', source }],
+		});
 		const { page, errors } = await loadRoute(
 			`http://localhost:${PREVIEW_PORT}`,
 			`/playground#${hash}`,
@@ -728,11 +774,127 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			const warnings = page.getByRole('region', { name: 'Compiler warnings' });
 			await warnings.waitFor();
 			expect(await warnings.textContent()).toContain('OCTANE_NATIVE_TEXT_ONCHANGE');
-			expect(await warnings.textContent()).toContain('playground.tsrx:1:');
+			expect(await warnings.textContent()).toContain('App.tsrx:1:');
 			expect(await page.locator('.pg-error').count()).toBe(0);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
 		}
 	}, 30_000);
+
+	it('playground runs a multi-file example selected from the dropdown', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			// The tab strip is absent for the single-file default…
+			expect(await page.locator('.pg-tabs').count()).toBe(0);
+			await page.selectOption('.pg-select', 'parallel-use');
+			// …and appears with one tab per virtual file for the example.
+			await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).waitFor({ timeout: 10_000 });
+			const preview = page.frameLocator('iframe[title="Playground preview"]');
+			// Both fake fetches resolve through the sibling module (no network).
+			await preview.locator('body').getByText('City: Reykjavík (1)').waitFor({ timeout: 20_000 });
+			// Switching tabs swaps the editor buffer to the sibling file.
+			await page.locator('.pg-tab', { hasText: 'Data.tsrx' }).click();
+			await page.waitForFunction(
+				() =>
+					document
+						.querySelector('.pg-editor .cm-content')
+						?.textContent?.includes('fetchForecast') ?? false,
+				null,
+				{ timeout: 10_000 },
+			);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 45_000);
+
+	it('playground Format button reprints the active file with Prettier', async () => {
+		const source = `export default function App() @{ <button onClick={()=>{}}>go</button> }`;
+		const hash = encodePlaygroundHash({
+			lang: 'tsrx',
+			entry: 'App.tsrx',
+			files: [{ name: 'App.tsrx', source }],
+		});
+		const { page, errors } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			`/playground#${hash}`,
+		);
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			await page.click('.pg-format');
+			// Prettier normalizes the squashed arrow — formatting works even while
+			// the shared payload is still consent-gated (it never executes code).
+			await page.waitForFunction(
+				() =>
+					document
+						.querySelector('.pg-editor .cm-content')
+						?.textContent?.includes('onClick={() => {}}') ?? false,
+				null,
+				{ timeout: 15_000 },
+			);
+			expect(await page.locator('.pg-error').count()).toBe(0);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 45_000);
+
+	it('playground gates a shared multi-file link behind consent, then runs it', async () => {
+		const hash = encodePlaygroundHash({
+			lang: 'tsrx',
+			entry: 'App.tsrx',
+			files: [
+				{
+					name: 'App.tsrx',
+					source:
+						"import { label } from './Shared.tsrx';\n\nexport default function App() @{\n\t<h2>{'Shared: ' + label}</h2>\n}",
+				},
+				{ name: 'Shared.tsrx', source: "export const label = 'from-a-link';" },
+			],
+		});
+		const { page, errors } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			`/playground#${hash}`,
+		);
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			// Untrusted payload: visible and compiled, but not executed.
+			await page.locator('.pg-consent').waitFor();
+			await page.click('.pg-consent-run');
+			const preview = page.frameLocator('iframe[title="Playground preview"]');
+			const heading = preview.locator('h2');
+			await waitForLocatorText(heading, 'Shared: from-a-link', 20_000);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 45_000);
+
+	it('playground runs the OctaneCompat React-host example end to end', async () => {
+		// This example loads the real react/react-dom from esm.sh inside the
+		// sandbox — like the rest of this browser suite, it requires a working
+		// network. A probe up front turns an unreachable CDN into an immediate,
+		// clearly-attributed failure instead of a slow in-iframe timeout.
+		const probe = await fetch('https://esm.sh/react@19.2.0', { method: 'HEAD' });
+		expect(probe.ok, 'esm.sh must be reachable to exercise the OctaneCompat example').toBe(true);
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			await page.selectOption('.pg-select', 'octane-compat');
+			await page.locator('.pg-tab', { hasText: 'Island.tsrx' }).waitFor({ timeout: 10_000 });
+			const preview = page.frameLocator('iframe[title="Playground preview"]');
+			// react-dom (esm.sh) mounts the host; the compiled Octane island renders
+			// inside it and resolves its own @try/@pending fetch.
+			await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
+			await preview.locator('body').getByText('island data #1').waitFor({ timeout: 20_000 });
+			// Native events keep working across the boundary.
+			await preview.getByRole('button', { name: 'clicks: 3' }).click();
+			await preview.getByRole('button', { name: 'clicks: 4' }).waitFor({ timeout: 10_000 });
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 90_000);
 });

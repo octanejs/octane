@@ -13,7 +13,7 @@ const packageJson = JSON.parse(
 	exports: Record<string, string>;
 };
 
-describe('@octanejs/lynx Milestone 3 public surface', () => {
+describe('@octanejs/lynx Milestone 4 public surface', () => {
 	it('keeps every required package subpath private and addressable', () => {
 		expect(packageJson.private).toBe(true);
 		expect(packageJson.version).toBe('0.0.0');
@@ -29,10 +29,10 @@ describe('@octanejs/lynx Milestone 3 public surface', () => {
 		]);
 	});
 
-	it('exposes the private background host surface while keeping later APIs deferred', () => {
+	it('exposes the private host and platform source surface without claiming a preview', () => {
 		expect(rootApi.lynxRootAvailability).toMatchObject({
 			available: true,
-			implementedMilestone: 3,
+			implementedMilestone: 4,
 		});
 		expect(platformApi.lynxPlatformAvailability).toMatchObject({
 			available: false,
@@ -45,7 +45,12 @@ describe('@octanejs/lynx Milestone 3 public surface', () => {
 		});
 		expect(rootApi.root.renderer).toBe('lynx');
 		expect(rootApi.createLynxRoot).toBeTypeOf('function');
+		expect(rootApi.createLynxNativeResource).toBeTypeOf('function');
 		expect(mainThreadApi.installLynxMainThread).toBeTypeOf('function');
+		expect(platformApi.useInitData).toBeTypeOf('function');
+		expect(platformApi.useGlobalProps).toBeTypeOf('function');
+		expect(platformApi.getNativeModules).toBeTypeOf('function');
+		expect(platformApi.reload).toBeTypeOf('function');
 		expect(platformApi).not.toHaveProperty('getInitData');
 		expect(testingApi).not.toHaveProperty('createRoot');
 	});

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
+import { compile } from 'octane/compiler';
 
 import {
 	LYNX_BACKGROUND_LAYER,
@@ -94,6 +95,23 @@ function createChain() {
 	};
 }
 
+function compilerOptions(state: ReturnType<typeof createChain>) {
+	return state.plugins.get('@octanejs/rspeedy-plugin:compiler')?.options[0] as {
+		universalRuntime: unknown;
+		renderers: {
+			default: string;
+			registry: {
+				lynx: {
+					validation: {
+						forbiddenGlobals: readonly string[];
+						forbiddenImports: readonly string[];
+					};
+				};
+			};
+		};
+	};
+}
+
 function applyPlugin(options: Parameters<typeof pluginOctane>[0], environment = 'lynx') {
 	const root = createToolchainRoot();
 	const callbacks: Array<(chain: unknown, context: unknown) => void> = [];
@@ -136,6 +154,12 @@ describe('@octanejs/rspeedy-plugin', () => {
 				renderers: expect.objectContaining({ default: 'lynx' }),
 			}),
 		]);
+		expect(
+			compilerOptions(state).renderers.registry.lynx.validation.forbiddenGlobals,
+		).not.toContain('NativeModules');
+		expect(
+			compilerOptions(state).renderers.registry.lynx.validation.forbiddenImports,
+		).not.toContain('@octanejs/lynx/platform');
 		expect(state.extensionAliases.get('.js')).toEqual(['.ts', '.js']);
 	});
 
@@ -150,13 +174,64 @@ describe('@octanejs/rspeedy-plugin', () => {
 				layer: LYNX_MAIN_THREAD_LAYER,
 			},
 		]);
-		expect(
-			(
-				state.plugins.get('@octanejs/rspeedy-plugin:compiler')?.options[0] as {
-					universalRuntime: unknown;
-				}
-			).universalRuntime,
-		).toBe(LYNX_MAIN_THREAD_RUNTIME);
+		const compiler = compilerOptions(state);
+		expect(compiler.universalRuntime).toBe(LYNX_MAIN_THREAD_RUNTIME);
+		expect(compiler.renderers.registry.lynx.validation.forbiddenGlobals).toContain('NativeModules');
+		expect(compiler.renderers.registry.lynx.validation.forbiddenImports).toContain(
+			'@octanejs/lynx/platform',
+		);
+	});
+
+	it('diagnoses background-only APIs at main-thread authored locations', () => {
+		const background = compilerOptions(applyPlugin(undefined));
+		const mainThread = compilerOptions(applyPlugin({ thread: 'main-thread' }));
+		const renderer = (compiler: ReturnType<typeof compilerOptions>) =>
+			({ id: 'lynx', ...compiler.renderers.registry.lynx }) as never;
+
+		const backgroundSource = `import { lynxPlatformAvailability } from '@octanejs/lynx/platform';
+export const nativeModule = NativeModules.Settings;
+export function App() @{ <view data-platform={lynxPlatformAvailability.available} /> }
+`;
+		expect(() =>
+			compile(backgroundSource, '/src/Background.lynx.tsrx', {
+				hmr: false,
+				renderer: renderer(background),
+			}),
+		).not.toThrow();
+
+		const nativeModulesSource = `export const nativeModule = NativeModules.Settings;
+export function App() @{ <view /> }
+`;
+		expect(() =>
+			compile(nativeModulesSource, '/src/MainNative.lynx.tsrx', {
+				hmr: false,
+				renderer: renderer(mainThread),
+			}),
+		).toThrow(/renderer "lynx" forbids unbound global "NativeModules".*MainNative\.lynx\.tsrx:1:/);
+
+		const platformSource = `import { lynxPlatformAvailability } from '@octanejs/lynx/platform';
+export function App() @{ <view data-platform={lynxPlatformAvailability.available} /> }
+`;
+		expect(() =>
+			compile(platformSource, '/src/MainPlatform.lynx.tsrx', {
+				hmr: false,
+				renderer: renderer(mainThread),
+			}),
+		).toThrow(
+			/renderer "lynx" forbids static import "@octanejs\/lynx\/platform".*MainPlatform\.lynx\.tsrx:1:/,
+		);
+
+		const shadowedSource = `export function readModule(NativeModules) {
+  return NativeModules.Settings;
+}
+export function App() @{ <view /> }
+`;
+		expect(() =>
+			compile(shadowedSource, '/src/ShadowedNative.lynx.tsrx', {
+				hmr: false,
+				renderer: renderer(mainThread),
+			}),
+		).not.toThrow();
 	});
 
 	it('preserves existing JavaScript extension aliases while adding TypeScript source', () => {

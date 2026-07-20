@@ -106,7 +106,11 @@ afterAll(async () => {
 	fs.rmSync(path.join(fixtureRoot, 'node_modules'), { recursive: true, force: true });
 });
 
-describe('production SSR build', () => {
+// Dynamic-importing freshly built output legitimately exceeds vitest's 5s
+// default when the whole suite runs in parallel (module-graph load competes
+// with sibling projects for I/O); the generous budget only matters under
+// contention — these tests finish in well under a second on an idle machine.
+describe('production SSR build', { timeout: 30_000 }, () => {
 	it('emits both bundles, moves the template to dist/server, and strips build metadata', () => {
 		expect(fs.existsSync(path.join(distDir, 'server/entry.js'))).toBe(true);
 		expect(fs.existsSync(path.join(distDir, 'server/index.html'))).toBe(true);
@@ -127,6 +131,11 @@ describe('production SSR build', () => {
 
 	it('the server bundle is self-contained (imports only node builtins)', () => {
 		const entry = fs.readFileSync(path.join(distDir, 'server/entry.js'), 'utf-8');
+		// The server build is intentionally unminified by default. Its explicit
+		// production define must still let Rollup erase the generated DEV table.
+		expect(entry).not.toContain('process.env.NODE_ENV');
+		expect(entry).not.toContain('octane SSR: pipe() may only be called once.');
+		expect(entry).toContain('https://octanejs.dev/errors/');
 		const specifiers = [...entry.matchAll(/^import[^'"]*['"]([^'"]+)['"]/gm)].map((m) => m[1]);
 		expect(specifiers.length).toBeGreaterThan(0);
 		for (const spec of specifiers) {

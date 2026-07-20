@@ -212,7 +212,11 @@ export const Route = createRootRoute({
 			{ rel: 'icon', href: '/favicon.ico', sizes: '48x48 32x32 16x16' },
 			{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
 			{ rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
-			{ rel: 'manifest', href: '/site.webmanifest' },
+			// use-credentials: browsers fetch manifests anonymously by default, so
+			// on SSO-protected Vercel previews the request loses its auth cookie
+			// and dies on a cross-origin login redirect (console CORS noise).
+			// Same-origin production requests are unaffected.
+			{ rel: 'manifest', href: '/site.webmanifest', crossOrigin: 'use-credentials' },
 		],
 		styles: [{ children: BASE_STYLES }],
 	}),
