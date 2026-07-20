@@ -498,6 +498,37 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'nuqs',
+					include: ['packages/nuqs/tests/**/*.test.ts'],
+					environment: 'jsdom',
+					globals: false,
+				},
+				plugins: [octane()],
+				// `@octanejs/nuqs` is the package under test; alias the public name and
+				// its subpaths (`./server`, `./testing`, `./adapters/*`) to source so
+				// fixtures import it exactly as a consumer would. The `/server` alias is
+				// listed before the catch-all because it maps to `index.server.ts`, not
+				// `server.ts`; the regex catch-all then maps `@octanejs/nuqs/adapters/react`
+				// -> `src/adapters/react.ts` without the bare entry swallowing the subpath.
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/nuqs$/,
+							replacement: resolve(import.meta.dirname, 'packages/nuqs/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/nuqs\/server$/,
+							replacement: resolve(import.meta.dirname, 'packages/nuqs/src/index.server.ts'),
+						},
+						{
+							find: /^@octanejs\/nuqs\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/nuqs/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'i18next',
 					include: ['packages/i18next/tests/**/*.test.ts'],
 					exclude: [...configDefaults.exclude, 'packages/i18next/tests/ssr/**/*.test.ts'],

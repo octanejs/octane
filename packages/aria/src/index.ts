@@ -318,3 +318,41 @@ export type {
 // combobox — mirrors the @react-aria/combobox shim surface.
 export { useComboBox } from './combobox/useComboBox';
 export type { AriaComboBoxProps, AriaComboBoxOptions, ComboBoxAria } from './combobox/useComboBox';
+
+// tree — mirrors the @react-aria/tree shim surface.
+export { useTree } from './tree/useTree';
+export { useTreeItem } from './tree/useTreeItem';
+export type { AriaTreeOptions, AriaTreeProps, TreeAria, TreeProps } from './tree/useTree';
+export type { AriaTreeItemOptions, TreeItemAria } from './tree/useTreeItem';
+
+// table — mirrors the @react-aria/table shim surface.
+export { useTable } from './table/useTable';
+export { useTableColumnHeader } from './table/useTableColumnHeader';
+export { useTableRow } from './table/useTableRow';
+export { useTableHeaderRow } from './table/useTableHeaderRow';
+export { useTableCell } from './table/useTableCell';
+export {
+	useTableSelectionCheckbox,
+	useTableSelectAllCheckbox,
+} from './table/useTableSelectionCheckbox';
+export { useTableColumnResize } from './table/useTableColumnResize';
+export { useTableRowGroup } from './table/useTableRowGroup';
+export type { AriaTableProps } from './table/useTable';
+export type {
+	AriaTableColumnHeaderProps,
+	TableColumnHeaderAria,
+} from './table/useTableColumnHeader';
+export type { TableRowAria } from './table/useTableRow';
+export type { TableHeaderRowAria } from './table/useTableHeaderRow';
+export type { AriaTableCellProps, TableCellAria } from './table/useTableCell';
+export type {
+	AriaTableSelectionCheckboxProps,
+	TableSelectionCheckboxAria,
+	TableSelectAllCheckboxAria,
+} from './table/useTableSelectionCheckbox';
+export type {
+	AriaTableColumnResizeProps,
+	TableColumnResizeAria,
+} from './table/useTableColumnResize';
+export type { GridAria, GridProps } from './grid/useGrid';
+export type { GridRowAria, GridRowProps } from './grid/useGridRow';

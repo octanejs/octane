@@ -19,7 +19,8 @@
       "@octanejs/dexie",
       "@octanejs/tanstack-query",
       "@octanejs/tanstack-router",
-      "@octanejs/remix-router"
+      "@octanejs/remix-router",
+      "@octanejs/nuqs"
     ]
   },
   {

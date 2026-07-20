@@ -116,3 +116,46 @@ export type { NumberFieldState, NumberFieldStateOptions } from './numberfield/us
 // slider
 export { useSliderState } from './slider/useSliderState';
 export type { SliderState, SliderStateOptions } from './slider/useSliderState';
+
+// grid — mirrors the @react-stately/grid shim surface.
+export { useGridState } from './grid/useGridState';
+export { GridCollection } from './grid/GridCollection';
+export type { GridStateOptions, GridState } from './grid/useGridState';
+export type { IGridCollection, GridNode, GridRow } from './grid/GridCollection';
+
+// table — mirrors the @react-stately/table shim surface (Section is already
+// exported from the collections section above).
+export { useTableState, UNSTABLE_useFilteredTableState } from './table/useTableState';
+export { useTableColumnResizeState } from './table/useTableColumnResizeState';
+export { UNSTABLE_useTreeGridState } from './table/useTreeGridState';
+export { TableHeader } from './table/TableHeader';
+export { TableBody } from './table/TableBody';
+export { Column } from './table/Column';
+export { Row } from './table/Row';
+export { Cell } from './table/Cell';
+export { TableCollection, buildHeaderRows } from './table/TableCollection';
+export { TableColumnLayout } from './table/TableColumnLayout';
+export type {
+	TableProps,
+	TableState,
+	TableStateProps,
+	CollectionBuilderContext,
+} from './table/useTableState';
+export type {
+	TableColumnResizeState,
+	TableColumnResizeStateProps,
+} from './table/useTableColumnResizeState';
+export type { TreeGridState, TreeGridStateProps } from './table/useTreeGridState';
+export type {
+	ColumnProps,
+	ColumnSize,
+	ColumnDynamicSize,
+	ColumnStaticSize,
+	ColumnElement,
+	ColumnRenderer,
+} from './table/Column';
+export type { TableHeaderProps } from './table/TableHeader';
+export type { TableBodyProps } from './table/TableBody';
+export type { RowProps, RowElement } from './table/Row';
+export type { CellProps, CellElement, CellRenderer } from './table/Cell';
+export type { ITableCollection } from './table/TableCollection';
