@@ -1,1 +1,0 @@
-import{P as e,W as t,m as n,n as r}from"./runtime-Cd_kM1Y5.js";var i=t(`<div data-testid="PostsIndexComponent">Select a post.</div>`,3);function a(e,t,a){let o=t.slots[0];o===void 0&&(o=r(t,n(i)))}typeof a==`function`&&e(a);export{a as component};

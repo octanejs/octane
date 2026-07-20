@@ -34,19 +34,14 @@ pnpm --filter tanstack-start-bench test:e2e# behavioral gate, one spec × both
   ordering, octane's `#__app` container), and requires the remaining element
   tree + text to match node for node. **Currently 5/5 routes PASS.**
 - `e2e/bench.spec.ts` runs identical journeys against both servers with a
-  clean-console gate. **Currently 7/8 pass.**
+  clean-console gate. **Currently 8/8 pass.**
 
-## Known issue (tracked, blocks the perf phase)
+## Status
 
-The `posts` journey's final assertion fails on the octane flavor only: a
-client-side child navigation (`/posts` → `/posts/3`) remounts the whole match
-tree (parent route state lost; every DOM node replaced) where the react
-flavor preserves it. Instrumented cause: `Match`'s `SuspenseWrap` flips
-`SafeFragment → Suspense` because `matchState.ssr === false` on
-client-loaded matches in the octane flavor — react-router 1.170.18 carries
-the identical condition without the flip, so the divergence is in the
-flavor-specific inputs that drive the ssr flag. `remount-probe.mjs`
-(production, DOM-identity) and `remount-dev-probe.mjs` (dev server + mount
-logging) reproduce it. The perf harness (`run.mjs`, bench.mjs registration)
-is deliberately absent until this gate is fully green — numbers taken today
-would compare a remounting app against a non-remounting one.
+Both gates are fully green: `compare` 5/5 routes, `test:e2e` 8/8 journeys on
+both flavors, including DOM-identity preservation across client child
+navigation (verified by `remount-probe.mjs`; an earlier octane full-tree
+remount on `/posts` → `/posts/3` was fixed on main by the passthrough-
+hydration remount fix, #192). The perf harness (`run.mjs` + bench.mjs
+registration) is the next phase, now unblocked — it was deliberately withheld
+until this correctness gate passed.
