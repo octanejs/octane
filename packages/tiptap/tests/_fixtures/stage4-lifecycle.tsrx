@@ -12,9 +12,7 @@ import { BubbleMenu } from '@octanejs/tiptap/menus';
 import { useEffect, useState } from 'octane';
 
 export function PendingRendererBody(props) @{
-	<span data-pending-renderer="true">
-		{props.label as string}
-	</span>
+	<span data-pending-renderer="true">{props.label as string}</span>
 }
 
 export function PendingRendererHost(props) @{
@@ -47,9 +45,7 @@ function SwitchingNodeView(props) @{
 		data-switching-node="true"
 		class={'switching-node-' + owner}
 	>
-		<output data-switching-node-owner="true">
-			{owner as string}
-		</output>
+		<output data-switching-node-owner="true">{owner as string}</output>
 		<button
 			type="button"
 			contentEditable={false}
@@ -105,9 +101,7 @@ function SwitchingMarkView(props) @{
 		data-switching-mark="true"
 		class={'switching-mark-' + owner}
 	>
-		<output data-switching-mark-owner="true">
-			{owner as string}
-		</output>
+		<output data-switching-mark-owner="true">{owner as string}</output>
 		<MarkViewContent id={'switching-mark-content-' + owner} />
 	</span>
 }
@@ -196,9 +190,11 @@ export function SwitchingMenuHost(props) @{
 			className={'switching-menu-' + props.owner}
 			ref={props.menuRef}
 		>
-			<button type="button" data-switching-menu-action="true" onClick={props.onAction}>
-				{props.owner as string}
-			</button>
+			<button
+				type="button"
+				data-switching-menu-action="true"
+				onClick={props.onAction}
+			>{props.owner as string}</button>
 		</BubbleMenu>
 	</section>
 }
@@ -207,13 +203,9 @@ function AdvancedNodeView(props) @{
 	const id = props.node.attrs.id;
 
 	<NodeViewWrapper as="article" data-advanced-view="true" id={'advanced-view-' + id}>
-		<output id={'advanced-label-' + id}>
-			{props.node.attrs.label as string}
-		</output>
+		<output id={'advanced-label-' + id}>{props.node.attrs.label as string}</output>
 		<output id={'advanced-position-' + id}>{String(props.getPos())}</output>
-		<output id={'advanced-storage-' + id}>
-			{props.extension.storage.version as string}
-		</output>
+		<output id={'advanced-storage-' + id}>{props.extension.storage.version as string}</output>
 		<output id={'advanced-revision-' + id}>{String(props.node.attrs.revision)}</output>
 		<button
 			type="button"

@@ -1,9 +1,7 @@
-export function GoogleIcon({
-	className,
-	width = '1em',
-	height = '1em',
-	...props
-}: Record<string, any>) {
+export function GoogleIcon({ className, width = '1em', height = '1em', ...props }: Record<
+	string,
+	any
+>) {
 	return <svg
 		viewBox="0 0 496 512"
 		fill="currentColor"

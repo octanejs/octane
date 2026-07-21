@@ -14,9 +14,7 @@ export function ForeignObjectInIf(props) @{
 			<svg id="fo-svg" viewBox="0 0 100 100">
 				<foreignObject id="fo" x="0" y="0" width="100" height="100">
 					<div id="fo-html" class="html-inside">
-						<span id="fo-span">
-							{props.label as string}
-						</span>
+						<span id="fo-span">{props.label as string}</span>
 					</div>
 				</foreignObject>
 				<rect id="fo-rect" class="svg-after" x="0" y="0" width="10" height="10" />

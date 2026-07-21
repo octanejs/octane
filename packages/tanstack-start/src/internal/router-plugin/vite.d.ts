@@ -68,14 +68,11 @@ declare const tanstackRouter: (
 						tmpDir: string;
 						importRoutesUsingAbsolutePaths: boolean;
 						virtualRouteConfig?:
-							| string
-							| import('@tanstack/virtual-file-routes').VirtualRootRoute
-							| undefined;
+							string | import('@tanstack/virtual-file-routes').VirtualRootRoute | undefined;
 						routeFilePrefix?: string | undefined;
 						routeFileIgnorePattern?: string | undefined;
 						pathParamsAllowedCharacters?:
-							| (':' | '$' | ';' | '@' | '&' | '=' | '+' | ',')[]
-							| undefined;
+							(':' | '$' | ';' | '@' | '&' | '=' | '+' | ',')[] | undefined;
 						routeTreeFileFooter?: string[] | (() => Array<string>) | undefined;
 						autoCodeSplitting?: boolean | undefined;
 						customScaffolding?:
@@ -146,14 +143,11 @@ declare const TanStackRouterVite: (
 						tmpDir: string;
 						importRoutesUsingAbsolutePaths: boolean;
 						virtualRouteConfig?:
-							| string
-							| import('@tanstack/virtual-file-routes').VirtualRootRoute
-							| undefined;
+							string | import('@tanstack/virtual-file-routes').VirtualRootRoute | undefined;
 						routeFilePrefix?: string | undefined;
 						routeFileIgnorePattern?: string | undefined;
 						pathParamsAllowedCharacters?:
-							| (':' | '$' | ';' | '@' | '&' | '=' | '+' | ',')[]
-							| undefined;
+							(':' | '$' | ';' | '@' | '&' | '=' | '+' | ',')[] | undefined;
 						routeTreeFileFooter?: string[] | (() => Array<string>) | undefined;
 						autoCodeSplitting?: boolean | undefined;
 						customScaffolding?:

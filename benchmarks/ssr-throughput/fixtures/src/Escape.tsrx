@@ -10,9 +10,7 @@ import { TEXTS } from './escape-data';
 export function EscapeApp() @{
 	<ul class="esc">
 		@for (const t of TEXTS; key t.id) {
-			<li class="e">
-				{t.text as string}
-			</li>
+			<li class="e">{t.text as string}</li>
 		}
 	</ul>
 }

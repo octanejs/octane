@@ -32,18 +32,14 @@ export function BasicReader(props) @{
 	useLayoutEffect(() => {
 		if (props.commitProbe) props.commitProbe.value = value;
 	}, null);
-	<span id="basic-store-value">
-		{value as string}
-	</span>
+	<span id="basic-store-value">{value as string}</span>
 }
 
 export function SwappableReader(props) @{
 	const [store, setStore] = useState(props.store);
 	controls.setStore = setStore;
 	const value = useSyncExternalStore(store.subscribe, store.getState);
-	<span id="swappable-store-value">
-		{value as string}
-	</span>
+	<span id="swappable-store-value">{value as string}</span>
 }
 
 function SelectedA(props) @{
@@ -135,16 +131,12 @@ function ResettingReader(props) @{
 			props.store.set(0);
 		}
 	}, [value]);
-	<span class="reset-reader">
-		{value as string}
-	</span>
+	<span class="reset-reader">{value as string}</span>
 }
 
 function PlainReader(props) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.getState);
-	<span class="plain-reader">
-		{value as string}
-	</span>
+	<span class="plain-reader">{value as string}</span>
 }
 
 export function ResetDuringCommit(props) @{
@@ -158,9 +150,7 @@ export function LatestSnapshotReader(props) @{
 	const [getSnapshot, setGetSnapshot] = useState(() => props.getSnapshotA);
 	controls.setGetSnapshot = setGetSnapshot;
 	const value = useSyncExternalStore(props.store.subscribe, getSnapshot);
-	<span id="latest-snapshot">
-		{value as string}
-	</span>
+	<span id="latest-snapshot">{value as string}</span>
 }
 
 function ThrowingSnapshotReader(props) @{
@@ -169,18 +159,14 @@ function ThrowingSnapshotReader(props) @{
 		if (state.throwInGetSnapshot) throw new Error('Error in getSnapshot');
 		return state.value;
 	});
-	<span id="throwing-snapshot-value">
-		{value as string}
-	</span>
+	<span id="throwing-snapshot-value">{value as string}</span>
 }
 
 export function SnapshotErrorBoundary(props) @{
 	@try {
 		<ThrowingSnapshotReader store={props.store} />
 	} @catch (error) {
-		<span id="snapshot-error">
-			{error.message as string}
-		</span>
+		<span id="snapshot-error">{error.message as string}</span>
 	}
 }
 
@@ -194,9 +180,7 @@ export function NumberSnapshotReader(props) @{
 		props.store.subscribe,
 		() => parseInt(props.store.getState(), 10),
 	);
-	<span id="number-snapshot">
-		{value as string}
-	</span>
+	<span id="number-snapshot">{value as string}</span>
 }
 
 export function DerivedSnapshotReader(props) @{
@@ -204,9 +188,7 @@ export function DerivedSnapshotReader(props) @{
 	const [derivedValue, setDerivedValue] = useState(value);
 	useEffect(() => {}, []);
 	if (derivedValue !== value.toUpperCase()) setDerivedValue(value.toUpperCase());
-	<span id="derived-snapshot">
-		{derivedValue as string}
-	</span>
+	<span id="derived-snapshot">{derivedValue as string}</span>
 }
 
 export function HydrationStoreReader(props) @{
@@ -215,7 +197,5 @@ export function HydrationStoreReader(props) @{
 		props.store.getState,
 		props.store.getServerState,
 	);
-	<div id="hydrated-store" ref={props.hostRef}>
-		{value as string}
-	</div>
+	<div id="hydrated-store" ref={props.hostRef}>{value as string}</div>
 }

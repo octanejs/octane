@@ -234,16 +234,13 @@ export declare namespace useSuspenseQuery {
 		| (TOptions extends any
 				? TOptions extends SkipToken
 					? 'empty'
-					:
-							| (OptionWithFallback<TOptions, DefaultOptions, 'errorPolicy'> extends 'none'
-									? never
-									: 'empty')
-							| (OptionWithFallback<TOptions, DefaultOptions, 'skip'> extends false
-									? never
-									: 'empty')
-							| (OptionWithFallback<TOptions, DefaultOptions, 'returnPartialData'> extends false
-									? never
-									: 'partial')
+					: | (OptionWithFallback<TOptions, DefaultOptions, 'errorPolicy'> extends 'none'
+								? never
+								: 'empty')
+						| (OptionWithFallback<TOptions, DefaultOptions, 'skip'> extends false ? never : 'empty')
+						| (OptionWithFallback<TOptions, DefaultOptions, 'returnPartialData'> extends false
+								? never
+								: 'partial')
 				: never)
 		| ([TOptions] extends [SkipToken]
 				? DefaultOptions extends {

@@ -58,9 +58,7 @@ export function FilterTable(props: { global?: boolean }) @{
 		}
 		<ul>
 			@for (const row of table.getRowModel().rows; key row.id) {
-				<li class="f-row">
-					{row.original.firstName as string}
-				</li>
+				<li class="f-row">{row.original.firstName as string}</li>
 			}
 		</ul>
 	</div>
@@ -96,9 +94,7 @@ export function PaginationTable() @{
 		<button id="ps-5" onClick={() => table.setPageSize(5)}>5</button>
 		<ul>
 			@for (const row of table.getRowModel().rows; key row.id) {
-				<li class="p-row">
-					{row.original.firstName as string}
-				</li>
+				<li class="p-row">{row.original.firstName as string}</li>
 			}
 		</ul>
 	</div>
@@ -160,9 +156,10 @@ export function VisibilityTable() @{
 	captured.table = table;
 	<div>
 		@for (const col of table.getAllLeafColumns(); key col.id) {
-			<button id={'vis-' + col.id} onClick={() => col.toggleVisibility()}>
-				{col.id as string}
-			</button>
+			<button
+				id={'vis-' + col.id}
+				onClick={() => col.toggleVisibility()}
+			>{col.id as string}</button>
 		}
 		<table>
 			<thead>

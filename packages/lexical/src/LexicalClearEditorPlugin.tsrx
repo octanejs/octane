@@ -4,7 +4,8 @@ import { useLexicalComposerContext } from './LexicalComposerContext';
 import { registerClearEditor } from '@lexical/extension';
 import { useLayoutEffect } from 'octane';
 
-type Props = Readonly<{
+type Props =
+	Readonly<{
 		onClear?: () => void;
 	}>;
 

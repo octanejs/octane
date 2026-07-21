@@ -26,9 +26,7 @@ export function RedirectVersionBanner(props: { version: string; latestVersion: s
 		>
 			<p class="block">
 				You are currently reading
-				<strong>
-					{version as string}
-				</strong>
+				<strong>{version as string}</strong>
 				docs. Redirect to
 				{' '}
 				<Link

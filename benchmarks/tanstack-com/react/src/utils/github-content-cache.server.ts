@@ -580,20 +580,16 @@ function pruneMemoryCache() {
 	}
 
 	const entries: Array<MemoryCacheEntry> = [
-		...Array.from(memoryGitHubContent.entries()).map(
-			([key, record]): MemoryCacheEntry => ({
-				cache: 'content',
-				key,
-				updatedAt: record.updatedAt,
-			}),
-		),
-		...Array.from(memoryDocsArtifacts.entries()).map(
-			([key, record]): MemoryCacheEntry => ({
-				cache: 'artifact',
-				key,
-				updatedAt: record.updatedAt,
-			}),
-		),
+		...Array.from(memoryGitHubContent.entries()).map(([key, record]): MemoryCacheEntry => ({
+			cache: 'content',
+			key,
+			updatedAt: record.updatedAt,
+		})),
+		...Array.from(memoryDocsArtifacts.entries()).map(([key, record]): MemoryCacheEntry => ({
+			cache: 'artifact',
+			key,
+			updatedAt: record.updatedAt,
+		})),
 	].sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
 
 	for (const entry of entries.slice(0, totalEntries - MAX_MEMORY_CACHE_ENTRIES)) {

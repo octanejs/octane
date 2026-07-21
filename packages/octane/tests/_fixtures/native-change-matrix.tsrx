@@ -28,9 +28,7 @@ export function TextControlledByChange(props) @{
 				setValue(event.target.value);
 			}}
 		/>
-		<output>
-			{value as string}
-		</output>
+		<output>{value as string}</output>
 	</section>
 }
 
@@ -46,9 +44,7 @@ export function TextControlledByInput(props) @{
 			}}
 			onChange={(event) => props.record('change', event)}
 		/>
-		<output>
-			{value as string}
-		</output>
+		<output>{value as string}</output>
 	</section>
 }
 
@@ -80,9 +76,7 @@ export function SelectTimeline(props) @{
 			<option value="a">A</option>
 			<option value="b">B</option>
 		</select>
-		<output>
-			{value as string}
-		</output>
+		<output>{value as string}</output>
 	</section>
 }
 
@@ -184,9 +178,7 @@ export function RadioAccept(props) @{
 				setValue('b');
 			}}
 		/>
-		<output>
-			{value as string}
-		</output>
+		<output>{value as string}</output>
 	</form>
 }
 
@@ -213,9 +205,7 @@ export function RadioReject(props) @{
 			onInput={(event) => props.record('b:input', event)}
 			onChange={(event) => props.record('b:change', event)}
 		/>
-		<output>
-			{value as string}
-		</output>
+		<output>{value as string}</output>
 	</form>
 }
 
@@ -276,8 +266,6 @@ export function CompositionTimeline(props) @{
 			}}
 			onChange={(event) => props.record('change', event)}
 		/>
-		<output>
-			{value as string}
-		</output>
+		<output>{value as string}</output>
 	</section>
 }

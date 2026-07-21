@@ -15,9 +15,7 @@ export default function Layout(props: { children: unknown }) @{
 		<button onClick={checkModuleIdentity}>
 			Check hydration module identity
 		</button>
-		<output data-hydration-module-identity="">
-			{moduleIdentity as string}
-		</output>
+		<output data-hydration-module-identity="">{moduleIdentity as string}</output>
 		{props.children}
 	</div>
 }

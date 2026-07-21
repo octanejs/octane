@@ -20,8 +20,7 @@ export function useRouter<TRouter extends AnyRouter = RegisteredRouter>(opts?: {
 }): TRouter;
 export function useRouter(...args: unknown[]): AnyRouter {
 	const opts = (args.length && typeof args[0] !== 'symbol' ? args[0] : undefined) as
-		| { router?: AnyRouter; warn?: boolean }
-		| undefined;
+		{ router?: AnyRouter; warn?: boolean } | undefined;
 	const ctx = useContext(routerContext);
 	const router = opts?.router ?? ctx;
 	if (!router && opts?.warn !== false) {

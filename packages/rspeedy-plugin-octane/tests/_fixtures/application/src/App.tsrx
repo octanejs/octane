@@ -16,8 +16,6 @@ export function App({ label }: { label: string }) @{
 		bindtap={() => runBackgroundOnlyCallback()}
 	>
 		<image src={badge} />
-		<text>
-			{label as string}
-		</text>
+		<text>{label as string}</text>
 	</view>
 }

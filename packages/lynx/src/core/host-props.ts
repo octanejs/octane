@@ -43,14 +43,7 @@ export interface NormalizedLynxCSSScope {
 }
 
 export type LynxHostPropRoute =
-	| 'attribute'
-	| 'classes'
-	| 'css-scope'
-	| 'dataset'
-	| 'event'
-	| 'id'
-	| 'inline-styles'
-	| 'reserved';
+	'attribute' | 'classes' | 'css-scope' | 'dataset' | 'event' | 'id' | 'inline-styles' | 'reserved';
 
 export interface LynxValuePatch<T> {
 	readonly value: T;

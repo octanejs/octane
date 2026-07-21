@@ -41,9 +41,7 @@ function Reader(props) @{
 		queryFn: () => props.queryFn(value),
 		retry: false,
 	});
-	<span id="data">
-		{'data:' + q.data as string}
-	</span>
+	<span id="data">{'data:' + q.data as string}</span>
 }
 
 export function TransitionSuspenseApp(props) @{
@@ -59,9 +57,7 @@ export function TransitionSuspenseApp(props) @{
 			} @pending {
 				<span id="fallback">loading</span>
 			} @catch (e) {
-				<span id="caught">
-					{'caught:' + (e as Error).message as string}
-				</span>
+				<span id="caught">{'caught:' + (e as Error).message as string}</span>
 			}
 		</div>
 	</QueryClientProvider>

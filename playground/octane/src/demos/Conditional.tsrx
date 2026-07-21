@@ -12,17 +12,15 @@ export function Conditional() @{
 			class="demo-blurb"
 		>{'@if / @else with useState INSIDE the branch body — the inner counter resets every time you toggle.'}</p>
 		<div class="row">
-			<button class="btn" onClick={() => setOpen((o) => !o)}>
-				{(open ? 'collapse' : 'expand') as string}
-			</button>
+			<button class="btn" onClick={() => setOpen((o) => !o)}>{(open
+				? 'collapse'
+				: 'expand') as string}</button>
 		</div>
 		@if (open) {
 			const [bumps, setBumps] = useState(0);
 
 			<div class="panel" style="margin-top: 12px">
-				<p style="margin: 0 0 8px">
-					{'inner bumps: ' + bumps as string}
-				</p>
+				<p style="margin: 0 0 8px">{'inner bumps: ' + bumps as string}</p>
 				<button class="btn" onClick={() => setBumps((b) => b + 1)}>{'bump inner'}</button>
 			</div>
 		} @else {

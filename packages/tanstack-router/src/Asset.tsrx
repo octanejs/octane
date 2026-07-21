@@ -4,7 +4,8 @@ import type { RouterManagedTag } from '@tanstack/router-core';
 import { useRouter } from './context.ts';
 import { useHydrated } from './ClientOnly.tsrx';
 
-export type AssetProps = RouterManagedTag & {
+export type AssetProps =
+	RouterManagedTag & {
 		assetKey: string;
 		target: 'head' | 'body';
 	};

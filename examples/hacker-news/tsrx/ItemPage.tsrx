@@ -18,18 +18,14 @@ export function ItemPage() @{
 	<div data-testid="item-page">
 		<h1 {...stylex.props(styles.storyTitle)}>
 			@if (item.url) {
-				<a href={item.url} {...stylex.props(styles.storyTitleLink)}>
-					{item.title as string}
-				</a>
+				<a href={item.url} {...stylex.props(styles.storyTitleLink)}>{item.title as string}</a>
 			} @else {
 				{
 					item.title as string;
 				}
 			}
 			@if (host) {
-				<span {...stylex.props(styles.host)}>
-					{' (' + host + ')' as string}
-				</span>
+				<span {...stylex.props(styles.host)}>{' (' + host + ')' as string}</span>
 			}
 		</h1>
 		<div {...stylex.props(styles.meta)}>
@@ -39,9 +35,7 @@ export function ItemPage() @{
 				params={{ id: item.by ?? '' }}
 				data-testid="user-link"
 				{...stylex.props(styles.metaLink)}
-			>
-				{item.by as string}
-			</Link>
+			>{item.by as string}</Link>
 			{' ' + relativeTime(item.time)}
 		</div>
 		@if (item.text) {

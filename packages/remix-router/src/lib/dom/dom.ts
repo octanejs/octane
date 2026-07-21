@@ -41,10 +41,7 @@ export function shouldProcessLinkClick(event: LimitedMouseEvent, target?: string
 export type ParamKeyValuePair = [string, string];
 
 export type URLSearchParamsInit =
-	| string
-	| ParamKeyValuePair[]
-	| Record<string, string | string[]>
-	| URLSearchParams;
+	string | ParamKeyValuePair[] | Record<string, string | string[]> | URLSearchParams;
 
 /**
   Creates a URLSearchParams object using the given initializer.

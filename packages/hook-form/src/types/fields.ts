@@ -25,10 +25,7 @@ export type FieldValues = Record<string, any>;
 export type NativeFieldValue = string | number | boolean | null | undefined | unknown[];
 
 export type FieldElement<TFieldValues extends FieldValues = FieldValues> =
-	| HTMLInputElement
-	| HTMLSelectElement
-	| HTMLTextAreaElement
-	| CustomElement<TFieldValues>;
+	HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | CustomElement<TFieldValues>;
 
 export type Ref = FieldElement;
 

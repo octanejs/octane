@@ -38,16 +38,16 @@ function getTabs(value: unknown): Array<TabMeta> {
 	}
 
 	return value.tabs.filter(
-		(tab): tab is TabMeta => isRecord(tab) && typeof tab.name === 'string' &&
-			typeof tab.slug === 'string',
+		(tab): tab is TabMeta =>
+			isRecord(tab) && typeof tab.name === 'string' && typeof tab.slug === 'string',
 	);
 }
 
 function isPackageGroups(value: unknown): value is string[][] {
 	return Array.isArray(value) &&
 		value.every(
-			(group) => Array.isArray(group) &&
-				group.every((packageName) => typeof packageName === 'string'),
+			(group) =>
+				Array.isArray(group) && group.every((packageName) => typeof packageName === 'string'),
 		);
 }
 

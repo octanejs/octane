@@ -32,14 +32,7 @@ export interface ApplyThreePropsOptions {
 }
 
 type PropertyApplication =
-	| 'skip'
-	| 'layers'
-	| 'color'
-	| 'copy'
-	| 'array'
-	| 'number'
-	| 'uniforms'
-	| 'assign';
+	'skip' | 'layers' | 'color' | 'copy' | 'array' | 'number' | 'uniforms' | 'assign';
 
 interface PropertyBehaviorReader {
 	readonly target: (key: 'set' | 'copy' | 'constructor' | 'fromArray' | 'setScalar') => unknown;

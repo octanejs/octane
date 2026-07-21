@@ -12,10 +12,7 @@ import type {
 // tsgo treats as `any` via the ambient module — so the typed surface lives here).
 
 export type InitialEditorStateType =
-	| null
-	| string
-	| EditorState
-	| ((editor: LexicalEditor) => void);
+	null | string | EditorState | ((editor: LexicalEditor) => void);
 
 export type InitialConfigType = Readonly<{
 	namespace: string;

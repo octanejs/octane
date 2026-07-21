@@ -48,9 +48,7 @@ function InterleavedCounter(props) @{
 		props.log('Create Layout 2 for Component ' + props.name + ' ' + props.read());
 		return () => props.log('Destroy Layout 2 for Component ' + props.name + ' ' + props.read());
 	}, [props.count]);
-	<span>
-		{props.name as string}
-	</span>
+	<span>{props.name as string}</span>
 }
 
 export function InterleavedPair(props) @{

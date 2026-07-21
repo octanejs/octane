@@ -42,9 +42,10 @@ export function VisExpand() @{
 	});
 	<div>
 		@for (const col of table.getAllLeafColumns(); key col.id) {
-			<button id={'vis-' + col.id} onClick={() => col.toggleVisibility()}>
-				{col.id as string}
-			</button>
+			<button
+				id={'vis-' + col.id}
+				onClick={() => col.toggleVisibility()}
+			>{col.id as string}</button>
 		}
 		<table>
 			<thead>

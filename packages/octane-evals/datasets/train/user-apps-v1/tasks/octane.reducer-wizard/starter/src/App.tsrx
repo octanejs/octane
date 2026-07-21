@@ -57,12 +57,8 @@ export function ReviewStep(props: {
 	onConfirm: () => void;
 }) @{
 	<section aria-label="Review step">
-		<output aria-label="Review name">
-			{props.name as string}
-		</output>
-		<output aria-label="Review plan">
-			{props.plan as string}
-		</output>
+		<output aria-label="Review name">{props.name as string}</output>
+		<output aria-label="Review plan">{props.plan as string}</output>
 		<button>Back</button>
 		<button>Confirm</button>
 	</section>

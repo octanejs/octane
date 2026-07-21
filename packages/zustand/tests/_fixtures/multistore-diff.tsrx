@@ -22,12 +22,8 @@ export function Zoo() @{
 	const addBear = useBears((s) => s.add);
 	const addFish = useFish((s) => s.add);
 	<div>
-		<span id="bears">
-			{bears as string}
-		</span>
-		<span id="fish">
-			{fish as string}
-		</span>
+		<span id="bears">{bears as string}</span>
+		<span id="fish">{fish as string}</span>
 		<button id="addBear" onClick={addBear}>addBear</button>
 		<button id="addFish" onClick={addFish}>addFish</button>
 	</div>

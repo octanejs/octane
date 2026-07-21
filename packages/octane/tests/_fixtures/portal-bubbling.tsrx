@@ -11,9 +11,7 @@ export function NestedPortals(props) @{
 	const [trail, setTrail] = useState('');
 
 	<div class="app-root" onClick={() => setTrail((t) => t + 'root,')}>
-		<span class="trail">
-			{trail as string}
-		</span>
+		<span class="trail">{trail as string}</span>
 		{createPortal(
 			() => @{
 				<div

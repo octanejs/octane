@@ -97,9 +97,7 @@ export function ErrorComponent(props: {
 					style="font-size:.7em;border:1px solid red;border-radius:.25rem;padding:.3rem;color:red;overflow:auto"
 				>
 					@if (props.error?.message) {
-						<code>
-							{props.error.message as string}
-						</code>
+						<code>{props.error.message as string}</code>
 					}
 				</pre>
 			</div>

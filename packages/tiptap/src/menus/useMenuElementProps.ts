@@ -9,9 +9,7 @@ type MenuStyle = Record<string, MenuStyleValue>;
 type MenuEventHandler<E extends Event = Event> = (event: E) => unknown;
 
 export type MenuElementRef<T> =
-	| { current: T | null }
-	| ((value: T | null) => void | (() => void))
-	| null;
+	{ current: T | null } | ((value: T | null) => void | (() => void)) | null;
 
 export type MenuElementProps = {
 	children?: unknown;

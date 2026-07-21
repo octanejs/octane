@@ -21,13 +21,9 @@ export default function Row({ item, selected, onSelect, onRemove }) @{
 	const rowAttrs = { class: selected ? 'danger' : '' };
 
 	<tr {...rowAttrs}>
-		<td class="col-md-1">
-			{item.id as string}
-		</td>
+		<td class="col-md-1">{item.id as string}</td>
 		<td class="col-md-4">
-			<a onClick={() => actions.select(item.id)}>
-				{item.label as string}
-			</a>
+			<a onClick={() => actions.select(item.id)}>{item.label as string}</a>
 		</td>
 		<td class="col-md-1">
 			<a onClick={() => actions.remove(item)}>

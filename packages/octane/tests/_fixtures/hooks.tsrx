@@ -12,9 +12,7 @@ import {
 // Lazy initial value
 export function LazyInit() @{
 	const [n, setN] = octaneUseState(() => 41 + 1);
-	<span>
-		{n as string}
-	</span>
+	<span>{n as string}</span>
 }
 
 // Two independent useState slots
@@ -22,21 +20,15 @@ export function TwoStates() @{
 	const [a, setA] = octaneUseState(1);
 	const [b, setB] = octaneUseState(10);
 	<div>
-		<button id="a" onClick={() => setA(a + 1)}>
-			{a as string}
-		</button>
-		<button id="b" onClick={() => setB(b + 2)}>
-			{b as string}
-		</button>
+		<button id="a" onClick={() => setA(a + 1)}>{a as string}</button>
+		<button id="b" onClick={() => setB(b + 2)}>{b as string}</button>
 	</div>
 }
 
 // useReducer
 export function Tally() @{
 	const [n, dispatch] = useReducer((s, a) => s + a, 0);
-	<button onClick={() => dispatch(5)}>
-		{n as string}
-	</button>
+	<button onClick={() => dispatch(5)}>{n as string}</button>
 }
 
 // useMemo — recompute only when deps change.
@@ -48,12 +40,8 @@ export function MemoTest(props) @{
 		return props.n * 2;
 	});
 	<div>
-		<span class="val">
-			{doubled as string}
-		</span>
-		<span class="count">
-			{computeCount.current as string}
-		</span>
+		<span class="val">{doubled as string}</span>
+		<span class="count">{computeCount.current as string}</span>
 	</div>
 }
 
@@ -64,12 +52,8 @@ function useComputed(factory, dependencies) {
 export function CustomMemoDeps(props) @{
 	const value = useComputed(() => props.compute(props.value));
 	<div>
-		<span class="value">
-			{value as string}
-		</span>
-		<span class="noise">
-			{props.noise as string}
-		</span>
+		<span class="value">{value as string}</span>
+		<span class="noise">{props.noise as string}</span>
 	</div>
 }
 
@@ -91,9 +75,7 @@ function useMemo(callback, options) {
 
 export function BuiltinLookalike(props) @{
 	const value = useMemo(() => props.value);
-	<span>
-		{value as string}
-	</span>
+	<span>{value as string}</span>
 }
 
 function useState(value) {
@@ -108,9 +90,7 @@ export function StableResultLookalikes(props) @{
 	const [, read] = useState(props.value);
 	const ref = useRef(props.value);
 	const value = useComputed(() => read() + '/' + ref.current);
-	<span>
-		{value as string}
-	</span>
+	<span>{value as string}</span>
 }
 
 function useSelectorLike(selector, equality) {
@@ -119,17 +99,13 @@ function useSelectorLike(selector, equality) {
 
 export function CustomSelectorCallback(props) @{
 	const value = useSelectorLike(() => props.value);
-	<span>
-		{value as string}
-	</span>
+	<span>{value as string}</span>
 }
 
 // useCallback — stable identity per deps
 export function CbTest(props) @{
 	const cb = useCallback(() => props.label);
-	<span>
-		{props.label as string}
-	</span>
+	<span>{props.label as string}</span>
 }
 
 // useRef — survives across renders, mutations don't trigger re-render.
@@ -141,9 +117,7 @@ export function RefTest() @{
 			ref.current++;
 			setTick(tick + 1);
 		}}
-	>
-		{ref.current as string}
-	</button>
+	>{ref.current as string}</button>
 }
 
 // useEffect — fires after commit; cleanup on unmount
@@ -162,9 +136,7 @@ export function EffectDeps(props) @{
 	useEffect(() => {
 		props.cb(props.n);
 	});
-	<span>
-		{props.n as string}
-	</span>
+	<span>{props.n as string}</span>
 }
 
 function useObservedEffect(callback, dependencies) {
@@ -173,9 +145,7 @@ function useObservedEffect(callback, dependencies) {
 
 export function CustomEffectDeps(props) @{
 	useObservedEffect(() => props.cb(props.value));
-	<span>
-		{props.noise as string}
-	</span>
+	<span>{props.noise as string}</span>
 }
 
 // useLayoutEffect runs synchronously (before passive useEffect)
@@ -196,7 +166,5 @@ export function LayoutVsEffect(props) @{
 // compiler-inferred dependencies.
 export function EffectAlways(props) @{
 	useEffect(() => props.cb(props.n), null);
-	<span>
-		{props.n as string}
-	</span>
+	<span>{props.n as string}</span>
 }

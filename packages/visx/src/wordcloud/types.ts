@@ -58,9 +58,7 @@ export interface WordcloudConfig<Datum extends BaseDatum> {
 	 * @default archimedean
 	 */
 	spiral?:
-		| 'archimedean'
-		| 'rectangular'
-		| ((size: [number, number]) => (t: number) => [number, number]);
+		'archimedean' | 'rectangular' | ((size: [number, number]) => (t: number) => [number, number]);
 	/**
 	 * Sets the internal random number generator, used for selecting the initial position of each word,
 	 * and the clockwise/counterclockwise direction of the spiral for each word. Random function should return a number in the range [0, 1).

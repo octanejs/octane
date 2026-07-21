@@ -7,15 +7,11 @@ function ItemView({ item, idPrefix = 'item-' }: { item: Item; idPrefix?: string 
 	<div class="item-component" id={idPrefix + item.id}>
 		<p>
 			ID:
-			<span class="id-span">
-				{item.id as string}
-			</span>
+			<span class="id-span">{item.id as string}</span>
 		</p>
 		<p>
 			Name:
-			<span class="name-span">
-				{item.name as string}
-			</span>
+			<span class="name-span">{item.name as string}</span>
 		</p>
 	</div>
 }

@@ -22,19 +22,16 @@ export function Inputs() @{
 		<div class="panel" style="margin-top: 12px">
 			@switch (kind) {
 				@case 'plain': {
-					<p style="margin: 0">
-						{'hello, ' + name as string}
-					</p>
+					<p style="margin: 0">{'hello, ' + name as string}</p>
 				}
 				@case 'shout': {
-					<p style="margin: 0; font-weight: 700">
-						{'HELLO, ' + name.toUpperCase() + '!' as string}
-					</p>
+					<p style="margin: 0; font-weight: 700">{'HELLO, ' + name.toUpperCase() +
+						'!' as string}</p>
 				}
 				@case 'whisper': {
-					<p style="margin: 0; color: var(--muted); font-style: italic">
-						{'hello, ' + name.toLowerCase() + '...' as string}
-					</p>
+					<p style="margin: 0; color: var(--muted); font-style: italic">{'hello, ' +
+						name.toLowerCase() +
+						'...' as string}</p>
 				}
 				@default: {
 					<p style="margin: 0">{'(unknown kind)'}</p>

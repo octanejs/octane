@@ -25,9 +25,8 @@ export function AbortedMountRefs(props) @{
 				<BrokenRender />
 			</>
 		} @catch (err) {
-			<div class="error-message" ref={props.errorMessageRef}>
-				{'Caught an error: ' + err.message + '.' as string}
-			</div>
+			<div class="error-message" ref={props.errorMessageRef}>{'Caught an error: ' + err.message +
+				'.' as string}</div>
 		}
 	</>
 }

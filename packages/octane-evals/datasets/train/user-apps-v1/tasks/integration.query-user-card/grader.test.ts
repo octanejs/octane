@@ -52,11 +52,10 @@ describe('TanStack Query user card', () => {
 	});
 
 	it('loads a different cache entry when the user ID changes', async () => {
-		const loadUser = vi.fn(
-			async (id: string): Promise<User> =>
-				id === '1'
-					? { id, name: 'Ada Lovelace', email: 'ada@example.com' }
-					: { id, name: 'Grace Hopper', email: 'grace@example.com' },
+		const loadUser = vi.fn(async (id: string): Promise<User> =>
+			id === '1'
+				? { id, name: 'Ada Lovelace', email: 'ada@example.com' }
+				: { id, name: 'Grace Hopper', email: 'grace@example.com' },
 		);
 		const client = queryClient();
 		const view = render(App, { props: { client, userId: '1', loadUser } });

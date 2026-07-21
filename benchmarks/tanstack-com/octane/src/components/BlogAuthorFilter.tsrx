@@ -102,9 +102,7 @@ export function BlogAuthorFilter({
 							alt=""
 							class="w-5 h-5 rounded object-cover shrink-0"
 						/>
-						<span class="truncate">
-							{name as string}
-						</span>
+						<span class="truncate">{name as string}</span>
 						{isSelected
 							? <Check
 									className="h-4 w-4 absolute right-2 text-blue-600 dark:text-blue-300"

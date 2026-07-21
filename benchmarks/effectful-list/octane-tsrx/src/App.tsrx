@@ -13,9 +13,7 @@ export default function App() @{
 	bindHandlers({ setItems, setTick });
 
 	<div>
-		<div class="tick">
-			{tick as string}
-		</div>
+		<div class="tick">{tick as string}</div>
 		<table class="test-data">
 			<tbody>
 				@for (const item of items; key item.id) {

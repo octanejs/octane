@@ -11,8 +11,6 @@ export function FocusEvents() {
 			onFocus={() => setLog((l) => l + 'f')}
 			onBlur={() => setLog((l) => l + 'b')}
 		/>
-		<span class="log">
-			{log as string}
-		</span>
+		<span class="log">{log as string}</span>
 	</div>;
 }

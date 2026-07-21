@@ -16,16 +16,12 @@ export const useEq = createWithEqualityFn(
 export function EqDefault(props: { onRender: () => void }) @{
 	const slice = useEq((s) => ({ a: s.a }));
 	props.onRender();
-	<span id="a">
-		{slice.a as string}
-	</span>
+	<span id="a">{slice.a as string}</span>
 }
 
 // Object slice with a PER-CALL equality function override.
 export function EqPerCall(props: { onRender: () => void }) @{
 	const slice = useEq((s) => ({ a: s.a }), shallow);
 	props.onRender();
-	<span id="a">
-		{slice.a as string}
-	</span>
+	<span id="a">{slice.a as string}</span>
 }

@@ -251,9 +251,7 @@ export declare const getConfig: (
 	tmpDir: string;
 	importRoutesUsingAbsolutePaths: boolean;
 	virtualRouteConfig?:
-		| string
-		| import('@tanstack/virtual-file-routes').VirtualRootRoute
-		| undefined;
+		string | import('@tanstack/virtual-file-routes').VirtualRootRoute | undefined;
 	routeFilePrefix?: string | undefined;
 	routeFileIgnorePattern?: string | undefined;
 	pathParamsAllowedCharacters?: (':' | '$' | ';' | '@' | '&' | '=' | '+' | ',')[] | undefined;
