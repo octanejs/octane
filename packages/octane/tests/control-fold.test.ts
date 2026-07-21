@@ -23,6 +23,10 @@ import {
 	DescriptorHostWithKeyedFragment,
 	DescriptorHostWithKeyedComponents,
 	ReturnedChildCodeBlock,
+	ValueTemplateSlot,
+	ClonedValueTemplateSlot,
+	ValueTemplateSvg,
+	ValueTemplateMatrix,
 } from './_fixtures/control-fold.tsrx';
 import {
 	DirectReturnedFragmentRefMailbox,
@@ -756,6 +760,240 @@ describe('template directives in a returned fragment', () => {
 				),
 			).toThrow(/setup statements.*not supported at JSX child position/);
 		}
+	});
+});
+
+describe('template directives in JSX setup values', () => {
+	it('preserves child-code-block diagnostics in client and server compilation', () => {
+		for (const mode of ['client', 'server'] as const) {
+			expect(() =>
+				compile(
+					`export function BadSlot() @{
+						const slot = <div>@{ const value = 'bad'; <span>{value}</span> }</div>;
+						<main>{slot}</main>
+					}`,
+					`setup-value-child-block-${mode}.tsrx`,
+					{ mode },
+				),
+			).toThrow(/setup statements.*not supported at JSX child position/);
+		}
+	});
+
+	it('renders and updates an @if nested in an object property', () => {
+		const result = mount(ValueTemplateSlot, {
+			showHeading: true,
+			heading: 'First heading',
+		});
+		const composer = result.find('#composer');
+		const before = result.find('#before-heading');
+		const after = result.find('#after-heading');
+
+		expect(result.find('#heading').textContent).toBe('First heading');
+		expect(Array.from(composer.children, (child) => child.id)).toEqual([
+			'before-heading',
+			'heading',
+			'setup-value-code-block',
+			'after-heading',
+		]);
+		result.update(ValueTemplateSlot, {
+			showHeading: true,
+			heading: 'Updated heading',
+		});
+		expect(result.find('#heading').textContent).toBe('Updated heading');
+		expect(result.find('#setup-value-code-block').textContent).toBe('Updated heading action');
+
+		result.update(ValueTemplateSlot, {
+			showHeading: false,
+			heading: 'Hidden heading',
+		});
+		expect(result.findAll('#heading')).toHaveLength(0);
+		expect(result.find('#composer')).toBe(composer);
+		expect(result.find('#before-heading')).toBe(before);
+		expect(result.find('#after-heading')).toBe(after);
+
+		result.update(ValueTemplateSlot, {
+			showHeading: true,
+			heading: 'Restored heading',
+		});
+		expect(result.find('#heading').textContent).toBe('Restored heading');
+		expect(result.find('#composer')).toBe(composer);
+		expect(result.find('#before-heading')).toBe(before);
+		expect(result.find('#after-heading')).toBe(after);
+		result.unmount();
+	});
+
+	it('preserves the outer descriptor in return-JSX setup and cloneElement', async () => {
+		const hostRef = { current: null as HTMLElement | null };
+		const props = {
+			showHeading: true,
+			heading: 'Cloned heading',
+			slotKey: 'stable',
+			hostRef,
+		};
+		const result = mount(ClonedValueTemplateSlot, props);
+		const composer = result.find('#cloned-composer');
+		const counter = result.find('#cloned-counter');
+
+		expect(result.findAll('#original-composer')).toHaveLength(0);
+		expect(composer.getAttribute('data-source')).toBe('clone');
+		expect(hostRef.current).toBe(composer);
+		expect(counter.textContent).toBe('Cloned heading:0');
+		expect(Array.from(composer.children, (child) => child.id)).toEqual([
+			'clone-before',
+			'cloned-heading',
+			'clone-after',
+		]);
+
+		result.click('#cloned-counter');
+		expect(counter.textContent).toBe('Cloned heading:1');
+		result.update(ClonedValueTemplateSlot, { ...props, heading: 'Updated heading' });
+		expect(result.find('#cloned-composer')).toBe(composer);
+		expect(result.find('#cloned-counter')).toBe(counter);
+		expect(counter.textContent).toBe('Updated heading:1');
+		expect(hostRef.current).toBe(composer);
+
+		result.update(ClonedValueTemplateSlot, {
+			...props,
+			heading: 'Remounted heading',
+			slotKey: 'replacement',
+		});
+		const replacement = result.find('#cloned-composer');
+		expect(replacement).not.toBe(composer);
+		expect(result.find('#cloned-counter')).not.toBe(counter);
+		expect(result.find('#cloned-counter').textContent).toBe('Remounted heading:0');
+		expect(hostRef.current).toBe(replacement);
+		result.unmount();
+		expect(hostRef.current).toBeNull();
+
+		const server = serverModule();
+		const { html } = await ServerRT.renderToString(server.ClonedValueTemplateSlot, props);
+		expect(html).toContain('<section id="cloned-composer" data-source="clone">');
+		expect(html).toContain('<button id="cloned-counter">Cloned heading:0</button>');
+		expect(html).not.toContain('original-composer');
+	});
+
+	it('server-renders the branch and hydrates its existing DOM', async () => {
+		const server = serverModule();
+		const props = { showHeading: true, heading: 'Server heading' };
+		const { html } = await ServerRT.renderToString(server.ValueTemplateSlot, props);
+		const { html: hiddenHtml } = await ServerRT.renderToString(server.ValueTemplateSlot, {
+			showHeading: false,
+			heading: 'Hidden heading',
+		});
+		expect(html).toContain('<h1 id="heading">Server heading</h1>');
+		expect(hiddenHtml).not.toContain('<h1');
+
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const composer = container.querySelector('#composer');
+		const before = container.querySelector('#before-heading');
+		const after = container.querySelector('#after-heading');
+		const root = hydrateRoot(container, ValueTemplateSlot, props);
+		flushSync(() => {});
+
+		expect(container.querySelector('#composer')).toBe(composer);
+		expect(container.querySelector('#before-heading')).toBe(before);
+		expect(container.querySelector('#after-heading')).toBe(after);
+		expect(container.querySelectorAll('#heading')).toHaveLength(1);
+		expect(container.querySelector('#heading')?.textContent).toBe('Server heading');
+		expect(container.querySelectorAll('#setup-value-code-block')).toHaveLength(1);
+		expect(container.querySelector('#setup-value-code-block')?.textContent).toBe(
+			'Server heading action',
+		);
+
+		flushSync(() =>
+			root.render(ValueTemplateSlot, {
+				showHeading: false,
+				heading: 'Hidden heading',
+			}),
+		);
+		expect(container.querySelector('#heading')).toBeNull();
+		expect(container.querySelector('#composer')).toBe(composer);
+		expect(container.querySelector('#before-heading')).toBe(before);
+		expect(container.querySelector('#after-heading')).toBe(after);
+
+		root.unmount();
+		container.remove();
+	});
+
+	it('keeps an ambiguous title in the stored descriptor SVG namespace', async () => {
+		const props = { showTitle: true, title: 'Setup icon' };
+		const result = mount(ValueTemplateSvg, props);
+		const svg = result.find('#setup-value-svg');
+		const title = result.find('#setup-value-svg-title');
+
+		expect(title.namespaceURI).toBe('http://www.w3.org/2000/svg');
+		expect(title.parentElement).toBe(svg);
+		expect(document.head.querySelector('#setup-value-svg-title')).toBeNull();
+		result.unmount();
+
+		const server = serverModule();
+		const { html } = await ServerRT.renderToString(server.ValueTemplateSvg, props);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const serverSvg = container.querySelector('#setup-value-svg');
+		const serverTitle = container.querySelector('#setup-value-svg-title');
+		expect(serverTitle?.namespaceURI).toBe('http://www.w3.org/2000/svg');
+		expect(serverTitle?.parentElement).toBe(serverSvg);
+
+		const root = hydrateRoot(container, ValueTemplateSvg, props);
+		flushSync(() => {});
+		expect(container.querySelectorAll('#setup-value-svg-title')).toHaveLength(1);
+		expect(container.querySelector('#setup-value-svg-title')?.parentElement).toBe(serverSvg);
+		expect(document.head.querySelector('#setup-value-svg-title')).toBeNull();
+		root.unmount();
+		container.remove();
+	});
+
+	it('keeps keyed @for state and @switch output live in a stored descriptor', async () => {
+		const initial = {
+			items: [
+				{ id: 'a', label: 'A' },
+				{ id: 'b', label: 'B' },
+			],
+			mode: 'primary',
+		};
+		const reordered = { items: [initial.items[1], initial.items[0]], mode: 'secondary' };
+		const result = mount(ValueTemplateMatrix, initial);
+		const firstA = result.find('[data-id="a"]');
+		const firstB = result.find('[data-id="b"]');
+
+		result.click('[data-id="a"]');
+		result.update(ValueTemplateMatrix, reordered);
+		expect(result.findAll('.setup-value-row').map((row) => row.textContent)).toEqual([
+			'B:0',
+			'A:1',
+		]);
+		expect(result.find('[data-id="a"]')).toBe(firstA);
+		expect(result.find('[data-id="b"]')).toBe(firstB);
+		expect(result.find('#setup-value-mode').textContent).toBe('Secondary');
+		result.unmount();
+
+		const server = serverModule();
+		const { html } = await ServerRT.renderToString(server.ValueTemplateMatrix, initial);
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const root = hydrateRoot(container, ValueTemplateMatrix, initial);
+		flushSync(() => {});
+		expect(
+			Array.from(container.querySelectorAll('.setup-value-row'), (row) => row.textContent),
+		).toEqual(['A:0', 'B:0']);
+		expect(container.querySelectorAll('#setup-value-mode')).toHaveLength(1);
+		const hydratedA = container.querySelector('[data-id="a"]');
+		const hydratedB = container.querySelector('[data-id="b"]');
+
+		flushSync(() => root.render(ValueTemplateMatrix, reordered));
+		expect(
+			Array.from(container.querySelectorAll('.setup-value-row'), (row) => row.textContent),
+		).toEqual(['B:0', 'A:0']);
+		expect(container.querySelector('[data-id="a"]')).toBe(hydratedA);
+		expect(container.querySelector('[data-id="b"]')).toBe(hydratedB);
+		expect(container.querySelector('#setup-value-mode')?.textContent).toBe('Secondary');
+		root.unmount();
+		container.remove();
 	});
 });
 

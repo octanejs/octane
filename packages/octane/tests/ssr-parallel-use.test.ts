@@ -115,6 +115,43 @@ describe('SSR parallel use() — the server mirror', () => {
 		expect(started).toEqual(['a', 'b', 'c']);
 	});
 
+	it('memoizes a stratum nested in a JSX setup value across server passes', async () => {
+		const mod = evalServer(
+			`export function Page(p) @{
+				const slot = (
+					<section>
+						@try {
+							const a = use(p.make('a'));
+							const b = use(p.make('b'));
+							<p class="ok">{a + '|' + b}</p>
+						} @pending {
+							<i>loading</i>
+						}
+					</section>
+				);
+				<main>{slot}</main>
+			}`,
+			'setup-value.tsrx',
+		);
+		const started: string[] = [];
+		const jobs = new Map<string, ReturnType<typeof deferred<string>>>();
+		const make = (key: string) => {
+			started.push(key);
+			const job = deferred<string>();
+			jobs.set(key, job);
+			return job.promise;
+		};
+
+		const done = prerender(mod.Page, { make });
+		await drain();
+		expect(started).toEqual(['a', 'b']);
+		jobs.get('a')!.resolve('A');
+		jobs.get('b')!.resolve('B');
+		const out = await done;
+		expect(out.html).toContain('<p class="ok">A|B</p>');
+		expect(started).toEqual(['a', 'b']);
+	});
+
 	it('starts independent reads together when they live in an imported plain-TS custom hook', async () => {
 		const hookRequest = './_fixtures/ssr-parallel-use-custom-hook.ts';
 		const hookFile = join(process.cwd(), 'packages/octane/tests', hookRequest);

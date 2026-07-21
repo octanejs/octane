@@ -397,3 +397,20 @@ export function AdjacentPanelsHost(props) @{
 		}
 	</>
 }
+
+// A directive nested in a first-class JSX value is lowered after the owning
+// component's ordinary render-tree walk. Its async creations must still receive
+// Pass A before the synthetic branch helper runs Pass B.
+export function SetupValueParallelHost(props) @{
+	const slot = <section class="setup-value-slot">
+		@try {
+			const a = use(props.load('a'));
+			const b = use(props.load('b'));
+			<p class="setup-value-result">{a + '|' + b as string}</p>
+		} @pending {
+			<i class="setup-value-fallback">loading</i>
+		}
+	</section>;
+
+	<main>{slot}</main>
+}

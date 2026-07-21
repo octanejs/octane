@@ -18,6 +18,7 @@ import {
 	VersionedSiblingsHost,
 	RepeatedPanelsHost,
 	ManyRepeatedPanelsHost,
+	SetupValueParallelHost,
 } from './_fixtures/parallel-use.tsrx';
 
 // Runtime behavior of the compiler's unconditional parallel-use pipeline.
@@ -143,6 +144,31 @@ describe('parallel use() — fetch-tree warming (nested chain)', () => {
 		]);
 		expect(f.calls).toHaveLength(6); // adoption — no re-fetch on the resume renders
 		r.unmount();
+	});
+});
+
+describe('parallel use() — directives in JSX setup values', () => {
+	it('starts each creation once and reuses it across the suspense replay', async () => {
+		const calls: string[] = [];
+		const jobs = new Map<string, Deferred<string>>();
+		const load = (key: string) => {
+			calls.push(key);
+			const job = deferred<string>();
+			jobs.set(key, job);
+			return job.promise;
+		};
+		const result = mount(SetupValueParallelHost, { load });
+
+		expect(calls).toEqual(['a', 'b']);
+		expect(result.find('.setup-value-fallback').textContent).toBe('loading');
+
+		await act(() => {
+			jobs.get('a')!.resolve('A');
+			jobs.get('b')!.resolve('B');
+		});
+		expect(result.find('.setup-value-result').textContent).toBe('A|B');
+		expect(calls).toEqual(['a', 'b']);
+		result.unmount();
 	});
 });
 
