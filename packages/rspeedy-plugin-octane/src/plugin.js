@@ -8,10 +8,40 @@ import { OctaneRspackPlugin } from '@octanejs/rspack-plugin';
 
 import { applyLynxApplication, exposeLynxTemplatePlugin } from './application.js';
 import { configureLynxCSS } from './css.js';
-import { applyLynxEntryLayer, resolveLynxLayer } from './layers.js';
+import {
+	applyLynxEntryLayer,
+	LYNX_MAIN_THREAD_LAYER,
+	LYNX_MAIN_THREAD_RUNTIME,
+	resolveLynxLayer,
+} from './layers.js';
 import { assertLynxToolchain } from './toolchain.js';
 
 const PLUGIN_NAME = '@octanejs/rspeedy-plugin';
+const MAIN_THREAD_FACADE_PLUGIN = `${PLUGIN_NAME}:main-thread-facade`;
+const LYNX_PACKAGE_ROOT = /^@octanejs\/lynx$/;
+const APPLICATION_LAYER_SPECIALIZATIONS = Object.freeze({
+	[LYNX_MAIN_THREAD_LAYER]: Object.freeze({
+		renderers: lynxRspeedyMainThreadRenderers,
+		runtime: '@octanejs/lynx/main-renderer',
+		universalRuntime: LYNX_MAIN_THREAD_RUNTIME,
+	}),
+});
+
+class LynxMainThreadFacadePlugin {
+	apply(compiler) {
+		const NormalModuleReplacementPlugin = compiler.webpack?.NormalModuleReplacementPlugin;
+		if (typeof NormalModuleReplacementPlugin !== 'function') {
+			throw new TypeError(
+				`${PLUGIN_NAME}: this Rspack compiler does not expose webpack.NormalModuleReplacementPlugin.`,
+			);
+		}
+		new NormalModuleReplacementPlugin(LYNX_PACKAGE_ROOT, (resource) => {
+			if (resource.contextInfo?.issuerLayer === LYNX_MAIN_THREAD_LAYER) {
+				resource.request = '@octanejs/lynx/first-screen';
+			}
+		}).apply(compiler);
+	}
+}
 
 function normalizeStringArray(value, name) {
 	if (value === undefined) return undefined;
@@ -52,6 +82,7 @@ function normalizeOptions(value) {
 		thread,
 		renderers:
 			thread === 'main-thread' ? lynxRspeedyMainThreadRenderers : lynxRspeedyBackgroundRenderers,
+		...(application ? { layerSpecializations: APPLICATION_LAYER_SPECIALIZATIONS } : null),
 		...(options.dev === undefined ? null : { dev: options.dev }),
 		...(options.hmr === undefined ? null : { hmr: options.hmr }),
 		...(options.profile === undefined ? null : { profile: options.profile }),
@@ -107,6 +138,9 @@ export function pluginOctane(value) {
 						renderers: options.renderers,
 						runtime: '@octanejs/lynx/renderer',
 						universalRuntime: options.universalRuntime,
+						...(options.layerSpecializations === undefined
+							? null
+							: { layerSpecializations: options.layerSpecializations }),
 						...(options.dev === undefined ? null : { dev: options.dev }),
 						...(options.hmr === undefined ? null : { hmr: options.hmr }),
 						...(options.profile === undefined ? null : { profile: options.profile }),
@@ -116,6 +150,9 @@ export function pluginOctane(value) {
 							: { requireDirective: options.requireDirective }),
 					},
 				]);
+				if (options.application) {
+					chain.plugin(MAIN_THREAD_FACADE_PLUGIN).use(LynxMainThreadFacadePlugin, []);
+				}
 			});
 			api.modifyBundlerChain({
 				order: 'post',

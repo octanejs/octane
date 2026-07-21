@@ -98,6 +98,8 @@ export interface LynxElementPAPI<Node extends LynxElementRef = LynxElementRef> {
 	/** Present when the runtime publishes the native list callback API. */
 	readonly list?: LynxListPAPI<Node>;
 	getUniqueId(node: Node): number;
+	getParent(node: Node): Node | null;
+	isEqual(first: Node, second: Node): boolean;
 	isChild(parent: Node, child: Node): boolean;
 	insertBefore(parent: Node, child: Node, before: Node | null): void;
 	remove(parent: Node, child: Node): void;
@@ -210,6 +212,17 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 			'Octane Lynx requires the public Element PAPI function __GetParent for retry-safe cleanup.',
 		);
 	}
+	const normalizedParent = (node: Node): Node | null => {
+		if (getParent !== undefined) return getParent(node) ?? null;
+		if (node !== null && typeof node === 'object' && 'parentNode' in node) {
+			const parent = (node as { parentNode: unknown }).parentNode;
+			if (parent === null || parent === undefined) return null;
+			if (typeof parent === 'object') return parent as Node;
+		}
+		throw new Error('Octane Lynx could not inspect an Element PAPI parent.');
+	};
+	const elementsAreEqual = (first: Node, second: Node): boolean =>
+		elementIsEqual === undefined ? first === second : elementIsEqual(first, second);
 	const insertBefore = requireFunction<Node, '__InsertElementBefore'>(
 		target,
 		'__InsertElementBefore',
@@ -250,22 +263,15 @@ export function createLynxElementPAPI<Node extends LynxElementRef = LynxElementR
 		getUniqueId(node) {
 			return getUniqueId(node);
 		},
+		getParent(node) {
+			return normalizedParent(node);
+		},
+		isEqual(first, second) {
+			return elementsAreEqual(first, second);
+		},
 		isChild(parent, child) {
-			if (getParent !== undefined) {
-				const actualParent = getParent(child);
-				return actualParent != null && elementIsEqual!(actualParent, parent);
-			}
-			// @lynx-js/testing-environment@0.3.0 models ElementRefs as DOM nodes,
-			// but does not expose the public parent-inspection primitives.
-			if (
-				hasTestingParentFallback &&
-				child !== null &&
-				typeof child === 'object' &&
-				'parentNode' in child
-			) {
-				return (child as { parentNode: unknown }).parentNode === parent;
-			}
-			return false;
+			const actualParent = normalizedParent(child);
+			return actualParent !== null && elementsAreEqual(actualParent, parent);
 		},
 		insertBefore(parent, child, before) {
 			insertBefore(parent, child, before ?? undefined);

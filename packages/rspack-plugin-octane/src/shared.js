@@ -44,8 +44,19 @@ const LOADER_OPTION_KEYS = new Set([
 	'renderers',
 	'requireDirective',
 	'universalRuntime',
+	'layerSpecializations',
 ]);
 const PLUGIN_OPTION_KEYS = new Set([...LOADER_OPTION_KEYS, 'runtime', 'transpile']);
+const LAYER_SPECIALIZATION_KEYS = new Set(['runtime', 'renderers', 'universalRuntime']);
+
+function normalizeRuntimeRequest(value, label = 'runtime') {
+	if (value !== undefined && (typeof value !== 'string' || value.trim() !== value || !value)) {
+		throw new TypeError(
+			`@octanejs/rspack-plugin: \`${label}\` must be a non-empty module request string.`,
+		);
+	}
+	return value;
+}
 
 function normalizeUniversalRuntime(value) {
 	if (value === undefined) return undefined;
@@ -73,6 +84,68 @@ function normalizeUniversalRuntime(value) {
 	return Object.freeze({ runtime: value.runtime, thread: value.thread });
 }
 
+function normalizeLayerSpecializations(value) {
+	if (value === undefined) return undefined;
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+		throw new TypeError('@octanejs/rspack-plugin: `layerSpecializations` must be an object map.');
+	}
+	const entries = Object.entries(value).sort(([left], [right]) =>
+		left < right ? -1 : left > right ? 1 : 0,
+	);
+	const normalized = [];
+	for (const [layer, specialization] of entries) {
+		if (!layer || layer.trim() !== layer) {
+			throw new TypeError(
+				'@octanejs/rspack-plugin: `layerSpecializations` keys must be non-empty layer names without surrounding whitespace.',
+			);
+		}
+		if (
+			specialization === null ||
+			typeof specialization !== 'object' ||
+			Array.isArray(specialization)
+		) {
+			throw new TypeError(
+				`@octanejs/rspack-plugin: \`layerSpecializations.${layer}\` must be an object.`,
+			);
+		}
+		for (const key of Object.keys(specialization)) {
+			if (!LAYER_SPECIALIZATION_KEYS.has(key)) {
+				throw new TypeError(
+					`@octanejs/rspack-plugin: unknown \`layerSpecializations.${layer}.${key}\` option.`,
+				);
+			}
+		}
+		const runtime = normalizeRuntimeRequest(
+			specialization.runtime,
+			`layerSpecializations.${layer}.runtime`,
+		);
+		const renderers =
+			specialization.renderers === undefined
+				? undefined
+				: normalizeRendererConfig(specialization.renderers);
+		const universalRuntime = normalizeUniversalRuntime(specialization.universalRuntime);
+		normalized.push([
+			layer,
+			Object.freeze({
+				...(runtime === undefined ? null : { runtime }),
+				...(renderers === undefined ? null : { renderers }),
+				...(universalRuntime === undefined ? null : { universalRuntime }),
+			}),
+		]);
+	}
+	return Object.freeze(Object.fromEntries(normalized));
+}
+
+/** Select the compiler-facing options for a module's Rspack layer. */
+export function selectLayerCompilerOptions(options, module) {
+	const layer = typeof module?.layer === 'string' ? module.layer : undefined;
+	const specialization = layer === undefined ? undefined : options.layerSpecializations?.[layer];
+	return {
+		renderers: specialization?.renderers ?? options.renderers,
+		universalRuntime: specialization?.universalRuntime ?? options.universalRuntime,
+	};
+}
+
 function assertBooleanOption(options, key) {
 	if (options[key] !== undefined && typeof options[key] !== 'boolean') {
 		throw new TypeError(`@octanejs/rspack-plugin: \`${key}\` must be a boolean.`);
@@ -93,17 +166,7 @@ function normalizeOptions(value, plugin) {
 	if (options.root !== undefined && typeof options.root !== 'string') {
 		throw new TypeError('@octanejs/rspack-plugin: `root` must be a path string.');
 	}
-	if (
-		plugin &&
-		options.runtime !== undefined &&
-		(typeof options.runtime !== 'string' ||
-			options.runtime.trim() !== options.runtime ||
-			!options.runtime)
-	) {
-		throw new TypeError(
-			'@octanejs/rspack-plugin: `runtime` must be a non-empty module request string.',
-		);
-	}
+	if (plugin) normalizeRuntimeRequest(options.runtime);
 	if (
 		options.environment !== undefined &&
 		options.environment !== 'client' &&
@@ -125,6 +188,7 @@ function normalizeOptions(value, plugin) {
 	const renderers =
 		options.renderers === undefined ? undefined : normalizeRendererConfig(options.renderers);
 	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
+	const layerSpecializations = normalizeLayerSpecializations(options.layerSpecializations);
 
 	const normalized = {
 		...(options.root === undefined ? null : { root: options.root }),
@@ -135,6 +199,7 @@ function normalizeOptions(value, plugin) {
 		...(options.exclude === undefined ? null : { exclude: [...options.exclude] }),
 		...(renderers === undefined ? null : { renderers }),
 		...(universalRuntime === undefined ? null : { universalRuntime }),
+		...(layerSpecializations === undefined ? null : { layerSpecializations }),
 		...(options.requireDirective === undefined
 			? null
 			: { requireDirective: options.requireDirective }),

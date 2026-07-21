@@ -10,7 +10,8 @@ export interface OctaneLynxUniversalRuntime {
 export interface OctaneRspeedyPluginOptions {
 	/**
 	 * Select one isolated compiler graph for diagnostics and source tests.
-	 * Omit this option to build a complete background-rendered Lynx application.
+	 * Omit this option to build the dual-thread application graph: a synchronous
+	 * main-thread first screen followed by background runtime adoption.
 	 */
 	thread?: OctaneLynxThread;
 	/** Restrict the plugin to named Rspeedy environments. */

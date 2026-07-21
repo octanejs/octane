@@ -9,7 +9,7 @@ import {
 } from 'octane/universal/native';
 import { describe, expect, it } from 'vitest';
 import { createLynxClientContainer, createLynxClientDriver } from '../src/core/client-driver.js';
-import { createLynxNativeResource } from '../src/resource.js';
+import { createLynxNativeResource } from '../src/index.js';
 
 const resourcePlan = universalPlan('lynx', {
 	kind: 'host',
