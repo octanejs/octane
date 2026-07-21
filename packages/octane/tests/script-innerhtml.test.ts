@@ -142,8 +142,10 @@ describe('<script> content contract', () => {
 		}
 	});
 
-	it('hydrates executable source after HTML parser line-ending normalization', () => {
-		const source = 'window.__first = 1;\r\nwindow.__boundary = "</ScRiPt>";\rwindow.__last = 2;';
+	it('hydrates executable source after HTML script-data normalization', () => {
+		const source =
+			'/* nul:\u0000 */window.__first = 1;\r\nwindow.__boundary = "</ScRiPt>";\r' +
+			'window.__entities = "&amp;&lt;&quot;&#39;";\nwindow.__last = 2;';
 		const { html } = ServerRuntime.renderToString(server.ExecutableScript, { source });
 		const container = document.createElement('div');
 		container.innerHTML = html;
@@ -155,12 +157,15 @@ describe('<script> content contract', () => {
 			flushSync(() => {});
 			expect(container.querySelector('script')).toBe(serverNode);
 			expect(serverNode?.textContent).not.toContain('\r');
+			expect(serverNode?.textContent).not.toContain('\u0000');
+			expect(serverNode?.textContent).toContain('\uFFFD');
 			expect(warning).not.toHaveBeenCalled();
 			const isolatedWindow: Record<string, unknown> = {};
 			new Function('window', serverNode?.textContent ?? '')(isolatedWindow);
 			expect(isolatedWindow).toMatchObject({
 				__first: 1,
 				__boundary: '</ScRiPt>',
+				__entities: '&amp;&lt;&quot;&#39;',
 				__last: 2,
 			});
 		} finally {

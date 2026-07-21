@@ -8021,9 +8021,9 @@ export function setScriptText(el: Element, value: any): void {
 }
 
 // SSR replaces only the `s` in case-insensitive opening/closing script tokens.
-// Hydration compares against that serialized spelling after the same HTML parser
-// normalization as the server markup; later client updates use textContent
-// directly and therefore need no escape.
+// Hydration compares against that serialized spelling after the script-data
+// input normalization applied to server markup; later client updates use
+// textContent directly and therefore need no escape.
 const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
 
 function escapeInlineScriptContentForHydration(value: string): string {
@@ -8031,6 +8031,17 @@ function escapeInlineScriptContentForHydration(value: string): string {
 		INLINE_SCRIPT_TOKEN,
 		(_match, prefix: string, s: string, suffix: string) =>
 			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
+	);
+}
+
+// Unlike ordinary HTML data, script-data preserves character references such as
+// `&amp;` verbatim. Normalize only the input-stream transformations that affect a
+// parsed script Text node: CRLF/CR become LF and NUL becomes U+FFFD.
+const SCRIPT_DATA_NORMALIZATION = /\r\n?|\u0000/g;
+
+function normalizeScriptTextForHydration(value: string): string {
+	return value.replace(SCRIPT_DATA_NORMALIZATION, (match) =>
+		match === '\u0000' ? '\uFFFD' : '\n',
 	);
 }
 
@@ -8056,7 +8067,7 @@ export function setHTML(el: Element, value: any): void {
 		const server = el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML;
 		const expected =
 			el.localName === 'script'
-				? normalizeHTMLForHydration(el, escapeInlineScriptContentForHydration(next))
+				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
 				: normalizeHTMLForHydration(el, next);
 		if (server === expected || isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
