@@ -7810,9 +7810,18 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
 	const bodyCode = lines.join('\n');
 	const needsBlock = !returnedOutput && bodyCode.includes('__block');
-	if (!needsBlock && setupMaps) {
-		// Omitting the header shifts every setup statement up by one generated line.
-		for (const mapping of setupMaps) mapping.fnRelLine--;
+	if (setupMaps) {
+		// Setup maps were recorded against the nominal layout (line 0 `function`,
+		// line 1 `const __block`, line 2 first statement). Reconcile with the
+		// ACTUAL assembly: no `__block` header shifts statements up one line, and
+		// each emitted memo prelude (autoMemo transactional cache, hook-memo cell
+		// array — two lines apiece) shifts them down.
+		let lineShift = needsBlock ? 0 : -1;
+		if (autoMemoSize > 0) lineShift += 2;
+		if (hookMemoSize > 0) lineShift += 2;
+		if (lineShift !== 0) {
+			for (const mapping of setupMaps) mapping.fnRelLine += lineShift;
+		}
 	}
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
