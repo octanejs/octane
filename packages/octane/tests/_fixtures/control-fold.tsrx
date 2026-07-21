@@ -1,4 +1,12 @@
-import { Activity, Fragment, createContext, createElement, use, useState } from 'octane';
+import {
+	Activity,
+	Fragment,
+	cloneElement,
+	createContext,
+	createElement,
+	use,
+	useState,
+} from 'octane';
 
 // return-JSX form: a host element containing `@if` — folds to the return-based
 // fragment model (the branch helpers stay in the component for their closure; the
@@ -262,4 +270,105 @@ export function ReturnedChildCodeBlock(props) {
 			<button id="child-code-block-action" onClick={props.onAction}>{props.label as string}</button>
 		}
 	</>;
+}
+
+// The object wrapper mirrors component-slot composition used by consumers. Its
+// outer JSX remains a descriptor; only the compiler-owned directive child folds
+// into a fragment renderer.
+export function ValueTemplateSlot(props: {
+	showHeading: boolean;
+	heading: string;
+}) @{
+	const slots = {
+		composer: <div id="composer">
+			<span id="before-heading">Before</span>
+
+			@if (props.showHeading) {
+				<h1 id="heading">{props.heading}</h1>
+			}
+			@{
+				<small id="setup-value-code-block">{props.heading + ' action'}</small>
+			}
+
+			<span id="after-heading">After</span>
+		</div>,
+	};
+
+	<main>{slots.composer}</main>
+}
+
+// A setup JSX value remains the authored host descriptor even when one child
+// needs template lowering. cloneElement must therefore still target <section>,
+// not the compiler-owned fragment inserted for the directive child.
+export function ClonedValueTemplateSlot(props: {
+	showHeading: boolean;
+	heading: string;
+	slotKey: string;
+	hostRef: { current: HTMLElement | null };
+}) {
+	const composer = <section id="original-composer" data-source="original">
+		<span id="clone-before">Before</span>
+
+		@if (props.showHeading) {
+			const [count, setCount] = useState(0);
+			<h2 id="cloned-heading">
+				<button id="cloned-counter" onClick={() => setCount((value) => value + 1)}>
+					{props.heading + ':' + count}
+				</button>
+			</h2>
+		}
+
+		<span id="clone-after">After</span>
+	</section>;
+	const cloned = cloneElement(composer, {
+		id: 'cloned-composer',
+		'data-source': 'clone',
+		key: props.slotKey,
+		ref: props.hostRef,
+	});
+	return <main>{cloned}</main>;
+}
+
+// The stored descriptor can be inserted under any namespace. A directive child
+// must defer ambiguous <title> placement to its actual SVG parent at runtime.
+export function ValueTemplateSvg(props: { showTitle: boolean; title: string }) @{
+	const icon = <svg id="setup-value-svg" viewBox="0 0 10 10">
+		@if (props.showTitle) {
+			<title id="setup-value-svg-title">{props.title}</title>
+		}
+		<circle id="setup-value-circle" cx="5" cy="5" r="4" />
+	</svg>;
+
+	<main>{icon}</main>
+}
+
+export function ValueTemplateMatrix(props: {
+	items: Array<{ id: string; label: string }>;
+	mode: string;
+}) @{
+	const panel = <section id="setup-value-matrix">
+		@for (const item of props.items; key item.id) {
+			const [count, setCount] = useState(0);
+			<button
+				class="setup-value-row"
+				data-id={item.id as string}
+				onClick={() => setCount((value) => value + 1)}
+			>
+				{item.label + ':' + count}
+			</button>
+		} @empty {
+			<i id="setup-value-empty">empty</i>
+		}
+
+		@switch (props.mode) {
+			@case 'primary': {
+				<strong id="setup-value-mode">Primary</strong>
+			}
+			@default: {
+				<strong id="setup-value-mode">Secondary</strong>
+			}
+		}
+	</section>;
+
+	<main>{panel}</main>
 }
