@@ -122,20 +122,32 @@ function createChain(
 	};
 }
 
-function compilerOptions(state: ReturnType<typeof createChain>) {
-	return state.plugins.get('@octanejs/rspeedy-plugin:compiler')?.options[0] as {
-		universalRuntime: unknown;
-		renderers: {
-			default: string;
-			registry: {
-				lynx: {
-					validation: {
-						forbiddenGlobals: readonly string[];
-						forbiddenImports: readonly string[];
-					};
-				};
+interface CompilerRendererOptions {
+	default: string;
+	registry: {
+		lynx: {
+			module: string;
+			validation: {
+				forbiddenGlobals: readonly string[];
+				forbiddenImports: readonly string[];
 			};
 		};
+	};
+}
+
+function compilerOptions(state: ReturnType<typeof createChain>) {
+	return state.plugins.get('@octanejs/rspeedy-plugin:compiler')?.options[0] as {
+		runtime: string;
+		universalRuntime: unknown;
+		layerSpecializations?: Record<
+			string,
+			{
+				runtime: string;
+				universalRuntime: unknown;
+				renderers: CompilerRendererOptions;
+			}
+		>;
+		renderers: CompilerRendererOptions;
 	};
 }
 
@@ -231,6 +243,8 @@ describe('@octanejs/rspeedy-plugin', () => {
 				renderers: expect.objectContaining({ default: 'lynx' }),
 			}),
 		]);
+		expect(compilerOptions(state).layerSpecializations).toBeUndefined();
+		expect(state.plugins.has('@octanejs/rspeedy-plugin:main-thread-facade')).toBe(false);
 		expect(
 			compilerOptions(state).renderers.registry.lynx.validation.forbiddenGlobals,
 		).not.toContain('NativeModules');
@@ -253,6 +267,8 @@ describe('@octanejs/rspeedy-plugin', () => {
 		]);
 		const compiler = compilerOptions(state);
 		expect(compiler.universalRuntime).toBe(LYNX_MAIN_THREAD_RUNTIME);
+		expect(compiler.layerSpecializations).toBeUndefined();
+		expect(state.plugins.has('@octanejs/rspeedy-plugin:main-thread-facade')).toBe(false);
 		expect(compiler.renderers.registry.lynx.validation.forbiddenGlobals).toContain('NativeModules');
 		expect(compiler.renderers.registry.lynx.validation.forbiddenImports).toContain(
 			'@octanejs/lynx/platform',
@@ -281,20 +297,38 @@ describe('@octanejs/rspeedy-plugin', () => {
 			},
 		]);
 		const receiver = state.entries.get('app__octane_main_thread');
-		expect(receiver).toHaveLength(2);
+		expect(receiver).toHaveLength(1);
 		expect(receiver?.[0]).toEqual(
 			expect.objectContaining({
-				import: [expect.stringMatching(/hotModuleReplacement\.lepus\.cjs$/)],
-				layer: LYNX_MAIN_THREAD_LAYER,
-			}),
-		);
-		expect(receiver?.[1]).toEqual(
-			expect.objectContaining({
 				filename: '.rspeedy/app/main-thread.js',
-				import: [expect.stringMatching(/main-thread-entry\.js$/)],
+				import: [
+					expect.stringMatching(/main-thread-entry\.js$/),
+					expect.stringMatching(/hotModuleReplacement\.lepus\.cjs$/),
+					'./src/setup.js',
+					'./src/App.lynx.tsrx',
+					expect.stringMatching(/main-thread-ready\.js$/),
+				],
 				layer: LYNX_MAIN_THREAD_LAYER,
 			}),
 		);
+		const applicationCompiler = compilerOptions(state);
+		expect(applicationCompiler).toMatchObject({
+			runtime: '@octanejs/lynx/renderer',
+			universalRuntime: LYNX_BACKGROUND_RUNTIME,
+			renderers: { default: 'lynx' },
+		});
+		expect(applicationCompiler.renderers.registry.lynx.module).toBe('@octanejs/lynx/renderer');
+		const mainSpecialization = applicationCompiler.layerSpecializations?.[LYNX_MAIN_THREAD_LAYER];
+		expect(mainSpecialization).toMatchObject({
+			runtime: '@octanejs/lynx/main-renderer',
+			universalRuntime: LYNX_MAIN_THREAD_RUNTIME,
+			renderers: { default: 'lynx' },
+		});
+		expect(mainSpecialization?.renderers.registry.lynx.module).toBe('@octanejs/lynx/main-renderer');
+		expect(mainSpecialization?.renderers.registry.lynx.validation.forbiddenGlobals).toContain(
+			'NativeModules',
+		);
+		expect(state.plugins.has('@octanejs/rspeedy-plugin:main-thread-facade')).toBe(true);
 		const appRequire = createRequire(join(state.root, 'package.json'));
 		expect(realpathSync(appRequire.resolve('@lynx-js/webpack-dev-transport/client'))).toBe(
 			realpathSync(testRequire.resolve('@lynx-js/webpack-dev-transport/client')),
@@ -302,6 +336,44 @@ describe('@octanejs/rspeedy-plugin', () => {
 		expect(JSON.stringify([...state.entries.values()])).not.toMatch(
 			/@lynx-js\/react|react-refresh/i,
 		);
+	});
+
+	it('replaces only main-layer imports of the exact Lynx package root', () => {
+		const state = applyPlugin(undefined, 'lynx', {}, { app: ['./src/App.tsrx'] });
+		const installed = state.plugins.get('@octanejs/rspeedy-plugin:main-thread-facade');
+		const FacadePlugin = installed?.implementation as new () => {
+			apply(compiler: unknown): void;
+		};
+		let requestPattern: RegExp | undefined;
+		let replace:
+			| ((resource: { request: string; contextInfo?: { issuerLayer?: string } }) => void)
+			| undefined;
+		class NormalModuleReplacementPlugin {
+			constructor(
+				pattern: RegExp,
+				callback: (resource: { request: string; contextInfo?: { issuerLayer?: string } }) => void,
+			) {
+				requestPattern = pattern;
+				replace = callback;
+			}
+			apply() {}
+		}
+		new FacadePlugin().apply({ webpack: { NormalModuleReplacementPlugin } });
+
+		expect(requestPattern?.test('@octanejs/lynx')).toBe(true);
+		expect(requestPattern?.test('@octanejs/lynx/main-thread')).toBe(false);
+		const background = {
+			request: '@octanejs/lynx',
+			contextInfo: { issuerLayer: LYNX_BACKGROUND_LAYER },
+		};
+		const main = {
+			request: '@octanejs/lynx',
+			contextInfo: { issuerLayer: LYNX_MAIN_THREAD_LAYER },
+		};
+		replace?.(background);
+		replace?.(main);
+		expect(background.request).toBe('@octanejs/lynx');
+		expect(main.request).toBe('@octanejs/lynx/first-screen');
 	});
 
 	it('preserves public entry loading metadata on the background graph', () => {
@@ -335,6 +407,24 @@ describe('@octanejs/rspeedy-plugin', () => {
 				filename: '.rspeedy/app/background.js',
 				import: ['./src/App.tsrx'],
 				layer: LYNX_BACKGROUND_LAYER,
+				library,
+				publicPath: '/assets/',
+				runtime: false,
+				wasmLoading: false,
+			},
+		]);
+		expect(state.entries.get('app__octane_main_thread')).toEqual([
+			{
+				asyncChunks: false,
+				baseUri: 'lynx://octane/',
+				chunkLoading: false,
+				filename: '.rspeedy/app/main-thread.js',
+				import: [
+					expect.stringMatching(/main-thread-entry\.js$/),
+					'./src/App.tsrx',
+					expect.stringMatching(/main-thread-ready\.js$/),
+				],
+				layer: LYNX_MAIN_THREAD_LAYER,
 				library,
 				publicPath: '/assets/',
 				runtime: false,

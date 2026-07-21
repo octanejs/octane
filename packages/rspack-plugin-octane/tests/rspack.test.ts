@@ -275,6 +275,103 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 		}
 	}, 30_000);
 
+	it('builds one source with layer-specific compiler and runtime identities', async () => {
+		for (const [name, marker] of [
+			['background', 'background-runtime-marker'],
+			['main', 'main-runtime-marker'],
+		] as const) {
+			write(
+				root,
+				`node_modules/@fixture/${name}-runtime/package.json`,
+				JSON.stringify({
+					name: `@fixture/${name}-runtime`,
+					type: 'module',
+					exports: './index.js',
+				}) + '\n',
+			);
+			write(
+				root,
+				`node_modules/@fixture/${name}-runtime/index.js`,
+				`export const runtimeMarker = '${marker}';\n`,
+			);
+			write(
+				root,
+				`src/${name}-renderer.js`,
+				readFileSync(join(root, 'node_modules/@fixture/object-renderer/index.js'), 'utf8').replace(
+					'client-object-renderer',
+					`${name}-renderer-marker`,
+				),
+			);
+		}
+		write(root, 'src/Layered.tsrx', `export function Layered() @{ <item /> }\n`);
+		write(root, 'src/runtime-marker.js', `export { runtimeMarker } from 'octane';\n`);
+		for (const name of ['background', 'main']) {
+			write(
+				root,
+				`src/${name}.js`,
+				`export { Layered } from './Layered.tsrx';\nexport { runtimeMarker } from './runtime-marker.js';\n`,
+			);
+		}
+
+		const outputPath = join(root, 'dist-layers');
+		const stats = await compile({
+			context: root,
+			mode: 'development',
+			target: 'web',
+			experiments: { layers: true },
+			entry: {
+				background: { import: './src/background.js', layer: 'octane:background' },
+				main: { import: './src/main.js', layer: 'octane:main-thread' },
+			},
+			optimization: { minimize: false },
+			output: { path: outputPath, filename: '[name].js' },
+			plugins: [
+				new OctaneRspackPlugin({
+					runtime: '@fixture/background-runtime',
+					renderers: {
+						registry: { object: '/src/background-renderer.js' },
+						default: 'object',
+					},
+					universalRuntime: { runtime: 'object', thread: 'background' },
+					layerSpecializations: {
+						'octane:main-thread': {
+							runtime: '@fixture/main-runtime',
+							renderers: {
+								registry: { object: '/src/main-renderer.js' },
+								default: 'object',
+							},
+							universalRuntime: { runtime: 'object', thread: 'main-thread' },
+						},
+					},
+				}),
+			],
+		});
+
+		const background = readFileSync(join(outputPath, 'background.js'), 'utf8');
+		const main = readFileSync(join(outputPath, 'main.js'), 'utf8');
+		expect(background).toContain('background-runtime-marker');
+		expect(background).toContain('background-renderer-marker');
+		expect(background).not.toContain('main-runtime-marker');
+		expect(background).not.toContain('main-renderer-marker');
+		expect(main).toContain('main-runtime-marker');
+		expect(main).toContain('main-renderer-marker');
+		expect(main).not.toContain('background-runtime-marker');
+		expect(main).not.toContain('background-renderer-marker');
+
+		const layeredModules = [...stats.compilation.modules]
+			.map((module: any) => ({
+				identifier: module.identifier?.(),
+				info: getOctaneRspackBuildInfo(module),
+			}))
+			.filter((module) => module.identifier?.includes('src/Layered.tsrx'));
+		expect(layeredModules.map((module) => module.info?.universalRuntime)).toEqual(
+			expect.arrayContaining([
+				{ runtime: 'object', thread: 'background' },
+				{ runtime: 'object', thread: 'main-thread' },
+			]),
+		);
+	}, 30_000);
+
 	it('splits client-only renderer dependencies from the raw server graph with stable module identity', async () => {
 		write(
 			root,

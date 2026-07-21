@@ -94,6 +94,52 @@ describe('declarative options', () => {
 		expect(() => normalizeLoaderOptions({ runtime: 'other' })).toThrow(/unknown option `runtime`/);
 	});
 
+	it('copies, orders, and deeply freezes layer compiler specializations', () => {
+		const layerSpecializations = {
+			'worker:main': {
+				runtime: '@fixture/main-runtime',
+				renderers: {
+					registry: { native: '/src/main-renderer.js' },
+					default: 'native',
+				},
+				universalRuntime: { runtime: 'native', thread: 'main-thread' as const },
+			},
+			'worker:background': {
+				universalRuntime: { runtime: 'native', thread: 'background' as const },
+			},
+		};
+		const options = normalizePluginOptions({ layerSpecializations });
+
+		layerSpecializations['worker:main'].runtime = '@fixture/later-runtime';
+		layerSpecializations['worker:main'].renderers.registry.native = '/src/later-renderer.js';
+		(layerSpecializations['worker:main'].universalRuntime as { thread: string }).thread =
+			'background';
+
+		expect(Object.keys(options.layerSpecializations!)).toEqual([
+			'worker:background',
+			'worker:main',
+		]);
+		expect(options.layerSpecializations!['worker:main']).toMatchObject({
+			runtime: '@fixture/main-runtime',
+			renderers: {
+				registry: {
+					native: { module: '/src/main-renderer.js', target: 'universal' },
+				},
+				default: 'native',
+			},
+			universalRuntime: { runtime: 'native', thread: 'main-thread' },
+		});
+		expect(Object.isFrozen(options.layerSpecializations)).toBe(true);
+		expect(Object.isFrozen(options.layerSpecializations!['worker:main'])).toBe(true);
+		expect(Object.isFrozen(options.layerSpecializations!['worker:main'].renderers)).toBe(true);
+		expect(Object.isFrozen(options.layerSpecializations!['worker:main'].universalRuntime)).toBe(
+			true,
+		);
+		expect(normalizeLoaderOptions({ layerSpecializations })).toHaveProperty(
+			'layerSpecializations.worker:main',
+		);
+	});
+
 	it.each([
 		[{ environment: 'worker' }, /environment/],
 		[{ hmr: 'webpack' }, /hmr/],
@@ -101,6 +147,15 @@ describe('declarative options', () => {
 		[{ renderers: { default: 'missing' } }, /default references unknown renderer/],
 		[{ universalRuntime: { runtime: 'lynx', thread: 'worker' } }, /thread/],
 		[{ universalRuntime: { runtime: 'Lynx', thread: 'background' } }, /runtime/],
+		[{ layerSpecializations: [] }, /layerSpecializations/],
+		[{ layerSpecializations: { '': {} } }, /layer names/],
+		[{ layerSpecializations: { main: null } }, /layerSpecializations\.main/],
+		[{ layerSpecializations: { main: { environment: 'client' } } }, /unknown/],
+		[{ layerSpecializations: { main: { runtime: ' later ' } } }, /runtime/],
+		[
+			{ layerSpecializations: { main: { universalRuntime: { runtime: 'native', thread: 'ui' } } } },
+			/thread/,
+		],
 		[{ runtime: '' }, /runtime/],
 		[{ transform: () => {} }, /unknown option/],
 	] as const)('rejects invalid options %#', (value, message) => {
