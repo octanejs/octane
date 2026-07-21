@@ -19,7 +19,7 @@
 // in localStorage — it never touches the bridge, so it cannot feed the refresh
 // loop; drags mutate the DOM directly and commit state + storage on release.
 // The dock is a bottom drawer only.
-import { useCallback, useEffect, useMemo, useRef, useState, version } from 'octane';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, version } from 'octane';
 import type {
 	DevtoolsEvent,
 	DevtoolsInstanceDetail,
@@ -73,6 +73,10 @@ interface DockPrefs {
 const REFRESH_THROTTLE_MS = 300;
 const COPIED_FLASH_MS = 1500;
 const DEFAULT_EXPANDED_DEPTH = 3;
+/** Fixed tree-row height (px) — must match `.tree-row` in styles.ts. */
+const ROW_HEIGHT_PX = 22;
+/** Rows rendered beyond each viewport edge so small scrolls stay seamless. */
+const TREE_OVERSCAN_ROWS = 8;
 const TRIGGER_STORAGE_KEY = 'octane-devtools:trigger';
 const DOCK_STORAGE_KEY = 'octane-devtools:dock';
 const DRAG_THRESHOLD_PX = 4;
@@ -342,99 +346,103 @@ function PinIcon(props: { size: number }) @{
 	</svg>
 }
 
+/** One visible tree row after expansion and filtering are resolved. */
+interface FlatTreeRow {
+	node: DevtoolsTreeNode;
+	depth: number;
+	expanded: boolean;
+}
+
+/**
+ * The visible tree as a flat row list. Expansion state and filtering are
+ * resolved here (while filtering, every row on a match path is force-
+ * expanded), so the scroller can window rows by index and each row renders
+ * independently of its subtree.
+ */
+function flattenTree(
+	tree: DevtoolsTreeNode[],
+	overrides: Record<number, boolean>,
+	visibleIds: ReadonlySet<number> | null,
+): FlatTreeRow[] {
+	const rows: FlatTreeRow[] = [];
+	const push = (node: DevtoolsTreeNode, depth: number): void => {
+		if (visibleIds !== null && !visibleIds.has(node.id)) return;
+		const expanded =
+			visibleIds !== null ? true : overrides[node.id] ?? depth < DEFAULT_EXPANDED_DEPTH;
+		rows.push({ node, depth, expanded });
+		if (expanded) {
+			for (const child of node.children) push(child, depth + 1);
+		}
+	};
+	for (const rootNode of tree) push(rootNode, 0);
+	return rows;
+}
+
 interface TreeRowProps {
 	node: DevtoolsTreeNode;
 	depth: number;
-	selectedId: number | null;
-	/** The node the element picker is currently hovering, if any. */
-	pickerHoverId: number | null;
-	/** Non-null while the filter box is active: the ids on paths to matches. */
-	visibleIds: ReadonlySet<number> | null;
-	overrides: Record<number, boolean>;
+	expanded: boolean;
+	selected: boolean;
+	/** The element picker is currently hovering this row's node. */
+	pickerHover: boolean;
 	onToggle: (id: number, depth: number) => void;
 	onSelect: (id: number) => void;
 	onHover: (id: number, label: string) => void;
 	onLeave: () => void;
 }
 
-function TreeRow(props: TreeRowProps) @{
+// A single flat row, memoized: the bridge's getTree() identity contract
+// reuses node objects for unchanged subtrees and the handlers are stable
+// useCallbacks, so a refresh re-renders only rows whose content, selection,
+// or hover state actually changed.
+function TreeRowImpl(props: TreeRowProps) @{
 	const node = props.node;
-	const filtering = props.visibleIds !== null;
-	const expanded = filtering
-		? true
-		: props.overrides[node.id] ?? props.depth < DEFAULT_EXPANDED_DEPTH;
-	const children =
-		filtering
-			? node.children.filter((child) => props.visibleIds !== null && props.visibleIds.has(child.id))
-			: node.children;
 
-	<div>
-		<div
-			class={[
-				'tree-row',
-				'type-' + node.type,
-				{
-					selected: props.selectedId === node.id,
-					'picker-hover': props.pickerHoverId === node.id,
-				},
-			]}
-			data-node-id={String(node.id)}
-			style={{ paddingLeft: 8 + props.depth * 14 + 'px' }}
-			onClick={() => props.onSelect(node.id)}
-			onMouseEnter={() => props.onHover(node.id, node.label)}
-			onMouseLeave={() => props.onLeave()}
-		>
-			@if (node.children.length > 0) {
-				<button
-					class="caret"
-					onClick={(event: MouseEvent) => {
-						event.stopPropagation();
-						props.onToggle(node.id, props.depth);
-					}}
-				>
-					{(expanded ? '▾' : '▸') as string}
-				</button>
-			} @else {
-				<span class="caret-spacer"></span>
-			}
-			<span class="tree-label">
-				{node.label as string}
+	<div
+		class={[
+			'tree-row',
+			'type-' + node.type,
+			{ selected: props.selected, 'picker-hover': props.pickerHover },
+		]}
+		style={{ paddingLeft: 8 + props.depth * 14 + 'px' }}
+		onClick={() => props.onSelect(node.id)}
+		onMouseEnter={() => props.onHover(node.id, node.label)}
+		onMouseLeave={() => props.onLeave()}
+	>
+		@if (node.children.length > 0) {
+			<button
+				class="caret"
+				onClick={(event: MouseEvent) => {
+					event.stopPropagation();
+					props.onToggle(node.id, props.depth);
+				}}
+			>
+				{(props.expanded ? '▾' : '▸') as string}
+			</button>
+		} @else {
+			<span class="caret-spacer"></span>
+		}
+		<span class="tree-label">
+			{node.label as string}
+		</span>
+		@if (node.key !== null) {
+			<span class="badge badge-key">
+				{'key=' + node.key as string}
 			</span>
-			@if (node.key !== null) {
-				<span class="badge badge-key">
-					{'key=' + node.key as string}
-				</span>
-			}
-			@if (node.lite) {
-				<span class="badge">lite</span>
-			}
-			@if (node.pending) {
-				<span class="badge badge-pending">pending</span>
-			}
-			@if (node.inactive) {
-				<span class="badge badge-inactive">inactive</span>
-			}
-		</div>
-		@if (expanded && children.length > 0) {
-			<div>
-				@for (const child of children; key child.id) {
-					<TreeRow
-						node={child}
-						depth={props.depth + 1}
-						selectedId={props.selectedId}
-						pickerHoverId={props.pickerHoverId}
-						visibleIds={props.visibleIds}
-						overrides={props.overrides}
-						onToggle={props.onToggle}
-						onSelect={props.onSelect}
-						onHover={props.onHover}
-						onLeave={props.onLeave}
-					/>
-				}
-			</div>
+		}
+		@if (node.lite) {
+			<span class="badge">lite</span>
+		}
+		@if (node.pending) {
+			<span class="badge badge-pending">pending</span>
+		}
+		@if (node.inactive) {
+			<span class="badge badge-inactive">inactive</span>
 		}
 	</div>
 }
+
+const TreeRow = memo(TreeRowImpl);
 
 export function Panel(props: PanelProps) @{
 	const { hook, options } = props;
@@ -488,6 +496,31 @@ export function Panel(props: PanelProps) @{
 	const [picking, setPicking] = useState(false);
 	const [pickerHoverId, setPickerHoverId] = useState<number | null>(null);
 	const pickerHoverRef = useRef<number | null>(null);
+
+	// Tree virtualization: rows are fixed-height, so the scroller renders only
+	// the window around the scroll offset. A viewport of 0 rows (unmeasured, or
+	// jsdom's zero layout) renders every row — correctness never depends on
+	// measurement. `flatRowsRef` mirrors the latest flat list for handlers that
+	// run outside the render (picker scroll-into-view).
+	const treeScrollRef = useRef<HTMLElement | null>(null);
+	const flatRowsRef = useRef<FlatTreeRow[]>([]);
+	const [treeScrollRow, setTreeScrollRow] = useState(0);
+	const [treeViewportRows, setTreeViewportRows] = useState(0);
+
+	const onTreeScroll = (event: Event) => {
+		const el = event.target as HTMLElement;
+		// Same-value sets bail without a render, so per-pixel scroll events cost
+		// two divisions until the window shifts by a full row.
+		setTreeScrollRow(Math.floor(el.scrollTop / ROW_HEIGHT_PX));
+		setTreeViewportRows(Math.ceil(el.clientHeight / ROW_HEIGHT_PX));
+	};
+
+	// Measure the scroller whenever layout-affecting state settles (open/tab
+	// switches, dock resize, collapse). jsdom reports 0 and keeps the fallback.
+	useEffect(() => {
+		const el = treeScrollRef.current;
+		if (el !== null) setTreeViewportRows(Math.ceil(el.clientHeight / ROW_HEIGHT_PX));
+	}, [open, tab, dockPrefs, collapsed]);
 
 	const refresh = useCallback(() => {
 		const nextTree = hook.getTree();
@@ -822,23 +855,29 @@ export function Panel(props: PanelProps) @{
 		(current) => ({ ...current, [kindName]: value }),
 	);
 
-	const toggleExpanded = (id: number, depth: number) => setExpandedOverrides(
-		(current) => ({
-			...current,
-			[id]: !(current[id] ?? depth < DEFAULT_EXPANDED_DEPTH),
-		}),
+	// Row handlers are stable useCallbacks so memoized TreeRows can bail on
+	// unchanged props.
+	const toggleExpanded = useCallback(
+		(id: number, depth: number) => setExpandedOverrides(
+			(current) => ({
+				...current,
+				[id]: !(current[id] ?? depth < DEFAULT_EXPANDED_DEPTH),
+			}),
+		),
 	);
 
-	const selectNode = (id: number) => {
+	const selectNode = useCallback((id: number) => {
 		setSelectedId(id);
 		const nextDetail = hook.inspect(id);
 		detailRef.current = nextDetail;
 		fingerprintRef.current = detailFingerprint(nextDetail);
-	};
+	});
 
-	const hoverNode = (id: number, label: string) => highlightNodes(hook.getDomNodes(id), label);
+	const hoverNode = useCallback(
+		(id: number, label: string) => highlightNodes(hook.getDomNodes(id), label),
+	);
 
-	const leaveNode = () => clearHighlight();
+	const leaveNode = useCallback(() => clearHighlight());
 
 	const scrollSelectedIntoView = () => {
 		const selected = getSelectedId();
@@ -884,17 +923,19 @@ export function Panel(props: PanelProps) @{
 		});
 	};
 
+	// Scroll the tree scroller so the row for `id` is visible. Windowed rows
+	// may not be in the DOM, so this positions by flat-list index; the scroll
+	// event then shifts the rendered window to match.
 	const scrollRowIntoView = (id: number) => {
-		const rootNode =
-			triggerRef.current !== null ? triggerRef.current.getRootNode() : null;
-		if (!(rootNode instanceof ShadowRoot)) return;
-		const row = rootNode.querySelector('.tree-row[data-node-id="' + id + '"]');
-		if (row !== null && typeof (row as HTMLElement).scrollIntoView === 'function') {
-			try {
-				(row as HTMLElement).scrollIntoView({ block: 'nearest' });
-			} catch {
-				// Scrolling is best-effort (jsdom, detached rows).
-			}
+		const el = treeScrollRef.current;
+		if (el === null) return;
+		const index = flatRowsRef.current.findIndex((row) => row.node.id === id);
+		if (index < 0) return;
+		const top = index * ROW_HEIGHT_PX;
+		if (top < el.scrollTop) {
+			el.scrollTop = top;
+		} else if (top + ROW_HEIGHT_PX > el.scrollTop + el.clientHeight) {
+			el.scrollTop = top + ROW_HEIGHT_PX - el.clientHeight;
 		}
 	};
 
@@ -994,8 +1035,23 @@ export function Panel(props: PanelProps) @{
 		() => (trimmedFilter === '' ? null : computeVisibleIds(tree, trimmedFilter)),
 		[tree, trimmedFilter],
 	);
-	const visibleRoots =
-		visibleIds === null ? tree : tree.filter((rootNode) => visibleIds.has(rootNode.id));
+	// The flat visible-row list, then the window of it the scroller renders.
+	const flatRows = useMemo(() => flattenTree(tree, expandedOverrides, visibleIds), [
+		tree,
+		expandedOverrides,
+		visibleIds,
+	]);
+	flatRowsRef.current = flatRows;
+	const totalTreeRows = flatRows.length;
+	const windowStart =
+		treeViewportRows === 0 ? 0 : Math.max(0, treeScrollRow - TREE_OVERSCAN_ROWS);
+	const windowEnd =
+		treeViewportRows === 0
+			? totalTreeRows
+			: Math.min(totalTreeRows, treeScrollRow + treeViewportRows + TREE_OVERSCAN_ROWS);
+	const windowRows = flatRows.slice(windowStart, windowEnd);
+	const treePadTop = windowStart * ROW_HEIGHT_PX;
+	const treePadBottom = (totalTreeRows - windowEnd) * ROW_HEIGHT_PX;
 	const emptyTreeMessage =
 		trimmedFilter !== ''
 			? 'No components match "' + filter.trim() + '".'
@@ -1117,23 +1173,31 @@ export function Panel(props: PanelProps) @{
 											)}
 										/>
 									</div>
-									<div class="tree-scroll">
-										@for (const rootNode of visibleRoots; key rootNode.id) {
-											<TreeRow
-												node={rootNode}
-												depth={0}
-												selectedId={selectedId}
-												pickerHoverId={pickerHoverId}
-												visibleIds={visibleIds}
-												overrides={expandedOverrides}
-												onToggle={toggleExpanded}
-												onSelect={selectNode}
-												onHover={hoverNode}
-												onLeave={leaveNode}
-											/>
-										} @empty {
+									<div class="tree-scroll" ref={treeScrollRef} onScroll={onTreeScroll}>
+										@if (totalTreeRows === 0) {
 											<div class="empty">
 												{emptyTreeMessage as string}
+											</div>
+										} @else {
+											<div
+												style={{
+													paddingTop: treePadTop + 'px',
+													paddingBottom: treePadBottom + 'px',
+												}}
+											>
+												@for (const row of windowRows; key row.node.id) {
+													<TreeRow
+														node={row.node}
+														depth={row.depth}
+														expanded={row.expanded}
+														selected={selectedId === row.node.id}
+														pickerHover={pickerHoverId === row.node.id}
+														onToggle={toggleExpanded}
+														onSelect={selectNode}
+														onHover={hoverNode}
+														onLeave={leaveNode}
+													/>
+												}
 											</div>
 										}
 									</div>

@@ -346,6 +346,10 @@ export const PANEL_CSS: string = `
 	display: flex;
 	align-items: center;
 	gap: 6px;
+	/* Fixed row height — the virtualized scroller windows rows by this size
+	   (ROW_HEIGHT_PX in panel.tsrx must match). */
+	height: 22px;
+	box-sizing: border-box;
 	padding: 2px 8px;
 	border-radius: 4px;
 	cursor: pointer;

@@ -16574,8 +16574,13 @@ export function hmr<P>(fn: ComponentBody<P>): ComponentBody<P> {
 					__profileSchedule(b, 'hmr');
 				scheduleRender(b);
 			}
-			if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+			if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+				// An edit can change labels/sources cached in devtools tree nodes, so
+				// every memoized node is stale — bump the generation before the bridge
+				// drops its root trees.
+				DEVTOOLS_NODE_CACHE_GEN++;
 				__devtoolsHmr(meta.fn as unknown as Function);
+			}
 			return true;
 		},
 	};
@@ -21214,6 +21219,30 @@ function devtoolsBlockIdentity(block: Block): {
 	};
 }
 
+/**
+ * Identity-preserving node memo: the tree walk always visits the live
+ * structure, but a subject whose displayed fields and children are unchanged
+ * returns the SAME node object as the previous walk — node reference identity
+ * therefore encodes content equality, which is the change-detection contract
+ * `getTree()` documents and the panel's refresh/row-memo paths rely on. Live
+ * mutable fields (pending/inactive/hookCount) are re-read and compared on
+ * every walk rather than invalidated by instrumentation, so flag flips that
+ * happen without a re-render (Activity hide walks, bailed schedules) can
+ * never serve stale. Labels and sources come from component metadata, which
+ * only changes on HMR — the generation bump there invalidates every entry.
+ * Weakly keyed by live subject, so entries die with their instances.
+ */
+let DEVTOOLS_NODE_CACHE_GEN = 0;
+const devtoolsNodeCache = new WeakMap<object, { gen: number; node: DevtoolsTreeNode }>();
+
+function devtoolsSameChildren(a: DevtoolsTreeNode[], b: DevtoolsTreeNode[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
+}
+
 function devtoolsNodeForBlock(
 	block: Block,
 	structuralLabel: string | null,
@@ -21221,9 +21250,24 @@ function devtoolsNodeForBlock(
 	idFor: (subject: object) => number,
 ): DevtoolsTreeNode | null {
 	if (block.disposed) return null;
+	const children = devtoolsChildrenOfScope(block, idFor);
+	const hookCount = block.hooks?.size ?? 0;
+	const pending = block.pending === true;
+	const inactive = block.inactive === true;
+	const cached = devtoolsNodeCache.get(block);
+	if (
+		cached !== undefined &&
+		cached.gen === DEVTOOLS_NODE_CACHE_GEN &&
+		cached.node.hookCount === hookCount &&
+		cached.node.pending === pending &&
+		cached.node.inactive === inactive &&
+		devtoolsSameChildren(cached.node.children, children)
+	) {
+		return cached.node;
+	}
 	const structural = structuralLabel !== null && block.kind !== 'dynamic' && block.kind !== 'root';
 	const identity = structural ? null : devtoolsBlockIdentity(block);
-	return {
+	const node: DevtoolsTreeNode = {
 		id: idFor(block),
 		type:
 			block.kind === 'root'
@@ -21239,11 +21283,13 @@ function devtoolsNodeForBlock(
 		lite: false,
 		key: devtoolsKeyLabel(key),
 		source: identity !== null ? identity.source : null,
-		hookCount: block.hooks?.size ?? 0,
-		pending: block.pending === true,
-		inactive: block.inactive === true,
-		children: devtoolsChildrenOfScope(block, idFor),
+		hookCount,
+		pending,
+		inactive,
+		children,
 	};
+	devtoolsNodeCache.set(block, { gen: DEVTOOLS_NODE_CACHE_GEN, node });
+	return node;
 }
 
 const DEVTOOLS_STRUCTURAL_LABELS: Record<string, string> = {
@@ -21315,18 +21361,32 @@ function devtoolsCollectScopeChildren(
 		const child = children[i].scope;
 		const tracked = __profileTrackedComponentFor(child);
 		if (tracked !== undefined) {
-			out.push({
-				id: idFor(child),
-				type: 'component',
-				label: __profileMetadataFor(tracked).name,
-				lite: true,
-				key: null,
-				source: devtoolsSourceFor(tracked),
-				hookCount: child.hooks?.size ?? 0,
-				pending: false,
-				inactive: false,
-				children: devtoolsChildrenOfScope(child, idFor),
-			});
+			const childNodes = devtoolsChildrenOfScope(child, idFor);
+			const hookCount = child.hooks?.size ?? 0;
+			const cached = devtoolsNodeCache.get(child);
+			if (
+				cached !== undefined &&
+				cached.gen === DEVTOOLS_NODE_CACHE_GEN &&
+				cached.node.hookCount === hookCount &&
+				devtoolsSameChildren(cached.node.children, childNodes)
+			) {
+				out.push(cached.node);
+			} else {
+				const node: DevtoolsTreeNode = {
+					id: idFor(child),
+					type: 'component',
+					label: __profileMetadataFor(tracked).name,
+					lite: true,
+					key: null,
+					source: devtoolsSourceFor(tracked),
+					hookCount,
+					pending: false,
+					inactive: false,
+					children: childNodes,
+				};
+				devtoolsNodeCache.set(child, { gen: DEVTOOLS_NODE_CACHE_GEN, node });
+				out.push(node);
+			}
 		} else {
 			devtoolsCollectScopeChildren(child, idFor, out);
 		}
@@ -21337,6 +21397,8 @@ function devtoolsCollectScopeChildren(
 			// Keyed-list blocks group under a synthetic `@for` container; every
 			// other block lands directly in `out`.
 			let listNode: DevtoolsTreeNode | null = null;
+			let listSlot: object | null = null;
+			let listIndex = -1;
 			devtoolsEachSlotBlock(
 				slots[i],
 				(block, structuralLabel, key) => {
@@ -21344,6 +21406,8 @@ function devtoolsCollectScopeChildren(
 					if (node !== null) (listNode !== null ? listNode.children : out).push(node);
 				},
 				(forSlot) => {
+					listSlot = forSlot;
+					listIndex = out.length;
 					listNode = {
 						id: idFor(forSlot),
 						type: 'control-flow',
@@ -21359,6 +21423,20 @@ function devtoolsCollectScopeChildren(
 					out.push(listNode);
 				},
 			);
+			// The container node memoizes like any other subject: identical item
+			// node references swap the freshly built container for the cached one.
+			if (listNode !== null && listSlot !== null) {
+				const cached = devtoolsNodeCache.get(listSlot);
+				if (
+					cached !== undefined &&
+					cached.gen === DEVTOOLS_NODE_CACHE_GEN &&
+					devtoolsSameChildren(cached.node.children, (listNode as DevtoolsTreeNode).children)
+				) {
+					out[listIndex] = cached.node;
+				} else {
+					devtoolsNodeCache.set(listSlot, { gen: DEVTOOLS_NODE_CACHE_GEN, node: listNode });
+				}
+			}
 		}
 	}
 }

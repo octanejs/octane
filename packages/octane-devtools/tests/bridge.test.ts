@@ -194,6 +194,41 @@ describe('devtools bridge', () => {
 
 			// Nodes no live root owns resolve to null.
 			expect(hook().findByDomNode(document.body)).toBeNull();
+
+			// A commit invalidates the reverse lookup: DOM added by the update
+			// resolves to its own fresh tree node.
+			app.click('.add');
+			const items = app.findAll('li');
+			const listAfter = findNode(hook().getTree(), '@for')!;
+			expect(hook().findByDomNode(items[items.length - 1])).toBe(
+				listAfter.children[listAfter.children.length - 1].id,
+			);
+		} finally {
+			app.unmount();
+		}
+	});
+
+	it('preserves node identity for unchanged subtrees across commits (change-detection contract)', () => {
+		const app = mount(App);
+		try {
+			const before = hook().getTree();
+			const rootBefore = findNode(before, 'App')!;
+			const counterBefore = findNode(before, 'Counter')!;
+
+			app.click('.add');
+
+			// The changed path (list → root) is rebuilt into fresh node objects…
+			const after = hook().getTree();
+			expect(findNode(after, '@for')!.children.map((item) => item.key)).toEqual([
+				'alpha',
+				'beta',
+				'gamma',
+			]);
+			expect(findNode(after, 'App')).not.toBe(rootBefore);
+			// …while an untouched sibling subtree keeps its exact node object, so
+			// consumers (the panel's refresh and row memoization) detect change by
+			// reference comparison instead of deep-comparing trees.
+			expect(findNode(after, 'Counter')).toBe(counterBefore);
 		} finally {
 			app.unmount();
 		}

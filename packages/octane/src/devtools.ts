@@ -136,7 +136,17 @@ export interface OctaneDevtools {
 	/** True once an instrumented Octane runtime has connected. */
 	isAttached(): boolean;
 	subscribe(listener: (event: DevtoolsEvent) => void): () => void;
-	/** One tree per live (non-internal) root, in registration order. */
+	/**
+	 * One tree per live (non-internal) root, in registration order.
+	 *
+	 * Reference identity is the change signal: a returned node is the SAME
+	 * object as the previous `getTree()` read exactly when nothing displayed
+	 * in that node or its subtree changed (per-root trees are cached until
+	 * work is scheduled under them, and rebuilds reuse the node object for
+	 * every content-identical subtree). Consumers can therefore detect
+	 * changes by comparing references instead of deep-comparing trees — and
+	 * must treat every returned node as immutable.
+	 */
 	getTree(): DevtoolsTreeNode[];
 	/** Live-value detail for a tree node id. Null when the instance is gone. */
 	inspect(id: number): DevtoolsInstanceDetail | null;
@@ -257,6 +267,40 @@ let hasDebugValues = false;
  */
 let lastPick: { target: Node; id: number | null } | null = null;
 
+/**
+ * Picker reverse index: every tree node's top-level DOM nodes mapped to its
+ * id, built lazily from the cached trees on the first `findByDomNode` after a
+ * commit or root change (zero cost while the picker is idle), and dropped at
+ * the same sites as `lastPick`. A query walks `target.parentNode` up to the
+ * nearest indexed node — O(DOM depth) instead of a full tree walk per hovered
+ * element. The pre-order build makes a deeper block overwrite an ancestor
+ * sharing the same boundary node, so the deepest owner wins, matching the
+ * adapter walk's deepest-match rule. Weakly keyed, so the index never pins
+ * DOM. The adapter's exact walk remains the fallback for targets the index
+ * cannot see (e.g. app-managed nodes inserted directly under a root
+ * container, or content behind a shadow boundary the parentNode walk cannot
+ * cross).
+ */
+let domIndex: WeakMap<Node, number> | null = null;
+
+function buildDomIndex(): WeakMap<Node, number> {
+	const index = new WeakMap<Node, number>();
+	const visit = (node: DevtoolsTreeNode): void => {
+		const subject = subjectFor(node.id);
+		if (subject !== null && adapter !== null) {
+			try {
+				for (const dom of adapter.domNodes(subject)) index.set(dom, node.id);
+			} catch {
+				// A half-torn-down subject contributes nothing; the fallback walk
+				// still answers exactly.
+			}
+		}
+		for (const child of node.children) visit(child);
+	};
+	for (const tree of devtools.getTree()) visit(tree);
+	return index;
+}
+
 function pushEvent(event: DevtoolsEvent): void {
 	if (recording) {
 		if (eventCount < DEFAULT_EVENT_BUFFER) {
@@ -364,15 +408,25 @@ const devtools: OctaneDevtools = {
 		if (adapter === null || target === null || typeof target !== 'object') return null;
 		if (lastPick !== null && lastPick.target === target) return lastPick.id;
 		let id: number | null = null;
-		for (const root of liveRoots) {
-			try {
-				const subject = adapter.findByDomNode(root, target);
-				if (subject !== null) {
-					id = idFor(subject);
-					break;
+		const index = (domIndex ??= buildDomIndex());
+		for (let node: Node | null = target; node !== null; node = node.parentNode) {
+			const hit = index.get(node);
+			if (hit !== undefined) {
+				id = hit;
+				break;
+			}
+		}
+		if (id === null) {
+			for (const root of liveRoots) {
+				try {
+					const subject = adapter.findByDomNode(root, target);
+					if (subject !== null) {
+						id = idFor(subject);
+						break;
+					}
+				} catch {
+					// A half-torn-down root must not break the picker for other roots.
 				}
-			} catch {
-				// A half-torn-down root must not break the picker for other roots.
 			}
 		}
 		lastPick = { target, id };
@@ -446,6 +500,7 @@ export function __devtoolsRegisterRoot(root: object, container: object): void {
 	}
 	liveRoots.add(root);
 	lastPick = null;
+	domIndex = null;
 	if (hasEventConsumer()) pushEvent({ kind: 'root-added', at: now() });
 }
 
@@ -454,6 +509,7 @@ export function __devtoolsUnregisterRoot(root: object): void {
 	rootTreeCache.delete(root);
 	if (!liveRoots.delete(root)) return;
 	lastPick = null;
+	domIndex = null;
 	if (hasEventConsumer()) pushEvent({ kind: 'root-removed', at: now() });
 }
 
@@ -469,6 +525,7 @@ export function __devtoolsUnregisterRoot(root: object): void {
  */
 function commitFinished(roots: ReadonlySet<object> | null): void {
 	lastPick = null;
+	domIndex = null;
 	if (roots === null || roots.size === 0 || !hasEventConsumer()) return;
 	let ids: number[] | undefined;
 	for (const root of roots) {
