@@ -1,0 +1,41 @@
+export const libraryIds = [
+	'start',
+	'router',
+	'query',
+	'table',
+	'form',
+	'virtual',
+	'ranger',
+	'store',
+	'pacer',
+	'hotkeys',
+	'db',
+	'ai',
+	'intent',
+	'workflow',
+	'config',
+	'devtools',
+	'mcp',
+	'cli',
+	'react-charts',
+	'create-tsrouter-app',
+] as const;
+
+export type LibraryId = (typeof libraryIds)[number];
+
+export const SIDEBAR_LIBRARY_IDS = [
+	'start',
+	'router',
+	'query',
+	'table',
+	'db',
+	'ai',
+	'form',
+	'virtual',
+	'pacer',
+	'hotkeys',
+	'store',
+	'devtools',
+	'cli',
+	'intent',
+] as const satisfies readonly LibraryId[];

@@ -86,6 +86,11 @@
       "import": "./src/client-only.js",
       "default": "./src/client-only.js"
     },
+    "./hydration": {
+      "types": "./src/hydration.d.ts",
+      "import": "./src/hydration.js",
+      "default": "./src/hydration.js"
+    },
     "./plugin/vite": {
       "types": "./src/plugin-vite.d.ts",
       "import": "./src/plugin-vite.js",

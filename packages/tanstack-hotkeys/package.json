@@ -1,0 +1,44 @@
+{
+  "name": "@octanejs/tanstack-hotkeys",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "TanStack Hotkeys bindings for Octane — reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-hotkeys"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@tanstack/hotkeys": "0.8.0"
+  },
+  "peerDependencies": {
+    "@octanejs/tanstack-store": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/tanstack-store": "workspace:*",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

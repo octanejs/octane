@@ -240,6 +240,9 @@ var Generator = class Generator {
 					} else {
 						const unrecoverableErrors = errArray.filter((e) => !isRerun(e));
 						this.runPromise = void 0;
+						if (process.env.OCTANE_DEBUG_GENERATOR) {
+							for (const e of unrecoverableErrors) console.error('[generator-debug]', e);
+						}
 						throw new Error(unrecoverableErrors.map((e) => e.message).join());
 					}
 				}

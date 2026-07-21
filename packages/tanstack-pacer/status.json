@@ -1,0 +1,16 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-pacer",
+    "version": "0.22.1"
+  },
+  "surface": "Complete: every upstream hook family — debouncer (`useDebouncer`, `useDebouncedState`, `useDebouncedValue`, `useDebouncedCallback`), throttler, rate-limiter, queuer, batcher, and their async variants (async-debouncer, async-throttler, async-rate-limiter, async-queuer, async-batcher) — plus `PacerProvider`/`usePacerContext`/`useDefaultPacerOptions`, the per-instance `Subscribe` render-prop component, and the upstream subpath exports (`/debouncer`, `/async-retryer`, `/types`, `/utils`, ...), re-exporting the framework-agnostic `@tanstack/pacer@0.21.1` core unchanged.",
+  "divergences": [
+    "Upstream types spelled with `React.Dispatch<React.SetStateAction<T>>` use structurally identical local aliases (Octane state setters have the same shape)."
+  ],
+  "ssr": "Supported: instances are created lazily in `useState` initializers, cleanup runs in effects, and no browser globals are touched during render, so server rendering produces the initial (non-pending) state exactly like upstream.",
+  "notes": [
+    "Created for the tanstack-com benchmark's octane flavor (Phase 2c); `useDebouncedValue` and `useAsyncDebouncer` are exercised by that app's application-builder and DeployDialog surfaces.",
+    "Upstream `React`-prefixed type names (`ReactDebouncer`, `ReactThrottler`, ...) are kept verbatim so ports only change the import specifier."
+  ],
+  "verified": "2026-07-20"
+}

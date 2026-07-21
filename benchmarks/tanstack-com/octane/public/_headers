@@ -1,0 +1,10 @@
+# WebContainer requires these headers for SharedArrayBuffer support
+# Only apply to /builder route to avoid affecting other pages
+/builder
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# Vite emits fingerprinted files under /assets, so they can be cached until
+# the filename changes on a later build.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

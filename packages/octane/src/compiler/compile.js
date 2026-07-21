@@ -735,6 +735,54 @@ function errorBoundaryFallback(node, fallbackAttribute) {
 }
 
 /**
+ * Annotate direct calls to octane's `lazy` with `@__PURE__` so bundlers can
+ * tree-shake unused lazy-component declarations. Creating a lazy descriptor
+ * has no side effects, and React builds get the same effect (an unused
+ * `React.lazy(() => import('./x.client'))` const disappears from the server
+ * bundle, which Start's import-protection tree-shake verification relies on
+ * for `*.client.*` modules). Locals shadowed anywhere below module scope are
+ * skipped wholesale — same conservatism as lowerImportedErrorBoundaries.
+ */
+function annotatePureLazyCalls(ast) {
+	const lazyLocals = new Set();
+	for (const node of ast.body || []) {
+		if (node.type !== 'ImportDeclaration' || node.source?.value !== 'octane') continue;
+		for (const specifier of node.specifiers || []) {
+			if (
+				specifier.type === 'ImportSpecifier' &&
+				(specifier.imported?.name ?? specifier.imported?.value) === 'lazy' &&
+				specifier.local?.name
+			) {
+				lazyLocals.add(specifier.local.name);
+			}
+		}
+	}
+	if (lazyLocals.size === 0) return;
+	for (const name of collectNestedBindingNames(ast.body)) lazyLocals.delete(name);
+	if (lazyLocals.size === 0) return;
+	const seen = new Set();
+	const visit = (value) => {
+		if (!value || typeof value !== 'object' || seen.has(value)) return;
+		seen.add(value);
+		if (Array.isArray(value)) {
+			for (const item of value) visit(item);
+			return;
+		}
+		if (
+			value.type === 'CallExpression' &&
+			value.callee?.type === 'Identifier' &&
+			lazyLocals.has(value.callee.name)
+		) {
+			value.__octanePure = true;
+		}
+		for (const key in value) {
+			if (key !== 'loc') visit(value[key]);
+		}
+	};
+	visit(ast.body);
+}
+
+/**
  * Lower the exact imported `<ErrorBoundary>` builtin to the same tryBlock IR
  * as `@try/@catch` when its fallback is statically compilable. This removes the
  * generic component/children dispatcher while preserving the public JSX API.
@@ -4411,6 +4459,7 @@ export function compile(source, filename, options) {
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
+	annotatePureLazyCalls(ast);
 	const consumedRuntimeLocals = lowerImportedErrorBoundaries(ast);
 	// A null-only shorthand guard is template control flow, not an arbitrary
 	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
@@ -5345,6 +5394,7 @@ function compileServer(source, filename, options, styleRemap = null) {
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
 	normalizeArrowComponents(ast);
+	annotatePureLazyCalls(ast);
 	const consumedRuntimeLocals = lowerImportedErrorBoundaries(ast);
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
@@ -9002,6 +9052,13 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			let value;
 			if (a.value == null) value = { type: 'Literal', value: true, raw: 'true' };
 			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
+			else if (typeof a.value.value === 'string')
+				// JSX string attrs may hold raw newlines — re-derive a valid raw.
+				value = {
+					type: 'Literal',
+					value: a.value.value,
+					raw: JSON.stringify(a.value.value),
+				};
 			else value = a.value; // Literal
 			props.push({ key, value, memo: a._octanePropMemo });
 		}
@@ -9352,7 +9409,11 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 				type: 'ObjectExpression',
 				properties: w.props.map((p) => ({
 					type: 'Property',
-					key: { type: 'Identifier', name: p.key },
+					// Non-identifier prop names (aria-*, data-*) must print as
+					// quoted string keys — a bare Identifier would emit `aria-hidden:`.
+					key: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(p.key)
+						? { type: 'Identifier', name: p.key }
+						: { type: 'Literal', value: p.key, raw: JSON.stringify(p.key) },
 					value: warmPropValue(p),
 					kind: 'init',
 					method: false,
@@ -11337,6 +11398,18 @@ function jsxElementToCreateElement(node, ctx) {
 		let valNode;
 		if (attr.value == null) {
 			valNode = { type: 'Literal', value: true };
+		} else if (
+			attr.value.type !== 'JSXExpressionContainer' &&
+			typeof attr.value.value === 'string'
+		) {
+			// JSX string attributes may contain raw newlines (multi-line class
+			// strings); the parser's `raw` is the raw JSX slice, which is not a
+			// valid JS string literal. Re-derive raw from the cooked value.
+			valNode = {
+				type: 'Literal',
+				value: attr.value.value,
+				raw: JSON.stringify(attr.value.value),
+			};
 		} else {
 			const inner =
 				attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
@@ -12363,6 +12436,17 @@ function stripTsOnlyWrappers(node) {
 		node.type === 'TSInstantiationExpression'
 	) {
 		return stripTsOnlyWrappers(node.expression);
+	}
+	// A TS `this` parameter (`function f(this: Foo, …)`) is type-only and is
+	// parsed as a leading plain Identifier named `this` — dropping only its
+	// annotation would leave `this` as a real (invalid) parameter name.
+	if (
+		Array.isArray(node.params) &&
+		node.params[0] != null &&
+		node.params[0].type === 'Identifier' &&
+		node.params[0].name === 'this'
+	) {
+		node.params.shift();
 	}
 	// Drop type-only properties before descending so esrap never sees them.
 	for (let i = 0; i < TS_TYPE_PROPS.length; i++) {
@@ -16709,6 +16793,11 @@ function escapeAttr(s) {
 	return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
+const PURE_ANNOTATION_COMMENTS = [{ type: 'Block', value: ' @__PURE__ ' }];
+const esrapCommentOptions = {
+	getLeadingComments: (node) => (node.__octanePure ? PURE_ANNOTATION_COMMENTS : undefined),
+};
+
 function printNode(node) {
 	// Strip TS-only wrappers (TSAsExpression / TSNonNullExpression / etc.)
 	// before printing. esrap's tsx printer would otherwise emit
@@ -16718,7 +16807,7 @@ function printNode(node) {
 	// files"). Centralizing here covers every emit path (statement-level
 	// rewrittenStatements, planJsx-emitted bindings, attribute / prop
 	// values via printExprWithTsrx) — no per-call-site strip needed.
-	const { code } = esrapPrint(stripTsOnlyWrappers(node), esrapTsx());
+	const { code } = esrapPrint(stripTsOnlyWrappers(node), esrapTsx(esrapCommentOptions));
 	return code;
 }
 
@@ -16732,7 +16821,7 @@ function printNode(node) {
  * `.tsrx`, via the node's `.loc`).
  */
 function printNodeWithMap(node, ctx) {
-	const { code, map } = esrapPrint(stripTsOnlyWrappers(node), esrapTsx(), {
+	const { code, map } = esrapPrint(stripTsOnlyWrappers(node), esrapTsx(esrapCommentOptions), {
 		sourceMapSource: ctx.mapSourceName,
 		sourceMapContent: ctx.mapSource,
 		sourceMapEncodeMappings: false,
@@ -16742,7 +16831,10 @@ function printNodeWithMap(node, ctx) {
 
 function printExpr(node) {
 	// Wrap in an ExpressionStatement to get a printable form, then strip trailing `;`.
-	const wrapped = { type: 'ExpressionStatement', expression: node };
+	const wrapped = {
+		type: 'ExpressionStatement',
+		expression: escapeMultilineStringLiterals(node),
+	};
 	return printNode(wrapped).trim().replace(/;$/, '');
 }
 
@@ -16751,6 +16843,25 @@ function printExpr(node) {
  * or `<tsx>...</tsx>` blocks with identifier references to hoisted render fns.
  * Used at attribute-value and prop-value sites where Tsrx is at expression position.
  */
+// JSX string ATTRIBUTES may legally contain raw newlines (multi-line class
+// strings are common upstream React); a raw source slice of such a literal is
+// not a valid JS string literal. Re-derive the printable raw from the cooked
+// value for exactly those literals — ordinary JS strings cannot contain raw
+// line terminators, so this never rewrites them.
+function escapeMultilineStringLiterals(node) {
+	return mapAst(node, (n) => {
+		if (
+			n.type === 'Literal' &&
+			typeof n.value === 'string' &&
+			typeof n.raw === 'string' &&
+			/[\n\r\u2028\u2029]/.test(n.raw)
+		) {
+			return { ...n, raw: JSON.stringify(n.value) };
+		}
+		return null;
+	});
+}
+
 function printExprWithTsrx(node, ctx, componentName, inlinedSubs) {
 	// In server mode, JSX expression positions (attribute / prop / spread values)
 	// bypass the setup-statement rewrite in ssrCompileBody, so apply the server

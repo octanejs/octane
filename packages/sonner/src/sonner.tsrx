@@ -828,4 +828,4 @@ export function Toaster(props: ToasterProps) {
 }
 
 export { toast };
-export { ExternalToast, ToastT, ToasterProps };
+export type { ExternalToast, ToastT, ToasterProps };

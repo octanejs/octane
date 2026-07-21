@@ -1,6 +1,7 @@
 import { START_ENVIRONMENT_NAMES, tanStackStartVite } from '#tanstack-start/plugin-core/vite';
 import { octaneRouteGeneratorPlugin } from '@octanejs/tanstack-router/generator-plugin';
 import { octane } from 'octane/compiler/vite';
+import { octaneClientOnlyServerStrip } from './client-only-server-strip.js';
 import { octaneStartDefaultEntryPaths } from './default-entry-paths.js';
 import { validateOctaneCompilerOptions } from './validate-options.js';
 
@@ -23,6 +24,7 @@ const WORKSPACE_SOURCE_EXCLUDES = [
 const WORKSPACE_SOURCE_INCLUDES = [
 	'@octanejs/tanstack-router > @tanstack/router-core/isServer',
 	'@octanejs/tanstack-router > @tanstack/router-core/scroll-restoration-script',
+	'@octanejs/tanstack-start > @tanstack/router-core/isServer',
 ];
 
 export function tanstackStart(options) {
@@ -39,6 +41,9 @@ export function tanstackStart(options) {
 	};
 
 	return [
+		// Must run before the octane compiler: strips <ClientOnly> children on
+		// the server (the octane analogue of start-compiler handleClientOnlyJSX).
+		octaneClientOnlyServerStrip(),
 		octane(octaneOptions),
 		{
 			name: 'octanejs-tanstack-start:workspace-source-deps',

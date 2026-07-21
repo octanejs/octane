@@ -1,5 +1,9 @@
 import { defineCollection, defineConfig } from '@content-collections/core';
-import { libraryIds } from '~/libraries/libraries';
+// Bench delta (both flavors): import libraryIds from the dependency-free
+// ids module — this config runs under plain node (content-collections CLI),
+// and ~/libraries/libraries transitively imports the router package, whose
+// source-shipped internal imports are bundler-resolved only.
+import { libraryIds } from '~/libraries/ids';
 import { normalizeRedirectFrom } from '~/utils/redirects';
 import { z } from 'zod';
 

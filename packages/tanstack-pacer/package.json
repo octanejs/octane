@@ -1,0 +1,58 @@
+{
+  "name": "@octanejs/tanstack-pacer",
+  "version": "0.0.1",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "description": "TanStack Pacer bindings for Octane — debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-pacer"
+  },
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./async-batcher": "./src/async-batcher/index.ts",
+    "./async-debouncer": "./src/async-debouncer/index.ts",
+    "./async-queuer": "./src/async-queuer/index.ts",
+    "./async-rate-limiter": "./src/async-rate-limiter/index.ts",
+    "./async-retryer": "./src/async-retryer/index.ts",
+    "./async-throttler": "./src/async-throttler/index.ts",
+    "./batcher": "./src/batcher/index.ts",
+    "./debouncer": "./src/debouncer/index.ts",
+    "./provider": "./src/provider/index.ts",
+    "./queuer": "./src/queuer/index.ts",
+    "./rate-limiter": "./src/rate-limiter/index.ts",
+    "./throttler": "./src/throttler/index.ts",
+    "./types": "./src/types/index.ts",
+    "./utils": "./src/utils/index.ts"
+  },
+  "dependencies": {
+    "@tanstack/pacer": "0.21.1"
+  },
+  "peerDependencies": {
+    "@octanejs/tanstack-store": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/tanstack-store": "workspace:*",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  }
+}

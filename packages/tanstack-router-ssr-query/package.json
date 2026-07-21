@@ -1,0 +1,44 @@
+{
+  "name": "@octanejs/tanstack-router-ssr-query",
+  "version": "0.0.1",
+  "description": "Octane port of @tanstack/react-router-ssr-query — TanStack Router ⇄ Query SSR integration.",
+  "type": "module",
+  "main": "src/index.tsrx",
+  "exports": {
+    ".": "./src/index.tsrx"
+  },
+  "dependencies": {
+    "@tanstack/router-ssr-query-core": "1.169.1"
+  },
+  "peerDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/tanstack-router": "workspace:*",
+    "octane": "workspace:*"
+  },
+  "devDependencies": {
+    "@octanejs/tanstack-query": "workspace:*",
+    "@octanejs/tanstack-router": "workspace:*",
+    "octane": "workspace:*",
+    "vitest": "catalog:default"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-router-ssr-query"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  }
+}
