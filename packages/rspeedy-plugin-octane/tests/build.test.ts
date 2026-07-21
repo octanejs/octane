@@ -330,8 +330,12 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 			expect(background).not.toMatch(/getJSContext/);
 			expect(mainThread).toContain('milestone-five');
 			expect(mainThread).toContain('Native bundle');
+			expect(mainThread).toContain('octane-m7-main-thread-worklet');
+			expect(mainThread).not.toContain('octane-m7-background-function');
 			expect(mainThread).not.toContain(BACKGROUND_ONLY_MARKER);
 			expect(background).toContain('milestone-five');
+			expect(background).not.toContain('octane-m7-main-thread-worklet');
+			expect(background).toContain('octane-m7-background-function');
 			expect(background).toContain(BACKGROUND_ONLY_MARKER);
 			expect(completeBundleText).not.toMatch(
 				/@lynx-js[\\/]react|ReactLynx|\b(?:react-dom|preact)\b/i,

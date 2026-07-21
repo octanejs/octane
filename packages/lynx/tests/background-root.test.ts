@@ -740,26 +740,37 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		);
 	});
 
-	it('propagates a completion delivery failure after accepting the native batch', () => {
+	it('fail-stops an accepted root when completion delivery and immediate cleanup fail', async () => {
 		const deliveryError = new Error('injected completion delivery failure');
-		const { dom, main } = installEnvironment(undefined, (delegate) =>
-			Object.freeze({
-				dispatchEvent(event) {
-					if (
-						event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
-						(event.data as { type?: unknown }).type === 'complete'
-					) {
-						throw deliveryError;
-					}
-					return delegate.dispatchEvent(event);
-				},
-				addEventListener(type, listener) {
-					delegate.addEventListener(type, listener);
-				},
-				removeEventListener(type, listener) {
-					delegate.removeEventListener(type, listener);
-				},
-			}),
+		const cleanupError = new Error('injected completion cleanup failure');
+		let failCleanup = true;
+		const { dom, main } = installEnvironment(
+			(target) => {
+				const remove = target.__RemoveElement as (parent: object, child: object) => unknown;
+				target.__RemoveElement = (parent: object, child: object) => {
+					if (!failCleanup) return remove(parent, child);
+					failCleanup = false;
+					throw cleanupError;
+				};
+			},
+			(delegate) =>
+				Object.freeze({
+					dispatchEvent(event) {
+						if (
+							event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
+							(event.data as { type?: unknown }).type === 'complete'
+						) {
+							throw deliveryError;
+						}
+						return delegate.dispatchEvent(event);
+					},
+					addEventListener(type, listener) {
+						delegate.addEventListener(type, listener);
+					},
+					removeEventListener(type, listener) {
+						delegate.removeEventListener(type, listener);
+					},
+				}),
 		);
 		const context = backgroundContext();
 		const inbound: LynxBackgroundInboundMessage[] = [];
@@ -788,6 +799,33 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		expect(main.activeIdentity()).toMatchObject({ root: 751, version: 1 });
 		expect(dom.window.document.querySelector('#accepted')).not.toBeNull();
 		expect(main.diagnostics()).toContain(deliveryError);
+		expect(main.diagnostics()).toContain(cleanupError);
+		await expect(
+			main.callBackground({ _jsFnId: 'app:after-completion-fault' }, []).promise,
+		).rejects.toThrow('Octane Lynx main-thread root is faulted');
+
+		context.dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				...identity(751, 1),
+				type: 'call-main',
+				call: 1,
+				worklet: { _wkltId: 'app:after-completion-fault' },
+				args: [],
+			},
+		});
+		expect(inbound.at(-1)).toMatchObject({
+			type: 'call-main-error',
+			error: { message: 'Octane Lynx main-thread root is faulted.' },
+		});
+
+		context.dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: { ...identity(751, 1), type: 'terminal-dispose' },
+		});
+		expect(inbound.at(-1)?.type).toBe('dispose-ack');
+		expect(main.activeIdentity()).toBeNull();
+		expect(dom.window.document.querySelector('#accepted')).toBeNull();
 	});
 
 	it('propagates dispose acknowledgement failure after native cleanup completes', () => {

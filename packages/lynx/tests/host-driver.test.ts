@@ -18,7 +18,19 @@ import {
 	resolveLynxFirstTreeEvent,
 } from '../src/core/first-screen.js';
 import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
-import { createLynxElementPAPI, type LynxElementPAPI } from '../src/core/papi.js';
+import {
+	createLynxElementPAPI,
+	type LynxElementEventListener,
+	type LynxElementPAPI,
+} from '../src/core/papi.js';
+import {
+	createLynxMainThreadWorkletRegistry,
+	registerMainThreadWorklet,
+	type LynxActivatedMainThreadWorklet,
+	type LynxMainThreadRefCell,
+	type LynxMainThreadRefDescriptor,
+	type LynxMainThreadWorkletRegistry,
+} from '../src/core/worklets.js';
 
 interface FakeNode {
 	readonly uid: number;
@@ -30,7 +42,7 @@ interface FakeNode {
 	inlineStyle: string;
 	readonly dataset: Record<string, unknown>;
 	cssScope: { id: number; entryName?: string } | null;
-	readonly events: Map<string, string>;
+	readonly events: Map<string, Exclude<LynxElementEventListener, undefined>>;
 	selector: string;
 	id: string | null;
 	text: string;
@@ -220,9 +232,42 @@ function batch(
 	return { renderer, version, commands };
 }
 
-function createHost(root = 1) {
+for (const id of ['counter.tsrx:tap', 'scene.tsrx:swipe', 'card.tsrx:tap']) {
+	registerMainThreadWorklet(id, undefined, () => undefined);
+}
+registerMainThreadWorklet('alias.tsrx:tap', undefined, function () {
+	const values = this._c?.values as readonly unknown[] | undefined;
+	return values?.[0] === values?.[1];
+});
+
+interface ObservedWorkletRegistry extends LynxMainThreadWorkletRegistry {
+	readonly refValues: ReadonlyMap<string, unknown>;
+}
+
+function createObservedWorkletRegistry(): ObservedWorkletRegistry {
+	const registry = createLynxMainThreadWorkletRegistry();
+	const refValues = new Map<string, unknown>();
+	return Object.freeze({
+		...registry,
+		refValues,
+		retainRef<T>(
+			descriptor: LynxMainThreadRefDescriptor,
+			initialValue: T,
+		): LynxMainThreadRefCell<T> {
+			const cell = registry.retainRef(descriptor, initialValue);
+			refValues.set(descriptor._wvid, initialValue);
+			return cell;
+		},
+		updateRef<T>(descriptor: LynxMainThreadRefDescriptor, value: T): void {
+			registry.updateRef(descriptor, value);
+			refValues.set(descriptor._wvid, value);
+		},
+	});
+}
+
+function createHost(root = 1, worklets?: LynxMainThreadWorkletRegistry) {
 	const papi = createFakePAPI();
-	const container = createLynxHostContainer(papi, { root });
+	const container = createLynxHostContainer(papi, { root, worklets });
 	const driver = createLynxHostDriver<FakeNode>();
 	papi.resetCalls();
 	return { container, driver, page: container.page, papi };
@@ -236,7 +281,15 @@ describe('Lynx Element PAPI host driver', () => {
 		environment.clearGlobal();
 		environment.switchToMainThread();
 		try {
+			const worklets = createObservedWorkletRegistry();
 			const setIds: Array<string | null> = [];
+			const workletCalls: unknown[] = [];
+			(globalThis as unknown as { runWorklet: (context: unknown) => void }).runWorklet = (
+				context,
+			) => {
+				workletCalls.push(context);
+				worklets.runWorklet(context as never);
+			};
 			const testingSetId = globalThis.__SetID;
 			globalThis.__SetID = (node, id) => {
 				setIds.push(id);
@@ -246,11 +299,19 @@ describe('Lynx Element PAPI host driver', () => {
 				testingSetId(node, id ?? '');
 			};
 			const papi = createLynxElementPAPI(globalThis);
-			const container = createLynxHostContainer(papi, { root: 1 });
+			const container = createLynxHostContainer(papi, { root: 1, worklets });
 			prepareLynxHostBatch(
 				container,
 				batch(1, [
-					{ op: 'create', id: 1, type: 'view', props: { id: 'counter' } },
+					{
+						op: 'create',
+						id: 1,
+						type: 'view',
+						props: {
+							id: 'counter',
+							'main-thread:bindtap': { _wkltId: 'counter.tsrx:tap' },
+						},
+					},
 					{ op: 'create', id: 2, type: 'text', props: {} },
 					{ op: 'create', id: 3, type: '#text', props: { value: 'Count: 0' } },
 					{ op: 'insert', parent: null, id: 1, before: null },
@@ -261,8 +322,16 @@ describe('Lynx Element PAPI host driver', () => {
 
 			const page = container.page as unknown as Element;
 			expect(page.querySelector('#counter')?.textContent).toBe('Count: 0');
+			page
+				.querySelector('#counter')!
+				.dispatchEvent(new dom.window.Event('bindEvent:tap', { bubbles: true }));
+			expect(workletCalls).toEqual([{ _wkltId: 'counter.tsrx:tap', _owlt: expect.any(Number) }]);
 			prepareLynxHostBatch(container, batch(2, [{ op: 'update', id: 1, props: {} }])).apply();
 			expect(setIds).toEqual(['counter', null]);
+			page
+				.querySelector('view')!
+				.dispatchEvent(new dom.window.Event('bindEvent:tap', { bubbles: true }));
+			expect(workletCalls).toHaveLength(1);
 			expect(page.querySelector('#counter')).toBeNull();
 			expect(disposeLynxHostContainer(container).errors).toEqual([]);
 			expect(page.children).toHaveLength(0);
@@ -286,11 +355,40 @@ describe('Lynx Element PAPI host driver', () => {
 	it('transfers a compatible first tree without allocating or restructuring native nodes', () => {
 		const papi = createFakePAPI();
 		const page = papi.createPage('entry', 0);
-		const source = createLynxHostContainer(papi, { root: 7, page });
+		const worklets = createObservedWorkletRegistry();
+		const mainThreadProps = {
+			'main-thread:catchswipe': {
+				_wkltId: 'scene.tsrx:swipe',
+				_c: {
+					axis: 'x',
+					onBackground: { _jsFnId: 'scene.tsrx:background', _c: { label: 'saved' } },
+				},
+			},
+			'main-thread:ref': { _wvid: 'scene:button' },
+		};
+		const adoptedMainThreadProps = {
+			...mainThreadProps,
+			'main-thread:catchswipe': {
+				...mainThreadProps['main-thread:catchswipe'],
+				_c: {
+					...mainThreadProps['main-thread:catchswipe']._c,
+					onBackground: {
+						...mainThreadProps['main-thread:catchswipe']._c.onBackground,
+						_execId: 'exec:scene:background',
+					},
+				},
+			},
+		};
+		const source = createLynxHostContainer(papi, { root: 7, page, worklets });
 		prepareLynxHostBatch(
 			source,
 			batch(1, [
-				{ op: 'create', id: 1, type: 'view', props: { id: 'button' } },
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: { id: 'button', ...mainThreadProps },
+				},
 				{ op: 'create', id: 2, type: 'text', props: { class: ['label', 'active'] } },
 				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 101, priority: 'discrete' } },
 				{ op: 'insert', parent: null, id: 1, before: null },
@@ -316,6 +414,9 @@ describe('Lynx Element PAPI host driver', () => {
 			roots: [1],
 		});
 		const capturedClass = firstTree.snapshot.nodes.find((node) => node.id === 2)?.props.class;
+		expect(firstTree.snapshot.nodes.find((node) => node.id === 1)?.props).toMatchObject(
+			mainThreadProps,
+		);
 		expect(capturedClass).toEqual(['label', 'active']);
 		expect(Object.isFrozen(capturedClass)).toBe(true);
 		expect(() => (capturedClass as string[]).push('mutated')).toThrow();
@@ -330,13 +431,18 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(() => preparedBeforeCapture.apply()).toThrow(/captured first-tree root/);
 		preparedBeforeCapture.abort();
 
-		const target = createLynxHostContainer(papi, { root: 7, page });
+		const target = createLynxHostContainer(papi, { root: 7, page, worklets });
 		const driver = createLynxHostDriver<FakeNode>();
 		papi.resetCalls();
 		const prepared = prepareLynxHostBatch(
 			target,
 			batch(1, [
-				{ op: 'create', id: 1, type: 'view', props: { id: 'button' } },
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: { id: 'button', ...adoptedMainThreadProps },
+				},
 				{ op: 'create', id: 2, type: 'text', props: { class: ['label', 'active'] } },
 				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 202, priority: 'discrete' } },
 				{ op: 'insert', parent: null, id: 1, before: null },
@@ -351,6 +457,13 @@ describe('Lynx Element PAPI host driver', () => {
 
 		expect(page.children).toEqual([sourceRoot]);
 		expect(sourceRoot.children).toEqual([sourceChild]);
+		expect(sourceRoot.events.get('catchEvent:swipe')).toMatchObject({
+			type: 'worklet',
+			value: {
+				_c: { onBackground: { _execId: 'exec:scene:background' } },
+			},
+		});
+		expect(worklets.refValues.get('scene:button')).toBe(sourceRoot);
 		expect(source.disposed).toBe(true);
 		expect(target.instanceCount).toBe(2);
 		expect(driver.getPublicInstance(target, 1)).toMatchObject({
@@ -371,6 +484,131 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(target.disposed).toBe(false);
 		releaseLynxFirstTree(firstTree);
 		expect(resolveLynxFirstTreeEvent(firstTree, placeholderToken)).toBeNull();
+	});
+
+	it('preserves capture aliases through compatible first-tree adoption', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const worklets = createLynxMainThreadWorkletRegistry();
+		const sourceShared = { value: 1 };
+		const source = createLynxHostContainer(papi, { root: 31, page, worklets });
+		prepareLynxHostBatch(
+			source,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: {
+						'main-thread:bindtap': {
+							_wkltId: 'alias.tsrx:tap',
+							_c: { values: [sourceShared, sourceShared] },
+						},
+					},
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const painted = page.children[0]!;
+		const firstTree = captureLynxFirstTree(source);
+		const captured = firstTree.snapshot.nodes[0]!.props['main-thread:bindtap'] as {
+			readonly _c: { readonly values: readonly unknown[] };
+		};
+		expect(captured._c.values[0]).toBe(captured._c.values[1]);
+
+		const targetShared = { value: 1 };
+		const target = createLynxHostContainer(papi, { root: 31, page, worklets });
+		const prepared = prepareLynxHostBatch(
+			target,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: {
+						'main-thread:bindtap': {
+							_wkltId: 'alias.tsrx:tap',
+							_c: { values: [targetShared, targetShared] },
+						},
+					},
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+			{ firstTree },
+		);
+
+		expect(prepared.firstTreeAction).toBe('adopt');
+		prepared.apply();
+		expect(page.children[0]).toBe(painted);
+		const active = (
+			painted.events.get('bindEvent:tap') as {
+				readonly value: LynxActivatedMainThreadWorklet;
+			}
+		).value;
+		expect(worklets.runWorklet(active)).toBe(true);
+		expect(disposeLynxHostContainer(target).complete).toBe(true);
+		expect(disposeLynxFirstTree(firstTree).complete).toBe(true);
+		releaseLynxFirstTree(firstTree);
+	});
+
+	it('repairs a first tree when capture alias topology changes', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const worklets = createLynxMainThreadWorkletRegistry();
+		const sourceShared = { value: 1 };
+		const source = createLynxHostContainer(papi, { root: 32, page, worklets });
+		prepareLynxHostBatch(
+			source,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: {
+						'main-thread:bindtap': {
+							_wkltId: 'alias.tsrx:tap',
+							_c: { values: [sourceShared, sourceShared] },
+						},
+					},
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const painted = page.children[0]!;
+		const firstTree = captureLynxFirstTree(source);
+		const target = createLynxHostContainer(papi, { root: 32, page, worklets });
+		const prepared = prepareLynxHostBatch(
+			target,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: {
+						'main-thread:bindtap': {
+							_wkltId: 'alias.tsrx:tap',
+							_c: { values: [{ value: 1 }, { value: 1 }] },
+						},
+					},
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+			{ firstTree },
+		);
+
+		expect(prepared.firstTreeAction).toBe('repair');
+		prepared.apply();
+		const replacement = page.children[0]!;
+		expect(replacement).not.toBe(painted);
+		const active = (
+			replacement.events.get('bindEvent:tap') as {
+				readonly value: LynxActivatedMainThreadWorklet;
+			}
+		).value;
+		expect(worklets.runWorklet(active)).toBe(false);
+		expect(disposeLynxHostContainer(target).complete).toBe(true);
+		expect(disposeLynxFirstTree(firstTree).complete).toBe(true);
+		releaseLynxFirstTree(firstTree);
 	});
 
 	it.each([
@@ -935,6 +1173,368 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(replacement.events.size).toBe(0);
 		expect(resolveLynxHostNativeEvent(container, replacementToken)).toBe(null);
 	});
+
+	it('routes main-thread worklet events and refs without background callback tokens', () => {
+		const worklets = createObservedWorkletRegistry();
+		const { container, page } = createHost(21, worklets);
+		const firstWorklet = { _wkltId: 'card.tsrx:tap', _c: { count: 1 } };
+		const secondWorklet = { _wkltId: 'card.tsrx:tap', _c: { count: 2 } };
+		const ref = { _wvid: 'card:root' };
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: { 'main-thread:bindtap': firstWorklet, 'main-thread:ref': ref },
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const first = page.children[0]!;
+		expect(first.events.get('bindEvent:tap')).toMatchObject({
+			type: 'worklet',
+			value: { ...firstWorklet, _owlt: expect.any(Number) },
+		});
+		const firstListener = first.events.get('bindEvent:tap');
+		expect(worklets.isActive((firstListener as { value: { _owlt: number } }).value._owlt)).toBe(
+			true,
+		);
+		expect(worklets.refValues.get(ref._wvid)).toBe(first);
+
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{
+					op: 'update',
+					id: 1,
+					props: { 'main-thread:bindtap': secondWorklet, 'main-thread:ref': ref },
+				},
+			]),
+		).apply();
+		expect(first.events.get('bindEvent:tap')).toMatchObject({
+			type: 'worklet',
+			value: { _wkltId: 'card.tsrx:tap', _c: { count: 2 } },
+		});
+		expect(worklets.isActive((firstListener as { value: { _owlt: number } }).value._owlt)).toBe(
+			false,
+		);
+
+		prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'visibility', id: 1, state: 'hidden' }]),
+		).apply();
+		expect(first.events.size).toBe(0);
+		expect(worklets.refValues.get(ref._wvid)).toBe(null);
+		prepareLynxHostBatch(
+			container,
+			batch(4, [{ op: 'visibility', id: 1, state: 'visible' }]),
+		).apply();
+		expect(first.events.get('bindEvent:tap')).toMatchObject({ type: 'worklet' });
+		expect(worklets.refValues.get(ref._wvid)).toBe(first);
+
+		prepareLynxHostBatch(container, batch(5, [{ op: 'remove', parent: null, id: 1 }])).apply();
+		expect(first.events.size).toBe(0);
+		expect(worklets.refValues.get(ref._wvid)).toBe(null);
+		prepareLynxHostBatch(
+			container,
+			batch(6, [{ op: 'insert', parent: null, id: 1, before: null }]),
+		).apply();
+		expect(first.events.get('bindEvent:tap')).toMatchObject({ type: 'worklet' });
+		expect(worklets.refValues.get(ref._wvid)).toBe(first);
+
+		prepareLynxHostBatch(
+			container,
+			batch(7, [
+				{
+					op: 'recreate',
+					id: 1,
+					type: 'view',
+					props: { 'main-thread:bindtap': secondWorklet, 'main-thread:ref': ref },
+				},
+			]),
+		).apply();
+		const replacement = page.children[0]!;
+		expect(replacement).not.toBe(first);
+		expect(first.events.size).toBe(0);
+		expect(replacement.events.get('bindEvent:tap')).toMatchObject({ type: 'worklet' });
+		expect(worklets.refValues.get(ref._wvid)).toBe(replacement);
+
+		expect(disposeLynxHostContainer(container).complete).toBe(true);
+		expect(replacement.events.size).toBe(0);
+		expect(worklets.refValues.get(ref._wvid)).toBe(null);
+	});
+
+	it('activates main-thread props only while their subtree is root-connected', () => {
+		const worklets = createObservedWorkletRegistry();
+		const { container, page } = createHost(22, worklets);
+		const props = (ref: string) => ({
+			'main-thread:bindtap': { _wkltId: 'card.tsrx:tap', _c: { ref } },
+			'main-thread:ref': { _wvid: ref },
+		});
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: props('detached:parent') },
+				{ op: 'create', id: 2, type: 'view', props: props('detached:child') },
+				{ op: 'create', id: 3, type: 'view', props: {} },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+			]),
+		).apply();
+
+		expect(page.children).toEqual([]);
+		expect(worklets.refValues.get('detached:parent')).toBeUndefined();
+		expect(worklets.refValues.get('detached:child')).toBeUndefined();
+
+		prepareLynxHostBatch(
+			container,
+			batch(2, [{ op: 'insert', parent: null, id: 1, before: null }]),
+		).apply();
+		const parent = page.children[0]!;
+		const child = parent.children[0]!;
+		expect(parent.events.get('bindEvent:tap')).toMatchObject({ type: 'worklet' });
+		expect(child.events.get('bindEvent:tap')).toMatchObject({ type: 'worklet' });
+		expect(worklets.refValues.get('detached:parent')).toBe(parent);
+		expect(worklets.refValues.get('detached:child')).toBe(child);
+
+		prepareLynxHostBatch(
+			container,
+			batch(3, [{ op: 'move', parent: 3, id: 1, before: null }]),
+		).apply();
+		expect(page.children).toEqual([]);
+		expect(parent.events.size).toBe(0);
+		expect(child.events.size).toBe(0);
+		expect(worklets.refValues.get('detached:parent')).toBe(null);
+		expect(worklets.refValues.get('detached:child')).toBe(null);
+	});
+
+	it('rejects ordinary and main-thread handlers targeting the same PAPI event tuple', () => {
+		const { container } = createHost(22);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(1, [
+					{
+						op: 'create',
+						id: 1,
+						type: 'view',
+						props: { 'main-thread:bindtap': { _wkltId: 'card.tsrx:tap' } },
+					},
+					{
+						op: 'event',
+						id: 1,
+						type: 'bindtap',
+						listener: { id: 101, priority: 'discrete' },
+					},
+				]),
+			),
+		).toThrow(/conflicts with background event "bindtap"/);
+	});
+
+	it('transfers one PAPI event tuple between background and main-thread ownership', () => {
+		const worklets = createLynxMainThreadWorkletRegistry();
+		const { container, page } = createHost(23, worklets);
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: {} },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 101, priority: 'discrete' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const node = page.children[0]!;
+		const backgroundToken = node.events.get('bindEvent:tap')!;
+
+		// Universal core emits prop updates before ordinary event removals.
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{
+					op: 'update',
+					id: 1,
+					props: { 'main-thread:bindtap': { _wkltId: 'card.tsrx:tap' } },
+				},
+				{ op: 'event', id: 1, type: 'bindtap', listener: null },
+			]),
+		).apply();
+		const mainListener = node.events.get('bindEvent:tap') as {
+			readonly type: 'worklet';
+			readonly value: LynxActivatedMainThreadWorklet;
+		};
+		expect(mainListener).toMatchObject({ type: 'worklet' });
+		expect(worklets.isActive(mainListener.value)).toBe(true);
+		expect(resolveLynxHostNativeEvent(container, backgroundToken)).toBe(null);
+
+		prepareLynxHostBatch(
+			container,
+			batch(3, [
+				{ op: 'update', id: 1, props: {} },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 202, priority: 'default' } },
+			]),
+		).apply();
+		const nextBackgroundToken = node.events.get('bindEvent:tap')!;
+		expect(typeof nextBackgroundToken).toBe('string');
+		expect(nextBackgroundToken).not.toBe(backgroundToken);
+		expect(worklets.isActive(mainListener.value)).toBe(false);
+		expect(resolveLynxHostNativeEvent(container, nextBackgroundToken)).toEqual({
+			listener: 202,
+			priority: 'default',
+		});
+	});
+
+	it.each(['before', 'after'] as const)(
+		'cleans both event journals when a background-to-main replacement fails %s mutation',
+		(timing) => {
+			const registry = createLynxMainThreadWorkletRegistry();
+			const activations: LynxActivatedMainThreadWorklet[] = [];
+			const worklets: LynxMainThreadWorkletRegistry = Object.freeze({
+				...registry,
+				activate(descriptor) {
+					const active = registry.activate(descriptor);
+					activations.push(active);
+					return active;
+				},
+			});
+			const { container, page, papi } = createHost(24, worklets);
+			prepareLynxHostBatch(
+				container,
+				batch(1, [
+					{ op: 'create', id: 1, type: 'view', props: {} },
+					{
+						op: 'event',
+						id: 1,
+						type: 'bindtap',
+						listener: { id: 101, priority: 'discrete' },
+					},
+					{ op: 'insert', parent: null, id: 1, before: null },
+				]),
+			).apply();
+			const node = page.children[0]!;
+			const failure = new Error(`event replacement failed ${timing} mutation`);
+			papi.failNext('setEvent', timing, failure);
+			const prepared = prepareLynxHostBatch(
+				container,
+				batch(2, [
+					{
+						op: 'update',
+						id: 1,
+						props: { 'main-thread:bindtap': { _wkltId: 'card.tsrx:tap' } },
+					},
+					{ op: 'event', id: 1, type: 'bindtap', listener: null },
+				]),
+			);
+
+			expect(() => prepared.apply()).toThrow(failure);
+			expect(activations).toHaveLength(1);
+			expect(registry.isActive(activations[0]!)).toBe(false);
+			const cleanup = disposeLynxHostContainer(container);
+			expect(cleanup.complete).toBe(true);
+			expect(cleanup.errors).toEqual([]);
+			expect(node.events.size).toBe(0);
+			expect(registry.isActive(activations[0]!)).toBe(false);
+			expect(page.children).toEqual([]);
+		},
+	);
+
+	it('does not retain an empty native-event journal when worklet activation fails', () => {
+		const worklets = createLynxMainThreadWorkletRegistry();
+		const { container, page } = createHost(25, worklets);
+		const prepared = prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{
+					op: 'create',
+					id: 1,
+					type: 'view',
+					props: { 'main-thread:bindtap': { _wkltId: 'missing.tsrx:tap' } },
+				},
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		);
+
+		expect(() => prepared.apply()).toThrow(/missing\.tsrx:tap is not registered/);
+		expect(prepared.mutationStarted).toBe(true);
+		expect(disposeLynxHostContainer(container)).toEqual({
+			complete: true,
+			removedRoots: 0,
+			remainingRoots: 0,
+			flushed: false,
+			errors: [],
+		});
+		expect(container.disposed).toBe(true);
+		expect(page.children).toEqual([]);
+	});
+
+	it.each([
+		['setAttribute', 'before'],
+		['setAttribute', 'after'],
+		['flush', 'before'],
+		['flush', 'after'],
+	] as const)(
+		'invalidates direct main-thread lifetimes when accepted %s fails %s mutation',
+		(method, timing) => {
+			const worklets = createLynxMainThreadWorkletRegistry();
+			const ref = { _wvid: `fault:${method}:${timing}` };
+			const refCell = worklets.retainOwner(ref);
+			const worklet = { _wkltId: 'card.tsrx:tap' };
+			const { container, page, papi } = createHost(26, worklets);
+			prepareLynxHostBatch(
+				container,
+				batch(1, [
+					{
+						op: 'create',
+						id: 1,
+						type: 'view',
+						props: { 'main-thread:bindtap': worklet, 'main-thread:ref': ref },
+					},
+					{ op: 'insert', parent: null, id: 1, before: null },
+				]),
+			).apply();
+			const node = page.children[0]!;
+			const listener = node.events.get('bindEvent:tap') as {
+				readonly type: 'worklet';
+				readonly value: LynxActivatedMainThreadWorklet;
+			};
+			expect(worklets.isActive(listener.value)).toBe(true);
+			expect(refCell.current).toBe(node);
+
+			const failure = new Error(`${method} failed ${timing} mutation`);
+			papi.failNext(method, timing, failure);
+			const prepared = prepareLynxHostBatch(
+				container,
+				batch(2, [
+					{
+						op: 'update',
+						id: 1,
+						props: {
+							title: 'faulted',
+							'main-thread:bindtap': worklet,
+							'main-thread:ref': ref,
+						},
+					},
+				]),
+			);
+
+			expect(() => prepared.apply()).toThrow(failure);
+			expect(worklets.isActive(listener.value)).toBe(false);
+			expect(() => worklets.runWorklet(listener.value)).toThrow(/stale or foreign/);
+			expect(refCell.current).toBe(null);
+			// Refs have no PAPI binding, so fault invalidation releases the host
+			// retain immediately while leaving an explicit owner independently live.
+			expect(() => worklets.updateRef(ref, null)).not.toThrow();
+			worklets.releaseOwner(ref);
+			expect(() => worklets.updateRef(ref, null)).toThrow(/stale/);
+			expect(node.events.get('bindEvent:tap')).toBe(listener);
+
+			const cleanup = disposeLynxHostContainer(container);
+			expect(cleanup.complete).toBe(true);
+			expect(cleanup.errors).toEqual([]);
+			expect(node.events.size).toBe(0);
+			expect(worklets.isActive(listener.value)).toBe(false);
+			expect(page.children).toEqual([]);
+		},
+	);
 
 	it('recreates a host while preserving child identity and changing only its handle generation', () => {
 		const { container, driver, page, papi } = createHost(7);

@@ -10,6 +10,7 @@ import {
 	normalizeLynxInlineStyle,
 	planLynxHostPropPatch,
 } from '../src/core/host-props.js';
+import { attachThreadFunction } from '../src/core/worklets.js';
 
 function attributes(patch: ReturnType<typeof planLynxHostPropPatch>): Record<string, unknown> {
 	return Object.fromEntries(patch.attributes.map(({ name, value }) => [name, value]));
@@ -164,7 +165,8 @@ describe('Lynx host prop routing', () => {
 		expect(classifyLynxHostPropName('style')).toBe('inline-styles');
 		expect(classifyLynxHostPropName('data-user-id')).toBe('dataset');
 		expect(classifyLynxHostPropName('bindtap')).toBe('event');
-		expect(classifyLynxHostPropName('main-thread:catchtap')).toBe('reserved');
+		expect(classifyLynxHostPropName('main-thread:catchtap')).toBe('main-thread-event');
+		expect(classifyLynxHostPropName('main-thread:ref')).toBe('main-thread-ref');
 		expect(classifyLynxHostPropName('foreign:bindtap')).toBe('reserved');
 		expect(classifyLynxHostPropName('octane-ref')).toBe('reserved');
 		expect(classifyLynxHostPropName('css-id')).toBe('reserved');
@@ -193,7 +195,157 @@ describe('Lynx host prop routing', () => {
 			/reserved for generation-scoped query handles/,
 		);
 		expect(() => planLynxHostPropPatch('view', {}, { 'main-thread:bindtap': 42 })).toThrow(
-			/reserved for a later main-thread capability/,
+			/main-thread worklet descriptor/,
 		);
+	});
+
+	it('routes clone-safe main-thread events and refs as dedicated semantic patches', () => {
+		const tap = { _wkltId: 'card.tsrx:tap', _c: { count: 1, ref: { _wvid: 'card:ref' } } };
+		const ref = { _wvid: 'card:ref' };
+		const created = planLynxHostPropPatch(
+			'view',
+			{},
+			{ 'main-thread:bindtap': tap, 'main-thread:ref': ref },
+		);
+
+		expect(created.mainThreadEvents).toEqual([
+			{
+				binding: {
+					prop: 'main-thread:bindtap',
+					prefix: 'bind',
+					type: 'bindEvent',
+					name: 'tap',
+				},
+				value: tap,
+			},
+		]);
+		expect(created.mainThreadRef?.value).toBe(ref);
+		expect(attributes(created)).toEqual({});
+		expect(
+			planLynxHostPropPatch(
+				'view',
+				{ 'main-thread:bindtap': tap, 'main-thread:ref': ref },
+				{
+					'main-thread:bindtap': {
+						_wkltId: 'card.tsrx:tap',
+						_c: { count: 1, ref: { _wvid: 'card:ref' } },
+					},
+					'main-thread:ref': { _wvid: 'card:ref' },
+				},
+			).mainThreadEvents,
+		).toEqual([]);
+
+		const removed = planLynxHostPropPatch(
+			'view',
+			{ 'main-thread:bindtap': tap, 'main-thread:ref': ref },
+			{},
+		);
+		expect(removed.mainThreadEvents[0]?.value).toBe(null);
+		expect(removed.mainThreadRef?.value).toBe(null);
+	});
+
+	it('rebinds a main-thread event when capture alias topology changes', () => {
+		const shared = { value: 1 };
+		const aliased = {
+			_wkltId: 'card.tsrx:alias',
+			_c: { values: [shared, shared] },
+		};
+		const distinct = {
+			_wkltId: 'card.tsrx:alias',
+			_c: { values: [{ value: 1 }, { value: 1 }] },
+		};
+		const nextShared = { value: 1 };
+		const equivalentlyAliased = {
+			_wkltId: 'card.tsrx:alias',
+			_c: { values: [nextShared, nextShared] },
+		};
+
+		expect(
+			planLynxHostPropPatch(
+				'view',
+				{ 'main-thread:bindtap': aliased },
+				{ 'main-thread:bindtap': distinct },
+			).mainThreadEvents,
+		).toHaveLength(1);
+		expect(
+			planLynxHostPropPatch(
+				'view',
+				{ 'main-thread:bindtap': distinct },
+				{ 'main-thread:bindtap': aliased },
+			).mainThreadEvents,
+		).toHaveLength(1);
+		expect(
+			planLynxHostPropPatch(
+				'view',
+				{ 'main-thread:bindtap': aliased },
+				{ 'main-thread:bindtap': equivalentlyAliased },
+			).mainThreadEvents,
+		).toEqual([]);
+	});
+
+	it('unwraps compiler-tagged main-thread functions at the host prop boundary', () => {
+		const handler = attachThreadFunction(
+			function handler() {},
+			'main-thread',
+			'host-props.test:tap',
+			() => [{ count: 1 }],
+		);
+
+		const patch = planLynxHostPropPatch('view', {}, { 'main-thread:bindtap': handler });
+
+		expect(patch.mainThreadEvents).toEqual([
+			{
+				binding: {
+					prop: 'main-thread:bindtap',
+					prefix: 'bind',
+					type: 'bindEvent',
+					name: 'tap',
+				},
+				value: { _wkltId: 'host-props.test:tap', _c: { values: [{ count: 1 }] } },
+			},
+		]);
+	});
+
+	it('rejects main/background channel collisions and non-clone-safe worklet values', () => {
+		expect(() =>
+			planLynxHostPropPatch(
+				'raw-text',
+				{},
+				{
+					'main-thread:bindtap': { _wkltId: 'tap' },
+				},
+			),
+		).toThrow(/raw-text hosts cannot own direct main-thread prop/);
+		expect(() =>
+			planLynxHostPropPatch(
+				'raw-text',
+				{},
+				{
+					'main-thread:ref': { _wvid: 'label' },
+				},
+			),
+		).toThrow(/raw-text hosts cannot own direct main-thread prop/);
+		expect(() =>
+			planLynxHostPropPatch(
+				'view',
+				{},
+				{
+					bindtap: 1,
+					'main-thread:bindtap': { _wkltId: 'tap' },
+				},
+			),
+		).toThrow(/conflicts with "bindtap"/);
+		expect(() =>
+			planLynxHostPropPatch(
+				'view',
+				{},
+				{
+					'main-thread:bindtap': { _wkltId: 'tap', _c: { callback() {} } },
+				},
+			),
+		).toThrow(/non-clone-safe/);
+		expect(() =>
+			planLynxHostPropPatch('view', {}, { 'main-thread:gesture': { _wkltId: 'gesture' } }),
+		).toThrow(/not a supported Lynx host capability/);
 	});
 });
