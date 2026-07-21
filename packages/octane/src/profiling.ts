@@ -45,6 +45,11 @@ export interface ProfileEvent {
 	file: string;
 	line: number;
 	column: number;
+	/**
+	 * Persistent per-live-instance id, stable across `clear()` and shared with
+	 * the devtools bridge: equal to the `octane/devtools` tree-node id for the
+	 * same instance, so an event row resolves through `inspect()`/`getDomNodes()`.
+	 */
 	instanceId: number;
 	attempt: number;
 	phase: 'mount' | 'update';
@@ -124,6 +129,54 @@ const componentSources = new WeakMap<Function, Function>();
 const hookMetadata = new Map<symbol, HookProfileMetadata>();
 const fallbackMetadata = new WeakMap<Function, ComponentProfileMetadata>();
 const trackedComponents = new WeakMap<object, Function>();
+
+/**
+ * Persistent subject identity, shared with the devtools bridge: a subject (a
+ * render scope/block) keeps one id for its whole life, `ProfileEvent.
+ * instanceId` carries it, and `octane/devtools` tree-node ids equal it — so a
+ * profiler event row can be handed straight to the bridge's `inspect()` /
+ * `getDomNodes()`. Identity deliberately survives `clear()`, which resets
+ * recorded data, not who instances are. The reverse map is weakly held and
+ * reclaimed by the FinalizationRegistry, so identity never extends an
+ * instance's lifetime and needs no periodic pruning. Non-DOM universal
+ * renderers may forbid these GC globals, so they are read off a bound global
+ * reference; without them only the reverse lookup degrades (to null) — the
+ * forward id path never needs them.
+ */
+const subjectIds = new WeakMap<object, number>();
+const subjectRefs = new Map<number, WeakRef<object>>();
+const globalScope = globalThis as {
+	WeakRef?: { new (target: object): WeakRef<object> };
+	FinalizationRegistry?: {
+		new (cleanup: (heldValue: number) => void): FinalizationRegistry<number>;
+	};
+};
+const WeakRefCtor = globalScope.WeakRef;
+const subjectReclaim =
+	globalScope.FinalizationRegistry !== undefined
+		? new globalScope.FinalizationRegistry((subjectId) => {
+				subjectRefs.delete(subjectId);
+			})
+		: null;
+
+/** Runtime ABI: the persistent id naming a profiled/inspected subject. */
+export function __profileSubjectId(subject: object): number {
+	let id = subjectIds.get(subject);
+	if (id === undefined) {
+		id = nextInstanceId++;
+		subjectIds.set(subject, id);
+		if (WeakRefCtor !== undefined) {
+			subjectRefs.set(id, new WeakRefCtor(subject));
+			subjectReclaim?.register(subject, id);
+		}
+	}
+	return id;
+}
+
+/** Runtime ABI: the live subject for an id, or null once collected or unknown. */
+export function __profileSubjectFor(id: number): object | null {
+	return subjectRefs.get(id)?.deref() ?? null;
+}
 
 let instances = new WeakMap<object, InstanceProfile>();
 let pending = new WeakMap<object, PendingProfile>();
@@ -209,7 +262,7 @@ function metadataFor(component: Function): ComponentProfileMetadata {
 function instanceFor(subject: object): InstanceProfile {
 	let instance = instances.get(subject);
 	if (instance === undefined) {
-		instance = { id: nextInstanceId++, attempts: 0 };
+		instance = { id: __profileSubjectId(subject), attempts: 0 };
 		instances.set(subject, instance);
 	}
 	return instance;
@@ -557,8 +610,10 @@ export const profiler: OctaneProfiler = {
 		eventCount = 0;
 		pendingTimelineEvents = [];
 		pending = new WeakMap();
+		// Attempt counters restart, but subject identity is NOT reset: an id
+		// names an instance for its whole life so devtools correlation and any
+		// retained event copies stay valid across a buffer clear.
 		instances = new WeakMap();
-		nextInstanceId = 1;
 		recordingGeneration++;
 		currentFrame = null;
 	},

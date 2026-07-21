@@ -199,6 +199,27 @@ describe('devtools bridge', () => {
 		}
 	});
 
+	it('shares instance identity with the profiler so event rows resolve here', () => {
+		const profiler = hook().getProfiler();
+		expect(profiler).toBeDefined();
+		profiler!.clear();
+		const app = mount(App);
+		try {
+			app.click('.inc');
+			const counter = findNode(hook().getTree(), 'Counter')!;
+			const events = profiler!.getEvents().filter((event) => event.component === 'Counter');
+			expect(events.length).toBeGreaterThan(0);
+			// Every profiler row for this instance carries the tree node's id…
+			expect(new Set(events.map((event) => event.instanceId))).toEqual(new Set([counter.id]));
+			// …so a row's instanceId resolves through the bridge directly.
+			const detail = hook().inspect(events[0].instanceId);
+			expect(detail?.label).toBe('Counter');
+			expect(hook().getDomNodes(events[0].instanceId).length).toBeGreaterThan(0);
+		} finally {
+			app.unmount();
+		}
+	});
+
 	it('notifies subscribers on commits and prunes unmounted roots', () => {
 		const events: DevtoolsEvent[] = [];
 		const unsubscribe = hook().subscribe((event) => events.push(event));

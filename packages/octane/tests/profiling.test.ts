@@ -194,6 +194,26 @@ describe('profiler queries', () => {
 		});
 	});
 
+	it('keeps instance identity stable across clear() while attempts restart', () => {
+		function Widget() {}
+		register(Widget);
+		const first = track(Widget);
+		const second = track(Widget);
+		record(first, Widget);
+		record(second, Widget);
+		const secondId = profiler.why(Widget)[1].instanceId;
+
+		profiler.clear();
+		record(second, Widget, true);
+
+		const [event] = profiler.why(Widget);
+		// The live instance keeps its id, so retained event copies and devtools
+		// correlation stay valid across a buffer clear…
+		expect(event.instanceId).toBe(secondId);
+		// …while recorded data (the attempt counter) starts over.
+		expect(event.attempt).toBe(1);
+	});
+
 	it('exports an independent Chrome trace snapshot', () => {
 		function Row() {}
 		register(Row);

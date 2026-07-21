@@ -17,6 +17,8 @@ import {
 	__profileHookMetadataFor,
 	__profileMetadataFor,
 	__profileNow as now,
+	__profileSubjectFor,
+	__profileSubjectId,
 	__profileTrackedComponentFor,
 	type HookProfileMetadata,
 	type OctaneProfiler,
@@ -36,7 +38,11 @@ export type DevtoolsNodeType = 'root' | 'component' | 'control-flow' | 'list-ite
  * separately through `inspect(id)`.
  */
 export interface DevtoolsTreeNode {
-	/** Stable per live instance for the instance's lifetime. */
+	/**
+	 * Stable per live instance for the instance's lifetime, and shared with the
+	 * profiler: equal to `ProfileEvent.instanceId` for the same instance, so a
+	 * profiler event row resolves through `inspect()`/`getDomNodes()` directly.
+	 */
 	id: number;
 	type: DevtoolsNodeType;
 	label: string;
@@ -198,9 +204,16 @@ function hasEventConsumer(): boolean {
 	return recording || listeners.size > 0;
 }
 
-const subjectIds = new WeakMap<object, number>();
-const subjectsById = new Map<number, WeakRef<object>>();
-let nextSubjectId = 1;
+/**
+ * Instance identity comes from the shared profiling registry, so a tree-node
+ * id, `inspect(id)`, `getDomNodes(id)`, and the profiler's
+ * `ProfileEvent.instanceId` all name the same live instance — a profiler event
+ * row resolves straight back through this bridge. Reverse entries are weakly
+ * held and GC-reclaimed by that registry, so the bridge pins nothing and needs
+ * no periodic pruning.
+ */
+const idFor = __profileSubjectId;
+const subjectFor = __profileSubjectFor;
 
 /**
  * `useDebugValue` records, keyed per render scope then per compiler slot —
@@ -213,6 +226,8 @@ interface DebugValueCell {
 	format: ((value: unknown) => unknown) | undefined;
 }
 const debugValueCells = new WeakMap<object, Map<symbol | number, DebugValueCell>>();
+/** Flips on the first useDebugValue ever; until then every render skips the sidecar lookup. */
+let hasDebugValues = false;
 
 /**
  * Picker memo: pointermove fires many times per hovered element, so the last
@@ -221,34 +236,6 @@ const debugValueCells = new WeakMap<object, Map<symbol | number, DebugValueCell>
  */
 let pickGeneration = 0;
 let lastPick: { target: Node; id: number | null; generation: number } | null = null;
-
-function idFor(subject: object): number {
-	let id = subjectIds.get(subject);
-	if (id === undefined) {
-		id = nextSubjectId++;
-		subjectIds.set(subject, id);
-		subjectsById.set(id, new WeakRef(subject));
-	}
-	return id;
-}
-
-function subjectFor(id: number): object | null {
-	const ref = subjectsById.get(id);
-	if (ref === undefined) return null;
-	const subject = ref.deref();
-	if (subject === undefined) {
-		subjectsById.delete(id);
-		return null;
-	}
-	return subject;
-}
-
-/** Drop id entries whose instances were collected; called from getTree(). */
-function pruneSubjectIds(): void {
-	for (const [id, ref] of subjectsById) {
-		if (ref.deref() === undefined) subjectsById.delete(id);
-	}
-}
 
 function pushEvent(event: DevtoolsEvent): void {
 	if (recording) {
@@ -318,7 +305,6 @@ const devtools: OctaneDevtools = {
 	},
 	getTree() {
 		if (adapter === null) return [];
-		pruneSubjectIds();
 		const trees: DevtoolsTreeNode[] = [];
 		for (const root of liveRoots) {
 			try {
@@ -510,7 +496,7 @@ export function __devtoolsHmr(component: Function): void {
  * being reported as live state.
  */
 export function __devtoolsRenderStarted(scope: object): void {
-	debugValueCells.get(scope)?.clear();
+	if (hasDebugValues) debugValueCells.get(scope)?.clear();
 }
 
 /** Runtime ABI: a `useDebugValue(value, format?)` call during a render. */
@@ -520,6 +506,7 @@ export function __devtoolsDebugValue(
 	value: unknown,
 	format: unknown,
 ): void {
+	hasDebugValues = true;
 	let cells = debugValueCells.get(scope);
 	if (cells === undefined) debugValueCells.set(scope, (cells = new Map()));
 	const cell = cells.get(slot);
