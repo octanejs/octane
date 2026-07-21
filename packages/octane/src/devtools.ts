@@ -250,11 +250,12 @@ let hasDebugValues = false;
 
 /**
  * Picker memo: pointermove fires many times per hovered element, so the last
- * reverse lookup is cached per target and invalidated whenever a commit or
- * root change could move DOM between components.
+ * reverse lookup is cached per target and dropped whenever a commit or root
+ * change could move DOM between components. Dropping the entry (rather than
+ * versioning it) also releases the target reference, so the memo never pins a
+ * detached DOM subtree after picking stops.
  */
-let pickGeneration = 0;
-let lastPick: { target: Node; id: number | null; generation: number } | null = null;
+let lastPick: { target: Node; id: number | null } | null = null;
 
 function pushEvent(event: DevtoolsEvent): void {
 	if (recording) {
@@ -361,9 +362,7 @@ const devtools: OctaneDevtools = {
 	},
 	findByDomNode(target) {
 		if (adapter === null || target === null || typeof target !== 'object') return null;
-		if (lastPick !== null && lastPick.target === target && lastPick.generation === pickGeneration) {
-			return lastPick.id;
-		}
+		if (lastPick !== null && lastPick.target === target) return lastPick.id;
 		let id: number | null = null;
 		for (const root of liveRoots) {
 			try {
@@ -376,7 +375,7 @@ const devtools: OctaneDevtools = {
 				// A half-torn-down root must not break the picker for other roots.
 			}
 		}
-		lastPick = { target, id, generation: pickGeneration };
+		lastPick = { target, id };
 		return id;
 	},
 	getComponentSource(component) {
@@ -446,7 +445,7 @@ export function __devtoolsRegisterRoot(root: object, container: object): void {
 		return;
 	}
 	liveRoots.add(root);
-	pickGeneration++;
+	lastPick = null;
 	if (hasEventConsumer()) pushEvent({ kind: 'root-added', at: now() });
 }
 
@@ -454,7 +453,7 @@ export function __devtoolsRegisterRoot(root: object, container: object): void {
 export function __devtoolsUnregisterRoot(root: object): void {
 	rootTreeCache.delete(root);
 	if (!liveRoots.delete(root)) return;
-	pickGeneration++;
+	lastPick = null;
 	if (hasEventConsumer()) pushEvent({ kind: 'root-removed', at: now() });
 }
 
@@ -469,14 +468,14 @@ export function __devtoolsUnregisterRoot(root: object): void {
  * re-triggering panel refreshes.
  */
 function commitFinished(roots: ReadonlySet<object> | null): void {
-	pickGeneration++;
-	if (roots === null || roots.size === 0) return;
+	lastPick = null;
+	if (roots === null || roots.size === 0 || !hasEventConsumer()) return;
 	let ids: number[] | undefined;
 	for (const root of roots) {
 		if (internalRoots.has(root)) continue;
 		(ids ??= []).push(idFor(root));
 	}
-	if (ids === undefined || !hasEventConsumer()) return;
+	if (ids === undefined) return;
 	pushEvent({ kind: 'commit', at: now(), roots: ids });
 }
 

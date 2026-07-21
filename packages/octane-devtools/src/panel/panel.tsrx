@@ -6,15 +6,20 @@
 // longer emits commits caused only by internal (panel-owned) roots, so the
 // panel does not hear its own renders. It still NEVER sets state directly
 // from `subscribe`: while open it schedules a trailing throttled refresh that
-// re-reads the tree, fingerprints it, and only calls setState when the
-// fingerprint actually changed — a cheap defensive guard that keeps the loop
-// terminating even if an embedder surfaces extra commit events.
+// re-reads the tree and only calls setState when something changed. Change
+// detection is by reference — the bridge's per-root tree cache hands back the
+// IDENTICAL node objects for untouched roots and fresh objects for rebuilt
+// ones, so comparing root references (plus a bounded fingerprint of the
+// selected node's serialized detail) is O(roots) instead of stringifying the
+// whole tree. It also keeps the loop terminating even if an embedder surfaces
+// extra commit events: an event that drained no work touches no root, so
+// every reference stays identical and no setState fires.
 //
 // Layout (trigger position, dock height, pin) is panel-local state persisted
 // in localStorage — it never touches the bridge, so it cannot feed the refresh
 // loop; drags mutate the DOM directly and commit state + storage on release.
 // The dock is a bottom drawer only.
-import { useCallback, useEffect, useRef, useState, version } from 'octane';
+import { useCallback, useEffect, useMemo, useRef, useState, version } from 'octane';
 import type {
 	DevtoolsEvent,
 	DevtoolsInstanceDetail,
@@ -110,23 +115,36 @@ function safeStringify(value: unknown): string {
 }
 
 /**
- * Cheap change detector: the tree is inert JSON already; the selected detail
- * goes through `serializeValue` (depth/size-bounded, never throws) so live
- * props/hook values compare structurally instead of by identity.
+ * Change detector for the selected node's live detail: props/hook values are
+ * live references, so they go through `serializeValue` (depth/size-bounded,
+ * never throws) and compare structurally. The tree needs no fingerprint —
+ * the bridge's per-root cache makes root-node references the change signal
+ * (see sameTreeRoots).
  */
-function computeFingerprint(
-	tree: DevtoolsTreeNode[],
-	detail: DevtoolsInstanceDetail | null,
-): string {
-	// The tree is inert JSON and the detail is depth-bounded by serializeValue,
-	// so the only real escape is the engine refusing a colossal result string
-	// (RangeError). A constant fallback then forces refreshes through.
+function detailFingerprint(detail: DevtoolsInstanceDetail | null): string {
+	// The detail is depth-bounded by serializeValue, so the only real escape is
+	// the engine refusing a colossal result string (RangeError). A constant
+	// fallback then forces refreshes through.
 	try {
-		return JSON.stringify(tree) + '|' +
-			(detail === null ? 'null' : JSON.stringify(serializeValue(detail)));
+		return detail === null ? '' : JSON.stringify(serializeValue(detail));
 	} catch {
 		return '(unfingerprintable)';
 	}
+}
+
+/**
+ * True when two `getTree()` reads returned the same cached tree per root. The
+ * bridge rebuilds a root's tree (fresh objects) whenever work was scheduled
+ * under it, so element-wise reference equality is an exact "nothing rendered"
+ * check — any commit that could change tree shape or hook state invalidates
+ * the touched root's cache first.
+ */
+function sameTreeRoots(a: DevtoolsTreeNode[], b: DevtoolsTreeNode[]): boolean {
+	if (a.length !== b.length) return false;
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
 }
 
 function computeVisibleIds(tree: DevtoolsTreeNode[], query: string): Set<number> {
@@ -476,8 +494,10 @@ export function Panel(props: PanelProps) @{
 		const selected = getSelectedId();
 		const nextDetail =
 			selected === null ? null : hook.inspect(selected);
-		const fingerprint = computeFingerprint(nextTree, nextDetail);
-		if (fingerprint === fingerprintRef.current) return;
+		const fingerprint = detailFingerprint(nextDetail);
+		if (sameTreeRoots(treeRef.current, nextTree) && fingerprint === fingerprintRef.current) {
+			return;
+		}
 		fingerprintRef.current = fingerprint;
 		treeRef.current = nextTree;
 		detailRef.current = nextDetail;
@@ -813,7 +833,7 @@ export function Panel(props: PanelProps) @{
 		setSelectedId(id);
 		const nextDetail = hook.inspect(id);
 		detailRef.current = nextDetail;
-		fingerprintRef.current = computeFingerprint(treeRef.current, nextDetail);
+		fingerprintRef.current = detailFingerprint(nextDetail);
 	};
 
 	const hoverNode = (id: number, label: string) => highlightNodes(hook.getDomNodes(id), label);
@@ -968,8 +988,12 @@ export function Panel(props: PanelProps) @{
 	const tree = treeRef.current;
 	const detail = detailRef.current;
 	const trimmedFilter = filter.trim().toLowerCase();
-	const visibleIds =
-		trimmedFilter === '' ? null : computeVisibleIds(tree, trimmedFilter);
+	// The match walk is O(tree); memoized so re-renders that change neither the
+	// tree nor the query (hover state, tab state) skip it.
+	const visibleIds = useMemo(
+		() => (trimmedFilter === '' ? null : computeVisibleIds(tree, trimmedFilter)),
+		[tree, trimmedFilter],
+	);
 	const visibleRoots =
 		visibleIds === null ? tree : tree.filter((rootNode) => visibleIds.has(rootNode.id));
 	const emptyTreeMessage =
