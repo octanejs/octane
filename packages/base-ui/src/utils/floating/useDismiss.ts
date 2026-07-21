@@ -57,9 +57,7 @@ export interface UseDismissProps {
 		| (() => PressType | { mouse: PressType; touch: PressType })
 		| undefined;
 	bubbles?:
-		| boolean
-		| { escapeKey?: boolean | undefined; outsidePress?: boolean | undefined }
-		| undefined;
+		boolean | { escapeKey?: boolean | undefined; outsidePress?: boolean | undefined } | undefined;
 	externalTree?: FloatingTreeStore | undefined;
 }
 

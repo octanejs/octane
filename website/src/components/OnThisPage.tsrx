@@ -311,9 +311,7 @@ export function OnThisPage(props: {
 									aria-current={activeId === section.id ? 'true' : undefined}
 									onClick={(event: MouseEvent) => scrollToSection(event, section.id)}
 								>
-									<span class="toc-link-text">
-										{section.title as string}
-									</span>
+									<span class="toc-link-text">{section.title as string}</span>
 								</a>
 							</li>
 						}

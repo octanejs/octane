@@ -8,9 +8,7 @@ export function SuspendingValue({
 	cacheKey: string[];
 }) @{
 	const value = useSuspendingLiveQuery(querier, cacheKey);
-	<div id="suspending-value">
-		{value as string}
-	</div>
+	<div id="suspending-value">{value as string}</div>
 }
 
 export function SuspendingBoundary({
@@ -25,9 +23,7 @@ export function SuspendingBoundary({
 	} @pending {
 		<div id="suspending-pending">loading</div>
 	} @catch (error) {
-		<div id="suspending-error">
-			{(error as Error).message as string}
-		</div>
+		<div id="suspending-error">{(error as Error).message as string}</div>
 	}
 }
 

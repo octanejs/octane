@@ -30,9 +30,7 @@ export function SelectedValueReader(props) @{
 		null,
 		selectA,
 	);
-	<span id="selected-value">
-		{value as number}
-	</span>
+	<span id="selected-value">{value as number}</span>
 }
 
 function selectAObject(state) {
@@ -104,9 +102,7 @@ export function ChangingSelectorReader(props) @{
 		<span id="changing-selection">
 			{selection.items.join(',') + '|selected:' + selection.selectedAtStep}
 		</span>
-		<span id="changing-selector-step">
-			{props.step as string}
-		</span>
+		<span id="changing-selector-step">{props.step as string}</span>
 	</div>
 }
 
@@ -120,18 +116,14 @@ function ThrowingSelectorReader(props) @{
 			return state.a.toUpperCase();
 		},
 	);
-	<span id="selector-value">
-		{value as string}
-	</span>
+	<span id="selector-value">{value as string}</span>
 }
 
 export function SelectorErrorBoundary(props) @{
 	@try {
 		<ThrowingSelectorReader store={props.store} />
 	} @catch (error) {
-		<span id="selector-error">
-			{error.message as string}
-		</span>
+		<span id="selector-error">{error.message as string}</span>
 	}
 }
 
@@ -148,17 +140,13 @@ function ThrowingEqualityReader(props) @{
 			return left.trim() === right.trim();
 		},
 	);
-	<span id="equality-value">
-		{value as string}
-	</span>
+	<span id="equality-value">{value as string}</span>
 }
 
 export function EqualityErrorBoundary(props) @{
 	@try {
 		<ThrowingEqualityReader store={props.store} />
 	} @catch (error) {
-		<span id="equality-error">
-			{error.message as string}
-		</span>
+		<span id="equality-error">{error.message as string}</span>
 	}
 }

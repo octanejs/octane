@@ -33,10 +33,9 @@ type ExcludeList = {
 };
 
 export type NonOctaneStatics<S extends AnyComponent, C extends ExcludeList = {}> = {
-	[key in Exclude<
-		keyof S,
-		keyof typeof COMPONENT_STATICS | keyof typeof KNOWN_STATICS | keyof C
-	>]: S[key];
+	[
+		key in Exclude<keyof S, keyof typeof COMPONENT_STATICS | keyof typeof KNOWN_STATICS | keyof C>
+	]: S[key];
 };
 
 export default function hoistNonOctaneStatics<

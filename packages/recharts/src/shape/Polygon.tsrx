@@ -39,8 +39,8 @@ function getSinglePolygonPath(points, connectNulls) {
 	}
 	const polygonPath = segmentPoints.map(
 		(segPoints) => segPoints.reduce(
-			(path, point, index) => path + (index === 0 ? 'M' : 'L') + round(point.x) + ',' +
-				round(point.y),
+			(path, point, index) =>
+				path + (index === 0 ? 'M' : 'L') + round(point.x) + ',' + round(point.y),
 			'',
 		),
 	).join('');

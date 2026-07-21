@@ -5,10 +5,12 @@ const customNode = [
 	['path', { d: 'm9 12 2 2 4-4', key: 'check' }],
 ] as const;
 
-export function IconGallery(props: {
+export function IconGallery(
+	props: {
 		onCameraClick?: (event: MouseEvent) => void;
 		onCameraRef?: (node: SVGSVGElement | null) => void;
-	} = {}) {
+	} = {},
+) {
 	return <section>
 		<Camera
 			id="camera"

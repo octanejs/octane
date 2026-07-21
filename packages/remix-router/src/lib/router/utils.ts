@@ -79,10 +79,7 @@ export type FormMethod = UpperCaseFormMethod;
 export type MutationFormMethod = Exclude<FormMethod, 'GET'>;
 
 export type FormEncType =
-	| 'application/x-www-form-urlencoded'
-	| 'multipart/form-data'
-	| 'application/json'
-	| 'text/plain';
+	'application/x-www-form-urlencoded' | 'multipart/form-data' | 'application/json' | 'text/plain';
 
 // Thanks https://github.com/sindresorhus/type-fest!
 type JsonObject = { [Key in string]: JsonValue } & {
@@ -559,12 +556,7 @@ export interface MapRoutePropertiesFunction {
  * ignored.
  */
 type UnsupportedLazyRouteObjectKey =
-	| 'lazy'
-	| 'caseSensitive'
-	| 'path'
-	| 'id'
-	| 'index'
-	| 'children';
+	'lazy' | 'caseSensitive' | 'path' | 'id' | 'index' | 'children';
 const unsupportedLazyRouteObjectKeys = new Set<UnsupportedLazyRouteObjectKey>([
 	'lazy',
 	'caseSensitive',

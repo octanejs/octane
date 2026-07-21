@@ -23,12 +23,10 @@ export function VersionSelect({ libraryId }: { libraryId: LibraryId }) {
 // Let's use zustand to wrap the local storage logic. This way
 // we'll get subscriptions for free and we can use it in other
 // components if we need to.
-const useLocalCurrentVersion = create<
-	{
-		currentVersion?: string;
-		setCurrentVersion: (version: string) => void;
-	}
->(
+const useLocalCurrentVersion = create<{
+	currentVersion?: string;
+	setCurrentVersion: (version: string) => void;
+}>(
 	(set) => ({
 		currentVersion: getLocalStorageItem('version') || undefined,
 		setCurrentVersion: (version: string) => {

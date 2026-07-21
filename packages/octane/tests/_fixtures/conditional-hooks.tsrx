@@ -12,9 +12,7 @@ export function Guarded(props) @{
 		props.log.push('mount:' + n);
 		return () => props.log.push('cleanup:' + n);
 	}, [n]);
-	<button id="bump" onClick={() => setN(n + 1)}>
-		{n as string}
-	</button>
+	<button id="bump" onClick={() => setN(n + 1)}>{n as string}</button>
 }
 
 // Same shape but with the hook order interleaved with intermediate logic.
@@ -28,11 +26,7 @@ export function PartialGuard(props) @{
 		props.log.push('seen:' + n + ':' + m);
 	}, [n, m]);
 	<>
-		<button id="bumpN" onClick={() => setN(n + 1)}>
-			{'n=' + n as string}
-		</button>
-		<button id="bumpM" onClick={() => setM(m + 1)}>
-			{'m=' + m as string}
-		</button>
+		<button id="bumpN" onClick={() => setN(n + 1)}>{'n=' + n as string}</button>
+		<button id="bumpM" onClick={() => setM(m + 1)}>{'m=' + m as string}</button>
 	</>
 }

@@ -24,9 +24,7 @@ const Ctx = createContext(0);
 function ConsumerImpl() @{
 	const value = use(Ctx);
 	log('Consumer:' + value);
-	<span class="consumer">
-		{value as string}
-	</span>
+	<span class="consumer">{value as string}</span>
 }
 const Consumer = memo(ConsumerImpl);
 
@@ -65,18 +63,14 @@ export function App(props) @{
 function InlineConsumerImpl() @{
 	const value = use(Ctx);
 	log('Consumer');
-	<span class="inline">
-		{value as string}
-	</span>
+	<span class="inline">{value as string}</span>
 }
 const InlineConsumer = memo(InlineConsumerImpl);
 
 function CachedConsumerImpl() @{
 	const value = use(Ctx);
 	log('Consumer');
-	<span class="cached">
-		{value as string}
-	</span>
+	<span class="cached">{value as string}</span>
 }
 const CachedConsumer = memo(CachedConsumerImpl);
 
@@ -108,9 +102,7 @@ export function AppIndirect(props) @{
 function SibConsumerImpl() @{
 	const value = use(Ctx);
 	log('Consumer');
-	<span class="sib">
-		{value as string}
-	</span>
+	<span class="sib">{value as string}</span>
 }
 const SibConsumer = memo(SibConsumerImpl);
 
@@ -146,9 +138,7 @@ export function AppSiblings(props) @{
 function RowImpl(props) @{
 	const value = use(Ctx);
 	log('Row:' + props.id);
-	<li class={'row-' + props.id as string}>
-		{value as string}
-	</li>
+	<li class={'row-' + props.id as string}>{value as string}</li>
 }
 const Row = memo(RowImpl);
 
@@ -159,9 +149,7 @@ function ListWrapperImpl(props) @{
 			<Row id={id} />
 		}
 		@if (props.showExtra) {
-			<li class="extra">
-				{use(Ctx) as string}
-			</li>
+			<li class="extra">{use(Ctx) as string}</li>
 		}
 	</ul>
 }
@@ -187,9 +175,7 @@ export function AppList(props) @{
 function DeepConsumerImpl() @{
 	const value = use(Ctx);
 	log('DeepConsumer:' + value);
-	<span class="deep">
-		{value as string}
-	</span>
+	<span class="deep">{value as string}</span>
 }
 const DeepConsumer = memo(DeepConsumerImpl);
 

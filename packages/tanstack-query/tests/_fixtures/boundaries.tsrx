@@ -10,9 +10,7 @@ import {
 // --- IsRestoring: a restoring subtree reads cache but doesn't subscribe/fetch ---
 function RestoreReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({ queryKey: ['r'], queryFn: props.queryFn, retry: false });
-	<div id="status">
-		{(q.isPending ? 'pending' : 'data:' + q.data) as string}
-	</div>
+	<div id="status">{(q.isPending ? 'pending' : 'data:' + q.data) as string}</div>
 }
 
 export function RestoringApp(props: {
@@ -30,9 +28,7 @@ export function RestoringApp(props: {
 // --- QueryErrorResetBoundary: reset() lets a throwOnError query retry ---
 function ErrReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({ queryKey: ['e'], queryFn: props.queryFn, retry: false, throwOnError: true });
-	<span id="data">
-		{'data:' + q.data as string}
-	</span>
+	<span id="data">{'data:' + q.data as string}</span>
 }
 
 function Boundary(props: { queryFn: () => Promise<string> }) @{

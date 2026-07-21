@@ -23,9 +23,7 @@ export function Loader(props) @{
 }
 
 function SuspendingContent(props) @{
-	<div data-testid="content">
-		{use(props.promise) as string}
-	</div>
+	<div data-testid="content">{use(props.promise) as string}</div>
 }
 
 // Suspense reveal driven by an externally-resolved promise (the async waitFor

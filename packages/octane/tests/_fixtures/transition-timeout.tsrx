@@ -25,18 +25,14 @@ function SuspendingLeaf(props) @{
 	const v = use(props.promise);
 	const readyRef =
 		v === props.readyValue ? props.readyRef : null;
-	<span class="leaf" ref={readyRef}>
-		{v as string}
-	</span>
+	<span class="leaf" ref={readyRef}>{v as string}</span>
 }
 
 export function TimeoutFallback(props) @{
 	const [promise, setPromise] = useState(props.initialPromise);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="pending">
-			{(isPending ? '1' : '0') as string}
-		</span>
+		<span id="pending">{(isPending ? '1' : '0') as string}</span>
 		<button id="swap" onClick={() => start(() => setPromise(props.nextPromise))}>{'swap'}</button>
 		@try {
 			<SuspendingLeaf promise={promise} readyRef={props.readyRef} readyValue={props.readyValue} />
@@ -54,9 +50,7 @@ function NestedRefTree(props) @{
 	const value = use(props.promise);
 	<div id="nested-ref-parent" ref={props.parentRef}>
 		<NestedRefChild childRef={props.childRef} />
-		<span>
-			{value as string}
-		</span>
+		<span>{value as string}</span>
 	</div>
 }
 
@@ -88,18 +82,14 @@ function StagedReadyProbe(props) @{
 		if (props.revealLog) props.revealLog.push('A');
 		props.onLayout?.();
 	}, [props.log, props.value, props.revealLog, props.onLayout]);
-	<span id="entangled-a" ref={props.readyRef}>
-		{'A:' + props.value as string}
-	</span>
+	<span id="entangled-a" ref={props.readyRef}>{'A:' + props.value as string}</span>
 }
 
 function StagedBProbe(props) @{
 	useLayoutEffect(() => {
 		props.revealLog.push('B');
 	}, [props.revealLog, props.value]);
-	<span id="entangled-b">
-		{'B:' + props.value as string}
-	</span>
+	<span id="entangled-b">{'B:' + props.value as string}</span>
 }
 
 export function TimedEntangledSupersession(props) @{
@@ -136,9 +126,7 @@ export function TimedEntangledSupersession(props) @{
 					onLayout={props.onLayout}
 				/>
 			} @else {
-				<span id="entangled-a">
-					{'A:' + valueA as string}
-				</span>
+				<span id="entangled-a">{'A:' + valueA as string}</span>
 			}
 		} @pending {
 			<span id="entangled-a-fallback">{'A loading'}</span>
@@ -148,9 +136,7 @@ export function TimedEntangledSupersession(props) @{
 			@if (props.revealLog) {
 				<StagedBProbe value={valueB} revealLog={props.revealLog} />
 			} @else {
-				<span id="entangled-b">
-					{'B:' + valueB as string}
-				</span>
+				<span id="entangled-b">{'B:' + valueB as string}</span>
 			}
 		} @pending {
 			<span id="entangled-b-fallback">{'B loading'}</span>
@@ -168,9 +154,7 @@ function HiddenRetryCommitProbe(props) @{
 		return () => props.effectLog.push('cleanup:' + props.effectValue);
 	}, [props.effectValue]);
 	<>
-		<span id="hidden-retry-ref" ref={props.activeRef}>
-			{'ref:' + props.effectValue as string}
-		</span>
+		<span id="hidden-retry-ref" ref={props.activeRef}>{'ref:' + props.effectValue as string}</span>
 		<SuspendingLeaf promise={props.tailPromise} />
 	</>
 }
@@ -226,9 +210,7 @@ export function TimedHiddenRetrySupersession(props) @{
 		}
 		@try {
 			const other = use(otherPromise);
-			<span id="hidden-retry-other">
-				{'other:' + other as string}
-			</span>
+			<span id="hidden-retry-other">{'other:' + other as string}</span>
 		} @pending {
 			<span id="hidden-retry-other-fallback">{'other loading'}</span>
 		}
@@ -280,9 +262,7 @@ function WaterfallA(props) @{
 	useLayoutEffect(() => {
 		props.log.push('layout:A:' + value);
 	}, [props.log, value]);
-	<span id="waterfall-a" ref={props.readyRef}>
-		{'A:' + value as string}
-	</span>
+	<span id="waterfall-a" ref={props.readyRef}>{'A:' + value as string}</span>
 }
 
 function WaterfallB(props) @{
@@ -291,9 +271,7 @@ function WaterfallB(props) @{
 	useLayoutEffect(() => {
 		props.log.push('layout:B:' + value);
 	}, [props.log, value]);
-	<span id="waterfall-b">
-		{'B:' + value as string}
-	</span>
+	<span id="waterfall-b">{'B:' + value as string}</span>
 }
 
 // B's second thenable is data-dependent on its first, so it cannot be warmed
@@ -331,9 +309,7 @@ function CatchCommitProbe(props) @{
 	useLayoutEffect(() => {
 		props.log.push('layout:catch');
 	}, [props.log]);
-	<span id="timeout-catch" ref={props.catchRef}>
-		{props.message as string}
-	</span>
+	<span id="timeout-catch" ref={props.catchRef}>{props.message as string}</span>
 }
 
 export function TimedHiddenRejection(props) @{

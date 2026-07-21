@@ -25,9 +25,7 @@ import { makeTipB, stableTipBS } from './tips.ts';
 function TipA(props) @{
 	<span class="anchor">{createPortal(
 		<div class="tip tipA">
-			<span class="tip-label">
-				{props.item.label as string}
-			</span>
+			<span class="tip-label">{props.item.label as string}</span>
 			<button class="tip-btn" onClick={hit}>{'hit'}</button>
 		</div>,
 		props.target,
@@ -45,9 +43,7 @@ function SectionA() @{
 		<ul class="list">
 			@for (const item of ITEMS; key item.id) {
 				<li class="item">
-					<span class="label">
-						{item.label as string}
-					</span>
+					<span class="label">{item.label as string}</span>
 					@if (open) {
 						<TipA item={item} target={distinct ? targetFor(item.id) : sharedTarget()} />
 					}
@@ -61,9 +57,7 @@ function SectionA() @{
 // the full childSlot classifier path (portal mount/teardown at value position).
 function ItemB(props) @{
 	<li class="item">
-		<span class="label">
-			{props.item.label as string}
-		</span>
+		<span class="label">{props.item.label as string}</span>
 		{props.open ? makeTipB(props.item, props.distinct) : null}
 	</li>
 }
@@ -86,9 +80,7 @@ function SectionB() @{
 
 function ItemBS(props) @{
 	<li class="item">
-		<span class="label">
-			{props.item.label as string}
-		</span>
+		<span class="label">{props.item.label as string}</span>
 		{props.open ? stableTipBS(props.item, props.distinct) : null}
 	</li>
 }

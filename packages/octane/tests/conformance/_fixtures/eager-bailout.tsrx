@@ -11,9 +11,7 @@ export function getSetC2() {
 
 function BailChild(props) @{
 	props.log('Child: ' + props.text);
-	<span id="child">
-		{props.text as string}
-	</span>
+	<span id="child">{props.text as string}</span>
 }
 
 // Per ReactHooks-test.internal.js "bails out in the render phase if all of the
@@ -80,7 +78,5 @@ export function ReducerBatchedNoop() @{
 	const [n, dispatch] = useReducer((s: number, a: number) => (a < 0 ? s : a), 0);
 	_dispatch = dispatch;
 	_renderCount++;
-	<span id="out">
-		{n as number}
-	</span>
+	<span id="out">{n as number}</span>
 }

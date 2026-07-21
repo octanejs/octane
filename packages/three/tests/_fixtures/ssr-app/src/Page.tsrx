@@ -11,7 +11,8 @@ interface ThreeSsrFixtureProof {
 }
 
 function recordCreated(state: RootState): void {
-	const fixture = globalThis as typeof globalThis & {
+	const fixture = globalThis as
+		typeof globalThis & {
 			__octaneThreeSsrProof?: ThreeSsrFixtureProof;
 		};
 	const proof = fixture.__octaneThreeSsrProof ??= {};
@@ -52,9 +53,7 @@ export function Page(props: { params: Record<string, string> }) @{
 			} @pending {
 				<p data-three-pending="">Loading Three scene</p>
 			} @catch (error) {
-				<p data-three-error="">
-					{error.message as string}
-				</p>
+				<p data-three-error="">{error.message as string}</p>
 			}
 		}
 	</main>

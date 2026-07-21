@@ -37,12 +37,10 @@ export function FrameworkSelect({ libraryId }: { libraryId: LibraryId }) {
 // Let's use zustand to wrap the local storage logic. This way
 // we'll get subscriptions for free and we can use it in other
 // components if we need to.
-export const useLocalCurrentFramework = create<
-	{
-		currentFramework?: string;
-		setCurrentFramework: (framework: string) => void;
-	}
->(
+export const useLocalCurrentFramework = create<{
+	currentFramework?: string;
+	setCurrentFramework: (framework: string) => void;
+}>(
 	(set) => ({
 		currentFramework: getLocalStorageItem('framework') || undefined,
 		setCurrentFramework: (framework: string) => {

@@ -41,9 +41,7 @@ export function ReturnedMailbox(props) {
 			<section id="drafts">
 				<h2>Saved drafts</h2>
 				@for (const draft of props.drafts; key draft.id) {
-					<article class="draft" data-id={draft.id as string}>
-						{draft.subject as string}
-					</article>
+					<article class="draft" data-id={draft.id as string}>{draft.subject as string}</article>
 				} @empty {
 					<p id="empty-drafts">No saved drafts</p>
 				}
@@ -79,9 +77,7 @@ export function ReturnedDashboard(props) {
 			}
 		}
 		@for (const event of props.events; key event.id) {
-			<article class="delivery-event" data-id={event.id as string}>
-				{event.label as string}
-			</article>
+			<article class="delivery-event" data-id={event.id as string}>{event.label as string}</article>
 		} @empty {
 			<p id="empty-events">No delivery events</p>
 		}
@@ -141,9 +137,8 @@ export function ReturnedMemberEvaluationOrder(props) {
 
 function ActivityDraft(props) {
 	const [edits, setEdits] = useState(0);
-	return <button id={props.id} onClick={() => setEdits((count) => count + 1)}>
-		{props.prefix + edits as string}
-	</button>;
+	return <button id={props.id} onClick={() => setEdits((count) => count + 1)}>{props.prefix +
+		edits as string}</button>;
 }
 
 // Activity is compiler-owned template control flow, even when it is the only
@@ -165,9 +160,10 @@ export function DirectReturnedActivityMailbox(props) {
 	return <Activity mode={props.observe('mode', props.mode)}>
 		<h2 id="direct-activity-title">Direct focused draft</h2>
 		<ActivityDraft id="direct-activity-draft" prefix="Direct edits: " />
-		<span id="direct-activity-tail">
-			{props.observe('child', 'Direct mailbox ready') as string}
-		</span>
+		<span id="direct-activity-tail">{props.observe(
+			'child',
+			'Direct mailbox ready',
+		) as string}</span>
 	</Activity>;
 }
 
@@ -175,25 +171,19 @@ export function DirectReturnedActivityMailbox(props) {
 // document-head channel. Dynamic values make update/adoption behavior observable.
 export function ReturnedHeadMailbox(props) {
 	return <>
-		<title data-returned-fragment-head="title">
-			{props.title as string}
-		</title>
+		<title data-returned-fragment-head="title">{props.title as string}</title>
 		<meta
 			name="returned-fragment-description"
 			content={props.description}
 			data-returned-fragment-head="meta"
 		/>
 		<link rel="canonical" href={props.canonical} data-returned-fragment-head="link" />
-		<main id="head-mailbox">
-			{props.body as string}
-		</main>
+		<main id="head-mailbox">{props.body as string}</main>
 	</>;
 }
 
 export function DirectReturnedTitle(props) {
-	return <title data-direct-returned-head="title">
-		{props.title as string}
-	</title>;
+	return <title data-direct-returned-head="title">{props.title as string}</title>;
 }
 
 export function DirectReturnedMeta(props) {
@@ -243,9 +233,7 @@ export function DescriptorHostWithKeyedFragment() {
 }
 
 function DescriptorComponentLeaf(props) {
-	return <button id={props.id}>
-		{props.label as string}
-	</button>;
+	return <button id={props.id}>{props.label as string}</button>;
 }
 
 export function DescriptorHostWithKeyedComponents() {
@@ -271,9 +259,7 @@ export function ReturnedChildCodeBlock(props) {
 	return <>
 		<h2 id="child-code-block-title">Quick action</h2>
 		@{
-			<button id="child-code-block-action" onClick={props.onAction}>
-				{props.label as string}
-			</button>
+			<button id="child-code-block-action" onClick={props.onAction}>{props.label as string}</button>
 		}
 	</>;
 }

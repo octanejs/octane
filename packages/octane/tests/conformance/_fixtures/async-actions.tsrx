@@ -18,12 +18,8 @@ export function OptimisticRebase(props) @{
 		<span id="pending">
 			{isPending ? '1' : '0'}
 		</span>
-		<span id="opt">
-			{optimistic as string}
-		</span>
-		<span id="saved">
-			{saved as string}
-		</span>
+		<span id="opt">{optimistic as string}</span>
+		<span id="saved">{saved as string}</span>
 	</div>
 }
 
@@ -46,11 +42,7 @@ export function OptimisticRepeated(props) @{
 		<span id="pending">
 			{isPending ? '1' : '0'}
 		</span>
-		<span id="opt">
-			{optimistic as string}
-		</span>
-		<span id="saved">
-			{saved as string}
-		</span>
+		<span id="opt">{optimistic as string}</span>
+		<span id="saved">{saved as string}</span>
 	</div>
 }

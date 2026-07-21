@@ -6,11 +6,9 @@ import { useState } from 'octane';
 export function Header() @{
 	const [dark, setDark] = useState(false);
 	<header class={dark ? 'masthead dark' : 'masthead'}>
-		<h1 class="logo">
-			{'The Octane Times' as string}
-		</h1>
-		<button id="theme" class="theme" onClick={() => setDark(!dark)}>
-			{(dark ? 'Light mode' : 'Dark mode') as string}
-		</button>
+		<h1 class="logo">{'The Octane Times' as string}</h1>
+		<button id="theme" class="theme" onClick={() => setDark(!dark)}>{(dark
+			? 'Light mode'
+			: 'Dark mode') as string}</button>
 	</header>
 }

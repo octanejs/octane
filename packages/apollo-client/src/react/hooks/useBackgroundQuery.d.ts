@@ -196,28 +196,21 @@ export declare namespace useBackgroundQuery {
 		queryRef: TOptions extends any
 			? TOptions extends SkipToken
 				? undefined
-				:
-						| QueryRef<
-								TData,
-								TVariables,
-								| 'complete'
-								| 'streaming'
-								| (
-										| (OptionWithFallback<TOptions, DefaultOptions, 'errorPolicy'> extends 'none'
-												? never
-												: 'empty')
-										| (OptionWithFallback<
-												TOptions,
-												DefaultOptions,
-												'returnPartialData'
-										  > extends false
-												? never
-												: 'partial')
-								  )
-						  >
-						| (OptionWithFallback<TOptions, DefaultOptions, 'skip'> extends false
-								? never
-								: undefined)
+				: | QueryRef<
+							TData,
+							TVariables,
+							| 'complete'
+							| 'streaming'
+							| (
+									| (OptionWithFallback<TOptions, DefaultOptions, 'errorPolicy'> extends 'none'
+											? never
+											: 'empty')
+									| (OptionWithFallback<TOptions, DefaultOptions, 'returnPartialData'> extends false
+											? never
+											: 'partial')
+							  )
+					  >
+					| (OptionWithFallback<TOptions, DefaultOptions, 'skip'> extends false ? never : undefined)
 			: never,
 		result: useBackgroundQuery.Result<TData, TVariables>,
 	];

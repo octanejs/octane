@@ -54,8 +54,7 @@ type GetUseQueryOptionsForUseQueries<T> =
 							: // Part 3: responsible for inferring and enforcing type if no explicit parameter was provided
 								T extends {
 										queryFn?:
-											| QueryFunction<infer TQueryFnData, infer TQueryKey>
-											| SkipTokenForUseQueries;
+											QueryFunction<infer TQueryFnData, infer TQueryKey> | SkipTokenForUseQueries;
 										select?: (data: any) => infer TData;
 										throwOnError?: ThrowOnError<any, infer TError, any, any>;
 								  }

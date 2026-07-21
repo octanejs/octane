@@ -3,7 +3,8 @@ import { selectionAlwaysOnDisplay } from '@lexical/utils';
 import { useLexicalComposerContext } from './LexicalComposerContext';
 import { useEffect } from 'octane';
 
-type Props = Readonly<{
+type Props =
+	Readonly<{
 		onReposition?: (node: readonly HTMLElement[]) => void;
 	}>;
 

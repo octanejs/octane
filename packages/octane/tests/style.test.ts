@@ -187,8 +187,8 @@ describe('style prop — inside for-of', () => {
 // ---------------------------------------------------------------------------
 
 function getInjectedStyles(): string[] {
-	return Array.from(document.querySelectorAll('style[data-octane]')).map(
-		(s) => s.getAttribute('data-octane')!,
+	return Array.from(document.querySelectorAll('style[data-octane]')).map((s) =>
+		s.getAttribute('data-octane')!,
 	);
 }
 

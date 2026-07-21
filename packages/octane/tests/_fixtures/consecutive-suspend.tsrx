@@ -22,9 +22,7 @@ function TwiceSuspending(props) @{
 	const active =
 		phase === 0 ? props.a : props.b;
 	const value = use(active);
-	<div class="content">
-		{value as string}
-	</div>
+	<div class="content">{value as string}</div>
 }
 
 export function ConsecutiveSuspend(props) @{

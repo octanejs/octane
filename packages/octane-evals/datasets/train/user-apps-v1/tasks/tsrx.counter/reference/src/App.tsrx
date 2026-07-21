@@ -11,9 +11,7 @@ export function App() @{
 				disabled={count === 0}
 				onClick={() => setCount(Math.max(0, count - 1))}
 			>{'−'}</button>
-			<output aria-label="Seat count">
-				{count as string}
-			</output>
+			<output aria-label="Seat count">{count as string}</output>
 			<button
 				aria-label="Add seat"
 				disabled={count === 3}

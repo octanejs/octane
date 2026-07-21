@@ -25,8 +25,7 @@ export function useFormReset(...args: any[]): void {
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useFormReset');
 	const ref = user[0] as
-		| { current: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null }
-		| undefined;
+		{ current: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null } | undefined;
 	const initialValue = user[1];
 	const onReset = user[2] as (value: any) => void;
 

@@ -19,9 +19,7 @@ export function CleanupLifecycle(props) @{
 		props.log('setup:' + props.n);
 		return () => props.log('cleanup:' + props.n);
 	}, [props.n]);
-	<div>
-		{props.n as string}
-	</div>
+	<div>{props.n as string}</div>
 }
 
 // ---------------------------------------------------------------------------
@@ -39,9 +37,7 @@ export function NoDeps(props) @{
 		props.log('memo');
 		return n * 10;
 	}, null);
-	<button id="bump" onClick={() => setN(n + 1)}>
-		{m as string}
-	</button>
+	<button id="bump" onClick={() => setN(n + 1)}>{m as string}</button>
 }
 
 // ---------------------------------------------------------------------------
@@ -53,17 +49,13 @@ export function ReducerFnInitialArg(props) @{
 	// initialArg is a function — React stores it verbatim, does NOT call it.
 	const [state] = useReducer((s) => s, () => 'fn-value');
 	props.observe(state);
-	<div>
-		{typeof state as string}
-	</div>
+	<div>{typeof state as string}</div>
 }
 
 export function ReducerLazyInit() @{
 	// Third arg is the lazy initializer: state = init(5) = 10.
 	const [state] = useReducer((s, a: number) => s + a, 5, (x: number) => x * 2);
-	<div id="v">
-		{state as string}
-	</div>
+	<div id="v">{state as string}</div>
 }
 
 // ---------------------------------------------------------------------------
@@ -75,9 +67,7 @@ export function ReducerLazyInit() @{
 // Object.is: a NaN prop should compare equal across renders → skip the body.
 function PlainChildImpl(props) @{
 	props.log('render');
-	<span class="val">
-		{String(props.value) as string}
-	</span>
+	<span class="val">{String(props.value) as string}</span>
 }
 const PlainChild = memo(PlainChildImpl);
 
@@ -92,9 +82,7 @@ export function MemoObjectIs(props) @{
 // Custom comparator: only re-render when `id` changes; ignore `noise`.
 function ComparedChildImpl(props) @{
 	props.log('render:' + props.id);
-	<span class="cmp">
-		{props.id as string}
-	</span>
+	<span class="cmp">{props.id as string}</span>
 }
 const ComparedChild = memo(ComparedChildImpl, (prev, next) => prev.id === next.id);
 
@@ -114,9 +102,7 @@ const Theme = createContext('light');
 function ThemedChildImpl(props) @{
 	const theme = use(Theme);
 	props.log('render:' + theme);
-	<span class="theme">
-		{theme as string}
-	</span>
+	<span class="theme">{theme as string}</span>
 }
 const ThemedChild = memo(ThemedChildImpl);
 
@@ -140,9 +126,7 @@ export function MemoContext(props) @{
 function DeepConsumer(props) @{
 	const theme = use(Theme);
 	props.log('deep:' + theme);
-	<span class="deep">
-		{theme as string}
-	</span>
+	<span class="deep">{theme as string}</span>
 }
 
 function MemoWrapperImpl(props) @{
@@ -173,9 +157,7 @@ export function MemoContextDeep(props) @{
 export function StoreConsumer(props) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot);
 	props.log('render:' + value);
-	<span class="store">
-		{value as string}
-	</span>
+	<span class="store">{value as string}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +171,5 @@ export function DepsAsArgs(props) @{
 	useEffect((n, log) => {
 		log('eff:' + n);
 	}, [props.n, props.log]);
-	<div class="out">
-		{doubled + ':' + cb(props.label) as string}
-	</div>
+	<div class="out">{doubled + ':' + cb(props.label) as string}</div>
 }

@@ -51,9 +51,7 @@ export function DeferredHydration(props) @{
 
 function ClientOnlySuspendingChild(props) @{
 	const value = use(props.promise);
-	<button id="client-only-content" onClick={() => props.onClick?.(value)}>
-		{value as string}
-	</button>
+	<button id="client-only-content" onClick={() => props.onClick?.(value)}>{value as string}</button>
 }
 
 export function ClientOnlyHydrate(props) @{
@@ -74,9 +72,11 @@ export function ClientOnlyHydrate(props) @{
 function DeferredSeed(props) @{
 	const value = use(props.promise);
 	const id = useId();
-	<button id="deferred-seed" data-runtime-id={id} onClick={() => props.onClick?.(value, id)}>
-		{value as string}
-	</button>
+	<button
+		id="deferred-seed"
+		data-runtime-id={id}
+		onClick={() => props.onClick?.(value, id)}
+	>{value as string}</button>
 }
 
 function EagerSeed(props) @{
@@ -86,9 +86,7 @@ function EagerSeed(props) @{
 		id="eager-seed"
 		data-runtime-id={id}
 		onClick={() => props.onClick?.(value, id, props.beforeId)}
-	>
-		{value as string}
-	</button>
+	>{value as string}</button>
 }
 
 export function DeferredSeedHydration(props) @{

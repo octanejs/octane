@@ -52,8 +52,7 @@ function LearnMoreButton() {
 }
 
 type PartnerImageConfig =
-	| { light: string; dark: string; scale?: number }
-	| { src: string; scale?: number };
+	{ light: string; dark: string; scale?: number } | { src: string; scale?: number };
 
 type PartnerApplicationStarterIcon = {
 	mode: 'contain' | 'left-crop';

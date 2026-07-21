@@ -101,11 +101,9 @@ function getCanonicalHeadTags(matches: ReadonlyArray<CanonicalHeadMatch>): {
 	};
 }
 
-export const Route = createRootRouteWithContext<
-	{
-		queryClient: QueryClient;
-	}
->()({
+export const Route = createRootRouteWithContext<{
+	queryClient: QueryClient;
+}>()({
 	loader: () => {
 		return {
 			partnerPlacementSessionSeed: createPartnerPlacementSessionSeed(),

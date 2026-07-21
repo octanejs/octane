@@ -27,8 +27,7 @@ export interface Post {
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 type RetryMutation =
-	| { kind: 'like'; postId: string; targetLiked: boolean }
-	| { kind: 'post'; body: string };
+	{ kind: 'like'; postId: string; targetLiked: boolean } | { kind: 'post'; body: string };
 
 export interface Notice {
 	id: number;

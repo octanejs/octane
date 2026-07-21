@@ -33,9 +33,7 @@ export function Overridable(props) {
 
 export function Card(props) @{
 	<div id="card">
-		<props.parts.title id="t" class={props.klass}>
-			{props.text as string}
-		</props.parts.title>
+		<props.parts.title id="t" class={props.klass}>{props.text as string}</props.parts.title>
 	</div>
 }
 

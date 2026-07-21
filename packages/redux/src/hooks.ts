@@ -77,8 +77,7 @@ export function createSelectorHook(context = ReactReduxContext) {
 	): Selected {
 		const [user, slot] = splitSlot(rest);
 		const equalityFnOrOptions = (user[0] ?? {}) as
-			| ((a: Selected, b: Selected) => boolean)
-			| UseSelectorOptions<Selected>;
+			((a: Selected, b: Selected) => boolean) | UseSelectorOptions<Selected>;
 		const { equalityFn = refEquality } =
 			typeof equalityFnOrOptions === 'function'
 				? { equalityFn: equalityFnOrOptions }

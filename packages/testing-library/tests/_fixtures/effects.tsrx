@@ -17,7 +17,5 @@ export function DeferredLabel() @{
 	useEffect(() => {
 		setLabel('committed');
 	}, []);
-	<div data-testid="label">
-		{label as string}
-	</div>
+	<div data-testid="label">{label as string}</div>
 }

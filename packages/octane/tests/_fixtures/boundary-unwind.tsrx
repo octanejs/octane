@@ -75,9 +75,7 @@ export function RethrowingCatchUnderIf(props) @{
 // stall shape).
 function Suspender(props) @{
 	const v = use(props.promise);
-	<span class="v">
-		{'v:' + v as string}
-	</span>
+	<span class="v">{'v:' + v as string}</span>
 }
 
 export function DeepSuspenseHost(props) @{

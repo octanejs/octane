@@ -415,12 +415,10 @@ function importProtectionPlugin(opts) {
 	) {
 		const normalizedResolvedId = normalizeFilePath(resolvedId);
 		const markerKind = shared.fileMarkerKind.get(normalizedResolvedId);
-		if (
-			!(
-				(envType === 'client' && markerKind === 'server') ||
-				(envType === 'server' && markerKind === 'client')
-			)
-		)
+		if (!(
+			(envType === 'client' && markerKind === 'server') ||
+			(envType === 'server' && markerKind === 'client')
+		))
 			return void 0;
 		return buildViolationInfo(
 			envName,
@@ -1081,14 +1079,12 @@ function importProtectionPlugin(opts) {
 					if (internalVirtualId) return internalVirtualId;
 					if (!importer) {
 						const normalizedSource = normalizeFilePath(source);
-						if (
-							!(
-								config.command === 'serve' &&
-								config.bundledDev &&
-								envType === 'client' &&
-								isInsideDirectory(normalizedSource, config.srcDirectory)
-							)
-						)
+						if (!(
+							config.command === 'serve' &&
+							config.bundledDev &&
+							envType === 'client' &&
+							isInsideDirectory(normalizedSource, config.srcDirectory)
+						))
 							env.graph.addEntry(source);
 						await processPendingViolations(env, this.warn.bind(this));
 						return;

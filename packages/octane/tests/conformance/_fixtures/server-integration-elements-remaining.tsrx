@@ -279,15 +279,11 @@ export function NoscriptChildren() @{
 }
 
 export function PreformattedText(props) @{
-	<pre id="preformatted-text">
-		{props.text as string}
-	</pre>
+	<pre id="preformatted-text">{props.text as string}</pre>
 }
 
 export function NormalNewlineText(props) @{
-	<div id="normal-newline-text">
-		{props.text as string}
-	</div>
+	<div id="normal-newline-text">{props.text as string}</div>
 }
 
 export function StatelessComponent() @{
@@ -368,9 +364,7 @@ export function EscapedMultipleText() @{
 }
 
 export function SpecialText(props) @{
-	<div id="special-text">
-		{props.text as string}
-	</div>
+	<div id="special-text">{props.text as string}</div>
 }
 
 export function SpecialTextPair(props) @{

@@ -2,9 +2,10 @@ import { useState, useMemo, useId, useRef, useEffect } from 'octane';
 
 // Dynamic object style + camelCase keys + a dynamic class.
 export function Styled(props) @{
-	<div class={props.klass} style={{ color: props.color, fontSize: '12px' }}>
-		{props.label as string}
-	</div>
+	<div
+		class={props.klass}
+		style={{ color: props.color, fontSize: '12px' }}
+	>{props.label as string}</div>
 }
 
 // Boolean attribute, void element, static + dynamic attrs.
@@ -41,27 +42,19 @@ export function HookView(props) @{
 		props.onEffect();
 	}, []);
 	<section id={id}>
-		<span class="n">
-			{n as string}
-		</span>
-		<span class="d">
-			{doubled as string}
-		</span>
+		<span class="n">{n as string}</span>
+		<span class="d">{doubled as string}</span>
 	</section>
 }
 
 // Nested component composition (no children).
 function Badge(props) @{
-	<em class="badge">
-		{props.text as string}
-	</em>
+	<em class="badge">{props.text as string}</em>
 }
 
 export function Card(props) @{
 	<article class="card">
-		<h2>
-			{props.title as string}
-		</h2>
+		<h2>{props.title as string}</h2>
 		<Badge text={props.tag} />
 	</article>
 }

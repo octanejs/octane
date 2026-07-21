@@ -43,8 +43,7 @@ export interface UseTypeaheadProps {
 	 * @default lowercase-finder
 	 */
 	findMatch?:
-		| null
-		| ((list: Array<string | null>, typedString: string) => string | null | undefined);
+		null | ((list: Array<string | null>, typedString: string) => string | null | undefined);
 	/**
 	 * The number of milliseconds to wait before resetting the typed string.
 	 * @default 750

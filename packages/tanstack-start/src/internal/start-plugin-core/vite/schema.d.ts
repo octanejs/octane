@@ -1810,8 +1810,7 @@ export declare function parseStartConfig(
 		base: string;
 		disableCsrfMiddlewareWarning: boolean;
 		generateFunctionId?:
-			| ((opts: { filename: string; functionName: string }) => string | undefined)
-			| undefined;
+			((opts: { filename: string; functionName: string }) => string | undefined) | undefined;
 	};
 	pages: {
 		path: string;
@@ -1820,14 +1819,7 @@ export declare function parseStartConfig(
 					exclude?: boolean | undefined;
 					priority?: number | undefined;
 					changefreq?:
-						| 'never'
-						| 'always'
-						| 'hourly'
-						| 'daily'
-						| 'weekly'
-						| 'monthly'
-						| 'yearly'
-						| undefined;
+						'never' | 'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | undefined;
 					lastmod?: string | Date | undefined;
 					alternateRefs?:
 						| {
@@ -2390,8 +2382,7 @@ export declare function parseStartConfig(
 					| undefined;
 				mockAccess?: 'error' | 'warn' | 'off' | undefined;
 				onViolation?:
-					| ((violation: unknown) => boolean | void | Promise<boolean | void>)
-					| undefined;
+					((violation: unknown) => boolean | void | Promise<boolean | void>) | undefined;
 				include?: (string | RegExp)[] | undefined;
 				exclude?: (string | RegExp)[] | undefined;
 				client?:

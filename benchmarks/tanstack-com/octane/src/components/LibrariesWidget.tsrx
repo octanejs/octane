@@ -16,14 +16,13 @@ export function LibrariesWidget() {
 			</Link>
 		</div>
 		<div class="grid grid-cols-2 gap-2">{featuredLibraries.map(
-			(library) => <Link
-				key={library.id}
-				to="/$libraryId"
-				params={{ libraryId: library.id }}
-				className="text-xs opacity-70 hover:opacity-100 hover:underline"
-			>
-				{library.name.replace('TanStack ', '') as string}
-			</Link>,
+			(library) =>
+				<Link
+					key={library.id}
+					to="/$libraryId"
+					params={{ libraryId: library.id }}
+					className="text-xs opacity-70 hover:opacity-100 hover:underline"
+				>{library.name.replace('TanStack ', '') as string}</Link>,
 		)}</div>
 	</div>;
 }

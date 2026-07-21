@@ -23,35 +23,27 @@ export function makeStore(initial) {
 // Use the inline selector shape common in Zustand and query-store adapters.
 export function StoreConsumer(props) @{
 	const value = useSyncExternalStore(props.store.subscribe, () => props.store.getState());
-	<span class="uc">
-		{value as string}
-	</span>
+	<span class="uc">{value as string}</span>
 }
 
 // Select a field named by props so updates must use the latest selector.
 export function KeyedConsumer(props) @{
 	const value = useSyncExternalStore(props.store.subscribe, () => props.store.getState()[props.k]);
-	<span class="kc">
-		{value as string}
-	</span>
+	<span class="kc">{value as string}</span>
 }
 
 // Throw after reading a negative snapshot so the nearest boundary handles it.
 function ThrowConsumer(props) @{
 	const value = useSyncExternalStore(props.store.subscribe, props.store.getState);
 	if (value < 0) throw new Error('boom-' + -value as string);
-	<span class="tc">
-		{value as string}
-	</span>
+	<span class="tc">{value as string}</span>
 }
 
 export function ThrowBoundary(props) @{
 	@try {
 		<ThrowConsumer store={props.store} />
 	} @catch (e) {
-		<span class="err">
-			{'err:' + e.message as string}
-		</span>
+		<span class="err">{'err:' + e.message as string}</span>
 	}
 }
 
