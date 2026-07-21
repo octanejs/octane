@@ -50,8 +50,15 @@ describe('compiler-owned native event callbacks', () => {
 			{ hmr: false, dev: false },
 		).code;
 
-		expect(code).toMatch(/const escaped = [_$a-zA-Z]*useCallback\(/);
-		expect(code).toMatch(/const spreadEvent = [_$a-zA-Z]*useCallback\(/);
+		// Escaping / non-mount-only callbacks stay MEMOIZED (not demoted to a
+		// mount-only event slot) — in production output the memoization is the
+		// inline hook-memo region over the `_k$` cell array, not a useCallback
+		// call (the closure allocates only on a dependency miss).
+		expect(code).not.toContain('useCallback');
+		expect(code).toMatch(/let escaped;/);
+		expect(code).toMatch(/let spreadEvent;/);
+		expect(code).toMatch(/__s\.slots\._k\$0/);
+		expect(code.match(/__hk\[\d+\] = \(\) => setValue/g)).toHaveLength(2);
 	});
 
 	it('keeps callbacks live for hot replacement', () => {

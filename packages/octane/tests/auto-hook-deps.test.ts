@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { compile } from 'octane/compiler';
 import { slotHooks } from '../src/compiler/slot-hooks.js';
 
+// This file's contract is the INFERENCE — the dependency argument the
+// compiler attaches to the emitted hook call. Compile with the inline
+// hook-memo tier's diagnostic escape hatch so production output keeps the
+// runtime-call form these source-level assertions inspect (the tier's own
+// routing and semantics are covered by inline-hook-memo*.test.ts).
 const c = (source: string, options?: { mode?: 'client' | 'server' }): string =>
-	compile(source, 'auto-deps.tsrx', options).code;
+	compile(source, 'auto-deps.tsrx', { inlineHookMemo: false, ...options }).code;
 
 describe('automatic hook dependencies — full compiler', () => {
 	it('infers precise member paths and omits known-stable hook results', () => {

@@ -131,6 +131,13 @@ The remaining public props are `fallback`, client-only loading UI for a later cl
 - `useMemo` and `useCallback` infer dependencies from the create/callback closure when the second argument is omitted.
 - `useImperativeHandle` infers dependencies from its handle factory when the third argument is omitted; ref identity is still tracked separately.
 - An explicit array is authoritative. `[]` retains mount/reconnect-only or stable-value behavior, `[a, b]` tracks exactly those values, and `null` opts into every-render/recompute behavior.
+- In production compiles, eligible `useMemo`/`useCallback` declarations become inline caches (no per-render closure or deps-array allocation). This is transparent — identical semantics, including `Object.is` dependency compares.
+
+## Async data with use()
+
+- Creating promises during render is the SUPPORTED pattern — do not add React's `cache()` or hoist fetches into effects/state to avoid re-creation. The compiler memoizes every creation feeding a `use()` at its declaration, keyed on its inputs.
+- Local promise chains are included: `const p = fetchUser(id); const t = p.then((u) => u.thumbnail()); use(t)` fetches once, survives re-renders and suspense replays, and refetches exactly when `id` changes (the derived link keys on `p`'s identity).
+- Independent `use()` reads start in parallel and suspend once per stratum; true data dependencies stay sequential. Descendant fetch trees prefetch (`__warm`) while an ancestor is still suspended. Do not restructure code into React-style manual promise hoisting to "fix" waterfalls — the compiler already eliminates the avoidable ones.
 
 ## Ecosystem and bindings
 
