@@ -30,6 +30,7 @@ const ENTRY_METADATA_KEYS = new Set([
 ]);
 const pluginRequire = createRequire(import.meta.url);
 const mainThreadEntry = fileURLToPath(new URL('./main-thread-entry.js', import.meta.url));
+const mainThreadReady = fileURLToPath(new URL('./main-thread-ready.js', import.meta.url));
 const mainThreadCSSHMR = pluginRequire.resolve(
 	'@lynx-js/css-extract-webpack-plugin/runtime/hotModuleReplacement.lepus.cjs',
 );
@@ -230,7 +231,7 @@ function prefixFilename(prefix, filename) {
 		: posix.join(prefix, filename);
 }
 
-/** Split authored entries into a background application and generated receiver. */
+/** Split authored entries into specialized main-thread and background graphs. */
 export function applyLynxApplication(chain, context, rspeedyConfig, options) {
 	const kind = environmentKind(context.environment.name);
 	if (kind === null) return false;
@@ -262,18 +263,22 @@ export function applyLynxApplication(chain, context, rspeedyConfig, options) {
 			resolveBackgroundFilename(entryName, context.environment.config, isProd),
 		);
 
-		const receiver = chain.entry(generatedName);
-		receiver.add({
+		const mainThread = chain.entry(generatedName);
+		mainThread.add({
+			...configuredEntry.metadata,
 			filename: mainFilename,
-			import: [mainThreadEntry],
+			// The receiver owns the first side effect. The authored imports then
+			// evaluate with the same entry metadata and initialization inputs as the
+			// background graph under the main-thread compiler specialization. The
+			// final module releases manual synchronization only after setup returns.
+			import: [
+				mainThreadEntry,
+				...(hmr ? [mainThreadCSSHMR] : []),
+				...configuredEntry.imports,
+				mainThreadReady,
+			],
 			layer: LYNX_MAIN_THREAD_LAYER,
 		});
-		if (hmr) {
-			prepend(receiver, {
-				import: [mainThreadCSSHMR],
-				layer: LYNX_MAIN_THREAD_LAYER,
-			});
-		}
 
 		const background = chain.entry(entryName);
 		background.add({

@@ -32,6 +32,8 @@ export type OctaneRendererRegistryEntry =
 			intrinsics?: string;
 			text?: 'reject' | 'ignore' | 'host';
 			capabilities?: readonly string[];
+			/** Host event prop names or prefix patterns retained as first-screen listener sentinels. */
+			firstScreenEvents?: readonly string[];
 			validation?: OctaneRendererValidationOptions;
 	  };
 
@@ -64,6 +66,7 @@ export interface OctaneResolvedRendererConfig {
 				readonly intrinsics?: string;
 				readonly text: 'reject' | 'ignore' | 'host';
 				readonly capabilities: readonly string[];
+				readonly firstScreenEvents?: readonly string[];
 				readonly validation?: Readonly<OctaneRendererValidationOptions>;
 			}
 		>
@@ -78,6 +81,24 @@ export interface OctaneResolvedRendererConfig {
 		readonly renderer: string;
 	}[];
 	readonly signature: string;
+}
+
+/** Compile-only host identity attached to a universal renderer graph. */
+export interface OctaneUniversalRuntimeOptions {
+	readonly runtime: string;
+	readonly thread: 'background' | 'main-thread';
+}
+
+/** Compiler options selected for modules issued from one Rspack layer. */
+export interface OctaneRspackLoaderLayerSpecializationOptions {
+	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
+	universalRuntime?: OctaneUniversalRuntimeOptions;
+}
+
+/** Plugin-owned compiler and runtime options selected for one Rspack layer. */
+export interface OctaneRspackLayerSpecializationOptions extends OctaneRspackLoaderLayerSpecializationOptions {
+	/** Override exact `octane` imports for modules issued from this layer. */
+	runtime?: string;
 }
 
 export interface OctaneRspackLoaderOptions {
@@ -101,10 +122,13 @@ export interface OctaneRspackLoaderOptions {
 	/** @experimental Renderer registry and ordered per-file selection rules. */
 	renderers?: OctaneRendererConfigOptions | OctaneResolvedRendererConfig;
 	/** Compile-only host runtime/thread identity for a universal renderer graph. */
-	universalRuntime?: {
-		readonly runtime: string;
-		readonly thread: 'background' | 'main-thread';
-	};
+	universalRuntime?: OctaneUniversalRuntimeOptions;
+	/**
+	 * Compiler options selected by the current module's Rspack layer. Unknown
+	 * layers retain the top-level compiler options. Runtime aliases remain a
+	 * class-plugin concern and cannot be configured by the standalone loader.
+	 */
+	layerSpecializations?: Readonly<Record<string, OctaneRspackLoaderLayerSpecializationOptions>>;
 	/**
 	 * Mixed-toolchain ownership gate: when `true`, a project `.tsrx` is
 	 * Octane's by extension, and a project `.tsx` (full compile) or plain
@@ -119,6 +143,11 @@ export interface OctaneRspackLoaderOptions {
 }
 
 export interface OctaneRspackPluginOptions extends OctaneRspackLoaderOptions {
+	/**
+	 * Compiler and exact-runtime overrides selected by the current module's
+	 * Rspack layer. Unknown layers retain the top-level plugin options.
+	 */
+	layerSpecializations?: Readonly<Record<string, OctaneRspackLayerSpecializationOptions>>;
 	/**
 	 * Override the exact module used for plain `octane` imports in this graph.
 	 * Universal host integrations use this to share one hook/context runtime
@@ -138,10 +167,7 @@ export interface OctaneRspackBuildInfo {
 	transformKind: 'compile' | 'slots' | 'client-only-stub';
 	serverRpc: boolean;
 	/** Universal host runtime/thread identity, when this module was specialized. */
-	universalRuntime?: {
-		readonly runtime: string;
-		readonly thread: 'background' | 'main-thread';
-	};
+	universalRuntime?: OctaneUniversalRuntimeOptions;
 	/** Stable identity shared by the client compile and its inert server stub. */
 	clientReference?: {
 		readonly id: string;

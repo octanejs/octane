@@ -13,6 +13,7 @@ import type {
 	UniversalTransportIdentity,
 	UniversalTransportRejectMessage,
 } from 'octane/universal/native';
+import type { LynxFirstTreeSnapshot } from './first-screen.js';
 
 /**
  * Kept as a local literal so the main-thread protocol graph does not evaluate
@@ -52,6 +53,7 @@ export interface LynxMainReadyReply {
 	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
 	readonly type: 'main-ready';
 	readonly request: number;
+	readonly firstTree?: LynxFirstTreeSnapshot;
 }
 
 export interface LynxPublicHandleUpsert {
@@ -73,6 +75,12 @@ export type LynxPublicHandleDelta = LynxPublicHandleUpsert | LynxPublicHandleRem
 
 export interface LynxTransportAcknowledgement extends UniversalTransportAcknowledgement {
 	readonly handles: readonly LynxPublicHandleDelta[];
+	readonly adoption?: 'adopted' | 'repaired';
+}
+
+/** Background listener ownership is live; buffered first-screen events may replay. */
+export interface LynxAdoptionReadyMessage extends UniversalTransportIdentity {
+	readonly type: 'adoption-ready';
 }
 
 export interface LynxHostAttachmentChange {
@@ -113,6 +121,7 @@ export interface LynxDisposeRetryMessage extends UniversalTransportIdentity {
 
 export type LynxBackgroundOutboundMessage =
 	| LynxMainReadyRequest
+	| LynxAdoptionReadyMessage
 	| UniversalTransportCommitMessage
 	| UniversalTransportAbortMessage
 	| LynxDisposeMessage
@@ -387,10 +396,69 @@ function assertHandleDelta(
 	fail(`${label}.op`, `uses unsupported operation ${JSON.stringify(delta.op)}.`);
 }
 
+function assertFirstTreeSnapshot(value: unknown, label: string): void {
+	const snapshot = record(value, label);
+	exactKeys(snapshot, ['format', 'renderer', 'root', 'version', 'plan', 'roots', 'nodes'], label);
+	if (snapshot.format !== 1) fail(`${label}.format`, 'must be 1.');
+	if (snapshot.renderer !== LYNX_TRANSPORT_RENDERER) {
+		fail(`${label}.renderer`, `must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+	}
+	positiveInteger(snapshot.root, `${label}.root`);
+	positiveInteger(snapshot.version, `${label}.version`);
+	if (snapshot.plan !== null && (typeof snapshot.plan !== 'string' || snapshot.plan.length === 0)) {
+		fail(`${label}.plan`, 'must be null or a non-empty string.');
+	}
+	if (!Array.isArray(snapshot.roots)) fail(`${label}.roots`, 'must be an array.');
+	for (let index = 0; index < snapshot.roots.length; index++) {
+		positiveInteger(snapshot.roots[index], `${label}.roots[${index}]`);
+	}
+	if (!Array.isArray(snapshot.nodes)) fail(`${label}.nodes`, 'must be an array.');
+	for (let index = 0; index < snapshot.nodes.length; index++) {
+		const nodeLabel = `${label}.nodes[${index}]`;
+		const node = record(snapshot.nodes[index], nodeLabel);
+		exactKeys(
+			node,
+			['id', 'nativeId', 'type', 'generation', 'parent', 'children', 'props', 'visible', 'events'],
+			nodeLabel,
+		);
+		positiveInteger(node.id, `${nodeLabel}.id`);
+		positiveInteger(node.nativeId, `${nodeLabel}.nativeId`);
+		nonEmptyString(node.type, `${nodeLabel}.type`);
+		positiveInteger(node.generation, `${nodeLabel}.generation`);
+		nullableHostId(node.parent, `${nodeLabel}.parent`);
+		if (!Array.isArray(node.children)) fail(`${nodeLabel}.children`, 'must be an array.');
+		for (let child = 0; child < node.children.length; child++) {
+			positiveInteger(node.children[child], `${nodeLabel}.children[${child}]`);
+		}
+		assertProps(node.props, `${nodeLabel}.props`);
+		if (typeof node.visible !== 'boolean') fail(`${nodeLabel}.visible`, 'must be a boolean.');
+		if (!Array.isArray(node.events)) fail(`${nodeLabel}.events`, 'must be an array.');
+		for (let eventIndex = 0; eventIndex < node.events.length; eventIndex++) {
+			const eventLabel = `${nodeLabel}.events[${eventIndex}]`;
+			const event = record(node.events[eventIndex], eventLabel);
+			exactKeys(event, ['host', 'generation', 'type', 'listener', 'priority'], eventLabel);
+			positiveInteger(event.host, `${eventLabel}.host`);
+			positiveInteger(event.generation, `${eventLabel}.generation`);
+			nonEmptyString(event.type, `${eventLabel}.type`);
+			positiveInteger(event.listener, `${eventLabel}.listener`);
+			if (!['continuous', 'default', 'discrete'].includes(event.priority as string)) {
+				fail(`${eventLabel}.priority`, 'must be discrete, continuous, or default.');
+			}
+		}
+	}
+}
+
 function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | LynxMainReadyReply {
 	const label = reply ? 'main-ready reply' : 'main-ready request';
 	const message = record(value, label);
-	exactKeys(message, ['protocol', 'renderer', 'type', 'request'], label);
+	const hasFirstTree = reply && Object.prototype.hasOwnProperty.call(message, 'firstTree');
+	exactKeys(
+		message,
+		hasFirstTree
+			? ['protocol', 'renderer', 'type', 'request', 'firstTree']
+			: ['protocol', 'renderer', 'type', 'request'],
+		label,
+	);
 	if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
 		fail(label, `protocol must be ${LYNX_TRANSPORT_PROTOCOL_VERSION}.`);
 	}
@@ -405,6 +473,7 @@ function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | Lyn
 	}
 	if (reply) nonNegativeInteger(message.request, `${label}.request`);
 	else positiveInteger(message.request, `${label}.request`);
+	if (hasFirstTree) assertFirstTreeSnapshot(message.firstTree, `${label}.firstTree`);
 	return message as unknown as LynxMainReadyRequest | LynxMainReadyReply;
 }
 
@@ -415,6 +484,10 @@ export function validateLynxBackgroundOutboundMessage(
 	if (message.type === 'main-ready-request')
 		return assertReady(message, false) as LynxMainReadyRequest;
 	assertIdentity(message, 'outbound message');
+	if (message.type === 'adoption-ready') {
+		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type'], 'adoption-ready');
+		return message as unknown as LynxAdoptionReadyMessage;
+	}
 	if (message.type === 'commit') {
 		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'batch'], 'commit');
 		assertBatch(message.batch, message);
@@ -440,7 +513,17 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 	if (message.type === 'main-ready') return assertReady(message, true) as LynxMainReadyReply;
 	assertIdentity(message, 'inbound message');
 	if (message.type === 'ack') {
-		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'handles'], 'ack');
+		const hasAdoption = Object.prototype.hasOwnProperty.call(message, 'adoption');
+		exactKeys(
+			message,
+			hasAdoption
+				? ['protocol', 'renderer', 'root', 'version', 'type', 'handles', 'adoption']
+				: ['protocol', 'renderer', 'root', 'version', 'type', 'handles'],
+			'ack',
+		);
+		if (hasAdoption && message.adoption !== 'adopted' && message.adoption !== 'repaired') {
+			fail('ack.adoption', 'must be adopted or repaired.');
+		}
 		if (!Array.isArray(message.handles)) fail('ack.handles', 'must be an array.');
 		for (let index = 0; index < message.handles.length; index++) {
 			assertHandleDelta(message.handles[index], index, message);

@@ -135,6 +135,42 @@ describe('renderer configuration', () => {
 		expect(normalizeRendererConfig(config).signature).toBe(config.signature);
 	});
 
+	it('normalizes first-screen event patterns as frozen renderer metadata', () => {
+		const config = normalizeRendererConfig({
+			registry: {
+				native: {
+					module: '@octanejs/native/renderer',
+					capabilities: ['main-thread-render-only'],
+					firstScreenEvents: ['onUpdate', 'bind*', 'onUpdate', 'catch*'],
+				},
+			},
+		});
+
+		expect(config.registry.native.firstScreenEvents).toEqual(['bind*', 'catch*', 'onUpdate']);
+		expect(Object.isFrozen(config.registry.native.firstScreenEvents)).toBe(true);
+		const reordered = normalizeRendererConfig({
+			registry: {
+				native: {
+					module: '@octanejs/native/renderer',
+					firstScreenEvents: ['catch*', 'onUpdate', 'bind*'],
+					capabilities: ['main-thread-render-only'],
+				},
+			},
+		});
+		expect(reordered.signature).toBe(config.signature);
+		expect(normalizeRendererConfig(config).signature).toBe(config.signature);
+		const differentPatterns = normalizeRendererConfig({
+			registry: {
+				native: {
+					module: '@octanejs/native/renderer',
+					capabilities: ['main-thread-render-only'],
+					firstScreenEvents: ['bind*', 'onUpdate'],
+				},
+			},
+		});
+		expect(differentPatterns.signature).not.toBe(config.signature);
+	});
+
 	it('normalizes renderer-owned child regions by stable module and export identity', () => {
 		const config = normalizeRendererConfig({
 			registry: { three: '@octanejs/three/renderer' },
@@ -410,6 +446,16 @@ describe('renderer configuration', () => {
 				},
 			}),
 		).toThrow(/hostProps\["view"\]\[0\].*prefix ending in "\*"/);
+		expect(() =>
+			normalizeRendererConfig({
+				registry: {
+					three: {
+						module: '@octanejs/three/renderer',
+						firstScreenEvents: ['bind*suffix'],
+					},
+				},
+			}),
+		).toThrow(/firstScreenEvents\[0\].*prefix ending in "\*"/);
 		expect(() =>
 			normalizeRendererConfig({
 				registry: { three: '@octanejs/three/renderer' },

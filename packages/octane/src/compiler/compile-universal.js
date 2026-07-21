@@ -41,6 +41,84 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'useTransition',
 ]);
 
+// A renderer must opt in explicitly before main-thread metadata changes emitted
+// code. This keeps universalRuntime useful as cache/diagnostic identity for
+// ordinary renderers while allowing native first-screen programs to erase
+// background-owned callbacks from their render-only specialization.
+const MAIN_THREAD_RENDER_ONLY_CAPABILITY = 'main-thread-render-only';
+const MAIN_THREAD_BACKGROUND_EFFECTS = new Set([
+	'useEffect',
+	'useEffectEvent',
+	'useImperativeHandle',
+	'useInsertionEffect',
+	'useLayoutEffect',
+]);
+
+function isMainThreadRenderOnly(state) {
+	return (
+		state.universalRuntime?.thread === 'main-thread' &&
+		rendererHasCapability(state, MAIN_THREAD_RENDER_ONLY_CAPABILITY)
+	);
+}
+
+function isFirstScreenEvent(name, state) {
+	return (state.renderer.firstScreenEvents ?? []).some((pattern) => hostPropMatches(name, pattern));
+}
+
+function unwrapFirstScreenExpression(node) {
+	while (
+		node &&
+		(node.type === 'ParenthesizedExpression' ||
+			node.type === 'ChainExpression' ||
+			node.type === 'TSAsExpression' ||
+			node.type === 'TSNonNullExpression' ||
+			node.type === 'TSSatisfiesExpression' ||
+			node.type === 'TSTypeAssertion')
+	) {
+		node = node.expression;
+	}
+	return node;
+}
+
+function firstScreenEventHelper(state) {
+	return (state.helpers.firstScreenEvent ??= allocName(state, '__octaneFirstScreenEvent'));
+}
+
+function firstScreenEventValue(expression, state) {
+	const value = unwrapFirstScreenExpression(expression);
+	if (value?.type === 'ArrowFunctionExpression' || value?.type === 'FunctionExpression') {
+		return firstScreenEventHelper(state);
+	}
+	if (value?.type === 'Literal' && value.value === null) {
+		return printDynamicExpression(expression, state);
+	}
+	if (value?.type === 'Identifier' && value.name === 'undefined') {
+		return printDynamicExpression(expression, state);
+	}
+	if (value?.type === 'UnaryExpression' && value.operator === 'void') {
+		return printDynamicExpression(expression, state);
+	}
+	if (value?.type === 'ConditionalExpression') {
+		return `(${printDynamicExpression(value.test, state)} ? ${firstScreenEventValue(
+			value.consequent,
+			state,
+		)} : ${firstScreenEventValue(value.alternate, state)})`;
+	}
+	// A callback read through props or another runtime expression may be
+	// optional. Evaluate that read exactly once, preserve its nullish absence,
+	// and replace only a present value with the marker. Inline callback bodies
+	// take the static branch above and never enter the main-thread graph.
+	return `((${printDynamicExpression(expression, state)}) == null ? undefined : ${firstScreenEventHelper(state)})`;
+}
+
+function mainThreadHostValue(name, expression, state) {
+	if (!isMainThreadRenderOnly(state)) return printDynamicExpression(expression, state);
+	if (name === 'ref') return 'undefined';
+	return isFirstScreenEvent(name, state)
+		? firstScreenEventValue(expression, state)
+		: printDynamicExpression(expression, state);
+}
+
 function universalError(filename, node, message) {
 	const start = node?.loc?.start;
 	const at = start ? ` at ${filename}:${start.line}:${start.column}` : '';
@@ -242,6 +320,48 @@ function validateRuntimeImports(ast, state) {
 			}
 		}
 	}
+}
+
+/**
+ * Keep effect hook calls (and therefore compiler-assigned call-site slots) in
+ * the first-screen program, but erase every authored argument before the
+ * shared hook pass sees it. The main renderer supplies inert implementations;
+ * preserving the call shape keeps later state/useId slots deterministic while
+ * removing callback closures, captured imports, refs, and dependency reads.
+ */
+function prepareMainThreadRenderOnlyReplacements(ast, state) {
+	if (!isMainThreadRenderOnly(state)) return;
+	state.sourceNodeReplacements ??= new WeakMap();
+	const { nodeScopes, resolveBinding, rootScope } = createLexicalAnalysis(ast);
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			resolveBinding(nodeScopes.get(node.callee) ?? rootScope, node.callee.name)?.importSource
+				?.value === 'octane' &&
+			MAIN_THREAD_BACKGROUND_EFFECTS.has(state.runtimeImports.get(node.callee.name))
+		) {
+			for (const argument of node.arguments ?? []) {
+				if (argument && typeof argument === 'object') {
+					state.sourceNodeReplacements.set(argument, 'undefined');
+				}
+			}
+			return;
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			visit(child);
+		}
+	};
+	visit(ast);
 }
 
 const NON_RUNTIME_AST_KEYS = new Set([
@@ -1381,7 +1501,7 @@ function compileProps(attributes, childrenExpression, state, canonicalizeHostCla
 		if (value.type === 'JSXExpressionContainer') {
 			if (!value.expression || value.expression.type === 'JSXEmptyExpression') continue;
 			entries.push(
-				`['set', ${JSON.stringify(name)}, (${printDynamicExpression(value.expression, state)})]`,
+				`['set', ${JSON.stringify(name)}, (${mainThreadHostValue(name, value.expression, state)})]`,
 			);
 			continue;
 		}
@@ -1436,7 +1556,7 @@ function compileAttribute(attribute, context, state, canonicalizeHostClass) {
 	if (value.type === 'JSXExpressionContainer') {
 		if (!value.expression || value.expression.type === 'JSXEmptyExpression') return null;
 		const slot = context.values.length;
-		context.values.push(printDynamicExpression(value.expression, state));
+		context.values.push(mainThreadHostValue(name, value.expression, state));
 		return { name, slot };
 	}
 	throw universalError(state.filename, attribute, `unsupported value for host attribute ${name}.`);
@@ -1458,6 +1578,19 @@ function compileHostElement(node, context, state) {
 	if (!/^[a-z]/.test(type)) return compileComponentElement(node, context, state);
 	recordMapping(state, JSON.stringify(type), node.openingElement?.name ?? node.name ?? node);
 	const attributes = node.openingElement?.attributes ?? node.attributes ?? [];
+	if (isMainThreadRenderOnly(state)) {
+		const spread = attributes.find(
+			(attribute) =>
+				attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute',
+		);
+		if (spread !== undefined) {
+			throw universalError(
+				state.filename,
+				spread,
+				'main-thread render-only host spreads are unsupported because first-screen event and ref props must be statically named for callback erasure; expand the spread into explicit host props.',
+			);
+		}
+	}
 	const canonicalizeHostClass = rendererHasCapability(state, 'class-name-alias');
 	const needsOrderedProps =
 		attributes.some(
@@ -2637,6 +2770,7 @@ export function lowerUniversalRendererRegion(
 		source: wrapper,
 		filename,
 		renderer,
+		universalRuntime,
 		names: new Set(),
 		plans: [],
 		components: [],
@@ -2702,6 +2836,7 @@ export function lowerUniversalRendererRegion(
 		validateLoweredRendererSource(ast, state, synthetic.origins, options.authoredSource);
 	}
 	validateRuntimeImports(ast, state);
+	prepareMainThreadRenderOnlyReplacements(ast, state);
 	const regionHelper = allocName(state, `${prefix}Descriptor`);
 	const componentName = allocName(state, `${prefix}Body`);
 	const emittedComponents = [];
@@ -2768,6 +2903,9 @@ export function lowerUniversalRendererRegion(
 		`universalSwitch as ${state.helpers.switch}, universalFor as ${state.helpers.for}, ` +
 		`universalTry as ${state.helpers.try}, universalChildren as ${state.helpers.children}, ` +
 		`universalContext as ${state.helpers.context}, universalActivity as ${state.helpers.activity}, ` +
+		(state.helpers.firstScreenEvent === undefined
+			? ''
+			: `firstScreenEvent as ${state.helpers.firstScreenEvent}, `) +
 		`rendererRegion as ${regionHelper}` +
 		(state.hmr
 			? `, hmrUniversalComponent as ${state.helpers.hmr}, UNIVERSAL_HMR as ${state.helpers.hmrSymbol}`
@@ -2890,7 +3028,7 @@ export function lowerUniversalRendererRegion(
 /**
  * @param {string} source
  * @param {string} filename
- * @param {{ id: string, module: string, target: 'universal', text?: 'host'|'ignore'|'reject', capabilities?: readonly string[] }} renderer
+ * @param {{ id: string, module: string, target: 'universal', text?: 'host'|'ignore'|'reject', capabilities?: readonly string[], firstScreenEvents?: readonly string[] }} renderer
  * @param {(source: string, metadata: any) => { code: string, map: any }} compileClient
  * @param {Record<string, any>} [options]
  */
@@ -2910,6 +3048,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		source,
 		filename,
 		renderer,
+		universalRuntime,
 		names: new Set(),
 		plans: [],
 		components: [],
@@ -2951,6 +3090,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		}
 	}
 	validateRuntimeImports(ast, state);
+	prepareMainThreadRenderOnlyReplacements(ast, state);
 
 	const emitted = [];
 	for (const node of ast.body ?? []) {
@@ -2974,6 +3114,9 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		`universalSwitch as ${state.helpers.switch}, universalFor as ${state.helpers.for}, ` +
 		`universalTry as ${state.helpers.try}, universalChildren as ${state.helpers.children}, ` +
 		`universalContext as ${state.helpers.context}, universalActivity as ${state.helpers.activity}` +
+		(state.helpers.firstScreenEvent === undefined
+			? ''
+			: `, firstScreenEvent as ${state.helpers.firstScreenEvent}`) +
 		(state.hmr
 			? `, hmrUniversalComponent as ${state.helpers.hmr}, UNIVERSAL_HMR as ${state.helpers.hmrSymbol}`
 			: '') +

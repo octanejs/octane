@@ -1,7 +1,6 @@
 import { CssExtractRspackPlugin } from '@lynx-js/css-extract-webpack-plugin';
 
 import { LYNX_TARGET_SDK_VERSION } from './application.js';
-import { LYNX_BACKGROUND_LAYER } from './layers.js';
 
 const PLUGIN_NAME = '@octanejs/rspeedy-plugin';
 
@@ -41,10 +40,7 @@ export function configureLynxCSS(api, environments) {
 			const mainRuleName = ruleName === CHAIN_ID.RULE.CSS ? CHAIN_ID.ONE_OF.CSS_MAIN : ruleName;
 			const mainRule = rule.oneOf(mainRuleName);
 			removeLightningCSS(mainRule, CHAIN_ID.USE.LIGHTNINGCSS);
-			mainRule
-				.issuerLayer(LYNX_BACKGROUND_LAYER)
-				.use(CHAIN_ID.USE.MINI_CSS_EXTRACT)
-				.loader(CssExtractRspackPlugin.loader);
+			mainRule.use(CHAIN_ID.USE.MINI_CSS_EXTRACT).loader(CssExtractRspackPlugin.loader);
 
 			const inlineRuleName =
 				ruleName === CHAIN_ID.RULE.CSS ? CHAIN_ID.ONE_OF.CSS_INLINE : `${ruleName}-inline`;

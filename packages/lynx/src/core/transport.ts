@@ -373,6 +373,16 @@ export function createLynxBackgroundTransport(
 			terminalCloseAfterHostAcceptance(message, terminalError);
 			return;
 		}
+		if (message.adoption === 'adopted') {
+			try {
+				dispatch({ ...frozenIdentity(message), type: 'adoption-ready' });
+			} catch (error) {
+				terminalCloseAfterHostAcceptance(
+					message,
+					report(error, `Octane Lynx could not confirm adoption ${message.version}.`),
+				);
+			}
+		}
 	};
 
 	const settleCommitResponse = (entry: PendingCommit, message: CommitSettlement): void => {

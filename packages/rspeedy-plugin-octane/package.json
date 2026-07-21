@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 5 Rspeedy production bundle integration for Octane Lynx.",
+  "description": "Private Milestone 6 dual-thread Rspeedy bundle integration for Octane Lynx.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",

@@ -2,7 +2,11 @@ import { realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import remapping from '@jridgewell/remapping';
 import { canonicalModuleId, cleanModuleId, createOctaneCompiler } from 'octane/compiler/bundler';
-import { inferRspackEnvironment, normalizeLoaderOptions } from './shared.js';
+import {
+	inferRspackEnvironment,
+	normalizeLoaderOptions,
+	selectLayerCompilerOptions,
+} from './shared.js';
 
 function realRoot(path) {
 	try {
@@ -99,14 +103,20 @@ export default function octaneLoader(source, inputSourceMap) {
 			environment === 'client' &&
 			(options.dev ?? (this.mode === undefined || this.mode !== 'production'));
 		const profile = environment === 'client' && options.profile === true;
+		const compilerOptions =
+			options.layerSpecializations === undefined
+				? options
+				: selectLayerCompilerOptions(options, this._module);
 		const compiler = createOctaneCompiler({
 			root,
 			profile,
 			...(options.exclude === undefined ? null : { exclude: options.exclude }),
-			...(options.renderers === undefined ? null : { renderers: options.renderers }),
-			...(options.universalRuntime === undefined
+			...(compilerOptions.renderers === undefined
 				? null
-				: { universalRuntime: options.universalRuntime }),
+				: { renderers: compilerOptions.renderers }),
+			...(compilerOptions.universalRuntime === undefined
+				? null
+				: { universalRuntime: compilerOptions.universalRuntime }),
 			...(options.requireDirective === undefined
 				? null
 				: { requireDirective: options.requireDirective }),

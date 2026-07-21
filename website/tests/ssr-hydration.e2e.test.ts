@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 // Dev-SSR → real-browser hydration smoke — the seam every historical website
 // breakage lived in (router-parity SSR regression, the 2026-07-08 bare-Symbol()
 // slot regression) and the one the jsdom suites can't see: those client-render
@@ -13,15 +15,26 @@
 // a required prerequisite; CI installs it (see ci.yml), and local runs fail
 // with the exact setup command when it is missing.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { build } from 'esbuild';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
 import { encodePlaygroundHash } from '../src/lib/playground-hash.ts';
+import { PLAYGROUND_REACT_VERSION } from '../src/lib/playground-sandbox.ts';
 
 const WEBSITE = join(process.cwd(), 'website');
 const PLAYWRIGHT_ACTION_TIMEOUT = 10_000;
 const PLAYWRIGHT_NAVIGATION_TIMEOUT = 15_000;
+const REACT_CDN_ENTRY_PREFIX = 'octane-e2e-react-cdn:';
+const REACT_CDN_ENTRIES = {
+	[`react@${PLAYGROUND_REACT_VERSION}`]: 'react',
+	[`react@${PLAYGROUND_REACT_VERSION}/jsx-runtime`]: 'react/jsx-runtime',
+	[`react@${PLAYGROUND_REACT_VERSION}/jsx-dev-runtime`]: 'react/jsx-dev-runtime',
+	[`react-dom@${PLAYGROUND_REACT_VERSION}`]: 'react-dom',
+	[`react-dom@${PLAYGROUND_REACT_VERSION}/client`]: 'react-dom/client',
+};
 const ROUTES = [
 	'/',
 	'/docs',
@@ -36,6 +49,99 @@ const ROUTES = [
 	'/benchmarks',
 	'/playground',
 ];
+
+let reactCdnMirror: Promise<Map<string, Buffer>> | undefined;
+
+// The playground deliberately points its opaque-origin iframe at esm.sh. Keep
+// that production security boundary intact while making this behavioral test
+// deterministic: Chromium still performs the real cross-origin module loads,
+// but Playwright fulfills the React family from the workspace packages.
+function getReactCdnMirror(): Promise<Map<string, Buffer>> {
+	return (reactCdnMirror ??= buildReactCdnMirror());
+}
+
+async function buildReactCdnMirror(): Promise<Map<string, Buffer>> {
+	const octaneRequire = createRequire(join(process.cwd(), 'packages/octane/package.json'));
+	const outdir = join(process.cwd(), '.octane-e2e-react-cdn');
+	const result = await build({
+		absWorkingDir: process.cwd(),
+		entryPoints: Object.fromEntries(
+			Object.entries(REACT_CDN_ENTRIES).map(([cdnPath, packageSpecifier]) => [
+				cdnPath,
+				REACT_CDN_ENTRY_PREFIX + packageSpecifier,
+			]),
+		),
+		bundle: true,
+		chunkNames: 'chunks/[name]-[hash]',
+		define: { 'process.env.NODE_ENV': '"production"' },
+		entryNames: '[dir]/[name]',
+		format: 'esm',
+		outdir,
+		platform: 'browser',
+		plugins: [
+			{
+				name: 'workspace-react-cdn-entries',
+				setup(esbuild) {
+					esbuild.onResolve({ filter: /^octane-e2e-react-cdn:/ }, (args) => ({
+						namespace: 'workspace-react-cdn-entry',
+						path: args.path.slice(REACT_CDN_ENTRY_PREFIX.length),
+					}));
+					esbuild.onLoad({ filter: /.*/, namespace: 'workspace-react-cdn-entry' }, (args) => {
+						const entryPath = octaneRequire.resolve(args.path);
+						const exportNames = Object.keys(
+							octaneRequire(args.path) as Record<string, unknown>,
+						).filter((name) => /^[$A-Z_a-z][$\w]*$/.test(name) && name !== 'default');
+						return {
+							contents: [
+								`import workspaceModule from ${JSON.stringify(entryPath)};`,
+								'export default workspaceModule;',
+								`export const { ${exportNames.join(', ')} } = workspaceModule;`,
+							].join('\n'),
+							loader: 'js',
+							resolveDir: '/',
+						};
+					});
+				},
+			},
+		],
+		splitting: true,
+		write: false,
+	});
+
+	const modules = new Map<string, Buffer>();
+	for (const output of result.outputFiles) {
+		const outputPath = relative(outdir, output.path).replaceAll('\\', '/');
+		const requestPath = outputPath.startsWith('chunks/')
+			? '/' + outputPath
+			: '/' + outputPath.replace(/\.js$/, '');
+		modules.set(requestPath, Buffer.from(output.contents));
+	}
+	return modules;
+}
+
+async function installReactCdnMirror(
+	page: import('playwright').Page,
+	errors: string[],
+): Promise<void> {
+	const modules = await getReactCdnMirror();
+	await page.route('https://esm.sh/**', async (route) => {
+		const url = new URL(route.request().url());
+		const body = url.search === '' ? modules.get(url.pathname) : undefined;
+		if (!body) {
+			errors.push(`unexpected esm.sh request: ${url.pathname}${url.search}`);
+			await route.abort('blockedbyclient');
+			return;
+		}
+		await route.fulfill({
+			body,
+			headers: {
+				'access-control-allow-origin': '*',
+				'content-type': 'application/javascript; charset=utf-8',
+			},
+			status: 200,
+		});
+	});
+}
 
 // A fresh ephemeral port per run — NEVER a fixed one. With a fixed port, a
 // leftover server from an earlier run (or another checkout) already listening
@@ -156,7 +262,10 @@ async function stop(child: ChildProcess | undefined): Promise<void> {
 async function loadRoute(
 	base: string,
 	path: string,
-	options: { waitForNetworkIdle?: boolean } = {},
+	options: {
+		beforeNavigation?: (page: import('playwright').Page, errors: string[]) => Promise<void>;
+		waitForNetworkIdle?: boolean;
+	} = {},
 ) {
 	const page = await browser!.newPage();
 	page.setDefaultTimeout(PLAYWRIGHT_ACTION_TIMEOUT);
@@ -167,6 +276,7 @@ async function loadRoute(
 	});
 	page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
 	try {
+		await options.beforeNavigation?.(page, errors);
 		await page.goto(base + path, { waitUntil: 'load' });
 		if (options.waitForNetworkIdle) await page.waitForLoadState('networkidle');
 		await page.waitForFunction(
@@ -1046,19 +1156,15 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 	}, 45_000);
 
 	it('playground runs the OctaneCompat React-host example end to end', async () => {
-		// This example loads the real react/react-dom from esm.sh inside the
-		// sandbox — like the rest of this browser suite, it requires a working
-		// network. A probe up front turns an unreachable CDN into an immediate,
-		// clearly-attributed failure instead of a slow in-iframe timeout.
-		const probe = await fetch('https://esm.sh/react@19.2.0', { method: 'HEAD' });
-		expect(probe.ok, 'esm.sh must be reachable to exercise the OctaneCompat example').toBe(true);
-		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground', {
+			beforeNavigation: installReactCdnMirror,
+		});
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
 			await page.selectOption('.pg-select', 'octane-compat');
 			await page.locator('.pg-tab', { hasText: 'Island.tsrx' }).waitFor({ timeout: 10_000 });
 			const preview = page.frameLocator('iframe[title="Playground preview"]');
-			// react-dom (esm.sh) mounts the host; the compiled Octane island renders
+			// Real react-dom mounts the host; the compiled Octane island renders
 			// inside it and resolves its own @try/@pending fetch.
 			await preview.locator('h3', { hasText: 'Octane island' }).waitFor({ timeout: 30_000 });
 			await preview.locator('body').getByText('island data #1').waitFor({ timeout: 20_000 });

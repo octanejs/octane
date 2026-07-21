@@ -4,6 +4,7 @@ import type {
 	UniversalHostCommitContext,
 	UniversalHostDriver,
 	UniversalPreparedHostBatch,
+	UniversalSerializableValue,
 } from 'octane/universal/native';
 import { LYNX_RENDERER_ID } from '../config.js';
 import {
@@ -13,6 +14,17 @@ import {
 	type LynxNativeEventBinding,
 	type LynxNativeEventToken,
 } from './native-events.js';
+import {
+	createLynxFirstTree,
+	LYNX_FIRST_TREE_STATE,
+	LynxFirstTreeMismatchError,
+	type CaptureLynxFirstTreeOptions,
+	type LynxFirstTree,
+	type LynxFirstTreeEventSnapshot,
+	type LynxFirstTreeNodeSnapshot,
+	type LynxFirstTreeSnapshot,
+	type LynxResolvedFirstTreeEvent,
+} from './first-screen.js';
 import {
 	LYNX_CSS_SCOPE_PROP,
 	planLynxHostPropPatch,
@@ -143,6 +155,7 @@ interface LynxHostState<Node extends LynxElementRef> {
 	faulted: boolean;
 	applying: boolean;
 	cleanupNeedsFlush: boolean;
+	firstTree: LynxFirstTree<Node> | null;
 }
 
 interface LynxNativeEventRegistration {
@@ -177,6 +190,13 @@ export interface LynxPreparedHostBatch extends UniversalPreparedHostBatch {
 	readonly mutationStarted: boolean;
 	/** Clone-safe public-handle changes that must be published before acknowledgement. */
 	readonly handleDelta: readonly LynxHostHandleDelta[];
+	/** First-screen path selected during clone-safe preparation. */
+	readonly firstTreeAction: 'none' | 'adopt' | 'repair';
+}
+
+export interface PrepareLynxHostBatchOptions<Node extends LynxElementRef> {
+	readonly firstTree?: LynxFirstTree<Node>;
+	readonly onMismatch?: (error: LynxFirstTreeMismatchError) => void;
 }
 
 export interface LynxHostDriver<
@@ -1248,6 +1268,7 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		faulted: false,
 		applying: false,
 		cleanupNeedsFlush: false,
+		firstTree: null,
 	};
 	return Object.freeze({
 		renderer: LYNX_RENDERER_ID,
@@ -1267,13 +1288,448 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 	});
 }
 
+function sameSnapshotValue(first: unknown, second: unknown): boolean {
+	if (Object.is(first, second)) return true;
+	if (Array.isArray(first)) {
+		if (!Array.isArray(second) || first.length !== second.length) return false;
+		for (let index = 0; index < first.length; index++) {
+			if (!sameSnapshotValue(first[index], second[index])) return false;
+		}
+		return true;
+	}
+	if (
+		first === null ||
+		second === null ||
+		typeof first !== 'object' ||
+		typeof second !== 'object' ||
+		Array.isArray(second)
+	) {
+		return false;
+	}
+	const firstKeys = Object.keys(first).sort();
+	const secondKeys = Object.keys(second).sort();
+	if (firstKeys.length !== secondKeys.length) return false;
+	for (let index = 0; index < firstKeys.length; index++) {
+		const key = firstKeys[index]!;
+		if (
+			key !== secondKeys[index] ||
+			!sameSnapshotValue(
+				(first as Record<string, unknown>)[key],
+				(second as Record<string, unknown>)[key],
+			)
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function sameIds(first: readonly number[], second: readonly number[]): boolean {
+	if (first.length !== second.length) return false;
+	for (let index = 0; index < first.length; index++) {
+		if (first[index] !== second[index]) return false;
+	}
+	return true;
+}
+
+function snapshotFirstTreeValue(
+	value: UniversalSerializableValue,
+	seen: Set<object>,
+): UniversalSerializableValue {
+	if (value === null || typeof value !== 'object') return value;
+	if (seen.has(value)) throw hostError('first-tree props cannot contain cycles.');
+	seen.add(value);
+	try {
+		if (Array.isArray(value)) {
+			return Object.freeze(value.map((entry) => snapshotFirstTreeValue(entry, seen)));
+		}
+		const output: Record<string, UniversalSerializableValue> = {};
+		for (const key of Object.keys(value)) {
+			const entry = snapshotFirstTreeValue(
+				(value as Readonly<Record<string, UniversalSerializableValue>>)[key]!,
+				seen,
+			);
+			if (key === '__proto__') {
+				Object.defineProperty(output, key, {
+					configurable: false,
+					enumerable: true,
+					value: entry,
+					writable: false,
+				});
+			} else {
+				output[key] = entry;
+			}
+		}
+		return Object.freeze(output);
+	} finally {
+		seen.delete(value);
+	}
+}
+
+function snapshotFirstTreeProps(
+	props: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, UniversalSerializableValue>> {
+	return snapshotFirstTreeValue(
+		props as Readonly<Record<string, UniversalSerializableValue>>,
+		new Set(),
+	) as Readonly<Record<string, UniversalSerializableValue>>;
+}
+
+function mismatch(
+	firstTree: LynxFirstTree,
+	path: string,
+	message: string,
+): LynxFirstTreeMismatchError {
+	return new LynxFirstTreeMismatchError(path, message, firstTree.snapshot.plan);
+}
+
+function firstTreeOwner<Node extends LynxElementRef>(
+	firstTree: LynxFirstTree<Node>,
+): LynxHostContainer<Node> {
+	if (firstTree === null || typeof firstTree !== 'object') {
+		throw hostError('firstTree must be a captured Lynx first tree.');
+	}
+	const journal = firstTree[LYNX_FIRST_TREE_STATE];
+	if (journal === undefined || journal.status !== 'available') {
+		throw hostError('firstTree is no longer available for adoption.');
+	}
+	const owner = journal.owner;
+	if (
+		owner === null ||
+		typeof owner !== 'object' ||
+		!(LYNX_HOST_STATE in owner) ||
+		(owner as LynxHostContainer<Node>).renderer !== LYNX_RENDERER_ID
+	) {
+		throw hostError('firstTree has no valid Lynx host owner.');
+	}
+	const source = owner as LynxHostContainer<Node>;
+	if (source[LYNX_HOST_STATE].firstTree !== firstTree) {
+		throw hostError('firstTree is not the current journal for its Lynx host owner.');
+	}
+	return source;
+}
+
+/**
+ * Freeze the accepted main-runtime tree into a clone-safe description while
+ * retaining PAPI references in a single-consumer, main-local journal.
+ */
+export function captureLynxFirstTree<Node extends LynxElementRef>(
+	container: LynxHostContainer<Node>,
+	options: CaptureLynxFirstTreeOptions = {},
+): LynxFirstTree<Node> {
+	const state = container[LYNX_HOST_STATE];
+	if (state.disposed || state.disposing || state.faulted || state.applying) {
+		throw hostError('first tree can only be captured from a stable accepted root.');
+	}
+	if (state.firstTree !== null) throw hostError('the root already owns a first-tree journal.');
+	if (state.acceptedVersion === 0)
+		throw hostError('cannot capture a first tree before a batch is accepted.');
+	if (
+		options.plan !== undefined &&
+		(typeof options.plan !== 'string' || options.plan.length === 0)
+	) {
+		throw hostError('first-tree plan must be a non-empty string when provided.');
+	}
+	if (state.lists.size !== 0) {
+		throw hostError('native list materializations cannot be captured as a first tree.');
+	}
+	const eventsByToken = new Map<string, LynxResolvedFirstTreeEvent>();
+	const nodes: LynxFirstTreeNodeSnapshot[] = [];
+	const ids = [...state.records.keys()].sort((first, second) => first - second);
+	for (const id of ids) {
+		const record = state.records.get(id)!;
+		if (record.node === null || record.parent === undefined) {
+			throw hostError(`first-tree host ${id} must own an attached physical node.`);
+		}
+		if (record.type === 'list') {
+			throw hostError('native list hosts cannot be captured as a first tree.');
+		}
+		if (!state.ownedNodes.has(record.node)) {
+			throw hostError(`first-tree host ${id} is missing from the physical ownership journal.`);
+		}
+		const nativeId = state.papi.getUniqueId(record.node);
+		assertSafeId(nativeId, `first-tree host ${id} native ID`);
+		const events: LynxFirstTreeEventSnapshot[] = [];
+		const eventEntries = [...record.events].sort(([first], [second]) =>
+			first < second ? -1 : first > second ? 1 : 0,
+		);
+		for (const [type, descriptor] of eventEntries) {
+			const event = Object.freeze({
+				host: id,
+				generation: record.handle.generation,
+				type,
+				listener: descriptor.id,
+				priority: descriptor.priority,
+			});
+			events.push(event);
+			const registration = state.nativeEvents.get(record.node)?.get(type);
+			if (record.visible) {
+				if (registration === undefined) {
+					throw hostError(`first-tree host ${id} is missing native event ${JSON.stringify(type)}.`);
+				}
+				eventsByToken.set(registration.token, event);
+			} else if (registration !== undefined) {
+				throw hostError(
+					`hidden first-tree host ${id} retains native event ${JSON.stringify(type)}.`,
+				);
+			}
+		}
+		nodes.push(
+			Object.freeze({
+				id,
+				nativeId,
+				type: record.type,
+				generation: record.handle.generation,
+				parent: record.parent,
+				children: Object.freeze([...record.children]),
+				props: snapshotFirstTreeProps(record.props),
+				visible: record.visible,
+				events: Object.freeze(events),
+			}),
+		);
+	}
+	if (state.ownedNodes.size !== state.records.size) {
+		throw hostError('first-tree physical ownership contains untracked nodes.');
+	}
+	if (state.ownedPageRoots.size !== state.rootChildren.length) {
+		throw hostError('first-tree page-root ownership does not match logical roots.');
+	}
+	for (const id of state.rootChildren) {
+		const node = state.records.get(id)?.node;
+		if (node === null || node === undefined || !state.ownedPageRoots.has(node)) {
+			throw hostError(`first-tree root ${id} is missing from page-root ownership.`);
+		}
+	}
+	const snapshot: LynxFirstTreeSnapshot = Object.freeze({
+		format: 1,
+		renderer: LYNX_RENDERER_ID,
+		root: container.root,
+		version: state.acceptedVersion,
+		plan: options.plan ?? null,
+		roots: Object.freeze([...state.rootChildren]),
+		nodes: Object.freeze(nodes),
+	});
+	const firstTree = createLynxFirstTree<Node>(snapshot, container, eventsByToken);
+	state.firstTree = firstTree;
+	return firstTree;
+}
+
+function compareFirstTree<Node extends LynxElementRef>(
+	target: LynxHostContainer<Node>,
+	batch: UniversalHostBatch,
+	firstTree: LynxFirstTree<Node>,
+	source: LynxHostContainer<Node>,
+	finalIds: ReadonlySet<number>,
+	finalRoots: readonly number[],
+	getRecord: (id: number) => LynxHostRecord<Node> | undefined,
+	operations: readonly LynxApplyOperation<Node>[],
+	listUpdates: readonly LynxPreparedListUpdate[],
+): LynxFirstTreeMismatchError | null {
+	const snapshot = firstTree.snapshot;
+	const sourceState = source[LYNX_HOST_STATE];
+	if (snapshot.format !== 1 || snapshot.renderer !== LYNX_RENDERER_ID) {
+		return mismatch(
+			firstTree,
+			'snapshot.format',
+			'the snapshot format or renderer is unsupported.',
+		);
+	}
+	if (snapshot.root !== target.root || source.root !== target.root) {
+		return mismatch(firstTree, 'snapshot.root', 'the captured and background root IDs differ.');
+	}
+	if (source.page !== target.page) {
+		return mismatch(
+			firstTree,
+			'snapshot.page',
+			'the captured and background page references differ.',
+		);
+	}
+	if (snapshot.version !== batch.version || sourceState.acceptedVersion !== snapshot.version) {
+		return mismatch(
+			firstTree,
+			'snapshot.version',
+			'the captured and background batch versions differ.',
+		);
+	}
+	if (
+		sourceState.disposed ||
+		sourceState.disposing ||
+		sourceState.faulted ||
+		sourceState.applying
+	) {
+		return mismatch(firstTree, 'snapshot.owner', 'the captured host owner is not stable.');
+	}
+	if (sourceState.lists.size !== 0 || listUpdates.length !== 0) {
+		return mismatch(firstTree, 'snapshot.nodes', 'native list materializations require repair.');
+	}
+	for (let index = 0; index < operations.length; index++) {
+		const operation = operations[index]!;
+		if (
+			operation.op !== 'create' &&
+			operation.op !== 'insert' &&
+			operation.op !== 'event' &&
+			operation.op !== 'visibility'
+		) {
+			return mismatch(
+				firstTree,
+				`batch.operations[${index}]`,
+				`initial adoption cannot replay a ${operation.op} operation.`,
+			);
+		}
+	}
+	if (snapshot.nodes.length !== finalIds.size || sourceState.records.size !== finalIds.size) {
+		return mismatch(firstTree, 'snapshot.nodes', 'the host counts differ.');
+	}
+	if (!sameIds(snapshot.roots, finalRoots)) {
+		return mismatch(firstTree, 'snapshot.roots', 'the root child order differs.');
+	}
+	const snapshotsById = new Map(snapshot.nodes.map((node) => [node.id, node]));
+	for (const id of [...finalIds].sort((first, second) => first - second)) {
+		const captured = snapshotsById.get(id);
+		const next = getRecord(id);
+		const sourceRecord = sourceState.records.get(id);
+		if (captured === undefined || next === undefined || sourceRecord === undefined) {
+			return mismatch(firstTree, `snapshot.nodes[${id}]`, 'the logical host identity differs.');
+		}
+		if (captured.type !== next.type || sourceRecord.type !== captured.type) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].type`, 'the host type differs.');
+		}
+		if (
+			captured.generation !== next.handle.generation ||
+			sourceRecord.handle.generation !== captured.generation
+		) {
+			return mismatch(
+				firstTree,
+				`snapshot.nodes[${id}].generation`,
+				'the host generation differs.',
+			);
+		}
+		if (captured.parent !== next.parent || sourceRecord.parent !== captured.parent) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].parent`, 'the host parent differs.');
+		}
+		if (
+			!sameIds(captured.children, next.children) ||
+			!sameIds(captured.children, sourceRecord.children)
+		) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].children`, 'the child order differs.');
+		}
+		if (captured.visible !== next.visible || sourceRecord.visible !== captured.visible) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].visible`, 'the visibility state differs.');
+		}
+		if (
+			!sameSnapshotValue(captured.props, next.props) ||
+			!sameSnapshotValue(captured.props, sourceRecord.props)
+		) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].props`, 'the host props differ.');
+		}
+		if (
+			sourceRecord.node === null ||
+			sourceState.papi.getUniqueId(sourceRecord.node) !== captured.nativeId
+		) {
+			return mismatch(
+				firstTree,
+				`snapshot.nodes[${id}].nativeId`,
+				'the physical node identity changed.',
+			);
+		}
+		const physicalParent =
+			captured.parent === null ? source.page : sourceState.records.get(captured.parent)?.node;
+		if (physicalParent == null || !sourceState.papi.isChild(physicalParent, sourceRecord.node)) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].parent`, 'the physical parent changed.');
+		}
+		const nextEvents = [...next.events].sort(([first], [second]) =>
+			first < second ? -1 : first > second ? 1 : 0,
+		);
+		const sourceEvents = [...sourceRecord.events].sort(([first], [second]) =>
+			first < second ? -1 : first > second ? 1 : 0,
+		);
+		if (
+			captured.events.length !== nextEvents.length ||
+			captured.events.length !== sourceEvents.length
+		) {
+			return mismatch(
+				firstTree,
+				`snapshot.nodes[${id}].events`,
+				'the event binding count differs.',
+			);
+		}
+		for (let index = 0; index < captured.events.length; index++) {
+			const event = captured.events[index]!;
+			const nextEntry = nextEvents[index]!;
+			const sourceEntry = sourceEvents[index]!;
+			if (
+				event.host !== id ||
+				event.generation !== captured.generation ||
+				event.type !== nextEntry[0] ||
+				event.type !== sourceEntry[0] ||
+				event.priority !== nextEntry[1].priority ||
+				event.listener !== sourceEntry[1].id ||
+				event.priority !== sourceEntry[1].priority
+			) {
+				return mismatch(
+					firstTree,
+					`snapshot.nodes[${id}].events[${index}]`,
+					'the event binding differs.',
+				);
+			}
+		}
+	}
+	return null;
+}
+
+function transferFirstTree<Node extends LynxElementRef>(
+	target: LynxHostContainer<Node>,
+	firstTree: LynxFirstTree<Node>,
+	source: LynxHostContainer<Node>,
+	activeNodes: Map<number, Node>,
+): void {
+	const targetState = target[LYNX_HOST_STATE];
+	const sourceState = source[LYNX_HOST_STATE];
+	for (const [id, targetRecord] of targetState.records) {
+		const sourceRecord = sourceState.records.get(id);
+		if (sourceRecord?.node === null || sourceRecord?.node === undefined) {
+			throw hostError(`captured first-tree host ${id} lost its physical node.`);
+		}
+		const node = sourceRecord.node;
+		targetRecord.node = node;
+		activeNodes.set(id, node);
+		targetState.ownedNodes.add(node);
+		if (targetRecord.parent === null) targetState.ownedPageRoots.add(node);
+		const nativeEvents = sourceState.nativeEvents.get(node);
+		if (nativeEvents !== undefined) targetState.nativeEvents.set(node, nativeEvents);
+	}
+
+	// From this point the background journal is the only disposal authority.
+	// Carry every native placeholder registration into that journal before the
+	// background tokens below replace them. If selector/event installation faults
+	// partway through adoption, terminal cleanup must still clear registrations on
+	// nodes the replacement loop did not reach.
+	sourceState.ownedNodes.clear();
+	sourceState.ownedPageRoots.clear();
+	sourceState.nativeEvents.clear();
+	sourceState.records.clear();
+	sourceState.rootChildren.length = 0;
+	sourceState.generations.clear();
+	sourceState.firstTree = null;
+	sourceState.cleanupNeedsFlush = false;
+	sourceState.disposing = false;
+	sourceState.disposed = true;
+	const journal = firstTree[LYNX_FIRST_TREE_STATE];
+	journal.owner = null;
+	journal.status = 'transferred';
+}
+
 export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	container: LynxHostContainer<Node>,
 	batch: UniversalHostBatch,
+	options?: PrepareLynxHostBatchOptions<Node>,
 ): LynxPreparedHostBatch {
 	const state = container[LYNX_HOST_STATE];
 	if (state.disposed) throw hostError('cannot prepare a batch for a disposed root.');
 	if (state.disposing) throw hostError('cannot prepare a batch while root cleanup is pending.');
+	if (state.firstTree !== null) {
+		throw hostError('a captured first-tree root cannot accept another batch.');
+	}
 	if (container.renderer !== LYNX_RENDERER_ID || batch.renderer !== LYNX_RENDERER_ID) {
 		throw hostError(
 			`renderer mismatch: expected ${JSON.stringify(LYNX_RENDERER_ID)}, received ${JSON.stringify(batch.renderer)}.`,
@@ -1286,6 +1742,28 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		);
 	}
 	if (!Array.isArray(batch.commands)) throw hostError('batch.commands must be an array.');
+	if (options?.onMismatch !== undefined && typeof options.onMismatch !== 'function') {
+		throw hostError('onMismatch must be a function when provided.');
+	}
+	const firstTree = options?.firstTree;
+	let firstTreeSource: LynxHostContainer<Node> | null = null;
+	if (firstTree !== undefined) {
+		if (
+			state.acceptedVersion !== 0 ||
+			state.records.size !== 0 ||
+			state.generations.size !== 0 ||
+			state.ownedNodes.size !== 0 ||
+			state.ownedPageRoots.size !== 0 ||
+			state.nativeEvents.size !== 0 ||
+			state.lists.size !== 0
+		) {
+			throw hostError('firstTree may only be prepared against an empty background root.');
+		}
+		firstTreeSource = firstTreeOwner(firstTree);
+		if (firstTreeSource === container) {
+			throw hostError('firstTree must be adopted by a different Lynx host container.');
+		}
+	}
 	const logicalTeardown = state.faulted;
 	if (
 		logicalTeardown &&
@@ -1684,6 +2162,23 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		}
 	}
 	Object.freeze(handleDelta);
+	let firstTreeAction: LynxPreparedHostBatch['firstTreeAction'] = 'none';
+	let firstTreeMismatch: LynxFirstTreeMismatchError | null = null;
+	if (firstTree !== undefined && firstTreeSource !== null) {
+		firstTreeMismatch = compareFirstTree(
+			container,
+			batch,
+			firstTree,
+			firstTreeSource,
+			finalIds,
+			childrenForRead(null),
+			getRecord,
+			operations,
+			listUpdates,
+		);
+		firstTreeAction = firstTreeMismatch === null ? 'adopt' : 'repair';
+		if (firstTreeMismatch !== null) options?.onMismatch?.(firstTreeMismatch);
+	}
 	let status: 'prepared' | 'applying' | 'applied' | 'aborted' | 'faulted' = 'prepared';
 	let mutationStarted = false;
 	let fault: unknown;
@@ -1693,6 +2188,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			return mutationStarted;
 		},
 		handleDelta,
+		firstTreeAction,
 		apply() {
 			if (status === 'aborted' || status === 'applied') return;
 			if (status === 'faulted') throw fault;
@@ -1700,15 +2196,35 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			if (state.disposed || state.disposing) {
 				throw hostError('cannot apply a batch while root cleanup is pending.');
 			}
+			if (state.firstTree !== null) {
+				throw hostError('a captured first-tree root cannot apply a prepared batch.');
+			}
 			if (state.acceptedVersion !== baseVersion) {
 				throw hostError(
 					`prepared batch ${batch.version} was superseded by version ${state.acceptedVersion}.`,
 				);
 			}
+			if (
+				firstTree !== undefined &&
+				(firstTreeSource === null || firstTreeOwner(firstTree) !== firstTreeSource)
+			) {
+				throw hostError('firstTree ownership changed after preparation.');
+			}
 			status = 'applying';
 			state.applying = true;
 			try {
 				mutationStarted = true;
+				if (firstTreeAction === 'repair') {
+					const cleanup = disposeLynxFirstTree(firstTree!);
+					if (!cleanup.complete) {
+						const error =
+							cleanup.errors[0] ?? hostError('first-tree repair cleanup did not complete.');
+						state.faulted = true;
+						status = 'faulted';
+						fault = error;
+						throw error;
+					}
+				}
 				const retiredPhysicalIds = new Set<number>();
 				let preApplicationFailed = false;
 				let preApplicationError: unknown;
@@ -1764,7 +2280,25 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 					let applicationError: unknown = preApplicationError;
 					try {
 						if (applicationFailed) throw applicationError;
-						for (const operation of operations) {
+						if (firstTreeAction === 'adopt') {
+							transferFirstTree(container, firstTree!, firstTreeSource!, activeNodes);
+							for (const [id, record] of state.records) {
+								const node = nodeFor(activeNodes, id, 'first-tree adoption');
+								installNodesRefSelector(state.papi, node, record.handle);
+								if (record.visible) {
+									installNativeEvents(
+										state,
+										node,
+										container.root,
+										id,
+										record.handle.generation,
+										record.events,
+									);
+								}
+							}
+						}
+						const applicationOperations = firstTreeAction === 'adopt' ? [] : operations;
+						for (const operation of applicationOperations) {
 							if (retiredPhysicalIds.has(operation.id)) continue;
 							if (operation.op === 'create') {
 								const membership = directListItem((id) => state.records.get(id), operation.id);
@@ -2100,6 +2634,66 @@ function normalizeCleanupError(error: unknown): Error {
 	return error instanceof Error ? error : new Error(String(error));
 }
 
+function indexPhysicalNodes<Node extends LynxElementRef>(
+	papi: LynxElementPAPI<Node>,
+	nodes: ReadonlySet<Node>,
+): ReadonlyMap<number, Node> {
+	const byNativeId = new Map<number, Node>();
+	for (const node of nodes) {
+		const nativeId = papi.getUniqueId(node);
+		if (!Number.isSafeInteger(nativeId)) {
+			throw hostError('cleanup native ID must be a safe integer.');
+		}
+		const previous = byNativeId.get(nativeId);
+		if (previous !== undefined && previous !== node && !papi.isEqual(previous, node)) {
+			throw hostError(`cleanup native ID ${nativeId} is not unique.`);
+		}
+		if (previous === undefined) byNativeId.set(nativeId, node);
+	}
+	return byNativeId;
+}
+
+function containsPhysicalNode<Node extends LynxElementRef>(
+	papi: LynxElementPAPI<Node>,
+	byNativeId: ReadonlyMap<number, Node>,
+	candidate: Node,
+): boolean {
+	const nativeId = papi.getUniqueId(candidate);
+	if (!Number.isSafeInteger(nativeId)) {
+		throw hostError('cleanup parent native ID must be a safe integer.');
+	}
+	const owned = byNativeId.get(nativeId);
+	if (owned === undefined) return false;
+	// Native parent lookup may return a different opaque wrapper for the same
+	// element. The unique native-ID index keeps this equality fallback O(1)
+	// instead of rescanning the complete owned tree.
+	return owned === candidate || papi.isEqual(owned, candidate);
+}
+
+function completedFirstTreeCleanup(): LynxHostCleanupResult {
+	return Object.freeze({
+		complete: true,
+		removedRoots: 0,
+		remainingRoots: 0,
+		flushed: false,
+		errors: Object.freeze([]),
+	});
+}
+
+/** Dispose a captured tree unless its physical nodes were already transferred. */
+export function disposeLynxFirstTree<Node extends LynxElementRef>(
+	firstTree: LynxFirstTree<Node>,
+): LynxHostCleanupResult {
+	if (firstTree === null || typeof firstTree !== 'object') {
+		throw hostError('firstTree must be a captured Lynx first tree.');
+	}
+	const journal = firstTree[LYNX_FIRST_TREE_STATE];
+	if (journal === undefined) throw hostError('firstTree has no Lynx ownership journal.');
+	if (journal.status !== 'available') return completedFirstTreeCleanup();
+	const owner = firstTreeOwner(firstTree);
+	return disposeLynxHostContainer(owner);
+}
+
 /**
  * Retry-safe terminal cleanup for success and post-accept fault paths.
  * Incomplete attempts retain their ownership journal and logical records so a
@@ -2119,8 +2713,18 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 		});
 	}
 	state.disposing = true;
-	const roots = [...state.ownedPageRoots];
 	const errors: Error[] = [];
+	// Snapshot every physical reference before list teardown releases its ordinary
+	// journals. Failed external-edge removal re-adds that node to ownedNodes so a
+	// later dispose attempt can retry it.
+	const cleanupNodes = new Set(state.ownedNodes);
+	for (const node of state.ownedPageRoots) cleanupNodes.add(node);
+	let cleanupNodeIndex: ReadonlyMap<number, Node> | null = null;
+	try {
+		cleanupNodeIndex = indexPhysicalNodes(state.papi, cleanupNodes);
+	} catch (error) {
+		errors.push(normalizeCleanupError(error));
+	}
 	for (const listId of [...state.lists.keys()]) {
 		try {
 			disposeNativeListState(state, listId);
@@ -2140,35 +2744,76 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 		}
 	}
 	let removedRoots = 0;
-	for (const node of roots) {
-		let attached: boolean;
-		try {
-			attached = state.papi.isChild(container.page, node);
-		} catch (error) {
-			errors.push(normalizeCleanupError(error));
-			continue;
-		}
-		if (attached) {
-			try {
-				state.papi.remove(container.page, node);
-			} catch (error) {
-				try {
-					// Native removal may detach and then throw. Forget ownership only
-					// when public parent inspection proves the mutation completed.
-					if (state.papi.isChild(container.page, node)) {
-						errors.push(normalizeCleanupError(error));
-						continue;
-					}
-				} catch (inspectionError) {
-					errors.push(normalizeCleanupError(error));
-					errors.push(normalizeCleanupError(inspectionError));
-					continue;
-				}
-			}
-		}
-		state.ownedPageRoots.delete(node);
+	let unresolvedExternalRoots = 0;
+	const releaseRootOwnership = (node: Node): void => {
+		if (!state.ownedPageRoots.delete(node)) return;
 		state.cleanupNeedsFlush = true;
 		removedRoots += 1;
+	};
+	const retainUnresolvedOwnership = (node: Node): void => {
+		state.ownedNodes.add(node);
+		// Logical page roots already remain counted in ownedPageRoots. A child
+		// reparented beneath a non-owned native node is itself another physical
+		// cleanup root until that external edge can be removed.
+		if (!state.ownedPageRoots.has(node)) unresolvedExternalRoots += 1;
+	};
+	for (const node of cleanupNodes) {
+		let parent: Node | null;
+		try {
+			parent = state.papi.getParent(node);
+		} catch (error) {
+			errors.push(normalizeCleanupError(error));
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		if (parent === null) {
+			releaseRootOwnership(node);
+			continue;
+		}
+		if (cleanupNodeIndex === null) {
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		let parentIsOwned: boolean;
+		try {
+			parentIsOwned = containsPhysicalNode(state.papi, cleanupNodeIndex, parent);
+		} catch (error) {
+			errors.push(normalizeCleanupError(error));
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		if (parentIsOwned) {
+			// Nested ownership is released by removing the one external edge above
+			// this subtree. Do not turn normal cleanup into one native removal per host.
+			releaseRootOwnership(node);
+			continue;
+		}
+
+		let externalEdgeRemoved = false;
+		try {
+			state.papi.remove(parent, node);
+			externalEdgeRemoved = true;
+		} catch (error) {
+			try {
+				// Native removal may detach and then throw. It is also safe if the node
+				// ended up beneath another owned node: the remaining owned boundary edge
+				// will release that complete subtree.
+				const currentParent = state.papi.getParent(node);
+				externalEdgeRemoved =
+					currentParent === null ||
+					containsPhysicalNode(state.papi, cleanupNodeIndex, currentParent);
+				if (!externalEdgeRemoved) errors.push(normalizeCleanupError(error));
+			} catch (inspectionError) {
+				errors.push(normalizeCleanupError(error));
+				errors.push(normalizeCleanupError(inspectionError));
+			}
+		}
+		if (!externalEdgeRemoved) {
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		state.cleanupNeedsFlush = true;
+		releaseRootOwnership(node);
 	}
 	let flushed = false;
 	if (state.cleanupNeedsFlush) {
@@ -2180,25 +2825,33 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 			errors.push(normalizeCleanupError(error));
 		}
 	}
+	const remainingRoots = state.ownedPageRoots.size + unresolvedExternalRoots;
 	const complete =
-		state.ownedPageRoots.size === 0 &&
+		remainingRoots === 0 &&
 		state.nativeEvents.size === 0 &&
 		state.lists.size === 0 &&
 		!state.cleanupNeedsFlush;
 	if (complete) {
+		const firstTree = state.firstTree;
 		state.ownedNodes.clear();
 		state.nativeEvents.clear();
 		state.lists.clear();
 		state.records.clear();
 		state.rootChildren.length = 0;
 		state.generations.clear();
+		state.firstTree = null;
 		state.disposing = false;
 		state.disposed = true;
+		if (firstTree !== null) {
+			const journal = firstTree[LYNX_FIRST_TREE_STATE];
+			journal.owner = null;
+			journal.status = 'disposed';
+		}
 	}
 	return Object.freeze({
 		complete,
 		removedRoots,
-		remainingRoots: state.ownedPageRoots.size,
+		remainingRoots,
 		flushed,
 		errors: Object.freeze(errors),
 	});

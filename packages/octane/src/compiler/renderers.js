@@ -17,6 +17,7 @@ const CONFIG_KEYS = new Set(['boundaries', 'default', 'registry', 'rules', 'sign
 const RULE_KEYS = new Set(['exclude', 'include', 'renderer']);
 const REGISTRY_ENTRY_KEYS = new Set([
 	'capabilities',
+	'firstScreenEvents',
 	'intrinsics',
 	'module',
 	'server',
@@ -187,6 +188,7 @@ function normalizeRegistryEntry(id, value, path) {
 	let intrinsics;
 	let text;
 	let capabilities;
+	let firstScreenEvents;
 	let validation;
 	if (typeof value === 'string') {
 		moduleId = validateModuleId(value, path);
@@ -229,6 +231,13 @@ function normalizeRegistryEntry(id, value, path) {
 			throw configError(`${path}.text must be "reject", "ignore", or "host".`);
 		}
 		capabilities = normalizeCapabilities(value.capabilities, `${path}.capabilities`);
+		if (value.firstScreenEvents !== undefined) {
+			firstScreenEvents = normalizeValidationList(
+				value.firstScreenEvents,
+				`${path}.firstScreenEvents`,
+				validateHostPropPattern,
+			);
+		}
 		validation = normalizeValidation(value.validation, `${path}.validation`);
 	}
 
@@ -240,6 +249,7 @@ function normalizeRegistryEntry(id, value, path) {
 			intrinsics !== undefined ||
 			text !== 'host' ||
 			capabilities.length !== 0 ||
+			firstScreenEvents !== undefined ||
 			validation !== undefined
 		) {
 			throw configError(
@@ -257,6 +267,7 @@ function normalizeRegistryEntry(id, value, path) {
 		...(intrinsics === undefined ? {} : { intrinsics }),
 		text,
 		capabilities,
+		...(firstScreenEvents === undefined ? {} : { firstScreenEvents }),
 		...(validation === undefined ? {} : { validation }),
 	});
 }
@@ -597,7 +608,10 @@ export function normalizeRendererConfig(input = {}) {
 	const signature = stableSignature({
 		default: defaultRenderer,
 		registry: entries.map(
-			([id, { module, target, server, intrinsics, text, capabilities, validation }]) => [
+			([
+				id,
+				{ module, target, server, intrinsics, text, capabilities, firstScreenEvents, validation },
+			]) => [
 				id,
 				module,
 				target,
@@ -605,6 +619,7 @@ export function normalizeRendererConfig(input = {}) {
 				intrinsics ?? null,
 				text,
 				capabilities,
+				firstScreenEvents ?? null,
 				validation ?? null,
 			],
 		),

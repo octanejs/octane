@@ -1,3 +1,3 @@
 import { installLynxMainThread } from '@octanejs/lynx/main-thread';
 
-installLynxMainThread();
+installLynxMainThread({ firstScreen: true, firstScreenSync: 'manual' });

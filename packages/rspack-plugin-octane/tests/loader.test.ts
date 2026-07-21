@@ -30,7 +30,7 @@ function runLoader({
 	resource = '/project/src/App.tsrx?cache=1',
 	source = 'export function App() @{ <div /> }',
 	inputSourceMap,
-	module = { buildInfo: {} as Record<string, unknown> },
+	module = { buildInfo: {} as Record<string, unknown>, layer: undefined as string | undefined },
 }: {
 	options?: Record<string, unknown>;
 	target?: unknown;
@@ -40,7 +40,7 @@ function runLoader({
 	resource?: string;
 	source?: string | Buffer;
 	inputSourceMap?: unknown;
-	module?: { buildInfo: Record<string, unknown> };
+	module?: { buildInfo: Record<string, unknown>; layer?: string };
 } = {}) {
 	const dependencies: string[] = [];
 	const missingDependencies: string[] = [];
@@ -148,6 +148,60 @@ describe('octane Rspack loader', () => {
 			serverRpc: true,
 			universalRuntime: { runtime: 'lynx', thread: 'background' },
 		});
+	});
+
+	it('selects compiler configuration from the current Rspack layer', () => {
+		mocks.transform.mockReturnValue(null);
+		const options = {
+			renderers: {
+				registry: { native: '/src/background-renderer.js' },
+				default: 'native',
+			},
+			universalRuntime: { runtime: 'native', thread: 'background' },
+			layerSpecializations: {
+				'octane:main-thread': {
+					runtime: '@fixture/main-runtime',
+					renderers: {
+						registry: { native: '/src/main-renderer.js' },
+						default: 'native',
+					},
+					universalRuntime: { runtime: 'native', thread: 'main-thread' },
+				},
+			},
+		};
+
+		runLoader({
+			options,
+			module: { buildInfo: {}, layer: 'octane:main-thread' },
+		});
+		expect(mocks.createOctaneCompiler).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				renderers: expect.objectContaining({
+					registry: {
+						dom: expect.any(Object),
+						native: expect.objectContaining({ module: '/src/main-renderer.js' }),
+					},
+					default: 'native',
+				}),
+				universalRuntime: { runtime: 'native', thread: 'main-thread' },
+			}),
+		);
+
+		runLoader({
+			options,
+			module: { buildInfo: {}, layer: 'other' },
+		});
+		expect(mocks.createOctaneCompiler).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				renderers: expect.objectContaining({
+					registry: expect.objectContaining({
+						native: expect.objectContaining({ module: '/src/background-renderer.js' }),
+					}),
+					default: 'native',
+				}),
+				universalRuntime: { runtime: 'native', thread: 'background' },
+			}),
+		);
 	});
 
 	it('composes a prior loader map with the Octane compiler map', () => {

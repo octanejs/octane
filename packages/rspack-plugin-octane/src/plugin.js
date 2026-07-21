@@ -78,6 +78,54 @@ function addProjectRendererAliases(resolveOptions, renderers, root) {
 	resolveOptions.alias = { ...aliases, ...additions };
 }
 
+function layerSpecializationCacheIdentity(layerSpecializations) {
+	if (layerSpecializations === undefined) return undefined;
+	return Object.fromEntries(
+		Object.entries(layerSpecializations).map(([layer, specialization]) => [
+			layer,
+			{
+				...(specialization.runtime === undefined ? null : { runtime: specialization.runtime }),
+				...(specialization.renderers === undefined
+					? null
+					: { renderers: specialization.renderers.signature }),
+				...(specialization.universalRuntime === undefined
+					? null
+					: { universalRuntime: specialization.universalRuntime }),
+			},
+		]),
+	);
+}
+
+function createDiscoveryCompiler(options, root, profile, specialization) {
+	const renderers = specialization?.renderers ?? options.renderers;
+	const universalRuntime = specialization?.universalRuntime ?? options.universalRuntime;
+	return createOctaneCompiler({
+		root,
+		profile,
+		...(options.exclude === undefined ? null : { exclude: options.exclude }),
+		...(renderers === undefined ? null : { renderers }),
+		...(universalRuntime === undefined ? null : { universalRuntime }),
+	});
+}
+
+function discoverAll(compilers) {
+	if (compilers.length === 1) return compilers[0].discoverSourceDependencies();
+	const packages = new Set();
+	const dependencies = new Set();
+	const missingDependencies = new Set();
+	for (const compiler of compilers) {
+		const discovery = compiler.discoverSourceDependencies();
+		for (const value of discovery.packages ?? []) packages.add(value);
+		for (const value of discovery.dependencies ?? []) dependencies.add(value);
+		for (const value of discovery.missingDependencies ?? []) missingDependencies.add(value);
+	}
+	return {
+		packages: [...packages].sort(),
+		dependencies: [...dependencies].sort(),
+		missingDependencies: [...missingDependencies].sort(),
+	};
+}
+
 function addDependencies(collection, values) {
 	if (!collection?.add) return;
 	for (const value of values ?? []) collection.add(value);
@@ -239,21 +287,18 @@ export class OctaneRspackPlugin {
 			renderers: this.options.renderers?.signature,
 			runtime: this.options.runtime,
 			universalRuntime: this.options.universalRuntime,
+			layerSpecializations: layerSpecializationCacheIdentity(this.options.layerSpecializations),
 			// Ownership flips which modules compile vs pass through — cached
 			// transform results must not survive a requireDirective toggle.
 			requireDirective: this.options.requireDirective === true,
 			transpile: this.options.transpile !== false,
 		});
 		installProfilingDefine(compiler, profile);
-		const neutralCompiler = createOctaneCompiler({
-			root,
-			profile,
-			...(this.options.exclude === undefined ? null : { exclude: this.options.exclude }),
-			...(this.options.renderers === undefined ? null : { renderers: this.options.renderers }),
-			...(this.options.universalRuntime === undefined
-				? null
-				: { universalRuntime: this.options.universalRuntime }),
-		});
+		const neutralCompiler = createDiscoveryCompiler(this.options, root, profile);
+		const discoveryCompilers = [neutralCompiler];
+		for (const specialization of Object.values(this.options.layerSpecializations ?? {})) {
+			discoveryCompilers.push(createDiscoveryCompiler(this.options, root, profile, specialization));
+		}
 		const runtimeRequest =
 			this.options.runtime ?? neutralCompiler.resolveRuntimeRequest('octane', environment);
 
@@ -261,6 +306,9 @@ export class OctaneRspackPlugin {
 		addUniqueExtensions(compiler.options.resolve);
 		addRuntimeAlias(compiler.options.resolve, runtimeRequest, root);
 		addProjectRendererAliases(compiler.options.resolve, this.options.renderers, root);
+		for (const specialization of Object.values(this.options.layerSpecializations ?? {})) {
+			addProjectRendererAliases(compiler.options.resolve, specialization.renderers, root);
+		}
 
 		compiler.options.module ??= {};
 		compiler.options.module.rules ??= [];
@@ -275,6 +323,9 @@ export class OctaneRspackPlugin {
 			...(this.options.universalRuntime === undefined
 				? null
 				: { universalRuntime: this.options.universalRuntime }),
+			...(this.options.layerSpecializations === undefined
+				? null
+				: { layerSpecializations: this.options.layerSpecializations }),
 			...(this.options.requireDirective === undefined
 				? null
 				: { requireDirective: this.options.requireDirective }),
@@ -292,21 +343,32 @@ export class OctaneRspackPlugin {
 				use: [{ loader: 'builtin:swc-loader', options: { detectSyntax: 'auto' } }],
 			});
 		}
+		for (const [layer, specialization] of Object.entries(this.options.layerSpecializations ?? {})) {
+			if (specialization.runtime === undefined) continue;
+			compiler.options.module.rules.push({
+				issuerLayer: layer,
+				resolve: {
+					alias: {
+						octane$: resolveRuntimeModule(specialization.runtime, root),
+					},
+				},
+			});
+		}
 
 		let discovery;
 		const discover = () => {
 			if (discovery === undefined) {
-				discovery = neutralCompiler.discoverSourceDependencies();
+				discovery = discoverAll(discoveryCompilers);
 				this.sourceDependencies = Object.freeze([...(discovery.packages ?? [])]);
 			}
 			return discovery;
 		};
 		compiler.hooks.invalid?.tap(PLUGIN_NAME, (filename) => {
-			neutralCompiler.invalidate(filename);
+			for (const current of discoveryCompilers) current.invalidate(filename);
 			discovery = undefined;
 		});
 		compiler.hooks.watchRun?.tap(PLUGIN_NAME, () => {
-			neutralCompiler.invalidate();
+			for (const current of discoveryCompilers) current.invalidate();
 			discovery = undefined;
 		});
 		compiler.hooks.thisCompilation?.tap(PLUGIN_NAME, (compilation) => {

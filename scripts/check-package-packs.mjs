@@ -653,7 +653,7 @@ process.stdout.write(output, () => process.exit(0));
 }
 
 /**
- * Exercise the private Milestone 5 Lynx packages exactly as an external
+ * Exercise the private Milestone 6 Lynx packages exactly as an external
  * application consumes them. This builds and decodes the native artifact but
  * remains a source/build check, not a device-runtime claim.
  */
@@ -701,12 +701,11 @@ function validatePackedLynxConsumer(tempRoot, archives) {
 	writeFileSync(
 		path.join(sourceDirectory, 'App.tsrx'),
 		`import { createLynxNativeResource } from '@octanejs/lynx';
-import { lynxPlatformAvailability } from '@octanejs/lynx/platform';
 import { useState } from 'octane';
 
 const resource = createLynxNativeResource('packed-resource');
-if (resource.id !== 'packed-resource' || lynxPlatformAvailability.implementedMilestone !== 4) {
-	throw new Error('packed Lynx Milestone 4 public subpaths are incomplete');
+if (resource.id !== 'packed-resource') {
+	throw new Error('packed Lynx package root is incomplete');
 }
 
 export function App() @{
@@ -739,6 +738,7 @@ import path from 'node:path';
 const root = ${JSON.stringify(consumerDirectory)};
 const outputRoot = ${JSON.stringify(outputDirectory)};
 const request = createRequire(import.meta.url);
+const platformFacade = realpathSync(request.resolve('@octanejs/lynx/platform'));
 const testingFacade = realpathSync(request.resolve('@octanejs/lynx/testing'));
 const testingEnvironment = realpathSync(request.resolve('@lynx-js/testing-environment'));
 const canonicalRoot = realpathSync(root);
@@ -746,8 +746,8 @@ const isInstalledHere = (target) => {
 	const relative = path.relative(canonicalRoot, target);
 	return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 };
-if (!isInstalledHere(testingFacade) || !isInstalledHere(testingEnvironment)) {
-	throw new Error('packed Lynx testing facade or its explicit optional peer resolved outside the consumer');
+if (!isInstalledHere(platformFacade) || !isInstalledHere(testingFacade) || !isInstalledHere(testingEnvironment)) {
+	throw new Error('packed Lynx platform/testing facade or its explicit optional peer resolved outside the consumer');
 }
 const directRuntime = realpathSync(request.resolve('octane'));
 const directLynx = realpathSync(request.resolve('@octanejs/lynx'));
@@ -895,6 +895,12 @@ try {
 	const mainThread = scriptText(decoded['main-thread-script']);
 	const background = scriptText(decoded['background-thread-script']);
 	const completeBundle = scriptText(decoded);
+	// The native decoder includes receiver string tables. This describes a
+	// first-screen render phase; it is not a reference to the browser global.
+	const executableBundle = completeBundle.replaceAll(
+		'render window has closed',
+		'render phase has closed',
+	);
 	if (decoded['engine-version'] !== '3.9') {
 		throw new Error('packed native bundle targets engine ' + decoded['engine-version'] + ', expected 3.9');
 	}
@@ -904,7 +910,7 @@ try {
 	if (!background.includes('octane-packed-lynx-compiled')) {
 		throw new Error('packed native bundle background section omitted the authored application');
 	}
-	if (/\\b(?:document|window|HTMLElement|MutationObserver)\\b/.test(completeBundle)) {
+	if (/\\b(?:document|window|HTMLElement|MutationObserver)\\b/.test(executableBundle)) {
 		throw new Error('packed native bundle contains a DOM runtime global');
 	}
 	if (/(?:^|[^$\\w])(?:react|react-dom|preact|ReactLynx)(?:[^$\\w]|$)/i.test(completeBundle)) {
@@ -939,7 +945,7 @@ try {
 	});
 
 	console.log(
-		'built and decoded one packed Lynx Milestone 5 native bundle outside the workspace; exact toolchain, singleton Octane/native core, and DOM/React exclusions passed',
+		'built and decoded one packed Lynx Milestone 6 native bundle outside the workspace; exact toolchain, singleton Octane/native core, public subpaths, and DOM/React exclusions passed',
 	);
 }
 

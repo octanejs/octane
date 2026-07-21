@@ -32,6 +32,8 @@ export type OctaneRendererRegistryEntry =
 			intrinsics?: string;
 			text?: 'reject' | 'ignore' | 'host';
 			capabilities?: readonly string[];
+			/** Host event prop names/prefixes replaced by first-screen listener sentinels. */
+			firstScreenEvents?: readonly string[];
 			validation?: OctaneRendererValidationOptions;
 	  };
 

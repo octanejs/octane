@@ -67,6 +67,34 @@ new OctaneRspackPlugin({
 Options remain serializable data—there are no renderer callbacks—so the same
 configuration is safe to reuse across compiler environments and caches.
 
+Rspack layers can compile the same authored module against distinct universal
+renderer graphs. Configure the background graph at the top level, then key
+`layerSpecializations` by the exact value of `module.layer`:
+
+```js
+new OctaneRspackPlugin({
+	runtime: '@fixture/native-background-runtime',
+	renderers: backgroundRenderers,
+	universalRuntime: { runtime: 'native', thread: 'background' },
+	layerSpecializations: {
+		'native:main': {
+			runtime: '@fixture/native-main-runtime',
+			renderers: mainThreadRenderers,
+			universalRuntime: { runtime: 'native', thread: 'main-thread' },
+		},
+	},
+});
+```
+
+The compiler selects `renderers` and `universalRuntime` from each transformed
+module's layer. The plugin also installs `runtime` as an exact `octane` alias
+for requests whose issuer belongs to that layer. Unconfigured and unknown
+layers keep the top-level options. All renderer configurations participate in
+source-dependency discovery and watching, and their normalized signatures and
+runtime identities salt Rspack's persistent cache. The standalone loader
+supports layer-specific compiler options but cannot install runtime aliases,
+so `runtime` specializations require `OctaneRspackPlugin`.
+
 Rspack's dev server enables the loader's hot context. If you run a custom dev
 server, add Rspack's `HotModuleReplacementPlugin` as usual.
 

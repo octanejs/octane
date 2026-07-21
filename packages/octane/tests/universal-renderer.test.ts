@@ -93,6 +93,75 @@ function objectRoot(compilerLeafProps = false) {
 	return { container, root };
 }
 
+function walkCompiledAst(root: unknown, visit: (node: any) => void): void {
+	const seen = new WeakSet<object>();
+	const walk = (node: any): void => {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		visit(node);
+		for (const [key, child] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent') continue;
+			walk(child);
+		}
+	};
+	walk(root);
+}
+
+function callsByImportedName(code: string, request: string): Map<string, any[]> {
+	const ast = parseModule(code, '/dist/compiled.js');
+	const imports = new Map<string, string>();
+	for (const statement of ast.body as any[]) {
+		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== request) continue;
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.type !== 'ImportSpecifier') continue;
+			imports.set(specifier.local.name, specifier.imported.name ?? specifier.imported.value);
+		}
+	}
+	const calls = new Map<string, any[]>();
+	walkCompiledAst(ast, (node) => {
+		if (node.type !== 'CallExpression' || node.callee?.type !== 'Identifier') return;
+		const imported = imports.get(node.callee.name);
+		if (imported === undefined) return;
+		const entries = calls.get(imported);
+		if (entries === undefined) calls.set(imported, [node]);
+		else entries.push(node);
+	});
+	return calls;
+}
+
+function importedLocalName(
+	code: string,
+	request: string,
+	importedName: string,
+): string | undefined {
+	const ast = parseModule(code, '/dist/compiled.js');
+	for (const statement of ast.body as any[]) {
+		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== request) continue;
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.type !== 'ImportSpecifier') continue;
+			if ((specifier.imported.name ?? specifier.imported.value) === importedName) {
+				return specifier.local.name;
+			}
+		}
+	}
+	return undefined;
+}
+
+function comparableCompiledAst(node: any): unknown {
+	if (Array.isArray(node)) return node.map(comparableCompiledAst);
+	if (node === null || typeof node !== 'object') return node;
+	return Object.fromEntries(
+		Object.entries(node)
+			.filter(([key]) => !['start', 'end', 'loc', 'metadata', 'parent'].includes(key))
+			.map(([key, value]) => [key, comparableCompiledAst(value)]),
+	);
+}
+
 describe('universal compiler target', () => {
 	it('leaves the DOM compiler byte-identical when renderer selection stays DOM', () => {
 		const source =
@@ -117,7 +186,7 @@ describe('universal compiler target', () => {
 		expect(optionalValidation).toEqual(baseline);
 	});
 
-	it('carries frozen runtime/thread metadata without changing emitted code', () => {
+	it('carries frozen runtime/thread metadata without changing emitted code by default', () => {
 		const source = 'export function Scene() @{ <view id="root" /> }';
 		const baseline = compile(source, '/src/Scene.object.tsrx', { hmr: false, renderer });
 		const background = compile(source, '/src/Scene.object.tsrx', {
@@ -156,6 +225,223 @@ describe('universal compiler target', () => {
 				universalRuntime: { runtime: 'object', thread: 'background' },
 			}),
 		).toThrow(/universalRuntime is available only in client mode/);
+	});
+
+	it('erases background callbacks from opted-in main-thread first-screen output', () => {
+		const source = `
+import {
+  useEffect as usePassive,
+  useEffectEvent,
+  useImperativeHandle,
+  useInsertionEffect,
+  useLayoutEffect,
+  useState,
+} from 'octane';
+
+function preserveLocalUseEffect(useEffect) {
+  useEffect(() => console.log('non-runtime-use-effect-callback'));
+}
+
+export function Scene({ id, ref }) @{
+  const [count] = useState(0);
+  usePassive(() => console.log('passive-main-thread-capture', id), [id]);
+  useLayoutEffect(() => console.log('layout-main-thread-capture', id));
+  useInsertionEffect(() => console.log('insertion-main-thread-capture', id), null);
+  const update = useEffectEvent(() => console.log('effect-event-main-thread-capture', id));
+  useImperativeHandle(ref, () => ({ id }), [id]);
+
+  <>
+    <view id={id} bindtap={() => console.log('event-main-thread-capture', count)} ref={ref} onUpdate={update} catchtap={null} />
+    <view key="ordered" bindlongpress={() => console.log('ordered-main-thread-capture', count)} ref={ref} />
+  </>
+}`;
+		const firstScreenRenderer = {
+			...renderer,
+			capabilities: ['main-thread-render-only'],
+			firstScreenEvents: ['bind*', 'catch*', 'onUpdate'],
+		} as const;
+		const baseline = compile(source, '/src/FirstScreen.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+		});
+		const background = compile(source, '/src/FirstScreen.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+			universalRuntime: { runtime: 'object', thread: 'background' },
+		});
+		const mainThread = compile(source, '/src/FirstScreen.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+
+		// The capability is inert outside the main-thread specialization.
+		expect(background.code).toBe(baseline.code);
+		expect(() => parseModule(mainThread.code, '/dist/FirstScreen.js')).not.toThrow();
+		expect(mainThread.code).toContain('non-runtime-use-effect-callback');
+		for (const marker of [
+			'passive-main-thread-capture',
+			'layout-main-thread-capture',
+			'insertion-main-thread-capture',
+			'effect-event-main-thread-capture',
+			'event-main-thread-capture',
+			'ordered-main-thread-capture',
+		]) {
+			expect(baseline.code).toContain(marker);
+			expect(mainThread.code).not.toContain(marker);
+		}
+
+		const baselineCalls = callsByImportedName(baseline.code, 'octane/universal');
+		const mainCalls = callsByImportedName(mainThread.code, 'octane/universal');
+		const baselinePlan = baselineCalls.get('universalPlan')?.[0];
+		const mainPlan = mainCalls.get('universalPlan')?.[0];
+		expect(comparableCompiledAst(mainPlan?.arguments[1])).toEqual(
+			comparableCompiledAst(baselinePlan?.arguments[1]),
+		);
+		expect(mainCalls.get('hookSlots')?.[0]?.arguments[0]?.value).toBe(
+			baselineCalls.get('hookSlots')?.[0]?.arguments[0]?.value,
+		);
+
+		for (const hook of [
+			'useEffect',
+			'useEffectEvent',
+			'useImperativeHandle',
+			'useInsertionEffect',
+			'useLayoutEffect',
+		]) {
+			const call = mainCalls.get(hook)?.[0];
+			expect(call, `expected ${hook} to retain its compiler-owned slot`).toBeDefined();
+			expect(call.arguments.at(-1)?.type).toBe('Identifier');
+			expect(call.arguments.slice(0, -1)).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ type: 'Identifier', name: 'undefined' }),
+				]),
+			);
+		}
+
+		const mainValues = mainCalls.get('universalValue') ?? [];
+		const baselineValues = baselineCalls.get('universalValue') ?? [];
+		const firstScreenEvent = importedLocalName(
+			mainThread.code,
+			'octane/universal',
+			'firstScreenEvent',
+		);
+		expect(firstScreenEvent).toBeDefined();
+		expect(
+			importedLocalName(baseline.code, 'octane/universal', 'firstScreenEvent'),
+		).toBeUndefined();
+		expect(mainValues).toHaveLength(baselineValues.length);
+		expect(mainValues[0].arguments[1].elements.map((element: any) => element.type)).toEqual([
+			'Identifier',
+			'Identifier',
+			'Identifier',
+			'ConditionalExpression',
+			'Literal',
+			'CallExpression',
+		]);
+		expect(mainValues[0].arguments[1].elements[1].name).toBe(firstScreenEvent);
+		expect(mainValues[0].arguments[1].elements[2].name).toBe('undefined');
+		expect(mainValues[0].arguments[1].elements[3]).toMatchObject({
+			type: 'ConditionalExpression',
+			consequent: { type: 'Identifier', name: 'undefined' },
+			alternate: { type: 'Identifier', name: firstScreenEvent },
+		});
+		expect(mainValues[0].arguments[1].elements[4].value).toBeNull();
+		const orderedEntries = mainCalls.get('universalProps')?.[0]?.arguments[0]?.elements;
+		expect(orderedEntries.at(-2).elements[2]).toMatchObject({
+			type: 'Identifier',
+			name: firstScreenEvent,
+		});
+		expect(orderedEntries.at(-1).elements[2]).toMatchObject({
+			type: 'Identifier',
+			name: 'undefined',
+		});
+	});
+
+	it('preserves nullish optional event reads while erasing inline callback bodies', () => {
+		const source = `
+import { runBackgroundOnly } from './background-only.js';
+
+export function Scene({ onTap, handlers }) @{
+  <view
+    bindtap={onTap}
+    catchtap={handlers.catchtap}
+    bindlongpress={() => runBackgroundOnly('optional-event-inline-capture')}
+  />
+}`;
+		const firstScreenRenderer = {
+			...renderer,
+			capabilities: ['main-thread-render-only'],
+			firstScreenEvents: ['bind*', 'catch*'],
+		} as const;
+		const mainThread = compile(source, '/src/OptionalEvents.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+
+		expect(() => parseModule(mainThread.code, '/dist/OptionalEvents.js')).not.toThrow();
+		expect(mainThread.code).not.toContain('optional-event-inline-capture');
+		const calls = callsByImportedName(mainThread.code, 'octane/universal');
+		const values = calls.get('universalValue')?.[0]?.arguments[1]?.elements;
+		const firstScreenEvent = importedLocalName(
+			mainThread.code,
+			'octane/universal',
+			'firstScreenEvent',
+		);
+		expect(firstScreenEvent).toBeDefined();
+		expect(values).toHaveLength(3);
+		for (const optional of values.slice(0, 2)) {
+			expect(optional).toMatchObject({
+				type: 'ConditionalExpression',
+				test: {
+					type: 'BinaryExpression',
+					operator: '==',
+					right: { type: 'Literal', value: null },
+				},
+				consequent: { type: 'Identifier', name: 'undefined' },
+				alternate: { type: 'Identifier', name: firstScreenEvent },
+			});
+		}
+		expect(values[0].test.left).toMatchObject({ type: 'Identifier', name: 'onTap' });
+		expect(values[1].test.left).toMatchObject({
+			type: 'MemberExpression',
+			property: { type: 'Identifier', name: 'catchtap' },
+		});
+		expect(values[2]).toMatchObject({ type: 'Identifier', name: firstScreenEvent });
+	});
+
+	it('rejects host spreads only in the main-thread render-only specialization', () => {
+		const source = `
+export function Scene({ hostProps }) @{
+  <view {...hostProps} />
+}`;
+		const firstScreenRenderer = {
+			...renderer,
+			capabilities: ['main-thread-render-only'],
+			firstScreenEvents: ['bind*', 'catch*'],
+		} as const;
+
+		expect(() =>
+			compile(source, '/src/SpreadEvents.object.tsrx', {
+				hmr: false,
+				renderer: firstScreenRenderer,
+			}),
+		).not.toThrow();
+		expect(() =>
+			compile(source, '/src/SpreadEvents.object.tsrx', {
+				hmr: false,
+				renderer: firstScreenRenderer,
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			}),
+		).not.toThrow();
+		expect(() =>
+			compile(source, '/src/SpreadEvents.object.tsrx', {
+				hmr: false,
+				renderer: firstScreenRenderer,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}),
+		).toThrow(/main-thread render-only host spreads.*statically named.*expand the spread/);
 	});
 
 	it('accepts allowed hosts and props while respecting lexical bindings and property keys', () => {

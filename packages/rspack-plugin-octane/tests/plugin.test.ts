@@ -188,6 +188,121 @@ describe('OctaneRspackPlugin', () => {
 		);
 	});
 
+	it('specializes compiler and runtime resolution by Rspack layer', () => {
+		const compiler = createCompiler('web');
+		const plugin = new OctaneRspackPlugin({
+			runtime: '@fixture/background-runtime',
+			renderers: {
+				registry: { native: '/src/background-renderer.js' },
+				default: 'native',
+			},
+			universalRuntime: { runtime: 'native', thread: 'background' },
+			layerSpecializations: {
+				'octane:main-thread': {
+					runtime: '@fixture/main-runtime',
+					renderers: {
+						registry: { native: '/src/main-renderer.js' },
+						default: 'native',
+					},
+					universalRuntime: { runtime: 'native', thread: 'main-thread' },
+				},
+			},
+			transpile: false,
+		});
+		plugin.apply(compiler as any);
+
+		expect(mocks.createOctaneCompiler).toHaveBeenCalledTimes(2);
+		expect(mocks.createOctaneCompiler).toHaveBeenNthCalledWith(
+			1,
+			expect.objectContaining({
+				renderers: expect.objectContaining({
+					default: 'native',
+					registry: expect.objectContaining({
+						native: expect.objectContaining({ module: '/src/background-renderer.js' }),
+					}),
+				}),
+				universalRuntime: { runtime: 'native', thread: 'background' },
+			}),
+		);
+		expect(mocks.createOctaneCompiler).toHaveBeenNthCalledWith(
+			2,
+			expect.objectContaining({
+				renderers: expect.objectContaining({
+					default: 'native',
+					registry: expect.objectContaining({
+						native: expect.objectContaining({ module: '/src/main-renderer.js' }),
+					}),
+				}),
+				universalRuntime: { runtime: 'native', thread: 'main-thread' },
+			}),
+		);
+
+		const aliases = compiler.options.resolve.alias as Record<string, string>;
+		expect(aliases['octane$']).toBe('@fixture/background-runtime');
+		expect(aliases['/src/background-renderer.js$']).toBe('/project/src/background-renderer.js');
+		expect(aliases['/src/main-renderer.js$']).toBe('/project/src/main-renderer.js');
+		expect(compiler.options.module.rules).toHaveLength(2);
+		expect(compiler.options.module.rules[0].use[0].options).toMatchObject({
+			universalRuntime: { runtime: 'native', thread: 'background' },
+			layerSpecializations: {
+				'octane:main-thread': expect.objectContaining({
+					runtime: '@fixture/main-runtime',
+					universalRuntime: { runtime: 'native', thread: 'main-thread' },
+				}),
+			},
+		});
+		expect(compiler.options.module.rules[1]).toEqual({
+			issuerLayer: 'octane:main-thread',
+			resolve: { alias: { octane$: '@fixture/main-runtime' } },
+		});
+	});
+
+	it('watches the union of base and layer-specialized source dependencies', () => {
+		const invalidations = new Map<string, ReturnType<typeof vi.fn>>();
+		mocks.createOctaneCompiler.mockImplementation((options) => {
+			const thread = options.universalRuntime?.thread ?? 'base';
+			const invalidate = vi.fn();
+			invalidations.set(thread, invalidate);
+			return {
+				discoverSourceDependencies: () => ({
+					packages: [`@fixture/${thread}`, '@fixture/shared'],
+					dependencies: [`/project/${thread}.json`, '/project/shared.json'],
+					missingDependencies: [`/project/${thread}.missing`],
+				}),
+				invalidate,
+				resolveRuntimeRequest: mocks.resolveRuntimeRequest,
+			};
+		});
+		const compiler = createCompiler('node');
+		const plugin = new OctaneRspackPlugin({
+			universalRuntime: { runtime: 'native', thread: 'background' },
+			layerSpecializations: {
+				'octane:main-thread': {
+					universalRuntime: { runtime: 'native', thread: 'main-thread' },
+				},
+			},
+		});
+		plugin.apply(compiler as any);
+
+		const compilation = { fileDependencies: new Set(), missingDependencies: new Set() };
+		compiler.hooks.thisCompilation.call(compilation);
+		expect(compilation.fileDependencies).toEqual(
+			new Set(['/project/background.json', '/project/main-thread.json', '/project/shared.json']),
+		);
+		expect(compilation.missingDependencies).toEqual(
+			new Set(['/project/background.missing', '/project/main-thread.missing']),
+		);
+		expect(plugin.sourceDependencies).toEqual([
+			'@fixture/background',
+			'@fixture/main-thread',
+			'@fixture/shared',
+		]);
+
+		compiler.hooks.invalid.call('/project/package.json');
+		expect(invalidations.get('background')).toHaveBeenCalledWith('/project/package.json');
+		expect(invalidations.get('main-thread')).toHaveBeenCalledWith('/project/package.json');
+	});
+
 	it('salts persistent caches with the normalized renderer configuration', () => {
 		const createCachedCompiler = () => {
 			const compiler = createCompiler('web');
@@ -199,6 +314,8 @@ describe('OctaneRspackPlugin', () => {
 		const boundedObject = createCachedCompiler();
 		const nativeBackground = createCachedCompiler();
 		const nativeMain = createCachedCompiler();
+		const layeredBackground = createCachedCompiler();
+		const layeredMain = createCachedCompiler();
 
 		new OctaneRspackPlugin().apply(dom as any);
 		new OctaneRspackPlugin({
@@ -230,6 +347,16 @@ describe('OctaneRspackPlugin', () => {
 			runtime: '@octanejs/lynx/renderer',
 			universalRuntime: { runtime: 'lynx', thread: 'main-thread' },
 		}).apply(nativeMain as any);
+		new OctaneRspackPlugin({
+			layerSpecializations: {
+				main: { universalRuntime: { runtime: 'lynx', thread: 'background' } },
+			},
+		}).apply(layeredBackground as any);
+		new OctaneRspackPlugin({
+			layerSpecializations: {
+				main: { universalRuntime: { runtime: 'lynx', thread: 'main-thread' } },
+			},
+		}).apply(layeredMain as any);
 
 		expect((dom.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
 		expect((object.options as any).cache.version).toMatch(/^user-cache\|octane-rspack@/);
@@ -240,6 +367,9 @@ describe('OctaneRspackPlugin', () => {
 		);
 		expect((nativeBackground.options as any).cache.version).not.toBe(
 			(nativeMain.options as any).cache.version,
+		);
+		expect((layeredBackground.options as any).cache.version).not.toBe(
+			(layeredMain.options as any).cache.version,
 		);
 
 		// requireDirective flips which modules compile vs pass through, so a
