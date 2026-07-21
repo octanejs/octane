@@ -133,6 +133,14 @@ export type State = {
 	value: string;
 	selectedItemId?: string;
 	filtered: { count: number; items: Map<string, number>; groups: Set<string> };
+	/**
+	 * How many force-mounted items are live. They bypass registration and
+	 * filtering entirely, so they never reach `filtered.count` — but they ARE on
+	 * screen, and `Command.Empty` must not claim "no results" while one is
+	 * visible. Kept separate from `filtered.count` so that count keeps its
+	 * upstream meaning (items matching the current search) for `useCommandState`.
+	 */
+	forceMountedCount: number;
 };
 
 export type Store = {
@@ -145,6 +153,8 @@ export type Store = {
 export type Context = {
 	value: (id: string, value: string | undefined, keywords?: string[]) => void;
 	item: (id: string, groupId: string | undefined) => () => void;
+	/** Registers a force-mounted item, which is exempt from filtering. */
+	forceItem: (id: string) => () => void;
 	group: (id: string) => () => void;
 	filter: () => boolean;
 	label: string;

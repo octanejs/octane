@@ -25,12 +25,18 @@ export function CommandRoot(props: CommandProps) @{
 			value: props.value ?? props.defaultValue ?? '',
 			selectedItemId: undefined,
 			filtered: { count: 0, items: new Map(), groups: new Set() },
+			forceMountedCount: 0,
 		}),
 	);
 	const allItems = useLazyRef<Set<string>>(() => new Set());
+	const allForceMounted = useLazyRef<Set<string>>(() => new Set());
 	const allGroups = useLazyRef<Map<string, Set<string>>>(() => new Map());
 	const ids = useLazyRef<Map<string, { value: string; keywords?: string[] }>>(() => new Map());
 	const listeners = useLazyRef<Set<() => void>>(() => new Set());
+	// DEV ONLY: how many live items claim each value, so a duplicate can be
+	// reported. Maintained incrementally (O(1) per registration) rather than by
+	// scanning `ids` on every value change.
+	const valueOwners = useLazyRef<Map<string, number>>(() => new Map());
 	const propsRef = useAsRef(props);
 
 	// Destructure the cmdk-specific props out of `etc` so they are not spread as
@@ -122,6 +128,9 @@ export function CommandRoot(props: CommandProps) @{
 		() => ({
 			value: (id, itemValue, keywords) => {
 				if (itemValue !== ids.current.get(id)?.value) {
+					if (process.env.NODE_ENV !== 'production') {
+						trackValueOwner(ids.current.get(id)?.value, itemValue ?? '');
+					}
 					ids.current.set(id, { value: itemValue ?? '', keywords });
 					state.current.filtered.items.set(id, score(itemValue ?? '', keywords));
 					// Re-derive the aggregate before sorting. Scoring this one item
@@ -156,8 +165,16 @@ export function CommandRoot(props: CommandProps) @{
 				});
 
 				return () => {
+					if (process.env.NODE_ENV !== 'production') {
+						trackValueOwner(ids.current.get(id)?.value, '');
+					}
 					ids.current.delete(id);
 					allItems.current.delete(id);
+					// An item leaving its group has to be dropped from that group's member
+					// set too, or the set accumulates dead ids for the Command's lifetime
+					// (unbounded growth in a menu whose results churn) and filterItems()
+					// walks them on every keystroke.
+					if (groupId) allGroups.current.get(groupId)?.delete(id);
 					state.current.filtered.items.delete(id);
 					const selectedItem = getSelectedItem();
 
@@ -166,6 +183,21 @@ export function CommandRoot(props: CommandProps) @{
 						if (selectedItem?.getAttribute('id') === id) selectFirstItem();
 						store.emit();
 					});
+				};
+			},
+			// A force-mounted item bypasses registration and filtering, so it never
+			// reaches `filtered.count` — but it IS rendered, and Empty must not
+			// announce "no results" over the top of it. Track the live count
+			// separately and let Empty consult both.
+			forceItem: (id) => {
+				allForceMounted.current.add(id);
+				state.current.forceMountedCount = allForceMounted.current.size;
+				schedule(8, () => store.emit());
+
+				return () => {
+					allForceMounted.current.delete(id);
+					state.current.forceMountedCount = allForceMounted.current.size;
+					schedule(8, () => store.emit());
 				};
 			},
 			group: (id) => {
@@ -185,6 +217,32 @@ export function CommandRoot(props: CommandProps) @{
 		}),
 		[],
 	);
+
+	/**
+ * DEV ONLY. Selection is keyed by VALUE, not by item id, so two items sharing
+ * a value both report `aria-selected="true"` while only the first one — the
+ * one `getSelectedItem()`'s `querySelector` finds — actually responds to
+ * Enter. That is an authoring error (cmdk requires unique values) rather than
+ * something the runtime can resolve, so report it instead of silently
+ * rendering a listbox with two selected options.
+ */
+	function trackValueOwner(previous: string | undefined, next: string) {
+		if (previous) {
+			const remaining = (valueOwners.current.get(previous) ?? 1) - 1;
+			if (remaining > 0) valueOwners.current.set(previous, remaining);
+			else valueOwners.current.delete(previous);
+		}
+		if (!next) return;
+		const owners = (valueOwners.current.get(next) ?? 0) + 1;
+		valueOwners.current.set(next, owners);
+		if (owners > 1) {
+			console.warn(
+				`[@octanejs/cmdk] ${owners} items share the value ${JSON.stringify(next)}. ` +
+					`Selection is keyed by value, so they will all appear selected at once and ` +
+					`only the first will respond to Enter. Give each item a unique \`value\` prop.`,
+			);
+		}
+	}
 
 	function score(itemValue: string, keywords?: string[]) {
 		const filter = propsRef.current?.filter ?? defaultFilter;

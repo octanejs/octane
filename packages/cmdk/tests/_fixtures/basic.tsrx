@@ -133,6 +133,73 @@ export function DynamicValueMenu(props: { itemValue: string }) @{
 	</Command>
 }
 
+// A force-mounted item stays rendered through any search. It is exempt from
+// filtering, so it never reaches `filtered.count` — Empty still has to see it.
+export function ForceMountMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			<Command.Item forceMount>Always Here</Command.Item>
+			<Command.Item>Apple</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+// Two items sharing a value. Selection is value-keyed, so both report
+// aria-selected while only the first responds to Enter — an authoring error the
+// port reports in development.
+export function DuplicateValueMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Item>Apple</Command.Item>
+			<Command.Item>Apple</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+export function KeywordsMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			<Command.Item keywords={['zebra']}>Apple</Command.Item>
+			<Command.Item>Banana</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+export function NoFilterMenu() @{
+	<Command label="Command Menu" shouldFilter={false}>
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			<Command.Item>Apple</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+export function DefaultValueMenu() @{
+	<Command label="Command Menu" defaultValue="Banana">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Item>Apple</Command.Item>
+			<Command.Item>Banana</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+export function DisabledItemMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Item disabled>Apple</Command.Item>
+			<Command.Item>Banana</Command.Item>
+		</Command.List>
+	</Command>
+}
+
 export function DialogMenu(props: { open: boolean }) @{
 	<Command.Dialog open={props.open} label="Command Menu">
 		<Command.Input placeholder="Search…" />

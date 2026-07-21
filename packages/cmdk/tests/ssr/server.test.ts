@@ -21,4 +21,15 @@ describe('@octanejs/cmdk — server rendering', () => {
 		expect(apple).toBeLessThan(banana);
 		expect(banana).toBeLessThan(cherry);
 	});
+
+	it('does not ship the empty state above the results', () => {
+		// Items register in layout effects, which never run on the server, so the
+		// match count is unavoidably 0 during SSR. Rendering Empty on that would put
+		// "No results found." above a fully-populated list on every server-rendered
+		// page — and leave it there permanently for readers without JavaScript.
+		const { html } = renderToString(BasicMenu);
+
+		expect(html).toContain('cmdk-item');
+		expect(html).not.toContain('cmdk-empty');
+	});
 });

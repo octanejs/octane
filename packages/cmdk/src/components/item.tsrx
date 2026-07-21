@@ -15,9 +15,10 @@ export function Item(props: ItemProps) @{
 	const forceMount = propsRef.current?.forceMount ?? groupContext?.forceMount;
 
 	useLayoutEffect(() => {
-		if (!forceMount) {
-			return context.item(id, groupContext?.id);
-		}
+		// A force-mounted item is exempt from filtering, so it is registered on the
+		// force-mount path instead — it still has to be counted somewhere, or Empty
+		// renders "no results" while this item is on screen.
+		return forceMount ? context.forceItem(id) : context.item(id, groupContext?.id);
 	}, [forceMount]);
 
 	// deps: the provided `value` prop, else the rendered element's textContent

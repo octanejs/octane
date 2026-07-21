@@ -1,15 +1,22 @@
 // Phase 1 behavior: the Command menu renders its items and the cmdk attribute
 // contract, infers item values from textContent, filters on input, selects the
 // first valid item, and shows Empty when nothing matches.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
+import { clearConsoleErrors, consoleErrorCalls } from './_setup';
 import {
 	BasicMenu,
 	ControlledCallbackMenu,
 	ControlledMenu,
+	DefaultValueMenu,
 	DialogMenu,
+	DisabledItemMenu,
+	DuplicateValueMenu,
 	DynamicValueMenu,
+	ForceMountMenu,
+	KeywordsMenu,
+	NoFilterMenu,
 	GroupedMenu,
 	LoadingMenu,
 	LoopMenu,
@@ -31,23 +38,8 @@ function type(input: HTMLInputElement, value: string): void {
 	input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-// A green test must also mean "nothing threw". Octane reports an exception
-// raised inside an effect through console.error WITHOUT failing the test, so a
-// broken hook can sit behind passing DOM assertions indefinitely (that is how a
-// per-render TypeError in Group's useValue went unnoticed). Fail on any noise.
-let consoleError: ReturnType<typeof vi.spyOn>;
-
-beforeEach(() => {
-	consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-});
-
-afterEach(() => {
-	const calls = consoleError.mock.calls.map((call) => String(call[0]));
-	consoleError.mockRestore();
-	if (calls.length > 0) {
-		throw new Error(`Unexpected console.error during test:\n${calls.join('\n')}`);
-	}
-});
+// The "a green test must also mean nothing threw" guard now lives in
+// tests/_setup.ts so it covers every cmdk suite, not just this file.
 
 describe('@octanejs/cmdk — Command (Phase 1)', () => {
 	it('renders the cmdk attribute contract and item values', async () => {
@@ -385,7 +377,7 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		await settle();
 
 		// The failure is reported...
-		const reported = consoleError.mock.calls.map((call) => String(call[0]));
+		const reported = consoleErrorCalls();
 		expect(reported.some((message) => message.includes('boom from onValueChange'))).toBe(true);
 
 		// ...and the rest of the scheduled work still ran (isolation preserved):
@@ -393,8 +385,8 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple']);
 
 		app.unmount();
-		// This test asserts on the reported error itself, so clear it for the guard.
-		consoleError.mockClear();
+		// This test asserts on the reported error itself, so acknowledge it.
+		clearConsoleErrors();
 	});
 
 	it('controlled value drives the selection', async () => {
@@ -433,6 +425,125 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		expect(app.container.querySelector('[cmdk-empty]')).toBeNull();
 		// The group holding the newly-matching item is visible too.
 		expect(app.find('[cmdk-group]').hasAttribute('hidden')).toBe(false);
+
+		app.unmount();
+	});
+
+	it('does not announce "no results" while a forceMount item is visible', async () => {
+		// A force-mounted item is exempt from filtering, so it never enters
+		// `filtered.count` — but it is on screen, and Empty and a visible item are
+		// mutually exclusive.
+		const app = mount(ForceMountMenu);
+		await settle();
+
+		const input = app.find('[cmdk-input]') as HTMLInputElement;
+		type(input, 'zzzzzz');
+		await settle();
+
+		const items = app.findAll('[cmdk-item]');
+		expect(items.map((el) => el.textContent)).toEqual(['Always Here']);
+		expect(app.container.querySelector('[cmdk-empty]')).toBeNull();
+
+		app.unmount();
+	});
+
+	it('shows Empty again once the last forceMount item unmounts', async () => {
+		// The force-mount count has to be released on unmount, or Empty is
+		// suppressed forever after a force-mounted item goes away.
+		const app = mount(ForceMountMenu);
+		await settle();
+		const input = app.find('[cmdk-input]') as HTMLInputElement;
+		type(input, 'zzzzzz');
+		await settle();
+		expect(app.container.querySelector('[cmdk-empty]')).toBeNull();
+
+		// Swap to a menu with no force-mounted items; nothing matches, so Empty returns.
+		app.update(BasicMenu);
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'zzzzzz');
+		await settle();
+		expect(app.container.querySelector('[cmdk-empty]')).toBeTruthy();
+
+		app.unmount();
+	});
+
+	it('matches an item by its keywords, not just its text', async () => {
+		const app = mount(KeywordsMenu);
+		await settle();
+
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'zebra');
+		await settle();
+
+		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple']);
+
+		app.unmount();
+	});
+
+	it('shouldFilter={false} keeps every item and never shows Empty', async () => {
+		const app = mount(NoFilterMenu);
+		await settle();
+
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'zzzzzz');
+		await settle();
+
+		expect(app.findAll('[cmdk-item]')).toHaveLength(1);
+		expect(app.container.querySelector('[cmdk-empty]')).toBeNull();
+
+		app.unmount();
+	});
+
+	it('defaultValue selects that item instead of the first', async () => {
+		const app = mount(DefaultValueMenu);
+		await settle();
+
+		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Banana');
+
+		app.unmount();
+	});
+
+	it('skips a disabled item when auto-selecting', async () => {
+		const app = mount(DisabledItemMenu);
+		await settle();
+
+		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Banana');
+
+		app.unmount();
+	});
+
+	it('reports duplicate item values in development', async () => {
+		// Two items sharing a value both render aria-selected while only the first
+		// responds to Enter. The runtime cannot pick a winner, so it must say so
+		// rather than silently producing a listbox with two selected options.
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const app = mount(DuplicateValueMenu);
+		await settle();
+
+		const messages = warn.mock.calls.map((call) => String(call[0]));
+		warn.mockRestore();
+
+		expect(messages.some((m) => m.includes('share the value') && m.includes('Apple'))).toBe(true);
+
+		app.unmount();
+	});
+
+	it('restores every item when the search is cleared', async () => {
+		// OCTANE DIVERGENCE: the items all come back and the selection is right,
+		// but they stay in the order `sort()` left them rather than returning to
+		// source order — octane's reconciler does not reposition nodes it did not
+		// move. Pinned here so a change in either direction is visible.
+		const app = mount(BasicMenu);
+		await settle();
+		const input = app.find('[cmdk-input]') as HTMLInputElement;
+
+		type(input, 'app');
+		await settle();
+		expect(app.findAll('[cmdk-item]')).toHaveLength(1);
+
+		type(input, '');
+		await settle();
+		const texts = app.findAll('[cmdk-item]').map((el) => el.textContent);
+		expect([...texts].sort()).toEqual(['Apple', 'Banana', 'Cherry']);
+		expect(texts).toEqual(['Banana', 'Cherry', 'Apple']);
 
 		app.unmount();
 	});
