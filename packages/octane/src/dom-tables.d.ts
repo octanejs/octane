@@ -7,6 +7,8 @@ export const BOOLEAN_ATTR_PROPS: Set<string>;
 export const MUST_USE_PROPERTY_PROPS: Set<string>;
 export const POSITIVE_NUMERIC_ATTR_PROPS: Set<string>;
 export const SVG_ONLY_TAGS: Set<string>;
+export const HTML_ONLY_TAGS: Set<string>;
+export const MATHML_ONLY_TAGS: Set<string>;
 export const ATTRIBUTE_ALIASES: Map<string, string>;
 export function isEnumeratedBooleanAttr(name: string): boolean;
 export function isUnitlessStyleProp(name: string): boolean;

@@ -69,6 +69,8 @@ import {
 	MUST_USE_PROPERTY_PROPS,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	SVG_ONLY_TAGS,
+	HTML_ONLY_TAGS,
+	MATHML_ONLY_TAGS,
 	ATTRIBUTE_ALIASES,
 	isEnumeratedBooleanAttr,
 	cssStyleValue,
@@ -1334,6 +1336,23 @@ function nsForRootTag(node, parentNs) {
 	if (t === 'math') return 'mathml';
 	if (t !== null && SVG_ONLY_TAGS.has(t)) return 'svg';
 	return parentNs;
+}
+
+// Static namespace of one root of an 'opaque' (component-destination) template
+// whose tag didn't already imply SVG/MathML via nsForRootTag. A root tag that
+// exists in exactly one namespace parses the same way at every destination, so
+// the template can bake the concrete flag and skip clone()'s per-destination
+// namespace resolution. Non-element roots (text, `<!>` anchors, comments) are
+// namespace-neutral — the HTML5 parser produces identical nodes for them under
+// any wrapper — so they resolve as HTML. Ambiguous names (`a`, `script`,
+// `style`, `title`, `font`), custom elements, and unknown/legacy tags return
+// 'opaque': only clone()'s actual-parent walk can namespace those correctly.
+function staticNsForOpaqueRoot(node) {
+	const t = elementTagName(node);
+	if (t === null) return 'html';
+	if (HTML_ONLY_TAGS.has(t)) return 'html';
+	if (MATHML_ONLY_TAGS.has(t)) return 'mathml';
+	return 'opaque';
 }
 
 // ---------------------------------------------------------------------------
@@ -12782,9 +12801,14 @@ function planJsx(
 		//     the inner root.
 		//   - SVG/MathML multi-root: pass ns + frag=1; runtime wraps and returns
 		//     the wrap itself (caller drains its children — no <octane-frag>).
-		//   - Opaque component bodies/children: pass flag 3 (+ frag=1 for multiple
-		//     roots); clone() resolves and caches the concrete namespace from the
-		//     render block's actual parent.
+		//   - Opaque component bodies/children whose root tags pin the namespace
+		//     statically (every root exists in exactly one namespace — see
+		//     staticNsForOpaqueRoot) compile like fixed HTML/SVG/MathML templates:
+		//     the parse is identical at every destination, so pay nothing per
+		//     clone. Only genuinely ambiguous roots (`a`, `title`, custom/unknown
+		//     tags, mixed fragments) pass flag 3 (+ frag=1 for multiple roots);
+		//     clone() resolves and caches the concrete namespace from the render
+		//     block's actual parent.
 		// Multi-root fragments at an HTML parent imply SVG only when EVERY element
 		// root does (an all-SVG fragment — e.g. portal children `<rect/><g/>` — must
 		// parse in foreign content; a MIXED fragment can't share one wrapper, so it
@@ -12798,16 +12822,41 @@ function planJsx(
 			(single
 				? !isNonHtmlRootTag(jsxNodes[0]) // svg/math/SVG-only root means non-HTML ns
 				: !fragImpliesSvg);
-		const tplNs = isHtmlNs
+		let tplNs = isHtmlNs
 			? 'html'
 			: single
 				? nsForRootTag(jsxNodes[0], parentNs)
 				: (parentNs === 'html' || parentNs === 'opaque') && fragImpliesSvg
 					? 'svg'
 					: parentNs;
+		// A resolved-HTML multi-root ships raw markup + frag=1 (parseTemplate adds
+		// the <octane-frag> wrapper) instead of the fixed-HTML path's pre-wrapped
+		// string: same parsed DOM, but the template literal stays as small as the
+		// opaque form it replaces.
+		let resolvedFrag = false;
+		if (tplNs === 'opaque') {
+			// Component-destination template whose root tags didn't imply SVG:
+			// resolve the namespace statically when every root pins the same one.
+			if (single) {
+				tplNs = staticNsForOpaqueRoot(jsxNodes[0]);
+			} else {
+				let resolved = null; // null = only namespace-neutral roots so far
+				for (const root of elementRoots) {
+					const ns = staticNsForOpaqueRoot(root);
+					if (ns === 'opaque' || (resolved !== null && ns !== resolved)) {
+						resolved = 'opaque';
+						break;
+					}
+					resolved = ns;
+				}
+				tplNs = resolved === null ? 'html' : resolved;
+				resolvedFrag = tplNs !== 'opaque';
+			}
+		}
 		const flag = nsFlag(tplNs);
-		const fragArg = !single && flag !== 0 ? 1 : 0;
-		const tplHtml = single || flag !== 0 ? html : `<octane-frag>${html}</octane-frag>`;
+		const fragArg = !single && (flag !== 0 || resolvedFrag) ? 1 : 0;
+		const tplHtml =
+			single || flag !== 0 || resolvedFrag ? html : `<octane-frag>${html}</octane-frag>`;
 		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
