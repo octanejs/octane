@@ -1,6 +1,10 @@
 {
   "include": ["src/**/*", "vite.config.ts", "vite.config.minimal.ts"],
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "~/*": ["./src/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "module": "ESNext",
@@ -12,7 +16,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "target": "ES2024",
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "noEmit": true,
     "jsx": "react-jsx",
     "jsxImportSource": "octane",

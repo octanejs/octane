@@ -772,7 +772,7 @@ importers:
         version: 0.3.104(prettier@3.8.4)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
-        version: 0.3.104(@tsrx/react@0.2.44(react@19.2.7))(@tsrx/ripple@0.1.45)(@tsrx/solid@0.1.44(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.11(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
+        version: 0.3.104(@tsrx/react@0.2.44(react@19.2.7))(@tsrx/ripple@0.1.45)(@tsrx/solid@0.1.44(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.12(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.2
@@ -2413,28 +2413,103 @@ importers:
       '@octanejs/lucide':
         specifier: workspace:*
         version: link:../../../packages/lucide
+      '@octanejs/radix':
+        specifier: workspace:*
+        version: link:../../../packages/radix
+      '@octanejs/sonner':
+        specifier: workspace:*
+        version: link:../../../packages/sonner
+      '@octanejs/tanstack-hotkeys':
+        specifier: workspace:*
+        version: link:../../../packages/tanstack-hotkeys
+      '@octanejs/tanstack-pacer':
+        specifier: workspace:*
+        version: link:../../../packages/tanstack-pacer
       '@octanejs/tanstack-query':
         specifier: workspace:*
         version: link:../../../packages/tanstack-query
       '@octanejs/tanstack-router':
         specifier: workspace:*
         version: link:../../../packages/tanstack-router
+      '@octanejs/tanstack-router-ssr-query':
+        specifier: workspace:*
+        version: link:../../../packages/tanstack-router-ssr-query
       '@octanejs/tanstack-start':
         specifier: workspace:*
         version: link:../../../packages/tanstack-start
+      '@octanejs/tanstack-store':
+        specifier: workspace:*
+        version: link:../../../packages/tanstack-store
+      '@octanejs/visx':
+        specifier: workspace:*
+        version: link:../../../packages/visx
       '@octanejs/zustand':
         specifier: workspace:*
         version: link:../../../packages/zustand
+      '@tanstack/create':
+        specifier: ^0.68.4
+        version: 0.68.5(tslib@2.8.1)
+      '@tanstack/highlight':
+        specifier: ^0.0.3
+        version: 0.0.3
+      '@tanstack/markdown':
+        specifier: ^0.0.6
+        version: 0.0.6(react@19.2.7)
+      '@tanstack/pacer':
+        specifier: ^0.21.1
+        version: 0.21.1
+      d3:
+        specifier: ^7.9.0
+        version: 7.9.0
+      gray-matter:
+        specifier: ^4.0.3
+        version: 4.0.3
+      jszip:
+        specifier: ^3.10.1
+        version: 3.10.1
+      lru-cache:
+        specifier: ^11.2.7
+        version: 11.5.1
+      match-sorter:
+        specifier: ^8.2.0
+        version: 8.3.0
+      mermaid:
+        specifier: ^11.14.0
+        version: 11.16.0
       octane:
         specifier: workspace:*
         version: link:../../../packages/octane
+      remove-markdown:
+        specifier: ^0.6.3
+        version: 0.6.4
+      tailwind-merge:
+        specifier: ^3.5.0
+        version: 3.6.0
+      valibot:
+        specifier: ^1.3.1
+        version: 1.4.1(typescript@5.9.3)
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
     devDependencies:
+      '@content-collections/core':
+        specifier: ^0.14.3
+        version: 0.14.3(typescript@5.9.3)
+      '@content-collections/vite':
+        specifier: ^0.2.9
+        version: 0.2.9(@content-collections/core@0.14.3(typescript@5.9.3))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
       '@tailwindcss/typography':
         specifier: ^0.5.19
         version: 0.5.20(tailwindcss@4.3.3)
       '@tailwindcss/vite':
         specifier: ^4.2.2
         version: 4.3.3(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.9.5
       nitro:
         specifier: ^3.0.260311-beta
         version: 3.0.260311-beta(chokidar@5.0.0)(dotenv@8.6.0)(jiti@2.7.0)(lru-cache@11.5.1)(miniflare@4.20260714.0)(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -4549,6 +4624,38 @@ importers:
         specifier: catalog:default
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
 
+  packages/tanstack-hotkeys:
+    dependencies:
+      '@tanstack/hotkeys':
+        specifier: 0.8.0
+        version: 0.8.0
+    devDependencies:
+      '@octanejs/tanstack-store':
+        specifier: workspace:*
+        version: link:../tanstack-store
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
+
+  packages/tanstack-pacer:
+    dependencies:
+      '@tanstack/pacer':
+        specifier: 0.21.1
+        version: 0.21.1
+    devDependencies:
+      '@octanejs/tanstack-store':
+        specifier: workspace:*
+        version: link:../tanstack-store
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/tanstack-query:
     dependencies:
       '@tanstack/query-core':
@@ -4610,6 +4717,25 @@ importers:
       react-dom:
         specifier: catalog:default
         version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
+
+  packages/tanstack-router-ssr-query:
+    dependencies:
+      '@tanstack/router-ssr-query-core':
+        specifier: 1.169.1
+        version: 1.169.1(@tanstack/query-core@5.101.0)(@tanstack/router-core@1.171.15)
+    devDependencies:
+      '@octanejs/tanstack-query':
+        specifier: workspace:*
+        version: link:../tanstack-query
+      '@octanejs/tanstack-router':
+        specifier: workspace:*
+        version: link:../tanstack-router
+      octane:
+        specifier: workspace:*
+        version: link:../octane
       vitest:
         specifier: catalog:default
         version: 4.1.9(@opentelemetry/api@1.9.1)(@types/node@25.9.5)(@vitest/coverage-istanbul@4.1.9)(@vitest/coverage-v8@4.1.9)(happy-dom@20.10.6)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
@@ -13135,8 +13261,8 @@ packages:
   ocache@0.1.5:
     resolution: {integrity: sha512-kNNnkkVQup/QDvmTz8Q84wc2ntiyoVHDxa6eHWKt5qdGAmFRBIxy83rxgCYEjW0x06UJ9E3P6VgM2yY4rOBH4w==}
 
-  octane@0.1.11:
-    resolution: {integrity: sha512-XJR6w60nqK7ZJCB3Yzsgk6mGYkDbYvsVGcJ570wPRkirp/PJWpHQ8VdXXllLsBrOvDAymlSIeszncu92EqjA6Q==}
+  octane@0.1.12:
+    resolution: {integrity: sha512-H+2vp04JrrBRZ/U+RRhOfU533d5oPCPclt97QIIOnIjx8vEguNI8JI5gPnGPpjX3gQKPfyaBgERP0rI6KD3Lxw==}
     engines: {node: '>=22'}
     peerDependencies:
       react: ^19.0.0
@@ -15833,6 +15959,12 @@ snapshots:
       '@content-collections/integrations': 0.5.0(@content-collections/core@0.14.3(typescript@5.9.3))
       vite: 8.0.16(@types/node@25.9.5)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)
 
+  '@content-collections/vite@0.2.9(@content-collections/core@0.14.3(typescript@5.9.3))(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))':
+    dependencies:
+      '@content-collections/core': 0.14.3(typescript@5.9.3)
+      '@content-collections/integrations': 0.5.0(@content-collections/core@0.14.3(typescript@5.9.3))
+      vite: 8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)
+
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.9
@@ -16385,7 +16517,7 @@ snapshots:
 
   '@jest/pattern@30.4.0':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       jest-regex-util: 30.4.0
 
   '@jest/schemas@30.4.1':
@@ -16398,7 +16530,7 @@ snapshots:
       '@jest/schemas': 30.4.1
       '@types/istanbul-lib-coverage': 2.0.6
       '@types/istanbul-reports': 3.0.4
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       '@types/yargs': 17.0.35
       chalk: 4.1.2
 
@@ -19388,6 +19520,10 @@ snapshots:
     optionalDependencies:
       react: 19.2.3
 
+  '@tanstack/markdown@0.0.6(react@19.2.7)':
+    optionalDependencies:
+      react: 19.2.7
+
   '@tanstack/openai-base@0.3.5(@tanstack/ai@0.20.1(@opentelemetry/api@1.9.1))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@tanstack/ai': 0.20.1(@opentelemetry/api@1.9.1)
@@ -20291,7 +20427,7 @@ snapshots:
       - '@typescript-eslint/types'
     optional: true
 
-  '@tsrx/typescript-plugin@0.3.104(@tsrx/react@0.2.44(react@19.2.7))(@tsrx/ripple@0.1.45)(@tsrx/solid@0.1.44(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.11(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
+  '@tsrx/typescript-plugin@0.3.104(@tsrx/react@0.2.44(react@19.2.7))(@tsrx/ripple@0.1.45)(@tsrx/solid@0.1.44(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.12(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.28
       '@volar/typescript': 2.4.28
@@ -20300,7 +20436,7 @@ snapshots:
       '@tsrx/react': 0.2.44(react@19.2.7)
       '@tsrx/ripple': 0.1.45
       '@tsrx/solid': 0.1.44(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
-      octane: 0.1.11(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
+      octane: 0.1.12(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))
 
   '@tsrx/vite-plugin-react@0.0.75(react@19.2.7)(vite@8.0.16(@types/node@25.9.5)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:
@@ -20356,11 +20492,11 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
 
   '@types/cors@2.8.19':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
 
   '@types/d3-array@3.0.3': {}
 
@@ -20553,7 +20689,7 @@ snapshots:
 
   '@types/mysql@2.15.26':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
 
   '@types/node@12.20.55': {}
 
@@ -20573,7 +20709,7 @@ snapshots:
 
   '@types/pg@8.6.1':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       pg-protocol: 1.15.0
       pg-types: 2.2.0
 
@@ -20603,7 +20739,7 @@ snapshots:
 
   '@types/tedious@4.0.14':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
 
   '@types/three@0.172.0':
     dependencies:
@@ -20638,7 +20774,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -21694,7 +21830,7 @@ snapshots:
 
   buffer-image-size@0.6.4:
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
 
   buffer@6.0.3:
     dependencies:
@@ -21787,7 +21923,7 @@ snapshots:
 
   chrome-launcher@1.2.1:
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       escape-string-regexp: 4.0.0
       is-wsl: 2.2.0
       lighthouse-logger: 2.0.2
@@ -22051,7 +22187,7 @@ snapshots:
 
   d3-brush@3.0.0:
     dependencies:
-      d3-dispatch: 1.0.6
+      d3-dispatch: 3.0.1
       d3-drag: 3.0.0
       d3-interpolate: 3.0.1
       d3-selection: 3.0.0
@@ -22086,7 +22222,7 @@ snapshots:
 
   d3-drag@3.0.0:
     dependencies:
-      d3-dispatch: 1.0.6
+      d3-dispatch: 3.0.1
       d3-selection: 3.0.0
 
   d3-dsv@3.0.1:
@@ -22103,7 +22239,7 @@ snapshots:
 
   d3-force@3.0.0:
     dependencies:
-      d3-dispatch: 1.0.6
+      d3-dispatch: 3.0.1
       d3-quadtree: 3.0.1
       d3-timer: 3.0.1
 
@@ -22178,7 +22314,7 @@ snapshots:
   d3-transition@3.0.1(d3-selection@3.0.0):
     dependencies:
       d3-color: 3.1.0
-      d3-dispatch: 1.0.6
+      d3-dispatch: 3.0.1
       d3-ease: 3.0.1
       d3-interpolate: 3.0.1
       d3-selection: 3.0.0
@@ -22188,7 +22324,7 @@ snapshots:
 
   d3-zoom@3.0.0:
     dependencies:
-      d3-dispatch: 1.0.6
+      d3-dispatch: 3.0.1
       d3-drag: 3.0.0
       d3-interpolate: 3.0.1
       d3-selection: 3.0.0
@@ -22423,7 +22559,7 @@ snapshots:
   engine.io@6.6.9:
     dependencies:
       '@types/cors': 2.8.19
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       '@types/ws': 8.18.1
       accepts: 1.3.8
       base64id: 2.0.0
@@ -23631,7 +23767,7 @@ snapshots:
   jest-util@30.4.1:
     dependencies:
       '@jest/types': 30.4.1
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       chalk: 4.1.2
       ci-info: 4.4.0
       graceful-fs: 4.2.11
@@ -23639,13 +23775,13 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
   jest-worker@30.4.1:
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       '@ungap/structured-clone': 1.3.2
       jest-util: 30.4.1
       merge-stream: 2.0.0
@@ -24822,7 +24958,7 @@ snapshots:
     dependencies:
       ohash: 2.0.11
 
-  octane@0.1.11(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)):
+  octane@0.1.12(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.48.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       '@tsrx/core': 0.1.44
       '@types/react': 19.2.17
@@ -26233,7 +26369,7 @@ snapshots:
 
   speedline-core@1.4.3:
     dependencies:
-      '@types/node': 24.13.2
+      '@types/node': 25.9.5
       image-ssim: 0.2.0
       jpeg-js: 0.4.4
 

@@ -221,7 +221,15 @@ export function octane(options = {}) {
 				// Vite's rolling optimizer; this keeps module-identity-sensitive packages
 				// from mixing cold-crawl generations.
 				optimizeDeps: { exclude: optimizeDepsExclusions },
-				resolve: { dedupe: ['octane'] },
+				resolve: {
+					dedupe: ['octane'],
+					// Vite's default extension list, plus .tsrx: extensionless imports
+					// of octane components must resolve exactly like React's .tsx do
+					// (faithful ports keep upstream's extensionless dynamic imports,
+					// and Start's import-protection relies on the extensionless
+					// specifier shape for its deferred client-module mocking).
+					extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.tsrx'],
+				},
 				ssr: { noExternal: sourceDependencies },
 			};
 		},
