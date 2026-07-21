@@ -505,6 +505,41 @@ export function Greeting(props) @{
 }
 ```
 
+### Inline scripts
+
+An authored `<script>` body is static, raw script text. Braces are literal source,
+so blocks and object literals work normally; Octane does not treat `{...}` inside
+the body as a TSRX interpolation:
+
+```jsx
+export function Bootstrap() @{
+  <script>
+    window.appConfig = { locale: 'en-GB' };
+  </script>
+}
+```
+
+For a dynamic whole-script value, use the standard raw-content prop. Serialize
+structured values explicitly:
+
+```jsx
+export function Rules(props) @{
+  <script
+    type="speculationrules"
+    dangerouslySetInnerHTML={{ __html: JSON.stringify(props.rules) }}
+  />
+}
+```
+
+`<script>{JSON.stringify(props.rules) as string}</script>` is static script source,
+not an interpolation; the cast does not change the raw-text grammar.
+`dangerouslySetInnerHTML` supplies the complete body and cannot be combined with
+child content. Client mounts and updates write it through `textContent`; server
+rendering neutralizes case-insensitive opening and closing `script` tokens without
+HTML-escaping ordinary JavaScript or JSON characters. This prevents the value from
+creating sibling markup, but it does not validate or sanitize executable
+JavaScript—only inject executable source you trust.
+
 ### Class composition
 
 `class` (and its alias `className`) accepts more than a string. Octane composes the

@@ -448,6 +448,47 @@ function hasSemanticJsxChildren(children) {
 	return semanticJsxChildCount(children) > 0;
 }
 
+// @tsrx/core keeps an authored <script> body as verbatim raw text on
+// `element.content`. Braces inside that string are JavaScript/JSON source, not
+// JSX expression containers. An empty explicitly closed body is semantically
+// absent, while whitespace is real script content and therefore owns the child
+// position over an earlier `children=` attribute or spread.
+function staticScriptContent(node, tag) {
+	return tag === 'script' && typeof node.content === 'string' ? node.content : undefined;
+}
+
+function hasStaticScriptBody(node, tag) {
+	const content = staticScriptContent(node, tag);
+	return content !== undefined && content.length > 0;
+}
+
+// Static script source must not pass through generic HTML text escaping: entity
+// references are not decoded in the HTML script-data state. Neutralize only a
+// case-insensitive opening/closing script token so the surrounding template or
+// SSR document cannot be terminated early; the JavaScript/JSON escape preserves
+// the value's meaning.
+const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
+
+function escapeInlineScriptContent(value) {
+	return value.replace(
+		INLINE_SCRIPT_TOKEN,
+		(_match, prefix, s, suffix) => `${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
+	);
+}
+
+// Value-position host JSX lowers through a descriptor and installs its child via
+// textContent instead of parsing a static template. Match the HTML script-data
+// input normalization up front so fresh client DOM and parsed SSR DOM have the
+// same spelling; character references deliberately remain literal.
+const SCRIPT_DATA_INPUT_NORMALIZATION = /\r\n?|\u0000/g;
+
+function normalizeStaticScriptDescriptorContent(value) {
+	const normalized = value.replace(SCRIPT_DATA_INPUT_NORMALIZATION, (match) =>
+		match === '\u0000' ? '\uFFFD' : '\n',
+	);
+	return escapeInlineScriptContent(normalized);
+}
+
 function hasDefinitelyNonNullishJsxChild(children, knownStringLocals) {
 	for (const child of children || []) {
 		if (!child) continue;
@@ -485,11 +526,13 @@ function hasDefinitelyNonNullishJsxChild(children, knownStringLocals) {
 	return false;
 }
 
-function rejectDangerouslySetInnerHTMLChildren(_tag, node, ctx) {
+function rejectDangerouslySetInnerHTMLChildren(tag, node, ctx) {
 	if (!hasDefinitelyPresentDirectDangerouslySetInnerHTML(node)) return;
-	const hasNestedChildren = hasSemanticJsxChildren(node.children || []);
+	const hasRawScriptBody = hasStaticScriptBody(node, tag);
+	const hasNestedChildren = hasRawScriptBody || hasSemanticJsxChildren(node.children || []);
 	if (
 		(hasNestedChildren || !hasDefinitelyPresentDirectChildrenProp(node)) &&
+		!hasRawScriptBody &&
 		!hasDefinitelyNonNullishJsxChild(node.children || [], ctx.knownStringLocals)
 	)
 		return;
@@ -5934,6 +5977,9 @@ function ssrEmitNode(
 
 function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const tag = elementTagName(node);
+	const authoredStaticScriptContent = staticScriptContent(node, tag);
+	const hasAuthoredStaticScriptBody =
+		authoredStaticScriptContent !== undefined && authoredStaticScriptContent.length > 0;
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
 	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
@@ -6417,13 +6463,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	}
 
 	if (tag !== 'option') lit += '>'; // option: ssrOption assembles the tag (attrs-only here)
-	const normChildren = normalizeChildren(node.children || [], childNs === 'svg');
-	const hasNestedChildren = normChildren.length > 0;
+	const normChildren =
+		authoredStaticScriptContent === undefined
+			? normalizeChildren(node.children || [], childNs === 'svg')
+			: [];
+	const hasNestedChildren = hasAuthoredStaticScriptBody || normChildren.length > 0;
 	const effectiveChildrenPropSources = hasNestedChildren ? [] : childrenPropSources;
-	const definitelyHasDangerChild = hasDefinitelyNonNullishJsxChild(
-		node.children || [],
-		ctx.knownStringLocals,
-	);
+	const definitelyHasDangerChild =
+		hasDefinitelyNonNullishJsxChild(node.children || [], ctx.knownStringLocals) ||
+		hasAuthoredStaticScriptBody;
 	// Only-child renderable `{expr}` → markerless `ssrChildText` (mirrors the client's
 	// markerless `childTextHole` mount: a primitive is the host's bare text, an object
 	// still gets a `<!--[-->…<!--]-->` block). Must match the client's only-child
@@ -6433,7 +6481,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const onlyChild0 =
 		normChildren.length === 1 && normChildren[0].type === 'Text' ? normChildren[0] : null;
 	let childrenExpr;
-	if (
+	if (authoredStaticScriptContent !== undefined) {
+		const content = escapeInlineScriptContent(authoredStaticScriptContent);
+		childrenExpr = content === '' ? "''" : JSON.stringify(content);
+	} else if (
 		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
 		staticTextLiteral(onlyChild0.expression) === null &&
@@ -11374,12 +11425,13 @@ function jsxNameToExpr(name) {
 function jsxElementToCreateElement(node, ctx) {
 	ctx.runtimeNeeded.add('createElement');
 	const nameNode = node.openingElement?.name || node.id;
+	const componentTag = isComponentTag(node);
 	// Host (lowercase) tag → string literal (`'li'`) for the de-opt renderer;
 	// component (capitalized / member / dynamic) → the identifier/member ref.
-	const compNode = isComponentTag(node)
+	const compNode = componentTag
 		? jsxNameToExpr(nameNode)
 		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
-	if (!isComponentTag(node)) {
+	if (!componentTag) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
 	}
@@ -11428,7 +11480,7 @@ function jsxElementToCreateElement(node, ctx) {
 			computed: false,
 		});
 	}
-	if (ctx.dev && !isComponentTag(node)) {
+	if (ctx.dev && !componentTag) {
 		const classification = ctx.nativeChangeClassifications?.get(
 			node.start ?? node.openingElement?.start,
 		);
@@ -11451,13 +11503,25 @@ function jsxElementToCreateElement(node, ctx) {
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
 	// string). The runtime collects these into `descriptor.children`.
-	const opaqueChildren = isComponentTag(node);
-	for (const child of node.children || []) {
-		const lowered = lowerJsxChild(
-			opaqueChildren ? rewriteOpaqueTitles(child, ctx, 'opaque') : child,
-			ctx,
-		);
-		if (lowered !== null) args.push(lowered);
+	const authoredStaticScriptContent = componentTag
+		? undefined
+		: staticScriptContent(node, compNode.value);
+	if (authoredStaticScriptContent !== undefined) {
+		// Raw script-data is one authored body, not ordinary JSX text. Carry it as
+		// one unit while matching the parsed template/SSR DOM spelling and applying
+		// the same whole-script neutralization.
+		const content = normalizeStaticScriptDescriptorContent(authoredStaticScriptContent);
+		if (content !== '') {
+			args.push({ type: 'Literal', value: content });
+		}
+	} else {
+		for (const child of node.children || []) {
+			const lowered = lowerJsxChild(
+				componentTag ? rewriteOpaqueTitles(child, ctx, 'opaque') : child,
+				ctx,
+			);
+			if (lowered !== null) args.push(lowered);
+		}
 	}
 	return {
 		type: 'CallExpression',
@@ -12089,7 +12153,7 @@ function normalizeChildren(nodes, inSvg = false) {
 				out.push({ type: 'HeadHoist', element: n });
 				continue;
 			}
-			out.push({
+			const element = {
 				type: 'Element',
 				id: n.openingElement.name,
 				attributes: n.openingElement.attributes || [],
@@ -12097,7 +12161,13 @@ function normalizeChildren(nodes, inSvg = false) {
 				children: n.children || [],
 				selfClosing: n.openingElement.selfClosing,
 				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
-			});
+			};
+			// Preserve @tsrx/core's raw-text script discriminator without changing
+			// the normalized object shape of every ordinary element.
+			if (elementTagName(element) === 'script' && typeof n.content === 'string') {
+				element.content = n.content;
+			}
+			out.push(element);
 		} else if (n.type === 'Tsx' || n.type === 'Tsrx' || n.type === 'JSXFragment') {
 			out.push(...normalizeChildren(n.children || [], inSvg));
 		} else if (n.type === 'JSXStyleElement') {
@@ -14318,6 +14388,9 @@ function emitElementHtml(
 
 	const tag = node.id?.name || node.openingElement?.name?.name;
 	if (!tag) throw new Error('Element without tag');
+	const authoredStaticScriptContent = staticScriptContent(node, tag);
+	const hasAuthoredStaticScriptBody =
+		authoredStaticScriptContent !== undefined && authoredStaticScriptContent.length > 0;
 	rejectVoidElementContent(tag, node, ctx);
 	rejectTextareaValueChildren(tag, node, ctx);
 	rejectDangerouslySetInnerHTMLChildren(tag, node, ctx);
@@ -14335,9 +14408,11 @@ function emitElementHtml(
 	// preceding binding just adopted/applied.
 	const potentialDangerouslySetInnerHTML = hasPotentialDangerouslySetInnerHTML(node);
 	const sourceChildren =
-		potentialDangerouslySetInnerHTML && hasOnlyDefinitelyNullishJsxChildren(node.children || [])
+		authoredStaticScriptContent !== undefined
 			? []
-			: node.children || [];
+			: potentialDangerouslySetInnerHTML && hasOnlyDefinitelyNullishJsxChildren(node.children || [])
+				? []
+				: node.children || [];
 	// React convention: later attributes win on collision. If ANY spread is
 	// present, attributes that come AFTER the first spread can't be inlined
 	// into the template HTML (the spread would clobber them at runtime) —
@@ -14374,7 +14449,8 @@ function emitElementHtml(
 	const hostClientSources = [];
 	let directChildrenClientBinding = null;
 	let hostCommitClientBinding = null;
-	const hasNestedJsxChildren = normalizeChildren(node.children || [], childNs === 'svg').length > 0;
+	const hasNestedJsxChildren =
+		hasAuthoredStaticScriptBody || normalizeChildren(sourceChildren, childNs === 'svg').length > 0;
 	const resolveDangerouslySetInnerHTMLAcrossSpreads = firstSpreadIdx !== -1;
 	const dangerHtmlClientSources = [];
 	const resolveFormControlsAcrossSpreads =
@@ -14934,6 +15010,9 @@ function emitElementHtml(
 
 	const isVoid = VOID_ELEMENTS.has(tag);
 	let html = isVoid ? `<${tag}${attrHtml}/>` : `<${tag}${attrHtml}>`;
+	if (authoredStaticScriptContent !== undefined) {
+		html += escapeInlineScriptContent(authoredStaticScriptContent);
+	}
 
 	const children = normalizeChildren(sourceChildren, childNs === 'svg');
 	// Special case: a single Text child (only-child text fast path).
@@ -15281,7 +15360,8 @@ function emitElementHtml(
 	}
 	if (
 		potentialDangerouslySetInnerHTML &&
-		hasDefinitelyNonNullishJsxChild(node.children || [], ctx.knownStringLocals)
+		(hasAuthoredStaticScriptBody ||
+			hasDefinitelyNonNullishJsxChild(node.children || [], ctx.knownStringLocals))
 	) {
 		bindings.push({
 			id: bindings.length,

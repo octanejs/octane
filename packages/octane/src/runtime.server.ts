@@ -1203,26 +1203,35 @@ function ssrHostElement(
 		} else if (rawInner !== undefined) {
 			inner = rawInner;
 		} else if (hasChildren) {
-			// A de-opt host whose children contain COMPONENTS renders those children on the
-			// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
-			// on hydration), so they must carry the full childSlot/block marker structure —
-			// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
-			// children are rebuilt by the client de-opt reconciler, so they stay as plain
-			// marker-less markup via `ssrDescriptorContent`.
-			const build = () =>
-				ssrInNamespace(childrenNamespace, () =>
-					iterableChildren || serverDescNeedsBlocks(children)
-						? ssrDeoptBlockChildren(children, scope)
-						: ssrDescriptorContent(children, scope),
-				);
-			// A controlled <select> projects `selected` onto the options serialized
-			// inside its children (compiled options included — the scope is global).
-			inner =
-				semanticTag === 'select' &&
-				props != null &&
-				(props.value != null || props.defaultValue != null)
-					? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
-					: build();
+			// Script-data does not decode HTML entities. A compiler-generated host
+			// descriptor therefore needs the same whole-body serializer as the direct
+			// template path. Join primitive arrays before escaping so a breakout token
+			// split across adjacent children cannot evade the boundary guard.
+			const scriptText = semanticTag === 'script' ? scriptDescriptorText(children) : null;
+			if (scriptText !== null) {
+				inner = escapeEntireInlineScriptContent(scriptText);
+			} else {
+				// A de-opt host whose children contain COMPONENTS renders those children on the
+				// client through `hostElementBody` → `childSlot` (a Block path that ADOPTS markers
+				// on hydration), so they must carry the full childSlot/block marker structure —
+				// emit them via `ssrChild` (the server analogue of childSlot). Pure host/text
+				// children are rebuilt by the client de-opt reconciler, so they stay as plain
+				// marker-less markup via `ssrDescriptorContent`.
+				const build = () =>
+					ssrInNamespace(childrenNamespace, () =>
+						iterableChildren || serverDescNeedsBlocks(children)
+							? ssrDeoptBlockChildren(children, scope)
+							: ssrDescriptorContent(children, scope),
+					);
+				// A controlled <select> projects `selected` onto the options serialized
+				// inside its children (compiled options included — the scope is global).
+				inner =
+					semanticTag === 'select' &&
+					props != null &&
+					(props.value != null || props.defaultValue != null)
+						? ssrSelectScope(props.value, props.defaultValue, !!props.multiple, build)
+						: build();
+			}
 		}
 		// <option> assembles via ssrOption so an active select scope can mark it
 		// ` selected` (its value prop already serialized as a plain attribute).
@@ -1298,6 +1307,25 @@ function serverDescNeedsBlocks(v: unknown): boolean {
 		return typeof d.type === 'function' || serverDescNeedsBlocks(d.children);
 	}
 	return false;
+}
+
+// Return one complete script-data string when a host descriptor contains only
+// primitive text children. `null` means the descriptor needs the ordinary
+// renderable-child path. This mirrors ssrDescriptorContent's primitive coercion
+// and empty handling without serializing HTML entities into script data.
+function scriptDescriptorText(v: unknown): string | null {
+	if (v == null || v === false || v === true || v === '') return '';
+	if (Array.isArray(v)) {
+		let out = '';
+		for (let i = 0; i < v.length; i++) {
+			const part = scriptDescriptorText(v[i]);
+			if (part === null) return null;
+			out += part;
+		}
+		return out;
+	}
+	if (typeof v === 'object' || typeof v === 'function') return null;
+	return String(v);
 }
 
 // Serialize the CONTENT inside a host descriptor (a `createElement(...)` child

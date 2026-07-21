@@ -1,16 +1,18 @@
 /**
- * Shared loader for executing a real fixture through Octane's server compiler.
+ * Shared loader for executing Octane compiler output in tests.
  *
- * Client fixtures should be imported normally through Vitest. This helper owns
- * the one unavoidable server-module evaluation boundary so SSR, streaming, and
- * hydration tests do not duplicate generated-import/export rewriting.
+ * Real client fixtures should normally be imported through Vitest. Tests that
+ * require source bytes which cannot live in a formatted fixture may use the
+ * source loader below. This module owns the generated import/export rewriting
+ * and the one unavoidable `new Function` boundary.
  */
 import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
+import * as ClientRuntime from '../src/index.js';
 
-export type ServerFixtureModule = Record<string, any>;
+export type CompiledFixtureModule = Record<string, any>;
 
 export interface ServerFixtureOptions {
 	/** Compiler module id. Defaults to the root-relative fixture path. */
@@ -19,27 +21,30 @@ export interface ServerFixtureOptions {
 	compileOptions?: Record<string, unknown>;
 }
 
-export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureModule>(
-	fixture: string,
-	options: ServerFixtureOptions = {},
+export interface CompiledFixtureSourceOptions {
+	/** Compiler module id used for diagnostics and source locations. */
+	id: string;
+	mode: 'client' | 'server';
+	/** Additional public compiler options; `mode` is always enforced. */
+	compileOptions?: Record<string, unknown>;
+}
+
+export function loadCompiledFixtureSource<T extends CompiledFixtureModule = CompiledFixtureModule>(
+	source: string,
+	options: CompiledFixtureSourceOptions,
 ): T {
-	const absolute = isAbsolute(fixture) ? fixture : resolve(process.cwd(), fixture);
-	const defaultId = '/' + relative(process.cwd(), absolute).split(sep).join('/');
-	let { code } = compile(readFileSync(absolute, 'utf8'), options.id ?? defaultId, {
+	const { id, mode } = options;
+	let { code } = compile(source, id, {
 		...options.compileOptions,
-		mode: 'server',
+		mode,
 	});
 
-	// Server compilation retargets Octane API imports to `octane/server`.
-	// Bind that generated import to the real public runtime supplied below.
+	const runtime = mode === 'server' ? ServerRuntime : ClientRuntime;
 	code = code.replace(
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
-		(_match: string, names: string) =>
-			`const {${names.replace(/\s+as\s+/g, ': ')}} = __serverRuntime;`,
+		(_match: string, names: string) => `const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`,
 	);
 
-	// Fixtures are authored as normal ESM. Publish named declarations onto a
-	// result object while keeping the compiler output otherwise executable.
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
 		(_match: string, asyncKeyword: string | undefined, name: string) =>
@@ -53,16 +58,27 @@ export function loadServerFixture<T extends ServerFixtureModule = ServerFixtureM
 
 	if (/^\s*import\s/m.test(code) || /^\s*export\s/m.test(code)) {
 		throw new Error(
-			`Server fixture ${fixture} contains an import/export shape the shared loader cannot evaluate.`,
+			`Compiled fixture ${id} contains an import/export shape the shared loader cannot evaluate.`,
 		);
 	}
 
 	const evaluate = new Function(
-		'__serverRuntime',
+		'__runtime',
 		'__exports',
-		`'use strict';\n` +
-			code +
-			`\n//# sourceURL=${options.id ?? defaultId}?server-fixture\nreturn __exports;`,
+		`'use strict';\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
-	return evaluate(ServerRuntime, {}) as T;
+	return evaluate(runtime, {}) as T;
+}
+
+export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(
+	fixture: string,
+	options: ServerFixtureOptions = {},
+): T {
+	const absolute = isAbsolute(fixture) ? fixture : resolve(process.cwd(), fixture);
+	const defaultId = '/' + relative(process.cwd(), absolute).split(sep).join('/');
+	return loadCompiledFixtureSource<T>(readFileSync(absolute, 'utf8'), {
+		id: options.id ?? defaultId,
+		mode: 'server',
+		compileOptions: options.compileOptions,
+	});
 }
