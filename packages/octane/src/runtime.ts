@@ -8020,6 +8020,20 @@ export function setScriptText(el: Element, value: any): void {
 	el.textContent = value == null ? '' : String(value);
 }
 
+// SSR replaces only the `s` in case-insensitive opening/closing script tokens.
+// Hydration compares against that serialized spelling after the same HTML parser
+// normalization as the server markup; later client updates use textContent
+// directly and therefore need no escape.
+const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
+
+function escapeInlineScriptContentForHydration(value: string): string {
+	return value.replace(
+		INLINE_SCRIPT_TOKEN,
+		(_match, prefix: string, s: string, suffix: string) =>
+			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
+	);
+}
+
 /** Parse raw HTML in its authored host context for hydration comparison. */
 function normalizeHTMLForHydration(parent: Element, html: string): string {
 	// Match React's comparison boundary: the browser canonicalizes equivalent
@@ -8040,7 +8054,10 @@ export function setHTML(el: Element, value: any): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.isFresh(el)) {
 		const server = el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML;
-		const expected = el.localName === 'script' ? next : normalizeHTMLForHydration(el, next);
+		const expected =
+			el.localName === 'script'
+				? normalizeHTMLForHydration(el, escapeInlineScriptContentForHydration(next))
+				: normalizeHTMLForHydration(el, next);
 		if (server === expected || isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
 			(el as any).__oct_loc,
