@@ -1771,6 +1771,9 @@ export default defineConfig({
 					name: 'cmdk',
 					include: ['packages/cmdk/tests/**/*.test.ts', '!packages/cmdk/tests/ssr/**/*.test.ts'],
 					environment: 'jsdom',
+					// Differential precompile for cmdk fixtures: rewrites
+					// `@octanejs/cmdk` → the real published `cmdk@1.1.1`.
+					globalSetup: ['packages/cmdk/tests/differential/_setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],

@@ -1,8 +1,8 @@
 // Command.Item. Registers itself, tracks selection, and fires onSelect via the
 // native cmdk select event (dispatched by the root's Enter handler or a click).
-import { useContext, useEffect, useId, useLayoutEffect, useRef } from 'octane';
+import { useContext, useEffect, useLayoutEffect, useRef } from 'octane';
 import { GroupContext, useCommand, useStore } from '../context.tsrx';
-import { useAsRef, useCmdk, useValue } from '../hooks.tsrx';
+import { useAsRef, useCmdk, useId, useValue } from '../hooks.tsrx';
 import { SELECT_EVENT } from '../lib/constants';
 import type { ItemProps } from '../types';
 

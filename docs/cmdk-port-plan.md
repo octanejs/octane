@@ -144,19 +144,19 @@ validation. Each phase carries a hard exit criterion and gets a
 - **Phase 1 — core static render.** `Command`, `Command.Input`, `Command.List`,
   `Command.Item`, `Command.Empty` with the store, registration, and `useValue`
   wired; `onInput`-driven search; filtering (no sort yet — non-matches unmount).
-  *Exit:* differential byte-equality vs real cmdk+React for
-  render → type-to-filter → empty-state, and an SSR test rendering all items in
-  source order. **Status: shipped 2026-07-21** (behavioral coverage — render,
-  value inference from textContent, first-item selection, filter, empty; the
-  differential + SSR layers land with the registration pass). Cleared open
-  risks #2 (`useSyncExternalStore` re-runs selectors on `emit`) and the
-  opaque-children question (value derives from `textContent`).
+  *Exit:* behavioral coverage of render → type-to-filter → empty-state, and an
+  SSR test rendering all items in source order. **Status: shipped 2026-07-21**
+  (render, value inference from textContent, first-item selection, filter,
+  empty; SSR landed in Phase 5). Cleared open risks #2
+  (`useSyncExternalStore` re-runs selectors on `emit`) and the opaque-children
+  question (value derives from `textContent`).
+  Differential parity against real cmdk + React landed later (see Evidence).
 - **Phase 2 — selection + keyboard + sort.** `aria-selected`/`data-selected`,
   first-item selection, arrow/Home/End/vim navigation, Enter → `onSelect`,
-  `scrollIntoView`, and score-ordered results. *Exit:* differential parity on
-  keyboard-driven selection and filtered ordering; behavioral test for the
-  imperative-sort/reconciler interaction (see Open risks). **Status: shipped
-  2026-07-21.** Cleared **open risk #1**: Octane tolerates cmdk's imperative
+  `scrollIntoView`, and score-ordered results. *Exit:* behavioral coverage of
+  keyboard-driven selection and filtered ordering, plus a test for the
+  imperative-sort/reconciler interaction (see Open risks). **Status: shipped 2026-07-21.**
+  Cleared **open risk #1**: Octane tolerates cmdk's imperative
   `appendChild` reordering — a narrowing-after-reorder test confirms no ghost
   nodes and no reconciler corruption; the final DOM order is correct. The port
   is faithful (no divergence needed) after fixing a real robustness bug in the
@@ -167,11 +167,11 @@ validation. Each phase carries a hard exit criterion and gets a
 - **Phase 3 — groups, separator, loading, controlled modes.** `Command.Group`
   (+heading), `Command.Separator` (`alwaysRender`), `Command.Loading`,
   controlled `value`/`onValueChange`, `loop`, `forceMount`, `shouldFilter`,
-  custom `filter`. *Exit:* differential parity for grouped + controlled fixtures.
-  **Status: shipped 2026-07-21** (behavioral coverage — grouped filtering + group
-  hiding, separator show/hide, loading progressbar, loop wrap, controlled value
-  via re-render; the differential layer lands with the registration pass).
-  Nested `GroupContext`, grouped item registration, and group-level visibility
+  custom `filter`. *Exit:* behavioral coverage of grouped + controlled fixtures.
+  **Status: shipped 2026-07-21** (grouped filtering + group hiding, group value
+  registration and group score ordering, separator show/hide, loading
+  progressbar, loop wrap, controlled value via re-render). Nested
+  `GroupContext`, grouped item registration, and group-level visibility
   filtering all work on Octane.
 - **Phase 4 — `Command.Dialog` + `asChild`.** Wrap `@octanejs/radix` `Dialog`;
   wire `Slot` for `asChild`. *Exit:* behavioral tests for open/close, focus, and
@@ -218,9 +218,10 @@ One test layer per bullet, following the sonner/nuqs layout; every test must run
   `cmdk`+React using the shared rig
   (`packages/octane/tests/differential/_rig.ts` `mountDifferential`, with this
   package's own `tests/differential/_setup.ts` and `.react-cache/`), asserting
-  byte-equal `innerHTML` after each `step`. Covers render, type-to-filter,
-  keyboard selection, grouped/controlled fixtures. (Focus/portal/`Command.Dialog`
-  get behavioral coverage — one shared document in the rig.)
+  byte-equal `innerHTML` after each `step` over render, type-to-filter, keyboard
+  selection, and grouped/controlled fixtures. (Focus/portal/`Command.Dialog`
+  stays behavioral — one shared document in the rig.) Documented divergences are
+  driven through `observe`; everything else is byte-compared.
 - **SSR + hydration** — `tests/ssr/` (node env, `renderToString`) for all-items
   source-order markup and stable ids; `tests/hydration.test.ts` for adoption
   with zero `console.error` and preserved node identity.
@@ -277,8 +278,18 @@ add one only if the port requires a fix inside `packages/octane`.
 
 ## Follow-up
 
-Hardening that does not change the public API: broaden differential fixtures to
-cover `vimBindings`/`disablePointerSelection` edge cases and IME composition;
-add `Command.Dialog` container/portal option coverage; revisit any `asChild`
-corner deferred in Phase 4; keep `status.json` `verified` and the `ssr` field
-honest as coverage grows.
+1. **Restore source order when a search is cleared.** The differential suite
+   surfaced this: `sort()` relocates matching items with `appendChild`, and when
+   the search clears React's reconciler puts the nodes it owns back in source
+   order while octane leaves them where they were moved. Same items and
+   selection, different residual order — recorded in `status.json`.
+2. **File a compiler diagnostic** for the trailing slot symbol: octane compiles a
+   custom-hook call as `withSlot(sym, hook, ...args, sym)`, so ANY custom hook
+   with an optional trailing parameter silently receives a Symbol when a caller
+   omits it (the `= []` default never fires). This cost this port a per-render
+   throw in `Group` that passing tests could not see.
+3. Hardening that does not change the public API: cover
+   `vimBindings`/`disablePointerSelection` edge cases and IME composition; add
+   `Command.Dialog` container/portal option coverage; revisit the `asChild`
+   decision from Phase 4; keep `status.json` `verified`, `surface` and `ssr`
+   honest as coverage grows.

@@ -9,23 +9,7 @@ import { flushEffects } from '../../octane/tests/_helpers';
 import { BasicMenu } from './_fixtures/basic.tsrx';
 
 const SERVER_HTML =
-	'<div tabindex="-1" cmdk-root=""><label cmdk-label="" for=":in-2:" id=":in-1:" ' +
-	'style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;' +
-	'clip:rect(0, 0, 0, 0);white-space:nowrap;border-width:0;">Command Menu</label>' +
-	'<!--[--><!--[--><!--[--><!--[--><input placeholder="Search…" cmdk-input="" autoComplete="off" ' +
-	'autoCorrect="off" spellCheck="false" aria-autocomplete="list" role="combobox" aria-expanded="true" ' +
-	'aria-controls=":in-0:" aria-labelledby=":in-1:" id=":in-2:" type="text" value=""/><!--]-->' +
-	'<!--[--><div cmdk-list="" role="listbox" tabindex="-1" aria-label="Suggestions" id=":in-0:">' +
-	'<div cmdk-list-sizer=""><!--[--><!--[--><!--[--><!--[--><div cmdk-empty="" role="presentation">' +
-	'<!--[-->No results found.<!--]--></div><!--]--><!--]--><!--]--><!--[--><!--[--><!--[-->' +
-	'<div id=":in-3:" cmdk-item="" role="option" aria-disabled="false" aria-selected="false" ' +
-	'data-disabled="false" data-selected="false"><!--[-->Apple<!--]--></div><!--]--><!--]--><!--]-->' +
-	'<!--[--><!--[--><!--[--><div id=":in-4:" cmdk-item="" role="option" aria-disabled="false" ' +
-	'aria-selected="false" data-disabled="false" data-selected="false"><!--[-->Banana<!--]--></div>' +
-	'<!--]--><!--]--><!--]--><!--[--><!--[--><!--[--><div id=":in-5:" cmdk-item="" role="option" ' +
-	'aria-disabled="false" aria-selected="false" data-disabled="false" data-selected="false">' +
-	'<!--[-->Cherry<!--]--></div><!--]--><!--]--><!--]--><!--]--></div></div>' +
-	'<!--]--><!--]--><!--]--><!--]--></div>';
+	'<div tabindex="-1" cmdk-root=""><label cmdk-label="" for="radix-:in-2:" id="radix-:in-1:" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0, 0, 0, 0);white-space:nowrap;border-width:0;">Command Menu</label><!--[--><!--[--><!--[--><!--[--><input placeholder="Search…" cmdk-input="" autoComplete="off" autoCorrect="off" spellCheck="false" aria-autocomplete="list" role="combobox" aria-expanded="true" aria-controls="radix-:in-0:" aria-labelledby="radix-:in-1:" id="radix-:in-2:" type="text" value=""/><!--]--><!--[--><div cmdk-list="" role="listbox" tabindex="-1" aria-label="Suggestions" id="radix-:in-0:"><div cmdk-list-sizer=""><!--[--><!--[--><!--[--><!--[--><div cmdk-empty="" role="presentation"><!--[-->No results found.<!--]--></div><!--]--><!--]--><!--]--><!--[--><!--[--><!--[--><div id="radix-:in-3:" cmdk-item="" role="option" aria-disabled="false" aria-selected="false" data-disabled="false" data-selected="false"><!--[-->Apple<!--]--></div><!--]--><!--]--><!--]--><!--[--><!--[--><!--[--><div id="radix-:in-4:" cmdk-item="" role="option" aria-disabled="false" aria-selected="false" data-disabled="false" data-selected="false"><!--[-->Banana<!--]--></div><!--]--><!--]--><!--]--><!--[--><!--[--><!--[--><div id="radix-:in-5:" cmdk-item="" role="option" aria-disabled="false" aria-selected="false" data-disabled="false" data-selected="false"><!--[-->Cherry<!--]--></div><!--]--><!--]--><!--]--><!--]--></div></div><!--]--><!--]--><!--]--><!--]--></div>';
 
 async function settle(): Promise<void> {
 	flushEffects();

@@ -1,9 +1,9 @@
 // Command (root). Owns the external store, item/group registration, filtering,
 // score sort, keyboard navigation, and controlled `value` handling, and provides
 // the store + command contexts to its children.
-import { useId, useLayoutEffect, useMemo, useRef } from 'octane';
+import { useLayoutEffect, useMemo, useRef } from 'octane';
 import { CommandContext, StoreContext } from '../context.tsrx';
-import { useAsRef, useLazyRef, useScheduleLayoutEffect } from '../hooks.tsrx';
+import { useAsRef, useId, useLazyRef, useScheduleLayoutEffect } from '../hooks.tsrx';
 import { defaultFilter } from '../filter';
 import { findNextSibling, findPreviousSibling } from '../lib/dom';
 import {
@@ -264,10 +264,19 @@ export function CommandRoot(props: CommandProps) @{
 			}
 		});
 
-		groups.sort((a, b) => b[1] - a[1]).forEach((group) => {
-			const element = listInnerRef.current?.querySelector(
-				`${GROUP_SELECTOR}[${VALUE_ATTR}="${encodeURIComponent(group[0])}"]`,
-			);
+		// OCTANE DIVERGENCE: upstream looks each group element up by
+		// `[cmdk-group=""][data-value="<groupId>"]`, but `data-value` holds the
+		// group's VALUE (its heading text), never its id — so upstream's selector
+		// can never match and its group reordering is effectively dead code.
+		// Resolve the id to its registered value and match on that instead, so
+		// groups genuinely reorder by their best item score. Comparing the
+		// attribute directly also avoids escaping problems for values containing
+		// quotes (upstream encodes the selector but writes `data-value` raw).
+		const groupElements = Array.from(listInsertionElement.querySelectorAll(GROUP_SELECTOR));
+		groups.sort((a, b) => b[1] - a[1]).forEach(([groupId]) => {
+			const groupValue = ids.current.get(groupId)?.value;
+			if (!groupValue) return;
+			const element = groupElements.find((el) => el.getAttribute(VALUE_ATTR) === groupValue);
 			if (element?.parentElement) element.parentElement.appendChild(element);
 		});
 	}
@@ -325,15 +334,19 @@ export function CommandRoot(props: CommandProps) @{
 
 	function scrollSelectedIntoView() {
 		const item = getSelectedItem();
-		if (item) {
-			if (item.parentElement?.firstChild === item) {
-				// First item in a group — keep the group heading in view too.
-				item.closest(GROUP_SELECTOR)?.querySelector(GROUP_HEADING_SELECTOR)?.scrollIntoView({
-					block: 'nearest',
-				});
-			}
-			item.scrollIntoView({ block: 'nearest' });
+		if (!item) return;
+		// Non-browser hosts (jsdom, SSR) do not implement scrollIntoView. Guard it
+		// here rather than relying on the scheduler swallowing the failure, so the
+		// scheduler is free to report genuine errors.
+		if (typeof item.scrollIntoView !== 'function') return;
+
+		if (item.parentElement?.firstChild === item) {
+			// First item in a group — keep the group heading in view too.
+			item.closest(GROUP_SELECTOR)?.querySelector(GROUP_HEADING_SELECTOR)?.scrollIntoView({
+				block: 'nearest',
+			});
 		}
+		item.scrollIntoView({ block: 'nearest' });
 	}
 
 	const last = () => updateSelectedToIndex(getValidItems().length - 1);

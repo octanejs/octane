@@ -1,11 +1,12 @@
 // Phase 1 behavior: the Command menu renders its items and the cmdk attribute
 // contract, infers item values from textContent, filters on input, selects the
 // first valid item, and shows Empty when nothing matches.
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushSync } from 'octane';
 import { flushEffects, mount } from '../../octane/tests/_helpers';
 import {
 	BasicMenu,
+	ControlledCallbackMenu,
 	ControlledMenu,
 	DialogMenu,
 	GroupedMenu,
@@ -13,6 +14,7 @@ import {
 	LoopMenu,
 	MenuWithSelect,
 	ReorderMenu,
+	ScoredGroupsMenu,
 } from './_fixtures/basic.tsrx';
 
 async function settle(): Promise<void> {
@@ -27,6 +29,24 @@ function type(input: HTMLInputElement, value: string): void {
 	input.value = value;
 	input.dispatchEvent(new Event('input', { bubbles: true }));
 }
+
+// A green test must also mean "nothing threw". Octane reports an exception
+// raised inside an effect through console.error WITHOUT failing the test, so a
+// broken hook can sit behind passing DOM assertions indefinitely (that is how a
+// per-render TypeError in Group's useValue went unnoticed). Fail on any noise.
+let consoleError: ReturnType<typeof vi.spyOn>;
+
+beforeEach(() => {
+	consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+	const calls = consoleError.mock.calls.map((call) => String(call[0]));
+	consoleError.mockRestore();
+	if (calls.length > 0) {
+		throw new Error(`Unexpected console.error during test:\n${calls.join('\n')}`);
+	}
+});
 
 describe('@octanejs/cmdk — Command (Phase 1)', () => {
 	it('renders the cmdk attribute contract and item values', async () => {
@@ -220,6 +240,42 @@ describe('@octanejs/cmdk — groups, separator, loading (Phase 3)', () => {
 		app.unmount();
 	});
 
+	it('registers each group value as data-value (from the heading)', async () => {
+		// Regression: Group omitted useValue's optional trailing `aliases`, so
+		// octane's trailing slot symbol landed there and `aliases.map` threw every
+		// render — aborting registration before context.value/setAttribute ran, so
+		// groups silently had no value at all.
+		const app = mount(GroupedMenu);
+		await settle();
+
+		expect(app.findAll('[cmdk-group]').map((el) => el.getAttribute('data-value'))).toEqual([
+			'Fruits',
+			'Vegetables',
+		]);
+
+		app.unmount();
+	});
+
+	it('reorders groups by their best item score', async () => {
+		// OCTANE DIVERGENCE: upstream resolves the group element by
+		// `[data-value="<groupId>"]`, but data-value holds the heading text, so its
+		// group reorder never fires. The port matches on the registered value.
+		const app = mount(ScoredGroupsMenu);
+		await settle();
+		const headings = () =>
+			app.findAll('[cmdk-group]').map((g) => g.querySelector('[cmdk-group-heading]')?.textContent);
+
+		expect(headings()).toEqual(['Beta', 'Alpha']);
+
+		// "a": Apple is a word-start match (high), Zebra matches late (low), so the
+		// Alpha group outranks Beta and moves above it.
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
+		await settle();
+		expect(headings()).toEqual(['Alpha', 'Beta']);
+
+		app.unmount();
+	});
+
 	it('shows the separator without a search and removes it during a search', async () => {
 		const app = mount(GroupedMenu);
 		await settle();
@@ -230,6 +286,53 @@ describe('@octanejs/cmdk — groups, separator, loading (Phase 3)', () => {
 		expect(app.container.querySelector('[cmdk-separator]')).toBeNull();
 
 		app.unmount();
+	});
+
+	it('keeps --cmdk-list-height in sync with the sizer', async () => {
+		// jsdom ships no ResizeObserver, so install one that reports immediately,
+		// and make rAF synchronous so the write is observable without waiting on
+		// jsdom's ~16ms frame timer. This asserts the observer wiring and the
+		// custom property, not jsdom layout (offsetHeight is always 0 there).
+		const observed: Element[] = [];
+		class FakeResizeObserver {
+			cb: () => void;
+			constructor(cb: () => void) {
+				this.cb = cb;
+			}
+			observe(el: Element) {
+				observed.push(el);
+				this.cb();
+			}
+			unobserve() {}
+			disconnect() {}
+		}
+		const globals = globalThis as unknown as Record<string, unknown>;
+		const realRaf = globals.requestAnimationFrame;
+		globals.ResizeObserver = FakeResizeObserver;
+		globals.requestAnimationFrame = (cb: (t: number) => void) => {
+			cb(0);
+			return 0;
+		};
+
+		// Unmount in `finally`: a failed assertion would otherwise leave this menu
+		// mounted and leak it into `document`, breaking later tests that query
+		// globally (Command.Dialog portals to document.body).
+		let app: ReturnType<typeof mount> | undefined;
+		try {
+			app = mount(BasicMenu);
+			await settle();
+
+			// It observes the sizer, and writes the property onto the list wrapper.
+			expect(observed).toHaveLength(1);
+			expect(observed[0]).toBe(app.find('[cmdk-list-sizer]'));
+			expect(
+				(app.find('[cmdk-list]') as HTMLElement).style.getPropertyValue('--cmdk-list-height'),
+			).toBe('0.0px');
+		} finally {
+			app?.unmount();
+			delete globals.ResizeObserver;
+			globals.requestAnimationFrame = realRaf;
+		}
 	});
 
 	it('renders Loading as a progressbar', async () => {
@@ -263,6 +366,34 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		expect(selectedText()).toBe('Apple');
 
 		app.unmount();
+	});
+
+	it('surfaces a throwing user callback instead of swallowing it', async () => {
+		// Regression: the scheduler isolated each queued callback with a bare
+		// `catch {}`, so a throwing onValueChange (reached via
+		// selectFirstItem -> setState('value')) disappeared silently.
+		const app = mount(ControlledCallbackMenu, {
+			value: '',
+			onValueChange: () => {
+				throw new Error('boom from onValueChange');
+			},
+		});
+		await settle();
+
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'app');
+		await settle();
+
+		// The failure is reported...
+		const reported = consoleError.mock.calls.map((call) => String(call[0]));
+		expect(reported.some((message) => message.includes('boom from onValueChange'))).toBe(true);
+
+		// ...and the rest of the scheduled work still ran (isolation preserved):
+		// filtering applied, so only Apple remains.
+		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple']);
+
+		app.unmount();
+		// This test asserts on the reported error itself, so clear it for the guard.
+		consoleError.mockClear();
 	});
 
 	it('controlled value drives the selection', async () => {

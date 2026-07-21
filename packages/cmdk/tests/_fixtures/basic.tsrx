@@ -55,6 +55,23 @@ export function GroupedMenu() @{
 	</Command>
 }
 
+// Source order (Beta, Alpha) differs from the score order for "a": Apple is a
+// word-start match (high) while Zebra matches late (low), so the Alpha group
+// outranks Beta and should sort above it.
+export function ScoredGroupsMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Group heading="Beta">
+				<Command.Item>Zebra</Command.Item>
+			</Command.Group>
+			<Command.Group heading="Alpha">
+				<Command.Item>Apple</Command.Item>
+			</Command.Group>
+		</Command.List>
+	</Command>
+}
+
 export function LoadingMenu() @{
 	<Command label="Command Menu">
 		<Command.List>
@@ -81,6 +98,21 @@ export function ControlledMenu(props: { value: string }) @{
 			<Command.Item>Apple</Command.Item>
 			<Command.Item>Banana</Command.Item>
 			<Command.Item>Cherry</Command.Item>
+		</Command.List>
+	</Command>
+}
+
+// Controlled selection, so setState('value') routes through onValueChange —
+// the path where a throwing user callback used to vanish inside the scheduler.
+export function ControlledCallbackMenu(props: {
+	value: string;
+	onValueChange: (value: string) => void;
+}) @{
+	<Command label="Command Menu" value={props.value} onValueChange={props.onValueChange}>
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Item>Apple</Command.Item>
+			<Command.Item>Banana</Command.Item>
 		</Command.List>
 	</Command>
 }

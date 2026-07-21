@@ -1,8 +1,8 @@
 // Command.Group. Registers itself, renders an optional heading, and hides when
 // no member item matches the search.
-import { useId, useLayoutEffect, useMemo, useRef } from 'octane';
+import { useLayoutEffect, useMemo, useRef } from 'octane';
 import { GroupContext, useCommand } from '../context.tsrx';
-import { useCmdk, useValue } from '../hooks.tsrx';
+import { useCmdk, useId, useValue } from '../hooks.tsrx';
 import type { GroupProps } from '../types';
 
 export function Group(props: GroupProps) @{
@@ -27,7 +27,11 @@ export function Group(props: GroupProps) @{
 	}, []);
 
 	// Value derives from the `value` prop or the heading's textContent.
-	useValue(id, ref, [props.value, headingRef]);
+	// `aliases` is passed explicitly (groups have no keywords): octane compiles a
+	// custom-hook call as `withSlot(sym, hook, ...args, sym)`, so an OMITTED
+	// optional trailing parameter receives the slot symbol instead of its default
+	// (`= []` only fires on `undefined`). See useValue in ../hooks.tsrx.
+	useValue(id, ref, [props.value, headingRef], []);
 
 	const contextValue = useMemo(() => ({ id, forceMount }), [forceMount]);
 

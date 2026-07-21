@@ -1,10 +1,27 @@
 // Custom hooks shared across the cmdk components. Kept in a `.tsrx` module so
 // octane's compiler owns their hook slots (the same pattern sonner uses for its
 // hooks.tsrx); consumers import and call them like any hook.
-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from 'octane';
+import {
+	useId as octaneUseId,
+	useLayoutEffect,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from 'octane';
 import { useCommand, useStore } from './context.tsrx';
 import { VALUE_ATTR } from './lib/constants';
 import type { State } from './types';
+
+/**
+ * cmdk takes its ids from `@radix-ui/react-id`, which prefixes the framework's
+ * `useId` with `radix-` so they read as Radix-owned and never collide with app
+ * ids. Match that here (rather than octane's bare `useId`) so the rendered
+ * `id`/`aria-*`/`for` wiring is shape-compatible with upstream — the
+ * differential suite compares it.
+ */
+export function useId(): string {
+	return `radix-${octaneUseId()}`;
+}
 
 /** A ref that always holds the latest value (updated in a layout effect). */
 export function useAsRef<T>(data: T) {
@@ -35,6 +52,14 @@ export function useCmdk<T>(selector: (state: State) => T): T {
  * Registers an item/group's value: from the provided `value` prop or the
  * rendered element's `textContent` (cmdk's string-child inspection is dropped
  * because octane's compiled children are opaque). Returns the value ref.
+ *
+ * NOTE on `aliases`: octane compiles a custom-hook call as
+ * `withSlot(sym, hook, ...args, sym)`, so the trailing slot symbol becomes an
+ * extra argument. A caller that OMITS this optional trailing parameter receives
+ * that symbol instead of the `= []` default (which only fires on `undefined`).
+ * Callers must therefore pass `aliases` explicitly, and the read below is
+ * defensive so a missed call site degrades to "no keywords" rather than
+ * throwing mid-effect (which silently aborts value registration).
  */
 export function useValue(
 	id: string,
@@ -57,7 +82,8 @@ export function useValue(
 			return undefined;
 		})();
 
-		const keywords = aliases.map((alias) => alias.trim());
+		const keywords =
+			Array.isArray(aliases) ? aliases.map((alias) => alias.trim()) : [];
 		context.value(id, value, keywords);
 		ref.current?.setAttribute(VALUE_ATTR, value ?? '');
 		valueRef.current = value;
@@ -82,8 +108,12 @@ export function useScheduleLayoutEffect() {
 		for (const f of pending) {
 			try {
 				f();
-			} catch {
-				// Ignore — a failed scheduled effect must not abort its siblings.
+			} catch (error) {
+				// Isolate, but never swallow. A scheduled callback can run user code
+				// (selectFirstItem -> setState('value') -> onValueChange), so a failure
+				// here must stay visible; report it the same way octane reports an
+				// exception raised inside an effect, and keep the siblings running.
+				console.error(error);
 			}
 		}
 	}, [s]);
