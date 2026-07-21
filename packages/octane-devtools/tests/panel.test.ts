@@ -89,6 +89,40 @@ describe('devtools panel', () => {
 		expect(document.querySelector('[data-octane-devtools-panel]')).toBeNull();
 	});
 
+	it('recovers when the bridge attaches after the initial wait instead of parking dead', async () => {
+		// A slow cold load can install the bridge after the panel's initial
+		// wait gives up. The panel must keep listening and attach late — not
+		// leak a dead host that only a reload can revive.
+		const app = mount(App);
+		const bridge = globalThis.__OCTANE_DEVTOOLS__!;
+		expect(bridge).toBeDefined();
+		globalThis.__OCTANE_DEVTOOLS__ = undefined;
+		const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+		vi.useFakeTimers();
+		const panel = mountDevtoolsPanel();
+		expect(panel).not.toBeNull();
+		try {
+			// The initial wait expires: one hint, no UI, host still present.
+			await vi.advanceTimersByTimeAsync(5100);
+			expect(info).toHaveBeenCalledTimes(1);
+			expect(shadow().querySelector('.trigger')).toBeNull();
+
+			// The bridge appears late; the next relaxed poll tick mounts the UI.
+			globalThis.__OCTANE_DEVTOOLS__ = bridge;
+			await vi.advanceTimersByTimeAsync(1100);
+			vi.useRealTimers();
+			await settle();
+			expect(shadow().querySelector('.trigger')).not.toBeNull();
+		} finally {
+			vi.useRealTimers();
+			globalThis.__OCTANE_DEVTOOLS__ = bridge;
+			info.mockRestore();
+			panel!.unmount();
+			app.unmount();
+		}
+		expect(document.querySelector('[data-octane-devtools-panel]')).toBeNull();
+	});
+
 	it('inspects a selected component and copies an agent prompt with its evidence', async () => {
 		const writeText = vi.fn(async () => {});
 		Object.defineProperty(navigator, 'clipboard', {
