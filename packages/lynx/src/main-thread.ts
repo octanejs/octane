@@ -803,7 +803,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		let prepared: LynxPreparedHostBatch;
-		const candidateFirstTree = firstTree;
+		// The opaque journal remains live after transfer only so first-screen event
+		// tokens can be resolved until background confirms listener ownership. It
+		// must never be offered to an already-populated background container again.
+		const candidateFirstTree = provisional ? firstTree : null;
 		try {
 			prepared = prepareLynxHostBatch(
 				record.container,
@@ -950,7 +953,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			message.root !== awaitingAdoption.root ||
 			message.version !== awaitingAdoption.version ||
 			message.root !== active.root ||
-			message.version !== active.acceptedVersion
+			message.version > active.acceptedVersion
 		) {
 			report(new Error('Octane Lynx received a stale or foreign adoption-ready message.'));
 			return;

@@ -297,6 +297,72 @@ describe.sequential('Lynx synchronous first-screen adoption', () => {
 		]);
 	});
 
+	it('accepts a later commit before adoption ownership is confirmed', () => {
+		const { dom, main } = installEnvironment();
+		firstScreenRoot.render(MainSingleHost, { id: 'first-screen' });
+		const inbound: LynxBackgroundInboundMessage[] = [];
+		let queuedSecondCommit = false;
+		mainContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+			const message = event.data as LynxBackgroundInboundMessage;
+			inbound.push(message);
+			if (message.type !== 'ack' || message.version !== 1 || queuedSecondCommit) return;
+			queuedSecondCommit = true;
+			backgroundContext().dispatchEvent({
+				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+				data: {
+					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+					renderer: LYNX_TRANSPORT_RENDERER,
+					root: 1,
+					version: 2,
+					type: 'commit',
+					batch: {
+						renderer: 'lynx',
+						version: 2,
+						commands: [{ op: 'update', id: 1, props: { id: 'after-adoption' } }],
+					},
+				},
+			});
+		});
+		main.markFirstScreenSyncReady();
+
+		const initial = renderLynxFirstScreen(MainSingleHost, { id: 'first-screen' });
+		backgroundContext().dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: 1,
+				version: 1,
+				type: 'commit',
+				batch: initial.batch,
+			},
+		});
+
+		expect(inbound.filter((message) => message.type === 'ack')).toEqual([
+			expect.objectContaining({ type: 'ack', version: 1, adoption: 'adopted' }),
+			expect.objectContaining({ type: 'ack', version: 2 }),
+		]);
+		expect(inbound.some((message) => message.type === 'reject')).toBe(false);
+		expect(dom.window.document.querySelector('#after-adoption')).not.toBeNull();
+		expect(main.activeIdentity()).toMatchObject({ root: 1, version: 2 });
+		expect(main.firstScreenSnapshot()).not.toBeNull();
+
+		backgroundContext().dispatchEvent({
+			type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+			data: {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: 1,
+				version: 1,
+				type: 'adoption-ready',
+			},
+		});
+
+		expect(main.firstScreenSnapshot()).toBeNull();
+		expect(main.activeIdentity()).toMatchObject({ root: 1, version: 2 });
+		expect(main.diagnostics()).toEqual([]);
+	});
+
 	it('can seal an entry with no first-screen render and unblock background readiness', () => {
 		const { main } = installEnvironment();
 		const inbound: LynxBackgroundInboundMessage[] = [];
