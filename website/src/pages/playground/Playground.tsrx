@@ -1,11 +1,18 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
-// LIVE rendered app or the compiled octane output, switchable with a tab. The
+// LIVE rendered app or the compiled output, switchable with a tab. The
+// compiled pane has two modes: PROD (the client-runtime emit of `compile()`)
+// and TYPES (the typed virtual TSX the IDE language service sees, via
+// `octane/compiler/volar`). Both modes support position mapping — placing the
+// cursor in the source highlights and scrolls the corresponding output ranges
+// into view, and vice versa (prod uses the compiler's real source map, types
+// uses the Volar token mappings; see src/lib/playground-mapping.ts). The
 // whole pipeline runs in the browser: `octane/compiler` (and sucrase for
 // React-host `.react.tsx` files) compiles the virtual files on a debounce, the
 // module graph executes inside a SANDBOXED IFRAME with an opaque origin (see
 // src/lib/playground.ts + playground-modules.ts + playground-sandbox.ts —
 // never in this page), and CodeMirror highlights through Shiki with the real
-// TSRX TextMate grammar (src/lib/shiki-codemirror.ts).
+// TSRX TextMate grammar (src/lib/shiki-codemirror.ts). Editors, panels, and
+// the preview canvas all follow the site's light/dark theme.
 //
 // Everything editor-related boots in an effect (dynamic imports), so SSR
 // renders just the static shell and hydration stays clean. A workspace is a
@@ -56,6 +63,9 @@ export function Playground() @{
 	useTitle('Octane — Playground');
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
+	// Which artifact the compiled pane shows: the prod client-runtime emit or
+	// the typed virtual TSX (a dev-emit option can join later).
+	const [compiledMode, setCompiledMode] = useState<'prod' | 'types'>('prod');
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
@@ -76,16 +86,37 @@ export function Playground() @{
 	const sourceHostRef = useRef<HTMLDivElement | null>(null);
 	const outputHostRef = useRef<HTMLDivElement | null>(null);
 	const previewHostRef = useRef<HTMLDivElement | null>(null);
+	// The boot closure runs once, so it can't read the view/mode STATE — this
+	// ref mirrors it (updated by the same handlers that set state) for the
+	// closure's output-refresh and position-mapping paths.
+	const resultModeRef = useRef<{ view: 'preview' | 'compiled'; compiledMode: 'prod' | 'types' }>({
+		view: 'preview',
+		compiledMode: 'prod',
+	});
 	// Imperative bridge into the boot closure below — populated once the editor
 	// stack has loaded; the toolbar buttons (and the consent overlay's Run
 	// button) call through it.
-	const controllerRef = useRef<{
-		switchLang?: (next: PlaygroundLang) => void;
-		selectExample?: (id: string) => void;
-		selectFile?: (name: string) => void;
-		formatActive?: () => void;
-		approveRun?: () => void;
-	}>({});
+	const controllerRef = useRef<
+		{
+			switchLang?: (next: PlaygroundLang) => void;
+			selectExample?: (id: string) => void;
+			selectFile?: (name: string) => void;
+			formatActive?: () => void;
+			approveRun?: () => void;
+			syncOutput?: () => void;
+		}
+	>({});
+
+	const selectView = (next: 'preview' | 'compiled') => {
+		setView(next);
+		resultModeRef.current.view = next;
+		controllerRef.current.syncOutput?.();
+	};
+	const selectCompiledMode = (next: 'prod' | 'types') => {
+		setCompiledMode(next);
+		resultModeRef.current.compiledMode = next;
+		controllerRef.current.syncOutput?.();
+	};
 
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
@@ -109,17 +140,19 @@ export function Playground() @{
 
 		(async () => {
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
-			let pgExamples: any;
+			let pgExamples: any, pgMapping: any;
 			try {
-				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgExamples] = await Promise.all([
-					import('@codemirror/state'),
-					import('@codemirror/commands'),
-					import('@codemirror/view'),
-					import('../../lib/shiki-codemirror.ts'),
-					import('../../lib/playground.ts'),
-					import('../../lib/playground-modules.ts'),
-					import('../../lib/playground-examples.ts'),
-				]);
+				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgExamples, pgMapping] =
+					await Promise.all([
+						import('@codemirror/state'),
+						import('@codemirror/commands'),
+						import('@codemirror/view'),
+						import('../../lib/shiki-codemirror.ts'),
+						import('../../lib/playground.ts'),
+						import('../../lib/playground-modules.ts'),
+						import('../../lib/playground-examples.ts'),
+						import('../../lib/playground-mapping.ts'),
+					]);
 			} catch (bootError) {
 				// A load failure after unmount (e.g. a test env torn down mid-import)
 				// must not become an unhandled rejection; while mounted, surface it.
@@ -130,9 +163,16 @@ export function Playground() @{
 			}
 			if (disposed) return;
 
-			const { EditorState, Compartment } = stateMod;
+			const { EditorState, Compartment, StateEffect, StateField } = stateMod;
 			const { history, defaultKeymap, historyKeymap, indentWithTab } = commandsMod;
-			const { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } = viewMod;
+			const {
+				EditorView,
+				keymap,
+				lineNumbers,
+				highlightActiveLine,
+				drawSelection,
+				Decoration,
+			} = viewMod;
 			const { shikiHighlight } = shikiMod;
 
 			type Workspace = { files: { name: string; source: string }[]; entry: string };
@@ -209,36 +249,35 @@ export function Playground() @{
 				setVariants(variantAvailability());
 			};
 
-			// github-dark canvas so the Shiki token colors sit on the palette they
-			// were designed for.
-			const sharedTheme = EditorView.theme(
-				{
-					'&': {
-						height: '100%',
-						backgroundColor: '#0d1117',
-						color: '#e6edf3',
-						fontSize: '0.85rem',
-					},
-					'.cm-scroller': {
-						overflow: 'auto',
-						fontFamily: 'ui-monospace, SFMono-Regular, \'SF Mono\', Menlo, Consolas, \'Liberation Mono\', monospace',
-					},
-					'.cm-content': { padding: '1rem 0.25rem 1.25rem' },
-					'.cm-gutters': {
-						backgroundColor: '#0d1117',
-						color: 'rgba(230, 237, 243, 0.35)',
-						border: 'none',
-					},
-					'.cm-activeLine, .cm-activeLineGutter': {
-						backgroundColor: 'rgba(110, 118, 129, 0.12)',
-					},
-					'.cm-selectionBackground': {
-						backgroundColor: 'rgba(56, 139, 253, 0.35) !important',
-					},
-					'.cm-cursor': { borderLeftColor: '#e6edf3' },
+			// Theme-variable canvas: the same custom properties the rest of the
+			// site swaps per `data-theme`, so both editors follow the ThemeToggle
+			// live (token colors flip through the dual-theme .cm-shiki rules).
+			const sharedTheme = EditorView.theme({
+				'&': {
+					height: '100%',
+					backgroundColor: 'var(--code-bg)',
+					color: 'var(--text)',
+					fontSize: '0.85rem',
 				},
-				{ dark: true },
-			);
+				'.cm-scroller': {
+					overflow: 'auto',
+					fontFamily: 'ui-monospace, SFMono-Regular, \'SF Mono\', Menlo, Consolas, \'Liberation Mono\', monospace',
+				},
+				'.cm-content': { padding: '1rem 0.25rem 1.25rem' },
+				'.cm-gutters': {
+					backgroundColor: 'var(--code-bg)',
+					color: 'var(--text-secondary)',
+					border: 'none',
+					opacity: '0.7',
+				},
+				'.cm-activeLine, .cm-activeLineGutter': {
+					backgroundColor: 'var(--surface)',
+				},
+				'.cm-selectionBackground': {
+					backgroundColor: 'rgba(56, 139, 253, 0.35) !important',
+				},
+				'.cm-cursor': { borderLeftColor: 'var(--text)' },
+			});
 
 			preview = pg.createPreview(previewHost, (message: string) => {
 				if (!disposed) setError(message);
@@ -248,13 +287,120 @@ export function Playground() @{
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
 			};
 
-			// The compiled-output pane tracks the ACTIVE file; keep the last good
-			// graph around so switching tabs doesn't need a recompile.
-			let lastCompiled: Map<string, string> | null = null;
-			const showCompiledFor = (name: string) => {
-				const code = lastCompiled?.get(name);
-				if (typeof code === 'string') replaceDoc(outputView, code);
+			// The compiled-output pane tracks the ACTIVE file and the selected
+			// mode (prod emit vs typed virtual TSX); the last good graph is kept
+			// so tab/mode switches don't need a recompile. `mapping` is derived
+			// lazily per artifact and cached on it (compiled-module identity is
+			// stable across rebuilds while a file's source is unchanged).
+			let lastCompiled: Map<string, any> | null = null;
+			// name → { source, code, mapping } — the types view is generated on
+			// demand for the active file only, keyed by the exact source.
+			const typesCache = new Map<string, { source: string; code: string; mapping: any }>();
+
+			const typesEntry = (name: string) => {
+				const source = fileSource(name);
+				const cached = typesCache.get(name);
+				if (cached && cached.source === source) return cached;
+				let entry: { source: string; code: string; mapping: any };
+				if (pgModules.isReactHostFile(name)) {
+					entry = {
+						source,
+						code: '// Types output covers Octane files (.tsrx / .tsx).\n// ' + name +
+							' is a React-host file compiled with sucrase, so it has no typed virtual TSX.',
+						mapping: null,
+					};
+				} else {
+					const result = pg.compileTypes(source, name);
+					entry = result.ok
+						? { source, code: result.code, mapping: pgMapping.mappingFromVolar(result.mappings) }
+						: { source, code: '// Types generation failed:\n// ' + result.error, mapping: null };
+				}
+				typesCache.set(name, entry);
+				return entry;
 			};
+
+			const showOutput = () => {
+				const code =
+					resultModeRef.current.compiledMode === 'types'
+						? typesEntry(currentFile).code
+						: lastCompiled?.get(currentFile)?.code;
+				if (typeof code !== 'string') return;
+				if (outputView.state.doc.toString() === code) return;
+				replaceDoc(outputView, code);
+			};
+
+			// ── Source ↔ output position mapping ─────────────────────────────
+			// Placing the cursor in one editor highlights and reveals the mapped
+			// ranges in the other (see playground-mapping.ts for the semantics).
+			const setMapped = StateEffect.define();
+			const mappedMark = Decoration.mark({ class: 'cm-mapped' });
+			const mappedField = StateField.define({
+				create: () => Decoration.none,
+				update(value: any, tr: any) {
+					for (const effect of tr.effects) if (effect.is(setMapped)) return effect.value;
+					// Any edit (or an output refresh) invalidates the offsets.
+					return tr.docChanged ? Decoration.none : value;
+				},
+				provide: (field: any) => EditorView.decorations.from(field),
+			});
+
+			// The mapping for the visible artifact, or null when navigation must
+			// stay off: preview mode, no map (React-host files), or offsets that
+			// no longer describe what's on screen (edits inside the compile
+			// debounce, a failed recompile leaving a stale pane).
+			const activeMapping = () => {
+				if (resultModeRef.current.view !== 'compiled') return null;
+				const liveSource = sourceView.state.doc.toString();
+				if (resultModeRef.current.compiledMode === 'types') {
+					const entry = typesEntry(currentFile);
+					if (entry.source !== liveSource) return null;
+					if (outputView.state.doc.toString() !== entry.code) return null;
+					return entry.mapping;
+				}
+				const entry = lastCompiled?.get(currentFile);
+				if (!entry || !entry.map || entry.source !== liveSource) return null;
+				if (outputView.state.doc.toString() !== entry.code) return null;
+				entry.mapping ??= pgMapping.mappingFromSourceMap(entry.map, entry.source, entry.code);
+				return entry.mapping;
+			};
+
+			const revealRanges = (targetView: any, ranges: { from: number; to: number }[]) => {
+				const limit = targetView.state.doc.length;
+				const clamped = ranges.filter((range: { from: number }) => range.from < limit).map(
+					(range: { from: number; to: number }) => ({
+						from: range.from,
+						to: Math.min(range.to, limit),
+					}),
+				);
+				if (clamped.length === 0) return;
+				targetView.dispatch({
+					effects: [
+						setMapped.of(
+							Decoration.set(
+								clamped.map(
+									(range: { from: number; to: number }) => mappedMark.range(range.from, range.to),
+								),
+							),
+						),
+						EditorView.scrollIntoView(clamped[0].from, { y: 'center' }),
+					],
+				});
+			};
+
+			const crossNavigate = (side: 'source' | 'output') => EditorView.updateListener.of(
+				(update: any) => {
+					if (!update.selectionSet || update.docChanged) return;
+					// Only user-driven cursor moves navigate — programmatic dispatches
+					// (doc replacement, highlight effects) must not feed back.
+					if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
+					const mapping = activeMapping();
+					if (!mapping) return;
+					const offset = update.state.selection.main.head;
+					const ranges =
+						side === 'source' ? mapping.toGenerated(offset) : mapping.toSource(offset);
+					if (ranges) revealRanges(side === 'source' ? outputView : sourceView, ranges);
+				},
+			);
 
 			let compileSeq = 0;
 			const compileAndRun = async () => {
@@ -282,7 +428,7 @@ export function Playground() @{
 				);
 				setError('');
 				lastCompiled = graph.compiled;
-				showCompiledFor(currentFile);
+				showOutput();
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.
 				if (executionGated) return;
@@ -369,6 +515,8 @@ export function Playground() @{
 					EditorState.tabSize.of(2),
 					shikiHighlight(grammarFor(name)),
 					sharedTheme,
+					mappedField,
+					crossNavigate('source'),
 					EditorView.updateListener.of((update: any) => {
 						if (!update.docChanged) return;
 						const next = update.state.doc.toString();
@@ -394,7 +542,7 @@ export function Playground() @{
 				const existing = editorStates.get(stateKey(name));
 				sourceView.setState(existing ?? makeEditorState(name, fileSource(name)));
 				setActiveFile(name);
-				showCompiledFor(name);
+				showOutput();
 			};
 
 			sourceView = new EditorView({
@@ -412,6 +560,8 @@ export function Playground() @{
 						EditorView.lineWrapping,
 						shikiHighlight('tsx'),
 						sharedTheme,
+						mappedField,
+						crossNavigate('output'),
 					],
 				}),
 				parent: outputHost,
@@ -457,6 +607,7 @@ export function Playground() @{
 				workspaces[nextLang] = pgExamples.exampleWorkspace(example, nextLang);
 				currentFile = workspace().entry;
 				editorStates.clear();
+				typesCache.clear();
 				sourceView.setState(makeEditorState(currentFile, fileSource(currentFile)));
 				// Picking an example is the visitor's own action — never gated.
 				executionGated = false;
@@ -503,6 +654,11 @@ export function Playground() @{
 				updateHash();
 			};
 
+			controllerRef.current.syncOutput = () => {
+				if (disposed || resultModeRef.current.view !== 'compiled') return;
+				showOutput();
+			};
+
 			publishWorkspaceState();
 			void compileAndRun();
 			if (initialDiagnostic) setError(initialDiagnostic);
@@ -516,6 +672,7 @@ export function Playground() @{
 			controllerRef.current.selectFile = undefined;
 			controllerRef.current.formatActive = undefined;
 			controllerRef.current.approveRun = undefined;
+			controllerRef.current.syncOutput = undefined;
 			window.clearTimeout(compileDebounceId);
 			window.clearTimeout(hashDebounceId);
 			sourceView?.destroy();
@@ -578,16 +735,16 @@ export function Playground() @{
 				<button
 					type="button"
 					class={['pg-seg-btn', view === 'preview' && 'active']}
-					onClick={() => setView('preview')}
+					onClick={() => selectView('preview')}
 				>
 					Preview
 				</button>
 				<button
 					type="button"
 					class={['pg-seg-btn', view === 'compiled' && 'active']}
-					onClick={() => setView('compiled')}
+					onClick={() => selectView('compiled')}
 				>
-					Compiled output
+					Compiled
 				</button>
 			</div>
 		</div>
@@ -646,8 +803,29 @@ export function Playground() @{
 			<section class={['pg-panel', pane !== 'result' && 'mobile-hidden']} aria-label="Result">
 				<div class="pg-panel-head">
 					<span>
-						{view === 'preview' ? 'Live preview' : 'Compiled output · ' + (activeFile || '…')}
+						{view === 'preview'
+							? 'Live preview'
+							: (compiledMode === 'types' ? 'Types output · ' : 'Compiled output · ') +
+								(activeFile || '…')}
 					</span>
+					@if (view === 'compiled') {
+						<div class="pg-seg pg-seg-sm" role="group" aria-label="Compiled output mode">
+							<button
+								type="button"
+								class={['pg-seg-btn', compiledMode === 'prod' && 'active']}
+								onClick={() => selectCompiledMode('prod')}
+							>
+								Prod
+							</button>
+							<button
+								type="button"
+								class={['pg-seg-btn', compiledMode === 'types' && 'active']}
+								onClick={() => selectCompiledMode('types')}
+							>
+								Types
+							</button>
+						</div>
+					}
 				</div>
 				<div class={['pg-result', view !== 'preview' && 'hidden']}>
 					<div class="pg-preview" ref={previewHostRef} />
@@ -768,6 +946,15 @@ export function Playground() @{
 				border: 1px solid var(--border);
 				background: var(--surface-subtle);
 			}
+			/* Compact variant for the panel-head Prod/Types switch. */
+			.pg-seg-sm {
+				padding: 2px;
+			}
+			.pg-seg-sm .pg-seg-btn {
+				font-size: 0.68rem;
+				padding: 0.12rem 0.6rem;
+				letter-spacing: 0.06em;
+			}
 			.pg-seg-btn {
 				border: none;
 				background: transparent;
@@ -842,12 +1029,12 @@ export function Playground() @{
 				flex-direction: column;
 				min-width: 0;
 				min-height: 0;
-				border-top: 1px solid rgba(255, 255, 255, 0.1);
+				border-top: 1px solid var(--border);
 				overflow: hidden;
-				background: #0d1117;
+				background: var(--code-bg);
 			}
 			.pg-panel + .pg-panel {
-				border-left: 1px solid rgba(255, 255, 255, 0.1);
+				border-left: 1px solid var(--border);
 			}
 			.pg-panel-head {
 				display: flex;
@@ -855,9 +1042,9 @@ export function Playground() @{
 				justify-content: space-between;
 				gap: 1rem;
 				padding: 0.45rem 0.9rem;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-				background: rgba(255, 255, 255, 0.03);
-				color: #99a1b3;
+				border-bottom: 1px solid var(--border);
+				background: var(--surface-subtle);
+				color: var(--text-secondary);
 				font-size: 0.72rem;
 				letter-spacing: 0.08em;
 				text-transform: uppercase;
@@ -870,7 +1057,7 @@ export function Playground() @{
 			.pg-tab {
 				border: none;
 				background: transparent;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font: inherit;
 				font-size: 0.78rem;
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -881,10 +1068,10 @@ export function Playground() @{
 				cursor: pointer;
 			}
 			.pg-tab:hover {
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.pg-tab.active {
-				color: #ff5d72;
+				color: var(--accent-text);
 				background: rgba(255, 65, 90, 0.14);
 			}
 			.pg-loading {
@@ -905,6 +1092,11 @@ export function Playground() @{
 			.pg-editor :global(.cm-editor) {
 				height: 100%;
 			}
+			/* Ranges revealed by source↔output position mapping. */
+			.pg-editor :global(.cm-mapped) {
+				background: rgba(56, 139, 253, 0.28);
+				border-radius: 2px;
+			}
 			.pg-result {
 				position: relative;
 				display: flex;
@@ -912,11 +1104,12 @@ export function Playground() @{
 				min-height: 0;
 			}
 			/* The preview is a sandboxed iframe (opaque origin) — the content's
-			   background/padding live in its srcdoc, not here. */
+			   background/padding live in its srcdoc, not here (the parent relays
+			   theme flips over the sandbox protocol). */
 			.pg-preview {
 				flex: 1;
 				min-height: 0;
-				background: #16181d;
+				background: var(--code-bg);
 			}
 			.pg-consent {
 				position: absolute;
@@ -924,7 +1117,7 @@ export function Playground() @{
 				display: grid;
 				place-items: center;
 				padding: 1.25rem;
-				background: rgba(13, 17, 23, 0.72);
+				background: var(--header-bg);
 				backdrop-filter: blur(6px);
 			}
 			.pg-consent-card {
@@ -934,14 +1127,14 @@ export function Playground() @{
 				justify-items: start;
 				padding: 1.1rem 1.25rem;
 				border-radius: 12px;
-				border: 1px solid rgba(255, 255, 255, 0.12);
-				background: #16181d;
-				color: #f4eee8;
+				border: 1px solid var(--border-strong);
+				background: var(--panel);
+				color: var(--text);
 				font-size: 0.9rem;
 			}
 			.pg-consent-card p {
 				margin: 0;
-				color: #99a1b3;
+				color: var(--text-secondary);
 			}
 			.pg-consent-run {
 				font: inherit;
@@ -950,7 +1143,7 @@ export function Playground() @{
 				border-radius: 8px;
 				border: 1px solid rgba(255, 93, 114, 0.5);
 				background: rgba(255, 65, 90, 0.14);
-				color: #ff5d72;
+				color: var(--accent-text);
 				cursor: pointer;
 			}
 			.pg-consent-run:disabled {

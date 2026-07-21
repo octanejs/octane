@@ -119,13 +119,17 @@ pre.shiki {
 	tab-size: 2;
 }
 /* Shiki dual-theme tokens (defaultColor: false — see mdx-options.ts). Dark is
-   the default token set; light overrides it under [data-theme='light']. */
+   the default token set; light overrides it under [data-theme='light']. The
+   playground's CodeMirror marks (shiki-codemirror.ts) carry the same custom
+   properties on .cm-shiki spans. */
 .shiki,
-.shiki span {
+.shiki span,
+.cm-shiki {
 	color: var(--shiki-dark);
 }
 :root[data-theme='light'] .shiki,
-:root[data-theme='light'] .shiki span {
+:root[data-theme='light'] .shiki span,
+:root[data-theme='light'] .cm-shiki {
 	color: var(--shiki-light);
 }
 `;

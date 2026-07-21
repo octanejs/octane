@@ -25,6 +25,19 @@ export interface PlaygroundFile {
 	source: string;
 }
 
+/**
+ * One file's compiled artifact for the "Compiled output" pane: the pre-rewrite
+ * code, its source map (null for React-host files — sucrase output isn't
+ * mapped), and the exact source the compile saw (position mappings are only
+ * valid against it). Object identity is stable across graph rebuilds while the
+ * file's source is unchanged, so consumers may cache derived data on it.
+ */
+export interface CompiledModule {
+	code: string;
+	map: unknown;
+	source: string;
+}
+
 export interface ModuleGraph {
 	ok: true;
 	entry: string;
@@ -33,7 +46,7 @@ export interface ModuleGraph {
 	modules: { name: string; code: string }[];
 	warnings: { file: string; diagnostic: CompileDiagnostic }[];
 	/** Per-file compiled output (pre-rewrite), for the "Compiled output" pane. */
-	compiled: Map<string, string>;
+	compiled: Map<string, CompiledModule>;
 }
 
 export interface ModuleGraphFailure {
@@ -60,10 +73,12 @@ export function isReactHostFile(name: string): boolean {
 const SIBLING_EXTENSIONS = ['', '.tsrx', '.tsx', '.react.tsx'];
 
 // Compilation is re-run on every debounced keystroke; memoize per (name,
-// source) so only the edited file recompiles.
+// source) so only the edited file recompiles. The ok-shape doubles as the
+// pane's `CompiledModule` (same object across rebuilds — see that interface).
 const compileCache = new Map<string, { source: string; result: CachedCompile }>();
 type CachedCompile =
-	{ ok: true; code: string; warnings: CompileDiagnostic[] } | { ok: false; error: string };
+	| ({ ok: true; warnings: CompileDiagnostic[] } & CompiledModule)
+	| { ok: false; error: string };
 
 async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 	const cached = compileCache.get(file.name);
@@ -81,7 +96,7 @@ async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 				jsxImportSource: 'react',
 				production: true,
 			});
-			result = { ok: true, code: out.code, warnings: [] };
+			result = { ok: true, code: out.code, map: null, source: file.source, warnings: [] };
 		} catch (error) {
 			result = {
 				ok: false,
@@ -89,7 +104,8 @@ async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 			};
 		}
 	} else {
-		result = compilePlayground(file.source, file.name);
+		const compiled = compilePlayground(file.source, file.name);
+		result = compiled.ok ? { ...compiled, source: file.source } : compiled;
 	}
 	compileCache.set(file.name, { source: file.source, result });
 	return result;
@@ -123,7 +139,7 @@ export async function buildModuleGraph(
 	const { init, parse } = await import('es-module-lexer');
 	await init;
 
-	const compiled = new Map<string, string>();
+	const compiled = new Map<string, CompiledModule>();
 	const rewritten = new Map<string, string>();
 	const siblingDeps = new Map<string, string[]>();
 	const warnings: ModuleGraph['warnings'] = [];
@@ -131,7 +147,7 @@ export async function buildModuleGraph(
 	for (const file of files) {
 		const out = await compileFile(file);
 		if (!out.ok) return { ok: false, error: out.error };
-		compiled.set(file.name, out.code);
+		compiled.set(file.name, out);
 		for (const diagnostic of out.warnings) warnings.push({ file: file.name, diagnostic });
 
 		let imports;
