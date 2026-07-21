@@ -161,6 +161,22 @@
     "note": "intra-octane de-opt cliff: plain-.ts createElement vs compiled .tsrx SSR (known ~2.1x). Bounds the cliff so a broken fast path (ratio\u21921) or a runaway deopt (ratio>4) both surface."
   },
   {
+    "suite": "news",
+    "op": "hydrate",
+    "target": "octane-tsrx",
+    "reference": "svelte",
+    "maxRatio": 1.3,
+    "note": "octane hydrateRoot() vs svelte hydrate() at 50 cards, paired in the same run. Measured 1.17x on 2026-07-22, BEFORE the P0 (static template namespaces) / P1 (template-free prod hydration validation) fixes \u2014 this guard exists because the 1.38\u21921.70ms hydrate regression went unnoticed with only an SSR guard. TIGHTEN to ~1.1 once P0/P1 land."
+  },
+  {
+    "suite": "news",
+    "op": "hydrate",
+    "target": "octane-jsx",
+    "reference": "svelte",
+    "maxRatio": 1.6,
+    "note": "the same hydrate guard for the JSX dialect (shared hydration core, regresses together): measured 1.45x on 2026-07-22 (JSX carries ~1.24x dialect overhead over .tsrx hydrate). Tighten to ~1.35 once the P0/P1 hydration fixes land."
+  },
+  {
     "suite": "bundle-size",
     "op": "js_gzip",
     "target": "octane-jsx",
