@@ -97,15 +97,12 @@ describe('parser fixes (tsrx 0.1.29)', () => {
 		r.unmount();
 	});
 
-	it('WhitespaceInIf: `as string` inside an @if body does not leak into compiled JS', () => {
-		// The pin is COMPILE-TIME — the fixture loading at all proves the
-		// stripTsOnlyWrappers pass works. Without the fix, rolldown rejects the
-		// emitted `'  spaced  ' as string;` with "Type assertion expressions can
-		// only be used in TypeScript files." Body renders nothing today (an
-		// expression-statement at @if body position is not lifted into a JSX
-		// child by current normalize semantics — separate parser-semantics
-		// ticket, tsrx d14ec84f).
+	it('WhitespaceInIf: a cast string in an expression-only arm renders', () => {
+		// Loading proves stripTsOnlyWrappers kept the assertion out of emitted JS;
+		// the text assertion prevents that successful compile from hiding a dropped
+		// expression-only directive arm.
 		const r = mount(WhitespaceInIf, { show: true });
+		expect(r.find('p').textContent).toBe('  spaced  ');
 		r.unmount();
 	});
 });
