@@ -20,5 +20,25 @@
     "@octanejs/tanstack-router": "workspace:*",
     "octane": "workspace:*",
     "vitest": "catalog:default"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/tanstack-router-ssr-query"
+  },
+  "license": "MIT",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
   }
 }

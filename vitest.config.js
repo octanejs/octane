@@ -1218,6 +1218,19 @@ export default defineConfig({
 				test: {
 					name: 'three',
 					include: ['packages/three/tests/**/*.test.ts'],
+					// Compatibility lanes (CI swaps in a different Three release) select
+					// Octane-owned behavior tests only: the differential oracle stays
+					// pinned to its exact r172 pair and the browser suites depend on the
+					// pinned bundle contract. Enforced HERE because the compat script's
+					// CLI --exclude flags proved unreliable once `pnpm add
+					// --lockfile=false` re-keys the workspace's vitest instances.
+					exclude:
+						process.env.OCTANE_THREE_COMPAT_VERSION !== undefined
+							? [
+									'packages/three/tests/**/*differential.test.ts',
+									'packages/three/tests/browser/**/*.test.ts',
+								]
+							: [],
 					environment: 'jsdom',
 					globalSetup: ['packages/three/tests/_react-setup.ts'],
 					globals: false,
