@@ -1055,30 +1055,51 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					{ timeout: 15_000 },
 				);
 			// Click the Nth occurrence of a token inside an editor pane (Shiki
-			// splits tokens into their own spans, so search per text node).
+			// splits tokens into their own spans, so search per text node). The
+			// rect is measured after a double rAF: CodeMirror applies a prior
+			// reveal's scroll in a DEFERRED measure phase, and clicking a rect
+			// captured before that flush lands on whatever scrolled into the
+			// stale coordinates (a CI-speed flake). A token outside the
+			// scroller's visible box resolves null instead of clicking through.
 			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
 				const point = await page.evaluate(
-					([index, needle, wanted]) => {
-						const content = document.querySelectorAll('.pg-editor .cm-content')[index as number];
-						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
-						let seen = 0;
-						while (walker.nextNode()) {
-							const node = walker.currentNode;
-							let at = -1;
-							while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
-								if (++seen < (wanted as number)) continue;
-								const range = document.createRange();
-								range.setStart(node, at + 1);
-								range.setEnd(node, at + 2);
-								const rect = range.getBoundingClientRect();
-								return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-							}
-						}
-						return null;
-					},
+					([index, needle, wanted]) =>
+						new Promise<{ x: number; y: number } | null>((resolve) =>
+							requestAnimationFrame(() =>
+								requestAnimationFrame(() => {
+									const content =
+										document.querySelectorAll('.pg-editor .cm-content')[index as number];
+									const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+									let seen = 0;
+									while (walker.nextNode()) {
+										const node = walker.currentNode;
+										let at = -1;
+										while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
+											if (++seen < (wanted as number)) continue;
+											const range = document.createRange();
+											range.setStart(node, at + 1);
+											range.setEnd(node, at + 2);
+											const rect = range.getBoundingClientRect();
+											const scroller = content.closest('.cm-scroller')!.getBoundingClientRect();
+											if (rect.top < scroller.top || rect.bottom > scroller.bottom) {
+												return resolve(null);
+											}
+											return resolve({
+												x: rect.x + rect.width / 2,
+												y: rect.y + rect.height / 2,
+											});
+										}
+									}
+									resolve(null);
+								}),
+							),
+						),
 					[paneIndex, token, occurrence] as const,
 				);
-				expect(point, `${token} (occurrence ${occurrence}) not visible in pane`).not.toBeNull();
+				expect(
+					point,
+					`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
+				).not.toBeNull();
 				await page.mouse.click(point!.x, point!.y);
 			};
 			const mappedIn = (paneIndex: number, token: string) =>
