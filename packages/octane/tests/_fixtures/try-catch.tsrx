@@ -25,9 +25,7 @@ export function RenderBoundary(props) @{
 			</div>
 		} @catch (err, reset) {
 			<div class="caught">
-				<span class="msg">
-					{err.message as string}
-				</span>
+				<span class="msg">{err.message as string}</span>
 				<button onClick={() => reset()}>{'retry'}</button>
 			</div>
 		}
@@ -43,9 +41,7 @@ export function EffectBoundary(props) @{
 			</div>
 		} @catch (err) {
 			<div class="caught">
-				<span class="msg">
-					{err.message as string}
-				</span>
+				<span class="msg">{err.message as string}</span>
 			</div>
 		}
 	</>
@@ -64,15 +60,11 @@ export function Nested() @{
 				@try {
 					<AlwaysThrows />
 				} @catch (err) {
-					<span class="inner-msg">
-						{'inner: ' + err.message as string}
-					</span>
+					<span class="inner-msg">{'inner: ' + err.message as string}</span>
 				}
 			</div>
 		} @catch (err) {
-			<span class="outer-msg">
-				{'outer: ' + err.message as string}
-			</span>
+			<span class="outer-msg">{'outer: ' + err.message as string}</span>
 		}
 	</>
 }
@@ -83,14 +75,10 @@ export function StatefulInside() @{
 	<>
 		@try {
 			<div class="wrap">
-				<button id="inc" onClick={() => setN(n + 1)}>
-					{n as string}
-				</button>
+				<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
 			</div>
 		} @catch (err) {
-			<span class="caught">
-				{err.message as string}
-			</span>
+			<span class="caught">{err.message as string}</span>
 		}
 	</>
 }

@@ -21,13 +21,16 @@ type PartnersGridProps = {
 	partnersList?: PartnerItem[];
 };
 
-const tierLayout: Record<PartnerTier, {
-	flexBasis: string;
-	minHeight: string;
-	logoMaxWidth: string;
-	logoMaxHeight: string;
-	padding: string;
-}> = {
+const tierLayout: Record<
+	PartnerTier,
+	{
+		flexBasis: string;
+		minHeight: string;
+		logoMaxWidth: string;
+		logoMaxHeight: string;
+		padding: string;
+	}
+> = {
 	gold: {
 		flexBasis: 'basis-full sm:basis-1/2',
 		minHeight: 'min-h-[220px]',
@@ -133,9 +136,9 @@ export function PartnersGrid({ analyticsPlacement = 'grid', partnersList }: Part
 					class="px-4 pt-3 pb-2 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2"
 				>
 					<span class={flare.iconColor}>{flare.icon}</span>
-					<span class={`text-[10px] uppercase tracking-[0.18em] font-semibold ${flare.labelColor}`}>
-						{partnerTierLabels[row.tier] as string}
-					</span>
+					<span
+						class={`text-[10px] uppercase tracking-[0.18em] font-semibold ${flare.labelColor}`}
+					>{partnerTierLabels[row.tier] as string}</span>
 				</div>
 				<div class="flex flex-wrap items-stretch -mr-px -mb-px">{row.partners.map((partner) => {
 					const index = slotIndex++;

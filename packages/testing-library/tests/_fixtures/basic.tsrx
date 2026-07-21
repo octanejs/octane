@@ -5,15 +5,11 @@ export function Greeting(props) @{
 }
 
 export function Message(props) @{
-	<span data-testid="message">
-		{props.text as string}
-	</span>
+	<span data-testid="message">{props.text as string}</span>
 }
 
 export function OtherMessage(props) @{
-	<p data-testid="other">
-		{props.text as string}
-	</p>
+	<p data-testid="other">{props.text as string}</p>
 }
 
 // `wrapper` render-option target — renders its children inside a landmark the

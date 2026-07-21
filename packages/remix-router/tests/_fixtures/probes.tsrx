@@ -24,9 +24,7 @@ export const nav: { fn?: any; revalidator?: any } = {};
 export function NavPage(props: { label: string }) @{
 	const navigate = useNavigate();
 	nav.fn = navigate;
-	<h1>
-		{props.label as string}
-	</h1>
+	<h1>{props.label as string}</h1>
 }
 
 export function StateProbe() @{
@@ -40,9 +38,7 @@ export function StatusProbe() @{
 	const text = isRouteErrorResponse(error)
 		? error.status + ' ' + error.statusText
 		: 'not-a-response';
-	<p class="status">
-		{text as string}
-	</p>
+	<p class="status">{text as string}</p>
 }
 
 export function RouteLoaderDataProbe(props: { routeId: string }) @{

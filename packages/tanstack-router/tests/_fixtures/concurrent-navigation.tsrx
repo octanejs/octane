@@ -50,9 +50,7 @@ let activePromise: Promise<string> | null = null;
 
 function SlowPage() @{
 	const value = use(activePromise!);
-	<h1 class="slow">
-		{value as string}
-	</h1>
+	<h1 class="slow">{value as string}</h1>
 }
 
 // Builds a router whose '/slow' route suspends on `deferred.promise`.

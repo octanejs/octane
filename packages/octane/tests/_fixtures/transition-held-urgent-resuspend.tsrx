@@ -39,9 +39,7 @@ function Child(props) @{
 	const [, start] = useTransition();
 	props.bindStart(start);
 	const v = use(props.promiseFor(value));
-	<span id="content">
-		{'content-' + v as string}
-	</span>
+	<span id="content">{'content-' + v as string}</span>
 }
 
 export function HeldUrgentResuspend(props) @{
@@ -66,9 +64,7 @@ export function HeldUrgentBodyResuspend(props) @{
 		@try {
 			const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 			const v = use(props.promiseFor(value));
-			<span id="content">
-				{'content-' + v as string}
-			</span>
+			<span id="content">{'content-' + v as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -81,9 +77,7 @@ export function FreshUrgentSuspend(props) @{
 	<div>
 		@try {
 			const v = use(props.promiseFor(props.value));
-			<span id="content">
-				{'content-' + v as string}
-			</span>
+			<span id="content">{'content-' + v as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}

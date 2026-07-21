@@ -36,9 +36,7 @@ type RendererProps = {
 function DefaultRenderer(props: RendererProps) @{
 	<span
 		class={'characters-limit ' + (props.remainingCharacters < 0 ? 'characters-limit-exceeded' : '')}
-	>
-		{props.remainingCharacters as unknown as string}
-	</span>
+	>{props.remainingCharacters as unknown as string}</span>
 }
 
 type Props = {

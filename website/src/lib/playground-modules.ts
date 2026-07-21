@@ -63,8 +63,7 @@ const SIBLING_EXTENSIONS = ['', '.tsrx', '.tsx', '.react.tsx'];
 // source) so only the edited file recompiles.
 const compileCache = new Map<string, { source: string; result: CachedCompile }>();
 type CachedCompile =
-	| { ok: true; code: string; warnings: CompileDiagnostic[] }
-	| { ok: false; error: string };
+	{ ok: true; code: string; warnings: CompileDiagnostic[] } | { ok: false; error: string };
 
 async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 	const cached = compileCache.get(file.name);

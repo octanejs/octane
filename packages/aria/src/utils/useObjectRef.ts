@@ -21,20 +21,14 @@ export function useObjectRef<T>(
 // Slot-threading form: sibling ported hooks pass their derived sub-slot as the trailing arg.
 export function useObjectRef<T>(
 	ref:
-		| ((instance: T | null) => (() => void) | void)
-		| MutableRefObject<T | null>
-		| null
-		| undefined,
+		((instance: T | null) => (() => void) | void) | MutableRefObject<T | null> | null | undefined,
 	slot: symbol | undefined,
 ): MutableRefObject<T | null>;
 export function useObjectRef(...args: any[]): any {
 	const [user, slotArg] = splitSlot(args);
 	const slot = slotArg ?? S('useObjectRef');
 	const ref = user[0] as
-		| ((instance: any) => (() => void) | void)
-		| MutableRefObject<any>
-		| null
-		| undefined;
+		((instance: any) => (() => void) | void) | MutableRefObject<any> | null | undefined;
 
 	const objRef: MutableRefObject<any> = useRef(null, subSlot(slot, 'obj'));
 	const cleanupRef: MutableRefObject<(() => void) | void> = useRef(

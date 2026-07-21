@@ -836,12 +836,9 @@ function detectCodeSplitGroupingsFromRoute(opts) {
 				programPath.traverse({
 					CallExpression(path) {
 						if (!t.isIdentifier(path.node.callee)) return;
-						if (
-							!(
-								path.node.callee.name === 'createRoute' ||
-								path.node.callee.name === 'createFileRoute'
-							)
-						)
+						if (!(
+							path.node.callee.name === 'createRoute' || path.node.callee.name === 'createFileRoute'
+						))
 							return;
 						function babelHandleSplittingGroups(routeOptions) {
 							if (t.isObjectExpression(routeOptions))

@@ -9,24 +9,18 @@ export function BindingsDirectory() @{
 			@for (const category of BINDING_CATEGORIES; key category.title) {
 				<section class="binding-card">
 					<header class="binding-card-head">
-						<h3>
-							{category.title as string}
-						</h3>
+						<h3>{category.title as string}</h3>
 						<span class="binding-count">
 							{category.packages.length +
 								(category.packages.length === 1 ? ' binding' : ' bindings')}
 						</span>
 					</header>
-					<p class="binding-description">
-						{category.description as string}
-					</p>
+					<p class="binding-description">{category.description as string}</p>
 					<ul class="binding-list">
 						@for (const packageName of category.packages; key packageName) {
 							<li>
 								<a class="binding-link" href={bindingRepositoryHref(packageName)}>
-									<code>
-										{packageName as string}
-									</code>
+									<code>{packageName as string}</code>
 								</a>
 							</li>
 						}

@@ -88,7 +88,8 @@ export function RenderErrorBoundary(props: RenderErrorBoundaryProps) @{
 	}
 }
 
-type CaughtErrorViewProps = Omit<RenderErrorBoundaryProps, 'children'> & {
+type CaughtErrorViewProps =
+	Omit<RenderErrorBoundaryProps, 'children'> & {
 		caught: unknown;
 		reset: () => void;
 	};

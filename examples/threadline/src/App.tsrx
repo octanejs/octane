@@ -72,9 +72,7 @@ function NavItem({
 		} @else {
 			<PersonIcon />
 		}
-		<span>
-			{label as string}
-		</span>
+		<span>{label as string}</span>
 	</a>
 }
 
@@ -89,9 +87,7 @@ function Avatar({
 		class={'avatar avatar-' + size}
 		style={{ backgroundColor: person.accent }}
 		aria-hidden="true"
-	>
-		{person.initials as string}
-	</span>
+	>{person.initials as string}</span>
 }
 
 function NoticeBar({
@@ -106,12 +102,8 @@ function NoticeBar({
 	@if (notice.tone === 'error') {
 		<div class="notice notice-error" role="alert">
 			<div>
-				<strong>
-					{notice.title as string}
-				</strong>
-				<p>
-					{notice.message as string}
-				</p>
+				<strong>{notice.title as string}</strong>
+				<p>{notice.message as string}</p>
 			</div>
 			<div class="notice-actions">
 				@if (notice.retry) {
@@ -131,12 +123,8 @@ function NoticeBar({
 	} @else {
 		<div class="notice notice-success" role="status">
 			<div>
-				<strong>
-					{notice.title as string}
-				</strong>
-				<p>
-					{notice.message as string}
-				</p>
+				<strong>{notice.title as string}</strong>
+				<p>{notice.message as string}</p>
 			</div>
 			<button
 				class="icon-button"
@@ -245,24 +233,18 @@ function PostCard({
 					href={profileHref}
 					onClick={(event) => openRoute(event, profileHref, navigate)}
 				>
-					<strong>
-						{author.name as string}
-					</strong>
+					<strong>{author.name as string}</strong>
 					<span>{'@' + author.handle}</span>
 				</a>
 				<span class="meta-separator">·</span>
-				<time>
-					{post.time as string}
-				</time>
+				<time>{post.time as string}</time>
 				@if (post.status === 'sending') {
 					<span class="post-status sending">Sending…</span>
 				} @else if (post.status === 'published') {
 					<span class="post-status published">Published</span>
 				}
 			</header>
-			<p class="post-copy">
-				{post.body as string}
-			</p>
+			<p class="post-copy">{post.body as string}</p>
 			<footer class="post-actions">
 				<span class="post-action passive" aria-label={'Replies to post by ' + author.name}>
 					<ReplyIcon />
@@ -310,9 +292,7 @@ function ProfileHeader({
 			<Avatar person={person} size="large" />
 			<div class="profile-name-row">
 				<div>
-					<h1 id="profile-title">
-						{person.name as string}
-					</h1>
+					<h1 id="profile-title">{person.name as string}</h1>
 					<p>{'@' + person.handle}</p>
 				</div>
 				@if (person.handle !== 'avery') {
@@ -326,17 +306,11 @@ function ProfileHeader({
 					</button>
 				}
 			</div>
-			<p class="profile-bio">
-				{person.bio as string}
-			</p>
+			<p class="profile-bio">{person.bio as string}</p>
 			<p class="profile-counts">
-				<strong>
-					{person.following as string}
-				</strong>
+				<strong>{person.following as string}</strong>
 				Following
-				<strong>
-					{person.followers as string}
-				</strong>
+				<strong>{person.followers as string}</strong>
 				Followers
 			</p>
 		</div>
@@ -422,9 +396,7 @@ function RightRail({
 				>
 					<Avatar person={person} size="small" />
 					<span>
-						<strong>
-							{person.name as string}
-						</strong>
+						<strong>{person.name as string}</strong>
 						<small>{'@' + handle}</small>
 					</span>
 					<span class="row-arrow" aria-hidden="true">→</span>

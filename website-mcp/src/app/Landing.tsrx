@@ -47,13 +47,9 @@ export function Landing() @{
 			@for (const tool of TOOLS; key tool[0]) {
 				<>
 					<dt>
-						<code>
-							{tool[0] as string}
-						</code>
+						<code>{tool[0] as string}</code>
 					</dt>
-					<dd>
-						{tool[1] as string}
-					</dd>
+					<dd>{tool[1] as string}</dd>
 				</>
 			}
 		</dl>
@@ -64,13 +60,9 @@ export function Landing() @{
 			@for (const endpoint of ENDPOINTS; key endpoint[0]) {
 				<>
 					<dt>
-						<code>
-							{endpoint[0] as string}
-						</code>
+						<code>{endpoint[0] as string}</code>
 					</dt>
-					<dd>
-						{endpoint[1] as string}
-					</dd>
+					<dd>{endpoint[1] as string}</dd>
 				</>
 			}
 		</dl>

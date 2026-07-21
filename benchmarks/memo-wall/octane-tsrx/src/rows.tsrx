@@ -26,9 +26,7 @@ export const ThemeB = createContext('t0');
 function Leaf(props) @{
 	window.__renders['leaf' + props.wall]++;
 	const theme = useContext(props.wall === 'A' ? ThemeA : ThemeB);
-	<span class="leaf">
-		{theme as string}
-	</span>
+	<span class="leaf">{theme as string}</span>
 }
 
 // The nested memo boundary INSIDE Row — a memo'd pure indirection wrapping the
@@ -46,12 +44,8 @@ const Inner = memo(InnerImpl);
 function RowImpl(props) @{
 	window.__renders['row' + props.wall]++;
 	<div class="item">
-		<span class="id" onClick={props.onSelect}>
-			{props.id as string}
-		</span>
-		<span class="label">
-			{props.label as string}
-		</span>
+		<span class="id" onClick={props.onSelect}>{props.id as string}</span>
+		<span class="label">{props.label as string}</span>
 		<Inner value={props.value} wall={props.wall} />
 	</div>
 }

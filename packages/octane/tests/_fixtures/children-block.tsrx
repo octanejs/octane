@@ -27,8 +27,6 @@ export function TextChildren() @{
 // Render-prop child → called with `{ name: 'payload' }`.
 export function RenderPropChildren() @{
 	<Consumer>
-		{(data) => <span class="rp">
-			{data.name as string}
-		</span>}
+		{(data) => <span class="rp">{data.name as string}</span>}
 	</Consumer>
 }

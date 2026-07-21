@@ -1,9 +1,7 @@
-export function DiscordIcon({
-	className,
-	width = '1em',
-	height = '1em',
-	...props
-}: Record<string, any>) {
+export function DiscordIcon({ className, width = '1em', height = '1em', ...props }: Record<
+	string,
+	any
+>) {
 	return <svg
 		viewBox="0 0 640 512"
 		fill="currentColor"

@@ -6,9 +6,7 @@ export function PersistsAcrossRenders() @{
 	const ref = useRef(0);
 	const [tick, setTick] = useState(0);
 	<div>
-		<span class="value">
-			{ref.current as string}
-		</span>
+		<span class="value">{ref.current as string}</span>
 		<button
 			id="bump"
 			onClick={() => {
@@ -27,9 +25,7 @@ export function MutationDoesNotRerender(props) @{
 		ref.current++;
 	};
 	props.bumpHandle.read = () => ref.current;
-	<span class="count">
-		{props.tick as string}
-	</span>
+	<span class="count">{props.tick as string}</span>
 }
 
 // Ref identity is stable across renders.
@@ -37,9 +33,7 @@ export function StableIdentity(props) @{
 	const ref = useRef({ data: 'inner' });
 	const [tick, setTick] = useState(0);
 	props.observe(ref);
-	<button onClick={() => setTick(tick + 1)}>
-		{tick as string}
-	</button>
+	<button onClick={() => setTick(tick + 1)}>{tick as string}</button>
 }
 
 // Ref inside an if-branch resets to its initial value when the branch unmounts/remounts.
@@ -56,9 +50,7 @@ export function RefInIf() @{
 					ref.current++;
 					force(ref.current);
 				}}
-			>
-				{ref.current as string}
-			</button>
+			>{ref.current as string}</button>
 		}
 	</div>
 }
@@ -73,9 +65,7 @@ function RowWithRef(props) @{
 				counter.current++;
 				force(counter.current);
 			}}
-		>
-			{props.label + ':' + counter.current as string}
-		</button>
+		>{props.label + ':' + counter.current as string}</button>
 	</li>
 }
 
@@ -160,9 +150,7 @@ function Counter(props) @{
 		}),
 		[props.api],
 	);
-	<span class="counter">
-		{n as string}
-	</span>
+	<span class="counter">{n as string}</span>
 }
 
 export function ImperativeOwner(props) @{
@@ -177,7 +165,5 @@ export function ImperativeOwner(props) @{
 export function LazyInit(props) @{
 	const ref = useRef(props.factory());
 	const [tick, setTick] = useState(0);
-	<button onClick={() => setTick(tick + 1)}>
-		{'init-value:' + ref.current as string}
-	</button>
+	<button onClick={() => setTick(tick + 1)}>{'init-value:' + ref.current as string}</button>
 }

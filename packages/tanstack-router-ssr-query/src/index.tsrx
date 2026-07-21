@@ -9,7 +9,8 @@ import { setupCoreRouterSsrQueryIntegration } from '@tanstack/router-ssr-query-c
 import type { RouterSsrQueryOptions } from '@tanstack/router-ssr-query-core';
 import type { AnyRouter } from '@octanejs/tanstack-router';
 
-export type Options<TRouter extends AnyRouter> = RouterSsrQueryOptions<TRouter> & {
+export type Options<TRouter extends AnyRouter> =
+	RouterSsrQueryOptions<TRouter> & {
 		wrapQueryClient?: boolean;
 	};
 

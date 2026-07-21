@@ -1197,7 +1197,7 @@ function vtMarkDirtyFromCurrentBlock(): void {
 function vtRangeElements(block: Block): Element[] {
 	const els: Element[] = [];
 	if (block.startMarker !== null && block.endMarker !== null) {
-		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker; ) {
+		for (let n = block.startMarker.nextSibling; n !== null && n !== block.endMarker;) {
 			if (n.nodeType === 1) els.push(n as Element);
 			n = n.nextSibling;
 		}
@@ -3825,15 +3825,16 @@ function unmountBlockInner(block: Block, detachDom: boolean): void {
 			let n: Node | null = excl ? block.startMarker.nextSibling : block.startMarker;
 			const stop = excl ? block.endMarker : block.endMarker.nextSibling;
 			while (n && n !== stop) {
-				const next: Node | null = n.nextSibling;
+				const next: Node | null = getNextSibling(n);
 				parent.removeChild(n);
 				n = next;
 			}
 		}
 	} else if (block.kind === 'root') {
 		// Root block — clear the whole container.
-		while (block.parentNode.firstChild) {
-			block.parentNode.removeChild(block.parentNode.firstChild);
+		let c: Node | null;
+		while ((c = getFirstChild(block.parentNode)) !== null) {
+			block.parentNode.removeChild(c);
 		}
 	}
 	// else: a non-root block with no markers produced no DOM (e.g. a singleRoot
@@ -4126,8 +4127,7 @@ export function useState<T>(initial?: T | (() => T), slot?: HookSlot): StateTupl
 				if (stageTransitionValue(s!, block, operation, computed)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
-							| TransitionActionUpdate<T>
-							| undefined;
+							TransitionActionUpdate<T> | undefined;
 						if (update !== undefined) {
 							update.profileType = 'state';
 							update.profileSlot = slot;
@@ -4265,8 +4265,7 @@ export function useReducer<S, A, I = S>(
 				if (stageTransitionValue(s!, block, operation, computed, true)) {
 					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
 						const update = s!.pendingActionBatch?.updates.get(s!) as
-							| TransitionActionUpdate<S>
-							| undefined;
+							TransitionActionUpdate<S> | undefined;
 						if (update !== undefined) {
 							update.profileType = 'reducer';
 							update.profileSlot = slot;
@@ -4430,8 +4429,7 @@ export function useMemo<T>(
 	const [d, s] = resolveHookArgs('useMemo', deps, slot);
 	const scope = CURRENT_SCOPE!;
 	const prev = scope.hooks?.get(s) as
-		| { deps: any[] | undefined; value: T; warmEpisode?: number }
-		| undefined;
+		{ deps: any[] | undefined; value: T; warmEpisode?: number } | undefined;
 	// deps === undefined → recompute every render (`null` at the public API;
 	// direct/uncompiled omitted calls also retain this runtime fallback).
 	if (prev && d !== undefined && !depsChanged(prev.deps, d)) {
@@ -5590,7 +5588,7 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	}
 	if (state.preservedFallbackNodes === null) {
 		const snapshot: Node[] = [];
-		for (let node = state.start.nextSibling; node !== null && node !== state.end; ) {
+		for (let node = state.start.nextSibling; node !== null && node !== state.end;) {
 			snapshot.push(node.cloneNode(true));
 			node = node.nextSibling;
 		}
@@ -6930,8 +6928,7 @@ export function lazy<C extends ComponentBody<any>>(load: () => PromiseLike<{ def
 				(lazyWrapper as any).__compare = (prev: any, next: any): boolean => {
 					const current = resolveLazyModule(result);
 					const compare = (current as any).__compare as
-						| ((previous: any, incoming: any) => boolean)
-						| undefined;
+						((previous: any, incoming: any) => boolean) | undefined;
 					const previous = lazyResolvedProps(current, prev);
 					const incoming = lazyResolvedProps(current, next);
 					return compare ? compare(previous, incoming) : shallowEqualProps(previous, incoming);
@@ -7022,6 +7019,90 @@ export function useId(slot?: HookSlot): string {
 }
 
 // ---------------------------------------------------------------------------
+// DOM operations bootstrap (Svelte's operations.js technique, measured for
+// octane on the js-framework / dbmon / news suites).
+//
+// Two independent tricks, both initialized lazily so importing the runtime in
+// a DOM-less process (compiler tooling, node-only tests) stays safe:
+//
+// 1. `firstChild` / `nextSibling` reads on the runtime's SHARED helpers
+//    (`child`, `sibling`, the hydration cursor walks, range clears) see every
+//    DOM hidden class — element tags, Text, Comment — at ONE call site, so the
+//    property access goes megamorphic. Calling the native accessor through a
+//    cached function reference keeps those sites monomorphic: the C++ accessor
+//    doesn't dispatch on the receiver's map. (Compiled template walks —
+//    `_root.firstChild.nextSibling…` — stay raw property access on purpose:
+//    each generated mount has its own per-template call sites, which V8 keeps
+//    mono/polymorphic already.)
+//
+// 2. The runtime polls expando slots on nodes that mostly DON'T carry them —
+//    `$$<type>` handler bundles + `$$portalParent` on every ancestor of every
+//    delegated event, `$$portalEnd`/`$$deoptKey` in the de-opt child scans,
+//    `$$ctrl`/`__oct_suppress` on form/hydration paths. A read of a property
+//    the object does NOT have walks the whole prototype chain and cannot be
+//    negatively cached as well as a hit. Pre-seeding the key as `undefined` on
+//    the prototype turns every such miss into a fast constant proto hit.
+//    Handler-slot keys are seeded per delegated event type at registration
+//    (delegateEvents / delegateCaptureEvents), the fixed set here.
+// ---------------------------------------------------------------------------
+
+let firstChildGetter: ((this: Node) => Node | null) | undefined;
+let nextSiblingGetter: ((this: Node) => Node | null) | undefined;
+
+function getFirstChild(node: Node): Node | null {
+	// Fallback keeps DOM-less/uninitialized callers correct; the branch is a
+	// single well-predicted check once initDomOperations has run.
+	return firstChildGetter === undefined ? node.firstChild : firstChildGetter.call(node);
+}
+
+function getNextSibling(node: Node): Node | null {
+	return nextSiblingGetter === undefined ? node.nextSibling : nextSiblingGetter.call(node);
+}
+
+/** Pre-seed one expando key on a prototype (see bootstrap comment, trick 2). */
+function seedExpando(proto: object, key: string): void {
+	if (!(key in proto)) (proto as any)[key] = undefined;
+}
+
+let domOperationsReady = false;
+
+/**
+ * One-time client bootstrap. Called from every cold entry that precedes DOM
+ * work — parseTemplate (first template mount), root creation/hydration, and
+ * delegation-target registration — and a no-op everywhere without a DOM.
+ */
+function initDomOperations(): void {
+	if (domOperationsReady || typeof Element === 'undefined') return;
+	domOperationsReady = true;
+	const nodeProto = Node.prototype;
+	firstChildGetter = Object.getOwnPropertyDescriptor(nodeProto, 'firstChild')?.get;
+	nextSiblingGetter = Object.getOwnPropertyDescriptor(nodeProto, 'nextSibling')?.get;
+	const elementProto = Element.prototype;
+	if (Object.isExtensible(elementProto)) {
+		// Polled on every delegated event's ancestor walk.
+		seedExpando(elementProto, '$$portalParent');
+		// De-opt child scans poll these on every owned child.
+		seedExpando(elementProto, '$$portalEnd');
+		seedExpando(elementProto, '$$deoptKey');
+		// Controlled-form and hydration-suppression checks.
+		seedExpando(elementProto, '$$ctrl');
+		seedExpando(elementProto, '__oct_suppress');
+		// clone()/drainFrag() fragment-wrapper discriminants.
+		seedExpando(elementProto, '__oct_frag');
+		seedExpando(elementProto, '__oct_vfrag');
+		if (process.env.NODE_ENV !== 'production') {
+			seedExpando(elementProto, '__oct_loc');
+		}
+	}
+	// The de-opt/portal scans also poll Text and Comment children (both inherit
+	// from CharacterData).
+	if (typeof CharacterData !== 'undefined' && Object.isExtensible(CharacterData.prototype)) {
+		seedExpando(CharacterData.prototype, '$$portalEnd');
+		seedExpando(CharacterData.prototype, '$$deoptKey');
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Templates: inert module token → parse on first mount → clone per instance
 // ---------------------------------------------------------------------------
 
@@ -7048,6 +7129,7 @@ interface LazyTemplateRecord {
 const LAZY_TEMPLATE = Symbol('octane.lazy-template');
 
 function parseTemplate(html: string, ns: 0 | 1 | 2, frag: number): Element {
+	initDomOperations();
 	const t = document.createElement('template');
 	if (ns === 0) {
 		// Fixed HTML multi-root templates arrive pre-wrapped by the compiler. Opaque
@@ -7590,7 +7672,7 @@ class HydrationCapability {
 	}
 
 	htext(el: Node, text: string, loc?: string): Text {
-		const first = el.firstChild;
+		const first = getFirstChild(el);
 		if (first !== null && first.nodeType === 3) {
 			const server = (first as Text).nodeValue;
 			if (
@@ -7649,12 +7731,12 @@ class HydrationCapability {
 			if (cursor === null) return null;
 			if (isBlockOpen(cursor)) cursor = this.close(cursor);
 			if (isTextSeparator(cursor)) {
-				cursor = cursor.nextSibling;
+				cursor = getNextSibling(cursor!);
 				continue;
 			}
-			cursor = cursor.nextSibling;
+			cursor = getNextSibling(cursor!);
 			if (isTextSeparator(cursor)) {
-				const after: Node | null = cursor.nextSibling;
+				const after: Node | null = getNextSibling(cursor!);
 				if (after !== null && (after.nodeType === 3 || isTextSeparator(after))) cursor = after;
 			}
 		}
@@ -7859,7 +7941,8 @@ export function clone<T extends Node>(node: T, loc?: string): T {
  */
 export function drainFrag(root: Node, parent: Node, anchor: Node | null): void {
 	if (activeHydration() !== null && (root as any).__oct_vfrag === true) return;
-	while (root.firstChild) parent.insertBefore(root.firstChild, anchor);
+	let c: Node | null;
+	while ((c = getFirstChild(root)) !== null) parent.insertBefore(c, anchor);
 }
 
 /**
@@ -8071,7 +8154,7 @@ function isTextSeparator(node: Node | null): node is Comment {
 /** From a block-open `<!--[-->`, the matching `<!--]-->` (depth-tracked). */
 function findMatchingClose(open: Node): Comment {
 	let depth = 0;
-	let node: Node = open.nextSibling as Node;
+	let node: Node = getNextSibling(open) as Node;
 	for (;;) {
 		if (node.nodeType === 8) {
 			const data = (node as Comment).data;
@@ -8094,7 +8177,7 @@ function findMatchingClose(open: Node): Comment {
 				depth += 1;
 			}
 		}
-		node = node.nextSibling as Node;
+		node = getNextSibling(node) as Node;
 	}
 }
 
@@ -8107,7 +8190,12 @@ function ssrForMarkerState(node: Node): -1 | 0 | 1 {
 
 /** Logical index-0 child: `node.firstChild` for both client and hydration. */
 export function child<T extends Node>(node: T): Node | null {
-	return node.firstChild;
+	// While hydrating, a multi-root clone() can hand back the virtual-fragment
+	// stand-in — a plain object whose `firstChild` is a snapshot property (see
+	// adopt()) — and the native accessor throws on a non-Node receiver. Keep the
+	// plain read on the hydration branch; client mounts always hold a real Node.
+	if (currentHydration !== null) return node.firstChild;
+	return getFirstChild(node);
 }
 
 /**
@@ -8122,7 +8210,7 @@ export function sibling(node: Node, n: number = 1): Node | null {
 	for (let i = 0; i < n; i++) {
 		// Over-walk (cursor already past the last node) → return null, don't throw.
 		if (c === null) return null;
-		c = c.nextSibling;
+		c = getNextSibling(c);
 	}
 	return c;
 }
@@ -10367,10 +10455,16 @@ const TARGET_ONLY_DELEGATED = /* @__PURE__ */ new Set([
 ]);
 
 export function delegateEvents(eventNames: string[]): void {
+	// Seedable prototype may not exist at compiled-module load in exotic hosts.
+	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegated.has(name)) continue;
 		_delegated.add(name);
+		// Pre-seed the handler-slot key: the dispatch walk polls `$$<type>` on
+		// EVERY logical ancestor of every delegated event, and most of them carry
+		// no handler (see initDomOperations, trick 2).
+		if (canSeed) seedExpando(Element.prototype, '$$' + name);
 		// A new event type was registered after some roots/portals already mounted —
 		// back-attach the listener to every active target so handlers stamped on
 		// their DOM via `el.$$click = …` still receive events.
@@ -10386,10 +10480,14 @@ export function delegateEvents(eventNames: string[]): void {
 // modules call this at load for the capture handlers they contain; the spread path
 // lazy-registers dynamically-supplied ones.
 export function delegateCaptureEvents(eventNames: string[]): void {
+	const canSeed = typeof Element !== 'undefined' && Object.isExtensible(Element.prototype);
 	for (let i = 0; i < eventNames.length; i++) {
 		const name = eventNames[i];
 		if (_delegatedCapture.has(name)) continue;
 		_delegatedCapture.add(name);
+		// Same seeding rationale as delegateEvents (the capture walk polls
+		// `$$capture:<type>` along the built path).
+		if (canSeed) seedExpando(Element.prototype, CAPTURE_PREFIX + name);
 		for (const target of _delegationTargets.keys()) {
 			target.addEventListener(name, dispatchDelegatedCapture, true);
 		}
@@ -10403,6 +10501,7 @@ export function delegateCaptureEvents(eventNames: string[]): void {
  * just bump the refcount.
  */
 function registerDelegationTarget(target: Node): void {
+	initDomOperations();
 	const prev = _delegationTargets.get(target) || 0;
 	_delegationTargets.set(target, prev + 1);
 	if (prev === 0) {
@@ -10760,7 +10859,7 @@ function dispatchDelegatedCapture(event: Event): void {
 	if (!event.bubbles || !_delegated.has(event.type)) maybeEnqueueRestore(event);
 	const key = CAPTURE_PREFIX + event.type;
 	const path: any[] = [];
-	for (let node = event.target as any; node !== null && node !== undefined; ) {
+	for (let node = event.target as any; node !== null && node !== undefined;) {
 		path.push(node);
 		node = node.$$portalParent ? node.$$portalParent : node.parentNode;
 	}
@@ -14268,7 +14367,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 	// with the container's rendered children). Range starts carry $$portalEnd.
 	const owned: Node[] = [];
 	let hasForeign = false;
-	let scan: Node | null = el.firstChild;
+	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
@@ -14277,7 +14376,7 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 			continue;
 		}
 		owned.push(scan);
-		scan = scan.nextSibling;
+		scan = getNextSibling(scan);
 	}
 	// Partition current children by their stamped SLOT KEY (position-scoped —
 	// see flattenDeoptChildrenKeyed; explicit keys ride the same scheme). Nodes
@@ -14339,8 +14438,8 @@ function reconcileDeoptChildren(el: Element, children: any, ownerBlock: Block): 
 // Shared by reconcileDeoptChildren's owned-children scan and liveOwnedChildAt.
 function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 	let m: Node | null = start;
-	while (m !== null && m !== end) m = m.nextSibling;
-	return (m ?? start).nextSibling;
+	while (m !== null && m !== end) m = getNextSibling(m);
+	return getNextSibling(m ?? start);
 }
 
 // The i-th child of `el` that the de-opt reconciler OWNS, skipping foreign
@@ -14348,7 +14447,7 @@ function nodeAfterPortalRange(start: Node, end: Node): Node | null {
 // called per reorder step, only when a foreign range exists.
 function liveOwnedChildAt(el: Element, index: number): Node | null {
 	let i = 0;
-	let scan: Node | null = el.firstChild;
+	let scan: Node | null = getFirstChild(el);
 	while (scan !== null) {
 		const rangeEnd = (scan as any).$$portalEnd as Node | undefined;
 		if (rangeEnd != null) {
@@ -14357,7 +14456,7 @@ function liveOwnedChildAt(el: Element, index: number): Node | null {
 		}
 		if (i === index) return scan;
 		i++;
-		scan = scan.nextSibling;
+		scan = getNextSibling(scan);
 	}
 	return null;
 }
@@ -17586,8 +17685,7 @@ export function useTransition(
 	const scope = CURRENT_SCOPE!;
 	const block = CURRENT_BLOCK!;
 	let s = scope.hooks?.get(slot) as
-		| { isPending: boolean; start: (fn: () => void | Promise<unknown>) => void }
-		| undefined;
+		{ isPending: boolean; start: (fn: () => void | Promise<unknown>) => void } | undefined;
 	if (s === undefined) {
 		const slotRef = { isPending: false, start: startTransition };
 		s = slotRef;
@@ -21210,7 +21308,7 @@ export function hydrateRoot(
 	// Executed stream runtime/reveal scripts remain in a real browser's DOM. They
 	// are protocol sidecars rather than authored component output, so remove only
 	// direct children carrying the renderer-owned marker before root adoption.
-	for (let child = container.firstElementChild; child !== null; ) {
+	for (let child = container.firstElementChild; child !== null;) {
 		const next = child.nextElementSibling;
 		if (child.localName === 'script' && child.hasAttribute(STREAM_SCRIPT_ATTR)) child.remove();
 		child = next;

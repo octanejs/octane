@@ -3,9 +3,7 @@ import { createElement, useLayoutEffect, useState } from 'octane';
 // A component that renders a <div> (mirrors Base UI's Fieldset.Legend, which renders a
 // div via its render engine).
 function Leaf(props) @{
-	<div class="leaf">
-		{props.label as string}
-	</div>
+	<div class="leaf">{props.label as string}</div>
 }
 
 // Mimics Base UI's FieldsetRoot: it receives its children as a runtime array via
@@ -39,9 +37,7 @@ function LeafWithEffect(props) @{
 	useLayoutEffect(() => {
 		props.onMount('legend-id');
 	}, [props.onMount]);
-	<div class="leaf">
-		{props.label as string}
-	</div>
+	<div class="leaf">{props.label as string}</div>
 }
 
 // Probe B: the parent holds state; the component child's layout effect updates it,

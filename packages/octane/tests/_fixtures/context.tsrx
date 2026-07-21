@@ -8,32 +8,24 @@ export const CountCtx = createContext(0);
 // Reads a single context value.
 export function ThemeReader() @{
 	const v = use(ThemeCtx);
-	<span class="theme">
-		{v as string}
-	</span>
+	<span class="theme">{v as string}</span>
 }
 
 export function UserReader() @{
 	const v = use(UserCtx);
-	<span class="user">
-		{v as string}
-	</span>
+	<span class="user">{v as string}</span>
 }
 
 export function CountReader() @{
 	const v = use(CountCtx);
-	<span class="count">
-		{v as string}
-	</span>
+	<span class="count">{v as string}</span>
 }
 
 // Reads two contexts in one component.
 export function CombinedReader() @{
 	const theme = use(ThemeCtx);
 	const user = use(UserCtx);
-	<span class="combined">
-		{theme + '/' + user as string}
-	</span>
+	<span class="combined">{theme + '/' + user as string}</span>
 }
 
 // Reads a context that has NO Provider anywhere above it: must resolve to the
@@ -43,9 +35,7 @@ export function CombinedReader() @{
 // a surviving consumer) means later reads must keep returning the default.
 export function BareReader(props) @{
 	const v = use(CountCtx);
-	<span class="bare">
-		{v + ':' + props.tick as string}
-	</span>
+	<span class="bare">{v + ':' + props.tick as string}</span>
 }
 
 // Provider value updates → consumers re-render.
@@ -164,9 +154,7 @@ export function ListConsumers(props) @{
 			@for (const x of props.items; key x) {
 				<li>
 					<CountReader />
-					<span class="ix">
-						{x as string}
-					</span>
+					<span class="ix">{x as string}</span>
 				</li>
 			}
 		</ul>
@@ -193,15 +181,11 @@ export function LiveCount(props) @{
 	const [n, setN] = useState(0);
 	<CountCtx.Provider value={n}>
 		<div>
-			<button id="inc" onClick={() => setN(n + 1)}>
-				{n as string}
-			</button>
+			<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
 			<ul>
 				@for (const x of props.ids; key x) {
 					<li>
-						<span class="label">
-							{'r' + x as string}
-						</span>
+						<span class="label">{'r' + x as string}</span>
 						<CountReader />
 					</li>
 				}

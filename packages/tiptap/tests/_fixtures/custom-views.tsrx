@@ -32,9 +32,7 @@ function PanelNodeView(props) @{
 		class="panel-node-view"
 	>
 		<output data-node-theme="true">{theme}</output>
-		<output data-node-label="true">
-			{props.node.attrs.label as string}
-		</output>
+		<output data-node-label="true">{props.node.attrs.label as string}</output>
 		<output data-node-selected="true">
 			{props.selected ? 'selected' : 'unselected'}
 		</output>
@@ -123,9 +121,7 @@ function BadgeMarkView(props) @{
 		class="badge-mark-view"
 	>
 		<output data-mark-theme="true">{theme}</output>
-		<output data-mark-tone="true">
-			{props.mark.attrs.tone as string}
-		</output>
+		<output data-mark-tone="true">{props.mark.attrs.tone as string}</output>
 		<MarkViewContent as="strong" class="badge-mark-content" />
 	</span>
 }
@@ -205,9 +201,7 @@ function DirectWidget(props) @{
 
 	<div ref={props.ref} data-direct-widget="true">
 		<output data-direct-theme="true">{theme}</output>
-		<output data-direct-label="true">
-			{props.label as string}
-		</output>
+		<output data-direct-label="true">{props.label as string}</output>
 		<button
 			type="button"
 			data-direct-increment="true"

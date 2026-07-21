@@ -1,14 +1,7 @@
 import { twMerge } from 'tailwind-merge';
 
 type BadgeVariant =
-	| 'default'
-	| 'success'
-	| 'warning'
-	| 'error'
-	| 'info'
-	| 'purple'
-	| 'teal'
-	| 'orange';
+	'default' | 'success' | 'warning' | 'error' | 'info' | 'purple' | 'teal' | 'orange';
 
 type BadgeProps = {
 	children: React.ReactNode;

@@ -12,9 +12,7 @@ import { parseAsInteger, parseAsString, useQueryState, useQueryStates } from '@o
 function Counter() @{
 	const [count, setCount] = useQueryState('count', parseAsInteger.withDefault(0));
 	<div>
-		<span id="count">
-			{'count=' + count as number}
-		</span>
+		<span id="count">{'count=' + count as number}</span>
 		<button id="inc" onClick={() => setCount((c) => (c ?? 0) + 1)}>{'inc'}</button>
 		<button id="clear" onClick={() => setCount(null)}>{'clear'}</button>
 	</div>
@@ -41,12 +39,8 @@ function Filters() @{
 		page: parseAsInteger.withDefault(1),
 	});
 	<div>
-		<span id="q">
-			{'q=' + q as string}
-		</span>
-		<span id="page">
-			{'page=' + page as number}
-		</span>
+		<span id="q">{'q=' + q as string}</span>
+		<span id="page">{'page=' + page as number}</span>
 		<button id="set" onClick={() => setFilters({ q: 'hello', page: 2 })}>{'set'}</button>
 		<button
 			id="next"

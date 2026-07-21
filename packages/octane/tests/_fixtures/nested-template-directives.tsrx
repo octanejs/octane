@@ -1,8 +1,6 @@
 function StoryRow(props) @{
 	const label = props.read(props.story);
-	<article class="story" data-story-id={props.story.id}>
-		{label as string}
-	</article>
+	<article class="story" data-story-id={props.story.id}>{label as string}</article>
 }
 
 // Product-style feed composition: visibility owns the keyed collection and

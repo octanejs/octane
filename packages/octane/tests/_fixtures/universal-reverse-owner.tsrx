@@ -3,9 +3,7 @@ import { UniversalTheme } from './universal-boundary.tsrx';
 
 function ReverseThemeLabelBody() @{
 	const theme = useContext(UniversalTheme);
-	<span class="reverse-theme">
-		{theme as string}
-	</span>
+	<span class="reverse-theme">{theme as string}</span>
 }
 
 const ReverseThemeLabel = memo(ReverseThemeLabelBody);

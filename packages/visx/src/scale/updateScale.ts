@@ -157,7 +157,7 @@ function updateScale<
 	scale: D3Scale<Output, DiscreteInput, ThresholdInput>,
 	config?: ScaleConfigWithoutType<Output, DiscreteInput, ThresholdInput>,
 ) {
-	return applyAllOperators(scale.copy(), config);
+	return applyAllOperators<Output, DiscreteInput, ThresholdInput>(scale.copy(), config);
 }
 
 export default updateScale;

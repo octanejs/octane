@@ -61,9 +61,9 @@ type RenderableNormalizedPropsEqual<LocalComponent, UpstreamComponent> = Equal<
 type OctaneOnlyAttributeKeys = 'class' | 'for';
 type AttributeBagDivergentKeys = 'className' | 'style' | 'ref' | `on${string}`;
 type NormalizeAttributeBagProps<P> = {
-	[K in keyof P as K extends OctaneOnlyAttributeKeys
-		? never
-		: K]: K extends AttributeBagDivergentKeys ? unknown : NormalizeProp<P[K]>;
+	[
+		K in keyof P as K extends OctaneOnlyAttributeKeys ? never : K
+	]: K extends AttributeBagDivergentKeys ? unknown : NormalizeProp<P[K]>;
 };
 type AttributeBagNormalizedPropsEqual<LocalComponent, UpstreamComponent> = Equal<
 	NormalizeAttributeBagProps<ComponentProps<LocalComponent>>,
@@ -136,12 +136,7 @@ type _Gradient = Assert<Extends<Local['Gradient'], Upstream['Gradient']>>;
 // Grid/Group components spread octane attribute bags — see the attribute-bag
 // carve-out above.
 type GridComponents =
-	| 'Grid'
-	| 'GridRows'
-	| 'GridColumns'
-	| 'GridAngle'
-	| 'GridRadial'
-	| 'GridPolar';
+	'Grid' | 'GridRows' | 'GridColumns' | 'GridAngle' | 'GridRadial' | 'GridPolar';
 type _Grid = Assert<
 	Extends<Omit<Local['Grid'], GridComponents>, Omit<Upstream['Grid'], GridComponents>>
 >;

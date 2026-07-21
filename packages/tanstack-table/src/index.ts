@@ -24,13 +24,7 @@ import { splitSlot, subSlot } from './internal';
 export * from '@tanstack/table-core';
 
 export type Renderable<TProps> =
-	| ComponentBody<TProps>
-	| ElementDescriptor<any>
-	| string
-	| number
-	| boolean
-	| null
-	| undefined;
+	ComponentBody<TProps> | ElementDescriptor<any> | string | number | boolean | null | undefined;
 
 /**
  * If rendering headers, cells, or footers with custom markup, use flexRender

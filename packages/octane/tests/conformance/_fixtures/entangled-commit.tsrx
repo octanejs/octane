@@ -3,16 +3,12 @@ import { use, useState, useTransition, useLayoutEffect } from 'octane';
 function SlowA(props) @{
 	const v = use(props.p);
 	useLayoutEffect((log) => log.push('A reveal'), [props.log]);
-	<span class="a">
-		{'A:' + v as string}
-	</span>
+	<span class="a">{'A:' + v as string}</span>
 }
 function SlowB(props) @{
 	const v = use(props.p);
 	useLayoutEffect((log) => log.push('B reveal'), [props.log]);
-	<span class="b">
-		{'B:' + v as string}
-	</span>
+	<span class="b">{'B:' + v as string}</span>
 }
 
 // Two independent boundaries; one startTransition swaps BOTH from their committed

@@ -506,8 +506,7 @@ function renderComponent(
 	props: Readonly<Record<string, unknown>>,
 ): FirstScreenNode[] {
 	const metadata = (component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] as
-		| { id?: unknown }
-		| undefined;
+		{ id?: unknown } | undefined;
 	if (metadata?.id !== 'lynx') {
 		throw new Error('Lynx first-screen rendering requires a compiled Lynx component.');
 	}
@@ -588,8 +587,7 @@ function renderTry(value: Record<string, unknown>): FirstScreenNode[] {
 				return [range([range(materialize(pending(), null))])];
 			}
 			const catchBody = value.catch as
-				| ((error: unknown, reset: () => void) => UniversalRenderable)
-				| null;
+				((error: unknown, reset: () => void) => UniversalRenderable) | null;
 			if (catchBody === null) throw error;
 			return [
 				range([
@@ -813,8 +811,7 @@ export function renderLynxFirstScreen<Props>(
 	let nodes: FirstScreenNode[];
 	try {
 		const metadata = (component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] as
-			| { id?: unknown }
-			| undefined;
+			{ id?: unknown } | undefined;
 		if (metadata?.id !== 'lynx') {
 			throw new Error('Lynx first-screen root.render() requires a compiled Lynx component.');
 		}

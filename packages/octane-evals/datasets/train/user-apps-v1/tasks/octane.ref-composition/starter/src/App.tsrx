@@ -2,9 +2,7 @@ import { useRef } from 'octane';
 
 export function TextField(props: { id: string; label: string; ref: unknown }) @{
 	<>
-		<label htmlFor={props.id}>
-			{props.label as string}
-		</label>
+		<label htmlFor={props.id}>{props.label as string}</label>
 		<input id={props.id} type="text" />
 	</>
 }

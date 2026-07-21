@@ -86,14 +86,7 @@ export interface LynxTransitionEvent extends LynxDispatchEvent<string, Record<st
 		| {
 				animation_type: 'transition-animation';
 				animation_name:
-					| 'width'
-					| 'height'
-					| 'left'
-					| 'top'
-					| 'right'
-					| 'bottom'
-					| 'background-color'
-					| 'opacity';
+					'width' | 'height' | 'left' | 'top' | 'right' | 'bottom' | 'background-color' | 'opacity';
 				new_animator: true;
 		  }
 		| {

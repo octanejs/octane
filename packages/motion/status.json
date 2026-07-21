@@ -1,12 +1,12 @@
 {
-  "upstream": { "package": "motion", "version": "12.40.0" },
+  "upstream": { "package": "motion", "version": "12.42.2" },
   "surface": "Core surface: `motion.<tag>` (animate, gestures, variants with propagation/stagger, drag, layout basics), `AnimatePresence`, `MotionConfig`, and the motion-value hooks (`useMotionValue`, `useScroll`, `useTransform`, `useSpring`, `useAnimate`, `useMotionValueEvent`); motion-dom's animation engine and gesture primitives are reused verbatim.",
   "divergences": [
     "Exit animations run via cleanup-before-detach instead of React's deferred-deletion machinery.",
     "`layout`/`layoutId` use single-element FLIP, not the full projection tree."
   ],
   "ssr": "No SSR-specific surface; no dedicated SSR tests.",
-  "verified": "2026-07-06",
+  "verified": "2026-07-21",
   "notes": [
     "Not yet ported: nested/shared layout projection (incl. child scale correction and shared layout during drag), drag momentum + elastic physics, reduced-motion enforcement, the `useTransform` output-map form, and `when: 'beforeChildren' | 'afterChildren'` sequencing."
   ]

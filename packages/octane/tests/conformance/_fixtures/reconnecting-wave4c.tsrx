@@ -8,9 +8,7 @@ export function AddedStyleValues(props) @{
 }
 
 export function NumberStringText(props) @{
-	<div id="number-string-text">
-		{props.value as string}
-	</div>
+	<div id="number-string-text">{props.value as string}</div>
 }
 
 export function DeepReorderedChildrenServer() @{
@@ -42,9 +40,7 @@ export function EmptyFunctionRoot() @{
 }
 
 export function EmptyTextRoot(props) @{
-	<div id="empty-root">
-		{props.text as string}
-	</div>
+	<div id="empty-root">{props.text as string}</div>
 }
 
 export function ReorderedStyleValues(props) @{
@@ -55,9 +51,7 @@ export function ReorderedStyleValues(props) @{
 }
 
 export function DifferentNumbers(props) @{
-	<div id="different-numbers">
-		{props.value as string}
-	</div>
+	<div id="different-numbers">{props.value as string}</div>
 }
 
 export function RawHtml(props) @{
@@ -112,9 +106,7 @@ export function DifferentChildType(props) @{
 }
 
 export function NumberVsText(props) @{
-	<div id="number-vs-text">
-		{props.value as string}
-	</div>
+	<div id="number-vs-text">{props.value as string}</div>
 }
 
 export function ReorderedChildrenServer() @{

@@ -3,9 +3,7 @@ import { createContext, lazy, Suspense, use, useState, useSyncExternalStore } fr
 export const StreamContext = createContext('default');
 
 export function TextPayload(props) @{
-	<div id="payload">
-		{props.text as string}
-	</div>
+	<div id="payload">{props.text as string}</div>
 }
 
 export function RootError(props) {
@@ -16,15 +14,11 @@ export function PendingBoundary(props) @{
 	<section id="pending-boundary">
 		@try {
 			const value = use(props.promise);
-			<strong class="pending-ready">
-				{value as string}
-			</strong>
+			<strong class="pending-ready">{value as string}</strong>
 		} @pending {
 			<i class="pending-fallback">{'loading'}</i>
 		} @catch (error) {
-			<b class="pending-error">
-				{error.message as string}
-			</b>
+			<b class="pending-error">{error.message as string}</b>
 		}
 	</section>
 }
@@ -32,9 +26,7 @@ export function PendingBoundary(props) @{
 function ContextLeaf(props) @{
 	const context = use(StreamContext);
 	const value = use(props.promise);
-	<span class="context-value">
-		{context + ':' + value as string}
-	</span>
+	<span class="context-value">{context + ':' + value as string}</span>
 }
 
 function ContextOutside() @{
@@ -61,9 +53,7 @@ export function ExternalStoreReader(props) @{
 		props.getClientSnapshot,
 		props.getServerSnapshot,
 	);
-	<span id="store-value">
-		{value as string}
-	</span>
+	<span id="store-value">{value as string}</span>
 }
 
 function LazyLeaf() @{
@@ -90,9 +80,7 @@ export function BoundaryBeforePromiseNode(props) @{
 	<div id="mixed-root-suspension">
 		@try {
 			const value = use(props.boundaryPromise);
-			<strong id="mixed-boundary-value">
-				{value as string}
-			</strong>
+			<strong id="mixed-boundary-value">{value as string}</strong>
 		} @pending {
 			<i id="mixed-boundary-fallback">{'loading'}</i>
 		}
@@ -105,9 +93,7 @@ export function BoundaryRemovedBeforeRootRetry(props) @{
 		@if (props.readBoundaryVisibility()) {
 			@try {
 				const value = use(props.boundaryPromise);
-				<strong class="conditional-boundary-value">
-					{value as string}
-				</strong>
+				<strong class="conditional-boundary-value">{value as string}</strong>
 			} @pending {
 				<i class="conditional-boundary-fallback">{'stale fallback'}</i>
 			}
@@ -134,9 +120,7 @@ export function TableBoundary(props) @{
 			const value = use(props.promise);
 			<tbody class="table-ready">
 				<tr>
-					<td>
-						{value as string}
-					</td>
+					<td>{value as string}</td>
 				</tr>
 			</tbody>
 		} @pending {
@@ -247,9 +231,7 @@ export function EsotericBoundary(props) @{
 		<select>
 			@try {
 				const option = use(props.option);
-				<option>
-					{option as string}
-				</option>
+				<option>{option as string}</option>
 			} @pending {
 				<option>{'loading'}</option>
 			}
@@ -325,9 +307,7 @@ export function ElementAfterTextBoundary(props) @{
 		{'hello'}
 		@try {
 			const value = use(props.promise);
-			<b>
-				{value as string}
-			</b>
+			<b>{value as string}</b>
 		} @pending {
 			<i>{'loading'}</i>
 		}
@@ -366,9 +346,7 @@ export function DeepTree(props) @{
 }
 
 function GetterReader(props) @{
-	<span id="getter-value">
-		{props.model.label as string}
-	</span>
+	<span id="getter-value">{props.model.label as string}</span>
 }
 
 export function DescendantGetterUpdate() @{

@@ -1,12 +1,5 @@
 export type ChartType =
-	| 'line'
-	| 'bar'
-	| 'scatter'
-	| 'area'
-	| 'pie'
-	| 'donut'
-	| 'histogram'
-	| 'heatmap';
+	'line' | 'bar' | 'scatter' | 'area' | 'pie' | 'donut' | 'histogram' | 'heatmap';
 
 export type ChartA11yValue = string | number | Date;
 

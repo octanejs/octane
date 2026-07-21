@@ -9,9 +9,7 @@ import { fetchData, LEVELS } from './data.js';
 function Level({ level, version }: { level: number; version: number }) @{
 	const data = use(fetchData(level, version));
 	<div class="level" data-level={level}>
-		<span class="val">
-			{data as string}
-		</span>
+		<span class="val">{data as string}</span>
 		@if (level < LEVELS - 1) {
 			<Level level={level + 1} version={version} />
 		}

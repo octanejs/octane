@@ -53,18 +53,14 @@ function TransitionChild(props) @{
 	const [, start] = useTransition();
 	_setValueTransition = (v) => start(() => setValue(v));
 	const v = use(props.promiseFor(value));
-	<span id="content">
-		{'content-' + v as string}
-	</span>
+	<span id="content">{'content-' + v as string}</span>
 }
 
 function UrgentChild(props) @{
 	const [value, setValue] = useState(1);
 	_setValueUrgent = (v) => setValue(v);
 	const v = use(props.promiseFor(value));
-	<span id="content">
-		{'content-' + v as string}
-	</span>
+	<span id="content">{'content-' + v as string}</span>
 }
 
 export function TransitionDescendantSuspend(props) @{

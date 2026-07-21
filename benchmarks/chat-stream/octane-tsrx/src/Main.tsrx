@@ -92,9 +92,7 @@ export function ChatApp() @{
 						class={{ 'conv-tab': true, active: c.id === active }}
 						data-conv={'' + c.id}
 						onClick={() => setActive(c.id)}
-					>
-						{c.title as string}
-					</button>
+					>{c.title as string}</button>
 				}
 			</nav>
 		</header>
@@ -105,14 +103,10 @@ export function ChatApp() @{
 						@for (const s of m.segments; key s.id) {
 							@if (s.type === 'code') {
 								<pre class="code">
-									<code>
-										{segText(s, m.done) as string}
-									</code>
+									<code>{segText(s, m.done) as string}</code>
 								</pre>
 							} @else {
-								<p class="text">
-									{segText(s, m.done) as string}
-								</p>
+								<p class="text">{segText(s, m.done) as string}</p>
 							}
 						}
 					</div>

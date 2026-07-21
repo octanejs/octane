@@ -180,12 +180,10 @@ async function getRouteNodes(config, root, tokenRegexes) {
 					}
 					const lastOriginalSegment = originalRoutePath.split('/').filter(Boolean).pop() || '';
 					const indexTokenCandidate = unwrapBracketWrappedSegment(lastOriginalSegment);
-					if (
-						!(
-							lastOriginalSegment !== indexTokenCandidate &&
-							indexTokenSegmentRegex.test(indexTokenCandidate)
-						)
-					) {
+					if (!(
+						lastOriginalSegment !== indexTokenCandidate &&
+						indexTokenSegmentRegex.test(indexTokenCandidate)
+					)) {
 						const updatedRouteSegments = routePath.split('/').filter(Boolean);
 						const updatedLastRouteSegment =
 							updatedRouteSegments[updatedRouteSegments.length - 1] || '';

@@ -1,7 +1,8 @@
 import './deferred-hydration.css';
 
 export function DeferredHydrationProof() @{
-	const fixture = globalThis as typeof globalThis & {
+	const fixture = globalThis as
+		typeof globalThis & {
 			__fixtureDeferredHydrationClicks?: number;
 		};
 	<button

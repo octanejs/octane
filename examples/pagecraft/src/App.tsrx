@@ -408,9 +408,7 @@ function DocumentSurface(props: { document: PageDocument }) {
 	return <article class="document-surface" aria-labelledby="document-heading">
 		<header class="document-header">
 			<div>
-				<p class="document-eyebrow">
-					{document.eyebrow as string}
-				</p>
+				<p class="document-eyebrow">{document.eyebrow as string}</p>
 				<h1 id="document-heading" class="document-semantic-title">
 					{title.trim() || 'Untitled document' as string}
 				</h1>
@@ -442,9 +440,7 @@ function DocumentSurface(props: { document: PageDocument }) {
 			</div>
 			<div class={'save-indicator ' + saveState} role="status" aria-live="polite">
 				<span class="save-dot" />
-				<span>
-					{saveLabel(saveState) as string}
-				</span>
+				<span>{saveLabel(saveState) as string}</span>
 			</div>
 		</header>
 
@@ -487,9 +483,7 @@ function DocumentSurface(props: { document: PageDocument }) {
 			<div class="save-error" role="alert">
 				<div>
 					<strong>We could not autosave.</strong>
-					<p>
-						{owner.error as string}
-					</p>
+					<p>{owner.error as string}</p>
 				</div>
 				<button type="button" class="retry-button" onClick={() => void saveOwner(owner)}>
 					Retry save
@@ -679,12 +673,8 @@ export function App() {
 						>
 							<span class="document-glyph" aria-hidden="true">{'◇'}</span>
 							<span class="document-link-copy">
-								<strong>
-									{item.title as string}
-								</strong>
-								<small>
-									{item.updatedAt as string}
-								</small>
+								<strong>{item.title as string}</strong>
+								<small>{item.updatedAt as string}</small>
 							</span>
 						</a>
 					}
@@ -724,9 +714,7 @@ export function App() {
 					<span class="problem-mark" aria-hidden="true">{'↻'}</span>
 					<p class="document-eyebrow">A temporary pause</p>
 					<h1>Let’s try that document again.</h1>
-					<p>
-						{documentState.message as string}
-					</p>
+					<p>{documentState.message as string}</p>
 					<button
 						type="button"
 						class="primary-button"
@@ -740,9 +728,7 @@ export function App() {
 					<span class="problem-mark" aria-hidden="true">{'404'}</span>
 					<p class="document-eyebrow">Missing page</p>
 					<h1>That document is not in this workspace.</h1>
-					<p>
-						{documentState.message as string}
-					</p>
+					<p>{documentState.message as string}</p>
 					<a
 						class="primary-link"
 						href={`/documents${window.location.search}`}

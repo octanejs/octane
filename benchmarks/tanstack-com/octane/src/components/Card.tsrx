@@ -1,7 +1,8 @@
 import { createElement } from 'octane';
 import { twMerge } from 'tailwind-merge';
 
-type CardProps = Record<string, any> & {
+type CardProps =
+	Record<string, any> & {
 		as?: any;
 		children?: any;
 		className?: string;

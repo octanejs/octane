@@ -180,7 +180,8 @@ export function useBlocker(
 
 // Upstream's PromptProps: the blocker options plus optional children (a render
 // prop receiving the resolver, or plain renderables).
-export type PromptProps = (UseBlockerOpts | LegacyBlockerOpts) & {
+export type PromptProps =
+	(UseBlockerOpts | LegacyBlockerOpts) & {
 		children?: OctaneNode | ((params: BlockerResolver) => OctaneNode);
 	};
 

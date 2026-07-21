@@ -46,9 +46,9 @@ export function UserFeedbackSection(_props: UserFeedbackSectionProps) {
 					</div>
 					{stats
 						? <>
-								<div class="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-									{stats.totalApprovedPoints.toFixed(1) as string}
-								</div>
+								<div
+									class="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2"
+								>{stats.totalApprovedPoints.toFixed(1) as string}</div>
 								<div class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
 									<div>
 										<span class="font-medium">{stats.byStatus.approved.count}</span>
@@ -130,9 +130,7 @@ export function UserFeedbackSection(_props: UserFeedbackSectionProps) {
 												<div
 													class="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400"
 												>
-													<span>
-														{new Date(item.createdAt).toLocaleDateString() as string}
-													</span>
+													<span>{new Date(item.createdAt).toLocaleDateString() as string}</span>
 													<span>•</span>
 													<span class="font-mono">{item.pagePath}</span>
 												</div>

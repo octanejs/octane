@@ -281,14 +281,12 @@ async function buildPackageDetail(
 		repositoryUrl: repoUrl ?? null,
 		npmUrl: `https://www.npmjs.com/package/${name}`,
 		latestVersion,
-		versions: versions.map(
-			(ver): PackageVersionSummary => ({
-				id: ver.id,
-				version: ver.version,
-				skillCount: ver.skillCount,
-				publishedAt: ver.publishedAt,
-			}),
-		),
+		versions: versions.map((ver): PackageVersionSummary => ({
+			id: ver.id,
+			version: ver.version,
+			skillCount: ver.skillCount,
+			publishedAt: ver.publishedAt,
+		})),
 		firstSeenAt: pkg.firstSeenAt,
 		lastSyncedAt: pkg.lastSyncedAt,
 	};
@@ -476,19 +474,17 @@ export const getIntentVersionSkills = createServerFn({ method: 'GET' })
 			packageName: data.packageName,
 			version: data.version,
 			versionId: versionRecord.id,
-			skills: skills.map(
-				(s): IntentSkillSummary => ({
-					id: s.id,
-					name: s.name,
-					description: s.description,
-					type: s.type,
-					framework: s.framework,
-					requires: s.requires,
-					skillPath: s.skillPath,
-					contentHash: s.contentHash,
-					lineCount: s.lineCount,
-				}),
-			),
+			skills: skills.map((s): IntentSkillSummary => ({
+				id: s.id,
+				name: s.name,
+				description: s.description,
+				type: s.type,
+				framework: s.framework,
+				requires: s.requires,
+				skillPath: s.skillPath,
+				contentHash: s.contentHash,
+				lineCount: s.lineCount,
+			})),
 		};
 	});
 

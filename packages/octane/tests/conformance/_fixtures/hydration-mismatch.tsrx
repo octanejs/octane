@@ -10,9 +10,7 @@ import { useState } from 'octane';
 // Text content differs (Per ReactDOMHydrationDiff-test.js:119).
 export function TextMismatch(props) @{
 	<div class="parent">
-		<main class="child">
-			{(props.isClient ? 'client' : 'server') as string}
-		</main>
+		<main class="child">{(props.isClient ? 'client' : 'server') as string}</main>
 	</div>
 }
 
@@ -49,9 +47,7 @@ export function StyleMismatch(props) @{
 
 // Whitespace-only text difference — must NOT be collapsed away (Per Reconnecting:306).
 export function WhitespaceMismatch(props) @{
-	<div id="ws">
-		{(props.isClient ? 'a b' : 'a  b') as string}
-	</div>
+	<div id="ws">{(props.isClient ? 'a b' : 'a  b') as string}</div>
 }
 
 // ── CLEAN reconnects (no mismatch expected) ─────────────────────────────────
@@ -65,9 +61,7 @@ export function Clean(props) @{
 
 // Number vs string of the same number → same serialized text, clean (Per Reconnecting:215).
 export function NumberString(props) @{
-	<div id="numstr">
-		{(props.isClient ? 5 : '5') as string}
-	</div>
+	<div id="numstr">{(props.isClient ? 5 : '5') as string}</div>
 }
 
 // null/false coerce to absent the same on both sides — clean (Per number/null coercion).
@@ -79,9 +73,7 @@ export function NullishAttr(props) @{
 
 // Opt out: keep the server value, no warning (Per Reconnecting:132 "can explicitly ignore").
 export function Suppressed(props) @{
-	<div id="sup" suppressHydrationWarning>
-		{(props.isClient ? 'client' : 'server') as string}
-	</div>
+	<div id="sup" suppressHydrationWarning>{(props.isClient ? 'client' : 'server') as string}</div>
 }
 
 // ── STRUCTURAL mismatches ───────────────────────────────────────────────────
@@ -90,13 +82,9 @@ export function Suppressed(props) @{
 export function ElementTypeMismatch(props) @{
 	<div id="etm">
 		@if (props.isClient) {
-			<article class="x">
-				{'hi' as string}
-			</article>
+			<article class="x">{'hi' as string}</article>
 		} @else {
-			<section class="x">
-				{'hi' as string}
-			</section>
+			<section class="x">{'hi' as string}</section>
 		}
 	</div>
 }
@@ -105,9 +93,7 @@ export function ElementTypeMismatch(props) @{
 export function ClientExtraOnlyChild(props) @{
 	<div id="ceoc">
 		@if (props.isClient) {
-			<span class="extra">
-				{'x' as string}
-			</span>
+			<span class="extra">{'x' as string}</span>
 		}
 	</div>
 }
@@ -118,33 +104,25 @@ export function ClientExtraBegin(props) @{
 		@if (props.isClient) {
 			<br class="extra" />
 		}
-		<main class="child">
-			{'hello' as string}
-		</main>
+		<main class="child">{'hello' as string}</main>
 	</div>
 }
 
 // Client renders an extra element in the MIDDLE, between two stable siblings (Per :605).
 export function ClientExtraMiddle(props) @{
 	<div id="cem">
-		<main class="a">
-			{'A' as string}
-		</main>
+		<main class="a">{'A' as string}</main>
 		@if (props.isClient) {
 			<br class="extra" />
 		}
-		<main class="b">
-			{'B' as string}
-		</main>
+		<main class="b">{'B' as string}</main>
 	</div>
 }
 
 // Client renders an extra element at the END, after a stable sibling (Per :644).
 export function ClientExtraEnd(props) @{
 	<div id="cee">
-		<main class="a">
-			{'A' as string}
-		</main>
+		<main class="a">{'A' as string}</main>
 		@if (props.isClient) {
 			<br class="extra" />
 		}
@@ -157,13 +135,9 @@ export function ClientExtraEnd(props) @{
 export function ServerExtraElement(props) @{
 	<div id="see">
 		@if (!props.isClient) {
-			<span class="gone">
-				{'bye' as string}
-			</span>
+			<span class="gone">{'bye' as string}</span>
 		}
-		<main class="child">
-			{'hello' as string}
-		</main>
+		<main class="child">{'hello' as string}</main>
 	</div>
 }
 
@@ -173,13 +147,9 @@ export function DeepExtra(props) @{
 		<section class="wrap">
 			<p class="para">
 				@if (props.isClient) {
-					<b class="bold">
-						{'B' as string}
-					</b>
+					<b class="bold">{'B' as string}</b>
 				}
-				<span class="tail">
-					{'tail' as string}
-				</span>
+				<span class="tail">{'tail' as string}</span>
 			</p>
 		</section>
 	</div>
@@ -188,9 +158,7 @@ export function DeepExtra(props) @{
 // Two DIFFERENT numbers as text — a real mismatch (Per Reconnecting:218). The `number | string`
 // union keeps the `as string` cast honest while still exercising number→text coercion.
 export function DifferentNumbers(props) @{
-	<div id="dn">
-		{(props.isClient ? 42 : '7') as string}
-	</div>
+	<div id="dn">{(props.isClient ? 42 : '7') as string}</div>
 }
 
 // dangerouslySetInnerHTML differs (Per ReactDOMHydrationDiff-test.js:196 / Reconnecting:405).
@@ -216,35 +184,31 @@ export function DetachedTextRenderReplay() @{
 		@if (step === 1) {
 			<em id="detached-text-transient">{'transient'}</em>
 		} @else {
-			<span id="detached-text-final">
-				{(step === 0 ? 'attempt' : 'final') as string}
-			</span>
+			<span id="detached-text-final">{(step === 0 ? 'attempt' : 'final') as string}</span>
 		}
 	</section>
 }
 
 // suppressHydrationWarning on an element with a divergent ATTRIBUTE (Per Reconnecting:144).
 export function SuppressedAttr(props) @{
-	<div id="supa" class={props.isClient ? 'client' : 'server'} suppressHydrationWarning>
-		{'x' as string}
-	</div>
+	<div
+		id="supa"
+		class={props.isClient ? 'client' : 'server'}
+		suppressHydrationWarning
+	>{'x' as string}</div>
 }
 
 // Component form vs bare-element form of the SAME markup — reconnect clean
 // (Per Reconnecting:64-100 "reconnect Pure/Class/Bare to …"). octane has only function
 // components + bare elements, so this collapses to func-component ≡ bare element.
 function Leaf(props) @{
-	<span id="leaf" class="leaf">
-		{'ok' as string}
-	</span>
+	<span id="leaf" class="leaf">{'ok' as string}</span>
 }
 export function CompForm(props) @{
 	<Leaf />
 }
 export function BareForm(props) @{
-	<span id="leaf" class="leaf">
-		{'ok' as string}
-	</span>
+	<span id="leaf" class="leaf">{'ok' as string}</span>
 }
 
 // A text mismatch FOLLOWED by a stable, INTERACTIVE sibling — proves hydration continues
@@ -252,11 +216,7 @@ export function BareForm(props) @{
 export function MismatchThenButton(props) @{
 	const [n, setN] = useState(0);
 	<div id="mtb">
-		<p class="msg">
-			{(props.isClient ? 'client' : 'server') as string}
-		</p>
-		<button id="mtb-btn" onClick={() => setN(n + 1)}>
-			{'count:' + n as string}
-		</button>
+		<p class="msg">{(props.isClient ? 'client' : 'server') as string}</p>
+		<button id="mtb-btn" onClick={() => setN(n + 1)}>{'count:' + n as string}</button>
 	</div>
 }

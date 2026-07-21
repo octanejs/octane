@@ -77,12 +77,8 @@ function NavItem(props: { folder: FolderId; search: string; count: number; activ
 		aria-current={props.active ? 'page' : undefined}
 		aria-label={`${label}, ${count} ${count === 1 ? 'item' : 'items'}`}
 	>
-		<span class="mailbox-icon" aria-hidden="true">
-			{FOLDER_ICONS[props.folder] as string}
-		</span>
-		<span>
-			{label as string}
-		</span>
+		<span class="mailbox-icon" aria-hidden="true">{FOLDER_ICONS[props.folder] as string}</span>
+		<span>{label as string}</span>
 		<span class="mailbox-count">{String(props.count)}</span>
 	</Link>;
 }
@@ -425,8 +421,8 @@ function Compose() {
 	const stayRef = useRef<HTMLButtonElement | null>(null);
 	const bypassBlocker = useRef(false);
 	const blocker = useBlocker(
-		({ currentLocation, nextLocation }) => dirty && !bypassBlocker.current &&
-			currentLocation.pathname !== nextLocation.pathname,
+		({ currentLocation, nextLocation }) =>
+			dirty && !bypassBlocker.current && currentLocation.pathname !== nextLocation.pathname,
 	);
 
 	useEffect(() => {

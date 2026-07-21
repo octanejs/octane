@@ -45,9 +45,7 @@ export function KeyedList() @{
 		<ul class="list">
 			@for (const item of items; key item.id) {
 				<li>
-					<span>
-						{item.label as string}
-					</span>
+					<span>{item.label as string}</span>
 					<button class="btn" onClick={() => remove(item.id)}>{'×'}</button>
 				</li>
 			} @empty {

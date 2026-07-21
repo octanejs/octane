@@ -19,18 +19,14 @@ export function ShadowSetText() @{
 	const [text, setText] = useState('');
 	<div>
 		<button id="st-btn" onClick={() => setText('xyz')}>{'go'}</button>
-		<span id="st-label">
-			{text as string}
-		</span>
+		<span id="st-label">{text as string}</span>
 	</div>
 }
 
 // `htext` shadows the mount-path text helper (create+append the text node).
 export function ShadowHtext(props: { value: string }) @{
 	const htext = props.value;
-	<span id="ht-label">
-		{htext as string}
-	</span>
+	<span id="ht-label">{htext as string}</span>
 }
 
 // Locals named after the attr/style/class/walk helpers used by this template.
@@ -56,9 +52,7 @@ export function ShadowUpdateHelpers() @{
 }
 
 function Row(props: { label: string }) @{
-	<li>
-		{props.label as string}
-	</li>
+	<li>{props.label as string}</li>
 }
 
 // Locals named after the control-flow / component-slot helpers.
@@ -70,9 +64,7 @@ export function ShadowBlocks() @{
 	<div>
 		<button id="b-btn" onClick={() => setOn(!on)}>{'t'}</button>
 		@if (on) {
-			<em id="b-if">
-				{ifBlock as string}
-			</em>
+			<em id="b-if">{ifBlock as string}</em>
 		}
 		<ul id="b-list">
 			@for (const x of forBlock; key x.id) {
