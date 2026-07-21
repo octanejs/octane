@@ -75,6 +75,65 @@ export function BatchCatch(props) @{
 	</>
 }
 
+export function ElseIfDirectUse({
+	load,
+	mode,
+}: {
+	load: (key: string) => Promise<string>;
+	mode: string;
+}) @{
+	if (mode === 'a') {
+		use(load('a'));
+	} else if (mode === 'b') {
+		use(load('b'));
+	}
+	<p class="else-if-use">{'mode=' + mode}</p>
+}
+
+export function BracelessDirectUse({
+	active,
+	load,
+}: {
+	active: boolean;
+	load: (key: string) => Promise<string>;
+}) @{
+	if (active) use(load('braceless'));
+	<p class="braceless-use">{'active=' + active}</p>
+}
+
+export function NestedIfDirectUse({
+	inner,
+	load,
+	outer,
+}: {
+	inner: boolean;
+	load: (key: string) => Promise<string>;
+	outer: boolean;
+}) @{
+	if (outer)
+		if (inner) use(load('nested'));
+	<p class="nested-if-use">{'active=' + (outer && inner)}</p>
+}
+
+export function ConditionalDirectUseWarmHost({
+	gate,
+	load,
+	mode,
+}: {
+	gate: Promise<string>;
+	load: (key: string) => Promise<string>;
+	mode: string;
+}) @{
+	<>
+		@try {
+			use(gate);
+			<ElseIfDirectUse load={load} mode={mode} />
+		} @pending {
+			<p class="conditional-warm-fallback">loading</p>
+		}
+	</>
+}
+
 // Warm exclusion: the leaf's `id` prop reads the suspended value `a`, so the
 // compiler must NOT prefetch it — its fetch correctly starts on resume.
 export function GatedLeaf(props) @{

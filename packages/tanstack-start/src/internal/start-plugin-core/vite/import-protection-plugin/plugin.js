@@ -1,4 +1,4 @@
-import { VITE_ENVIRONMENT_NAMES } from '../../constants.js';
+import { TRANSFORM_ID_REGEX, VITE_ENVIRONMENT_NAMES } from '../../constants.js';
 import { escapeRegExp, resolveViteId } from '../../utils.js';
 import {
 	IMPORT_PROTECTION_DEBUG,
@@ -1389,7 +1389,11 @@ function importProtectionPlugin(opts) {
 				return environmentNames.has(env.name);
 			},
 			transform: {
-				filter: { id: { include: [/\.[cm]?[tj]sx?($|\?)/] } },
+				// TRANSFORM_ID_REGEX includes .tsrx — the hand-rolled react-only
+				// regex here silently skipped octane importers, so denied *.client.*
+				// imports were never edge-rewritten/deferred and hard-errored at
+				// resolve instead of tree-shake-verified like react's do.
+				filter: { id: { include: [...TRANSFORM_ID_REGEX] } },
 				async handler(code, id) {
 					perf?.count('transform.calls');
 					const envName = this.environment.name;

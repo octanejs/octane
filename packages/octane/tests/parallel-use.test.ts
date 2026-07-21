@@ -4,6 +4,10 @@ import {
 	ChainHost,
 	DependentChain,
 	BatchCatch,
+	ElseIfDirectUse,
+	BracelessDirectUse,
+	NestedIfDirectUse,
+	ConditionalDirectUseWarmHost,
 	GatedHost,
 	ImportedHookHost,
 	ImportedHookTwiceHost,
@@ -193,6 +197,71 @@ describe('parallel use() — batched rejection routing', () => {
 
 		await act(() => da.resolve('A'));
 		expect(r.find('.err').textContent).toBe('caught:boom-b');
+		r.unmount();
+	});
+});
+
+describe('parallel use() — conditional setup arms', () => {
+	const fulfilled = (value: string): Promise<string> =>
+		({ then: () => {}, status: 'fulfilled', value }) as unknown as Promise<string>;
+
+	it('supports a direct use() in an else-if arm', () => {
+		const calls: string[] = [];
+		const r = mount(ElseIfDirectUse, {
+			mode: 'b',
+			load: (key: string) => {
+				calls.push(key);
+				return fulfilled(key);
+			},
+		});
+		expect(r.find('.else-if-use').textContent).toBe('mode=b');
+		expect(calls).toEqual(['b']);
+		r.unmount();
+	});
+
+	it('supports a direct use() in a braceless conditional arm', () => {
+		const calls: string[] = [];
+		const r = mount(BracelessDirectUse, {
+			active: true,
+			load: (key: string) => {
+				calls.push(key);
+				return fulfilled(key);
+			},
+		});
+		expect(r.find('.braceless-use').textContent).toBe('active=true');
+		expect(calls).toEqual(['braceless']);
+		r.unmount();
+	});
+
+	it('supports a direct use() in nested braceless conditional arms', () => {
+		const calls: string[] = [];
+		const r = mount(NestedIfDirectUse, {
+			inner: true,
+			outer: true,
+			load: (key: string) => {
+				calls.push(key);
+				return fulfilled(key);
+			},
+		});
+		expect(r.find('.nested-if-use').textContent).toBe('active=true');
+		expect(calls).toEqual(['nested']);
+		r.unmount();
+	});
+
+	it('warms only the selected conditional arm', () => {
+		const gate = deferred<string>();
+		const calls: string[] = [];
+		const r = mount(ConditionalDirectUseWarmHost, {
+			gate: gate.promise,
+			mode: 'b',
+			load: (key: string) => {
+				calls.push(key);
+				return new Promise<string>(() => {});
+			},
+		});
+		expect(r.find('.conditional-warm-fallback').textContent).toBe('loading');
+		// Warming must honor the same branch guards as the real child render.
+		expect(calls).toEqual(['b']);
 		r.unmount();
 	});
 });

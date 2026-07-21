@@ -81,7 +81,14 @@ the exact pinned snapshot and source-attributed React counts come from the
 - **The full React hook API** — `useState`, `useEffect`, `useMemo`, `useRef`,
   `useId`, `useTransition`, `useDeferredValue`, `use`, and the rest — with the
   same effect ordering and Suspense semantics, plus compiler-inferred dependency
-  lists when you omit them.
+  lists when you omit them. In production builds, `useMemo`/`useCallback`
+  compile to inline caches: a dependency hit allocates nothing — no factory
+  closure, no deps array.
+- **Promises in render are safe** — no `cache()` wrapper: creations feeding
+  `use()` are memoized at their declarations, including local `.then` chains
+  (`const p = fetchUser(id); const t = p.then(…); use(t)`). Independent
+  requests start together, one suspension per stratum, and descendant fetch
+  trees prefetch while an ancestor is still suspended.
 - **Fully async** — transitions, deferred values, and `<Activity>`.
 - **Streaming SSR and byte-stable hydration** — out-of-order Suspense flushing
   over Node or web streams, or buffered/static rendering when you want it.
@@ -472,6 +479,10 @@ export function Panel(props) @{
 Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
 and `@try`. Plain JavaScript control flow stays in setup code.
 
+Directive arms keep setup and output separate: a bare expression statement such as
+`console.log(value);` or `value;` is setup and does not render. To render a computed
+value, make the output explicit with a fragment: `<>{value}</>`.
+
 ```jsx
 export function Feed(props) @{
   <ul>
@@ -493,6 +504,41 @@ export function Greeting(props) @{
   }
 }
 ```
+
+### Inline scripts
+
+An authored `<script>` body is static, raw script text. Braces are literal source,
+so blocks and object literals work normally; Octane does not treat `{...}` inside
+the body as a TSRX interpolation:
+
+```jsx
+export function Bootstrap() @{
+  <script>
+    window.appConfig = { locale: 'en-GB' };
+  </script>
+}
+```
+
+For a dynamic whole-script value, use the standard raw-content prop. Serialize
+structured values explicitly:
+
+```jsx
+export function Rules(props) @{
+  <script
+    type="speculationrules"
+    dangerouslySetInnerHTML={{ __html: JSON.stringify(props.rules) }}
+  />
+}
+```
+
+`<script>{JSON.stringify(props.rules) as string}</script>` is static script source,
+not an interpolation; the cast does not change the raw-text grammar.
+`dangerouslySetInnerHTML` supplies the complete body and cannot be combined with
+child content. Client mounts and updates write it through `textContent`; server
+rendering neutralizes case-insensitive opening and closing `script` tokens without
+HTML-escaping ordinary JavaScript or JSON characters. This prevents the value from
+creating sibling markup, but it does not validate or sanitize executable
+JavaScript—only inject executable source you trust.
 
 ### Class composition
 

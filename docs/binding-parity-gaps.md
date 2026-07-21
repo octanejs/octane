@@ -11,7 +11,7 @@ remain at zero. Zero pins does **not** imply complete upstream parity. Consult
 [`docs/bindings-status.md`](bindings-status.md) for each binding's supported
 surface and evidence.
 
-**0 active pin(s) across 36 binding package(s).**
+**0 active pin(s) across 39 binding package(s).**
 
 | Package | Active pins |
 | --- | ---: |
@@ -41,8 +41,11 @@ surface and evidence.
 | `@octanejs/tanstack-ai` | 0 |
 | `@octanejs/tanstack-devtools` | 0 |
 | `@octanejs/tanstack-form` | 0 |
+| `@octanejs/tanstack-hotkeys` | 0 |
+| `@octanejs/tanstack-pacer` | 0 |
 | `@octanejs/tanstack-query` | 0 |
 | `@octanejs/tanstack-router` | 0 |
+| `@octanejs/tanstack-router-ssr-query` | 0 |
 | `@octanejs/tanstack-store` | 0 |
 | `@octanejs/tanstack-table` | 0 |
 | `@octanejs/tanstack-virtual` | 0 |

@@ -6693,6 +6693,125 @@ function adoptWarmValue(slot: HookSlot, deps: any[]): any {
 }
 
 // ---------------------------------------------------------------------------
+// Closure-free parallel-use creation ABI (inline hook-memo tier).
+//
+// The production compiler lowers each Pass A creation
+// (`_$useMemo(() => make(a, b), [a, b], _h$N)`) to
+//
+//   __pu$0 = _$puTake2(_h$N, _d0, _d1);
+//   if (__pu$0 === _$puMiss) __pu$0 = _$puPub(_h$N, make(_d0, _d1), _d0, _d1);
+//
+// so the per-render arrow + deps-array allocations disappear; the deps array
+// is built only on the take's cold branches (warm adoption / publish, where a
+// fetch is being started anyway). puTakeK + puPub together are exactly
+// useMemo's thenable-creation path split at the compute: the same scope.hooks
+// entry (Symbol slot — warm-visible to activeMemoMatch / adoptWarmValue), the
+// same hit-side recordRealWarmMemo episode stamping, the same warm adoption
+// before compute, and the same publish tail. `puMiss` is a dedicated sentinel
+// so a legitimately-`undefined` cached creation value round-trips.
+// ---------------------------------------------------------------------------
+
+export const puMiss: unique symbol = Symbol('octane.pu.miss');
+
+type PuMemoEntry = { deps: any[] | undefined; value: any; warmEpisode?: number };
+
+function puHit(slot: HookSlot, entry: PuMemoEntry): any {
+	if (
+		entry.warmEpisode !== CURRENT_WARM_EPISODE &&
+		recordRealWarmMemo(slot, entry.deps as any[], entry)
+	) {
+		entry.warmEpisode = CURRENT_WARM_EPISODE;
+	}
+	return entry.value;
+}
+
+function puAdopt(slot: HookSlot, deps: any[]): any {
+	const adopted = adoptWarmValue(slot, deps);
+	if (adopted === WARM_MISS) return puMiss;
+	ensureHooks(CURRENT_SCOPE!).set(slot, {
+		deps,
+		value: adopted,
+		warmEpisode: CURRENT_WARM_EPISODE,
+	});
+	return adopted;
+}
+
+export function puTake0(slot: HookSlot): any {
+	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
+	if (prev !== undefined && prev.deps !== undefined && prev.deps.length === 0) {
+		return puHit(slot, prev);
+	}
+	if (WARM_EVER) return puAdopt(slot, []);
+	return puMiss;
+}
+
+export function puTake1(slot: HookSlot, d0: any): any {
+	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (pd !== undefined && pd.length === 1 && Object.is(pd[0], d0)) return puHit(slot, prev);
+	}
+	if (WARM_EVER) return puAdopt(slot, [d0]);
+	return puMiss;
+}
+
+export function puTake2(slot: HookSlot, d0: any, d1: any): any {
+	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (pd !== undefined && pd.length === 2 && Object.is(pd[0], d0) && Object.is(pd[1], d1)) {
+			return puHit(slot, prev);
+		}
+	}
+	if (WARM_EVER) return puAdopt(slot, [d0, d1]);
+	return puMiss;
+}
+
+export function puTake3(slot: HookSlot, d0: any, d1: any, d2: any): any {
+	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (
+			pd !== undefined &&
+			pd.length === 3 &&
+			Object.is(pd[0], d0) &&
+			Object.is(pd[1], d1) &&
+			Object.is(pd[2], d2)
+		) {
+			return puHit(slot, prev);
+		}
+	}
+	if (WARM_EVER) return puAdopt(slot, [d0, d1, d2]);
+	return puMiss;
+}
+
+export function puTake4(slot: HookSlot, d0: any, d1: any, d2: any, d3: any): any {
+	const prev = CURRENT_SCOPE!.hooks?.get(slot) as PuMemoEntry | undefined;
+	if (prev !== undefined) {
+		const pd = prev.deps;
+		if (
+			pd !== undefined &&
+			pd.length === 4 &&
+			Object.is(pd[0], d0) &&
+			Object.is(pd[1], d1) &&
+			Object.is(pd[2], d2) &&
+			Object.is(pd[3], d3)
+		) {
+			return puHit(slot, prev);
+		}
+	}
+	if (WARM_EVER) return puAdopt(slot, [d0, d1, d2, d3]);
+	return puMiss;
+}
+
+export function puPub(slot: HookSlot, value: any, ...deps: any[]): any {
+	const entry: PuMemoEntry = { deps, value };
+	ensureHooks(CURRENT_SCOPE!).set(slot, entry);
+	if (recordRealWarmMemo(slot, deps, entry)) entry.warmEpisode = CURRENT_WARM_EPISODE;
+	return value;
+}
+
+// ---------------------------------------------------------------------------
 // lazy — React's code-splitting component wrapper.
 // ---------------------------------------------------------------------------
 
@@ -7901,6 +8020,31 @@ export function setScriptText(el: Element, value: any): void {
 	el.textContent = value == null ? '' : String(value);
 }
 
+// SSR replaces only the `s` in case-insensitive opening/closing script tokens.
+// Hydration compares against that serialized spelling after the script-data
+// input normalization applied to server markup; later client updates use
+// textContent directly and therefore need no escape.
+const INLINE_SCRIPT_TOKEN = /(<\/|<)(s)(cript)/gi;
+
+function escapeInlineScriptContentForHydration(value: string): string {
+	return value.replace(
+		INLINE_SCRIPT_TOKEN,
+		(_match, prefix: string, s: string, suffix: string) =>
+			`${prefix}${s === 's' ? '\\u0073' : '\\u0053'}${suffix}`,
+	);
+}
+
+// Unlike ordinary HTML data, script-data preserves character references such as
+// `&amp;` verbatim. Normalize only the input-stream transformations that affect a
+// parsed script Text node: CRLF/CR become LF and NUL becomes U+FFFD.
+const SCRIPT_DATA_NORMALIZATION = /\r\n?|\u0000/g;
+
+function normalizeScriptTextForHydration(value: string): string {
+	return value.replace(SCRIPT_DATA_NORMALIZATION, (match) =>
+		match === '\u0000' ? '\uFFFD' : '\n',
+	);
+}
+
 /** Parse raw HTML in its authored host context for hydration comparison. */
 function normalizeHTMLForHydration(parent: Element, html: string): string {
 	// Match React's comparison boundary: the browser canonicalizes equivalent
@@ -7921,7 +8065,10 @@ export function setHTML(el: Element, value: any): void {
 	const hydration = activeHydration();
 	if (hydration !== null && !hydration.isFresh(el)) {
 		const server = el.localName === 'script' ? (el.textContent ?? '') : el.innerHTML;
-		const expected = el.localName === 'script' ? next : normalizeHTMLForHydration(el, next);
+		const expected =
+			el.localName === 'script'
+				? normalizeScriptTextForHydration(escapeInlineScriptContentForHydration(next))
+				: normalizeHTMLForHydration(el, next);
 		if (server === expected || isHydrationSuppressed(el)) return;
 		warnHydrationKeptServerValue(
 			(el as any).__oct_loc,

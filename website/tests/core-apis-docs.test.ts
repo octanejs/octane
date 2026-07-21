@@ -376,10 +376,14 @@ describe('Core APIs documentation', { timeout: 15_000 }, () => {
 
 	it('collapses the mobile docs menu after choosing another page', async () => {
 		const { container } = await renderCoreApis();
-		const mobileMenu = container.querySelector('details.sidebar-mobile')!;
-		const nextGuide = mobileMenu.querySelector<HTMLAnchorElement>('a[href="/docs/tsrx-vs-tsx"]')!;
+		const mobileToggle = container.querySelector<HTMLButtonElement>('.sidebar-mobile-toggle')!;
+		const sidebar = container.querySelector<HTMLElement>('#docs-sidebar-nav')!;
+		const nextGuide = sidebar.querySelector<HTMLAnchorElement>('a[href="/docs/tsrx-vs-tsx"]')!;
 
-		mobileMenu.setAttribute('open', '');
+		expect(container.querySelectorAll('.sidebar-mobile-toggle')).toHaveLength(1);
+		expect(mobileToggle.textContent).toContain('Documentation');
+		fireEvent.click(mobileToggle);
+		expect(mobileToggle.getAttribute('aria-expanded')).toBe('true');
 		fireEvent.click(nextGuide);
 
 		await waitFor(() => {
@@ -387,6 +391,6 @@ describe('Core APIs documentation', { timeout: 15_000 }, () => {
 				throw new Error('next guide not committed');
 			}
 		});
-		expect(mobileMenu.hasAttribute('open')).toBe(false);
+		expect(mobileToggle.getAttribute('aria-expanded')).toBe('false');
 	});
 });
