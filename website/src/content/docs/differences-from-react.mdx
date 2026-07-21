@@ -166,6 +166,27 @@ const user = use(fetchUser(id));
 const teams = use(fetchTeams(id)); // starts alongside fetchUser
 ```
 
+Promises created during render are safe in Octane — no `cache()` wrapper
+needed. The compiler memoizes every creation that feeds a `use()` at its
+declaration, keyed on its real inputs, and that includes local promise chains:
+
+```tsrx
+const userPromise = fetchUser(id);
+const thumbnailPromise = userPromise.then((user) => user.thumbnail());
+<Avatar thumbnail={use(thumbnailPromise)} />
+```
+
+`userPromise` is keyed on `id`, and the derived `.then` link is keyed on
+`userPromise`'s identity — so nothing refetches on an unrelated re-render or a
+suspense replay, the whole chain refetches exactly when `id` changes, and the
+chain's head joins the prefetch (`__warm`) plan an ancestor can start early.
+React re-runs an uncached creation on every render attempt (with a dev
+warning), and the React Compiler stabilizes the promise identity but still
+unwraps serially. In production output these memoized creations — and
+`useMemo`/`useCallback` themselves — compile to inline caches: a dependency
+hit costs a few comparisons with no closure, dependency-array, or hook-map
+allocations.
+
 Two known gaps are tracked while this area is under active work: independence
 analysis stops at module boundaries (independent `use()` reads inside an
 imported custom hook still serialize), and a transition-wrapped update

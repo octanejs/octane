@@ -81,7 +81,14 @@ the exact pinned snapshot and source-attributed React counts come from the
 - **The full React hook API** — `useState`, `useEffect`, `useMemo`, `useRef`,
   `useId`, `useTransition`, `useDeferredValue`, `use`, and the rest — with the
   same effect ordering and Suspense semantics, plus compiler-inferred dependency
-  lists when you omit them.
+  lists when you omit them. In production builds, `useMemo`/`useCallback`
+  compile to inline caches: a dependency hit allocates nothing — no factory
+  closure, no deps array.
+- **Promises in render are safe** — no `cache()` wrapper: creations feeding
+  `use()` are memoized at their declarations, including local `.then` chains
+  (`const p = fetchUser(id); const t = p.then(…); use(t)`). Independent
+  requests start together, one suspension per stratum, and descendant fetch
+  trees prefetch while an ancestor is still suspended.
 - **Fully async** — transitions, deferred values, and `<Activity>`.
 - **Streaming SSR and byte-stable hydration** — out-of-order Suspense flushing
   over Node or web streams, or buffered/static rendering when you want it.

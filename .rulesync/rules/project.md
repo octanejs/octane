@@ -211,9 +211,10 @@ these toward React without checking `docs/react-parity-migration-plan.md`:
   can differ. Survivor node identity and final order ARE guaranteed (and tested).
 - **Parallel `use()` — no suspense waterfalls.** The compiler always runs its
   waterfall-elimination analysis: it memoizes eligible `use()` argument creations
-  per call site, starts provably-independent ones together, suspends ONCE per
-  stratum, and prefetches eligible independent descendant fetch trees (`__warm`
-  plans). React
+  per call site AND use()-fed local `const` creation chains at their declarations
+  (docs/decallback-memo.md Pass A′), starts provably-independent ones together,
+  suspends ONCE per stratum, and prefetches eligible independent descendant fetch
+  trees (`__warm` plans). React
   runs the same code as a serial waterfall — do not "fix" fetch-start timing,
   batch replay counts, or prefetch behavior toward React
   (docs/suspense-parallel-use-plan.md). True data dependencies stay sequential;
