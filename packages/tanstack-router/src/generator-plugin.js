@@ -18,6 +18,14 @@ import { compileToVolarMappings } from 'octane/compiler/volar';
  * @returns {string}
  */
 export function maskOctaneRouteSource(source, filename = 'route.tsrx') {
+	// Only .tsrx carries the native template dialect. Plain .ts/.tsx route
+	// files (robots.txt.ts-style server routes, shared route helpers) must
+	// pass through untouched — the TSRX parser is not a general TS parser and
+	// rejects valid TS it was never meant to see.
+	if (!filename.endsWith('.tsrx')) {
+		return source;
+	}
+
 	const { sourceAst } = compileToVolarMappings(source, filename);
 	const output = source.split('');
 

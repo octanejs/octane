@@ -1,4 +1,5 @@
 import { useServerFn } from './use-server-fn.js';
+import { Hydrate } from './Hydrate.tsrx';
 import {
 	createClientOnlyFn,
 	createCsrfMiddleware,
@@ -11,6 +12,7 @@ import {
 
 export * from '@tanstack/start-client-core';
 export {
+	Hydrate,
 	createClientOnlyFn,
 	createCsrfMiddleware,
 	createIsomorphicFn,

@@ -1,0 +1,16 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-hotkeys",
+    "version": "0.10.0"
+  },
+  "surface": "Complete: the full upstream hook surface (`useHotkey`, `useHotkeys`, `useHeldKeys`, `useHeldKeyCodes`, `useKeyHold`, `useHotkeySequence`, `useHotkeySequences`, `useHotkeyRecorder`, `useHotkeySequenceRecorder`, `useHotkeyRegistrations`) plus `HotkeysProvider`/`useHotkeysContext`/`useDefaultHotkeysOptions`, re-exporting the framework-agnostic `@tanstack/hotkeys@0.8.0` core unchanged; store subscriptions go through `@octanejs/tanstack-store`.",
+  "divergences": [
+    "`target` refs are plain `{ current }` objects (Octane has no `React.RefObject`); the `isRef` guard and behavior are otherwise identical."
+  ],
+  "ssr": "Supported: every hook registers listeners in effects and resolves `document` lazily, so server rendering produces no registrations and no browser access (matching upstream's `typeof document` guards).",
+  "notes": [
+    "Created for the tanstack-com benchmark's octane flavor (Phase 2c); exercised by that app's ApplicationStarter hotkeys surface.",
+    "Upstream `React`-prefixed type names (`ReactHotkeyRecorder`, `ReactHotkeySequenceRecorder`) are kept verbatim so ports only change the import specifier."
+  ],
+  "verified": "2026-07-20"
+}

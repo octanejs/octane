@@ -1354,7 +1354,7 @@ export default defineConfig({
 							),
 						},
 						{
-							find: /^@octanejs\/tanstack-start\/(client|server)$/,
+							find: /^@octanejs\/tanstack-start\/(client|server|hydration)$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-start/src/$1.js'),
 						},
 						{

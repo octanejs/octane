@@ -56,7 +56,7 @@ export function useStore<TState, StateSlice>(
 	);
 }
 
-type UseBoundStore<S extends ReadonlyStoreApi<unknown>> = {
+export type UseBoundStore<S extends ReadonlyStoreApi<unknown>> = {
 	(): ExtractState<S>;
 	<U>(selector: (state: ExtractState<S>) => U): U;
 } & S;

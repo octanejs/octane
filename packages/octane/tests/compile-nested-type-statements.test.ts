@@ -97,3 +97,31 @@ describe('compile — inline type-only import/export specifiers', () => {
 		});
 	}
 });
+
+// A TS `this` parameter is type-only (`function f(this: Foo, x: T)`) but the
+// parser represents it as a leading plain Identifier named `this` — before
+// the stripTsOnlyWrappers params-shift, the annotation strip left `this` as a
+// real parameter name and the emitted JS was a SyntaxError. Found porting
+// @tanstack/react-start's Hydrate (whose strategies type `this`).
+describe('compile — TS `this` parameters', () => {
+	for (const mode of ['client', 'server'] as const) {
+		it(`${mode} emit drops the type-only this parameter`, () => {
+			const src = [
+				'export function useThing(this: { x: number }, label: string) {',
+				'\treturn label;',
+				'}',
+				'export function App() {',
+				"\treturn <p>{useThing.call({ x: 1 }, 'hi')}</p>;",
+				'}',
+				'',
+			].join('\n');
+			const { code } = compile(
+				src,
+				'this-param.test.tsrx',
+				mode === 'server' ? { mode: 'server' } : undefined,
+			);
+			expect(code).toMatch(/function useThing\(label\)/);
+			expect(code).not.toMatch(/\(this[,)]/);
+		});
+	}
+});

@@ -19,13 +19,14 @@
       "@octanejs/dexie",
       "@octanejs/tanstack-query",
       "@octanejs/tanstack-router",
+      "@octanejs/tanstack-router-ssr-query",
       "@octanejs/remix-router",
       "@octanejs/nuqs"
     ]
   },
   {
     "title": "UI and interaction",
-    "description": "Primitives, positioning, motion, drag and drop, toasts, and icons.",
+    "description": "Primitives, positioning, motion, drag and drop, toasts, icons, keyboard shortcuts, and event pacing.",
     "packages": [
       "@octanejs/radix",
       "@octanejs/base-ui",
@@ -34,7 +35,9 @@
       "@octanejs/motion",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
-      "@octanejs/lucide"
+      "@octanejs/lucide",
+      "@octanejs/tanstack-hotkeys",
+      "@octanejs/tanstack-pacer"
     ]
   },
   {

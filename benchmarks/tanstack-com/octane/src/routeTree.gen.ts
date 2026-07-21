@@ -10,33 +10,365 @@
 
 import { Route as rootRouteImport } from './routes/__root.tsrx';
 import { Route as IndexRouteImport } from './routes/index.tsrx';
+import { Route as LibraryRouteImport } from './routes/_library.tsrx';
+import { Route as BlogRouteImport } from './routes/blog.tsrx';
+import { Route as EthosRouteImport } from './routes/ethos.tsrx';
+import { Route as LearnRouteImport } from './routes/learn.tsrx';
+import { Route as LibrariesRouteImport } from './routes/libraries.tsrx';
+import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt.ts';
+import { Route as PrivacyRouteImport } from './routes/privacy.tsrx';
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt.ts';
+import { Route as RssDotxmlRouteImport } from './routes/rss[.]xml.ts';
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml.ts';
+import { Route as SupportRouteImport } from './routes/support.tsrx';
+import { Route as TenetsRouteImport } from './routes/tenets.tsrx';
+import { Route as TermsRouteImport } from './routes/terms.tsrx';
+import { Route as LibraryLibraryIdRouteRouteImport } from './routes/_library/$libraryId/route.tsrx';
+import { Route as BlogIndexRouteImport } from './routes/blog.index.tsrx';
+import { Route as BlogSplatRouteImport } from './routes/blog.$.tsrx';
+import { Route as LibrariesFrameworkRouteImport } from './routes/libraries_.$framework.tsrx';
+import { Route as LibraryLibraryIdIndexRouteImport } from './routes/_library/$libraryId/index.tsrx';
+import { Route as LibraryLibraryIdVersionRouteImport } from './routes/_library/$libraryId/$version.tsrx';
+import { Route as LibraryLibraryIdVersionIndexRouteImport } from './routes/_library/$libraryId/$version.index.tsrx';
+import { Route as LibraryLibraryIdVersionDocsRouteImport } from './routes/_library/$libraryId/$version.docs.tsrx';
+import { Route as LibraryRouterVersionIndexRouteImport } from './routes/_library/router.$version.index.tsrx';
+import { Route as LibraryLibraryIdVersionDocsIndexRouteImport } from './routes/_library/$libraryId/$version.docs.index.tsrx';
+import { Route as LibraryLibraryIdVersionDocsSplatRouteImport } from './routes/_library/$libraryId/$version.docs.$.tsrx';
+import { Route as LibraryLibraryIdVersionDocsFrameworkIndexRouteImport } from './routes/_library/$libraryId/$version.docs.framework.index.tsrx';
+import { Route as LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRouteImport } from './routes/_library/$libraryId/$version.docs.framework.$framework.index.tsrx';
+import { Route as LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRouteImport } from './routes/_library/$libraryId/$version.docs.framework.$framework.$.tsrx';
 
 const IndexRoute = IndexRouteImport.update({
 	id: '/',
 	path: '/',
 	getParentRoute: () => rootRouteImport,
 } as any);
+const LibraryRoute = LibraryRouteImport.update({
+	id: '/_library',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const BlogRoute = BlogRouteImport.update({
+	id: '/blog',
+	path: '/blog',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const EthosRoute = EthosRouteImport.update({
+	id: '/ethos',
+	path: '/ethos',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const LearnRoute = LearnRouteImport.update({
+	id: '/learn',
+	path: '/learn',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const LibrariesRoute = LibrariesRouteImport.update({
+	id: '/libraries',
+	path: '/libraries',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const LlmsDottxtRoute = LlmsDottxtRouteImport.update({
+	id: '/llms.txt',
+	path: '/llms.txt',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const PrivacyRoute = PrivacyRouteImport.update({
+	id: '/privacy',
+	path: '/privacy',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+	id: '/robots.txt',
+	path: '/robots.txt',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const RssDotxmlRoute = RssDotxmlRouteImport.update({
+	id: '/rss.xml',
+	path: '/rss.xml',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+	id: '/sitemap.xml',
+	path: '/sitemap.xml',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const SupportRoute = SupportRouteImport.update({
+	id: '/support',
+	path: '/support',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const TenetsRoute = TenetsRouteImport.update({
+	id: '/tenets',
+	path: '/tenets',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const TermsRoute = TermsRouteImport.update({
+	id: '/terms',
+	path: '/terms',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const LibraryLibraryIdRouteRoute = LibraryLibraryIdRouteRouteImport.update({
+	id: '/$libraryId',
+	path: '/$libraryId',
+	getParentRoute: () => LibraryRoute,
+} as any);
+const BlogIndexRoute = BlogIndexRouteImport.update({
+	id: '/',
+	path: '/',
+	getParentRoute: () => BlogRoute,
+} as any);
+const BlogSplatRoute = BlogSplatRouteImport.update({
+	id: '/$',
+	path: '/$',
+	getParentRoute: () => BlogRoute,
+} as any);
+const LibrariesFrameworkRoute = LibrariesFrameworkRouteImport.update({
+	id: '/libraries_/$framework',
+	path: '/libraries/$framework',
+	getParentRoute: () => rootRouteImport,
+} as any);
+const LibraryLibraryIdIndexRoute = LibraryLibraryIdIndexRouteImport.update({
+	id: '/',
+	path: '/',
+	getParentRoute: () => LibraryLibraryIdRouteRoute,
+} as any);
+const LibraryLibraryIdVersionRoute = LibraryLibraryIdVersionRouteImport.update({
+	id: '/$version',
+	path: '/$version',
+	getParentRoute: () => LibraryLibraryIdRouteRoute,
+} as any);
+const LibraryLibraryIdVersionIndexRoute = LibraryLibraryIdVersionIndexRouteImport.update({
+	id: '/',
+	path: '/',
+	getParentRoute: () => LibraryLibraryIdVersionRoute,
+} as any);
+const LibraryLibraryIdVersionDocsRoute = LibraryLibraryIdVersionDocsRouteImport.update({
+	id: '/docs',
+	path: '/docs',
+	getParentRoute: () => LibraryLibraryIdVersionRoute,
+} as any);
+const LibraryRouterVersionIndexRoute = LibraryRouterVersionIndexRouteImport.update({
+	id: '/router/$version/',
+	path: '/router/$version/',
+	getParentRoute: () => LibraryRoute,
+} as any);
+const LibraryLibraryIdVersionDocsIndexRoute = LibraryLibraryIdVersionDocsIndexRouteImport.update({
+	id: '/',
+	path: '/',
+	getParentRoute: () => LibraryLibraryIdVersionDocsRoute,
+} as any);
+const LibraryLibraryIdVersionDocsSplatRoute = LibraryLibraryIdVersionDocsSplatRouteImport.update({
+	id: '/$',
+	path: '/$',
+	getParentRoute: () => LibraryLibraryIdVersionDocsRoute,
+} as any);
+const LibraryLibraryIdVersionDocsFrameworkIndexRoute =
+	LibraryLibraryIdVersionDocsFrameworkIndexRouteImport.update({
+		id: '/framework/',
+		path: '/framework/',
+		getParentRoute: () => LibraryLibraryIdVersionDocsRoute,
+	} as any);
+const LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute =
+	LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRouteImport.update({
+		id: '/framework/$framework/',
+		path: '/framework/$framework/',
+		getParentRoute: () => LibraryLibraryIdVersionDocsRoute,
+	} as any);
+const LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute =
+	LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRouteImport.update({
+		id: '/framework/$framework/$',
+		path: '/framework/$framework/$',
+		getParentRoute: () => LibraryLibraryIdVersionDocsRoute,
+	} as any);
 
 export interface FileRoutesByFullPath {
 	'/': typeof IndexRoute;
+	'/blog': typeof BlogRouteWithChildren;
+	'/ethos': typeof EthosRoute;
+	'/learn': typeof LearnRoute;
+	'/libraries': typeof LibrariesRoute;
+	'/llms.txt': typeof LlmsDottxtRoute;
+	'/privacy': typeof PrivacyRoute;
+	'/robots.txt': typeof RobotsDottxtRoute;
+	'/rss.xml': typeof RssDotxmlRoute;
+	'/sitemap.xml': typeof SitemapDotxmlRoute;
+	'/support': typeof SupportRoute;
+	'/tenets': typeof TenetsRoute;
+	'/terms': typeof TermsRoute;
+	'/$libraryId': typeof LibraryLibraryIdRouteRouteWithChildren;
+	'/blog/$': typeof BlogSplatRoute;
+	'/libraries/$framework': typeof LibrariesFrameworkRoute;
+	'/blog/': typeof BlogIndexRoute;
+	'/$libraryId/$version': typeof LibraryLibraryIdVersionRouteWithChildren;
+	'/$libraryId/': typeof LibraryLibraryIdIndexRoute;
+	'/$libraryId/$version/docs': typeof LibraryLibraryIdVersionDocsRouteWithChildren;
+	'/$libraryId/$version/': typeof LibraryLibraryIdVersionIndexRoute;
+	'/router/$version/': typeof LibraryRouterVersionIndexRoute;
+	'/$libraryId/$version/docs/$': typeof LibraryLibraryIdVersionDocsSplatRoute;
+	'/$libraryId/$version/docs/': typeof LibraryLibraryIdVersionDocsIndexRoute;
+	'/$libraryId/$version/docs/framework/': typeof LibraryLibraryIdVersionDocsFrameworkIndexRoute;
+	'/$libraryId/$version/docs/framework/$framework/$': typeof LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute;
+	'/$libraryId/$version/docs/framework/$framework/': typeof LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute;
 }
 export interface FileRoutesByTo {
 	'/': typeof IndexRoute;
+	'/ethos': typeof EthosRoute;
+	'/learn': typeof LearnRoute;
+	'/libraries': typeof LibrariesRoute;
+	'/llms.txt': typeof LlmsDottxtRoute;
+	'/privacy': typeof PrivacyRoute;
+	'/robots.txt': typeof RobotsDottxtRoute;
+	'/rss.xml': typeof RssDotxmlRoute;
+	'/sitemap.xml': typeof SitemapDotxmlRoute;
+	'/support': typeof SupportRoute;
+	'/tenets': typeof TenetsRoute;
+	'/terms': typeof TermsRoute;
+	'/blog/$': typeof BlogSplatRoute;
+	'/libraries/$framework': typeof LibrariesFrameworkRoute;
+	'/blog': typeof BlogIndexRoute;
+	'/$libraryId': typeof LibraryLibraryIdIndexRoute;
+	'/$libraryId/$version': typeof LibraryLibraryIdVersionIndexRoute;
+	'/router/$version': typeof LibraryRouterVersionIndexRoute;
+	'/$libraryId/$version/docs/$': typeof LibraryLibraryIdVersionDocsSplatRoute;
+	'/$libraryId/$version/docs': typeof LibraryLibraryIdVersionDocsIndexRoute;
+	'/$libraryId/$version/docs/framework': typeof LibraryLibraryIdVersionDocsFrameworkIndexRoute;
+	'/$libraryId/$version/docs/framework/$framework/$': typeof LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute;
+	'/$libraryId/$version/docs/framework/$framework': typeof LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute;
 }
 export interface FileRoutesById {
 	__root__: typeof rootRouteImport;
 	'/': typeof IndexRoute;
+	'/_library': typeof LibraryRouteWithChildren;
+	'/blog': typeof BlogRouteWithChildren;
+	'/ethos': typeof EthosRoute;
+	'/learn': typeof LearnRoute;
+	'/libraries': typeof LibrariesRoute;
+	'/llms.txt': typeof LlmsDottxtRoute;
+	'/privacy': typeof PrivacyRoute;
+	'/robots.txt': typeof RobotsDottxtRoute;
+	'/rss.xml': typeof RssDotxmlRoute;
+	'/sitemap.xml': typeof SitemapDotxmlRoute;
+	'/support': typeof SupportRoute;
+	'/tenets': typeof TenetsRoute;
+	'/terms': typeof TermsRoute;
+	'/_library/$libraryId': typeof LibraryLibraryIdRouteRouteWithChildren;
+	'/blog/$': typeof BlogSplatRoute;
+	'/libraries_/$framework': typeof LibrariesFrameworkRoute;
+	'/blog/': typeof BlogIndexRoute;
+	'/_library/$libraryId/$version': typeof LibraryLibraryIdVersionRouteWithChildren;
+	'/_library/$libraryId/': typeof LibraryLibraryIdIndexRoute;
+	'/_library/$libraryId/$version/docs': typeof LibraryLibraryIdVersionDocsRouteWithChildren;
+	'/_library/$libraryId/$version/': typeof LibraryLibraryIdVersionIndexRoute;
+	'/_library/router/$version/': typeof LibraryRouterVersionIndexRoute;
+	'/_library/$libraryId/$version/docs/$': typeof LibraryLibraryIdVersionDocsSplatRoute;
+	'/_library/$libraryId/$version/docs/': typeof LibraryLibraryIdVersionDocsIndexRoute;
+	'/_library/$libraryId/$version/docs/framework/': typeof LibraryLibraryIdVersionDocsFrameworkIndexRoute;
+	'/_library/$libraryId/$version/docs/framework/$framework/$': typeof LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute;
+	'/_library/$libraryId/$version/docs/framework/$framework/': typeof LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute;
 }
 export interface FileRouteTypes {
 	fileRoutesByFullPath: FileRoutesByFullPath;
-	fullPaths: '/';
+	fullPaths:
+		| '/'
+		| '/blog'
+		| '/ethos'
+		| '/learn'
+		| '/libraries'
+		| '/llms.txt'
+		| '/privacy'
+		| '/robots.txt'
+		| '/rss.xml'
+		| '/sitemap.xml'
+		| '/support'
+		| '/tenets'
+		| '/terms'
+		| '/$libraryId'
+		| '/blog/$'
+		| '/libraries/$framework'
+		| '/blog/'
+		| '/$libraryId/$version'
+		| '/$libraryId/'
+		| '/$libraryId/$version/docs'
+		| '/$libraryId/$version/'
+		| '/router/$version/'
+		| '/$libraryId/$version/docs/$'
+		| '/$libraryId/$version/docs/'
+		| '/$libraryId/$version/docs/framework/'
+		| '/$libraryId/$version/docs/framework/$framework/$'
+		| '/$libraryId/$version/docs/framework/$framework/';
 	fileRoutesByTo: FileRoutesByTo;
-	to: '/';
-	id: '__root__' | '/';
+	to:
+		| '/'
+		| '/ethos'
+		| '/learn'
+		| '/libraries'
+		| '/llms.txt'
+		| '/privacy'
+		| '/robots.txt'
+		| '/rss.xml'
+		| '/sitemap.xml'
+		| '/support'
+		| '/tenets'
+		| '/terms'
+		| '/blog/$'
+		| '/libraries/$framework'
+		| '/blog'
+		| '/$libraryId'
+		| '/$libraryId/$version'
+		| '/router/$version'
+		| '/$libraryId/$version/docs/$'
+		| '/$libraryId/$version/docs'
+		| '/$libraryId/$version/docs/framework'
+		| '/$libraryId/$version/docs/framework/$framework/$'
+		| '/$libraryId/$version/docs/framework/$framework';
+	id:
+		| '__root__'
+		| '/'
+		| '/_library'
+		| '/blog'
+		| '/ethos'
+		| '/learn'
+		| '/libraries'
+		| '/llms.txt'
+		| '/privacy'
+		| '/robots.txt'
+		| '/rss.xml'
+		| '/sitemap.xml'
+		| '/support'
+		| '/tenets'
+		| '/terms'
+		| '/_library/$libraryId'
+		| '/blog/$'
+		| '/libraries_/$framework'
+		| '/blog/'
+		| '/_library/$libraryId/$version'
+		| '/_library/$libraryId/'
+		| '/_library/$libraryId/$version/docs'
+		| '/_library/$libraryId/$version/'
+		| '/_library/router/$version/'
+		| '/_library/$libraryId/$version/docs/$'
+		| '/_library/$libraryId/$version/docs/'
+		| '/_library/$libraryId/$version/docs/framework/'
+		| '/_library/$libraryId/$version/docs/framework/$framework/$'
+		| '/_library/$libraryId/$version/docs/framework/$framework/';
 	fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
 	IndexRoute: typeof IndexRoute;
+	LibraryRoute: typeof LibraryRouteWithChildren;
+	BlogRoute: typeof BlogRouteWithChildren;
+	EthosRoute: typeof EthosRoute;
+	LearnRoute: typeof LearnRoute;
+	LibrariesRoute: typeof LibrariesRoute;
+	LlmsDottxtRoute: typeof LlmsDottxtRoute;
+	PrivacyRoute: typeof PrivacyRoute;
+	RobotsDottxtRoute: typeof RobotsDottxtRoute;
+	RssDotxmlRoute: typeof RssDotxmlRoute;
+	SitemapDotxmlRoute: typeof SitemapDotxmlRoute;
+	SupportRoute: typeof SupportRoute;
+	TenetsRoute: typeof TenetsRoute;
+	TermsRoute: typeof TermsRoute;
+	LibrariesFrameworkRoute: typeof LibrariesFrameworkRoute;
 }
 
 declare module '@octanejs/tanstack-router' {
@@ -48,11 +380,287 @@ declare module '@octanejs/tanstack-router' {
 			preLoaderRoute: typeof IndexRouteImport;
 			parentRoute: typeof rootRouteImport;
 		};
+		'/_library': {
+			id: '/_library';
+			path: '';
+			fullPath: '/';
+			preLoaderRoute: typeof LibraryRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/blog': {
+			id: '/blog';
+			path: '/blog';
+			fullPath: '/blog';
+			preLoaderRoute: typeof BlogRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/ethos': {
+			id: '/ethos';
+			path: '/ethos';
+			fullPath: '/ethos';
+			preLoaderRoute: typeof EthosRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/learn': {
+			id: '/learn';
+			path: '/learn';
+			fullPath: '/learn';
+			preLoaderRoute: typeof LearnRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/libraries': {
+			id: '/libraries';
+			path: '/libraries';
+			fullPath: '/libraries';
+			preLoaderRoute: typeof LibrariesRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/llms.txt': {
+			id: '/llms.txt';
+			path: '/llms.txt';
+			fullPath: '/llms.txt';
+			preLoaderRoute: typeof LlmsDottxtRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/privacy': {
+			id: '/privacy';
+			path: '/privacy';
+			fullPath: '/privacy';
+			preLoaderRoute: typeof PrivacyRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/robots.txt': {
+			id: '/robots.txt';
+			path: '/robots.txt';
+			fullPath: '/robots.txt';
+			preLoaderRoute: typeof RobotsDottxtRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/rss.xml': {
+			id: '/rss.xml';
+			path: '/rss.xml';
+			fullPath: '/rss.xml';
+			preLoaderRoute: typeof RssDotxmlRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/sitemap.xml': {
+			id: '/sitemap.xml';
+			path: '/sitemap.xml';
+			fullPath: '/sitemap.xml';
+			preLoaderRoute: typeof SitemapDotxmlRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/support': {
+			id: '/support';
+			path: '/support';
+			fullPath: '/support';
+			preLoaderRoute: typeof SupportRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/tenets': {
+			id: '/tenets';
+			path: '/tenets';
+			fullPath: '/tenets';
+			preLoaderRoute: typeof TenetsRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/terms': {
+			id: '/terms';
+			path: '/terms';
+			fullPath: '/terms';
+			preLoaderRoute: typeof TermsRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/_library/$libraryId': {
+			id: '/_library/$libraryId';
+			path: '/$libraryId';
+			fullPath: '/$libraryId';
+			preLoaderRoute: typeof LibraryLibraryIdRouteRouteImport;
+			parentRoute: typeof LibraryRoute;
+		};
+		'/blog/': {
+			id: '/blog/';
+			path: '/';
+			fullPath: '/blog/';
+			preLoaderRoute: typeof BlogIndexRouteImport;
+			parentRoute: typeof BlogRoute;
+		};
+		'/blog/$': {
+			id: '/blog/$';
+			path: '/$';
+			fullPath: '/blog/$';
+			preLoaderRoute: typeof BlogSplatRouteImport;
+			parentRoute: typeof BlogRoute;
+		};
+		'/libraries_/$framework': {
+			id: '/libraries_/$framework';
+			path: '/libraries/$framework';
+			fullPath: '/libraries/$framework';
+			preLoaderRoute: typeof LibrariesFrameworkRouteImport;
+			parentRoute: typeof rootRouteImport;
+		};
+		'/_library/$libraryId/': {
+			id: '/_library/$libraryId/';
+			path: '/';
+			fullPath: '/$libraryId/';
+			preLoaderRoute: typeof LibraryLibraryIdIndexRouteImport;
+			parentRoute: typeof LibraryLibraryIdRouteRoute;
+		};
+		'/_library/$libraryId/$version': {
+			id: '/_library/$libraryId/$version';
+			path: '/$version';
+			fullPath: '/$libraryId/$version';
+			preLoaderRoute: typeof LibraryLibraryIdVersionRouteImport;
+			parentRoute: typeof LibraryLibraryIdRouteRoute;
+		};
+		'/_library/$libraryId/$version/': {
+			id: '/_library/$libraryId/$version/';
+			path: '/';
+			fullPath: '/$libraryId/$version/';
+			preLoaderRoute: typeof LibraryLibraryIdVersionIndexRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionRoute;
+		};
+		'/_library/$libraryId/$version/docs': {
+			id: '/_library/$libraryId/$version/docs';
+			path: '/docs';
+			fullPath: '/$libraryId/$version/docs';
+			preLoaderRoute: typeof LibraryLibraryIdVersionDocsRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionRoute;
+		};
+		'/_library/router/$version/': {
+			id: '/_library/router/$version/';
+			path: '/router/$version';
+			fullPath: '/router/$version/';
+			preLoaderRoute: typeof LibraryRouterVersionIndexRouteImport;
+			parentRoute: typeof LibraryRoute;
+		};
+		'/_library/$libraryId/$version/docs/': {
+			id: '/_library/$libraryId/$version/docs/';
+			path: '/';
+			fullPath: '/$libraryId/$version/docs/';
+			preLoaderRoute: typeof LibraryLibraryIdVersionDocsIndexRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionDocsRoute;
+		};
+		'/_library/$libraryId/$version/docs/$': {
+			id: '/_library/$libraryId/$version/docs/$';
+			path: '/$';
+			fullPath: '/$libraryId/$version/docs/$';
+			preLoaderRoute: typeof LibraryLibraryIdVersionDocsSplatRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionDocsRoute;
+		};
+		'/_library/$libraryId/$version/docs/framework/': {
+			id: '/_library/$libraryId/$version/docs/framework/';
+			path: '/framework';
+			fullPath: '/$libraryId/$version/docs/framework/';
+			preLoaderRoute: typeof LibraryLibraryIdVersionDocsFrameworkIndexRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionDocsRoute;
+		};
+		'/_library/$libraryId/$version/docs/framework/$framework/': {
+			id: '/_library/$libraryId/$version/docs/framework/$framework/';
+			path: '/framework/$framework';
+			fullPath: '/$libraryId/$version/docs/framework/$framework/';
+			preLoaderRoute: typeof LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionDocsRoute;
+		};
+		'/_library/$libraryId/$version/docs/framework/$framework/$': {
+			id: '/_library/$libraryId/$version/docs/framework/$framework/$';
+			path: '/framework/$framework/$';
+			fullPath: '/$libraryId/$version/docs/framework/$framework/$';
+			preLoaderRoute: typeof LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRouteImport;
+			parentRoute: typeof LibraryLibraryIdVersionDocsRoute;
+		};
 	}
 }
 
+interface LibraryLibraryIdVersionDocsRouteChildren {
+	LibraryLibraryIdVersionDocsSplatRoute: typeof LibraryLibraryIdVersionDocsSplatRoute;
+	LibraryLibraryIdVersionDocsIndexRoute: typeof LibraryLibraryIdVersionDocsIndexRoute;
+	LibraryLibraryIdVersionDocsFrameworkIndexRoute: typeof LibraryLibraryIdVersionDocsFrameworkIndexRoute;
+	LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute: typeof LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute;
+	LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute: typeof LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute;
+}
+
+const LibraryLibraryIdVersionDocsRouteChildren: LibraryLibraryIdVersionDocsRouteChildren = {
+	LibraryLibraryIdVersionDocsSplatRoute: LibraryLibraryIdVersionDocsSplatRoute,
+	LibraryLibraryIdVersionDocsIndexRoute: LibraryLibraryIdVersionDocsIndexRoute,
+	LibraryLibraryIdVersionDocsFrameworkIndexRoute: LibraryLibraryIdVersionDocsFrameworkIndexRoute,
+	LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute:
+		LibraryLibraryIdVersionDocsFrameworkFrameworkSplatRoute,
+	LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute:
+		LibraryLibraryIdVersionDocsFrameworkFrameworkIndexRoute,
+};
+
+const LibraryLibraryIdVersionDocsRouteWithChildren =
+	LibraryLibraryIdVersionDocsRoute._addFileChildren(LibraryLibraryIdVersionDocsRouteChildren);
+
+interface LibraryLibraryIdVersionRouteChildren {
+	LibraryLibraryIdVersionDocsRoute: typeof LibraryLibraryIdVersionDocsRouteWithChildren;
+	LibraryLibraryIdVersionIndexRoute: typeof LibraryLibraryIdVersionIndexRoute;
+}
+
+const LibraryLibraryIdVersionRouteChildren: LibraryLibraryIdVersionRouteChildren = {
+	LibraryLibraryIdVersionDocsRoute: LibraryLibraryIdVersionDocsRouteWithChildren,
+	LibraryLibraryIdVersionIndexRoute: LibraryLibraryIdVersionIndexRoute,
+};
+
+const LibraryLibraryIdVersionRouteWithChildren = LibraryLibraryIdVersionRoute._addFileChildren(
+	LibraryLibraryIdVersionRouteChildren,
+);
+
+interface LibraryLibraryIdRouteRouteChildren {
+	LibraryLibraryIdVersionRoute: typeof LibraryLibraryIdVersionRouteWithChildren;
+	LibraryLibraryIdIndexRoute: typeof LibraryLibraryIdIndexRoute;
+}
+
+const LibraryLibraryIdRouteRouteChildren: LibraryLibraryIdRouteRouteChildren = {
+	LibraryLibraryIdVersionRoute: LibraryLibraryIdVersionRouteWithChildren,
+	LibraryLibraryIdIndexRoute: LibraryLibraryIdIndexRoute,
+};
+
+const LibraryLibraryIdRouteRouteWithChildren = LibraryLibraryIdRouteRoute._addFileChildren(
+	LibraryLibraryIdRouteRouteChildren,
+);
+
+interface LibraryRouteChildren {
+	LibraryLibraryIdRouteRoute: typeof LibraryLibraryIdRouteRouteWithChildren;
+	LibraryRouterVersionIndexRoute: typeof LibraryRouterVersionIndexRoute;
+}
+
+const LibraryRouteChildren: LibraryRouteChildren = {
+	LibraryLibraryIdRouteRoute: LibraryLibraryIdRouteRouteWithChildren,
+	LibraryRouterVersionIndexRoute: LibraryRouterVersionIndexRoute,
+};
+
+const LibraryRouteWithChildren = LibraryRoute._addFileChildren(LibraryRouteChildren);
+
+interface BlogRouteChildren {
+	BlogSplatRoute: typeof BlogSplatRoute;
+	BlogIndexRoute: typeof BlogIndexRoute;
+}
+
+const BlogRouteChildren: BlogRouteChildren = {
+	BlogSplatRoute: BlogSplatRoute,
+	BlogIndexRoute: BlogIndexRoute,
+};
+
+const BlogRouteWithChildren = BlogRoute._addFileChildren(BlogRouteChildren);
+
 const rootRouteChildren: RootRouteChildren = {
 	IndexRoute: IndexRoute,
+	LibraryRoute: LibraryRouteWithChildren,
+	BlogRoute: BlogRouteWithChildren,
+	EthosRoute: EthosRoute,
+	LearnRoute: LearnRoute,
+	LibrariesRoute: LibrariesRoute,
+	LlmsDottxtRoute: LlmsDottxtRoute,
+	PrivacyRoute: PrivacyRoute,
+	RobotsDottxtRoute: RobotsDottxtRoute,
+	RssDotxmlRoute: RssDotxmlRoute,
+	SitemapDotxmlRoute: SitemapDotxmlRoute,
+	SupportRoute: SupportRoute,
+	TenetsRoute: TenetsRoute,
+	TermsRoute: TermsRoute,
+	LibrariesFrameworkRoute: LibrariesFrameworkRoute,
 };
 export const routeTree = rootRouteImport
 	._addFileChildren(rootRouteChildren)

@@ -1,0 +1,13 @@
+{
+  "upstream": {
+    "package": "@tanstack/react-router-ssr-query",
+    "version": "1.167.1"
+  },
+  "surface": "Complete: `setupRouterSsrQueryIntegration` (the package's only export) delegating to `@tanstack/router-ssr-query-core@1.169.1`, with the QueryClientProvider Wrap composition on Octane.",
+  "divergences": [],
+  "ssr": "Supported — this package IS the SSR integration (dehydrates query state into the router stream and wraps the app in the query provider).",
+  "notes": [
+    "Created for the tanstack-com benchmark's octane flavor (Phase 2c); exercised end-to-end by that app's SSR + hydration."
+  ],
+  "verified": "2026-07-20"
+}
