@@ -97,12 +97,12 @@ describe('parser fixes (tsrx 0.1.29)', () => {
 		r.unmount();
 	});
 
-	it('WhitespaceInIf: a cast string in an expression-only arm renders', () => {
+	it('WhitespaceInIf: a cast expression stays setup-only and does not leak TS', () => {
 		// Loading proves stripTsOnlyWrappers kept the assertion out of emitted JS;
-		// the text assertion prevents that successful compile from hiding a dropped
-		// expression-only directive arm.
+		// the empty output pins the intentional rule that a bare expression in a
+		// directive arm is setup, even when it is the arm's only statement.
 		const r = mount(WhitespaceInIf, { show: true });
-		expect(r.find('p').textContent).toBe('  spaced  ');
+		expect(r.find('p').textContent).toBe('');
 		r.unmount();
 	});
 });

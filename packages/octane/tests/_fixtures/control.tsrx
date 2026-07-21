@@ -56,10 +56,9 @@ export function IdInComponent() @{
 // `trailing!` / `tail` immediately after the closing `}` of an @if and
 // an @for so any regression drops the text from the rendered output.
 //
-// WhitespaceInIf pins both the as-string leak fix and expression-only arm
-// rendering: a TSAsExpression inside an @if BlockStatement body used to print
-// verbatim into compiled JavaScript, then was discarded after the TS wrapper
-// was stripped. It must now take the normal string-rendering path.
+// WhitespaceInIf pins two intentional behaviors for a direct expression-only
+// directive arm: stripTsOnlyWrappers keeps the TS assertion out of compiled
+// JavaScript, and the ExpressionStatement remains setup rather than output.
 
 export function IfTrailingText(props) @{
 	<p>

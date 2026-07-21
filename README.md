@@ -479,6 +479,10 @@ export function Panel(props) @{
 Rendered control flow uses directive-prefixed blocks: `@if`, `@for`, `@switch`,
 and `@try`. Plain JavaScript control flow stays in setup code.
 
+Directive arms keep setup and output separate: a bare expression statement such as
+`console.log(value);` or `value;` is setup and does not render. To render a computed
+value, make the output explicit with a fragment: `<>{value}</>`.
+
 ```jsx
 export function Feed(props) @{
   <ul>

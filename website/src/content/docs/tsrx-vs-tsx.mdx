@@ -90,6 +90,31 @@ export function SearchResults(props) @{
 }
 ```
 
+Directive arms keep JavaScript setup and template output separate, just like an
+`@{ ... }` component body. An ordinary expression statement is setup and does not
+render, even when it is the arm's only statement. This is deliberate:
+`@if (ready) { console.log(value); }` logs without treating the call as UI. The same
+rule means a bare renderable value is evaluated but not output:
+
+```tsrx
+@if (ready) {
+	value; // setup: evaluated, but not rendered
+};
+```
+
+Make a computed output explicit by wrapping its expression hole in a fragment:
+
+```tsrx
+@if (ready) {
+	<>
+		{value}
+	</>
+};
+```
+
+The same rule applies to `@else`, `@for`/`@empty`, `@switch` cases and defaults,
+and `@try`/`@pending`/`@catch`.
+
 The `key` tells Octane which item is which when the list changes. The `@empty` branch
 keeps the empty state beside the list it belongs to. Simple keyed `.map()` expressions
 still work when that reads better.

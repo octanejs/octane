@@ -2770,68 +2770,6 @@ function isIfDirective(node) {
 	return node?.type === 'IfStatement' || node?.type === 'JSXIfExpression';
 }
 
-// TSRX directive arms are script-shaped BlockStatements even when their only
-// authored value is meant to render. Route that exact shape through the same
-// JSXExpressionContainer path as `{value}` without changing ordinary setup or
-// multi-statement semantics. Nested directives already classify as JSX and
-// must stay wrapped as ExpressionStatements so normalizeChildren can unwrap
-// them as directives rather than treating them as value holes.
-function promoteDirectiveArmExpression(block) {
-	if (block?.type !== 'BlockStatement' || block.body?.length !== 1) return block;
-	const statement = block.body[0];
-	if (
-		statement?.type !== 'ExpressionStatement' ||
-		statement.expression == null ||
-		isWrappedJsxDirective(statement)
-	) {
-		return block;
-	}
-	const expression = statement.expression;
-	return {
-		type: 'JSXExpressionContainer',
-		expression,
-		loc: block.loc || statement.loc || expression.loc,
-		start: block.start ?? statement.start ?? expression.start,
-		end: block.end ?? statement.end ?? expression.end,
-	};
-}
-
-function normalizeDirectiveIfContinuation(node) {
-	const normalizeArm = (arm) => {
-		if (isIfDirective(arm)) return normalizeDirectiveIfContinuation(arm);
-		const promoted = promoteDirectiveArmExpression(arm);
-		return promoted === arm ? arm : { ...arm, body: [promoted] };
-	};
-	return {
-		...node,
-		consequent: normalizeArm(node.consequent),
-		alternate: node.alternate == null ? null : normalizeArm(node.alternate),
-	};
-}
-
-function directiveArmStatements(arm, source = null) {
-	if (isIfDirective(arm)) return [normalizeDirectiveIfContinuation(arm)];
-	// @tsrx/core retains BlockStatements for every directive arm except
-	// @switch, whose source-braced SwitchCase body is exposed as consequent[].
-	// Only switch emitters pass `source`, keeping arbitrary statement arrays out
-	// of this normalization.
-	const block =
-		arm?.type === 'BlockStatement'
-			? arm
-			: Array.isArray(arm) && source != null
-				? {
-						type: 'BlockStatement',
-						body: arm,
-						loc: source.loc,
-						start: source.start,
-						end: source.end,
-					}
-				: null;
-	if (block == null) return statementsOf(arm);
-	const promoted = promoteDirectiveArmExpression(block);
-	return promoted === block ? block.body || [] : [promoted];
-}
-
 /**
  * A directive @if/@else whose every reachable arm emits exactly one plain
  * host. The chosen tag may change, but the item always owns one element; the
@@ -6709,14 +6647,16 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	// rewriteHookCalls: key any `use(thenable)` in the @if test (it bypasses the
 	// setup rewrite, so without a stable key it collides with sibling/body use()).
 	const testExpr = printExpr(rewriteHookCalls(node.test, ctx, name));
-	const thenStmts = directiveArmStatements(node.consequent);
+	const thenStmts =
+		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
 	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(thenSub.fn + ';');
 	let elseCall = "''";
 	if (node.alternate) {
 		// An `else if` arrives as an IfStatement; wrap it so it recurses through
 		// ssrEmitNode and gets its own marker.
-		const elseStmts = directiveArmStatements(node.alternate);
+		const elseStmts =
+			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
 		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
 		inlinedSubs.push(elseSub.fn + ';');
 		elseCall = `${elseSub.fnName}(undefined, __s)`;
@@ -6760,12 +6700,19 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const itemId = node.left.declarations[0].id; // Identifier or destructuring Pattern
 	const params = [itemId];
 	if (node.index) params.push(node.index);
-	const itemStmts = directiveArmStatements(node.body);
-	const itemSub = ssrCompileSub(itemStmts, ctx, '__sitem', params, cssHash, parentNs, componentNs);
+	const itemSub = ssrCompileSub(
+		node.body.body,
+		ctx,
+		'__sitem',
+		params,
+		cssHash,
+		parentNs,
+		componentNs,
+	);
 	inlinedSubs.push(itemSub.fn + ';');
 	let emptyCall = "''";
 	if (node.empty) {
-		const emptyStmts = directiveArmStatements(node.empty);
+		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
 		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs, componentNs);
 		inlinedSubs.push(emptySub.fn + ';');
 		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
@@ -6775,7 +6722,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	ctx.runtimeNeeded.add('ssrControl');
 	let itemKey = '__it != null && __it.id != null ? __it.id : __it';
 	let explicitKey = null;
-	const firstEl = itemStmts.find(
+	const firstEl = (node.body.body || []).find(
 		(child) => child.type === 'Element' || child.type === 'JSXElement',
 	);
 	if (firstEl) {
@@ -6809,8 +6756,8 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// attribute serialization stay on the allocation-free path, matching the
 	// client forBlock's existing PURE-body proof.
 	const itemNeedsIdentity =
-		containsComponentCallOrControlFlow(itemStmts) ||
-		containsRenderCall(itemStmts) ||
+		containsComponentCallOrControlFlow(node.body.body) ||
+		containsRenderCall(node.body.body) ||
 		itemSub.fn.includes('_$ssrChild') ||
 		itemSub.fn.includes('_$ssrComponent');
 	const itemCall = node.index
@@ -6837,7 +6784,7 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 	let caseIndex = 0;
 	for (const c of node.cases || []) {
 		const sub = ssrCompileSub(
-			directiveArmStatements(c.consequent || [], c),
+			c.consequent || [],
 			ctx,
 			'__scase',
 			[],
@@ -6865,15 +6812,7 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 }
 
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
-	const trySub = ssrCompileSub(
-		directiveArmStatements(node.block),
-		ctx,
-		'__stry',
-		[],
-		cssHash,
-		parentNs,
-		componentNs,
-	);
+	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
 	inlinedSubs.push(trySub.fn + ';');
 	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
 	// client adopts it as the boundary's branch range during hydration without
@@ -6881,7 +6820,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	let pendFnName = 'null'; // no @pending → ssrTry renders an empty slot on suspend
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(
-			directiveArmStatements(node.pending),
+			node.pending.body,
 			ctx,
 			'__spend',
 			[],
@@ -6898,7 +6837,7 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		if (node.handler.param) params.push(node.handler.param);
 		if (node.handler.resetParam) params.push(node.handler.resetParam);
 		const catchSub = ssrCompileSub(
-			directiveArmStatements(node.handler.body),
+			node.handler.body.body,
 			ctx,
 			'__scatch',
 			params,
@@ -15452,8 +15391,13 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.test, node.consequent (BlockStatement | Element), node.alternate (BlockStatement | IfStatement | null)
 	const condExpr = printExpr(node.test);
 
-	const thenStmts = directiveArmStatements(node.consequent);
-	const elseStmts = node.alternate ? directiveArmStatements(node.alternate) : null;
+	const thenStmts =
+		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
+	const elseStmts = node.alternate
+		? node.alternate.type === 'BlockStatement'
+			? node.alternate.body
+			: [node.alternate]
+		: null;
 	// Phase 2: one shared env tuple for both branches (see unionEnv).
 	const envNames = unionEnv(ctx, [
 		{ stmts: thenStmts, params: [] },
@@ -15966,18 +15910,16 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// catch body's `err`/`reset` destructure (from its own `__props` param) is
 	// built FIRST and included in its analyzed statements, so those bind as
 	// locals, not captures.
-	const tryStmts = directiveArmStatements(node.block);
+	const tryStmts = node.block.body;
 	const pendingStmts =
-		node.pending && node.pending.body && node.pending.body.length > 0
-			? directiveArmStatements(node.pending)
-			: null;
+		node.pending && node.pending.body && node.pending.body.length > 0 ? node.pending.body : null;
 
 	let catchBodyStmts = null;
 	if (node.handler) {
 		const handler = node.handler;
 		const errName = handler.param?.name || '_err';
 		const resetName = handler.resetParam?.name || '_reset';
-		const catchStmts = directiveArmStatements(handler.body);
+		const catchStmts = handler.body.body;
 		// The catch body sees `err` and `reset` as bindings unpacked from the
 		// tryBlock-supplied props object. We synthesize a small destructuring
 		// VariableDeclaration at the top of the body so the user's identifiers
@@ -16089,16 +16031,13 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 	const discExpr = printExpr(node.discriminant);
 	const caseRecords = [];
 	let defaultHelper = 'null';
-	const arms = (node.cases || []).map((entry) => ({
-		entry,
-		stmts: directiveArmStatements(entry.consequent || [], entry),
-	}));
 	// Phase 2: one shared env tuple across every case + default (see unionEnv).
 	const envNames = unionEnv(
 		ctx,
-		arms.map((arm) => ({ stmts: arm.stmts, params: [] })),
+		(node.cases || []).map((c) => ({ stmts: c.consequent || [], params: [] })),
 	);
-	for (const { entry: c, stmts } of arms) {
+	for (const c of node.cases || []) {
+		const stmts = c.consequent || [];
 		const isDefault = c.test == null;
 		const helperName = hoistBodyHelper(
 			ctx,
@@ -16156,7 +16095,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// items.length === 0 the runtime mounts the empty branch in place of the
 	// (empty) item list; transitioning items → 0 unmounts the chain and mounts
 	// the empty body, and 0 → items does the reverse.
-	const emptyStmts = node.empty ? directiveArmStatements(node.empty) : null;
+	const emptyStmts = node.empty
+		? node.empty.type === 'BlockStatement'
+			? node.empty.body
+			: [node.empty]
+		: null;
 	const leftDeclId = node.left.declarations[0].id;
 	const isDestructured = leftDeclId.type !== 'Identifier';
 	// `itemName` is the identifier used in the body signature + keyFn. For a
@@ -16165,7 +16108,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// the keyFn still gets the whole item and the body still sees the fields.
 	const itemName = isDestructured ? '_item' : leftDeclId.name;
 	const itemsExpr = printExpr(node.right);
-	const subStmts = directiveArmStatements(node.body);
+	const subStmts = node.body.body;
 
 	// Key resolution priority (matches @tsrx/core's build_hoisted_for_of_with_hooks):
 	//   1. `key={…}` attribute on the first Element child (legacy / explicit).
