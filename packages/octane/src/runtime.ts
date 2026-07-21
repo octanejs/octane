@@ -7111,16 +7111,15 @@ function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
 	const root = lazyRootDescriptor(lazy);
 	if (typeof root === 'number') return server.nodeType === root;
 	if (server.nodeType !== 1) return false;
-	const name = (server as Element).localName;
-	if (name === root) return true;
-	// Cold fallback, reached only when the fast compare fails: foreign-content
-	// tags outside the parser's SVG case-adjustment table are lowercased
-	// identically on both sides, so a case-only difference can never be a real
-	// branch divergence. The HTML parser's `<image>`→`img` tag rewrite needs no
-	// arm here: the compiler namespaces `image` roots as SVG (SVG_ONLY_TAGS),
-	// where the parser keeps `image` — treating `img` as a match would wrongly
-	// ADOPT across an SVG-`image`/HTML-`img` branch swap instead of recovering.
-	return name === root.toLowerCase();
+	// EXACT compare only — for every valid pairing the parser canonicalizes the
+	// server node's localName to the source spelling (HTML/MathML sources are
+	// lowercase; SVG camelCase is restored by the parser's case-adjustment), so
+	// a difference means a different branch. No case-folding or `<image>`→`img`
+	// fallback: those "matches" only arise from INVALID markup (an SVG-only root
+	// misplaced in an HTML parent parses lowercased/rewritten) where adopting the
+	// wrong-namespace node would be a correctness break — a false mismatch fails
+	// safe (rebuild, exactly what the parsed-template compare did pre-narrowing).
+	return (server as Element).localName === root;
 }
 
 /**
