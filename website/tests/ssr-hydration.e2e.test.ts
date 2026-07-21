@@ -995,6 +995,27 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// …and clicking the output maps back into the source.
 			await clickToken(1, 'setCount', 1);
 			await mappedIn(0, 'setCount');
+			// Editing the source orphans the output's marks even when the
+			// recompile FAILS — the output document is never replaced, so only
+			// the cross-editor clearing can remove them. Re-place output marks,
+			// then type a breaking character at the cursor.
+			await clickToken(0, 'useState', 2);
+			await mappedIn(1, 'useState');
+			await page.keyboard.type('{');
+			await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+			await page.waitForFunction(
+				() => {
+					const out = document.querySelectorAll('.pg-editor .cm-content')[1];
+					// Marks are gone while the stale types document is still shown.
+					return (
+						!!out &&
+						!out.querySelector('.cm-mapped') &&
+						(out.textContent ?? '').includes('@jsxImportSource octane')
+					);
+				},
+				null,
+				{ timeout: 10_000 },
+			);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
