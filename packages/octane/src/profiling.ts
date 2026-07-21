@@ -1,3 +1,9 @@
+// This module's `declare global` augmentation makes some tsgo builds drop the
+// `dom` lib for this file, so a bare `Element` type fails to resolve here.
+// runtime.ts references `Element` as a value throughout, so the type always
+// resolves there; import the alias from it for the node-resolver ABI.
+import type { DomNodeElement } from './runtime.js';
+
 /**
  * Build-specialized client profiler for Octane.
  *
@@ -6,8 +12,11 @@
  * helpers behind `__OCTANE_PROFILE_ENABLED__`, allowing normal production
  * bundles to tree-shake this module and every profiling branch away.
  *
- * Profiling deliberately stores identities and timings, never live props,
- * state, reducer actions, DOM nodes, errors, or promises.
+ * Recorded events deliberately store identities and timings, never live props,
+ * state, reducer actions, DOM nodes, errors, or promises. Consumers that need
+ * the live DOM (devtools overlays) resolve it PULL-based through
+ * `profiler.domNodes(instanceId)`, which the runtime serves in profile builds
+ * only — nothing DOM-shaped is ever retained in an event.
  */
 
 export interface ComponentProfileMetadata {
@@ -176,6 +185,59 @@ export function __profileSubjectId(subject: object): number {
 /** Runtime ABI: the live subject for an id, or null once collected or unknown. */
 export function __profileSubjectFor(id: number): object | null {
 	return subjectRefs.get(id)?.deref() ?? null;
+}
+
+/**
+ * Real commit boundaries, shared by every inspection consumer. The runtime
+ * signals the END of each commit flush synchronously — an exact boundary, not
+ * a derived microtask heuristic — passing the touched root subjects when root
+ * attribution is instrumented (devtools builds) and null otherwise (profile-
+ * only builds). Listeners are isolated: inspection must never break the app.
+ */
+const commitListeners = new Set<(touchedRoots: ReadonlySet<object> | null) => void>();
+
+/** Devtools ABI: observe real commit-flush boundaries. Returns the detach function. */
+export function __profileOnCommit(
+	listener: (touchedRoots: ReadonlySet<object> | null) => void,
+): () => void {
+	commitListeners.add(listener);
+	return () => {
+		commitListeners.delete(listener);
+	};
+}
+
+/** Runtime ABI: a commit flush finished; notify inspection listeners. */
+export function __profileCommitFinish(touchedRoots: ReadonlySet<object> | null): void {
+	if (commitListeners.size === 0) return;
+	for (const listener of commitListeners) {
+		try {
+			listener(touchedRoots);
+		} catch {
+			// Inspection listeners must never affect application rendering.
+		}
+	}
+}
+
+/** The runtime-installed subject→elements resolver (profile builds only). */
+let nodeResolver: ((subject: object) => DomNodeElement[]) | null = null;
+
+/**
+ * Runtime ABI: install the subject→top-level-elements resolver. runtime.ts
+ * calls this once at module load in profile builds; the resolver stays null
+ * otherwise, so `domNodes` degrades to an empty answer instead of guessing.
+ */
+export function __profileInstallNodeResolver(
+	resolver: (subject: object) => DomNodeElement[],
+): void {
+	nodeResolver = resolver;
+}
+
+/**
+ * Devtools ABI: the stable componentId events carry for a (possibly wrapped)
+ * component function — the same resolution `why()` applies to its argument.
+ */
+export function __profileComponentId(component: Function): string {
+	return metadataFor(component).id;
 }
 
 let instances = new WeakMap<object, InstanceProfile>();
@@ -575,6 +637,14 @@ export interface OctaneProfiler {
 	summary(): ProfileSummary[];
 	why(component: string | Function): ProfileEvent[];
 	exportTrace(): ChromeTrace;
+	/**
+	 * The top-level elements currently rendered by a profiled instance, or `[]`
+	 * once it unmounts, its subject is collected, or outside profile builds.
+	 * Pull-based on purpose: recorded events stay DOM-free, and identity is
+	 * persistent, so an `instanceId` from any retained event resolves for as
+	 * long as the instance lives — including across `clear()`.
+	 */
+	domNodes(instanceId: number): DomNodeElement[];
 }
 
 declare global {
@@ -695,6 +765,18 @@ export const profiler: OctaneProfiler = {
 		return orderedEvents()
 			.filter((event) => eventMatches(event, component))
 			.map((event) => ({ ...event, causes: event.causes.map((cause) => ({ ...cause })) }));
+	},
+	domNodes(instanceId) {
+		if (nodeResolver === null) return [];
+		const subject = __profileSubjectFor(instanceId);
+		if (subject === null) return [];
+		try {
+			return nodeResolver(subject);
+		} catch {
+			// Inspection must never throw into devtools; a torn-down subject
+			// simply has no nodes.
+			return [];
+		}
 	},
 	exportTrace() {
 		return {

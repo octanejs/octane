@@ -30,9 +30,12 @@ export function Gated() @{
 }
 
 export function App() @{
-	const [items] = useState(['alpha', 'beta']);
+	const [items, setItems] = useState(['alpha', 'beta']);
 	<main>
 		<Counter step={2} />
+		<button class="add" onClick={() => setItems([...items, 'gamma'])}>
+			add
+		</button>
 		<ul>
 			@for (const item of items; key item) {
 				<li>{item}</li>

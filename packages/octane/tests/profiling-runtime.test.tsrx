@@ -8,7 +8,7 @@ import {
 	useState,
 	useTransition,
 } from 'octane';
-import { profiler } from 'octane/profiling';
+import { __profileOnCommit, profiler } from 'octane/profiling';
 import { act, mount, nextPaint } from './_helpers';
 import { App as ContextApp } from './_fixtures/context-bailout.tsrx';
 import { makeStore, Reader } from './_fixtures/sync-external-store.tsrx';
@@ -369,5 +369,63 @@ describe('profile build component boundaries', () => {
 		expect(profiler.summary().map((entry) => entry.component)).toEqual(['InlinePortalApp']);
 		inlinePortal.unmount();
 		target.remove();
+	});
+});
+
+describe('profile build inspection channel', () => {
+	it('signals real commit boundaries and stops after detach', async () => {
+		let commits = 0;
+		const detach = __profileOnCommit(() => commits++);
+		try {
+			const mounted = mount(CounterApp);
+			const afterMount = commits;
+			expect(afterMount).toBeGreaterThan(0);
+
+			await act(() => mounted.click('button'));
+			const afterUpdate = commits;
+			expect(afterUpdate).toBeGreaterThan(afterMount);
+
+			detach();
+			await act(() => mounted.click('button'));
+			expect(commits).toBe(afterUpdate);
+
+			mounted.unmount();
+		} finally {
+			detach();
+		}
+	});
+
+	it('resolves a profiled instance to the elements it renders', () => {
+		const mounted = mount(CounterApp);
+
+		// CounterApp is a full component: its exact top-level range.
+		const appNodes = profiler.domNodes(render('CounterApp', 'mount').instanceId);
+		expect(appNodes.length).toBeGreaterThan(0);
+		expect(appNodes.some((el) => el.querySelector('button') !== null)).toBe(true);
+
+		// CounterLeaf may compile lite (no owned range); its rendered span must
+		// be covered by the answer — containment, not exact bounds, is the
+		// contract while lite ranges stay an over-approximation.
+		const leafNodes = profiler.domNodes(render('CounterLeaf', 'mount').instanceId);
+		expect(leafNodes.some((el) => el.tagName === 'SPAN' || el.querySelector('span') !== null)).toBe(
+			true,
+		);
+
+		mounted.unmount();
+	});
+
+	it('resolves nothing for unknown or unmounted instances, but survives clear()', () => {
+		const mounted = mount(CounterApp);
+		const instanceId = render('CounterApp', 'mount').instanceId;
+		expect(profiler.domNodes(instanceId).length).toBeGreaterThan(0);
+		expect(profiler.domNodes(987654321)).toEqual([]);
+
+		// Identity is persistent: a retained event's instanceId keeps resolving
+		// for as long as the instance lives, even after the buffer is cleared.
+		profiler.clear();
+		expect(profiler.domNodes(instanceId).length).toBeGreaterThan(0);
+
+		mounted.unmount();
+		expect(profiler.domNodes(instanceId)).toEqual([]);
 	});
 });

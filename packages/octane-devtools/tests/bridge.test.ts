@@ -215,6 +215,23 @@ describe('devtools bridge', () => {
 			const detail = hook().inspect(events[0].instanceId);
 			expect(detail?.label).toBe('Counter');
 			expect(hook().getDomNodes(events[0].instanceId).length).toBeGreaterThan(0);
+			// The profiler's own pull-based DOM resolution answers for the same id.
+			expect(profiler!.domNodes(events[0].instanceId).length).toBeGreaterThan(0);
+		} finally {
+			app.unmount();
+		}
+	});
+
+	it('reflects structural updates in getTree() across commits', () => {
+		const app = mount(App);
+		try {
+			const before = findNode(hook().getTree(), '@for')!;
+			expect(before.children.map((item) => item.key)).toEqual(['alpha', 'beta']);
+
+			app.click('.add');
+
+			const after = findNode(hook().getTree(), '@for')!;
+			expect(after.children.map((item) => item.key)).toEqual(['alpha', 'beta', 'gamma']);
 		} finally {
 			app.unmount();
 		}

@@ -17,6 +17,7 @@ import {
 	__profileHookMetadataFor,
 	__profileMetadataFor,
 	__profileNow as now,
+	__profileOnCommit,
 	__profileSubjectFor,
 	__profileSubjectId,
 	__profileTrackedComponentFor,
@@ -216,6 +217,24 @@ const idFor = __profileSubjectId;
 const subjectFor = __profileSubjectFor;
 
 /**
+ * Per-root memo of the last built tree, so `getTree()` re-walks only roots
+ * that actually changed — the difference between O(changed subtree) and
+ * O(whole app) per panel refresh on large trees. A cached tree stays valid
+ * until work is scheduled anywhere under its root: every render entry point
+ * reports its root through `__devtoolsRootTouched` BEFORE the work flushes
+ * (so even the transient `pending` bit is never served stale). Keyed weakly —
+ * a dead root drops its cached tree with it. Consumers must treat returned
+ * nodes as immutable (they already must: nodes are shared with the event
+ * stream's serialization path).
+ */
+const rootTreeCache = new WeakMap<object, DevtoolsTreeNode>();
+
+/** Runtime ABI: work was scheduled under `root`; its cached tree is stale. */
+export function __devtoolsRootTouched(root: object): void {
+	rootTreeCache.delete(root);
+}
+
+/**
  * `useDebugValue` records, keyed per render scope then per compiler slot —
  * slot identity makes re-renders overwrite in place, and Map insertion order
  * preserves the first-render call order. A WeakMap sidecar (never a Scope
@@ -308,7 +327,12 @@ const devtools: OctaneDevtools = {
 		const trees: DevtoolsTreeNode[] = [];
 		for (const root of liveRoots) {
 			try {
-				trees.push(adapter.buildRootNode(root, idFor));
+				let tree = rootTreeCache.get(root);
+				if (tree === undefined) {
+					tree = adapter.buildRootNode(root, idFor);
+					rootTreeCache.set(root, tree);
+				}
+				trees.push(tree);
 			} catch {
 				// A half-torn-down root mid-walk must not take the whole tree with it.
 			}
@@ -406,6 +430,12 @@ function installGlobal(): void {
 /** Runtime ABI: connect the instrumented runtime's reflection layer (module evaluation). */
 export function __devtoolsInstallRuntime(impl: DevtoolsRuntimeAdapter): void {
 	adapter = impl;
+	// The bridge's commit signal rides the shared profiling channel — the same
+	// real flush boundary scan-style subscribers observe. Registered here (a
+	// devtools-gated runtime call), never at module evaluation, so the module
+	// stays side-effect-free and production builds keep tree-shaking it away.
+	// Set-backed listeners make a repeated install idempotent.
+	__profileOnCommit(commitFinished);
 	installGlobal();
 }
 
@@ -422,13 +452,15 @@ export function __devtoolsRegisterRoot(root: object, container: object): void {
 
 /** Runtime ABI: a public root unmounted or was replaced. */
 export function __devtoolsUnregisterRoot(root: object): void {
+	rootTreeCache.delete(root);
 	if (!liveRoots.delete(root)) return;
 	pickGeneration++;
 	if (hasEventConsumer()) pushEvent({ kind: 'root-removed', at: now() });
 }
 
 /**
- * Runtime ABI: a commit finished — the tree/state may have changed. `roots`
+ * A commit finished — the tree/state may have changed. Registered with the
+ * shared profiling commit channel by `__devtoolsInstallRuntime`. `roots`
  * holds the root blocks whose work this commit drained; every render entry
  * point (root mount, hydrate, scheduleRender) attributes its root, so a
  * commit with no attribution rendered nothing new (an effects-only or empty
@@ -436,7 +468,7 @@ export function __devtoolsUnregisterRoot(root: object): void {
  * (panel-owned) roots — which is what stops the panel's own renders from
  * re-triggering panel refreshes.
  */
-export function __devtoolsCommit(roots: ReadonlySet<object> | null): void {
+function commitFinished(roots: ReadonlySet<object> | null): void {
 	pickGeneration++;
 	if (roots === null || roots.size === 0) return;
 	let ids: number[] | undefined;
@@ -486,6 +518,9 @@ export function __devtoolsEffectEnd(
 
 /** Runtime ABI: an HMR update swapped a component body in place. */
 export function __devtoolsHmr(component: Function): void {
+	// An edit can change labels/sources beyond the instances it re-renders
+	// (touch-invalidated), so drop every cached tree — HMR is rare and cheap.
+	for (const root of liveRoots) rootTreeCache.delete(root);
 	if (!hasEventConsumer()) return;
 	pushEvent({ kind: 'hmr', at: now(), component: componentInfo(component).name });
 }

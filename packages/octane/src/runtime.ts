@@ -46,10 +46,12 @@ import {
 import {
 	__profileBail,
 	__profileBeginRender,
+	__profileCommitFinish,
 	__profileComponentSource,
 	__profileEndRender,
 	__profileHasComponentMetadata,
 	__profileHookMetadataFor,
+	__profileInstallNodeResolver,
 	__profileMetadataFor,
 	__profileResolveHook,
 	__profileSchedule,
@@ -58,7 +60,6 @@ import {
 	type ProfileFrame,
 } from './profiling.js';
 import {
-	__devtoolsCommit,
 	__devtoolsDebugValue,
 	__devtoolsDebugValuesFor,
 	__devtoolsEffectEnd,
@@ -68,6 +69,7 @@ import {
 	__devtoolsMetaSource,
 	__devtoolsRegisterRoot,
 	__devtoolsRenderStarted,
+	__devtoolsRootTouched,
 	__devtoolsUnregisterRoot,
 	type DevtoolsEffectPhase,
 	type DevtoolsHookInfo,
@@ -1806,7 +1808,14 @@ let DEVTOOLS_TOUCHED_ROOTS: Set<Block> | null = null;
 function devtoolsTouchRoot(block: Block): void {
 	let root = block;
 	while (root.parentBlock !== null) root = root.parentBlock;
-	(DEVTOOLS_TOUCHED_ROOTS ??= new Set()).add(root);
+	const touched = (DEVTOOLS_TOUCHED_ROOTS ??= new Set());
+	if (!touched.has(root)) {
+		touched.add(root);
+		// First touch since the last commit: the bridge's cached tree for this
+		// root is stale from this moment (a `pending` bit may already show), so
+		// invalidation happens here rather than at the commit that drains it.
+		__devtoolsRootTouched(root);
+	}
 }
 
 function scheduleRender(block: Block): void {
@@ -2621,14 +2630,21 @@ function commitEffects(): void {
 	) {
 		schedulePassiveFlush();
 	}
-	// Devtools refresh signal: the panel re-walks the tree lazily on commit
-	// instead of the runtime emitting per-mount/unmount events. The roots the
-	// drained work belonged to attribute the commit, letting the bridge drop
-	// commits caused only by the panel's own (internal) root.
-	if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__) {
+	// Inspection commit signal — the REAL end of the flush, shared by both
+	// channels: profiling commit listeners (the devtools bridge, scan-style
+	// overlays) get an exact batch boundary instead of deriving one, and the
+	// bridge re-walks its tree lazily on it rather than the runtime emitting
+	// per-mount/unmount events. The roots the drained work belonged to
+	// attribute the commit in devtools builds (letting the bridge drop commits
+	// caused only by the panel's own internal root); profile-only builds pass
+	// null — root attribution is devtools instrumentation.
+	if (
+		(typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) ||
+		(typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+	) {
 		const touched = DEVTOOLS_TOUCHED_ROOTS;
 		DEVTOOLS_TOUCHED_ROOTS = null;
-		__devtoolsCommit(touched);
+		__profileCommitFinish(touched);
 	}
 }
 
@@ -21510,6 +21526,48 @@ function devtoolsDomNodes(subject: object): Node[] {
 	return out;
 }
 
+// The DOM `Element` type, re-exported for profiling.ts's node-resolver ABI.
+// profiling.ts has a `declare global` block that, on some tsgo builds, drops
+// the `dom` lib for that file so a bare `Element` type fails to resolve there;
+// runtime.ts references `Element` as a value throughout, so the type always
+// resolves here. Importing the alias keeps profiling.ts's ABI DOM-typed.
+export type DomNodeElement = Element;
+
+/**
+ * Profiling ABI: the top-level elements a profiled subject currently renders,
+ * serving `profiler.domNodes(instanceId)`. A full component's Block resolves
+ * its exact managed range — the same deopt/single-root/marker shapes
+ * devtoolsDomNodes walks, elements only. A lite (inlined) component's scope
+ * owns no tracked range, so it resolves through its LiteBlockImpl host
+ * context: the host's elements up to the insertion anchor — a deliberate
+ * over-approximation (preceding siblings are included) rather than a guess at
+ * boundaries the runtime does not track for lite scopes; precise lite ranges
+ * need compiler-emitted markers. A lite scope whose context is its parent's
+ * real Block over-approximates to that block's element range the same way.
+ */
+function profileSubjectElements(subject: object): Element[] {
+	if ((subject as any).__kind !== undefined) return [];
+	const block: Block | LiteBlockImpl | null | undefined =
+		(subject as Block).kind !== undefined ? (subject as Block) : (subject as Scope).block;
+	if (block == null) return [];
+	if ((block as Block).kind !== undefined) {
+		// Real Block: devtoolsDomNodes owns the disposed check and range walk.
+		const out: Element[] = [];
+		for (const node of devtoolsDomNodes(block)) {
+			if (node.nodeType === 1) out.push(node as Element);
+		}
+		return out;
+	}
+	const lite = block as LiteBlockImpl;
+	const host = lite.parentNode;
+	if (host == null || host.isConnected === false) return [];
+	const out: Element[] = [];
+	for (let n = host.firstChild; n !== null && n !== lite.endMarker; n = n.nextSibling) {
+		if (n.nodeType === 1) out.push(n as Element);
+	}
+	return out;
+}
+
 /**
  * Does this block's managed DOM contain `target`? The allocation-free twin of
  * devtoolsDomNodes: checks the de-opt node, the self-delimiting single-root
@@ -21582,6 +21640,10 @@ if (typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENAB
 		findByDomNode: devtoolsFindByDomNode,
 	});
 }
+// Profile builds (a superset of devtools builds) serve `profiler.domNodes()`
+// pull-based through the same range walk the devtools adapter uses.
+if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+	__profileInstallNodeResolver(profileSubjectElements);
 
 // ---------------------------------------------------------------------------
 // Public root API — React-DOM parity
