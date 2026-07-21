@@ -2508,6 +2508,32 @@ function blockSubtreeDisposed(block: Block | null): boolean {
 }
 
 function commitEffects(): void {
+	// No-work fast path: every commit queue the drains below consume is empty —
+	// the common case for a hydration adoption or an effect-free app's flush.
+	// One combined check (module-scope length reads, same emptiness conditions
+	// each drain tests individually) keeps the whole drain pipeline off this
+	// path; only the passive hand-off below can still apply. INVARIANT: a drain
+	// added to this function must also add its has-work condition here, or its
+	// work is silently skipped whenever the other queues are empty.
+	if (
+		effectEventQueue.length === 0 &&
+		effectEventCommitActions.length === 0 &&
+		effectQueues[INSERTION].length === 0 &&
+		effectQueues[LAYOUT].length === 0 &&
+		refDetachQueue.length === 0 &&
+		refAttachQueue.length === 0 &&
+		storeSyncQueue.length === 0 &&
+		activeFragments.size === 0 &&
+		!hasControlledSyncs()
+	) {
+		if (
+			(effectQueues[PASSIVE].length > 0 || pendingPassiveUnmounts.length > 0) &&
+			!passiveScheduled
+		) {
+			schedulePassiveFlush();
+		}
+		return;
+	}
 	// React publishes every Effect Event body before any insertion/layout effect
 	// can call an already-registered wrapper. Entries from failed or suspended
 	// renders are filtered by their block's completed render version.
@@ -15116,7 +15142,13 @@ export function childSlot(
 		// singleRoot=2 (marker-elision M4): pure single-element items self-mark —
 		// no `it` pair per item — resolved per item value in mountItem; shape
 		// flips promote to a minted pair in place (deoptItemBody).
-		reconcileKeyed(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, false, 2);
+		// First fill dispatches to the linear pass directly (see mountItemsLinear)
+		// so a de-opt list's hydration adopt skips the full reconciler too.
+		if (state.forSlot.size === 0) {
+			mountItemsLinear(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, 2, false);
+		} else {
+			reconcileKeyed(parentBlock, state.forSlot, items, getKey, deoptItemBody as any, false, 2);
+		}
 		// Upgrade adoption: nodes the empty→fill mount didn't consume (old
 		// children whose keys have no new item) are orphans inside the range —
 		// sweep them now.
@@ -19232,18 +19264,32 @@ export function forBlock<T>(
 		}
 		state.cachedDeps = deps;
 	}
-	reconcileKeyed(
-		parentBlock,
-		state,
-		items,
-		getKey,
-		itemBody as any,
-		pure,
-		(f & 2) !== 0,
-		lite,
-		(f & 8) !== 0,
-		(f & 16) !== 0,
-	);
+	if (state.size === 0) {
+		// First fill (hydration adopt / fresh mount / update-path 0 → N): the
+		// linear pass — the full reconciler has no old list to diff against.
+		mountItemsLinear(
+			parentBlock,
+			state,
+			items,
+			getKey,
+			itemBody as any,
+			(f & 2) !== 0,
+			(f & 16) !== 0,
+		);
+	} else {
+		reconcileKeyed(
+			parentBlock,
+			state,
+			items,
+			getKey,
+			itemBody as any,
+			pure,
+			(f & 2) !== 0,
+			lite,
+			(f & 8) !== 0,
+			(f & 16) !== 0,
+		);
+	}
 	// Advance the hydration cursor past the @for's `<!--]-->` so a later sibling's
 	// clone() starts after this block — covers the zero-item, no-@empty case where
 	// reconcileKeyed mounts nothing and the cursor would otherwise stay on the
@@ -19369,6 +19415,90 @@ function updateSurvivor<T>(
 	}
 }
 
+/**
+ * Linear first-fill of an EMPTY keyed list — the hydration-adopt / first-mount
+ * path: append (or adopt) each item in order and build the survivor machinery
+ * (key map + intrusive sibling chain) as a byproduct of the same pass. Kept as
+ * its own small function, OUTSIDE reconcileKeyed, so a first mount — every
+ * hydration adopt of a server-rendered @for, and every fresh list mount — never
+ * enters (and on a cold page, never lazily compiles) the full prefix/suffix/LIS
+ * reconciler. reconcileKeyed delegates here too, so its empty→fill contract is
+ * unchanged for update-path 0 → N transitions.
+ */
+function mountItemsLinear<T>(
+	parentBlock: Block,
+	state: ForSlot,
+	items: ArrayLike<T>,
+	getKey: (item: T, index: number) => any,
+	itemBody: (item: T, scope: Scope) => void,
+	singleRoot: boolean | 2,
+	ssrMarkerless: boolean,
+): void {
+	const newLen = items.length;
+	if (newLen === 0) return;
+	const oldItems = state.items;
+	const parentNode = state.end.parentNode!;
+	// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
+	// element's existing raw children, keyed like the incoming items. An item
+	// whose key matches the queue FRONT adopts that node in place (mountItem
+	// wraps it in the item's markers and seeds block.deoptNode); other items
+	// mount fresh BEFORE the next unconsumed node so DOM order tracks list
+	// order. Non-front key matches (a reorder in the very same render) mount
+	// fresh — the unconsumed nodes are swept by the caller.
+	const adopt = state.adopt;
+	let prev: Block | null = null;
+	const mounted: Block[] = [];
+	try {
+		for (let i = 0; i < newLen; i++) {
+			const item = items[i];
+			const key = getKey(item, i);
+			let adoptNode: Node | null = null;
+			let anchor: Node = state.end;
+			if (adopt !== null && adopt.length !== 0) {
+				if (adopt[0].key === key) adoptNode = adopt.shift()!.node;
+				else anchor = adopt[0].node;
+			}
+			const block = mountItem(
+				parentBlock,
+				parentNode,
+				anchor,
+				item,
+				i,
+				itemBody,
+				state,
+				singleRoot,
+				ssrMarkerless,
+				adoptNode,
+			);
+			mounted.push(block);
+			oldItems.set(key, block);
+			block.key = key;
+			block.prevSibling = prev;
+			block.nextSibling = null;
+			if (prev) prev.nextSibling = block;
+			else state.head = block;
+			prev = block;
+		}
+		state.tail = prev;
+		state.size = newLen;
+	} catch (error) {
+		// A list item may suspend while mounting (most visibly a lazy
+		// component). None of this empty->fill pass has committed yet: discard
+		// every completed prefix item, while mountItem discards the throwing
+		// item itself. A retry then starts from a genuinely empty list instead
+		// of duplicating the completed prefix and overwriting its Map entry.
+		for (let i = mounted.length - 1; i >= 0; i--) {
+			const block = mounted[i];
+			oldItems.delete(block.key);
+			unmountBlock(block, true);
+		}
+		state.head = null;
+		state.tail = null;
+		state.size = 0;
+		throw error;
+	}
+}
+
 function reconcileKeyed<T>(
 	parentBlock: Block,
 	state: ForSlot,
@@ -19391,68 +19521,10 @@ function reconcileKeyed<T>(
 	const newLen = items.length;
 	const parentNode = state.end.parentNode!;
 
-	// Fast path: empty → fill. Append each new block to the tail of the (empty) list.
+	// Fast path: empty → fill — the linear first-fill pass (callers on the
+	// first-mount path dispatch to it directly and skip this function entirely).
 	if (oldSize === 0) {
-		if (newLen === 0) return;
-		// Pure-host → blocks upgrade adoption (childSlot arms `state.adopt`): the
-		// element's existing raw children, keyed like the incoming items. An item
-		// whose key matches the queue FRONT adopts that node in place (mountItem
-		// wraps it in the item's markers and seeds block.deoptNode); other items
-		// mount fresh BEFORE the next unconsumed node so DOM order tracks list
-		// order. Non-front key matches (a reorder in the very same render) mount
-		// fresh — the unconsumed nodes are swept by the caller.
-		const adopt = state.adopt;
-		let prev: Block | null = null;
-		const mounted: Block[] = [];
-		try {
-			for (let i = 0; i < newLen; i++) {
-				const item = items[i];
-				const key = getKey(item, i);
-				let adoptNode: Node | null = null;
-				let anchor: Node = state.end;
-				if (adopt !== null && adopt.length !== 0) {
-					if (adopt[0].key === key) adoptNode = adopt.shift()!.node;
-					else anchor = adopt[0].node;
-				}
-				const block = mountItem(
-					parentBlock,
-					parentNode,
-					anchor,
-					item,
-					i,
-					itemBody,
-					state,
-					singleRoot,
-					ssrMarkerless,
-					adoptNode,
-				);
-				mounted.push(block);
-				oldItems.set(key, block);
-				block.key = key;
-				block.prevSibling = prev;
-				block.nextSibling = null;
-				if (prev) prev.nextSibling = block;
-				else state.head = block;
-				prev = block;
-			}
-			state.tail = prev;
-			state.size = newLen;
-		} catch (error) {
-			// A list item may suspend while mounting (most visibly a lazy
-			// component). None of this empty->fill pass has committed yet: discard
-			// every completed prefix item, while mountItem discards the throwing
-			// item itself. A retry then starts from a genuinely empty list instead
-			// of duplicating the completed prefix and overwriting its Map entry.
-			for (let i = mounted.length - 1; i >= 0; i--) {
-				const block = mounted[i];
-				oldItems.delete(block.key);
-				unmountBlock(block, true);
-			}
-			state.head = null;
-			state.tail = null;
-			state.size = 0;
-			throw error;
-		}
+		mountItemsLinear(parentBlock, state, items, getKey, itemBody, singleRoot, ssrMarkerless);
 		return;
 	}
 	// Fast path: clear all.
