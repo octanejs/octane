@@ -304,7 +304,12 @@ cost model) instead of per-boundary incremental renders; no selective
 hydration; head elements hoisted inside streamed boundaries re-create
 client-side on hydration. Hydration mismatch recovery patches attributes to the
 **client** value (React keeps the server's) and warns + rebuilds in place
-rather than throwing.
+rather than throwing. Structural validation depth matches React's: production
+hydration checks an adopted root's nodeType + tag only (tag and text mismatches
+still recover), so branches sharing a tag and differing only in static
+attributes — e.g. `@switch` cases that are all `<span>` with different
+`class` — are not detected in production; development performs the full
+static-structure and attribute comparison and warns + rebuilds.
 
 Octane core also leaves document and transport orchestration to the surrounding
 server: it has no Fizz bootstrap-script/module/import-map, doctype/preamble,

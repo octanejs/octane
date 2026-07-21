@@ -346,3 +346,107 @@ describe('hydrateRoot — STRUCTURAL mismatch (detect + rebuild + cursor stays a
 		expect(ul.textContent).not.toContain('No items yet');
 	});
 });
+
+// PROD RUNTIME validation contract (NODE_ENV=production — the runtime reads it at
+// call time, so stubbing it around hydrateRoot exercises the build-time-stripped
+// production branches under vitest). In prod, an adoption root is validated by
+// nodeType + tag ONLY, answered from the template SOURCE, so the happy path never
+// parses a template; tag-level and text-level mismatches still detect + recover.
+describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse-free happy path)', () => {
+	const MIXEDFRAG = join(
+		process.cwd(),
+		'packages/octane/tests/hydration/_fixtures/mixed-frag.tsrx',
+	);
+	const server = serverModule(CONTROL, 'control.tsrx');
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.stubEnv('NODE_ENV', 'production');
+	});
+	afterEach(() => {
+		vi.unstubAllEnvs();
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	const warns = () =>
+		errSpy.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('hydration mismatch'));
+
+	it('happy path adopts the server DOM without parsing or cloning any template', async () => {
+		// Fresh module → cold template records: proves the adoption itself never
+		// forces the lazy parse (the news-bench hydrate cost this contract removes)
+		// and never clones template DOM (Svelte-5 parity: hydration adopts the
+		// server nodes — a clone would be built only to be thrown away).
+		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		container.innerHTML = html;
+		const button = container.querySelector('#hit') as HTMLButtonElement;
+		const createEl = vi.spyOn(document, 'createElement');
+		const cloneSpy = vi.spyOn(Node.prototype, 'cloneNode');
+		hydrateRoot(container, clientProd.Toggle, { on: true });
+		flushSync(() => {});
+		// Adopted, not rebuilt — the template stayed an unparsed source string and
+		// no DOM was cloned anywhere in the hydrate window.
+		expect(container.querySelector('#hit')).toBe(button);
+		expect(createEl.mock.calls.filter((c) => String(c[0]) === 'template')).toEqual([]);
+		expect(cloneSpy).not.toHaveBeenCalled();
+		createEl.mockRestore();
+		cloneSpy.mockRestore();
+		// The adopted branch is live (delegated handler reaches the server node).
+		flushSync(() => button.click());
+		expect(button.textContent).toBe('on:1');
+		expect(warns()).toEqual([]);
+	});
+
+	it('tag-level branch mismatch still detects + rebuilds (silently) in prod', async () => {
+		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
+		const { html } = await ServerRT.renderToString(server.Toggle, { on: true });
+		expect(html).toContain('<button id="hit"');
+		container.innerHTML = html;
+		hydrateRoot(container, clientProd.Toggle, { on: false });
+		flushSync(() => {});
+		const div = container.querySelector('#toggle')!;
+		expect(div.querySelector('span.off')).not.toBeNull(); // rebuilt to the client branch
+		expect(div.querySelector('#hit')).toBeNull(); // stale server branch discarded
+		expect(div.textContent).toContain('off');
+		expect(warns()).toEqual([]); // prod recovery is silent
+	});
+
+	it('same-tag attribute-only branch divergence is NOT detected in prod (server attrs kept; text holes still self-correct)', async () => {
+		// OCTANE DIVERGENCE (documented narrowing, React parity: prod React hydration
+		// does not attribute-validate either): prod validates an adoption root by
+		// nodeType + tag only, so @switch branches that share a tag and differ only in
+		// STATIC attributes adopt the server branch as-is. Dev still detects + rebuilds
+		// (see the SAME-tag swap test above). Text holes carry a compiler-seeded prev
+		// value, so text divergence self-corrects even in prod.
+		const clientProd = prodClientModule(CONTROL, 'control.tsrx');
+		const { html } = await ServerRT.renderToString(server.Pick, { k: 'a' });
+		expect(html).toContain('<span class="a">');
+		container.innerHTML = html;
+		const span = container.querySelector('#pick span')!;
+		hydrateRoot(container, clientProd.Pick, { k: 'b' });
+		flushSync(() => {});
+		expect(container.querySelector('#pick span')).toBe(span); // adopted, not rebuilt
+		expect(span.className).toBe('a'); // server static attribute kept
+		expect(span.textContent).toBe('BBB'); // the text hole was still patched
+		expect(warns()).toEqual([]);
+	});
+
+	it('multi-root fragment component hydrates by adoption in prod', async () => {
+		const srv = serverModule(MIXEDFRAG, 'mixed-frag.tsrx');
+		const cli = prodClientModule(MIXEDFRAG, 'mixed-frag.tsrx');
+		const { html } = await ServerRT.renderToString(srv.MixedFrag, {});
+		container.innerHTML = html;
+		const input = container.querySelector('input')!;
+		const leaf = container.querySelector('.leaf')!;
+		hydrateRoot(container, cli.MixedFrag, {});
+		flushSync(() => {});
+		expect(container.querySelector('input')).toBe(input);
+		expect(container.querySelector('.leaf')).toBe(leaf);
+		expect(leaf.textContent).toBe('A');
+		expect(warns()).toEqual([]);
+	});
+});

@@ -407,10 +407,16 @@ P4 and P5 are independent of P0–P3 and can run in parallel by a second contrib
    - **VALUE (text / attribute):** patched to the client value (`htext`/`htextSwap`/
      `childTextHole`/`setAttribute`); `suppressHydrationWarning` (React shallow semantics)
      keeps the server value + suppresses the warning, and is never serialized by SSR.
-   - **STRUCTURAL:** `clone()` compares the adopted server node vs the template (nodeType +
-     tag + static attributes) and rebuilds the subtree on a mismatch — discard the divergent
-     server range, fresh-clone, advance the cursor. Covers swapped `@if`/`@switch` branches
-     (including same-tag, via static attrs), changed tags, host↔component swaps. `mountItem`
+   - **STRUCTURAL:** `clone()` compares the adopted server node vs the template and rebuilds
+     the subtree on a mismatch — discard the divergent server range, fresh-clone, advance the
+     cursor. DEV compares nodeType + tag + static attributes (+ nested static structure), so
+     it covers swapped `@if`/`@switch` branches including same-tag-different-static-attrs,
+     changed tags, host↔component swaps. PROD compares nodeType + tag ONLY (React parity —
+     prod React hydration doesn't attribute-validate either), answered straight off the
+     template's source string so the happy adoption path never parses the template (2026-07-21,
+     the news-bench hydrate fix): tag-level and text-level mismatches still detect + recover in
+     prod, while same-tag branches differing only in static attributes/nested static markup are
+     adopted as the server rendered them (dev still warns + rebuilds those). `mountItem`
      guards the cursor (was a list-grow crash); `hostElementBody` + `forBlock` discard
      leftover server nodes.
    - **Dev DX:** warnings carry Svelte-5-style source locations (`file:line:col`) via a
