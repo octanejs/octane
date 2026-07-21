@@ -10,12 +10,7 @@ import type {
 export type GenericWheelEvent = ReactWheelEvent | WheelEvent;
 
 export type InteractionEvent =
-	| ReactMouseEvent
-	| ReactTouchEvent
-	| ReactPointerEvent
-	| MouseEvent
-	| TouchEvent
-	| PointerEvent;
+	ReactMouseEvent | ReactTouchEvent | ReactPointerEvent | MouseEvent | TouchEvent | PointerEvent;
 
 export interface TransformMatrix {
 	scaleX: number;

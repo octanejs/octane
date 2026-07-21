@@ -11,14 +11,7 @@ export type StateSetter<T> = (value: T | ((previous: T) => T)) => void;
 export type Ref<T> = ((value: T | null) => void) | { current: T | null } | null;
 
 export type ToastTypes =
-	| 'normal'
-	| 'action'
-	| 'success'
-	| 'info'
-	| 'warning'
-	| 'error'
-	| 'loading'
-	| 'default';
+	'normal' | 'action' | 'success' | 'info' | 'warning' | 'error' | 'loading' | 'default';
 
 export type PromiseT<Data = any> = Promise<Data> | (() => Promise<Data>);
 
@@ -31,9 +24,7 @@ export type PromiseTExtendedResult<Data = any> =
 	| ((data: Data) => PromiseIExtendedResult | Promise<PromiseIExtendedResult>);
 
 export type PromiseTResult<Data = any> =
-	| string
-	| ToastContent
-	| ((data: Data) => ToastContent | string | Promise<ToastContent | string>);
+	string | ToastContent | ((data: Data) => ToastContent | string | Promise<ToastContent | string>);
 
 export type PromiseExternalToast = Omit<ExternalToast, 'description'>;
 
@@ -115,12 +106,7 @@ export function isAction(action: Action | ToastContent): action is Action {
 }
 
 export type Position =
-	| 'top-left'
-	| 'top-right'
-	| 'bottom-left'
-	| 'bottom-right'
-	| 'top-center'
-	| 'bottom-center';
+	'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'top-center' | 'bottom-center';
 
 export interface HeightT {
 	height: number;

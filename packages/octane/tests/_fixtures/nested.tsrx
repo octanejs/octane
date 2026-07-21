@@ -11,9 +11,7 @@ export function HookInIf() @{
 		<button id="top" onClick={() => setShow(!show)}>{'toggle'}</button>
 		@if (show) {
 			const [n, setN] = useState(0);
-			<button id="inner" onClick={() => setN(n + 1)}>
-				{n as string}
-			</button>
+			<button id="inner" onClick={() => setN(n + 1)}>{n as string}</button>
 		}
 	</>
 }
@@ -25,14 +23,10 @@ export function HooksInIfElse() @{
 		<button id="swap" onClick={() => setPath(path === 'a' ? 'b' : 'a')}>{'swap'}</button>
 		@if (path === 'a') {
 			const [na, setNa] = useState(0);
-			<button id="a" onClick={() => setNa(na + 1)}>
-				{'a:' + na as string}
-			</button>
+			<button id="a" onClick={() => setNa(na + 1)}>{'a:' + na as string}</button>
 		} @else {
 			const [nb, setNb] = useState(0);
-			<button id="b" onClick={() => setNb(nb + 1)}>
-				{'b:' + nb as string}
-			</button>
+			<button id="b" onClick={() => setNb(nb + 1)}>{'b:' + nb as string}</button>
 		}
 	</>
 }
@@ -42,9 +36,7 @@ export function HooksInIfElse() @{
 function Row(props) @{
 	const [n, setN] = useState(0);
 	<li class={'row-' + props.id}>
-		<button onClick={() => setN(n + 1)}>
-			{props.label + ':' + n as string}
-		</button>
+		<button onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</button>
 	</li>
 }
 
@@ -72,14 +64,10 @@ function TryBoundaryWithHooks(props) @{
 			if (props.bang) {
 				throw new Error('boom');
 			}
-			<button id="hit" onClick={() => setHit(hit + 1)}>
-				{'hit:' + hit as string}
-			</button>
+			<button id="hit" onClick={() => setHit(hit + 1)}>{'hit:' + hit as string}</button>
 		} @catch (err) {
 			const [tries, setTries] = useState(0);
-			<button id="retry" onClick={() => setTries(tries + 1)}>
-				{'tries:' + tries as string}
-			</button>
+			<button id="retry" onClick={() => setTries(tries + 1)}>{'tries:' + tries as string}</button>
 		}
 	</>
 }
@@ -102,14 +90,10 @@ export function DeclInIf(props) @{
 	<>
 		@if (props.flag) {
 			const greeting = 'hello ' + props.name;
-			<p class="msg">
-				{greeting as string}
-			</p>
+			<p class="msg">{greeting as string}</p>
 		} @else {
 			const fallback = props.name + '?';
-			<p class="msg">
-				{fallback as string}
-			</p>
+			<p class="msg">{fallback as string}</p>
 		}
 	</>
 }
@@ -119,9 +103,7 @@ export function DeclInForLoop(props) @{
 		@for (const n of props.nums; key n) {
 			const squared = n * n;
 			const label = n + '² = ' + squared;
-			<li>
-				{label as string}
-			</li>
+			<li>{label as string}</li>
 		}
 	</ul>
 }
@@ -131,14 +113,10 @@ export function DeclInTry() @{
 		@try {
 			const computed = 'try-branch';
 			throw new Error('always');
-			<p class="out">
-				{computed as string}
-			</p>
+			<p class="out">{computed as string}</p>
 		} @catch (err) {
 			const recovered = 'caught: ' + err.message;
-			<p class="out">
-				{recovered as string}
-			</p>
+			<p class="out">{recovered as string}</p>
 		}
 	</>
 }

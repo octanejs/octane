@@ -15,9 +15,7 @@ import { useState } from 'octane';
 export function forBeforeSibling(props) @{
 	<div class="wrap">
 		@for (const item of props.items; key item.id) {
-			<p class="row">
-				{item.label as string}
-			</p>
+			<p class="row">{item.label as string}</p>
 		}
 		<span class="after">{'after'}</span>
 	</div>
@@ -44,9 +42,7 @@ export function forBetweenSiblings() @{
 		<button id="clear" onClick={() => setItems([])}>{'clear'}</button>
 		<section class="list">
 			@for (const item of items; key item.id) {
-				<p class="row">
-					{item.label as string}
-				</p>
+				<p class="row">{item.label as string}</p>
 			}
 			<footer class="ftr">{'tail'}</footer>
 		</section>
@@ -173,9 +169,7 @@ export function tryBeforeSibling(props) @{
 			</div>
 		} @catch (err, reset) {
 			<div class="caught">
-				<span class="msg">
-					{err.message as string}
-				</span>
+				<span class="msg">{err.message as string}</span>
 				<button
 					id="reset"
 					onClick={() => {

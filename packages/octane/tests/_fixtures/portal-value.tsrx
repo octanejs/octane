@@ -3,16 +3,12 @@ import { useState, createPortal, createContext, use, memo } from 'octane';
 export const Theme = createContext('light');
 
 function ModalBody(props) @{
-	<div class="modal">
-		{props.label as string}
-	</div>
+	<div class="modal">{props.label as string}</div>
 }
 
 function ThemedBody() @{
 	const theme = use(Theme);
-	<div class="modal themed">
-		{theme as string}
-	</div>
+	<div class="modal themed">{theme as string}</div>
 }
 
 // 1. A component that RETURNS a createPortal VALUE (not at a host-element child).
@@ -51,9 +47,7 @@ function ReturnThemed(props) {
 // 5b. createPortal with INLINE component JSX as the body (React-shape:
 //     createPortal(<Comp/>, target)) — lowered to an ElementDescriptor body.
 function InnerComp(props) @{
-	<div class="modal inline">
-		{props.label as string}
-	</div>
+	<div class="modal inline">{props.label as string}</div>
 }
 export function InlineJsxPortal(props) {
 	return createPortal(<InnerComp label="inline" />, props.target);
@@ -64,9 +58,7 @@ export function InlineJsxPortal(props) {
 //    This is the placeholder-toggle / menu-open-close shape that must not corrupt
 //    the slot when it switches kind.
 function SoloDiv(props) @{
-	<div class="solo">
-		{props.label as string}
-	</div>
+	<div class="solo">{props.label as string}</div>
 }
 function Flipper(props) {
 	if (props.mode === 'null') {

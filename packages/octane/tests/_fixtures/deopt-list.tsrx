@@ -39,21 +39,13 @@ export function DeoptUnkeyed(props) @{
 // `<li/>` at this value position to `createElement('li', …)`. Same source runs on
 // React (where `.map(<li/>)` is native), so the differential rig proves parity.
 export function JsxList(props) @{
-	<ul>{props.items.map(
-		(it) => <li key={it.id}>
-			{it.label as string}
-		</li>,
-	)}</ul>
+	<ul>{props.items.map((it) => <li key={it.id}>{it.label as string}</li>)}</ul>
 }
 
 // A return-JSX component with a typed destructured parameter, matching ordinary
 // TSX function syntax used by application components.
 export function DestructuredJsxList({ items }: { items: Array<{ id: number; label: string }> }) {
-	return <ul>{items.map(
-		(it) => <li key={it.id}>
-			{it.label as string}
-		</li>,
-	)}</ul>;
+	return <ul>{items.map((it) => <li key={it.id}>{it.label as string}</li>)}</ul>;
 }
 
 export function JsxListStateful() @{
@@ -69,10 +61,6 @@ export function JsxListStateful() @{
 			onClick={() => setItems([...items, { id: items.length + 1, label: 'x' }])}
 		>{'add'}</button>
 		<button id="remove" onClick={() => setItems(items.slice(1))}>{'rm'}</button>
-		<ul>{items.map(
-			(it) => <li key={it.id}>
-				{it.label as string}
-			</li>,
-		)}</ul>
+		<ul>{items.map((it) => <li key={it.id}>{it.label as string}</li>)}</ul>
 	</div>
 }

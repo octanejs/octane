@@ -137,9 +137,7 @@ function BlogIndex() {
 											className={`inline-flex items-center rounded-md px-3 py-1.5 text-xs font-black uppercase shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${library.bgStyle} ${
 												library.badgeTextStyle ?? 'text-white'
 											}`}
-										>
-											{library.name.replace('TanStack ', '') as string}
-										</Link>,
+										>{library.name.replace('TanStack ', '') as string}</Link>,
 									)}</div>
 								</div>
 							: null}
@@ -156,9 +154,7 @@ function BlogIndex() {
 									? <>
 											{' '}
 											by
-											<span class="font-medium">
-												{author as string}
-											</span>
+											<span class="font-medium">{author as string}</span>
 										</>
 									: null}
 								.

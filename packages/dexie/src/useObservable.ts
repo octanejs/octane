@@ -44,8 +44,7 @@ export function useObservable<T, TDefault>(
 	const [args, slot] = splitSlot(rest);
 	const deps = typeof observableOrFactory === 'function' ? ((args[0] as unknown[]) ?? []) : [];
 	const defaultResult = (typeof observableOrFactory === 'function' ? args[1] : args[0]) as
-		| TDefault
-		| undefined;
+		TDefault | undefined;
 	const monitor = useRef(
 		{
 			hasResult: false,

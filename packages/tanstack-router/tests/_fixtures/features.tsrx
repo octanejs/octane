@@ -26,9 +26,7 @@ function AwaitPage() @{
 	const [promise] = useState(() => Promise.resolve('streamed'));
 	<div class="await-page">
 		<Await promise={promise} fallback="loading">
-			{(value) => <span class="await-resolved">
-				{value as string}
-			</span>}
+			{(value) => <span class="await-resolved">{value as string}</span>}
 		</Await>
 	</div>
 }
@@ -40,9 +38,7 @@ const frozenExternalPromise = Object.freeze(Promise.resolve('externally hydrated
 function ExternalAwaitPage() @{
 	<div class="external-await-page">
 		<Await promise={frozenExternalPromise} fallback="loading">
-			{(value) => <span class="external-await-resolved">
-				{value as string}
-			</span>}
+			{(value) => <span class="external-await-resolved">{value as string}</span>}
 		</Await>
 	</div>
 }

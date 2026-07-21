@@ -5,15 +5,11 @@ export function S1(props) @{
 	<div id="root">
 		@try {
 			const v = use(props.p);
-			<span class="r">
-				{v as string}
-			</span>
+			<span class="r">{v as string}</span>
 		} @pending {
 			<span class="f">{'F1'}</span>
 		} @catch (err) {
-			<span class="e">
-				{'E1:' + (err as any).message as string}
-			</span>
+			<span class="e">{'E1:' + (err as any).message as string}</span>
 		}
 	</div>
 }
@@ -26,15 +22,11 @@ export function S2(props) @{
 		@try {
 			const a = use(props.a);
 			const b = use(props.b);
-			<span class="r">
-				{a + ':' + b as string}
-			</span>
+			<span class="r">{a + ':' + b as string}</span>
 		} @pending {
 			<span class="f">{'F2'}</span>
 		} @catch (err) {
-			<span class="e">
-				{'E2:' + (err as any).message as string}
-			</span>
+			<span class="e">{'E2:' + (err as any).message as string}</span>
 		}
 	</div>
 }
@@ -45,17 +37,13 @@ export function SSibling(props) @{
 	<div id="root">
 		@try {
 			const a = use(props.a);
-			<span class="r1">
-				{a as string}
-			</span>
+			<span class="r1">{a as string}</span>
 		} @pending {
 			<span class="f1">{'F1'}</span>
 		}
 		@try {
 			const b = use(props.b);
-			<span class="r2">
-				{b as string}
-			</span>
+			<span class="r2">{b as string}</span>
 		} @pending {
 			<span class="f2">{'F2'}</span>
 		}
@@ -69,14 +57,10 @@ export function SNested(props) @{
 		@try {
 			const a = use(props.a);
 			<div class="r1">
-				<span>
-					{a as string}
-				</span>
+				<span>{a as string}</span>
 				@try {
 					const b = use(props.b);
-					<span class="r2">
-						{b as string}
-					</span>
+					<span class="r2">{b as string}</span>
 				} @pending {
 					<span class="f2">{'IF2'}</span>
 				}
@@ -99,9 +83,7 @@ export function SState(props) @{
 			const [n, setN] = useState(0);
 			_bumpState = setN;
 			const v = use(props.p);
-			<span class="r">
-				{v + ':' + n as string}
-			</span>
+			<span class="r">{v + ':' + n as string}</span>
 		} @pending {
 			<span class="f">{'F'}</span>
 		}
@@ -114,15 +96,11 @@ export function SCatchReset(props) @{
 	<div id="root">
 		@try {
 			const v = use(props.p);
-			<span class="r">
-				{v as string}
-			</span>
+			<span class="r">{v as string}</span>
 		} @pending {
 			<span class="f">{'F'}</span>
 		} @catch (err, reset) {
-			<button class="reset" onClick={reset}>
-				{'reset:' + (err as any).message as string}
-			</button>
+			<button class="reset" onClick={reset}>{'reset:' + (err as any).message as string}</button>
 		}
 	</div>
 }

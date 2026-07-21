@@ -406,7 +406,9 @@ function areDocsPartnerSlotsEqual(
 	return left?.partner.id === right?.partner.id && left?.slotIndex === right?.slotIndex;
 }
 
-function getCompactPartnerImageConfig(image: Parameters<typeof PartnerImage>[0]['config']): Parameters<typeof PartnerImage>[0]['config'] {
+function getCompactPartnerImageConfig(
+	image: Parameters<typeof PartnerImage>[0]['config'],
+): Parameters<typeof PartnerImage>[0]['config'] {
 	if (!image.scale) {
 		return image;
 	}

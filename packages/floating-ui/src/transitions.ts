@@ -22,8 +22,7 @@ type Duration = number | Partial<{ open: number; close: number }>;
 // Upstream's `CSSStylesProperty`, with `React.CSSProperties` → the octane style
 // object form.
 type CSSStylesProperty =
-	| CSSProperties
-	| ((params: { side: Side; placement: Placement }) => CSSProperties);
+	CSSProperties | ((params: { side: Side; placement: Placement }) => CSSProperties);
 
 function useDelayUnmount(open: boolean, durationMs: number, slot: symbol | undefined): boolean {
 	const [isMounted, setIsMounted] = useState(open, subSlot(slot, 'mounted'));

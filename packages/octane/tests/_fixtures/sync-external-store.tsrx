@@ -29,9 +29,7 @@ export function Reader(props) @{
 	const subscribe = useCallback(props.store.subscribe, [props.store]);
 	const getSnapshot = useCallback(props.store.get, [props.store]);
 	const value = useSyncExternalStore(subscribe, getSnapshot);
-	<p class="value">
-		{value as string}
-	</p>
+	<p class="value">{value as string}</p>
 }
 
 // Same component bound to a different store identity — exercises the
@@ -40,7 +38,5 @@ export function SwappableReader(props) @{
 	const subscribe = useCallback(props.store.subscribe, [props.store]);
 	const getSnapshot = useCallback(props.store.get, [props.store]);
 	const value = useSyncExternalStore(subscribe, getSnapshot);
-	<p class="value" data-key={props.store === props.alt ? 'alt' : 'main'}>
-		{value as string}
-	</p>
+	<p class="value" data-key={props.store === props.alt ? 'alt' : 'main'}>{value as string}</p>
 }

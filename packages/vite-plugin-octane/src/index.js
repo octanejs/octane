@@ -1,5 +1,5 @@
 // @ts-check
-/** @import {Plugin, RenderBuiltAssetUrl, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
+/** @import {ModulePreloadOptions, Plugin, RenderBuiltAssetUrl, ResolvedConfig, ViteDevServer, UserConfig} from 'vite' */
 /** @import {LoadedOctaneConfig, OctaneConfigOptions, ResolvedOctaneConfig, RenderRoute} from '@octanejs/vite-plugin' */
 
 import fs from 'node:fs';
@@ -243,6 +243,8 @@ export function octane(inlineOptions = {}) {
 	let buildOctaneConfig = null;
 	/** @type {string[]} Module paths the generated client entry maps statically (build only) */
 	let staticEntries = [];
+	/** @type {Record<string, string>} Static module path → emitted client chunk file */
+	let staticEntryFiles = Object.create(null);
 	/** @type {Set<string>} Vite-root paths of modules containing `module server` */
 	const serverModuleModules = new Set();
 
@@ -328,6 +330,25 @@ export function octane(inlineOptions = {}) {
 						if (buildOctaneConfig.build.target !== undefined) {
 							buildConfig.target = buildOctaneConfig.build.target;
 						}
+						const userModulePreload = userConfig.build?.modulePreload;
+						if (userModulePreload === false) {
+							buildConfig.modulePreload = false;
+						} else {
+							/** @type {ModulePreloadOptions} */
+							const modulePreload =
+								typeof userModulePreload === 'object' ? { ...userModulePreload } : {};
+							const userResolveDependencies = modulePreload.resolveDependencies;
+							modulePreload.resolveDependencies = (filename, dependencies, context) => {
+								// Vite 8.1 emits entry dependency hints after the entry script.
+								// A script that installs <base> in between can redirect those
+								// root-relative requests off-origin. Static imports discover the
+								// same dependencies safely from the entry module URL, so omit only
+								// the redundant HTML hints; retain JS dynamic-import preloading.
+								if (context.hostType === 'html') return [];
+								return userResolveDependencies?.(filename, dependencies, context) ?? dependencies;
+							};
+							buildConfig.modulePreload = modulePreload;
+						}
 						const userRenderBuiltUrl = userConfig.experimental?.renderBuiltUrl;
 						/** @type {RenderBuiltAssetUrl} */
 						const renderBuiltUrl = (filename, context) => {
@@ -367,6 +388,28 @@ export function octane(inlineOptions = {}) {
 			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
 			serverModuleModules.clear();
 			staticEntries = collect_hydrate_module_paths(buildOctaneConfig);
+			staticEntryFiles = Object.create(null);
+		},
+
+		/**
+		 * Preserve the source-to-file relation that Vite's manifest cannot express
+		 * when Rolldown promotes a dynamic route entry into a shared chunk.
+		 */
+		generateBundle(_options, bundle) {
+			if (!isBuild || isSSRBuild || !has_route_config(buildOctaneConfig)) return;
+			const entryByModuleId = new Map(
+				staticEntries.map((moduleId) => {
+					const file = path.resolve(root, moduleId.startsWith('/') ? `.${moduleId}` : moduleId);
+					return [file.split(path.sep).join('/'), moduleId];
+				}),
+			);
+			for (const output of Object.values(bundle)) {
+				if (output.type !== 'chunk') continue;
+				for (const moduleId of output.moduleIds) {
+					const entryId = entryByModuleId.get(moduleId.split(path.sep).join('/'));
+					if (entryId !== undefined) staticEntryFiles[entryId] = output.fileName;
+				}
+			}
 		},
 
 		async configResolved(resolvedConfig) {
@@ -693,7 +736,7 @@ export function octane(inlineOptions = {}) {
 				);
 			}
 
-			const clientAssetMap = createClientAssetMap(clientManifest, staticEntries);
+			const clientAssetMap = createClientAssetMap(clientManifest, staticEntries, staticEntryFiles);
 
 			// The manifest was only needed here; leaving .vite/ in dist/client would
 			// publish source file paths through the static server.

@@ -7,18 +7,14 @@ import { use } from 'octane';
 
 // A leaf component (no control flow) rendered inside the @try body.
 function Leaf(props) @{
-	<div class="leaf">
-		{props.msg as string}
-	</div>
+	<div class="leaf">{props.msg as string}</div>
 }
 
 // A component containing a @for, rendered inside the @try body.
 function ListLeaf(props) @{
 	<ul class="list-leaf">
 		@for (const item of props.items; key item.id) {
-			<li class="row">
-				{item.name as string}
-			</li>
+			<li class="row">{item.name as string}</li>
 		}
 	</ul>
 }
@@ -29,9 +25,7 @@ export function TryFor(props) @{
 		@try {
 			const items = use(props.promise);
 			@for (const item of items; key item.id) {
-				<li class="item">
-					{item.name as string}
-				</li>
+				<li class="item">{item.name as string}</li>
 			}
 		} @pending {
 			<span class="loading">{'loading'}</span>
@@ -66,15 +60,11 @@ export function TryComponentFor(props) @{
 // The exact router `Match` shape: a @try whose body is a component, with a @pending
 // fallback that is also a component (an `Outlet`-like fallback).
 function Fallback() @{
-	<div class="fallback">
-		{'fallback' as string}
-	</div>
+	<div class="fallback">{'fallback' as string}</div>
 }
 
 function Matched(props) @{
-	<section class="matched">
-		{props.label as string}
-	</section>
+	<section class="matched">{props.label as string}</section>
 }
 
 export function MatchShape(props) @{

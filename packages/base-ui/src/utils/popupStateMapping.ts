@@ -38,11 +38,11 @@ export const pressableTriggerOpenStateMapping: StateAttributesMapping<{ open: bo
 	},
 };
 
-export const popupStateMapping: StateAttributesMapping<{ open: boolean; anchorHidden: boolean }> = {
+export const popupStateMapping = {
 	open(value: boolean) {
 		return value ? POPUP_OPEN_HOOK : POPUP_CLOSED_HOOK;
 	},
 	anchorHidden(value: boolean) {
 		return value ? ANCHOR_HIDDEN_HOOK : null;
 	},
-};
+} satisfies StateAttributesMapping<{ open: boolean; anchorHidden: boolean }>;

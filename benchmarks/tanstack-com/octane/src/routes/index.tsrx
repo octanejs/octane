@@ -541,14 +541,12 @@ function WhyTanStackSection() {
 					/>
 					<div class="relative flex items-start justify-between gap-4">
 						<div>
-							<p class="font-mono text-[11px] font-bold uppercase text-gray-500 dark:text-gray-500">
-								{principle.label as string}
-							</p>
+							<p
+								class="font-mono text-[11px] font-bold uppercase text-gray-500 dark:text-gray-500"
+							>{principle.label as string}</p>
 							<h4
 								class="mt-4 max-w-64 text-xl font-black leading-tight text-gray-950 dark:text-white"
-							>
-								{principle.title as string}
-							</h4>
+							>{principle.title as string}</h4>
 						</div>
 						<span
 							class={twMerge(
@@ -559,16 +557,14 @@ function WhyTanStackSection() {
 							<principle.Icon className="h-5 w-5" />
 						</span>
 					</div>
-					<p class="relative mt-4 max-w-[25rem] text-sm leading-6 text-gray-600 dark:text-gray-400">
-						{principle.body as string}
-					</p>
+					<p
+						class="relative mt-4 max-w-[25rem] text-sm leading-6 text-gray-600 dark:text-gray-400"
+					>{principle.body as string}</p>
 					<PrincipleProof proof={principle.proof} accentClassName={principle.accentClassName} />
 					<span
 						aria-hidden="true"
 						class="absolute bottom-3 right-5 font-mono text-5xl font-black leading-none text-gray-100 transition-colors group-hover:text-gray-200 dark:text-white/[0.04] dark:group-hover:text-white/[0.07]"
-					>
-						{String(index + 1).padStart(2, '0') as string}
-					</span>
+					>{String(index + 1).padStart(2, '0') as string}</span>
 				</li>,
 			)}</ol>
 		</div>
@@ -625,9 +621,7 @@ function FrameworkAdapterGraph({ accentClassName }: { accentClassName: string })
 							? 'border-cyan-300 bg-cyan-50 text-cyan-800 shadow-cyan-500/15 dark:border-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200'
 							: 'border-gray-200 bg-white/85 dark:border-gray-800 dark:bg-black/55',
 					)}
-				>
-					{adapter.label as string}
-				</span>;
+				>{adapter.label as string}</span>;
 			})}
 
 			<span
@@ -719,17 +713,13 @@ function PrincipleProof({
 				['form.email', 'Field<string>'],
 			].map(
 				([name, value]) => <div key={name} class="flex items-center justify-between gap-3">
-					<span>
-						{name as string}
-					</span>
+					<span>{name as string}</span>
 					<span
 						class={twMerge(
 							'bg-linear-to-r bg-clip-text font-black text-transparent',
 							accentClassName,
 						)}
-					>
-						{value as string}
-					</span>
+					>{value as string}</span>
 				</div>,
 			)}</div>
 		</div>;
@@ -763,12 +753,11 @@ function PrincipleProof({
 		<div
 			class="flex flex-wrap gap-1.5 font-mono text-[11px] font-bold text-gray-600 dark:text-gray-400"
 		>{['MIT', 'self-host', 'any host', 'no paid products'].map(
-			(item) => <span
-				key={item}
-				class="rounded-md border border-gray-200 bg-white/70 px-2 py-1.5 dark:border-gray-800 dark:bg-black/30"
-			>
-				{item as string}
-			</span>,
+			(item) =>
+				<span
+					key={item}
+					class="rounded-md border border-gray-200 bg-white/70 px-2 py-1.5 dark:border-gray-800 dark:bg-black/30"
+				>{item as string}</span>,
 		)}</div>
 		<div aria-hidden="true" class={twMerge('mt-3 h-px bg-linear-to-r', accentClassName)} />
 	</div>;
@@ -789,9 +778,7 @@ function StackCategoryCard({
 		params={{ category: categorySlug }}
 		className="group flex flex-col rounded-xl border border-gray-200 bg-white/60 p-5 transition-all hover:-translate-y-0.5 hover:border-gray-300 hover:shadow-md dark:border-gray-800 dark:bg-gray-900/40 dark:hover:border-gray-700"
 	>
-		<h4 class="text-base font-bold group-hover:underline">
-			{groupName as string}
-		</h4>
+		<h4 class="text-base font-bold group-hover:underline">{groupName as string}</h4>
 		<ol class="mt-4 space-y-2.5">{libraries.map(
 			(lib, i) => <li key={lib.id} class="flex items-start gap-2.5">
 				<span
@@ -803,9 +790,10 @@ function StackCategoryCard({
 				>
 					{i + 1}
 				</span>
-				<span class="min-w-0 flex-1 text-sm font-semibold leading-snug">
-					{lib.name.replace('TanStack ', '') as string}
-				</span>
+				<span class="min-w-0 flex-1 text-sm font-semibold leading-snug">{lib.name.replace(
+					'TanStack ',
+					'',
+				) as string}</span>
 			</li>,
 		)}</ol>
 		<span

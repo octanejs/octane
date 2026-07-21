@@ -14,9 +14,7 @@ function Child(props) @{
 		return () => props.log('unmount passive');
 	}, []);
 	props.log('render');
-	<span id="child">
-		{n as number}
-	</span>
+	<span id="child">{n as number}</span>
 }
 
 export function ActivityHost(props) @{
@@ -43,9 +41,7 @@ function InsertionChild(props) @{
 		props.log('layout mount');
 		return () => props.log('layout cleanup');
 	}, []);
-	<span id="ichild">
-		{n as number}
-	</span>
+	<span id="ichild">{n as number}</span>
 }
 
 export function InsertionActivityHost(props) @{
@@ -60,9 +56,7 @@ export function InsertionActivityHost(props) @{
 // can't take display:none) must still be hidden — see hideActivityRange.
 export function TextActivityHost(props) @{
 	<div id="host">
-		<Activity mode={props.mode}>
-			{props.text as string}
-		</Activity>
+		<Activity mode={props.mode}>{props.text as string}</Activity>
 	</div>
 }
 
@@ -92,9 +86,7 @@ function Labeled(props) @{
 		props.log('Mount ' + props.label);
 		return () => props.log('Unmount ' + props.label);
 	}, []);
-	<span class="labeled">
-		{props.label as string}
-	</span>
+	<span class="labeled">{props.label as string}</span>
 }
 
 // Outer Activity wrapping a child + an independently-controlled inner Activity.

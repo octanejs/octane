@@ -83,9 +83,7 @@ export function ControlledTextareaMarkup() @{
 }
 
 function MatrixOption(props) @{
-	<option value={props.value}>
-		{props.value as string}
-	</option>
+	<option value={props.value}>{props.value as string}</option>
 }
 
 export function ControlledSelectMarkup() {
@@ -105,9 +103,7 @@ const Colour = createContext('none');
 
 function ColourReader() @{
 	const colour = useContext(Colour);
-	<strong id="context-value">
-		{colour as string}
-	</strong>
+	<strong id="context-value">{colour as string}</strong>
 }
 
 export function NestedContext() @{
@@ -225,9 +221,7 @@ const DefaultContext = createContext('none');
 
 function DefaultContextReader(props) @{
 	const value = useContext(props.context);
-	<span id={props.id}>
-		{value as string}
-	</span>
+	<span id={props.id}>{value as string}</span>
 }
 
 function DefaultContextGrandchild() @{
@@ -257,12 +251,8 @@ function MultipleContextReader() @{
 	const theme = useContext(ThemeContext);
 	const language = useContext(LanguageContext);
 	<div id="multiple-contexts">
-		<span id="multiple-theme">
-			{theme as string}
-		</span>
-		<span id="multiple-language">
-			{language as string}
-		</span>
+		<span id="multiple-theme">{theme as string}</span>
+		<span id="multiple-language">{language as string}</span>
 	</div>
 }
 
@@ -276,16 +266,12 @@ export function MultipleContexts() @{
 
 function ThemeValue(props) @{
 	const theme = useContext(ThemeContext);
-	<div id={props.id}>
-		{theme as string}
-	</div>
+	<div id={props.id}>{theme as string}</div>
 }
 
 function LanguageValue(props) @{
 	const language = useContext(LanguageContext);
-	<div id={props.id}>
-		{language as string}
-	</div>
+	<div id={props.id}>{language as string}</div>
 }
 
 export function NestedContextUnwinding() @{

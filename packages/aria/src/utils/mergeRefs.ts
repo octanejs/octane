@@ -3,10 +3,7 @@
 // (callback ref with optional cleanup, or object ref), passed as ordinary props.
 
 export type MergableRef<T> =
-	| ((value: T | null) => void | (() => void))
-	| { current: T | null }
-	| null
-	| undefined;
+	((value: T | null) => void | (() => void)) | { current: T | null } | null | undefined;
 
 /**
  * Merges multiple refs into one. Works with either callback or object refs.

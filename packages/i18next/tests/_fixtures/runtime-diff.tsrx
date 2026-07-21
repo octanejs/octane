@@ -25,9 +25,7 @@ await instance.init({
 function Content() @{
 	const { t, ready } = useTranslation('translation', { useSuspense: false });
 	<div>
-		<p id="plain">
-			{t('plain', { name: 'Ada' }) as string}
-		</p>
+		<p id="plain">{t('plain', { name: 'Ada' }) as string}</p>
 		<p id="ready">{String(ready)}</p>
 		<p id="rich">
 			<Trans

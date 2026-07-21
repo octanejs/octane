@@ -16,9 +16,7 @@ export function EffectEventCounter(props) @{
 	const [count, setCount] = useState(0);
 	const increment = useEffectEvent(() => setCount((value) => value + props.incrementBy));
 	props.observe?.(increment);
-	<button id="increment" onClick={() => increment()}>
-		{count as number}
-	</button>
+	<button id="increment" onClick={() => increment()}>{count as number}</button>
 }
 
 export function MultipleEffectEvents(props) @{
@@ -28,9 +26,7 @@ export function MultipleEffectEvents(props) @{
 	<>
 		<button id="add" onClick={() => add()}>{'add'}</button>
 		<button id="multiply" onClick={() => multiply()}>{'multiply'}</button>
-		<output>
-			{count as number}
-		</output>
+		<output>{count as number}</output>
 	</>
 }
 
@@ -58,9 +54,7 @@ export function LayoutEffectEventCounter(props) @{
 		props.log('layout ' + props.incrementBy);
 		increment();
 	}, [props.incrementBy]);
-	<button id="increment" onClick={() => increment()}>
-		{count as number}
-	</button>
+	<button id="increment" onClick={() => increment()}>{count as number}</button>
 }
 
 export function PassiveEffectEventCounter(props) @{
@@ -70,9 +64,7 @@ export function PassiveEffectEventCounter(props) @{
 		props.log('passive ' + props.incrementBy);
 		increment();
 	}, [props.incrementBy]);
-	<button id="increment" onClick={() => increment()}>
-		{count as number}
-	</button>
+	<button id="increment" onClick={() => increment()}>{count as number}</button>
 }
 
 function useEventCount(incrementBy) {
@@ -87,9 +79,7 @@ export function CustomHookEffectEventCounter(props) @{
 		props.log('custom ' + props.incrementBy);
 		increment();
 	}, [props.incrementBy]);
-	<button id="increment" onClick={() => increment()}>
-		{count as number}
-	</button>
+	<button id="increment" onClick={() => increment()}>{count as number}</button>
 }
 
 export function EffectEventBeforeEffects(props) @{
@@ -165,9 +155,7 @@ export function EffectEventMemoPropIdentity(props) @{
 	const event = useEffectEvent(() => value);
 	<>
 		<EffectEventIdentityChild event={event} observe={props.observe} />
-		<button onClick={() => setValue(value + 1)}>
-			{value as number}
-		</button>
+		<button onClick={() => setValue(value + 1)}>{value as number}</button>
 	</>
 }
 
@@ -176,9 +164,7 @@ function CommittedEventChild(props) @{
 	props.observe(event);
 	if (props.error) throw new Error('render failed');
 	if (props.resource) use(props.resource);
-	<span class="value">
-		{props.value as string}
-	</span>
+	<span class="value">{props.value as string}</span>
 }
 
 export function CommittedEventBoundary(props) @{
@@ -192,9 +178,7 @@ export function CommittedEventBoundary(props) @{
 	} @pending {
 		<span class="pending">{'pending'}</span>
 	} @catch (error) {
-		<span class="caught">
-			{error.message as string}
-		</span>
+		<span class="caught">{error.message as string}</span>
 	}
 }
 
@@ -206,9 +190,7 @@ function RegisteredSiblingEvent(props) @{
 			if (props.eventRef.current === read) props.eventRef.current = null;
 		};
 	}, []);
-	<span class="registered-sibling">
-		{props.value as string}
-	</span>
+	<span class="registered-sibling">{props.value as string}</span>
 }
 
 function LaterSuspendingSibling(props) @{
@@ -237,9 +219,7 @@ function IndependentlyUpdatedEventSibling(props) @{
 			if (props.eventRef.current === read) props.eventRef.current = null;
 		};
 	}, []);
-	<span class="independent-event-sibling">
-		{value as string}
-	</span>
+	<span class="independent-event-sibling">{value as string}</span>
 }
 
 function IndependentlySuspendingSibling(props) @{
@@ -266,9 +246,7 @@ function ConditionalEventCleanupChild(props) @{
 	useLayoutEffect(() => {
 		return () => props.log('cleanup ' + read() + ' connected=' + elementRef.current.isConnected);
 	}, []);
-	<span ref={elementRef} class="conditional-event-child">
-		{props.value as string}
-	</span>
+	<span ref={elementRef} class="conditional-event-child">{props.value as string}</span>
 }
 
 export function ConditionalEventCleanup(props) @{
@@ -284,9 +262,7 @@ export function EffectEventChatRoom(props) @{
 	useEffect(() => {
 		return props.connection.connect(props.roomId, () => onConnected());
 	}, [props.roomId, props.connection]);
-	<div>
-		{props.roomId as string}
-	</div>
+	<div>{props.roomId as string}</div>
 }
 
 export function EffectEventLogVisit(props) @{
@@ -296,9 +272,7 @@ export function EffectEventLogVisit(props) @{
 	useEffect(() => {
 		onVisit(props.url);
 	}, [props.url]);
-	<button id="add" onClick={() => addItem()}>
-		{items.length as number}
-	</button>
+	<button id="add" onClick={() => addItem()}>{items.length as number}</button>
 }
 
 const EffectEventContext = createContext('default');
@@ -309,9 +283,7 @@ function MemoContextReaderImpl(props) @{
 	useEffect(() => {
 		props.eventRef.current = read;
 	}, []);
-	<div>
-		{value as string}
-	</div>
+	<div>{value as string}</div>
 }
 const MemoContextReader = memo(MemoContextReaderImpl);
 
@@ -327,9 +299,7 @@ function RefPropContextReader(props) @{
 	useEffect(() => {
 		props.ref.current = read;
 	}, []);
-	<div>
-		{value as string}
-	</div>
+	<div>{value as string}</div>
 }
 
 export function RefPropContextEffectEvent(props) @{

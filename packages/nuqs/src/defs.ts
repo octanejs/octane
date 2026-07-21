@@ -8,8 +8,7 @@ export type TransitionStartFunction = (callback: () => void | Promise<void>) => 
 export type SearchParams = Record<string, string | string[] | undefined>;
 export type HistoryOptions = 'replace' | 'push';
 export type LimitUrlUpdates =
-	| { method: 'debounce'; timeMs: number }
-	| { method: 'throttle'; timeMs: number };
+	{ method: 'debounce'; timeMs: number } | { method: 'throttle'; timeMs: number };
 
 export type Options = {
 	/**

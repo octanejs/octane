@@ -35,9 +35,7 @@ export declare namespace useFragment {
 		 * be retrieved, or a `{ __ref: "..." }` reference, or a `string` ID (uncommon).
 		 */
 		from:
-			| useFragment.FromOptionValue<TData>
-			| Array<useFragment.FromOptionValue<TData> | null>
-			| null;
+			useFragment.FromOptionValue<TData> | Array<useFragment.FromOptionValue<TData> | null> | null;
 		/**
 		 * Whether to read from optimistic or non-optimistic cache data. If
 		 * this named option is provided, the optimistic parameter of the

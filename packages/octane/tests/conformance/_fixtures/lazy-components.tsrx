@@ -1,9 +1,7 @@
 import { createElement, useContext, useLayoutEffect, useState } from 'octane';
 
 export function LazyText(props) @{
-	<span class="lazy-value">
-		{String(props.text) as string}
-	</span>
+	<span class="lazy-value">{String(props.text) as string}</span>
 }
 
 export function LazyAdd(props) {
@@ -12,9 +10,7 @@ export function LazyAdd(props) {
 
 export function LazyMemoProbe(props) @{
 	props.onRender(props.value);
-	<span class="lazy-memo-probe">
-		{String(props.value) as string}
-	</span>
+	<span class="lazy-memo-probe">{String(props.value) as string}</span>
 }
 
 export const LazyDefaultText = (props) => <span class="lazy-default">{String(props.text)}</span>;
@@ -30,15 +26,11 @@ export function LazyStatefulItem(props) @{
 		class="lazy-item"
 		data-id={props.id as string}
 		onClick={() => setCount((value) => value + 1)}
-	>
-		{props.label + ':' + count as string}
-	</button>
+	>{props.label + ':' + count as string}</button>
 }
 
 export function LazyRefTarget(props) @{
-	<div class="lazy-ref" ref={props.ref}>
-		{props.label as string}
-	</div>
+	<div class="lazy-ref" ref={props.ref}>{props.label as string}</div>
 }
 
 export function LazyHost(props) @{
@@ -49,9 +41,7 @@ export function LazyHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">
-				{'Error: ' + error.message as string}
-			</div>
+			<div class="lazy-error">{'Error: ' + error.message as string}</div>
 		}
 	</>
 }
@@ -68,9 +58,7 @@ export function LazyPairHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">
-				{'Error: ' + error.message as string}
-			</div>
+			<div class="lazy-error">{'Error: ' + error.message as string}</div>
 		}
 	</>
 }
@@ -90,18 +78,14 @@ export function LazyListHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">
-				{'Error: ' + error.message as string}
-			</div>
+			<div class="lazy-error">{'Error: ' + error.message as string}</div>
 		}
 	</>
 }
 
 function LazyContextConsumer(props) @{
 	const value = useContext(props.context);
-	<span class="lazy-context">
-		{String(value) as string}
-	</span>
+	<span class="lazy-context">{String(value) as string}</span>
 }
 
 export function LazyProviderHost(props) @{
@@ -114,9 +98,7 @@ export function LazyProviderHost(props) @{
 		} @pending {
 			<div class="lazy-fallback">{'Loading...'}</div>
 		} @catch (error) {
-			<div class="lazy-error">
-				{'Error: ' + error.message as string}
-			</div>
+			<div class="lazy-error">{'Error: ' + error.message as string}</div>
 		}
 	</>
 }

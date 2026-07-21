@@ -1,10 +1,10 @@
 {
-  "upstream": { "package": "@tanstack/react-query", "version": "5.101.0" },
+  "upstream": { "package": "@tanstack/react-query", "version": "5.101.3" },
   "surface": "Complete: 58/58 runtime exports plus the full TypeScript surface; the export surface is byte-identical to upstream in both directions (locked by test), and `@tanstack/query-core` is re-exported verbatim.",
   "divergences": [
     "Suspense integrates via octane's `use(thenable)` rather than throwing a promise (observable behavior matches)."
   ],
   "ssr": "`HydrationBoundary` fully ported (incl. streaming `promise`/`dehydratedAt` re-hydration); the SSR/streaming server entries and server-render tests are still open.",
-  "verified": "2026-07-06",
+  "verified": "2026-07-21",
   "docs": ["docs/tanstack-parity-audit.md"]
 }

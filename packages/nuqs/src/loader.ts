@@ -3,11 +3,7 @@ import { isAbsentFromUrl } from './lib/search-params';
 import type { inferParserType, ParserMap } from './parsers';
 
 export type LoaderInput =
-	| URL
-	| Request
-	| URLSearchParams
-	| Record<string, string | string[] | undefined>
-	| string;
+	URL | Request | URLSearchParams | Record<string, string | string[] | undefined> | string;
 
 /**
  * @deprecated Use `CreateLoaderOptions` instead.

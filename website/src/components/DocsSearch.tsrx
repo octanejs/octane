@@ -203,13 +203,9 @@ function SearchDialog(props: DialogProps) @{
 										>
 											@for (const part of line.parts; key part.i) {
 												@if (part.hit) {
-													<mark>
-														{part.text as string}
-													</mark>
+													<mark>{part.text as string}</mark>
 												} @else {
-													<span>
-														{part.text as string}
-													</span>
+													<span>{part.text as string}</span>
 												}
 											}
 										</button>

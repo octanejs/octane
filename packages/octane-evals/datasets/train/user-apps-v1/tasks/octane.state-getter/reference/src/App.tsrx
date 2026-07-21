@@ -13,9 +13,7 @@ export function App(props: {
 	};
 
 	<section>
-		<output aria-label="Current count">
-			{count as string}
-		</output>
+		<output aria-label="Current count">{count as string}</output>
 		<button type="button" onClick={() => setCount((value) => value + 1)}>
 			Increment
 		</button>

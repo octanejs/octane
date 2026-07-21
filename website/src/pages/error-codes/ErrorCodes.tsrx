@@ -166,8 +166,9 @@ export function ErrorCodesIndex() @{
 	const visibleCodes =
 		normalizedQuery
 			? errorCodes.filter(
-					(entry) => entry.code.includes(normalizedQuery) ||
-						entry.message.toLowerCase().includes(normalizedQuery),
+					(entry) =>
+						entry.code.includes(normalizedQuery) ||
+							entry.message.toLowerCase().includes(normalizedQuery),
 				)
 			: errorCodes;
 	useTitle('Octane — Error decoder');
@@ -200,9 +201,7 @@ export function ErrorCodesIndex() @{
 									<span class="error-card-status">Retired</span>
 								}
 							</span>
-							<span class="error-card-message">
-								{entry.message as string}
-							</span>
+							<span class="error-card-message">{entry.message as string}</span>
 						</Link>
 					</li>
 				}
@@ -251,9 +250,7 @@ export function ErrorCodeDecoder() @{
 				<ul class="error-extra-args">
 					@for (const extra of extraEntries; key extra.key) {
 						<li>
-							<code>
-								{extra.argument as string}
-							</code>
+							<code>{extra.argument as string}</code>
 						</li>
 					}
 				</ul>

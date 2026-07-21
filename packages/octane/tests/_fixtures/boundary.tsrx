@@ -2,9 +2,7 @@ import { Suspense, ErrorBoundary, use, useState } from 'octane';
 
 export function Suspender(props) @{
 	const v = use(props.promise);
-	<span id="v">
-		{'v:' + v as string}
-	</span>
+	<span id="v">{'v:' + v as string}</span>
 }
 
 export function SuspenseHost(props) @{
@@ -64,8 +62,7 @@ export function ResetErrorHost(props) @{
 			}}
 		>
 			{'retry:' + (error as Error).message}
-		</button>
-		}
+		</button>}
 	>
 		<ResetThrower state={props.state} />
 	</ErrorBoundary>

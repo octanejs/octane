@@ -95,11 +95,7 @@ interface TransportedChild {
 }
 
 export type LifecycleEvent =
-	| 'attached'
-	| 'hidden'
-	| 'reattached'
-	| 'disposed-by-unmount'
-	| 'dispose-check-canceled';
+	'attached' | 'hidden' | 'reattached' | 'disposed-by-unmount' | 'dispose-check-canceled';
 
 export class IslandController {
 	// ── RendererRegionOwnerBridge surface ────────────────────────────────────

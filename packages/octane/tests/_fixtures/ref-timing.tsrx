@@ -18,9 +18,7 @@ export function RefInLayout(props) @{
 
 function TimingChild(props) @{
 	const [n] = useState(0);
-	<span id="child" ref={() => props.log('child')}>
-		{n as number}
-	</span>
+	<span id="child" ref={() => props.log('child')}>{n as number}</span>
 }
 
 export function NestedTiming(props) @{

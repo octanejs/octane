@@ -79,15 +79,13 @@ export function Playground() @{
 	// Imperative bridge into the boot closure below — populated once the editor
 	// stack has loaded; the toolbar buttons (and the consent overlay's Run
 	// button) call through it.
-	const controllerRef = useRef<
-		{
-			switchLang?: (next: PlaygroundLang) => void;
-			selectExample?: (id: string) => void;
-			selectFile?: (name: string) => void;
-			formatActive?: () => void;
-			approveRun?: () => void;
-		}
-	>({});
+	const controllerRef = useRef<{
+		switchLang?: (next: PlaygroundLang) => void;
+		selectExample?: (id: string) => void;
+		selectFile?: (name: string) => void;
+		formatActive?: () => void;
+		approveRun?: () => void;
+	}>({});
 
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
@@ -190,10 +188,8 @@ export function Playground() @{
 			let currentFile = workspaces[currentLang]!.entry;
 
 			const workspace = (): Workspace => workspaces[currentLang]!;
-			const fileSource = (name: string): string => workspace().files.find(
-				(file: { name: string }) => file.name === name,
-			)?.source ??
-				'';
+			const fileSource = (name: string): string =>
+				workspace().files.find((file: { name: string }) => file.name === name)?.source ?? '';
 
 			// Which language variants the current selection can switch to: an
 			// example offers exactly its declared variants; “Custom” keeps both
@@ -545,9 +541,7 @@ export function Playground() @{
 					@for (const group of EXAMPLE_GROUPS; key group.group) {
 						<optgroup label={group.group}>
 							@for (const example of group.examples; key example.id) {
-								<option value={example.id}>
-									{example.label as string}
-								</option>
+								<option value={example.id}>{example.label as string}</option>
 							}
 						</optgroup>
 					}
@@ -578,9 +572,7 @@ export function Playground() @{
 					disabled={!ready || formatting}
 					title="Format with Prettier (Ctrl/Cmd-Shift-F)"
 					onClick={() => controllerRef.current.formatActive?.()}
-				>
-					{(formatting ? 'Formatting…' : 'Format') as string}
-				</button>
+				>{(formatting ? 'Formatting…' : 'Format') as string}</button>
 			</div>
 			<div class="pg-seg" role="group" aria-label="Result view">
 				<button
@@ -638,9 +630,7 @@ export function Playground() @{
 									aria-selected={name === activeFile}
 									class={['pg-tab', name === activeFile && 'active']}
 									onClick={() => controllerRef.current.selectFile?.(name)}
-								>
-									{name as string}
-								</button>
+								>{name as string}</button>
 							}
 						</div>
 					} @else {

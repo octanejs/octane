@@ -77,18 +77,18 @@ export function FrameworkCard({
 
 			{/* Framework Name */}
 			<div class="text-center flex-1 flex items-center justify-center">
-				<div class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-					{framework.label as string}
-				</div>
+				<div
+					class="text-lg font-semibold text-gray-900 dark:text-gray-100"
+				>{framework.label as string}</div>
 			</div>
 		</Link>
 
 		{/* Package Name with Copy Button - Bottom of Card */}
 		<div class="pt-2 border-t border-gray-200 dark:border-gray-800 space-y-2">
 			<div class="flex items-center justify-center gap-2">
-				<code class="text-xs text-gray-600 dark:text-gray-400 font-mono">
-					{packageName as string}
-				</code>
+				<code
+					class="text-xs text-gray-600 dark:text-gray-400 font-mono"
+				>{packageName as string}</code>
 				<button
 					onClick={(e) => {
 						e.preventDefault();

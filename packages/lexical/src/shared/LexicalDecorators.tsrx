@@ -21,7 +21,8 @@ import {
 	Suspense,
 } from 'octane';
 
-type ErrorBoundaryType = (props: {
+type ErrorBoundaryType =
+	(props: {
 		children: OctaneNode;
 		onError: (error: Error) => void;
 	}) => OctaneNode;

@@ -6,7 +6,5 @@ export function HydrationLiveQuery({ db }: { db: any }) @{
 		[db],
 		['server'] as string[],
 	) as string[];
-	<div id="hydration-items">
-		{items.join(',') as string}
-	</div>
+	<div id="hydration-items">{items.join(',') as string}</div>
 }

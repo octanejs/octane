@@ -34,14 +34,13 @@ export function BlogCard({ post, showLibraryBadges = true }: BlogCardProps) {
 			? <div
 					class="absolute right-3 top-3 z-10 flex flex-wrap justify-end gap-1"
 				>{blogLibraries.map(
-					(blogLibrary) => <div
-						key={blogLibrary.id}
-						class={`rounded-md px-2 py-1 text-xs font-black uppercase shadow-sm ${blogLibrary.bgStyle} ${
-							blogLibrary.badgeTextStyle ?? 'text-white'
-						}`}
-					>
-						{blogLibrary.name.replace('TanStack ', '') as string}
-					</div>,
+					(blogLibrary) =>
+						<div
+							key={blogLibrary.id}
+							class={`rounded-md px-2 py-1 text-xs font-black uppercase shadow-sm ${blogLibrary.bgStyle} ${
+								blogLibrary.badgeTextStyle ?? 'text-white'
+							}`}
+						>{blogLibrary.name.replace('TanStack ', '') as string}</div>,
 				)}</div>
 			: null}
 		{headerImage
@@ -62,9 +61,7 @@ export function BlogCard({ post, showLibraryBadges = true }: BlogCardProps) {
 			: <CoverFallback slug={slug} library={library} className="aspect-video w-full" />}
 		<div class="p-4 md:p-8 flex flex-col gap-4 flex-1 justify-between">
 			<div>
-				<div class="text-lg font-extrabold">
-					{title as string}
-				</div>
+				<div class="text-lg font-extrabold">{title as string}</div>
 				<div class="text-xs italic font-light mt-1">
 					by
 					{formatAuthors(authors) as string}
@@ -77,9 +74,9 @@ export function BlogCard({ post, showLibraryBadges = true }: BlogCardProps) {
 						: null}
 				</div>
 				{excerpt
-					? <p class="text-sm mt-4 text-gray-600 dark:text-gray-400 leading-7 line-clamp-4">
-							{excerpt as string}
-						</p>
+					? <p
+							class="text-sm mt-4 text-gray-600 dark:text-gray-400 leading-7 line-clamp-4"
+						>{excerpt as string}</p>
 					: null}
 			</div>
 			<div>

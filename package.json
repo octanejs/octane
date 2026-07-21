@@ -7,7 +7,7 @@
   },
   "author": "Dominic Gannaway",
   "license": "MIT",
-  "packageManager": "pnpm@11.1.1",
+  "packageManager": "pnpm@11.15.1",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git"
@@ -68,7 +68,7 @@
     "@tsrx/prettier-plugin": "catalog:default",
     "@tsrx/typescript-plugin": "catalog:default",
     "@types/node": "catalog:default",
-    "@typescript/native-preview": "7.0.0-dev.20260616.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "prettier": "catalog:default",
     "prettier-plugin-svelte": "catalog:default",
     "rulesync": "catalog:default",

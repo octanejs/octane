@@ -21,9 +21,7 @@ import {
 // the error again (not fall through and render undefined data). ---
 function AlwaysFailReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useSuspenseQuery({ queryKey: ['fail'], queryFn: props.queryFn, retry: false });
-	<span id="sq-data">
-		{'data:' + q.data as string}
-	</span>
+	<span id="sq-data">{'data:' + q.data as string}</span>
 }
 
 function SuspenseRetryBoundary(props: { queryFn: () => Promise<string> }) @{
@@ -34,12 +32,9 @@ function SuspenseRetryBoundary(props: { queryFn: () => Promise<string> }) @{
 	};
 	<ErrorBoundary
 		fallback={(e, reset) => <div id="sq-error">
-			<span id="sq-msg">
-				{(e as Error).message as string}
-			</span>
+			<span id="sq-msg">{(e as Error).message as string}</span>
 			<button id="sq-retry" onClick={onRetry(reset)}>retry</button>
-		</div>
-		}
+		</div>}
 	>
 		<Suspense fallback={<i id="sq-loading">loading</i>}>
 			<AlwaysFailReader queryFn={props.queryFn} />
@@ -72,9 +67,7 @@ export function RenderPropResetApp(props: { client: unknown }) @{
 // --- HydrationBoundary ---
 function HydratedReader(props: { queryKey: unknown[] }) @{
 	const q = useQuery({ queryKey: props.queryKey, queryFn: skipToken });
-	<span id="hydrated">
-		{String(q.data ?? 'none') as string}
-	</span>
+	<span id="hydrated">{String(q.data ?? 'none') as string}</span>
 }
 
 export function HydrationApp(props: { client: unknown; state: unknown; queryKey: unknown[] }) @{
@@ -96,9 +89,7 @@ function PrefetchInRenderReader(props: { queryFn: () => Promise<string> }) @{
 		retry: false,
 	});
 	promiseCapture.promise = q.promise;
-	<span id="pir">
-		{(q.isPending ? 'pending' : 'data:' + q.data) as string}
-	</span>
+	<span id="pir">{(q.isPending ? 'pending' : 'data:' + q.data) as string}</span>
 }
 
 export function PrefetchInRenderApp(props: { client: unknown; queryFn: () => Promise<string> }) @{
@@ -151,9 +142,7 @@ function InfiniteReader(props: { pageFn: (page: number) => Promise<string> }) @{
 		getNextPageParam: (_last: unknown, all: unknown[]) => (all.length < 3 ? all.length : undefined),
 	});
 	<div>
-		<span id="pages">
-			{(q.data ? q.data.pages.join(',') : 'none') as string}
-		</span>
+		<span id="pages">{(q.data ? q.data.pages.join(',') : 'none') as string}</span>
 		<span id="has-next">{String(q.hasNextPage)}</span>
 		<button id="next" onClick={() => q.fetchNextPage()}>next</button>
 	</div>
@@ -176,9 +165,7 @@ function SuspenseInfiniteReader(props: { pageFn: (page: number) => Promise<strin
 		initialPageParam: 0,
 		getNextPageParam: () => undefined,
 	});
-	<span id="sinf">
-		{q.data.pages.join(',') as string}
-	</span>
+	<span id="sinf">{q.data.pages.join(',') as string}</span>
 }
 
 export function SuspenseInfiniteApp(props: {
@@ -241,9 +228,7 @@ export const trackedRenders = { count: 0 };
 function TrackedReader(props: { queryFn: () => Promise<string> }) @{
 	trackedRenders.count++;
 	const q = useQuery({ queryKey: ['tracked'], queryFn: props.queryFn, staleTime: 0 });
-	<span id="tracked">
-		{String(q.data ?? 'none') as string}
-	</span>
+	<span id="tracked">{String(q.data ?? 'none') as string}</span>
 }
 
 export function TrackedApp(props: { client: unknown; queryFn: () => Promise<string> }) @{
@@ -265,9 +250,7 @@ function FlipRestoring(props: { queryFn: () => Promise<string> }) @{
 
 function RestoreFlipReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({ queryKey: ['flip'], queryFn: props.queryFn, retry: false });
-	<span id="flip">
-		{(q.isPending ? 'pending' : 'data:' + q.data) as string}
-	</span>
+	<span id="flip">{(q.isPending ? 'pending' : 'data:' + q.data) as string}</span>
 }
 
 export function FlipRestoringApp(props: { client: unknown; queryFn: () => Promise<string> }) @{

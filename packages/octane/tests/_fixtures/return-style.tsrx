@@ -4,9 +4,7 @@
 export function ReturnedScopedMailbox(props) {
 	return <>
 		<section id="returned-scoped-mailbox" class={['mailbox', { active: props.active }]}>
-			<h2 class="mailbox-title">
-				{props.title as string}
-			</h2>
+			<h2 class="mailbox-title">{props.title as string}</h2>
 			<p class="mailbox-status">
 				{props.active ? 'Active mailbox' : 'Idle mailbox'}
 			</p>

@@ -7,9 +7,7 @@ import { useState } from 'octane';
 export function RetList(props) {
 	return <ul>
 		@for (const item of props.items; key item.id) {
-			<li>
-				{item.title as string}
-			</li>
+			<li>{item.title as string}</li>
 		} @empty {
 			<li class="empty">none</li>
 		}
@@ -20,9 +18,7 @@ export function RetList(props) {
 export function AtList(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
-			<li>
-				{item.title as string}
-			</li>
+			<li>{item.title as string}</li>
 		} @empty {
 			<li class="empty">none</li>
 		}
@@ -40,9 +36,7 @@ export function RetListApp() {
 		</button>
 		<ul>
 			@for (const item of items; key item.id) {
-				<li>
-					{item.title as string}
-				</li>
+				<li>{item.title as string}</li>
 			}
 		</ul>
 	</div>;

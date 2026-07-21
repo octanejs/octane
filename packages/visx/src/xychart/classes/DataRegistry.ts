@@ -14,8 +14,7 @@ export default class DataRegistry<
 	/** Add one or more entries to the registry. */
 	public registerData(
 		entryOrEntries:
-			| DataRegistryEntry<XScale, YScale, Datum>
-			| DataRegistryEntry<XScale, YScale, Datum>[],
+			DataRegistryEntry<XScale, YScale, Datum> | DataRegistryEntry<XScale, YScale, Datum>[],
 	) {
 		const entries = Array.isArray(entryOrEntries) ? entryOrEntries : [entryOrEntries];
 		entries.forEach((currEntry) => {

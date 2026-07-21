@@ -19,8 +19,6 @@ export function Scene(props) @{
 
 export function ReverseScene(props) @{
 	<Html>
-		<section class="overlay">
-			{props.label as string}
-		</section>
+		<section class="overlay">{props.label as string}</section>
 	</Html>
 }

@@ -5,9 +5,7 @@ import { createRoot, createContext, useState, useContext } from 'octane';
 // holds its own count (so block-identity reuse across re-renders is observable).
 export function App(props) @{
 	const [n, setN] = useState(5);
-	<button id="app-btn" onClick={() => setN(n + 1)}>
-		{props.label + ':' + n as string}
-	</button>
+	<button id="app-btn" onClick={() => setN(n + 1)}>{props.label + ':' + n as string}</button>
 }
 
 // Uses the React element form — the compiler lowers <App/> to createElement(App, …).
@@ -27,9 +25,7 @@ const Theme = createContext('light');
 
 export function ThemeReader() @{
 	const theme = useContext(Theme);
-	<span id="theme-read">
-		{theme as string}
-	</span>
+	<span id="theme-read">{theme as string}</span>
 }
 
 export function ThemeApp(props) @{

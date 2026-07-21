@@ -9,13 +9,9 @@ export function Toggle(props) @{
 	const [n, setN] = useState(0);
 	<div id="toggle">
 		@if (props.on) {
-			<button id="hit" class="on" onClick={() => setN(n + 1)}>
-				{'on:' + n as string}
-			</button>
+			<button id="hit" class="on" onClick={() => setN(n + 1)}>{'on:' + n as string}</button>
 		} @else {
-			<span class="off">
-				{'off' as string}
-			</span>
+			<span class="off">{'off' as string}</span>
 		}
 	</div>
 }
@@ -24,19 +20,13 @@ export function Pick(props) @{
 	<div id="pick">
 		@switch (props.k) {
 			@case 'a': {
-				<span class="a">
-					{'AAA' as string}
-				</span>
+				<span class="a">{'AAA' as string}</span>
 			}
 			@case 'b': {
-				<span class="b">
-					{'BBB' as string}
-				</span>
+				<span class="b">{'BBB' as string}</span>
 			}
 			@default: {
-				<span class="d">
-					{'???' as string}
-				</span>
+				<span class="d">{'???' as string}</span>
 			}
 		}
 	</div>

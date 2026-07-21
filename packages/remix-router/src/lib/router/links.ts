@@ -3,8 +3,7 @@
 type Primitive = null | undefined | string | number | boolean | symbol | bigint;
 
 type LiteralUnion<LiteralType, BaseType extends Primitive> =
-	| LiteralType
-	| (BaseType & Record<never, never>);
+	LiteralType | (BaseType & Record<never, never>);
 
 interface HtmlLinkProps {
 	/**

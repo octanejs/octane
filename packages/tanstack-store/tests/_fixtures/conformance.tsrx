@@ -47,9 +47,7 @@ export function SwitchingSource(props: {
 	const value = useSelector(useSecond ? props.second : props.first);
 
 	<div>
-		<p id="switched">
-			{value as string}
-		</p>
+		<p id="switched">{value as string}</p>
 		<button id="switch" onClick={() => setUseSecond(true)}>switch</button>
 	</div>
 }
@@ -93,9 +91,7 @@ export function AtomTuple(props: { atom: Atom<number> }) @{
 	const [value, setValue] = useAtom(props.atom);
 
 	<div>
-		<p id="atom-tuple">
-			{value as string}
-		</p>
+		<p id="atom-tuple">{value as string}</p>
 		<button id="set-atom" onClick={() => setValue((previous) => previous + 2)}>set</button>
 	</div>
 }
@@ -117,9 +113,7 @@ function ContextValue() @{
 	const { atom } = useStoreContext();
 	const value = useSelector(atom);
 
-	<p class="context-value">
-		{value as string}
-	</p>
+	<p class="context-value">{value as string}</p>
 }
 
 export function NestedProviders(props: {
@@ -137,9 +131,7 @@ export function NestedProviders(props: {
 export function MissingProvider() @{
 	const { atom } = useStoreContext();
 	const value = useSelector(atom);
-	<p>
-		{value as string}
-	</p>
+	<p>{value as string}</p>
 }
 
 export function SubscriptionReader(props: {
@@ -149,7 +141,5 @@ export function SubscriptionReader(props: {
 	};
 }) @{
 	const value = useSelector(props.source);
-	<p id="subscription">
-		{value as string}
-	</p>
+	<p id="subscription">{value as string}</p>
 }

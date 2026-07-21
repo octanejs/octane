@@ -7,7 +7,7 @@
     "Router devtools are distributed separately."
   ],
   "ssr": "Full-document buffered and readable-stream SSR through `./ssr/server`, client hydration through `./ssr/client`, route-owned head/scripts, CSP nonce propagation, per-route SSR modes, and native Octane stream injection; covered by retained upstream conformance tests.",
-  "verified": "2026-07-20",
+  "verified": "2026-07-21",
   "notes": [
     "The framework-neutral runtime dependency is `@tanstack/router-core@1.171.15`.",
     "The TSRX-aware generator plugin is exported from `@octanejs/tanstack-router/generator-plugin` for `@octanejs/tanstack-start`'s package-owned generator."

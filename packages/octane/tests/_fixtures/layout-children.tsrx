@@ -5,9 +5,7 @@
 // explicitly and thread the scope.
 
 export function ChildPage(props) @{
-	<span>
-		{props.params.id as string}
-	</span>
+	<span>{props.params.id as string}</span>
 }
 
 export function ParentLayout(props) @{

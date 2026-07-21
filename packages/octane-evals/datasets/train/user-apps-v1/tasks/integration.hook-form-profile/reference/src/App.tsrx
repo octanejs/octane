@@ -16,9 +16,7 @@ export function App(props: { onSave: (profile: Profile) => void }) @{
 		<label for="name">Name</label>
 		<input id="name" {...register('name', { required: 'Name is required' })} />
 		@if (errors.name) {
-			<p role="alert">
-				{errors.name.message as string}
-			</p>
+			<p role="alert">{errors.name.message as string}</p>
 		}
 
 		<label for="email">Email</label>
@@ -31,9 +29,7 @@ export function App(props: { onSave: (profile: Profile) => void }) @{
 			})}
 		/>
 		@if (errors.email) {
-			<p role="alert">
-				{errors.email.message as string}
-			</p>
+			<p role="alert">{errors.email.message as string}</p>
 		}
 
 		<button type="submit">Save profile</button>

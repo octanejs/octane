@@ -21,9 +21,7 @@ function RoleBadge({
 	if (isCreator) {
 		return <span
 			class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-linear-to-r from-purple-500 to-pink-500 text-white shadow-sm"
-		>
-			{role as string}
-		</span>;
+		>{role as string}</span>;
 	}
 
 	if (isMaintainer) {
@@ -33,16 +31,12 @@ function RoleBadge({
 					? 'bg-linear-to-r from-blue-400 to-blue-700 text-white shadow border border-blue-300'
 					: 'bg-blue-500 text-white'
 			}`}
-		>
-			{role as string}
-		</span>;
+		>{role as string}</span>;
 	}
 
 	return <span
 		class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500 text-white"
-	>
-		{role as string}
-	</span>;
+	>{role as string}</span>;
 }
 
 function FrameworkChip({ framework }: { framework: Framework }) {
@@ -85,9 +79,7 @@ function LibraryBadge({ library }: { library: Library }) {
 			tabIndex={0}
 			onClick={(e) => e.stopPropagation()}
 			title={`View all contributors for ${library.name}`}
-		>
-			{library.name.replace('TanStack', '🌴') as string}
-		</Link>;
+		>{library.name.replace('TanStack', '🌴') as string}</Link>;
 	}
 	return <span
 		class={twMerge(
@@ -96,9 +88,7 @@ function LibraryBadge({ library }: { library: Library }) {
 		)}
 		aria-label={`View contributors for ${library.name}`}
 		title={`View all contributors for ${library.name}`}
-	>
-		{library.name.replace('TanStack', '🌴') as string}
-	</span>;
+	>{library.name.replace('TanStack', '🌴') as string}</span>;
 }
 
 const MaintainerSocialIcons: Record<keyof Maintainer['social'], any> = {
@@ -191,9 +181,7 @@ export function CompactMaintainerCard({ maintainer }: CompactMaintainerCardProps
 		<div class="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
 		<div class="absolute inset-0 p-3 flex flex-col justify-end">
 			<div class="text-white">
-				<div class="text-sm font-bold leading-tight">
-					{maintainer.name as string}
-				</div>
+				<div class="text-sm font-bold leading-tight">{maintainer.name as string}</div>
 			</div>
 		</div>
 		<div
@@ -238,9 +226,10 @@ export function MaintainerRowCard({ maintainer, libraryId }: MaintainerRowCardPr
 			<div class="flex-1 min-w-0 overflow-hidden">
 				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 					<div class="flex items-center gap-3">
-						<span class="text-lg font-bold truncate" id={`maintainer-name-${maintainer.github}`}>
-							{maintainer.name as string}
-						</span>
+						<span
+							class="text-lg font-bold truncate"
+							id={`maintainer-name-${maintainer.github}`}
+						>{maintainer.name as string}</span>
 						{libraryId && <RoleBadge maintainer={maintainer} libraryId={libraryId} />}
 					</div>
 
@@ -342,9 +331,10 @@ export function MaintainerCard({ maintainer, libraryId, hideLibraries }: Maintai
 		</a>
 		<div class="p-3 space-y-2">
 			<div class="flex items-center justify-between">
-				<span class="text-base font-bold" id={`maintainer-name-${maintainer.github}`}>
-					{maintainer.name as string}
-				</span>
+				<span
+					class="text-base font-bold"
+					id={`maintainer-name-${maintainer.github}`}
+				>{maintainer.name as string}</span>
 				<div class="flex items-center gap-2">
 					{libraryId && <RoleBadge maintainer={maintainer} libraryId={libraryId} />}
 				</div>

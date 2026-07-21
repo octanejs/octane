@@ -79,9 +79,7 @@ export function MathInForOf(props) @{
 	<math id="math-for">
 		<mrow>
 			@for (const t of props.terms; key t.id) {
-				<mi class={'term term-' + t.id}>
-					{t.s as string}
-				</mi>
+				<mi class={'term term-' + t.id}>{t.s as string}</mi>
 			}
 		</mrow>
 	</math>

@@ -13,9 +13,7 @@ export function StoreView(props) @{
 		props.store.getSnapshot,
 		props.store.getServerSnapshot,
 	);
-	<span id="sv">
-		{v as string}
-	</span>
+	<span id="sv">{v as string}</span>
 }
 
 // Static text only-child.
@@ -25,9 +23,7 @@ export function StaticText() @{
 
 // Dynamic attributes + dynamic single-text-child.
 export function Attrs(props) @{
-	<div id={props.id} class={props.cls} data-kind="leaf">
-		{props.text as string}
-	</div>
+	<div id={props.id} class={props.cls} data-kind="leaf">{props.text as string}</div>
 }
 
 // The client compiler proves this data-* value is already a string and uses
@@ -57,7 +53,5 @@ export function Mixed() @{
 // Stateful + event — proves handlers attach to adopted nodes and updates work.
 export function Counter(props) @{
 	const [n, setN] = useState(props.start);
-	<button id="btn" onClick={() => setN(n + 1)}>
-		{n as string}
-	</button>
+	<button id="btn" onClick={() => setN(n + 1)}>{n as string}</button>
 }

@@ -4,15 +4,7 @@ import { twMerge } from 'tailwind-merge';
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'icon';
 
 type ButtonColor =
-	| 'blue'
-	| 'green'
-	| 'red'
-	| 'orange'
-	| 'purple'
-	| 'gray'
-	| 'emerald'
-	| 'cyan'
-	| 'yellow';
+	'blue' | 'green' | 'red' | 'orange' | 'purple' | 'gray' | 'emerald' | 'cyan' | 'yellow';
 
 type ButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'icon-sm' | 'icon-md';
 

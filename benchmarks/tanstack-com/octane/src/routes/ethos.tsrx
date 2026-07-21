@@ -125,9 +125,7 @@ function RouteComp() {
 						>
 							<Icon className="w-6 h-6 text-white" />
 						</div>
-						<h2 class="text-xl md:text-2xl font-bold pt-2">
-							{section.title as string}
-						</h2>
+						<h2 class="text-xl md:text-2xl font-bold pt-2">{section.title as string}</h2>
 					</div>
 
 					{/* Content */}
@@ -140,9 +138,7 @@ function RouteComp() {
 								<div
 									class={`shrink-0 w-1.5 h-1.5 rounded-full bg-linear-to-br ${section.gradient} mt-2`}
 								/>
-								<span class="text-gray-600 dark:text-gray-400">
-									{bullet as string}
-								</span>
+								<span class="text-gray-600 dark:text-gray-400">{bullet as string}</span>
 							</div>,
 						)}</div>}
 				</Card>;

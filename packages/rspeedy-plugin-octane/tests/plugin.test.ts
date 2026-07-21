@@ -346,8 +346,7 @@ describe('@octanejs/rspeedy-plugin', () => {
 		};
 		let requestPattern: RegExp | undefined;
 		let replace:
-			| ((resource: { request: string; contextInfo?: { issuerLayer?: string } }) => void)
-			| undefined;
+			((resource: { request: string; contextInfo?: { issuerLayer?: string } }) => void) | undefined;
 		class NormalModuleReplacementPlugin {
 			constructor(
 				pattern: RegExp,

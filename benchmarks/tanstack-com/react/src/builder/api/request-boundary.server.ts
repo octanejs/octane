@@ -16,8 +16,7 @@ import {
 const BUILDER_JSON_MAX_BYTES = 128 * 1024;
 
 export type BuilderJsonRequestResult<T> =
-	| { body: T; rateLimit: RateLimitResult }
-	| { response: Response };
+	{ body: T; rateLimit: RateLimitResult } | { response: Response };
 
 export async function readBuilderJsonRequest(
 	request: Request,

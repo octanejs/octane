@@ -29,9 +29,7 @@ export function Mixed(props) {
 			createElement('i', { key: 'b', class: 'array-b' }, 'B'),
 		];
 	}
-	return <button class="host">
-		{props.label as string}
-	</button>;
+	return <button class="host">{props.label as string}</button>;
 }
 
 export function NestedMixed(props) @{
@@ -50,9 +48,7 @@ function MixedInlineImpl(props) @{
 	if (props.mode === 'undefined') return undefined;
 
 	<section class="mixed-inline">
-		<span class="mixed-label">
-			{props.label as string}
-		</span>
+		<span class="mixed-label">{props.label as string}</span>
 		@if (props.detail) {
 			<strong class="mixed-detail">detail</strong>
 		}
@@ -65,9 +61,7 @@ export function MixedFragment(props) @{
 	if (props.empty) return null;
 
 	<>
-		<span class="mixed-fragment-a">
-			{props.label as string}
-		</span>
+		<span class="mixed-fragment-a">{props.label as string}</span>
 		<span class="mixed-fragment-b">B</span>
 	</>
 }
@@ -91,9 +85,7 @@ export function MixedList(props) @{
 
 function AwaitedValue(props) @{
 	const value = use(props.promise);
-	<span class="mixed-transition-value">
-		{value as string}
-	</span>
+	<span class="mixed-transition-value">{value as string}</span>
 }
 
 function MixedTransitionOutput(props) @{

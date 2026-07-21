@@ -79,13 +79,13 @@ export default function LibraryCard({
 										TanStack
 									</span>
 								</span>
-								<span class={isGeneric ? 'text-slate-500 dark:text-slate-400' : 'text-current'}>
-									{displayName as string}
-								</span>
+								<span
+									class={isGeneric ? 'text-slate-500 dark:text-slate-400' : 'text-current'}
+								>{displayName as string}</span>
 							</>
-						: <span class={isGeneric ? 'text-slate-500 dark:text-slate-400' : 'text-current'}>
-								{displayName as string}
-							</span>}
+						: <span
+								class={isGeneric ? 'text-slate-500 dark:text-slate-400' : 'text-current'}
+							>{displayName as string}</span>}
 				</div>
 			</div>
 			<div
@@ -93,14 +93,12 @@ export default function LibraryCard({
 					`text-sm italic font-medium mt-3`,
 					isGeneric ? 'text-slate-500 dark:text-slate-400' : 'text-current',
 				)}
-			>
-				{library.tagline as string}
-			</div>
+			>{library.tagline as string}</div>
 
 			{/* Description preview with ellipsis */}
-			<div class={`text-sm mt-3 text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed`}>
-				{library.description as string}
-			</div>
+			<div
+				class={`text-sm mt-3 text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed`}
+			>{library.description as string}</div>
 		</div>
 
 		{/* Foreground content that appears on hover */}
@@ -109,9 +107,9 @@ export default function LibraryCard({
                     backdrop-blur-sm flex flex-col justify-center opacity-0 group-hover:opacity-100
                     transition-opacity duration-300 ease-out pointer-events-none group-hover:pointer-events-auto"
 		>
-			<div class={`text-sm text-gray-800 dark:text-gray-200 leading-relaxed`}>
-				{library.description as string}
-			</div>
+			<div
+				class={`text-sm text-gray-800 dark:text-gray-200 leading-relaxed`}
+			>{library.description as string}</div>
 			<div class="mt-6 text-center">
 				<span
 					class="inline-flex items-center gap-2 px-4 py-2 bg-black/5 dark:bg-white/10 
@@ -145,9 +143,7 @@ export default function LibraryCard({
 						['--scale-factor' as any]: '1.1',
 					}}
 				>
-					<span>
-						{library.badge as string}
-					</span>
+					<span>{library.badge as string}</span>
 				</div>
 			: null}
 	</Component>;

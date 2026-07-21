@@ -85,12 +85,15 @@ const partnerTierToBuilderTier: Record<PartnerTier, ApplicationStarterPartnerTie
 	bronze: 3,
 };
 
-export const partnerTierFlares: Record<PartnerTier, {
-	gradientStops: string;
-	iconColor: string;
-	labelColor: string;
-	icon: any;
-}> = {
+export const partnerTierFlares: Record<
+	PartnerTier,
+	{
+		gradientStops: string;
+		iconColor: string;
+		labelColor: string;
+		icon: any;
+	}
+> = {
 	gold: {
 		gradientStops: 'from-yellow-400 via-amber-500 to-orange-600 dark:from-yellow-300 dark:via-amber-400 dark:to-orange-400',
 		iconColor: 'text-amber-500 dark:text-amber-300',
@@ -1155,7 +1158,9 @@ function findApplicationStarterPartnerSuggestion(
 export function hasApplicationStarterPartnerConflictWithAny(
 	partnerId: string,
 	partnerIds: Array<string>,
-	partnerSuggestions: Array<ApplicationStarterPartnerSuggestion> = applicationStarterPartnerSuggestions,
+	partnerSuggestions: Array<
+		ApplicationStarterPartnerSuggestion
+	> = applicationStarterPartnerSuggestions,
 ) {
 	const partner = findApplicationStarterPartnerSuggestion(partnerId, partnerSuggestions);
 
@@ -1189,7 +1194,9 @@ export function getApplicationStarterConflictingPartnerIds(
 
 export function getApplicationStarterCompatiblePartnerIds(
 	partnerIds: Array<string>,
-	partnerSuggestions: Array<ApplicationStarterPartnerSuggestion> = applicationStarterPartnerSuggestions,
+	partnerSuggestions: Array<
+		ApplicationStarterPartnerSuggestion
+	> = applicationStarterPartnerSuggestions,
 ) {
 	const normalized = Array<string>();
 
@@ -1258,7 +1265,9 @@ export function getApplicationStarterVisiblePartnerSuggestions(
 export function hasApplicationStarterPartnerUniqueConstraint(
 	partnerId: string,
 	uniqueConstraint: PartnerUniqueConstraint,
-	partnerSuggestions: Array<ApplicationStarterPartnerSuggestion> = applicationStarterPartnerSuggestions,
+	partnerSuggestions: Array<
+		ApplicationStarterPartnerSuggestion
+	> = applicationStarterPartnerSuggestions,
 ) {
 	const partner = findApplicationStarterPartnerSuggestion(partnerId, partnerSuggestions);
 
@@ -1349,7 +1358,9 @@ function normalizeApplicationStarterPartnerKey(value: string) {
 	return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function getApplicationStarterPartnerTier(partner: Pick<Partner, 'tier'>): ApplicationStarterPartnerTier {
+function getApplicationStarterPartnerTier(
+	partner: Pick<Partner, 'tier'>,
+): ApplicationStarterPartnerTier {
 	return partner.tier ? partnerTierToBuilderTier[partner.tier] : 3;
 }
 
@@ -1450,7 +1461,9 @@ export function getInferredApplicationStarterPartnerIdsFromUserInput(
 	return inferApplicationStarterPartnerIds(input, selectedPartnerIds);
 }
 
-function createApplicationStarterPartnerSuggestion(partner: Partner): ApplicationStarterPartnerSuggestion {
+function createApplicationStarterPartnerSuggestion(
+	partner: Partner,
+): ApplicationStarterPartnerSuggestion {
 	const tier = getApplicationStarterPartnerTier(partner);
 	const normalizedPartnerKey = normalizeApplicationStarterPartnerKey(partner.id);
 	const iconMode: ApplicationStarterPartnerSuggestion['iconMode'] =

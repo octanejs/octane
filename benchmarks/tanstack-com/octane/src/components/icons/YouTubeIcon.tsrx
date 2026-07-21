@@ -1,9 +1,7 @@
-export function YouTubeIcon({
-	className,
-	width = '1em',
-	height = '1em',
-	...props
-}: Record<string, any>) {
+export function YouTubeIcon({ className, width = '1em', height = '1em', ...props }: Record<
+	string,
+	any
+>) {
 	return <svg
 		viewBox="0 0 461 461"
 		fill="currentColor"

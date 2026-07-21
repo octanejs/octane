@@ -14,7 +14,8 @@ type CollapsibleProps = {
 	className?: string;
 };
 
-type CollapsibleTriggerProps = Record<string, any> & {
+type CollapsibleTriggerProps =
+	Record<string, any> & {
 		children?: any;
 	};
 

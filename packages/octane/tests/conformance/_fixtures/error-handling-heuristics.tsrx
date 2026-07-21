@@ -35,9 +35,7 @@ export function NonHandlingInnerBoundary(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<span class="outer-caught">
-				{'Caught an error: ' + err.message as string}
-			</span>
+			<span class="outer-caught">{'Caught an error: ' + err.message as string}</span>
 		}
 	</div>
 }
@@ -56,9 +54,7 @@ export function RethrowingInnerBoundary(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<span class="outer-caught">
-				{'Caught an error: ' + err.message as string}
-			</span>
+			<span class="outer-caught">{'Caught an error: ' + err.message as string}</span>
 		}
 	</div>
 }
@@ -90,9 +86,7 @@ export function NonErrorCapture() @{
 		@try {
 			<ThrowsObject />
 		} @catch (err) {
-			<span class="caught">
-				{'Caught an error: ' + err.nonStandardMessage as string}
-			</span>
+			<span class="caught">{'Caught an error: ' + err.nonStandardMessage as string}</span>
 		}
 	</div>
 }
@@ -116,9 +110,7 @@ export function ThrowWithSiblings(props) @{
 				<Sibling log={props.log} />
 			</>
 		} @catch (err) {
-			<span class="caught">
-				{'Caught an error: ' + err.message as string}
-			</span>
+			<span class="caught">{'Caught an error: ' + err.message as string}</span>
 		}
 	</div>
 }
@@ -133,9 +125,7 @@ export function BrokenRoot(props) @{
 }
 
 export function OkRoot(props) @{
-	<span class="ok">
-		{props.label as string}
-	</span>
+	<span class="ok">{props.label as string}</span>
 }
 
 export function CaughtBoundaryRoot(props) @{
@@ -143,9 +133,7 @@ export function CaughtBoundaryRoot(props) @{
 		@try {
 			<Thrower />
 		} @catch (err) {
-			<span class="caught">
-				{'Caught an error: ' + err.message as string}
-			</span>
+			<span class="caught">{'Caught an error: ' + err.message as string}</span>
 		}
 	</div>
 }
@@ -196,9 +184,7 @@ export function UnmountingBoundary(props) @{
 function AllGood(props) @{
 	const [n, setN] = useState(0);
 	props.register(setN);
-	<span class="child">
-		{'All good:' + n as string}
-	</span>
+	<span class="child">{'All good:' + n as string}</span>
 }
 
 export function RenderPhaseUpdateWithError(props) @{
@@ -256,9 +242,7 @@ export function TransitionSwapThrowBranch(props) @{
 				<GoodA log={props.log} />
 			}
 		} @catch (err) {
-			<span class="caught">
-				{'Caught an error: ' + err.message as string}
-			</span>
+			<span class="caught">{'Caught an error: ' + err.message as string}</span>
 		}
 	</div>
 }
@@ -275,9 +259,7 @@ export function TransitionSwapThrowValue(props) @{
 				{showB ? <ThrowsOnMount log={props.log} /> : <GoodA log={props.log} />}
 			</div>
 		} @catch (err) {
-			<span class="caught">
-				{'Caught an error: ' + err.message as string}
-			</span>
+			<span class="caught">{'Caught an error: ' + err.message as string}</span>
 		}
 	</div>
 }

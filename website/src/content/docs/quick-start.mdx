@@ -68,9 +68,7 @@ export function App(props: AppProps) @{
 	const [count, setCount] = useState(0);
 
 	<main>
-		<h1>
-			{props.title as string}
-		</h1>
+		<h1>{props.title as string}</h1>
 		<p>{'Button pressed ' + count + ' times'}</p>
 		<button onClick={() => setCount((current) => current + 1)}>
 			Press me
@@ -122,9 +120,7 @@ TSRX keeps rendered branches and lists next to the elements they control. For ex
 export function TodoList(props) @{
 	<ul>
 		@for (const todo of props.todos; key todo.id) {
-			<li>
-				{todo.label as string}
-			</li>
+			<li>{todo.label as string}</li>
 		} @empty {
 			<li>No tasks yet</li>
 		}

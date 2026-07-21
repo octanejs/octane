@@ -61,37 +61,27 @@ function TemplateForeignObjectDestination(props) @{
 // These component roots are intentionally ambiguous at definition time. The
 // element namespace is selected by the host where each component is rendered.
 function AmbiguousAnchorRoot(props) @{
-	<a id={props.id}>
-		{props.label as string}
-	</a>
+	<a id={props.id}>{props.label as string}</a>
 }
 
 function AmbiguousSvgAnchorRoot(props) @{
 	<a id={props.id}>
-		<text id={props.textId}>
-			{props.label as string}
-		</text>
+		<text id={props.textId}>{props.label as string}</text>
 	</a>
 }
 
 function AmbiguousMathRowRoot(props) @{
 	<mrow id={props.id}>
-		<mi id={props.textId}>
-			{props.label as string}
-		</mi>
+		<mi id={props.textId}>{props.label as string}</mi>
 	</mrow>
 }
 
 function ReturnedAmbiguousAnchorRoot(props) {
-	return <a id={props.id}>
-		{props.label as string}
-	</a>;
+	return <a id={props.id}>{props.label as string}</a>;
 }
 
 function ReturnedAmbiguousMathRowRoot(props) {
-	return <mrow id={props.id}>
-		{props.label as string}
-	</mrow>;
+	return <mrow id={props.id}>{props.label as string}</mrow>;
 }
 
 // Template-form children cross an opaque component boundary before their
@@ -102,13 +92,9 @@ export function TemplateNamespaceDestinations(props) @{
 	<section id="template-namespace-destinations">
 		<TemplateSvgDestination id="template-svg-destination">
 			<a id="template-svg-anchor">
-				<text id="template-svg-anchor-text">
-					{props.label as string}
-				</text>
+				<text id="template-svg-anchor-text">{props.label as string}</text>
 			</a>
-			<text id="template-svg-sibling">
-				{props.label as string}
-			</text>
+			<text id="template-svg-sibling">{props.label as string}</text>
 			<AmbiguousAnchorRoot id="template-svg-component-anchor" label={props.label} />
 			<ReturnedAmbiguousAnchorRoot
 				id="template-svg-returned-component-anchor"
@@ -122,13 +108,9 @@ export function TemplateNamespaceDestinations(props) @{
 		</TemplateSvgDestination>
 		<TemplateMathDestination id="template-math-destination">
 			<mrow id="template-math-row">
-				<mi id="template-math-row-text">
-					{props.label as string}
-				</mi>
+				<mi id="template-math-row-text">{props.label as string}</mi>
 			</mrow>
-			<mtext id="template-math-sibling">
-				{props.label as string}
-			</mtext>
+			<mtext id="template-math-sibling">{props.label as string}</mtext>
 			<AmbiguousMathRowRoot
 				id="template-math-component-row"
 				textId="template-math-component-text"
@@ -138,13 +120,9 @@ export function TemplateNamespaceDestinations(props) @{
 		</TemplateMathDestination>
 		<TemplateHtmlDestination id="template-html-destination">
 			<a id="template-html-anchor">
-				<span id="template-html-anchor-text">
-					{props.label as string}
-				</span>
+				<span id="template-html-anchor-text">{props.label as string}</span>
 			</a>
-			<span id="template-html-sibling">
-				{props.label as string}
-			</span>
+			<span id="template-html-sibling">{props.label as string}</span>
 			<AmbiguousAnchorRoot id="template-html-component-anchor" label={props.label} />
 			<ReturnedAmbiguousAnchorRoot
 				id="template-html-returned-component-anchor"
@@ -153,13 +131,9 @@ export function TemplateNamespaceDestinations(props) @{
 		</TemplateHtmlDestination>
 		<TemplateForeignObjectDestination svgId="template-foreign-svg" id="template-foreign-object">
 			<a id="template-foreign-anchor">
-				<span id="template-foreign-anchor-text">
-					{props.label as string}
-				</span>
+				<span id="template-foreign-anchor-text">{props.label as string}</span>
 			</a>
-			<span id="template-foreign-sibling">
-				{props.label as string}
-			</span>
+			<span id="template-foreign-sibling">{props.label as string}</span>
 			<AmbiguousAnchorRoot id="template-foreign-component-anchor" label={props.label} />
 			<ReturnedAmbiguousAnchorRoot
 				id="template-foreign-returned-component-anchor"
@@ -213,9 +187,7 @@ export function DeoptNamespaceSlots(props) @{
 				}),
 			)}
 			<props.parts.svgLink id="svg-string-tag">
-				<text id="svg-string-text">
-					{props.label as string}
-				</text>
+				<text id="svg-string-text">{props.label as string}</text>
 			</props.parts.svgLink>
 			{upgradingLink}
 			<foreignObject id="svg-foreign-object">{createElement(HtmlAnchor, {

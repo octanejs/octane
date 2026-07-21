@@ -19,13 +19,9 @@ export function TypedLeaf(props) @{
 		return () => props.log?.('cleanup:' + id);
 	}, []);
 	@if (props.tag === 'span') {
-		<span data-k="leaf" data-tag="span">
-			{'leaf' as string}
-		</span>
+		<span data-k="leaf" data-tag="span">{'leaf' as string}</span>
 	} @else {
-		<div data-k="leaf" data-tag="div">
-			{'leaf' as string}
-		</div>
+		<div data-k="leaf" data-tag="div">{'leaf' as string}</div>
 	}
 }
 
@@ -37,9 +33,7 @@ export function KeyedChild(props) @{
 		props.log?.('mount:' + props.k);
 		return () => props.log?.('cleanup:' + props.k);
 	}, []);
-	<span data-k={props.k as string} data-key={props.k as string}>
-		{'child' as string}
-	</span>
+	<span data-k={props.k as string} data-key={props.k as string}>{'child' as string}</span>
 }
 
 export function KeyHost(props) @{
@@ -56,9 +50,7 @@ export function StableLeaf(props) @{
 		return () => props.log?.('cleanup');
 	}, []);
 	<div>
-		<span data-k="leaf" id="leaf">
-			{props.text as string}
-		</span>
+		<span data-k="leaf" id="leaf">{props.text as string}</span>
 	</div>
 }
 
@@ -73,9 +65,7 @@ export function ClassLike(props) @{
 		props.log?.('mount:Class');
 		return () => props.log?.('cleanup:Class');
 	}, []);
-	<span data-k="slot" data-prop="Class">
-		{'Class' as string}
-	</span>
+	<span data-k="slot" data-prop="Class">{'Class' as string}</span>
 }
 
 export function FunctionLike(props) @{
@@ -83,9 +73,7 @@ export function FunctionLike(props) @{
 		props.log?.('mount:Function');
 		return () => props.log?.('cleanup:Function');
 	}, []);
-	<span data-k="slot" data-prop="Function">
-		{'Function' as string}
-	</span>
+	<span data-k="slot" data-prop="Function">{'Function' as string}</span>
 }
 
 // Drives the implicit-key variant: the conditional slot picks ClassLike /
@@ -99,15 +87,11 @@ export function ImplicitTypeChange(props) @{
 				<FunctionLike log={props.log} />
 			} @else {
 				@if (props.useText) {
-					<span data-k="slot" data-prop="Text">
-						{'Text' as string}
-					</span>
+					<span data-k="slot" data-prop="Text">{'Text' as string}</span>
 				}
 			}
 		}
-		<b data-k="trail" id="trail">
-			{'Trail' as string}
-		</b>
+		<b data-k="trail" id="trail">{'Trail' as string}</b>
 	</div>
 }
 
@@ -123,8 +107,6 @@ export function ExplicitTypeChange(props) @{
 				<FunctionLike key="a" log={props.log} />
 			}
 		}
-		<b data-k="trail" id="trail">
-			{'Trail' as string}
-		</b>
+		<b data-k="trail" id="trail">{'Trail' as string}</b>
 	</div>
 }

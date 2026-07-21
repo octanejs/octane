@@ -346,13 +346,9 @@ export default function Main() @{
 			<tbody>
 				@for (const row of items; key row.id) {
 					<tr class={selected === row.id ? 'danger' : ''}>
-						<td class="col-md-1">
-							{row.id as string}
-						</td>
+						<td class="col-md-1">{row.id as string}</td>
 						<td class="col-md-4">
-							<a onClick={() => select(row.id)}>
-								{row.label as string}
-							</a>
+							<a onClick={() => select(row.id)}>{row.label as string}</a>
 						</td>
 						<td class="col-md-1">
 							<a onClick={() => remove(row)}>

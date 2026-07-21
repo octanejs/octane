@@ -5,9 +5,7 @@ function A() @{
 }
 function Sus(props) @{
 	const v = use(props.promise);
-	<span id="content">
-		{'B-' + v as string}
-	</span>
+	<span id="content">{'B-' + v as string}</span>
 }
 
 // nested Suspense: B has its OWN @try that catches its suspend → the OUTER swap

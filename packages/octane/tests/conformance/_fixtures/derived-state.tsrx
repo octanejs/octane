@@ -20,9 +20,7 @@ export function DerivedFromProp(props) @{
 		setPrev(props.value);
 		setDerived(props.value * 2);
 	}
-	<span id="out">
-		{derived as number}
-	</span>
+	<span id="out">{derived as number}</span>
 }
 
 // Render-phase update chain that takes several passes to converge: state climbs
@@ -33,9 +31,7 @@ export function ConvergingClamp(props) @{
 	if (n < props.target) {
 		setN(n + 1);
 	}
-	<span id="out">
-		{n as number}
-	</span>
+	<span id="out">{n as number}</span>
 }
 
 // Unguarded render-phase update — every render schedules another one. React
@@ -43,9 +39,7 @@ export function ConvergingClamp(props) @{
 export function UnguardedRenderLoop() @{
 	const [n, setN] = useState(0);
 	setN(n + 1);
-	<span id="out">
-		{n as number}
-	</span>
+	<span id="out">{n as number}</span>
 }
 
 export function CaughtRenderLoop() @{
@@ -53,9 +47,7 @@ export function CaughtRenderLoop() @{
 		@try {
 			<UnguardedRenderLoop />
 		} @catch (err) {
-			<span id="err">
-				{err.message as string}
-			</span>
+			<span id="err">{err.message as string}</span>
 		}
 	</>
 }
@@ -65,9 +57,7 @@ export function CaughtRenderLoop() @{
 export function InitialFromProp(props) @{
 	const [n] = useState(props.seed);
 	_renderCount++;
-	<span id="out">
-		{n as number}
-	</span>
+	<span id="out">{n as number}</span>
 }
 
 // Setting state to its current value must skip the render AND therefore any
@@ -87,9 +77,7 @@ export function SameValueEffectSkip() @{
 	<div>
 		<button id="same" onClick={() => setN(0)}>{'same'}</button>
 		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -136,9 +124,7 @@ export function UpdaterSeesPending() @{
 				});
 			}}
 		>{'chain'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -155,9 +141,7 @@ export function SetThenRevert() @{
 				setN(0);
 			}}
 		>{'revert'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -169,7 +153,5 @@ export function CleanupClosure(props) @{
 		props.log('setup:' + n);
 		return () => props.log('cleanup:' + n);
 	}, [n]);
-	<button id="inc" onClick={() => setN(n + 1)}>
-		{n as number}
-	</button>
+	<button id="inc" onClick={() => setN(n + 1)}>{n as number}</button>
 }

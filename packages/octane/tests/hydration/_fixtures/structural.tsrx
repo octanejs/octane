@@ -5,19 +5,13 @@ export function Pick(props) @{
 	<div id="pick">
 		@switch (props.k) {
 			@case 'a': {
-				<em class="a">
-					{'AAA' as string}
-				</em>
+				<em class="a">{'AAA' as string}</em>
 			}
 			@case 'b': {
-				<strong class="b">
-					{'BBB' as string}
-				</strong>
+				<strong class="b">{'BBB' as string}</strong>
 			}
 			@default: {
-				<span class="d">
-					{'???' as string}
-				</span>
+				<span class="d">{'???' as string}</span>
 			}
 		}
 	</div>

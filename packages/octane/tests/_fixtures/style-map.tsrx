@@ -23,9 +23,7 @@ const styles = <style>
 </style>;
 
 export function Picker(props) @{
-	<div class={styles[props.kind]}>
-		{'I am ' + props.kind as string}
-	</div>
+	<div class={styles[props.kind]}>{'I am ' + props.kind as string}</div>
 }
 
 export function Composed() @{
@@ -37,9 +35,9 @@ export function Composed() @{
 // `class` when the key changes.
 export function Switchable() @{
 	const [on, setOn] = useState(false);
-	<button class={on ? styles.blue : styles.red} onClick={() => setOn(!on)}>
-		{(on ? 'blue' : 'red') as string}
-	</button>
+	<button class={on ? styles.blue : styles.red} onClick={() => setOn(!on)}>{(on
+		? 'blue'
+		: 'red') as string}</button>
 }
 
 // Style map exported from the module — proves the `export const x = <style>...</style>`

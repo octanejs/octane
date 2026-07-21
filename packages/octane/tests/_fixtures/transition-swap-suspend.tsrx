@@ -11,9 +11,7 @@ function A() @{
 
 function B(props) @{
 	const v = use(props.promise);
-	<span id="content">
-		{'B-' + v as string}
-	</span>
+	<span id="content">{'B-' + v as string}</span>
 }
 
 export function SwapSuspend(props) @{

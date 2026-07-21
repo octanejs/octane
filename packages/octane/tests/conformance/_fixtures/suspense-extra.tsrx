@@ -14,9 +14,7 @@ export function UseContextInTryBody() @{
 	<>
 		@try {
 			const v = use(ExtraCtx);
-			<span class="ctx-val">
-				{v as string}
-			</span>
+			<span class="ctx-val">{v as string}</span>
 		} @pending {
 			<span class="fallback">{'loading'}</span>
 		}
@@ -28,13 +26,9 @@ export function UseUnsupportedUsable(props) @{
 		@try {
 			// `use(props.x)` where `x` is neither thenable nor Context should throw.
 			const v = use(props.x);
-			<span class="resolved">
-				{v as string}
-			</span>
+			<span class="resolved">{v as string}</span>
 		} @catch (err) {
-			<span class="caught">
-				{err.message as string}
-			</span>
+			<span class="caught">{err.message as string}</span>
 		}
 	</>
 }
@@ -58,9 +52,7 @@ export function SyncThrowBoundary(props) @{
 		@try {
 			<SyncThrowChild bang={props.bang} />
 		} @catch (err) {
-			<span class="caught">
-				{err.message as string}
-			</span>
+			<span class="caught">{err.message as string}</span>
 		}
 	</>
 }
@@ -69,9 +61,7 @@ function AsyncRejectChild(props) @{
 	// Resolved/rejected via the parent's promise prop. `use()` of a rejected
 	// promise throws `err` — identical surface as the sync-throw case above.
 	const _v = use(props.promise);
-	<span class="ok">
-		{_v as string}
-	</span>
+	<span class="ok">{_v as string}</span>
 }
 
 export function AsyncRejectBoundary(props) @{
@@ -81,9 +71,7 @@ export function AsyncRejectBoundary(props) @{
 		} @pending {
 			<span class="fallback">{'loading'}</span>
 		} @catch (err) {
-			<span class="caught">
-				{err.message as string}
-			</span>
+			<span class="caught">{err.message as string}</span>
 		}
 	</>
 }
@@ -97,9 +85,7 @@ export function AsyncRejectBoundary(props) @{
 
 function SuspendingLeaf(props) @{
 	const v = use(props.promise);
-	<span class="leaf">
-		{v as string}
-	</span>
+	<span class="leaf">{v as string}</span>
 }
 
 export function ToggleableSuspense(props) @{
@@ -133,18 +119,10 @@ export function HooksAboveReplay(props) @{
 			const memoed = useMemo(() => ({ k: 'fixed' }), []);
 			const v = use(props.promise);
 			<div class="out">
-				<span id="ref-count">
-					{ref.current.count as string}
-				</span>
-				<span id="reduced">
-					{reduced as string}
-				</span>
-				<span id="memo-ident">
-					{(memoed === props.lastMemoed ? 'same' : 'fresh') as string}
-				</span>
-				<span id="value">
-					{v as string}
-				</span>
+				<span id="ref-count">{ref.current.count as string}</span>
+				<span id="reduced">{reduced as string}</span>
+				<span id="memo-ident">{(memoed === props.lastMemoed ? 'same' : 'fresh') as string}</span>
+				<span id="value">{v as string}</span>
 				<button id="dispatch" onClick={() => dispatch(10)}>{'+10'}</button>
 			</div>
 		} @pending {
@@ -171,9 +149,7 @@ export function HooksBelowNoFire(props) @{
 			const r = useRef(0);
 			r.current++;
 			props.observeRef(r);
-			<span class="below">
-				{v as string}
-			</span>
+			<span class="below">{v as string}</span>
 		} @pending {
 			<span class="fallback">{'pending'}</span>
 		}
@@ -192,13 +168,9 @@ export function UseInIf(props) @{
 	<>
 		@try {
 			@if (props.which === 'a') {
-				<span class="a">
-					{use(props.pA) as string}
-				</span>
+				<span class="a">{use(props.pA) as string}</span>
 			} @else {
-				<span class="b">
-					{use(props.pB) as string}
-				</span>
+				<span class="b">{use(props.pB) as string}</span>
 			}
 		} @pending {
 			<span class="fallback">{'pending'}</span>
@@ -219,15 +191,9 @@ export function SamePromiseTwice(props) @{
 			const a = use(props.promise);
 			const b = use(props.promise);
 			<div class="both">
-				<span id="a">
-					{a as string}
-				</span>
-				<span id="b">
-					{b as string}
-				</span>
-				<span id="same">
-					{(a === b ? 'same' : 'diff') as string}
-				</span>
+				<span id="a">{a as string}</span>
+				<span id="b">{b as string}</span>
+				<span id="same">{(a === b ? 'same' : 'diff') as string}</span>
 			</div>
 		} @pending {
 			<span class="fallback">{'pending'}</span>
@@ -243,9 +209,7 @@ export function SamePromiseTwice(props) @{
 // inter-boundary lag.
 
 function SharedLeaf(props) @{
-	<span class={'shared shared-' + props.id}>
-		{use(props.promise) as string}
-	</span>
+	<span class={'shared shared-' + props.id}>{use(props.promise) as string}</span>
 }
 
 export function TwoBoundariesSharedPromise(props) @{

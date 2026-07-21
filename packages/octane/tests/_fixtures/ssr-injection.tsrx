@@ -9,9 +9,7 @@ import { createElement, use } from 'octane';
 
 function Inner(props) @{
 	const value = use(props.promise);
-	<p id="inner">
-		{value as string}
-	</p>
+	<p id="inner">{value as string}</p>
 }
 
 export function FragmentApp(props) @{

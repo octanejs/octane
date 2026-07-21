@@ -26,9 +26,7 @@ function InnerChild(props) @{
 	const [, start] = useTransition();
 	props.bindStart(start);
 	const v = use(props.promiseFor(value));
-	<span id="inner-content">
-		{'inner-' + v as string}
-	</span>
+	<span id="inner-content">{'inner-' + v as string}</span>
 }
 
 export function NestedHeldBoundary(props) @{
@@ -66,9 +64,7 @@ function ThrowableChild(props) @{
 		throw new Error('boom-' + -value as string);
 	}
 	const v = use(props.promiseFor(value));
-	<span id="content">
-		{'content-' + v as string}
-	</span>
+	<span id="content">{'content-' + v as string}</span>
 }
 
 export function ErrorWhileHeld(props) @{
@@ -83,9 +79,7 @@ export function ErrorWhileHeld(props) @{
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		} @catch (e) {
-			<span id="error">
-				{'error:' + (e.message) as string}
-			</span>
+			<span id="error">{'error:' + (e.message) as string}</span>
 		}
 	</div>
 }
@@ -102,9 +96,7 @@ export function RapidTransitions(props) @{
 		@try {
 			const value = useSyncExternalStore(props.store.subscribe, props.store.get);
 			const v = use(props.promiseFor(value));
-			<span id="content">
-				{'content-' + v as string}
-			</span>
+			<span id="content">{'content-' + v as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -126,9 +118,7 @@ function EffectChild(props) @{
 		props.log('mount-' + v);
 		return () => props.log('cleanup-' + v);
 	}, [v]);
-	<span id="content">
-		{'content-' + v as string}
-	</span>
+	<span id="content">{'content-' + v as string}</span>
 }
 
 export function EffectOrdering(props) @{

@@ -9,9 +9,7 @@ function A() @{
 
 function Suspender(props) @{
 	const v = use(props.promise);
-	<span id="sus">
-		{'sus-' + v as string}
-	</span>
+	<span id="sus">{'sus-' + v as string}</span>
 }
 
 function BPortal(props) @{

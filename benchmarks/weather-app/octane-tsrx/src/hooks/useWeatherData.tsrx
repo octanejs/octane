@@ -3,8 +3,8 @@ import WeatherService from '../../../shared/src/WeatherService.js';
 import type { WeatherData } from '../types';
 
 const messageFor = (error: unknown) => (error instanceof Error ? error.message : String(error));
-const isAbortError = (error: unknown) => error instanceof DOMException &&
-	error.name === 'AbortError';
+const isAbortError = (error: unknown) =>
+	error instanceof DOMException && error.name === 'AbortError';
 
 export function useWeatherData() {
 	const [weatherData, setWeatherData] = useState<WeatherData | null>(null);

@@ -81,12 +81,8 @@ export function BatchedPair(props) @{
 		props.log(`${props.label}:${first},${second}`);
 	}, [props.label, first, second]);
 	<div id="pair" data-label={props.label as string}>
-		<span id="first">
-			{first as number}
-		</span>
-		<span id="second">
-			{second as number}
-		</span>
+		<span id="first">{first as number}</span>
+		<span id="second">{second as number}</span>
 	</div>
 }
 
@@ -117,9 +113,7 @@ function MemoChild(props) @{
 	useLayoutEffect(() => {
 		props.log(`child:${value}`);
 	}, [value]);
-	<span id="memo-child">
-		{value as number}
-	</span>
+	<span id="memo-child">{value as number}</span>
 }
 
 function MemoParentBody(props) @{
@@ -165,9 +159,7 @@ export function StableChildrenHost(props) @{
 
 function StableRetryLeaf(props) {
 	const value = use(props.promise);
-	return <span id="stable-retry-value">
-		{value as string}
-	</span>;
+	return <span id="stable-retry-value">{value as string}</span>;
 }
 
 function StableRetryShell(props) @{
@@ -245,9 +237,7 @@ function DeleteChild(props) @{
 	useLayoutEffect(() => {
 		props.log(`child:${value}`);
 	}, [value]);
-	<span id="delete-child">
-		{value as number}
-	</span>
+	<span id="delete-child">{value as number}</span>
 }
 
 export function DeletePendingChild(props) @{
@@ -262,9 +252,7 @@ export function ReentrantEditor(props) @{
 	useLayoutEffect(() => {
 		if (!props.rendered) props.onChange();
 	}, [props.rendered]);
-	<div id="editor">
-		{props.text as string}
-	</div>
+	<div id="editor">{props.text as string}</div>
 }
 
 const _renderPhaseBases: string[] = [];
@@ -283,16 +271,12 @@ export function RenderPhaseBaseState() @{
 		_renderPhaseBases.push(`base:${baseStep},memoized:${memoizedStep}`);
 		return baseStep === 0 ? 1 : baseStep;
 	});
-	<span id="render-phase-base">
-		{step as number}
-	</span>
+	<span id="render-phase-base">{step as number}</span>
 }
 
 export function HiddenSubtree(props) @{
 	<div id="hidden-owner" hidden>
-		<span id="hidden-value">
-			{props.value as string}
-		</span>
+		<span id="hidden-value">{props.value as string}</span>
 	</div>
 }
 
@@ -301,9 +285,7 @@ export function IndependentCell(props) @{
 	useEffect(() => {
 		if (props.trigger) setValue(1);
 	}, [props.trigger]);
-	<span class="independent-cell">
-		{value as number}
-	</span>
+	<span class="independent-cell">{value as number}</span>
 }
 
 export function ManyRootsSpawner(props) @{
@@ -316,9 +298,7 @@ export function ManyRootsSpawner(props) @{
 function BatchCell(props) @{
 	const [value, setValue] = useState(0);
 	props.capture(props.id, setValue);
-	<span class="batch-cell" data-id={props.id as number}>
-		{value as number}
-	</span>
+	<span class="batch-cell" data-id={props.id as number}>{value as number}</span>
 }
 
 export function ManyBatchCells(props) @{
@@ -334,9 +314,7 @@ export function LayoutEffectLoop() @{
 	useLayoutEffect(() => {
 		setStep((value: number) => value + 1);
 	}, null);
-	<span>
-		{step as number}
-	</span>
+	<span>{step as number}</span>
 }
 
 export function LayoutCleanupLoop() @{
@@ -347,9 +325,7 @@ export function LayoutCleanupLoop() @{
 	useLayoutEffect(() => {
 		setStep(1);
 	}, []);
-	<span>
-		{step as number}
-	</span>
+	<span>{step as number}</span>
 }
 
 export function PassiveCleanupLoop() @{
@@ -360,9 +336,7 @@ export function PassiveCleanupLoop() @{
 	useEffect(() => {
 		setStep(1);
 	}, []);
-	<span>
-		{step as number}
-	</span>
+	<span>{step as number}</span>
 }
 
 export function MixedLayoutRenderLoop() @{
@@ -419,9 +393,7 @@ export function NestedEffectUpdates(props) @{
 	useEffect(() => {
 		if (step < props.limit) setStep((value: number) => value + 1);
 	}, null);
-	<span id="nested-effect-step">
-		{step as number}
-	</span>
+	<span id="nested-effect-step">{step as number}</span>
 }
 
 export function ExternalUnmountCleanupSource(props) @{
@@ -437,9 +409,7 @@ export function ExternalUnmountTarget() @{
 	useEffect(() => {
 		if (step < 50) setStep((value: number) => value + 1);
 	}, null);
-	<span id="external-unmount-target">
-		{step as number}
-	</span>
+	<span id="external-unmount-target">{step as number}</span>
 }
 
 export function ManyUpdatesInOneEffect() @{
@@ -447,9 +417,7 @@ export function ManyUpdatesInOneEffect() @{
 	useEffect(() => {
 		for (let i = 0; i < 1000; i++) setStep((value: number) => value + 1);
 	}, []);
-	<span id="many-effect-updates">
-		{step as number}
-	</span>
+	<span id="many-effect-updates">{step as number}</span>
 }
 
 export function SynchronousPassiveEffectLoop() @{
@@ -457,9 +425,7 @@ export function SynchronousPassiveEffectLoop() @{
 	useEffect(() => {
 		flushSync(() => setStep(step + 1));
 	}, [step]);
-	<span>
-		{step as number}
-	</span>
+	<span>{step as number}</span>
 }
 
 export function RefCallbackLoop() @{
@@ -468,9 +434,7 @@ export function RefCallbackLoop() @{
 		ref={() => {
 			for (let i = 0; i < 50; i++) dispatch(1);
 		}}
-	>
-		{count as number}
-	</div>
+	>{count as number}</div>
 }
 
 export function FiniteLayoutChain(props) @{
@@ -479,9 +443,7 @@ export function FiniteLayoutChain(props) @{
 	useLayoutEffect(() => {
 		if (step < props.limit) setStep((value: number) => value + 1);
 	}, null);
-	<span id="finite-layout-step">
-		{step as number}
-	</span>
+	<span id="finite-layout-step">{step as number}</span>
 }
 
 export function OneStepLayoutUpdate() @{
@@ -489,9 +451,7 @@ export function OneStepLayoutUpdate() @{
 	useLayoutEffect(() => {
 		if (step === 0) setStep(1);
 	}, null);
-	<span id="one-step-layout">
-		{step as number}
-	</span>
+	<span id="one-step-layout">{step as number}</span>
 }
 
 function AlwaysThrows() @{

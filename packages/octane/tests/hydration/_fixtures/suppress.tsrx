@@ -3,25 +3,19 @@
 // opt-out, hydration keeps the SERVER value and emits no warning.
 
 export function Suppressed(props) @{
-	<div id={props.id} suppressHydrationWarning>
-		{props.text as string}
-	</div>
+	<div id={props.id} suppressHydrationWarning>{props.text as string}</div>
 }
 
 // Control: same shape WITHOUT the opt-out — should warn + patch.
 export function NotSuppressed(props) @{
-	<div id={props.id}>
-		{props.text as string}
-	</div>
+	<div id={props.id}>{props.text as string}</div>
 }
 
 // Spread-supplied opt-out: `suppressHydrationWarning` arriving via `{...props.rest}`
 // must behave exactly like the direct attribute — a JS flag stamped before the other
 // spread keys apply (never a DOM attribute), suppressing attr/class/text mismatches.
 export function SpreadSuppressed(props) @{
-	<div {...props.rest}>
-		{props.text as string}
-	</div>
+	<div {...props.rest}>{props.text as string}</div>
 }
 
 // Control: a spread class WITHOUT the opt-out — a server/client divergence must

@@ -6,9 +6,7 @@ export function CallbackIdentity(props) @{
 	const [n, setN] = useState(0);
 	const cb = useCallback((x) => x + 1, [props.depKey]);
 	props.observe(cb);
-	<button id="inc" onClick={() => setN(n + 1)}>
-		{n as string}
-	</button>
+	<button id="inc" onClick={() => setN(n + 1)}>{n as string}</button>
 }
 
 // useEffectEvent — a registered wrapper always invokes the latest committed closure.
@@ -29,9 +27,7 @@ export function EffectEventSubscriber(props) @{
 		return cleanup;
 	}, [props.tickLog, props.fire]);
 
-	<button id="inc" onClick={() => setCount(count + 1)}>
-		{count as string}
-	</button>
+	<button id="inc" onClick={() => setCount(count + 1)}>{count as string}</button>
 }
 
 // useEffectEvent returns a fresh wrapper on every render.
@@ -39,7 +35,5 @@ export function EffectEventIdentity(props) @{
 	const [n, setN] = useState(0);
 	const ev = useEffectEvent(() => n);
 	props.observe(ev);
-	<button onClick={() => setN(n + 1)}>
-		{n as string}
-	</button>
+	<button onClick={() => setN(n + 1)}>{n as string}</button>
 }

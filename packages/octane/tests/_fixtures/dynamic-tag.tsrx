@@ -8,15 +8,11 @@ import { useState } from 'octane';
 // reference.
 
 export function Red(props) @{
-	<span class="leaf red">
-		{'red:' + (props.label || '') as string}
-	</span>
+	<span class="leaf red">{'red:' + (props.label || '') as string}</span>
 }
 
 export function Blue(props) @{
-	<span class="leaf blue">
-		{'blue:' + (props.label || '') as string}
-	</span>
+	<span class="leaf blue">{'blue:' + (props.label || '') as string}</span>
 }
 
 // Direct prop drive — parent picks the component to render.
@@ -32,9 +28,10 @@ export function ToggleTag() @{
 	const Comp =
 		which === 'red' ? Red : Blue;
 	<div>
-		<button id="swap" onClick={() => setWhich(which === 'red' ? 'blue' : 'red')}>
-			{which as string}
-		</button>
+		<button
+			id="swap"
+			onClick={() => setWhich(which === 'red' ? 'blue' : 'red')}
+		>{which as string}</button>
 		<{Comp} label="ok" />
 	</div>
 }

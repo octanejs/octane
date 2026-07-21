@@ -24,12 +24,10 @@ function RecentPostsList({ posts }: { posts: ReadonlyArray<RecentPost> }) {
 				className="flex flex-col gap-0.5 px-3 py-2.5
               hover:bg-gray-500/5 transition-colors duration-150"
 			>
-				<span class="text-xs font-medium leading-snug line-clamp-2">
-					{post.title as string}
-				</span>
-				<span class="text-[10px] text-gray-500 dark:text-gray-500">
-					{formatPublishedDate(post.published) as string}
-				</span>
+				<span class="text-xs font-medium leading-snug line-clamp-2">{post.title as string}</span>
+				<span class="text-[10px] text-gray-500 dark:text-gray-500">{formatPublishedDate(
+					post.published,
+				) as string}</span>
 			</Link>,
 		)}</div>
 	</div>;

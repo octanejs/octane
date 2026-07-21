@@ -9,9 +9,7 @@ import { useLayoutEffect } from 'octane';
 // Per ReactErrorBoundaries-test.internal.js:296 — Normal: renders a div with
 // its children (here: a label prop).
 function NormalRow(props) @{
-	<div class="normal">
-		{props.label as string}
-	</div>
+	<div class="normal">{props.label as string}</div>
 }
 
 // Per ReactErrorBoundaries-test.internal.js:378 — BrokenRender: always throws
@@ -30,9 +28,7 @@ function StressRow(props) @{
 	if (props.item.broken && props.fail) {
 		throw new Error('Hello');
 	}
-	<div class="row" data-k={props.item.id as number}>
-		{props.item.label as string}
-	</div>
+	<div class="row" data-k={props.item.id as number}>{props.item.label as string}</div>
 }
 
 // Per ReactErrorBoundaries-test.internal.js:1978 — "doesn't get into
@@ -48,9 +44,7 @@ export function ReorderStress(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<div class="caught">
-				{'Caught an error: ' + err.message + '.' as string}
-			</div>
+			<div class="caught">{'Caught an error: ' + err.message + '.' as string}</div>
 		}
 	</>
 }
@@ -71,9 +65,7 @@ export function AdditionsCase(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<div class="caught">
-				{'Caught an error: ' + err.message + '.' as string}
-			</div>
+			<div class="caught">{'Caught an error: ' + err.message + '.' as string}</div>
 		}
 	</>
 }
@@ -108,9 +100,7 @@ export function RemovalsCase(props) @{
 				}
 			</div>
 		} @catch (err) {
-			<div class="caught">
-				{'Caught an error: ' + err.message + '.' as string}
-			</div>
+			<div class="caught">{'Caught an error: ' + err.message + '.' as string}</div>
 		}
 	</>
 }

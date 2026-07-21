@@ -22,15 +22,9 @@ export function Counter() @{
 	const incOther = useStore((s) => s.incOther);
 	const reset = useStore((s) => s.reset);
 	<div>
-		<span id="count">
-			{count as string}
-		</span>
-		<span id="other">
-			{other as string}
-		</span>
-		<span id="doubled">
-			{doubled as string}
-		</span>
+		<span id="count">{count as string}</span>
+		<span id="other">{other as string}</span>
+		<span id="doubled">{doubled as string}</span>
 		<button id="inc" onClick={inc}>inc</button>
 		<button id="incOther" onClick={incOther}>incOther</button>
 		<button id="reset" onClick={reset}>reset</button>

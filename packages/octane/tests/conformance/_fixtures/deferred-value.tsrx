@@ -50,9 +50,7 @@ export function RenderPhaseDeferredHost(props) @{
 // that swaps to the final value.
 export function InitialValueApp(props) @{
 	const value = useDeferredValue('Final', 'Initial');
-	<span id="out">
-		{value as string}
-	</span>
+	<span id="out">{value as string}</span>
 }
 
 // Per ReactDeferredValue-test.js:390 — mounting under a TRANSITION still
@@ -78,9 +76,7 @@ export function SuspenseInitialFinal(props) @{
 		@try {
 			const text = useDeferredValue('Final', 'Loading...');
 			const value = use(props.getText(text));
-			<span id="content">
-				{value as string}
-			</span>
+			<span id="content">{value as string}</span>
 		} @pending {
 			<span id="fallback">{'Fallback'}</span>
 		}
@@ -93,9 +89,7 @@ export function SuspenseInitialFinal(props) @{
 function WaterfallInner(props) @{
 	const text = useDeferredValue('Content', 'Content Preview');
 	props.log('render:' + text);
-	<span id="content">
-		{text as string}
-	</span>
+	<span id="content">{text as string}</span>
 }
 
 export function WaterfallApp(props) @{
@@ -118,9 +112,7 @@ function PreviewContent(props) @{
 		@try {
 			const t = useDeferredValue(props.text, 'Preview ' + props.text + '...');
 			const v = use(props.getText(t));
-			<span id="content">
-				{v as string}
-			</span>
+			<span id="content">{v as string}</span>
 		} @pending {
 			<span id="fallback">{'...'}</span>
 		}
@@ -145,9 +137,7 @@ export function RemountPreviewApp(props) @{
 function ActivityDeferredChild(props) @{
 	const renderedText = useDeferredValue(props.text, 'Preview [' + props.text + ']');
 	props.log('render:' + renderedText);
-	<div id="app">
-		{renderedText as string}
-	</div>
+	<div id="app">{renderedText as string}</div>
 }
 
 export function ActivityDeferredContainer(props) @{
@@ -160,9 +150,7 @@ export function ActivityDeferredContainer(props) @{
 function ActivityNoInitialChild(props) @{
 	const renderedText = useDeferredValue(props.text);
 	props.log('render:' + renderedText);
-	<div id="app">
-		{renderedText as string}
-	</div>
+	<div id="app">{renderedText as string}</div>
 }
 
 export function ActivityNoInitialContainer(props) @{

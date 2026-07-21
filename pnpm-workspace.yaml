@@ -66,15 +66,19 @@ esrap_common: &esrap_common ^2.3.0
 
 overrides:
   esrap: *esrap_common
-  # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls
-  # babel-preset-solid@2.0.0-beta.7 transitively (→ babel-plugin-jsx-dom-expressions
-  # 0.41, which still EMITS the `ssrRunInScope` SSR helper), but @solidjs/web@2.0.0-beta.14
-  # REMOVED that export (dom-expressions 0.50 stopped emitting it). Force the
-  # transform to the 0.50-era preset the catalog already intends so SSR output
-  # matches the installed runtime. Without this, SSR throws "does not provide an
-  # export named 'ssrRunInScope'".
-  babel-preset-solid: '2.0.0-beta.14'
-  babel-plugin-jsx-dom-expressions: '0.50.0-next.13'
+  # Solid 2.0 SSR alignment: vite-plugin-solid@3.0.0-next.5 pulls an older
+  # beta preset transitively. Keep the transform on the beta.15 line required
+  # by @tsrx/solid so generated SSR helpers match the installed runtime.
+  babel-preset-solid: '2.0.0-beta.15'
+  babel-plugin-jsx-dom-expressions: '0.50.0-next.14'
+
+# Rspeedy exposes Rsbuild/Rspack-backed plugin state but does not declare
+# @rspack/core itself. Make the audited Lynx instance explicit so a newer
+# workspace-default Rspack cannot satisfy Rspeedy's private module lookup.
+packageExtensions:
+  '@lynx-js/rspeedy@0.16.0':
+    peerDependencies:
+      '@rspack/core': 2.1.3
 
 catalogs:
   lynx:
@@ -93,15 +97,15 @@ catalogs:
     '@apollo/client': 4.2.6
     dexie: 4.4.4
     fake-indexeddb: 6.2.5
-    '@graphql-typed-document-node/core': ^3.1.1
+    '@graphql-typed-document-node/core': ^3.2.0
     '@lucide/icons': 1.24.0
     '@babel/core': 7.29.7
     '@changesets/changelog-github': ^0.7.0
     '@changesets/changelog-git': ^0.2.1
-    '@changesets/cli': ^2.31.0
-    '@floating-ui/dom': ^1.7.0
+    '@changesets/cli': ^2.31.1
+    '@floating-ui/dom': ^1.8.0
     '@floating-ui/react': 0.27.19
-    '@floating-ui/utils': ^0.2.11
+    '@floating-ui/utils': ^0.2.12
     '@tanstack/form-core': 1.33.2
     '@tanstack/react-form': 1.33.2
     'aria-hidden': ^1.2.6
@@ -111,11 +115,11 @@ catalogs:
     '@jridgewell/remapping': ^2.3.5
     '@jridgewell/trace-mapping': ^0.3.31
     '@mdx-js/mdx': ^3.1.1
-    '@shikijs/rehype': ^3.0.0
-    shiki: ^3.0.0
-    '@codemirror/commands': ^6.9.1
-    '@codemirror/state': ^6.5.2
-    '@codemirror/view': ^6.38.6
+    '@shikijs/rehype': ^3.23.0
+    shiki: ^3.23.0
+    '@codemirror/commands': ^6.10.4
+    '@codemirror/state': ^6.7.1
+    '@codemirror/view': ^6.43.6
     'source-map': ^0.7.6
     'remark-frontmatter': ^5.0.0
     'remark-gfm': ^4.0.1
@@ -145,10 +149,10 @@ catalogs:
     '@tiptap/pm': 3.28.0
     '@tiptap/react': 3.28.0
     '@tiptap/starter-kit': 3.28.0
-    '@playwright/test': ^1.61.0
-    '@ripple-ts/adapter': ^0.3.101
-    '@ripple-ts/vite-plugin': ^0.3.101
-    '@solidjs/web': '2.0.0-beta.14'
+    '@playwright/test': ^1.61.1
+    '@ripple-ts/adapter': ^0.3.106
+    '@ripple-ts/vite-plugin': ^0.3.106
+    '@solidjs/web': '2.0.0-beta.15'
     '@stylexjs/babel-plugin': '0.19.0'
     '@stylexjs/stylex': '0.19.0'
     '@tanstack/ai': 0.41.0
@@ -156,9 +160,9 @@ catalogs:
     '@tanstack/ai-react': 0.17.0
     '@tanstack/devtools': 0.12.5
     '@tanstack/history': 1.162.0
-    '@tanstack/query-core': ^5.0.0
-    '@tanstack/react-query': ^5.0.0
-    '@tanstack/react-router': 1.170.16
+    '@tanstack/query-core': ^5.101.3
+    '@tanstack/react-query': ^5.101.3
+    '@tanstack/react-router': 1.170.18
     '@tanstack/react-store': ^0.11.0
     '@tanstack/react-table': 8.21.3
     '@tanstack/react-virtual': 3.14.5
@@ -168,46 +172,46 @@ catalogs:
     '@tanstack/virtual-core': 3.17.3
     '@testing-library/dom': ^10.4.1
     '@testing-library/jest-dom': ^6.9.1
-    '@vitest/coverage-istanbul': 4.1.9
-    '@vitest/coverage-v8': 4.1.9
-    '@tsrx/core': ^0.1.44
-    '@tsrx/prettier-plugin': ^0.3.104
-    '@tsrx/typescript-plugin': ^0.3.104
-    '@tsrx/ripple': ^0.1.45
-    '@tsrx/react': ^0.2.44
-    '@tsrx/solid': ^0.1.44
-    '@tsrx/vite-plugin-react': ^0.0.75
-    '@tsrx/vite-plugin-solid': ^0.0.73
+    '@vitest/coverage-istanbul': 4.1.10
+    '@vitest/coverage-v8': 4.1.10
+    '@tsrx/core': ^0.1.45
+    '@tsrx/prettier-plugin': ^0.3.106
+    '@tsrx/typescript-plugin': ^0.3.106
+    '@tsrx/ripple': ^0.1.46
+    '@tsrx/react': ^0.2.45
+    '@tsrx/solid': ^0.1.45
+    '@tsrx/vite-plugin-react': ^0.0.77
+    '@tsrx/vite-plugin-solid': ^0.0.75
     '@types/babel__core': 7.20.5
     '@types/d3-array': 3.0.3
-    '@types/d3-chord': ^1.0.9
+    '@types/d3-chord': ^1.0.14
     '@types/d3-color': 3.1.0
     '@types/d3-delaunay': 6.0.1
     '@types/d3-format': 3.0.1
     '@types/d3-geo': 3.1.0
-    '@types/d3-hierarchy': ^1.1.6
+    '@types/d3-hierarchy': ^1.1.11
     '@types/d3-interpolate': 3.0.1
     '@types/d3-path': 3.1.1
-    '@types/d3-random': ^2.2.0
-    '@types/d3-sankey': ^0.12.4
+    '@types/d3-random': ^2.2.3
+    '@types/d3-sankey': ^0.12.5
     '@types/d3-scale': 4.0.2
     '@types/d3-shape': 3.1.7
     '@types/d3-time': 3.0.0
     '@types/d3-time-format': 2.1.0
-    '@types/d3-voronoi': ^1.1.9
+    '@types/d3-voronoi': ^1.1.12
     '@types/geojson': ^7946.0.16
-    '@types/node': ^24.3.0
-    '@types/react': ^19.0.0
-    '@types/react-dom': ^19.0.0
+    '@types/node': ^24.13.3
+    '@types/react': ^19.2.17
+    '@types/react-dom': ^19.2.3
     '@types/three': 0.172.0
-    '@wry/equality': ^0.5.6
+    '@wry/equality': ^0.5.7
     '@wry/trie': ^0.5.0
-    '@preact/preset-vite': ^2.10.5
+    '@preact/preset-vite': ^2.10.6
     '@sveltejs/vite-plugin-svelte': ^7.2.0
-    '@vitejs/plugin-react': ^6.0.2
+    '@vitejs/plugin-react': ^6.0.3
     '@juggle/resize-observer': ^3.4.0
     '@react-three/fiber': 9.6.1
-    '@react-spring/web': ^10.0.0
+    '@react-spring/web': ^10.1.2
     '@visx/chord': 4.0.0
     '@visx/annotation': 4.0.0
     '@visx/brush': 4.0.0
@@ -221,27 +225,27 @@ catalogs:
     '@visx/zoom': 4.0.0
     '@use-gesture/react': 10.3.1
     '@use-gesture/core': 10.3.1
-    devalue: ^5.8.1
+    devalue: ^5.8.2
     es-module-lexer: ^1.7.0
     esbuild: ^0.28.1
     esrap: *esrap_common
-    sucrase: ^3.35.0
-    graphql: ^16.11.0
-    happy-dom: ^20.10.6
+    sucrase: ^3.35.1
+    graphql: ^16.14.2
+    happy-dom: ^20.11.0
     html-parse-stringify: ^3.0.1
     i18next: 26.3.6
-    jsdom: ^29.0.2
-    jotai: ^2.20.1
+    jsdom: ^29.1.1
+    jotai: ^2.20.2
     lexical: 0.46.0
-    lighthouse: 13.4.0
+    lighthouse: 13.4.1
     lucide-react: 1.24.0
-    motion: ^12.0.0
+    motion: ^12.42.2
     motion-dom: ^12.0.0
     miniflare: 4.20260714.0
     nuqs: 2.9.1
     '@standard-schema/spec': 1.1.0
-    playwright: ^1.61.0
-    prettier: ^3.8.4
+    playwright: ^1.61.1
+    prettier: ^3.9.5
     preact: ^10.29.7
     preact-render-to-string: ^6.7.0
     prettier-plugin-svelte: ^4.1.1
@@ -255,20 +259,20 @@ catalogs:
     '@dnd-kit/helpers': 0.5.0
     '@dnd-kit/react': 0.5.0
     '@dnd-kit/state': 0.5.0
-    radix-ui: ^1.4.3
-    '@reduxjs/toolkit': ^2.9.0
-    '@rsbuild/core': ^2.1.5
-    '@rspack/core': ^2.1.3
-    classnames: ^2.3.1
+    radix-ui: ^1.6.4
+    '@reduxjs/toolkit': ^2.12.0
+    '@rsbuild/core': ^2.1.6
+    '@rspack/core': ^2.1.4
+    classnames: ^2.5.1
     clsx: ^2.1.1
     d3-array: 3.2.1
-    d3-chord: ^1.0.4
-    d3-cloud: ^1.2.7
+    d3-chord: ^1.0.6
+    d3-cloud: ^1.2.9
     d3-color: 3.1.0
     d3-delaunay: 6.0.2
     d3-format: 3.1.0
     d3-geo: 3.1.0
-    d3-hierarchy: ^1.1.4
+    d3-hierarchy: ^1.1.9
     d3-interpolate: 3.0.1
     d3-interpolate-path: 2.2.1
     d3-path: 3.1.0
@@ -278,12 +282,12 @@ catalogs:
     d3-shape: 3.2.0
     d3-time: 3.1.0
     d3-time-format: 4.1.0
-    d3-voronoi: ^1.1.2
+    d3-voronoi: ^1.1.4
     'decimal.js-light': ^2.5.1
-    'es-toolkit': ^1.39.3
-    eventemitter3: ^5.0.1
-    fast-equals: ^5.3.3
-    immer: ^11.1.8
+    'es-toolkit': ^1.49.0
+    eventemitter3: ^5.0.4
+    fast-equals: ^5.4.1
+    immer: ^11.1.15
     internmap: 2.0.3
     mitt: ^2.1.0
     recharts: 3.9.2
@@ -295,32 +299,32 @@ catalogs:
     svg-path-properties: 2.0.2
     reselect: 5.2.0
     'tiny-invariant': ^1.3.3
-    'victory-vendor': ^37.0.2
-    react: ^19.2.0
+    'victory-vendor': ^37.3.6
+    react: ^19.2.7
     'react-router': 8.2.0
     react-aria: 3.50.0
     react-aria-components: 1.19.0
     react-stately: 3.48.0
     '@react-types/shared': ^3.36.0
-    react-dom: ^19.2.0
+    react-dom: ^19.2.7
     react-i18next: 17.0.9
-    ripple: ^0.3.101
+    ripple: ^0.3.106
     rxjs: ^7.8.2
-    rulesync: ^8.17.0
-    solid-js: '2.0.0-beta.14'
+    rulesync: ^8.32.0
+    solid-js: '2.0.0-beta.15'
     sonner: 2.0.7
     styled-components: 6.4.3
-    stylis: ^4.3.2
-    '@types/stylis': ^4.2.5
+    stylis: ^4.4.0
+    '@types/stylis': ^4.2.7
     '@emotion/is-prop-valid': 1.4.0
     csstype: 3.2.3
-    svelte: ^5.56.4
-    svelte-check: ^4.7.2
-    terser: ^5.31.0
+    svelte: ^5.56.7
+    svelte-check: ^4.7.3
+    terser: ^5.49.0
     three: 0.172.0
-    type-fest: ^5.6.0
+    type-fest: ^5.8.0
     typescript: ^5.9.3
-    vite: ^8.0.16
+    vite: ^8.1.5
     vite-plugin-solid: '3.0.0-next.5'
     # Vue Vapor (vapor-mode benchmark fixtures) — 3.6 is the first line with
     # vapor; pinned to a beta the way solid-js pins its 2.0 beta. The fixtures
@@ -329,15 +333,26 @@ catalogs:
     vue: 3.6.0-beta.17
     '@vue/runtime-dom': 3.6.0-beta.17
     '@vue/runtime-vapor': 3.6.0-beta.17
-    '@vitejs/plugin-vue': ^6.0.7
-    vitest: ^4.1.9
-    yjs: ^13.6.0
-    zustand: ^5.0.0
+    '@vitejs/plugin-vue': ^6.0.8
+    vitest: ^4.1.10
+    yjs: ^13.6.31
+    zustand: ^5.0.14
 
 # patchedDependencies: the @tsrx/core@0.1.37/0.1.40 JSX parse patches are
 # superseded — @tsrx/core >= 0.1.42 ships the fix.
 
 minimumReleaseAgeExclude:
+  - '@ripple-ts/adapter@0.3.106'
+  - '@ripple-ts/vite-plugin@0.3.106'
   - '@tanstack/ai-client@0.21.0'
   - '@tanstack/ai-react@0.17.0'
   - '@tanstack/ai@0.41.0'
+  - '@tsrx/core@0.1.45'
+  - '@tsrx/prettier-plugin@0.3.106'
+  - '@tsrx/react@0.2.45'
+  - '@tsrx/ripple@0.1.46'
+  - '@tsrx/solid@0.1.45'
+  - '@tsrx/typescript-plugin@0.3.106'
+  - '@tsrx/vite-plugin-react@0.0.77'
+  - '@tsrx/vite-plugin-solid@0.0.75'
+  - 'ripple@0.3.106'

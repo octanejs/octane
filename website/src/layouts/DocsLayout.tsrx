@@ -36,9 +36,7 @@ export function DocsLayout() @{
 						<div class="sidebar-groups">
 							@for (const group of docGroups; key group.title) {
 								<div class="sidebar-group">
-									<p class="sidebar-heading">
-										{group.title as string}
-									</p>
+									<p class="sidebar-heading">{group.title as string}</p>
 									<ul class="sidebar-list">
 										@for (const doc of group.docs; key doc.slug) {
 											<li>
@@ -49,9 +47,7 @@ export function DocsLayout() @{
 													onClick={() => {
 														void closeMobileNavigation();
 													}}
-												>
-													{doc.title as string}
-												</Link>
+												>{doc.title as string}</Link>
 												@if (pageActive(doc.slug) && doc.sections && doc.sections.length > 0) {
 													<OnThisPage
 														sections={doc.sections}

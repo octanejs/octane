@@ -40,9 +40,7 @@ export function App() @{
 		<ul>
 			@for (const item of items; key item.id) {
 				<li class={{ packed: item.packed }}>
-					<span>
-						{item.label as string}
-					</span>
+					<span>{item.label as string}</span>
 					<button
 						aria-label={(item.packed ? 'Unpack ' : 'Pack ') + item.label}
 						onClick={() => setItems(

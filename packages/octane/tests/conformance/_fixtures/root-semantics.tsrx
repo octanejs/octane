@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'octane';
 
 export function TextRoot(props) @{
-	<div id="text-root">
-		{props.text as string}
-	</div>
+	<div id="text-root">{props.text as string}</div>
 }
 
 export function DivRoot() @{
@@ -16,20 +14,14 @@ export function SpanRoot() @{
 
 export function OrderedChildren(props) @{
 	<div id="ordered-root">
-		<span>
-			{props.first as string}
-		</span>
-		<span>
-			{props.second as string}
-		</span>
+		<span>{props.first as string}</span>
+		<span>{props.second as string}</span>
 	</div>
 }
 
 export function HydrationRoot(props) @{
 	<div id="hydration-root">
-		<span class={props.className}>
-			{props.text as string}
-		</span>
+		<span class={props.className}>{props.text as string}</span>
 	</div>
 }
 
@@ -39,9 +31,7 @@ export function KeyedRoot(props) @{
 		props.log('Mount');
 		return () => props.log('Unmount');
 	}, []);
-	<span id="keyed-root">
-		{props.text + ':' + initialText as string}
-	</span>
+	<span id="keyed-root">{props.text + ':' + initialText as string}</span>
 }
 
 export function EffectUnmountRoot(props) @{

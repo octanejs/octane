@@ -6,9 +6,7 @@ import { useState, useLayoutEffect, useEffect } from 'octane';
 
 export function ClickCounter() @{
 	const [n, setN] = useState(0);
-	<button id="b" onClick={() => setN(n + 1)}>
-		{n as number}
-	</button>
+	<button id="b" onClick={() => setN(n + 1)}>{n as number}</button>
 }
 
 // Snapshot probe — handler reads DOM after setState. React's contract says
@@ -24,9 +22,7 @@ export function FastClick() @{
 		const btn = document.getElementById('fc');
 		snapshots.push(btn?.textContent ?? '' as string);
 	};
-	<button id="fc" onClick={handler}>
-		{n as number}
-	</button>
+	<button id="fc" onClick={handler}>{n as number}</button>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

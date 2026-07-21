@@ -5,9 +5,7 @@ function A() @{
 }
 function Sus(props) @{
 	const v = use(props.promise);
-	<span id="content">
-		{'B-' + v as string}
-	</span>
+	<span id="content">{'B-' + v as string}</span>
 }
 
 // switchBlock replace-suspend: a transition changes the discriminant 0→1, where case 1

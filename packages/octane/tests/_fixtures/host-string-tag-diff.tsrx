@@ -18,8 +18,6 @@ export function TagSwitcher() @{
 
 export function MemberTag(props) @{
 	<div class="wrap">
-		<props.parts.title id="t">
-			{props.text as string}
-		</props.parts.title>
+		<props.parts.title id="t">{props.text as string}</props.parts.title>
 	</div>
 }

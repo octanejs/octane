@@ -5,17 +5,14 @@ import { useDynamicPositioning } from '@octanejs/lexical/shared/useDynamicPositi
 export function CustomMenuBody(props) @{
 	<div class="custom-menu" data-testid="custom-menu">
 		{props.itemProps.options.map(
-			(option, i) => <button
-				key={option.key}
-				class={props.itemProps.selectedIndex === i ? 'active' : 'inactive'}
-				onClick={() => props.itemProps.selectOptionAndCleanUp(option)}
-			>
-				{option.title as string}
-			</button>,
+			(option, i) =>
+				<button
+					key={option.key}
+					class={props.itemProps.selectedIndex === i ? 'active' : 'inactive'}
+					onClick={() => props.itemProps.selectOptionAndCleanUp(option)}
+				>{option.title as string}</button>,
 		)}
-		<span class="matching-string">
-			{props.matchingString as string}
-		</span>
+		<span class="matching-string">{props.matchingString as string}</span>
 	</div>
 }
 

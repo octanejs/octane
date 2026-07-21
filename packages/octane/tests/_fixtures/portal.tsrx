@@ -4,9 +4,7 @@ export const Theme = createContext('light');
 
 export function PortalledChild() @{
 	const theme = use(Theme);
-	<span class="child">
-		{theme as string}
-	</span>
+	<span class="child">{theme as string}</span>
 }
 
 // React-shape: createPortal(children, target) at JSX child position.

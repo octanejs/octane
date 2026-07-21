@@ -5,9 +5,7 @@ import { Fragment, useLayoutEffect, useEffect } from 'octane';
 export function FragmentObjectRef(props) @{
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
-			<div id="child">
-				{'hi' as string}
-			</div>
+			<div id="child">{'hi' as string}</div>
 		</Fragment>
 	</div>
 }
@@ -17,9 +15,7 @@ export function FragmentObjectRef(props) @{
 export function FragmentCallbackRef(props) @{
 	<div id="parent">
 		<Fragment ref={props.cb}>
-			<div id="child">
-				{'hi' as string}
-			</div>
+			<div id="child">{'hi' as string}</div>
 		</Fragment>
 	</div>
 }
@@ -36,9 +32,7 @@ export function FragmentEffectVisibility(props) @{
 	}, []);
 	<div id="parent">
 		<Fragment ref={props.fragRef}>
-			<div id="child">
-				{'hi' as string}
-			</div>
+			<div id="child">{'hi' as string}</div>
 		</Fragment>
 	</div>
 }

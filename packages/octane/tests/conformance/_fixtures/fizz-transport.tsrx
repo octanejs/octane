@@ -7,18 +7,14 @@ function ThrowError(props) {
 function PendingBoundary(props) @{
 	@try {
 		const value = use(props.promise);
-		<strong class="pending-value">
-			{value as string}
-		</strong>
+		<strong class="pending-value">{value as string}</strong>
 	} @pending {
 		<i class="pending-fallback">{'loading'}</i>
 	}
 }
 
 export function TextPayload(props) @{
-	<div id="transport-payload">
-		{props.text as string}
-	</div>
+	<div id="transport-payload">{props.text as string}</div>
 }
 
 export function PendingPayload(props) @{
@@ -38,9 +34,7 @@ export function FatalFallback(props) @{
 	<section id="fatal-fallback">
 		@try {
 			const value = use(props.promise);
-			<strong>
-				{value as string}
-			</strong>
+			<strong>{value as string}</strong>
 		} @pending {
 			<ThrowError error={props.error} />
 		}
@@ -70,18 +64,14 @@ export function CompleteContent(props) @{
 			<strong>{'ready'}</strong>
 		} @pending {
 			const ignored = props.onFallback();
-			<i>
-				{ignored as string}
-			</i>
+			<i>{ignored as string}</i>
 		}
 	</section>
 }
 
 export function BarePendingRoot(props) @{
 	const value = use(props.promise);
-	<main id="bare-pending-root">
-		{value as string}
-	</main>
+	<main id="bare-pending-root">{value as string}</main>
 }
 
 export function AbortBeforeSuspend(props) @{
@@ -96,14 +86,10 @@ export function SuspendedFallbackAndContent(props) @{
 		@try {
 			@try {
 				const content = use(props.content);
-				<strong>
-					{content as string}
-				</strong>
+				<strong>{content as string}</strong>
 			} @pending {
 				const fallback = use(props.fallback);
-				<em>
-					{fallback as string}
-				</em>
+				<em>{fallback as string}</em>
 			}
 		} @pending {
 			<i class="outer-fallback">{'Loading'}</i>
@@ -115,9 +101,7 @@ function RootTasks(props) @{
 	props.onRender();
 	const one = use(props.one);
 	const two = use(props.two);
-	<span>
-		{one + two as string}
-	</span>
+	<span>{one + two as string}</span>
 }
 
 export function BoundaryAndRootTasks(props) @{
@@ -129,9 +113,7 @@ export function BoundaryAndRootTasks(props) @{
 
 export function DocumentTitle(props) @{
 	<>
-		<title>
-			{props.title as string}
-		</title>
+		<title>{props.title as string}</title>
 		<main>{'body'}</main>
 	</>
 }

@@ -373,13 +373,13 @@ function RouteMapPanel() {
 						{index + 1}
 					</span>
 					<div class="min-w-0">
-						<p class="truncate font-mono text-sm font-black text-zinc-950 dark:text-white">
-							{routeFile.file as string}
-						</p>
+						<p
+							class="truncate font-mono text-sm font-black text-zinc-950 dark:text-white"
+						>{routeFile.file as string}</p>
 						<p class="mt-1 text-xs leading-5 text-zinc-600 dark:text-zinc-400">
-							<span class="font-bold text-zinc-800 dark:text-zinc-200">
-								{routeFile.label as string}
-							</span>
+							<span
+								class="font-bold text-zinc-800 dark:text-zinc-200"
+							>{routeFile.label as string}</span>
 							{' '}
 							{routeFile.detail as string}
 						</p>
@@ -404,12 +404,11 @@ function RouteMapPanel() {
 					'useLoaderData()',
 					'validateSearch()',
 				].map(
-					(item) => <div
-						key={item}
-						class="rounded-md bg-white/80 px-3 py-2 font-mono dark:bg-zinc-950/70"
-					>
-						{item as string}
-					</div>,
+					(item) =>
+						<div
+							key={item}
+							class="rounded-md bg-white/80 px-3 py-2 font-mono dark:bg-zinc-950/70"
+						>{item as string}</div>,
 				)}</div>
 			</div>
 		</div>
@@ -429,9 +428,10 @@ function SearchStatePanel() {
 				class="min-w-0 break-all font-mono text-sm font-black leading-6 text-zinc-950 dark:text-white"
 			>
 				/docs
-				<span class="text-emerald-600 dark:text-emerald-300">
-					{searchParamDisplay.replace('/docs', '') as string}
-				</span>
+				<span class="text-emerald-600 dark:text-emerald-300">{searchParamDisplay.replace(
+					'/docs',
+					'',
+				) as string}</span>
 			</p>
 			<span
 				class="rounded-md bg-emerald-100 px-2 py-1 text-xs font-black uppercase text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
@@ -454,9 +454,7 @@ function SearchStatePanel() {
 					class={selectedPresetIndex === index
 						? 'text-[0.65rem] font-black uppercase text-white/75'
 						: 'text-[0.65rem] font-black uppercase text-zinc-500 dark:text-zinc-400'}
-				>
-					{preset.label as string}
-				</p>
+				>{preset.label as string}</p>
 				<p
 					class={selectedPresetIndex === index
 						? 'mt-1 font-mono text-sm font-bold text-white'
@@ -478,12 +476,12 @@ function SearchStatePanel() {
 				key={key}
 				class="rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/25"
 			>
-				<p class="text-[0.65rem] font-black uppercase text-emerald-800 dark:text-emerald-300">
-					{key as string}
-				</p>
-				<p class="mt-1 truncate font-mono text-sm font-bold text-emerald-950 dark:text-emerald-100">
-					{value as string}
-				</p>
+				<p
+					class="text-[0.65rem] font-black uppercase text-emerald-800 dark:text-emerald-300"
+				>{key as string}</p>
+				<p
+					class="mt-1 truncate font-mono text-sm font-bold text-emerald-950 dark:text-emerald-100"
+				>{value as string}</p>
 			</div>,
 		)}</div>
 
@@ -530,12 +528,8 @@ function LoaderPipeline() {
 			>
 				{index + 1}
 			</span>
-			<h3 class="mt-4 text-lg font-black capitalize leading-tight">
-				{step.label as string}
-			</h3>
-			<p class="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-				{step.body as string}
-			</p>
+			<h3 class="mt-4 text-lg font-black capitalize leading-tight">{step.label as string}</h3>
+			<p class="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{step.body as string}</p>
 		</div>,
 	)}</div>;
 }
@@ -560,16 +554,10 @@ function ContractCard({
 			>{icon}</span>
 			<span
 				class="rounded-md bg-zinc-100 px-2 py-1 text-[0.65rem] font-black uppercase text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
-			>
-				{eyebrow as string}
-			</span>
+			>{eyebrow as string}</span>
 		</div>
-		<h3 class="mt-4 text-xl font-black leading-tight">
-			{title as string}
-		</h3>
-		<p class="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-			{body as string}
-		</p>
+		<h3 class="mt-4 text-xl font-black leading-tight">{title as string}</h3>
+		<p class="mt-3 text-sm leading-6 text-zinc-700 dark:text-zinc-300">{body as string}</p>
 	</div>;
 }
 
@@ -584,12 +572,8 @@ function SectionKicker({ children, icon }: { children: any; icon: any }) {
 
 function ProofPill({ label, value }: { label: string; value: string }) {
 	return <div class="border-l-2 border-emerald-500 pl-3">
-		<p class="text-sm font-black text-zinc-950 dark:text-white">
-			{label as string}
-		</p>
-		<p class="mt-1 text-sm leading-5 text-zinc-600 dark:text-zinc-400">
-			{value as string}
-		</p>
+		<p class="text-sm font-black text-zinc-950 dark:text-white">{label as string}</p>
+		<p class="mt-1 text-sm leading-5 text-zinc-600 dark:text-zinc-400">{value as string}</p>
 	</div>;
 }
 

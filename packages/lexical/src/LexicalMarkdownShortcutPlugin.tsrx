@@ -29,7 +29,8 @@ const HR: ElementTransformer = {
 
 export const DEFAULT_TRANSFORMERS: Transformer[] = [HR, ...TRANSFORMERS];
 
-type Props = Readonly<{
+type Props =
+	Readonly<{
 		transformers?: Transformer[];
 	}>;
 

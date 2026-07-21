@@ -7,21 +7,15 @@ export function ActionForm(props) @{
 	<form action={formAction}>
 		<input id="field" name="name" />
 		<button id="submit" type="submit">{'submit'}</button>
-		<span id="state">
-			{String(state) as string}
-		</span>
-		<span id="pending">
-			{(isPending ? 'pending' : 'idle') as string}
-		</span>
+		<span id="state">{String(state) as string}</span>
+		<span id="pending">{(isPending ? 'pending' : 'idle') as string}</span>
 	</form>
 }
 
 // useFormStatus read from a CHILD component of the form.
 function StatusReader() @{
 	const status = useFormStatus();
-	<span id="status">
-		{(status.pending ? 'pending:' + status.method : 'idle') as string}
-	</span>
+	<span id="status">{(status.pending ? 'pending:' + status.method : 'idle') as string}</span>
 }
 
 export function FormWithStatus(props) @{
@@ -48,9 +42,7 @@ function StatusProbeInner(props) @{
 	const [, setN] = useState(0);
 	const status = useFormStatus();
 	props.expose(() => setN((n) => n + 1));
-	<span id="probe">
-		{(status.pending ? 'pending' : 'idle') as string}
-	</span>
+	<span id="probe">{(status.pending ? 'pending' : 'idle') as string}</span>
 }
 // The probe is a CHILD so it has real block markers — the test inserts a <form>
 // as an ancestor of #wrap, which becomes the probe's nearest ancestor form.
@@ -66,9 +58,7 @@ export function SelfFormStatus(props) @{
 	const status = useFormStatus();
 	props.expose(status);
 	<form action={props.action}>
-		<span id="self">
-			{(status.pending ? 'pending' : 'idle') as string}
-		</span>
+		<span id="self">{(status.pending ? 'pending' : 'idle') as string}</span>
 		<button id="submit" type="submit">{'go'}</button>
 	</form>
 }
@@ -87,9 +77,7 @@ export function OptimisticForm(props) @{
 	}, null);
 	<form action={formAction}>
 		<input id="field" name="item" />
-		<span id="list">
-			{optimistic.join(',') as string}
-		</span>
+		<span id="list">{optimistic.join(',') as string}</span>
 		<button id="add" type="submit">{'add'}</button>
 	</form>
 }
@@ -100,9 +88,7 @@ export function BareOptimistic(props) @{
 	const [items] = useState(props.initial);
 	const [optimistic, addOptimistic] = useOptimistic(items, (cur, v) => [...cur, v]);
 	<div>
-		<span id="list">
-			{optimistic.join(',') as string}
-		</span>
+		<span id="list">{optimistic.join(',') as string}</span>
 		<button id="add" onClick={() => addOptimistic('x')}>{'add'}</button>
 	</div>
 }
@@ -112,12 +98,8 @@ export function DirectAction(props) @{
 	const [state, formAction, isPending] = useActionState(props.action, props.initial);
 	<div>
 		<button id="run" onClick={() => formAction(props.payload)}>{'run'}</button>
-		<span id="state">
-			{String(state) as string}
-		</span>
-		<span id="pending">
-			{(isPending ? 'pending' : 'idle') as string}
-		</span>
+		<span id="state">{String(state) as string}</span>
+		<span id="pending">{(isPending ? 'pending' : 'idle') as string}</span>
 	</div>
 }
 

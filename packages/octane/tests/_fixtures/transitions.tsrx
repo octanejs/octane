@@ -15,9 +15,7 @@ export function TransitionBasics() @{
 	const [n, setN] = useState(0);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="n">
-			{n as string}
-		</span>
+		<span id="n">{n as string}</span>
 		<span id="pending">
 			{isPending ? 'pending' : 'idle'}
 		</span>
@@ -40,9 +38,7 @@ export function TransitionKeepsDom(props) @{
 		<button id="swap" onClick={() => start(() => setPromise(props.nextPromise))}>{'swap'}</button>
 		@try {
 			const value = use(promise);
-			<span id="value">
-				{value as string}
-			</span>
+			<span id="value">{value as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -65,15 +61,9 @@ export function AsyncActionKeepsCommittedState(props) @{
 		<span id="pending">
 			{isPending ? 'pending' : 'idle'}
 		</span>
-		<span id="parent-selection">
-			{selection.id as string}
-		</span>
-		<span id="reducer-selection">
-			{reducerSelection as string}
-		</span>
-		<span id="action-count">
-			{count as string}
-		</span>
+		<span id="parent-selection">{selection.id as string}</span>
+		<span id="reducer-selection">{reducerSelection as string}</span>
+		<span id="action-count">{count as string}</span>
 		<button
 			id="swap-action"
 			onClick={() => start(async () => {
@@ -89,9 +79,7 @@ export function AsyncActionKeepsCommittedState(props) @{
 		<button id="urgent-count" onClick={() => setCount((value) => value + 1)}>{'urgent'}</button>
 		@try {
 			const value = use(selection.promise);
-			<span id="action-value">
-				{value as string}
-			</span>
+			<span id="action-value">{value as string}</span>
 		} @pending {
 			<span id="action-fallback">{'fallback'}</span>
 		}
@@ -112,9 +100,7 @@ export function StandaloneStartTransition(props) @{
 		>{'swap'}</button>
 		@try {
 			const value = use(promise);
-			<span id="value">
-				{value as string}
-			</span>
+			<span id="value">{value as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -133,9 +119,7 @@ export function DeferredValueWithSuspense(props) @{
 	<div>
 		@try {
 			const value = use(deferred);
-			<span id="value" class={isStale ? 'stale' : 'fresh'}>
-				{value as string}
-			</span>
+			<span id="value" class={isStale ? 'stale' : 'fresh'}>{value as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -158,9 +142,7 @@ export function UrgentPreemptsTransition(props) @{
 		<button id="swap-urgent" onClick={() => setPromise(props.nextPromise)}>{'urgent'}</button>
 		@try {
 			const value = use(promise);
-			<span id="value">
-				{value as string}
-			</span>
+			<span id="value">{value as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -176,9 +158,7 @@ function EntLeafA(props) @{
 	<>
 		@try {
 			const v = use(props.p);
-			<span class="ent-a">
-				{'A:' + v as string}
-			</span>
+			<span class="ent-a">{'A:' + v as string}</span>
 		} @pending {
 			<span class="ent-a-load">{'A-load'}</span>
 		}
@@ -189,9 +169,7 @@ function EntLeafB(props) @{
 	<>
 		@try {
 			const v = use(props.p);
-			<span class="ent-b">
-				{'B:' + v as string}
-			</span>
+			<span class="ent-b">{'B:' + v as string}</span>
 		} @pending {
 			<span class="ent-b-load">{'B-load'}</span>
 		}
@@ -235,9 +213,7 @@ export function IsPendingThroughReplay(props) @{
 		@try {
 			const a = use(step === 0 ? props.initialA : props.nextA);
 			const b = use(step === 0 ? props.initialB : props.nextB);
-			<span id="value">
-				{a + '/' + b as string}
-			</span>
+			<span id="value">{a + '/' + b as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -254,15 +230,9 @@ export function NestedTransitions(props) @{
 	const [pendingA, startA] = useTransition();
 	const [pendingB, startB] = useTransition();
 	<div>
-		<span id="pending-a">
-			{'A:' + (pendingA ? '1' : '0') as string}
-		</span>
-		<span id="pending-b">
-			{'B:' + (pendingB ? '1' : '0') as string}
-		</span>
-		<span id="n">
-			{n as string}
-		</span>
+		<span id="pending-a">{'A:' + (pendingA ? '1' : '0') as string}</span>
+		<span id="pending-b">{'B:' + (pendingB ? '1' : '0') as string}</span>
+		<span id="n">{n as string}</span>
 		<button
 			id="nest"
 			onClick={() => startA(() => startB(() => setN(props.target)))}
@@ -280,12 +250,8 @@ export function DeferredValueInTransition() @{
 	const [_, start] = useTransition();
 	const deferred = useDeferredValue(v);
 	<div>
-		<span id="original">
-			{'Original: ' + v as string}
-		</span>
-		<span id="deferred">
-			{'Deferred: ' + deferred as string}
-		</span>
+		<span id="original">{'Original: ' + v as string}</span>
+		<span id="deferred">{'Deferred: ' + deferred as string}</span>
 		<button id="bump" onClick={() => start(() => setV(v + 1))}>{'bump'}</button>
 	</div>
 }
@@ -300,9 +266,7 @@ export function DeferredValueInTransition() @{
 function ListenerPreviewProbe(props) @{
 	const text = useDeferredValue('Final', 'Preview');
 	props.log('render:' + text);
-	<span id="probe">
-		{text as string}
-	</span>
+	<span id="probe">{text as string}</span>
 }
 
 function TransitionPendingProbe(props) @{
@@ -348,9 +312,7 @@ export function UrgentSupersedesTransition(props) @{
 		<button id="swap-urgent" onClick={() => setPromise(props.urgentPromise)}>{'urgent'}</button>
 		@try {
 			const value = use(promise);
-			<span id="value">
-				{value as string}
-			</span>
+			<span id="value">{value as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}
@@ -367,9 +329,7 @@ export function AsyncStartTransition(props) @{
 	const [n, setN] = useState(0);
 	const [isPending, start] = useTransition();
 	<div>
-		<span id="n">
-			{n as string}
-		</span>
+		<span id="n">{n as string}</span>
 		<span id="pending">
 			{isPending ? 'pending' : 'idle'}
 		</span>
@@ -406,9 +366,7 @@ export function AsyncTransitionKeepsDom(props) @{
 		>{'go'}</button>
 		@try {
 			const value = use(promise);
-			<span id="value">
-				{value as string}
-			</span>
+			<span id="value">{value as string}</span>
 		} @pending {
 			<span id="fallback">{'fallback'}</span>
 		}

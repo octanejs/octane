@@ -8,9 +8,7 @@ import {
 
 function SiblingSuspender(props) @{
 	const value = use(props.resource);
-	<span class="projected-sibling">
-		{value as string}
-	</span>
+	<span class="projected-sibling">{value as string}</span>
 }
 
 export function ProjectedBoundaryApp(props) @{
@@ -21,9 +19,7 @@ export function ProjectedBoundaryApp(props) @{
 	} @pending {
 		<p class="projected-pending">{'pending'}</p>
 	} @catch (error) {
-		<p class="projected-error">
-			{error.message as string}
-		</p>
+		<p class="projected-error">{error.message as string}</p>
 	}
 }
 
@@ -35,9 +31,7 @@ export function SequentialProjectedBoundaryApp(props) @{
 	} @pending {
 		<p class="projected-pending">{'pending'}</p>
 	} @catch (error) {
-		<p class="projected-error">
-			{error.message as string}
-		</p>
+		<p class="projected-error">{error.message as string}</p>
 	}
 }
 
@@ -52,8 +46,6 @@ export function PreparedThenSiblingBoundaryApp(props) @{
 	} @pending {
 		<p class="projected-pending">{'pending'}</p>
 	} @catch (error) {
-		<p class="projected-error">
-			{error.message as string}
-		</p>
+		<p class="projected-error">{error.message as string}</p>
 	}
 }

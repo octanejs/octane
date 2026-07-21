@@ -36,10 +36,12 @@ function IndexPage() @{
 	</>
 }
 
-export function makeSsrRouter(options: {
+export function makeSsrRouter(
+	options: {
 		routeSsr?: boolean | 'data-only';
 		scrollRestoration?: boolean;
-	} = {}) {
+	} = {},
+) {
 	const rootRoute = createRootRoute({
 		component: RootDocument,
 		head: () => ({

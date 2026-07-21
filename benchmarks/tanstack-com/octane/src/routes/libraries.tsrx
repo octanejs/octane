@@ -62,9 +62,7 @@ function LibrariesPage() {
 					className="group inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm transition-all hover:-translate-y-0.5 hover:border-current hover:shadow-md dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100"
 				>
 					<img src={framework.logo} alt="" loading="lazy" class="h-5 w-5 object-contain" />
-					<span>
-						{framework.label as string}
-					</span>
+					<span>{framework.label as string}</span>
 					<span class="text-gray-500 dark:text-gray-400">
 						{count}
 

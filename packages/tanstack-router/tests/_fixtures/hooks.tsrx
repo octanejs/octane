@@ -31,9 +31,7 @@ function ItemsLayout() @{
 	const match = useMatch();
 	<section class="items">
 		<p class="layout-params">{JSON.stringify(params)}</p>
-		<p class="layout-route">
-			{match.routeId as string}
-		</p>
+		<p class="layout-route">{match.routeId as string}</p>
 		<Outlet />
 	</section>
 }

@@ -41,14 +41,8 @@ export function HooksFixture(props) @{
 		data-first={first.value}
 		data-second={second.value}
 	>
-		<span id="computed">
-			{String(computed.value) as string}
-		</span>
-		<span id="deep">
-			{String(deep.value) as string}
-		</span>
-		<span id="maybe-deep">
-			{String(maybeDeep?.value ?? 'none') as string}
-		</span>
+		<span id="computed">{String(computed.value) as string}</span>
+		<span id="deep">{String(deep.value) as string}</span>
+		<span id="maybe-deep">{String(maybeDeep?.value ?? 'none') as string}</span>
 	</button>
 }

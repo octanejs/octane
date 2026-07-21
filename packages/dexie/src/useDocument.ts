@@ -19,8 +19,7 @@ type DexieWithYProvider = Dexie & {
 const gracePeriod = 100;
 const getProviderConstructor = () =>
 	(Dexie as unknown as DexieWithYProvider).DexieYProvider as
-		| DexieYProviderConstructor<object>
-		| undefined;
+		DexieYProviderConstructor<object> | undefined;
 
 const finalizationRegistry =
 	typeof FinalizationRegistry !== 'undefined'
@@ -42,8 +41,7 @@ export function useDocument<TDoc extends object>(
 	}
 
 	const providerConstructor = getProviderConstructor() as
-		| DexieYProviderConstructor<TDoc>
-		| undefined;
+		DexieYProviderConstructor<TDoc> | undefined;
 	if (!providerConstructor) {
 		throw new Error(
 			'DexieYProvider is not available. Make sure y-dexie is installed and imported.',

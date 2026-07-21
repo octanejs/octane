@@ -19,9 +19,10 @@ export function MenuHarness(props) @{
 				onClick={props.onMenuClick}
 				ref={props.bubbleRef}
 			>
-				<button data-menu-action="bubble" onClick={props.onActionClick}>
-					{props.label as string}
-				</button>
+				<button
+					data-menu-action="bubble"
+					onClick={props.onActionClick}
+				>{props.label as string}</button>
 				<button data-menu-action="stop" onClick={props.onStoppedActionClick}>
 					stop propagation
 				</button>

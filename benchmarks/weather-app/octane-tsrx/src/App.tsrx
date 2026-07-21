@@ -20,9 +20,7 @@ function UnexpectedError({ error }: { error: unknown }) @{
 					background: '#f5f5f5',
 					borderRadius: '4px',
 				}}
-			>
-				{String(error) as string}
-			</pre>
+			>{String(error) as string}</pre>
 		</details>
 	</div>
 }

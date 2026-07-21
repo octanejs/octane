@@ -59,9 +59,7 @@ function LibrariesFrameworkPage() {
 				All Libraries
 			</Link>
 			<span>/</span>
-			<span class="text-gray-900 dark:text-white">
-				{frameworkOption.label as string}
-			</span>
+			<span class="text-gray-900 dark:text-white">{frameworkOption.label as string}</span>
 		</div>
 
 		<div class="mt-6 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
@@ -111,9 +109,7 @@ function LibrariesFrameworkPage() {
 					)}
 				>
 					<img src={option.logo} alt="" loading="lazy" class="h-5 w-5 object-contain" />
-					<span>
-						{option.label as string}
-					</span>
+					<span>{option.label as string}</span>
 					<span class="text-gray-500 dark:text-gray-400">
 						{optionCount}
 

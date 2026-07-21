@@ -26,7 +26,9 @@ export type NodeMenuPluginProps<TOption extends MenuOption> = {
 	parent?: HTMLElement;
 };
 
-export function LexicalNodeMenuPlugin<TOption extends MenuOption>(props: NodeMenuPluginProps<TOption>) {
+export function LexicalNodeMenuPlugin<TOption extends MenuOption>(
+	props: NodeMenuPluginProps<TOption>,
+) {
 	const options = props.options;
 	const nodeKey = props.nodeKey;
 	const onClose = props.onClose;

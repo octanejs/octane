@@ -100,9 +100,7 @@ function ControlledRadiosChange(props) @{
 				if (props.accept) setPick('b');
 			}}
 		/>
-		<output>
-			{pick as string}
-		</output>
+		<output>{pick as string}</output>
 	</form>
 }
 

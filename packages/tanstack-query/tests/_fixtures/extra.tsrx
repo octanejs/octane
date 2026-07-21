@@ -9,9 +9,7 @@ export function KeyedReader(props: { k: number }) @{
 		retry: false,
 		staleTime: Infinity,
 	});
-	<div id="status">
-		{(q.isPending ? 'pending' : 'data:' + q.data) as string}
-	</div>
+	<div id="status">{(q.isPending ? 'pending' : 'data:' + q.data) as string}</div>
 }
 
 export function KeyedApp(props: { client: unknown; k: number }) @{

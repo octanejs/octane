@@ -39,9 +39,7 @@ export function CustomPropStyle(props) @{
 export function PerRowStyle(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
-			<li class={'r-' + item.id} style={item.s}>
-				{item.label as string}
-			</li>
+			<li class={'r-' + item.id} style={item.s}>{item.label as string}</li>
 		}
 	</ul>
 }
@@ -67,9 +65,7 @@ export function ScopedSingle() @{
 // Multiple instances share the same module-level <style> tag (idempotent).
 export function ScopedReuse(props) @{
 	<>
-		<span class="tag">
-			{props.label as string}
-		</span>
+		<span class="tag">{props.label as string}</span>
 		<style>
 			.tag {
 				font-style: italic;

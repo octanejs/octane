@@ -12,9 +12,7 @@ export function SvgForeignObject(props) @{
 	<svg>
 		<foreignObject>
 			<div class="html-inside">
-				<span>
-					{props.label as string}
-				</span>
+				<span>{props.label as string}</span>
 			</div>
 		</foreignObject>
 		<rect class="svg-after" />
@@ -43,9 +41,7 @@ export function MathAnnotationXml(props) @{
 			</mrow>
 			<annotation-xml encoding="text/html">
 				<div class="inside-anno">
-					<span>
-						{props.text as string}
-					</span>
+					<span>{props.text as string}</span>
 				</div>
 			</annotation-xml>
 		</semantics>

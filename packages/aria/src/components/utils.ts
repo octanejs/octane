@@ -160,11 +160,9 @@ export interface DOMProps extends StyleProps, SharedDOMProps {
 }
 
 export type ClassNameOrFunction<T> =
-	| string
-	| ((values: T & { defaultClassName: string | undefined }) => string);
+	string | ((values: T & { defaultClassName: string | undefined }) => string);
 type StyleOrFunction<T> =
-	| CSSProperties
-	| ((values: T & { defaultStyle: CSSProperties }) => CSSProperties | undefined);
+	CSSProperties | ((values: T & { defaultStyle: CSSProperties }) => CSSProperties | undefined);
 
 export interface StyleRenderProps<T, E extends string = 'div'> extends DOMRenderProps<E, T> {
 	/**
@@ -180,8 +178,7 @@ export interface StyleRenderProps<T, E extends string = 'div'> extends DOMRender
 }
 
 export type ChildrenOrFunction<T> =
-	| ReactNode
-	| ((values: T & { defaultChildren: ReactNode | undefined }) => ReactNode);
+	ReactNode | ((values: T & { defaultChildren: ReactNode | undefined }) => ReactNode);
 
 export interface RenderProps<T, E extends string = 'div'> extends StyleRenderProps<T, E> {
 	/**

@@ -14,9 +14,7 @@ export function App(props: {
 		@try {
 			const product = use(props.loadProduct(props.productId));
 			<article class="product" data-product-id={product.id}>
-				<h2>
-					{product.name as string}
-				</h2>
+				<h2>{product.name as string}</h2>
 				<p class="price">{'$' + (product.priceCents / 100).toFixed(2)}</p>
 			</article>
 		} @pending {
@@ -24,9 +22,7 @@ export function App(props: {
 		} @catch (error) {
 			const message =
 				error instanceof Error ? error.message : String(error);
-			<p class="error" role="alert">
-				{message as string}
-			</p>
+			<p class="error" role="alert">{message as string}</p>
 		}
 	</section>
 }

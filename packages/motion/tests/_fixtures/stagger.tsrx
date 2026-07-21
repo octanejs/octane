@@ -13,9 +13,7 @@ export function StaggerList(props) @{
 	};
 	<motion.div id="container" variants={container} initial="hidden" animate="visible">
 		@for (const n of props.items; key n) {
-			<motion.div id={'i' + n as string} variants={item}>
-				{n as string}
-			</motion.div>
+			<motion.div id={'i' + n as string} variants={item}>{n as string}</motion.div>
 		}
 	</motion.div>
 }

@@ -40,7 +40,9 @@ export type TypeaheadMenuPluginProps<TOption extends MenuOption> = {
 	ignoreEntityBoundary?: boolean;
 };
 
-export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(props: TypeaheadMenuPluginProps<TOption>) {
+export function LexicalTypeaheadMenuPlugin<TOption extends MenuOption>(
+	props: TypeaheadMenuPluginProps<TOption>,
+) {
 	const options = props.options;
 	const onQueryChange = props.onQueryChange;
 	const onSelectOption = props.onSelectOption;

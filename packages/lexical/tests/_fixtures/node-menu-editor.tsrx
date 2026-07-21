@@ -9,13 +9,12 @@ import { useCallback } from 'octane';
 // createPortal(CustomNodeMenuBody, anchor, { itemProps }).
 export function CustomNodeMenuBody(props) @{
 	<div class="custom-node-menu" data-testid="custom-node-menu">{props.itemProps.options.map(
-		(option, i) => <div
-			key={option.key}
-			data-selected={props.itemProps.selectedIndex === i ? 'true' : 'false'}
-			class="custom-node-menu-item"
-		>
-			{option.title as string}
-		</div>,
+		(option, i) =>
+			<div
+				key={option.key}
+				data-selected={props.itemProps.selectedIndex === i ? 'true' : 'false'}
+				class="custom-node-menu-item"
+			>{option.title as string}</div>,
 	)}</div>
 }
 

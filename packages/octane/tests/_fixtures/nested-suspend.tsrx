@@ -39,17 +39,13 @@ function Counter(props) @{
 	_bumpChild = () => setN(n + 1);
 	_goChild = () => setP(props.gate);
 	const v = use(p);
-	<div id="counter">
-		{n + '/' + v as string + '/' + tag as string}
-	</div>
+	<div id="counter">{n + '/' + v as string + '/' + tag as string}</div>
 }
 
 function Sibling() @{
 	const [m, setM] = useState(0);
 	_bumpSibling = () => setM(m + 1);
-	<div id="sibling">
-		{m as number}
-	</div>
+	<div id="sibling">{m as number}</div>
 }
 
 export function NestedSuspendBoundary(props) @{

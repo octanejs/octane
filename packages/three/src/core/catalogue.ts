@@ -48,9 +48,7 @@ export type AttachType<T = unknown> = Attach<T>;
 export type ThreeKey = string | number | symbol | bigint;
 
 export type ThreeRef<T> =
-	| ((value: T | null) => void | (() => void))
-	| { current: T | null }
-	| readonly ThreeRef<T>[];
+	((value: T | null) => void | (() => void)) | { current: T | null } | readonly ThreeRef<T>[];
 
 export interface ThreeInstanceProps<T = unknown> {
 	attach?: Attach<T>;
@@ -95,8 +93,7 @@ export interface VectorRepresentation extends MathRepresentation {
 
 export type MathTypes = MathRepresentation | THREE.Euler | THREE.Color;
 type MutableOrReadonlyParameters<T extends (...args: any[]) => any> =
-	| Parameters<T>
-	| Readonly<Parameters<T>>;
+	Parameters<T> | Readonly<Parameters<T>>;
 
 export type MathType<T extends MathTypes> = T extends THREE.Color
 	? Args<typeof THREE.Color> | THREE.ColorRepresentation

@@ -48,8 +48,8 @@ function stopLinkNavigation(event: MouseEvent): boolean {
 		event.altKey;
 }
 
-const isStringArray = (value: unknown): value is string[] => Array.isArray(value) &&
-	value.every((item) => typeof item === 'string');
+const isStringArray = (value: unknown): value is string[] =>
+	Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 function readStringArray(key: string): string[] {
 	try {
@@ -74,9 +74,10 @@ function readNote(tripId: string): string {
 function writeNotes(tripId: string, note: string): boolean {
 	try {
 		const parsed: unknown = JSON.parse(localStorage.getItem(NOTES_STORAGE_KEY) ?? '{}');
-		const notes = (parsed !== null && typeof parsed === 'object'
-			? parsed
-			: {}) as Record<string, string>;
+		const notes = (parsed !== null && typeof parsed === 'object' ? parsed : {}) as Record<
+			string,
+			string
+		>;
 		notes[tripId] = note;
 		localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
 		return true;
@@ -196,9 +197,7 @@ function DestinationCard(props: DestinationCardProps) @{
 				>{props.destination.city}</AppLink>
 			</h3>
 			<p>{props.destination.tagline}</p>
-			<p class="card-tags">
-				{props.destination.bestFor.join(' · ') as string}
-			</p>
+			<p class="card-tags">{props.destination.bestFor.join(' · ') as string}</p>
 		</div>
 	</article>
 }
@@ -428,9 +427,7 @@ function PairedPlan(props: PairedPlanProps) @{
 			<div class="inline-error" role="alert">
 				<p class="eyebrow">Planning interrupted</p>
 				<h2>Route and stays could not be paired.</h2>
-				<p>
-					{describeError(error) as string}
-				</p>
+				<p>{describeError(error) as string}</p>
 			</div>
 		}
 	</section>
@@ -464,9 +461,7 @@ function FareRegion(props: FareRegionProps) @{
 		} @catch (error) {
 			<div class="inline-error" role="alert">
 				<h2>Fare watch is resting.</h2>
-				<p>
-					{describeError(error) as string}
-				</p>
+				<p>{describeError(error) as string}</p>
 			</div>
 		}
 	</section>
@@ -503,9 +498,7 @@ function WeatherRegion(props: WeatherRegionProps) @{
 			<div class="inline-error weather-error" role="alert">
 				<p class="eyebrow">Forecast unavailable</p>
 				<h2>The local weather desk did not answer.</h2>
-				<p>
-					{describeError(error) as string}
-				</p>
+				<p>{describeError(error) as string}</p>
 				<button
 					class="button button-light"
 					type="button"

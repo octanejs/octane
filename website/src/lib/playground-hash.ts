@@ -26,8 +26,7 @@ export type PlaygroundHashPayload = {
 	files: PlaygroundFile[];
 };
 export type PlaygroundHashResult =
-	| { ok: true; value: PlaygroundHashPayload | null }
-	| { ok: false; error: string };
+	{ ok: true; value: PlaygroundHashPayload | null } | { ok: false; error: string };
 
 function totalLength(files: PlaygroundFile[]): number {
 	return files.reduce((sum, file) => sum + file.source.length, 0);

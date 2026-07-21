@@ -28,9 +28,10 @@ function WeeklyDownloadCounter({
 		updatedAt: startedAtRef.current,
 	});
 
-	return <span ref={ref} style={{ fontVariantNumeric: 'tabular-nums' }}>
-		{weeklyDownloads.toLocaleString() as string}
-	</span>;
+	return <span
+		ref={ref}
+		style={{ fontVariantNumeric: 'tabular-nums' }}
+	>{weeklyDownloads.toLocaleString() as string}</span>;
 }
 
 function isValidMetric(value: number | undefined | null): boolean {
@@ -40,9 +41,7 @@ function isValidMetric(value: number | undefined | null): boolean {
 
 function StatValue({ placeholder, children }: { placeholder: string; children?: any }) {
 	return <span class="inline-grid [&>*]:col-start-1 [&>*]:row-start-1">
-		<span class="invisible" aria-hidden>
-			{placeholder as string}
-		</span>
+		<span class="invisible" aria-hidden>{placeholder as string}</span>
 		<span>{children}</span>
 	</span>;
 }

@@ -22,9 +22,7 @@ export function InputEcho() @{
 	const [value, setValue] = useState('');
 	<div>
 		<input aria-label="name" onInput={(e) => setValue(e.target.value)} />
-		<p data-testid="echo">
-			{value as string}
-		</p>
+		<p data-testid="echo">{value as string}</p>
 	</div>
 }
 
@@ -41,9 +39,7 @@ export function ControlledInputAccepting() @{
 	const [value, setValue] = useState('');
 	<div>
 		<input aria-label="name" value={value} onInput={(e) => setValue(e.target.value)} />
-		<p data-testid="echo">
-			{value as string}
-		</p>
+		<p data-testid="echo">{value as string}</p>
 	</div>
 }
 

@@ -1,11 +1,9 @@
 import { createStoreContext, useAtom, useSelector } from '@octanejs/tanstack-store';
 import type { Atom, Store } from '@tanstack/store';
 
-const { StoreProvider, useStoreContext } = createStoreContext<
-	{
-		store: Store<{ count: number }>;
-	}
->();
+const { StoreProvider, useStoreContext } = createStoreContext<{
+	store: Store<{ count: number }>;
+}>();
 
 function ContextCount() @{
 	const { store } = useStoreContext();

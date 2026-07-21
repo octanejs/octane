@@ -1,9 +1,7 @@
 import { useState } from 'octane';
 
 function Cell(props) @{
-	<span class="cell">
-		{props.text as string}
-	</span>
+	<span class="cell">{props.text as string}</span>
 }
 
 // The keyed item body closes over PARENT state (`suffix`) beside the item

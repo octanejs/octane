@@ -19,9 +19,7 @@ function RefHost(props) @{
 }
 function Async(props) @{
 	const v = use(props.promise);
-	<span class="async">
-		{v as string}
-	</span>
+	<span class="async">{v as string}</span>
 }
 export function App(props) @{
 	const [show, setShow] = useState(false);

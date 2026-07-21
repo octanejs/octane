@@ -14,9 +14,7 @@ export function App(props: {
 	}, []);
 
 	<section aria-label="Invoice summary">
-		<output aria-label="Quantity">
-			{props.quantity as string}
-		</output>
+		<output aria-label="Quantity">{props.quantity as string}</output>
 		<output aria-label="Subtotal">{subtotal.toFixed(2)}</output>
 		<output aria-label="Total">{total.toFixed(2)}</output>
 	</section>

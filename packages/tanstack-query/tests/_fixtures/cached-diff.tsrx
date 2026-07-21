@@ -14,12 +14,10 @@ export function Cached() @{
 		initialData: 'seed',
 		staleTime: Infinity,
 	});
-	<div id="d">
-		{'data=' + q.data + ' status=' + q.status + ' pending=' + q.isPending + ' fetching=' +
-			q.isFetching +
-			' success=' +
-			q.isSuccess as string}
-	</div>
+	<div id="d">{'data=' + q.data + ' status=' + q.status + ' pending=' + q.isPending + ' fetching=' +
+		q.isFetching +
+		' success=' +
+		q.isSuccess as string}</div>
 }
 
 export function CachedApp() @{

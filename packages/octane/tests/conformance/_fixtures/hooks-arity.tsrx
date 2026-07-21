@@ -27,9 +27,7 @@ export function StableRefAcrossRenderPhase(props) @{
 		setCount(count + 1);
 	}
 
-	<span id="count">
-		{count as number}
-	</span>
+	<span id="count">{count as number}</span>
 }
 
 // Per ReactDOMHooks-test.js:157 — a state update scheduled from within an
@@ -41,8 +39,6 @@ export function InputEventUpdate(props) @{
 	const [inputText, setInputText] = useState('');
 	<div>
 		<input id="in" onInput={(e) => setInputText(e.target.value)} />
-		<label id="label">
-			{inputText as string}
-		</label>
+		<label id="label">{inputText as string}</label>
 	</div>
 }

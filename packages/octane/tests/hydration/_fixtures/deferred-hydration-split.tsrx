@@ -15,9 +15,7 @@ function SplitReviews(props) @{
 		id="split-review-action"
 		data-captured-label={label}
 		onClick={() => props.onClick?.(label)}
-	>
-		{label as string}
-	</button>
+	>{label as string}</button>
 }
 
 function LastSplitReviews() @{
@@ -74,9 +72,7 @@ export function RepeatedSplitHydration(props) @{
 					class="repeated-split-action"
 					data-item-id={item.id}
 					onClick={() => props.onClick?.(item.id)}
-				>
-					{item.label as string}
-				</button>
+				>{item.label as string}</button>
 			</Hydrate>
 		}
 	</section>

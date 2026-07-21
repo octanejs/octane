@@ -407,19 +407,17 @@ export async function replaceSkillsForVersion(
 	if (skills.length === 0) return;
 
 	await db.insert(intentSkills).values(
-		skills.map(
-			(s): NewIntentSkill => ({
-				packageVersionId,
-				name: s.name,
-				description: s.description,
-				type: s.type ?? null,
-				framework: s.framework ?? null,
-				requires: s.requires ?? null,
-				skillPath: s.skillPath || null,
-				contentHash: s.contentHash,
-				lineCount: s.lineCount,
-			}),
-		),
+		skills.map((s): NewIntentSkill => ({
+			packageVersionId,
+			name: s.name,
+			description: s.description,
+			type: s.type ?? null,
+			framework: s.framework ?? null,
+			requires: s.requires ?? null,
+			skillPath: s.skillPath || null,
+			contentHash: s.contentHash,
+			lineCount: s.lineCount,
+		})),
 	);
 }
 

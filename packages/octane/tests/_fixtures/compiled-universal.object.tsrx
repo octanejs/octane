@@ -7,8 +7,6 @@ export function CompiledUniversalScene(props) @{
 	}, [props.log, props.label]);
 	<scene tone={props.tone} ref={props.hostRef}>
 		<node value={props.value} />
-		<label>
-			{props.label as string}
-		</label>
+		<label>{props.label as string}</label>
 	</scene>
 }

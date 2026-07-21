@@ -40,9 +40,7 @@ export function FunctionalUpdaterQueue() @{
 				setN((p: number) => p + 1);
 			}}
 		>{'inc'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -77,9 +75,7 @@ export function MixedValueUpdater() @{
 				setN(5);
 			}}
 		>{'c'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -90,9 +86,7 @@ export function ObjectIsBailout() @{
 	_renderCount++;
 	<div>
 		<button id="same" onClick={() => setN(n)}>{'same'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -126,12 +120,8 @@ export function MultiSetterBatching() @{
 				setM(m + 1);
 			}}
 		>{'both'}</button>
-		<span id="n">
-			{n as number}
-		</span>
-		<span id="m">
-			{m as number}
-		</span>
+		<span id="n">{n as number}</span>
+		<span id="m">{m as number}</span>
 	</div>
 }
 
@@ -170,9 +160,7 @@ function CoalesceLeaf() @{
 	const [v, setV] = useState(0);
 	_setCoLeaf = setV;
 	_coLeaf++;
-	<span id="co-leaf">
-		{v as number}
-	</span>
+	<span id="co-leaf">{v as number}</span>
 }
 
 function CoalesceMid() @{
@@ -180,9 +168,7 @@ function CoalesceMid() @{
 	_setCoMid = setV;
 	_coMid++;
 	<div id="co-mid">
-		<span id="co-m">
-			{v as number}
-		</span>
+		<span id="co-m">{v as number}</span>
 		<CoalesceLeaf />
 	</div>
 }
@@ -192,9 +178,7 @@ export function CoalesceChain() @{
 	_setCoParent = setV;
 	_coParent++;
 	<div id="co-parent">
-		<span id="co-p">
-			{v as number}
-		</span>
+		<span id="co-p">{v as number}</span>
 		<CoalesceMid />
 	</div>
 }
@@ -217,9 +201,7 @@ export function LazyInitOnce() @{
 	_renderCount++;
 	<div>
 		<button id="inc" onClick={() => setN(n + 1)}>{'inc'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -244,9 +226,7 @@ export function ReducerSameRefBailout() @{
 	<div>
 		<button id="keep" onClick={() => dispatch('keep')}>{'keep'}</button>
 		<button id="inc" onClick={() => dispatch('inc')}>{'inc'}</button>
-		<span id="out">
-			{state.v as number}
-		</span>
+		<span id="out">{state.v as number}</span>
 	</div>
 }
 
@@ -258,9 +238,7 @@ export function ReducerLazyInit(props) @{
 	_renderCount++;
 	<div>
 		<button id="inc" onClick={() => dispatch('inc')}>{'inc'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -273,9 +251,7 @@ export function ReducerLatestRef(props) @{
 	_renderCount++;
 	<div>
 		<button id="go" onClick={() => dispatch('go')}>{'go'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -295,9 +271,7 @@ export function StableSetterIdentity() @{
 	_setN = setN;
 	_renderCount++;
 	<div>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -307,9 +281,7 @@ export function SetAfterUnmount() @{
 	_setN = setN;
 	_renderCount++;
 	<div>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }
 
@@ -330,9 +302,7 @@ export function EffectTriggersRender() @{
 		_effectFired++;
 		if (n === 0) setN(1);
 	}, [n]);
-	<span id="out">
-		{n as number}
-	</span>
+	<span id="out">{n as number}</span>
 }
 
 // Setting state on an object stored in useState — verifies reference
@@ -342,8 +312,6 @@ export function ObjectStateRender() @{
 	_setObj = setObj;
 	_renderCount++;
 	<div>
-		<span id="out">
-			{obj.a as number}
-		</span>
+		<span id="out">{obj.a as number}</span>
 	</div>
 }

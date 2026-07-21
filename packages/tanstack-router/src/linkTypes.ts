@@ -58,8 +58,7 @@ export type LinkProps<
 
 export interface LinkPropsChildren {
 	children?:
-		| OctaneRenderable
-		| ((state: { isActive: boolean; isTransitioning: boolean }) => unknown);
+		OctaneRenderable | ((state: { isActive: boolean; isTransitioning: boolean }) => unknown);
 }
 
 export type CreateLinkProps = LinkProps<any, any, string, string, string, string>;

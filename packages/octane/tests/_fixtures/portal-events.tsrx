@@ -7,9 +7,7 @@ import { useState, createPortal } from 'octane';
 export function BasicPortalClick(props) @{
 	const [count, setCount] = useState(0);
 	<div class="app-root">
-		<span class="count">
-			{count as string}
-		</span>
+		<span class="count">{count as string}</span>
 		{createPortal(
 			() => @{
 				<div class="modal">
@@ -33,12 +31,8 @@ export function CrossPortalBubble(props) @{
 	// because the inner button is logically a descendant of this div even
 	// though its DOM lives in props.target.
 	<div class="app-root" onClick={() => setOuterCount(outerCount + 1)}>
-		<span class="inner-count">
-			{innerCount as string}
-		</span>
-		<span class="outer-count">
-			{outerCount as string}
-		</span>
+		<span class="inner-count">{innerCount as string}</span>
+		<span class="outer-count">{outerCount as string}</span>
 		{createPortal(
 			() => @{
 				<div class="modal">
@@ -75,12 +69,8 @@ export function StopPropagation(props) @{
 		setInnerCount(innerCount + 1);
 	};
 	<div class="app-root" onClick={() => setOuterCount(outerCount + 1)}>
-		<span class="inner-count">
-			{innerCount as string}
-		</span>
-		<span class="outer-count">
-			{outerCount as string}
-		</span>
+		<span class="inner-count">{innerCount as string}</span>
+		<span class="outer-count">{outerCount as string}</span>
 		{createPortal(
 			() => @{
 				<div class="modal">
@@ -101,12 +91,8 @@ export function TwoPortalsSameTarget(props) @{
 	const [aCount, setACount] = useState(0);
 	const [bCount, setBCount] = useState(0);
 	<div class="app-root">
-		<span class="a-count">
-			{aCount as string}
-		</span>
-		<span class="b-count">
-			{bCount as string}
-		</span>
+		<span class="a-count">{aCount as string}</span>
+		<span class="b-count">{bCount as string}</span>
 		{createPortal(
 			() => @{
 				<button class="btn-a" onClick={() => setACount(aCount + 1)}>{'A'}</button>

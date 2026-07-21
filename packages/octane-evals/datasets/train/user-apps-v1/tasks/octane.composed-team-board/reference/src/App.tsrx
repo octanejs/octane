@@ -19,12 +19,8 @@ export function MemberCard(props: {
 	const [detailsOpen, setDetailsOpen] = useState(false);
 
 	<article data-member-id={props.member.id}>
-		<h2>
-			{props.member.name as string}
-		</h2>
-		<output aria-label={'Applause ' + props.member.name}>
-			{props.applause as string}
-		</output>
+		<h2>{props.member.name as string}</h2>
+		<output aria-label={'Applause ' + props.member.name}>{props.applause as string}</output>
 		<button
 			aria-label={(detailsOpen ? 'Hide details ' : 'Show details ') + props.member.name}
 			onClick={() => setDetailsOpen((open) => !open)}
@@ -41,17 +37,13 @@ export function MemberCard(props: {
 			Applaud twice
 		</button>
 		@if (detailsOpen) {
-			<p>
-				{props.member.bio as string}
-			</p>
+			<p>{props.member.bio as string}</p>
 		}
 	</article>
 }
 
 export function TeamSummary(props: { total: number }) @{
-	<output aria-label="Total applause">
-		{props.total as string}
-	</output>
+	<output aria-label="Total applause">{props.total as string}</output>
 }
 
 export function App() @{

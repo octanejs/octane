@@ -44,9 +44,7 @@ function EnterFailurePage() @{
 // Reads a path param via useParams (loose access).
 function ItemPage() @{
 	const params = useParams({ strict: false });
-	<h1 class="item">
-		{'Item ' + params.id as string}
-	</h1>
+	<h1 class="item">{'Item ' + params.id as string}</h1>
 }
 
 // A second layout level: posts has its own <Outlet/> for its children, exercising

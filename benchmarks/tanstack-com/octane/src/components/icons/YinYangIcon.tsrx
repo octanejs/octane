@@ -1,4 +1,5 @@
-type SVGIconProps = Record<string, any> & {
+type SVGIconProps =
+	Record<string, any> & {
 		className?: string;
 		width?: string | number;
 		height?: string | number;

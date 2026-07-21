@@ -144,7 +144,7 @@ const reactQueryV3List = [
     {from: "reference/QueryClient", to: "docs/reference/QueryClient"},
     {from: "examples/basic", to: "docs/framework/react/examples/basic"},
     // {from: '',to: ''},
-  ]
+  ];
 
 /**
   Features that have been removed in v5
@@ -154,7 +154,7 @@ const reactQueryV3RemovedInV5List = [
     {from: "guides/custom-logger", to: "docs/framework/react/guides/migrating-to-v5#the-deprecated-custom-logger-has-been-removed"},
     {from: "plugins/createWebStoragePersister", to: "docs/framework/react/guides/migrating-to-react-query-4#persistqueryclient-and-the-corresponding-persister-plugins-are-no-longer-experimental-and-have-been-renamed"},
     {from: "plugins/createAsyncStoragePersister", to: "docs/framework/react/guides/migrating-to-react-query-4#persistqueryclient-and-the-corresponding-persister-plugins-are-no-longer-experimental-and-have-been-renamed"},
-]
+];
 
 /*
 Community resources section to new location
@@ -189,7 +189,7 @@ const queryCommunityLinks = [
     from: 'docs/framework/react/videos',
     to: 'docs/community-resources',
   },
-]
+];
 
 export const router: LibrarySlim = {
 	id: 'router',
@@ -374,7 +374,7 @@ const reactTableV7List = [
     {from: 'docs/installation',to: 'docs/installation',},
     {from: 'docs/overview',to: 'docs/introduction',},
     {from: 'docs/quick-start',to: 'docs/overview',},
-]
+];
 
 export const form: LibrarySlim = {
 	id: 'form',

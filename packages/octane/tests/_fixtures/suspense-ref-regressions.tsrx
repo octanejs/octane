@@ -11,9 +11,7 @@ export function SupersededRefOrder(props) @{
 	<>
 		@try {
 			const value = use(props.promise);
-			<span class="superseded-value" ref={props.cbRef}>
-				{value as string}
-			</span>
+			<span class="superseded-value" ref={props.cbRef}>{value as string}</span>
 		} @pending {
 			<span class="superseded-fallback">{'loading'}</span>
 		}

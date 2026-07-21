@@ -29,7 +29,9 @@ type LexicalAutoEmbedPluginProps<TEmbedConfig extends EmbedConfig> = {
 	menuCommandPriority?: CommandListenerPriority;
 };
 
-export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(props: LexicalAutoEmbedPluginProps<TEmbedConfig>) {
+export function LexicalAutoEmbedPlugin<TEmbedConfig extends EmbedConfig>(
+	props: LexicalAutoEmbedPluginProps<TEmbedConfig>,
+) {
 	const embedConfigs = props.embedConfigs;
 	const onOpenEmbedModalForConfig = props.onOpenEmbedModalForConfig;
 	const getMenuOptions = props.getMenuOptions;

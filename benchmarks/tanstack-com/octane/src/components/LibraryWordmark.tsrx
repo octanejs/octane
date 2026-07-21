@@ -37,8 +37,6 @@ export function LibraryWordmark({
 					: '',
 				productClassName,
 			)}
-		>
-			{productName as string}
-		</span>
+		>{productName as string}</span>
 	</span>;
 }

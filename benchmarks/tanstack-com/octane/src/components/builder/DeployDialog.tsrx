@@ -83,9 +83,9 @@ export function DeployDialog({
 
 	const providerInfo = provider ? PROVIDER_INFO[provider] : null;
 
-	const trackDialogLinkClick = useCallback((action: | 'repo'
-	| 'provider_auto_redirect'
-	| 'provider_manual_redirect') => {
+	const trackDialogLinkClick = useCallback((
+		action: 'repo' | 'provider_auto_redirect' | 'provider_manual_redirect',
+	) => {
 		const builderAction: BuilderAction =
 			action === 'repo'
 				? 'open_repo'
@@ -295,16 +295,12 @@ export function DeployDialog({
 							: <GitHub className="w-5 h-5 text-white" />}
 					</div>
 					<div>
-						<h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-							{(providerInfo
-								? `Deploy to ${providerInfo.name}`
-								: 'Create GitHub Repository') as string}
-						</h2>
-						<p class="text-sm text-gray-500 dark:text-gray-400">
-							{(providerInfo
-								? 'Create a GitHub repo and deploy'
-								: 'Push your project to GitHub') as string}
-						</p>
+						<h2 class="text-lg font-semibold text-gray-900 dark:text-white">{(providerInfo
+							? `Deploy to ${providerInfo.name}`
+							: 'Create GitHub Repository') as string}</h2>
+						<p class="text-sm text-gray-500 dark:text-gray-400">{(providerInfo
+							? 'Create a GitHub repo and deploy'
+							: 'Push your project to GitHub') as string}</p>
 					</div>
 				</div>
 			</div>
@@ -371,10 +367,7 @@ export function DeployDialog({
 										<AlertCircle className="w-4 h-4 text-red-500" />}
 								</div>
 							</div>
-							{repoNameError &&
-								<p class="mt-1 text-xs text-red-500">
-									{repoNameError as string}
-								</p>}
+							{repoNameError && <p class="mt-1 text-xs text-red-500">{repoNameError as string}</p>}
 						</div>
 
 						<div>
@@ -438,9 +431,7 @@ export function DeployDialog({
 				{state.step === 'deploying' &&
 					<div class="flex flex-col items-center justify-center py-8">
 						<Loader2 className="w-8 h-8 animate-spin text-blue-500 dark:text-cyan-400" />
-						<p class="mt-4 text-sm text-gray-600 dark:text-gray-400">
-							{state.message as string}
-						</p>
+						<p class="mt-4 text-sm text-gray-600 dark:text-gray-400">{state.message as string}</p>
 					</div>}
 
 				{state.step === 'success' &&
@@ -515,9 +506,7 @@ export function DeployDialog({
 						<h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
 							Deployment Failed
 						</h3>
-						<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-							{state.message as string}
-						</p>
+						<p class="text-sm text-gray-500 dark:text-gray-400 mb-4">{state.message as string}</p>
 						<div class="flex gap-3">
 							<Button variant="secondary" onClick={onClose}>
 								Cancel

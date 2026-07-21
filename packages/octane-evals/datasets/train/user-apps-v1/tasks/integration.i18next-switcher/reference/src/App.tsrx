@@ -5,9 +5,7 @@ function LocalizedContent(props: { name: string }) @{
 	const { t, i18n } = useTranslation('translation', { useSuspense: false });
 
 	<section>
-		<h1>
-			{t('greeting', { name: props.name }) as string}
-		</h1>
+		<h1>{t('greeting', { name: props.name }) as string}</h1>
 		<p>
 			<Trans i18nKey="details" components={{ strong: <strong /> }} />
 		</p>

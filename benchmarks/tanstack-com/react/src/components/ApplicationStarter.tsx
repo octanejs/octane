@@ -69,13 +69,7 @@ const starterToolchains = ['biome', 'eslint'] as const;
 
 type HostingDeployPartnerId = 'cloudflare' | 'lovable' | 'netlify' | 'railway';
 type StarterTransientAction =
-	| 'claude'
-	| 'clone'
-	| 'codex'
-	| 'cursor'
-	| 'deploy'
-	| 'download'
-	| 'netlify';
+	'claude' | 'clone' | 'codex' | 'cursor' | 'deploy' | 'download' | 'netlify';
 
 const hostingDeployPartnerLabels: Record<HostingDeployPartnerId, string> = {
 	cloudflare: 'Cloudflare',

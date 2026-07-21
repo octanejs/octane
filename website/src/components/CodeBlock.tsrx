@@ -58,9 +58,7 @@ export function CodeBlock(props: CodeBlockProps) @{
 					</>
 				}
 				@if (label) {
-					<span class="codeblock-name">
-						{label as string}
-					</span>
+					<span class="codeblock-name">{label as string}</span>
 				}
 				@if (showBarCopy) {
 					<button

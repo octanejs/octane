@@ -15,9 +15,7 @@ export function HookApp(props) @{
 		useSuspense: false,
 	});
 	<div>
-		<p id="hook-value">
-			{t('welcome', { name: props.name }) as string}
-		</p>
+		<p id="hook-value">{t('welcome', { name: props.name }) as string}</p>
 		<p id="hook-ready">{String(ready)}</p>
 		<button id="fr" onClick={() => props.i18n.changeLanguage('fr')}>{'French'}</button>
 	</div>
@@ -33,20 +31,14 @@ export function MultipleHooksApp(props) @{
 		useSuspense: false,
 	});
 	<div>
-		<p id="multi-default">
-			{translateDefault('welcome', { name: 'Ada' }) as string}
-		</p>
-		<p id="multi-common">
-			{translateCommon('action') as string}
-		</p>
+		<p id="multi-default">{translateDefault('welcome', { name: 'Ada' }) as string}</p>
+		<p id="multi-common">{translateCommon('action') as string}</p>
 	</div>
 }
 
 function ProviderConsumer() @{
 	const { t } = useTranslation();
-	<p id="provider-value">
-		{t('welcome', { name: 'Ada' }) as string}
-	</p>
+	<p id="provider-value">{t('welcome', { name: 'Ada' }) as string}</p>
 }
 
 export function ProviderApp(props) @{
@@ -88,9 +80,7 @@ export function BlockChildrenApp(props) @{
 }
 
 function WrappedView(props) @{
-	<p id="hoc-value">
-		{props.t('welcome', { name: props.name }) as string}
-	</p>
+	<p id="hoc-value">{props.t('welcome', { name: props.name }) as string}</p>
 }
 
 const WrappedTranslation = withTranslation('translation')(WrappedView);
@@ -100,9 +90,7 @@ export function ComponentApisApp(props) @{
 		<div>
 			<Translation
 				ns="translation"
-				children={(t) => <p id="render-prop">
-					{t('welcome', { name: props.name }) as string}
-				</p>}
+				children={(t) => <p id="render-prop">{t('welcome', { name: props.name }) as string}</p>}
 			/>
 			<WrappedTranslation name={props.name} />
 		</div>
@@ -140,9 +128,7 @@ export function IcuApp(props) @{
 
 function AsyncConsumer(props) @{
 	const { t } = useTranslation('lazy', { i18n: props.i18n });
-	<p id="async-value">
-		{t('key1') as string}
-	</p>
+	<p id="async-value">{t('key1') as string}</p>
 }
 
 export function SuspenseApp(props) @{
@@ -157,7 +143,5 @@ export function SSRSeedApp(props) @{
 		i18n: props.i18n,
 		useSuspense: false,
 	});
-	<p id="seeded-value">
-		{t('seeded') as string}
-	</p>
+	<p id="seeded-value">{t('seeded') as string}</p>
 }

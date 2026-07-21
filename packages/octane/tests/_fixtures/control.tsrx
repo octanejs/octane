@@ -37,9 +37,7 @@ export function HookInIf() @{
 		<section>
 			@if (show) {
 				const [n, setN] = useState(0);
-				<button id="inner" onClick={() => setN(n + 1)}>
-					{n as string}
-				</button>
+				<button id="inner" onClick={() => setN(n + 1)}>{n as string}</button>
 			}
 		</section>
 	</div>
@@ -72,9 +70,7 @@ export function IfTrailingText(props) @{
 export function ForTrailingText(props) @{
 	<p>
 		@for (const x of props.items; key x) {
-			<span class="row">
-				{x as string}
-			</span>
+			<span class="row">{x as string}</span>
 		}
 		tail
 	</p>

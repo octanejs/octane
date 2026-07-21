@@ -7,16 +7,12 @@ export function MixedHydrationOwners(props) @{
 		id="mixed-hydration-owners"
 		data-external={String(external)}
 		data-ordinary={String(ordinary)}
-	>
-		{String(external) + ':' + String(ordinary) as string}
-	</div>
+	>{String(external) + ':' + String(ordinary) as string}</div>
 }
 
 export function ExternalBoundary(props) @{
 	@try {
-		<span class="resolved">
-			{String(use(props.promise)) as string}
-		</span>
+		<span class="resolved">{String(use(props.promise)) as string}</span>
 	} @pending {
 		<span class="pending">pending</span>
 	}

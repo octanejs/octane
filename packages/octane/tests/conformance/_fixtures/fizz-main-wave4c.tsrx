@@ -12,9 +12,7 @@ export function SyncThenableBoundary(props) @{
 	<section id="sync-thenable-boundary">
 		@try {
 			const value = use(props.thenable);
-			<strong id="sync-thenable-value">
-				{value as string}
-			</strong>
+			<strong id="sync-thenable-value">{value as string}</strong>
 		} @pending {
 			<i id="sync-thenable-fallback">{'loading'}</i>
 		}
@@ -45,9 +43,7 @@ export function CustomElementChildren() @{
 function NestedUse(props) @{
 	const c = use(props.c);
 	const d = use(props.d);
-	<span id="nested-use-values">
-		{c + d as string}
-	</span>
+	<span id="nested-use-values">{c + d as string}</span>
 }
 
 function ParentUse(props) @{
@@ -73,9 +69,7 @@ export function setLazyUseModule(modulePromise) {
 
 export function LazyUseLeaf(props) @{
 	const value = use(props.promise);
-	<span id="lazy-use-second">
-		{value as string}
-	</span>
+	<span id="lazy-use-second">{value as string}</span>
 }
 
 const LazyUseLeafModule = lazy(() => lazyModule);
@@ -108,9 +102,7 @@ export function LazyRejectionBoundary() @{
 	} @pending {
 		<i id="lazy-rejection-fallback">{'loading'}</i>
 	} @catch (error) {
-		<strong id="lazy-rejection-error">
-			{error.message as string}
-		</strong>
+		<strong id="lazy-rejection-error">{error.message as string}</strong>
 	}
 }
 
@@ -122,9 +114,7 @@ function ThrowContextError(props) {
 
 function ResolvedAfterFatal(props) @{
 	props.onRender();
-	<span id="resolved-after-fatal">
-		{props.value as string}
-	</span>
+	<span id="resolved-after-fatal">{props.value as string}</span>
 }
 
 export function PendingThenFatal(props) @{
@@ -152,9 +142,7 @@ export function ContextErrorRecovery(props) @{
 					<ThrowContextError error={props.error} />
 				</RecoveryContext.Provider>
 			} @catch (error) {
-				<b id="context-error">
-					{error.message as string}
-				</b>
+				<b id="context-error">{error.message as string}</b>
 			}
 			<ReadRecoveryContext id="context-after-error" />
 		</RecoveryContext.Provider>
@@ -169,9 +157,8 @@ export function ActionStateRenderReplay(props) @{
 	<section id="action-state-replay">
 		@try {
 			const label = use(props.promise);
-			<strong id="action-state-value">
-				{label + ':' + actionState + ':' + localState as string}
-			</strong>
+			<strong id="action-state-value">{label + ':' + actionState + ':' +
+				localState as string}</strong>
 		} @pending {
 			<i id="action-state-fallback">{'loading'}</i>
 		}

@@ -11,11 +11,9 @@ import {
 
 const externalStore = createStore({ count: 1, ignored: 10 });
 const externalAtom = createAtom(5);
-const { StoreProvider, useStoreContext } = createStoreContext<
-	{
-		atom: typeof externalAtom;
-	}
->();
+const { StoreProvider, useStoreContext } = createStoreContext<{
+	atom: typeof externalAtom;
+}>();
 
 function ContextReader() @{
 	const { atom } = useStoreContext();

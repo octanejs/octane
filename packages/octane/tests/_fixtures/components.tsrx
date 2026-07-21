@@ -1,9 +1,7 @@
 import { useState, createContext, use } from 'octane';
 
 export function Label(props) @{
-	<span class="lbl">
-		{props.text as string}
-	</span>
+	<span class="lbl">{props.text as string}</span>
 }
 
 export function Greeting(props) @{
@@ -17,17 +15,13 @@ export const Theme = createContext('light');
 
 export function ThemeReader() @{
 	const theme = use(Theme);
-	<span class="theme">
-		{theme as string}
-	</span>
+	<span class="theme">{theme as string}</span>
 }
 
 export function App() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button onClick={() => setN(n + 1)}>
-			{n as string}
-		</button>
+		<button onClick={() => setN(n + 1)}>{n as string}</button>
 		<Theme.Provider value={n % 2 === 0 ? 'light' : 'dark'}>
 			<ThemeReader />
 		</Theme.Provider>
@@ -80,9 +74,7 @@ export function Counter(props) @{
 	}, []);
 	<div class="kh">
 		<span class="label">{props.label ?? '' as string}</span>
-		<span class="count">
-			{n as string}
-		</span>
+		<span class="count">{n as string}</span>
 		<button class="inc" onClick={() => setN(n + 1)}>{'+'}</button>
 	</div>
 }

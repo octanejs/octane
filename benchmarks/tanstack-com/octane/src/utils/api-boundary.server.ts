@@ -4,12 +4,10 @@ export type ApiBoundaryError = {
 };
 
 export type JsonBodyResult =
-	| { success: true; body: unknown }
-	| { success: false; error: ApiBoundaryError };
+	{ success: true; body: unknown } | { success: false; error: ApiBoundaryError };
 
 export type TextBodyResult =
-	| { success: true; text: string }
-	| { success: false; error: ApiBoundaryError };
+	{ success: true; text: string } | { success: false; error: ApiBoundaryError };
 
 export type JsonRequestGuardOptions = {
 	maxContentLength?: number;

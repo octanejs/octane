@@ -9,10 +9,20 @@ import { DragDropContext } from './context';
 import { Renderer } from './renderer.tsrx';
 import type { OctaneRenderer } from './renderer.tsrx';
 
-export type Events<T extends Data = Data, U extends Draggable<T> = Draggable<T>, V extends Droppable<T> = Droppable<T>, W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>> =
+export type Events<
+	T extends Data = Data,
+	U extends Draggable<T> = Draggable<T>,
+	V extends Droppable<T> = Droppable<T>,
+	W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>,
+> =
 	DragDropEventHandlers<U, V, W>;
 
-export interface DragDropProviderProps<T extends Data = Data, U extends Draggable<T> = Draggable<T>, V extends Droppable<T> = Droppable<T>, W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>> extends DragDropManagerInput {
+export interface DragDropProviderProps<
+	T extends Data = Data,
+	U extends Draggable<T> = Draggable<T>,
+	V extends Droppable<T> = Droppable<T>,
+	W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>,
+> extends DragDropManagerInput {
 	children?: unknown;
 	manager?: W;
 	onBeforeDragStart?: Events<T, U, V, W>['beforedragstart'];
@@ -25,7 +35,12 @@ export interface DragDropProviderProps<T extends Data = Data, U extends Draggabl
 
 const changeOptions = [undefined, deepEqual] as const;
 
-export function DragDropProvider<T extends Data = Data, U extends Draggable<T> = Draggable<T>, V extends Droppable<T> = Droppable<T>, W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>>(props: DragDropProviderProps<T, U, V, W>) {
+export function DragDropProvider<
+	T extends Data = Data,
+	U extends Draggable<T> = Draggable<T>,
+	V extends Droppable<T> = Droppable<T>,
+	W extends DragDropManager<T, U, V> = DragDropManager<T, U, V>,
+>(props: DragDropProviderProps<T, U, V, W>) {
 	const {
 		children,
 		onCollision,

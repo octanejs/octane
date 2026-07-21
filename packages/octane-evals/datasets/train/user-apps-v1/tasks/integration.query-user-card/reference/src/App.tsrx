@@ -26,12 +26,8 @@ function UserCard(props: UserCardProps) @{
 			<p role="alert">{'Could not load user: ' + (query.error as Error).message}</p>
 		} @else {
 			<>
-				<h1>
-					{query.data.name as string}
-				</h1>
-				<p>
-					{query.data.email as string}
-				</p>
+				<h1>{query.data.name as string}</h1>
+				<p>{query.data.email as string}</p>
 			</>
 		}
 	</section>

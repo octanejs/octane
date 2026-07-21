@@ -10,9 +10,7 @@ import { Hydrate, use, useId, useState } from 'octane';
 // suspension, so the client MUST get the value from the seed.
 export function AsyncLeaf(props) @{
 	const value = use(props.promise);
-	<div id="leaf">
-		{value as string}
-	</div>
+	<div id="leaf">{value as string}</div>
 }
 
 export function DeferredAsyncLeaf(props) @{
@@ -27,13 +25,11 @@ export function DeferredAsyncLeaf(props) @{
 // can prove the seeded value is undefined.
 export function AsyncUndef(props) @{
 	const value = use(props.promise);
-	<div id="undef">
-		{(value === undefined
-			? 'is-undefined'
-			: value === null
-				? 'is-null'
-				: 'other') as string}
-	</div>
+	<div id="undef">{(value === undefined
+		? 'is-undefined'
+		: value === null
+			? 'is-null'
+			: 'other') as string}</div>
 }
 
 // Mirrors the playground/octane-ssr App shape: a bare use() (async data
@@ -45,12 +41,8 @@ export function AsyncCounter(props) @{
 	const message = use(props.promise);
 	const [n, setN] = useState(0);
 	<main id="ac">
-		<h1>
-			{message as string}
-		</h1>
-		<button id="ac-btn" onClick={() => setN(n + 1)}>
-			{'count:' + n as string}
-		</button>
+		<h1>{message as string}</h1>
+		<button id="ac-btn" onClick={() => setN(n + 1)}>{'count:' + n as string}</button>
 	</main>
 }
 
@@ -60,15 +52,11 @@ export function Boundary(props) @{
 	<div id="box">
 		@try {
 			const value = use(props.promise);
-			<span class="ok">
-				{value as string}
-			</span>
+			<span class="ok">{value as string}</span>
 		} @pending {
 			<span class="loading">{'loading'}</span>
 		} @catch (err) {
-			<span class="err">
-				{err.message as string}
-			</span>
+			<span class="err">{err.message as string}</span>
 		}
 	</div>
 }
@@ -80,9 +68,7 @@ export function ReasonBoundary(props) @{
 	<div id="reason-box">
 		@try {
 			const value = use(props.promise);
-			<span class="reason-ok">
-				{String(value) as string}
-			</span>
+			<span class="reason-ok">{String(value) as string}</span>
 		} @pending {
 			<span class="reason-loading">{'loading'}</span>
 		} @catch (err) {
@@ -93,9 +79,8 @@ export function ReasonBoundary(props) @{
 			const code =
 				isObject && typeof err.code === 'string' ? err.code : '';
 			props.onCatch?.(err);
-			<span class="reason-error" data-kind={kind} data-code={code}>
-				{message + ':' + code as string}
-			</span>
+			<span class="reason-error" data-kind={kind} data-code={code}>{message + ':' +
+				code as string}</span>
 		}
 	</div>
 }
@@ -125,9 +110,7 @@ export function SeedCollision(props) @{
 		id="seed-collision"
 		data-message={value.__octane_new_rejection__.message}
 		data-undefined={String(value.__octane_new_undefined__)}
-	>
-		{value.label as string}
-	</div>
+	>{value.label as string}</div>
 }
 
 // The inner boundary has no catch arm. A hydrated rejection must retain its
@@ -137,18 +120,14 @@ export function NestedRejectionBoundary(props) @{
 		@try {
 			@try {
 				const value = use(props.promise);
-				<span class="nested-ok">
-					{String(value) as string}
-				</span>
+				<span class="nested-ok">{String(value) as string}</span>
 			} @pending {
 				<span class="nested-inner-loading">{'inner'}</span>
 			}
 		} @pending {
 			<span class="nested-outer-loading">{'outer'}</span>
 		} @catch (err) {
-			<span class="nested-error">
-				{String(err) as string}
-			</span>
+			<span class="nested-error">{String(err) as string}</span>
 		}
 	</div>
 }
@@ -161,9 +140,7 @@ export function RethrowingNestedRejectionBoundary(props) @{
 		@try {
 			@try {
 				const value = use(props.promise);
-				<span class="nested-rethrow-ok">
-					{String(value) as string}
-				</span>
+				<span class="nested-rethrow-ok">{String(value) as string}</span>
 			} @pending {
 				<i>{'inner pending'}</i>
 			} @catch (err) {
@@ -175,9 +152,7 @@ export function RethrowingNestedRejectionBoundary(props) @{
 			<i>{'outer pending'}</i>
 		} @catch (err) {
 			props.onOuterCatch?.(err);
-			<span class="nested-rethrow-error" data-code={err.code}>
-				{err.message as string}
-			</span>
+			<span class="nested-rethrow-error" data-code={err.code}>{err.message as string}</span>
 		}
 	</div>
 }
@@ -187,21 +162,15 @@ export function RethrowingNestedRejectionBoundary(props) @{
 // consuming the outer segment's later seed.
 function LaterStreamSeed(props) @{
 	const later = use(props.promise);
-	<span class="later-seed">
-		{later as string}
-	</span>
+	<span class="later-seed">{later as string}</span>
 }
 
 function NestedStreamSeedContent(props) @{
 	<section class="outer-seed-content">
-		<span class="outer-seed">
-			{props.outer as string}
-		</span>
+		<span class="outer-seed">{props.outer as string}</span>
 		@try {
 			const inner = use(props.inner);
-			<span class="inner-seed">
-				{inner as string}
-			</span>
+			<span class="inner-seed">{inner as string}</span>
 		} @pending {
 			<span class="inner-seed-pending">{'inner pending'}</span>
 		}
@@ -232,9 +201,7 @@ export function IdBoundary(props) @{
 			const value = use(props.promise);
 			const contentId = useId();
 			props.onId?.('content', contentId);
-			<span class="id-ok" data-boundary-id={contentId}>
-				{value as string}
-			</span>
+			<span class="id-ok" data-boundary-id={contentId}>{value as string}</span>
 		} @pending {
 			const pendingId = useId();
 			props.onId?.('pending', pendingId);
@@ -242,9 +209,7 @@ export function IdBoundary(props) @{
 		} @catch (err) {
 			const catchId = useId();
 			props.onId?.('catch', catchId);
-			<span class="id-error" data-boundary-id={catchId}>
-				{err.message as string}
-			</span>
+			<span class="id-error" data-boundary-id={catchId}>{err.message as string}</span>
 		}
 	</div>
 }
@@ -257,9 +222,7 @@ export function StyledBoundary(props) @{
 	<div id="sbox" class="frame">
 		@try {
 			const value = use(props.promise);
-			<span class="ok">
-				{value as string}
-			</span>
+			<span class="ok">{value as string}</span>
 		} @pending {
 			<span class="loading">{'loading'}</span>
 		}
@@ -273,9 +236,7 @@ export function StyledBoundary(props) @{
 
 function LateStyledContent(props) @{
 	<>
-		<span class="late-content">
-			{props.value as string}
-		</span>
+		<span class="late-content">{props.value as string}</span>
 		<style>
 			.late-content {
 				color: rgb(4, 5, 6);
@@ -300,9 +261,7 @@ export function LateStyledBoundary(props) @{
 function TransientObjectItem(props) @{
 	@try {
 		const value = use(props.promise);
-		<span class="transient-object-ready">
-			{value as string}
-		</span>
+		<span class="transient-object-ready">{value as string}</span>
 	} @pending {
 		<i class="transient-object-loading">loading</i>
 	}
@@ -342,9 +301,7 @@ export function Nested(props) @{
 			const first = use(props.outer);
 			@try {
 				const second = use(props.inner);
-				<span class="both">
-					{first + ':' + second as string}
-				</span>
+				<span class="both">{first + ':' + second as string}</span>
 			} @pending {
 				<span class="inner-loading">{'inner…'}</span>
 			}
@@ -360,17 +317,13 @@ export function Siblings(props) @{
 	<div id="sibs">
 		@try {
 			const a = use(props.a);
-			<span class="a">
-				{a as string}
-			</span>
+			<span class="a">{a as string}</span>
 		} @pending {
 			<span>{'a…'}</span>
 		}
 		@try {
 			const b = use(props.b);
-			<span class="b">
-				{b as string}
-			</span>
+			<span class="b">{b as string}</span>
 		} @pending {
 			<span>{'b…'}</span>
 		}

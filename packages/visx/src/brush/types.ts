@@ -37,14 +37,7 @@ export interface PartialBrushStartEnd {
 }
 
 export type ResizeTriggerAreas =
-	| 'left'
-	| 'right'
-	| 'top'
-	| 'bottom'
-	| 'topLeft'
-	| 'topRight'
-	| 'bottomLeft'
-	| 'bottomRight';
+	'left' | 'right' | 'top' | 'bottom' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
 
 export type BrushingType = 'move' | 'select' | ResizeTriggerAreas;
 export type BrushPageOffset = {

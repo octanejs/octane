@@ -21,9 +21,7 @@ interface FixedReplacement {
 }
 
 type NpmDownloadOutlierReplacement =
-	| FixedReplacement
-	| LocalMedianReplacement
-	| SameWeekdayReplacement;
+	FixedReplacement | LocalMedianReplacement | SameWeekdayReplacement;
 
 interface NpmDownloadOutlierOverride {
 	dateFrom: string;

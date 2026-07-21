@@ -10,29 +10,15 @@ export function App() @{
 		<main class="feed">
 			@for (const a of ARTICLES; key a.id) {
 				<article class="card">
-					<span class="section">
-						{a.section as string}
-					</span>
-					<h2 class="title">
-						{a.title as string}
-					</h2>
-					<p class="byline">
-						{a.byline as string}
-					</p>
-					<p class="lead">
-						{a.lead as string}
-					</p>
-					<p class="body">
-						{a.body1 as string}
-					</p>
-					<p class="body">
-						{a.body2 as string}
-					</p>
+					<span class="section">{a.section as string}</span>
+					<h2 class="title">{a.title as string}</h2>
+					<p class="byline">{a.byline as string}</p>
+					<p class="lead">{a.lead as string}</p>
+					<p class="body">{a.body1 as string}</p>
+					<p class="body">{a.body2 as string}</p>
 				</article>
 			}
 		</main>
-		<footer class="foot">
-			{'The Octane Times — SSR + hydration benchmark' as string}
-		</footer>
+		<footer class="foot">{'The Octane Times — SSR + hydration benchmark' as string}</footer>
 	</div>
 }

@@ -10,9 +10,7 @@ export function bump() {
 export default function Counter() @{
 	const [n, setN] = useState(0);
 	_setN = setN;
-	<div class="c">
-		{n as number}
-	</div>
+	<div class="c">{n as number}</div>
 }
 
 export function ActLayoutLoop() @{
@@ -20,7 +18,5 @@ export function ActLayoutLoop() @{
 	useLayoutEffect(() => {
 		setValue((current) => current + 1);
 	}, null);
-	<span>
-		{value as number}
-	</span>
+	<span>{value as number}</span>
 }

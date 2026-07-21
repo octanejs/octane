@@ -36,10 +36,7 @@ export type MatrixRenderMode = Exclude<RenderMode, 'production-compile'>;
 export type BufferedRenderVariant = 'renderToString' | 'renderToStaticMarkup' | 'prerender';
 export type StreamRenderVariant = 'renderToPipeableStream' | 'renderToReadableStream';
 export type RenderVariant =
-	| 'createRoot'
-	| BufferedRenderVariant
-	| StreamRenderVariant
-	| 'hydrateRoot';
+	'createRoot' | BufferedRenderVariant | StreamRenderVariant | 'hydrateRoot';
 export type RenderSide = 'client' | 'server';
 
 type FixtureModule = Record<string, any>;
@@ -174,11 +171,9 @@ export interface ServerRenderMatrixCase<
 	/** Connect the container for focus/layout/event cases. */
 	attachContainer?: boolean;
 	renderOptions?:
-		| RenderOptions
-		| ((context: RenderCaseContext<State>) => RenderOptions | undefined);
+		RenderOptions | ((context: RenderCaseContext<State>) => RenderOptions | undefined);
 	streamOptions?:
-		| StreamOptions
-		| ((context: RenderCaseContext<State>) => StreamOptions | undefined);
+		StreamOptions | ((context: RenderCaseContext<State>) => StreamOptions | undefined);
 	rootOptions?: RootOptions | ((context: RenderCaseContext<State>) => RootOptions | undefined);
 	prepareBeforeHydrate?: (
 		container: HTMLElement,

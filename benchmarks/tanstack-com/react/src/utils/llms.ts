@@ -275,12 +275,10 @@ export function generateLibraryDocsIndexMarkdown({
 
 function getDocsIndexEntries(config: ConfigSchema) {
 	return config.sections.flatMap((section) => [
-		...section.children.map(
-			(child): DocsIndexEntry => ({
-				child,
-				section,
-			}),
-		),
+		...section.children.map((child): DocsIndexEntry => ({
+			child,
+			section,
+		})),
 		...(section.frameworks ?? []).flatMap((framework) =>
 			getFrameworkDocsIndexEntries({ framework, section }),
 		),
@@ -294,13 +292,11 @@ function getFrameworkDocsIndexEntries({
 	framework: ConfigFramework;
 	section: ConfigSection;
 }) {
-	return framework.children.map(
-		(child): DocsIndexEntry => ({
-			child,
-			framework: framework.label,
-			section,
-		}),
-	);
+	return framework.children.map((child): DocsIndexEntry => ({
+		child,
+		framework: framework.label,
+		section,
+	}));
 }
 
 function formatDocsIndexEntry({

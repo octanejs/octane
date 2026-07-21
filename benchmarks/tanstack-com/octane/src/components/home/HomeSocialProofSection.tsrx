@@ -108,9 +108,7 @@ function HomeSocialProofContent({ recentPosts }: HomeSocialProofSectionProps) {
 							: null}
 						<div class="p-4 flex flex-col gap-3 flex-1 justify-between">
 							<div>
-								<div class="text-base font-bold">
-									{title as string}
-								</div>
+								<div class="text-base font-bold">{title as string}</div>
 								<div class="text-xs italic font-light mt-1 text-gray-600 dark:text-gray-400">
 									by
 									{formatAuthors(authors) as string}
@@ -125,9 +123,7 @@ function HomeSocialProofContent({ recentPosts }: HomeSocialProofSectionProps) {
 								{excerpt
 									? <p
 											class="text-sm mt-3 text-gray-600 dark:text-gray-400 line-clamp-4 leading-relaxed"
-										>
-											{excerpt as string}
-										</p>
+										>{excerpt as string}</p>
 									: null}
 							</div>
 							<div class="text-blue-500 uppercase font-bold text-xs">Read More →</div>

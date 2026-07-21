@@ -34,12 +34,8 @@ export function Breadcrumbs({
 				? <Link
 						to={sectionTo}
 						className="whitespace-nowrap hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-					>
-						{section as string}
-					</Link>
-				: <span class="whitespace-nowrap">
-						{section as string}
-					</span>}
+					>{section as string}</Link>
+				: <span class="whitespace-nowrap">{section as string}</span>}
 			{showTocToggle &&
 				<Dropdown>
 					<DropdownTrigger>

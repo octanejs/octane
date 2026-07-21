@@ -13,9 +13,7 @@ export function RenderProp(props) @{
 // Render-prop child returns a HOST element with attrs + a nested text hole.
 export function HostProp() @{
 	<RenderProp>
-		{(data) => <span class="lbl" data-k="v">
-			{data as string}
-		</span>}
+		{(data) => <span class="lbl" data-k="v">{data as string}</span>}
 	</RenderProp>
 }
 
@@ -23,9 +21,7 @@ export function HostProp() @{
 export function FragProp() @{
 	<RenderProp>
 		{(data) => <>
-			<b>
-				{data as string}
-			</b>
+			<b>{data as string}</b>
 			<i>!</i>
 		</>}
 	</RenderProp>
@@ -33,11 +29,7 @@ export function FragProp() @{
 
 // `{xs.map(x => <li/>)}` at child position → an array of host descriptors.
 export function MapList(props) @{
-	<ul id="ml">{props.items.map(
-		(x) => <li class="row">
-			{x as string}
-		</li>,
-	)}</ul>
+	<ul id="ml">{props.items.map((x) => <li class="row">{x as string}</li>)}</ul>
 }
 
 // A return-based nested component with empty output. Its server component

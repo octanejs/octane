@@ -3,9 +3,7 @@ import { I18nextProvider, Trans, useTranslation } from '@octanejs/i18next';
 function ServerContent() @{
 	const { t, ready } = useTranslation('translation', { useSuspense: false });
 	<main lang="en">
-		<h1>
-			{t('heading') as string}
-		</h1>
+		<h1>{t('heading') as string}</h1>
 		<p id="ready">{String(ready)}</p>
 		<p>
 			<Trans i18nKey="rich" values={{ name: 'Ada' }} components={{ strong: <strong /> }} />

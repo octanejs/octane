@@ -9,8 +9,7 @@ import type { FieldPath, FieldPathValue } from './path';
 export type ValidationValue = boolean | number | string | RegExp;
 
 export type ValidationRule<TValidationValue extends ValidationValue = ValidationValue> =
-	| TValidationValue
-	| ValidationValueMessage<TValidationValue>;
+	TValidationValue | ValidationValueMessage<TValidationValue>;
 
 export type ValidationValueMessage<TValidationValue extends ValidationValue = ValidationValue> = {
 	value: TValidationValue;

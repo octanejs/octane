@@ -41,9 +41,10 @@ function HydrationBoundary(props: { g: VisibleGate; o?: () => void; children?: O
 
 export function VisibleHydrate(props: HydrateProps) @{
 	const when = props.when;
-	const strategy = (typeof when === 'function'
-		? when()
-		: when) as OctaneHydrationStrategy<'visible', true>;
+	const strategy = (typeof when === 'function' ? when() : when) as OctaneHydrationStrategy<
+		'visible',
+		true
+	>;
 	const prefetchStrategy = props.prefetch;
 	const preload = (props as InternalHydrateProps).p;
 	const markerRef = useRef<HTMLDivElement | null>(null);
@@ -94,7 +95,9 @@ export function VisibleHydrate(props: HydrateProps) @{
 }
 
 /* @__NO_SIDE_EFFECTS__ */
-export function visible(options?: VisibleHydrationOptions): OctaneHydrationStrategy<'visible', true> & HydrationPrefetchStrategy<'visible'> {
+export function visible(
+	options?: VisibleHydrationOptions,
+): OctaneHydrationStrategy<'visible', true> & HydrationPrefetchStrategy<'visible'> {
 	const rootMargin = options?.rootMargin ?? '600px';
 	const threshold = options?.threshold ?? 0;
 

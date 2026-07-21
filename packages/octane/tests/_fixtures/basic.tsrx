@@ -3,9 +3,7 @@ export function Hello() @{
 }
 
 export function Counter(props) @{
-	<span>
-		{props.n as string}
-	</span>
+	<span>{props.n as string}</span>
 }
 
 export function Greet(props) @{
@@ -57,8 +55,6 @@ export function MathStatic() @{
 
 export function MathDynamic(props) @{
 	<math id="dyneq" display={props.display}>
-		<mn class={props.klass}>
-			{props.value as string}
-		</mn>
+		<mn class={props.klass}>{props.value as string}</mn>
 	</math>
 }

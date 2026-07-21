@@ -76,8 +76,6 @@ export function LibraryNavbarTitle({ libraryId }: { libraryId: LandingLibraryId 
 	const gradientText = `inline-block text-transparent bg-clip-text bg-linear-to-r ${library.colorFrom} ${library.colorTo}`;
 
 	return <Link to="/$libraryId" params={{ libraryId: library.id }} className="whitespace-nowrap">
-		<span class={gradientText}>
-			{libraryName as string}
-		</span>
+		<span class={gradientText}>{libraryName as string}</span>
 	</Link>;
 }

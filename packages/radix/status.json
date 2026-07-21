@@ -1,11 +1,11 @@
 {
-  "upstream": { "package": "radix-ui", "version": "1.6.1" },
-  "surface": "Complete against the unified `radix-ui@1.6.1` component surface — all primitives (incl. Dialog, the Menu/DropdownMenu/ContextMenu family, Popover, Tooltip, Select, NavigationMenu, Toast, Menubar, Slider, the form controls, and OneTimePasswordField/PasswordToggleField) plus the composition/state/overlay foundations — verified by a differential suite (same fixtures through octane and the real radix-ui, byte-identical DOM).",
+  "upstream": { "package": "radix-ui", "version": "1.6.4" },
+  "surface": "Complete against the unified `radix-ui@1.6.4` component surface — all primitives (incl. Dialog, the Menu/DropdownMenu/ContextMenu family, Popover, Tooltip, Select, NavigationMenu, Toast, Menubar, Slider, the form controls, and OneTimePasswordField/PasswordToggleField) plus the composition/state/overlay foundations — verified by a differential suite (same fixtures through octane and the real radix-ui, byte-identical DOM).",
   "divergences": [
     "`Slot`/`asChild` compose element descriptors (prop-position JSX, `createElement`, `.map()` returns), not children-position JSX.",
     "`forwardRef` becomes octane's ref-as-prop."
   ],
   "ssr": "SSR/hydration coverage for the overlay/portal components is still open (tracked in the migration plan).",
-  "verified": "2026-07-08",
+  "verified": "2026-07-21",
   "docs": ["docs/radix-migration-plan.md"]
 }

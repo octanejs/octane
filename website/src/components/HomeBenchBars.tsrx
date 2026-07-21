@@ -60,12 +60,8 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 	});
 	<figure class="bench-card">
 		<figcaption class="bench-card-head">
-			<span class="bench-card-title">
-				{card.title as string}
-			</span>
-			<span class="bench-card-desc">
-				{card.description as string}
-			</span>
+			<span class="bench-card-title">{card.title as string}</span>
+			<span class="bench-card-desc">{card.description as string}</span>
 		</figcaption>
 		<div class="bench-key-row" aria-hidden="true">
 			@for (const entry of series; key entry.series.key) {
@@ -85,9 +81,12 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 			>
 				@for (const rowEntry of rows; key rowEntry.row.op) {
 					<Group top={rowEntry.index * groupHeight}>
-						<text class="op-label" x={LABEL_WIDTH - 12} y={14} text-anchor="end">
-							{rowEntry.row.op as string}
-						</text>
+						<text
+							class="op-label"
+							x={LABEL_WIDTH - 12}
+							y={14}
+							text-anchor="end"
+						>{rowEntry.row.op as string}</text>
 						@for (const seriesEntry of series; key seriesEntry.series.key) {
 							@if (typeof rowEntry.row[seriesEntry.series.key] === 'number') {
 								<>
@@ -120,18 +119,14 @@ export function HomeBenchBars(props: { card: BenchCard }) @{
 					<tr>
 						<th scope="col">operation</th>
 						@for (const entry of series; key entry.series.key) {
-							<th scope="col">
-								{entry.series.label as string}
-							</th>
+							<th scope="col">{entry.series.label as string}</th>
 						}
 					</tr>
 				</thead>
 				<tbody>
 					@for (const rowEntry of rows; key rowEntry.row.op) {
 						<tr>
-							<th scope="row">
-								{rowEntry.row.op as string}
-							</th>
+							<th scope="row">{rowEntry.row.op as string}</th>
 							@for (const seriesEntry of series; key seriesEntry.series.key) {
 								<td>{fmtX(rowEntry.row[seriesEntry.series.key])}</td>
 							}

@@ -6,12 +6,8 @@ export function ExposedActionState(props) @{
 	const [state, dispatch, isPending] = useActionState(props.action, props.initial);
 	props.expose(dispatch);
 	<div>
-		<span id="state">
-			{String(state) as string}
-		</span>
-		<span id="pending">
-			{(isPending ? 'pending' : 'idle') as string}
-		</span>
+		<span id="state">{String(state) as string}</span>
+		<span id="pending">{(isPending ? 'pending' : 'idle') as string}</span>
 	</div>
 }
 
@@ -30,9 +26,7 @@ export function BoundaryActionState(props) @{
 // useFormStatus read from a child of the form.
 function StatusOut(props) @{
 	const { pending } = useFormStatus();
-	<span id="out">
-		{(pending ? props.value + ' (pending...)' : props.value) as string}
-	</span>
+	<span id="out">{(pending ? props.value + ' (pending...)' : props.value) as string}</span>
 }
 
 // Manual onSubmit: preventDefault + startTransition(async). Activates
@@ -93,9 +87,7 @@ function StatusFields(props) @{
 	if (status.pending) {
 		props.expose(status);
 	}
-	<span id="sf">
-		{(status.pending ? 'pending' : 'idle') as string}
-	</span>
+	<span id="sf">{(status.pending ? 'pending' : 'idle') as string}</span>
 }
 export function InterceptedForm(props) @{
 	<form action={props.action}>

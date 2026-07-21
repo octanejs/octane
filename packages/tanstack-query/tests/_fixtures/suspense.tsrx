@@ -5,9 +5,7 @@ import { QueryClientProvider, useQuery, useSuspenseQueries } from '@octanejs/tan
 // throws the error (→ @catch).
 export function SuspendingReader(props: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({ queryKey: ['s'], queryFn: props.queryFn, suspense: true, retry: false });
-	<span id="data">
-		{'data:' + q.data as string}
-	</span>
+	<span id="data">{'data:' + q.data as string}</span>
 }
 
 export function SuspenseApp(props: { client: unknown; queryFn: () => Promise<string> }) @{
@@ -17,9 +15,7 @@ export function SuspenseApp(props: { client: unknown; queryFn: () => Promise<str
 		} @pending {
 			<span id="fallback">loading</span>
 		} @catch (e) {
-			<span id="caught">
-				{'caught:' + (e as Error).message as string}
-			</span>
+			<span id="caught">{'caught:' + (e as Error).message as string}</span>
 		}
 	</QueryClientProvider>
 }
@@ -41,9 +37,7 @@ function SuspenseQueriesReader(props: { a: () => Promise<string>; b: () => Promi
 			{ queryKey: ['sq', 'b'], queryFn: props.b },
 		],
 	});
-	<span id="data">
-		{'data:' + results[0].data + '/' + results[1].data as string}
-	</span>
+	<span id="data">{'data:' + results[0].data + '/' + results[1].data as string}</span>
 }
 
 export function SuspenseQueriesApp(props: {

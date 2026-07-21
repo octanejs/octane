@@ -15,9 +15,7 @@ export function IfElse(props) @{
 export function List(props) @{
 	<ul>
 		@for (const item of props.items) {
-			<li>
-				{item as string}
-			</li>
+			<li>{item as string}</li>
 		} @empty {
 			<li class="empty">{'none'}</li>
 		}
@@ -47,15 +45,11 @@ export function Boundary(props) @{
 	<div>
 		@try {
 			const v = props.read();
-			<span class="ok">
-				{v as string}
-			</span>
+			<span class="ok">{v as string}</span>
 		} @pending {
 			<span class="loading">{'loading'}</span>
 		} @catch (err) {
-			<span class="error">
-				{err.message as string}
-			</span>
+			<span class="error">{err.message as string}</span>
 		}
 	</div>
 }
@@ -65,9 +59,7 @@ export function Boundary(props) @{
 const Theme = createContext('light');
 function Themed() @{
 	const t = use(Theme);
-	<span class="theme">
-		{t as string}
-	</span>
+	<span class="theme">{t as string}</span>
 }
 export function Provided(props) @{
 	<Theme.Provider value={props.theme}>

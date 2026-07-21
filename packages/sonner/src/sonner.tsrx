@@ -621,8 +621,8 @@ export function Toaster(props: ToasterProps) {
 	const isFocusWithinRef = useRef(false);
 	const getFrontToastHeight = (currentPosition: Position, positionIndex: number): number => {
 		const frontToast = filteredToasts.find(
-			(toastItem) => !toastItem.position && positionIndex === 0 ||
-				toastItem.position === currentPosition,
+			(toastItem) =>
+				!toastItem.position && positionIndex === 0 || toastItem.position === currentPosition,
 		);
 		return heights.find((height) => height.toastId === frontToast?.id)?.height ?? 0;
 	};

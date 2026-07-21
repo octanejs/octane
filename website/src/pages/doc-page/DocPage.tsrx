@@ -59,17 +59,13 @@ export function DocPage() @{
 										class="pagination-link previous"
 									>
 										<span>← Previous</span>
-										<strong>
-											{previous.title as string}
-										</strong>
+										<strong>{previous.title as string}</strong>
 									</Link>
 								}
 								@if (next) {
 									<Link to="/docs/$slug" params={{ slug: next.slug }} class="pagination-link next">
 										<span>Next →</span>
-										<strong>
-											{next.title as string}
-										</strong>
+										<strong>{next.title as string}</strong>
 									</Link>
 								}
 							</nav>
@@ -78,9 +74,7 @@ export function DocPage() @{
 				} @else {
 					<div class="doc-missing">
 						<h1>Document not found</h1>
-						<p>
-							{'No document named “' + params.slug + '”.' as string}
-						</p>
+						<p>{'No document named “' + params.slug + '”.' as string}</p>
 					</div>
 				}
 			</article>

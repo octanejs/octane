@@ -23,13 +23,9 @@ export function DefaultErrorComponent() @{
 
 	<>
 		<h2>Unexpected Application Error!</h2>
-		<h3 style={{ fontStyle: 'italic' }}>
-			{message as string}
-		</h3>
+		<h3 style={{ fontStyle: 'italic' }}>{message as string}</h3>
 		@if (stack) {
-			<pre style={{ padding: '0.5rem', backgroundColor: lightgrey }}>
-				{stack as string}
-			</pre>
+			<pre style={{ padding: '0.5rem', backgroundColor: lightgrey }}>{stack as string}</pre>
 		}
 		@if (ENABLE_DEV_WARNINGS) {
 			<>

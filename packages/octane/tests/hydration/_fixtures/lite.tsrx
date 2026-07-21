@@ -4,16 +4,12 @@
 // adopts that range during hydration (and the block-skipping `sibling` walk
 // resolves the SECOND badge's anchor past the first badge's range).
 function Badge(props) @{
-	<span class="badge">
-		{props.label as string}
-	</span>
+	<span class="badge">{props.label as string}</span>
 }
 
 export function Shell(props) @{
 	<div id="shell">
-		<h3>
-			{props.title as string}
-		</h3>
+		<h3>{props.title as string}</h3>
 		<Badge label={props.a} />
 		<Badge label={props.b} />
 	</div>

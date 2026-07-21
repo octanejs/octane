@@ -113,7 +113,8 @@ interface Props {
 // item-only fields are optional (`type` is a plain string, so the union does not
 // discriminate), plus the item's resolved getItemProps() bag —
 // `Record<string, unknown>`, the @octanejs/floating-ui prop-getter return type.
-type ContextMenuListItem = MenuSeparatorType & {
+type ContextMenuListItem =
+	MenuSeparatorType & {
 		disabled?: boolean;
 		icon?: OctaneNode | null;
 		label?: string;
@@ -143,9 +144,7 @@ function ContextMenuList(props: ContextMenuListProps) @{
 			@if (item.type === 'item') {
 				<button {...item.itemProps} class={item.className} role="menuitem" disabled={item.disabled}>
 					{item.icon}
-					<span>
-						{item.label as string}
-					</span>
+					<span>{item.label as string}</span>
 				</button>
 			} @else {
 				<hr {...item.itemProps} class={item.className} />

@@ -67,9 +67,7 @@ function Node(props) @{
 function Leaf(props) @{
 	const root = use(RootCtx);
 	const local = use(LocalCtx);
-	<span class="leaf">
-		{props.path + '|' + root + ':' + local as string}
-	</span>
+	<span class="leaf">{props.path + '|' + root + ':' + local as string}</span>
 }
 
 export default function App(props) @{

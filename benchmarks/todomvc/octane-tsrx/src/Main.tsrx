@@ -91,9 +91,7 @@ export function TodoApp() @{
 										checked={t.completed}
 										onClick={() => toggle(t.id)}
 									/>
-									<label onDoubleClick={() => startEdit(t.id)}>
-										{t.title as string}
-									</label>
+									<label onDoubleClick={() => startEdit(t.id)}>{t.title as string}</label>
 									<button class="destroy" onClick={() => destroy(t.id)}></button>
 								</div>
 								@if (editing === t.id) {

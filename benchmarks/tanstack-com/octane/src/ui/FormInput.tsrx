@@ -1,6 +1,7 @@
 import { twMerge } from 'tailwind-merge';
 
-type FormInputProps = Record<string, any> & {
+type FormInputProps =
+	Record<string, any> & {
 		/** Ring color on focus. Defaults to blue. */
 		focusRing?: 'blue' | 'orange' | 'purple';
 	};

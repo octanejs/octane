@@ -1,9 +1,7 @@
-export function BSkyIcon({
-	className,
-	width = '1em',
-	height = '1em',
-	...props
-}: Record<string, any>) {
+export function BSkyIcon({ className, width = '1em', height = '1em', ...props }: Record<
+	string,
+	any
+>) {
 	return <svg
 		viewBox="0 0 24 24"
 		fill="none"

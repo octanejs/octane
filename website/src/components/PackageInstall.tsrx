@@ -109,9 +109,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 						tabIndex={manager === pm ? 0 : -1}
 						class={['pkg-tab', manager === pm && 'pkg-tab-active']}
 						onClick={() => setManager(pm)}
-					>
-						{pm as string}
-					</button>
+					>{pm as string}</button>
 				}
 			</div>
 			<button
@@ -138,9 +136,7 @@ export function PackageInstall(props: PackageInstallProps) @{
 		>
 			<code class="pkg-code" ref={codeEl}>
 				@for (const tok of tokens; key tok.id) {
-					<span class={'pkg-tok-' + tok.kind}>
-						{tok.text as string}
-					</span>
+					<span class={'pkg-tok-' + tok.kind}>{tok.text as string}</span>
 				}
 			</code>
 		</pre>

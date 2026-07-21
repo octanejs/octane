@@ -59,9 +59,7 @@ export function BackgroundRootFixture(props) @{
 				<MaybeThrows fail={props.fail} />
 			} @catch (error) {
 				<view id="caught">
-					<text>
-						{error.message as string}
-					</text>
+					<text>{error.message as string}</text>
 				</view>
 			}
 		</>

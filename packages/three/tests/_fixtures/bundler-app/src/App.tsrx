@@ -3,7 +3,8 @@ import { Scene } from './Scene.three.tsrx';
 
 export function App() @{
 	const onPointerMissed = (event) => {
-		const proof = globalThis as typeof globalThis & {
+		const proof = globalThis as
+			typeof globalThis & {
 				__octaneThreeEventLog?: Array<Record<string, unknown>>;
 			};
 		(proof.__octaneThreeEventLog ??= []).push({
@@ -37,9 +38,7 @@ export function WebGLFailureApp() @{
 				<Scene />
 			</Canvas>
 		} @catch (error) {
-			<p data-three-webgl-error="">
-				{error.message as string}
-			</p>
+			<p data-three-webgl-error="">{error.message as string}</p>
 		}
 	</main>
 }

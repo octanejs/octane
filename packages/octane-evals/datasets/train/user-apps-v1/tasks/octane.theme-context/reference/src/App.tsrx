@@ -7,9 +7,11 @@ export const ThemeContext = createContext<Theme>('system');
 export function ThemeLabel(props: { id: string }) @{
 	const theme = use(ThemeContext);
 
-	<output id={props.id} data-theme={theme} class={['theme-label', 'theme-' + theme]}>
-		{theme as string}
-	</output>
+	<output
+		id={props.id}
+		data-theme={theme}
+		class={['theme-label', 'theme-' + theme]}
+	>{theme as string}</output>
 }
 
 export function App() @{

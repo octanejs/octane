@@ -156,9 +156,7 @@ function StarterLibraryTooltip({ library }: { library: StarterTryLibrary }) {
 		<div class="mt-2 flex flex-wrap gap-1.5">
 			<span
 				class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-			>
-				{(library.locked ? 'Included' : 'Optional') as string}
-			</span>
+			>{(library.locked ? 'Included' : 'Optional') as string}</span>
 		</div>
 		<div class="mt-2 text-sm leading-5 text-gray-600 dark:text-gray-300">
 			{library.description ?? library.tagline as string}
@@ -294,24 +292,16 @@ function StarterPartnerButton({
 									'mt-auto text-[9px] font-medium tracking-[0.02em] text-gray-400 dark:text-gray-500',
 									logoTagClass,
 								)}
-							>
-								{partnerTag as string}
-							</span>
+							>{partnerTag as string}</span>
 						: null}
-					<span class="sr-only">
-						{accessibleLabel as string}
-					</span>
+					<span class="sr-only">{accessibleLabel as string}</span>
 				</span>
 			: <span class="flex flex-col items-start gap-px">
-					<span>
-						{partner.label as string}
-					</span>
+					<span>{partner.label as string}</span>
 					{partnerTag
 						? <span
 								class="text-[9px] font-medium tracking-[0.02em] text-gray-400 dark:text-gray-500"
-							>
-								{partnerTag as string}
-							</span>
+							>{partnerTag as string}</span>
 						: null}
 				</span>}
 	</button>;
@@ -400,17 +390,16 @@ function StarterPartnerTooltip({ partner }: { partner: ApplicationStarterPartner
 		</div>
 		{partner.tags.length > 0
 			? <div class="mt-2 flex flex-wrap gap-1.5">{partner.tags.map(
-					(tag) => <span
-						key={tag}
-						class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
-					>
-						{tag as string}
-					</span>,
+					(tag) =>
+						<span
+							key={tag}
+							class="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+						>{tag as string}</span>,
 				)}</div>
 			: null}
-		<div class="mt-2 text-sm leading-5 text-gray-600 dark:text-gray-300">
-			{partner.description as string}
-		</div>
+		<div
+			class="mt-2 text-sm leading-5 text-gray-600 dark:text-gray-300"
+		>{partner.description as string}</div>
 	</div>;
 }
 
@@ -448,9 +437,7 @@ export function GeneratedPromptPreviewHeader({
 			<div>
 				<div
 					class="text-[11px] font-medium uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500"
-				>
-					{title as string}
-				</div>
+				>{title as string}</div>
 			</div>
 			<div class="flex items-center gap-2">
 				{onCopyPrompt
@@ -505,9 +492,7 @@ export function GeneratedPromptPreviewBody({ prompt }: { prompt: string }) {
 			<code
 				class="block min-w-0 max-w-full !whitespace-pre-wrap break-words font-sans !text-inherit [word-break:normal]"
 				style={{ color: 'inherit' }}
-			>
-				{prompt as string}
-			</code>
+			>{prompt as string}</code>
 		</pre>
 	</div>;
 }

@@ -4,7 +4,8 @@ import { getPublicImageDimensions } from '~/utils/publicImageDimensions';
 
 const DEFAULT_TRANSFORM_WIDTH = 1200;
 
-export type MarkdownImgProps = Record<string, any> & {
+export type MarkdownImgProps =
+	Record<string, any> & {
 		priority?: boolean;
 	};
 

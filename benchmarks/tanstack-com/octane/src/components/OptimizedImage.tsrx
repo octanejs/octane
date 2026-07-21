@@ -1,7 +1,8 @@
 import { useMemo } from 'octane';
 import { getOptimizedImageUrl, type ImageOptimizationOptions } from '~/utils/optimizedImage';
 
-type OptimizedImageProps = Record<string, any> & ImageOptimizationOptions & {
+type OptimizedImageProps =
+	Record<string, any> & ImageOptimizationOptions & {
 		src: string;
 	};
 

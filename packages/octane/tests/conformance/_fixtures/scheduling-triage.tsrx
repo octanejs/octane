@@ -17,9 +17,7 @@ export function drainSchedLog(): string[] {
 // ---------------------------------------------------------------------------
 export function Plain(props) @{
 	_log.push('text:' + props.text);
-	<span>
-		{props.text as string}
-	</span>
+	<span>{props.text as string}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -32,9 +30,7 @@ export function Plain(props) @{
 export function ThrowSwitch(props) @{
 	if (props.error) throw props.error;
 	_log.push('text:' + props.text);
-	<span>
-		{props.text as string}
-	</span>
+	<span>{props.text as string}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -100,9 +96,7 @@ export function EffectSpawn() @{
 	useEffect(() => {
 		if (n === 1) setN(2);
 	}, []);
-	<span id="es">
-		{n as number}
-	</span>
+	<span id="es">{n as number}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -126,9 +120,7 @@ export function PassiveSpawnSuspends(props) @{
 		@try {
 			const value =
 				step < 2 ? 'plain' + step : use(props.p2);
-			<span id="ps-value">
-				{value as string}
-			</span>
+			<span id="ps-value">{value as string}</span>
 		} @pending {
 			<span id="ps-fallback">{'loading'}</span>
 		}
@@ -157,7 +149,5 @@ export function LabelState() @{
 	const [s, setS] = useState('');
 	_setLabel = setS;
 	_labelRenders++;
-	<span id="label">
-		{s as string}
-	</span>
+	<span id="label">{s as string}</span>
 }

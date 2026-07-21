@@ -15,11 +15,7 @@ const UNSAFE_URL = 'javascript:notfine';
 const SAFE_SERVER_URL = 'https://server.example/';
 
 type MatrixMode =
-	| 'client'
-	| 'server-string'
-	| 'server-stream'
-	| 'hydrate-match'
-	| 'hydrate-mismatch';
+	'client' | 'server-string' | 'server-stream' | 'hydrate-match' | 'hydrate-mismatch';
 
 interface MatrixObservation {
 	mode: MatrixMode;

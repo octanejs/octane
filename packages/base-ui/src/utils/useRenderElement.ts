@@ -27,8 +27,7 @@ import { mergeProps, mergePropsN, mergeClassNames } from './mergeProps';
 const EMPTY_OBJECT: Record<string, any> = {};
 
 export type RenderProp<State> =
-	| ((props: Record<string, any>, state: State) => any)
-	| any /* element descriptor */;
+	((props: Record<string, any>, state: State) => any) | any; /* element descriptor */
 
 export interface UseRenderElementComponentProps<State> {
 	className?: string | ((state: State) => string | undefined);

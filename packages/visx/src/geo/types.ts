@@ -6,9 +6,4 @@ export type Projection = ProjectionPreset | (() => GeoProjection);
 
 // @TODO: Implement all projections of d3-geo
 export type ProjectionPreset =
-	| 'orthographic'
-	| 'albers'
-	| 'albersUsa'
-	| 'mercator'
-	| 'naturalEarth'
-	| 'equalEarth';
+	'orthographic' | 'albers' | 'albersUsa' | 'mercator' | 'naturalEarth' | 'equalEarth';

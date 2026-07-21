@@ -82,19 +82,14 @@ function SupportComp() {
 							NEW
 						</div>}
 					<div class={`bg-linear-to-br ${option.gradient} p-6 text-white rounded-lg h-full w-full`}>
-						<h3 class="text-xl font-semibold mb-2">
-							{option.title as string}
-						</h3>
-						<p class="text-sm text-white/80 mb-4">
-							{option.description as string}
-						</p>
+						<h3 class="text-xl font-semibold mb-2">{option.title as string}</h3>
+						<p class="text-sm text-white/80 mb-4">{option.description as string}</p>
 						<div class="flex flex-wrap gap-2">{option.badges.map(
-							(badge) => <span
-								key={badge}
-								class="text-xs bg-white/20 text-white rounded-md px-2 py-1"
-							>
-								{badge as string}
-							</span>,
+							(badge) =>
+								<span
+									key={badge}
+									class="text-xs bg-white/20 text-white rounded-md px-2 py-1"
+								>{badge as string}</span>,
 						)}</div>
 					</div>
 				</Link>,

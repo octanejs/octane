@@ -127,15 +127,12 @@ export type AttrsResultShape<Props extends BaseObject = BaseObject> = ExecutionP
 	Partial<Props> & { [key: string]: any };
 
 export type Attrs<Props extends BaseObject = BaseObject> =
-	| AttrsResultShape<Props>
-	| ((props: ExecutionContext & Props) => AttrsResultShape<Props>);
+	AttrsResultShape<Props> | ((props: ExecutionContext & Props) => AttrsResultShape<Props>);
 
 export type RuleSet<Props extends BaseObject = BaseObject> = Interpolation<Props>[];
 
 export type Styles<Props extends BaseObject> =
-	| TemplateStringsArray
-	| StyledObject<Props>
-	| StyleFunction<Props>;
+	TemplateStringsArray | StyledObject<Props> | StyleFunction<Props>;
 
 export type NameGenerator = (hash: number) => string;
 
@@ -263,12 +260,7 @@ export type CSSObject<Props extends BaseObject = BaseObject> = StyledObject<Prop
 export interface StyledObject<Props extends BaseObject = BaseObject>
 	extends CSSProperties, CSSPseudos {
 	[key: string]:
-		| StyledObject<Props>
-		| string
-		| number
-		| StyleFunction<Props>
-		| RuleSet<any>
-		| undefined;
+		StyledObject<Props> | string | number | StyleFunction<Props> | RuleSet<any> | undefined;
 }
 
 /**

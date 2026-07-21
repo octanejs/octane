@@ -5,21 +5,21 @@ import { useState } from 'octane';
 // just the slot's subtree, no parent re-render needed.
 
 function Red(props) @{
-	<span style="padding: 6px 12px; background: #fee2e2; color: #991b1b; border-radius: 4px">
-		{'red: ' + props.label as string}
-	</span>
+	<span
+		style="padding: 6px 12px; background: #fee2e2; color: #991b1b; border-radius: 4px"
+	>{'red: ' + props.label as string}</span>
 }
 
 function Blue(props) @{
-	<span style="padding: 6px 12px; background: #dbeafe; color: #1e40af; border-radius: 4px">
-		{'blue: ' + props.label as string}
-	</span>
+	<span
+		style="padding: 6px 12px; background: #dbeafe; color: #1e40af; border-radius: 4px"
+	>{'blue: ' + props.label as string}</span>
 }
 
 function Green(props) @{
-	<span style="padding: 6px 12px; background: #d1fae5; color: #065f46; border-radius: 4px">
-		{'green: ' + props.label as string}
-	</span>
+	<span
+		style="padding: 6px 12px; background: #d1fae5; color: #065f46; border-radius: 4px"
+	>{'green: ' + props.label as string}</span>
 }
 
 const LEAVES = { red: Red, blue: Blue, green: Green };

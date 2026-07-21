@@ -257,9 +257,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 									class={['bx-suite', { 'bx-suite-on': r.op === suite }]}
 									aria-pressed={r.op === suite}
 									onClick={() => setSuite(r.op as string)}
-								>
-									{r.op as string}
-								</button>
+								>{r.op as string}</button>
 							}
 						</div>
 					</div>
@@ -293,9 +291,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 							})}
 							onMouseLeave={hide}
 						>
-							<span class="bx-row-label">
-								{item.label as string}
-							</span>
+							<span class="bx-row-label">{item.label as string}</span>
 							<div class="bx-track">
 								<div
 									class="bx-fill"
@@ -305,17 +301,13 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 								<span
 									class={['bx-val', item.value / bars.scaleMax > 0.62 ? 'bx-val-in' : 'bx-val-out']}
 									style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
-								>
-									{fmtX(item.value) as string}
-								</span>
+								>{fmtX(item.value) as string}</span>
 							</div>
 						</div>
 					}
 					@for (const item of bars.missing; key item.key) {
 						<div class="bx-row bx-row-empty">
-							<span class="bx-row-label">
-								{item.label as string}
-							</span>
+							<span class="bx-row-label">{item.label as string}</span>
 							<div class="bx-track">
 								<span class="bx-val bx-val-out bx-muted" style="left:0">{'—'}</span>
 							</div>
@@ -368,9 +360,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 						<tbody>
 							@for (const r of heat.rows; key r.op) {
 								<tr>
-									<th scope="row" class="bx-rowhead">
-										{r.op as string}
-									</th>
+									<th scope="row" class="bx-rowhead">{r.op as string}</th>
 									@for (const cell of r.cells; key cell.key) {
 										<td
 											class={[
@@ -395,9 +385,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 											onMouseLeave={() => {
 												if (cell.kind === 'data') hide();
 											}}
-										>
-											{cell.text as string}
-										</td>
+										>{cell.text as string}</td>
 									}
 								</tr>
 							}
@@ -409,9 +397,7 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 									<td
 										class={['bx-cell', 'bx-geo', { 'bx-cell-ref': g.isRef }]}
 										style={g.tint ? 'background:' + g.tint : ''}
-									>
-										{g.text as string}
-									</td>
+									>{g.text as string}</td>
 								}
 							</tr>
 						</tfoot>
@@ -438,20 +424,12 @@ export function BenchmarkExplorer(props: { card: BenchCard }) @{
 			@if (hovered) {
 				<div class="bx-tip" role="tooltip" ref={mountTip}>
 					<div class="bx-tip-head">
-						<span class="bx-tip-fw">
-							{hovered.fw as string}
-						</span>
-						<span class="bx-tip-suite">
-							{hovered.suite as string}
-						</span>
+						<span class="bx-tip-fw">{hovered.fw as string}</span>
+						<span class="bx-tip-suite">{hovered.suite as string}</span>
 					</div>
-					<div class="bx-tip-primary">
-						{hovered.primary as string}
-					</div>
+					<div class="bx-tip-primary">{hovered.primary as string}</div>
 					@if (hovered.secondary) {
-						<div class="bx-tip-sec">
-							{hovered.secondary as string}
-						</div>
+						<div class="bx-tip-sec">{hovered.secondary as string}</div>
 					}
 					@if (hovered.fastest) {
 						<div class="bx-tip-fast">{'fastest: ' + hovered.fastest}</div>

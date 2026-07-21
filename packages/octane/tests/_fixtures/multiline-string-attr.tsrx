@@ -2,9 +2,7 @@
 // multiline-string-attrs.test.ts). The spread forces the hostValue binding
 // path; the component prop exercises the createElement/prop-bag paths.
 function Chip(props: { title?: string }) {
-	return <span>
-		{props.title as string}
-	</span>;
+	return <span>{props.title as string}</span>;
 }
 
 export function SpreadHost(props: { rest?: Record<string, string> }) {

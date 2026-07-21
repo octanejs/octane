@@ -4,7 +4,8 @@ import { useState as useThreeState } from '@octanejs/three/renderer';
 import { FileLoader } from 'three';
 import type { Mesh } from 'three';
 
-type ThreeBrowserProof = typeof globalThis & {
+type ThreeBrowserProof =
+	typeof globalThis & {
 		__octaneThreeFrameCount?: number;
 		__octaneThreeAsset?: string;
 		__octaneThreeSceneReady?: boolean;

@@ -18,9 +18,7 @@ function delay(ms, value, shouldFail) {
 function FetchedQuote(props) @{
 	// use() suspends the boundary until the promise resolves; cached on retry.
 	const quote = use(props.promise);
-	<p style="margin: 0; font-size: 14px">
-		{'"' + quote + '"' as string}
-	</p>
+	<p style="margin: 0; font-size: 14px">{'"' + quote + '"' as string}</p>
 }
 
 export function SuspenseDemo() @{
@@ -35,9 +33,8 @@ export function SuspenseDemo() @{
 			class="demo-blurb"
 		>{'Click fetch to suspend on a fake promise. Toggle failure to route into the catch branch with reset().'}</p>
 		<div class="row">
-			<button class="btn" onClick={() => setToken((t) => t + 1)}>
-				{'fetch ' + token + 1 as string}
-			</button>
+			<button class="btn" onClick={() => setToken((t) => t + 1)}>{'fetch ' + token +
+				1 as string}</button>
 			<label class="row" style="gap: 4px">
 				<input
 					type="checkbox"
@@ -54,9 +51,7 @@ export function SuspenseDemo() @{
 				<p style="margin: 0; color: var(--muted)">{'loading...'}</p>
 			} @catch (err, reset) {
 				<>
-					<pre class="boom">
-						{err.message as string}
-					</pre>
+					<pre class="boom">{err.message as string}</pre>
 					<button
 						class="btn"
 						onClick={() => {

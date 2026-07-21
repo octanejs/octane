@@ -20,7 +20,8 @@ type DivAttributes = Octane.HTMLAttributes<HTMLDivElement>;
  * set ARIA properties. The camelCase `aria*` props (such as `ariaLabel`) are
  * also accepted but are retained only for backwards compatibility.
  */
-export type ContentEditableElementProps = {
+export type ContentEditableElementProps =
+	{
 		editor: LexicalEditor;
 		ariaActiveDescendant?: DivAttributes['aria-activedescendant'];
 		ariaAutoComplete?: DivAttributes['aria-autocomplete'];

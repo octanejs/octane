@@ -32,9 +32,14 @@ function isDeferredHydrationId(id) {
  *
  * @param {Record<string, ViteManifestEntry>} manifest
  * @param {string[]} moduleIds
+ * @param {Record<string, string>} [entryFiles]
  * @returns {Record<string, { js: string, css: string[] }>}
  */
-export function createClientAssetMap(manifest, moduleIds) {
+export function createClientAssetMap(manifest, moduleIds, entryFiles = {}) {
+	const manifestKeysByFile = new Map(
+		Object.entries(manifest).map(([key, entry]) => [entry.file, key]),
+	);
+
 	/**
 	 * @param {string} key
 	 * @param {boolean} deferredHydrationBranch
@@ -69,9 +74,15 @@ export function createClientAssetMap(manifest, moduleIds) {
 	const assets = {};
 	for (const moduleId of moduleIds) {
 		// Vite manifest keys are root-relative without the leading slash.
-		const manifestKey = moduleId.startsWith('/') ? moduleId.slice(1) : moduleId;
+		const sourceKey = moduleId.startsWith('/') ? moduleId.slice(1) : moduleId;
+		// A route module that is also statically imported can become a shared
+		// non-facade chunk. Vite keys that manifest entry by generated chunk name,
+		// so use the Rollup-observed output file to recover the graph root.
+		const manifestKey = manifest[sourceKey]
+			? sourceKey
+			: manifestKeysByFile.get(entryFiles[moduleId]);
+		if (!manifestKey) continue;
 		const entry = manifest[manifestKey];
-		if (!entry) continue;
 		assets[moduleId] = {
 			js: entry.file,
 			css: [...new Set(collectCss(manifestKey, false, new Set()))],

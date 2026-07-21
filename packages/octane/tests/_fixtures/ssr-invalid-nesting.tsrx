@@ -81,9 +81,7 @@ export function Repeat(props) @{
 	<section>
 		@for (const item of props.items; key item) {
 			<p>
-				<div>
-					{item as string}
-				</div>
+				<div>{item as string}</div>
 			</p>
 		}
 	</section>

@@ -10,9 +10,7 @@ export function SetterIdentity(props) @{
 	const [n, setN] = useState(0);
 	props.observe(setN);
 	<div>
-		<button id="bump" onClick={() => setN(n + 1)}>
-			{n as string}
-		</button>
+		<button id="bump" onClick={() => setN(n + 1)}>{n as string}</button>
 	</div>
 }
 
@@ -26,9 +24,7 @@ export function EffectDepsObjectIs(props) @{
 		log.push('create ' + label + count);
 		return () => log.push('destroy ' + label + count);
 	}, [props.log, props.label, props.count]);
-	<div>
-		{props.label + ':' + props.count as string}
-	</div>
+	<div>{props.label + ':' + props.count as string}</div>
 }
 
 // ---------------------------------------------------------------------------
@@ -44,9 +40,7 @@ export function AllDestroysBeforeCreates(props) @{
 		log.push('Mount B ' + count);
 		return () => log.push('Unmount B ' + count);
 	}, [props.log, props.count]);
-	<div>
-		{props.count as string}
-	</div>
+	<div>{props.count as string}</div>
 }
 
 // ---------------------------------------------------------------------------
@@ -59,9 +53,7 @@ function SibLeaf(props) @{
 		log.push('Mount ' + label + count);
 		return () => log.push('Unmount ' + label + count);
 	}, [props.log, props.label, props.count]);
-	<span class={'leaf-' + props.label}>
-		{props.label + props.count as string}
-	</span>
+	<span class={'leaf-' + props.label}>{props.label + props.count as string}</span>
 }
 
 export function SiblingCleanupOrder(props) @{
@@ -88,7 +80,5 @@ export function LayoutVsPassive(props) @{
 		log.push('passive ' + (el ? el.textContent : '<missing>') + ' (' + count + ')');
 		return () => log.push('cleanup passive ' + count);
 	}, [props.log, props.count]);
-	<span id="layout-target">
-		{props.count as string}
-	</span>
+	<span id="layout-target">{props.count as string}</span>
 }

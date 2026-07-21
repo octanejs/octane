@@ -16,12 +16,10 @@ function AsyncReader() @{
 		queryFn: () => delayed('fetched', 10),
 		retry: false,
 	});
-	<div id="d">
-		{'data=' + q.data + ' status=' + q.status + ' pending=' + q.isPending + ' fetching=' +
-			q.isFetching +
-			' success=' +
-			q.isSuccess as string}
-	</div>
+	<div id="d">{'data=' + q.data + ' status=' + q.status + ' pending=' + q.isPending + ' fetching=' +
+		q.isFetching +
+		' success=' +
+		q.isSuccess as string}</div>
 }
 
 export function AsyncApp() @{
@@ -41,9 +39,7 @@ function MutationReader() @{
 	});
 	<div>
 		<button id="go" onClick={() => m.mutate('x')}>go</button>
-		<div id="m">
-			{'status=' + m.status + ' data=' + m.data + ' vars=' + m.variables as string}
-		</div>
+		<div id="m">{'status=' + m.status + ' data=' + m.data + ' vars=' + m.variables as string}</div>
 	</div>
 }
 

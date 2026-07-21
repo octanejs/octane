@@ -12,11 +12,7 @@ import {
 } from './schema.js';
 
 export type TaskDisposition =
-	| 'resolved'
-	| 'reported-unresolved'
-	| 'error'
-	| 'missing'
-	| 'duplicate';
+	'resolved' | 'reported-unresolved' | 'error' | 'missing' | 'duplicate';
 
 interface ScoredTask {
 	task: TaskManifest;

@@ -67,9 +67,7 @@ export function ParallelApp(props: { k: number }) @{
 			@for (const r of ROWS; key r.id) {
 				<li class="row">
 					<span class="rid">{'#' + r.id}</span>
-					<span class="label">
-						{r.label as string}
-					</span>
+					<span class="label">{r.label as string}</span>
 				</li>
 			}
 		</ul>

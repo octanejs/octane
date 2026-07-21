@@ -366,11 +366,15 @@ export function useApplicationBuilder({
 		}
 	}, [revealPromptCopyNotice]);
 
-	const handleCopy = useCallback(async (value: string, kind: string, options?: {
+	const handleCopy = useCallback(async (
+		value: string,
+		kind: string,
+		options?: {
 			notify?: boolean;
 			showPromptNotice?: boolean;
 			trigger?: CopyTrigger;
-		}) => {
+		},
+	) => {
 		await navigator.clipboard.writeText(value);
 		markCopied(kind, {
 			showPromptNotice: options?.showPromptNotice,
@@ -439,9 +443,9 @@ export function useApplicationBuilder({
 				notify(
 					<div>
 						<div class="font-medium">Could not rebuild the prompt</div>
-						<div class="text-xs text-gray-500 dark:text-gray-400">
-							{(error instanceof Error ? error.message : 'Please try again.') as string}
-						</div>
+						<div class="text-xs text-gray-500 dark:text-gray-400">{(error instanceof Error
+							? error.message
+							: 'Please try again.') as string}</div>
 					</div>,
 				);
 
@@ -588,31 +592,29 @@ export function useApplicationBuilder({
 		});
 	}, [trackActivation]);
 
-	const withResolvedResult = useCallback(
-		async (run: (nextResult: ApplicationStarterResult) => void | Promise<void>) => {
-			const nextResult = await ensureResolvedResult();
+	const withResolvedResult = useCallback(async (
+		run: (nextResult: ApplicationStarterResult) => void | Promise<void>,
+	) => {
+		const nextResult = await ensureResolvedResult();
 
-			if (!nextResult) {
-				return null;
+		if (!nextResult) {
+			return null;
+		}
+
+		return run(nextResult);
+	}, [ensureResolvedResult]);
+
+	const withResolvedPrompt = useCallback(async (
+		run: (nextResult: ApplicationStarterResult) => void | Promise<void>,
+	) => {
+		return withResolvedResult(async (nextResult) => {
+			if (!nextResult.prompt) {
+				return;
 			}
 
 			return run(nextResult);
-		},
-		[ensureResolvedResult],
-	);
-
-	const withResolvedPrompt = useCallback(
-		async (run: (nextResult: ApplicationStarterResult) => void | Promise<void>) => {
-			return withResolvedResult(async (nextResult) => {
-				if (!nextResult.prompt) {
-					return;
-				}
-
-				return run(nextResult);
-			});
-		},
-		[withResolvedResult],
-	);
+		});
+	}, [withResolvedResult]);
 
 	const navigateToResult = useCallback(async (kind: 'advanced' | 'download') => {
 		await withResolvedResult((nextResult) => {

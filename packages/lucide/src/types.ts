@@ -1,14 +1,7 @@
 import type { ElementDescriptor } from 'octane';
 
 export type SVGElementType =
-	| 'circle'
-	| 'ellipse'
-	| 'g'
-	| 'line'
-	| 'path'
-	| 'polygon'
-	| 'polyline'
-	| 'rect';
+	'circle' | 'ellipse' | 'g' | 'line' | 'path' | 'polygon' | 'polyline' | 'rect';
 
 export type IconNode = [elementName: SVGElementType, attrs: Record<string, string>][];
 
@@ -36,10 +29,7 @@ export interface LucideRefObject {
 }
 
 export type LucideRef =
-	| LucideRefObject
-	| ((instance: SVGSVGElement | null) => void)
-	| readonly LucideRef[]
-	| null;
+	LucideRefObject | ((instance: SVGSVGElement | null) => void) | readonly LucideRef[] | null;
 
 export interface LucideProps extends SVGAttributes {
 	absoluteStrokeWidth?: boolean;

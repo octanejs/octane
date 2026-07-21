@@ -18,9 +18,7 @@ export function MixedRootsIf(props) @{
 		@if (props.show) {
 			<span id="cond">{'cond'}</span>
 		}
-		<p id="after" class={props.cls}>
-			{props.label as string}
-		</p>
+		<p id="after" class={props.cls}>{props.label as string}</p>
 	</>
 }
 
@@ -28,13 +26,9 @@ export function MixedRootsFor(props) @{
 	<>
 		<h2 id="head">{'head'}</h2>
 		@for (const x of props.items; key x) {
-			<li class="item">
-				{x as string}
-			</li>
+			<li class="item">{x as string}</li>
 		}
-		<footer id="foot">
-			{props.note as string}
-		</footer>
+		<footer id="foot">{props.note as string}</footer>
 	</>
 }
 
@@ -42,9 +36,7 @@ export function MixedRootsFor(props) @{
 function RowsOnly(props) @{
 	<>
 		@for (const x of props.items; key x) {
-			<li class="row">
-				{x as string}
-			</li>
+			<li class="row">{x as string}</li>
 		}
 	</>
 }
@@ -60,9 +52,7 @@ export function ForOnlyWithSibling(props) @{
 function TryOnly(props) @{
 	<>
 		@try {
-			<em class="tried">
-				{props.label as string}
-			</em>
+			<em class="tried">{props.label as string}</em>
 		} @catch (e) {
 			<em class="failed">{'failed'}</em>
 		}

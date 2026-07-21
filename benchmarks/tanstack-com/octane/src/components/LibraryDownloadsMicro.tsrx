@@ -295,12 +295,10 @@ export function LibraryDownloadsMicro({
 						)}
 						ref={displayedDownloadsRef}
 						style={{ fontVariantNumeric: 'tabular-nums' }}
-					>
-						{(totalDownloads ?? 0).toLocaleString() as string}
-					</span>
-					<span class={twMerge(showTotals ? 'whitespace-nowrap' : 'relative z-10', labelClassName)}>
-						{formattedLabel as string}
-					</span>
+					>{(totalDownloads ?? 0).toLocaleString() as string}</span>
+					<span
+						class={twMerge(showTotals ? 'whitespace-nowrap' : 'relative z-10', labelClassName)}
+					>{formattedLabel as string}</span>
 				</span>
 			: null;
 
@@ -328,9 +326,7 @@ export function LibraryDownloadsMicro({
 				>
 					000,000,000
 				</span>
-				<span class={twMerge('whitespace-nowrap', labelClassName)}>
-					{formattedLabel as string}
-				</span>
+				<span class={twMerge('whitespace-nowrap', labelClassName)}>{formattedLabel as string}</span>
 			</span>;
 
 	return <span class={twMerge('inline-flex flex-col items-start gap-1.5', className)}>
@@ -341,11 +337,9 @@ export function LibraryDownloadsMicro({
 					!hasTotalDownloadCount ? 'invisible' : undefined,
 				)}
 				style={{ fontVariantNumeric: 'tabular-nums' }}
-			>
-				{(hasTotalDownloadCount
-					? formatAbbreviatedNumber(totalDownloadCount)
-					: '00.0 Million') as string}
-			</span>
+			>{(hasTotalDownloadCount
+				? formatAbbreviatedNumber(totalDownloadCount)
+				: '00.0 Million') as string}</span>
 			<span>Total Downloads</span>
 		</span>
 		{weeklyDownloadsRow}
@@ -356,9 +350,7 @@ export function LibraryDownloadsMicro({
 					!hasStarCount ? 'invisible' : undefined,
 				)}
 				style={{ fontVariantNumeric: 'tabular-nums' }}
-			>
-				{(hasStarCount ? starCount.toLocaleString() : '0') as string}
-			</span>
+			>{(hasStarCount ? starCount.toLocaleString() : '0') as string}</span>
 			<span>GitHub Stars</span>
 		</span>
 	</span>;

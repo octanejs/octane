@@ -2,9 +2,7 @@ import { lazy, use } from 'octane';
 
 function StreamValue(props) @{
 	const value = use(props.promise);
-	<strong id={props.id}>
-		{value as string}
-	</strong>
+	<strong id={props.id}>{value as string}</strong>
 }
 
 export function InstrumentedThenableBoundary(props) @{
@@ -60,9 +58,7 @@ export function ContentAndNestedFallbackSuspend(props) @{
 export function HydrationLeaf(props) @{
 	<>
 		<p id="hydration-leaf">{'A'}</p>
-		<h2 id="hydration-text">
-			{props.text as string}
-		</h2>
+		<h2 id="hydration-text">{props.text as string}</h2>
 	</>
 }
 
@@ -114,15 +110,9 @@ export function MultipleMismatchBoundary(props) @{
 	<div id="multiple-mismatch-boundary">
 		@try {
 			<>
-				<h2 class="mismatch-a">
-					{props.text as string}
-				</h2>
-				<h2 class="mismatch-b">
-					{props.text as string}
-				</h2>
-				<h2 class="mismatch-c">
-					{props.text as string}
-				</h2>
+				<h2 class="mismatch-a">{props.text as string}</h2>
+				<h2 class="mismatch-b">{props.text as string}</h2>
+				<h2 class="mismatch-c">{props.text as string}</h2>
 			</>
 		} @pending {
 			<h1>{'Loading…'}</h1>

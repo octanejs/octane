@@ -31,9 +31,7 @@ export function CountOnly(props: { onRender: () => void }) @{
 	const incOther = useCounter((s) => s.incOther);
 	props.onRender();
 	<div>
-		<span id="count">
-			{count as string}
-		</span>
+		<span id="count">{count as string}</span>
 		<button id="inc" onClick={inc}>inc</button>
 		<button id="incOther" onClick={incOther}>incOther</button>
 	</div>
@@ -42,17 +40,13 @@ export function CountOnly(props: { onRender: () => void }) @{
 // No selector → subscribes to the whole state object.
 export function Whole() @{
 	const s = useCounter();
-	<span id="whole">
-		{s.count + '/' + s.other as string}
-	</span>
+	<span id="whole">{s.count + '/' + s.other as string}</span>
 }
 
 // Derived selector — a computed slice, not a stored field.
 export function Doubled() @{
 	const double = useCounter((s) => s.count * 2);
-	<span id="double">
-		{double as string}
-	</span>
+	<span id="double">{double as string}</span>
 }
 
 // Two independent stores used in one component.
@@ -62,12 +56,8 @@ export function Both() @{
 	const incC = useCounter((s) => s.inc);
 	const addF = useFish((s) => s.add);
 	<div>
-		<button id="c" onClick={incC}>
-			{c as string}
-		</button>
-		<button id="f" onClick={addF}>
-			{f as string}
-		</button>
+		<button id="c" onClick={incC}>{c as string}</button>
+		<button id="f" onClick={addF}>{f as string}</button>
 	</div>
 }
 
@@ -82,7 +72,5 @@ export function Reader(props: {
 	};
 }) @{
 	const n = useStore(props.api, (s) => s.n);
-	<span id="n">
-		{n as string}
-	</span>
+	<span id="n">{n as string}</span>
 }

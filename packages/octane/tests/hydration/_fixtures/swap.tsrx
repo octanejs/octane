@@ -2,17 +2,13 @@
 // A server/client divergence here is a component-vs-host structural mismatch.
 
 function Inner(props) @{
-	<b class="inner">
-		{props.label as string}
-	</b>
+	<b class="inner">{props.label as string}</b>
 }
 
 export function Swap(props) @{
 	<div id="swap">
 		@if (props.host) {
-			<p class="host">
-				{'H' as string}
-			</p>
+			<p class="host">{'H' as string}</p>
 		} @else {
 			<Inner label="C" />
 		}

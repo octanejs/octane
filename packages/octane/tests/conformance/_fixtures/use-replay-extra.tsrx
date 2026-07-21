@@ -18,9 +18,7 @@ export function ExcitingText(props) @{
 				props.log('Add sparkles: ' + exclamatoryText);
 				return '* ' + exclamatoryText + ' *';
 			}, [exclamatoryText]);
-			<span id="out">
-				{sparklingText as string}
-			</span>
+			<span id="out">{sparklingText as string}</span>
 		} @pending {
 			<span id="fallback">{'loading'}</span>
 		}
@@ -35,9 +33,7 @@ export function SyncThenableBoundary(props) @{
 	<>
 		@try {
 			const v = use(props.thenable);
-			<span id="out">
-				{v as string}
-			</span>
+			<span id="out">{v as string}</span>
 		} @pending {
 			<span id="fallback">{'loading'}</span>
 		}

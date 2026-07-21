@@ -29,8 +29,7 @@ export interface DOMRegionBinding {
 
 export function createDOMRegionBinding(): DOMRegionBinding {
 	const createRoot = Reflect.get(Octane, 'createRoot') as
-		| typeof import('octane').createRoot
-		| undefined;
+		typeof import('octane').createRoot | undefined;
 	if (typeof createRoot !== 'function' || typeof document === 'undefined') {
 		throw new Error('@octanejs/three: DOMRegion is client-only and requires a DOM root.');
 	}

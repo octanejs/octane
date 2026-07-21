@@ -15,7 +15,5 @@ export const useCombined = create(
 export function CombinedView() @{
 	const count = useCombined((s) => s.count);
 	const inc = useCombined((s) => s.inc);
-	<button id="c" onClick={inc}>
-		{count as string}
-	</button>
+	<button id="c" onClick={inc}>{count as string}</button>
 }
