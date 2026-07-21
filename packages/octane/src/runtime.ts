@@ -427,13 +427,18 @@ function warnHydrationStructuralMismatch(
 }
 
 /**
- * Does the adopted server node match the template's shape? Compares nodeType, element tag,
- * and the template's STATIC attributes (baked into the template by both client + server from
- * the same JSX, so a differing/absent one means a DIFFERENT branch — e.g. `@switch` cases all
- * `<span>` but with a different `class`). DYNAMIC attrs are NOT in the template, so they
- * aren't checked here — a value divergence on those is handled by `setAttribute` (P2).
+ * Does the adopted server node match the template's shape? PROD compares nodeType + element
+ * tag ONLY (React parity: prod React hydration doesn't attribute-validate either) — tag-level
+ * and text-level mismatches still detect and recover, while same-tag branches differing only
+ * in static attributes/nested static markup go undetected (kept as the server rendered them).
  *
- * It then recurses into the NESTED STATIC element structure, catching same-root branches that
+ * DEV additionally compares the template's STATIC attributes (baked into the template by both
+ * client + server from the same JSX, so a differing/absent one means a DIFFERENT branch —
+ * e.g. `@switch` cases all `<span>` but with a different `class`). DYNAMIC attrs are NOT in
+ * the template, so they aren't checked here — a value divergence on those is handled by
+ * `setAttribute` (P2).
+ *
+ * DEV then recurses into the NESTED STATIC element structure, catching same-root branches that
  * differ only in nested static markup (`<div><span/></div>` vs `<div><p/></div>`). The recursion
  * BAILS (treats as a match) the moment a comment (a `<!>` hole placeholder / `<!--[-->` marker)
  * or a text↔element shift appears: template holes don't align 1:1 with server content (a text
@@ -447,6 +452,10 @@ function hydrationNodeMatches(server: Node, template: Node): boolean {
 	const s = server as Element;
 	const t = template as Element;
 	if (s.localName !== t.localName) return false;
+	// PROD stops at the root tag: no attribute compare, no static-structure walk
+	// (build-time stripped; the happy adoption path must stay allocation- and
+	// DOM-read-free beyond this single localName check).
+	if (process.env.NODE_ENV === 'production') return true;
 	const tAttrs = t.attributes;
 	for (let i = 0; i < tAttrs.length; i++) {
 		const a = tAttrs[i];
@@ -7000,6 +7009,14 @@ interface LazyTemplateRecord {
 	ns: 0 | 1 | 2 | 3;
 	frag: number;
 	parsed: Array<Element | undefined>;
+	/**
+	 * Lazily computed adoption-root descriptor for PROD hydration's parse-free
+	 * root check (see HydrationCapability.cloneLazy): 0 = not computed yet, a
+	 * string = the root element's tag as written in `html`, 3 / 8 = a text /
+	 * comment-anchor root (nodeType-only match). Declared in the `template()`
+	 * literal so the record's hidden class never transitions.
+	 */
+	root: string | 0 | 3 | 8;
 }
 
 const LAZY_TEMPLATE = Symbol('octane.lazy-template');
@@ -7045,8 +7062,85 @@ export function template(html: string, ns: number = 0, frag: number = 0): Elemen
 			ns: ns === 1 ? 1 : ns === 2 ? 2 : ns === 3 ? 3 : 0,
 			frag,
 			parsed: [],
+			root: 0,
 		} satisfies LazyTemplateRecord,
 	} as unknown as Element;
+}
+
+/**
+ * Cheap root scan of a template's HTML source — the HTML parser is never
+ * involved. Returns the root element's tag name exactly as written (the
+ * compiler emits HTML tags lowercase; SVG keeps its canonical casing, which is
+ * also what the parser's case-adjustment produces on the server DOM), or the
+ * root's nodeType for a text (3) or comment/`<!>`-anchor (8) root.
+ */
+function templateRootDescriptor(html: string): string | 3 | 8 {
+	if (html.charCodeAt(0) !== 60 /* < */) return 3;
+	const c = html.charCodeAt(1);
+	if (!((c >= 97 && c <= 122) || (c >= 65 && c <= 90))) return 8;
+	let i = 2;
+	for (; i < html.length; i++) {
+		const cc = html.charCodeAt(i);
+		if (cc === 62 /* > */ || cc === 47 /* / */ || cc <= 32 /* whitespace */) break;
+	}
+	return html.slice(1, i);
+}
+
+function lazyRootDescriptor(lazy: LazyTemplateRecord): string | 3 | 8 {
+	const root = lazy.root;
+	if (root !== 0) return root;
+	return (lazy.root = templateRootDescriptor(lazy.html));
+}
+
+/**
+ * Is this lazy template a multi-root fragment? SVG/MathML/opaque fragments carry
+ * `frag`; HTML multi-root templates arrive from the compiler pre-wrapped in
+ * `<octane-frag>` with frag=0, so the wrapper tag is the discriminant there
+ * (mirrors parseTemplate's `__oct_frag` stamping of the parsed root).
+ */
+function isLazyFragment(lazy: LazyTemplateRecord): boolean {
+	return lazy.frag !== 0 || lazyRootDescriptor(lazy) === 'octane-frag';
+}
+
+/**
+ * PROD hydration's adoption-root check — hydrationNodeMatches' prod narrowing
+ * (nodeType + localName only) answered straight off the template SOURCE so the
+ * happy adoption path never forces the template parse.
+ */
+function lazyRootMatches(server: Node, lazy: LazyTemplateRecord): boolean {
+	const root = lazyRootDescriptor(lazy);
+	if (typeof root === 'number') return server.nodeType === root;
+	if (server.nodeType !== 1) return false;
+	const name = (server as Element).localName;
+	if (name === root) return true;
+	// Cold fallbacks, reached only when the fast compare fails. Casing: foreign-
+	// content tags outside the parser's SVG case-adjustment table are lowercased
+	// identically on both sides, so a case-only difference can never be a real
+	// branch divergence. `<image>`: the HTML parser's one tag REWRITE — an HTML
+	// `<image>` source root becomes an `img` server node (in SVG it stays
+	// `image`, hence accepting both).
+	return name === root.toLowerCase() || (root === 'image' && name === 'img');
+}
+
+/**
+ * Resolve a lazy compiler template token to its parsed (and per-namespace
+ * cached) root for the namespace in effect at the current render site.
+ */
+function resolveLazyTemplate(lazy: LazyTemplateRecord): Element {
+	let ns: 0 | 1 | 2;
+	if (lazy.ns === 3) {
+		const inherited =
+			CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
+		ns = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
+	} else {
+		ns = lazy.ns;
+	}
+	let parsed = lazy.parsed[ns];
+	if (parsed === undefined) {
+		parsed = parseTemplate(lazy.html, ns, lazy.frag);
+		lazy.parsed[ns] = parsed;
+	}
+	return parsed;
 }
 
 // ---------------------------------------------------------------------------
@@ -7347,8 +7441,25 @@ class HydrationCapability {
 	}
 
 	clone<T extends Node>(template: T, loc?: string): T {
+		return this.adopt(template, null, loc) as T;
+	}
+
+	/**
+	 * PROD adoption entry for lazy compiler templates: the root check runs off
+	 * the template SOURCE (lazyRootMatches), so the happy path never forces the
+	 * parse — `adopt` resolves the parsed template on demand only on its cold
+	 * paths (mismatch recovery, client-side builds mid-hydration, fragment root
+	 * claims).
+	 */
+	cloneLazy(lazy: LazyTemplateRecord, loc?: string): Node {
+		return this.adopt(null, lazy, loc);
+	}
+
+	/** `template` is null only in prod lazy mode (then `lazy` is set) — every cold path resolves it. */
+	private adopt(template: Node | null, lazy: LazyTemplateRecord | null, loc?: string): Node {
 		const cursor = this.node;
-		const isFragment = (template as any).__oct_frag === true;
+		const isFragment =
+			template !== null ? (template as any).__oct_frag === true : isLazyFragment(lazy!);
 		// Lite/no-template wrappers can render the logical root while sharing the
 		// public root Block, and return-based wrappers render it in a child Block.
 		// Identify the first top-level cursor by DOM ownership, then claim its
@@ -7364,7 +7475,9 @@ class HydrationCapability {
 		// A synthetic fragment wrapper has no server counterpart. At a root, compare
 		// its logical static roots before returning the virtual adoption view; otherwise
 		// arbitrary server markup could be mistaken for every fragment child at once.
+		// (Root claims happen once per hydrateRoot, so parsing here is cold.)
 		if (isFragment && claimsRoot) {
+			if (template === null) template = resolveLazyTemplate(lazy!);
 			const remainder = this.fragmentRemainder(template, cursor);
 			if (remainder === undefined) {
 				this.abandonRoot(
@@ -7378,9 +7491,16 @@ class HydrationCapability {
 		}
 		if (cursor === null) {
 			if (claimsRoot) this.claimRootRemainder(null);
+			if (template === null) template = resolveLazyTemplate(lazy!);
 			return this.freshClone(template);
 		}
-		if (!isFragment && !hydrationNodeMatches(cursor, template)) {
+		if (
+			!isFragment &&
+			(template !== null
+				? !hydrationNodeMatches(cursor, template)
+				: !lazyRootMatches(cursor, lazy!))
+		) {
+			if (template === null) template = resolveLazyTemplate(lazy!);
 			if (process.env.NODE_ENV !== 'production' && loc)
 				warnHydrationStructuralMismatch(
 					loc,
@@ -7403,13 +7523,13 @@ class HydrationCapability {
 			return this.freshClone(template);
 		}
 		if (isFragment) {
-			return { __oct_vfrag: true, firstChild: cursor } as unknown as T;
+			return { __oct_vfrag: true, firstChild: cursor } as unknown as Node;
 		}
 		if (claimsRoot)
 			this.claimRootRemainder(
 				framedRemainder === undefined ? (unframedRemainder ?? null) : framedRemainder,
 			);
-		return cursor as unknown as T;
+		return cursor;
 	}
 
 	/** Remove server siblings left after the root's complete client shape was adopted. */
@@ -7689,20 +7809,16 @@ export function clone<T extends Node>(node: T, loc?: string): T {
 			? ((node as any)[LAZY_TEMPLATE] as LazyTemplateRecord | undefined)
 			: undefined;
 	if (lazy !== undefined) {
-		let ns: 0 | 1 | 2;
-		if (lazy.ns === 3) {
-			const inherited =
-				CURRENT_SCOPE === null ? undefined : deoptChildNamespace(CURRENT_SCOPE.block.parentNode);
-			ns = inherited === SVG_NS ? 1 : inherited === MATHML_NS ? 2 : 0;
-		} else {
-			ns = lazy.ns;
-		}
-		let parsed = lazy.parsed[ns];
-		if (parsed === undefined) {
-			parsed = parseTemplate(lazy.html, ns, lazy.frag);
-			lazy.parsed[ns] = parsed;
-		}
 		const hydration = activeHydration();
+		// PROD hydration validates adoption roots by nodeType + localName only
+		// (hydrationNodeMatches' prod narrowing), answered straight off the
+		// template SOURCE: the happy path adopts the server DOM without ever
+		// parsing the template. Parsing then happens only on mismatch recovery
+		// and genuine client-side mounts — both cold during hydration.
+		if (process.env.NODE_ENV === 'production' && hydration !== null) {
+			return hydration.cloneLazy(lazy, loc) as unknown as T;
+		}
+		const parsed = resolveLazyTemplate(lazy);
 		return (hydration === null ? parsed.cloneNode(true) : hydration.clone(parsed, loc)) as T;
 	}
 	const hydration = activeHydration();
