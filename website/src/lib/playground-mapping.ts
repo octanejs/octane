@@ -13,11 +13,15 @@
 //     for the language service; those lengths are exact, so ranges are used
 //     verbatim.
 //
-// Queries use nearest-preceding-anchor semantics (the source-map convention:
-// a mapping applies until the next one), and return EVERY range mapped from
-// the matched anchor — one source expression can lower to several places in
-// the compiled output (e.g. a value read in both the create and update
-// paths), and all of them should light up.
+// Queries match the nearest preceding anchor, BOUNDED to that anchor's token
+// span — the exact token for Volar segments, the identifier/word at the
+// anchor for source-map segments. An offset past the span (whitespace, a
+// keyword, compiler-generated plumbing with no anchor of its own) is
+// unmapped and returns null so the highlight clears instead of lighting an
+// unrelated node. A match returns EVERY range mapped from the anchor — one
+// source expression can lower to several places in the compiled output
+// (e.g. a value read in both the create and update paths), and all of them
+// should light up.
 //
 // Pure string/offset math — no CodeMirror or DOM imports, so tests can run
 // it directly and the editor wiring stays in the page component.
@@ -156,6 +160,22 @@ function createMapping(
 		return list.slice(first, found + 1);
 	};
 
+	// A query hits only within the matched anchor's own token span — the exact
+	// token for Volar segments, the word at the anchor for source-map segments
+	// (group() guarantees anchor ≤ offset, so only the upper edge needs
+	// checking; the end is inclusive so a cursor parked right after a word
+	// still counts). Past the span the offset belongs to unmapped text and the
+	// highlight must clear rather than borrow a farther anchor.
+	const withinAnchor = (matched: Segment[], side: 'src' | 'gen', offset: number): boolean => {
+		const text = side === 'gen' ? generatedText : sourceText;
+		for (const segment of matched) {
+			const start = side === 'gen' ? segment.gen : segment.src;
+			const length = side === 'gen' ? segment.genLen : segment.srcLen;
+			if (offset <= (length >= 0 ? start + length : expandWord(text, start).to)) return true;
+		}
+		return false;
+	};
+
 	const ranges = (matched: Segment[], side: 'src' | 'gen'): MappedRange[] | null => {
 		const text = side === 'gen' ? generatedText : sourceText;
 		const seen = new Set<number>();
@@ -178,11 +198,11 @@ function createMapping(
 	return {
 		toGenerated(offset) {
 			const matched = group(bySrc, 'src', offset);
-			return matched ? ranges(matched, 'gen') : null;
+			return matched && withinAnchor(matched, 'src', offset) ? ranges(matched, 'gen') : null;
 		},
 		toSource(offset) {
 			const matched = group(byGen, 'gen', offset);
-			return matched ? ranges(matched, 'src') : null;
+			return matched && withinAnchor(matched, 'gen', offset) ? ranges(matched, 'src') : null;
 		},
 	};
 }

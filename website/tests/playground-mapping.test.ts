@@ -49,7 +49,27 @@ describe('prod mapping (compiler source map)', () => {
 		expect(ranges!.some((range) => textAt(SOURCE, range).includes('useState'))).toBe(true);
 	});
 
-	it('answers every offset without throwing (nearest-anchor semantics)', () => {
+	it('clears on unmapped positions instead of borrowing a distant anchor', () => {
+		// The blank line between the hook statement and the JSX carries no
+		// mapping segment. Unbounded nearest-anchor matching used to resolve it
+		// to the previous anchor and light an unrelated range in the output.
+		const offset = SOURCE.indexOf('\n\n\t<div>') + 1;
+		expect(mapping!.toGenerated(offset)).toBeNull();
+	});
+
+	it('maps no source from generated plumbing past the last anchored token', () => {
+		const offset = compiled.code.lastIndexOf('\n\n') + 1;
+		expect(mapping!.toSource(offset)).toBeNull();
+	});
+
+	it('still matches with the cursor parked at the trailing edge of a word', () => {
+		const offset = SOURCE.indexOf('const [') + 'const'.length;
+		const ranges = mapping!.toGenerated(offset);
+		expect(ranges).not.toBeNull();
+		expect(ranges!.some((range) => textAt(compiled.code, range).includes('const'))).toBe(true);
+	});
+
+	it('answers every offset without throwing (bounded-anchor semantics)', () => {
 		for (const offset of [0, SOURCE.length - 1, SOURCE.length]) {
 			const ranges = mapping!.toGenerated(offset);
 			if (ranges) {
@@ -89,6 +109,21 @@ describe('types mapping (Volar token mappings)', () => {
 		const ranges = mapping!.toSource(offset);
 		expect(ranges).not.toBeNull();
 		expect(ranges!.some((range) => textAt(SOURCE, range) === 'useState')).toBe(true);
+	});
+
+	it('clears on positions past the mapped token instead of reusing it', () => {
+		// Same contract as the prod pane: an offset beyond the anchored token's
+		// exact span (here the blank line before the JSX) is unmapped and must
+		// clear the highlight, not resolve to the preceding token's image.
+		const offset = SOURCE.indexOf('\n\n\t<div>') + 1;
+		expect(mapping!.toGenerated(offset)).toBeNull();
+	});
+
+	it('still matches with the cursor parked at the trailing edge of a token', () => {
+		const offset = SOURCE.indexOf('setCount(count + 1)') + 'setCount'.length;
+		const ranges = mapping!.toGenerated(offset);
+		expect(ranges).not.toBeNull();
+		expect(ranges!.some((range) => textAt(types.code, range) === 'setCount')).toBe(true);
 	});
 
 	it('returns null for empty or absent mappings instead of throwing', () => {
