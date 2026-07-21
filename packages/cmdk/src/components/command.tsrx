@@ -124,7 +124,16 @@ export function CommandRoot(props: CommandProps) @{
 				if (itemValue !== ids.current.get(id)?.value) {
 					ids.current.set(id, { value: itemValue ?? '', keywords });
 					state.current.filtered.items.set(id, score(itemValue ?? '', keywords));
+					// Re-derive the aggregate before sorting. Scoring this one item
+					// updates `filtered.items` but leaves `filtered.count` and
+					// `filtered.groups` describing the previous values, and those two
+					// drive Empty and group visibility — so a value that starts or stops
+					// matching an active search would otherwise render an item and "no
+					// results" at the same time. filterItems() is the single place that
+					// derives all three, so reuse it rather than patching the aggregate
+					// here (the batcher collapses a burst of value changes into one).
 					schedule(2, () => {
+						filterItems();
 						sort();
 						store.emit();
 					});

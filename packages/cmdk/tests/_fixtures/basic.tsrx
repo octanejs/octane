@@ -117,6 +117,22 @@ export function ControlledCallbackMenu(props: {
 	</Command>
 }
 
+// An item whose `value` changes after mount. Re-registering a value while a
+// search is active re-scores that item, so the aggregate filter state (the
+// match count and the matching groups) has to be refreshed with it — otherwise
+// Empty and a matching item can render at the same time.
+export function DynamicValueMenu(props: { itemValue: string }) @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			<Command.Group heading="Fruits">
+				<Command.Item value={props.itemValue}>Fruit</Command.Item>
+			</Command.Group>
+		</Command.List>
+	</Command>
+}
+
 export function DialogMenu(props: { open: boolean }) @{
 	<Command.Dialog open={props.open} label="Command Menu">
 		<Command.Input placeholder="Search…" />
