@@ -438,9 +438,7 @@ export function SetupValueParallelHost(props) @{
 		@try {
 			const a = use(props.load('a'));
 			const b = use(props.load('b'));
-			<p class="setup-value-result">
-				{a + '|' + b as string}
-			</p>
+			<p class="setup-value-result">{a + '|' + b as string}</p>
 		} @pending {
 			<i class="setup-value-fallback">loading</i>
 		}
