@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/compile.js';
+import { decodeMappings } from '../src/compiler/compile-universal.js';
 import { mount } from './_helpers';
 import { AutoMemoApp } from './_fixtures/auto-memo.tsrx';
 import { ParentCaptureApp } from './_fixtures/auto-memo-parent-capture.tsrx';
@@ -280,5 +281,50 @@ describe('compiler-owned component-region memoization', () => {
 			{ hmr: false, autoMemo: true },
 		).code;
 		expectNoCompilerRegion(dynamicImport);
+	});
+
+	it('keeps setup-statement source mappings aligned when the memo prelude is emitted', () => {
+		const source = `import { useState } from 'octane';
+
+export default function App() @{
+	const [items, setItems] = useState<string[]>([]);
+	const addItem = () => {
+		setItems([...items, 'item']);
+	};
+
+	<div>
+		<button onClick={addItem}>add</button>
+		<ul>
+			@for (const item of items; key item) {
+				<li>{item}</li>
+			}
+		</ul>
+	</div>
+}
+`;
+		const out = compile(source, 'App.tsrx', { mode: 'client' });
+		// Premise guard: this component compiles WITH the transactional memo
+		// prelude — the lines inserted ABOVE the setup statements whose height
+		// the emitted source map must account for.
+		expect(out.code).toMatch(/const __memoCommitted[\w$]* = __s\.slots\._m\$\d+;/);
+		// Each setup statement's mapping must anchor to ITS OWN source line, not
+		// drift by the prelude height.
+		const sourceLines = source.split('\n');
+		const mappedSourceLine = (needle: string) => {
+			const offset = out.code.indexOf(needle);
+			expect(offset).toBeGreaterThanOrEqual(0);
+			const before = out.code.slice(0, offset).split('\n');
+			const line = before.length - 1;
+			const column = before.at(-1)!.length;
+			let traced: number[] | null = null;
+			for (const segment of decodeMappings(out.map.mappings)[line] ?? []) {
+				if (segment[0] > column) break;
+				if (segment.length > 1) traced = segment;
+			}
+			expect(traced, `no mapping found for ${JSON.stringify(needle)}`).not.toBeNull();
+			return sourceLines[traced![2]];
+		};
+		expect(mappedSourceLine('useState([]')).toContain('useState<string[]>([])');
+		expect(mappedSourceLine('const addItem')).toContain('const addItem');
 	});
 });
