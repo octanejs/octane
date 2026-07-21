@@ -12,6 +12,7 @@ import { RouterProvider, createMemoryHistory } from '@octanejs/tanstack-router';
 import { getRouter } from '../src/router.ts';
 import {
 	compilePlayground,
+	compileTypes,
 	createPreview,
 	PREVIEW_READY_TIMEOUT_MS,
 	PREVIEW_RUN_TIMEOUT_MS,
@@ -93,6 +94,34 @@ describe('playground compile pipeline', () => {
 		);
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.warnings).toEqual([]);
+	});
+
+	it('returns the source map alongside the compiled code', () => {
+		const result = compilePlayground(DEFAULT_WORKSPACES.tsrx.files[0].source, 'App.tsrx');
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.map as { mappings?: unknown })?.mappings).toBeTypeOf('string');
+		}
+	});
+
+	it('generates the typed virtual TSX for the default TSRX workspace', () => {
+		const result = compileTypes(DEFAULT_WORKSPACES.tsrx.files[0].source, 'App.tsrx');
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		// The types view is the language-service TSX, not the runtime emit: the
+		// @{ … } body desugars to an ordinary typed return.
+		expect(result.code).toContain('/** @jsxImportSource octane */');
+		expect(result.code).toContain('return');
+		expect(result.code).not.toContain('@{');
+		// Token mappings power source↔types navigation.
+		expect(result.mappings.length).toBeGreaterThan(0);
+	});
+
+	it('never throws on broken sources in the types pipeline', () => {
+		const result = compileTypes('export function App() @{ <div>{oops</div> }', 'App.tsrx');
+		// Loose parsing may yield partial output or a reported failure — either
+		// way the caller gets a result object, not an exception.
+		expect(typeof result.ok).toBe('boolean');
 	});
 });
 
@@ -218,6 +247,18 @@ describe('playground sandbox boundary', () => {
 		expect(csp).toContain("form-action 'none'");
 		expect(csp).toContain("base-uri 'none'");
 		expect(csp).not.toContain('connect-src');
+	});
+
+	it('theming the srcdoc never varies the security posture', () => {
+		const dark = sandboxSrcdoc();
+		const light = sandboxSrcdoc('light');
+		// The theme only stamps the initial data-theme attribute on <html>…
+		expect(dark).toContain('<html>');
+		expect(light).toContain('<html data-theme="light">');
+		// …the CSP is byte-identical either way.
+		const cspOf = (srcdoc: string) =>
+			srcdoc.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
+		expect(cspOf(light)).toBe(cspOf(dark));
 	});
 
 	it('createPreview mounts a sandboxed iframe WITHOUT allow-same-origin', () => {
@@ -348,7 +389,7 @@ describe('/playground route', () => {
 		// Result view switch — live preview vs compiled output.
 		const viewGroup = container.querySelector('[aria-label="Result view"]');
 		const viewButtons = Array.from(viewGroup?.querySelectorAll('button') ?? []);
-		expect(viewButtons.map((b) => b.textContent?.trim())).toEqual(['Preview', 'Compiled output']);
+		expect(viewButtons.map((b) => b.textContent?.trim())).toEqual(['Preview', 'Compiled']);
 
 		// Both panels exist; preview is the visible one by default; the file tab
 		// strip only appears for multi-file workspaces.

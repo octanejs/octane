@@ -931,6 +931,76 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 30_000);
 
+	it('playground compiled pane offers prod and types output with click-through position mapping', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			const outputIncludes = (needle: string) =>
+				page.waitForFunction(
+					(text) =>
+						(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(
+							text,
+						),
+					needle,
+					{ timeout: 15_000 },
+				);
+			// Prod is the default compiled mode: the real client-runtime emit.
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await outputIncludes("from 'octane'");
+			// Types swaps the pane to the typed virtual TSX (the language-service
+			// view), without recompiling the preview.
+			await page
+				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
+				.click();
+			await outputIncludes('@jsxImportSource octane');
+			// Click the Nth occurrence of a token inside an editor pane (Shiki
+			// splits tokens into their own spans, so search per text node).
+			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+				const point = await page.evaluate(
+					([index, needle, wanted]) => {
+						const content = document.querySelectorAll('.pg-editor .cm-content')[index as number];
+						const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+						let seen = 0;
+						while (walker.nextNode()) {
+							const node = walker.currentNode;
+							let at = -1;
+							while ((at = node.textContent!.indexOf(needle as string, at + 1)) !== -1) {
+								if (++seen < (wanted as number)) continue;
+								const range = document.createRange();
+								range.setStart(node, at + 1);
+								range.setEnd(node, at + 2);
+								const rect = range.getBoundingClientRect();
+								return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+							}
+						}
+						return null;
+					},
+					[paneIndex, token, occurrence] as const,
+				);
+				expect(point, `${token} (occurrence ${occurrence}) not visible in pane`).not.toBeNull();
+				await page.mouse.click(point!.x, point!.y);
+			};
+			const mappedIn = (paneIndex: number, token: string) =>
+				page.waitForFunction(
+					([index, text]) =>
+						document
+							.querySelectorAll('.pg-editor .cm-content')
+							[index as number]?.querySelector('.cm-mapped')?.textContent === text,
+					[paneIndex, token] as const,
+					{ timeout: 10_000 },
+				);
+			// Clicking a source token reveals the mapped token in the output…
+			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+			await mappedIn(1, 'useState');
+			// …and clicking the output maps back into the source.
+			await clickToken(1, 'setCount', 1);
+			await mappedIn(0, 'setCount');
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 45_000);
+
 	it('playground shows compiler warnings without treating runnable code as an error', async () => {
 		const source = `export function App() @{ <input onChange={() => {}} /> }`;
 		const hash = encodePlaygroundHash({
