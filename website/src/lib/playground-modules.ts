@@ -77,8 +77,7 @@ const SIBLING_EXTENSIONS = ['', '.tsrx', '.tsx', '.react.tsx'];
 // pane's `CompiledModule` (same object across rebuilds — see that interface).
 const compileCache = new Map<string, { source: string; result: CachedCompile }>();
 type CachedCompile =
-	| ({ ok: true; warnings: CompileDiagnostic[] } & CompiledModule)
-	| { ok: false; error: string };
+	({ ok: true; warnings: CompileDiagnostic[] } & CompiledModule) | { ok: false; error: string };
 
 async function compileFile(file: PlaygroundFile): Promise<CachedCompile> {
 	const cached = compileCache.get(file.name);

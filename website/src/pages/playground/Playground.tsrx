@@ -96,16 +96,14 @@ export function Playground() @{
 	// Imperative bridge into the boot closure below — populated once the editor
 	// stack has loaded; the toolbar buttons (and the consent overlay's Run
 	// button) call through it.
-	const controllerRef = useRef<
-		{
-			switchLang?: (next: PlaygroundLang) => void;
-			selectExample?: (id: string) => void;
-			selectFile?: (name: string) => void;
-			formatActive?: () => void;
-			approveRun?: () => void;
-			syncOutput?: () => void;
-		}
-	>({});
+	const controllerRef = useRef<{
+		switchLang?: (next: PlaygroundLang) => void;
+		selectExample?: (id: string) => void;
+		selectFile?: (name: string) => void;
+		formatActive?: () => void;
+		approveRun?: () => void;
+		syncOutput?: () => void;
+	}>({});
 
 	const selectView = (next: 'preview' | 'compiled') => {
 		setView(next);
@@ -440,28 +438,28 @@ export function Playground() @{
 				});
 			};
 
-			const crossNavigate = (side: 'source' | 'output') => EditorView.updateListener.of(
-				(update: any) => {
-					if (!update.selectionSet || update.docChanged) return;
-					// Only user-driven cursor moves navigate — programmatic dispatches
-					// (doc replacement, highlight effects) must not feed back.
-					if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
-					if (resultModeRef.current.view !== 'compiled') return;
-					const target =
-						side === 'source' ? outputView : sourceView;
-					const mapping = activeMapping();
-					const offset = update.state.selection.main.head;
-					const ranges =
-						mapping
-							? side === 'source'
-								? mapping.toGenerated(offset)
-								: mapping.toSource(offset)
-							: null;
-					// Marks reflect the CURRENT selection — an unmapped one clears.
-					if (ranges) revealRanges(target, ranges);
-					else clearMappedIn(target);
-				},
-			);
+			const crossNavigate = (side: 'source' | 'output') => EditorView.updateListener.of((
+				update: any,
+			) => {
+				if (!update.selectionSet || update.docChanged) return;
+				// Only user-driven cursor moves navigate — programmatic dispatches
+				// (doc replacement, highlight effects) must not feed back.
+				if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
+				if (resultModeRef.current.view !== 'compiled') return;
+				const target =
+					side === 'source' ? outputView : sourceView;
+				const mapping = activeMapping();
+				const offset = update.state.selection.main.head;
+				const ranges =
+					mapping
+						? side === 'source'
+							? mapping.toGenerated(offset)
+							: mapping.toSource(offset)
+						: null;
+				// Marks reflect the CURRENT selection — an unmapped one clears.
+				if (ranges) revealRanges(target, ranges);
+				else clearMappedIn(target);
+			});
 
 			let compileSeq = 0;
 			const compileAndRun = async () => {
@@ -1172,7 +1170,7 @@ export function Playground() @{
 			}
 			/* Ranges revealed by source↔output position mapping. */
 			.pg-editor :global(.cm-mapped) {
-				background: rgba(255, 213, 0, 0.4);
+				background: rgba(255, 221, 0, 0.55);
 				border-radius: 2px;
 			}
 			.pg-result {
