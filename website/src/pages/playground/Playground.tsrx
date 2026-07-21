@@ -351,11 +351,22 @@ export function Playground() @{
 				if (typeof code !== 'string' || code === lastShownOutput) return;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
+				// The output half of the pair changed — source marks were computed
+				// against the previous artifact (the output field self-cleared via
+				// its own doc change just now).
+				clearMappedIn(sourceView);
 			};
 
 			// ── Source ↔ output position mapping ─────────────────────────────
 			// Placing the cursor in one editor highlights and reveals the mapped
 			// ranges in the other (see playground-mapping.ts for the semantics).
+			// Marks are only valid for the exact (source doc, output doc) PAIR
+			// they were computed against, so a change to either side must clear
+			// BOTH editors: each field self-clears on its own doc change, and
+			// clearMappedIn handles the cross-editor half (a source edit leaves
+			// output marks orphaned — visibly so when a broken edit means no
+			// recompile ever replaces the output doc — and setState doc swaps
+			// produce no transaction at all).
 			const setMapped = StateEffect.define();
 			const mappedMark = Decoration.mark({ class: 'cm-mapped' });
 			const mappedField = StateField.define({
@@ -367,6 +378,13 @@ export function Playground() @{
 				},
 				provide: (field: any) => EditorView.decorations.from(field),
 			});
+			// Per-keystroke safe: one O(1) field-size read, and a transaction is
+			// dispatched only when marks actually exist to clear.
+			const clearMappedIn = (targetView: any) => {
+				if (targetView.state.field(mappedField, false)?.size) {
+					targetView.dispatch({ effects: setMapped.of(Decoration.none) });
+				}
+			};
 
 			// The mapping for the visible artifact, or null when navigation must
 			// stay off: preview mode, no mappings (React-host files), or offsets
@@ -550,6 +568,10 @@ export function Playground() @{
 					crossNavigate('source'),
 					EditorView.updateListener.of((update: any) => {
 						if (!update.docChanged) return;
+						// The source half of the pair changed — orphan any marks still
+						// shown in the output (this field self-clears; a failed
+						// recompile would otherwise leave the output's marks forever).
+						clearMappedIn(outputView);
 						const next = update.state.doc.toString();
 						const file = workspace().files.find(
 							(candidate: { name: string }) => candidate.name === currentFile,
@@ -572,6 +594,10 @@ export function Playground() @{
 				currentFile = name;
 				const existing = editorStates.get(stateKey(name));
 				sourceView.setState(existing ?? makeEditorState(name, fileSource(name)));
+				// setState fires no transaction: a restored state may carry marks
+				// from an old pair, and the output's marks belong to the old file.
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
 				setActiveFile(name);
 				showOutput();
 			};
@@ -615,6 +641,8 @@ export function Playground() @{
 					: workspace().entry;
 				const existing = editorStates.get(stateKey(currentFile));
 				sourceView.setState(existing ?? makeEditorState(currentFile, fileSource(currentFile)));
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
 				publishWorkspaceState();
 				window.clearTimeout(compileDebounceId);
 				void compileAndRun();
@@ -640,6 +668,7 @@ export function Playground() @{
 				editorStates.clear();
 				typesCache.clear();
 				sourceView.setState(makeEditorState(currentFile, fileSource(currentFile)));
+				clearMappedIn(outputView);
 				// Picking an example is the visitor's own action — never gated.
 				executionGated = false;
 				setGated(false);
