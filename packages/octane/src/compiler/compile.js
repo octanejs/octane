@@ -476,6 +476,19 @@ function escapeInlineScriptContent(value) {
 	);
 }
 
+// Value-position host JSX lowers through a descriptor and installs its child via
+// textContent instead of parsing a static template. Match the HTML script-data
+// input normalization up front so fresh client DOM and parsed SSR DOM have the
+// same spelling; character references deliberately remain literal.
+const SCRIPT_DATA_INPUT_NORMALIZATION = /\r\n?|\u0000/g;
+
+function normalizeStaticScriptDescriptorContent(value) {
+	const normalized = value.replace(SCRIPT_DATA_INPUT_NORMALIZATION, (match) =>
+		match === '\u0000' ? '\uFFFD' : '\n',
+	);
+	return escapeInlineScriptContent(normalized);
+}
+
 function hasDefinitelyNonNullishJsxChild(children, knownStringLocals) {
 	for (const child of children || []) {
 		if (!child) continue;
@@ -11421,11 +11434,12 @@ function jsxElementToCreateElement(node, ctx) {
 		? undefined
 		: staticScriptContent(node, compNode.value);
 	if (authoredStaticScriptContent !== undefined) {
-		// Raw script-data is one authored body, not ordinary JSX text. Preserve
-		// whitespace verbatim and let the client/server descriptor renderers own
-		// their respective whole-script safety paths.
-		if (authoredStaticScriptContent !== '') {
-			args.push({ type: 'Literal', value: authoredStaticScriptContent });
+		// Raw script-data is one authored body, not ordinary JSX text. Carry it as
+		// one unit while matching the parsed template/SSR DOM spelling and applying
+		// the same whole-script neutralization.
+		const content = normalizeStaticScriptDescriptorContent(authoredStaticScriptContent);
+		if (content !== '') {
+			args.push({ type: 'Literal', value: content });
 		}
 	} else {
 		for (const child of node.children || []) {

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
-import { loadServerFixture } from './_server-fixture.js';
+import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
 import { mount } from './_helpers.js';
 import * as client from './_fixtures/script-innerhtml.tsrx';
 
@@ -248,6 +248,80 @@ describe('<script> content contract', () => {
 		expect(JSON.parse(fragment.querySelector('script')?.textContent ?? '')).toEqual(
 			STATIC_JSON_VALUE,
 		);
+	});
+
+	it('hydrates a value-position static script without rewriting its server-safe text', () => {
+		const { html } = ServerRuntime.renderToString(server.ConditionalStaticJsonScript, {
+			show: true,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const serverNode = container.querySelector('script');
+		const serverText = serverNode?.textContent ?? '';
+		expect(JSON.parse(serverText)).toEqual(STATIC_JSON_VALUE);
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, client.ConditionalStaticJsonScript, { show: true });
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('script')).toBe(serverNode);
+			expect(serverNode?.textContent).toBe(serverText);
+			expect(warning).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			warning.mockRestore();
+			container.remove();
+		}
+	});
+
+	it('normalizes static descriptor script text to the parsed HTML spelling', () => {
+		const source =
+			'export function NormalizedStaticScript(props: { show: boolean }) @{\n' +
+			'\t<section>{props.show && <script type="text/plain">first\r\nsecond\rthird\u0000fourth</script>}</section>\n' +
+			'}\n';
+		const compileOptions = {
+			dev: process.env.OCTANE_TEST_COMPILE_MODE !== 'prod',
+			hmr: false,
+		};
+		const compiledClient = loadCompiledFixtureSource(source, {
+			id: '/inline-script-normalization.tsrx',
+			mode: 'client',
+			compileOptions,
+		});
+		const compiledServer = loadCompiledFixtureSource(source, {
+			id: '/inline-script-normalization.tsrx',
+			mode: 'server',
+			compileOptions,
+		});
+		const expected = 'first\nsecond\nthird\uFFFDfourth';
+
+		const mounted = mount(compiledClient.NormalizedStaticScript, { show: true });
+		try {
+			expect(mounted.find('script').textContent).toBe(expected);
+		} finally {
+			mounted.unmount();
+		}
+
+		const { html } = ServerRuntime.renderToString(compiledServer.NormalizedStaticScript, {
+			show: true,
+		});
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const serverNode = container.querySelector('script');
+		expect(serverNode?.textContent).toBe(expected);
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, compiledClient.NormalizedStaticScript, { show: true });
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('script')).toBe(serverNode);
+			expect(serverNode?.textContent).toBe(expected);
+			expect(warning).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			warning.mockRestore();
+			container.remove();
+		}
 	});
 
 	it('preserves static script text when JSX lowers through a value-position descriptor', () => {
