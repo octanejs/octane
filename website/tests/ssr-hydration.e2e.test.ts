@@ -944,15 +944,6 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					needle,
 					{ timeout: 15_000 },
 				);
-			// Prod is the default compiled mode: the real client-runtime emit.
-			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await outputIncludes("from 'octane'");
-			// Types swaps the pane to the typed virtual TSX (the language-service
-			// view), without recompiling the preview.
-			await page
-				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
-				.click();
-			await outputIncludes('@jsxImportSource octane');
 			// Click the Nth occurrence of a token inside an editor pane (Shiki
 			// splits tokens into their own spans, so search per text node).
 			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
@@ -989,12 +980,39 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					[paneIndex, token] as const,
 					{ timeout: 10_000 },
 				);
+			// Prod is the default compiled mode: the real client-runtime emit.
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await outputIncludes("from 'octane'");
+			// Prod navigation places marks; a cursor move to an unmapped position
+			// (the import line sits before the prod map's first anchor) clears
+			// them — marks must always reflect the current selection.
+			await clickToken(0, 'useState', 2);
+			await mappedIn(1, 'useState');
+			await clickToken(0, 'import', 1);
+			await page.waitForFunction(
+				() => !document.querySelectorAll('.pg-editor .cm-content')[1]?.querySelector('.cm-mapped'),
+				null,
+				{ timeout: 10_000 },
+			);
+			// Types swaps the pane to the typed virtual TSX (the language-service
+			// view), without recompiling the preview.
+			await page
+				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
+				.click();
+			await outputIncludes('@jsxImportSource octane');
 			// Clicking a source token reveals the mapped token in the output…
 			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
 			await mappedIn(1, 'useState');
 			// …and clicking the output maps back into the source.
 			await clickToken(1, 'setCount', 1);
 			await mappedIn(0, 'setCount');
+			// Switching to Preview clears every mark; Compiled returns clean.
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
+			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+				timeout: 5_000,
+			});
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await outputIncludes('@jsxImportSource octane');
 			// Editing the source orphans the output's marks even when the
 			// recompile FAILS — the output document is never replaced, so only
 			// the cross-editor clearing can remove them. Re-place output marks,

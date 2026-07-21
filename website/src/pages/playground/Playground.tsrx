@@ -423,7 +423,11 @@ export function Playground() @{
 						to: Math.min(range.to, limit),
 					}),
 				);
-				if (clamped.length === 0) return;
+				if (clamped.length === 0) {
+					// Same contract as an unmapped position: no lingering marks.
+					clearMappedIn(targetView);
+					return;
+				}
 				targetView.dispatch({
 					effects: [
 						setMapped.of(
@@ -444,12 +448,20 @@ export function Playground() @{
 					// Only user-driven cursor moves navigate — programmatic dispatches
 					// (doc replacement, highlight effects) must not feed back.
 					if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
+					if (resultModeRef.current.view !== 'compiled') return;
+					const target =
+						side === 'source' ? outputView : sourceView;
 					const mapping = activeMapping();
-					if (!mapping) return;
 					const offset = update.state.selection.main.head;
 					const ranges =
-						side === 'source' ? mapping.toGenerated(offset) : mapping.toSource(offset);
-					if (ranges) revealRanges(side === 'source' ? outputView : sourceView, ranges);
+						mapping
+							? side === 'source'
+								? mapping.toGenerated(offset)
+								: mapping.toSource(offset)
+							: null;
+					// Marks reflect the CURRENT selection — an unmapped one clears.
+					if (ranges) revealRanges(target, ranges);
+					else clearMappedIn(target);
 				},
 			);
 
@@ -717,8 +729,14 @@ export function Playground() @{
 			};
 
 			controllerRef.current.syncOutput = () => {
-				if (disposed || resultModeRef.current.view !== 'compiled') return;
-				showOutput();
+				if (disposed) return;
+				if (resultModeRef.current.view === 'compiled') {
+					showOutput();
+					return;
+				}
+				// Leaving the compiled view: marks pair with a pane no longer shown.
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
 			};
 
 			publishWorkspaceState();
