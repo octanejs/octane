@@ -349,13 +349,16 @@ export function Playground() @{
 			// The mapping for the visible artifact, or null when navigation must
 			// stay off: preview mode, no map (React-host files), or offsets that
 			// no longer describe what's on screen (edits inside the compile
-			// debounce, a failed recompile leaving a stale pane).
+			// debounce, a failed recompile leaving a stale pane). Read-only in
+			// BOTH modes — cached artifacts are consulted, never (re)generated;
+			// the types entry is produced solely by showOutput(), so a cursor
+			// move can never trigger a compile.
 			const activeMapping = () => {
 				if (resultModeRef.current.view !== 'compiled') return null;
 				const liveSource = sourceView.state.doc.toString();
 				if (resultModeRef.current.compiledMode === 'types') {
-					const entry = typesEntry(currentFile);
-					if (entry.source !== liveSource) return null;
+					const entry = typesCache.get(currentFile);
+					if (!entry || !entry.mapping || entry.source !== liveSource) return null;
 					if (outputView.state.doc.toString() !== entry.code) return null;
 					return entry.mapping;
 				}
