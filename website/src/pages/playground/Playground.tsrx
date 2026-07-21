@@ -1180,7 +1180,7 @@ export function Playground() @{
 			}
 			/* Ranges revealed by source↔output position mapping. */
 			.pg-editor :global(.cm-mapped) {
-				background: rgba(56, 139, 253, 0.28);
+				background: rgba(255, 213, 0, 0.4);
 				border-radius: 2px;
 			}
 			.pg-result {
