@@ -52,6 +52,26 @@ function getHighlighter(): Promise<Highlighter> {
 	return highlighterPromise;
 }
 
+// Re-highlighting allocates per TOKEN (thousands per document, every
+// keystroke), but the number of distinct token styles is bounded by the
+// theme palette (a few dozen pairs) — so mark decorations are interned by
+// their style string and reused across tokens, documents, and re-highlights.
+const tokenDecorations = new Map<string, Decoration>();
+
+function tokenDecoration(style: Record<string, string>): Decoration {
+	// With defaultColor: false the per-theme colors arrive as custom
+	// properties in htmlStyle; the stylesheet maps them to `color`. The
+	// serialized declaration doubles as the intern key.
+	let styleText = '';
+	for (const property in style) styleText += `${property}:${style[property]};`;
+	let deco = tokenDecorations.get(styleText);
+	if (!deco) {
+		deco = Decoration.mark({ class: 'cm-shiki', attributes: { style: styleText } });
+		tokenDecorations.set(styleText, deco);
+	}
+	return deco;
+}
+
 function buildDecorations(doc: string, highlighter: Highlighter, lang: string): DecorationSet {
 	if (!doc) return Decoration.none;
 
@@ -71,22 +91,9 @@ function buildDecorations(doc: string, highlighter: Highlighter, lang: string): 
 		for (const token of line) {
 			const from = token.offset;
 			const to = from + token.content.length;
-			// With defaultColor: false the per-theme colors arrive as custom
-			// properties in htmlStyle; the stylesheet maps them to `color`.
 			const style = token.htmlStyle;
 			if (style && to <= doc.length) {
-				ranges.push({
-					from,
-					to,
-					deco: Decoration.mark({
-						class: 'cm-shiki',
-						attributes: {
-							style: Object.entries(style)
-								.map(([property, value]) => `${property}:${value}`)
-								.join(';'),
-						},
-					}),
-				});
+				ranges.push({ from, to, deco: tokenDecoration(style) });
 			}
 		}
 	}

@@ -292,43 +292,67 @@ export function Playground() @{
 			// The compiled-output pane tracks the ACTIVE file and the selected
 			// mode (prod emit vs typed virtual TSX); the last good graph is kept
 			// so tab/mode switches don't need a recompile. `mapping` is derived
-			// lazily per artifact and cached on it (compiled-module identity is
-			// stable across rebuilds while a file's source is unchanged).
+			// lazily per artifact on first navigation and cached on it under an
+			// undefined/null sentinel (undefined = not built yet, null = built
+			// and absent); compiled-module identity is stable across rebuilds
+			// while a file's source is unchanged, so the cache survives them.
 			let lastCompiled: Map<string, any> | null = null;
-			// name → { source, code, mapping } — the types view is generated on
-			// demand for the active file only, keyed by the exact source.
-			const typesCache = new Map<string, { source: string; code: string; mapping: any }>();
+			// name → { source, code, volarMappings, mapping } — the types view is
+			// generated on demand for the active file only, keyed by the exact
+			// source. Raw volar mappings are kept so the CodeMapping is built
+			// lazily, exactly like the prod pane's source-map path.
+			const typesCache = new Map<
+				string,
+				{ source: string; code: string; volarMappings: any; mapping: any }
+			>();
 
 			const typesEntry = (name: string) => {
 				const source = fileSource(name);
 				const cached = typesCache.get(name);
 				if (cached && cached.source === source) return cached;
-				let entry: { source: string; code: string; mapping: any };
+				let entry: { source: string; code: string; volarMappings: any; mapping: any };
 				if (pgModules.isReactHostFile(name)) {
 					entry = {
 						source,
 						code: '// Types output covers Octane files (.tsrx / .tsx).\n// ' + name +
 							' is a React-host file compiled with sucrase, so it has no typed virtual TSX.',
+						volarMappings: null,
 						mapping: null,
 					};
 				} else {
 					const result = pg.compileTypes(source, name);
 					entry = result.ok
-						? { source, code: result.code, mapping: pgMapping.mappingFromVolar(result.mappings) }
-						: { source, code: '// Types generation failed:\n// ' + result.error, mapping: null };
+						? { source, code: result.code, volarMappings: result.mappings, mapping: undefined }
+						: {
+								source,
+								code: '// Types generation failed:\n// ' + result.error,
+								volarMappings: null,
+								mapping: null,
+							};
 				}
 				typesCache.set(name, entry);
 				return entry;
 			};
 
+			// The exact string the output editor currently displays. The output
+			// view is read-only and written ONLY here, so this makes both the
+			// refresh no-op check and activeMapping's staleness check a string
+			// reference compare instead of an O(doc) toString per call.
+			const OUTPUT_PLACEHOLDER = '// Compiled output appears here.';
+			let lastShownOutput = OUTPUT_PLACEHOLDER;
 			const showOutput = () => {
+				// The compiled pane is not visible: skip entirely — no types
+				// generation, no doc replacement, and (the dominant cost) no Shiki
+				// re-tokenize of the output document. syncOutput re-runs this when
+				// the pane is revealed, so it refreshes exactly once, on demand.
+				if (resultModeRef.current.view !== 'compiled') return;
 				const code =
 					resultModeRef.current.compiledMode === 'types'
 						? typesEntry(currentFile).code
 						: lastCompiled?.get(currentFile)?.code;
-				if (typeof code !== 'string') return;
-				if (outputView.state.doc.toString() === code) return;
+				if (typeof code !== 'string' || code === lastShownOutput) return;
 				replaceDoc(outputView, code);
+				lastShownOutput = code;
 			};
 
 			// ── Source ↔ output position mapping ─────────────────────────────
@@ -347,25 +371,29 @@ export function Playground() @{
 			});
 
 			// The mapping for the visible artifact, or null when navigation must
-			// stay off: preview mode, no map (React-host files), or offsets that
-			// no longer describe what's on screen (edits inside the compile
-			// debounce, a failed recompile leaving a stale pane). Read-only in
-			// BOTH modes — cached artifacts are consulted, never (re)generated;
-			// the types entry is produced solely by showOutput(), so a cursor
-			// move can never trigger a compile.
+			// stay off: preview mode, no mappings (React-host files), or offsets
+			// that no longer describe what's on screen (edits inside the compile
+			// debounce, a failed recompile leaving a stale pane). This runs per
+			// user cursor move, so it is O(1): cached artifacts are consulted,
+			// never generated (typesEntry runs solely inside showOutput), and
+			// both staleness checks are reference compares — the workspace file
+			// source tracks every edit, and lastShownOutput mirrors the pane.
+			// Only the first navigation against a fresh artifact builds the
+			// CodeMapping (undefined = not built, null = built, none available).
 			const activeMapping = () => {
 				if (resultModeRef.current.view !== 'compiled') return null;
-				const liveSource = sourceView.state.doc.toString();
-				if (resultModeRef.current.compiledMode === 'types') {
-					const entry = typesCache.get(currentFile);
-					if (!entry || !entry.mapping || entry.source !== liveSource) return null;
-					if (outputView.state.doc.toString() !== entry.code) return null;
-					return entry.mapping;
+				const types = resultModeRef.current.compiledMode === 'types';
+				const entry =
+					types ? typesCache.get(currentFile) : lastCompiled?.get(currentFile);
+				if (!entry || entry.source !== fileSource(currentFile)) return null;
+				if (entry.code !== lastShownOutput) return null;
+				if (entry.mapping === undefined) {
+					entry.mapping = types
+						? pgMapping.mappingFromVolar(entry.volarMappings)
+						: entry.map
+							? pgMapping.mappingFromSourceMap(entry.map, entry.source, entry.code)
+							: null;
 				}
-				const entry = lastCompiled?.get(currentFile);
-				if (!entry || !entry.map || entry.source !== liveSource) return null;
-				if (outputView.state.doc.toString() !== entry.code) return null;
-				entry.mapping ??= pgMapping.mappingFromSourceMap(entry.map, entry.source, entry.code);
 				return entry.mapping;
 			};
 
@@ -557,7 +585,7 @@ export function Playground() @{
 
 			outputView = new EditorView({
 				state: EditorState.create({
-					doc: '// Compiled output appears here.',
+					doc: OUTPUT_PLACEHOLDER,
 					extensions: [
 						lineNumbers(),
 						EditorState.readOnly.of(true),
