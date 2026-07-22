@@ -5,7 +5,7 @@
 // against real compiler artifacts; a focused nested-range fixture protects
 // Volar's shared generated-boundary behavior.
 import { describe, it, expect } from 'vitest';
-import { compilePlayground, compileTypes } from '../src/lib/playground.ts';
+import { compileAst, compilePlayground, compileTypes } from '../src/lib/playground.ts';
 import { mappingFromSourceMap, mappingFromVolar } from '../src/lib/playground-mapping.ts';
 
 const SOURCE = `import { useState } from 'octane';
@@ -113,6 +113,9 @@ describe('client output mapping (compiler source map)', () => {
 	const output = compilePlayground(SOURCE, 'App.tsrx');
 	if (!output.ok) throw new Error(output.error);
 	const mapping = mappingFromSourceMap(output.map, SOURCE, output.code);
+	const clientOutput = compileAst(SOURCE, 'App.tsrx', 'client-output');
+	if (!clientOutput.ok) throw new Error(clientOutput.error);
+	const clientMapping = mappingFromSourceMap(clientOutput.map, SOURCE, clientOutput.code!);
 
 	it('maps only tokens backed by compiler source-map anchors', () => {
 		const count = SOURCE.indexOf('count, setCount');
@@ -124,19 +127,20 @@ describe('client output mapping (compiler source map)', () => {
 
 	it('maps authored JSX tags to the tags baked into the client template', () => {
 		const sourceTag = SOURCE.indexOf('<div>') + 1;
-		const generatedTag = output.code.indexOf('<div>') + 1;
-		expect(mapping?.pairFromSource(sourceTag)).toEqual({
+		const generatedTag = clientOutput.code!.indexOf('<div>') + 1;
+		expect(mapping?.pairFromSource(sourceTag)).toBeNull();
+		expect(clientMapping?.pairFromSource(sourceTag)).toEqual({
 			source: [{ from: sourceTag, to: sourceTag + 3 }],
 			output: [{ from: generatedTag, to: generatedTag + 3 }],
 		});
-		expect(mapping?.pairFromGenerated(generatedTag)).toEqual({
+		expect(clientMapping?.pairFromGenerated(generatedTag)).toEqual({
 			source: [{ from: sourceTag, to: sourceTag + 3 }],
 			output: [{ from: generatedTag, to: generatedTag + 3 }],
 		});
 
 		const sourceClosingTag = SOURCE.indexOf('</div>') + 2;
-		const generatedClosingTag = output.code.indexOf('</div>') + 2;
-		expect(mapping?.pairFromGenerated(generatedClosingTag)).toEqual({
+		const generatedClosingTag = clientOutput.code!.indexOf('</div>') + 2;
+		expect(clientMapping?.pairFromGenerated(generatedClosingTag)).toEqual({
 			source: [{ from: sourceClosingTag, to: sourceClosingTag + 3 }],
 			output: [{ from: generatedClosingTag, to: generatedClosingTag + 3 }],
 		});
@@ -148,11 +152,11 @@ describe('client output mapping (compiler source map)', () => {
 		<span><div /></span>
 	</div>
 }`;
-		const compiled = compilePlayground(source, 'App.tsrx');
+		const compiled = compileAst(source, 'App.tsrx', 'client-output');
 		if (!compiled.ok) throw new Error(compiled.error);
-		const nested = mappingFromSourceMap(compiled.map, source, compiled.code);
-		const fakeGeneratedTag = compiled.code.indexOf('<span') + 1;
-		const realGeneratedTag = compiled.code.indexOf('<span', fakeGeneratedTag) + 1;
+		const nested = mappingFromSourceMap(compiled.map, source, compiled.code!);
+		const fakeGeneratedTag = compiled.code!.indexOf('<span') + 1;
+		const realGeneratedTag = compiled.code!.indexOf('<span', fakeGeneratedTag) + 1;
 		const sourceTag = source.indexOf('<span', source.indexOf('<span') + 1) + 1;
 
 		expect(nested?.pairFromGenerated(fakeGeneratedTag)).toBeNull();
@@ -161,7 +165,7 @@ describe('client output mapping (compiler source map)', () => {
 		]);
 
 		const sourceSelfClosing = source.indexOf('<div />') + 1;
-		const generatedSelfClosing = compiled.code.indexOf('<div></div>');
+		const generatedSelfClosing = compiled.code!.indexOf('<div></div>');
 		expect(nested?.pairFromSource(sourceSelfClosing)).toEqual({
 			source: [{ from: sourceSelfClosing, to: sourceSelfClosing + 3 }],
 			output: [

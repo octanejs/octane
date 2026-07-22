@@ -34,7 +34,12 @@ describe('client compiler source maps', () => {
 		<span><div /></span>
 	</div>
 }`;
-		const output = compile(source, 'App.tsrx', { mode: 'client' });
+		const defaultOutput = compile(source, 'App.tsrx', { mode: 'client' });
+		const output = compile(source, 'App.tsrx', {
+			mode: 'client',
+			sourceMapHostTags: true,
+		});
+		expect(output.code).toBe(defaultOutput.code);
 
 		const generatedAttributeText = nthIndexOf(output.code, '<span', 0) + 1;
 		const generatedSpanOpen = nthIndexOf(output.code, '<span', 1) + 1;
@@ -42,6 +47,7 @@ describe('client compiler source maps', () => {
 		const sourceSpanOpen = nthIndexOf(source, '<span', 1) + 1;
 		const sourceSpanClose = source.indexOf('</span>') + 2;
 
+		expect(originalPosition(defaultOutput.code, defaultOutput.map, generatedSpanOpen)).toBeNull();
 		expect(originalPosition(output.code, output.map, generatedAttributeText)).toBeNull();
 		expect(originalPosition(output.code, output.map, generatedSpanOpen)).toEqual(
 			offsetPosition(source, sourceSpanOpen),

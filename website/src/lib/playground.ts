@@ -110,7 +110,10 @@ export function compileAst(
 	try {
 		if (stage === 'client-output' || stage === 'server-output') {
 			const mode = stage === 'client-output' ? 'client' : 'server';
-			const result = compile(source, filename, { mode });
+			const result = compile(source, filename, {
+				mode,
+				sourceMapHostTags: mode === 'client',
+			});
 			return {
 				ok: true,
 				ast: parseGeneratedAst(result.code),

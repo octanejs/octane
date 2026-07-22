@@ -2,5 +2,6 @@
 'octane': patch
 ---
 
-Map host JSX tag names baked into client template strings back to their exact
-authored positions in compiler source maps.
+Allow inspection tooling to opt into exact source-map anchors for host JSX tag
+names baked into client template strings. Normal compiles keep the existing
+path without tag-location allocations or scans.

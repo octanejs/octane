@@ -29,6 +29,8 @@ declare module 'octane/compiler' {
 			mode?: 'client' | 'server';
 			hmr?: boolean;
 			dev?: boolean;
+			/** Inspection-only anchors for host tags baked into client templates. */
+			sourceMapHostTags?: boolean;
 		},
 	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 }
