@@ -122,6 +122,55 @@ describe('client output mapping (compiler source map)', () => {
 		expect(mapping?.toSourceRange(0, output.code.length)).not.toBeNull();
 	});
 
+	it('maps authored JSX tags to the tags baked into the client template', () => {
+		const sourceTag = SOURCE.indexOf('<div>') + 1;
+		const generatedTag = output.code.indexOf('<div>') + 1;
+		expect(mapping?.pairFromSource(sourceTag)).toEqual({
+			source: [{ from: sourceTag, to: sourceTag + 3 }],
+			output: [{ from: generatedTag, to: generatedTag + 3 }],
+		});
+		expect(mapping?.pairFromGenerated(generatedTag)).toEqual({
+			source: [{ from: sourceTag, to: sourceTag + 3 }],
+			output: [{ from: generatedTag, to: generatedTag + 3 }],
+		});
+
+		const sourceClosingTag = SOURCE.indexOf('</div>') + 2;
+		const generatedClosingTag = output.code.indexOf('</div>') + 2;
+		expect(mapping?.pairFromGenerated(generatedClosingTag)).toEqual({
+			source: [{ from: sourceClosingTag, to: sourceClosingTag + 3 }],
+			output: [{ from: generatedClosingTag, to: generatedClosingTag + 3 }],
+		});
+	});
+
+	it('keeps nested and self-closing tags exact when attribute text looks like markup', () => {
+		const source = `export function App() @{
+	<div data-label="<span">
+		<span><div /></span>
+	</div>
+}`;
+		const compiled = compilePlayground(source, 'App.tsrx');
+		if (!compiled.ok) throw new Error(compiled.error);
+		const nested = mappingFromSourceMap(compiled.map, source, compiled.code);
+		const fakeGeneratedTag = compiled.code.indexOf('<span') + 1;
+		const realGeneratedTag = compiled.code.indexOf('<span', fakeGeneratedTag) + 1;
+		const sourceTag = source.indexOf('<span', source.indexOf('<span') + 1) + 1;
+
+		expect(nested?.pairFromGenerated(fakeGeneratedTag)).toBeNull();
+		expect(nested?.pairFromGenerated(realGeneratedTag)?.source).toEqual([
+			{ from: sourceTag, to: sourceTag + 4 },
+		]);
+
+		const sourceSelfClosing = source.indexOf('<div />') + 1;
+		const generatedSelfClosing = compiled.code.indexOf('<div></div>');
+		expect(nested?.pairFromSource(sourceSelfClosing)).toEqual({
+			source: [{ from: sourceSelfClosing, to: sourceSelfClosing + 3 }],
+			output: [
+				{ from: generatedSelfClosing + 1, to: generatedSelfClosing + 4 },
+				{ from: generatedSelfClosing + 7, to: generatedSelfClosing + 10 },
+			],
+		});
+	});
+
 	it('does not interpolate across source text without an anchor', () => {
 		const blankLine = SOURCE.indexOf('\n\n\t<div>') + 1;
 		expect(mapping?.toGenerated(blankLine)).toBeNull();

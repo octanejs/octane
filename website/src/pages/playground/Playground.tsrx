@@ -559,6 +559,20 @@ export function Playground() @{
 				if (sourceRanges) revealRanges(sourceView, sourceRanges, scroll);
 				else clearMappedIn(sourceView);
 			};
+			const revealMappedAstFromSource = (offset: number, scroll: boolean) => {
+				const pair = activeMapping()?.pairFromSource(offset);
+				if (!pair) {
+					astPreview.clear();
+					clearMappedPair();
+					return;
+				}
+				astPreview.reveal(pair.output[0].from, scroll);
+				// Client templates are parsed as one string Literal. Revealing that
+				// AST node reports its whole range back through onNodeRange, whose
+				// first source anchor may be a different tag. Restore the exact
+				// source-side range that initiated navigation after the reveal.
+				revealRanges(sourceView, pair.source, false);
+			};
 
 			astPreview = pgAst.createAstPreview(astHost, {
 				onNodeRange: revealAstRange,
@@ -576,14 +590,7 @@ export function Playground() @{
 				if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
 					const entry = activeAstEntry();
 					if (entry?.space === 'source') astPreview.reveal(offset, true);
-					else {
-						const generated = activeMapping()?.toGenerated(offset);
-						if (generated) astPreview.reveal(generated[0].from, true);
-						else {
-							astPreview.clear();
-							clearMappedPair();
-						}
-					}
+					else revealMappedAstFromSource(offset, true);
 					return;
 				}
 				const pair = mappedPair(side, offset);
@@ -602,14 +609,7 @@ export function Playground() @{
 						const entry = activeAstEntry();
 						if (offset == null || !entry) clearMappedPair();
 						else if (entry.space === 'source') astPreview.reveal(offset, false);
-						else {
-							const generated = activeMapping()?.toGenerated(offset);
-							if (generated) astPreview.reveal(generated[0].from, false);
-							else {
-								astPreview.clear();
-								clearMappedPair();
-							}
-						}
+						else revealMappedAstFromSource(offset, false);
 						return;
 					}
 					const pair =

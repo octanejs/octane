@@ -1142,6 +1142,14 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					.first()
 					.evaluate((element) => getComputedStyle(element).backgroundColor),
 			).toBe('rgba(255, 234, 0, 0.42)');
+			// Client output bakes static JSX into one template Literal. Its AST
+			// reveal must preserve the exact tag that initiated navigation instead
+			// of falling back to the template's first source-map anchor.
+			await page.locator('[aria-label="AST compiler stage"]').selectOption('client-output');
+			await hoverToken(0, 'button', 2);
+			await mappedIn(0, 'button');
+			expect(await page.locator('.pg-ast-status').textContent()).toContain('Literal');
+			await page.locator('[aria-label="AST compiler stage"]').selectOption('source');
 			// Types swaps the pane to the typed virtual TSX (the language-service
 			// view), without recompiling the preview.
 			await page

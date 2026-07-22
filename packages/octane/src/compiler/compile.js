@@ -3653,13 +3653,15 @@ function countNewlines(str) {
  * from esrap itself — we print each user statement/expression via esrap with
  * `sourceMapEncodeMappings: false` (the same machinery the mainline TSRX
  * compilers use) and merge each node's real per-token mappings into module
- * coordinates. Generated runtime plumbing (templates, mount/update DOM ops) is
- * left unmapped — never mapped to a wrong position. `sourcesContent` is inlined
- * so the original `.tsrx` is visible in devtools.
+ * coordinates. Generated runtime plumbing (mount/update DOM ops) is left
+ * unmapped — never mapped to a wrong position. Baked template tag names are the
+ * exception: the emitter records their exact authored and generated positions
+ * so devtools can trace the static DOM shape too. `sourcesContent` is inlined so
+ * the original `.tsrx` is visible in devtools.
  *
  * @param {string} source original .tsrx text
  * @param {string} sourceName basename used as the map's single source entry
- * @param {Array<{ genLine: number, genCol: number, srcLine0: number, srcCol0: number }>} segments
+ * @param {Array<{ genLine: number, genCol: number, srcLine0?: number, srcCol0?: number, unmapped?: boolean }>} segments
  *   genLine/genCol are 0-based ABSOLUTE generated coords; src* are 0-based source coords.
  */
 function buildSourceMap(source, sourceName, segments) {
@@ -3689,6 +3691,11 @@ function buildSourceMap(source, sourceName, segments) {
 		for (const s of arr) {
 			if (s.genCol === lastGenCol) continue;
 			lastGenCol = s.genCol;
+			if (s.unmapped) {
+				group += (group ? ',' : '') + encodeVlq([s.genCol - prevGenCol]);
+				prevGenCol = s.genCol;
+				continue;
+			}
 			// Fields: [genColumn, sourceIndex, sourceLine, sourceColumn] as deltas.
 			// genColumn resets per line; sourceIndex is always 0 (single source).
 			group +=
@@ -4647,7 +4654,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
 		consumedRuntimeLocals,
-		hoistedTemplates: [], // { name, html }
+		hoistedTemplates: [], // { name, html, tagMappings }
+		_templateTagSources: null, // current plan's emitted host-tag source positions
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
@@ -5297,12 +5305,34 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		.map((i) => `_$injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
 		.join('\n');
 	const styleBlock = styleInjections ? styleInjections + '\n\n' : '';
+	const templateSegments = [];
 	const templates = ctx.hoistedTemplates
-		.map((t) => {
+		.map((t, templateLine) => {
+			const prefix = `const ${t.name} = /* @__PURE__ */ _$template(`;
 			const args = [JSON.stringify(t.html)];
+			let previousHtmlOffset = 0;
+			let encodedHtmlOffset = 0;
+			for (const mapping of t.tagMappings) {
+				// JSON string escaping can expand quotes/control characters before a
+				// tag. Encode each disjoint chunk once so mapping all tags stays O(n).
+				encodedHtmlOffset +=
+					JSON.stringify(t.html.slice(previousHtmlOffset, mapping.htmlOffset)).length - 2;
+				previousHtmlOffset = mapping.htmlOffset;
+				templateSegments.push({
+					genLine: templateLine,
+					genCol: prefix.length + 1 + encodedHtmlOffset,
+					srcLine0: mapping.srcLine0,
+					srcCol0: mapping.srcCol0,
+				});
+				templateSegments.push({
+					genLine: templateLine,
+					genCol: prefix.length + 1 + encodedHtmlOffset + mapping.length,
+					unmapped: true,
+				});
+			}
 			if (t.ns || t.frag) args.push(String(t.ns | 0));
 			if (t.frag) args.push(String(t.frag | 0));
-			return `const ${t.name} = /* @__PURE__ */ _$template(${args.join(', ')});`;
+			return prefix + args.join(', ') + ');';
 		})
 		.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
@@ -5429,21 +5459,26 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 
 	// Everything before `body` in the output — shifts every body segment's
 	// generated line down by the prelude's line count.
-	const prelude =
-		finalRuntimeImport +
-		finalProfileRuntimeImport +
-		vtHintBlock +
-		delegateCall +
-		styleBlock +
-		templatesBlock +
-		helpersBlock;
+	const beforeTemplates =
+		finalRuntimeImport + finalProfileRuntimeImport + vtHintBlock + delegateCall + styleBlock;
+	const prelude = beforeTemplates + templatesBlock + helpersBlock;
 	const preludeLines = countNewlines(prelude);
-	const segments = bodySegments.map((s) => ({
-		genLine: s.genLine + preludeLines,
-		genCol: s.genCol,
-		srcLine0: s.srcLine0,
-		srcCol0: s.srcCol0,
-	}));
+	const templateLineOffset = countNewlines(beforeTemplates);
+	const segments = [
+		...templateSegments.map((s) => ({
+			genLine: s.genLine + templateLineOffset,
+			genCol: s.genCol,
+			srcLine0: s.srcLine0,
+			srcCol0: s.srcCol0,
+			unmapped: s.unmapped,
+		})),
+		...bodySegments.map((s) => ({
+			genLine: s.genLine + preludeLines,
+			genCol: s.genCol,
+			srcLine0: s.srcLine0,
+			srcCol0: s.srcCol0,
+		})),
+	];
 
 	const result = {
 		code: prelude + body + stampBlock + hmrBlock + profileBlock,
@@ -12408,6 +12443,7 @@ function normalizeChildren(nodes, inSvg = false) {
 				id: n.openingElement.name,
 				attributes: n.openingElement.attributes || [],
 				openingElement: n.openingElement,
+				closingTagLoc: n.closingElement?.name?.loc?.start,
 				children: n.children || [],
 				selfClosing: n.openingElement.selfClosing,
 				loc: n.loc, // preserve element position for dev hydration LOC (component slots)
@@ -12864,6 +12900,11 @@ function planJsx(
 		ctx._elemLocs = _prevElemLocs;
 		return { mount: '', update: '', after: '', head: emitHeadClient(headNodes, ctx, 0) };
 	}
+	// Source positions for host tags emitted into THIS plan's template. Nested
+	// plans temporarily replace this list and restore it before the outer walk
+	// continues, matching the other plan-local compiler state below.
+	const _prevTemplateTagSources = ctx._templateTagSources;
+	ctx._templateTagSources = [];
 
 	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
 	// a synthetic <octane-frag>).
@@ -13088,7 +13129,7 @@ function planJsx(
 		const fragArg = !single && (flag !== 0 || resolvedFrag) ? 1 : 0;
 		const tplHtml =
 			single || flag !== 0 || resolvedFrag ? html : `<octane-frag>${html}</octane-frag>`;
-		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
+		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg, ctx._templateTagSources);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
@@ -13882,6 +13923,7 @@ function planJsx(
 	ctx._fragRefStack = _prevFragRefStack;
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
+	ctx._templateTagSources = _prevTemplateTagSources;
 
 	const updateJoined = updateLines.join('\n');
 	const everyRenderJoined = everyRenderLines.join('\n');
@@ -14668,6 +14710,15 @@ function emitElementHtml(
 
 	const tag = node.id?.name || node.openingElement?.name?.name;
 	if (!tag) throw new Error('Element without tag');
+	const openingTagLoc = (node.openingElement?.name ?? node.id)?.loc?.start;
+	if (ctx._templateTagSources && openingTagLoc) {
+		ctx._templateTagSources.push({
+			kind: 'open',
+			tag,
+			srcLine0: openingTagLoc.line - 1,
+			srcCol0: openingTagLoc.column | 0,
+		});
+	}
 	const authoredStaticScriptContent = staticScriptContent(node, tag);
 	const hasAuthoredStaticScriptBody =
 		authoredStaticScriptContent !== undefined && authoredStaticScriptContent.length > 0;
@@ -15652,7 +15703,21 @@ function emitElementHtml(
 		});
 	}
 
-	if (!isVoid) html += `</${tag}>`;
+	if (!isVoid) {
+		html += `</${tag}>`;
+		const closingTagLoc =
+			node.closingTagLoc ??
+			node.closingElement?.name?.loc?.start ??
+			(node.selfClosing ? openingTagLoc : null);
+		if (ctx._templateTagSources && closingTagLoc) {
+			ctx._templateTagSources.push({
+				kind: 'close',
+				tag,
+				srcLine0: closingTagLoc.line - 1,
+				srcCol0: closingTagLoc.column | 0,
+			});
+		}
+	}
 	return html;
 }
 
@@ -17138,10 +17203,88 @@ function walkExprH(rootVar, path) {
 	return expr;
 }
 
-function allocTemplate(ctx, html, ns = 0, frag = 0) {
+function templateTagTokens(html) {
+	const tokens = [];
+	let index = 0;
+	while (index < html.length) {
+		const opening = html.indexOf('<', index);
+		if (opening === -1) break;
+		if (html.startsWith('<!--', opening)) {
+			const end = html.indexOf('-->', opening + 4);
+			index = end === -1 ? html.length : end + 3;
+			continue;
+		}
+
+		let nameStart = opening + 1;
+		let kind = 'open';
+		if (html.charCodeAt(nameStart) === 47) {
+			kind = 'close';
+			nameStart++;
+		}
+		let nameEnd = nameStart;
+		while (nameEnd < html.length) {
+			const character = html.charCodeAt(nameEnd);
+			if (character <= 32 || character === 47 || character === 62) break;
+			nameEnd++;
+		}
+		if (nameEnd > nameStart) {
+			tokens.push({ kind, tag: html.slice(nameStart, nameEnd), nameStart });
+		}
+
+		// Advance past the complete tag so a `<tag` substring inside a quoted
+		// attribute value can never be mistaken for a nested element.
+		let quote = 0;
+		let cursor = nameEnd;
+		for (; cursor < html.length; cursor++) {
+			const character = html.charCodeAt(cursor);
+			if (quote !== 0) {
+				if (character === quote) quote = 0;
+			} else if (character === 34 || character === 39) {
+				quote = character;
+			} else if (character === 62) {
+				cursor++;
+				break;
+			}
+		}
+		index = cursor > opening ? cursor : opening + 1;
+	}
+	return tokens;
+}
+
+function mapTemplateTags(html, sources) {
+	if (!sources || sources.length === 0) return [];
+	const tokens = templateTagTokens(html);
+	const mappings = [];
+	let tokenIndex = 0;
+	for (const source of sources) {
+		while (
+			tokenIndex < tokens.length &&
+			(tokens[tokenIndex].kind !== source.kind || tokens[tokenIndex].tag !== source.tag)
+		) {
+			tokenIndex++;
+		}
+		if (tokenIndex === tokens.length) break;
+		mappings.push({
+			htmlOffset: tokens[tokenIndex].nameStart,
+			length: source.tag.length,
+			srcLine0: source.srcLine0,
+			srcCol0: source.srcCol0,
+		});
+		tokenIndex++;
+	}
+	return mappings;
+}
+
+function allocTemplate(ctx, html, ns = 0, frag = 0, tagSources = null) {
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	ctx.hoistedTemplates.push({ name, html, ns, frag });
+	ctx.hoistedTemplates.push({
+		name,
+		html,
+		ns,
+		frag,
+		tagMappings: mapTemplateTags(html, tagSources),
+	});
 	return name;
 }
 
