@@ -1060,7 +1060,7 @@ export function Playground() @{
 						<div class="pg-compiled-controls">
 							@if (compiledMode === 'ast') {
 								<select
-									class="pg-ast-stage-select"
+									class="pg-select pg-ast-stage-select"
 									aria-label="AST compiler stage"
 									value={astStage}
 									onChange={(event) => selectAstStage(event.currentTarget.value as typeof astStage)}
@@ -1231,12 +1231,8 @@ export function Playground() @{
 			}
 			.pg-ast-stage-select {
 				max-width: 9.5rem;
-				padding: 0.18rem 0.35rem;
-				border: 1px solid var(--border);
-				border-radius: 5px;
-				background: var(--code-bg);
-				color: var(--text-secondary);
-				font: inherit;
+				padding: 0.18rem 1.7rem 0.18rem 0.55rem;
+				background-position: right 0.55rem center;
 				font-size: 0.68rem;
 				letter-spacing: 0;
 				text-transform: none;
