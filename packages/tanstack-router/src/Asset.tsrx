@@ -71,11 +71,9 @@ function mountAsset(props: AssetProps) {
 
 export function Asset(props: AssetProps) @{
 	const router = useRouter();
-	const server = isServer ?? router.isServer;
 	const hydrated = useHydrated();
-	const renderElement = server || props.target === 'body' && !hydrated;
 
-	if (!server) {
+	if (!(isServer ?? router.isServer)) {
 		useLayoutEffect(() => mountAsset(props), [
 			props.assetKey,
 			props.attrs,
@@ -85,7 +83,7 @@ export function Asset(props: AssetProps) @{
 		]);
 	}
 
-	@if (renderElement) {
+	@if ((isServer ?? router.isServer) || props.target === 'body' && !hydrated) {
 		@switch (props.tag) {
 			@case 'title': {
 				<title {...props.attrs} data-tsr-managed-key={props.assetKey}>

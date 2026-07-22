@@ -850,7 +850,7 @@ var StartCompiler = class {
 		const binding = (await this.getModuleInfo(id)).bindings.get(ident);
 		if (!binding) return 'None';
 		if (binding.resolvedKind) return binding.resolvedKind;
-		const vKey = `${cleanId(id)}:${ident}`;
+		const vKey = `${id}:${ident}`;
 		if (visited.has(vKey)) return 'None';
 		visited.add(vKey);
 		const resolvedKind = await this.resolveBindingKind(binding, id, visited);
@@ -904,7 +904,7 @@ var StartCompiler = class {
 		if (isBuildMode) this.getExportResolutionCache(moduleInfo.id).set(exportName, null);
 	}
 	async resolveBindingTarget(resolution, visited = /* @__PURE__ */ new Set()) {
-		const key = `${cleanId(resolution.moduleInfo.id)}:${resolution.localName}`;
+		const key = `${resolution.moduleInfo.id}:${resolution.localName}`;
 		if (visited.has(key)) return;
 		visited.add(key);
 		if (resolution.binding.type !== 'import') return resolution;
@@ -936,7 +936,7 @@ var StartCompiler = class {
 				const target = found ? ((await this.resolveBindingTarget(found)) ?? found) : void 0;
 				if (
 					target &&
-					cleanId(resolved.moduleInfo.id) === cleanId(target.moduleInfo.id) &&
+					resolved.moduleInfo.id === target.moduleInfo.id &&
 					resolved.localName === target.localName
 				)
 					return kind;
@@ -965,7 +965,7 @@ var StartCompiler = class {
 			return knownKind;
 		}
 		if (found.binding.resolvedKind) return found.binding.resolvedKind;
-		const vKey = `${cleanId(found.moduleInfo.id)}:${found.localName}`;
+		const vKey = `${found.moduleInfo.id}:${found.localName}`;
 		if (visited.has(vKey)) return 'None';
 		visited.add(vKey);
 		const resolvedKind = await this.resolveBindingKind(found.binding, found.moduleInfo.id, visited);

@@ -1,4 +1,3 @@
-export declare const SERVER_FN_LOOKUP_QUERY = '?server-fn-module-lookup';
 export declare const MOCK_MODULE_ID = 'tanstack-start-import-protection:mock';
 export declare const MOCK_BUILD_PREFIX = 'tanstack-start-import-protection:mock:build:';
 export declare const MOCK_EDGE_PREFIX = 'tanstack-start-import-protection:mock-edge:';
