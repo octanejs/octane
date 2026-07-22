@@ -8408,26 +8408,31 @@ function isFreshBindingExpr(node) {
 	);
 }
 
+function depPathMember(node) {
+	const expression = node?.type === 'ChainExpression' ? node.expression : node;
+	return expression?.type === 'MemberExpression' ? expression : null;
+}
+
 function staticDepMemberName(node) {
-	if (node?.type !== 'MemberExpression') return null;
-	if (!node.computed && node.property.type === 'Identifier') return node.property.name;
+	const member = depPathMember(node);
+	if (member === null) return null;
+	if (!member.computed && member.property.type === 'Identifier') return member.property.name;
 	if (
-		node.computed &&
-		node.property.type === 'Literal' &&
-		typeof node.property.value === 'string'
+		member.computed &&
+		member.property.type === 'Literal' &&
+		typeof member.property.value === 'string'
 	) {
-		return node.property.value;
+		return member.property.value;
 	}
 	return null;
 }
 
 function depPathKey(node) {
 	if (node.type === 'Identifier') return `identifier:${node.name}`;
+	const member = depPathMember(node);
 	const propertyName = staticDepMemberName(node);
-	return node.type === 'MemberExpression' &&
-		node.object.type === 'Identifier' &&
-		propertyName !== null
-		? `member:${node.object.name}:${JSON.stringify(propertyName)}`
+	return member !== null && member.object.type === 'Identifier' && propertyName !== null
+		? `member:${member.object.name}:${JSON.stringify(propertyName)}`
 		: null;
 }
 
@@ -8461,7 +8466,7 @@ function collectDepPaths(expr) {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
 					if (!bound.has(n.object.name)) {
-						const dep = {
+						const member = {
 							type: 'MemberExpression',
 							object: { type: 'Identifier', name: n.object.name },
 							property: n.computed
@@ -8474,6 +8479,10 @@ function collectDepPaths(expr) {
 							computed: n.computed,
 							optional: n.optional === true,
 						};
+						// Optional MemberExpressions must remain inside a ChainExpression.
+						// Besides keeping the synthesized tree valid ESTree, the wrapper
+						// preserves optional-evaluation semantics through later AST passes.
+						const dep = member.optional ? { type: 'ChainExpression', expression: member } : member;
 						push(dep, depPathKey(dep));
 					}
 					return;
@@ -8728,9 +8737,10 @@ function makeCreationMemoCall(
 		const seen = new Set();
 		const coarsened = [];
 		for (const dep of deps) {
+			const member = depPathMember(dep);
 			const next =
-				dep.type === 'MemberExpression' && coarsenDepRoots.has(dep.object.name)
-					? { type: 'Identifier', name: dep.object.name }
+				member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)
+					? { type: 'Identifier', name: member.object.name }
 					: dep;
 			const key = depPathKey(next);
 			if (key !== null && seen.has(key)) continue;

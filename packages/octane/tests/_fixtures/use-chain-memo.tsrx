@@ -109,6 +109,27 @@ export function SwitchingChainHost({
 	}
 }
 
+function OptionalDerivedChainReader(props: {
+	fetchUser: (id: string) => Promise<{ v: string }> | null;
+	id: string;
+}) @{
+	const base = props.fetchUser(props.id);
+	const derived = base?.then((value) => value.v);
+	if (derived === undefined) throw new Error('fetchUser returned no promise');
+	<p id="optional-derived-chain">{use(derived) as string}</p>
+}
+
+export function OptionalDerivedChainHost(props: {
+	fetchUser: (id: string) => Promise<{ v: string }> | null;
+	id: string;
+}) @{
+	@try {
+		<OptionalDerivedChainReader fetchUser={props.fetchUser} id={props.id} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
 // A chain const declared in an `else if` arm — the alternate is an
 // IfStatement, not a block, and must still be reached by the taint pass.
 function BranchReader({

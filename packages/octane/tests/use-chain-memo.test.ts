@@ -6,6 +6,7 @@ import {
 	ChainHost,
 	ComputedPropChainHost,
 	NestedBranchChainHost,
+	OptionalDerivedChainHost,
 	PropChainHost,
 	SetupShadowHost,
 	ShadowedLoopHost,
@@ -146,6 +147,26 @@ describe('use()-fed const chain memoization', () => {
 		});
 		await act(() => {});
 		expect(r.html()).toContain('v=B');
+		r.unmount();
+	});
+
+	it('refreshes an optional derived chain when its upstream promise changes', async () => {
+		const calls: string[] = [];
+		const fetchUser = (id: string) => {
+			calls.push(id);
+			return Promise.resolve({ v: id.toUpperCase() });
+		};
+		const r = mount(OptionalDerivedChainHost, { fetchUser, id: 'a' });
+		await act(() => {});
+		expect(r.find('#optional-derived-chain').textContent).toBe('A');
+		expect(calls).toEqual(['a']);
+
+		await act(() => {
+			r.root.render(OptionalDerivedChainHost, { fetchUser, id: 'b' });
+		});
+		await act(() => {});
+		expect(r.find('#optional-derived-chain').textContent).toBe('B');
+		expect(calls).toEqual(['a', 'b']);
 		r.unmount();
 	});
 
