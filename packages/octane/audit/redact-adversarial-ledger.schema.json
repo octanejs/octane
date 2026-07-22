@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://octanejs.dev/schemas/redact-adversarial-ledger.schema.json",
+  "title": "Octane Redact-derived adversarial contract ledger",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "upstream", "idRegistry", "entries"],
+  "properties": {
+    "$schema": { "const": "./redact-adversarial-ledger.schema.json" },
+    "schemaVersion": { "const": 1 },
+    "upstream": { "$ref": "#/$defs/upstream" },
+    "idRegistry": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/idRegistryEntry" }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/entry" }
+    }
+  },
+  "$defs": {
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit", "capturedOn", "scope"],
+      "properties": {
+        "repository": { "const": "https://github.com/TanStack/redact" },
+        "commit": { "$ref": "#/$defs/commit" },
+        "capturedOn": { "type": "string", "format": "date" },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["issueNumbers", "pullRequestNumbers", "paths", "artifacts"],
+          "properties": {
+            "issueNumbers": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "integer", "minimum": 1 }
+            },
+            "pullRequestNumbers": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "integer", "minimum": 1 }
+            },
+            "paths": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/repositoryPath" }
+            },
+            "artifacts": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/auditedArtifact" }
+            }
+          }
+        }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "area",
+        "title",
+        "sources",
+        "symptom",
+        "octaneContract",
+        "classification",
+        "status",
+        "risk",
+        "owner",
+        "applicableModes",
+        "observables"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^RDX-[A-Z]+-[0-9]{3}$" },
+        "area": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "title": { "type": "string", "minLength": 1 },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/source" }
+        },
+        "symptom": { "type": "string", "minLength": 1 },
+        "octaneContract": { "type": "string", "minLength": 1 },
+        "classification": { "$ref": "#/$defs/classification" },
+        "status": { "$ref": "#/$defs/status" },
+        "risk": { "$ref": "#/$defs/risk" },
+        "owner": { "type": "string", "minLength": 1 },
+        "applicableModes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/mode" }
+        },
+        "observables": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/observable" }
+        },
+        "octaneReferences": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/octaneReference" }
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "nextAction": { "$ref": "#/$defs/nextAction" },
+        "rationale": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["status"],
+            "properties": { "status": { "const": "covered" } }
+          },
+          "then": { "required": ["evidence"] }
+        },
+        {
+          "if": {
+            "required": ["status"],
+            "properties": { "status": { "enum": ["planned", "in_progress"] } }
+          },
+          "then": { "required": ["nextAction"] }
+        },
+        {
+          "if": {
+            "required": ["status"],
+            "properties": { "status": { "const": "decision_required" } }
+          },
+          "then": {
+            "required": ["nextAction", "rationale"],
+            "properties": {
+              "nextAction": {
+                "properties": { "kind": { "const": "decision" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["classification"],
+            "properties": { "classification": { "enum": ["divergence", "non_goal"] } }
+          },
+          "then": { "required": ["rationale"] }
+        },
+        {
+          "if": {
+            "required": ["status"],
+            "properties": { "status": { "const": "blocked" } }
+          },
+          "then": { "required": ["rationale"] }
+        },
+        {
+          "if": {
+            "required": ["status"],
+            "properties": { "status": { "const": "documented" } }
+          },
+          "then": { "required": ["rationale"] }
+        },
+        {
+          "if": {
+            "required": ["status", "classification"],
+            "properties": {
+              "status": { "const": "documented" },
+              "classification": { "enum": ["portable", "adaptable"] }
+            }
+          },
+          "then": {
+            "required": ["octaneReferences"],
+            "properties": {
+              "octaneReferences": {
+                "minItems": 1,
+                "items": {
+                  "properties": {
+                    "kind": { "enum": ["documentation", "benchmark"] }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "url"],
+      "properties": {
+        "kind": { "enum": ["issue", "pull_request", "commit", "test"] },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://github\\.com/TanStack/redact/"
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "number": { "type": "integer", "minimum": 1 },
+        "commit": { "$ref": "#/$defs/commit" },
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "testName": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "enum": ["issue", "pull_request"] } }
+          },
+          "then": { "required": ["number", "title"] }
+        },
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "commit" } }
+          },
+          "then": { "required": ["commit"] }
+        },
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "test" } }
+          },
+          "then": { "required": ["commit", "path", "testName"] }
+        }
+      ]
+    },
+    "octaneReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "file"],
+      "properties": {
+        "kind": { "enum": ["source", "test", "documentation", "benchmark", "integration"] },
+        "file": { "$ref": "#/$defs/repositoryPath" },
+        "symbol": { "type": "string", "minLength": 1 },
+        "testName": { "type": "string", "minLength": 1 },
+        "note": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["kind"],
+            "properties": { "kind": { "const": "test" } }
+          },
+          "then": { "required": ["testName"] }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modes", "observables"],
+      "properties": {
+        "kind": { "enum": ["test", "command"] },
+        "file": { "$ref": "#/$defs/repositoryPath" },
+        "testName": { "type": "string", "minLength": 1 },
+        "script": { "type": "string", "minLength": 1 },
+        "modes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/mode" }
+        },
+        "observables": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/observable" }
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["file", "testName"],
+          "properties": { "kind": { "const": "test" } },
+          "not": { "required": ["script"] }
+        },
+        {
+          "required": ["kind", "script"],
+          "properties": { "kind": { "const": "command" } },
+          "not": { "anyOf": [{ "required": ["file"] }, { "required": ["testName"] }] }
+        }
+      ]
+    },
+    "nextAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "targets", "acceptance"],
+      "properties": {
+        "kind": {
+          "enum": ["test", "implementation", "decision", "documentation", "benchmark"]
+        },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "acceptance": { "type": "string", "minLength": 1 }
+      }
+    },
+    "classification": {
+      "enum": ["portable", "adaptable", "divergence", "non_goal"]
+    },
+    "status": {
+      "enum": ["planned", "in_progress", "covered", "documented", "decision_required", "blocked"]
+    },
+    "risk": { "enum": ["critical", "high", "medium", "low"] },
+    "mode": {
+      "enum": [
+        "client",
+        "server-string",
+        "server-static",
+        "server-stream",
+        "hydrate-match",
+        "hydrate-mismatch",
+        "deferred-hydration",
+        "production-compile",
+        "real-browser",
+        "packaged-consumer",
+        "vite-client",
+        "vite-ssr",
+        "rspack",
+        "rsbuild",
+        "benchmark"
+      ]
+    },
+    "observable": {
+      "enum": [
+        "markup",
+        "node-identity",
+        "dom-mutations",
+        "focus",
+        "selection",
+        "scroll",
+        "live-properties",
+        "effects",
+        "refs",
+        "events",
+        "errors",
+        "streaming",
+        "package-resolution",
+        "performance"
+      ]
+    },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+"
+    },
+    "idRegistryEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "introducedOn"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^RDX-[A-Z]+-[0-9]{3}$" },
+        "status": { "enum": ["active", "retired"] },
+        "introducedOn": { "type": "string", "format": "date" },
+        "rationale": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["status"],
+            "properties": { "status": { "const": "retired" } }
+          },
+          "then": { "required": ["rationale"] }
+        }
+      ]
+    },
+    "auditedArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "disposition", "entryIds"],
+      "properties": {
+        "path": { "$ref": "#/$defs/repositoryPath" },
+        "disposition": { "enum": ["mapped", "folded", "non_goal"] },
+        "entryIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^RDX-[A-Z]+-[0-9]{3}$" }
+        },
+        "note": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["disposition"],
+            "properties": { "disposition": { "enum": ["folded", "non_goal"] } }
+          },
+          "then": { "required": ["note"] }
+        }
+      ]
+    }
+  }
+}

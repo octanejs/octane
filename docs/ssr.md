@@ -332,8 +332,8 @@ These are the known gaps between Octane SSR and a full streaming SSR stack:
   React-style error digests. Recoverable Suspense errors retain their fallback
   and mark that boundary for client rendering; a fatal post-shell error ends the
   stream with every still-pending boundary marked for client rendering.
-- **React Fizz document orchestration options**: core rendering deliberately
-  does not own doctype/preamble insertion, bootstrap script/module lists,
-  import-map construction, response headers, or `onHeaders`. Compose the
-  returned stream into the surrounding document and set headers in the Vite
-  plugin, adapter, or application server instead.
+- **Document orchestration beyond the streaming doctype**: a streamed `<html>`
+  root gets the core-owned doctype described above, but core does not own
+  arbitrary preamble insertion, bootstrap script/module lists, import-map
+  construction, response headers, or `onHeaders`. Compose those concerns around
+  the returned stream in the Vite plugin, adapter, or application server.

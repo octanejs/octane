@@ -147,6 +147,11 @@ suite per shard.
 When adding a feature, choose the suite by observable rather than assuming a
 final-HTML differential test is sufficient.
 
+The generated [Redact-derived adversarial contract audit](redact-adversarial-audit.md)
+tracks external production failures and test patterns against these same observation
+boundaries. Its authored ledger distinguishes open Octane probes from covered
+contracts, intentional divergences, and Redact-specific non-goals.
+
 ## 5. Compiler/runtime contracts and hook slotting
 
 Status: **duplicated tables resolved; emitted ABI remains a compatibility
