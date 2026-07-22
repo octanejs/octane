@@ -96,19 +96,26 @@ export const HYDRATION_RANGE_BOUNDARY: unique symbol = Symbol.for(
 );
 
 // ── Deferred hydration boundary protocol (`<Hydrate>`) ──────────────────────────────
-// The boundary is a persistent real `<div>`: visibility/interaction strategies
-// and procedural prefetching need an Element to observe. During the initial
-// root hydration the client adopts that wrapper but leaves its child block
-// dormant. The attributes below carry the stable boundary id, strategy kind,
-// and number of useId slots reserved by the dormant child. Resolved `use()`
-// values are removed from the root seed stream and stored in a direct-child
-// JSON script so the later subtree hydration owns precisely its own seeds.
+// An ordinary boundary is a persistent real `<div>`: visibility/interaction
+// strategies and procedural prefetching need an Element to observe. During the
+// initial root hydration the client adopts that wrapper but leaves its child
+// block dormant. The attributes below carry the stable boundary id, strategy
+// kind, and number of useId slots reserved by the dormant child. Resolved `use()`
+// values are removed from the root seed stream and stored in a direct-child JSON
+// script so the later subtree hydration owns precisely its own seeds. The exact
+// compiler-proven permanent-static form instead uses the comment protocol below.
+/** Comment prefix carrying skipped `useId()` slots for a wrapper-free permanent-static range. */
+export const HYDRATE_STATIC_ID_COUNT_PREFIX = 'octane-static-hydrate:';
+/** Closing comment for a wrapper-free permanent-static range. */
+export const HYDRATE_STATIC_END = '/octane-static-hydrate';
 /** Stable id of a server-rendered deferred hydration boundary. */
 export const HYDRATE_ID_ATTR = 'data-octane-hydrate-id';
 /** Serialized strategy kind (`visible`, `idle`, `dynamic`, …). */
 export const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
 /** Number of `useId()` slots consumed while rendering the deferred child. */
 export const HYDRATE_ID_COUNT_ATTR = 'data-octane-hydrate-id-count';
+/** Opaque renderer stream token authenticating pending descendants owned by this boundary. */
+export { HYDRATE_STREAM_TOKEN_ATTR } from './stream-protocol.js';
 /** Direct-child JSON script carrying this boundary's `use()` seed slice. */
 export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
 
@@ -122,7 +129,7 @@ export const HYDRATE_SEED_ATTR = 'data-octane-hydrate-seed';
 // replaces the template with a `<!--oct-seed:N-->` comment the client's
 // hydration uses to scope that boundary's seeds.
 /** Sentinel <template> attribute marking a pending streamed boundary. */
-export const STREAM_BOUNDARY_ATTR = 'data-oct-b';
+export { STREAM_BOUNDARY_ATTR } from './stream-protocol.js';
 /** Hidden segment container attribute carrying a completed boundary's content. */
 export const STREAM_SEGMENT_ATTR = 'data-oct-s';
 /** Per-boundary seed-JSON script attribute (inside the segment). */

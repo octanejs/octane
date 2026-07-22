@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { compile } from 'octane/compiler';
 import * as ServerRuntime from 'octane/server';
+import * as HydrationRuntime from 'octane/hydration';
 import * as ClientRuntime from '../src/index.js';
 
 export type CompiledFixtureModule = Record<string, any>;
@@ -44,6 +45,11 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane(?:\/server)?['"];?/g,
 		(_match: string, names: string) => `const {${names.replace(/\s+as\s+/g, ': ')}} = __runtime;`,
 	);
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
+		(_match: string, names: string) =>
+			`const {${names.replace(/\s+as\s+/g, ': ')}} = __hydrationRuntime;`,
+	);
 
 	code = code.replace(
 		/export\s+(async\s+)?function\s+(\w+)/g,
@@ -64,10 +70,11 @@ export function loadCompiledFixtureSource<T extends CompiledFixtureModule = Comp
 
 	const evaluate = new Function(
 		'__runtime',
+		'__hydrationRuntime',
 		'__exports',
 		`'use strict';\n${code}\n//# sourceURL=${id}?${mode}-fixture\nreturn __exports;`,
 	);
-	return evaluate(runtime, {}) as T;
+	return evaluate(runtime, HydrationRuntime, {}) as T;
 }
 
 export function loadServerFixture<T extends CompiledFixtureModule = CompiledFixtureModule>(

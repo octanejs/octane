@@ -3,21 +3,27 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync } from '../src/index.js';
+import { act, hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
+import * as HydrationRT from 'octane/hydration';
 import { prerender } from 'octane/static';
-import { interaction } from 'octane/hydration';
+import { initializeHydrationEventCapture, interaction } from 'octane/hydration';
+import { loadServerFixture } from './_server-fixture.js';
 // CLIENT-compiled fixture (registers click delegation at import).
 import {
 	Boundary,
 	DeferredAsyncLeaf,
+	DeferredStreamWithLiveSibling,
+	DeferredStreamedSuspense,
 	IdBoundary,
 	LateStyledBoundary,
+	NestedDeferredStreamedHydrates,
 	NestedStreamSeedScopes,
 	ReasonBoundary,
 	Siblings,
 	StyledBoundary,
 } from './_fixtures/ssr-suspense.tsrx';
+import { DeferredWithPermanentStaticStream } from './_fixtures/ssr-permanent-static-stream.tsrx';
 
 // Streaming SSR — renderToPipeableStream / renderToReadableStream: shell with
 // fallbacks + <template data-oct-b> sentinels, out-of-order hidden segments
@@ -35,11 +41,22 @@ function serverModule(): Record<string, any> {
 		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/server['"];?/g,
 		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __rt;`,
 	);
+	code = code.replace(
+		/import\s*\{([^}]*)\}\s*from\s*['"]octane\/hydration['"];?/g,
+		(_m: string, names: string) => `const {${names.replace(/ as /g, ': ')}} = __hydration;`,
+	);
 	code = code.replace(/export const (\w+) =/g, 'const $1 = __exports.$1 =');
 	code = code.replace(/export function (\w+)/g, '__exports.$1 = function $1');
-	return new Function('__rt', '__exports', code + '\nreturn __exports;')(ServerRT, {});
+	return new Function('__rt', '__hydration', '__exports', code + '\nreturn __exports;')(
+		ServerRT,
+		HydrationRT,
+		{},
+	);
 }
 const server = serverModule();
+const permanentStaticServer = loadServerFixture<{
+	DeferredWithPermanentStaticStream: typeof DeferredWithPermanentStaticStream;
+}>('packages/octane/tests/_fixtures/ssr-permanent-static-stream.tsrx');
 
 function deferred<T>() {
 	let resolve!: (v: T) => void;
@@ -76,6 +93,10 @@ function swapCall(id: string): string {
 
 function errorCall(id: string): string {
 	return '$OCTRX(' + JSON.stringify(id) + ')';
+}
+
+function staticErrorCall(id: string): string {
+	return '$OCTRX(' + JSON.stringify(id) + ',1)';
 }
 
 /** Execute the stream's inline scripts the way a browser would (in order). */
@@ -135,6 +156,444 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(clientValue.value).toBe('streamed deferred value');
 		expect(container.querySelector('#leaf')).toBe(serverLeaf);
 		root.unmount();
+	});
+
+	it('waits for a pending streamed reveal before activating deferred hydration', async () => {
+		const serverValue = deferred<string>();
+		const clientValue: any = new Promise<string>(() => {});
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const when = interaction({ events: 'click' });
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.DeferredStreamedSuspense, {
+			promise: serverValue.promise,
+			when,
+		}).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+		expect(fallback.textContent).toBe('Loading streamed content');
+
+		const root = hydrateRoot(container, DeferredStreamedSuspense as any, {
+			promise: clientValue,
+			when,
+			onClick,
+			onHydrated,
+		});
+		try {
+			expect(() => fallback.click()).not.toThrow();
+			await act(() => {});
+
+			// Activation must stay dormant while the server still owns the pending
+			// reveal. Claiming the fallback now strands the later server result.
+			expect(container.querySelector('#deferred-stream-action')).toBe(fallback);
+			expect(onHydrated).not.toHaveBeenCalled();
+			expect(onClick).not.toHaveBeenCalled();
+
+			serverValue.resolve('Streamed content');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+			activate(container);
+			const revealed = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+			expect(revealed.textContent).toBe('Streamed content');
+
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledOnce();
+			});
+			expect(container.querySelector('#deferred-stream-action')).toBe(revealed);
+			expect(onClick).toHaveBeenCalledOnce();
+			expect(onClick).toHaveBeenCalledWith('Streamed content');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('replays pre-root interaction after the pending stream reveals', async () => {
+		const serverValue = deferred<string>();
+		const clientValue: any = new Promise<string>(() => {});
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const when = interaction({ events: 'click' });
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.DeferredStreamedSuspense, {
+			promise: serverValue.promise,
+			when,
+		}).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+		initializeHydrationEventCapture(document);
+		fallback.click();
+		expect(onClick).not.toHaveBeenCalled();
+
+		// The stream can replace the event target before hydrateRoot consumes the
+		// queued intent. Replay must address the corresponding revealed element.
+		serverValue.resolve('Pre-root streamed content');
+		await c.ended;
+		container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+		activate(container);
+		const revealed = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+		expect(revealed.textContent).toBe('Pre-root streamed content');
+
+		const root = hydrateRoot(container, DeferredStreamedSuspense as any, {
+			promise: clientValue,
+			when,
+			onClick,
+			onHydrated,
+		});
+		try {
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledOnce();
+			});
+			expect(container.querySelector('#deferred-stream-action')).toBe(revealed);
+			expect(onClick).toHaveBeenCalledOnce();
+			expect(onClick).toHaveBeenCalledWith('Pre-root streamed content');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('replays to a surviving sibling when a preceding stream changes element count', async () => {
+		const serverValue = deferred<string>();
+		const clientValue: any = new Promise<string>(() => {});
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const when = interaction({ events: 'click' });
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.DeferredStreamWithLiveSibling, {
+			promise: serverValue.promise,
+			when,
+		}).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const sibling = container.querySelector('#stream-live-sibling') as HTMLButtonElement;
+		const root = hydrateRoot(container, DeferredStreamWithLiveSibling as any, {
+			promise: clientValue,
+			when,
+			onClick,
+			onHydrated,
+		});
+		try {
+			sibling.click();
+			await act(() => {});
+			expect(onClick).not.toHaveBeenCalled();
+			expect(onHydrated).not.toHaveBeenCalled();
+
+			serverValue.resolve('First streamed node');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+			activate(container);
+			expect(container.querySelector('#streamed-first-value')?.textContent).toBe(
+				'First streamed node',
+			);
+			expect(container.querySelector('#streamed-second-value')?.textContent).toBe(
+				'Second streamed node',
+			);
+
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledOnce();
+			});
+			expect(container.querySelector('#stream-live-sibling')).toBe(sibling);
+			expect(onClick).toHaveBeenCalledOnce();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not make an outer Hydrate wait for a nested Hydrate stream reveal', async () => {
+		const serverValue = deferred<string>();
+		const clientValue: any = new Promise<string>(() => {});
+		const onOuterClick = vi.fn();
+		const onInnerClick = vi.fn();
+		const onOuterHydrated = vi.fn();
+		const onInnerHydrated = vi.fn();
+		const outerWhen = interaction({ events: 'click' });
+		const innerWhen = interaction({ events: 'click' });
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.NestedDeferredStreamedHydrates, {
+			promise: serverValue.promise,
+			outerWhen,
+			innerWhen,
+		}).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const outer = container.querySelector('#outer-deferred-stream-action') as HTMLButtonElement;
+		const nestedFallback = container.querySelector(
+			'#nested-deferred-stream-action',
+		) as HTMLButtonElement;
+		expect(nestedFallback.textContent).toBe('Loading nested stream');
+
+		const root = hydrateRoot(container, NestedDeferredStreamedHydrates as any, {
+			promise: clientValue,
+			outerWhen,
+			innerWhen,
+			onOuterClick,
+			onInnerClick,
+			onOuterHydrated,
+			onInnerHydrated,
+		});
+		try {
+			outer.click();
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onOuterHydrated).toHaveBeenCalledOnce();
+			});
+
+			// The pending record belongs to the independently dormant inner marker.
+			// It must survive outer adoption and must not delay the outer replay.
+			expect(container.querySelector('#outer-deferred-stream-action')).toBe(outer);
+			expect(container.querySelector('#nested-deferred-stream-action')).toBe(nestedFallback);
+			expect(onOuterClick).toHaveBeenCalledOnce();
+			expect(onInnerHydrated).not.toHaveBeenCalled();
+			expect(onInnerClick).not.toHaveBeenCalled();
+
+			serverValue.resolve('Nested streamed content');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+			activate(container);
+			const revealed = container.querySelector(
+				'#nested-deferred-stream-action',
+			) as HTMLButtonElement;
+			expect(revealed.textContent).toBe('Nested streamed content');
+			expect(onInnerHydrated).not.toHaveBeenCalled();
+
+			revealed.click();
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onInnerHydrated).toHaveBeenCalledOnce();
+			});
+			expect(container.querySelector('#nested-deferred-stream-action')).toBe(revealed);
+			expect(onInnerClick).toHaveBeenCalledOnce();
+			expect(onInnerClick).toHaveBeenCalledWith('Nested streamed content');
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('does not make an outer Hydrate wait for a permanent-static stream reveal', async () => {
+		const serverValue = deferred<string>();
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const when = interaction({ events: 'click' });
+		const c = collector();
+		ServerRT.renderToPipeableStream(permanentStaticServer.DeferredWithPermanentStaticStream, {
+			promise: serverValue.promise,
+			when,
+		}).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const [staticBoundaryId] = protocolIds(c.chunks.join(''));
+		const shellChunkCount = c.chunks.length;
+		const staticFallback = container.querySelector(
+			'#permanent-static-stream-value',
+		) as HTMLSpanElement;
+		const action = container.querySelector(
+			'#deferred-permanent-static-action',
+		) as HTMLButtonElement;
+		const root = hydrateRoot(container, DeferredWithPermanentStaticStream as any, {
+			promise: new Promise<string>(() => {}),
+			when,
+			onClick,
+			onHydrated,
+		});
+		try {
+			action.click();
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledOnce();
+			});
+
+			// The static subtree stays under the server stream's ownership while the
+			// live sibling hydrates and replays independently.
+			expect(container.querySelector('#deferred-permanent-static-action')).toBe(action);
+			expect(container.querySelector('#permanent-static-stream-value')).toBe(staticFallback);
+			expect(onClick).toHaveBeenCalledOnce();
+
+			serverValue.resolve('Permanent static streamed content');
+			await c.ended;
+			const tail = c.chunks.slice(shellChunkCount).join('');
+			expect(tail).not.toContain('data-oct-seed');
+			container.insertAdjacentHTML('beforeend', tail);
+			activate(container);
+			expect((window as any).$OCTS?.[staticBoundaryId]).toBeUndefined();
+			expect(container.querySelector('#permanent-static-stream-value')?.textContent).toBe(
+				'Permanent static streamed content',
+			);
+		} finally {
+			root.unmount();
+		}
+	});
+
+	it('routes a synchronous permanent-static error to an enclosing server catch', async () => {
+		const c = collector();
+		const onError = vi.fn();
+		ServerRT.renderToPipeableStream(
+			permanentStaticServer.PermanentStaticSyncCaught,
+			{ error: new Error('static shell boom') },
+			{ onError },
+		).pipe(c.dest);
+
+		await c.ended;
+		const html = c.chunks.join('');
+		expect(html).toContain('id="permanent-static-sync-catch"');
+		expect(html).toContain('static shell boom');
+		expect(html).not.toContain('data-oct-b');
+		expect(html).not.toContain('$OCTRX(');
+		expect(onError).not.toHaveBeenCalled();
+	});
+
+	it('retains a permanent-static fallback when its pending stream rejects', async () => {
+		const value = deferred<string>();
+		const c = collector();
+		const onError = vi.fn();
+		const onAllReady = vi.fn();
+		ServerRT.renderToPipeableStream(
+			permanentStaticServer.PermanentStaticRejectedStream,
+			{ promise: value.promise },
+			{ onError, onAllReady },
+		).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const [id] = protocolIds(c.chunks.join(''));
+		const fallback = container.querySelector('#permanent-static-rejected-fallback');
+		value.reject(new Error('static stream boom'));
+		await c.ended;
+		const tail = c.chunks.slice(shellChunkCount).join('');
+		expect(tail).toContain(staticErrorCall(id));
+		expect(tail).not.toContain(errorCall(id));
+		container.insertAdjacentHTML('beforeend', tail);
+		activate(container);
+
+		expect(container.querySelector('template[data-oct-b]')).toBeNull();
+		expect(container.querySelector('#permanent-static-rejected-fallback')).toBe(fallback);
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ message: 'static stream boom' }),
+		);
+		expect(onAllReady).toHaveBeenCalledOnce();
+	});
+
+	it('streams an authored catch inside a permanent-static range', async () => {
+		const value = deferred<string>();
+		const c = collector();
+		const onError = vi.fn();
+		ServerRT.renderToPipeableStream(
+			permanentStaticServer.PermanentStaticCaughtStream,
+			{ promise: value.promise },
+			{ onError },
+		).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		value.reject(new Error('caught static stream boom'));
+		await c.ended;
+		const tail = c.chunks.slice(shellChunkCount).join('');
+		expect(tail).not.toContain('data-oct-seed');
+		container.insertAdjacentHTML('beforeend', tail);
+		activate(container);
+
+		expect(container.querySelector('#permanent-static-caught-error')?.textContent).toBe(
+			'caught static stream boom',
+		);
+		expect(onError).not.toHaveBeenCalled();
+	});
+
+	it('retains a permanent-static fallback when the stream aborts', async () => {
+		const value = deferred<string>();
+		const c = collector();
+		const onError = vi.fn();
+		const onAllReady = vi.fn();
+		const render = ServerRT.renderToPipeableStream(
+			permanentStaticServer.PermanentStaticRejectedStream,
+			{ promise: value.promise },
+			{ onError, onAllReady },
+		);
+		render.pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const [id] = protocolIds(c.chunks.join(''));
+		const fallback = container.querySelector('#permanent-static-rejected-fallback');
+		render.abort(new Error('static stream aborted'));
+		await c.ended;
+		const tail = c.chunks.slice(shellChunkCount).join('');
+		expect(tail).toContain(staticErrorCall(id));
+		container.insertAdjacentHTML('beforeend', tail);
+		activate(container);
+
+		expect(container.querySelector('template[data-oct-b]')).toBeNull();
+		expect(container.querySelector('#permanent-static-rejected-fallback')).toBe(fallback);
+		expect(onError).toHaveBeenCalledWith(
+			expect.objectContaining({ message: 'static stream aborted' }),
+		);
+		expect(onAllReady).toHaveBeenCalledOnce();
+	});
+
+	it('releases deferred activation when a pending stream degrades to client rendering', async () => {
+		const serverValue = deferred<string>();
+		const clientValue = deferred<string>();
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const onError = vi.fn();
+		const when = interaction({ events: 'click' });
+		const c = collector();
+		const render = ServerRT.renderToPipeableStream(
+			server.DeferredStreamedSuspense,
+			{ promise: serverValue.promise, when },
+			{ onError },
+		);
+		render.pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+		const root = hydrateRoot(container, DeferredStreamedSuspense as any, {
+			promise: clientValue.promise,
+			when,
+			onClick,
+			onHydrated,
+		});
+		try {
+			fallback.click();
+			await act(() => {});
+			expect(onHydrated).not.toHaveBeenCalled();
+
+			render.abort(new Error('defer to client'));
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+			activate(container);
+			expect(container.querySelector('#deferred-stream-action')).toBe(fallback);
+			expect(onError).toHaveBeenCalled();
+
+			clientValue.resolve('Client recovery');
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledOnce();
+			});
+			expect(container.querySelector('#deferred-stream-action')?.textContent).toBe(
+				'Client recovery',
+			);
+			expect(onClick).toHaveBeenCalledOnce();
+			expect(onClick).toHaveBeenCalledWith('Client recovery');
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('flushes the shell with the fallback + template sentinel, then the segment', async () => {

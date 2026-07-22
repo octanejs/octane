@@ -6,6 +6,27 @@ import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/index.js';
 
 describe('production component bundles', () => {
+	it('keeps pre-root hydration capture independent of the DOM tables', async () => {
+		const result = await build({
+			stdin: {
+				contents: `export { initializeHydrationEventCapture } from './src/hydration/index.ts';`,
+				loader: 'js',
+				resolveDir: resolve(import.meta.dirname, '..'),
+				sourcefile: 'hydration-capture-entry.js',
+			},
+			bundle: true,
+			format: 'esm',
+			logLevel: 'silent',
+			metafile: true,
+			treeShaking: false,
+			write: false,
+		});
+		const inputs = Object.keys(result.metafile.inputs).map((input) => input.split(sep).join('/'));
+
+		expect(inputs.some((input) => input.endsWith('/src/constants.ts'))).toBe(false);
+		expect(inputs.some((input) => input.endsWith('/src/dom-tables.js'))).toBe(false);
+	});
+
 	it('drops a bare package-root import when no exports are used', async () => {
 		const result = await build({
 			stdin: {
@@ -101,5 +122,78 @@ export function Retained() @{
 		expect(code).not.toContain('unused-value-template');
 		expect(code).not.toContain('unused-warm-template');
 		expect(code).not.toContain('unused-event-template');
+	});
+
+	it('omits modules reached only through permanent-static local wrappers', async () => {
+		const page = compile(
+			`
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+import { StaticNavigation } from 'fixture:static-navigation';
+
+function StaticLeaf() @{
+	<StaticNavigation />
+}
+
+function StaticShell() @{
+	<StaticLeaf />
+}
+
+export function App() @{
+	<main data-bundle-probe="live-page">
+		<Hydrate split={false} when={never()}>
+			<StaticShell />
+		</Hydrate>
+	</main>
+}
+`,
+			'Page.tsrx',
+			{ hmr: false },
+		).code;
+		const staticNavigation = compile(
+			`
+globalThis.__octanePermanentStaticModuleLoaded = true;
+
+export function StaticNavigation() @{
+	<nav data-bundle-probe="permanent-static-navigation" />
+}
+`,
+			'StaticNavigation.tsrx',
+			{ hmr: false },
+		).code;
+
+		const result = await build({
+			stdin: {
+				contents: `export { App } from 'fixture:page';`,
+				loader: 'js',
+				sourcefile: 'entry.js',
+			},
+			bundle: true,
+			format: 'esm',
+			minify: true,
+			treeShaking: true,
+			write: false,
+			external: ['octane', 'octane/hydration'],
+			plugins: [
+				{
+					name: 'permanent-static-fixtures',
+					setup(build) {
+						build.onResolve({ filter: /^fixture:/ }, (args) => ({
+							path: args.path,
+							namespace: 'fixture',
+						}));
+						build.onLoad({ filter: /.*/, namespace: 'fixture' }, (args) => ({
+							contents: args.path === 'fixture:page' ? page : staticNavigation,
+							loader: 'js',
+						}));
+					},
+				},
+			],
+		});
+		const code = result.outputFiles[0].text;
+
+		expect(code).toContain('live-page');
+		expect(code).not.toContain('__octanePermanentStaticModuleLoaded');
+		expect(code).not.toContain('permanent-static-navigation');
 	});
 });

@@ -15,6 +15,8 @@
 
 import {
 	SUSPENSE_SCRIPT_ATTR,
+	HYDRATE_STATIC_ID_COUNT_PREFIX,
+	HYDRATE_STATIC_END,
 	HYDRATE_ID_ATTR,
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
@@ -86,6 +88,12 @@ import {
 	markComponentFlags,
 } from './component-flags.js';
 import { formatClientError } from './error-codes.client.generated.js';
+import {
+	HYDRATE_STREAM_TOKEN_ATTR,
+	isRendererStreamBoundaryTemplate,
+	isRendererStreamToken,
+	rendererRangeClose,
+} from './stream-protocol.js';
 
 export { EXTERNAL_HYDRATION_PROMISE, HYDRATION_RANGE_BOUNDARY };
 
@@ -4965,6 +4973,9 @@ const HYDRATE_STRATEGY_TYPES = /* @__PURE__ */ new Set<HydrationWhen>([
 // Boundary-local interaction capture uses the same marker protocol as the
 // lightweight pre-root event-capture module.
 const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
+const HYDRATE_STREAM_ERROR_ATTR = 'data-oct-err';
+const HYDRATE_STREAM_BOUNDARY_SELECTOR = `template[${STREAM_BOUNDARY_ATTR}]`;
+const HYDRATE_STREAM_SCAN_MASK = 1 /* SHOW_ELEMENT */ | 128; /* SHOW_COMMENT */
 
 type HydrateLoadResult = ComponentBody | { default: ComponentBody };
 
@@ -5019,8 +5030,84 @@ interface HydrateSlot {
 	replays: HydrationReplayIntent[];
 }
 
+// Created only for the rare activation that races a renderer stream. Keep the
+// ordinary Hydrate state shape unchanged and retain no completed boundaries.
+let hydrateStreamWaitCleanups: WeakMap<HydrateSlot, () => void> | null = null;
+
 function hydrateStrategyType(when: InternalHydrateProps['when']): HydrationWhen {
 	return typeof when === 'function' ? 'dynamic' : (when?._t ?? 'dynamic');
+}
+
+function reserveHydrationIds(ids: RootIdState, count: number): void {
+	let owner = ids;
+	while (count > 0) {
+		while (owner.limit !== undefined && owner.next >= owner.limit && owner.overflow !== undefined) {
+			owner = owner.overflow;
+		}
+		if (owner.limit === undefined || owner.overflow === undefined) {
+			owner.next += count;
+			return;
+		}
+		const available = owner.limit - owner.next;
+		const reserved = Math.min(count, available);
+		owner.next += reserved;
+		count -= reserved;
+	}
+}
+
+interface PermanentStaticHydrationMarker {
+	idCount: number;
+	streamToken: string | null;
+}
+
+function parsePermanentStaticHydrationMarker(data: string): PermanentStaticHydrationMarker | null {
+	if (!data.startsWith(HYDRATE_STATIC_ID_COUNT_PREFIX)) return null;
+	const payload = data.slice(HYDRATE_STATIC_ID_COUNT_PREFIX.length);
+	let rawCount = payload;
+	let streamToken: string | null = null;
+	const separator = payload.lastIndexOf(':');
+	if (separator !== -1) {
+		streamToken = payload.slice(0, separator);
+		rawCount = payload.slice(separator + 1);
+		if (!isRendererStreamToken(streamToken)) return null;
+	}
+	if (!/^(?:0|[1-9]\d*)$/.test(rawCount)) return null;
+	const idCount = Number(rawCount);
+	return Number.isSafeInteger(idCount) ? { idCount, streamToken } : null;
+}
+
+function permanentStaticHydrationRangeEnd(
+	marker: Comment,
+	expectedStreamToken?: string,
+): { end: Comment; idCount: number } | null {
+	const parsed = parsePermanentStaticHydrationMarker(marker.data);
+	if (
+		parsed === null ||
+		(expectedStreamToken !== undefined && parsed.streamToken !== expectedStreamToken)
+	)
+		return null;
+	const childClose = rendererRangeClose(marker.nextSibling);
+	const end = childClose?.nextSibling;
+	const expectedEnd =
+		parsed.streamToken === null
+			? HYDRATE_STATIC_END
+			: HYDRATE_STATIC_END + ':' + parsed.streamToken;
+	return end?.nodeType === 8 && (end as Comment).data === expectedEnd
+		? { end: end as Comment, idCount: parsed.idCount }
+		: null;
+}
+
+function preservePermanentStaticHydrationRange(scope: Scope): void {
+	const hydration = activeHydration();
+	if (hydration === null) return;
+	const marker = hydration.node;
+	if (marker?.nodeType !== 8) return;
+	const range = permanentStaticHydrationRangeEnd(marker as Comment);
+	if (range === null) return;
+	reserveHydrationIds(scope.block.idState, range.idCount);
+	hydration.node = marker.nextSibling;
+	(marker as ChildNode).remove();
+	range.end.remove();
 }
 
 function resolveHydrateStrategy(state: HydrateSlot): HydrationStrategy {
@@ -5116,6 +5203,7 @@ function hydrateBoundaryBody(state: HydrateSlot): ComponentBody {
 
 function failHydrateBoundary(state: HydrateSlot, error: unknown): void {
 	if (state.hasError || state.block.disposed) return;
+	cleanupHydrateStreamWait(state);
 	state.hasError = true;
 	state.error = error;
 	scheduleRender(state.parentBlock);
@@ -5223,6 +5311,7 @@ function cleanupHydrateInstallers(state: HydrateSlot): void {
 }
 
 function invalidateHydrateActivation(state: HydrateSlot): void {
+	cleanupHydrateStreamWait(state);
 	state.activationGeneration++;
 	state.activationRequested = false;
 	state.activationReady = false;
@@ -5242,16 +5331,26 @@ function invalidateHydrateActivation(state: HydrateSlot): void {
 
 function teardownHydrateBoundary(state: HydrateSlot): void {
 	cleanupHydrateInstallers(state);
+	cleanupHydrateStreamWait(state);
 	state.prefetchAbort?.abort();
 	resolveHydrateWaiters(state, 'abort');
 	unregisterHydrationIntentBoundary(state.wrapper, state.intentBoundary);
 }
 
 function resolveEventPath(root: Element, path: number[]): Element | null {
+	const streamToken = root.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
 	let node: Element = root;
 	for (let i = 0; i < path.length; i++) {
-		const next = node.children[path[i]];
-		if (next === undefined) return null;
+		let index = path[i];
+		let next = node.firstElementChild;
+		while (next !== null) {
+			if (!isRendererStreamBoundaryTemplate(next, streamToken)) {
+				if (index === 0) break;
+				index--;
+			}
+			next = next.nextElementSibling;
+		}
+		if (next === null) return null;
 		node = next;
 	}
 	return node;
@@ -5358,6 +5457,112 @@ function installHydrateInteraction(state: HydrateSlot, strategy: HydrationStrate
 	};
 }
 
+function isCanonicalHydrateIdCount(value: string | null): boolean {
+	if (value === null || !/^(?:0|[1-9]\d*)$/.test(value)) return false;
+	return Number.isSafeInteger(Number(value));
+}
+
+function isDormantServerHydrateOwner(element: Element, streamToken: string): boolean {
+	return (
+		element.localName === 'div' &&
+		element.getAttribute(HYDRATE_STREAM_TOKEN_ATTR) === streamToken &&
+		element.hasAttribute(HYDRATE_ID_ATTR) &&
+		element.hasAttribute(HYDRATE_WHEN_ATTR) &&
+		isCanonicalHydrateIdCount(element.getAttribute(HYDRATE_ID_COUNT_ATTR)) &&
+		rendererRangeClose(element.firstChild) !== null
+	);
+}
+
+function hydrateStreamBoundaryOwnedByState(
+	boundary: Element,
+	state: HydrateSlot,
+	streamToken: string,
+): boolean {
+	let owner = boundary.parentElement;
+	while (owner !== null && owner !== state.wrapper) {
+		// Only a complete token-bound server shape creates an ownership barrier.
+		// Authored lookalike data attributes remain ordinary descendants.
+		if (isDormantServerHydrateOwner(owner, streamToken)) return false;
+		owner = owner.parentElement;
+	}
+	return owner === state.wrapper;
+}
+
+function hasPendingHydrateStreamReveal(state: HydrateSlot): boolean {
+	const streamToken = state.wrapper.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
+	if (!isRendererStreamToken(streamToken)) return false;
+	// querySelector is the fast native rejection path for the overwhelmingly
+	// common non-streamed boundary. Only pay the ownership/range-aware JS walk
+	// after proving at least one renderer stream sentinel remains below it.
+	if (state.wrapper.querySelector(HYDRATE_STREAM_BOUNDARY_SELECTOR) === null) return false;
+	const walker = state.wrapper.ownerDocument.createTreeWalker(
+		state.wrapper,
+		HYDRATE_STREAM_SCAN_MASK,
+	);
+	let node: Node | null;
+	while ((node = walker.nextNode()) !== null) {
+		if (node.nodeType === 8) {
+			const range = permanentStaticHydrationRangeEnd(node as Comment, streamToken);
+			// The compiler-proven static range has no client owner. Skip its exact
+			// balanced server range so a descendant reveal cannot block this boundary.
+			if (range !== null) walker.currentNode = range.end;
+			continue;
+		}
+		const boundary = node as Element;
+		if (
+			isRendererStreamBoundaryTemplate(boundary, streamToken) &&
+			!boundary.hasAttribute(HYDRATE_STREAM_ERROR_ATTR) &&
+			hydrateStreamBoundaryOwnedByState(boundary, state, streamToken)
+		)
+			return true;
+	}
+	return false;
+}
+
+function cleanupHydrateStreamWait(state: HydrateSlot): void {
+	const cleanup = hydrateStreamWaitCleanups?.get(state);
+	hydrateStreamWaitCleanups?.delete(state);
+	cleanup?.();
+}
+
+/**
+ * A dormant Hydrate boundary still leaves its server DOM under the streaming
+ * renderer's ownership. If interaction opens it while a nested Suspense reveal
+ * is pending, wait for the renderer to either swap that range or mark it for
+ * client recovery. Pending ranges below another dormant Hydrate boundary belong
+ * to that boundary instead and must not block this one.
+ */
+function beginHydrateStreamWait(state: HydrateSlot): Promise<void> | null {
+	if (!state.serverPreserved || !hasPendingHydrateStreamReveal(state)) return null;
+
+	return new Promise<void>((resolve) => {
+		let settled = false;
+		let observer!: MutationObserver;
+		const finish = () => {
+			if (settled) return;
+			settled = true;
+			observer.disconnect();
+			if (hydrateStreamWaitCleanups?.get(state) === finish) hydrateStreamWaitCleanups.delete(state);
+			resolve();
+		};
+		const MutationObserverImpl =
+			state.wrapper.ownerDocument.defaultView?.MutationObserver ?? MutationObserver;
+		observer = new MutationObserverImpl(() => {
+			if (!hasPendingHydrateStreamReveal(state)) finish();
+		});
+
+		(hydrateStreamWaitCleanups ??= new WeakMap()).set(state, finish);
+		observer.observe(state.wrapper, {
+			attributes: true,
+			attributeFilter: [HYDRATE_STREAM_ERROR_ATTR],
+			childList: true,
+			subtree: true,
+		});
+		// The reveal may have landed after the initial scan but before observation.
+		if (!hasPendingHydrateStreamReveal(state)) finish();
+	});
+}
+
 function requestHydrateBoundary(state: HydrateSlot): void {
 	if (state.hydrated || state.activationRequested || state.block.disposed) return;
 	// A direct strategy prop can become never() after an earlier installer was
@@ -5370,6 +5575,8 @@ function requestHydrateBoundary(state: HydrateSlot): void {
 	resolveHydrateWaiters(state, 'hydrate');
 
 	const waits: Promise<void>[] = [];
+	const streamReveal = beginHydrateStreamWait(state);
+	if (streamReveal !== null) waits.push(streamReveal);
 	const prefetch = beginProceduralHydratePrefetch(state);
 	if (prefetch !== null) waits.push(prefetch);
 	const preload = beginHydratePreload(state);
@@ -5637,7 +5844,17 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
 	state.replays = [];
 	for (let i = 0; i < replays.length; i++) {
 		const replay = replays[i];
-		const target = resolveEventPath(state.wrapper, replay.path);
+		const originalTarget = replay.event.target;
+		// A streamed reveal can change the number of elements before an unrelated
+		// live sibling. Preserve exact intent whenever its original element survived;
+		// the filtered logical path remains the fallback for replaced server arms.
+		const target =
+			originalTarget !== null &&
+			typeof (originalTarget as Node).nodeType === 'number' &&
+			(originalTarget as Node).nodeType === 1 &&
+			state.wrapper.contains(originalTarget as Node)
+				? (originalTarget as Element)
+				: resolveEventPath(state.wrapper, replay.path);
 		if (target !== null) {
 			const event = replay.event;
 			// `click` is the platform exception among untrusted events: dispatching
@@ -5657,11 +5874,16 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
 
 /**
  * Defer the initial hydration of server-rendered children until `when` resolves.
- * A boundary first mounted on the client renders immediately; only existing SSR
- * HTML can be left dormant.
+ * An ordinary boundary first mounted on the client renders immediately; only
+ * existing SSR HTML can be left dormant. The compiler-proven permanent-static
+ * form is the server-only exception and intentionally renders no client child.
  */
-function initializeHydrateComponent(): ComponentBody<HydrateProps> {
-	return markComponentFlags<ComponentBody<HydrateProps>>(
+type InternalHydrateComponent = ComponentBody<HydrateProps> & {
+	readonly __octanePermanentStatic: ComponentBody<HydrateProps>;
+};
+
+function initializeHydrateComponent(): InternalHydrateComponent {
+	const hydrate = markComponentFlags<ComponentBody<HydrateProps>>(
 		function Hydrate(rawProps, scope) {
 			const props = rawProps as InternalHydrateProps;
 			const boundaryId = useId(HYDRATE_ID_SLOT);
@@ -5717,6 +5939,19 @@ function initializeHydrateComponent(): ComponentBody<HydrateProps> {
 		COMPONENT_FLAG_BOUNDARY,
 		'Hydrate',
 	);
+	const permanentStatic = markComponentFlags<ComponentBody<HydrateProps>>(
+		function PermanentStaticHydrate(_props, scope) {
+			// Match Hydrate's own server useId while leaving all child IDs to the
+			// paired private sidecar. The componentSlot's adopted outer range owns
+			// the untouched server DOM across parent updates and unmount.
+			useId(HYDRATE_ID_SLOT);
+			preservePermanentStaticHydrationRange(scope);
+		},
+		COMPONENT_FLAG_BOUNDARY,
+		'PermanentStaticHydrate',
+	);
+	Object.defineProperty(hydrate, '__octanePermanentStatic', { value: permanentStatic });
+	return hydrate as InternalHydrateComponent;
 }
 
 export const Hydrate: ComponentBody<HydrateProps> = /* @__PURE__ */ initializeHydrateComponent();
@@ -16687,8 +16922,7 @@ function mountTry(state: TrySlot): void {
 		hydration !== null &&
 		adoptCursor !== null &&
 		adoptCursor.nodeType === 1 &&
-		(adoptCursor as Element).localName === 'template' &&
-		(adoptCursor as Element).hasAttribute(STREAM_BOUNDARY_ATTR)
+		isRendererStreamBoundaryTemplate(adoptCursor as Element)
 	) {
 		hasScopedBoundary = true;
 		streamedBoundaryId = (adoptCursor as Element).getAttribute(STREAM_BOUNDARY_ATTR);
@@ -16720,6 +16954,10 @@ function mountTry(state: TrySlot): void {
 		bEnd = document.createComment('/try-b');
 		state.domParent.insertBefore(bStart, state.end);
 		state.domParent.insertBefore(bEnd, state.end);
+		if (hydration !== null) {
+			hydration.markFresh(bStart);
+			hydration.markFresh(bEnd);
+		}
 	}
 	const b = createBlock(
 		'control-flow',

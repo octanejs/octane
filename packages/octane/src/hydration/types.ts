@@ -113,5 +113,5 @@ export type HydrateOptions =
 	  });
 
 export type HydrateProps = HydrateOptions & {
-	children: unknown;
+	children?: unknown;
 };

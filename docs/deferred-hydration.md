@@ -245,6 +245,32 @@ JavaScript behavior; keep their fallback values safe to evaluate on the server.
 `onHydrated` runs once after the child successfully commits on the client,
 whether the boundary adopts preserved server DOM or mounts client-only.
 
+The exact direct-import form `<Hydrate split={false} when={never()}>` is a
+server-only static range. The compiler removes its descendants from the client
+render and prunes private module-scope declarations and imports reachable
+exclusively from that range. SSR emits the children without a host wrapper, and
+hydration reserves their ID positions without evaluating or reconciling them. A
+client-only mount has no server range to preserve, so this exact form renders no
+children. The tag must have exactly those two attributes; additional attributes,
+spreads, indirect `Hydrate`/`never` values, and every other strategy retain the
+ordinary runtime boundary semantics. Shared, exported, and coupled declarations
+remain in the client module so the optimization cannot change unrelated module
+behavior.
+
+When a descendant module is reachable only through a pruned static declaration
+chain, it is absent from the client manifest; a CSS file imported only by that
+module is absent too. Import ordinary stylesheets from an eager route/layout
+module. Scoped `<style>` remains safe: the client compiler retains a directly
+authored style long enough to preserve the surrounding component's scope hash,
+while SSR collects styles owned by removed descendant components and emits them
+with the rendered static content.
+
+For streamed static content, a synchronous unhandled server error still reaches
+the nearest authored server catch (or the stream's fatal path). If a pending
+fallback has already flushed, a later rejection or abort terminalizes that
+server-owned range and retains the fallback; it cannot request client recovery
+because its client graph does not exist.
+
 ## Correctness and nesting
 
 Deferred hydration is a performance hint. An update outside a dormant boundary
@@ -264,6 +290,13 @@ target boundary. A `never()` ancestor keeps every deferred descendant inert.
 Native event payload details such as pointer coordinates are not guaranteed to
 survive replay.
 
-`Hydrate` always renders a persistent HTML `<div>`. Account for that wrapper in
-layout and HTML nesting. Direct placement inside SVG or MathML is unsupported,
-because an HTML parser moves a `<div>` out of foreign content before hydration.
+If activation races a pending renderer-owned streamed Suspense reveal, the
+boundary waits for that reveal or its client-render degradation before adopting
+the range. Pending reveals inside an independently dormant nested `Hydrate`
+boundary remain owned by that nested boundary and do not delay its ancestor.
+
+Ordinary `Hydrate` boundaries render a persistent HTML `<div>`. Account for that
+wrapper in layout and HTML nesting; direct placement inside SVG or MathML is
+unsupported because an HTML parser moves a `<div>` out of foreign content before
+hydration. The exact permanent-static form described above is wrapper-free and
+inherits its HTML, SVG, or MathML parser namespace.
