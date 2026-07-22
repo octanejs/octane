@@ -18,9 +18,8 @@ const HydrationRangeOwner: ComponentBody<Pick<BodyProps, 'children'>> = (props) 
 
 export const Body: ComponentBody<BodyProps> = (props) => {
 	const router = useRouter();
-	const server = isServer ?? router.isServer;
 	const { children, ...attrs } = props;
-	if (server) {
+	if (isServer ?? router.isServer) {
 		return createElement(
 			'body',
 			attrs,

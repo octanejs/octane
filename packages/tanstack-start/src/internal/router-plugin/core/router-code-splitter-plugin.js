@@ -34,7 +34,7 @@ function createRouterCodeSplitterPlugin(options = {}, routerPluginContext) {
 		if (typeof options === 'function') userConfig = options();
 		else userConfig = getConfig(options, ROOT);
 	}
-	const isProduction = process.env.NODE_ENV === 'production';
+	let isProduction = process.env.NODE_ENV === 'production';
 	const sharedBindingsMap = /* @__PURE__ */ new Map();
 	const getGlobalCodeSplitGroupings = () => {
 		return userConfig.codeSplittingOptions?.defaultBehavior || defaultCodeSplitGroupings;
@@ -159,6 +159,7 @@ function createRouterCodeSplitterPlugin(options = {}, routerPluginContext) {
 			},
 			vite: {
 				configResolved(config) {
+					isProduction = config.command === 'build';
 					ROOT = config.root;
 					initUserConfig();
 					validateFrameworkPluginOrder({
@@ -173,11 +174,13 @@ function createRouterCodeSplitterPlugin(options = {}, routerPluginContext) {
 					return true;
 				},
 			},
-			rspack() {
+			rspack(compiler) {
+				isProduction = compiler.options.mode === 'production';
 				ROOT = process.cwd();
 				initUserConfig();
 			},
-			webpack() {
+			webpack(compiler) {
+				isProduction = compiler.options.mode === 'production';
 				ROOT = process.cwd();
 				initUserConfig();
 			},
