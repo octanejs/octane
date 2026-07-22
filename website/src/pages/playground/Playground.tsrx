@@ -1,7 +1,7 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
 // LIVE rendered app or the compiled output, switchable with a tab. The
 // compiled pane has two modes: AST (parsed source, type transform, and exact
-// emitted client/server/type-output trees) and TYPES (the typed virtual TSX
+// emitted client/type-output trees) and TYPES (the typed virtual TSX
 // the IDE language service sees via `octane/compiler/volar`). Hovering or
 // selecting source reveals the corresponding AST node where the compiler has
 // a mapping; hovering a tree node highlights its source origin. Types uses
@@ -30,7 +30,7 @@
 // the default sources auto-run as before.
 import { useState, useRef, useEffect } from 'octane';
 import type { CompileDiagnostic } from 'octane/compiler';
-import type { PlaygroundLang } from '../../lib/playground.ts';
+import type { PlaygroundAstStage, PlaygroundLang } from '../../lib/playground.ts';
 import {
 	decodePlaygroundHash,
 	encodePlaygroundHash,
@@ -65,9 +65,7 @@ export function Playground() @{
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Which compiler artifact the right pane shows.
 	const [compiledMode, setCompiledMode] = useState<'ast' | 'types'>('ast');
-	const [astStage, setAstStage] = useState<
-		'source' | 'type-transform' | 'type-output' | 'client-output' | 'server-output'
-	>('source');
+	const [astStage, setAstStage] = useState<PlaygroundAstStage>('source');
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
@@ -95,7 +93,7 @@ export function Playground() @{
 	const resultModeRef = useRef<{
 		view: 'preview' | 'compiled';
 		compiledMode: 'ast' | 'types';
-		astStage: 'source' | 'type-transform' | 'type-output' | 'client-output' | 'server-output';
+		astStage: PlaygroundAstStage;
 	}>({
 		view: 'preview',
 		compiledMode: 'ast',
@@ -1069,7 +1067,6 @@ export function Playground() @{
 									<option value="type-transform">Type transform</option>
 									<option value="type-output">Types output</option>
 									<option value="client-output">Client output</option>
-									<option value="server-output">Server output</option>
 								</select>
 							}
 							<div class="pg-seg pg-seg-sm" role="group" aria-label="Compiled output mode">

@@ -146,21 +146,19 @@ export function App() {
 		const transform = compileAst(source, filename, 'type-transform');
 		const typeOutput = compileAst(source, filename, 'type-output');
 		const clientOutput = compileAst(source, filename, 'client-output');
-		const serverOutput = compileAst(source, filename, 'server-output');
-		for (const result of [transform, typeOutput, clientOutput, serverOutput]) {
+		for (const result of [transform, typeOutput, clientOutput]) {
 			if (!result.ok) throw new Error(result.error);
 		}
-		if (!transform.ok || !typeOutput.ok || !clientOutput.ok || !serverOutput.ok) return;
+		if (!transform.ok || !typeOutput.ok || !clientOutput.ok) return;
 
 		expect(transform.space).toBe('source');
 		expect((transform.ast as { end: number }).end).toBe(source.length);
-		for (const output of [typeOutput, clientOutput, serverOutput]) {
+		for (const output of [typeOutput, clientOutput]) {
 			expect(output.space).toBe('generated');
 			expect((output.ast as { type: string }).type).toBe('Program');
 			expect((output.ast as { end: number }).end).toBe(output.code!.length);
 		}
 		expect(clientOutput.map).toBeDefined();
-		expect(serverOutput.notice).toContain('no source positions');
 	});
 });
 

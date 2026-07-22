@@ -1128,6 +1128,11 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					.locator('[aria-label="Compiled output mode"] button', { hasText: 'Prod' })
 					.count(),
 			).toBe(0);
+			expect(
+				await page
+					.locator('[aria-label="AST compiler stage"] option', { hasText: 'Server output' })
+					.count(),
+			).toBe(0);
 			await clickToken(0, 'useState', 2);
 			await page.waitForFunction(
 				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),

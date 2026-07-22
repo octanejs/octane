@@ -87,20 +87,19 @@ export interface AstSuccess {
 	code?: string;
 	/** Exact type-only source mappings, when available. */
 	mappings?: VolarTokenMapping[];
-	/** Compiler source map for client/server output, when available. */
+	/** Compiler source map for client output, when available. */
 	map?: unknown;
 }
 
-export type PlaygroundAstStage =
-	'source' | 'type-transform' | 'type-output' | 'client-output' | 'server-output';
+export type PlaygroundAstStage = 'source' | 'type-transform' | 'type-output' | 'client-output';
 
 const parseGeneratedAst = (code: string): unknown => __parseGeneratedModuleAst(code);
 
 /**
  * Build one stage of the AST trace shown by the playground. Source and
- * type-only transform trees come directly from the compiler. Client/server
- * output trees are parsed from the exact emitted code because those emitters
- * do not maintain one complete transformed AST. Never throws.
+ * type-only transform trees come directly from the compiler. The client output
+ * tree is parsed from the exact emitted code because that emitter does not
+ * maintain one complete transformed AST. Never throws.
  */
 export function compileAst(
 	source: string,
@@ -108,21 +107,18 @@ export function compileAst(
 	stage: PlaygroundAstStage = 'source',
 ): AstSuccess | CompileFailure {
 	try {
-		if (stage === 'client-output' || stage === 'server-output') {
-			const mode = stage === 'client-output' ? 'client' : 'server';
+		if (stage === 'client-output') {
 			const result = compile(source, filename, {
-				mode,
-				sourceMapHostTags: mode === 'client',
+				mode: 'client',
+				sourceMapHostTags: true,
 			});
 			return {
 				ok: true,
 				ast: parseGeneratedAst(result.code),
 				space: 'generated',
-				label: mode === 'client' ? 'Client output AST' : 'Server output AST',
+				label: 'Client output AST',
 				notice:
-					mode === 'client'
-						? 'Parsed from the exact client output. Source navigation is limited to compiler source-map anchors.'
-						: 'Parsed from the exact server output. The server emitter currently provides no source positions.',
+					'Parsed from the exact client output. Source navigation is limited to compiler source-map anchors.',
 				code: result.code,
 				map: result.map,
 			};
