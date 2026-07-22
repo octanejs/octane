@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "recordedAt": "2026-07-18",
+  "crosswalkUpdatedAt": "2026-07-22",
   "probe": "packages/lynx/probe",
   "executionHost": {
     "platform": "darwin",
@@ -206,14 +207,19 @@
       "reason": "The working test injection uses lynxCoreInject.tt.publishEvent, which is absent from the selected public type packages."
     },
     {
+      "id": "public-current-init-data-receiver",
+      "status": "blocked",
+      "reason": "Source and unit tests consume the framework-maintained lynx.__initData snapshot, but Octane has not installed or proven a public framework-neutral native receiver that updates that current snapshot across engines."
+    },
+    {
       "id": "public-reload-and-background-teardown",
       "status": "blocked",
       "reason": "ReactLynx uses injected onAppReload and callDestroyLifetimeFun hooks. A framework-neutral replacement has not been confirmed across engines."
     },
     {
       "id": "runner-expanded-test-case-inventory",
-      "status": "blocked",
-      "reason": "All 213 upstream test source files are classified, but dynamic Vitest/cargo case expansion has not been captured and classified case-by-case."
+      "status": "passed",
+      "evidence": "Vitest 3.2.4 expanded 1,725 runnable JavaScript/TypeScript cases across 212 source files at the pinned ReactLynx commit; all cases have stable task/source/location/title identities and exactly one classification in upstream-runner-cases.json. The remaining source file contains only an upstream skipped suite/todo. The separately inventoried 89 source-defined Rust compiler cases remain classified out of scope because Octane does not reuse that compiler implementation."
     },
     {
       "id": "comparable-runtime-baselines",
@@ -230,10 +236,10 @@
       "android-lynx-3.9.0",
       "ios-lynx-3.9.0",
       "public-background-event-receiver",
+      "public-current-init-data-receiver",
       "public-reload-and-background-teardown",
-      "runner-expanded-test-case-inventory",
       "comparable-runtime-baselines"
     ],
-    "decision": "Do not begin the production renderer port until the public-hook blockers are resolved and the exact bundle passes the required engine matrix."
+    "decision": "Keep the renderer packages private and make no native preview or release claim until the public-hook blockers are resolved and the exact bundles pass the required engine matrix."
   }
 }

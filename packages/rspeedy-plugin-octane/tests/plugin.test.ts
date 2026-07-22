@@ -1,4 +1,12 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -17,6 +25,28 @@ import {
 
 const temporaryRoots: string[] = [];
 const testRequire = createRequire(import.meta.url);
+const installedRspeedyRequire = createRequire(testRequire.resolve('@lynx-js/rspeedy/package.json'));
+const RSPEEDY_BUILD_PACKAGES = [
+	'@lynx-js/cache-events-webpack-plugin',
+	'@lynx-js/chunk-loading-webpack-plugin',
+	'@lynx-js/debug-metadata-rsbuild-plugin',
+	'@lynx-js/web-rsbuild-server-middleware',
+	'@lynx-js/webpack-dev-transport',
+	'@lynx-js/websocket',
+	'@rsbuild/plugin-css-minimizer',
+	'@rsdoctor/rspack-plugin',
+] as const;
+const RSPEEDY_DEPENDENCIES = {
+	'@lynx-js/cache-events-webpack-plugin': '^0.2.0',
+	'@lynx-js/chunk-loading-webpack-plugin': '^0.4.1',
+	'@lynx-js/debug-metadata-rsbuild-plugin': '^0.2.0',
+	'@lynx-js/web-rsbuild-server-middleware': '0.22.2',
+	'@lynx-js/webpack-dev-transport': '^0.3.0',
+	'@lynx-js/websocket': '^0.0.4',
+	'@rsbuild/core': '2.1.4',
+	'@rsbuild/plugin-css-minimizer': '2.0.0',
+	'@rsdoctor/rspack-plugin': '~1.5.6',
+} as const;
 
 type BundlerChainCallback = (chain: unknown, context: unknown) => void;
 type EnvironmentConfigCallback = (
@@ -34,30 +64,58 @@ function packageDirectory(root: string, name: string): string {
 	return join(root, 'node_modules', ...name.split('/'));
 }
 
-function writePackage(root: string, name: string, version: string): string {
+function writePackage(
+	root: string,
+	name: string,
+	version: string,
+	extra: Record<string, unknown> = {},
+): string {
 	const directory = packageDirectory(root, name);
 	mkdirSync(directory, { recursive: true });
 	writeFileSync(
 		join(directory, 'package.json'),
-		JSON.stringify({ name, version, type: 'module' }),
+		JSON.stringify({ name, version, type: 'module', ...extra }),
 		'utf8',
 	);
 	return directory;
+}
+
+function installedPackageRoot(packageName: string): string {
+	let filename: string;
+	try {
+		filename = installedRspeedyRequire.resolve(`${packageName}/package.json`);
+	} catch {
+		let directory = dirname(installedRspeedyRequire.resolve(packageName));
+		while (true) {
+			const candidate = join(directory, 'package.json');
+			try {
+				if (JSON.parse(readFileSync(candidate, 'utf8')).name === packageName) {
+					filename = candidate;
+					break;
+				}
+			} catch {
+				// Keep walking from a package-internal entry to its manifest.
+			}
+			const parent = dirname(directory);
+			if (parent === directory) throw new Error(`cannot find ${packageName}`);
+			directory = parent;
+		}
+	}
+	return dirname(realpathSync(filename));
 }
 
 function createToolchainRoot(): string {
 	const root = mkdtempSync(join(tmpdir(), 'octane-rspeedy-plugin-'));
 	temporaryRoots.push(root);
 	writeFileSync(join(root, 'package.json'), JSON.stringify({ private: true }), 'utf8');
-	writePackage(root, '@lynx-js/rspeedy', '0.16.0');
+	writePackage(root, '@lynx-js/rspeedy', '0.16.0', { dependencies: RSPEEDY_DEPENDENCIES });
 	writePackage(root, '@rsbuild/core', '2.1.4');
 	writePackage(root, '@rspack/core', '2.1.3');
-	const devTransport = dirname(
-		dirname(dirname(testRequire.resolve('@lynx-js/webpack-dev-transport/client'))),
-	);
-	const devTransportLink = packageDirectory(root, '@lynx-js/webpack-dev-transport');
-	mkdirSync(dirname(devTransportLink), { recursive: true });
-	symlinkSync(devTransport, devTransportLink, 'dir');
+	for (const packageName of RSPEEDY_BUILD_PACKAGES) {
+		const target = packageDirectory(root, packageName);
+		mkdirSync(dirname(target), { recursive: true });
+		symlinkSync(installedPackageRoot(packageName), target, 'dir');
+	}
 	return root;
 }
 

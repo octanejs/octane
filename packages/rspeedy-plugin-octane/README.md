@@ -1,4 +1,4 @@
-# `@octanejs/rspeedy-plugin` (private Milestones 6–8 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestones 6–9 source/build path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
@@ -74,29 +74,74 @@ entry for one thread, but they are not the normal application bundle path:
 pluginOctane({ thread: 'main-thread' });
 ```
 
-## Exact compatibility set
+## Compatibility lanes
 
-Milestone 6 supports one exact set while the packages remain private:
+Milestone 9 covers two exact, indivisible source/build graphs. Registry
+metadata was checked on 2026-07-22:
 
-| Component | Version |
-| --- | ---: |
-| Lynx SDK / target SDK | `3.9.0` / `3.9` |
-| `@lynx-js/rspeedy` | `0.16.0` |
-| `@rsbuild/core` | `2.1.4` |
-| `@rspack/core` | `2.1.3` |
-| `@lynx-js/template-webpack-plugin` | `0.13.0` |
-| `@lynx-js/css-extract-webpack-plugin` | `0.9.0` |
-| `@lynx-js/runtime-wrapper-webpack-plugin` | `0.2.2` |
-| `@lynx-js/webpack-dev-transport` | `0.3.0` |
-| `@lynx-js/webpack-runtime-globals` | `0.0.7` |
-| `@lynx-js/tasm` | `0.0.39` |
-| `@lynx-js/testing-environment` | `0.3.0` |
-| `@lynx-js/types` | `4.0.0` |
-| `@lynx-js/web-core` | `0.22.2` (encoder dependency; Web execution blocked) |
+| Component | Minimum | Current |
+| --- | ---: | ---: |
+| Lynx SDK / target SDK | `3.9.0` / `3.9` | `3.9.0` / `3.9` |
+| `@lynx-js/rspeedy` | `0.16.0` | `0.16.0` |
+| `@lynx-js/cache-events-webpack-plugin` | `0.2.0` | `0.2.0` |
+| `@lynx-js/chunk-loading-webpack-plugin` | `0.4.1` | `0.4.1` |
+| `@lynx-js/debug-metadata-rsbuild-plugin` | `0.2.0` | `0.2.0` |
+| `@lynx-js/debug-metadata` | `0.1.0` | `0.1.0` |
+| `@lynx-js/web-rsbuild-server-middleware` | `0.22.2` | `0.22.2` |
+| `@lynx-js/websocket` | `0.0.4` | `0.0.4` |
+| `@rsbuild/core` | `2.1.4` | `2.1.4` |
+| `@rsbuild/plugin-css-minimizer` | `2.0.0` | `2.0.0` |
+| `@rsdoctor/rspack-plugin` | `1.5.18` | `1.5.18` |
+| `@rspack/core` | `2.1.3` | `2.1.5` |
+| `@lynx-js/template-webpack-plugin` | `0.13.0` | `0.13.0` |
+| `@lynx-js/css-extract-webpack-plugin` | `0.9.0` | `0.9.0` |
+| `@lynx-js/runtime-wrapper-webpack-plugin` | `0.2.2` | `0.2.2` |
+| `@lynx-js/webpack-dev-transport` | `0.3.0` | `0.3.0` |
+| `@lynx-js/webpack-runtime-globals` | `0.0.7` | `0.0.7` |
+| `@lynx-js/tasm` | `0.0.39` | `0.0.39` |
+| `@lynx-js/testing-environment` | `0.3.0` | `0.3.0` |
+| `@lynx-js/types` | `4.0.0` | `4.0.0` |
+| `@lynx-js/web-core` | `0.22.2` | `0.22.2` |
+| TypeScript | `5.9.3` | `5.9.3` |
+| Webpack (tooling peer only) | `5.108.4` | `5.108.4` |
 
-The plugin rejects incompatible or duplicated Rspeedy, Rsbuild, or Rspack
-cores before registering compiler hooks. Production graph tests also reject
-React, Preact, and ReactLynx runtime dependencies.
+Rspeedy `0.16.0` requires Rsbuild `2.1.4` exactly. That Rsbuild release accepts
+Rspack `~2.1.2`, so the current lane advances only Rspack to the newest allowed
+patch. It does not mix in Rsbuild `2.1.7`. Likewise, template plugin `0.13.0`
+requires tasm `0.0.39` exactly, so the standalone tasm `0.0.48` release is not
+part of this graph. The lane also pins every direct Rspeedy dependency selected
+through a caret or tilde range, the debug-metadata payload, runtime globals, and
+the required Webpack 5 tooling peer. The current registry check recomputes the
+newest version inside each upstream range before accepting the recorded graph.
+
+`pnpm test:compat` packs Octane, the Lynx renderer, and both compiler plugins,
+then installs each lane into an external temporary consumer without creating a
+lockfile. It checks exact versions and dependency edges, one physical core
+graph, strict build-tool peer satisfaction, the absence of DOM and
+React/Preact/ReactLynx code in decoded programs, deterministic repeated
+production builds, and a decoded engine target of `3.9`. CI also checks registry
+drift for the current lane. These remain source/build checks, not Android or iOS
+runtime evidence.
+
+The exact sets are available to tooling as `LYNX_TOOLCHAIN_LANES`.
+`assertLynxToolchain(root)` validates the build-relevant packages in either
+set; the packed smoke additionally validates the testing, TypeScript, and
+Webpack tooling packages. Pass `"minimum"` or `"current"` as the optional
+second argument when a build must prove a specific lane:
+
+```js
+import {
+	assertLynxToolchain,
+	LYNX_TOOLCHAIN_LANES,
+} from '@octanejs/rspeedy-plugin';
+
+const expected = LYNX_TOOLCHAIN_LANES.current;
+const installed = assertLynxToolchain(process.cwd(), 'current');
+```
+
+The plugin rejects incompatible, cross-lane, or duplicated Rspeedy, Rsbuild,
+or Rspack cores before registering compiler hooks. Production graph tests also
+reject React, Preact, and ReactLynx runtime dependencies.
 
 Application mode owns each entry's generated filename and background layer,
 and rejects authored `filename`, a conflicting `layer`, and `dependOn` (every

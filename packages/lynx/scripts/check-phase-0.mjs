@@ -38,11 +38,19 @@ const installedVersions = (name) =>
 	);
 assert.deepEqual([...installedVersions('@rsbuild/core')], ['2.1.4']);
 assert.deepEqual([...installedVersions('@rspack/core')], ['2.1.3']);
+const expectedAbsentAuditedPackages = new Set([
+	// Audited for the Milestone 5 plugin path, but not installed by the Phase 0 probe.
+	'@lynx-js/css-extract-webpack-plugin',
+]);
+const absentAuditedPackages = new Set();
 for (const pinnedPackage of toolchain.packages) {
 	const matches = installedPackages.filter(([path]) =>
 		path.endsWith(`node_modules/${pinnedPackage.name}`),
 	);
-	assert(matches.length > 0, `${pinnedPackage.name} is missing from the isolated lock`);
+	if (matches.length === 0) {
+		absentAuditedPackages.add(pinnedPackage.name);
+		continue;
+	}
 	for (const [, installedPackage] of matches) {
 		assert.equal(
 			installedPackage.version,
@@ -58,6 +66,11 @@ for (const pinnedPackage of toolchain.packages) {
 		}
 	}
 }
+assert.deepEqual(
+	absentAuditedPackages,
+	expectedAbsentAuditedPackages,
+	'the audited packages absent from the isolated probe lock changed',
+);
 assert.equal(
 	installedPackages.some(
 		([path]) =>
@@ -107,12 +120,12 @@ for (const blockingGateId of evidence.milestoneExit.blockingGateIds) {
 for (const requiredGate of [
 	'encoded-bundle-in-testing-environment',
 	'public-background-event-receiver',
+	'public-current-init-data-receiver',
 	'public-reload-and-background-teardown',
 	'lynx-web-runtime',
 	'lynx-explorer-3.9.0',
 	'android-lynx-3.9.0',
 	'ios-lynx-3.9.0',
-	'runner-expanded-test-case-inventory',
 	'comparable-runtime-baselines',
 ]) {
 	assert(
@@ -120,5 +133,6 @@ for (const requiredGate of [
 		`${requiredGate} must remain an explicit exit gate`,
 	);
 }
+assert.equal(gatesById.get('runner-expanded-test-case-inventory')?.status, 'passed');
 
 console.log('Validated Lynx Phase 0 pins, dependency graph, evidence, and gates.');

@@ -453,6 +453,16 @@ const SUITES = [
 		runs: [{ script: 'run.mjs', args: (n) => [String(n)] }],
 	},
 	{
+		// Production Rspeedy preview/IFR bundles (Node-only): decodes both real
+		// compiler graphs, verifies semantic markers, and reports deterministic
+		// encoded and per-thread bytes. This is build evidence, not native timing.
+		name: 'lynx-bundle-size',
+		cwd: 'lynx-bundle-size',
+		servers: [],
+		iter: { normal: 1, quick: 1 },
+		runs: [{ script: 'run.mjs', args: () => [] }],
+	},
+	{
 		// Compiled-output size (Node-only, seconds-fast): compiles a fixed
 		// .tsrx/.tsx corpus through octane/compiler with prod settings and reports
 		// raw/minified/gzip bytes as `source` vs `compiled` targets — the per-commit
