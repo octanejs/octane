@@ -65,6 +65,28 @@ export interface TypesSuccess {
 	mappings: VolarTokenMapping[];
 }
 
+export interface AstSuccess {
+	ok: true;
+	/** Parser AST for the authored TSRX/TSX, including Octane/TSRX metadata. */
+	ast: unknown;
+}
+
+/**
+ * Build the AST shown by the playground. The Volar entry point returns the
+ * source tree from the same parser used by Octane's compiler, with TSRX
+ * metadata attached by the type-only transform. Never throws.
+ */
+export function compileAst(source: string, filename: string): AstSuccess | CompileFailure {
+	try {
+		const result = compileToVolarMappings(source, filename, { loose: true }) as unknown as {
+			sourceAst: unknown;
+		};
+		return { ok: true, ast: result.sourceAst };
+	} catch (error) {
+		return { ok: false, error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
 /**
  * Generate the TYPES view of a playground file: the same typed virtual TSX
  * the IDE language service sees (`octane/compiler/volar`), not the runtime

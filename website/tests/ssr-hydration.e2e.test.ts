@@ -1041,7 +1041,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 30_000);
 
-	it('playground compiled pane offers prod and types output with click-through position mapping', async () => {
+	it('playground compiled pane offers Svelte-style AST and types mapping', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
@@ -1061,7 +1061,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// captured before that flush lands on whatever scrolled into the
 			// stale coordinates (a CI-speed flake). A token outside the
 			// scroller's visible box resolves null instead of clicking through.
-			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+			const tokenPoint = async (paneIndex: number, token: string, occurrence: number) => {
 				const point = await page.evaluate(
 					([index, needle, wanted]) =>
 						new Promise<{ x: number; y: number } | null>((resolve) =>
@@ -1100,7 +1100,15 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					point,
 					`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
 				).not.toBeNull();
-				await page.mouse.click(point!.x, point!.y);
+				return point!;
+			};
+			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+				const point = await tokenPoint(paneIndex, token, occurrence);
+				await page.mouse.click(point.x, point.y);
+			};
+			const hoverToken = async (paneIndex: number, token: string, occurrence: number) => {
+				const point = await tokenPoint(paneIndex, token, occurrence);
+				await page.mouse.move(point.x, point.y);
 			};
 			const mappedIn = (paneIndex: number, token: string) =>
 				page.waitForFunction(
@@ -1111,20 +1119,29 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					[paneIndex, token] as const,
 					{ timeout: 10_000 },
 				);
-			// Prod is the default compiled mode: the real client-runtime emit.
+			// AST is the default compiler artifact. Like Svelte's playground it
+			// shows one source AST and reveals the deepest containing node.
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await outputIncludes("from 'octane'");
-			// Prod navigation places marks; a cursor move to an unmapped position
-			// (the import line sits before the prod map's first anchor) clears
-			// them — marks must always reflect the current selection.
+			await page.locator('.pg-ast-tree').waitFor();
+			expect(
+				await page
+					.locator('[aria-label="Compiled output mode"] button', { hasText: 'Prod' })
+					.count(),
+			).toBe(0);
 			await clickToken(0, 'useState', 2);
-			await mappedIn(1, 'useState');
-			await clickToken(0, 'import', 1);
 			await page.waitForFunction(
-				() => !document.querySelectorAll('.pg-editor .cm-content')[1]?.querySelector('.cm-mapped'),
+				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
 				null,
 				{ timeout: 10_000 },
 			);
+			expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
+			expect(await page.locator('.cm-mapped').count()).toBe(1);
+			expect(
+				await page
+					.locator('.pg-editor .cm-mapped')
+					.first()
+					.evaluate((element) => getComputedStyle(element).backgroundColor),
+			).toBe('rgba(255, 234, 0, 0.42)');
 			// Types swaps the pane to the typed virtual TSX (the language-service
 			// view), without recompiling the preview.
 			await page
@@ -1134,7 +1151,11 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// Clicking a source token reveals the mapped token in the output…
 			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
 			await mappedIn(1, 'useState');
-			// …and clicking the output maps back into the source.
+			// …and hovering the output maps back into the source too.
+			await hoverToken(1, 'setCount', 1);
+			await mappedIn(0, 'setCount');
+			await mappedIn(1, 'setCount');
+			// Clicking keeps that bidirectional mapping and scrolls it into view.
 			await clickToken(1, 'setCount', 1);
 			await mappedIn(0, 'setCount');
 			// Switching to Preview clears every mark; Compiled returns clean.
