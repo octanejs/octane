@@ -2,6 +2,7 @@ import {
 	HYDRATE_DEFAULT_INTERACTION_EVENTS,
 	HYDRATE_INTERACTION_EVENTS_ATTR,
 } from './interaction-config.js';
+import { HYDRATE_STREAM_TOKEN_ATTR, isRendererStreamBoundaryTemplate } from '../stream-protocol.js';
 
 const HYDRATE_MARKER_SELECTOR = '[data-octane-hydrate-id]';
 const HYDRATE_WHEN_ATTR = 'data-octane-hydrate-when';
@@ -53,19 +54,28 @@ const HYDRATE_DELEGATED_DYNAMIC_MARKERS = /* @__PURE__ */ new WeakSet<Element>()
 const HYDRATE_HANDLED_INTENT_EVENTS = /* @__PURE__ */ new WeakSet<Event>();
 const HYDRATE_INTENT_DOCUMENTS = /* @__PURE__ */ new WeakSet<Document>();
 
-/** @internal Resolve an event target to an element-only path beneath a marker. */
+/**
+ * @internal Resolve an event target to an element-only path beneath a marker.
+ * Renderer stream sentinels are omitted so the address survives their reveal.
+ */
 export function hydrationEventPathWithin(
 	root: Element,
 	target: EventTarget | null,
 ): number[] | null {
 	if (!isHydrationNode(target)) return null;
+	const streamToken = root.getAttribute(HYDRATE_STREAM_TOKEN_ATTR);
 	const path: number[] = [];
 	let node: Element | null = isHydrationElement(target) ? target : target.parentElement;
 	while (node !== root) {
 		const parent: Element | null = node?.parentElement ?? null;
 		if (parent === null) return null;
-		const index = Array.prototype.indexOf.call(parent.children, node) as number;
-		if (index < 0) return null;
+		let index = 0;
+		let sibling = parent.firstElementChild;
+		while (sibling !== null && sibling !== node) {
+			if (!isRendererStreamBoundaryTemplate(sibling, streamToken)) index++;
+			sibling = sibling.nextElementSibling;
+		}
+		if (sibling === null) return null;
 		path.push(index);
 		node = parent;
 	}

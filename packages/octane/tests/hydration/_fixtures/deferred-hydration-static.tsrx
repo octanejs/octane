@@ -31,6 +31,13 @@ export function PermanentStaticHtml(props) @{
 	</main>
 }
 
+export function EmptyPermanentStatic(props) @{
+	<main id="empty-static-layout">
+		<Hydrate split={false} when={never()} />
+		<LiveSibling label="Live after empty range" onClick={props.onLiveClick} />
+	</main>
+}
+
 export function NestedPermanentStatic() @{
 	<main id="nested-static-layout">
 		<Hydrate split={false} when={never()}>
@@ -39,6 +46,20 @@ export function NestedPermanentStatic() @{
 					<span id="inner-static-content">{'Nested static content'}</span>
 				</Hydrate>
 			</section>
+		</Hydrate>
+	</main>
+}
+
+export function NestedInteractiveHydrate(props) @{
+	<Hydrate split={false} when={props.when}>
+		<button id="static-nested-native-action">{'Native static action'}</button>
+	</Hydrate>
+}
+
+export function PermanentStaticWithNestedHydrate(props) @{
+	<main id="static-nested-hydrate-layout">
+		<Hydrate split={false} when={never()}>
+			<props.Child when={props.when} />
 		</Hydrate>
 	</main>
 }
@@ -62,7 +83,21 @@ export function PermanentStaticForeign() @{
 	</>
 }
 
-function ServerOwnedRange(props) @{
+export function PermanentStaticInsideDeferred(props) @{
+	<main id="nested-deferred-static-layout">
+		<Hydrate split={false} when={props.when}>
+			<section id="nested-deferred-content">
+				<Hydrate split={false} when={never()}>
+					<StaticLeaf onRender={props.onStaticRender} />
+				</Hydrate>
+				<LiveSibling label="Inner live sibling" onClick={props.onInnerLiveClick} />
+			</section>
+		</Hydrate>
+		<LiveSibling label="Outer live sibling" onClick={props.onOuterLiveClick} />
+	</main>
+}
+
+function ExternallyPatchedRange(props) @{
 	props.onRender?.();
 	<div
 		id="server-owned-range"
@@ -72,10 +107,10 @@ function ServerOwnedRange(props) @{
 	/>
 }
 
-export function PermanentServerOwned(props) @{
+export function PermanentExternallyPatched(props) @{
 	<section id="server-owned-layout">
 		<Hydrate split={false} when={never()}>
-			<ServerOwnedRange html={props.html} onRender={props.onStaticRender} />
+			<ExternallyPatchedRange html={props.html} onRender={props.onStaticRender} />
 		</Hydrate>
 		<span id="server-owned-live-label">{props.label as string}</span>
 	</section>

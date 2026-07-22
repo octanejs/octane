@@ -391,6 +391,187 @@ export function App(enabled) @{
 		expect(dynamicImports(defaulted.code)).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
 	});
 
+	it('erases only the exact permanent-static descendant graph from the client', () => {
+		const exact = `
+import { Hydrate, Hydrate as StaticRange } from 'octane';
+import { never as permanently } from 'octane/hydration';
+import { StaticNavigation } from './StaticNavigation.tsrx';
+export function App() @{
+  <StaticRange split={false} when={permanently()}>
+    <Hydrate when={gate}><StaticNavigation data-server-only="yes" /></Hydrate>
+  </StaticRange>
+}
+`;
+		const client = compiler().transform(exact, FILE, { environment: 'client' })!;
+		expect(hasStaticImport(client.code, './StaticNavigation.tsrx')).toBe(false);
+		expect(dynamicImports(client.code)).toEqual(new Set());
+		expect(client.code).not.toContain('data-server-only');
+		expect(client.code).toContain('__octanePermanentStatic');
+
+		const server = compiler().transform(exact, FILE, { environment: 'server' })!;
+		expect(hasStaticImport(server.code, './StaticNavigation.tsrx')).toBe(true);
+		expect(server.code).toContain('data-server-only');
+		expect(server.code).toContain('__octanePermanentStatic');
+
+		const configured = `
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+import { StaticNavigation } from './StaticNavigation.tsrx';
+export function App() @{
+  <Hydrate split={false} when={never()} onHydrated={done}>
+    <StaticNavigation data-server-only="yes" />
+  </Hydrate>
+}
+`;
+		const ordinary = compiler().transform(configured, FILE, { environment: 'client' })!;
+		expect(hasStaticImport(ordinary.code, './StaticNavigation.tsrx')).toBe(true);
+		expect(ordinary.code).toContain('data-server-only');
+		expect(ordinary.code).not.toContain('__octanePermanentStatic');
+
+		const empty = compiler().transform(
+			`import { Hydrate } from 'octane'; import { never } from 'octane/hydration'; export function App() @{ <Hydrate split={false} when={never()} /> }`,
+			FILE,
+			{ environment: 'client' },
+		)!;
+		expect(dynamicImports(empty.code)).toEqual(new Set());
+		expect(empty.code).toContain('__octanePermanentStatic');
+
+		for (const inexact of [
+			`import { Hydrate } from 'octane'; import { never } from 'octane/hydration'; import { StaticNavigation } from './StaticNavigation.tsrx'; export function App(options) @{ <Hydrate split={false} when={never()} {...options}><StaticNavigation data-server-only="yes" /></Hydrate> }`,
+			`import { Hydrate } from 'octane'; import { never as importedNever } from 'octane/hydration'; import { StaticNavigation } from './StaticNavigation.tsrx'; export function App(importedNever) @{ <Hydrate split={false} when={importedNever()}><StaticNavigation data-server-only="yes" /></Hydrate> }`,
+			`import { Hydrate } from 'octane'; import { never } from 'octane/hydration'; import { StaticNavigation } from './StaticNavigation.tsrx'; export function App() @{ <Hydrate split={false} when={never()} __static={true}><StaticNavigation data-server-only="yes" /></Hydrate> }`,
+		]) {
+			const retained = compiler().transform(inexact, FILE, { environment: 'client' })!;
+			expect(hasStaticImport(retained.code, './StaticNavigation.tsrx')).toBe(true);
+			expect(retained.code).toContain('data-server-only');
+			expect(retained.code).not.toContain('__octanePermanentStatic');
+		}
+	});
+
+	it('removes private declaration chains reachable only from a permanent-static range', () => {
+		const source = `
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+import { StaticNavigation } from './StaticNavigation.tsrx';
+function StaticLeaf() @{ <StaticNavigation data-server-only="leaf" /> }
+function StaticShell() @{ <StaticLeaf /> }
+function RetainedHelper() @{ <span data-client-retained="yes" /> }
+export function App() @{
+  <main>
+    <Hydrate split={false} when={never()}><StaticShell /></Hydrate>
+    <RetainedHelper />
+  </main>
+}
+`;
+		const client = compiler().transform(source, FILE, { environment: 'client' })!;
+		expect(hasStaticImport(client.code, './StaticNavigation.tsrx')).toBe(false);
+		expect(client.code).not.toContain('StaticLeaf');
+		expect(client.code).not.toContain('StaticShell');
+		expect(client.code).toContain('data-client-retained');
+
+		const server = compiler().transform(source, FILE, { environment: 'server' })!;
+		expect(hasStaticImport(server.code, './StaticNavigation.tsrx')).toBe(true);
+		expect(server.code).toContain('data-server-only');
+
+		const shared = source.replace('<RetainedHelper />', '<><StaticShell /><RetainedHelper /></>');
+		const retained = compiler().transform(shared, FILE, { environment: 'client' })!;
+		expect(hasStaticImport(retained.code, './StaticNavigation.tsrx')).toBe(true);
+		expect(retained.code).toContain('data-server-only');
+
+		const coupledInitializer = source.replace(
+			'function StaticShell() @{ <StaticLeaf /> }',
+			`const StaticShell = function StaticShell() @{ <StaticLeaf /> }, unrelated = observeClientModule();`,
+		);
+		const conservative = compiler().transform(coupledInitializer, FILE, {
+			environment: 'client',
+		})!;
+		expect(conservative.code).toContain('observeClientModule');
+		expect(hasStaticImport(conservative.code, './StaticNavigation.tsrx')).toBe(true);
+	});
+
+	it('preserves a permanent-static declaration graph exported by a later specifier', () => {
+		const source = `
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+import { StaticNavigation } from './StaticNavigation.tsrx';
+function StaticLeaf() @{ <StaticNavigation data-server-only="leaf" /> }
+function StaticShell() @{ <StaticLeaf /> }
+export { StaticShell as PublicStaticShell };
+export function App() @{
+  <Hydrate split={false} when={never()}><StaticShell /></Hydrate>
+}
+`;
+		const client = compiler().transform(source, FILE, { environment: 'client' })!;
+		expect(hasStaticImport(client.code, './StaticNavigation.tsrx')).toBe(true);
+		expect(client.code).toContain('function StaticLeaf');
+		expect(client.code).toContain('function StaticShell');
+		expect(client.code).toContain('export { StaticShell as PublicStaticShell }');
+	});
+
+	it.each([
+		['a TypeScript export assignment', 'export = StaticShell;'],
+		['a runtime enum initializer', 'export enum RuntimeValue { value = StaticShell() }'],
+		[
+			'a runtime namespace initializer',
+			'export namespace RuntimeValue { export const value = StaticShell }',
+		],
+		['a runtime export-import alias', 'export import RuntimeAlias = StaticShell.Member;'],
+		[
+			'a TypeScript parameter-property default',
+			'export class Retained { constructor(public shell = StaticShell) {} }',
+		],
+		[
+			'a parameter default before a body var',
+			'export function Retained(value = StaticShell) { var StaticShell; return value }',
+		],
+		[
+			'a use outside a nested class static-block var',
+			'export function Retained() { class Local { static { var StaticShell } } return StaticShell }',
+		],
+		[
+			'a declaration name observed through direct eval',
+			"export function Retained() { return eval('StaticShell') }",
+		],
+	])('does not erase a declaration referenced by %s', (_name, retainedSource) => {
+		const source = `
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+function StaticShell() { return <b /> }
+${retainedSource}
+function App() {
+  return <Hydrate split={false} when={never()}><StaticShell /></Hydrate>;
+}
+`;
+		const client = compiler().transform(source, FILE, { environment: 'client' })!;
+		expect(client.code).toContain('function StaticShell');
+		expect(client.code).toContain('__octanePermanentStatic');
+	});
+
+	it('erases an inner permanent-static graph from an ordinary split child', () => {
+		const source = `
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+import { StaticNavigation } from './StaticNavigation.tsrx';
+export function App() @{
+  <Hydrate when={gate}>
+    <section>
+      <Hydrate split={false} when={never()}>
+        <StaticNavigation data-server-only="yes" />
+      </Hydrate>
+    </section>
+  </Hydrate>
+}
+`;
+		const root = compiler().transform(source, FILE, { environment: 'client' })!;
+		expect(dynamicImports(root.code)).toEqual(new Set(['./App.tsrx?octane-hydrate=0']));
+		const child = compiler().transform(source, `${FILE}?octane-hydrate=0`, {
+			environment: 'client',
+		})!;
+		expect(hasStaticImport(child.code, './StaticNavigation.tsrx')).toBe(false);
+		expect(dynamicImports(child.code)).toEqual(new Set());
+		expect(child.code).not.toContain('data-server-only');
+	});
+
 	it('derives stable nested paths from the original source', () => {
 		const source = `
 import { Hydrate as Deferred } from 'octane';
@@ -575,6 +756,34 @@ export function App() @{
 		const server = hashes(instance.transform(source, FILE, { environment: 'server' })!.code);
 		expect(client.size).toBeGreaterThan(0);
 		expect(client).toEqual(server);
+	});
+
+	it('keeps owning scoped styles while erasing permanent-static runtime children', () => {
+		const source = `
+import { Hydrate } from 'octane';
+import { never } from 'octane/hydration';
+import { StaticNavigation } from './StaticNavigation.tsrx';
+export function App() @{
+  <main class="host">
+    <Hydrate split={false} when={never()}>
+      <section class="static"><StaticNavigation /></section>
+      <style>
+        .host, .static { color: red; }
+      </style>
+    </Hydrate>
+    <p class="live">Live sibling</p>
+  </main>
+}
+`;
+		const hashes = (code: string) => new Set(code.match(/tsrx-[0-9a-z]+/g) ?? []);
+		const clientCode = compile(source, FILE, { hmr: false }).code;
+		const serverCode = compile(source, FILE, { hmr: false, mode: 'server' }).code;
+		expect(hasStaticImport(clientCode, './StaticNavigation.tsrx')).toBe(false);
+		expect(clientCode).not.toContain('StaticNavigation');
+		expect(clientCode).toContain('.host.tsrx-');
+		expect(clientCode).toContain('live tsrx-');
+		expect(hashes(clientCode).size).toBeGreaterThan(0);
+		expect(hashes(clientCode)).toEqual(hashes(serverCode));
 	});
 
 	it.each([

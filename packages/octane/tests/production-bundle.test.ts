@@ -6,6 +6,27 @@ import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/index.js';
 
 describe('production component bundles', () => {
+	it('keeps pre-root hydration capture independent of the DOM tables', async () => {
+		const result = await build({
+			stdin: {
+				contents: `export { initializeHydrationEventCapture } from './src/hydration/index.ts';`,
+				loader: 'js',
+				resolveDir: resolve(import.meta.dirname, '..'),
+				sourcefile: 'hydration-capture-entry.js',
+			},
+			bundle: true,
+			format: 'esm',
+			logLevel: 'silent',
+			metafile: true,
+			treeShaking: false,
+			write: false,
+		});
+		const inputs = Object.keys(result.metafile.inputs).map((input) => input.split(sep).join('/'));
+
+		expect(inputs.some((input) => input.endsWith('/src/constants.ts'))).toBe(false);
+		expect(inputs.some((input) => input.endsWith('/src/dom-tables.js'))).toBe(false);
+	});
+
 	it('drops a bare package-root import when no exports are used', async () => {
 		const result = await build({
 			stdin: {
@@ -103,17 +124,25 @@ export function Retained() @{
 		expect(code).not.toContain('unused-event-template');
 	});
 
-	it('omits modules used only by a permanent-static boundary from the client bundle', async () => {
+	it('omits modules reached only through permanent-static local wrappers', async () => {
 		const page = compile(
 			`
 import { Hydrate } from 'octane';
 import { never } from 'octane/hydration';
 import { StaticNavigation } from 'fixture:static-navigation';
 
+function StaticLeaf() @{
+	<StaticNavigation />
+}
+
+function StaticShell() @{
+	<StaticLeaf />
+}
+
 export function App() @{
 	<main data-bundle-probe="live-page">
 		<Hydrate split={false} when={never()}>
-			<StaticNavigation />
+			<StaticShell />
 		</Hydrate>
 	</main>
 }
