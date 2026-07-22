@@ -165,20 +165,16 @@ export function CommandRoot(props: CommandProps) @{
 				});
 
 				return () => {
-					if (process.env.NODE_ENV !== 'production') {
-						trackValueOwner(ids.current.get(id)?.value, '');
-					}
-					ids.current.delete(id);
+					releaseValue(id);
 					allItems.current.delete(id);
 					// An item leaving its group has to be dropped from that group's member
 					// set too, or the set accumulates dead ids for the Command's lifetime
 					// (unbounded growth in a menu whose results churn) and filterItems()
 					// walks them on every keystroke.
 					if (groupId) allGroups.current.get(groupId)?.delete(id);
-					state.current.filtered.items.delete(id);
 					const selectedItem = getSelectedItem();
 
-					schedule(4, () => {
+					scheduleFromTeardown(4, () => {
 						filterItems();
 						if (selectedItem?.getAttribute('id') === id) selectFirstItem();
 						store.emit();
@@ -195,15 +191,27 @@ export function CommandRoot(props: CommandProps) @{
 				schedule(8, () => store.emit());
 
 				return () => {
+					releaseValue(id);
 					allForceMounted.current.delete(id);
 					state.current.forceMountedCount = allForceMounted.current.size;
-					schedule(8, () => store.emit());
+					// A force-mounted item is selectable like any other, so losing the
+					// selected one has to move the selection on — exactly as the plain
+					// item teardown does. Without this the value stays pointing at a node
+					// that is gone: nothing renders `aria-selected`, the combobox's
+					// `aria-activedescendant` dangles at a removed id, and Enter does
+					// nothing until the user arrows away.
+					const selectedItem = getSelectedItem();
+
+					scheduleFromTeardown(8, () => {
+						if (selectedItem?.getAttribute('id') === id) selectFirstItem();
+						store.emit();
+					});
 				};
 			},
 			group: (id) => {
 				if (!allGroups.current.has(id)) allGroups.current.set(id, new Set());
 				return () => {
-					ids.current.delete(id);
+					releaseValue(id);
 					allGroups.current.delete(id);
 				};
 			},
@@ -242,6 +250,43 @@ export function CommandRoot(props: CommandProps) @{
 					`only the first will respond to Enter. Give each item a unique \`value\` prop.`,
 			);
 		}
+	}
+
+	/**
+ * Queue a teardown's follow-up work.
+ *
+ * Octane runs a removed child's effect cleanups DURING the parent's render
+ * (`renderBranchSlot` → `unmountBlock` → `unmountScope` →
+ * `runEffectCleanupCallback`), so calling `schedule` straight from a teardown
+ * lands its `ss({})` mid-render and the runtime reports "Cannot update a
+ * component (`CommandRoot`) while rendering a different component" — advice a
+ * teardown cannot act on, since it does not choose when it runs. Hopping a
+ * microtask moves the update out of the render pass; the queued work itself is
+ * unchanged and still runs before paint.
+ *
+ * Only the teardowns defer. Every other caller schedules from a layout effect,
+ * where the synchronous update is both correct and load-bearing (the search →
+ * filter → select-first chain has to settle inside the same commit).
+ */
+	function scheduleFromTeardown(id: number, cb: () => void) {
+		queueMicrotask(() => schedule(id, cb));
+	}
+
+	/**
+ * Drop everything `context.value` registered for `id`. Items, force-mounted
+ * items AND groups all register their value through the same `useValue` hook,
+ * so all three teardown paths have to release through here. Releasing on only
+ * one of them leaves the entry alive past the component: the dev-only owner
+ * count then reports a duplicate for a value just one live component holds
+ * (re-showing a force-mounted item counts 2, then 3, ...), and `ids` /
+ * `filtered.items` keep growing for the Command's lifetime.
+ */
+	function releaseValue(id: string) {
+		if (process.env.NODE_ENV !== 'production') {
+			trackValueOwner(ids.current.get(id)?.value, '');
+		}
+		ids.current.delete(id);
+		state.current.filtered.items.delete(id);
 	}
 
 	function score(itemValue: string, keywords?: string[]) {

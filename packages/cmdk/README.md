@@ -42,6 +42,11 @@ Standard Octane binding adaptations (see
   so every component renders its own host element.
 - `Command.Empty` and a visible item are mutually exclusive, including for
   `forceMount` items and during SSR. Upstream can render both at once.
+- `forceMount` items are full citizens of registration: they release the value
+  they registered on unmount, and removing the selected one moves the selection
+  on. Upstream never registers them, so it does neither.
+- `Command.Dialog` also accepts `defaultOpen` and `modal`; upstream forwards
+  only `open`/`onOpenChange`.
 - After a search is cleared, items stay in the order `sort()` left them rather
   than returning to source order — octane's reconciler does not reposition nodes
   it did not move. Same items, same selection; only the residual order differs.

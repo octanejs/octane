@@ -14,7 +14,10 @@ import {
 	DisabledItemMenu,
 	DuplicateValueMenu,
 	DynamicValueMenu,
+	AsyncItemsMenu,
 	ForceMountMenu,
+	ForceMountSwapMenu,
+	GroupSwapMenu,
 	KeywordsMenu,
 	NoFilterMenu,
 	ReorderedGroupsMenu,
@@ -22,6 +25,7 @@ import {
 	LoadingMenu,
 	LoopMenu,
 	MenuWithSelect,
+	RemovableMenu,
 	ReorderMenu,
 	ScoredGroupsMenu,
 } from './_fixtures/basic.tsrx';
@@ -552,6 +556,104 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		warn.mockRestore();
 
 		expect(messages.some((m) => m.includes('share the value') && m.includes('Apple'))).toBe(true);
+
+		app.unmount();
+	});
+
+	it.each(['item', 'force', 'group'] as const)(
+		'removing a rendered %s from outside the menu reports nothing',
+		async (kind) => {
+			// Octane runs a removed child's effect cleanups during the PARENT's
+			// render, so registration teardown that schedules work synchronously
+			// updates Command while another component is rendering — which the
+			// runtime reports and this suite treats as a failure. Every registration
+			// path (item, force-mounted item, group) has to stay quiet, and the menu
+			// has to keep working afterwards.
+			const app = mount(RemovableMenu, { show: true, kind });
+			await settle();
+			expect(app.findAll('[cmdk-item]')).toHaveLength(2);
+
+			app.update(RemovableMenu, { show: false, kind });
+			await settle();
+
+			expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Banana']);
+			expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Banana');
+			expect(consoleErrorCalls()).toEqual([]);
+
+			app.unmount();
+		},
+	);
+
+	it('keeps Empty and the selection right as an async result set changes', async () => {
+		const app = mount(AsyncItemsMenu, { items: ['Apple', 'Banana'] });
+		await settle();
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'appl');
+		await settle();
+		expect(app.findAll('[cmdk-item]').map((el) => el.textContent)).toEqual(['Apple']);
+
+		// The only match is withdrawn by the data source — Empty takes over.
+		app.update(AsyncItemsMenu, { items: ['Banana'] });
+		await settle();
+		expect(app.findAll('[cmdk-item]')).toHaveLength(0);
+		expect(app.find('[cmdk-empty]')).toBeTruthy();
+
+		type(app.find('[cmdk-input]') as HTMLInputElement, '');
+		await settle();
+		app.update(AsyncItemsMenu, { items: ['Apple', 'Banana', 'Cherry'] });
+		await settle();
+		// A still-valid selection survives new results arriving around it.
+		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Banana');
+
+		// Withdrawing the selected item moves the selection on, and the combobox's
+		// active descendant follows it.
+		app.update(AsyncItemsMenu, { items: ['Apple', 'Cherry'] });
+		await settle();
+		const selected = app.find('[cmdk-item][aria-selected="true"]');
+		expect(selected.textContent).toBe('Apple');
+		expect(app.find('[cmdk-input]').getAttribute('aria-activedescendant')).toBe(
+			selected.getAttribute('id'),
+		);
+		expect(consoleErrorCalls()).toEqual([]);
+
+		app.unmount();
+	});
+
+	it('does not report a duplicate after a forceMount item is replaced', async () => {
+		// Every registration path goes through the same `useValue`, so every
+		// teardown has to release the value it registered. When only the plain-item
+		// teardown released, re-showing a force-mounted item counted its value again
+		// each time ("2 items share…", then "3…"), telling the author to fix code
+		// that holds exactly one live item with that value.
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const app = mount(ForceMountSwapMenu, { forced: true });
+		await settle();
+		app.update(ForceMountSwapMenu, { forced: false });
+		await settle();
+		app.update(ForceMountSwapMenu, { forced: true });
+		await settle();
+
+		const messages = warn.mock.calls.map((call) => String(call[0]));
+		warn.mockRestore();
+
+		expect(app.findAll('[cmdk-item]')).toHaveLength(1);
+		expect(messages.filter((m) => m.includes('share the value'))).toEqual([]);
+
+		app.unmount();
+	});
+
+	it('does not report a duplicate after a group is replaced', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const app = mount(GroupSwapMenu, { first: true });
+		await settle();
+		app.update(GroupSwapMenu, { first: false });
+		await settle();
+
+		const messages = warn.mock.calls.map((call) => String(call[0]));
+		warn.mockRestore();
+
+		expect(app.findAll('[cmdk-group]')).toHaveLength(1);
+		expect(app.find('[cmdk-group]').getAttribute('data-value')).toBe('Fruits');
+		expect(messages.filter((m) => m.includes('share the value'))).toEqual([]);
 
 		app.unmount();
 	});

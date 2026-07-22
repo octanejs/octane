@@ -181,6 +181,80 @@ export function DuplicateValueMenu() @{
 	</Command>
 }
 
+// A force-mounted item and a plain item that share one value but are never both
+// live. Toggling between them must not report a duplicate: the force-mount
+// teardown has to release the value it registered, exactly as the item teardown
+// does. Mirrors the playground's "Show/Hide forceMount item" button.
+export function ForceMountSwapMenu(props: { forced: boolean }) @{
+	<Command label="Command Menu">
+		<Command.List>
+			@if (props.forced) {
+				<Command.Item forceMount value="Apple">Apple</Command.Item>
+			}
+			@if (!props.forced) {
+				<Command.Item value="Apple">Apple</Command.Item>
+			}
+		</Command.List>
+	</Command>
+}
+
+// One group at a time, both headed "Fruits" — a group registers its value the
+// same way an item does, so its teardown has to release it the same way too.
+export function GroupSwapMenu(props: { first: boolean }) @{
+	<Command label="Command Menu">
+		<Command.List>
+			@if (props.first) {
+				<Command.Group heading="Fruits">
+					<Command.Item>Apple</Command.Item>
+				</Command.Group>
+			}
+			@if (!props.first) {
+				<Command.Group heading="Fruits">
+					<Command.Item>Banana</Command.Item>
+				</Command.Group>
+			}
+		</Command.List>
+	</Command>
+}
+
+// Items driven by a data source that grows and shrinks — the shape a real menu
+// takes while async results arrive. Removing an item unmounts it from OUTSIDE
+// the Command, which runs its registration teardown during the parent's render;
+// that is a different path from the filter (where the Item itself renders null)
+// and it was the one with no coverage.
+export function AsyncItemsMenu(props: { items: string[] }) @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			@for (const label of props.items; key label) {
+				<Command.Item value={label}>{label}</Command.Item>
+			}
+		</Command.List>
+	</Command>
+}
+
+// The same externally-driven removal for each registration path: a plain item, a
+// force-mounted item (which registers separately), and a group.
+export function RemovableMenu(props: { show: boolean; kind: 'item' | 'force' | 'group' }) @{
+	<Command label="Command Menu">
+		<Command.List>
+			@if (props.show && props.kind === 'item') {
+				<Command.Item value="Apple">Apple</Command.Item>
+			}
+			@if (props.show && props.kind === 'force') {
+				<Command.Item forceMount value="Apple">Apple</Command.Item>
+			}
+			@if (props.show && props.kind === 'group') {
+				<Command.Group heading="Fruits">
+					<Command.Item>Apple</Command.Item>
+				</Command.Group>
+			}
+			<Command.Item value="Banana">Banana</Command.Item>
+		</Command.List>
+	</Command>
+}
+
 export function KeywordsMenu() @{
 	<Command label="Command Menu">
 		<Command.Input placeholder="Search…" />
