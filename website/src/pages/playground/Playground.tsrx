@@ -2,8 +2,8 @@
 // LIVE rendered app or the compiled output, switchable with a tab. The
 // compiled pane has two modes: AST (the compiler's parser tree for the
 // authored file) and TYPES (the typed virtual TSX the IDE language service
-// sees via `octane/compiler/volar`). Like Svelte's AST output, hovering or
-// selecting source reveals the deepest containing AST node and hovering a
+// sees via `octane/compiler/volar`). Hovering or selecting source reveals the
+// deepest containing AST node and hovering a
 // tree node highlights its source range. Types uses the Volar token mappings
 // bidirectionally (see src/lib/playground-mapping.ts). The
 // whole pipeline runs in the browser: `octane/compiler` (and sucrase for
@@ -526,8 +526,7 @@ export function Playground() @{
 				else clearMappedPair();
 			});
 
-			// Match Svelte's playground interaction: hovering either document
-			// highlights the corresponding ranges without moving its scroll
+			// Hovering either document highlights the corresponding ranges without moving its scroll
 			// position; clicking/cursor movement above additionally reveals them.
 			const crossHover = (side: 'source' | 'output') => EditorView.domEventObservers({
 				mousemove(event: MouseEvent, view: any) {
