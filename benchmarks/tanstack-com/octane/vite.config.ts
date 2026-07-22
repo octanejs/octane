@@ -11,6 +11,14 @@ import tailwindcss from '@tailwindcss/vite';
 import path from 'node:path';
 
 export default defineConfig({
+	// Same compile-time globals as the react flavor's bench config — utils
+	// reference them and SSR dies with a ReferenceError otherwise (this was
+	// the whole-page-body-missing bug: the root error boundary swallowed it).
+	define: {
+		__TANSTACK_ENABLE_SERVER_BUILDER_GENERATION__: JSON.stringify(false),
+		__TANSTACK_ENABLE_IMAGE_TRANSFORMATIONS__: JSON.stringify(false),
+		__TANSTACK_SITE_URL__: JSON.stringify('https://tanstack.com'),
+	},
 	server: { port: Number(process.env.PORT) || 3000 },
 	resolve: {
 		alias: [{ find: '~', replacement: path.resolve(__dirname, './src') }],
