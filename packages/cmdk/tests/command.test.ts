@@ -26,6 +26,7 @@ import {
 	LoopMenu,
 	MenuWithSelect,
 	RemovableMenu,
+	RemovableSortedGroupsMenu,
 	ReorderMenu,
 	ScoredGroupsMenu,
 } from './_fixtures/basic.tsrx';
@@ -270,6 +271,38 @@ describe('@octanejs/cmdk — groups, separator, loading (Phase 3)', () => {
 		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
 		await settle();
 		expect(headings()).toEqual(['Alpha', 'Beta']);
+
+		app.unmount();
+	});
+
+	it('leaves no empty group behind when a reordered group is removed', async () => {
+		// `sort()` relocates group hosts to put the best-scoring group first. A
+		// Group is a component, so moving its host without the comment markers that
+		// fence it strands the node: the later unmount removes the heading and items
+		// the runtime still tracks and leaves an empty `<div cmdk-group>` in the
+		// list — a visible block for anyone styling `[cmdk-group]`, an
+		// `aria-labelledby` pointing at a removed id, and a ghost that keeps its
+		// `data-value` so the group lookup can match it over a live group.
+		const app = mount(RemovableSortedGroupsMenu, { showBeta: true });
+		await settle();
+		const headings = () =>
+			app.findAll('[cmdk-group]').map((g) => g.querySelector('[cmdk-group-heading]')?.textContent);
+		expect(headings()).toEqual(['Beta', 'Alpha', 'Gamma']);
+
+		// "a": Apple and Avocado are word-start matches, Zebra matches late, so
+		// Alpha and Gamma sort above Beta — every group host gets relocated.
+		type(app.find('[cmdk-input]') as HTMLInputElement, 'a');
+		await settle();
+		expect(headings()).toEqual(['Alpha', 'Gamma', 'Beta']);
+
+		// Remove a group that sort() moved.
+		app.update(RemovableSortedGroupsMenu, { showBeta: false });
+		await settle();
+
+		// Its host must be gone, not left as an empty shell.
+		expect(headings()).toEqual(['Alpha', 'Gamma']);
+		expect(app.findAll('[cmdk-group]')).toHaveLength(2);
+		expect(app.find('[cmdk-list]').textContent).toBe('AlphaAppleGammaAvocado');
 
 		app.unmount();
 	});

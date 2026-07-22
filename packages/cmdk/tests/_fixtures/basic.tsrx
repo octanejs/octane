@@ -72,6 +72,29 @@ export function ScoredGroupsMenu() @{
 	</Command>
 }
 
+// Source order (Beta, Alpha, Gamma) differs from the score order for "a", so
+// `sort()` physically relocates the GROUP host nodes. `showBeta` then removes
+// one of the relocated groups, which is the transition that strands a group
+// carried out of its own markers.
+export function RemovableSortedGroupsMenu(props: { showBeta: boolean }) @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			@if (props.showBeta) {
+				<Command.Group heading="Beta">
+					<Command.Item>Zebra</Command.Item>
+				</Command.Group>
+			}
+			<Command.Group heading="Alpha">
+				<Command.Item>Apple</Command.Item>
+			</Command.Group>
+			<Command.Group heading="Gamma">
+				<Command.Item>Avocado</Command.Item>
+			</Command.Group>
+		</Command.List>
+	</Command>
+}
+
 export function LoadingMenu() @{
 	<Command label="Command Menu">
 		<Command.List>

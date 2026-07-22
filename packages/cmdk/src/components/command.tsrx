@@ -418,7 +418,16 @@ export function CommandRoot(props: CommandProps) @{
 			const groupValue = ids.current.get(groupId)?.value;
 			if (!groupValue) return;
 			const element = groupElements.find((el) => el.getAttribute(VALUE_ATTR) === groupValue);
-			if (element?.parentElement) element.parentElement.appendChild(element);
+			// Carry the markers, exactly as the item branch does. A `Command.Group`
+			// is a component too, so relocating its host with a bare `appendChild`
+			// strands it outside its own fence: when that group later unmounts, the
+			// runtime removes the heading and items it still tracks but leaves the
+			// host `<div cmdk-group>` (and its empty `cmdk-group-items`) orphaned in
+			// the list — a visible empty block for anyone styling `[cmdk-group]`, an
+			// `aria-labelledby` pointing at a removed id, and a ghost that keeps its
+			// `data-value` so the lookup above can match it instead of a live group
+			// of the same name.
+			if (element?.parentElement) moveWithMarkers(element.parentElement, element);
 		});
 	}
 
