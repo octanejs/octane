@@ -1,4 +1,4 @@
-import { Hydrate, use, useId, useState } from 'octane';
+import { Hydrate, Suspense, use, useId, useState } from 'octane';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -16,6 +16,67 @@ export function AsyncLeaf(props) @{
 export function DeferredAsyncLeaf(props) @{
 	<Hydrate when={props.when} split={false}>
 		<AsyncLeaf promise={props.promise} />
+	</Hydrate>
+}
+
+function DeferredStreamedButton(props) @{
+	const value = use(props.promise);
+	<button
+		id="deferred-stream-action"
+		onClick={() => props.onClick?.(value)}
+	>{value as string}</button>
+}
+
+export function DeferredStreamedSuspense(props) @{
+	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+		<Suspense fallback={<button id="deferred-stream-action">{'Loading streamed content'}</button>}>
+			<DeferredStreamedButton promise={props.promise} onClick={props.onClick} />
+		</Suspense>
+	</Hydrate>
+}
+
+function NestedDeferredStreamedButton(props) @{
+	const value = use(props.promise);
+	<button
+		id="nested-deferred-stream-action"
+		onClick={() => props.onClick?.(value)}
+	>{value as string}</button>
+}
+
+export function NestedDeferredStreamedHydrates(props) @{
+	<Hydrate when={props.outerWhen} split={false} onHydrated={props.onOuterHydrated}>
+		<section id="outer-deferred-stream-shell">
+			<button
+				id="outer-deferred-stream-action"
+				onClick={props.onOuterClick}
+			>{'Activate outer'}</button>
+			<Hydrate when={props.innerWhen} split={false} onHydrated={props.onInnerHydrated}>
+				<Suspense
+					fallback={<button id="nested-deferred-stream-action">{'Loading nested stream'}</button>}
+				>
+					<NestedDeferredStreamedButton promise={props.promise} onClick={props.onInnerClick} />
+				</Suspense>
+			</Hydrate>
+		</section>
+	</Hydrate>
+}
+
+function TwoNodeStreamedValue(props) @{
+	const value = use(props.promise);
+	<>
+		<span id="streamed-first-value">{value as string}</span>
+		<span id="streamed-second-value">{'Second streamed node'}</span>
+	</>
+}
+
+export function DeferredStreamWithLiveSibling(props) @{
+	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+		<section id="deferred-stream-live-shell">
+			<Suspense fallback={<span id="streamed-first-value">{'Loading one node'}</span>}>
+				<TwoNodeStreamedValue promise={props.promise} />
+			</Suspense>
+			<button id="stream-live-sibling" onClick={props.onClick}>{'Live sibling'}</button>
+		</section>
 	</Hydrate>
 }
 
