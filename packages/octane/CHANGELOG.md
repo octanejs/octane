@@ -1,5 +1,96 @@
 # octane
 
+## 0.1.13
+
+### Patch Changes
+
+- a719b93: Add an opt-in universal-renderer compiler capability for `'main thread'` and
+  `'background only'` functions. Emit stable function identities, isolated
+  capture bindings, layer-specific dead-code and import removal, namespaced
+  main-thread host props, and source-attributed diagnostics through a
+  renderer-owned thread-function ABI.
+- 19c3ff1: Trim two cold-path costs on hydration/first mount. A keyed `@for`'s first fill
+  (hydration adoption of the server item ranges, or a fresh mount) now runs
+  through a small dedicated linear pass (`mountItemsLinear`) instead of entering
+  the full prefix/suffix/LIS reconciler, so a cold page never pays the big
+  function's first-call cost just to append items in order; the survivor key map
+  and sibling chain are still built as a byproduct of the same pass, so update
+  behavior and the keyed reconciler's guarantees are unchanged. And
+  `commitEffects` now takes a single no-work fast path when every commit queue is
+  empty — the common case for a hydration adoption or an effect-free flush —
+  instead of calling each drain helper to discover there is nothing to do.
+- 6cecb47: De-callback the hook memo tier in production client compiles, and memoize
+  use()-fed promise chains at their declarations.
+
+  - Authored and auto-generated `useMemo`/`useCallback` declarations compile to
+    inline flat-cache regions: zero allocations on a dependency hit (no factory
+    closure, no deps array, no hooks-map lookup), `Object.is` dependency
+    semantics, closures allocated only on a miss. Dev/HMR/profile, server,
+    universal units, and ineligible shapes keep the runtime form.
+  - Parallel-`use()` creations lower to a closure-free `puTake`/`puPub` runtime
+    ABI that preserves every warm-plan semantic (adoption, episode stamping,
+    dedup) while eliminating the per-render arrow + deps-array allocations.
+  - New Pass A′ (client and SSR): local `const` promise chains that feed `use()`
+    (`const p = fetchUser(id); const t = p.then(…); use(t)`) are now memoized at
+    their declarations — no duplicate fetch per suspend-replay, no refetch on
+    unrelated re-renders, derived links key on their upstream promise's
+    identity, and the chain head joins the `__warm` prefetch plan.
+
+- d6ee673: Add Rspack layer specializations for renderer configuration, universal runtime
+  identity, and exact runtime aliases. Include every specialized renderer graph
+  in dependency discovery and persistent-cache identity.
+
+  Allow universal renderers to declare first-screen event prop patterns and opt
+  into main-thread render-only compilation that erases background-owned effect
+  and ref callbacks and replaces event closures with lightweight listener
+  sentinels.
+
+- 9b6cd79: Preserve template directives nested in JSX values created during component setup across client rendering, SSR, hydration, and Suspense replay.
+- 40d562b: Make production hydration template-free on the happy adoption path. Prod now
+  validates an adoption root by nodeType + tag only, answered straight off the
+  template's source string, so adopting server DOM never parses the template
+  (parsing happens only on mismatch recovery and client-side mounts). Tag-level
+  and text-level mismatches still detect and recover in production; same-tag
+  branches differing only in static attributes are no longer detected there
+  (React parity — dev keeps the full deep validation and warns + rebuilds).
+- 3ffce4c: Update the TSRX compiler adapters and Ripple integration to their synchronized
+  latest releases, including the nested-JSX slash parsing fix and Solid 2 beta.15
+  alignment. Refresh the supported dependency ranges shipped by the affected
+  framework bindings and build integrations.
+- b92d76e: Define the inline-script content contract around static raw bodies and dynamic
+  `dangerouslySetInnerHTML` values. Preserve authored static script characters,
+  keep dynamic client and server output inside one script element, and hydrate the
+  server-safe script spelling without a false mismatch.
+- f325775: Resolve component-root template namespaces statically when the root tag is
+  unambiguous. A component body whose root tag exists in exactly one namespace
+  (`header`, `div`, `g`, `mi`, …) now compiles with the concrete `template()`
+  namespace flag instead of the opaque flag, so `clone()` skips the per-clone
+  destination-namespace walk on first mount and hydration. Genuinely ambiguous
+  roots (`a`, `title`, `script`, `style`, `font`, custom elements, unknown tags,
+  mixed fragments) keep the opaque flag and its per-destination resolution.
+- c36608c: Emit exact `split={false}` / `never()` hydration boundaries as wrapper-free
+  server-only ranges, prune private module-scope descendants used exclusively by
+  those ranges, and defer boundary activation until nested renderer-owned Suspense
+  reveals settle.
+- 5974429: Fixes surfaced by porting tanstack.com to Octane (Phase 2c of the tanstack-com benchmark):
+
+  - **octane compiler**: multi-line JSX string attributes no longer emit invalid JS (hostValue/spread, createElement de-opt, and SSR warm-child paths all re-derive the literal from its cooked value); TS `this` parameters are fully erased instead of surviving as parameter names; warm-child plans quote non-identifier prop keys (`aria-*`, `data-*`); direct calls to octane's `lazy` are emitted with `/* @__PURE__ */` so unused lazy declarations tree-shake like `React.lazy`; the vite plugin adds `.tsrx` to `resolve.extensions` so extensionless imports resolve like `.tsx`.
+  - **@octanejs/tanstack-start**: new partial-hydration surface (`Hydrate` + `visible`/`idle`/`load`/`never`/`media`/`condition`/`interaction` via `./hydration`); `<ClientOnly>` children are now stripped from server compiles (octane analogue of the start-compiler's `handleClientOnlyJSX`), letting import-protection's tree-shake verification pass for `*.client.*` modules; import-protection's transform filter now covers `.tsrx` importers.
+  - **@octanejs/tanstack-router**: the route-generator masker passes plain `.ts`/`.tsx` route files through untouched instead of feeding them to the TSRX parser.
+  - **@octanejs/zustand**: `UseBoundStore` type is exported (upstream parity).
+  - **@octanejs/sonner**: type-only names are re-exported with `export type` so compiled consumers don't reference erased bindings.
+
+- af337d0: Run the shared TSRX semantic analysis during client, server, universal-renderer, and Volar compilation. Unused template output now fails normal compilation and is reported as a recoverable editor diagnostic in Volar mappings.
+- b5b5880: Adopt Svelte's DOM operations technique in the client runtime: the shared
+  traversal helpers (`child`/`sibling`, hydration cursor walks, range clears,
+  de-opt child scans) now call cached native `firstChild`/`nextSibling`
+  accessors so those megamorphic call sites stay monomorphic, and the expando
+  keys the runtime polls on nodes that mostly don't carry them (`$$<event>`
+  handler slots, `$$portalParent`/`$$portalEnd`, `$$deoptKey`, `$$ctrl`,
+  hydration markers) are pre-seeded as `undefined` on the `Element`/
+  `CharacterData` prototypes, turning negative lookups into fast prototype
+  hits. Drift-corrected js-framework list/mount operations improve ~5–20%.
+
 ## 0.1.12
 
 ### Patch Changes
