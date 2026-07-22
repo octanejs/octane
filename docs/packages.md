@@ -6,7 +6,7 @@ This inventory is derived from the manifests directly under `packages/`.
 Repository tooling imports the same discovery helper, so adding, renaming, or
 privatizing a package updates every package-wide check together.
 
-**47 publishable package(s), including 38 framework binding(s).**
+**48 publishable package(s), including 38 framework binding(s).**
 
 All publishable packages share the enforced Node.js engine baseline `>=22`.
 
@@ -18,6 +18,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/app-core` | [`packages/app-core`](../packages/app-core) | metaframework core | `0.0.9` | 9 |
 | `@octanejs/aria` | [`packages/aria`](../packages/aria) | framework binding | `0.0.7` | 3 |
 | `@octanejs/base-ui` | [`packages/base-ui`](../packages/base-ui) | framework binding | `0.1.11` | 2 |
+| `@octanejs/devtools` | [`packages/octane-devtools`](../packages/octane-devtools) | developer tooling | `0.0.1` | 4 |
 | `@octanejs/dexie` | [`packages/dexie`](../packages/dexie) | framework binding | `0.1.6` | 1 |
 | `@octanejs/dnd-kit` | [`packages/dnd-kit`](../packages/dnd-kit) | framework binding | `0.1.8` | 4 |
 | `@octanejs/floating-ui` | [`packages/floating-ui`](../packages/floating-ui) | framework binding | `0.1.12` | 1 |
@@ -58,7 +59,7 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 | `@octanejs/visx` | [`packages/visx`](../packages/visx) | framework binding | `0.1.7` | 49 |
 | `@octanejs/vite-plugin` | [`packages/vite-plugin-octane`](../packages/vite-plugin-octane) | metaframework | `0.1.13` | 3 |
 | `@octanejs/zustand` | [`packages/zustand`](../packages/zustand) | framework binding | `0.1.12` | 5 |
-| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.13` | 19 |
+| `octane` | [`packages/octane`](../packages/octane) | core runtime + compiler | `0.1.13` | 20 |
 
 ## Private packages
 

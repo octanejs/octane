@@ -416,19 +416,13 @@ function TreeRowImpl(props: TreeRowProps) @{
 					event.stopPropagation();
 					props.onToggle(node.id, props.depth);
 				}}
-			>
-				{(props.expanded ? '▾' : '▸') as string}
-			</button>
+			>{(props.expanded ? '▾' : '▸') as string}</button>
 		} @else {
 			<span class="caret-spacer"></span>
 		}
-		<span class="tree-label">
-			{node.label as string}
-		</span>
+		<span class="tree-label">{node.label as string}</span>
 		@if (node.key !== null) {
-			<span class="badge badge-key">
-				{'key=' + node.key as string}
-			</span>
+			<span class="badge badge-key">{'key=' + node.key as string}</span>
 		}
 		@if (node.lite) {
 			<span class="badge">lite</span>
@@ -1126,17 +1120,13 @@ export function Panel(props: PanelProps) @{
 							<button
 								class={['tab', { active: tab === tabEntry.id }]}
 								onClick={() => selectTab(tabEntry.id)}
-							>
-								{tabEntry.label as string}
-							</button>
+							>{tabEntry.label as string}</button>
 						}
 						@for (const plugin of plugins; key plugin.id) {
 							<button
 								class={['tab', 'tab-plugin', { active: tab === 'plugin:' + plugin.id }]}
 								onClick={() => selectTab('plugin:' + plugin.id)}
-							>
-								{plugin.label as string}
-							</button>
+							>{plugin.label as string}</button>
 						}
 					</nav>
 					<div class="dock-controls">
@@ -1175,9 +1165,7 @@ export function Panel(props: PanelProps) @{
 									</div>
 									<div class="tree-scroll" ref={treeScrollRef} onScroll={onTreeScroll}>
 										@if (totalTreeRows === 0) {
-											<div class="empty">
-												{emptyTreeMessage as string}
-											</div>
+											<div class="empty">{emptyTreeMessage as string}</div>
 										} @else {
 											<div
 												style={{
@@ -1210,18 +1198,15 @@ export function Panel(props: PanelProps) @{
 									} @else {
 										<div>
 											<div class="inspector-head">
-												<span class="inspector-title">
-													{detail.label as string}
-												</span>
-												<span class="badge">
-													{detail.type as string}
-												</span>
+												<span class="inspector-title">{detail.label as string}</span>
+												<span class="badge">{detail.type as string}</span>
 											</div>
 											@if (detail.source !== null) {
 												<div class="row">
-													<span class="source" onClick={() => openInEditor(detail.source)}>
-														{formatSource(detail.source) as string}
-													</span>
+													<span
+														class="source"
+														onClick={() => openInEditor(detail.source)}
+													>{formatSource(detail.source) as string}</span>
 													<button class="btn" onClick={() => openInEditor(detail.source)}>
 														Open
 													</button>
@@ -1233,9 +1218,7 @@ export function Panel(props: PanelProps) @{
 													<div class="dim">Props are not retained for this node.</div>
 												} @else {
 													<div>
-														<div class="preview">
-															{propsPreview as string}
-														</div>
+														<div class="preview">{propsPreview as string}</div>
 														<details
 															class="raw"
 															onToggle={(event: Event) => setRawPropsOpen(
@@ -1243,38 +1226,34 @@ export function Panel(props: PanelProps) @{
 															)}
 														>
 															<summary>Raw JSON</summary>
-															<pre class="pre">
-																{propsJson as string}
-															</pre>
+															<pre class="pre">{propsJson as string}</pre>
 														</details>
 													</div>
 												}
 											</div>
 											<div class="section">
-												<div class="section-title">
-													{'Hooks (' + detail.hooks.length + ')' as string}
-												</div>
+												<div class="section-title">{'Hooks (' + detail.hooks.length +
+													')' as string}</div>
 												@for (const hookInfo of detail.hooks; key hookInfo.order) {
 													<div class="hook-row">
-														<span class="hook-order">
-															{String(hookInfo.order + 1) as string}
-														</span>
-														<span class="hook-name">
-															{hookInfo.name as string}
-														</span>
+														<span class="hook-order">{String(hookInfo.order + 1) as string}</span>
+														<span class="hook-name">{hookInfo.name as string}</span>
 														@if (hookInfo.source !== null) {
-															<span class="source" onClick={() => openInEditor(hookInfo.source)}>
-																{shortSource(hookInfo.source) as string}
-															</span>
+															<span
+																class="source"
+																onClick={() => openInEditor(hookInfo.source)}
+															>{shortSource(hookInfo.source) as string}</span>
 														}
-														<span class="hook-value">
-															{formatValuePreview(serializeValue(hookInfo.value), 60) as string}
-														</span>
+														<span class="hook-value">{formatValuePreview(
+															serializeValue(hookInfo.value),
+															60,
+														) as string}</span>
 														@if (hookInfo.deps !== undefined) {
-															<span class="hook-value dim">
-																{'deps ' +
-																	formatValuePreview(serializeValue(hookInfo.deps), 40) as string}
-															</span>
+															<span class="hook-value dim">{'deps ' +
+																formatValuePreview(
+																	serializeValue(hookInfo.deps),
+																	40,
+																) as string}</span>
 														}
 														@if (hookInfo.hasCleanup === true) {
 															<span class="badge">cleanup</span>
@@ -1286,33 +1265,30 @@ export function Panel(props: PanelProps) @{
 											</div>
 											@if (detail.debugValues.length > 0) {
 												<div class="section">
-													<div class="section-title">
-														{'Debug values (' + detail.debugValues.length + ')' as string}
-													</div>
+													<div class="section-title">{'Debug values (' + detail.debugValues.length +
+														')' as string}</div>
 													@for (const debug of detail.debugValues; key debug.order) {
 														<div class="hook-row">
 															@if (debug.owner !== null) {
-																<span class="hook-name">
-																	{debug.owner as string}
-																</span>
+																<span class="hook-name">{debug.owner as string}</span>
 															}
 															@if (debug.source !== null) {
-																<span class="source" onClick={() => openInEditor(debug.source)}>
-																	{shortSource(debug.source) as string}
-																</span>
+																<span
+																	class="source"
+																	onClick={() => openInEditor(debug.source)}
+																>{shortSource(debug.source) as string}</span>
 															}
-															<span class="hook-value">
-																{formatValuePreview(serializeValue(debug.value), 80) as string}
-															</span>
+															<span class="hook-value">{formatValuePreview(
+																serializeValue(debug.value),
+																80,
+															) as string}</span>
 														</div>
 													}
 												</div>
 											}
 											<div class="section">
 												<div class="row">
-													<span class="dim">
-														{'DOM nodes: ' + detail.domNodeCount as string}
-													</span>
+													<span class="dim">{'DOM nodes: ' + detail.domNodeCount as string}</span>
 													<button class="btn" onClick={scrollSelectedIntoView}>
 														Scroll into view
 													</button>
@@ -1329,14 +1305,16 @@ export function Panel(props: PanelProps) @{
 													)}
 												/>
 												<div class="row">
-													<button class="btn accent" onClick={() => copyPrompt('investigate')}>
-														{(copied === 'investigate'
-															? 'Copied ✓'
-															: 'Copy agent prompt') as string}
-													</button>
-													<button class="btn" onClick={() => copyPrompt('state')}>
-														{(copied === 'state' ? 'Copied ✓' : 'Copy state prompt') as string}
-													</button>
+													<button
+														class="btn accent"
+														onClick={() => copyPrompt('investigate')}
+													>{(copied === 'investigate'
+														? 'Copied ✓'
+														: 'Copy agent prompt') as string}</button>
+													<button class="btn" onClick={() => copyPrompt('state')}>{(copied ===
+													'state'
+														? 'Copied ✓'
+														: 'Copy state prompt') as string}</button>
 												</div>
 											</div>
 										</div>
@@ -1368,9 +1346,9 @@ export function Panel(props: PanelProps) @{
 											</label>
 											<button class="btn" onClick={clearPerf}>Clear</button>
 											<button class="btn" onClick={exportTrace}>Export Chrome trace</button>
-											<button class="btn accent" onClick={copyPerfPrompt}>
-												{(copied === 'performance' ? 'Copied ✓' : 'Copy perf prompt') as string}
-											</button>
+											<button class="btn accent" onClick={copyPerfPrompt}>{(copied === 'performance'
+												? 'Copied ✓'
+												: 'Copy perf prompt') as string}</button>
 										</div>
 										@if (perfRowsFiltered.length === 0) {
 											<div class="empty">
@@ -1395,33 +1373,17 @@ export function Panel(props: PanelProps) @{
 													<tbody>
 														@for (const perfRow of perfRowsFiltered; key perfRow.componentId) {
 															<tr>
-																<td>
-																	{perfRow.component as string}
-																</td>
-																<td class="file" title={perfRow.file}>
-																	{shortFile(perfRow.file) as string}
-																</td>
-																<td class="num">
-																	{String(perfRow.attempts) as string}
-																</td>
-																<td class="num">
-																	{String(perfRow.bails) as string}
-																</td>
-																<td class="num">
-																	{formatMs(perfRow.averageSelfTime) as string}
-																</td>
-																<td class="num">
-																	{formatMs(perfRow.totalSelfTime) as string}
-																</td>
-																<td class="num">
-																	{formatMs(perfRow.maxInclusiveTime) as string}
-																</td>
-																<td class="num">
-																	{formatMs(perfRow.averageQueueDelay) as string}
-																</td>
-																<td>
-																	{perfRow.dominantCause ?? '—' as string}
-																</td>
+																<td>{perfRow.component as string}</td>
+																<td class="file" title={perfRow.file}>{shortFile(
+																	perfRow.file,
+																) as string}</td>
+																<td class="num">{String(perfRow.attempts) as string}</td>
+																<td class="num">{String(perfRow.bails) as string}</td>
+																<td class="num">{formatMs(perfRow.averageSelfTime) as string}</td>
+																<td class="num">{formatMs(perfRow.totalSelfTime) as string}</td>
+																<td class="num">{formatMs(perfRow.maxInclusiveTime) as string}</td>
+																<td class="num">{formatMs(perfRow.averageQueueDelay) as string}</td>
+																<td>{perfRow.dominantCause ?? '—' as string}</td>
 															</tr>
 														}
 													</tbody>
@@ -1460,21 +1422,17 @@ export function Panel(props: PanelProps) @{
 													(event.target as HTMLInputElement).checked,
 												)}
 											/>
-											<span>
-												{kindName as string}
-											</span>
+											<span>{kindName as string}</span>
 										</label>
 									}
 								</div>
 								<div class="list">
 									@for (const item of visibleEvents; key item.key) {
 										<div class="event-row">
-											<span class={['badge', 'kind-' + item.entry.kind]}>
-												{item.entry.kind as string}
-											</span>
-											<span class="event-text">
-												{describeEvent(item.entry) as string}
-											</span>
+											<span
+												class={['badge', 'kind-' + item.entry.kind]}
+											>{item.entry.kind as string}</span>
+											<span class="event-text">{describeEvent(item.entry) as string}</span>
 										</div>
 									} @empty {
 										<div class="empty">
@@ -1491,21 +1449,15 @@ export function Panel(props: PanelProps) @{
 									<div class="section-title">Bridge</div>
 									<div class="row">
 										<span class="dim">Status</span>
-										<span>
-											{(hook.isAttached() ? 'attached' : 'not attached') as string}
-										</span>
+										<span>{(hook.isAttached() ? 'attached' : 'not attached') as string}</span>
 									</div>
 									<div class="row">
 										<span class="dim">Bridge protocol</span>
-										<span>
-											{'v' + hook.version as string}
-										</span>
+										<span>{'v' + hook.version as string}</span>
 									</div>
 									<div class="row">
 										<span class="dim">Octane</span>
-										<span>
-											{'v' + version as string}
-										</span>
+										<span>{'v' + version as string}</span>
 									</div>
 								</div>
 								<div class="section">
@@ -1538,9 +1490,9 @@ export function Panel(props: PanelProps) @{
 								<div class="section">
 									<div class="section-title">Export</div>
 									<div class="row">
-										<button class="btn accent" onClick={copySnapshotJson}>
-											{(copied === 'snapshot' ? 'Copied ✓' : 'Copy full snapshot JSON') as string}
-										</button>
+										<button class="btn accent" onClick={copySnapshotJson}>{(copied === 'snapshot'
+											? 'Copied ✓'
+											: 'Copy full snapshot JSON') as string}</button>
 									</div>
 								</div>
 								<p class="hint">

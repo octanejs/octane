@@ -62,7 +62,7 @@ pnpm rules:generate
 This is a pnpm monorepo containing the core `octane` runtime+compiler, the
 `@octanejs/vite-plugin` and `@octanejs/tanstack-start` metaframeworks (plus the
 Vercel and Cloudflare deploy adapters), the `@octanejs/mcp-server` MCP server,
-the private
+the `@octanejs/devtools` in-page developer tools, the private
 `@octanejs/evals` evaluation tooling package, and the `@octanejs/*` framework
 bindings. The current workspace package inventory and counts are generated from
 workspace manifests in `docs/packages.md`:
@@ -85,6 +85,11 @@ workspace manifests in `docs/packages.md`:
   `@octanejs/tanstack-router` for the renderer binding.
 - `packages/octane-mcp-server/` (npm: `@octanejs/mcp-server`) — an MCP server
   exposing octane docs/compile tooling to AI agents.
+- `packages/octane-devtools/` (npm: `@octanejs/devtools`) — the in-page
+  devtools panel (live component tree, hook state, profiler-backed
+  performance, agent prompt export) over the `octane/devtools` runtime
+  bridge; enabled per dev server with `octane({ devtools: true })`, always
+  compiled away from builds.
 - `packages/octane-evals/` (private workspace package: `@octanejs/evals`) —
   standalone Octane application prompts, starter workspaces, behavioral
   graders, public reference implementations, and reproducible evaluation

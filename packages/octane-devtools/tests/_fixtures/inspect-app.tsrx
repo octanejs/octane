@@ -16,17 +16,13 @@ export function Counter(props: { step: number }) @{
 	useEffect(() => {
 		return () => {};
 	}, []);
-	<button class="inc" onClick={increment}>
-		{'count: ' + count}
-	</button>
+	<button class="inc" onClick={increment}>{'count: ' + count}</button>
 }
 
 export function Gated() @{
 	const [on, setOn] = useState(true);
 	if (on) useCounter(1);
-	<button class="gate" onClick={() => setOn(false)}>
-		{'on: ' + on}
-	</button>
+	<button class="gate" onClick={() => setOn(false)}>{'on: ' + on}</button>
 }
 
 export function App() @{
