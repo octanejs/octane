@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
 import { compile } from 'octane/compiler';
-import { hydrateRoot, flushSync } from '../src/index.js';
+import { act, hydrateRoot, flushSync } from '../src/index.js';
 import * as ServerRT from 'octane/server';
 import { prerender } from 'octane/static';
 import { interaction } from 'octane/hydration';
@@ -11,6 +11,7 @@ import { interaction } from 'octane/hydration';
 import {
 	Boundary,
 	DeferredAsyncLeaf,
+	DeferredStreamedSuspense,
 	IdBoundary,
 	LateStyledBoundary,
 	NestedStreamSeedScopes,
@@ -135,6 +136,60 @@ describe('renderToPipeableStream — chunk protocol', () => {
 		expect(clientValue.value).toBe('streamed deferred value');
 		expect(container.querySelector('#leaf')).toBe(serverLeaf);
 		root.unmount();
+	});
+
+	it('waits for a pending streamed reveal before activating deferred hydration', async () => {
+		const serverValue = deferred<string>();
+		const clientValue: any = new Promise<string>(() => {});
+		const onClick = vi.fn();
+		const onHydrated = vi.fn();
+		const when = interaction({ events: 'click' });
+		const c = collector();
+		ServerRT.renderToPipeableStream(server.DeferredStreamedSuspense, {
+			promise: serverValue.promise,
+			when,
+		}).pipe(c.dest);
+
+		container.innerHTML = c.chunks.join('');
+		activate(container);
+		const shellChunkCount = c.chunks.length;
+		const fallback = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+		expect(fallback.textContent).toBe('Loading streamed content');
+
+		const root = hydrateRoot(container, DeferredStreamedSuspense as any, {
+			promise: clientValue,
+			when,
+			onClick,
+			onHydrated,
+		});
+		try {
+			expect(() => fallback.click()).not.toThrow();
+			await act(() => {});
+
+			// Activation must stay dormant while the server still owns the pending
+			// reveal. Claiming the fallback now strands the later server result.
+			expect(container.querySelector('#deferred-stream-action')).toBe(fallback);
+			expect(onHydrated).not.toHaveBeenCalled();
+
+			serverValue.resolve('Streamed content');
+			await c.ended;
+			container.insertAdjacentHTML('beforeend', c.chunks.slice(shellChunkCount).join(''));
+			activate(container);
+			const revealed = container.querySelector('#deferred-stream-action') as HTMLButtonElement;
+			expect(revealed.textContent).toBe('Streamed content');
+
+			await vi.waitFor(async () => {
+				await act(() => {});
+				expect(onHydrated).toHaveBeenCalledOnce();
+			});
+			expect(container.querySelector('#deferred-stream-action')).toBe(revealed);
+			expect(clientValue.status).toBe('fulfilled');
+			expect(clientValue.value).toBe('Streamed content');
+			expect(onClick).toHaveBeenCalledOnce();
+			expect(onClick).toHaveBeenCalledWith('Streamed content');
+		} finally {
+			root.unmount();
+		}
 	});
 
 	it('flushes the shell with the fallback + template sentinel, then the segment', async () => {

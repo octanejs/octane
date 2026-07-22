@@ -1,4 +1,4 @@
-import { Hydrate, use, useId, useState } from 'octane';
+import { Hydrate, Suspense, use, useId, useState } from 'octane';
 
 // SSR Phase 4 — Suspense + data serialization. The server render() awaits
 // use(promise) and renders the resolved value (not the @pending fallback); the
@@ -16,6 +16,22 @@ export function AsyncLeaf(props) @{
 export function DeferredAsyncLeaf(props) @{
 	<Hydrate when={props.when} split={false}>
 		<AsyncLeaf promise={props.promise} />
+	</Hydrate>
+}
+
+function DeferredStreamedButton(props) @{
+	const value = use(props.promise);
+	<button
+		id="deferred-stream-action"
+		onClick={() => props.onClick?.(value)}
+	>{value as string}</button>
+}
+
+export function DeferredStreamedSuspense(props) @{
+	<Hydrate when={props.when} split={false} onHydrated={props.onHydrated}>
+		<Suspense fallback={<button id="deferred-stream-action">{'Loading streamed content'}</button>}>
+			<DeferredStreamedButton promise={props.promise} onClick={props.onClick} />
+		</Suspense>
 	</Hydrate>
 }
 
