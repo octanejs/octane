@@ -2,8 +2,6 @@ import MagicString from 'magic-string';
 import { compileToVolarMappings } from 'octane/compiler/volar';
 import { START_ENVIRONMENT_NAMES } from '#tanstack-start/plugin-core/vite';
 
-const ROUTER_MODULE = '@octanejs/tanstack-router';
-
 /**
  * Remove the children of the Router ClientOnly binding before Octane compiles
  * server TSRX. This keeps client-only imports out of the server module graph,
@@ -252,11 +250,7 @@ function printRemainingImport(code, statement, specifiers) {
 function stripClientOnlyChildren(program) {
 	const importedNames = new Set();
 	for (const statement of asNodes(program.body)) {
-		if (
-			statement.type !== 'ImportDeclaration' ||
-			statement.importKind === 'type' ||
-			statement.source?.value !== ROUTER_MODULE
-		) {
+		if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') {
 			continue;
 		}
 

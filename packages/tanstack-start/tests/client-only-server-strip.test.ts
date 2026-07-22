@@ -80,6 +80,26 @@ describe('octaneClientOnlyServerStrip', () => {
 		expect(out!.code).not.toContain('<BrowserWidget />');
 	});
 
+	it('recognizes ClientOnly imported through a local barrel', () => {
+		const src = [
+			"import { ClientOnly as BrowserOnly } from './router';",
+			"import { BrowserWidget } from './BrowserWidget.client.tsrx';",
+			'export function App() @{',
+			'\t<BrowserOnly fallback={<p>loading</p>}>',
+			'\t\t<BrowserWidget />',
+			'\t</BrowserOnly>',
+			'}',
+			'',
+		].join('\n');
+		const out = run(src);
+		expect(out).toBeDefined();
+		expect(out!.code).toMatch(
+			/<BrowserOnly fallback={<p>loading<\/p>}>\s*\{null\}\s*<\/BrowserOnly>/,
+		);
+		expect(out!.code).not.toContain('<BrowserWidget />');
+		expect(out!.code).not.toContain("from './BrowserWidget.client.tsrx'");
+	});
+
 	it('removes imports whose only uses disappear with ClientOnly children', () => {
 		const src = [
 			"import BrowserDefault, { BrowserWidget as Widget, Keep, type Props } from './mixed.client.tsrx';",
