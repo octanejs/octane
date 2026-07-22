@@ -63,7 +63,15 @@ export interface LynxPublicHandleUpsert {
 	readonly type: string;
 	readonly generation: number;
 	readonly attached: boolean;
+	readonly listDescendant: boolean;
 	readonly snapshot: UniversalSerializableValue;
+}
+
+export interface LynxPublicHandleListAncestry {
+	readonly op: 'list-ancestry';
+	readonly id: number;
+	readonly generation: number;
+	readonly listDescendant: boolean;
 }
 
 export interface LynxPublicHandleRemoval {
@@ -72,7 +80,8 @@ export interface LynxPublicHandleRemoval {
 	readonly generation: number;
 }
 
-export type LynxPublicHandleDelta = LynxPublicHandleUpsert | LynxPublicHandleRemoval;
+export type LynxPublicHandleDelta =
+	LynxPublicHandleUpsert | LynxPublicHandleListAncestry | LynxPublicHandleRemoval;
 
 export interface LynxTransportAcknowledgement extends UniversalTransportAcknowledgement {
 	readonly handles: readonly LynxPublicHandleDelta[];
@@ -552,13 +561,29 @@ function assertHandleDelta(
 	const label = `ack.handles[${index}]`;
 	const delta = record(value, label);
 	if (delta.op === 'upsert') {
-		exactKeys(delta, ['op', 'id', 'type', 'generation', 'attached', 'snapshot'], label);
+		exactKeys(
+			delta,
+			['op', 'id', 'type', 'generation', 'attached', 'listDescendant', 'snapshot'],
+			label,
+		);
 		positiveInteger(delta.id, `${label}.id`);
 		nonEmptyString(delta.type, `${label}.type`);
 		positiveInteger(delta.generation, `${label}.generation`);
 		if (typeof delta.attached !== 'boolean') fail(`${label}.attached`, 'must be a boolean.');
+		if (typeof delta.listDescendant !== 'boolean') {
+			fail(`${label}.listDescendant`, 'must be a boolean.');
+		}
 		assertWireValue(delta.snapshot, `${label}.snapshot`);
 		assertSnapshotIdentity(delta.snapshot, delta, identity, label);
+		return;
+	}
+	if (delta.op === 'list-ancestry') {
+		exactKeys(delta, ['op', 'id', 'generation', 'listDescendant'], label);
+		positiveInteger(delta.id, `${label}.id`);
+		positiveInteger(delta.generation, `${label}.generation`);
+		if (typeof delta.listDescendant !== 'boolean') {
+			fail(`${label}.listDescendant`, 'must be a boolean.');
+		}
 		return;
 	}
 	if (delta.op === 'remove') {

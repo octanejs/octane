@@ -234,8 +234,16 @@ export interface LynxPreparedHostBatch extends UniversalPreparedHostBatch {
 	readonly mutationStarted: boolean;
 	/** Clone-safe public-handle changes that must be published before acknowledgement. */
 	readonly handleDelta: readonly LynxHostHandleDelta[];
+	/** Retained handles whose native-list ancestry changed without changing identity. */
+	readonly listAncestryDelta: readonly LynxHostListAncestryDelta[];
 	/** First-screen path selected during clone-safe preparation. */
 	readonly firstTreeAction: 'none' | 'adopt' | 'repair';
+}
+
+export interface LynxHostListAncestryDelta {
+	readonly id: number;
+	readonly generation: number;
+	readonly listDescendant: boolean;
 }
 
 export interface PrepareLynxHostBatchOptions<Node extends LynxElementRef> {
@@ -979,6 +987,39 @@ function directListItem<Node extends LynxElementRef>(
 		current = parent;
 	}
 	return null;
+}
+
+function cachedListDescendant<Node extends LynxElementRef>(
+	getRecord: (id: number) => LynxHostRecord<Node> | undefined,
+	id: number,
+	cache: Map<number, boolean>,
+): boolean {
+	const cached = cache.get(id);
+	if (cached !== undefined) return cached;
+	const path: number[] = [];
+	let currentId: number | null | undefined = id;
+	let result = false;
+	while (typeof currentId === 'number') {
+		const known = cache.get(currentId);
+		if (known !== undefined) {
+			result = known;
+			break;
+		}
+		const current = getRecord(currentId);
+		if (current === undefined) break;
+		path.push(currentId);
+		const parentId = parentHostId(current.parent);
+		if (typeof parentId !== 'number') break;
+		const parent = getRecord(parentId);
+		if (parent === undefined) break;
+		if (parent.type === 'list') {
+			result = current.type === 'list-item';
+			break;
+		}
+		currentId = parentId;
+	}
+	for (const pathId of path) cache.set(pathId, result);
+	return result;
 }
 
 function listItems<Node extends LynxElementRef>(
@@ -2491,6 +2532,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	const handleDelta: LynxHostHandleDelta[] = [];
 	const handleOrder: number[] = [];
 	const touchedHandles = new Set<number>();
+	let listAncestryRoots: Set<number> | null = null;
 	const touchHandle = (id: number) => {
 		if (touchedHandles.has(id)) return;
 		touchedHandles.add(id);
@@ -2601,6 +2643,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			}
 			const record = writeRecord(command.id);
 			if (record === undefined) throw hostError(`unknown ${command.op} target ${command.id}.`);
+			(listAncestryRoots ??= new Set()).add(command.id);
 			captureInitialNode(command.id);
 			const physicalParentId = parentHostId(parent);
 			if (typeof physicalParentId === 'number') {
@@ -2622,6 +2665,12 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 						`${record.type} host ${command.id} may only be placed directly under a text host.`,
 					);
 				}
+			}
+			if (
+				record.type === 'list-item' &&
+				(typeof parent !== 'number' || getRecord(parent)?.type !== 'list')
+			) {
+				throw hostError(`<list-item> ${command.id} must be placed directly under a <list>.`);
 			}
 			assertNoCycle(getRecord, command.id, parent);
 			const wasConnected = isRootConnected(getRecord, command.id);
@@ -2658,6 +2707,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			assertSafeId(command.id, `command ${index} remove.id`);
 			const record = writeRecord(command.id);
 			if (record === undefined) throw hostError(`unknown remove target ${command.id}.`);
+			(listAncestryRoots ??= new Set()).add(command.id);
 			const parent = resolveParent(command.parent, `command ${index} remove.parent`, record.parent);
 			captureInitialNode(command.id);
 			const physicalParentId = parentHostId(parent);
@@ -2836,13 +2886,60 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		if (record.type === 'list' && directListItem(getRecord, id) !== null) {
 			throw hostError('nested <list> hosts are not supported by the initial recycling contract.');
 		}
-		if (record.type === 'list-item' && typeof record.parent === 'number') {
-			const parent = getRecord(record.parent);
-			if (parent?.type !== 'list') {
-				throw hostError(`<list-item> ${id} must be placed directly under a <list>.`);
+		if (
+			record.type === 'list-item' &&
+			record.parent !== undefined &&
+			(typeof record.parent !== 'number' || getRecord(record.parent)?.type !== 'list')
+		) {
+			throw hostError(`<list-item> ${id} must be placed directly under a <list>.`);
+		}
+	}
+	const listAncestryDelta: LynxHostListAncestryDelta[] = [];
+	if (listAncestryRoots !== null) {
+		const getAcceptedRecord = (hostId: number) => state.records.get(hostId);
+		const previousListDescendants = new Map<number, boolean>();
+		const nextListDescendants = new Map<number, boolean>();
+		const ancestrySeen = new Set<number>();
+		for (const id of listAncestryRoots) {
+			const previous = state.records.get(id);
+			const next = getRecord(id);
+			if (previous === undefined || next === undefined) continue;
+			if (
+				cachedListDescendant(getAcceptedRecord, id, previousListDescendants) ===
+				cachedListDescendant(getRecord, id, nextListDescendants)
+			) {
+				continue;
+			}
+			const pending = [id];
+			while (pending.length !== 0) {
+				const descendantId = pending.pop()!;
+				if (ancestrySeen.has(descendantId)) continue;
+				ancestrySeen.add(descendantId);
+				const previousDescendant = state.records.get(descendantId);
+				const nextDescendant = getRecord(descendantId);
+				if (nextDescendant === undefined) continue;
+				for (let index = nextDescendant.children.length - 1; index >= 0; index--) {
+					pending.push(nextDescendant.children[index]!);
+				}
+				if (previousDescendant === undefined) continue;
+				const listDescendant = cachedListDescendant(getRecord, descendantId, nextListDescendants);
+				if (
+					previousDescendant.handle === nextDescendant.handle &&
+					cachedListDescendant(getAcceptedRecord, descendantId, previousListDescendants) !==
+						listDescendant
+				) {
+					listAncestryDelta.push(
+						Object.freeze({
+							id: descendantId,
+							generation: nextDescendant.handle.generation,
+							listDescendant,
+						}),
+					);
+				}
 			}
 		}
 	}
+	Object.freeze(listAncestryDelta);
 	const listUpdates: LynxPreparedListUpdate[] = [];
 	for (const hostId of listIds) {
 		const previous = listItems((id) => state.records.get(id), hostId);
@@ -2899,6 +2996,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			return mutationStarted;
 		},
 		handleDelta,
+		listAncestryDelta,
 		firstTreeAction,
 		apply() {
 			if (status === 'aborted' || status === 'applied') return;
@@ -3318,6 +3416,44 @@ export function isLynxHostAttached<Node extends LynxElementRef>(
 		record?.node != null &&
 		isRootConnected((hostId) => state.records.get(hostId), id)
 	);
+}
+
+export interface LynxHostPublicState {
+	readonly attached: boolean;
+	readonly listDescendant: boolean;
+}
+
+/** Commit-time public state derived in one accepted-ancestry walk. */
+export function getLynxHostPublicState<Node extends LynxElementRef>(
+	container: LynxHostContainer<Node>,
+	id: number,
+): LynxHostPublicState {
+	const state = container[LYNX_HOST_STATE];
+	const record = state.records.get(id);
+	if (record === undefined) return { attached: false, listDescendant: false };
+	let current = record;
+	let listDescendant = false;
+	let connected = false;
+	const visited = new Set<number>();
+	while (true) {
+		if (visited.has(current.handle.id)) throw hostError('host ancestry contains a cycle.');
+		visited.add(current.handle.id);
+		const parentId = parentHostId(current.parent);
+		if (parentId === null) {
+			connected = true;
+			break;
+		}
+		if (parentId === undefined) break;
+		const parent = state.records.get(parentId);
+		if (parent === undefined) break;
+		if (parent.type === 'list' && current.type === 'list-item') listDescendant = true;
+		current = parent;
+	}
+	return {
+		attached:
+			!state.disposed && !state.disposing && !state.faulted && record.node !== null && connected,
+		listDescendant,
+	};
 }
 
 export interface LynxListDiagnostics {

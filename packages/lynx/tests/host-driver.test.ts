@@ -1731,6 +1731,18 @@ describe('Lynx Element PAPI host driver', () => {
 				]),
 			),
 		).toThrow(/stale, detached, or unacknowledged host 9:1/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(5, [
+					{ op: 'create', id: 8, type: 'list-item', props: { 'item-key': 'portal' } },
+					{ op: 'insert', parent: portalA, id: 8, before: null },
+					{ op: 'recreate', id: 8, type: 'list-item', props: { 'item-key': 'portal' } },
+					{ op: 'remove', parent: portalA, id: 8 },
+					{ op: 'destroy', id: 8 },
+				]),
+			),
+		).toThrow(/<list-item> 8 must be placed directly under a <list>/);
 		expect(papi.calls).toEqual([]);
 		expect(targetA.children).toEqual(beforeTree[0]);
 		expect(targetB.children).toEqual(beforeTree[1]);
