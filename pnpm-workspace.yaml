@@ -356,4 +356,5 @@ minimumReleaseAgeExclude:
   - '@tsrx/typescript-plugin@0.3.108'
   - '@tsrx/vite-plugin-react@0.0.78'
   - '@tsrx/vite-plugin-solid@0.0.76'
+  - 'octane@0.1.13'
   - 'ripple@0.3.108'
