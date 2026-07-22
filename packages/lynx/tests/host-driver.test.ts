@@ -1,4 +1,8 @@
-import type { UniversalHostBatch, UniversalHostCommand } from 'octane/universal/native';
+import type {
+	UniversalHostBatch,
+	UniversalHostCommand,
+	UniversalPortalTargetHandle,
+} from 'octane/universal/native';
 import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing-environment';
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
@@ -23,6 +27,7 @@ import {
 	type LynxElementEventListener,
 	type LynxElementPAPI,
 } from '../src/core/papi.js';
+import { encodeLynxPortalTargetId } from '../src/core/portal.js';
 import {
 	createLynxMainThreadWorkletRegistry,
 	registerMainThreadWorklet,
@@ -230,6 +235,20 @@ function batch(
 	renderer = 'lynx',
 ): UniversalHostBatch {
 	return { renderer, version, commands };
+}
+
+function portalTarget(
+	target: number,
+	generation = 1,
+	transportRoot = 1,
+	universalRoot = 71,
+): UniversalPortalTargetHandle {
+	return Object.freeze({
+		$$kind: 'octane.universal.portal-target',
+		renderer: 'lynx',
+		root: universalRoot,
+		id: encodeLynxPortalTargetId({ root: transportRoot, id: target, generation }),
+	});
 }
 
 for (const id of ['counter.tsrx:tap', 'scene.tsrx:swipe', 'card.tsrx:tap']) {
@@ -1093,6 +1112,42 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(node.attributes).not.toHaveProperty('hidden');
 	});
 
+	it('leaves retained visibility on the nearest element host instead of raw text', () => {
+		const { container, page } = createHost();
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'text', props: {} },
+				{ op: 'create', id: 2, type: '#text', props: { value: 'dynamic' } },
+				{ op: 'create', id: 3, type: 'raw-text', props: { text: 'authored' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: 1, id: 3, before: null },
+				{ op: 'visibility', id: 1, state: 'hidden' },
+				{ op: 'visibility', id: 2, state: 'hidden' },
+				{ op: 'visibility', id: 3, state: 'hidden' },
+			]),
+		).apply();
+		const parent = page.children[0]!;
+		const [dynamic, authored] = parent.children;
+
+		expect(parent.attributes.hidden).toBe(true);
+		expect(dynamic.attributes).not.toHaveProperty('hidden');
+		expect(authored.attributes).not.toHaveProperty('hidden');
+
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{ op: 'visibility', id: 1, state: 'visible' },
+				{ op: 'visibility', id: 2, state: 'visible' },
+				{ op: 'visibility', id: 3, state: 'visible' },
+			]),
+		).apply();
+		expect(parent.attributes).not.toHaveProperty('hidden');
+		expect(dynamic.attributes).not.toHaveProperty('hidden');
+		expect(authored.attributes).not.toHaveProperty('hidden');
+	});
+
 	it('binds every native event kind, avoids handler-only rebinding, and cleans stale tokens', () => {
 		const { container, page, papi } = createHost(20);
 		const kinds = [
@@ -1572,6 +1627,132 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(replacementHandle.generation).toBe(previousHandle.generation + 1);
 		expect(recreate.handleDelta).toEqual([{ op: 'recreate', handle: replacementHandle }]);
 		expect(papi.flushCount).toBe(2);
+	});
+
+	it('resolves same-root portal parents transactionally without mixing authored child order', () => {
+		const { container, driver, page, papi } = createHost();
+		prepareLynxHostBatch(
+			container,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'target-a' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'ordinary-a' } },
+				{ op: 'create', id: 3, type: 'view', props: { id: 'target-b' } },
+				{ op: 'create', id: 4, type: 'view', props: { id: 'ordinary-b' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+				{ op: 'insert', parent: null, id: 3, before: null },
+				{ op: 'insert', parent: 3, id: 4, before: null },
+			]),
+		).apply();
+		const targetA = page.children[0]!;
+		const targetB = page.children[1]!;
+		const portalA = portalTarget(1);
+		const portalB = portalTarget(3);
+
+		prepareLynxHostBatch(
+			container,
+			batch(2, [
+				{ op: 'create', id: 5, type: 'view', props: { id: 'portal-child' } },
+				{ op: 'insert', parent: portalA, id: 5, before: null },
+			]),
+		).apply();
+		const portalNode = targetA.children[1]!;
+		const portalHandle = driver.getPublicInstance(container, 5);
+		expect(targetA.children.map((node) => node.id)).toEqual(['ordinary-a', 'portal-child']);
+
+		prepareLynxHostBatch(
+			container,
+			batch(3, [
+				{ op: 'create', id: 6, type: 'view', props: { id: 'ordinary-a-late' } },
+				{ op: 'insert', parent: 1, id: 6, before: null },
+			]),
+		).apply();
+		expect(targetA.children.map((node) => node.id)).toEqual([
+			'ordinary-a',
+			'ordinary-a-late',
+			'portal-child',
+		]);
+		expect(targetA.children[2]).toBe(portalNode);
+
+		prepareLynxHostBatch(
+			container,
+			batch(4, [
+				{ op: 'create', id: 7, type: 'view', props: { id: 'ordinary-b-late' } },
+				{ op: 'insert', parent: 3, id: 7, before: null },
+				{ op: 'move', parent: portalB, id: 5, before: null },
+			]),
+		).apply();
+		expect(targetA.children.map((node) => node.id)).toEqual(['ordinary-a', 'ordinary-a-late']);
+		expect(targetB.children.map((node) => node.id)).toEqual([
+			'ordinary-b',
+			'ordinary-b-late',
+			'portal-child',
+		]);
+		expect(targetB.children[2]).toBe(portalNode);
+		expect(driver.getPublicInstance(container, 5)).toBe(portalHandle);
+
+		papi.resetCalls();
+		const beforeTree = [targetA.children.slice(), targetB.children.slice()];
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(5, [
+					{ op: 'create', id: 8, type: 'view', props: {} },
+					{ op: 'insert', parent: portalTarget(3, 1, 2), id: 8, before: null },
+				]),
+			),
+		).toThrow(/foreign root 2/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(5, [
+					{ op: 'create', id: 8, type: 'view', props: {} },
+					{ op: 'insert', parent: portalTarget(3, 2), id: 8, before: null },
+				]),
+			),
+		).toThrow(/stale, detached, or unacknowledged host 3:2/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(5, [
+					{ op: 'create', id: 8, type: 'view', props: {} },
+					{ op: 'insert', parent: portalTarget(3, 1, 1, 72), id: 8, before: null },
+				]),
+			),
+		).toThrow(/foreign universal root/);
+		expect(() =>
+			prepareLynxHostBatch(
+				container,
+				batch(5, [
+					{ op: 'create', id: 8, type: 'view', props: {} },
+					{ op: 'create', id: 9, type: 'view', props: {} },
+					{ op: 'insert', parent: null, id: 9, before: null },
+					{ op: 'insert', parent: portalTarget(9), id: 8, before: null },
+				]),
+			),
+		).toThrow(/stale, detached, or unacknowledged host 9:1/);
+		expect(papi.calls).toEqual([]);
+		expect(targetA.children).toEqual(beforeTree[0]);
+		expect(targetB.children).toEqual(beforeTree[1]);
+
+		const ordinaryBNodes = targetB.children.slice(0, 2);
+		prepareLynxHostBatch(
+			container,
+			batch(5, [
+				{ op: 'recreate', id: 3, type: 'view', props: { id: 'target-b-recreated' } },
+				{ op: 'remove', parent: portalB, id: 5 },
+				{ op: 'destroy', id: 5 },
+			]),
+		).apply();
+		const replacementTargetB = page.children[1]!;
+		expect(replacementTargetB).not.toBe(targetB);
+		expect(replacementTargetB.children.map((node) => node.id)).toEqual([
+			'ordinary-b',
+			'ordinary-b-late',
+		]);
+		expect(replacementTargetB.children[0]).toBe(ordinaryBNodes[0]);
+		expect(replacementTargetB.children[1]).toBe(ordinaryBNodes[1]);
+		expect(driver.getPublicInstance(container, 5)).toBeNull();
 	});
 
 	it('validates the complete batch before making any PAPI call', () => {

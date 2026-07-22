@@ -30,11 +30,20 @@ interface HostBoundaryProps {
 interface BoundaryOwner {
 	readContext<T>(context: UniversalContext<T>): T;
 	invalidate(): void;
+	consumeRootInvalidation(): boolean;
 }
 
 interface BoundaryRoot extends UniversalRoot {
 	setBridge(owner: BoundaryOwner): void;
 	clearBridge(owner: BoundaryOwner): void;
+	__prepareBoundaryScheduled(
+		component: UniversalComponent<any>,
+		props: any,
+	): {
+		readonly attempt: UniversalPreparedAttempt;
+		readonly transition: boolean;
+		readonly projectedThenable: PromiseLike<unknown> | null;
+	};
 	__scheduleMicrotask(callback: () => void): void;
 	__runCommitTasks(tasks: readonly (() => void)[]): void;
 }
@@ -103,11 +112,20 @@ export function createUniversalHostBoundary(renderer: string): ((
 		let state = boundaryStates.get(scope);
 		const [, invalidate] = useDomState(0, BOUNDARY_INVALIDATE_SLOT);
 		if (state === undefined) {
+			let rootInvalidated = false;
 			const owner: BoundaryOwner = {
 				readContext<T>(context: UniversalContext<T>) {
 					return readContextFromScope(scope, context as Context<T>);
 				},
-				invalidate: () => invalidate((value) => value + 1),
+				invalidate() {
+					rootInvalidated = true;
+					invalidate((value) => value + 1);
+				},
+				consumeRootInvalidation() {
+					const invalidated = rootInvalidated;
+					rootInvalidated = false;
+					return invalidated;
+				},
 			};
 			state = {
 				root: props.root as BoundaryRoot,
@@ -122,8 +140,17 @@ export function createUniversalHostBoundary(renderer: string): ((
 			throw new Error('Changing the root owned by a mounted universal boundary is not supported.');
 		}
 		let attempt: UniversalPreparedAttempt;
+		let transitionAttempt = false;
+		let projectedThenable: PromiseLike<unknown> | null = null;
 		try {
-			attempt = state.root.prepare(component, componentProps);
+			if (state.owner.consumeRootInvalidation()) {
+				const preparation = state.root.__prepareBoundaryScheduled(component, componentProps);
+				attempt = preparation.attempt;
+				transitionAttempt = preparation.transition;
+				projectedThenable = preparation.projectedThenable;
+			} else {
+				attempt = state.root.prepare(component, componentProps);
+			}
 		} catch (error) {
 			if (!state.ownerCommitted) {
 				boundaryStates.delete(scope);
@@ -205,7 +232,11 @@ export function createUniversalHostBoundary(renderer: string): ((
 		// hide the Canvas shell and render its fallback. The queued abort above
 		// releases an abandoned initial attempt; a committed boundary keeps its
 		// bridge and retries from the DOM boundary when the thenable settles.
-		if (attempt.status === 'suspended') useDomRendererThenable(attempt.thenable);
+		if (projectedThenable !== null) {
+			useDomRendererThenable(projectedThenable);
+		} else if (attempt.status === 'suspended' && !transitionAttempt) {
+			useDomRendererThenable(attempt.thenable);
+		}
 	}) as ((props: HostBoundaryProps, scope: Scope) => void) & {
 		readonly [UNIVERSAL_BOUNDARY]: UniversalBoundaryMetadata;
 	};

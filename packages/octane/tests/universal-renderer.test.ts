@@ -492,6 +492,56 @@ export const capturedDeclarationValue = setupCapturedDeclaration();`;
 		);
 	});
 
+	it.each([
+		['Vite', true, 'import.meta.hot.dispose'],
+		['webpack', 'webpack', 'import.meta.webpackHot.dispose'],
+	] as const)(
+		'unregisters every active-layer thread site on %s disposal without requiring a component',
+		(_label, hmr, disposeCall) => {
+			const source = `
+export const first = () => { 'main thread'; return 1; };
+export const second = () => { 'main thread'; return 2; };
+export const background = () => { 'background only'; return 3; };`;
+			const result = compile(source, '/src/ThreadOnly.object.ts', {
+				hmr,
+				renderer: { ...renderer, capabilities: ['thread-functions'] },
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			});
+			const calls = callsByImportedName(result.code, 'octane/universal');
+			const registrations = calls.get('registerThreadFunction') ?? [];
+			const unregistrations = calls.get('unregisterThreadFunction') ?? [];
+
+			expect(registrations).toHaveLength(2);
+			expect(unregistrations).toHaveLength(2);
+			expect(unregistrations.map((call) => call.arguments[0].value)).toEqual([
+				'main-thread',
+				'main-thread',
+			]);
+			expect(unregistrations.map((call) => call.arguments[1].value)).toEqual(
+				registrations.map((call) => call.arguments[1].value),
+			);
+			expect(result.code).toContain(disposeCall);
+			expect(result.code.indexOf(disposeCall)).toBeLessThan(registrations[0].start);
+			expect(result.code).not.toContain('hot.accept');
+		},
+	);
+
+	it('keeps thread cleanup machinery out of non-HMR output', () => {
+		const result = compile(
+			`export const active = () => { 'main thread'; return 1; };`,
+			'/src/ProductionThread.object.ts',
+			{
+				hmr: false,
+				renderer: { ...renderer, capabilities: ['thread-functions'] },
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			},
+		);
+
+		expect(result.code).not.toContain('unregisterThreadFunction');
+		expect(result.code).not.toContain('import.meta.hot');
+		expect(result.code).not.toContain('import.meta.webpackHot');
+	});
+
 	it('supports hoisted declaration references and export specifiers', () => {
 		const source = `
 export { onTap };
@@ -2635,15 +2685,181 @@ export function Scene() @{
 		}
 	});
 
-	it('still diagnoses runtime APIs without a universal implementation', () => {
-		expect(() =>
-			compile(
-				`import { lazy } from 'octane';
-				 export const Scene = lazy(() => import('./Scene.object.tsrx'));`,
-				'/src/UnsupportedHook.object.tsrx',
-				{ renderer },
+	it('retargets lazy to the universal runtime', () => {
+		const result = compile(
+			`import { lazy as defer } from 'octane';
+			 export const Scene = defer(() => import('./Scene.object.tsrx'));`,
+			'/src/Lazy.object.tsrx',
+			{ hmr: false, renderer },
+		);
+
+		expect(importedLocalName(result.code, 'octane/universal', 'lazy')).toBe('defer');
+		expect(importedLocalName(result.code, 'octane', 'lazy')).toBeUndefined();
+	});
+
+	it('loads a universal component transactionally once and caches it across roots', async () => {
+		const eagerPlan = universalPlan('object', { kind: 'host', type: 'eager' });
+		const lazyPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'lazy-card',
+			bindings: [['label', 0]],
+		});
+		let resolve!: (module: {
+			default: ReturnType<typeof defineUniversalComponent<{ label: string }>>;
+		}) => void;
+		const modulePromise = new Promise<{
+			default: ReturnType<typeof defineUniversalComponent<{ label: string }>>;
+		}>((done) => {
+			resolve = done;
+		});
+		let loads = 0;
+		const Loaded = defineUniversalComponent('object', (props: { label: string }) =>
+			universalValue(lazyPlan, [props.label]),
+		);
+		const Lazy = UniversalRuntime.lazy(() => {
+			loads++;
+			return modulePromise;
+		});
+		const Parent = defineUniversalComponent('object', () => [
+			universalValue(eagerPlan, []),
+			UniversalRuntime.universalComponent('object', Lazy, { label: 'ready' }),
+		]);
+		const first = objectRoot();
+
+		expect(first.root.render(Parent, undefined).status).toBe('suspended');
+		expect(first.container.children).toEqual([]);
+		expect(loads).toBe(1);
+
+		resolve({ default: Loaded });
+		await modulePromise;
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(first.container.children.map((child) => child.type)).toEqual(['eager', 'lazy-card']);
+		expect(first.container.children[1].props.label).toBe('ready');
+
+		const second = objectRoot();
+		expect(second.root.render(Parent, undefined).status).toBe('committed');
+		expect(second.container.children[1].props.label).toBe('ready');
+		expect(loads).toBe(1);
+		first.root.unmount();
+		second.root.unmount();
+	});
+
+	it('composes memo comparators with resolved universal lazy components', async () => {
+		const loadedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'lazy-card',
+			bindings: [['label', 0]],
+		});
+		const Loaded = defineUniversalComponent('object', (props: { label: string }) =>
+			universalValue(loadedPlan, [props.label]),
+		);
+		const Lazy = UniversalRuntime.lazy(() => Promise.resolve({ default: Loaded }));
+		const Stable = UniversalRuntime.memo(Lazy, () => true);
+		const Parent = defineUniversalComponent('object', (props: { label: string }) =>
+			UniversalRuntime.universalComponent('object', Stable, props),
+		);
+		const { container, root } = objectRoot();
+
+		expect(Stable).not.toBe(Lazy);
+		expect(root.render(Parent, { label: 'A' }).status).toBe('suspended');
+		await Promise.resolve();
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(container.children[0].props.label).toBe('A');
+
+		root.render(Parent, { label: 'B' });
+		expect(container.children[0].props.label).toBe('A');
+		root.unmount();
+	});
+
+	it('caches universal lazy rejection and routes it through catch boundaries', async () => {
+		const pendingPlan = universalPlan('object', { kind: 'host', type: 'pending' });
+		const catchPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'caught',
+			bindings: [['message', 0]],
+		});
+		let reject!: (error: Error) => void;
+		const modulePromise = new Promise<never>((_resolve, fail) => {
+			reject = fail;
+		});
+		let loads = 0;
+		const Lazy = UniversalRuntime.lazy(() => {
+			loads++;
+			return modulePromise;
+		});
+		const Boundary = defineUniversalComponent('object', () =>
+			universalTry(
+				() => UniversalRuntime.universalComponent('object', Lazy),
+				() => universalValue(pendingPlan, []),
+				(error) => universalValue(catchPlan, [(error as Error).message]),
 			),
-		).toThrow(/runtime import "lazy" has no universal renderer implementation/);
+		);
+		const first = objectRoot();
+		first.root.render(Boundary, undefined);
+		expect(first.container.children[0].type).toBe('pending');
+
+		reject(new Error('chunk failed'));
+		await modulePromise.catch(() => undefined);
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(first.container.children[0]).toMatchObject({
+			type: 'caught',
+			props: { message: 'chunk failed' },
+		});
+
+		const second = objectRoot();
+		second.root.render(Boundary, undefined);
+		expect(second.container.children[0].type).toBe('caught');
+		expect(loads).toBe(1);
+		first.root.unmount();
+		second.root.unmount();
+	});
+
+	it('starts independent universal lazy loaders in one warm stratum', async () => {
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'lazy-chunk',
+			bindings: [['name', 0]],
+		});
+		const jobs = new Map<string, (component: unknown) => void>();
+		const calls: string[] = [];
+		const makeLazy = (name: string) =>
+			UniversalRuntime.lazy(
+				() =>
+					new Promise<any>((resolve) => {
+						calls.push(name);
+						jobs.set(name, resolve);
+					}),
+			);
+		const Left = makeLazy('left');
+		const Right = makeLazy('right');
+		const Parent = defineUniversalComponent('object', () => {
+			UniversalRuntime.useBatch([], () => {
+				UniversalRuntime.warmChild(Left, { name: 'left' });
+				UniversalRuntime.warmChild(Right, { name: 'right' });
+			});
+			return [
+				UniversalRuntime.universalComponent('object', Left, { name: 'left' }),
+				UniversalRuntime.universalComponent('object', Right, { name: 'right' }),
+			];
+		});
+		const { container, root } = objectRoot();
+
+		expect(root.render(Parent, undefined).status).toBe('suspended');
+		expect(calls).toEqual(['left', 'right']);
+		expect(container.children).toEqual([]);
+
+		for (const name of ['left', 'right']) {
+			jobs.get(name)!(defineUniversalComponent('object', () => universalValue(plan, [name])));
+		}
+		await Promise.resolve();
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(container.children.map((child) => child.props.name)).toEqual(['left', 'right']);
+		expect(calls).toEqual(['left', 'right']);
+		root.unmount();
 	});
 
 	it('capability-gates universal server serialization', () => {
@@ -2705,6 +2921,27 @@ export function Scene() @{
 });
 
 describe('universal logical topology and transactions', () => {
+	it('invalidates memoized universal wrappers when their HMR implementation changes', async () => {
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'node',
+			bindings: [['value', 0]],
+		});
+		const implementation = (value: string) =>
+			defineUniversalComponent('object', () => universalValue(plan, [value]));
+		const Hot = UniversalRuntime.hmrUniversalComponent('object', implementation('A'));
+		const Stable = UniversalRuntime.memo(Hot);
+		const { container, root } = objectRoot();
+
+		root.render(Stable, undefined);
+		(Hot as any)[UniversalRuntime.UNIVERSAL_HMR].update(implementation('B'));
+		await Promise.resolve();
+		await Promise.resolve();
+
+		expect(container.children[0].props.value).toBe('B');
+		root.unmount();
+	});
+
 	it('preserves nested owner, hook, and host identity across equivalent HMR plans', async () => {
 		const { container, root } = objectRoot();
 		const childPlan = universalPlan('object', {

@@ -1,7 +1,7 @@
-/** Availability metadata for the private, source/test Milestone 7 renderer. */
+/** Availability metadata for the private, source/test Milestone 8 renderer. */
 export const lynxRootAvailability = {
 	available: true,
-	implementedMilestone: 7,
+	implementedMilestone: 8,
 	status: 'private-milestone-0-native-gates-blocked',
 } as const;
 

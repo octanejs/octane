@@ -15,7 +15,7 @@ const packageJson = JSON.parse(
 	exports: Record<string, string>;
 };
 
-describe('@octanejs/lynx Milestone 7 private surface', () => {
+describe('@octanejs/lynx Milestone 8 private surface', () => {
 	it('keeps every required package subpath private and addressable', () => {
 		expect(packageJson.private).toBe(true);
 		expect(packageJson.version).toBe('0.0.0');
@@ -36,7 +36,7 @@ describe('@octanejs/lynx Milestone 7 private surface', () => {
 	it('exposes the private host and platform source surface without claiming a preview', () => {
 		expect(rootApi.lynxRootAvailability).toMatchObject({
 			available: true,
-			implementedMilestone: 7,
+			implementedMilestone: 8,
 		});
 		expect(platformApi.lynxPlatformAvailability).toMatchObject({
 			available: false,
@@ -55,7 +55,7 @@ describe('@octanejs/lynx Milestone 7 private surface', () => {
 		expect(rootApi.root.renderer).toBe('lynx');
 		expect(firstScreenApi.lynxRootAvailability).toMatchObject({
 			available: true,
-			implementedMilestone: 7,
+			implementedMilestone: 8,
 		});
 		expect(firstScreenApi.root.renderer).toBe('lynx');
 		expect(firstScreenApi.createLynxRoot()).toBe(firstScreenApi.root);
@@ -64,6 +64,7 @@ describe('@octanejs/lynx Milestone 7 private surface', () => {
 		expect(firstScreenApi.LynxNodesRefError).toBe(rootApi.LynxNodesRefError);
 		expect(mainRendererApi.renderLynxFirstScreen).toBeTypeOf('function');
 		expect(mainRendererApi.firstScreenEvent).toBeTypeOf('symbol');
+		expect(mainRendererApi.lazy).toBeTypeOf('function');
 		expect(mainRendererApi.useMainThreadRef).toBeTypeOf('function');
 		expect(mainRendererApi.registerThreadFunction).toBeTypeOf('function');
 		expect(firstScreenApi.runOnBackground).toBe(rootApi.runOnBackground);

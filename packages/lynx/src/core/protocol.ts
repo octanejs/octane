@@ -14,6 +14,7 @@ import type {
 	UniversalTransportRejectMessage,
 } from 'octane/universal/native';
 import type { LynxFirstTreeSnapshot } from './first-screen.js';
+import { decodeLynxPortalTargetId } from './portal.js';
 
 /**
  * Kept as a local literal so the main-thread protocol graph does not evaluate
@@ -282,6 +283,25 @@ function nullableHostId(value: unknown, label: string): asserts value is number 
 	if (value !== null) positiveInteger(value, label);
 }
 
+function hostParent(value: unknown, label: string): void {
+	if (value === null || typeof value === 'number') {
+		nullableHostId(value, label);
+		return;
+	}
+	const handle = record(value, label);
+	exactKeys(handle, ['$$kind', 'renderer', 'root', 'id'], label);
+	if (handle.$$kind !== 'octane.universal.portal-target') {
+		fail(`${label}.$$kind`, 'must identify a universal portal target.');
+	}
+	if (handle.renderer !== LYNX_TRANSPORT_RENDERER) {
+		fail(`${label}.renderer`, `must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+	}
+	positiveInteger(handle.root, `${label}.root`);
+	if (decodeLynxPortalTargetId(handle.id) === null) {
+		fail(`${label}.id`, 'must be an opaque Lynx portal target ID.');
+	}
+}
+
 function assertWireValue(value: unknown, label: string, seen = new Set<object>()): void {
 	if (
 		value === null ||
@@ -392,7 +412,7 @@ function assertCommand(value: unknown, index: number): asserts value is Universa
 		case 'insert':
 		case 'move':
 			exactKeys(command, ['op', 'parent', 'id', 'before'], label);
-			nullableHostId(command.parent, `${label}.parent`);
+			hostParent(command.parent, `${label}.parent`);
 			positiveInteger(command.id, `${label}.id`);
 			nullableHostId(command.before, `${label}.before`);
 			return;
@@ -414,7 +434,7 @@ function assertCommand(value: unknown, index: number): asserts value is Universa
 			return;
 		case 'remove':
 			exactKeys(command, ['op', 'parent', 'id'], label);
-			nullableHostId(command.parent, `${label}.parent`);
+			hostParent(command.parent, `${label}.parent`);
 			positiveInteger(command.id, `${label}.id`);
 			return;
 		case 'destroy':

@@ -1,6 +1,7 @@
 import type { UniversalHostBatch, UniversalHostDriver } from 'octane/universal/native';
 import {
 	createUniversalRoot,
+	defineUniversalComponent as defineBackgroundUniversalComponent,
 	use as useBackground,
 	useId as useBackgroundId,
 	type UniversalComponent,
@@ -12,7 +13,10 @@ import {
 	createContext,
 	defineUniversalComponent,
 	firstScreenEvent,
+	hmrUniversalComponent,
+	lazy,
 	renderLynxFirstScreen,
+	UNIVERSAL_HMR,
 	universalComponent,
 	universalContext,
 	universalActivity,
@@ -31,6 +35,7 @@ import {
 	useState,
 	use,
 	useBatch,
+	warmChild,
 } from '../src/main-renderer.js';
 
 interface CapturedContainer {
@@ -132,6 +137,209 @@ const Scene = defineUniversalComponent(
 );
 
 describe('Lynx main-thread first-screen renderer', () => {
+	it('keeps the first-screen wrapper stable while accepting a replacement implementation', () => {
+		const First = defineUniversalComponent('lynx', () =>
+			universalValue(rowPlan, [universalProps([['set', 'version', 'first']])]),
+		);
+		const Second = defineUniversalComponent('lynx', () =>
+			universalValue(rowPlan, [universalProps([['set', 'version', 'second']])]),
+		);
+		const firstWarm = () => undefined;
+		const secondWarm = () => undefined;
+		(First as any).__warm = firstWarm;
+		(Second as any).__warm = secondWarm;
+		const Reloadable = hmrUniversalComponent('lynx', First);
+		const identity = Reloadable;
+		expect((Reloadable as any).__warm).toBe(firstWarm);
+
+		(Reloadable as any)[UNIVERSAL_HMR].update(hmrUniversalComponent('lynx', Second));
+
+		expect(Reloadable).toBe(identity);
+		expect((Reloadable as any).__warm).toBe(secondWarm);
+		expect(renderLynxFirstScreen(Reloadable, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { version: 'second' },
+		});
+	});
+
+	it('commits an authored pending arm while a lazy chunk loads and reuses the cached module', async () => {
+		const Loaded = defineUniversalComponent('lynx', (props: { label: string }) =>
+			universalValue(rowPlan, [
+				universalProps([
+					['set', 'state', 'loaded'],
+					['set', 'label', props.label],
+				]),
+			]),
+		);
+		let resolve!: (module: { default: typeof Loaded }) => void;
+		const module = new Promise<{ default: typeof Loaded }>((done) => {
+			resolve = done;
+		});
+		let loads = 0;
+		const Lazy = lazy(() => {
+			loads++;
+			return module;
+		});
+		const Boundary = defineUniversalComponent('lynx', () =>
+			universalTry(
+				() => universalComponent('lynx', Lazy, { label: 'native chunk' }),
+				() => universalValue(rowPlan, [universalProps([['set', 'state', 'pending']])]),
+			),
+		);
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { state: 'pending' },
+		});
+		expect(loads).toBe(1);
+
+		resolve({ default: Loaded });
+		await module;
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { label: 'native chunk', state: 'loaded' },
+		});
+		expect(loads).toBe(1);
+	});
+
+	it('caches a rejected lazy chunk and routes the error through the authored catch arm', async () => {
+		let reject!: (error: Error) => void;
+		const module = new Promise<never>((_resolve, fail) => {
+			reject = fail;
+		});
+		let loads = 0;
+		const Lazy = lazy(() => {
+			loads++;
+			return module;
+		});
+		const Boundary = defineUniversalComponent('lynx', () =>
+			universalTry(
+				() => universalComponent('lynx', Lazy),
+				() => universalValue(rowPlan, [universalProps([['set', 'state', 'pending']])]),
+				(error) =>
+					universalValue(rowPlan, [
+						universalProps([
+							['set', 'state', 'caught'],
+							['set', 'message', (error as Error).message],
+						]),
+					]),
+			),
+		);
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { state: 'pending' },
+		});
+		reject(new Error('native chunk failed'));
+		await module.catch(() => undefined);
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { message: 'native chunk failed', state: 'caught' },
+		});
+		expect(loads).toBe(1);
+	});
+
+	it('rejects a lazy module compiled for another renderer', () => {
+		const Foreign = defineBackgroundUniversalComponent('object', () => null);
+		const Lazy = lazy(
+			() =>
+				({
+					then(resolve: (module: { default: typeof Foreign }) => void) {
+						resolve({ default: Foreign });
+					},
+				}) as PromiseLike<{ default: any }>,
+		);
+		const Boundary = defineUniversalComponent('lynx', () =>
+			universalTry(
+				() => universalComponent('lynx', Lazy),
+				null,
+				(error) =>
+					universalValue(rowPlan, [universalProps([['set', 'message', (error as Error).message]])]),
+			),
+		);
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { message: 'Universal lazy for renderer "lynx" cannot render component "object".' },
+		});
+	});
+
+	it('starts independent lazy chunks before committing their shared pending arm', () => {
+		const calls: string[] = [];
+		const pending = () => new Promise<never>(() => {});
+		const Left = lazy(() => {
+			calls.push('left');
+			return pending();
+		});
+		const Right = lazy(() => {
+			calls.push('right');
+			return pending();
+		});
+		const Boundary = defineUniversalComponent('lynx', () => {
+			useBatch([], () => {
+				warmChild(Left, {});
+				warmChild(Right, {});
+			});
+			return universalTry(
+				() => [universalComponent('lynx', Left), universalComponent('lynx', Right)],
+				() => universalValue(rowPlan, [universalProps([['set', 'state', 'pending']])]),
+			);
+		});
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { state: 'pending' },
+		});
+		expect(calls).toHaveLength(2);
+		expect(new Set(calls)).toEqual(new Set(['left', 'right']));
+	});
+
+	it('passes compiler warm-plan props through nested lazy children', () => {
+		const calls: string[] = [];
+		const pending = () => new Promise<never>(() => {});
+		const Left = lazy(() => {
+			calls.push('left');
+			return pending();
+		});
+		const Right = lazy(() => {
+			calls.push('right');
+			return pending();
+		});
+		const Branch = defineUniversalComponent(
+			'lynx',
+			(props: { child: UniversalComponent<any>; childProps: Record<string, unknown> }) =>
+				universalComponent('lynx', props.child, props.childProps),
+		);
+		(Branch as any).__warm = (props: {
+			child: UniversalComponent<any>;
+			childProps: Record<string, unknown>;
+		}) => warmChild(props.child, props.childProps);
+		const branchProps = { child: Right, childProps: { label: 'right' } };
+		const Boundary = defineUniversalComponent('lynx', () => {
+			useBatch([], () => warmChild(Branch, branchProps));
+			return universalTry(
+				() => [universalComponent('lynx', Left), universalComponent('lynx', Branch, branchProps)],
+				() => universalValue(rowPlan, [universalProps([['set', 'state', 'pending']])]),
+			);
+		});
+
+		expect(renderLynxFirstScreen(Boundary, {}).batch.commands[0]).toMatchObject({
+			op: 'create',
+			props: { state: 'pending' },
+		});
+		expect(calls).toEqual(['left', 'right']);
+	});
+
+	it('diagnoses pending lazy content that has no authored first-screen boundary', () => {
+		const Lazy = lazy(() => new Promise<never>(() => {}));
+		const Unbounded = defineUniversalComponent('lynx', () => universalComponent('lynx', Lazy));
+
+		expect(() => renderLynxFirstScreen(Unbounded, {})).toThrow(
+			/suspended without an authored @pending boundary.*cannot wait for lazy chunks/,
+		);
+	});
+
 	it('emits the same initial host IDs, topology, props, and listener metadata as background', () => {
 		const props = {
 			handler: () => {},

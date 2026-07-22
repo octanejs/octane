@@ -4,6 +4,7 @@ import type {
 	UniversalHostCommitContext,
 	UniversalHostDriver,
 	UniversalPreparedHostBatch,
+	UniversalPortalTargetHandle,
 	UniversalSerializableValue,
 } from 'octane/universal/native';
 import { LYNX_RENDERER_ID } from '../config.js';
@@ -51,10 +52,29 @@ import type {
 	LynxListEnqueueComponent,
 } from './papi.js';
 import type { LynxActivatedMainThreadWorklet, LynxMainThreadWorkletRegistry } from './worklets.js';
+import {
+	decodeLynxPortalTargetId,
+	isLynxPortalTargetHandle,
+	lynxPortalTargetKey,
+} from './portal.js';
 
 const LYNX_HOST_STATE: unique symbol = Symbol('octane.lynx.host-state');
 
-type LynxHostParent = number | null | undefined;
+interface LynxPortalParent {
+	readonly kind: 'portal';
+	readonly key: string;
+	readonly universalRoot: number;
+	readonly target: number;
+	readonly generation: number;
+}
+
+type LynxAttachedHostParent = number | null | LynxPortalParent;
+type LynxHostParent = LynxAttachedHostParent | undefined;
+
+interface LynxPortalChildren {
+	readonly parent: LynxPortalParent;
+	children: number[];
+}
 
 export interface LynxHostHandle {
 	readonly $$kind: 'octane.lynx.element';
@@ -149,6 +169,10 @@ interface LynxHostState<Node extends LynxElementRef> {
 	records: Map<number, LynxHostRecord<Node>>;
 	rootChildren: number[];
 	generations: Map<number, number>;
+	/** Universal root provenance is fixed by the first accepted portal handle. */
+	portalRoot: number | null;
+	/** Portal children stay separate from ordinary authored host children. */
+	portalChildren: Map<string, LynxPortalChildren>;
 	readonly ownedNodes: Set<Node>;
 	readonly ownedPageRoots: Set<Node>;
 	/** Physical listener journal retained until native removal succeeds. */
@@ -274,6 +298,7 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 			readonly props: Readonly<Record<string, unknown>>;
 			readonly parent: LynxHostParent;
 			readonly children: readonly number[];
+			readonly portalChildren: readonly number[];
 			readonly visible: boolean;
 			readonly events: ReadonlyMap<string, UniversalEventListenerDescriptor>;
 			readonly generation: number;
@@ -284,7 +309,7 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 	| {
 			readonly op: 'insert' | 'move';
 			readonly id: number;
-			readonly parent: number | null;
+			readonly parent: LynxAttachedHostParent;
 			readonly before: number | null;
 			readonly previousParent: LynxHostParent;
 			readonly wasConnected: boolean;
@@ -293,7 +318,7 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 	| {
 			readonly op: 'remove';
 			readonly id: number;
-			readonly parent: number | null;
+			readonly parent: LynxAttachedHostParent;
 	  }
 	| {
 			readonly op: 'visibility';
@@ -462,27 +487,36 @@ function createHandle(root: number, id: number, type: string, generation: number
 	});
 }
 
-function assertParent(value: unknown, label: string): asserts value is number | null {
-	if (value === null) return;
-	if (typeof value === 'object') throw hostError(`${label} cannot be a portal target.`);
-	assertSafeId(value, label);
+function isPortalParent(parent: LynxHostParent): parent is LynxPortalParent {
+	return parent !== null && typeof parent === 'object';
+}
+
+function parentHostId(parent: LynxHostParent): number | null | undefined {
+	return isPortalParent(parent) ? parent.target : parent;
+}
+
+function sameHostParent(first: LynxHostParent, second: LynxHostParent): boolean {
+	if (isPortalParent(first) || isPortalParent(second)) {
+		return isPortalParent(first) && isPortalParent(second) && first.key === second.key;
+	}
+	return first === second;
 }
 
 function assertNoCycle<Node extends LynxElementRef>(
 	getRecord: (id: number) => LynxHostRecord<Node> | undefined,
 	id: number,
-	parent: number | null,
+	parent: LynxAttachedHostParent,
 ): void {
-	let current = parent;
+	let current = parentHostId(parent);
 	const visited = new Set<number>();
-	while (current !== null) {
+	while (typeof current === 'number') {
 		if (current === id) throw hostError(`placement of ${id} would create a cycle.`);
 		if (visited.has(current)) throw hostError(`existing topology contains a cycle at ${current}.`);
 		visited.add(current);
 		const record = getRecord(current);
 		if (record === undefined) throw hostError(`unknown parent ${current}.`);
 		if (record.parent === undefined) return;
-		current = record.parent;
+		current = parentHostId(record.parent);
 	}
 }
 
@@ -497,7 +531,7 @@ function isRootConnected<Node extends LynxElementRef>(
 		visited.add(current);
 		const record = getRecord(current);
 		if (record === undefined) throw hostError(`topology references unknown host ${current}.`);
-		current = record.parent;
+		current = parentHostId(record.parent);
 	}
 	return current === null;
 }
@@ -513,7 +547,7 @@ function isAcceptedHostConnected<Node extends LynxElementRef>(
 		visited.add(current);
 		const record = state.records.get(current);
 		if (record === undefined) return false;
-		current = record.parent;
+		current = parentHostId(record.parent);
 	}
 	return current === null;
 }
@@ -526,6 +560,37 @@ function nodeFor<Node extends LynxElementRef>(
 	const node = nodes.get(id);
 	if (node === undefined) throw hostError(`${label} references unavailable host ${id}.`);
 	return node;
+}
+
+function physicalNodeForParent<Node extends LynxElementRef>(
+	nodes: Map<number, Node>,
+	page: Node,
+	parent: LynxAttachedHostParent,
+	label: string,
+): Node {
+	if (parent === null) return page;
+	return nodeFor(nodes, isPortalParent(parent) ? parent.target : parent, label);
+}
+
+function firstPortalChildNode<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	nodes: Map<number, Node>,
+	target: number,
+): Node | null {
+	const targetNode = nodes.get(target);
+	if (targetNode === undefined) return null;
+	for (const entry of state.portalChildren.values()) {
+		if (entry.parent.target !== target) continue;
+		for (const child of entry.children) {
+			const node = nodes.get(child);
+			// Logical portal state is published before PAPI operations run. During a
+			// same-batch retarget, the final destination therefore sees this child
+			// before the physical move has happened; it is not a legal `before` node
+			// until PAPI confirms that it already belongs to the destination.
+			if (node !== undefined && state.papi.isChild(targetNode, node)) return node;
+		}
+	}
+	return null;
 }
 
 function textValue(props: Readonly<Record<string, unknown>>): string {
@@ -899,10 +964,12 @@ function directListItem<Node extends LynxElementRef>(
 ): { readonly listId: number; readonly itemId: number } | null {
 	let current = getRecord(id);
 	const visited = new Set<number>();
-	while (current !== undefined && typeof current.parent === 'number') {
+	while (current !== undefined) {
 		if (visited.has(current.handle.id)) throw hostError('list ancestry contains a cycle.');
 		visited.add(current.handle.id);
-		const parent = getRecord(current.parent);
+		const parentId = parentHostId(current.parent);
+		if (typeof parentId !== 'number') return null;
+		const parent = getRecord(parentId);
 		if (parent === undefined) return null;
 		if (parent.type === 'list') {
 			return current.type === 'list-item'
@@ -1548,6 +1615,8 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		records: new Map(),
 		rootChildren: [],
 		generations: new Map(),
+		portalRoot: null,
+		portalChildren: new Map(),
 		ownedNodes: new Set(),
 		ownedPageRoots: new Set(),
 		nativeEvents: new Map(),
@@ -1828,6 +1897,9 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 	if (state.lists.size !== 0) {
 		throw hostError('native list materializations cannot be captured as a first tree.');
 	}
+	if (state.portalChildren.size !== 0) {
+		throw hostError('portals cannot be captured before background adoption.');
+	}
 	const eventsByToken = new Map<string, LynxResolvedFirstTreeEvent>();
 	const nodes: LynxFirstTreeNodeSnapshot[] = [];
 	const ids = [...state.records.keys()].sort((first, second) => first - second);
@@ -1835,6 +1907,9 @@ export function captureLynxFirstTree<Node extends LynxElementRef>(
 		const record = state.records.get(id)!;
 		if (record.node === null || record.parent === undefined) {
 			throw hostError(`first-tree host ${id} must own an attached physical node.`);
+		}
+		if (isPortalParent(record.parent)) {
+			throw hostError('portals cannot be captured before background adoption.');
 		}
 		if (record.type === 'list') {
 			throw hostError('native list hosts cannot be captured as a first tree.');
@@ -2157,6 +2232,8 @@ function transferFirstTree<Node extends LynxElementRef>(
 	sourceState.records.clear();
 	sourceState.rootChildren.length = 0;
 	sourceState.generations.clear();
+	sourceState.portalRoot = null;
+	sourceState.portalChildren.clear();
 	sourceState.firstTree = null;
 	sourceState.cleanupNeedsFlush = false;
 	sourceState.disposing = false;
@@ -2204,7 +2281,9 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			state.nativeEvents.size !== 0 ||
 			state.mainThreadRefs.size !== 0 ||
 			state.mainThreadRefOwners.size !== 0 ||
-			state.lists.size !== 0
+			state.lists.size !== 0 ||
+			state.portalRoot !== null ||
+			state.portalChildren.size !== 0
 		) {
 			throw hostError('firstTree may only be prepared against an empty background root.');
 		}
@@ -2236,6 +2315,10 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	const stagedRecords = new Map<number, LynxHostRecord<Node>>();
 	const deletedRecords = new Set<number>();
 	const stagedGenerations = new Map<number, number>();
+	let stagedPortalChildren: Map<string, LynxPortalChildren> | null = null;
+	const readStagedPortalChildren = (): Map<string, LynxPortalChildren> | null =>
+		stagedPortalChildren;
+	let stagedPortalRoot = state.portalRoot;
 	const initialNodes = new Map<number, Node>();
 	let stagedRootChildren: number[] | null = null;
 	let stagedRecordCount = state.records.size;
@@ -2272,14 +2355,115 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		if (stagedRootChildren === null) stagedRootChildren = [...state.rootChildren];
 		return stagedRootChildren;
 	};
-	const childrenForRead = (parent: number | null): readonly number[] => {
+	const portalChildrenForRead = (parent: LynxPortalParent): readonly number[] =>
+		stagedPortalChildren?.get(parent.key)?.children ??
+		state.portalChildren.get(parent.key)?.children ??
+		[];
+	const portalChildrenForWrite = (parent: LynxPortalParent): number[] => {
+		let entry = stagedPortalChildren?.get(parent.key);
+		if (entry !== undefined) return entry.children;
+		const previous = state.portalChildren.get(parent.key);
+		if (
+			previous !== undefined &&
+			(previous.parent.target !== parent.target ||
+				previous.parent.generation !== parent.generation ||
+				previous.parent.universalRoot !== parent.universalRoot)
+		) {
+			throw hostError('portal target identity changed without a new target handle.');
+		}
+		entry = {
+			parent,
+			children: previous === undefined ? [] : [...previous.children],
+		};
+		(stagedPortalChildren ??= new Map()).set(parent.key, entry);
+		return entry.children;
+	};
+	const portalChildrenForTarget = (target: number): readonly number[] => {
+		const children: number[] = [];
+		const keys = new Set(state.portalChildren.keys());
+		if (stagedPortalChildren !== null) {
+			for (const key of stagedPortalChildren.keys()) keys.add(key);
+		}
+		for (const key of keys) {
+			const entry = stagedPortalChildren?.get(key) ?? state.portalChildren.get(key);
+			if (entry?.parent.target === target) children.push(...entry.children);
+		}
+		return children;
+	};
+	const recreatedIds = new Set<number>();
+	const resolveParent = (
+		value: unknown,
+		label: string,
+		currentParent?: LynxHostParent,
+	): LynxAttachedHostParent => {
+		if (value === null) return null;
+		if (typeof value === 'number') {
+			assertSafeId(value, label);
+			return value;
+		}
+		if (
+			!isLynxPortalTargetHandle(value) ||
+			Object.keys(value).length !== 4 ||
+			!['$$kind', 'renderer', 'root', 'id'].every((name) =>
+				Object.prototype.hasOwnProperty.call(value, name),
+			)
+		) {
+			throw hostError(`${label} is not a valid Lynx portal target handle.`);
+		}
+		const handle = value as UniversalPortalTargetHandle;
+		const identity = decodeLynxPortalTargetId(handle.id)!;
+		if (identity.root !== container.root) {
+			throw hostError(`${label} belongs to foreign root ${identity.root}.`);
+		}
+		if (stagedPortalRoot === null) stagedPortalRoot = handle.root;
+		else if (stagedPortalRoot !== handle.root) {
+			throw hostError(`${label} belongs to a foreign universal root.`);
+		}
+		const accepted = state.records.get(identity.id);
+		const current = getRecord(identity.id);
+		const key = lynxPortalTargetKey(handle);
+		const removingFromRecreatedTarget =
+			isPortalParent(currentParent) && currentParent.key === key && recreatedIds.has(identity.id);
+		if (
+			accepted === undefined ||
+			current === undefined ||
+			accepted.node === null ||
+			accepted.handle.root !== container.root ||
+			accepted.handle.generation !== identity.generation ||
+			(current.handle.generation !== identity.generation && !removingFromRecreatedTarget) ||
+			!isRootConnected((id) => state.records.get(id), identity.id)
+		) {
+			throw hostError(
+				`${label} targets stale, detached, or unacknowledged host ${identity.id}:${identity.generation}.`,
+			);
+		}
+		if (
+			accepted.type === '#text' ||
+			accepted.type === 'raw-text' ||
+			accepted.type === 'list' ||
+			directListItem((id) => state.records.get(id), identity.id) !== null
+		) {
+			throw hostError(`${label} targets an unsupported text or native-list host.`);
+		}
+		if (removingFromRecreatedTarget) return currentParent;
+		return Object.freeze({
+			kind: 'portal' as const,
+			key,
+			universalRoot: handle.root,
+			target: identity.id,
+			generation: identity.generation,
+		});
+	};
+	const childrenForRead = (parent: LynxAttachedHostParent): readonly number[] => {
 		if (parent === null) return stagedRootChildren ?? state.rootChildren;
+		if (isPortalParent(parent)) return portalChildrenForRead(parent);
 		const record = getRecord(parent);
 		if (record === undefined) throw hostError(`unknown parent ${parent}.`);
 		return record.children;
 	};
-	const childrenForWrite = (parent: number | null): number[] => {
+	const childrenForWrite = (parent: LynxAttachedHostParent): number[] => {
 		if (parent === null) return rootChildrenForWrite();
+		if (isPortalParent(parent)) return portalChildrenForWrite(parent);
 		const record = writeRecord(parent);
 		if (record === undefined) throw hostError(`unknown parent ${parent}.`);
 		return record.children;
@@ -2288,6 +2472,13 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		if (initialNodes.has(id)) return;
 		const node = state.records.get(id)?.node;
 		if (node != null) initialNodes.set(id, node);
+	};
+	const capturePortalChildren = (target: number): void => {
+		if (state.portalChildren.size === 0) return;
+		for (const entry of state.portalChildren.values()) {
+			if (entry.parent.target !== target) continue;
+			for (const child of entry.children) captureInitialNode(child);
+		}
 	};
 	const destroyedIds = new Set<number>();
 	for (const command of batch.commands) {
@@ -2379,7 +2570,9 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			const generation = (getGeneration(command.id) ?? record.handle.generation) + 1;
 			const handle = createHandle(container.root, command.id, command.type, generation);
 			const recreateChildren = Object.freeze([...record.children]);
+			const recreatePortalChildren = Object.freeze([...portalChildrenForTarget(command.id)]);
 			for (const childId of recreateChildren) captureInitialNode(childId);
+			for (const childId of recreatePortalChildren) captureInitialNode(childId);
 			operations.push({
 				op: 'recreate',
 				id: command.id,
@@ -2387,6 +2580,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				props,
 				parent: record.parent,
 				children: recreateChildren,
+				portalChildren: recreatePortalChildren,
 				visible: record.visible,
 				events: new Map(record.events),
 				generation,
@@ -2395,19 +2589,24 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				record,
 			});
 			setGeneration(command.id, generation);
+			recreatedIds.add(command.id);
 			record.props = props;
 			record.handle = handle;
 			touchHandle(command.id);
 		} else if (command.op === 'insert' || command.op === 'move') {
 			assertSafeId(command.id, `command ${index} ${command.op}.id`);
-			assertParent(command.parent, `command ${index} ${command.op}.parent`);
+			const parent = resolveParent(command.parent, `command ${index} ${command.op}.parent`);
 			if (command.before !== null) {
 				assertSafeId(command.before, `command ${index} ${command.op}.before`);
 			}
 			const record = writeRecord(command.id);
 			if (record === undefined) throw hostError(`unknown ${command.op} target ${command.id}.`);
 			captureInitialNode(command.id);
-			if (typeof command.parent === 'number') captureInitialNode(command.parent);
+			const physicalParentId = parentHostId(parent);
+			if (typeof physicalParentId === 'number') {
+				captureInitialNode(physicalParentId);
+				if (!isPortalParent(parent)) capturePortalChildren(physicalParentId);
+			}
 			if (command.before !== null) captureInitialNode(command.before);
 			if (command.op === 'insert' && record.parent !== undefined) {
 				throw hostError(`insert target ${command.id} is already attached.`);
@@ -2417,14 +2616,14 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			}
 			if (record.type === '#text' || record.type === 'raw-text') {
 				const parentRecord =
-					typeof command.parent === 'number' ? getRecord(command.parent) : undefined;
+					typeof physicalParentId === 'number' ? getRecord(physicalParentId) : undefined;
 				if (parentRecord?.type !== 'text') {
 					throw hostError(
 						`${record.type} host ${command.id} may only be placed directly under a text host.`,
 					);
 				}
 			}
-			assertNoCycle(getRecord, command.id, command.parent);
+			assertNoCycle(getRecord, command.id, parent);
 			const wasConnected = isRootConnected(getRecord, command.id);
 			const previousParent = record.parent;
 			if (previousParent !== undefined) {
@@ -2435,7 +2634,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				}
 				previousChildren.splice(previousIndex, 1);
 			}
-			const children = childrenForWrite(command.parent);
+			const children = childrenForWrite(parent);
 			let beforeIndex = children.length;
 			if (command.before !== null) {
 				beforeIndex = children.indexOf(command.before);
@@ -2444,12 +2643,12 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				}
 			}
 			children.splice(beforeIndex, 0, command.id);
-			record.parent = command.parent;
+			record.parent = parent;
 			const willBeConnected = isRootConnected(getRecord, command.id);
 			operations.push({
 				op: command.op,
 				id: command.id,
-				parent: command.parent,
+				parent,
 				before: command.before,
 				previousParent,
 				wasConnected,
@@ -2457,20 +2656,21 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			});
 		} else if (command.op === 'remove') {
 			assertSafeId(command.id, `command ${index} remove.id`);
-			assertParent(command.parent, `command ${index} remove.parent`);
 			const record = writeRecord(command.id);
 			if (record === undefined) throw hostError(`unknown remove target ${command.id}.`);
+			const parent = resolveParent(command.parent, `command ${index} remove.parent`, record.parent);
 			captureInitialNode(command.id);
-			if (typeof command.parent === 'number') captureInitialNode(command.parent);
-			if (record.parent !== command.parent) {
+			const physicalParentId = parentHostId(parent);
+			if (typeof physicalParentId === 'number') captureInitialNode(physicalParentId);
+			if (!sameHostParent(record.parent, parent)) {
 				throw hostError(`remove parent does not own host ${command.id}.`);
 			}
-			const children = childrenForWrite(command.parent);
+			const children = childrenForWrite(parent);
 			const childIndex = children.indexOf(command.id);
 			if (childIndex === -1) throw hostError(`remove target ${command.id} is not attached.`);
 			children.splice(childIndex, 1);
 			record.parent = undefined;
-			operations.push({ op: 'remove', id: command.id, parent: command.parent });
+			operations.push({ op: 'remove', id: command.id, parent });
 		} else if (command.op === 'visibility') {
 			assertSafeId(command.id, `command ${index} visibility.id`);
 			if (command.state !== 'hidden' && command.state !== 'visible') {
@@ -2536,6 +2736,11 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			if (isRootConnected(getRecord, command.id)) {
 				throw hostError(`destroy target ${command.id} is still attached to the page.`);
 			}
+			if (isPortalParent(record.parent)) {
+				throw hostError(
+					`destroy target ${command.id} remains attached to a surviving portal target.`,
+				);
+			}
 			if (typeof record.parent === 'number') {
 				if (!destroyedIds.has(record.parent)) {
 					throw hostError(
@@ -2567,6 +2772,46 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	}
 	for (const id of stagedRecords.keys()) {
 		if (!deletedRecords.has(id)) finalIds.add(id);
+	}
+	let finalPortalChildren: ReadonlyMap<string, LynxPortalChildren> = state.portalChildren;
+	const portalChildrenChanges = readStagedPortalChildren();
+	if (portalChildrenChanges !== null) {
+		const nextPortalChildren = new Map(state.portalChildren);
+		for (const [key, entry] of portalChildrenChanges) {
+			if (entry.children.length === 0) nextPortalChildren.delete(key);
+			else nextPortalChildren.set(key, entry);
+		}
+		finalPortalChildren = nextPortalChildren;
+	}
+	for (const entry of finalPortalChildren.values()) {
+		const target = getRecord(entry.parent.target);
+		const acceptedTarget = state.records.get(entry.parent.target);
+		if (
+			target === undefined ||
+			acceptedTarget === undefined ||
+			acceptedTarget.node === null ||
+			target.handle.generation !== entry.parent.generation ||
+			acceptedTarget.handle.generation !== entry.parent.generation ||
+			!isRootConnected(getRecord, entry.parent.target)
+		) {
+			throw hostError(
+				`portal target ${entry.parent.target}:${entry.parent.generation} became stale or detached in the prepared batch.`,
+			);
+		}
+		if (
+			target.type === '#text' ||
+			target.type === 'raw-text' ||
+			target.type === 'list' ||
+			directListItem(getRecord, entry.parent.target) !== null
+		) {
+			throw hostError('portal targets cannot be text hosts or native-list hosts/descendants.');
+		}
+		for (const childId of entry.children) {
+			const child = getRecord(childId);
+			if (child === undefined || !sameHostParent(child.parent, entry.parent)) {
+				throw hostError(`portal topology does not own child ${childId}.`);
+			}
+		}
 	}
 	const listIds = new Set<number>();
 	const finalMainThreadRefOwners = new Map<string, number>();
@@ -2735,6 +2980,14 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				for (const [id, generation] of stagedGenerations) {
 					state.generations.set(id, generation);
 				}
+				state.portalRoot = stagedPortalRoot;
+				const portalChildrenChanges = readStagedPortalChildren();
+				if (portalChildrenChanges !== null) {
+					for (const [key, entry] of portalChildrenChanges) {
+						if (entry.children.length === 0) state.portalChildren.delete(key);
+						else state.portalChildren.set(key, entry);
+					}
+				}
 				state.acceptedVersion = batch.version;
 				if (logicalTeardown) {
 					status = 'applied';
@@ -2860,6 +3113,13 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 										null,
 									);
 								}
+								for (const childId of operation.portalChildren) {
+									state.papi.insertBefore(
+										replacement,
+										nodeFor(activeNodes, childId, 'recreate portal child'),
+										null,
+									);
+								}
 								if (operation.parent !== undefined) {
 									if (operation.parent === null) state.ownedPageRoots.add(replacement);
 									state.papi.replace(replacement, previous);
@@ -2874,13 +3134,17 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								if (parentRecord?.type === 'list') continue;
 								if (!activeNodes.has(operation.id)) continue;
 								const node = nodeFor(activeNodes, operation.id, operation.op);
-								const parent =
-									operation.parent === null
-										? container.page
-										: nodeFor(activeNodes, operation.parent, `${operation.op} parent`);
+								const parent = physicalNodeForParent(
+									activeNodes,
+									container.page,
+									operation.parent,
+									`${operation.op} parent`,
+								);
 								const before =
 									operation.before === null
-										? null
+										? typeof operation.parent === 'number'
+											? firstPortalChildNode(state, activeNodes, operation.parent)
+											: null
 										: nodeFor(activeNodes, operation.before, `${operation.op} before`);
 								if (operation.parent === null) state.ownedPageRoots.add(node);
 								if (operation.wasConnected && !operation.willBeConnected) {
@@ -2900,15 +3164,21 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 										: undefined;
 								if (parentRecord?.type === 'list' || !activeNodes.has(operation.id)) continue;
 								const node = nodeFor(activeNodes, operation.id, 'remove');
-								const parent =
-									operation.parent === null
-										? container.page
-										: nodeFor(activeNodes, operation.parent, 'remove parent');
+								const parent = physicalNodeForParent(
+									activeNodes,
+									container.page,
+									operation.parent,
+									'remove parent',
+								);
 								deactivateMainThreadSubtree(state, operation.id);
 								state.papi.remove(parent, node);
 								if (operation.parent === null) state.ownedPageRoots.delete(node);
 							} else if (operation.op === 'visibility') {
 								if (!activeNodes.has(operation.id)) continue;
+								const record = state.records.get(operation.id)!;
+								// Element PAPI cannot attach attributes to raw-text nodes. Their nearest
+								// host ancestor receives the same retained-tree visibility command.
+								if (record.type === '#text' || record.type === 'raw-text') continue;
 								const node = nodeFor(activeNodes, operation.id, 'visibility');
 								if (operation.state === 'hidden') {
 									removeAllNativeEvents(state, node);
@@ -2921,12 +3191,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								);
 								if (operation.state === 'visible') {
 									if (isAcceptedHostConnected(state, operation.id)) {
-										installMainThreadProps(
-											state,
-											node,
-											state.records.get(operation.id)!.type,
-											state.records.get(operation.id)!.props,
-										);
+										installMainThreadProps(state, node, record.type, record.props);
 									}
 									installNativeEvents(
 										state,
@@ -3350,6 +3615,8 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 		state.records.clear();
 		state.rootChildren.length = 0;
 		state.generations.clear();
+		state.portalRoot = null;
+		state.portalChildren.clear();
 		state.firstTree = null;
 		state.disposing = false;
 		state.disposed = true;

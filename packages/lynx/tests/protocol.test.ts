@@ -16,6 +16,7 @@ import {
 import {
 	createLynxClientContainer,
 	createLynxClientDriver,
+	prepareLynxHandleDeltas,
 	type LynxPublicHandle,
 } from '../src/core/client-driver.js';
 import {
@@ -241,6 +242,52 @@ describe('@octanejs/lynx transported protocol', () => {
 			},
 		};
 		expect(validateLynxBackgroundOutboundMessage(commit)).toBe(commit);
+		const portalParent = Object.freeze({
+			$$kind: 'octane.universal.portal-target',
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: 41,
+			id: 'octane.lynx.portal:1:7:2',
+		});
+		const portalCommit = {
+			...commit,
+			batch: {
+				...commit.batch,
+				commands: [{ op: 'insert', parent: portalParent, id: 9, before: null }],
+			},
+		};
+		expect(validateLynxBackgroundOutboundMessage(portalCommit)).toBe(portalCommit);
+		expect(() =>
+			validateLynxBackgroundOutboundMessage({
+				...portalCommit,
+				batch: {
+					...portalCommit.batch,
+					commands: [
+						{
+							op: 'insert',
+							parent: { ...portalParent, id: 'r1-h7-g2' },
+							id: 9,
+							before: null,
+						},
+					],
+				},
+			}),
+		).toThrow(/opaque Lynx portal target ID/);
+		expect(() =>
+			validateLynxBackgroundOutboundMessage({
+				...portalCommit,
+				batch: {
+					...portalCommit.batch,
+					commands: [
+						{
+							op: 'insert',
+							parent: { ...portalParent, publicHandle: true },
+							id: 9,
+							before: null,
+						},
+					],
+				},
+			}),
+		).toThrow(/unknown field "publicHandle"/);
 		expect(
 			validateLynxBackgroundInboundMessage({
 				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
@@ -330,6 +377,105 @@ describe('@octanejs/lynx transported protocol', () => {
 				error: { name: 'Error', message: 'retry cleanup' },
 			}),
 		).toMatchObject({ type: 'dispose-retry' });
+	});
+
+	it('uses only current same-root acknowledged public handles as portal targets', () => {
+		const firstContainer = createLynxClientContainer();
+		const secondContainer = createLynxClientContainer();
+		const driver = createLynxClientDriver();
+		const createPortalTargetHandle = (id: string | number) =>
+			Object.freeze({
+				$$kind: 'octane.universal.portal-target' as const,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: 41,
+				id,
+			});
+		const prepareTarget = (
+			container: ReturnType<typeof createLynxClientContainer>,
+			target: unknown,
+			transported = true,
+		) =>
+			driver.portals!.prepareTarget({
+				container,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				target,
+				transported,
+				createPortalTargetHandle,
+			});
+
+		expect(() => prepareTarget(firstContainer, null)).toThrow(
+			/Initial portals must wait for the target ref acknowledgement/,
+		);
+		const mountBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [
+				{ op: 'create', id: 1, type: 'view', props: {} },
+				{ op: 'create', id: 2, type: 'list', props: {} },
+			],
+		};
+		prepareLynxHandleDeltas(
+			firstContainer,
+			mountBatch,
+			[
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 1,
+					attached: true,
+					snapshot: handleSnapshot(17, 1, 'view', 1),
+				},
+				{
+					op: 'upsert',
+					id: 2,
+					type: 'list',
+					generation: 1,
+					attached: true,
+					snapshot: handleSnapshot(17, 2, 'list', 1),
+				},
+			],
+			identity(17, 1),
+		).apply();
+		const target = firstContainer.getPublicHandle(1)!;
+		const registration = prepareTarget(firstContainer, target);
+		expect(registration.handle).toEqual({
+			$$kind: 'octane.universal.portal-target',
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: 41,
+			id: 'octane.lynx.portal:17:1:1',
+		});
+		expect(Object.keys(registration.handle)).toEqual(['$$kind', 'renderer', 'root', 'id']);
+		expect(() => registration.release()).not.toThrow();
+
+		expect(() => prepareTarget(secondContainer, target)).toThrow(/from this root/);
+		expect(() => prepareTarget(firstContainer, target, false)).toThrow(/from this root/);
+		expect(() => prepareTarget(firstContainer, firstContainer.getPublicHandle(2))).toThrow(
+			/target type "list" is not supported/,
+		);
+
+		const recreateBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 2,
+			commands: [{ op: 'recreate', id: 1, type: 'view', props: {} }],
+		};
+		prepareLynxHandleDeltas(
+			firstContainer,
+			recreateBatch,
+			[
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 2,
+					attached: true,
+					snapshot: handleSnapshot(17, 1, 'view', 2),
+				},
+			],
+			identity(17, 2),
+		).apply();
+		expect(target.active).toBe(false);
+		expect(() => prepareTarget(firstContainer, target)).toThrow(/current, active/);
 	});
 
 	it('validates the root-scoped worklet call subprotocol without accepting executable values', () => {

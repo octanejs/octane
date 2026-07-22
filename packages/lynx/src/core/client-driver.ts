@@ -3,6 +3,8 @@ import type {
 	UniversalHostBatch,
 	UniversalHostDriver,
 	UniversalHostPropCodecContext,
+	UniversalPortalTargetContext,
+	UniversalPortalTargetRegistration,
 	UniversalSerializableValue,
 	UniversalTransportIdentity,
 } from 'octane/universal/native';
@@ -32,6 +34,7 @@ import {
 	type LynxNodesRefFieldsResult,
 	type LynxNodesRefPathResult,
 } from './nodes-ref.js';
+import { encodeLynxPortalTargetId } from './portal.js';
 
 export interface LynxPublicHandle {
 	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
@@ -720,6 +723,57 @@ export function createLynxClientDriver(): UniversalHostDriver<
 	const driver: UniversalHostDriver<LynxClientContainer, LynxPublicHandle> = {
 		id: LYNX_TRANSPORT_RENDERER,
 		capabilities: Object.freeze({ text: 'host' as const, visibility: true }),
+		portals: Object.freeze({
+			prepareTarget({
+				container,
+				target,
+				transported,
+				createPortalTargetHandle,
+			}: UniversalPortalTargetContext<LynxClientContainer>): UniversalPortalTargetRegistration {
+				const state = containerState(container);
+				const handleState =
+					target !== null && typeof target === 'object'
+						? HANDLE_STATE.get(target as LynxPublicHandle)
+						: undefined;
+				const handle = target as LynxPublicHandle;
+				if (
+					!transported ||
+					handleState === undefined ||
+					state.handles.get(handle.id) !== handle ||
+					!handleState.active
+				) {
+					throw new TypeError(
+						'Octane Lynx portals require a current, active LynxPublicHandle from this root. Initial portals must wait for the target ref acknowledgement.',
+					);
+				}
+				if (!handleState.attached) {
+					throw new Error(
+						`Octane Lynx portal target ${handle.id}:${handle.generation} is not physically attached.`,
+					);
+				}
+				if (
+					handle.type === '#text' ||
+					handle.type === 'raw-text' ||
+					handle.type === 'list' ||
+					handle.type === 'list-item'
+				) {
+					throw new Error(
+						`Octane Lynx portal target type ${JSON.stringify(handle.type)} is not supported.`,
+					);
+				}
+				const portalHandle = createPortalTargetHandle(
+					encodeLynxPortalTargetId({
+						root: handle.root,
+						id: handle.id,
+						generation: handle.generation,
+					}),
+				);
+				return Object.freeze({
+					handle: portalHandle,
+					release() {},
+				});
+			},
+		}),
 		attachments: Object.freeze({
 			subscribe(
 				container: LynxClientContainer,
