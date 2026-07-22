@@ -1,5 +1,29 @@
 # @octanejs/visx
 
+## 0.1.7
+
+### Patch Changes
+
+- 3ffce4c: Update the TSRX compiler adapters and Ripple integration to their synchronized
+  latest releases, including the nested-JSX slash parsing fix and Solid 2 beta.15
+  alignment. Refresh the supported dependency ranges shipped by the affected
+  framework bindings and build integrations.
+- Updated dependencies [a719b93]
+- Updated dependencies [19c3ff1]
+- Updated dependencies [6cecb47]
+- Updated dependencies [d6ee673]
+- Updated dependencies [9b6cd79]
+- Updated dependencies [40d562b]
+- Updated dependencies [3ffce4c]
+- Updated dependencies [b92d76e]
+- Updated dependencies [f325775]
+- Updated dependencies [c36608c]
+- Updated dependencies [5974429]
+- Updated dependencies [af337d0]
+- Updated dependencies [b5b5880]
+  - octane@0.1.13
+  - @octanejs/floating-ui@0.1.12
+
 ## 0.1.6
 
 ### Patch Changes
