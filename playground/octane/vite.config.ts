@@ -20,6 +20,9 @@ export default defineConfig({
 		// `octane` is workspace:* and points `main` at raw TS sources, and also
 		// provides the compiler at `octane/compiler`. Pre-bundling would snapshot
 		// stale output and require `vite --force` on every workspace edit.
-		exclude: ['octane'],
+		//
+		// The bindings are the same shape: they ship `.tsrx`/`.ts` sources that the
+		// octane plugin has to compile, so they must not be pre-bundled either.
+		exclude: ['octane', '@octanejs/cmdk', '@octanejs/radix'],
 	},
 });

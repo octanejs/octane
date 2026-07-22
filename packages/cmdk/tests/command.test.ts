@@ -17,6 +17,7 @@ import {
 	ForceMountMenu,
 	KeywordsMenu,
 	NoFilterMenu,
+	ReorderedGroupsMenu,
 	GroupedMenu,
 	LoadingMenu,
 	LoopMenu,
@@ -508,6 +509,35 @@ describe('@octanejs/cmdk — controlled modes (Phase 3)', () => {
 		expect(app.find('[cmdk-item][aria-selected="true"]').textContent).toBe('Banana');
 
 		app.unmount();
+	});
+
+	it('survives search, narrow-to-nothing, clear, and unmount after a reorder', async () => {
+		// `sort()` relocates item nodes to put matches in score order. Octane fences
+		// each component's DOM between marker comments, so a node moved out from
+		// between its own markers leaves the runtime's bookkeeping pointing at a
+		// range that no longer holds it — every later update and the teardown then
+		// work off stale references. Typing, filtering down to nothing, clearing,
+		// and unmounting walks a relocated node through all of those transitions.
+		const app = mount(ReorderedGroupsMenu);
+		await settle();
+		const input = app.find('[cmdk-input]') as HTMLInputElement;
+
+		type(input, 'go');
+		await settle();
+		type(input, 'zzzzzz');
+		await settle();
+		expect(app.findAll('[cmdk-item]')).toHaveLength(0);
+
+		type(input, '');
+		await settle();
+		expect(app.findAll('[cmdk-item]')).toHaveLength(4);
+
+		app.unmount();
+		await settle();
+
+		// The guard in _setup.ts fails the test on any reported error; assert here
+		// too so the contract is visible at the point it is being protected.
+		expect(consoleErrorCalls()).toEqual([]);
 	});
 
 	it('reports duplicate item values in development', async () => {

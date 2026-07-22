@@ -133,6 +133,28 @@ export function DynamicValueMenu(props: { itemValue: string }) @{
 	</Command>
 }
 
+// Grouped results whose score order differs from source order, so `sort()`
+// physically relocates item nodes. Searching, narrowing to nothing, and then
+// clearing takes those relocated nodes through unmount and remount — the path
+// where moving a node out of the markers octane fences it with corrupts the
+// runtime's bookkeeping.
+export function ReorderedGroupsMenu() @{
+	<Command label="Command Menu">
+		<Command.Input placeholder="Search…" />
+		<Command.List>
+			<Command.Empty>No results found.</Command.Empty>
+			<Command.Group heading="Navigation">
+				<Command.Item>Go to Dashboard</Command.Item>
+				<Command.Item>Go to Settings</Command.Item>
+			</Command.Group>
+			<Command.Group heading="Actions">
+				<Command.Item>Add a document</Command.Item>
+				<Command.Item>Rename workspace</Command.Item>
+			</Command.Group>
+		</Command.List>
+	</Command>
+}
+
 // A force-mounted item stays rendered through any search. It is exempt from
 // filtering, so it never reaches `filtered.count` — Empty still has to see it.
 export function ForceMountMenu() @{

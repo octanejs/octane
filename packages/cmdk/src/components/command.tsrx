@@ -285,6 +285,34 @@ export function CommandRoot(props: CommandProps) @{
 		state.current.filtered.count = itemCount;
 	}
 
+	/**
+ * Append `node` to `container`, carrying the comment markers that fence it.
+ *
+ * cmdk's sort is DOM-authoritative: it puts matches in score order by
+ * physically relocating item nodes. That is safe under React, which re-parents
+ * the nodes it owns on the next render. Octane instead delimits each
+ * component's DOM with a pair of comment markers and tracks the range between
+ * them, so appending the element alone strands it outside its own markers —
+ * the runtime's bookkeeping then describes a range that no longer contains the
+ * node, and the next update or teardown works off stale references (observed
+ * as "Cannot read properties of undefined" from an unmount cleanup, and
+ * "insertBefore ... not a child of this node" from the following render).
+ *
+ * Moving the flanking comment nodes with the element keeps the range intact.
+ * This does couple the port to how octane fences a component; it is the
+ * narrowest thing that works today, and the durable fix belongs upstream —
+ * either a supported way to relocate a component's range, or a teardown path
+ * that tolerates externally-moved nodes. Covered by the search → narrow →
+ * clear → unmount regression test.
+ */
+	function moveWithMarkers(container: Element, node: Element) {
+		const before = node.previousSibling;
+		const after = node.nextSibling;
+		if (before !== null && before.nodeType === Node.COMMENT_NODE) container.appendChild(before);
+		container.appendChild(node);
+		if (after !== null && after.nodeType === Node.COMMENT_NODE) container.appendChild(after);
+	}
+
 	/** Sorts items by score, and groups by highest item score, by reordering the
  * real DOM nodes (cmdk's DOM-authoritative model). */
 	function sort() {
@@ -321,13 +349,13 @@ export function CommandRoot(props: CommandProps) @{
 			if (group) {
 				const node =
 					item.parentElement === group ? item : item.closest(`${GROUP_ITEMS_SELECTOR} > *`);
-				if (node) group.appendChild(node);
+				if (node) moveWithMarkers(group, node);
 			} else {
 				const node =
 					item.parentElement === listInsertionElement
 						? item
 						: item.closest(`${GROUP_ITEMS_SELECTOR} > *`);
-				if (node) listInsertionElement.appendChild(node);
+				if (node) moveWithMarkers(listInsertionElement, node);
 			}
 		});
 

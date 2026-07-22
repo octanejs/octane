@@ -5,6 +5,7 @@ import { Conditional } from './demos/Conditional.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
+import { CommandMenu } from './demos/CommandMenu.tsrx';
 
 const DEMOS = [
 	{ id: 'counter', label: 'Counter' },
@@ -13,6 +14,7 @@ const DEMOS = [
 	{ id: 'inputs', label: 'Inputs + @switch' },
 	{ id: 'dynamic', label: '<{dynamic}>' },
 	{ id: 'suspense', label: 'Suspense' },
+	{ id: 'cmdk', label: 'Command menu' },
 ];
 
 export function App() @{
@@ -49,6 +51,9 @@ export function App() @{
 				}
 				@case 'suspense': {
 					<SuspenseDemo />
+				}
+				@case 'cmdk': {
+					<CommandMenu />
 				}
 				@default: {
 					<p>{'(pick a demo)'}</p>

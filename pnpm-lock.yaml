@@ -5339,6 +5339,9 @@ importers:
 
   playground/octane:
     dependencies:
+      '@octanejs/cmdk':
+        specifier: workspace:*
+        version: link:../../packages/cmdk
       octane:
         specifier: workspace:*
         version: link:../../packages/octane

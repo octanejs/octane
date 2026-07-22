@@ -15,6 +15,7 @@
     "debug-tsx": "pnpm run debug-volar"
   },
   "dependencies": {
+    "@octanejs/cmdk": "workspace:*",
     "octane": "workspace:*"
   },
   "devDependencies": {
