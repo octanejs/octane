@@ -436,6 +436,10 @@ jobs:
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
     runs-on: ubuntu-latest
+    # This matrix intentionally rewrites one importer without changing the
+    # repository lockfile after the frozen base install.
+    env:
+      PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
 
     strategy:
       fail-fast: false
