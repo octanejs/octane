@@ -150,6 +150,11 @@ function shiftGeneratedOffsets(mappings, offset) {
 // following `return` are parsed as one malformed expression. Insert explicit
 // statement terminators and return their original-code offsets so Volar
 // mappings can be shifted with the output.
+//
+// IMPORTANT: this applies only to statement-level native templates. Scoped
+// styles in return-style components stay as fragment children, where inserting
+// semicolons would produce invalid TSX like `<section/>;<style></style>;`
+// inside a `<>...</>`. Detect JSX context by scanning for an unclosed fragment.
 function terminateStylePlaceholderStatements(code) {
 	const marker = '<style></style>';
 	const insertions = new Set();
@@ -161,6 +166,35 @@ function terminateStylePlaceholderStatements(code) {
 		const nextLine = code.indexOf('\n', start + marker.length);
 		const lineEnd = nextLine < 0 ? code.length : nextLine;
 		if (code.slice(lineStart, lineEnd).trim() !== marker) {
+			from = start + marker.length;
+			continue;
+		}
+		// Check if we're inside a JSX fragment by scanning backwards for an
+		// unclosed `<>`. Find the enclosing block start first.
+		let braceDepth = 0;
+		let blockStart = start - 1;
+		while (blockStart >= 0) {
+			const ch = code[blockStart];
+			if (ch === '}') braceDepth++;
+			else if (ch === '{') {
+				if (braceDepth === 0) break;
+				braceDepth--;
+			}
+			blockStart--;
+		}
+		// Scan from block start to the style, tracking fragment depth.
+		let fragmentDepth = 0;
+		for (let i = Math.max(0, blockStart); i < start; i++) {
+			if (code[i] === '<' && code[i + 1] === '>') {
+				fragmentDepth++;
+				i++;
+			} else if (code[i] === '<' && code[i + 1] === '/' && code[i + 2] === '>') {
+				fragmentDepth--;
+				i += 2;
+			}
+		}
+		if (fragmentDepth > 0) {
+			// Inside an unclosed JSX fragment — skip terminators.
 			from = start + marker.length;
 			continue;
 		}
