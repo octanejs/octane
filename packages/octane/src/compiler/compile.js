@@ -8408,10 +8408,39 @@ function isFreshBindingExpr(node) {
 	);
 }
 
+function depPathMember(node) {
+	const expression = node?.type === 'ChainExpression' ? node.expression : node;
+	return expression?.type === 'MemberExpression' ? expression : null;
+}
+
+function staticDepMemberName(node) {
+	const member = depPathMember(node);
+	if (member === null) return null;
+	if (!member.computed && member.property.type === 'Identifier') return member.property.name;
+	if (
+		member.computed &&
+		member.property.type === 'Literal' &&
+		typeof member.property.value === 'string'
+	) {
+		return member.property.value;
+	}
+	return null;
+}
+
+function depPathKey(node) {
+	if (node.type === 'Identifier') return `identifier:${node.name}`;
+	const member = depPathMember(node);
+	const propertyName = staticDepMemberName(node);
+	return member !== null && member.object.type === 'Identifier' && propertyName !== null
+		? `member:${member.object.name}:${JSON.stringify(propertyName)}`
+		: null;
+}
+
 // Dep extraction for a memoized creation: one-level member paths for free
-// identifiers used as `obj.prop` (→ `props.id`, so a fresh props OBJECT with
-// unchanged fields doesn't refetch), bare identifiers otherwise. Scope-aware:
-// identifiers bound inside nested functions don't become deps.
+// identifiers used as `obj.prop` or `obj['prop']` (→ `props.id`, so a fresh
+// props OBJECT with unchanged fields doesn't refetch), bare identifiers
+// otherwise. Scope-aware: identifiers bound inside nested functions don't
+// become deps.
 function collectDepPaths(expr) {
 	const deps = [];
 	const seen = new Set();
@@ -8433,26 +8462,35 @@ function collectDepPaths(expr) {
 			case 'Identifier':
 				if (!bound.has(n.name)) push({ type: 'Identifier', name: n.name }, n.name);
 				return;
-			case 'MemberExpression':
-				if (!n.computed && n.object.type === 'Identifier' && n.property.type === 'Identifier') {
+			case 'MemberExpression': {
+				const propertyName = staticDepMemberName(n);
+				if (n.object.type === 'Identifier' && propertyName !== null) {
 					if (!bound.has(n.object.name)) {
-						const key = n.object.name + '.' + n.property.name;
-						push(
-							{
-								type: 'MemberExpression',
-								object: { type: 'Identifier', name: n.object.name },
-								property: { type: 'Identifier', name: n.property.name },
-								computed: false,
-								optional: false,
-							},
-							key,
-						);
+						const member = {
+							type: 'MemberExpression',
+							object: { type: 'Identifier', name: n.object.name },
+							property: n.computed
+								? {
+										type: 'Literal',
+										value: propertyName,
+										raw: JSON.stringify(propertyName),
+									}
+								: { type: 'Identifier', name: propertyName },
+							computed: n.computed,
+							optional: n.optional === true,
+						};
+						// Optional MemberExpressions must remain inside a ChainExpression.
+						// Besides keeping the synthesized tree valid ESTree, the wrapper
+						// preserves optional-evaluation semantics through later AST passes.
+						const dep = member.optional ? { type: 'ChainExpression', expression: member } : member;
+						push(dep, depPathKey(dep));
 					}
 					return;
 				}
 				walk(n.object, bound);
 				if (n.computed) walk(n.property, bound);
 				return;
+			}
 			case 'FunctionExpression':
 			case 'ArrowFunctionExpression': {
 				const inner = new Set(bound);
@@ -8699,14 +8737,14 @@ function makeCreationMemoCall(
 		const seen = new Set();
 		const coarsened = [];
 		for (const dep of deps) {
+			const member = depPathMember(dep);
 			const next =
-				dep.type === 'MemberExpression' && coarsenDepRoots.has(dep.object.name)
-					? { type: 'Identifier', name: dep.object.name }
+				member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)
+					? { type: 'Identifier', name: member.object.name }
 					: dep;
-			const key =
-				next.type === 'Identifier' ? next.name : `${next.object.name}.${next.property.name}`;
-			if (seen.has(key)) continue;
-			seen.add(key);
+			const key = depPathKey(next);
+			if (key !== null && seen.has(key)) continue;
+			if (key !== null) seen.add(key);
 			coarsened.push(next);
 		}
 		deps = coarsened;

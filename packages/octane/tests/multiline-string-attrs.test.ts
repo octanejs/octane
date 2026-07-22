@@ -1,10 +1,26 @@
-import { describe, expect, it } from 'vitest';
-import { compile } from 'octane/compiler';
+import { describe, expect, it, vi } from 'vitest';
+import { flushSync, hydrateRoot } from 'octane';
+import { renderToString } from 'octane/server';
+import { prerender } from 'octane/static';
 import { mount } from './_helpers.js';
-// Client compile of a fixture using every affected path: importing it at all
-// proves the emission is valid JS (an unescaped newline would be a module-load
-// SyntaxError).
-import { SpreadHost, PropChip } from './_fixtures/multiline-string-attr.tsrx';
+import { loadServerFixture } from './_server-fixture.js';
+import * as client from './_fixtures/multiline-string-attr.tsrx';
+
+const FIXTURE = 'packages/octane/tests/_fixtures/multiline-string-attr.tsrx';
+const server = loadServerFixture<typeof client>(FIXTURE);
+const MULTILINE_VALUE = 'one\n\t\t\t\ttwo';
+const MULTILINE_LABEL = 'accessible\n\t\t\t\tchip';
+const WARM_DATA_TESTID = 'warmed-multiline-prop-chip';
+const WARM_MULTILINE_VALUE = 'one\n\t\t\t\t\ttwo';
+const WARM_MULTILINE_LABEL = 'accessible\n\t\t\t\t\tchip';
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((fulfill) => {
+		resolve = fulfill;
+	});
+	return { promise, resolve };
+}
 
 // JSX string ATTRIBUTES may legally span lines (multi-line class strings are
 // common in Tailwind-heavy React code — tanstack.com's homepage has several).
@@ -13,25 +29,8 @@ import { SpreadHost, PropChip } from './_fixtures/multiline-string-attr.tsrx';
 // hostValue/spread binding path (printExpr), the createElement de-opt path,
 // and the SSR warm-child plan. Found porting tanstack.com (Phase 2c).
 describe('multi-line JSX string attributes', () => {
-	const MULTILINE =
-		'export function App(props: any) {\n\treturn (\n\t\t<div {...props.rest} class="one\n\t\ttwo" />\n\t);\n}\n';
-	const PROP =
-		'function Chip(props: any) { return <span>{props.title as string}</span>; }\nexport function App() {\n\treturn <Chip title="one\n\ttwo" />;\n}\n';
-
-	it('client + server compiles emit loadable JS for every affected path', () => {
-		for (const src of [MULTILINE, PROP]) {
-			for (const mode of [undefined, 'server'] as const) {
-				const { code } = compile(src, 'App.tsrx', mode ? { mode } : {});
-				// The literal must appear escaped, never as a raw line break
-				// inside a quoted string.
-				expect(code).not.toMatch(/"one\n/);
-				expect(code).not.toMatch(/'one\n/);
-			}
-		}
-	});
-
 	it('the multi-line value round-trips to the DOM intact', () => {
-		const mounted = mount(SpreadHost as any, { rest: { 'data-x': '1' } });
+		const mounted = mount(client.SpreadHost as any, { rest: { 'data-x': '1' } });
 		try {
 			expect(mounted.find('div').getAttribute('class')).toBe('one\n\t\ttwo');
 		} finally {
@@ -40,29 +39,106 @@ describe('multi-line JSX string attributes', () => {
 	});
 
 	it('component props carry the multi-line string intact', () => {
-		const mounted = mount(PropChip as any, {});
+		const mounted = mount(client.PropChip as any, {});
 		try {
-			expect(mounted.find('span').textContent).toBe('one\n\t\ttwo');
+			const chip = mounted.find('[data-testid="multiline-prop-chip"]');
+			expect(chip.getAttribute('aria-label')).toBe(MULTILINE_LABEL);
+			expect(chip.getAttribute('data-title')).toBe(MULTILINE_VALUE);
+			expect(chip.textContent).toBe(MULTILINE_VALUE);
 		} finally {
 			mounted.unmount();
 		}
 	});
-});
 
-// Sibling warm-plan emission bug found in the same integration pass: warm-child
-// prop KEYS printed as bare Identifiers, so aria-*/data-* props emitted
-// `aria-hidden:` (a parse error). Keys must quote when non-identifier.
-describe('warm-child plans quote non-identifier prop keys', () => {
-	it('server emit with aria-/data- props parses', () => {
-		const src = [
-			"import { Loader2 } from '@octanejs/lucide';",
-			'export function Spinner() {',
-			'\treturn <Loader2 aria-hidden="true" data-testid="spin" class="animate-spin" />;',
-			'}',
-			'',
-		].join('\n');
-		const { code } = compile(src, 'Spinner.tsrx', { mode: 'server' });
-		expect(code).not.toMatch(/[^"']aria-hidden:/);
-		expect(code).toMatch(/"aria-hidden"/);
+	it('server-renders and hydrates a spread-host value without replacing the node', () => {
+		const props = { rest: { 'data-x': 'server-and-client' } };
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = renderToString(server.SpreadHost, props).html;
+		const serverNode = container.querySelector('div')!;
+		expect(serverNode.getAttribute('class')).toBe('one\n\t\ttwo');
+		expect(serverNode.getAttribute('data-x')).toBe('server-and-client');
+
+		const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, client.SpreadHost, props);
+		try {
+			flushSync(() => {});
+			const hydratedNode = container.querySelector('div')!;
+			expect(hydratedNode).toBe(serverNode);
+			expect(hydratedNode.getAttribute('class')).toBe('one\n\t\ttwo');
+			expect(hydratedNode.getAttribute('data-x')).toBe('server-and-client');
+			expect(diagnostic).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			diagnostic.mockRestore();
+			container.remove();
+		}
+	});
+
+	it('server-renders and hydrates warm-child props exactly without replacing the node', () => {
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = renderToString(server.PropChip).html;
+		const serverNode = container.querySelector('[data-testid="multiline-prop-chip"]')!;
+		expect(serverNode.getAttribute('aria-label')).toBe(MULTILINE_LABEL);
+		expect(serverNode.getAttribute('data-testid')).toBe('multiline-prop-chip');
+		expect(serverNode.getAttribute('data-title')).toBe(MULTILINE_VALUE);
+		expect(serverNode.textContent).toBe(MULTILINE_VALUE);
+
+		const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, client.PropChip);
+		try {
+			flushSync(() => {});
+			const hydratedNode = container.querySelector('[data-testid="multiline-prop-chip"]')!;
+			expect(hydratedNode).toBe(serverNode);
+			expect(hydratedNode.getAttribute('aria-label')).toBe(MULTILINE_LABEL);
+			expect(hydratedNode.getAttribute('data-testid')).toBe('multiline-prop-chip');
+			expect(hydratedNode.getAttribute('data-title')).toBe(MULTILINE_VALUE);
+			expect(hydratedNode.textContent).toBe(MULTILINE_VALUE);
+			expect(diagnostic).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			diagnostic.mockRestore();
+			container.remove();
+		}
+	});
+
+	it('passes exact multi-line props into a warmed child fetch before it resolves', async () => {
+		const pending = deferred<string>();
+		const inputs: string[][] = [];
+		const done = prerender(server.WarmPropPage, {
+			load(...input) {
+				inputs.push(input);
+				return pending.promise;
+			},
+		});
+
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(inputs).toEqual([[WARM_MULTILINE_LABEL, WARM_DATA_TESTID, WARM_MULTILINE_VALUE]]);
+
+		pending.resolve('warmed');
+		const { html } = await done;
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		const chip = container.querySelector('[data-warm-result="warmed"]')!;
+		expect(chip.textContent).toBe(WARM_MULTILINE_VALUE);
+		expect(inputs).toHaveLength(1);
+	});
+
+	it('keeps an optional static computed dependency null-safe', async () => {
+		const inputs: string[] = [];
+		const { html } = await prerender(server.OptionalComputedPropPage, {
+			metadata: null,
+			load(label) {
+				inputs.push(label);
+				return Promise.resolve(label.toUpperCase());
+			},
+		});
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		expect(container.querySelector('[data-optional-computed-result]')?.textContent).toBe(
+			'FALLBACK',
+		);
+		expect(inputs).toEqual(['fallback']);
 	});
 });

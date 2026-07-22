@@ -51,6 +51,27 @@ export function PropChainHost({
 	}
 }
 
+function ComputedPropChainReader(props: {
+	'data-a': string;
+	'data-b': string;
+	load: (a: string, b: string) => Promise<string>;
+}) @{
+	const request = props.load(props['data-a'], props['data-b']);
+	<p id="computed-prop-chain">{use(request) as string}</p>
+}
+
+export function ComputedPropChainHost(props: {
+	'data-a': string;
+	'data-b': string;
+	load: (a: string, b: string) => Promise<string>;
+}) @{
+	@try {
+		<ComputedPropChainReader data-a={props['data-a']} data-b={props['data-b']} load={props.load} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
 function SwitchingChainReader({
 	fetchA,
 	fetchB,
@@ -83,6 +104,27 @@ export function SwitchingChainHost({
 }) @{
 	@try {
 		<SwitchingChainReader fetchA={fetchA} fetchB={fetchB} useB={useB} id={id} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
+function OptionalDerivedChainReader(props: {
+	fetchUser: (id: string) => Promise<{ v: string }> | null;
+	id: string;
+}) @{
+	const base = props.fetchUser(props.id);
+	const derived = base?.then((value) => value.v);
+	if (derived === undefined) throw new Error('fetchUser returned no promise');
+	<p id="optional-derived-chain">{use(derived) as string}</p>
+}
+
+export function OptionalDerivedChainHost(props: {
+	fetchUser: (id: string) => Promise<{ v: string }> | null;
+	id: string;
+}) @{
+	@try {
+		<OptionalDerivedChainReader fetchUser={props.fetchUser} id={props.id} />
 	} @pending {
 		<p>loading</p>
 	}
