@@ -132,10 +132,9 @@
         "reason": "Main-thread specialization is a post-preview capability."
       },
       {
-        "classification": "deferred",
-        "milestone": 7,
+        "classification": "out-of-scope",
         "subpaths": ["./worklet-dev-runtime", "./worklet-runtime"],
-        "reason": "Main-thread worklets and cross-thread calls are a post-preview capability."
+        "reason": "These are ReactLynx worklet runtime entrypoints, not compatibility targets. Milestone 7 implements the authored directives, Lynx-compatible descriptor envelope, capture isolation, lifetime registries, and cross-thread calls in Octane's compiler and @octanejs/lynx without importing the ReactLynx component, Preact, transform, or worklet runtime."
       },
       {
         "classification": "deferred",
@@ -231,10 +230,10 @@
         "reason": "Manual first-screen handoff requires dual-thread adoption."
       },
       {
-        "classification": "deferred",
+        "classification": "port",
         "milestone": 7,
         "exports": ["MainThreadRef", "runOnBackground", "runOnMainThread", "useMainThreadRef"],
-        "reason": "Main-thread refs and cross-thread calls are a post-preview capability."
+        "reason": "The private Milestone 7 source implements Octane-owned main-thread ref cells and cancelable bidirectional calls with clone-safe arguments/results, pre-adoption queuing, stale-root protection, and exactly-once settlement. Native and pinned differential evidence remain formal gates."
       },
       {
         "classification": "deferred",
@@ -375,9 +374,16 @@
         "members": ["global.__MAIN_THREAD__"]
       },
       {
+        "classification": "port",
+        "milestone": 7,
+        "members": ["StandardProps.main-thread:* event props", "StandardProps.main-thread:ref"],
+        "reason": "The private Milestone 7 host accepts main-thread worklet event descriptors and main-thread refs, activates them only while their host is live, and updates refs to adopted Element PAPI nodes in the JavaScript host model."
+      },
+      {
         "classification": "deferred",
         "milestone": 7,
-        "members": ["Lynx.querySelector", "Lynx.querySelectorAll", "StandardProps.main-thread:ref"]
+        "members": ["Lynx.querySelector", "Lynx.querySelectorAll"],
+        "reason": "Octane's initial main-thread refs expose adopted nodes through explicit cells; ReactLynx-compatible main-thread selector helpers and native behavior remain unproven."
       },
       {
         "classification": "deferred",
@@ -537,7 +543,7 @@
           "packages/react/testing-library/src/__tests__/worklet.test.jsx"
         ],
         "caseLevelOverrides": [
-          "Ordinary background event cases in ET compiled event fixtures are port/M3; main-thread event cases are deferred/M7.",
+          "Ordinary background event cases in ET compiled event fixtures are port/M3. Focused Octane Milestone 7 tests cover main-thread descriptors, host event/ref lifetime, and cross-thread calls, but case-level classification of the mixed upstream worklet sources remains pending.",
           "Main-thread API and root-render files mix preview lifecycle behavior with IFR/adoption behavior.",
           "The orphan shared/profile test is deferred/M9 and is not part of the runtime package test command."
         ]

@@ -46,6 +46,74 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 // ordinary renderers while allowing native first-screen programs to erase
 // background-owned callbacks from their render-only specialization.
 const MAIN_THREAD_RENDER_ONLY_CAPABILITY = 'main-thread-render-only';
+const THREAD_FUNCTION_CAPABILITY = 'thread-functions';
+const THREAD_DIRECTIVES = new Map([
+	['main thread', 'main-thread'],
+	['background only', 'background'],
+]);
+const UNIVERSAL_REALM_GLOBALS = new Set([
+	'Array',
+	'ArrayBuffer',
+	'Atomics',
+	'BigInt',
+	'BigInt64Array',
+	'BigUint64Array',
+	'Boolean',
+	'DataView',
+	'Date',
+	'Error',
+	'EvalError',
+	'FinalizationRegistry',
+	'Float32Array',
+	'Float64Array',
+	'Function',
+	'Infinity',
+	'Int16Array',
+	'Int32Array',
+	'Int8Array',
+	'Intl',
+	'JSON',
+	'Map',
+	'Math',
+	'NaN',
+	'Number',
+	'Object',
+	'Promise',
+	'Proxy',
+	'RangeError',
+	'ReferenceError',
+	'Reflect',
+	'RegExp',
+	'Set',
+	'SharedArrayBuffer',
+	'String',
+	'Symbol',
+	'SyntaxError',
+	'TypeError',
+	'URIError',
+	'Uint16Array',
+	'Uint32Array',
+	'Uint8Array',
+	'Uint8ClampedArray',
+	'WeakMap',
+	'WeakRef',
+	'WeakSet',
+	'WebAssembly',
+	'console',
+	'decodeURI',
+	'decodeURIComponent',
+	'encodeURI',
+	'encodeURIComponent',
+	'escape',
+	'eval',
+	'globalThis',
+	'isFinite',
+	'isNaN',
+	'parseFloat',
+	'parseInt',
+	'undefined',
+	'unescape',
+]);
 const MAIN_THREAD_BACKGROUND_EFFECTS = new Set([
 	'useEffect',
 	'useEffectEvent',
@@ -156,8 +224,9 @@ function compileRenderableExpression(node, state) {
 
 function rewriteSourceNode(node, state) {
 	if (!node || typeof node !== 'object' || typeof node.start !== 'number') return printNode(node);
+	const prefix = state.sourceNodePrefixes?.get(node) ?? '';
 	const directReplacement = state.sourceNodeReplacements?.get(node);
-	if (directReplacement !== undefined) return directReplacement;
+	if (directReplacement !== undefined) return prefix + directReplacement;
 	const replacements = [];
 	const seen = new WeakSet();
 	const visit = (value) => {
@@ -169,9 +238,13 @@ function rewriteSourceNode(node, state) {
 		if (seen.has(value)) return;
 		seen.add(value);
 		const replacement = state.sourceNodeReplacements?.get(value);
+		const nestedPrefix = state.sourceNodePrefixes?.get(value) ?? '';
 		if (value !== node && replacement !== undefined) {
-			replacements.push({ start: value.start, end: value.end, code: replacement });
+			replacements.push({ start: value.start, end: value.end, code: nestedPrefix + replacement });
 			return;
+		}
+		if (value !== node && nestedPrefix !== '') {
+			replacements.push({ start: value.start, end: value.start, code: nestedPrefix });
 		}
 		if (value !== node && isTemplateNode(value)) {
 			replacements.push({
@@ -194,7 +267,7 @@ function rewriteSourceNode(node, state) {
 			replacement.code +
 			code.slice(replacement.end - node.start);
 	}
-	return code;
+	return prefix + code;
 }
 
 function extractEntryParallelUses(expression, state) {
@@ -462,6 +535,8 @@ function validateForbiddenImports(
 		const source = sourceNode?.value;
 		if (
 			typeof source !== 'string' ||
+			!isThreadNodeActive(state, sourceNode) ||
+			isThreadImportElided(state, sourceNode) ||
 			(!isAuthored(sourceNode) && !referencedStaticSources?.has(sourceNode))
 		) {
 			return;
@@ -491,6 +566,7 @@ function validateForbiddenImports(
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+		if (!isThreadNodeActive(state, node)) return;
 		if (node.type === 'ImportExpression') collectRequest(node.source);
 		if (node.type === 'CallExpression') {
 			let bindingName = null;
@@ -788,6 +864,7 @@ function createLexicalAnalysis(ast) {
 	const isBound = (scope, name) => resolveBinding(scope, name) !== null;
 	return {
 		bindingNodes,
+		commonJsSource,
 		nonReferenceNodes,
 		nodeScopes,
 		rootScope,
@@ -845,18 +922,527 @@ function isIdentifierReference(node, parent, key, lexicalAnalysis) {
 	return true;
 }
 
+function threadHash(value) {
+	let left = 5381;
+	let right = 52711;
+	for (let index = 0; index < value.length; index++) {
+		const code = value.charCodeAt(index);
+		left = (Math.imul(left, 33) + code) | 0;
+		right = (Math.imul(right, 31) ^ code) | 0;
+	}
+	return `${(left >>> 0).toString(36)}${(right >>> 0).toString(36)}`;
+}
+
+function compareSourcePosition(left, right) {
+	if (left.line !== right.line) return left.line - right.line;
+	return left.column - right.column;
+}
+
+function isThreadNodeActive(state, node) {
+	const ranges = state.threadErasedRanges ?? [];
+	const position = node?.loc?.start;
+	if (position === undefined || ranges.length === 0) return true;
+	let low = 0;
+	let high = ranges.length - 1;
+	while (low <= high) {
+		const middle = (low + high) >>> 1;
+		const range = ranges[middle];
+		if (compareSourcePosition(position, range.start) < 0) {
+			high = middle - 1;
+		} else if (compareSourcePosition(position, range.end) >= 0) {
+			low = middle + 1;
+		} else {
+			return false;
+		}
+	}
+	return true;
+}
+
+function isThreadImportElided(state, sourceNode) {
+	const position = sourceNode?.loc?.start;
+	return (
+		position !== undefined &&
+		(state.threadElidedImportLocations ?? []).some(
+			(candidate) => compareSourcePosition(position, candidate) === 0,
+		)
+	);
+}
+
+function scopeContains(scope, boundary) {
+	for (let current = scope; current; current = current.parent) {
+		if (current === boundary) return true;
+	}
+	return false;
+}
+
+function threadFunctionCaptures(site, state, lexicalAnalysis) {
+	const { fn, directive } = site;
+	const { nodeScopes, resolveBinding, rootScope } = lexicalAnalysis;
+	const bodyScope = nodeScopes.get(fn.body);
+	const functionBoundary = bodyScope?.parent ?? bodyScope;
+	const captures = new Map();
+	const seen = new WeakSet();
+	const visit = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, parent, key);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (node === directive) return;
+		if (isTemplateNode(node)) {
+			throw universalError(
+				state.filename,
+				node,
+				'thread functions cannot contain JSX or TSRX template syntax.',
+			);
+		}
+		if (node.type === 'ThisExpression' || node.type === 'Super') {
+			throw universalError(
+				state.filename,
+				node,
+				'thread functions cannot reference this or super; pass serializable values explicitly.',
+			);
+		}
+		if (
+			node.type === 'MetaProperty' &&
+			node.meta?.name === 'new' &&
+			node.property?.name === 'target'
+		) {
+			throw universalError(state.filename, node, 'thread functions cannot reference new.target.');
+		}
+		if (
+			node.type === 'Identifier' &&
+			node.name === 'arguments' &&
+			isIdentifierReference(node, parent, key, lexicalAnalysis)
+		) {
+			throw universalError(
+				state.filename,
+				node,
+				'thread functions cannot capture arguments; use an explicit rest parameter.',
+			);
+		}
+		if (node.type === 'CallExpression' && node.callee?.type === 'Identifier') {
+			const binding = resolveBinding(nodeScopes.get(node.callee) ?? rootScope, node.callee.name);
+			if (node.callee.name === 'eval' && binding === null) {
+				throw universalError(
+					state.filename,
+					node.callee,
+					'thread functions cannot call direct eval.',
+				);
+			}
+			const imported = state.runtimeImports.get(node.callee.name);
+			if (imported === 'use' || /^use[A-Z]/.test(imported ?? node.callee.name)) {
+				throw universalError(state.filename, node.callee, 'thread functions cannot call hooks.');
+			}
+		}
+		if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexicalAnalysis)) {
+			const binding = resolveBinding(nodeScopes.get(node) ?? rootScope, node.name);
+			if (
+				(binding === null && state.threadExternalCaptures?.has(node.name)) ||
+				(binding !== null &&
+					binding.scope !== rootScope &&
+					!scopeContains(binding.scope, functionBoundary))
+			) {
+				const existing = captures.get(node.name);
+				if (existing === undefined || (node.start ?? Infinity) < existing.offset) {
+					captures.set(node.name, { name: node.name, offset: node.start ?? Infinity });
+				}
+			}
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	};
+	for (const parameter of fn.params ?? []) visit(parameter, fn, 'params');
+	visit(fn.body, fn, 'body');
+	return [...captures.values()].sort((left, right) => left.offset - right.offset);
+}
+
+function threadFunctionSource(site, state) {
+	const { fn, directive } = site;
+	const source = state.source.slice(fn.start, fn.end);
+	return source.slice(0, directive.start - fn.start) + source.slice(directive.end - fn.start);
+}
+
+function rewriteThreadImport(node, specifiers, state) {
+	const defaultSpecifier = specifiers.find(
+		(specifier) => specifier.type === 'ImportDefaultSpecifier',
+	);
+	const namespaceSpecifier = specifiers.find(
+		(specifier) => specifier.type === 'ImportNamespaceSpecifier',
+	);
+	const namedSpecifiers = specifiers.filter((specifier) => specifier.type === 'ImportSpecifier');
+	const parts = [];
+	if (defaultSpecifier) parts.push(defaultSpecifier.local.name);
+	if (namespaceSpecifier) parts.push(`* as ${namespaceSpecifier.local.name}`);
+	if (namedSpecifiers.length > 0) {
+		parts.push(
+			`{ ${namedSpecifiers
+				.map((specifier) => {
+					const imported = state.source.slice(specifier.imported.start, specifier.imported.end);
+					const local = specifier.local.name;
+					const binding = imported === local ? imported : `${imported} as ${local}`;
+					return specifier.importKind === 'type' ? `type ${binding}` : binding;
+				})
+				.join(', ')} }`,
+		);
+	}
+	const sourceAndAttributes = state.source.slice(node.source.start, node.end);
+	return `import${node.importKind === 'type' ? ' type' : ''} ${parts.join(
+		', ',
+	)} from ${sourceAndAttributes}`;
+}
+
+function keepThreadImportBinding(references, source, name) {
+	const counts = references.get(source)?.get(name);
+	return counts === undefined || counts.total === 0 || counts.active > 0;
+}
+
+function isStaticThreadImportSource(source) {
+	return source?.type === 'Literal' && typeof source.value === 'string';
+}
+
+function rewriteThreadVariableDeclaration(node, declarations, state) {
+	const first = node.declarations?.[0];
+	const last = node.declarations?.at(-1);
+	if (first === undefined || last === undefined) return rewriteSourceNode(node, state);
+	return (
+		state.source.slice(node.start, first.start) +
+		declarations.map((declaration) => rewriteSourceNode(declaration, state)).join(', ') +
+		state.source.slice(last.end, node.end)
+	);
+}
+
+function prepareThreadFunctionReplacements(ast, state) {
+	if (!rendererHasCapability(state, THREAD_FUNCTION_CAPABILITY)) return;
+	const parents = new WeakMap();
+	const directives = [];
+	const seen = new WeakSet();
+	const visit = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, parent, key);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (parent !== null) parents.set(node, parent);
+		if (
+			node.type === 'ExpressionStatement' &&
+			THREAD_DIRECTIVES.has(node.directive ?? node.expression?.value)
+		) {
+			directives.push(node);
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	};
+	visit(ast);
+	if (directives.length === 0) return;
+
+	const sites = [];
+	for (const directive of directives.sort((left, right) => left.start - right.start)) {
+		const directiveValue = directive.directive ?? directive.expression.value;
+		let fn = parents.get(directive);
+		while (
+			fn &&
+			fn.type !== 'FunctionDeclaration' &&
+			fn.type !== 'FunctionExpression' &&
+			fn.type !== 'ArrowFunctionExpression'
+		) {
+			fn = parents.get(fn);
+		}
+		if (!fn || fn.body?.type !== 'BlockStatement' || fn.body.body?.[0] !== directive) {
+			throw universalError(
+				state.filename,
+				directive,
+				`${JSON.stringify(directiveValue)} must be the first statement of a function body.`,
+			);
+		}
+		const parent = parents.get(fn);
+		if (
+			parent?.type === 'MethodDefinition' ||
+			(parent?.type === 'Property' && (parent.method === true || parent.kind !== 'init'))
+		) {
+			throw universalError(
+				state.filename,
+				directive,
+				'thread directives are not supported in methods, getters, setters, or constructors; use a function-valued field or declaration.',
+			);
+		}
+		let declarationContainer = null;
+		if (fn.type === 'FunctionDeclaration') {
+			const declarationParent = parents.get(fn);
+			declarationContainer =
+				declarationParent?.type === 'ExportNamedDeclaration' ||
+				declarationParent?.type === 'ExportDefaultDeclaration'
+					? parents.get(declarationParent)
+					: declarationParent;
+			if (
+				declarationContainer?.type !== 'Program' &&
+				declarationContainer?.type !== 'BlockStatement' &&
+				declarationContainer?.type !== 'JSXCodeBlock'
+			) {
+				throw universalError(
+					state.filename,
+					directive,
+					'thread function declarations require a module or block statement container.',
+				);
+			}
+		}
+		const kind = THREAD_DIRECTIVES.get(directiveValue);
+		if (fn.generator || (kind === 'main-thread' && fn.async)) {
+			throw universalError(
+				state.filename,
+				directive,
+				kind === 'main-thread' && fn.async
+					? 'main-thread functions cannot be async functions.'
+					: 'thread functions cannot be generator functions.',
+			);
+		}
+		sites.push({
+			fn,
+			directive,
+			kind,
+			declarationContainer,
+		});
+	}
+
+	for (let index = 0; index < sites.length; index++) {
+		const outer = sites[index];
+		for (let nestedIndex = index + 1; nestedIndex < sites.length; nestedIndex++) {
+			const nested = sites[nestedIndex];
+			if (nested.fn.start >= outer.fn.end) break;
+			if (nested.fn.end <= outer.fn.end) {
+				throw universalError(
+					state.filename,
+					nested.directive,
+					'thread functions cannot contain another thread function.',
+				);
+			}
+		}
+	}
+
+	if (state.universalRuntime === undefined) {
+		throw universalError(
+			state.filename,
+			sites[0].directive,
+			'thread directives require universalRuntime.thread to select the current execution layer.',
+		);
+	}
+
+	state.sourceNodeReplacements ??= new WeakMap();
+	state.threadFunctionNodes = new WeakSet(sites.map((site) => site.fn));
+	state.threadFunctionRegistrations = [];
+	state.threadErasedRanges = sites
+		.filter((site) => site.kind !== state.universalRuntime.thread)
+		.map((site) => ({ start: site.fn.loc?.start, end: site.fn.loc?.end }))
+		.sort((left, right) => compareSourcePosition(left.start, right.start));
+	if (sites.some((site) => site.kind === state.universalRuntime.thread)) {
+		state.helpers.registerThreadFunction = allocName(
+			state,
+			`${state.planPrefix ?? '__octane'}RegisterThreadFunction`,
+		);
+	}
+	if (sites.some((site) => site.fn.type !== 'FunctionDeclaration')) {
+		state.helpers.bindThreadFunction = allocName(
+			state,
+			`${state.planPrefix ?? '__octane'}BindThreadFunction`,
+		);
+	}
+	if (sites.some((site) => site.fn.type === 'FunctionDeclaration')) {
+		state.helpers.attachThreadFunction = allocName(
+			state,
+			`${state.planPrefix ?? '__octane'}AttachThreadFunction`,
+		);
+		state.helpers.invokeThreadFunction = allocName(
+			state,
+			`${state.planPrefix ?? '__octane'}InvokeThreadFunction`,
+		);
+	}
+	const captureParameter = allocName(state, '__octaneThreadCaptures');
+	const receiverParameter = allocName(state, '__octaneThreadReceiver');
+	const argumentParameter = allocName(state, '__octaneThreadArguments');
+	const wrapperArguments = allocName(state, '__octaneThreadCallArguments');
+	const lexicalAnalysis = createLexicalAnalysis(ast);
+
+	for (const site of sites) {
+		const captures = threadFunctionCaptures(site, state, lexicalAnalysis);
+		const strippedSource = threadFunctionSource(site, state);
+		const loc = site.fn.loc?.start;
+		// Function bodies change during live definition reloads. Keep the site ID
+		// anchored to module/location so re-registration revises the same runtime
+		// definition and existing activations become inert.
+		const id = `tf_${threadHash(
+			`${state.profileFilename || state.filename || '<anon>'}\0${site.kind}\0${loc?.line ?? 0}:${
+				loc?.column ?? 0
+			}`,
+		)}`;
+		const metadata = JSON.stringify({
+			file: (state.profileFilename || state.filename || '<anon>').split(/[\\/]/).pop(),
+			line: loc?.line ?? 0,
+			column: loc?.column ?? 0,
+		});
+		const captureValues = `[${captures.map((capture) => capture.name).join(', ')}]`;
+		const captureProvider = `() => ${captureValues}`;
+		const helperArguments = `${JSON.stringify(site.kind)}, ${JSON.stringify(id)}, ${captureProvider}, ${metadata}`;
+		Object.assign(site, { captures, strippedSource, id, metadata, helperArguments });
+	}
+
+	const declarationAttachments = new Map();
+	for (const site of sites) {
+		const { captures, strippedSource, id, metadata, helperArguments } = site;
+		if (site.fn.type === 'FunctionDeclaration') {
+			let name = site.fn.id?.name;
+			if (!name) name = allocName(state, '__octaneThreadDefault');
+			const attachment = `${state.helpers.attachThreadFunction}(${name}, ${helperArguments});`;
+			const wrapper =
+				`function ${name}(...${wrapperArguments}) { ` +
+				`${attachment} ` +
+				`return ${state.helpers.invokeThreadFunction}(${name}, this, ${wrapperArguments}); }`;
+			state.sourceNodeReplacements.set(site.fn, wrapper);
+			let attachments = declarationAttachments.get(site.declarationContainer);
+			if (attachments === undefined) {
+				attachments = [];
+				declarationAttachments.set(site.declarationContainer, attachments);
+			}
+			attachments.push(attachment);
+		} else {
+			state.sourceNodeReplacements.set(
+				site.fn,
+				`${state.helpers.bindThreadFunction}(${helperArguments})`,
+			);
+		}
+		if (site.kind === state.universalRuntime.thread) {
+			const captureSetup =
+				captures.length === 0
+					? ''
+					: `let [${captures.map((capture) => capture.name).join(', ')}] = ${captureParameter}; `;
+			state.threadFunctionRegistrations.push(
+				`${state.helpers.registerThreadFunction}(${JSON.stringify(site.kind)}, ${JSON.stringify(
+					id,
+				)}, function (${captureParameter}, ${receiverParameter}, ${argumentParameter}) { ${captureSetup}return (${strippedSource}).apply(${receiverParameter}, ${argumentParameter}); }, ${metadata});`,
+			);
+		}
+	}
+	state.sourceNodePrefixes ??= new WeakMap();
+	for (const [container, attachments] of declarationAttachments) {
+		const prefix = `${attachments.join(' ')}\n`;
+		if (container?.type === 'Program') {
+			state.threadFunctionRegistrations.push(prefix);
+			continue;
+		}
+		const firstStatement = (container?.body ?? []).find(
+			(statement) => statement?.type !== 'ExpressionStatement' || statement.directive === undefined,
+		);
+		if (firstStatement === undefined) continue;
+		state.sourceNodePrefixes.set(
+			firstStatement,
+			(state.sourceNodePrefixes.get(firstStatement) ?? '') + prefix,
+		);
+	}
+
+	const importReferences = new Map();
+	const visitImportReferences = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visitImportReferences(child, parent, key);
+			return;
+		}
+		if (
+			(node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexicalAnalysis)) ||
+			isJsxBindingReference(node, parent, key)
+		) {
+			const binding = lexicalAnalysis.resolveBinding(
+				lexicalAnalysis.nodeScopes.get(node) ?? lexicalAnalysis.rootScope,
+				node.name,
+			);
+			if (binding?.importSource) {
+				let references = importReferences.get(binding.importSource);
+				if (references === undefined) {
+					references = new Map();
+					importReferences.set(binding.importSource, references);
+				}
+				const counts = references.get(node.name) ?? { active: 0, total: 0 };
+				counts.total++;
+				if (isThreadNodeActive(state, node)) counts.active++;
+				references.set(node.name, counts);
+			}
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visitImportReferences(child, node, childKey));
+	};
+	visitImportReferences(ast);
+	state.threadElidedImportLocations = [];
+	for (const node of ast.body ?? []) {
+		if (node.type === 'ImportDeclaration' && (node.specifiers?.length ?? 0) > 0) {
+			const keptSpecifiers = (node.specifiers ?? []).filter((specifier) => {
+				if (node.importKind === 'type' || specifier.importKind === 'type') return true;
+				return keepThreadImportBinding(importReferences, node.source, specifier.local?.name);
+			});
+			if (keptSpecifiers.length === (node.specifiers ?? []).length) continue;
+			if (keptSpecifiers.length === 0) {
+				state.sourceNodeReplacements.set(node, '');
+				if (node.source?.loc?.start) state.threadElidedImportLocations.push(node.source.loc.start);
+			} else {
+				state.sourceNodeReplacements.set(node, rewriteThreadImport(node, keptSpecifiers, state));
+			}
+			continue;
+		}
+		if (node.type === 'TSImportEqualsDeclaration') {
+			const source = node.moduleReference?.expression;
+			if (
+				node.isExport !== true &&
+				isStaticThreadImportSource(source) &&
+				!keepThreadImportBinding(importReferences, source, node.id?.name)
+			) {
+				state.sourceNodeReplacements.set(node, '');
+				if (source.loc?.start) state.threadElidedImportLocations.push(source.loc.start);
+			}
+			continue;
+		}
+		if (node.type === 'VariableDeclaration' && node.declare !== true) {
+			const removedSources = [];
+			const keptDeclarations = (node.declarations ?? []).filter((declaration) => {
+				const source = lexicalAnalysis.commonJsSource(
+					declaration.init,
+					lexicalAnalysis.nodeScopes.get(declaration.init) ?? lexicalAnalysis.rootScope,
+				);
+				if (!isStaticThreadImportSource(source)) return true;
+				const names = new Set();
+				addPatternNames(declaration.id, names);
+				if (
+					names.size === 0 ||
+					[...names].some((name) => keepThreadImportBinding(importReferences, source, name))
+				) {
+					return true;
+				}
+				removedSources.push(source);
+				return false;
+			});
+			if (keptDeclarations.length === (node.declarations ?? []).length) continue;
+			state.sourceNodeReplacements.set(
+				node,
+				keptDeclarations.length === 0
+					? ''
+					: rewriteThreadVariableDeclaration(node, keptDeclarations, state),
+			);
+			for (const source of removedSources) {
+				if (source.loc?.start) state.threadElidedImportLocations.push(source.loc.start);
+			}
+		}
+	}
+}
+
 function isJsxBindingReference(node, parent, key) {
 	if (node.type !== 'JSXIdentifier') return false;
 	if (
 		(parent?.type === 'JSXOpeningElement' || parent?.type === 'JSXClosingElement') &&
 		key === 'name'
 	) {
-		return true;
+		return !/^[a-z]/.test(node.name) && !node.name.includes('-');
 	}
 	return parent?.type === 'JSXMemberExpression' && key === 'object';
 }
 
-function referencedImportSources(ast, lexicalAnalysis, isAuthored) {
+function referencedImportSources(ast, lexicalAnalysis, isAuthored, isActive = () => true) {
 	const { nodeScopes, resolveBinding, rootScope } = lexicalAnalysis;
 	const sources = new Set();
 	const seen = new WeakSet();
@@ -868,6 +1454,7 @@ function referencedImportSources(ast, lexicalAnalysis, isAuthored) {
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+		if (!isActive(node)) return;
 		if (
 			isAuthored(node) &&
 			((node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexicalAnalysis)) ||
@@ -926,6 +1513,7 @@ function validateForbiddenGlobals(ast, state, validation, isAuthored, lexicalAna
 		}
 		if (seen.has(node)) return;
 		seen.add(node);
+		if (!isThreadNodeActive(state, node)) return;
 		const scope = nodeScopes.get(node) ?? rootScope;
 		if (
 			node.type === 'Identifier' &&
@@ -1177,6 +1765,7 @@ function validateLoweredRendererSource(ast, state, origins, authoredSource) {
 			authoredAst,
 			lexicalAnalysis,
 			isOriginalAuthored,
+			(node) => isThreadNodeActive(state, node),
 		);
 		state.validationImportReferences = importSourceRanges(referencedStaticSources);
 		validateForbiddenImports(
@@ -1257,6 +1846,21 @@ function jsxName(node) {
 
 function attributeName(attribute) {
 	return attribute?.name?.type === 'JSXIdentifier' ? attribute.name.name : null;
+}
+
+function hostAttributeName(attribute, state) {
+	const direct = attributeName(attribute);
+	if (direct !== null) return direct;
+	const name = attribute?.name;
+	if (
+		!rendererHasCapability(state, THREAD_FUNCTION_CAPABILITY) ||
+		name?.type !== 'JSXNamespacedName' ||
+		name.namespace?.name !== 'main-thread' ||
+		typeof name.name?.name !== 'string'
+	) {
+		return null;
+	}
+	return `main-thread:${name.name.name}`;
 }
 
 function canonicalHostAttributeName(name, canonicalizeHostClass) {
@@ -1347,19 +1951,19 @@ function addPatternNames(pattern, names) {
 }
 
 function collectEntryCaptures(expression, excluded) {
+	const lexicalAnalysis = createLexicalAnalysis(expression);
+	const { nodeScopes, resolveBinding, rootScope } = lexicalAnalysis;
 	const found = new Map();
-	const visit = (node, bound, parent = null, key = null) => {
+	const visit = (node, parent = null, key = null) => {
 		if (!node || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
-			for (const child of node) visit(child, bound, parent, key);
+			for (const child of node) visit(child, parent, key);
 			return;
 		}
-		if (node.type === 'Identifier') {
+		if (node.type === 'Identifier' && isIdentifierReference(node, parent, key, lexicalAnalysis)) {
 			if (
-				!bound.has(node.name) &&
-				!excluded.has(node.name) &&
-				!(parent?.type === 'MemberExpression' && key === 'property' && !parent.computed) &&
-				!(parent?.type === 'Property' && key === 'key' && !parent.computed && !parent.shorthand)
+				resolveBinding(nodeScopes.get(node) ?? rootScope, node.name) === null &&
+				!excluded.has(node.name)
 			) {
 				const entry = found.get(node.name) ?? { offset: Infinity, nodes: [] };
 				entry.offset = Math.min(entry.offset, node.start ?? Infinity);
@@ -1368,66 +1972,55 @@ function collectEntryCaptures(expression, excluded) {
 			}
 			return;
 		}
-		if (node.type === 'JSXElement' || node.type === 'Element') {
-			for (const attribute of node.openingElement?.attributes ?? node.attributes ?? []) {
-				if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
-					visit(attribute.argument, bound, attribute, 'argument');
-				} else if (attribute.value?.type === 'JSXExpressionContainer') {
-					visit(attribute.value.expression, bound, attribute.value, 'expression');
-				}
-			}
-			visit(node.children, bound, node, 'children');
-			return;
-		}
-		if (node.type === 'JSXFragment' || node.type === 'Fragment') {
-			visit(node.children, bound, node, 'children');
-			return;
-		}
-		if (
-			node.type === 'FunctionDeclaration' ||
-			node.type === 'FunctionExpression' ||
-			node.type === 'ArrowFunctionExpression'
-		) {
-			const inner = new Set(bound);
-			if (node.id) addPatternNames(node.id, inner);
-			for (const parameter of node.params ?? []) addPatternNames(parameter, inner);
-			visit(node.body, inner, node, 'body');
-			return;
-		}
-		if (node.type === 'VariableDeclaration') {
-			const inner = new Set(bound);
-			for (const declaration of node.declarations ?? []) addPatternNames(declaration.id, inner);
-			for (const declaration of node.declarations ?? []) {
-				visit(declaration.init, inner, declaration, 'init');
-			}
-			return;
-		}
-		if (node.type === 'ForOfStatement' || node.type === 'ForInStatement') {
-			visit(node.right, bound, node, 'right');
-			const inner = new Set(bound);
-			if (node.left?.type === 'VariableDeclaration') {
-				for (const declaration of node.left.declarations ?? [])
-					addPatternNames(declaration.id, inner);
-			} else addPatternNames(node.left, inner);
-			visit(node.body, inner, node, 'body');
-			return;
-		}
-		for (const [childKey, child] of Object.entries(node)) {
-			if (
-				childKey === 'loc' ||
-				childKey === 'start' ||
-				childKey === 'end' ||
-				childKey === 'metadata'
-			) {
-				continue;
-			}
-			visit(child, bound, node, childKey);
-		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
 	};
-	visit(expression, new Set());
+	visit(expression);
 	return [...found]
 		.sort((left, right) => left[1].offset - right[1].offset)
 		.map(([source, entry]) => ({ source, nodes: entry.nodes }));
+}
+
+function authoredReferenceBindingMap(source, filename) {
+	const ast = parseModule(source, filename);
+	const lexicalAnalysis = createLexicalAnalysis(ast);
+	const { nodeScopes, resolveBinding, rootScope } = lexicalAnalysis;
+	const bindings = new Map();
+	const seen = new WeakSet();
+	const visit = (node, parent = null, key = null) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child, parent, key);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'Identifier' &&
+			typeof node.start === 'number' &&
+			isIdentifierReference(node, parent, key, lexicalAnalysis)
+		) {
+			const binding = resolveBinding(nodeScopes.get(node) ?? rootScope, node.name);
+			bindings.set(
+				`${node.start}:${node.name}`,
+				binding === null ? 'global' : binding.scope === rootScope ? 'module' : 'local',
+			);
+		}
+		forEachRuntimeAstChild(node, (child, childKey) => visit(child, node, childKey));
+	};
+	visit(ast);
+	return bindings;
+}
+
+function captureHasAuthoredBinding(capture, origins, bindings) {
+	for (const node of capture.nodes) {
+		for (let offset = node.start ?? 0; offset < (node.end ?? node.start ?? 0); offset++) {
+			const original = origins[offset] ?? -1;
+			if (original < 0) continue;
+			const bound = bindings.get(`${original}:${capture.source}`);
+			if (bound !== undefined) return bound;
+		}
+	}
+	return null;
 }
 
 function collectIdentifierNodes(root, names) {
@@ -1477,14 +2070,20 @@ function addDynamic(context, expression) {
 	return { kind: 'slot', slot };
 }
 
-function compileProps(attributes, childrenExpression, state, canonicalizeHostClass = false) {
+function compileProps(
+	attributes,
+	childrenExpression,
+	state,
+	canonicalizeHostClass = false,
+	host = false,
+) {
 	const entries = [];
 	for (const attribute of attributes) {
 		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
 			entries.push(`['spread', (${printDynamicExpression(attribute.argument, state)})]`);
 			continue;
 		}
-		const rawName = attributeName(attribute);
+		const rawName = host ? hostAttributeName(attribute, state) : attributeName(attribute);
 		const name = canonicalHostAttributeName(rawName, canonicalizeHostClass);
 		if (name === null) {
 			throw universalError(state.filename, attribute, 'namespaced JSX attributes are unsupported.');
@@ -1545,7 +2144,10 @@ function compileAttribute(attribute, context, state, canonicalizeHostClass) {
 			'host spreads require the ordered universal prop program.',
 		);
 	}
-	const name = canonicalHostAttributeName(attributeName(attribute), canonicalizeHostClass);
+	const name = canonicalHostAttributeName(
+		hostAttributeName(attribute, state),
+		canonicalizeHostClass,
+	);
 	if (name === null) {
 		throw universalError(state.filename, attribute, 'namespaced host attributes are unsupported.');
 	}
@@ -1592,26 +2194,27 @@ function compileHostElement(node, context, state) {
 		}
 	}
 	const canonicalizeHostClass = rendererHasCapability(state, 'class-name-alias');
+	const readAttributeName = (attribute) => hostAttributeName(attribute, state);
 	const needsOrderedProps =
 		attributes.some(
 			(attribute) =>
 				attribute.type === 'JSXSpreadAttribute' ||
 				attribute.type === 'SpreadAttribute' ||
-				attributeName(attribute) === 'key' ||
-				attributeName(attribute) === 'children',
+				readAttributeName(attribute) === 'key' ||
+				readAttributeName(attribute) === 'children',
 		) ||
 		new Set(
 			attributes
-				.map(attributeName)
+				.map(readAttributeName)
 				.map((name) => canonicalHostAttributeName(name, canonicalizeHostClass))
 				.filter(Boolean),
-		).size !== attributes.filter((attribute) => attributeName(attribute) !== null).length;
+		).size !== attributes.filter((attribute) => readAttributeName(attribute) !== null).length;
 	const props = {};
 	const bindings = [];
 	let propsSlot = null;
 	if (needsOrderedProps) {
 		propsSlot = context.values.length;
-		context.values.push(compileProps(attributes, null, state, canonicalizeHostClass));
+		context.values.push(compileProps(attributes, null, state, canonicalizeHostClass, true));
 	} else {
 		for (const attribute of attributes) {
 			const compiled = compileAttribute(attribute, context, state, canonicalizeHostClass);
@@ -1635,6 +2238,18 @@ function rendererHasCapability(state, capability) {
 	return Array.isArray(state.renderer.capabilities)
 		? state.renderer.capabilities.includes(capability)
 		: false;
+}
+
+function threadHelperImports(state) {
+	return [
+		['registerThreadFunction', state.helpers.registerThreadFunction],
+		['bindThreadFunction', state.helpers.bindThreadFunction],
+		['attachThreadFunction', state.helpers.attachThreadFunction],
+		['invokeThreadFunction', state.helpers.invokeThreadFunction],
+	]
+		.filter(([, local]) => local !== undefined)
+		.map(([imported, local]) => `${imported} as ${local}`)
+		.join(', ');
 }
 
 function compileActivityElement(node, context, state) {
@@ -1757,6 +2372,7 @@ function compileBlockValue(statements, state, params = '') {
 
 function nestedFunctionComponent(statement, state) {
 	if (statement?.type !== 'FunctionDeclaration') return null;
+	if (state.threadFunctionNodes?.has(statement)) return null;
 	const name = functionName(statement);
 	if (
 		statement.body?.type !== 'JSXCodeBlock' &&
@@ -1774,7 +2390,10 @@ function rewriteSetupStatements(statements, state) {
 	for (const statement of statements ?? []) {
 		const component = nestedFunctionComponent(statement, state);
 		const entry = {
-			code: component ?? rewriteSetupStatement(statement, state),
+			code:
+				component === null
+					? rewriteSetupStatement(statement, state)
+					: (state.sourceNodePrefixes?.get(statement) ?? '') + component,
 			node: statement,
 		};
 		// Function declarations are hoisted by JavaScript. Their universal brand
@@ -1796,7 +2415,10 @@ function rewriteSetupStatement(statement, state) {
 			hasOwnTemplateReturn(variable.fn) ||
 			state.componentNames.has(variable.name))
 	) {
-		return emitComponent({ ...variable, exportKind: null }, state.source, state);
+		return (
+			(state.sourceNodePrefixes?.get(statement) ?? '') +
+			emitComponent({ ...variable, exportKind: null }, state.source, state)
+		);
 	}
 	return rewriteSourceNode(statement, state);
 }
@@ -2074,11 +2696,16 @@ function singleFunctionDeclarator(node, state) {
 
 function componentShape(node, state) {
 	if (node.type === 'FunctionDeclaration') {
+		if (state.threadFunctionNodes?.has(node)) return null;
 		return { fn: node, name: functionName(node), binding: node.id, exportKind: null };
 	}
 	const variable = singleFunctionDeclarator(node, state);
-	if (variable !== null) return { ...variable, exportKind: null };
+	if (variable !== null) {
+		if (state.threadFunctionNodes?.has(variable.fn)) return null;
+		return { ...variable, exportKind: null };
+	}
 	if (node.type === 'ExportNamedDeclaration' && node.declaration?.type === 'FunctionDeclaration') {
+		if (state.threadFunctionNodes?.has(node.declaration)) return null;
 		return {
 			fn: node.declaration,
 			name: functionName(node.declaration),
@@ -2088,12 +2715,16 @@ function componentShape(node, state) {
 	}
 	if (node.type === 'ExportNamedDeclaration') {
 		const exportedVariable = singleFunctionDeclarator(node.declaration, state);
-		if (exportedVariable !== null) return { ...exportedVariable, exportKind: 'named' };
+		if (exportedVariable !== null) {
+			if (state.threadFunctionNodes?.has(exportedVariable.fn)) return null;
+			return { ...exportedVariable, exportKind: 'named' };
+		}
 	}
 	if (
 		node.type === 'ExportDefaultDeclaration' &&
 		node.declaration?.type === 'FunctionDeclaration'
 	) {
+		if (state.threadFunctionNodes?.has(node.declaration)) return null;
 		return {
 			fn: node.declaration,
 			name: functionName(node.declaration),
@@ -2106,6 +2737,7 @@ function componentShape(node, state) {
 		(node.declaration?.type === 'ArrowFunctionExpression' ||
 			node.declaration?.type === 'FunctionExpression')
 	) {
+		if (state.threadFunctionNodes?.has(node.declaration)) return null;
 		return {
 			fn: node.declaration,
 			name: node.declaration.id?.name ?? null,
@@ -2832,17 +3464,54 @@ export function lowerUniversalRendererRegion(
 			synthetic.origins,
 		);
 	}
+	const specializationBindings = new Set();
+	const entryExcluded = new Set((options.runtimeImports ?? []).map(({ local }) => local));
+	for (const region of options.deferredRendererRegions ?? []) entryExcluded.add(region.token);
+	for (const node of ast.body.slice(0, -1)) {
+		const declaration =
+			node.type === 'ExportNamedDeclaration' || node.type === 'ExportDefaultDeclaration'
+				? node.declaration
+				: node;
+		if (declaration?.id?.name) {
+			entryExcluded.add(declaration.id.name);
+			specializationBindings.add(declaration.id.name);
+		}
+		if (declaration?.type === 'VariableDeclaration') {
+			for (const item of declaration.declarations ?? []) {
+				addPatternNames(item.id, entryExcluded);
+				addPatternNames(item.id, specializationBindings);
+			}
+		}
+	}
+	const authoredBindings =
+		typeof options.authoredSource === 'string'
+			? authoredReferenceBindingMap(options.authoredSource, filename)
+			: null;
+	const entryCaptureCandidates = collectEntryCaptures(expression, entryExcluded)
+		.filter((capture) => {
+			if (authoredBindings !== null) {
+				const bound = captureHasAuthoredBinding(capture, synthetic.origins, authoredBindings);
+				if (bound !== null) return bound === 'local';
+			}
+			return !UNIVERSAL_REALM_GLOBALS.has(capture.source);
+		})
+		.map((capture) => ({
+			...capture,
+			local: capture.source,
+		}));
+	state.threadExternalCaptures = new Set(entryCaptureCandidates.map((capture) => capture.source));
+	validateRuntimeImports(ast, state);
+	prepareThreadFunctionReplacements(ast, state);
+	const entryCaptures = entryCaptureCandidates.filter((capture) =>
+		capture.nodes.some((node) => isThreadNodeActive(state, node)),
+	);
 	if (renderer.validation !== undefined) {
 		validateLoweredRendererSource(ast, state, synthetic.origins, options.authoredSource);
 	}
-	validateRuntimeImports(ast, state);
 	prepareMainThreadRenderOnlyReplacements(ast, state);
 	const regionHelper = allocName(state, `${prefix}Descriptor`);
 	const componentName = allocName(state, `${prefix}Body`);
 	const emittedComponents = [];
-	const specializationBindings = new Set();
-	const entryExcluded = new Set((options.runtimeImports ?? []).map(({ local }) => local));
-	for (const region of options.deferredRendererRegions ?? []) entryExcluded.add(region.token);
 	for (const node of ast.body.slice(0, -1)) {
 		if (node.type === 'ImportDeclaration') continue;
 		const declaration =
@@ -2861,7 +3530,7 @@ export function lowerUniversalRendererRegion(
 		const component = shape === null ? null : emitComponent(shape, wrapper, state);
 		if (component === null) {
 			assertNoResidualTemplate(node, state, 'a renderer specialization helper');
-			const helper = wrapper.slice(node.start, node.end);
+			const helper = rewriteSourceNode(node, state);
 			recordMapping(state, helper, node);
 			if (declaration?.id?.name) recordMapping(state, declaration.id.name, declaration.id);
 			emittedComponents.push(helper);
@@ -2869,10 +3538,6 @@ export function lowerUniversalRendererRegion(
 		}
 		emittedComponents.push(component);
 	}
-	const entryCaptures = collectEntryCaptures(expression, entryExcluded).map((capture) => ({
-		...capture,
-		local: capture.source,
-	}));
 	state.sourceNodeReplacements ??= new WeakMap();
 	for (const capture of entryCaptures) {
 		for (const node of capture.nodes) state.sourceNodeReplacements.set(node, capture.local);
@@ -2895,6 +3560,7 @@ export function lowerUniversalRendererRegion(
 	const loweredExpression = isTemplateNode(expression)
 		? compileRenderableExpression(expression, state)
 		: rewriteSourceNode(expression, state);
+	const importedThreadHelpers = threadHelperImports(state);
 	const helperImport =
 		`import { defineUniversalComponent as ${state.helpers.component}, ` +
 		`universalPlan as ${state.helpers.plan}, universalValue as ${state.helpers.value}, ` +
@@ -2906,6 +3572,7 @@ export function lowerUniversalRendererRegion(
 		(state.helpers.firstScreenEvent === undefined
 			? ''
 			: `firstScreenEvent as ${state.helpers.firstScreenEvent}, `) +
+		(importedThreadHelpers === '' ? '' : `${importedThreadHelpers}, `) +
 		`rendererRegion as ${regionHelper}` +
 		(state.hmr
 			? `, hmrUniversalComponent as ${state.helpers.hmr}, UNIVERSAL_HMR as ${state.helpers.hmrSymbol}`
@@ -2962,11 +3629,13 @@ export function lowerUniversalRendererRegion(
 	const component = `export ${declaration} ${componentName} = ${componentValue};`;
 	specializationBindings.add(componentName);
 	const hmrBlock = buildUniversalHmrBlock(state);
+	const threadRegistrations = (state.threadFunctionRegistrations ?? []).join('\n');
 	const prelude = [
 		helperImport,
 		profileImport,
 		runtimeImport,
 		plans,
+		threadRegistrations,
 		emittedComponents.join('\n'),
 		component,
 		hmrBlock,
@@ -3079,6 +3748,8 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		state.helpers.hmrSymbol = allocName(state, '__octaneUniversalHmrSymbol');
 	}
 	if (state.profile) state.helpers.profile = allocName(state, '__octaneProfileComponent');
+	validateRuntimeImports(ast, state);
+	prepareThreadFunctionReplacements(ast, state);
 	if (renderer.validation !== undefined) {
 		const remap = options.__universalValidationRemap;
 		if (remap?.origins && remap.authored) {
@@ -3089,7 +3760,6 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 			validateRendererSource(ast, state);
 		}
 	}
-	validateRuntimeImports(ast, state);
 	prepareMainThreadRenderOnlyReplacements(ast, state);
 
 	const emitted = [];
@@ -3103,9 +3773,10 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 			}
 		}
 		assertNoResidualTemplate(node, state, 'an unsupported module declaration');
-		emitted.push(source.slice(node.start, node.end));
+		emitted.push(rewriteSourceNode(node, state));
 	}
 
+	const importedThreadHelpers = threadHelperImports(state);
 	const helperImport =
 		`import { defineUniversalComponent as ${state.helpers.component}, ` +
 		`universalPlan as ${state.helpers.plan}, universalValue as ${state.helpers.value}, ` +
@@ -3117,6 +3788,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		(state.helpers.firstScreenEvent === undefined
 			? ''
 			: `, firstScreenEvent as ${state.helpers.firstScreenEvent}`) +
+		(importedThreadHelpers === '' ? '' : `, ${importedThreadHelpers}`) +
 		(state.hmr
 			? `, hmrUniversalComponent as ${state.helpers.hmr}, UNIVERSAL_HMR as ${state.helpers.hmrSymbol}`
 			: '') +
@@ -3163,7 +3835,10 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 				'\n  });\n}\n';
 		}
 	}
-	const lowered = `${helperImport}\n${profileImport}\n${plans}\n${emitted.join('\n')}\n${hmrBlock}`;
+	const threadRegistrations = (state.threadFunctionRegistrations ?? []).join('\n');
+	const lowered = `${helperImport}\n${profileImport}\n${plans}\n${threadRegistrations}\n${emitted.join(
+		'\n',
+	)}\n${hmrBlock}`;
 	const intermediateMap = buildIntermediateMap(lowered, source, filename, state.mappingNeedles);
 	const result = compileClient(lowered, {
 		componentHelper: state.helpers.component,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	decodeLynxNativeEventToken,
 	encodeLynxNativeEventToken,
+	parseLynxMainThreadEventProp,
 	parseLynxNativeEventProp,
 	snapshotLynxNativeEventPayload,
 } from '../src/core/native-events.js';
@@ -33,6 +34,17 @@ describe('Lynx native event boundary', () => {
 			type: 'global-bindEvent',
 			name: 'scroll',
 		});
+	});
+
+	it('maps direct main-thread event props without classifying them as background callbacks', () => {
+		expect(parseLynxMainThreadEventProp('main-thread:capture-catchtap')).toEqual({
+			prop: 'main-thread:capture-catchtap',
+			prefix: 'capture-catch',
+			type: 'capture-catch',
+			name: 'tap',
+		});
+		expect(parseLynxMainThreadEventProp('bindtap')).toBeNull();
+		expect(parseLynxMainThreadEventProp('main-thread:gesture')).toBeNull();
 	});
 
 	it('does not classify malformed, main-thread, or ordinary props as background events', () => {

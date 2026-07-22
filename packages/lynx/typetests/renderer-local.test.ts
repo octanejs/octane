@@ -1,5 +1,12 @@
 import type { JSX as ReactJSX } from 'react';
-import { root, type LynxPublicHandle } from '@octanejs/lynx';
+import {
+	root,
+	runOnBackground,
+	runOnMainThread,
+	useMainThreadRef,
+	type LynxCancelablePromise,
+	type LynxPublicHandle,
+} from '@octanejs/lynx';
 import type {
 	LynxElements,
 	LynxInputEvent,
@@ -62,6 +69,35 @@ const viewProps: RendererElements['view'] = {
 		void firstTouchPageY;
 	},
 };
+const mainThreadRef = useMainThreadRef<object>();
+const mainThreadState = useMainThreadRef(0);
+const mainThreadStateValue: number = mainThreadState.current;
+const optionalMainThreadState = useMainThreadRef<string>();
+const optionalMainThreadStateValue: string | undefined = optionalMainThreadState.current;
+void mainThreadStateValue;
+void optionalMainThreadStateValue;
+const mainThreadViewProps: RendererElements['view'] = {
+	'main-thread:ref': mainThreadRef,
+	'main-thread:bindtap': (event) => {
+		'main thread';
+		const eventType: string = event.type;
+		void eventType;
+	},
+};
+const onMainThread = (value: number) => {
+	'main thread';
+	return value + 1;
+};
+const onBackground = (value: string) => {
+	'background only';
+	return value.length;
+};
+const callMainThread = runOnMainThread(onMainThread);
+const callBackground = runOnBackground(onBackground);
+const pendingMainThread: LynxCancelablePromise<number> = callMainThread(1);
+const pendingBackground: LynxCancelablePromise<number> = callBackground('value');
+pendingMainThread.cancel();
+pendingBackground.cancel(new Error('cancelled'));
 const rawTextProps: RendererElements['raw-text'] = { text: 'Hello' };
 const imageProps: RendererElements['image'] = {
 	src: 'asset://hero.png',
@@ -116,6 +152,7 @@ const unregisteredCustomProps: RendererElements['native-video'] = {};
 root.render(nativeComponent, { title: 'wrong' });
 
 void viewProps;
+void mainThreadViewProps;
 void rawTextProps;
 void imageProps;
 void inputProps;

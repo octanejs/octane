@@ -332,6 +332,338 @@ describe('@octanejs/lynx transported protocol', () => {
 		).toMatchObject({ type: 'dispose-retry' });
 	});
 
+	it('validates the root-scoped worklet call subprotocol without accepting executable values', () => {
+		for (const phase of ['open', 'close'] as const) {
+			expect(
+				validateLynxBackgroundOutboundMessage({
+					...identity(7, 3),
+					type: 'main-call-publication',
+					phase,
+				}),
+			).toMatchObject({ type: 'main-call-publication', phase });
+		}
+		expect(() =>
+			validateLynxBackgroundOutboundMessage({
+				...identity(7, 3),
+				type: 'main-call-publication',
+				phase: 'pending',
+			}),
+		).toThrow(/main-call-publication\.phase/);
+
+		const callMain = {
+			...identity(7, 3),
+			type: 'call-main' as const,
+			call: 1,
+			worklet: { _wkltId: 'app:tap', _c: { count: 2, nested: ['safe'] } },
+			args: [{ type: 'tap' }, 4],
+		};
+		expect(validateLynxBackgroundOutboundMessage(callMain)).toBe(callMain);
+		expect(
+			validateLynxBackgroundOutboundMessage({
+				...identity(7, 3),
+				type: 'cancel-main',
+				call: 1,
+			}),
+		).toMatchObject({ type: 'cancel-main', call: 1 });
+		expect(
+			validateLynxBackgroundInboundMessage({
+				...identity(7, 3),
+				type: 'call-main-result',
+				call: 1,
+				value: { accepted: true },
+			}),
+		).toMatchObject({ type: 'call-main-result', call: 1 });
+		expect(
+			validateLynxBackgroundInboundMessage({
+				...identity(7, 3),
+				type: 'call-main-error',
+				call: 1,
+				error: { name: 'RangeError', message: 'outside range' },
+			}),
+		).toMatchObject({ type: 'call-main-error', call: 1 });
+
+		const callBackground = {
+			...identity(7, 3),
+			type: 'call-background' as const,
+			call: 2,
+			fn: { _jsFnId: 'app:save', _execId: '7:3:save' },
+			args: ['value'],
+		};
+		expect(validateLynxBackgroundInboundMessage(callBackground)).toBe(callBackground);
+		expect(
+			validateLynxBackgroundInboundMessage({
+				...identity(7, 3),
+				type: 'cancel-background',
+				call: 2,
+			}),
+		).toMatchObject({ type: 'cancel-background', call: 2 });
+		expect(
+			validateLynxBackgroundOutboundMessage({
+				...identity(7, 3),
+				type: 'call-background-result',
+				call: 2,
+				value: null,
+			}),
+		).toMatchObject({ type: 'call-background-result', call: 2 });
+		expect(
+			validateLynxBackgroundOutboundMessage({
+				...identity(7, 3),
+				type: 'call-background-error',
+				call: 2,
+				error: { name: 'Error', message: 'failed' },
+			}),
+		).toMatchObject({ type: 'call-background-error', call: 2 });
+
+		expect(() =>
+			validateLynxBackgroundOutboundMessage({
+				...callMain,
+				worklet: { _wkltId: 'app:tap', _c: { callback() {} } },
+			}),
+		).toThrow(/non-serializable/);
+		expect(() => validateLynxBackgroundInboundMessage({ ...callBackground, extra: true })).toThrow(
+			/unknown field "extra"/,
+		);
+		const cyclic: unknown[] = [];
+		cyclic.push(cyclic);
+		expect(() => validateLynxBackgroundInboundMessage({ ...callBackground, args: cyclic })).toThrow(
+			/cycle/,
+		);
+	});
+
+	it('rejects malformed call argument arrays without evaluating accessors', () => {
+		const callMain = {
+			...identity(7, 3),
+			type: 'call-main' as const,
+			call: 1,
+			worklet: { _wkltId: 'app:tap' },
+			args: [] as unknown[],
+		};
+		const callBackground = {
+			...identity(7, 3),
+			type: 'call-background' as const,
+			call: 2,
+			fn: { _jsFnId: 'app:save' },
+			args: [] as unknown[],
+		};
+		const sparseArguments: unknown[] = [];
+		sparseArguments.length = 1;
+		let getterRuns = 0;
+		const accessorArguments: unknown[] = [];
+		Object.defineProperty(accessorArguments, '0', {
+			enumerable: true,
+			get() {
+				getterRuns++;
+				return 'unsafe';
+			},
+		});
+		const extraArguments: unknown[] & { extra?: boolean } = [];
+		extraArguments.extra = true;
+
+		for (const args of [sparseArguments, accessorArguments, extraArguments]) {
+			expect(() => validateLynxBackgroundOutboundMessage({ ...callMain, args })).toThrow(
+				/dense array|enumerable data property/,
+			);
+			expect(() => validateLynxBackgroundInboundMessage({ ...callBackground, args })).toThrow(
+				/dense array|enumerable data property/,
+			);
+		}
+		expect(getterRuns).toBe(0);
+
+		const shared = { value: 'shared' };
+		const aliasedMain = { ...callMain, args: [shared, shared] };
+		const aliasedBackground = { ...callBackground, args: [shared, shared] };
+		expect(validateLynxBackgroundOutboundMessage(aliasedMain)).toBe(aliasedMain);
+		expect(validateLynxBackgroundInboundMessage(aliasedBackground)).toBe(aliasedBackground);
+	});
+
+	it('queues main calls until adoption, settles by birth identity, and executes background calls', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const executed: Array<readonly unknown[]> = [];
+		const backgroundResult = { saved: 'record' };
+		const container = createLynxClientContainer();
+		const transport = createLynxBackgroundTransport(context, container, {
+			executeBackgroundFunction(fn, args) {
+				executed.push([fn._jsFnId, ...args]);
+				return backgroundResult;
+			},
+		});
+		await transport.ready;
+		const beforeAdoption = transport.callMain({ _wkltId: 'app:before' }, ['queued']);
+		expect(
+			context.events.some(
+				(event) =>
+					event.type === LYNX_BACKGROUND_TO_MAIN_EVENT &&
+					(event.data as { type?: unknown }).type === 'call-main',
+			),
+		).toBe(false);
+
+		const batch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [{ op: 'create', id: 1, type: 'view', props: {} }],
+		};
+		beforeAdoption.cancel();
+		await expect(beforeAdoption.promise).rejects.toMatchObject({ name: 'AbortError' });
+
+		const queuedWorklet = { _wkltId: 'app:queued', _c: { label: 'before' } };
+		const queuedArgument = { value: 'before' };
+		const queued = transport.callMain(queuedWorklet, [queuedArgument]);
+		queuedWorklet._c.label = 'mutated';
+		queuedArgument.value = 'mutated';
+		const mounted = transport.prepareBatch(container, batch, identity(82, 1)).apply(() => {});
+		await flushMicrotasks();
+		const mount = main.commits.at(-1)!;
+		main.acknowledge(mount, 'complete');
+		await mounted;
+		const callMessage = context.events
+			.map((event) => event.data)
+			.find(
+				(message): message is ReturnType<typeof validateLynxBackgroundOutboundMessage> =>
+					(message as { type?: unknown }).type === 'call-main' &&
+					(message as { worklet?: { _wkltId?: unknown } }).worklet?._wkltId === 'app:queued',
+			)!;
+		if (callMessage.type !== 'call-main') throw new Error('Expected a main-thread call.');
+		expect(callMessage.worklet).toEqual({ _wkltId: 'app:queued', _c: { label: 'before' } });
+		expect(callMessage.args).toEqual([{ value: 'before' }]);
+		const mainResult = { status: 'done' };
+		context.sendToBackground({
+			...identity(callMessage.root, callMessage.version),
+			type: 'call-main-result',
+			call: callMessage.call,
+			value: mainResult,
+		});
+		mainResult.status = 'mutated';
+		const resolvedMain = await queued.promise;
+		expect(resolvedMain).toEqual({ status: 'done' });
+		expect(resolvedMain).not.toBe(mainResult);
+
+		context.sendToBackground({
+			...identity(82, 1),
+			type: 'call-background',
+			call: 19,
+			fn: { _jsFnId: 'app:save' },
+			args: ['record'],
+		});
+		await flushMicrotasks();
+		backgroundResult.saved = 'mutated';
+		expect(executed).toContainEqual(['app:save', 'record']);
+		const backgroundMessage = context.events
+			.map((event) => event.data)
+			.find(
+				(message) =>
+					(message as { type?: unknown }).type === 'call-background-result' &&
+					(message as { call?: unknown }).call === 19,
+			) as { readonly value: unknown };
+		expect(backgroundMessage).toMatchObject({ value: { saved: 'record' } });
+		expect(backgroundMessage.value).not.toBe(backgroundResult);
+
+		const malformedResultCall = transport.callMain({ _wkltId: 'app:malformed-result' }, []);
+		const malformedResultMessage = context.events
+			.map((event) => event.data as { readonly type?: unknown; readonly call?: unknown })
+			.find(
+				(message) =>
+					message.type === 'call-main' &&
+					(message as { readonly worklet?: { readonly _wkltId?: unknown } }).worklet?._wkltId ===
+						'app:malformed-result',
+			) as { readonly call: number };
+		const updateBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 2,
+			commands: [{ op: 'update', id: 1, props: { id: 'newer' } }],
+		};
+		const updated = transport.prepareBatch(container, updateBatch, identity(82, 2)).apply(() => {});
+		await flushMicrotasks();
+		main.acknowledge(main.commits.at(-1)!, 'complete');
+		await updated;
+		context.sendToBackground({
+			...identity(82, 1),
+			type: 'call-main-result',
+			call: malformedResultMessage.call,
+			value() {},
+		});
+		await expect(malformedResultCall.promise).rejects.toThrow(/non-serializable|clone-safe/);
+
+		context.sendToBackground({
+			...identity(82, 1),
+			type: 'call-background',
+			call: 20,
+			fn: { _jsFnId: 'app:malformed-call' },
+			args: [() => undefined],
+		});
+		const malformedCallError = context.events
+			.map((event) => event.data as { readonly type?: unknown; readonly call?: unknown })
+			.find((message) => message.type === 'call-background-error' && message.call === 20);
+		expect(malformedCallError).toMatchObject({ root: 82, version: 1 });
+
+		transport.close();
+	});
+
+	it('never reexecutes replayed background calls after settlement or cancellation', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const executions: string[] = [];
+		const container = createLynxClientContainer();
+		const transport = createLynxBackgroundTransport(context, container, {
+			executeBackgroundFunction(fn) {
+				executions.push(fn._jsFnId);
+				if (fn._jsFnId === 'app:throw') throw new RangeError('background failed');
+				if (fn._jsFnId === 'app:pending') return new Promise<never>(() => {});
+				return 'completed';
+			},
+		});
+		await transport.ready;
+		const batch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [{ op: 'create', id: 1, type: 'view', props: {} }],
+		};
+		const mounted = transport.prepareBatch(container, batch, identity(83, 1)).apply(() => {});
+		await flushMicrotasks();
+		main.acknowledge(main.commits[0]!, 'complete');
+		await mounted;
+
+		const call = (id: number, fn: string): void => {
+			context.sendToBackground({
+				...identity(83, 1),
+				type: 'call-background',
+				call: id,
+				fn: { _jsFnId: fn },
+				args: [],
+			});
+		};
+
+		call(1, 'app:return');
+		await flushMicrotasks();
+		call(1, 'app:return');
+		call(2, 'app:throw');
+		await flushMicrotasks();
+		call(2, 'app:throw');
+		call(3, 'app:pending');
+		context.sendToBackground({
+			...identity(83, 1),
+			type: 'cancel-background',
+			call: 3,
+		});
+		call(3, 'app:pending');
+		await flushMicrotasks();
+
+		expect(executions).toEqual(['app:return', 'app:throw', 'app:pending']);
+		const settlements = context.events
+			.map((event) => event.data as { readonly type?: unknown; readonly call?: unknown })
+			.filter(
+				(message) =>
+					message.type === 'call-background-result' || message.type === 'call-background-error',
+			);
+		expect(settlements.filter((message) => message.call === 1)).toHaveLength(1);
+		expect(settlements.filter((message) => message.call === 2)).toHaveLength(1);
+		expect(settlements.filter((message) => message.call === 3)).toHaveLength(0);
+		expect(
+			transport.diagnostics().filter((error) => /duplicate background call/.test(error.message)),
+		).toHaveLength(3);
+		transport.close();
+	});
+
 	it('terminally closes only the exact accepted root for an unsolicited host fault', async () => {
 		const context = new FakeContextProxy();
 		const main = installMainHarness(context);
@@ -888,6 +1220,50 @@ describe('@octanejs/lynx transported protocol', () => {
 		expect(deliveries).toEqual([{ phase: 'layout' }]);
 		expect(transport.diagnostics()).toEqual([]);
 		transport.close();
+	});
+
+	it('drains acknowledgement-time and reentrant main calls without overtaking older IDs', async () => {
+		const context = new FakeContextProxy();
+		const main = installMainHarness(context);
+		const container = createLynxClientContainer();
+		let queueAcceptedCall = (): void => {};
+		const transport = createLynxBackgroundTransport(context, container, {
+			onWorkletBatchAccepted() {
+				queueAcceptedCall();
+			},
+		});
+		await transport.ready;
+		const delivered: number[] = [];
+		const calls: ReturnType<typeof transport.callMain>[] = [];
+		const queue = (id: string): void => {
+			const call = transport.callMain({ _wkltId: id }, []);
+			void call.promise.catch(() => {});
+			calls.push(call);
+		};
+		queueAcceptedCall = () => queue('app:batch-accepted');
+		context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
+			const message = validateLynxBackgroundOutboundMessage(event.data);
+			if (message.type !== 'call-main') return;
+			delivered.push(message.call);
+			if (message.call === 1) queue('app:reentrant');
+		});
+
+		queue('app:queued-first');
+		queue('app:queued-second');
+		const batch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [],
+		};
+		const token = transport.prepareBatch(container, batch, identity(109, 1));
+		const applying = token.apply(() => queue('app:acknowledgement'));
+		await flushMicrotasks();
+		main.acknowledge(main.commits[0], 'complete');
+		await applying;
+
+		expect(delivered).toEqual([1, 2, 3, 4, 5]);
+		transport.close();
+		expect(calls).toHaveLength(5);
 	});
 
 	it('keeps pre-ACK failures retryable and disposes an accepted faulted teardown', async () => {

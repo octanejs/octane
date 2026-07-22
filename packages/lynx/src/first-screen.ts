@@ -74,7 +74,7 @@ export function markFirstScreenSyncReady(): void {
 
 export const lynxRootAvailability = {
 	available: true,
-	implementedMilestone: 6,
+	implementedMilestone: 7,
 	status: 'private-milestone-0-native-gates-blocked',
 } as const;
 
@@ -84,6 +84,20 @@ export const lynxRootAvailability = {
 export { createLynxNativeResource } from './resource.js';
 export type { LynxNativeResource } from './resource.js';
 export { LynxNodesRefError } from './core/nodes-ref.js';
+export { useMainThreadRef } from './main-renderer.js';
+export {
+	runOnBackground,
+	runOnMainThread,
+	LynxCrossThreadCallCancelledError,
+} from './core/worklets.js';
+export type {
+	LynxBackgroundFunctionDescriptor,
+	LynxCancelablePromise,
+	LynxMainThreadRefCell,
+	LynxMainThreadRefDescriptor,
+	LynxMainThreadWorkletDescriptor,
+	LynxWorkletValue,
+} from './core/worklets.js';
 
 export type {
 	LynxCustomIntrinsicElements,

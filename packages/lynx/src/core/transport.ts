@@ -7,6 +7,7 @@ import {
 	type UniversalTransportAcknowledgement,
 	type UniversalTransportCommitMessage,
 	type UniversalTransportIdentity,
+	type UniversalSerializableValue,
 } from 'octane/universal/native';
 import {
 	applyLynxHostAttachments,
@@ -24,6 +25,10 @@ import {
 	validateLynxBackgroundInboundMessage,
 	validateLynxBackgroundOutboundMessage,
 	type LynxBackgroundInboundMessage,
+	type LynxBackgroundFunctionWireDescriptor,
+	type LynxCallBackgroundMessage,
+	type LynxCallMainErrorMessage,
+	type LynxCallMainResultMessage,
 	type LynxContextProxy,
 	type LynxContextProxyEvent,
 	type LynxDisposeAcknowledgement,
@@ -32,11 +37,31 @@ import {
 	type LynxHostFaultMessage,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
+	type LynxMainThreadWorkletWireDescriptor,
 	type LynxTransportAcknowledgement,
 } from './protocol.js';
+import {
+	isLynxMainThreadWorkletDescriptor,
+	isolateLynxWorkletValue,
+	type LynxWorkletValue,
+} from './worklets.js';
 
 export interface LynxBackgroundTransportOptions {
 	readonly onDiagnostic?: (error: Error) => void;
+	/** Transactionally bind renderer-local worklet handles at the complete-batch boundary. */
+	readonly prepareWorkletBatch?: (batch: UniversalHostBatch) => UniversalHostBatch;
+	/** Release or publish background execution lifetimes at the host acceptance boundary. */
+	readonly onWorkletBatchAccepted?: (batch: UniversalHostBatch) => void;
+	readonly onWorkletBatchRejected?: (batch: UniversalHostBatch) => void;
+	readonly executeBackgroundFunction?: (
+		fn: LynxBackgroundFunctionWireDescriptor,
+		args: readonly UniversalSerializableValue[],
+	) => unknown;
+}
+
+export interface LynxThreadCall<Result = UniversalSerializableValue> {
+	readonly promise: Promise<Result>;
+	cancel(reason?: unknown): void;
 }
 
 export interface LynxBackgroundTransport extends UniversalAsyncCommitTransport<LynxClientContainer> {
@@ -51,6 +76,10 @@ export interface LynxBackgroundTransport extends UniversalAsyncCommitTransport<L
 	closedReason(): Error | null;
 	enableLogicalTeardown(): void;
 	dispose(): Promise<void>;
+	callMain(
+		worklet: LynxMainThreadWorkletWireDescriptor,
+		args: readonly UniversalSerializableValue[],
+	): LynxThreadCall;
 	close(reason?: unknown): void;
 	diagnostics(): readonly Error[];
 }
@@ -109,8 +138,23 @@ type CommitSettlement = Extract<
 	{ readonly type: 'complete' | 'reject' | 'fault' }
 >;
 
+interface PendingMainThreadCall {
+	readonly call: number;
+	readonly worklet: LynxMainThreadWorkletWireDescriptor;
+	readonly args: readonly UniversalSerializableValue[];
+	readonly deferred: Deferred<UniversalSerializableValue>;
+	identity: UniversalTransportIdentity | null;
+	state: 'queued' | 'sent';
+}
+
+interface RunningBackgroundCall {
+	readonly identity: UniversalTransportIdentity;
+	cancelled: boolean;
+}
+
 let NEXT_READY_REQUEST = 1;
 const MAX_DISPOSE_ATTEMPTS = 3;
+const MAX_QUEUED_THREAD_CALLS = 128;
 
 function errorFrom(value: unknown, fallback: string): Error {
 	if (value instanceof Error) return value;
@@ -172,6 +216,8 @@ export function createLynxBackgroundTransport(
 
 	const reported: Error[] = [];
 	const pending = new Map<number, PendingCommit>();
+	const pendingMainCalls = new Map<number, PendingMainThreadCall>();
+	const runningBackgroundCalls = new Map<number, RunningBackgroundCall>();
 	const readyRequest = NEXT_READY_REQUEST++;
 	const readyDeferred = createDeferred<void>();
 	// A transport can be synchronously closed before a root observes `ready`.
@@ -190,8 +236,14 @@ export function createLynxBackgroundTransport(
 	let terminalDisposeAttempts = 0;
 	let terminalDisposeRetryQueued = false;
 	let receiverAttached = false;
+	let publishingAcknowledgement = false;
+	let drainingMainThreadCalls = false;
+	let mainThreadCallsNeedDrain = false;
 	let preparationCount = 0;
 	let logicalTeardownEnabled = false;
+	let nextThreadCall = 1;
+	let lastBackgroundCall = 0;
+	const finalizedWorkletBatches = new WeakSet<object>();
 
 	const report = (error: unknown, fallback = 'Octane Lynx transport protocol error.') => {
 		const normalized = errorFrom(error, fallback);
@@ -204,15 +256,209 @@ export function createLynxBackgroundTransport(
 		return normalized;
 	};
 
+	const finalizeWorkletBatch = (batch: UniversalHostBatch, acceptedByHost: boolean): void => {
+		if (finalizedWorkletBatches.has(batch)) return;
+		finalizedWorkletBatches.add(batch);
+		try {
+			(acceptedByHost ? options.onWorkletBatchAccepted : options.onWorkletBatchRejected)?.(batch);
+		} catch (error) {
+			report(error, 'Octane Lynx could not finalize background worklet lifetimes.');
+		}
+	};
+
 	const dispatch = (message: Parameters<typeof validateLynxBackgroundOutboundMessage>[0]) => {
 		if (closedError !== null) throw closedError;
 		const validated = validateLynxBackgroundOutboundMessage(message);
 		context.dispatchEvent({ type: LYNX_BACKGROUND_TO_MAIN_EVENT, data: validated });
 	};
 
+	const wireError = (value: unknown, fallback: string) => {
+		const error = errorFrom(value, fallback);
+		return Object.freeze({
+			name: error.name.length === 0 ? 'Error' : error.name,
+			message: error.message,
+		});
+	};
+
+	const callIdentityMatches = (
+		identity: UniversalTransportIdentity | null,
+		message: UniversalTransportIdentity,
+	): boolean => identity !== null && sameLynxTransportIdentity(identity, message);
+
+	const sendMainThreadCall = (entry: PendingMainThreadCall): void => {
+		if (accepted === null || entry.state !== 'queued') return;
+		entry.identity = frozenIdentity(accepted);
+		entry.state = 'sent';
+		try {
+			dispatch({
+				...entry.identity,
+				type: 'call-main',
+				call: entry.call,
+				worklet: entry.worklet,
+				args: entry.args,
+			});
+		} catch (error) {
+			// ContextProxy delivery may settle synchronously before dispatchEvent throws.
+			// First settlement wins; never overwrite that result with the delivery error.
+			if (pendingMainCalls.get(entry.call) !== entry) return;
+			pendingMainCalls.delete(entry.call);
+			entry.deferred.reject(report(error, 'Octane Lynx could not deliver a main-thread call.'));
+		}
+	};
+
+	const drainMainThreadCalls = (): void => {
+		if (
+			accepted === null ||
+			closedError !== null ||
+			publishingAcknowledgement ||
+			drainingMainThreadCalls ||
+			!mainThreadCallsNeedDrain
+		) {
+			return;
+		}
+		drainingMainThreadCalls = true;
+		try {
+			// Map iterators preserve insertion order and include entries appended while
+			// dispatch synchronously re-enters the background thread. Keeping one drain
+			// active therefore prevents a newer call from overtaking queued lower IDs.
+			for (const entry of pendingMainCalls.values()) {
+				if (entry.state === 'queued') sendMainThreadCall(entry);
+			}
+			mainThreadCallsNeedDrain = false;
+		} finally {
+			drainingMainThreadCalls = false;
+		}
+	};
+
+	const settleMainThreadCall = (
+		message: LynxCallMainResultMessage | LynxCallMainErrorMessage,
+	): void => {
+		const entry = pendingMainCalls.get(message.call);
+		if (entry === undefined) {
+			report(
+				new Error(
+					`Octane Lynx received a late or duplicate main-thread call result ${message.call}.`,
+				),
+			);
+			return;
+		}
+		if (!callIdentityMatches(entry.identity, message)) {
+			report(
+				new Error(
+					`Octane Lynx received a stale or foreign main-thread call result ${message.call}.`,
+				),
+			);
+			return;
+		}
+		pendingMainCalls.delete(message.call);
+		if (message.type === 'call-main-result') {
+			try {
+				entry.deferred.resolve(
+					isolateLynxWorkletValue(
+						message.value as LynxWorkletValue,
+						'main-thread call result',
+					) as UniversalSerializableValue,
+				);
+			} catch (error) {
+				entry.deferred.reject(report(error, 'Octane Lynx received an invalid main-thread result.'));
+			}
+		} else entry.deferred.reject(remoteError(message.error));
+	};
+
+	const dispatchBackgroundCallError = (
+		message: LynxCallBackgroundMessage,
+		error: unknown,
+	): void => {
+		try {
+			dispatch({
+				...frozenIdentity(message),
+				type: 'call-background-error',
+				call: message.call,
+				error: wireError(error, 'Octane Lynx background function failed.'),
+			});
+		} catch (dispatchError) {
+			report(dispatchError, 'Octane Lynx could not deliver a background call error.');
+		}
+	};
+
+	const handleBackgroundCall = (message: LynxCallBackgroundMessage): void => {
+		if (
+			accepted === null ||
+			message.root !== accepted.root ||
+			message.version > accepted.version ||
+			transportRoot !== message.root
+		) {
+			report(new Error(`Octane Lynx received a stale or foreign background call ${message.call}.`));
+			dispatchBackgroundCallError(message, new Error('Octane Lynx background call is stale.'));
+			return;
+		}
+		// The main side allocates call IDs monotonically and ContextProxy preserves
+		// sender order. A scalar high-water mark rejects in-flight and settled
+		// replays while keeping transport memory bounded for long-lived roots.
+		if (message.call <= lastBackgroundCall) {
+			report(new Error(`Octane Lynx received duplicate background call ${message.call}.`));
+			return;
+		}
+		lastBackgroundCall = message.call;
+		const running: RunningBackgroundCall = {
+			identity: frozenIdentity(message),
+			cancelled: false,
+		};
+		runningBackgroundCalls.set(message.call, running);
+		let result: unknown;
+		try {
+			if (options.executeBackgroundFunction === undefined) {
+				throw new Error('Octane Lynx has no background function registry installed.');
+			}
+			result = options.executeBackgroundFunction(message.fn, message.args);
+		} catch (error) {
+			runningBackgroundCalls.delete(message.call);
+			dispatchBackgroundCallError(message, error);
+			return;
+		}
+		void Promise.resolve(result).then(
+			(value) => {
+				if (
+					runningBackgroundCalls.get(message.call) !== running ||
+					running.cancelled ||
+					closedError !== null
+				) {
+					return;
+				}
+				runningBackgroundCalls.delete(message.call);
+				try {
+					const isolated = isolateLynxWorkletValue(
+						value as LynxWorkletValue,
+						'background call result',
+					);
+					dispatch({
+						...running.identity,
+						type: 'call-background-result',
+						call: message.call,
+						value: isolated as UniversalSerializableValue,
+					});
+				} catch (error) {
+					dispatchBackgroundCallError(message, error);
+				}
+			},
+			(error) => {
+				if (
+					runningBackgroundCalls.get(message.call) !== running ||
+					running.cancelled ||
+					closedError !== null
+				) {
+					return;
+				}
+				runningBackgroundCalls.delete(message.call);
+				dispatchBackgroundCallError(message, error);
+			},
+		);
+	};
+
 	const closeEntry = (entry: PendingCommit, error: unknown) => {
 		if (pending.get(entry.identity.version) !== entry) return;
 		pending.delete(entry.identity.version);
+		if (entry.state !== 'acknowledged') finalizeWorkletBatch(entry.batch, false);
 		entry.token.entry = null;
 		entry.token.status = 'settled';
 		entry.deferred.reject(error);
@@ -253,8 +499,25 @@ export function createLynxBackgroundTransport(
 		}
 	};
 
+	const closeThreadCalls = (error: Error): void => {
+		for (const entry of [...pendingMainCalls.values()]) {
+			pendingMainCalls.delete(entry.call);
+			if (entry.state === 'sent' && entry.identity !== null) {
+				try {
+					dispatch({ ...entry.identity, type: 'cancel-main', call: entry.call });
+				} catch (cancelError) {
+					report(cancelError, 'Octane Lynx could not cancel a closing main-thread call.');
+				}
+			}
+			entry.deferred.reject(error);
+		}
+		for (const running of runningBackgroundCalls.values()) running.cancelled = true;
+		runningBackgroundCalls.clear();
+	};
+
 	const closeClientState = (error: Error, preserveDisposeResolution: boolean): boolean => {
 		if (closedError !== null) return false;
+		closeThreadCalls(error);
 		closedError = error;
 		readyDeferred.reject(error);
 		for (const entry of [...pending.values()]) closeEntry(entry, error);
@@ -328,6 +591,45 @@ export function createLynxBackgroundTransport(
 		sendTerminalDisposeRequest();
 	};
 
+	const publishAcknowledgementMainCalls = (message: LynxTransportAcknowledgement): boolean => {
+		let hasQueuedCall = false;
+		if (mainThreadCallsNeedDrain) {
+			for (const entry of pendingMainCalls.values()) {
+				if (entry.state !== 'queued') continue;
+				hasQueuedCall = true;
+				break;
+			}
+		}
+		if (!hasQueuedCall) {
+			mainThreadCallsNeedDrain = false;
+			publishingAcknowledgement = false;
+			return true;
+		}
+
+		let phase: 'open' | 'calls' | 'close' = 'open';
+		try {
+			// Keep acknowledgement publication closed to direct sends until main has
+			// opened the matching ref-owner lifetime window. ContextProxy sender order
+			// then places every queued call before the close marker, even when the two
+			// runtimes take a microtask checkpoint between individual messages.
+			dispatch({ ...frozenIdentity(message), type: 'main-call-publication', phase: 'open' });
+			phase = 'calls';
+			publishingAcknowledgement = false;
+			drainMainThreadCalls();
+			phase = 'close';
+			dispatch({ ...frozenIdentity(message), type: 'main-call-publication', phase: 'close' });
+			return true;
+		} catch (error) {
+			terminalCloseAfterHostAcceptance(
+				message,
+				report(error, `Octane Lynx could not publish acknowledgement-time main-thread ${phase}.`),
+			);
+			return false;
+		} finally {
+			publishingAcknowledgement = false;
+		}
+	};
+
 	const handleReady = (message: LynxMainReadyReply) => {
 		if (message.request !== LYNX_READY_ANNOUNCEMENT_REQUEST && message.request !== readyRequest) {
 			report(
@@ -357,11 +659,16 @@ export function createLynxBackgroundTransport(
 		const previousAccepted = accepted;
 		try {
 			handles = prepareLynxHandleDeltas(container, entry.batch, message.handles, message);
+			// Applying handle deltas and acceptance callbacks can invoke user code.
+			// Queue any resulting calls until all older pre-acceptance IDs can drain.
+			publishingAcknowledgement = true;
 			handles.apply();
 			entry.state = 'acknowledged';
 			accepted = frozenIdentity(message);
+			finalizeWorkletBatch(entry.batch, true);
 			entry.acknowledge(message);
 		} catch (error) {
+			publishingAcknowledgement = false;
 			accepted = previousAccepted;
 			handles?.rollback();
 			const terminalError = report(
@@ -377,12 +684,15 @@ export function createLynxBackgroundTransport(
 			try {
 				dispatch({ ...frozenIdentity(message), type: 'adoption-ready' });
 			} catch (error) {
+				publishingAcknowledgement = false;
 				terminalCloseAfterHostAcceptance(
 					message,
 					report(error, `Octane Lynx could not confirm adoption ${message.version}.`),
 				);
+				return;
 			}
 		}
+		publishAcknowledgementMainCalls(message);
 	};
 
 	const settleCommitResponse = (entry: PendingCommit, message: CommitSettlement): void => {
@@ -403,6 +713,10 @@ export function createLynxBackgroundTransport(
 			return;
 		}
 		if (
+			message.type === 'call-background' ||
+			message.type === 'cancel-background' ||
+			message.type === 'call-main-result' ||
+			message.type === 'call-main-error' ||
 			message.type === 'event' ||
 			message.type === 'host-attachment' ||
 			message.type === 'host-fault' ||
@@ -502,6 +816,30 @@ export function createLynxBackgroundTransport(
 		terminalCloseAfterHostAcceptance(message, remoteError(message.error));
 	};
 
+	const handleCancelBackgroundCall = (
+		message: Extract<LynxBackgroundInboundMessage, { type: 'cancel-background' }>,
+	): void => {
+		const running = runningBackgroundCalls.get(message.call);
+		if (running === undefined) {
+			report(
+				new Error(
+					`Octane Lynx received a late or duplicate background cancellation ${message.call}.`,
+				),
+			);
+			return;
+		}
+		if (!sameLynxTransportIdentity(running.identity, message)) {
+			report(
+				new Error(
+					`Octane Lynx received a stale or foreign background cancellation ${message.call}.`,
+				),
+			);
+			return;
+		}
+		runningBackgroundCalls.delete(message.call);
+		running.cancelled = true;
+	};
+
 	function queueDisposeRetry(error: Error): void {
 		if (disposeDeferred === null || disposeDeferred.settled || closedError !== null) return;
 		if (disposeAttempts >= MAX_DISPOSE_ATTEMPTS) {
@@ -586,6 +924,56 @@ export function createLynxBackgroundTransport(
 	const rejectExpectedMalformed = (value: unknown, error: Error) => {
 		if (value === null || typeof value !== 'object') return;
 		const raw = value as Record<string, unknown>;
+		if (
+			(raw.type === 'call-main-result' || raw.type === 'call-main-error') &&
+			Number.isSafeInteger(raw.call) &&
+			(raw.call as number) > 0
+		) {
+			const entry = pendingMainCalls.get(raw.call as number);
+			if (
+				entry?.identity !== null &&
+				entry?.identity !== undefined &&
+				raw.protocol === entry.identity.protocol &&
+				raw.renderer === entry.identity.renderer &&
+				raw.root === entry.identity.root &&
+				raw.version === entry.identity.version
+			) {
+				pendingMainCalls.delete(entry.call);
+				entry.deferred.reject(error);
+				return;
+			}
+		}
+		if (
+			raw.type === 'call-background' &&
+			accepted !== null &&
+			Number.isSafeInteger(raw.call) &&
+			(raw.call as number) > 0 &&
+			raw.protocol === accepted.protocol &&
+			raw.renderer === accepted.renderer &&
+			raw.root === accepted.root &&
+			raw.root === transportRoot &&
+			Number.isSafeInteger(raw.version) &&
+			(raw.version as number) > 0 &&
+			(raw.version as number) <= accepted.version
+		) {
+			try {
+				dispatch({
+					protocol: accepted.protocol,
+					renderer: accepted.renderer,
+					root: accepted.root,
+					version: raw.version as number,
+					type: 'call-background-error',
+					call: raw.call as number,
+					error: wireError(error, 'Octane Lynx received a malformed background call.'),
+				});
+			} catch (dispatchError) {
+				closeInternal(
+					report(dispatchError, 'Octane Lynx could not reject a malformed background call.'),
+					false,
+				);
+			}
+			return;
+		}
 		if (
 			raw.type === 'main-ready' &&
 			(raw.request === readyRequest || raw.request === LYNX_READY_ANNOUNCEMENT_REQUEST) &&
@@ -676,6 +1064,18 @@ export function createLynxBackgroundTransport(
 			handleReady(message);
 			return;
 		}
+		if (message.type === 'call-main-result' || message.type === 'call-main-error') {
+			settleMainThreadCall(message);
+			return;
+		}
+		if (message.type === 'call-background') {
+			handleBackgroundCall(message);
+			return;
+		}
+		if (message.type === 'cancel-background') {
+			handleCancelBackgroundCall(message);
+			return;
+		}
 		if (message.type === 'event') {
 			handleEvent(message);
 			return;
@@ -757,8 +1157,18 @@ export function createLynxBackgroundTransport(
 					},
 				});
 			}
-			const commit: UniversalTransportCommitMessage = { ...identity, type: 'commit', batch };
-			validateLynxBackgroundOutboundMessage(commit);
+			const preparedBatch = options.prepareWorkletBatch?.(batch) ?? batch;
+			const commit: UniversalTransportCommitMessage = {
+				...identity,
+				type: 'commit',
+				batch: preparedBatch,
+			};
+			try {
+				validateLynxBackgroundOutboundMessage(commit);
+			} catch (error) {
+				finalizeWorkletBatch(preparedBatch, false);
+				throw error;
+			}
 			const token: PreparedTokenState = { status: 'prepared', entry: null };
 			return {
 				apply(acknowledge) {
@@ -767,12 +1177,17 @@ export function createLynxBackgroundTransport(
 							new Error('Octane Lynx prepared batch apply() may only run once.'),
 						);
 					}
-					if (closedError !== null) return Promise.reject(closedError);
+					if (closedError !== null) {
+						finalizeWorkletBatch(preparedBatch, false);
+						return Promise.reject(closedError);
+					}
 					if (transportRoot === null) transportRoot = identity.root;
 					else if (transportRoot !== identity.root) {
+						finalizeWorkletBatch(preparedBatch, false);
 						return Promise.reject(new Error('Octane Lynx transport cannot serve a foreign root.'));
 					}
 					if (pending.has(identity.version)) {
+						finalizeWorkletBatch(preparedBatch, false);
 						return Promise.reject(
 							new Error(`Octane Lynx transport already has batch ${identity.version}.`),
 						);
@@ -780,7 +1195,7 @@ export function createLynxBackgroundTransport(
 					token.status = 'applying';
 					const entry: PendingCommit = {
 						identity: frozenIdentity(identity),
-						batch,
+						batch: preparedBatch,
 						acknowledge,
 						deferred: createDeferred<void>(),
 						token,
@@ -824,6 +1239,7 @@ export function createLynxBackgroundTransport(
 					if (token.status === 'aborted' || token.status === 'settled') return;
 					if (token.status === 'prepared') {
 						token.status = 'aborted';
+						finalizeWorkletBatch(preparedBatch, false);
 						return;
 					}
 					const entry = token.entry;
@@ -898,6 +1314,69 @@ export function createLynxBackgroundTransport(
 				(error) => deferred.reject(error),
 			);
 			return deferred.promise;
+		},
+		callMain(worklet, args) {
+			if (closedError !== null) {
+				const deferred = createDeferred<UniversalSerializableValue>();
+				deferred.reject(closedError);
+				return Object.freeze({ promise: deferred.promise, cancel() {} });
+			}
+			if (pendingMainCalls.size >= MAX_QUEUED_THREAD_CALLS) {
+				const deferred = createDeferred<UniversalSerializableValue>();
+				deferred.reject(
+					new Error(
+						`Octane Lynx main-thread call queue is limited to ${MAX_QUEUED_THREAD_CALLS} entries.`,
+					),
+				);
+				return Object.freeze({ promise: deferred.promise, cancel() {} });
+			}
+			if (nextThreadCall > Number.MAX_SAFE_INTEGER) {
+				const deferred = createDeferred<UniversalSerializableValue>();
+				deferred.reject(new Error('Octane Lynx main-thread call identity space is exhausted.'));
+				return Object.freeze({ promise: deferred.promise, cancel() {} });
+			}
+			const isolatedWorklet = isolateLynxWorkletValue(
+				worklet as LynxWorkletValue,
+				'main-thread call target',
+			);
+			if (!isLynxMainThreadWorkletDescriptor(isolatedWorklet)) {
+				throw new TypeError('Octane Lynx main-thread call target is invalid.');
+			}
+			const isolatedArgs = isolateLynxWorkletValue(
+				args as unknown as LynxWorkletValue[],
+				'main-thread call arguments',
+			);
+			const entry: PendingMainThreadCall = {
+				call: nextThreadCall++,
+				worklet: isolatedWorklet as LynxMainThreadWorkletWireDescriptor,
+				args: isolatedArgs as readonly UniversalSerializableValue[],
+				deferred: createDeferred<UniversalSerializableValue>(),
+				identity: null,
+				state: 'queued',
+			};
+			pendingMainCalls.set(entry.call, entry);
+			if (accepted !== null && !publishingAcknowledgement && !drainingMainThreadCalls) {
+				sendMainThreadCall(entry);
+			} else {
+				mainThreadCallsNeedDrain = true;
+			}
+			return Object.freeze({
+				promise: entry.deferred.promise,
+				cancel(reason?: unknown) {
+					if (pendingMainCalls.get(entry.call) !== entry) return;
+					pendingMainCalls.delete(entry.call);
+					if (entry.state === 'sent' && entry.identity !== null && closedError === null) {
+						try {
+							dispatch({ ...entry.identity, type: 'cancel-main', call: entry.call });
+						} catch (error) {
+							report(error, 'Octane Lynx could not deliver a main-thread cancellation.');
+						}
+					}
+					const cancellation = errorFrom(reason, 'Octane Lynx main-thread call was cancelled.');
+					if (reason === undefined) cancellation.name = 'AbortError';
+					entry.deferred.reject(cancellation);
+				},
+			});
 		},
 		close(reason) {
 			closeInternal(errorFrom(reason, 'Octane Lynx background transport was closed.'), false);

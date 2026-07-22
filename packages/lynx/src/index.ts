@@ -1,7 +1,7 @@
-/** Availability metadata for the private, source/test Milestone 4 root. */
+/** Availability metadata for the private, source/test Milestone 7 renderer. */
 export const lynxRootAvailability = {
 	available: true,
-	implementedMilestone: 4,
+	implementedMilestone: 7,
 	status: 'private-milestone-0-native-gates-blocked',
 } as const;
 
@@ -9,6 +9,20 @@ export type LynxRootAvailability = typeof lynxRootAvailability;
 
 export { createLynxRoot, root } from './root.js';
 export type { CreateLynxRootOptions, LynxRoot } from './root.js';
+export { useMainThreadRef } from './renderer.js';
+export {
+	runOnBackground,
+	runOnMainThread,
+	LynxCrossThreadCallCancelledError,
+} from './core/worklets.js';
+export type {
+	LynxBackgroundFunctionDescriptor,
+	LynxCancelablePromise,
+	LynxMainThreadRefCell,
+	LynxMainThreadRefDescriptor,
+	LynxMainThreadWorkletDescriptor,
+	LynxWorkletValue,
+} from './core/worklets.js';
 export type { LynxPublicHandle } from './core/client-driver.js';
 export { LynxNodesRefError } from './core/nodes-ref.js';
 export { createLynxNativeResource } from './resource.js';

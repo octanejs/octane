@@ -16,6 +16,12 @@ import { planLynxHostPropPatch } from './host-props.js';
 import { parseLynxNativeEventProp } from './native-events.js';
 import { isLynxNativeResource } from '../resource.js';
 import {
+	getThreadFunctionDescriptor,
+	isLynxMainThreadWorkletDescriptor,
+	type LynxBackgroundFunctionRegistry,
+	type LynxWorkletValue,
+} from './worklets.js';
+import {
 	createLynxNodesRef,
 	createLynxNodesRefSelector,
 	type LynxCreateSelectorQuery,
@@ -140,6 +146,7 @@ function createPublicHandle(
 interface LynxClientContainerState {
 	handles: Map<number, LynxPublicHandle>;
 	readonly generations: Map<number, number>;
+	readonly worklets?: LynxBackgroundFunctionRegistry;
 	readonly createSelectorQuery: LynxCreateSelectorQuery;
 	readonly attachmentSubscribers: Set<(batch: UniversalHostAttachmentBatch) => void>;
 }
@@ -153,6 +160,8 @@ export interface LynxClientContainer {
 
 export interface CreateLynxClientContainerOptions {
 	readonly createSelectorQuery?: LynxCreateSelectorQuery;
+	/** Background-owned execution lifetimes embedded in main-thread captures. */
+	readonly worklets?: LynxBackgroundFunctionRegistry;
 }
 
 export function createLynxClientContainer(
@@ -177,10 +186,66 @@ export function createLynxClientContainer(
 	CONTAINER_STATE.set(container, {
 		handles: new Map(),
 		generations: new Map(),
+		worklets: options.worklets,
 		createSelectorQuery,
 		attachmentSubscribers: new Set(),
 	});
 	return container;
+}
+
+function collectWorkletExecutionIds(
+	value: unknown,
+	output: Set<string>,
+	seen = new Set<object>(),
+): void {
+	if (value === null || typeof value !== 'object' || seen.has(value)) return;
+	seen.add(value);
+	if (Array.isArray(value)) {
+		for (const entry of value) collectWorkletExecutionIds(entry, output, seen);
+		return;
+	}
+	const execution = (value as { readonly _execId?: unknown })._execId;
+	if (typeof execution === 'string' && execution.length !== 0) output.add(execution);
+	for (const entry of Object.values(value)) collectWorkletExecutionIds(entry, output, seen);
+}
+
+/** Bind background closures only after a complete render reaches the transport boundary. */
+export function prepareLynxClientWorkletBatch(
+	container: LynxClientContainer,
+	batch: UniversalHostBatch,
+): UniversalHostBatch {
+	const worklets = containerState(container).worklets;
+	if (worklets === undefined) return batch;
+	const retained = new Set<string>();
+	try {
+		const commands = batch.commands.map((command) => {
+			if (command.op !== 'create' && command.op !== 'update' && command.op !== 'recreate') {
+				return command;
+			}
+			let changed = false;
+			const props: Record<string, unknown> = { ...command.props };
+			for (const name of Object.keys(props)) {
+				if (!name.startsWith('main-thread:') || name === 'main-thread:ref') continue;
+				const value = props[name];
+				if (value === null || value === undefined) continue;
+				const descriptor = getThreadFunctionDescriptor(value);
+				if (!isLynxMainThreadWorkletDescriptor(descriptor)) {
+					throw new TypeError(
+						`Octane Lynx ${JSON.stringify(name)} requires a compiler-transformed main-thread function.`,
+					);
+				}
+				const bound = worklets.retain(descriptor as LynxWorkletValue);
+				collectWorkletExecutionIds(bound, retained);
+				props[name] = bound;
+				changed = true;
+			}
+			return changed ? Object.freeze({ ...command, props: Object.freeze(props) }) : command;
+		});
+		return Object.freeze({ ...batch, commands: Object.freeze(commands) });
+	} catch (error) {
+		for (const execution of retained) worklets.release(execution);
+		throw error;
+	}
 }
 
 function containerState(container: LynxClientContainer): LynxClientContainerState {
@@ -684,6 +749,21 @@ export function createLynxClientDriver(): UniversalHostDriver<
 					return {
 						kind: 'resource' as const,
 						handle: context.createResourceHandle(context.value.id),
+					};
+				}
+				if (context.name.startsWith('main-thread:') && context.name !== 'main-thread:ref') {
+					if (context.value === null || context.value === undefined) {
+						return { kind: 'value' as const, value: context.value };
+					}
+					const descriptor = getThreadFunctionDescriptor(context.value);
+					if (!isLynxMainThreadWorkletDescriptor(descriptor)) {
+						throw new TypeError(
+							`Octane Lynx ${JSON.stringify(context.name)} requires a compiler-transformed main-thread function.`,
+						);
+					}
+					return {
+						kind: 'value' as const,
+						value: descriptor as never,
 					};
 				}
 				return { kind: 'value' as const, value: context.value as never };

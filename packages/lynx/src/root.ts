@@ -1,18 +1,26 @@
 import {
 	createUniversalRoot,
 	type UniversalComponent,
+	type UniversalHostBatch,
 	type UniversalPreparedAttempt,
 	type UniversalTransportIdentity,
 } from 'octane/universal/native';
 import {
 	createLynxClientContainer,
 	createLynxClientDriver,
+	prepareLynxClientWorkletBatch,
 	type LynxClientContainer,
 	type LynxPublicHandle,
 } from './core/client-driver.js';
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
-import type { LynxContextProxy } from './core/protocol.js';
+import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
+import {
+	createLynxBackgroundFunctionRegistry,
+	installBackgroundCallBridge,
+	type LynxBackgroundFunctionDescriptor,
+	type LynxWorkletValue,
+} from './core/worklets.js';
 
 interface LynxBackgroundGlobals {
 	readonly lynx?: {
@@ -47,6 +55,7 @@ export interface LynxRoot {
 
 interface LynxRootState {
 	readonly transport: LynxBackgroundTransport;
+	closeWorklets(): void;
 	status: 'active' | 'unmounting' | 'unmounted';
 	unmount: Promise<void> | null;
 }
@@ -106,30 +115,159 @@ function identityAdvanced(
 	);
 }
 
+function collectBackgroundExecutionIds(
+	value: unknown,
+	output: Set<string>,
+	seen: Set<object> = new Set(),
+): void {
+	if (value === null || typeof value !== 'object' || seen.has(value)) return;
+	seen.add(value);
+	if (Array.isArray(value)) {
+		for (const entry of value) collectBackgroundExecutionIds(entry, output, seen);
+		return;
+	}
+	const execution = (value as { readonly _execId?: unknown })._execId;
+	if (typeof execution === 'string' && execution.length !== 0) output.add(execution);
+	for (const entry of Object.values(value)) collectBackgroundExecutionIds(entry, output, seen);
+}
+
+function batchBackgroundExecutionIds(batch: UniversalHostBatch): Set<string> {
+	const ids = new Set<string>();
+	for (const command of batch.commands) {
+		if (command.op === 'create' || command.op === 'update' || command.op === 'recreate') {
+			collectBackgroundExecutionIds(command.props, ids);
+		}
+	}
+	return ids;
+}
+
 /** Create one background-owned root and its isolated async transport state. */
 export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 	const target = readBackgroundGlobals(options.target ?? globalThis);
 	const context = resolveContext(target, options.context);
 	const scheduleMicrotask = resolveMicrotaskScheduler(target, options.scheduleMicrotask);
 	const createSelectorQuery = target.lynx?.createSelectorQuery;
+	const worklets = createLynxBackgroundFunctionRegistry();
+	const acceptedWorklets = new Map<number, ReadonlySet<string>>();
+	const acceptedExecutionCounts = new Map<string, number>();
+	const retainAcceptedExecution = (execution: string): void => {
+		acceptedExecutionCounts.set(execution, (acceptedExecutionCounts.get(execution) ?? 0) + 1);
+	};
+	const releaseAcceptedExecution = (execution: string): void => {
+		const count = acceptedExecutionCounts.get(execution);
+		if (count === undefined) return;
+		if (count === 1) acceptedExecutionCounts.delete(execution);
+		else acceptedExecutionCounts.set(execution, count - 1);
+	};
+	const acceptWorkletBatch = (batch: UniversalHostBatch): void => {
+		const releaseCandidates = new Set<string>();
+		for (const command of batch.commands) {
+			if (command.op === 'create' || command.op === 'update' || command.op === 'recreate') {
+				const previous = acceptedWorklets.get(command.id);
+				if (previous !== undefined) {
+					for (const execution of previous) {
+						releaseAcceptedExecution(execution);
+						releaseCandidates.add(execution);
+					}
+				}
+				const ids = new Set<string>();
+				collectBackgroundExecutionIds(command.props, ids);
+				acceptedWorklets.set(command.id, ids);
+				for (const execution of ids) {
+					retainAcceptedExecution(execution);
+					releaseCandidates.add(execution);
+				}
+			} else if (command.op === 'destroy') {
+				const previous = acceptedWorklets.get(command.id);
+				if (previous !== undefined) {
+					for (const execution of previous) {
+						releaseAcceptedExecution(execution);
+						releaseCandidates.add(execution);
+					}
+				}
+				acceptedWorklets.delete(command.id);
+			}
+		}
+		for (const execution of releaseCandidates) {
+			if (!acceptedExecutionCounts.has(execution)) worklets.release(execution);
+		}
+	};
+	const rejectWorkletBatch = (batch: UniversalHostBatch): void => {
+		for (const execution of batchBackgroundExecutionIds(batch)) {
+			if (!acceptedExecutionCounts.has(execution)) worklets.release(execution);
+		}
+	};
 	const container = createLynxClientContainer({
 		createSelectorQuery:
 			typeof createSelectorQuery === 'function'
 				? () => createSelectorQuery.call(target.lynx)
 				: undefined,
+		worklets,
 	});
-	const transport = createLynxBackgroundTransport(context, container, {
-		onDiagnostic: options.onDiagnostic,
-	});
-	const universalRoot = createUniversalRoot<LynxClientContainer, LynxPublicHandle>(
-		container,
-		createLynxClientDriver(),
-		{ scheduleMicrotask, transport },
-	);
-	transport.bindRoot(universalRoot);
+	const transport = (() => {
+		try {
+			return createLynxBackgroundTransport(context, container, {
+				onDiagnostic: options.onDiagnostic,
+				prepareWorkletBatch: (batch) => prepareLynxClientWorkletBatch(container, batch),
+				onWorkletBatchAccepted: acceptWorkletBatch,
+				onWorkletBatchRejected: rejectWorkletBatch,
+				executeBackgroundFunction(fn, args) {
+					return worklets.run(fn as LynxBackgroundFunctionDescriptor, args);
+				},
+			});
+		} catch (error) {
+			worklets.close();
+			throw error;
+		}
+	})();
+	const universalRoot = (() => {
+		try {
+			const root = createUniversalRoot<LynxClientContainer, LynxPublicHandle>(
+				container,
+				createLynxClientDriver(),
+				{ scheduleMicrotask, transport },
+			);
+			transport.bindRoot(root);
+			return root;
+		} catch (error) {
+			transport.close(error);
+			worklets.close();
+			throw error;
+		}
+	})();
+	let uninstallCallBridge: (() => void) | null = null;
+	let workletsClosed = false;
+	const closeWorklets = (): void => {
+		if (workletsClosed) return;
+		workletsClosed = true;
+		uninstallCallBridge?.();
+		uninstallCallBridge = null;
+		acceptedWorklets.clear();
+		acceptedExecutionCounts.clear();
+		worklets.close();
+	};
+	try {
+		uninstallCallBridge = installBackgroundCallBridge({
+			callMain<Result>(
+				worklet: import('./core/worklets.js').LynxMainThreadWorkletDescriptor,
+				args: readonly LynxWorkletValue[],
+			) {
+				const call = transport.callMain(
+					worklet as LynxMainThreadWorkletWireDescriptor,
+					args as never,
+				);
+				return { promise: call.promise as Promise<Result>, cancel: call.cancel };
+			},
+		});
+	} catch (error) {
+		transport.close(error);
+		closeWorklets();
+		throw error;
+	}
 
 	const state: LynxRootState = {
 		transport,
+		closeWorklets,
 		status: 'active',
 		unmount: null,
 	};
@@ -206,6 +344,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 					disposeError = error;
 				} finally {
 					transport.close(disposeFailed ? disposeError : unmountFailed ? unmountError : undefined);
+					state.closeWorklets();
 					state.status = 'unmounted';
 				}
 				if (unmountFailed) throw unmountError;

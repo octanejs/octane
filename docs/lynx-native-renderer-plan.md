@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–6 have private source/test/build implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–7 have private source/test/build implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-18**
 
@@ -15,6 +15,8 @@ Milestone 4 source/test evidence date: **2026-07-19**
 Milestone 5 source/build evidence date: **2026-07-20**
 
 Milestone 6 source/build evidence date: **2026-07-21**
+
+Milestone 7 source/test evidence date: **2026-07-21**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -856,6 +858,30 @@ mismatches are repaired or diagnosed deterministically. At this point Octane
 may claim Lynx IFR support.
 
 ### Milestone 7 — main-thread scripts, refs, and cross-thread calls (4–6 engineer-weeks)
+
+> **Progress (2026-07-21): private source/test implementation complete; formal
+> exit blocked.** The Octane universal compiler now recognizes leading
+> `'main thread'` and `'background only'` function directives for renderers that
+> opt into thread functions. It assigns source-stable IDs, removes
+> opposite-layer definitions and imports, serializes captures in deterministic
+> order, and reports source-attributed diagnostics for unsupported placement,
+> captures, hooks, async main-thread functions, `this`, JSX, and unavailable
+> layer imports.
+> `@octanejs/lynx` owns the descriptor registries, capture isolation, activation
+> and ref lifetimes, host prop/event/ref routing, and root-scoped bidirectional
+> call protocol. Main-thread event props use the pinned Lynx-compatible worklet
+> envelope, while refs are updated only with main-local Element PAPI nodes.
+> Calls support pre-adoption queuing, async values/errors, cancellation,
+> exactly-once settlement, and stale-root plus active/retained
+> definition-revision rejection. Raw descriptors that were never activated or
+> retained, removed module sites, and end-to-end runtime HMR remain Milestone 8
+> work. No ReactLynx component, Preact, transform, or worklet runtime is a
+> dependency. Compiler, protocol, driver, and official-JavaScript-host tests
+> cover those boundaries, but there is no Lynx Web, Explorer, Android, or iOS
+> proof that worklets execute on the native main thread, refs retain the adopted
+> native identity, or gestures and continuous events avoid a background round
+> trip. There is also no native latency, memory, or cleanup benchmark, so the
+> formal Milestone 7 and stable/IFR gates remain blocked.
 
 - Support `'main thread'` and `'background only'` directives, including import
   DCE and source-attributed diagnostics.

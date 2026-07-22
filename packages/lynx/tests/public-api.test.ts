@@ -15,7 +15,7 @@ const packageJson = JSON.parse(
 	exports: Record<string, string>;
 };
 
-describe('@octanejs/lynx Milestone 6 private surface', () => {
+describe('@octanejs/lynx Milestone 7 private surface', () => {
 	it('keeps every required package subpath private and addressable', () => {
 		expect(packageJson.private).toBe(true);
 		expect(packageJson.version).toBe('0.0.0');
@@ -36,7 +36,7 @@ describe('@octanejs/lynx Milestone 6 private surface', () => {
 	it('exposes the private host and platform source surface without claiming a preview', () => {
 		expect(rootApi.lynxRootAvailability).toMatchObject({
 			available: true,
-			implementedMilestone: 4,
+			implementedMilestone: 7,
 		});
 		expect(platformApi.lynxPlatformAvailability).toMatchObject({
 			available: false,
@@ -55,7 +55,7 @@ describe('@octanejs/lynx Milestone 6 private surface', () => {
 		expect(rootApi.root.renderer).toBe('lynx');
 		expect(firstScreenApi.lynxRootAvailability).toMatchObject({
 			available: true,
-			implementedMilestone: 6,
+			implementedMilestone: 7,
 		});
 		expect(firstScreenApi.root.renderer).toBe('lynx');
 		expect(firstScreenApi.createLynxRoot()).toBe(firstScreenApi.root);
@@ -64,9 +64,17 @@ describe('@octanejs/lynx Milestone 6 private surface', () => {
 		expect(firstScreenApi.LynxNodesRefError).toBe(rootApi.LynxNodesRefError);
 		expect(mainRendererApi.renderLynxFirstScreen).toBeTypeOf('function');
 		expect(mainRendererApi.firstScreenEvent).toBeTypeOf('symbol');
+		expect(mainRendererApi.useMainThreadRef).toBeTypeOf('function');
+		expect(mainRendererApi.registerThreadFunction).toBeTypeOf('function');
+		expect(firstScreenApi.runOnBackground).toBe(rootApi.runOnBackground);
+		expect(firstScreenApi.runOnMainThread).toBe(rootApi.runOnMainThread);
 		expect(rootApi.createLynxRoot).toBeTypeOf('function');
+		expect(rootApi.useMainThreadRef).toBeTypeOf('function');
+		expect(rootApi.runOnBackground).toBeTypeOf('function');
+		expect(rootApi.runOnMainThread).toBeTypeOf('function');
 		expect(rootApi.createLynxNativeResource).toBeTypeOf('function');
 		expect(mainThreadApi.installLynxMainThread).toBeTypeOf('function');
+		expect(mainThreadApi.runOnBackground).toBe(rootApi.runOnBackground);
 		expect(platformApi.useInitData).toBeTypeOf('function');
 		expect(platformApi.useGlobalProps).toBeTypeOf('function');
 		expect(platformApi.getNativeModules).toBeTypeOf('function');
