@@ -350,16 +350,16 @@ export function Playground() @{
 				typesCache.set(name, entry);
 				return entry;
 			};
-			const astEntry = (name: string) => {
-				if (pgModules.isReactHostFile(name)) return null;
+			type AstEntryResult = { entry: AstEntry | null; error: string | null };
+			const astEntry = (name: string): AstEntryResult => {
+				if (pgModules.isReactHostFile(name)) return { entry: null, error: null };
 				const source = fileSource(name);
 				const key = astCacheKey(name);
 				const cached = astCache.get(key);
-				if (cached && cached.source === source) return cached;
+				if (cached && cached.source === source) return { entry: cached, error: null };
 				const result = pg.compileAst(source, name, resultModeRef.current.astStage);
 				if (!result.ok) {
-					setError(`AST generation failed: ${result.error}`);
-					return null;
+					return { entry: null, error: `AST generation failed: ${result.error}` };
 				}
 				const entry: AstEntry = {
 					source,
@@ -373,7 +373,7 @@ export function Playground() @{
 					mapping: undefined,
 				};
 				astCache.set(key, entry);
-				return entry;
+				return { entry, error: null };
 			};
 
 			// The exact string the output editor currently displays. The output
@@ -383,14 +383,14 @@ export function Playground() @{
 			const OUTPUT_PLACEHOLDER = '// Types output appears here.';
 			let lastShownOutput = OUTPUT_PLACEHOLDER;
 			let lastShownAst: object | null = null;
-			const showOutput = () => {
+			const showOutput = (): string | null => {
 				// The compiled pane is not visible: skip entirely — no types
 				// generation, no doc replacement, and (the dominant cost) no Shiki
 				// re-tokenize of the output document. syncOutput re-runs this when
 				// the pane is revealed, so it refreshes exactly once, on demand.
-				if (resultModeRef.current.view !== 'compiled') return;
+				if (resultModeRef.current.view !== 'compiled') return null;
 				if (resultModeRef.current.compiledMode === 'ast') {
-					const entry = astEntry(currentFile);
+					const { entry, error } = astEntry(currentFile);
 					if (entry && entry !== lastShownAst) {
 						astPreview.setAst(entry.ast, currentFile, {
 							label: entry.label,
@@ -406,20 +406,22 @@ export function Playground() @{
 					}
 					clearMappedPair();
 					astPreview.clear();
-					return;
+					if (error) setError(error);
+					return error;
 				}
 				const code = typesEntry(currentFile).code;
 				// AST and Types highlights describe different artifacts. Clear the
 				// pair even when the cached Types document needs no replacement.
 				clearMappedPair();
 				astPreview.clear();
-				if (typeof code !== 'string' || code === lastShownOutput) return;
+				if (typeof code !== 'string' || code === lastShownOutput) return null;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
 				// The output half of the pair changed — source marks were computed
 				// against the previous artifact (the output field self-cleared via
 				// its own doc change just now).
 				clearMappedIn(sourceView);
+				return null;
 			};
 
 			// ── Source ↔ output position mapping ─────────────────────────────
@@ -524,16 +526,9 @@ export function Playground() @{
 			const mappedPair = (side: 'source' | 'output', offset: number) => {
 				const mapping = activeMapping();
 				if (!mapping) return null;
-				if (side === 'source') {
-					const output = mapping.toGenerated(offset);
-					const source =
-						output ? mapping.toSource(output[0].from) : null;
-					return source && output ? { source, output } : null;
-				}
-				const source = mapping.toSource(offset);
-				const output =
-					source ? mapping.toGenerated(source[0].from) : null;
-				return source && output ? { source, output } : null;
+				return side === 'source'
+					? mapping.pairFromSource(offset)
+					: mapping.pairFromGenerated(offset);
 			};
 			const clearMappedPair = () => {
 				clearMappedIn(sourceView);
@@ -645,16 +640,16 @@ export function Playground() @{
 				// AST and Types describe the active source file, independently of
 				// whether another workspace file prevents the runnable module graph
 				// from compiling. Refresh inspection before handling graph failure.
-				showOutput();
+				const inspectionError = showOutput();
 				if (!graph.ok) {
 					setWarnings([]);
-					setError(graph.error);
+					setError(pg.resolvePlaygroundError(graph.error, inspectionError));
 					return;
 				}
 				setWarnings(
 					graph.warnings.map((warning: { diagnostic: CompileDiagnostic }) => warning.diagnostic),
 				);
-				setError('');
+				setError(pg.resolvePlaygroundError(null, inspectionError));
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.
 				if (executionGated) return;

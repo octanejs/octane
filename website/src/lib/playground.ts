@@ -40,6 +40,14 @@ export interface CompileFailure {
 	error: string;
 }
 
+/** Preserve an inspection failure unless module-graph compilation has a more direct error. */
+export function resolvePlaygroundError(
+	graphError: string | null,
+	inspectionError: string | null,
+): string {
+	return graphError ?? inspectionError ?? '';
+}
+
 /**
  * Compile one playground file for the client runtime. Never throws. The
  * filename is the virtual file's real name (e.g. `Island.tsrx`) so diagnostics
