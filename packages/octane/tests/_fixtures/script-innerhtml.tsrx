@@ -14,6 +14,10 @@ export interface ScriptSpreadProps {
 	spread: { dangerouslySetInnerHTML?: { __html: string } | null };
 }
 
+export interface ConditionalSpreadScriptProps extends ScriptSpreadProps {
+	show: boolean;
+}
+
 export function ExecutableScript(props: ScriptSourceProps) @{
 	<script data-kind="executable" dangerouslySetInnerHTML={{ __html: props.source }} />
 }
@@ -32,6 +36,13 @@ export function SpeculationRules(props: ScriptValueProps) @{
 		data-kind="speculationrules"
 		dangerouslySetInnerHTML={{ __html: JSON.stringify(props.value) }}
 	/>
+}
+
+export function ConditionalSpreadScript(props: ConditionalSpreadScriptProps) @{
+	<section>
+		{props.show &&
+			<script type="application/json" data-kind="conditional-spread" {...props.spread} />}
+	</section>
 }
 
 export function StaticScript() @{

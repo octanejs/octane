@@ -5,7 +5,7 @@ import { Canvas } from '@fixture/object-canvas';
 import { Scene } from './Scene.object.tsrx';
 import { DeferredHydrationProof } from './deferred-hydration.tsrx';
 import { PrefetchedHydrationProof } from './prefetched-hydration.tsrx';
-import { GuardedConst } from './GuardedConst.tsrx';
+import { GuardedConst } from './GuardedConst';
 
 export const fixturePageModuleState = { rendered: false };
 

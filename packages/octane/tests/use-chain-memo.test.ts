@@ -4,7 +4,9 @@ import {
 	BracelessVarChainHost,
 	BranchChainHost,
 	ChainHost,
+	ComputedPropChainHost,
 	NestedBranchChainHost,
+	OptionalDerivedChainHost,
 	PropChainHost,
 	SetupShadowHost,
 	ShadowedLoopHost,
@@ -90,6 +92,35 @@ describe('use()-fed const chain memoization', () => {
 		r.unmount();
 	});
 
+	it('tracks distinct static computed prop dependencies in a local creation chain', () => {
+		const calls: string[] = [];
+		const load = (a: string, b: string) => {
+			const value = a + ':' + b;
+			calls.push(value);
+			return {
+				status: 'fulfilled',
+				value,
+				then() {},
+			} as unknown as Promise<string>;
+		};
+		const r = mount(ComputedPropChainHost, {
+			'data-a': 'stable',
+			'data-b': 'first',
+			load,
+		});
+		expect(r.find('#computed-prop-chain').textContent).toBe('stable:first');
+		expect(calls).toEqual(['stable:first']);
+
+		r.update(ComputedPropChainHost, {
+			'data-a': 'stable',
+			'data-b': 'second',
+			load,
+		});
+		expect(r.find('#computed-prop-chain').textContent).toBe('stable:second');
+		expect(calls).toEqual(['stable:first', 'stable:second']);
+		r.unmount();
+	});
+
 	it('a derived link tracks an unmemoized upstream promise (never staler than recompute)', async () => {
 		// `base` is a reassigned let — not memoizable — so the derived `.then`
 		// link must key on base's IDENTITY. A member-path dep (`base.then` ===
@@ -116,6 +147,26 @@ describe('use()-fed const chain memoization', () => {
 		});
 		await act(() => {});
 		expect(r.html()).toContain('v=B');
+		r.unmount();
+	});
+
+	it('refreshes an optional derived chain when its upstream promise changes', async () => {
+		const calls: string[] = [];
+		const fetchUser = (id: string) => {
+			calls.push(id);
+			return Promise.resolve({ v: id.toUpperCase() });
+		};
+		const r = mount(OptionalDerivedChainHost, { fetchUser, id: 'a' });
+		await act(() => {});
+		expect(r.find('#optional-derived-chain').textContent).toBe('A');
+		expect(calls).toEqual(['a']);
+
+		await act(() => {
+			r.root.render(OptionalDerivedChainHost, { fetchUser, id: 'b' });
+		});
+		await act(() => {});
+		expect(r.find('#optional-derived-chain').textContent).toBe('B');
+		expect(calls).toEqual(['a', 'b']);
 		r.unmount();
 	});
 

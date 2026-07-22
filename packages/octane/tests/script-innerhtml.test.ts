@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as ServerRuntime from 'octane/server';
 import { flushSync, hydrateRoot } from '../src/index.js';
 import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.js';
+import { collectPipeableStream } from './_server-stream.js';
 import { mount } from './_helpers.js';
 import * as client from './_fixtures/script-innerhtml.tsrx';
 
@@ -22,6 +23,10 @@ const BREAKOUT_VALUE = {
 };
 
 const EXECUTABLE_SOURCE = `window.__octaneScriptValue = ${JSON.stringify(BREAKOUT_VALUE)};`;
+
+function scriptSpread(value: unknown) {
+	return { dangerouslySetInnerHTML: { __html: JSON.stringify(value) } };
+}
 
 const STATIC_JSON_VALUE = {
 	nested: { enabled: true },
@@ -135,6 +140,91 @@ describe('<script> content contract', () => {
 			expect(container.querySelectorAll('script')).toHaveLength(1);
 			expect(container.querySelector('[data-pwn]')).toBeNull();
 			expect(serverNode?.textContent).toBe(JSON.stringify(next));
+		} finally {
+			root.unmount();
+			warning.mockRestore();
+			container.remove();
+		}
+	});
+
+	it('mounts, updates, and conditionally removes dynamic script content passed through a spread', () => {
+		const mounted = mount(client.ConditionalSpreadScript, {
+			show: true,
+			spread: scriptSpread(BREAKOUT_VALUE),
+		});
+		try {
+			const script = mounted.find('script');
+			expect(mounted.findAll('script')).toHaveLength(1);
+			expect(mounted.container.querySelector('[data-pwn]')).toBeNull();
+			expect(JSON.parse(script.textContent ?? '')).toEqual(BREAKOUT_VALUE);
+
+			const next = { enabled: false, boundary: '</script><script data-pwn="next">bad</script>' };
+			mounted.update(client.ConditionalSpreadScript, {
+				show: true,
+				spread: scriptSpread(next),
+			});
+			expect(mounted.find('script')).toBe(script);
+			expect(mounted.container.querySelector('[data-pwn]')).toBeNull();
+			expect(JSON.parse(script.textContent ?? '')).toEqual(next);
+
+			mounted.update(client.ConditionalSpreadScript, {
+				show: false,
+				spread: scriptSpread(next),
+			});
+			expect(mounted.container.querySelector('script')).toBeNull();
+		} finally {
+			mounted.unmount();
+		}
+	});
+
+	it('serializes conditional dynamic script spread props in buffered and streaming SSR', async () => {
+		const props = { show: true, spread: scriptSpread(BREAKOUT_VALUE) };
+		const buffered = ServerRuntime.renderToString(server.ConditionalSpreadScript, props);
+		const streamed = await collectPipeableStream(server.ConditionalSpreadScript, props);
+		expect(streamed.errors).toEqual([]);
+		for (const html of [buffered.html, streamed.html]) {
+			const fragment = parseFragment(html);
+			const scripts = fragment.querySelectorAll('script');
+			expect(scripts).toHaveLength(1);
+			expect(fragment.querySelector('[data-pwn]')).toBeNull();
+			expect(JSON.parse(scripts[0].textContent ?? '')).toEqual(BREAKOUT_VALUE);
+		}
+
+		const hidden = await collectPipeableStream(server.ConditionalSpreadScript, {
+			show: false,
+			spread: scriptSpread(BREAKOUT_VALUE),
+		});
+		expect(parseFragment(hidden.html).querySelector('script')).toBeNull();
+		expect(hidden.errors).toEqual([]);
+	});
+
+	it('hydrates a conditional dynamic script spread by adoption and applies later updates', () => {
+		const props = { show: true, spread: scriptSpread(BREAKOUT_VALUE) };
+		const { html } = ServerRuntime.renderToString(server.ConditionalSpreadScript, props);
+		const container = document.createElement('div');
+		container.innerHTML = html;
+		document.body.appendChild(container);
+		const serverNode = container.querySelector('script');
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, client.ConditionalSpreadScript, props);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('script')).toBe(serverNode);
+			expect(JSON.parse(serverNode?.textContent ?? '')).toEqual(BREAKOUT_VALUE);
+			expect(warning).not.toHaveBeenCalled();
+
+			const next = { enabled: true, boundary: '</script><script data-pwn="updated">bad</script>' };
+			flushSync(() =>
+				root.render(client.ConditionalSpreadScript, {
+					show: true,
+					spread: scriptSpread(next),
+				}),
+			);
+			expect(container.querySelector('script')).toBe(serverNode);
+			expect(container.querySelectorAll('script')).toHaveLength(1);
+			expect(container.querySelector('[data-pwn]')).toBeNull();
+			expect(JSON.parse(serverNode?.textContent ?? '')).toEqual(next);
+			expect(warning).not.toHaveBeenCalled();
 		} finally {
 			root.unmount();
 			warning.mockRestore();

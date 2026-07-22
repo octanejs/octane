@@ -23,6 +23,8 @@ import {
 	DescriptorHostWithKeyedFragment,
 	DescriptorHostWithKeyedComponents,
 	ReturnedChildCodeBlock,
+	ValueTemplatePropSlot,
+	ValueTemplateExpressionSemantics,
 	ValueTemplateSlot,
 	ClonedValueTemplateSlot,
 	ValueTemplateSvg,
@@ -822,6 +824,124 @@ describe('template directives in JSX setup values', () => {
 		result.unmount();
 	});
 
+	it('passes a stored descriptor through a component prop and updates it in place', () => {
+		const result = mount(ValueTemplatePropSlot, {
+			showHeading: true,
+			heading: 'First prop heading',
+		});
+		const host = result.find('#setup-value-prop-host');
+		const content = result.find('#setup-value-prop-content');
+		const before = result.find('#setup-value-prop-before');
+		const heading = result.find('#setup-value-prop-heading');
+		const after = result.find('#setup-value-prop-after');
+
+		result.update(ValueTemplatePropSlot, {
+			showHeading: true,
+			heading: 'Updated prop heading',
+		});
+		expect(result.find('#setup-value-prop-host')).toBe(host);
+		expect(result.find('#setup-value-prop-content')).toBe(content);
+		expect(result.find('#setup-value-prop-before')).toBe(before);
+		expect(result.find('#setup-value-prop-heading')).toBe(heading);
+		expect(heading.textContent).toBe('Updated prop heading');
+		expect(result.find('#setup-value-prop-after')).toBe(after);
+
+		result.update(ValueTemplatePropSlot, {
+			showHeading: false,
+			heading: 'Hidden prop heading',
+		});
+		expect(result.findAll('#setup-value-prop-heading')).toHaveLength(0);
+		expect(result.find('#setup-value-prop-host')).toBe(host);
+		expect(result.find('#setup-value-prop-content')).toBe(content);
+		expect(result.find('#setup-value-prop-before')).toBe(before);
+		expect(result.find('#setup-value-prop-after')).toBe(after);
+
+		result.update(ValueTemplatePropSlot, {
+			showHeading: true,
+			heading: 'Restored prop heading',
+		});
+		expect(result.find('#setup-value-prop-heading').textContent).toBe('Restored prop heading');
+		expect(result.find('#setup-value-prop-host')).toBe(host);
+		expect(result.find('#setup-value-prop-content')).toBe(content);
+		result.unmount();
+	});
+
+	it('server-renders and hydrates a component-prop descriptor in place', async () => {
+		const server = serverModule();
+		const props = { showHeading: true, heading: 'Server prop heading' };
+		const { html } = await ServerRT.renderToString(server.ValueTemplatePropSlot, props);
+
+		const container = document.createElement('div');
+		document.body.appendChild(container);
+		container.innerHTML = html;
+		const host = container.querySelector('#setup-value-prop-host');
+		const content = container.querySelector('#setup-value-prop-content');
+		const before = container.querySelector('#setup-value-prop-before');
+		const heading = container.querySelector('#setup-value-prop-heading');
+		const after = container.querySelector('#setup-value-prop-after');
+		expect(host).not.toBeNull();
+		expect(content).not.toBeNull();
+		expect(before?.textContent).toBe('Before');
+		expect(heading?.textContent).toBe('Server prop heading');
+		expect(after?.textContent).toBe('After');
+		const root = hydrateRoot(container, ValueTemplatePropSlot, props);
+		flushSync(() => {});
+
+		expect(container.querySelector('#setup-value-prop-host')).toBe(host);
+		expect(container.querySelector('#setup-value-prop-content')).toBe(content);
+		expect(container.querySelector('#setup-value-prop-before')).toBe(before);
+		expect(container.querySelector('#setup-value-prop-heading')).toBe(heading);
+		expect(container.querySelector('#setup-value-prop-after')).toBe(after);
+
+		root.render(ValueTemplatePropSlot, {
+			showHeading: true,
+			heading: 'Hydrated prop heading',
+		});
+		flushSync(() => {});
+		expect(container.querySelector('#setup-value-prop-host')).toBe(host);
+		expect(container.querySelector('#setup-value-prop-content')).toBe(content);
+		expect(container.querySelector('#setup-value-prop-heading')).toBe(heading);
+		expect(heading?.textContent).toBe('Hydrated prop heading');
+		root.unmount();
+		container.remove();
+	});
+
+	it('keeps bare expressions setup-only and renders explicit fragments', () => {
+		const observed = new Set<string>();
+		const observe = (value: string) => {
+			observed.add(value);
+			return 'setup result: ' + value;
+		};
+		const result = mount(ValueTemplateExpressionSemantics, {
+			visible: true,
+			setupValue: 'first setup',
+			output: 'First output',
+			observe,
+		});
+
+		expect(observed.has('first setup')).toBe(true);
+		expect(result.find('#setup-value-expression-semantics').textContent).toBe('First output');
+
+		result.update(ValueTemplateExpressionSemantics, {
+			visible: false,
+			setupValue: 'hidden setup',
+			output: 'Hidden output',
+			observe,
+		});
+		expect(observed.has('hidden setup')).toBe(false);
+		expect(result.find('#setup-value-expression-semantics').textContent).toBe('');
+
+		result.update(ValueTemplateExpressionSemantics, {
+			visible: true,
+			setupValue: 'restored setup',
+			output: 'Restored output',
+			observe,
+		});
+		expect(observed.has('restored setup')).toBe(true);
+		expect(result.find('#setup-value-expression-semantics').textContent).toBe('Restored output');
+		result.unmount();
+	});
+
 	it('preserves the outer descriptor in return-JSX setup and cloneElement', async () => {
 		const hostRef = { current: null as HTMLElement | null };
 		const props = {
@@ -994,6 +1114,33 @@ describe('template directives in JSX setup values', () => {
 		expect(container.querySelector('#setup-value-mode')?.textContent).toBe('Secondary');
 		root.unmount();
 		container.remove();
+	});
+
+	it('switches a stored keyed list through @empty and back to nonempty', () => {
+		const items = [
+			{ id: 'a', label: 'A' },
+			{ id: 'b', label: 'B' },
+		];
+		const result = mount(ValueTemplateMatrix, { items, mode: 'primary' });
+		const matrix = result.find('#setup-value-matrix');
+		const firstA = result.find('[data-id="a"]');
+		result.click('[data-id="a"]');
+		expect(firstA.textContent).toBe('A:1');
+
+		result.update(ValueTemplateMatrix, { items: [], mode: 'primary' });
+		expect(result.find('#setup-value-matrix')).toBe(matrix);
+		expect(result.findAll('.setup-value-row')).toHaveLength(0);
+		expect(result.find('#setup-value-empty').textContent).toBe('empty');
+
+		result.update(ValueTemplateMatrix, { items, mode: 'primary' });
+		expect(result.find('#setup-value-matrix')).toBe(matrix);
+		expect(result.findAll('#setup-value-empty')).toHaveLength(0);
+		expect(result.findAll('.setup-value-row').map((row) => row.textContent)).toEqual([
+			'A:0',
+			'B:0',
+		]);
+		expect(result.find('[data-id="a"]')).not.toBe(firstA);
+		result.unmount();
 	});
 });
 
