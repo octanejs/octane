@@ -40,7 +40,7 @@ describe('@octanejs/lynx renderer preset', () => {
 			server: 'unsupported',
 			intrinsics: '@octanejs/lynx/intrinsics',
 			text: 'host',
-			capabilities: ['class-name-alias', 'visibility'],
+			capabilities: ['class-name-alias', 'thread-functions', 'visibility'],
 			validation: expect.objectContaining({
 				textHosts: ['raw-text'],
 				textParents: ['text'],
