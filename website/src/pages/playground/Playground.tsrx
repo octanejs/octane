@@ -642,6 +642,10 @@ export function Playground() @{
 				}
 				const graph = await pgModules.buildModuleGraph(wsFiles, entry);
 				if (disposed || seq !== compileSeq) return;
+				// AST and Types describe the active source file, independently of
+				// whether another workspace file prevents the runnable module graph
+				// from compiling. Refresh inspection before handling graph failure.
+				showOutput();
 				if (!graph.ok) {
 					setWarnings([]);
 					setError(graph.error);
@@ -651,7 +655,6 @@ export function Playground() @{
 					graph.warnings.map((warning: { diagnostic: CompileDiagnostic }) => warning.diagnostic),
 				);
 				setError('');
-				showOutput();
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.
 				if (executionGated) return;

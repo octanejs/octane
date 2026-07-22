@@ -2,7 +2,8 @@
 // contract behind the playground's click-to-navigate: an offset in the source
 // resolves to the range(s) in the compiled output that came from it, and an
 // offset in the output resolves back to its source range. It is exercised
-// against real Volar token mappings, not synthetic fixtures.
+// against real compiler artifacts; a focused nested-range fixture protects
+// Volar's shared generated-boundary behavior.
 import { describe, it, expect } from 'vitest';
 import { compilePlayground, compileTypes } from '../src/lib/playground.ts';
 import { mappingFromSourceMap, mappingFromVolar } from '../src/lib/playground-mapping.ts';
@@ -67,6 +68,18 @@ describe('types mapping (Volar token mappings)', () => {
 		const ranges = mapping!.toGenerated(offset);
 		expect(ranges).not.toBeNull();
 		expect(ranges!.some((range) => textAt(types.code, range) === 'setCount')).toBe(true);
+	});
+
+	it('maps a generated AST range to the narrowest token at a shared boundary', () => {
+		const nested = mappingFromVolar([
+			{ sourceOffsets: [0], generatedOffsets: [10], lengths: [20] },
+			{ sourceOffsets: [5], generatedOffsets: [10], lengths: [3] },
+		]);
+
+		expect(nested?.toSourceRange(10, 13)).toEqual([{ from: 5, to: 8 }]);
+		// The AST node may begin in unmapped generated plumbing. Its first
+		// mapped boundary must make the same narrow choice.
+		expect(nested?.toSourceRange(8, 13)).toEqual([{ from: 5, to: 8 }]);
 	});
 
 	it('returns null for empty or absent mappings instead of throwing', () => {
