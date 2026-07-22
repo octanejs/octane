@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	createAstPreview,
 	findDeepestAstNode,
 	preparePlaygroundAst,
 	type PlaygroundAstNode,
@@ -80,6 +81,36 @@ describe('playground AST preparation', () => {
 		expect(findDeepestAstNode(prepared, 5)?.type).toBe('Identifier');
 		expect(findDeepestAstNode(prepared, 6)?.type).toBe('ExpressionStatement');
 		expect(findDeepestAstNode(prepared, 10)).toBeNull();
+	});
+
+	it('drops source ranges when the current AST becomes unavailable', () => {
+		const host = document.createElement('div');
+		const ranges: Array<{ from: number; to: number } | null> = [];
+		const preview = createAstPreview(host, {
+			onNodeRange(range) {
+				ranges.push(range);
+			},
+		});
+		preview.setAst(
+			{
+				type: 'Program',
+				start: 0,
+				end: 10,
+				body: [{ type: 'Identifier', start: 4, end: 6, name: 'x' }],
+			},
+			'App.tsrx',
+		);
+		preview.reveal(5, false);
+		expect(ranges.at(-1)).toEqual({ from: 4, to: 6 });
+
+		preview.setUnavailable('Waiting for a successful compile…', 'App.tsrx');
+		expect(ranges.at(-1)).toBeNull();
+		expect(host.querySelector('.pg-ast-tree')).toBeNull();
+		expect(host.textContent).toContain('Waiting for a successful compile…');
+
+		preview.reveal(5, false);
+		expect(ranges.at(-1)).toBeNull();
+		preview.destroy();
 	});
 });
 

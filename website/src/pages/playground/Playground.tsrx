@@ -291,9 +291,6 @@ export function Playground() @{
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
 			};
 
-			// The last good graph still drives preview execution. AST and Types
-			// are generated lazily for only the active file when their tab opens.
-			let lastCompiled: Map<string, any> | null = null;
 			// name → { source, code, volarMappings, mapping } — the types view is
 			// generated on demand for the active file only, keyed by the exact
 			// source. Raw volar mappings are kept so the CodeMapping is built
@@ -364,11 +361,11 @@ export function Playground() @{
 					if (entry && entry !== lastShownAst) {
 						astPreview.setAst(entry.ast, currentFile);
 						lastShownAst = entry;
-					} else if (!entry && pgModules.isReactHostFile(currentFile)) {
-						astPreview.setUnavailable(
-							'AST trace covers Octane-owned .tsrx and .tsx files. React-host files use the separate Sucrase pipeline.',
-							currentFile,
-						);
+					} else if (!entry) {
+						const message = pgModules.isReactHostFile(currentFile)
+							? 'AST trace covers Octane-owned .tsrx and .tsx files. React-host files use the separate Sucrase pipeline.'
+							: 'AST generation failed. Fix the source to generate a new tree.';
+						astPreview.setUnavailable(message, currentFile);
 						lastShownAst = null;
 					}
 					clearMappedPair();
@@ -376,6 +373,10 @@ export function Playground() @{
 					return;
 				}
 				const code = typesEntry(currentFile).code;
+				// AST and Types highlights describe different artifacts. Clear the
+				// pair even when the cached Types document needs no replacement.
+				clearMappedPair();
+				astPreview.clear();
 				if (typeof code !== 'string' || code === lastShownOutput) return;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
@@ -573,7 +574,6 @@ export function Playground() @{
 					graph.warnings.map((warning: { diagnostic: CompileDiagnostic }) => warning.diagnostic),
 				);
 				setError('');
-				lastCompiled = graph.compiled;
 				showOutput();
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.

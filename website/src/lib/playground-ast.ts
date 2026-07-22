@@ -355,6 +355,8 @@ export function createAstPreview(
 		setUnavailable(message, nextFilename) {
 			filename = nextFilename;
 			unavailable = message;
+			prepared = null;
+			options.onNodeRange(null, false);
 			renderAst();
 		},
 		reveal(offset, scroll) {
