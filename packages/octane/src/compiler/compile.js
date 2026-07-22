@@ -4284,16 +4284,29 @@ function restampAuthoredStyleHashes(ast, styleRemap, filename) {
 }
 
 export function compile(source, filename, options) {
+	return compileAuthored(source, filename, options, null);
+}
+
+// Internal bundler entry point. Unlike the old __hydratePrepared handoff, this
+// always validates authored source and only exposes the hydrate slice that the
+// same compilation already prepared for production void-export classification.
+export function compileForBundler(source, filename, options) {
+	const metadata = { hydrateSource: source };
+	const result = compileAuthored(source, filename, options, metadata);
+	return { result, hydrateSource: metadata.hydrateSource };
+}
+
+function compileAuthored(source, filename, options, bundlerMetadata) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
 	const analyzedAst = parseModule(source, filename);
 	analyzeTsrx(analyzedAst, filename);
-	return compileInternal(source, filename, options, analyzedAst, mode);
+	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
 }
 
-function compileInternal(source, filename, options, analyzedAst, mode) {
+function compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata) {
 	const authoredSource = source;
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
@@ -4324,6 +4337,9 @@ function compileInternal(source, filename, options, analyzedAst, mode) {
 						rendererRegistry: options?.rendererRegistry,
 					},
 				).diagnostics;
+			if (bundlerMetadata !== null) {
+				bundlerMetadata.hydrateSource = hydratePreparation.source;
+			}
 			const compiled = compileInternal(
 				hydratePreparation.source,
 				cleanFilename,
@@ -4340,6 +4356,7 @@ function compileInternal(source, filename, options, analyzedAst, mode) {
 				},
 				null,
 				mode,
+				null,
 			);
 			if (hydratePreparation.map && compiled.map) {
 				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
@@ -4499,6 +4516,7 @@ function compileInternal(source, filename, options, analyzedAst, mode) {
 					},
 					null,
 					mode,
+					null,
 				);
 				if (expansionMap !== null) {
 					compiled.map = composeSourceMaps(compiled.map, expansionMap);
