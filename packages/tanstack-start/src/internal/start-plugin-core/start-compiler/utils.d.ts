@@ -14,6 +14,13 @@ export declare function codeFrameError(
 	},
 	message: string,
 ): Error;
+/**
+ * Converts a bundler module ID to its physical-file identity for diagnostics,
+ * filesystem matching, and file-based invalidation.
+ *
+ * Do not use this for IDs passed to resolve/load hooks or as module cache keys:
+ * virtual prefixes and queries can be part of the module's semantic identity.
+ */
 export declare function cleanId(id: string): string;
 /**
  * Strips a method call by replacing it with its callee object.

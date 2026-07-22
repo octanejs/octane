@@ -1,6 +1,4 @@
-import { SERVER_FN_LOOKUP } from '../constants.js';
 //#region src/import-protection/constants.ts
-var SERVER_FN_LOOKUP_QUERY = `?${SERVER_FN_LOOKUP}`;
 var MOCK_MODULE_ID = 'tanstack-start-import-protection:mock';
 var MOCK_BUILD_PREFIX = 'tanstack-start-import-protection:mock:build:';
 var MOCK_EDGE_PREFIX = 'tanstack-start-import-protection:mock-edge:';
@@ -34,6 +32,5 @@ export {
 	MOCK_EDGE_PREFIX,
 	MOCK_MODULE_ID,
 	MOCK_RUNTIME_PREFIX,
-	SERVER_FN_LOOKUP_QUERY,
 	VITE_BROWSER_VIRTUAL_PREFIX,
 };

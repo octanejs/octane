@@ -1,9 +1,8 @@
-import { TRANSFORM_ID_REGEX, VITE_ENVIRONMENT_NAMES } from '../../constants.js';
+import { SERVER_FN_LOOKUP, TRANSFORM_ID_REGEX, VITE_ENVIRONMENT_NAMES } from '../../constants.js';
 import { escapeRegExp, resolveViteId } from '../../utils.js';
 import {
 	IMPORT_PROTECTION_DEBUG,
 	MOCK_BUILD_PREFIX,
-	SERVER_FN_LOOKUP_QUERY,
 	VITE_BROWSER_VIRTUAL_PREFIX,
 } from '../../import-protection/constants.js';
 import {
@@ -64,6 +63,7 @@ import {
 	resolveInternalVirtualModuleId,
 	resolvedMarkerVirtualModuleId,
 } from './virtualModules.js';
+import { hasIdQueryFlag } from '../module-id.js';
 import { dirname, relative } from 'pathe';
 import { writeFileSync } from 'node:fs';
 import { normalizePath } from 'vite';
@@ -694,7 +694,7 @@ function importProtectionPlugin(opts) {
 		let merged = null;
 		if (keySet)
 			for (const k of keySet) {
-				if (k.includes(SERVER_FN_LOOKUP_QUERY)) continue;
+				if (hasIdQueryFlag(k, SERVER_FN_LOOKUP)) continue;
 				const imports = env.postTransformImports.get(k);
 				if (imports)
 					if (!merged) merged = new Set(imports);
@@ -721,7 +721,7 @@ function importProtectionPlugin(opts) {
 		let anyVariantCached = false;
 		if (keySet)
 			for (const k of keySet) {
-				if (k.includes(SERVER_FN_LOOKUP_QUERY)) continue;
+				if (hasIdQueryFlag(k, SERVER_FN_LOOKUP)) continue;
 				const imports = env.postTransformImports.get(k);
 				if (imports) {
 					anyVariantCached = true;
@@ -1091,7 +1091,7 @@ function importProtectionPlugin(opts) {
 					}
 					if (source.startsWith('\0') || source.startsWith('virtual:')) return;
 					const normalizedImporter = normalizeFilePath(importer);
-					const isDirectLookup = importer.includes(SERVER_FN_LOOKUP_QUERY);
+					const isDirectLookup = hasIdQueryFlag(importer, SERVER_FN_LOOKUP);
 					if (config.command === 'serve' && config.bundledDev && envType === 'client') {
 						if (
 							isInsideDirectory(normalizedImporter, normalizePath(`${config.srcDirectory}/routes`))
@@ -1432,7 +1432,7 @@ function importProtectionPlugin(opts) {
 					}
 					const cacheKey = normalizePath(id);
 					const envState = getEnv(envName);
-					const isServerFnLookup = id.includes(SERVER_FN_LOOKUP_QUERY);
+					const isServerFnLookup = hasIdQueryFlag(id, SERVER_FN_LOOKUP);
 					if (isServerFnLookup) envState.serverFnLookupModules.add(file);
 					const result = {
 						code,
