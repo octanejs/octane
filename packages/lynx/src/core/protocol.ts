@@ -57,6 +57,13 @@ export interface LynxMainReadyReply {
 	readonly firstTree?: LynxFirstTreeSnapshot;
 }
 
+/** Root-independent native page lifetime teardown broadcast to the background runtime. */
+export interface LynxPageDestroyMessage {
+	readonly protocol: typeof LYNX_TRANSPORT_PROTOCOL_VERSION;
+	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
+	readonly type: 'page-destroy';
+}
+
 export interface LynxPublicHandleUpsert {
 	readonly op: 'upsert';
 	readonly id: number;
@@ -215,6 +222,7 @@ export type LynxBackgroundOutboundMessage =
 
 export type LynxBackgroundInboundMessage =
 	| LynxMainReadyReply
+	| LynxPageDestroyMessage
 	| LynxCallBackgroundMessage
 	| LynxCancelBackgroundCallMessage
 	| LynxCallMainResultMessage
@@ -745,6 +753,16 @@ export function validateLynxBackgroundOutboundMessage(
 export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgroundInboundMessage {
 	const message = record(value, 'inbound message');
 	if (message.type === 'main-ready') return assertReady(message, true) as LynxMainReadyReply;
+	if (message.type === 'page-destroy') {
+		exactKeys(message, ['protocol', 'renderer', 'type'], 'page-destroy');
+		if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
+			fail('page-destroy', `protocol must be ${LYNX_TRANSPORT_PROTOCOL_VERSION}.`);
+		}
+		if (message.renderer !== LYNX_TRANSPORT_RENDERER) {
+			fail('page-destroy', `renderer must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+		}
+		return message as unknown as LynxPageDestroyMessage;
+	}
 	assertIdentity(message, 'inbound message');
 	if (message.type === 'call-background') {
 		exactKeys(

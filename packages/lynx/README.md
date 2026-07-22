@@ -21,8 +21,9 @@ ReactLynx-to-Octane migration:
 
 The package is `0.0.0`, marked `private`, and is not a native renderer release.
 Milestone 9's API/package review keeps the subpaths below unchanged and the
-universal renderer ABI experimental: public stabilization waits for the public
-native lifecycle/event hooks and device evidence listed under Current decision.
+universal renderer ABI experimental: public stabilization waits for the native
+event/reload contracts, verified destroy delivery, and device evidence listed
+under Current decision.
 
 ## Milestones 3–9 private surface
 
@@ -36,7 +37,8 @@ The package now contains:
   cross-thread `ContextProxy`;
 - a separate `@octanejs/lynx/main-thread` receiver which validates and stages
   complete batches, applies root-scoped Element PAPI mutations, flushes once,
-  then acknowledges acceptance;
+  then acknowledges acceptance, and automatically closes both renderer
+  runtimes from the typed public native `__DestroyLifetime` event;
 - async rejection, abort, accepted-fault, version-gap, stale-root, and terminal
   disposal behavior;
 - acknowledgement-gated, cloned public identity handles whose identity survives
@@ -224,8 +226,14 @@ the framework-maintained current `__initData` snapshot when present, so source
 tests cover reset key removal and an update between render and layout
 subscription. Installing and proving the native update receiver that maintains
 that snapshot remains a formal gate. The `reload()` API forwards a public
-request; it is not the missing framework reload receiver. No public
-page-destroy receiver has been installed. The packaged testing facade and
+request; it is not the missing framework reload receiver. The main receiver now
+subscribes to the public typed `lynx.getNative()` `__DestroyLifetime` event and
+broadcasts one root-independent teardown to the background root. Official
+JavaScript-host tests prove main PAPI cleanup plus background effect/ref cleanup,
+including registration failure and duplicate destroy during a reentrant host
+commit; the same source path closes background worklet ownership. They do not
+prove that the native event reaches the expected context or has the required
+ordering on Explorer, Android, or iOS. The packaged testing facade and
 production Rspeedy assembly do not remove those native execution gates.
 
 ## Milestones 4–9 exclusions and examples
@@ -320,10 +328,12 @@ check, not by committed tarball-integrity provenance.
 
 Native applications keep Lynx's event spelling: `bind`, `catch`,
 `capture-bind`, `capture-catch`, and `global-bind`. There is no DOM-style event
-alias or synthetic event layer. Page destroy, framework reload/background
-teardown, and native string-event delivery still lack the public framework
-hooks required by the plan. List recycling and the app-owned Native Module and
-custom-element boundary remain exactly as qualified above.
+alias or synthetic event layer. Page destroy now has a public typed,
+source-integrated candidate; native delivery and ordering are still unverified.
+Framework reload, native string-event delivery, and a proven cross-engine
+background teardown contract remain unresolved. List recycling and the
+app-owned Native Module and custom-element boundary remain exactly as qualified
+above.
 
 ## Current decision
 
@@ -331,7 +341,11 @@ Milestone 0 remains **blocked from exit**. The selected public packages expose
 PAPI, cross-thread contexts, and typed lifecycle messages, but do not expose a
 framework-neutral background receiver for native string event tokens. The
 ReactLynx path uses `lynxCoreInject.tt.publishEvent`; reload and background
-teardown also depend on injection-specific callbacks.
+teardown also depend on injection-specific callbacks. Octane now uses the
+typed native `__DestroyLifetime` event as a source-integrated replacement for
+page/background teardown, but the required engine matrix has not yet confirmed
+that event's context, delivery, or ordering, and no public reload receiver has
+been established.
 
 The production Web control and transport bundles currently fail before
 rendering under `@lynx-js/web-core@0.22.2` with a `MutationObserver` target type

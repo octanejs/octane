@@ -22,6 +22,8 @@ Milestone 8 source/test/build evidence date: **2026-07-22**
 
 Milestone 9 repository-stabilization evidence date: **2026-07-22**
 
+Post-Milestone-9 public page-destroy source/test evidence date: **2026-07-22**
+
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
 for ReactLynx can migrate without carrying React, Preact, React Reconciler, or a
@@ -500,11 +502,17 @@ seed from public `__presetData` and consume the framework-maintained current
 `__initData` snapshot when available; tests cover RESET key removal and the
 render-to-layout subscription race. The native update receiver that maintains
 that current snapshot is still uninstalled and remains part of the formal
-device gate. The source also does not install a framework reload or page-destroy
-receiver. Milestone 6 now supplies `markFirstScreenSyncReady()` as the explicit
-main-entry initialization gate before a first-tree snapshot is offered to the
-background runtime. This source contract has not been exercised by a native
-lifecycle receiver.
+device gate. The source still does not install a framework reload receiver. A
+post-Milestone-9 gate-closure tranche now installs the public typed native
+`__DestroyLifetime` listener, sends one root-independent background teardown,
+and closes main PAPI plus background effect/ref/worklet ownership. Source tests
+observe main PAPI and background effect/ref cleanup across ordinary,
+registration-failure, delivery-failure, duplicate, and reentrant-commit paths;
+the same source path closes the worklet registry. Native context, delivery, and
+ordering remain unproven on Explorer, Android, and iOS, so this does not close
+the lifecycle device gate. Milestone 6 supplies
+`markFirstScreenSyncReady()` as the explicit main-entry initialization gate
+before a first-tree snapshot is offered to the background runtime.
 
 Native Modules stay background-thread-only. The compiler diagnoses statically
 visible Native Module access and `@octanejs/lynx/platform` imports from
@@ -750,8 +758,9 @@ contract. No test uses private snapshot fields or command order as its oracle.
 > `lynx.getJSModule()` surface. App-owned Android/iOS module and custom
 > element examples document the intended seam but have not run on devices.
 > Formal exit remains blocked on Android/iOS allocation, scroll, module,
-> element, lifecycle, and teardown evidence; a public native event, destroy,
-> and reload receiver; and the existing Milestone 0 gates. The initial slice
+> element, lifecycle, and teardown evidence; a public native event and reload
+> receiver; native verification of the typed destroy path; and the existing
+> Milestone 0 gates. The initial slice
 > excludes nested lists, portals, Lynx Suspense proof, lazy bundles, gestures,
 > animations, full boolean-`defer` parity, and `defer.unmountRecycled`
 > semantics.
@@ -760,7 +769,8 @@ contract. No test uses private snapshot fields or command order as its oracle.
   detach refs, item reuse, reorder, and destruction.
 - Add init data, global props, global events, page reload/destroy, lifecycle and
   error reporting. A public reload request is not evidence for the still-missing
-  framework reload/destroy receiver.
+  framework reload receiver, and source integration is not native proof of the
+  typed destroy path.
 - Type Native Modules and diagnose thread misuse. Add one Android and one iOS
   native module example plus one custom native element fixture; do not ship
   application-native code inside the renderer.
@@ -981,9 +991,10 @@ runtimes.
 > universal ABI were reviewed for this private phase; both Lynx packages remain
 > `0.0.0` and `private` rather than becoming a technical preview.
 >
-> Formal exit still requires public framework-neutral native string-event,
-> page-destroy, reload/background-teardown, and current init-data receiver
-> hooks; a working Lynx Web transport; Explorer, Android, and iOS execution;
+> Formal exit still requires a public framework-neutral native string-event,
+> reload, and current init-data receiver contract; native verification of the
+> typed page/background-destroy path; a working Lynx Web transport; Explorer,
+> Android, and iOS execution;
 > minimum/current toolchain execution on native engines; native proof of first
 > paint and node identity adoption, worklet/ref/call execution, list allocation
 > and lifecycle, lazy-chunk execution, portal placement, Native Modules/custom

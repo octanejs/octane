@@ -353,6 +353,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 			return state.unmount;
 		},
 	};
+	transport.bindPageDestroy(() => facade.unmount());
 	return Object.freeze(facade);
 }
 
