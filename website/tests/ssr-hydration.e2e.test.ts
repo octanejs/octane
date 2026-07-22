@@ -1218,6 +1218,54 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 45_000);
 
+	it('playground refreshes the active AST when another workspace file fails', async () => {
+		const appSource =
+			"import { value } from './Value';\nexport default function App() @{ <p>{'Value: ' + value}</p> }";
+		const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+		const hash = encodePlaygroundHash({
+			lang: 'tsrx',
+			entry: 'App.tsrx',
+			files: [
+				{
+					name: 'App.tsrx',
+					source: appSource,
+				},
+				{ name: 'Value.tsrx', source: 'export const value = 1;' },
+			],
+		});
+		const { page, errors } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			`/playground#${hash}`,
+		);
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await page.locator('.pg-ast-tree').waitFor();
+
+			// Break an inactive dependency so the runnable module graph fails.
+			await page.locator('.pg-tab', { hasText: 'Value.tsrx' }).click();
+			await page.locator('.pg-editor .cm-content').first().click();
+			await page.keyboard.press(selectAll);
+			await page.keyboard.type('export const value = ;');
+			await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+
+			// The active App source still has a valid compiler AST. Editing it
+			// briefly invalidates the tree, then must restore it even though the
+			// dependency keeps the module graph in its failed state.
+			await page.locator('.pg-tab', { hasText: 'App.tsrx' }).click();
+			await page.locator('.pg-ast-tree').waitFor();
+			await page.locator('.pg-editor .cm-content').first().click();
+			await page.keyboard.press(selectAll);
+			await page.keyboard.type(appSource + '\n');
+			await page.getByText('Waiting for the next successful compile…').waitFor({ timeout: 5_000 });
+			await page.locator('.pg-ast-tree').waitFor({ timeout: 10_000 });
+			expect(await page.locator('.pg-error').count()).toBe(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
+
 	it('playground shows compiler warnings without treating runnable code as an error', async () => {
 		const source = `export function App() @{ <input onChange={() => {}} /> }`;
 		const hash = encodePlaygroundHash({

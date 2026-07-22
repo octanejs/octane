@@ -205,6 +205,19 @@ function createMapping(segments: Segment[]): CodeMapping | null {
 			return matched ? ranges(matched, 'src') : null;
 		},
 		toSourceRange(from, to) {
+			if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to <= from)
+				return null;
+
+			// An AST range is half-open. Prefer the narrowest mapping that
+			// contains its first character; Volar can emit a parent expression
+			// and a nested token at the same generated boundary.
+			const atStart = containing(byGen, genPrefixEnds, 'gen', from)?.filter(
+				(segment) => segment.gen < to && segment.gen + segment.genLen > from,
+			);
+			if (atStart?.length) return ranges(atStart, 'src');
+
+			// If the node starts in unmapped compiler plumbing, use the first
+			// mapped token inside the node, again narrowing shared boundaries.
 			let low = 0;
 			let high = byGen.length;
 			while (low < high) {
@@ -212,16 +225,11 @@ function createMapping(segments: Segment[]): CodeMapping | null {
 				if (byGen[middle].gen < from) low = middle + 1;
 				else high = middle;
 			}
-			if (low < byGen.length && byGen[low].gen === from) {
-				let last = low + 1;
-				while (last < byGen.length && byGen[last].gen === from) last++;
-				return ranges(byGen.slice(low, last), 'src');
-			}
-			const atStart = containing(byGen, genPrefixEnds, 'gen', from)?.filter(
-				(segment) => segment.gen + segment.genLen > from,
+			if (low >= byGen.length || byGen[low].gen >= to) return null;
+			const firstMapped = containing(byGen, genPrefixEnds, 'gen', byGen[low].gen)?.filter(
+				(segment) => segment.gen < to && segment.gen + segment.genLen > from,
 			);
-			if (atStart?.length) return ranges(atStart, 'src');
-			return low < byGen.length && byGen[low].gen < to ? ranges([byGen[low]], 'src') : null;
+			return firstMapped?.length ? ranges(firstMapped, 'src') : null;
 		},
 	};
 }
