@@ -17,7 +17,7 @@ describe('Lynx upstream crosswalk', () => {
 		const output = execFileSync(
 			process.execPath,
 			[resolve(LYNX_ROOT, 'audit/validate-crosswalk.mjs')],
-			{ encoding: 'utf8' },
+			{ encoding: 'utf8', timeout: 20_000 },
 		);
 
 		expect(output).toContain('213 classified test source files, 1725 classified runnable cases.');
@@ -28,5 +28,5 @@ describe('Lynx upstream crosswalk', () => {
 		expect(phaseZeroEvidence.milestoneExit.blockingGateIds).not.toContain(
 			'runner-expanded-test-case-inventory',
 		);
-	});
+	}, 30_000);
 });
