@@ -329,6 +329,71 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		expect(main.activeIdentity()).not.toBeNull();
 	});
 
+	it('fails a waiting background root before publishing readiness when native lifetime registration fails', async () => {
+		const dom = new JSDOM('<!doctype html><html><body></body></html>');
+		installLynxTestingEnv(globalThis, {
+			window: dom.window as unknown as Window & typeof globalThis,
+		});
+		const env = globalThis.lynxTestingEnv;
+		const registrationError = new Error('injected native lifetime registration failure');
+		try {
+			env.switchToBackgroundThread();
+			const inbound: LynxBackgroundInboundMessage[] = [];
+			backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+				inbound.push(event.data as LynxBackgroundInboundMessage);
+			});
+			backgroundRoot = createLynxRoot();
+			const rendering = backgroundRoot.render(SimpleScene, { id: 'must-not-become-ready' });
+			void rendering.catch(() => {});
+
+			env.switchToMainThread();
+			const lynx = (
+				globalThis as typeof globalThis & {
+					lynx: { getNative(): LynxContextProxy };
+				}
+			).lynx;
+			const native = lynx.getNative();
+			Object.defineProperty(lynx, 'getNative', {
+				configurable: true,
+				value: () =>
+					Object.freeze({
+						dispatchEvent(event) {
+							return native.dispatchEvent(event);
+						},
+						addEventListener(type, listener) {
+							if (type === '__DestroyLifetime') throw registrationError;
+							native.addEventListener(type, listener);
+						},
+						removeEventListener(type, listener) {
+							native.removeEventListener(type, listener);
+						},
+					}),
+			});
+
+			expect(() => installLynxMainThread()).toThrow(registrationError);
+			env.switchToBackgroundThread();
+			await expect(rendering).rejects.toThrow(/native page lifetime was destroyed/);
+			await backgroundRoot.unmount();
+			backgroundRoot = null;
+
+			expect(inbound.map((message) => message.type)).toEqual(['page-destroy']);
+			expect(dom.window.document.querySelector('page')?.innerHTML).toBe('');
+		} finally {
+			env.switchToBackgroundThread();
+			if (backgroundRoot !== null) {
+				try {
+					await backgroundRoot.unmount();
+				} catch {
+					// The startup failure may already have completed logical teardown.
+				}
+			}
+			backgroundRoot = null;
+			env.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
 	it('cancels an unaccepted render when unmounted before main is ready', async () => {
 		const dom = new JSDOM('<!doctype html><html><body></body></html>');
 		installLynxTestingEnv(globalThis, {
@@ -520,6 +585,61 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 			});
 		}).toThrow(deliveryError);
 		expect(main.diagnostics()).toContain(deliveryError);
+	});
+
+	it('tears down background ownership when the public native page lifetime ends', async () => {
+		const { dom, env, main } = installEnvironment();
+		const logs: string[] = [];
+		const counterRefs: Array<LynxPublicHandle | null> = [];
+		let resolveCleanup!: () => void;
+		const cleanedUp = new Promise<void>((resolve) => {
+			resolveCleanup = resolve;
+		});
+		const props: FixtureProps = {
+			label: 'lifetime',
+			items: [],
+			showDetails: false,
+			fail: false,
+			log(entry) {
+				logs.push(entry);
+				if (entry === 'passive-cleanup:0') resolveCleanup();
+			},
+			captureActions() {},
+			captureRow() {},
+			counterRef(handle) {
+				counterRefs.push(handle);
+			},
+		};
+
+		backgroundRoot = createLynxRoot();
+		await backgroundRoot.render(fixture, props);
+		await backgroundRoot.flushTransport();
+		const destroyedRoot = backgroundRoot;
+		const counterHandle = counterRefs.at(-1)!;
+		expect(counterHandle).not.toBeNull();
+		expect(main.activeIdentity()).not.toBeNull();
+
+		env.switchToMainThread();
+		(
+			globalThis as typeof globalThis & {
+				lynx: { getNative(): LynxContextProxy };
+			}
+		).lynx
+			.getNative()
+			.dispatchEvent({ type: '__DestroyLifetime', data: [1] });
+		env.switchToBackgroundThread();
+
+		await cleanedUp;
+		await destroyedRoot.unmount();
+		backgroundRoot = null;
+
+		expect(dom.window.document.querySelector('page')?.innerHTML).toBe('');
+		expect(main.activeIdentity()).toBeNull();
+		expect(counterHandle.active).toBe(false);
+		expect(counterRefs.at(-1)).toBeNull();
+		expect(logs).toEqual(expect.arrayContaining(['layout-cleanup:0', 'passive-cleanup:0']));
+		await expect(destroyedRoot.render(fixture, props)).rejects.toThrow(/unmounted Lynx root/);
+		expect(main.diagnostics()).toEqual([]);
 	});
 
 	it('mounts, updates state/context/conditionals, reorders keyed hosts, and unmounts', async () => {

@@ -96,6 +96,7 @@ function installEnvironment(
 		readMain: () => LynxMainThreadController | null,
 		readRegistrations: () => readonly EventRegistration[],
 	) => void,
+	wrapContext?: (context: LynxContextProxy) => LynxContextProxy,
 ): InstalledEnvironment {
 	const dom = new JSDOM('<!doctype html><html><body></body></html>');
 	installLynxTestingEnv(globalThis, {
@@ -121,7 +122,17 @@ function installEnvironment(
 		() => main,
 		() => registrations,
 	);
-	main = installLynxMainThread();
+	const wrappedContext = wrapContext?.(
+		(
+			target as {
+				lynx: { getJSContext(): LynxContextProxy };
+			}
+		).lynx.getJSContext(),
+	);
+	main =
+		wrappedContext === undefined
+			? installLynxMainThread()
+			: installLynxMainThread({ context: wrappedContext });
 	env.switchToBackgroundThread();
 	return (installed = { dom, main, registrations });
 }
@@ -144,6 +155,15 @@ function backgroundContext(): LynxContextProxy {
 			lynx: { getCoreContext(): LynxContextProxy };
 		}
 	).lynx.getCoreContext();
+}
+
+function nativeContext(): LynxContextProxy {
+	globalThis.lynxTestingEnv.switchToMainThread();
+	return (
+		globalThis as typeof globalThis & {
+			lynx: { getNative(): LynxContextProxy };
+		}
+	).lynx.getNative();
 }
 
 function dispatchCommit(
@@ -184,6 +204,130 @@ afterEach(async () => {
 });
 
 describe.sequential('Lynx main-thread native event bridge', () => {
+	it('tears down the active page when the public native lifetime is destroyed', () => {
+		const { dom, main } = installEnvironment();
+		dispatchCommit(backgroundContext(), 89, 1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'lifetime-root' } },
+			{ op: 'create', id: 2, type: 'text', props: {} },
+			{ op: 'create', id: 3, type: '#text', props: { value: 'alive' } },
+			{ op: 'insert', parent: 2, id: 3, before: null },
+			{ op: 'insert', parent: 1, id: 2, before: null },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+		const page = dom.window.document.querySelector('page')!;
+
+		expect(page.querySelector('#lifetime-root')?.textContent).toBe('alive');
+		expect(page.children).toHaveLength(1);
+		expect(main.activeIdentity()).toMatchObject({ root: 89, version: 1 });
+
+		nativeContext().dispatchEvent({
+			type: '__DestroyLifetime',
+			data: [1],
+		});
+
+		expect(page.innerHTML).toBe('');
+		expect(main.activeIdentity()).toBeNull();
+		expect(main.diagnostics()).toEqual([]);
+
+		// A late delivery is inert and diagnosable after lifetime teardown.
+		main.dispatchNativeEvent('late-native-event', { detail: { phase: 'late' } });
+		expect(main.diagnostics().at(-1)?.message).toBe(
+			'Octane Lynx received a native event after the main receiver closed.',
+		);
+		expect(page.innerHTML).toBe('');
+	});
+
+	it('still closes native state when the background lifetime notification cannot be delivered', () => {
+		const deliveryError = new Error('injected page-destroy delivery failure');
+		const { dom, main } = installEnvironment(undefined, (delegate) =>
+			Object.freeze({
+				dispatchEvent(event) {
+					if (
+						event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
+						(event.data as { readonly type?: unknown }).type === 'page-destroy'
+					) {
+						throw deliveryError;
+					}
+					return delegate.dispatchEvent(event);
+				},
+				addEventListener(type, listener) {
+					delegate.addEventListener(type, listener);
+				},
+				removeEventListener(type, listener) {
+					delegate.removeEventListener(type, listener);
+				},
+			}),
+		);
+		dispatchCommit(backgroundContext(), 88, 1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'delivery-failure-root' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+
+		expect(() =>
+			nativeContext().dispatchEvent({ type: '__DestroyLifetime', data: [1] }),
+		).not.toThrow();
+		expect(dom.window.document.querySelector('page')?.innerHTML).toBe('');
+		expect(main.activeIdentity()).toBeNull();
+		expect(main.diagnostics()).toContain(deliveryError);
+	});
+
+	it('defers destructive lifetime cleanup until a reentrant PAPI commit unwinds', () => {
+		let destroyOnFlush = true;
+		let destroyBroadcasts = 0;
+		const { dom, main } = installEnvironment(
+			(target) => {
+				const flush = target.__FlushElementTree as () => void;
+				target.__FlushElementTree = () => {
+					flush.call(target);
+					if (!destroyOnFlush) return;
+					destroyOnFlush = false;
+					const native = (
+						target as {
+							lynx: { getNative(): LynxContextProxy };
+						}
+					).lynx.getNative();
+					native.dispatchEvent({ type: '__DestroyLifetime', data: [1] });
+					native.dispatchEvent({ type: '__DestroyLifetime', data: [1] });
+				};
+			},
+			(delegate) =>
+				Object.freeze({
+					dispatchEvent(event) {
+						if (
+							event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
+							(event.data as { readonly type?: unknown }).type === 'page-destroy'
+						) {
+							destroyBroadcasts++;
+						}
+						return delegate.dispatchEvent(event);
+					},
+					addEventListener(type, listener) {
+						delegate.addEventListener(type, listener);
+					},
+					removeEventListener(type, listener) {
+						delegate.removeEventListener(type, listener);
+					},
+				}),
+		);
+		const context = backgroundContext();
+
+		dispatchCommit(context, 87, 1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'reentrant-destroy-root' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+
+		expect(dom.window.document.querySelector('page')?.innerHTML).toBe('');
+		expect(main.activeIdentity()).toBeNull();
+		expect(main.diagnostics()).toEqual([]);
+		expect(destroyBroadcasts).toBe(1);
+
+		dispatchCommit(context, 87, 2, [
+			{ op: 'create', id: 2, type: 'view', props: { id: 'late-root' } },
+			{ op: 'insert', parent: null, id: 2, before: null },
+		]);
+		expect(dom.window.document.querySelector('#late-root')).toBeNull();
+	});
+
 	it('publishes native-list ancestry with public-handle acknowledgements', () => {
 		const { dom } = installEnvironment();
 		const context = backgroundContext();
