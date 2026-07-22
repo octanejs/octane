@@ -93,6 +93,52 @@ function removeListItem(index: number): UniversalHostCommand[] {
 }
 
 describe('Lynx native list recycling', () => {
+	it('reports retained subtree ancestry changes and omits same-list reorders', () => {
+		const dom = new JSDOM();
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.clearGlobal();
+		environment.switchToMainThread();
+		try {
+			const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 12 });
+			prepareLynxHostBatch(
+				container,
+				batch(1, [
+					{ op: 'create', id: 1, type: 'list', props: { id: 'ancestry-list' } },
+					{ op: 'create', id: 2, type: 'list-item', props: { 'item-key': 'row' } },
+					{ op: 'create', id: 3, type: 'view', props: { id: 'retained-root' } },
+					{ op: 'create', id: 4, type: 'view', props: { id: 'retained-child' } },
+					{ op: 'insert', parent: 3, id: 4, before: null },
+					{ op: 'insert', parent: 1, id: 2, before: null },
+					{ op: 'insert', parent: null, id: 1, before: null },
+					{ op: 'insert', parent: null, id: 3, before: null },
+				]),
+			).apply();
+
+			const enterList = prepareLynxHostBatch(
+				container,
+				batch(2, [{ op: 'move', parent: 2, id: 3, before: null }]),
+			);
+			expect(enterList.listAncestryDelta).toEqual([
+				{ id: 3, generation: 1, listDescendant: true },
+				{ id: 4, generation: 1, listDescendant: true },
+			]);
+			enterList.abort();
+
+			const reorder = prepareLynxHostBatch(
+				container,
+				batch(2, [{ op: 'move', parent: 1, id: 2, before: null }]),
+			);
+			expect(reorder.listAncestryDelta).toEqual([]);
+			reorder.abort();
+			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+		} finally {
+			environment.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
 	it('materializes requested cells, reuses their native identity, and makes late callbacks inert', () => {
 		const dom = new JSDOM();
 		installLynxTestingEnv(globalThis, { window: dom.window as never });

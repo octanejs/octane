@@ -28,6 +28,7 @@ export {
 	registerThreadFunction,
 	runOnBackground,
 	runOnMainThread,
+	unregisterThreadFunction,
 } from './core/worklets.js';
 export type {
 	LynxBackgroundFunctionDescriptor,
@@ -52,10 +53,17 @@ const UNIVERSAL_CONTEXT = Symbol.for('octane.universal.context');
 const UNIVERSAL_ACTIVITY = Symbol.for('octane.universal.activity');
 const UNIVERSAL_KEYED = Symbol.for('octane.universal.keyed');
 const UNIVERSAL_PORTAL = Symbol.for('octane.universal.portal');
+const LAZY_COMPONENT = Symbol.for('octane.lazy');
 const CONTEXT_TAG = Symbol.for('octane.context');
 const FIRST_SCREEN_EVENT = Symbol.for('octane.lynx.first-screen-event');
 const NO_CHILDREN = Symbol('octane.lynx.first-screen.no-children');
 const NO_KEY = Symbol('octane.lynx.first-screen.no-key');
+const FIRST_SCREEN_WARM_DEPTH_CAP = 64;
+
+const FIRST_SCREEN_LAZY_METADATA = Object.freeze({
+	id: '<lazy>',
+	target: 'universal' as const,
+});
 
 export const UNIVERSAL_HMR: unique symbol = Symbol.for('octane.universal.hmr') as never;
 
@@ -128,7 +136,9 @@ class FirstScreenSuspense {
 
 let CURRENT_ATTEMPT: FirstScreenAttempt | null = null;
 let NEXT_HOOK_SLOT = 0;
+let FIRST_SCREEN_WARM_DEPTH = 0;
 const SLOT_STACK: unknown[] = [];
+const ACTIVE_FIRST_SCREEN_WARM_PLANS: Array<() => void> = [];
 
 function currentAttempt(): FirstScreenAttempt {
 	if (CURRENT_ATTEMPT === null) {
@@ -419,11 +429,161 @@ export function defineUniversalComponent<P>(
 /** Compiler sentinel replacing an ordinary background event expression. */
 export const firstScreenEvent = FIRST_SCREEN_EVENT;
 
+function componentMetadata(component: UniversalComponent<any>): {
+	readonly id?: unknown;
+	readonly module?: string;
+} {
+	const metadata = (component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] as
+		{ id?: unknown; module?: string } | undefined;
+	if (metadata !== undefined) return metadata;
+	if ((component as any)?.[LAZY_COMPONENT] === true) return FIRST_SCREEN_LAZY_METADATA;
+	throw new Error('Lynx first-screen rendering requires a compiled Lynx component.');
+}
+
 export function hmrUniversalComponent<P>(
-	_renderer: string,
+	renderer: string,
 	component: UniversalComponent<P>,
 ): UniversalComponent<P> {
-	return component;
+	assertRenderer(renderer);
+	const metadata = (component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] as
+		{ id?: unknown; module?: string } | undefined;
+	if (metadata?.id !== renderer) {
+		throw new Error(
+			`Universal HMR renderer mismatch: wrapper ${JSON.stringify(renderer)} cannot own ${JSON.stringify(metadata?.id)}.`,
+		);
+	}
+	const state: {
+		component: UniversalComponent<P>;
+		update(incoming: UniversalComponent<P>): void;
+	} = {
+		component,
+		update(incoming) {
+			const incomingState = (incoming as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_HMR] as
+				{ component?: UniversalComponent<P> } | undefined;
+			const next = incomingState?.component ?? incoming;
+			const nextMetadata = (next as unknown as Record<PropertyKey, unknown>)[
+				UNIVERSAL_COMPONENT
+			] as { id?: unknown } | undefined;
+			if (nextMetadata?.id !== renderer) {
+				throw new Error(
+					`Universal HMR renderer mismatch: wrapper ${JSON.stringify(renderer)} cannot accept ${JSON.stringify(nextMetadata?.id)}.`,
+				);
+			}
+			state.component = next;
+			if ((next as any).__warm === undefined) delete (wrapper as any).__warm;
+			else (wrapper as any).__warm = (next as any).__warm;
+		},
+	};
+	const wrapper = defineUniversalComponent<P>(
+		renderer,
+		(props, context) => state.component(props, context),
+		{ module: metadata.module },
+	);
+	Object.defineProperty(wrapper, UNIVERSAL_HMR, { value: state });
+	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
+	return wrapper;
+}
+
+function firstScreenLazyProps(
+	component: UniversalComponent<any>,
+	props: any,
+): Readonly<Record<string, unknown>> {
+	const defaults = (component as any).defaultProps;
+	if (defaults == null || typeof defaults !== 'object') return props;
+	let resolved = props;
+	for (const key of Object.keys(defaults)) {
+		if (props == null || props[key] === undefined) {
+			if (resolved === props) resolved = props == null ? {} : { ...props };
+			resolved[key] = defaults[key];
+		}
+	}
+	return resolved;
+}
+
+function resolveFirstScreenLazyModule(module: unknown): UniversalComponent<any> {
+	let component = module;
+	if (module != null) {
+		const defaultExport = (module as { readonly default?: unknown }).default;
+		if (defaultExport !== undefined) component = defaultExport;
+	}
+	if (typeof component !== 'function' || (component as any)[LAZY_COMPONENT] === true) {
+		throw new Error(
+			`Universal lazy expected a component function or module default, got ${
+				(component as any)?.[LAZY_COMPONENT] === true ? 'a lazy component' : typeof component
+			}.`,
+		);
+	}
+	const resolved = component as UniversalComponent<any>;
+	const metadata = componentMetadata(resolved);
+	if (metadata.id !== 'lynx') {
+		throw new Error(
+			`Universal lazy for renderer "lynx" cannot render component ${JSON.stringify(metadata.id)}.`,
+		);
+	}
+	return resolved;
+}
+
+/**
+ * Main-thread mirror of universal lazy loading. A pending chunk can only commit
+ * an authored `@pending` arm because the native first-screen pass is one-shot;
+ * the retained background root owns later reveal/error updates after adoption.
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export function lazy<C extends UniversalComponent<any>>(
+	load: () => PromiseLike<{ default: C } | C>,
+): C {
+	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
+	let result: unknown = null;
+	let thenable: TrackedThenable<{ default: C } | C> | null = null;
+
+	const initialize = (): void => {
+		if (status !== 'uninitialized') return;
+		try {
+			const loaded = load();
+			thenable = loaded as TrackedThenable<{ default: C } | C>;
+			loaded.then(
+				(module) => {
+					if (status === 'uninitialized' || status === 'pending') {
+						result = module;
+						status = 'fulfilled';
+					}
+				},
+				(error) => {
+					if (status === 'uninitialized' || status === 'pending') {
+						result = error;
+						status = 'rejected';
+					}
+				},
+			);
+		} catch (error) {
+			if (status === 'uninitialized') thenable = null;
+			throw error;
+		}
+		if (status === 'uninitialized') status = 'pending';
+	};
+
+	const wrapper = ((props: any, context: UniversalRenderContext): UniversalRenderable => {
+		if (status === 'uninitialized') initialize();
+		let settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
+		if (settledStatus === 'fulfilled') {
+			const component = resolveFirstScreenLazyModule(result);
+			return component(firstScreenLazyProps(component, props), context);
+		}
+		if (settledStatus === 'rejected') throw result;
+		useBatch([thenable!]);
+		settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
+		if (settledStatus === 'fulfilled') {
+			const component = resolveFirstScreenLazyModule(result);
+			return component(firstScreenLazyProps(component, props), context);
+		}
+		if (settledStatus === 'rejected') throw result;
+		throw new FirstScreenSuspense(thenable!);
+	}) as UniversalComponent<any>;
+	Object.defineProperties(wrapper, {
+		[LAZY_COMPONENT]: { value: true },
+		__warm: { value: initialize },
+	});
+	return wrapper as C;
 }
 
 export function rendererRegion(): never {
@@ -522,13 +682,17 @@ function renderComponent(
 	component: UniversalComponent<any>,
 	props: Readonly<Record<string, unknown>>,
 ): FirstScreenNode[] {
-	const metadata = (component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] as
-		{ id?: unknown } | undefined;
-	if (metadata?.id !== 'lynx') {
+	const metadata = componentMetadata(component);
+	if (metadata !== FIRST_SCREEN_LAZY_METADATA && metadata.id !== 'lynx') {
 		throw new Error('Lynx first-screen rendering requires a compiled Lynx component.');
 	}
 	const owner = childOwner(currentOwner());
-	return withOwner(owner, () => materialize(component(props, componentContext()), null));
+	const warmPlanCheckpoint = ACTIVE_FIRST_SCREEN_WARM_PLANS.length;
+	try {
+		return withOwner(owner, () => materialize(component(props, componentContext()), null));
+	} finally {
+		ACTIVE_FIRST_SCREEN_WARM_PLANS.length = warmPlanCheckpoint;
+	}
 }
 
 function renderPlanNode(node: UniversalPlanNode, values: readonly unknown[]): FirstScreenNode[] {
@@ -588,12 +752,14 @@ function renderPlanNode(node: UniversalPlanNode, values: readonly unknown[]): Fi
 function renderTry(value: Record<string, unknown>): FirstScreenNode[] {
 	const attempt = currentAttempt();
 	const universalIdCheckpoint = attempt.nextUniversalId;
+	const warmPlanCheckpoint = ACTIVE_FIRST_SCREEN_WARM_PLANS.length;
 	const owner = childOwner(currentOwner());
 	return withOwner(owner, () => {
 		try {
 			const body = value.body as () => UniversalRenderable;
 			return [range([range(materialize(body(), null))])];
 		} catch (error) {
+			ACTIVE_FIRST_SCREEN_WARM_PLANS.length = warmPlanCheckpoint;
 			// The body is abandoned before pending/catch commits. Match the
 			// background transaction by making its speculative useId allocations
 			// available to whichever fallback becomes the first tree.
@@ -616,6 +782,8 @@ function renderTry(value: Record<string, unknown>): FirstScreenNode[] {
 					),
 				]),
 			];
+		} finally {
+			ACTIVE_FIRST_SCREEN_WARM_PLANS.length = warmPlanCheckpoint;
 		}
 	});
 }
@@ -825,16 +993,27 @@ export function renderLynxFirstScreen<Props>(
 		nextUniversalId: 1,
 	};
 	CURRENT_ATTEMPT = attempt;
+	ACTIVE_FIRST_SCREEN_WARM_PLANS.length = 0;
+	FIRST_SCREEN_WARM_DEPTH = 0;
 	let nodes: FirstScreenNode[];
 	try {
-		const metadata = (component as unknown as Record<PropertyKey, unknown>)[UNIVERSAL_COMPONENT] as
-			{ id?: unknown } | undefined;
-		if (metadata?.id !== 'lynx') {
+		const metadata = componentMetadata(component);
+		if (metadata !== FIRST_SCREEN_LAZY_METADATA && metadata.id !== 'lynx') {
 			throw new Error('Lynx first-screen root.render() requires a compiled Lynx component.');
 		}
 		nodes = materialize(component(props, componentContext()), null);
 		assignIds(nodes, attempt);
+	} catch (error) {
+		if (error instanceof FirstScreenSuspense) {
+			throw new Error(
+				'Lynx first-screen rendering suspended without an authored @pending boundary; the synchronous first-screen pass cannot wait for lazy chunks or other asynchronous work.',
+				{ cause: error.thenable },
+			);
+		}
+		throw error;
 	} finally {
+		ACTIVE_FIRST_SCREEN_WARM_PLANS.length = 0;
+		FIRST_SCREEN_WARM_DEPTH = 0;
 		CURRENT_ATTEMPT = null;
 	}
 
@@ -1071,7 +1250,23 @@ export function use<T>(usable: UniversalContext<T> | PromiseLike<T>): T {
 	throw new FirstScreenSuspense(thenable);
 }
 
-export function useBatch(items: any[]): void {
+function warmFirstScreenPlan(plan: () => void): void {
+	if (FIRST_SCREEN_WARM_DEPTH >= FIRST_SCREEN_WARM_DEPTH_CAP) return;
+	FIRST_SCREEN_WARM_DEPTH++;
+	try {
+		plan();
+	} catch {
+		// Warming is speculative and cannot replace the authored pending arm.
+	} finally {
+		FIRST_SCREEN_WARM_DEPTH--;
+	}
+}
+
+export function useBatch(items: any[], warm?: () => void): void {
+	if (items.length === 0) {
+		if (warm !== undefined) ACTIVE_FIRST_SCREEN_WARM_PLANS.push(warm);
+		return;
+	}
 	let pending: TrackedThenable[] | null = null;
 	for (const item of items) {
 		if (item == null || typeof item.then !== 'function') continue;
@@ -1081,12 +1276,20 @@ export function useBatch(items: any[]): void {
 		if (thenable.status === 'pending') (pending ??= []).push(thenable);
 	}
 	if (pending === null) return;
+	for (let index = 0; index < ACTIVE_FIRST_SCREEN_WARM_PLANS.length; index++) {
+		warmFirstScreenPlan(ACTIVE_FIRST_SCREEN_WARM_PLANS[index]);
+	}
+	if (warm !== undefined) warmFirstScreenPlan(warm);
 	if (pending.length === 1) throw new FirstScreenSuspense(pending[0]);
 	throw new FirstScreenSuspense(Promise.all(pending));
 }
 
 export function warmMemo(): void {}
-export function warmChild(): void {}
+export function warmChild(component: any, props: any): void {
+	if (FIRST_SCREEN_WARM_DEPTH === 0 || component == null) return;
+	const plan = component.__warm;
+	if (typeof plan === 'function') warmFirstScreenPlan(() => plan(props));
+}
 
 export function useImperativeHandle(): void {
 	currentOwner();

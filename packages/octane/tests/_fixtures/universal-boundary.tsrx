@@ -38,3 +38,11 @@ export function UniversalSchedulerBridgeApp(props) @{
 		props={{ version, onLayout: props.onUniversalLayout }}
 	/>
 }
+
+export function UniversalPendingBoundaryFixture(props) @{
+	@try {
+		<ObjectBoundary root={props.root} component={props.component} props={props.childProps} />
+	} @pending {
+		<p class="projected-pending">{'pending'}</p>
+	}
+}

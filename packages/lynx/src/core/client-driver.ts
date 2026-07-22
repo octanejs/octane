@@ -3,6 +3,8 @@ import type {
 	UniversalHostBatch,
 	UniversalHostDriver,
 	UniversalHostPropCodecContext,
+	UniversalPortalTargetContext,
+	UniversalPortalTargetRegistration,
 	UniversalSerializableValue,
 	UniversalTransportIdentity,
 } from 'octane/universal/native';
@@ -32,6 +34,7 @@ import {
 	type LynxNodesRefFieldsResult,
 	type LynxNodesRefPathResult,
 } from './nodes-ref.js';
+import { encodeLynxPortalTargetId } from './portal.js';
 
 export interface LynxPublicHandle {
 	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
@@ -56,6 +59,7 @@ export interface LynxPublicHandle {
 interface MutableHandleState {
 	active: boolean;
 	attached: boolean;
+	listDescendant: boolean;
 	attachmentEpoch: number;
 	snapshot: UniversalSerializableValue;
 	readonly binding: LynxNodesRefBinding;
@@ -136,6 +140,7 @@ function createPublicHandle(
 	HANDLE_STATE.set(handle, {
 		active: false,
 		attached: false,
+		listDescendant: false,
 		attachmentEpoch: 0,
 		snapshot,
 		binding,
@@ -405,6 +410,12 @@ export function prepareLynxHandleDeltas(
 	const createdHandles = new Set<LynxPublicHandle>();
 	const priorGenerations = new Map<number, number | undefined>();
 	const nextGenerations = new Map<number, number>();
+	// Main owns the accepted host topology and publishes this derived bit. The
+	// command gate prevents ancestry state from changing on a non-structural ACK;
+	// identity, generation, transition, and change checks guard its lifecycle.
+	const hasTopologyMutation = batch.commands.some(
+		(command) => command.op === 'insert' || command.op === 'move' || command.op === 'remove',
+	);
 	const stageGeneration = (id: number, generation: number) => {
 		if (!priorGenerations.has(id)) priorGenerations.set(id, state.generations.get(id));
 		nextGenerations.set(id, generation);
@@ -416,6 +427,31 @@ export function prepareLynxHandleDeltas(
 		seen.add(delta.id);
 		const transition = transitions.get(delta.id);
 		const expected = transition === undefined ? 'none' : expectedHandleDelta(transition);
+		if (delta.op === 'list-ancestry') {
+			const handle = originalHandles.get(delta.id);
+			const current = handle === undefined ? undefined : HANDLE_STATE.get(handle);
+			if (
+				!hasTopologyMutation ||
+				expected !== 'none' ||
+				handle === undefined ||
+				current === undefined ||
+				!current.active ||
+				handle.root !== identity.root ||
+				handle.generation !== delta.generation
+			) {
+				throw new Error(
+					`Octane Lynx acknowledgement changes list ancestry for stale or transitioning handle ${delta.id}:${delta.generation}.`,
+				);
+			}
+			if (current.listDescendant === delta.listDescendant) {
+				throw new Error(
+					`Octane Lynx acknowledgement publishes unchanged list ancestry for handle ${delta.id}.`,
+				);
+			}
+			priorStates.set(handle, { ...current });
+			nextStates.set(handle, { ...current, listDescendant: delta.listDescendant });
+			continue;
+		}
 		if (transition === undefined || expected === 'none') {
 			throw new Error(`Octane Lynx acknowledgement publishes unchanged handle ${delta.id}.`);
 		}
@@ -459,6 +495,7 @@ export function prepareLynxHandleDeltas(
 				...current,
 				active: true,
 				attached: delta.attached,
+				listDescendant: delta.listDescendant,
 				attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
 			});
 			stagedHandles.set(delta.id, handle);
@@ -493,6 +530,7 @@ export function prepareLynxHandleDeltas(
 				...current,
 				active: true,
 				attached: delta.attached,
+				listDescendant: delta.listDescendant,
 				attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
 			});
 			stagedHandles.set(delta.id, handle);
@@ -507,6 +545,7 @@ export function prepareLynxHandleDeltas(
 			...current,
 			active: true,
 			attached: delta.attached,
+			listDescendant: delta.listDescendant,
 			attachmentEpoch: nextAttachmentEpoch(current, delta.attached),
 			snapshot: cloneSnapshot(delta.snapshot),
 		});
@@ -720,6 +759,62 @@ export function createLynxClientDriver(): UniversalHostDriver<
 	const driver: UniversalHostDriver<LynxClientContainer, LynxPublicHandle> = {
 		id: LYNX_TRANSPORT_RENDERER,
 		capabilities: Object.freeze({ text: 'host' as const, visibility: true }),
+		portals: Object.freeze({
+			prepareTarget({
+				container,
+				target,
+				transported,
+				createPortalTargetHandle,
+			}: UniversalPortalTargetContext<LynxClientContainer>): UniversalPortalTargetRegistration {
+				const state = containerState(container);
+				const handleState =
+					target !== null && typeof target === 'object'
+						? HANDLE_STATE.get(target as LynxPublicHandle)
+						: undefined;
+				const handle = target as LynxPublicHandle;
+				if (
+					!transported ||
+					handleState === undefined ||
+					state.handles.get(handle.id) !== handle ||
+					!handleState.active
+				) {
+					throw new TypeError(
+						'Octane Lynx portals require a current, active LynxPublicHandle from this root. Initial portals must wait for the target ref acknowledgement.',
+					);
+				}
+				if (!handleState.attached) {
+					throw new Error(
+						`Octane Lynx portal target ${handle.id}:${handle.generation} is not physically attached.`,
+					);
+				}
+				if (
+					handle.type === '#text' ||
+					handle.type === 'raw-text' ||
+					handle.type === 'list' ||
+					handle.type === 'list-item'
+				) {
+					throw new Error(
+						`Octane Lynx portal target type ${JSON.stringify(handle.type)} is not supported.`,
+					);
+				}
+				if (handleState.listDescendant) {
+					throw new Error(
+						`Octane Lynx portal target ${handle.id}:${handle.generation} is a native-list descendant.`,
+					);
+				}
+				const portalHandle = createPortalTargetHandle(
+					encodeLynxPortalTargetId({
+						root: handle.root,
+						id: handle.id,
+						generation: handle.generation,
+					}),
+				);
+				return Object.freeze({
+					handle: portalHandle,
+					release() {},
+				});
+			},
+		}),
 		attachments: Object.freeze({
 			subscribe(
 				container: LynxClientContainer,

@@ -74,7 +74,7 @@ export function markFirstScreenSyncReady(): void {
 
 export const lynxRootAvailability = {
 	available: true,
-	implementedMilestone: 7,
+	implementedMilestone: 8,
 	status: 'private-milestone-0-native-gates-blocked',
 } as const;
 

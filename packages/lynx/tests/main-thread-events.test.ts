@@ -19,6 +19,7 @@ import {
 	type LynxBackgroundInboundMessage,
 	type LynxContextProxy,
 } from '../src/core/protocol.js';
+import { encodeLynxPortalTargetId } from '../src/core/portal.js';
 
 type Handler = ((payload: unknown) => void) | null;
 
@@ -183,6 +184,85 @@ afterEach(async () => {
 });
 
 describe.sequential('Lynx main-thread native event bridge', () => {
+	it('publishes native-list ancestry with public-handle acknowledgements', () => {
+		const { dom } = installEnvironment();
+		const context = backgroundContext();
+		const inbound: LynxBackgroundInboundMessage[] = [];
+		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+			inbound.push(event.data as LynxBackgroundInboundMessage);
+		});
+
+		dispatchCommit(context, 90, 1, [
+			{ op: 'create', id: 1, type: 'list', props: { id: 'feed' } },
+			{ op: 'create', id: 2, type: 'list-item', props: { 'item-key': 'row' } },
+			{ op: 'create', id: 3, type: 'text', props: {} },
+			{ op: 'create', id: 4, type: 'view', props: { id: 'retained-root' } },
+			{ op: 'create', id: 5, type: 'view', props: { id: 'retained-child' } },
+			{ op: 'insert', parent: 2, id: 3, before: null },
+			{ op: 'insert', parent: 4, id: 5, before: null },
+			{ op: 'insert', parent: 1, id: 2, before: null },
+			{ op: 'insert', parent: null, id: 1, before: null },
+			{ op: 'insert', parent: null, id: 4, before: null },
+		]);
+
+		const acknowledgement = inbound[0];
+		if (acknowledgement?.type !== 'ack') throw new Error('Expected a Lynx acknowledgement.');
+		expect(acknowledgement.handles).toEqual([
+			expect.objectContaining({ op: 'upsert', id: 1, listDescendant: false }),
+			expect.objectContaining({ op: 'upsert', id: 2, listDescendant: true }),
+			expect.objectContaining({ op: 'upsert', id: 3, listDescendant: true }),
+			expect.objectContaining({ op: 'upsert', id: 4, listDescendant: false }),
+			expect.objectContaining({ op: 'upsert', id: 5, listDescendant: false }),
+		]);
+		expect(inbound.map(({ type }) => type)).toEqual(['ack', 'complete']);
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		const list = dom.window.document.querySelector('#feed')!;
+		expect(globalThis.elementTree.enterListItemAtIndex(list as never, 0)).toBeGreaterThan(0);
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		inbound.length = 0;
+		dispatchCommit(context, 90, 2, [
+			{
+				op: 'move',
+				parent: {
+					$$kind: 'octane.universal.portal-target',
+					renderer: LYNX_TRANSPORT_RENDERER,
+					root: 71,
+					id: encodeLynxPortalTargetId({ root: 90, id: 4, generation: 1 }),
+				},
+				id: 2,
+				before: null,
+			},
+			{ op: 'recreate', id: 2, type: 'list-item', props: { 'item-key': 'row' } },
+			{ op: 'move', parent: 1, id: 2, before: null },
+		]);
+		expect(inbound.map(({ type }) => type)).toEqual(['reject']);
+		expect(inbound[0]).toMatchObject({
+			type: 'reject',
+			error: { message: expect.stringMatching(/must be placed directly under a <list>/) },
+		});
+
+		inbound.length = 0;
+		dispatchCommit(context, 90, 2, [{ op: 'move', parent: 2, id: 4, before: null }]);
+		const enterList = inbound[0];
+		if (enterList?.type !== 'ack') throw new Error('Expected a Lynx acknowledgement.');
+		expect(enterList.handles).toEqual([
+			{ op: 'list-ancestry', id: 4, generation: 1, listDescendant: true },
+			{ op: 'list-ancestry', id: 5, generation: 1, listDescendant: true },
+		]);
+		expect(inbound.map(({ type }) => type)).toEqual(['ack', 'complete']);
+
+		inbound.length = 0;
+		dispatchCommit(context, 90, 3, [{ op: 'move', parent: null, id: 4, before: null }]);
+		const leaveList = inbound[0];
+		if (leaveList?.type !== 'ack') throw new Error('Expected a Lynx acknowledgement.');
+		expect(leaveList.handles).toEqual([
+			{ op: 'list-ancestry', id: 4, generation: 1, listDescendant: false },
+			{ op: 'list-ancestry', id: 5, generation: 1, listDescendant: false },
+		]);
+		expect(inbound.map(({ type }) => type)).toEqual(['ack', 'complete']);
+	});
+
 	it('settles complete-time events immediately and drops reject-time reentry', () => {
 		const { main, registrations } = installEnvironment();
 		const context = backgroundContext();

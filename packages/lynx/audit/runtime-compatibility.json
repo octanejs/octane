@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-07-21",
+  "recordedAt": "2026-07-22",
   "selectedSdk": "3.9.0",
   "selectedRspeedy": "0.16.0",
-  "purpose": "Milestones 1–6 source/build runtime-ownership evidence for Octane's DOM-free Lynx graphs, including the dual-layer first-screen specialization. This is JavaScript graph, decoded-bundle, and host-emulator evidence, not Lynx Web or native device execution.",
+  "purpose": "Milestones 1–8 source/build runtime-ownership evidence for Octane's DOM-free Lynx graphs, including the dual-layer first-screen specialization and lazy chunks. This is JavaScript graph, decoded-bundle, and host-emulator evidence, not Lynx Web or native device execution.",
   "sources": [
     {
       "url": "https://lynxjs.org/guide/scripting-runtime/",
@@ -52,7 +52,7 @@
     "sync": "The generated receiver opens background readiness only after the authored entry's synchronous initialization returns.",
     "ownership": "The main renderer emits one initial host batch and event markers. Effects, refs, state ownership, listener closures, scheduling, and later updates remain background-owned.",
     "handoff": "A clone-safe snapshot is paired with a main-local host journal. Compatible background batches transfer the existing host tree without allocation or structural mutation; ordinary events replay in FIFO order after background listener ownership; typed mismatches repair from the background tree.",
-    "excluded": "Native list hosts and materializations are not captured for adoption. Boolean list defer has no eager-main versus deferred-background claim.",
+    "excluded": "Native list hosts and materializations are not captured for adoption. Boolean list defer has no eager-main versus deferred-background claim. A first-screen lazy pending arm is one-shot; the background root owns later reveal or rejection.",
     "evidence": "Compiler, source-graph, decoded-bundle, and official JavaScript host-emulator tests only; no native first-paint, identity, device, or performance evidence."
   },
   "universalCoreBuiltins": {
@@ -85,5 +85,5 @@
       "WeakRef"
     ]
   },
-  "qualification": "The exact pinned Rspeedy toolchain specializes one authored Milestone 6 application entry into production background and main-thread graphs and emits a decoded .lynx.bundle. The background graph contains the full universal runtime and asynchronous client boundary; the main graph contains the one-shot first-screen renderer, receiver, and PAPI host while excluding the universal core. Both graphs exclude DOM, React, Preact, and ReactLynx runtime modules. Source and JavaScript-host tests cover snapshot adoption, event handoff, mismatch repair, and cleanup. This does not prove main-thread bytecode execution, native first paint, native identity retention, event/lifecycle receiver wiring, list allocation/scrolling, Lynx Web, Android, iOS, or performance; every corresponding formal gate remains blocked."
+  "qualification": "The exact pinned Rspeedy toolchain specializes one authored Milestone 8 application entry into production background and main-thread graphs and emits decoded entry and content-hashed async .lynx.bundle artifacts. The lazy module is present in both Octane layers. The background graph contains the full universal runtime and asynchronous client boundary; the main graph contains the one-shot first-screen renderer, receiver, and PAPI host while excluding the universal core. Both graphs exclude DOM, React, Preact, and ReactLynx runtime modules. Source and JavaScript-host tests cover snapshot adoption, retained boundaries, same-root portals, event handoff, mismatch repair, and cleanup. This does not prove main-thread bytecode execution, native first paint, native identity retention, native chunk execution or portal placement, event/lifecycle receiver wiring, list allocation/scrolling, Lynx Web, Android, iOS, or performance; every corresponding formal gate remains blocked."
 }
