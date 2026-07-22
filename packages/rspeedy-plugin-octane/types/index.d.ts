@@ -49,19 +49,66 @@ export interface LynxToolchainPackage {
 	readonly version: string;
 }
 
+export type LynxToolchainLaneName = 'minimum' | 'current';
+
+export interface LynxToolchainLane {
+	readonly description: string;
+	readonly lynxSdk: '3.9.0';
+	readonly targetSdk: '3.9';
+	readonly packages: Readonly<
+		Record<
+			| '@lynx-js/cache-events-webpack-plugin'
+			| '@lynx-js/chunk-loading-webpack-plugin'
+			| '@lynx-js/css-extract-webpack-plugin'
+			| '@lynx-js/debug-metadata'
+			| '@lynx-js/debug-metadata-rsbuild-plugin'
+			| '@lynx-js/rspeedy'
+			| '@lynx-js/runtime-wrapper-webpack-plugin'
+			| '@lynx-js/tasm'
+			| '@lynx-js/template-webpack-plugin'
+			| '@lynx-js/testing-environment'
+			| '@lynx-js/types'
+			| '@lynx-js/web-core'
+			| '@lynx-js/web-rsbuild-server-middleware'
+			| '@lynx-js/webpack-dev-transport'
+			| '@lynx-js/webpack-runtime-globals'
+			| '@lynx-js/websocket'
+			| '@rsbuild/core'
+			| '@rsbuild/plugin-css-minimizer'
+			| '@rsdoctor/rspack-plugin'
+			| '@rspack/core'
+			| 'typescript'
+			| 'webpack',
+			string
+		>
+	>;
+}
+
+export const LYNX_TOOLCHAIN_LANES: Readonly<Record<LynxToolchainLaneName, LynxToolchainLane>>;
+
 export function assertLynxToolchain(
 	root: string,
+	lane?: LynxToolchainLaneName,
 ): Readonly<
 	Record<
+		| '@lynx-js/cache-events-webpack-plugin'
+		| '@lynx-js/chunk-loading-webpack-plugin'
 		| '@lynx-js/css-extract-webpack-plugin'
+		| '@lynx-js/debug-metadata'
+		| '@lynx-js/debug-metadata-rsbuild-plugin'
 		| '@lynx-js/rspeedy'
 		| '@lynx-js/runtime-wrapper-webpack-plugin'
 		| '@lynx-js/tasm'
 		| '@lynx-js/template-webpack-plugin'
+		| '@lynx-js/types'
 		| '@lynx-js/web-core'
+		| '@lynx-js/web-rsbuild-server-middleware'
 		| '@lynx-js/webpack-dev-transport'
 		| '@lynx-js/webpack-runtime-globals'
+		| '@lynx-js/websocket'
 		| '@rsbuild/core'
+		| '@rsbuild/plugin-css-minimizer'
+		| '@rsdoctor/rspack-plugin'
 		| '@rspack/core',
 		LynxToolchainPackage
 	>

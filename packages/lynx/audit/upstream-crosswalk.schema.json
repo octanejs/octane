@@ -59,7 +59,13 @@
         "orphanedSourceFileCount",
         "totalSourceFileCount",
         "unclassifiedSourceFileCount",
+        "rustCaseCount",
+        "rustSourceFileCount",
+        "rustClassification",
+        "rustReason",
+        "rustSources",
         "classificationGroups",
+        "runnerCaseOverrides",
         "runnerExpandedCases"
       ],
       "properties": {
@@ -97,6 +103,23 @@
         },
         "rustReason": {
           "type": "string"
+        },
+        "rustSources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source", "caseCount"],
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "caseCount": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "taskCounts": {
           "type": "array"
@@ -148,12 +171,40 @@
         "knownNonRunnableCases": {
           "type": "array"
         },
+        "runnerCaseOverrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source", "titlePattern", "classification", "reason"],
+            "properties": {
+              "source": {
+                "type": "string"
+              },
+              "titlePattern": {
+                "type": "string"
+              },
+              "classification": {
+                "$ref": "#/$defs/classification"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
         "runnerExpandedCases": {
           "type": "object",
           "required": [
             "status",
+            "artifact",
             "runnableCaseCount",
+            "classifiedCaseCount",
+            "sourceFileCount",
             "unclassifiedRunnableCaseCount",
+            "caseDigest",
+            "rustCaseDigest",
+            "classificationCounts",
             "reason",
             "requiredEvidence"
           ],
@@ -161,13 +212,39 @@
             "status": {
               "enum": ["unmet-gate", "complete"]
             },
+            "artifact": {
+              "type": "string"
+            },
             "runnableCaseCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "classifiedCaseCount": {
+              "type": ["integer", "null"],
+              "minimum": 0
+            },
+            "sourceFileCount": {
               "type": ["integer", "null"],
               "minimum": 0
             },
             "unclassifiedRunnableCaseCount": {
               "type": ["integer", "null"],
               "minimum": 0
+            },
+            "caseDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "rustCaseDigest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "classificationCounts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
             },
             "reason": {
               "type": "string"

@@ -21,6 +21,8 @@ import {
 } from '@lynx-js/tasm';
 import { describe, expect, it } from 'vitest';
 
+import { LYNX_TOOLCHAIN_LANES } from '../src/toolchain-lanes.js';
+
 const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../..');
 const APPLICATION_FIXTURE = resolve(import.meta.dirname, '_fixtures/application');
 const PACKAGES = {
@@ -100,12 +102,10 @@ describe('@octanejs/rspeedy-plugin packed consumer', () => {
 						private: true,
 						type: 'module',
 						dependencies: {
-							'@lynx-js/rspeedy': '0.16.0',
+							...LYNX_TOOLCHAIN_LANES.minimum.packages,
 							'@octanejs/lynx': archiveSpecs['@octanejs/lynx'],
 							'@octanejs/rspack-plugin': archiveSpecs['@octanejs/rspack-plugin'],
 							'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
-							'@rsbuild/core': '2.1.4',
-							'@rspack/core': '2.1.3',
 							octane: archiveSpecs.octane,
 						},
 					},
@@ -160,6 +160,7 @@ try {
 					'--ignore-scripts',
 					'--no-frozen-lockfile',
 					'--config.auto-install-peers=false',
+					'--strict-peer-dependencies',
 				],
 				{
 					cwd: consumerRoot,

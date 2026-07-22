@@ -814,6 +814,22 @@
     "note": "Deterministic source-level allocation gate: a 12-cell visible window over 1,000 logical rows currently allocates 0.012x as many physical cell roots as an eager one-cell-per-row model. The 0.02 ceiling catches loss of bounded native recycling without relying on timing."
   },
   {
+    "suite": "lynx-bundle-size",
+    "op": "bundle_gzip",
+    "target": "octane-ifr",
+    "reference": "octane-preview",
+    "maxRatio": 1.05,
+    "note": "Deterministic pinned-Rspeedy artifact gate for the same semantic-checksummed app. On 2026-07-22 the IFR artifact measured 110670 / 107222 = 1.0322x preview gzip. This is source/build evidence only; it makes no native first-paint or timing claim."
+  },
+  {
+    "suite": "lynx-bundle-size",
+    "op": "main_gzip",
+    "target": "octane-ifr",
+    "reference": "octane-preview",
+    "maxRatio": 1.08,
+    "note": "Deterministic decoded main-program gate comparing the common host receiver plus IFR's authored first-tree graph with the preview's receiver-only program. The source/build record is 59260 / 55709 = 1.0637x; background bytes are separately required to remain byte-identical by the harness."
+  },
+  {
     "suite": "ssr-http",
     "op": "import_renderer",
     "target": "octane-tsrx",

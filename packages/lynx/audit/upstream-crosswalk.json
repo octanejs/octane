@@ -1,8 +1,8 @@
 {
   "$schema": "./upstream-crosswalk.schema.json",
   "schemaVersion": 1,
-  "auditDate": "2026-07-18",
-  "status": "source-file-inventory-complete-runner-case-inventory-pending",
+  "auditDate": "2026-07-22",
+  "status": "source-and-vitest-runner-inventory-complete",
   "classifications": ["port", "differential", "intentional-divergence", "deferred", "out-of-scope"],
   "upstream": {
     "reactLynxOracle": {
@@ -363,10 +363,9 @@
         "reason": "The prop is accepted and forwarded as list metadata, but every item in the initial background-rendered Octane host is callback-demanded regardless of it; ReactLynx's eager-main versus deferred-background distinction requires the Milestone 6 dual-thread renderer."
       },
       {
-        "classification": "deferred",
-        "milestone": 9,
+        "classification": "intentional-divergence",
         "members": ["ListItemProps.defer.unmountRecycled"],
-        "reason": "The initial list host detaches physical refs on recycle but retains the logical Octane subtree; viewport recycling does not yet run component/effect cleanup."
+        "reason": "Octane accepts only boolean defer metadata. Physical cell recycling detaches refs but intentionally retains the logical subtree, component state, and effects until that logical item is removed; the ReactLynx defer.unmountRecycled object form is rejected rather than silently changing lifecycle semantics without a framework-neutral native contract."
       },
       {
         "classification": "deferred",
@@ -427,10 +426,56 @@
     "orphanedSourceFileCount": 1,
     "totalSourceFileCount": 213,
     "unclassifiedSourceFileCount": 0,
-    "rustCaseCount": 65,
+    "rustCaseCount": 89,
     "rustSourceFileCount": 11,
     "rustClassification": "out-of-scope",
     "rustReason": "ReactLynx SWC/Snapshot/Element Template compiler implementation tests. Relevant authored behavior is linked to Octane compiler or bundle tests instead of porting Rust transforms.",
+    "rustSources": [
+      {
+        "source": "packages/react/transform/crates/swc_plugin_element_template/template_identity.rs",
+        "caseCount": 3
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugin_element_template/tests/element_template.rs",
+        "caseCount": 40
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugin_element_template/tests/element_template_contract.rs",
+        "caseCount": 21
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugin_snapshot/lib.rs",
+        "caseCount": 2
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugins_shared/engine_version.rs",
+        "caseCount": 1
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugins_shared/target.rs",
+        "caseCount": 4
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugins_shared/transform_mode.rs",
+        "caseCount": 2
+      },
+      {
+        "source": "packages/react/transform/crates/swc_plugins_shared/utils.rs",
+        "caseCount": 1
+      },
+      {
+        "source": "packages/react/transform/src/esbuild.rs",
+        "caseCount": 2
+      },
+      {
+        "source": "packages/react/transform/src/lib.rs",
+        "caseCount": 3
+      },
+      {
+        "source": "packages/react/transform/swc-plugin-reactlynx/src/lib.rs",
+        "caseCount": 10
+      }
+    ],
     "taskCounts": [
       {
         "task": "@lynx-js/react-runtime#test:core",
@@ -475,7 +520,10 @@
           "packages/react/runtime/__test__/snapshot/ref.test.jsx",
           "packages/react/runtime/__test__/snapshot/spread.test.jsx"
         ],
-        "observationBoundary": "Run the same application-shaped fixture and compare normalized public native tree, event/effect/ref logs, identity, lifecycle, or public errors. Never compare Snapshot fields or opcode order."
+        "observationBoundary": "Run the same application-shaped fixture and compare normalized public native tree, event/effect/ref logs, identity, lifecycle, or public errors. Never compare Snapshot fields or opcode order.",
+        "caseLevelOverrides": [
+          "Boolean defer cases remain deferred until their eager-main versus deferred-background contract is implemented; the public unmountRecycled lifecycle case is an intentional divergence."
+        ]
       },
       {
         "classification": "intentional-divergence",
@@ -486,7 +534,7 @@
           "packages/react/runtime/__test__/snapshot/compat/initData.test.jsx",
           "packages/react/runtime/__test__/snapshot/lynx/component-compat.test.ts"
         ],
-        "reason": "Class/PureComponent, forwardRef, Preact transition behavior, or class-only init-data compatibility. Case-level extraction must reclassify ordinary init-data hook behavior as port."
+        "reason": "Class/PureComponent, forwardRef, Preact transition behavior, or class-only init-data compatibility. A structured runner override classifies the ordinary useInitData hook case as port."
       },
       {
         "classification": "deferred",
@@ -543,8 +591,8 @@
           "packages/react/testing-library/src/__tests__/worklet.test.jsx"
         ],
         "caseLevelOverrides": [
-          "Ordinary background event cases in ET compiled event fixtures are port/M3. Focused Octane Milestone 7 tests cover main-thread descriptors, host event/ref lifetime, and cross-thread calls, but case-level classification of the mixed upstream worklet sources remains pending.",
-          "Main-thread API and root-render files mix preview lifecycle behavior with IFR/adoption behavior.",
+          "Structured runner overrides leave ordinary background event cases at port/M3 and move main-thread event descriptors, MTEvent state, and cross-thread calls in mixed Element Template sources to deferred/M7.",
+          "Structured runner overrides move IFR render/reload, jsReady, and manual first-screen timing cases to deferred/M6–9; private render-scope installation is out of scope.",
           "The orphan shared/profile test is deferred/M9 and is not part of the runtime package test command."
         ]
       },
@@ -604,9 +652,9 @@
           "!packages/react/testing-library/src/__tests__/worklet.test.jsx"
         ],
         "caseLevelOverrides": [
-          "Class lifecycle cases in snapshot/lifecycle.test.jsx are intentional divergences; hook effect cases are ports.",
-          "Class-shaped testing-library fixtures must be rewritten to function/effect fixtures and keep only public observations.",
-          "Private Snapshot/opcode assertions in a port source are replaced by public native-tree, identity, event, ref, effect, cleanup, or error observations."
+          "Structured runner overrides classify class lifecycle and withInitDataInState cases as intentional divergences while hook/provider lifecycle and init-data cases remain ports.",
+          "Testing-library cases that explicitly require a class lifecycle or unmountRecycled are intentional divergences; boolean-defer lifecycle cases remain deferred.",
+          "Private helper, Snapshot, and render-scope cases are out of scope; other implementation-shaped assertions in port sources must be replaced by public native-tree, identity, event, ref, effect, cleanup, or error observations."
         ]
       },
       {
@@ -652,6 +700,182 @@
         "reason": "Private ReactLynx/Preact/Snapshot/Element Template/compiler/debug mechanism. It may be implementation reference material but is not an Octane runtime dependency or private-state test oracle."
       }
     ],
+    "runnerCaseOverrides": [
+      {
+        "source": "packages/react/runtime/__test__/element-template/lynx/env.test.ts",
+        "titlePattern": "^setupLynxEnv > exposes SystemInfo in main-thread env for worklet runtime initialization$",
+        "classification": "deferred",
+        "reason": "Worklet-runtime initialization belongs to the main-thread script capability rather than the ordinary background environment contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/native/main-thread-api.test.ts",
+        "titlePattern": "^injectCalledByNative > (?:wires renderPage through initData, setupPage and renderMainThread|routes reloadTemplate through the reload main-thread path|keeps non-immediately timing outside the Phase 1 ordinary updatePage path)$",
+        "classification": "deferred",
+        "reason": "Main-thread first render, reload, and non-ordinary timing are IFR or stabilization work; ordinary init-data and global-props update cases in this source remain ports."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/native/mts-destroy.test.ts",
+        "titlePattern": "^mts-destroy > clears delayed runOnBackground tasks on destruction$",
+        "classification": "deferred",
+        "reason": "Delayed cross-thread call teardown belongs to the main-thread script capability, not the ordinary native destroy contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/runtime/background/commit-hook.test.ts",
+        "titlePattern": "^ElementTemplate commit hook > (?:dispatches delayed-only runOnMainThread payload after commit when hydrated|drops only the failed delayed runOnMainThread return when update dispatch throws)$",
+        "classification": "deferred",
+        "reason": "These cases exercise cross-thread call delivery and cancellation rather than ordinary background commit behavior."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/runtime/background/commit-hook.test.ts",
+        "titlePattern": "^ElementTemplate commit hook > dispatches triggerDataUpdated when withInitDataInState observes a data change$",
+        "classification": "intentional-divergence",
+        "reason": "withInitDataInState is class-component compatibility and has no Octane component-model counterpart."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/runtime/background/event/compiled-fixtures.test.tsx",
+        "titlePattern": "^Compiled direct event background updates > (?:hydrates and updates compiled direct main-thread events through native MTEvent slots|hydrates compiled direct main-thread events with serialized runOnBackground handles|records dynamic-entry compiled direct main-thread event state on first-screen create)$",
+        "classification": "deferred",
+        "reason": "These cases require main-thread event descriptors, worklet state, or cross-thread handles; the ordinary background event cases in the same source remain ports."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/runtime/background/root-render.test.tsx",
+        "titlePattern": "^ElementTemplate root render timing > (?:does not eagerly render on main thread and only caches jsx on root|wraps background render with profile timing)$",
+        "classification": "deferred",
+        "reason": "Dual-thread root ownership and render profiling belong to IFR and release stabilization rather than the ordinary background root contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/runtime/background/root-render.test.tsx",
+        "titlePattern": "^ElementTemplate root render timing > keeps render scope hook installation idempotent$",
+        "classification": "out-of-scope",
+        "reason": "Render-scope hook installation is private Element Template machinery, not an observable application contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/element-template/runtime/patch/element-template-patch.test.tsx",
+        "titlePattern": "^ElementTemplate patch stream \\(apply\\) > (?:(?:(?:records|deletes|keeps|does not record) (?:dynamic-entry )?main-thread dynamic attr state).*$|.*(?:MTEvent|runOnMainThread|runOnBackground|delayed main-thread tasks).*)$",
+        "classification": "deferred",
+        "reason": "MTEvent state and delayed cross-thread calls belong to the main-thread script capability; ordinary host patches in this mixed source remain ports."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/compat/initData.test.jsx",
+        "titlePattern": "^initData > should get latest initData$",
+        "classification": "port",
+        "reason": "Reading the latest init data through a function hook is ordinary platform behavior, unlike the class-only withInitDataInState cases in this source."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/event.test.jsx",
+        "titlePattern": "^getValueBySign > should throw error$",
+        "classification": "out-of-scope",
+        "reason": "BackgroundSnapshotInstance manager sign parsing is private renderer machinery with no public application observation."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle.test.jsx",
+        "titlePattern": "^(?:componentDidMount|componentWillUnmount|componentDidUpdate) >",
+        "classification": "intentional-divergence",
+        "reason": "ReactLynx class lifecycle cases have no Octane component model counterpart. Hook effect lifecycle cases in the same source remain ports."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle.test.jsx",
+        "titlePattern": "^BackgroundSnapshotInstance remove >",
+        "classification": "out-of-scope",
+        "reason": "BackgroundSnapshotInstance is private ReactLynx renderer machinery rather than an observable framework contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle/resetPageDataError.test.jsx",
+        "titlePattern": "^data reset \\+ withInitDataInState dev error >",
+        "classification": "intentional-divergence",
+        "reason": "The diagnostic exists only for ReactLynx's class-component withInitDataInState compatibility API, which Octane does not expose."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle/updateData.test.jsx",
+        "titlePattern": "^triggerDataUpdated > should send triggerDataUpdated when using withInitDataInState$",
+        "classification": "intentional-divergence",
+        "reason": "withInitDataInState is class-component compatibility; useInitData and InitDataProvider cases in this source remain ports."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle/updateData.test.jsx",
+        "titlePattern": "^triggerDataUpdated when jsReady is enabled > should (?:refresh withInitDataInState state|keep the wrapped getDerivedStateFromProps working) on a main-thread updatePage re-render$",
+        "classification": "intentional-divergence",
+        "reason": "These cases require ReactLynx class state or getDerivedStateFromProps compatibility."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle/updateData.test.jsx",
+        "titlePattern": "^triggerDataUpdated when jsReady is enabled > should (?:send triggerDataUpdated when updateData before hydration|not send triggerDataUpdated when updateData after hydration)$",
+        "classification": "deferred",
+        "reason": "jsReady data-update timing is part of dual-thread first-screen handoff rather than the ordinary background init-data contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle/updateData.test.jsx",
+        "titlePattern": "^flush pending `renderComponent` before hydrate >",
+        "classification": "deferred",
+        "reason": "Pre-hydration render flushing is dual-thread adoption behavior."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/lifecycle/updateData.test.jsx",
+        "titlePattern": "^firstScreenSyncTiming - manual >",
+        "classification": "deferred",
+        "reason": "markFirstScreenSyncReady and manual first-screen synchronization are deferred IFR behavior."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/list.test.jsx",
+        "titlePattern": "^list-item with \"defer\" attribute > (?:basic deferred <list-item/>|basic deferred <list-item/> - componentAtIndex continuously should throw|basic deferred <list-item/> - componentAtIndexes|basic deferred <list-item/> - should unmount when reused)$",
+        "classification": "deferred",
+        "reason": "Boolean defer's eager-main versus deferred-background lifecycle is not part of the implemented list recycling contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/list.test.jsx",
+        "titlePattern": "^list-item with \"defer\" attribute > should throw without custom-list-name=\"list-container\"$",
+        "classification": "out-of-scope",
+        "reason": "Requiring ReactLynx's private Snapshot list-container marker is a renderer implementation constraint, not an observable Lynx list contract."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/list.test.jsx",
+        "titlePattern": "^nested list >",
+        "classification": "deferred",
+        "reason": "Nested native lists are explicitly excluded from Octane's initial list contract and require a future public lifecycle and recycling contract before application-shaped differential coverage is meaningful."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/ref.test.jsx",
+        "titlePattern": "^component ref > basic$",
+        "classification": "intentional-divergence",
+        "reason": "This case observes refs to ReactLynx class component instances; Octane has no class components and passes refs as props instead."
+      },
+      {
+        "source": "packages/react/runtime/__test__/snapshot/ref.test.jsx",
+        "titlePattern": "^runDelayedUiOps helper >",
+        "classification": "out-of-scope",
+        "reason": "The delayed-UI-ops flag reset helper is private Snapshot bookkeeping rather than public ref behavior."
+      },
+      {
+        "source": "packages/react/testing-library/src/__tests__/act.test.jsx",
+        "titlePattern": "^render calls componentDidMount immediately$",
+        "classification": "intentional-divergence",
+        "reason": "Octane has no class components or componentDidMount lifecycle."
+      },
+      {
+        "source": "packages/react/testing-library/src/__tests__/list.test.jsx",
+        "titlePattern": "^list - deferred <list-item/> should render as normal > (?:basic|switch from defer=\\{false\\} to defer=\\{true\\} and backwards)$",
+        "classification": "deferred",
+        "reason": "These cases exercise ReactLynx's boolean defer component-materialization lifecycle, which Octane currently preserves only as native metadata."
+      },
+      {
+        "source": "packages/react/testing-library/src/__tests__/list.test.jsx",
+        "titlePattern": "^list - deferred <list-item/> should render as normal > should unmount when reused$",
+        "classification": "intentional-divergence",
+        "reason": "This is the public defer.unmountRecycled lifecycle case; Octane deliberately retains logical state and effects while physical cells recycle."
+      },
+      {
+        "source": "packages/react/testing-library/src/__tests__/list.test.jsx",
+        "titlePattern": "^list - deferred <list-item/> should render as normal > spread props inside list-item should not trigger redundant snapshot patch$",
+        "classification": "out-of-scope",
+        "reason": "Exact Snapshot patch suppression is a private implementation optimization, not a public list behavior oracle."
+      },
+      {
+        "source": "packages/react/testing-library/src/__tests__/ref.test.jsx",
+        "titlePattern": "^component ref > basic$",
+        "classification": "intentional-divergence",
+        "reason": "This case observes refs to ReactLynx class component instances; Octane has no class components and passes refs as props instead."
+      }
+    ],
     "knownNonRunnableCases": [
       {
         "source": "packages/react/runtime/__test__/snapshot/ref.test.jsx",
@@ -674,14 +898,27 @@
       }
     ],
     "runnerExpandedCases": {
-      "status": "unmet-gate",
-      "runnableCaseCount": null,
-      "unclassifiedRunnableCaseCount": null,
-      "reason": "Static source parsing cannot enumerate loops, test.each expansions, compiled fixture runners, or dynamically generated todo cases. Source files are fully classified, but Milestone 0 still requires a machine-readable Vitest/JUnit and cargo-nextest run at the pinned tag, followed by case-level classification with zero runnable cases unclassified.",
+      "status": "complete",
+      "artifact": "upstream-runner-cases.json",
+      "runnableCaseCount": 1725,
+      "classifiedCaseCount": 1725,
+      "sourceFileCount": 212,
+      "unclassifiedRunnableCaseCount": 0,
+      "caseDigest": "1c7b345c6a51c5f3dd484ce6c1ed127fc7c6d66848a2931c8124241ee21aa1fd",
+      "rustCaseDigest": "21e2af6b4b827e29fc4cae90c90c504d985161d0ba3260de407b5d9074a10a4b",
+      "classificationCounts": {
+        "port": 478,
+        "differential": 185,
+        "intentional-divergence": 39,
+        "deferred": 644,
+        "out-of-scope": 379
+      },
+      "reason": "Vitest 3.2.4 collected every runnable JavaScript/TypeScript case at the pinned ReactLynx tag with full title, source, line, task, and classification. The 89 source-defined Rust compiler cases remain classified out of scope as a separate inventory because Octane does not reuse the ReactLynx compiler implementation.",
       "requiredEvidence": [
-        "Expanded full test names, source paths, source lines, runner state, and task id from the pinned checkout",
-        "Case-level overrides for mixed lifecycle, init-data, event, main-thread API, and testing-library sources",
-        "A validator failure for any runnable case without exactly one classification"
+        "packages/lynx/audit/upstream-runner-cases.json records the expanded full title, source path, source line, task id, and classification for every runnable Vitest case",
+        "runnerCaseOverrides classifies mixed lifecycle sources without treating private class or Snapshot machinery as Octane behavior",
+        "validate-crosswalk.mjs rejects missing, duplicate, stale, multiply matched, or unclassified runnable cases",
+        "the artifact records the source path, identifier line, function name, location kind, and classification of every source-defined Rust test case"
       ]
     }
   },
@@ -691,8 +928,8 @@
     "reactTypePassthroughsClassified": true,
     "ambientSurfaceClassified": true,
     "testSourceFilesClassified": true,
-    "runnerExpandedTestCasesClassified": false,
-    "phase0CrosswalkComplete": false,
-    "blockedBy": ["runner-expanded-test-case-inventory"]
+    "runnerExpandedTestCasesClassified": true,
+    "phase0CrosswalkComplete": true,
+    "blockedBy": []
   }
 }

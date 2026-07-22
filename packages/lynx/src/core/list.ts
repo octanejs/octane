@@ -54,7 +54,10 @@ export function createLynxListItemDescriptor(
 		throw listError(`<list-item> ${id} recyclable must be a boolean when present.`);
 	}
 	if (props.defer !== undefined && typeof props.defer !== 'boolean') {
-		throw listError(`<list-item> ${id} defer must be a boolean when present.`);
+		throw listError(
+			`<list-item> ${id} defer must be a boolean when present; ` +
+				'the object form is intentionally unsupported because Octane retains logical component state and effects while native cells recycle.',
+		);
 	}
 	return Object.freeze({
 		id,

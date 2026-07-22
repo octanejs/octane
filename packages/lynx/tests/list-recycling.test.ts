@@ -498,6 +498,42 @@ describe('Lynx native list recycling', () => {
 		}
 	});
 
+	it('rejects ReactLynx unmount-on-recycle metadata before mutation', () => {
+		const dom = new JSDOM();
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.clearGlobal();
+		environment.switchToMainThread();
+		try {
+			const container = createLynxHostContainer(createLynxElementPAPI(globalThis), { root: 5 });
+			expect(() =>
+				prepareLynxHostBatch(
+					container,
+					batch(1, [
+						{ op: 'create', id: 1, type: 'list', props: {} },
+						{
+							op: 'create',
+							id: 2,
+							type: 'list-item',
+							props: {
+								'item-key': 'retained',
+								defer: { unmountRecycled: true },
+							},
+						},
+						{ op: 'insert', parent: 1, id: 2, before: null },
+						{ op: 'insert', parent: null, id: 1, before: null },
+					]),
+				),
+			).toThrow(/object form.*intentionally unsupported.*retains logical component state/);
+			expect((container.page as unknown as Element).children).toHaveLength(0);
+			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+		} finally {
+			environment.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
 	it('rekeys the native callback sign when reuse must recreate a cell root', () => {
 		const dom = new JSDOM();
 		installLynxTestingEnv(globalThis, { window: dom.window as never });

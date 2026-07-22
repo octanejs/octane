@@ -7,3 +7,4 @@ export {
 	LYNX_MAIN_THREAD_RUNTIME,
 } from './layers.js';
 export { assertLynxToolchain } from './toolchain.js';
+export { LYNX_TOOLCHAIN_LANES } from './toolchain-lanes.js';

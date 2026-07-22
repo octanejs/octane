@@ -97,6 +97,8 @@ jobs:
             );
             const requiredJobs = new Set([
               "lint",
+              "Lynx compatibility (current)",
+              "Lynx compatibility (minimum)",
               "Three compatibility (current)",
               "Three compatibility (minimum r156)",
               "typecheck",

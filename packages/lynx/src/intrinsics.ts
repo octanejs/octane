@@ -257,7 +257,11 @@ export type LynxListItemProps = LynxStandardProps & {
 	recyclable?: boolean;
 	/** Native reuse pool partition; omission or `''` selects the default pool. */
 	'reuse-identifier'?: string;
-	/** Defer native materialization until the list requests this cell. */
+	/**
+	 * Forwarded as boolean deferred-item metadata. Physical cell recycling always
+	 * retains the logical Octane subtree, including component state and effects;
+	 * ReactLynx's `{ unmountRecycled: true }` form is intentionally unsupported.
+	 */
 	defer?: boolean;
 };
 

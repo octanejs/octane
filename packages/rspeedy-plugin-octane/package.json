@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 8 dual-thread Rspeedy and lazy-bundle integration for Octane Lynx.",
+  "description": "Private Milestone 9 dual-thread Rspeedy and compatibility-lane integration for Octane Lynx.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
@@ -33,7 +33,8 @@
     }
   },
   "scripts": {
-    "test": "vitest run --root ../.. --project rspeedy-plugin"
+    "test": "vitest run --root ../.. --project rspeedy-plugin",
+    "test:compat": "node scripts/compatibility-smoke.mjs"
   },
   "dependencies": {
     "@lynx-js/css-extract-webpack-plugin": "catalog:lynx",
@@ -46,7 +47,7 @@
   "peerDependencies": {
     "@lynx-js/rspeedy": "0.16.0",
     "@rsbuild/core": "2.1.4",
-    "@rspack/core": "2.1.3",
+    "@rspack/core": "2.1.3 || 2.1.5",
     "octane": "workspace:*"
   },
   "devDependencies": {
