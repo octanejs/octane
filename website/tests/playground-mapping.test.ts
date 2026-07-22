@@ -146,6 +146,29 @@ describe('client output mapping (compiler source map)', () => {
 		});
 	});
 
+	it('uses explicit source-map endpoints for custom element tag names', () => {
+		const source = `export function App() @{
+	<my-el></my-el>
+}`;
+		const compiled = compileAst(source, 'App.tsrx', 'client-output');
+		if (!compiled.ok) throw new Error(compiled.error);
+		const customMapping = mappingFromSourceMap(compiled.map, source, compiled.code!);
+		const sourceTag = source.indexOf('<my-el>') + 1;
+		const generatedTag = compiled.code!.indexOf('<my-el>') + 1;
+
+		expect(customMapping?.pairFromSource(sourceTag)).toEqual({
+			source: [{ from: sourceTag, to: sourceTag + 'my-el'.length }],
+			output: [{ from: generatedTag, to: generatedTag + 'my-el'.length }],
+		});
+
+		const sourceClosingTag = source.indexOf('</my-el>') + 2;
+		const generatedClosingTag = compiled.code!.indexOf('</my-el>') + 2;
+		expect(customMapping?.pairFromGenerated(generatedClosingTag)).toEqual({
+			source: [{ from: sourceClosingTag, to: sourceClosingTag + 'my-el'.length }],
+			output: [{ from: generatedClosingTag, to: generatedClosingTag + 'my-el'.length }],
+		});
+	});
+
 	it('keeps nested and self-closing tags exact when attribute text looks like markup', () => {
 		const source = `export function App() @{
 	<div data-label="<span">

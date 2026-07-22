@@ -307,7 +307,9 @@ export function mappingFromSourceMap(
 		generatedLine++
 	) {
 		let generatedColumn = 0;
-		for (const encodedSegment of lines[generatedLine]) {
+		const encodedLine = lines[generatedLine];
+		for (let segmentIndex = 0; segmentIndex < encodedLine.length; segmentIndex++) {
+			const encodedSegment = encodedLine[segmentIndex];
 			generatedColumn += encodedSegment[0];
 			if (encodedSegment.length < 4) continue;
 			sourceIndex += encodedSegment[1];
@@ -321,8 +323,29 @@ export function mappingFromSourceMap(
 				generatedColumn < 0
 			)
 				continue;
-			const source = wordRange(sourceText, sourceLines[sourceLine] + sourceColumn);
-			const generated = wordRange(generatedText, generatedLines[generatedLine] + generatedColumn);
+			const sourceOffset = sourceLines[sourceLine] + sourceColumn;
+			const generatedOffset = generatedLines[generatedLine] + generatedColumn;
+			const next = encodedLine[segmentIndex + 1];
+			const explicitLength = next?.length === 1 && next[0] > 0 ? next[0] : 0;
+			const explicitToken =
+				explicitLength > 0
+					? generatedText.slice(generatedOffset, generatedOffset + explicitLength)
+					: '';
+			// The client compiler emits a single-field (unmapped) segment directly
+			// after a host-tag anchor to mark its exact generated endpoint. Preserve
+			// that boundary when the same token exists at the authored coordinate;
+			// wordRange intentionally remains the fallback for ordinary sparse maps.
+			const exactBoundary =
+				explicitToken.length === explicitLength &&
+				/[-:]/.test(explicitToken) &&
+				!/[\s"'<>/=]/.test(explicitToken) &&
+				sourceText.startsWith(explicitToken, sourceOffset);
+			const source = exactBoundary
+				? { from: sourceOffset, to: sourceOffset + explicitLength }
+				: wordRange(sourceText, sourceOffset);
+			const generated = exactBoundary
+				? { from: generatedOffset, to: generatedOffset + explicitLength }
+				: wordRange(generatedText, generatedOffset);
 			if (!source || !generated) continue;
 			segments.push({
 				src: source.from,
