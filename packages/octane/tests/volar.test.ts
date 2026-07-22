@@ -63,6 +63,54 @@ describe('compileToVolarMappings', () => {
 		expect(result.sourceAst.type).toBe('Program');
 	});
 
+	it('builds transform and generated ASTs only when tracing is requested', () => {
+		const source = "export function App() @{ <button>{'Trace'}</button> }\n";
+		const normal = compileToVolarMappings(source, 'App.tsrx') as any;
+		const transformed = compileToVolarMappings(source, 'App.tsrx', {
+			astTrace: 'transform',
+		}) as any;
+		const generated = compileToVolarMappings(source, 'App.tsrx', {
+			astTrace: 'generated',
+		}) as any;
+
+		expect(normal.astTrace).toBeUndefined();
+		expect(transformed.astTrace.transformedAst.type).toBe('Program');
+		expect(transformed.astTrace.transformedAst.end).toBe(source.length);
+		expect(transformed.astTrace.generatedAst).toBeUndefined();
+		expect(generated.astTrace.generatedAst.type).toBe('Program');
+		expect(generated.astTrace.generatedAst.end).toBe(generated.code.length);
+	});
+
+	it('keeps scoped-style virtual TSX parseable without shifting mappings', () => {
+		const source = `export function App() @{
+	<button>Styled</button>
+	<style>
+		button { color: red; }
+	</style>
+}`;
+		const result = compileToVolarMappings(source, 'App.tsrx', {
+			astTrace: 'generated',
+		}) as any;
+
+		expect(result.code).toContain('<style></style>;');
+		expect(result.code).toContain('</button>;');
+		expect(result.astTrace.generatedAst.end).toBe(result.code.length);
+		for (const mapping of result.mappings) {
+			for (const offset of mapping.generatedOffsets) {
+				expect(offset).toBeLessThanOrEqual(result.code.length);
+			}
+		}
+	});
+
+	it('does not rewrite style-placeholder text inside authored strings', () => {
+		const source = `export const marker = '<style></style>';
+export function App() @{ <div>{marker}</div> }`;
+		const result = compileToVolarMappings(source, 'App.tsrx');
+
+		expect(result.code).toContain("marker = '<style></style>'");
+		expect(result.code).not.toContain("'<style></style>;'");
+	});
+
 	it('preserves user identifiers in the generated TSX', () => {
 		const src =
 			"import { useState } from 'octane';\n" +

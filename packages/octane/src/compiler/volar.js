@@ -25,10 +25,12 @@
 
 import {
 	analyzeTsrx,
+	acorn,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
 	parseModule,
+	tsPlugin,
 } from '@tsrx/core';
 import { analyzeNativeChangeDiagnostics } from './native-change-diagnostics.js';
 import { jsxImportSourcePragmaModule } from './pragma.js';
@@ -96,6 +98,7 @@ const OCTANE_PLATFORM = {
 };
 
 const octaneTransform = createJsxTransform(OCTANE_PLATFORM);
+const GeneratedOutputParser = acorn.Parser.extend(tsPlugin({ jsx: true }));
 
 /**
  * Does the parsed file carry an authored `@jsxImportSource` pragma in its
@@ -140,6 +143,82 @@ function shiftGeneratedOffsets(mappings, offset) {
 		...mapping,
 		generatedOffsets: mapping.generatedOffsets.map((generatedOffset) => generatedOffset + offset),
 	}));
+}
+
+// The shared type-only printer keeps a scoped-style placeholder as a bare JSX
+// expression statement. Without separators, a preceding JSX statement and a
+// following `return` are parsed as one malformed expression. Insert explicit
+// statement terminators and return their original-code offsets so Volar
+// mappings can be shifted with the output.
+function terminateStylePlaceholderStatements(code) {
+	const marker = '<style></style>';
+	const insertions = new Set();
+	let from = 0;
+	while (true) {
+		const start = code.indexOf(marker, from);
+		if (start < 0) break;
+		const lineStart = code.lastIndexOf('\n', start - 1) + 1;
+		const nextLine = code.indexOf('\n', start + marker.length);
+		const lineEnd = nextLine < 0 ? code.length : nextLine;
+		if (code.slice(lineStart, lineEnd).trim() !== marker) {
+			from = start + marker.length;
+			continue;
+		}
+		let before = start - 1;
+		while (before >= 0 && /\s/.test(code[before])) before--;
+		if (code[before] === '>') insertions.add(before + 1);
+		const end = start + marker.length;
+		if (code[end] !== ';') insertions.add(end);
+		from = end;
+	}
+	const positions = [...insertions].sort((a, b) => a - b);
+	let output = '';
+	let cursor = 0;
+	for (const position of positions) {
+		output += code.slice(cursor, position) + ';';
+		cursor = position;
+	}
+	return { code: output + code.slice(cursor), insertions: positions };
+}
+
+function shiftGeneratedInsertions(mappings, insertions) {
+	if (insertions.length === 0) return mappings;
+	return mappings.map((mapping) => {
+		const generatedLengths = mapping.generatedLengths ?? mapping.lengths;
+		return {
+			...mapping,
+			generatedOffsets: mapping.generatedOffsets.map(
+				(offset) => offset + insertions.filter((position) => position <= offset).length,
+			),
+			generatedLengths: generatedLengths.map((length, index) => {
+				const start =
+					mapping.generatedOffsets[Math.min(index, mapping.generatedOffsets.length - 1)];
+				return (
+					length +
+					insertions.filter((position) => start < position && position < start + length).length
+				);
+			}),
+		};
+	});
+}
+
+/**
+ * Parse emitted compiler code for diagnostics tooling. Runtime client/server
+ * emitters do not retain one complete transformed tree, so consumers that
+ * need an output-coordinate AST must parse the final artifact instead.
+ *
+ * @param {string} code
+ * @returns {unknown}
+ * @internal
+ */
+export function __parseGeneratedModuleAst(code) {
+	return GeneratedOutputParser.parse(code, {
+		sourceType: 'module',
+		ecmaVersion: 'latest',
+		allowReturnOutsideFunction: true,
+		locations: true,
+		preserveParens: true,
+	});
 }
 
 /**
@@ -191,8 +270,16 @@ function markNativeTemplateBodies(root) {
  * `intrinsics`; when present, the virtual TSX gets a file-local pragma so host
  * element types cannot leak into files owned by another renderer.
  *
- * @param {{ loose?: boolean, renderers?: unknown }} [options]
- * @returns {import('@tsrx/core/types').VolarMappingsResult & { diagnostics: readonly unknown[] }}
+ * `astTrace` is an opt-in diagnostics hook used by tooling such as the
+ * playground. It exposes the copy-on-write transform tree and an AST parsed
+ * from the final virtual TSX. The normal language-service path does not pay
+ * for that second parse.
+ *
+ * @param {{ loose?: boolean, renderers?: unknown, astTrace?: boolean | 'transform' | 'generated' }} [options]
+ * @returns {import('@tsrx/core/types').VolarMappingsResult & {
+ *   diagnostics: readonly unknown[],
+ *   astTrace?: { transformedAst: unknown, generatedAst?: unknown }
+ * }}
  */
 export function compileToVolarMappings(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */
@@ -249,11 +336,25 @@ export function compileToVolarMappings(source, filename, options) {
 		source_map: transformed.map,
 		errors,
 	});
-	const mappings = dedupeMappings(result.mappings);
+	const mappings = shiftGeneratedOffsets(dedupeMappings(result.mappings), prelude.length);
+	const terminated = terminateStylePlaceholderStatements(prelude + result.code);
+	const code = terminated.code;
 	return {
 		...result,
-		code: prelude + result.code,
-		mappings: shiftGeneratedOffsets(mappings, prelude.length),
+		code,
+		mappings: shiftGeneratedInsertions(mappings, terminated.insertions),
 		diagnostics,
+		...(options?.astTrace
+			? {
+					astTrace: {
+						transformedAst: transformed.ast,
+						...(options.astTrace === 'transform'
+							? null
+							: {
+									generatedAst: __parseGeneratedModuleAst(code),
+								}),
+					},
+				}
+			: null),
 	};
 }

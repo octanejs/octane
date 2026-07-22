@@ -157,7 +157,7 @@ export function findDeepestAstNode(
 }
 
 export interface AstPreviewController {
-	setAst(ast: unknown, filename: string): void;
+	setAst(ast: unknown, filename: string, options?: { label?: string; notice?: string }): void;
 	setUnavailable(message: string, filename: string): void;
 	reveal(offset: number, scroll: boolean): void;
 	clear(): void;
@@ -180,6 +180,7 @@ export function createAstPreview(
 	const doc = host.ownerDocument;
 	let prepared: PreparedPlaygroundAst | null = null;
 	let filename = '';
+	let label = 'AST';
 	let unavailable = '';
 	let destroyed = false;
 	let activeNodes: PlaygroundAstNode[] = [];
@@ -195,7 +196,7 @@ export function createAstPreview(
 	scrollHost.className = 'pg-ast-scroll';
 	const notice = doc.createElement('div');
 	notice.className = 'pg-ast-notice';
-	notice.textContent = 'Compiler-internal AST; its shape may change.';
+	notice.textContent = 'Compiler AST; its internal shape may change.';
 	shell.append(status, scrollHost, notice);
 	host.replaceChildren(shell);
 
@@ -209,7 +210,7 @@ export function createAstPreview(
 		}
 		activeNodes = [];
 		if (!node) {
-			status.textContent = `AST · ${filename}`;
+			status.textContent = `${label} · ${filename}`;
 			return;
 		}
 
@@ -239,7 +240,7 @@ export function createAstPreview(
 		}
 		activeNodes = path;
 		const range = node.range;
-		status.textContent = `${node.type ?? node.path} · [${range?.from ?? '–'}, ${range?.to ?? '–'})`;
+		status.textContent = `${label} · ${node.type ?? node.path} · [${range?.from ?? '–'}, ${range?.to ?? '–'})`;
 	};
 
 	const renderNode = (node: PlaygroundAstNode): HTMLLIElement => {
@@ -329,7 +330,7 @@ export function createAstPreview(
 		elements.clear();
 		renderedBranches = new WeakSet<PlaygroundAstNode>();
 		activeNodes = [];
-		status.textContent = `AST · ${filename}`;
+		status.textContent = `${label} · ${filename}`;
 		if (unavailable) {
 			scrollHost.textContent = unavailable;
 			return;
@@ -346,8 +347,10 @@ export function createAstPreview(
 
 	renderAst();
 	return {
-		setAst(ast, nextFilename) {
+		setAst(ast, nextFilename, nextOptions) {
 			filename = nextFilename;
+			label = nextOptions?.label ?? 'AST';
+			notice.textContent = nextOptions?.notice ?? 'Compiler AST; its internal shape may change.';
 			unavailable = '';
 			prepared = preparePlaygroundAst(ast);
 			renderAst();

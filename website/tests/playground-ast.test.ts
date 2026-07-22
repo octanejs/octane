@@ -141,4 +141,41 @@ export function App() {
 		expect(nodeTypes(tree.root)).toContain(sourceNode);
 		expect(tree.root.range).toEqual({ from: 0, to: source.length });
 	});
+
+	it('distinguishes transformer and emitted-output coordinate spaces', () => {
+		const transform = compileAst(source, filename, 'type-transform');
+		const typeOutput = compileAst(source, filename, 'type-output');
+		const clientOutput = compileAst(source, filename, 'client-output');
+		const serverOutput = compileAst(source, filename, 'server-output');
+		for (const result of [transform, typeOutput, clientOutput, serverOutput]) {
+			if (!result.ok) throw new Error(result.error);
+		}
+		if (!transform.ok || !typeOutput.ok || !clientOutput.ok || !serverOutput.ok) return;
+
+		expect(transform.space).toBe('source');
+		expect((transform.ast as { end: number }).end).toBe(source.length);
+		for (const output of [typeOutput, clientOutput, serverOutput]) {
+			expect(output.space).toBe('generated');
+			expect((output.ast as { type: string }).type).toBe('Program');
+			expect((output.ast as { end: number }).end).toBe(output.code!.length);
+		}
+		expect(clientOutput.map).toBeDefined();
+		expect(serverOutput.notice).toContain('no source positions');
+	});
+});
+
+it('parses typed output as TSX when the source contains a scoped style block', () => {
+	const source = `export function App() @{
+	<button>Styled</button>
+	<style>
+		button { color: red; }
+	</style>
+}`;
+	const parsed = compileAst(source, 'App.tsrx', 'source');
+	const output = compileAst(source, 'App.tsrx', 'type-output');
+	if (!parsed.ok) throw new Error(parsed.error);
+	if (!output.ok) throw new Error(output.error);
+
+	expect((parsed.ast as { end: number }).end).toBe(source.length);
+	expect((output.ast as { end: number }).end).toBe(output.code!.length);
 });
