@@ -17,13 +17,14 @@ ReactLynx-to-Octane migration:
   scheduling, memo, and compatible-HMR slice; and
 - the Milestone 9 repository-side runner crosswalk, permanent list-lifecycle
   decision, deterministic preview/IFR size guards, and private API/status
-  review.
+  review, plus post-Milestone-9 typed page-destroy and Engine data-lifecycle
+  source/test candidates.
 
 The package is `0.0.0`, marked `private`, and is not a native renderer release.
 Milestone 9's API/package review keeps the subpaths below unchanged and the
 universal renderer ABI experimental: public stabilization waits for the native
-event/reload contracts, verified destroy delivery, and device evidence listed
-under Current decision.
+event/reload contracts, verified typed data/destroy delivery, native
+bootstrap/first-paint, and device evidence listed under Current decision.
 
 ## Milestones 3–9 private surface
 
@@ -37,8 +38,9 @@ The package now contains:
   cross-thread `ContextProxy`;
 - a separate `@octanejs/lynx/main-thread` receiver which validates and stages
   complete batches, applies root-scoped Element PAPI mutations, flushes once,
-  then acknowledges acceptance, and automatically closes both renderer
-  runtimes from the typed public native `__DestroyLifetime` event;
+  then acknowledges acceptance; listens on the public Engine context for typed
+  render/update/global-props lifecycle messages; and automatically closes both
+  renderer runtimes from the typed public native `__DestroyLifetime` event;
 - async rejection, abort, accepted-fault, version-gap, stale-root, and terminal
   disposal behavior;
 - acknowledgement-gated, cloned public identity handles whose identity survives
@@ -60,9 +62,10 @@ The package now contains:
   application-owned custom-element resources in the background renderer; the
   synchronous first-screen renderer rejects these props because it cannot
   allocate background-root-scoped handles;
-- augmentable init-data, global-props, and Native Module types plus background
-  hooks for data/global-event updates, typed global access, public reload
-  requests, and error reporting;
+- augmentable init-data, global-props, and Native Module types; a typed Engine
+  lifecycle bridge that seeds, merges, or resets init data and patches global
+  props; plus background hooks for data/global-event updates, typed global
+  access, public reload requests, and error reporting;
 - separate main/background renderer presets, with compile-time rejection of
   statically visible `NativeModules` and `@octanejs/lynx/platform` use in the
   main-thread specialization; `createLynxRoot()` separately verifies the public
@@ -221,20 +224,36 @@ omitted keys, and it implements selector-query `setNativeProps` while `invoke`,
 `fields`, and `path` throw. Selector compatibility, measurement/layout results,
 form/scroll behavior, and cleanup therefore still require Explorer, Android,
 and iOS evidence. The platform subpath now implements source/test-only
-background hooks. Init data is seeded from public `__presetData` and prefers
-the framework-maintained current `__initData` snapshot when present, so source
-tests cover reset key removal and an update between render and layout
-subscription. Installing and proving the native update receiver that maintains
-that snapshot remains a formal gate. The `reload()` API forwards a public
-request; it is not the missing framework reload receiver. The main receiver now
-subscribes to the public typed `lynx.getNative()` `__DestroyLifetime` event and
-broadcasts one root-independent teardown to the background root. Official
-JavaScript-host tests prove main PAPI cleanup plus background effect/ref cleanup,
-including registration failure and duplicate destroy during a reentrant host
-commit; the same source path closes background worklet ownership. They do not
-prove that the native event reaches the expected context or has the required
-ordering on Explorer, Android, or iOS. The packaged testing facade and
-production Rspeedy assembly do not remove those native execution gates.
+background hooks, and `installLynxMainThread()` installs a typed data-lifecycle
+bridge on public `lynx.getEngine()`. `__RenderPage` sends `page-data` with
+operation `replace` to seed the current init-data snapshot. `__UpdatePage`
+sends `update` for the ordinary merge or `reset` when
+`updateOptions.resetPageData === true`, removing omitted keys; a
+`reloadTemplate === true` update is diagnosed and rejected rather than being
+misclassified as data. `__UpdateGlobalProps` sends a `global-props` patch into
+the existing global-props store and subscriptions. This follows the exact Lynx
+SDK 3.9.0 `d7f13487` [`TemplateAssembler` route](https://github.com/lynx-family/lynx/blob/d7f13487df0d69497148e93b71aded676a8fe243/core/renderer/template_assembler.h#L981-L1004),
+which tries the Engine event listener before its legacy global-function
+fallback. Source/unit tests cover seeding, merge, reset, global-props updates,
+subscription timing, and cleanup. The root-independent background receiver is
+page-lifetime rather than root-lifetime, so data received between ordinary root
+unmount and a later root is retained. Before correlated readiness, the main
+receiver bounds its queue and compacts overflow into the authoritative current
+page/global state; a delivery failure tears down the page instead of announcing
+readiness with stale data. These guarantees do not establish native context,
+delivery, ordering, or payload completeness on Explorer, Android, or iOS.
+
+The `reload()` API forwards a public request; it is not the missing
+reconstructing framework reload receiver. The main receiver also subscribes to
+the public typed `lynx.getNative()` `__DestroyLifetime` event and broadcasts one
+root-independent teardown to the background root. Official JavaScript-host
+tests prove main PAPI cleanup plus background effect/ref cleanup, including
+registration failure and duplicate destroy during a reentrant host commit; the
+same source path closes background worklet ownership. They do not prove that
+the native event reaches the expected context or has the required ordering on
+Explorer, Android, or iOS. The typed data bridge likewise does not prove native
+bootstrap/first-paint. The packaged testing facade and production Rspeedy
+assembly do not remove those native execution gates.
 
 ## Milestones 4–9 exclusions and examples
 
@@ -341,11 +360,13 @@ Milestone 0 remains **blocked from exit**. The selected public packages expose
 PAPI, cross-thread contexts, and typed lifecycle messages, but do not expose a
 framework-neutral background receiver for native string event tokens. The
 ReactLynx path uses `lynxCoreInject.tt.publishEvent`; reload and background
-teardown also depend on injection-specific callbacks. Octane now uses the
-typed native `__DestroyLifetime` event as a source-integrated replacement for
-page/background teardown, but the required engine matrix has not yet confirmed
-that event's context, delivery, or ordering, and no public reload receiver has
-been established.
+teardown also depend on injection-specific callbacks. Octane now installs the
+typed `__RenderPage`, `__UpdatePage`, and `__UpdateGlobalProps` Engine listeners
+as a source-integrated data-lifecycle candidate and uses the typed native
+`__DestroyLifetime` event as a source-integrated replacement for
+page/background teardown. The required engine matrix has not yet confirmed
+either path's context, delivery, ordering, or payload completeness, and no
+public reconstructing reload receiver has been established.
 
 The production Web control and transport bundles currently fail before
 rendering under `@lynx-js/web-core@0.22.2` with a `MutationObserver` target type
@@ -362,8 +383,9 @@ that adoption retains platform node identity. Milestones 7–8 lack native proof
 of main-thread event execution, adopted-node ref identity, gesture/continuous-event
 latency, cross-thread call cleanup, portal placement, lazy-chunk execution, and
 transition timing. The unresolved Milestone 0 native
-event/lifecycle/reload hooks, Web failure, Android/iOS evidence, real
-selector-query/layout/list allocation behavior, app-native module/element
+event receiver and reconstructing-reload hook, typed data/destroy native
+verification, native bootstrap/first-paint, Web failure, Android/iOS evidence,
+real selector-query/layout/list allocation behavior, app-native module/element
 execution, source-map resolution in an engine, runtime HMR cleanup,
 minimum/current native toolchain execution, pinned ReactLynx behavioral
 comparisons for deferred cases, and semantic native performance baselines

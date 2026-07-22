@@ -210,7 +210,7 @@
           "useState",
           "useSyncExternalStore"
         ],
-        "reason": "Existing Octane component/hook semantics or a renderer-owned Lynx platform API. The Milestone 4 source implements the init/global/global-event hooks through public background APIs; native update ordering and lifecycle integration remain device gates."
+        "reason": "Existing Octane component/hook semantics or a renderer-owned Lynx platform API. The Milestone 4 source implements the init/global/global-event hooks through public background APIs, and the post-Milestone-9 typed Engine bridge integrates render/update/global-props delivery in source and JavaScript-host tests; native context, delivery, ordering, and payload completeness remain device gates."
       },
       {
         "classification": "intentional-divergence",
