@@ -41,11 +41,12 @@ suites reuse it. Collected results land in `benchmarks/results/<suite>.json`
 
 Some suites need no preview servers: **news** vite-builds and times each target
 itself (the runner loops its per-target invocations and merges them),
-**ssr-throughput**, **streaming-ssr**, and **lynx-list** are Node-only,
+**ssr-throughput**, **streaming-ssr**, **lynx-list**, and
+**lynx-bundle-size** are Node-only,
 **ssr-http** and **tanstack-start** boot (and kill) their own production HTTP
 servers per sample — that spawn/listen/first-byte cycle IS the measurement —
-and **codegen-size** / **bundle-size** / **three-bundle-size** are
-deterministic build/byte checks.
+and **codegen-size** / **bundle-size** / **three-bundle-size** /
+**lynx-bundle-size** are deterministic build/byte checks.
 
 ## Regression modes
 
@@ -185,6 +186,7 @@ internally, get their own baseline and guard namespace.
 | `async-waterfall` | async-waterfall | octane-tsrx, react, preact, solid, svelte, ripple | 10-level nested async: `use()` waterfall vs parallel-by-model signals (init + transition update) |
 | `async-composition` | async-composition | octane-tsrx, react | dashboard composition: adjacent async panels, nested children, imported custom hook, and one true dependency |
 | `lynx-list` | lynx-list | none (Node-only) | deterministic 1,000-row native-list physical allocation, reuse, and teardown through a fake Element PAPI |
+| `lynx-bundle-size` | lynx-bundle-size | none (builds) | semantic-checksummed production Rspeedy artifact bytes for background preview and dual-thread IFR modes; source/build evidence only |
 | `codegen-size` | codegen-size | none (Node-only) | compiled-output bytes: fixed corpus through octane/compiler, raw/min/gzip, `compiled` vs `source` |
 | `bundle-size` | bundle-size | none (builds) | shipped JS bytes: production builds of js-framework, TodoMVC, chat-stream, and weather-app, normalized minify, raw/gzip/brotli |
 | `three-renderer` | three | Octane Three, R3F, plain Three | 1,000-object lifecycle, reconstruction/disposal, frame subscribers, and raycast events |
@@ -198,6 +200,10 @@ per-commit signal (its corpus is FIXED — editing the corpus list invalidates t
 baseline, re-record when you change it), `bundle-size` is the cross-framework
 comparison (all targets built with one normalized minify so solid's
 `minify:false` dev config and octane's terser passes don't skew the compare).
+`lynx-bundle-size` instead uses the pinned Rspeedy native encoder unchanged and
+bounds the incremental decoded/encoded cost of IFR against the equivalent
+background-rendered preview graph; its semantic checks remain source/build
+evidence rather than native execution.
 
 `bundle-size` classifies every build's emitted JavaScript into an `app` bucket
 (modules under the app's own src/) and a `framework` bucket (node_modules + the

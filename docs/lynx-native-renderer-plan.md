@@ -1,8 +1,8 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–7 have private source/test/build implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–9 have private source/test/build or repository-stabilization implementations but their formal exits remain blocked**
 
-Upstream audit date: **2026-07-18**
+Upstream audit date: **2026-07-22**
 
 Milestone 1 evidence date: **2026-07-19**
 
@@ -17,6 +17,12 @@ Milestone 5 source/build evidence date: **2026-07-20**
 Milestone 6 source/build evidence date: **2026-07-21**
 
 Milestone 7 source/test evidence date: **2026-07-21**
+
+Milestone 8 source/test/build evidence date: **2026-07-22**
+
+Milestone 9 repository-stabilization evidence date: **2026-07-22**
+
+Post-Milestone-9 public page-destroy source/test evidence date: **2026-07-22**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -496,11 +502,17 @@ seed from public `__presetData` and consume the framework-maintained current
 `__initData` snapshot when available; tests cover RESET key removal and the
 render-to-layout subscription race. The native update receiver that maintains
 that current snapshot is still uninstalled and remains part of the formal
-device gate. The source also does not install a framework reload or page-destroy
-receiver. Milestone 6 now supplies `markFirstScreenSyncReady()` as the explicit
-main-entry initialization gate before a first-tree snapshot is offered to the
-background runtime. This source contract has not been exercised by a native
-lifecycle receiver.
+device gate. The source still does not install a framework reload receiver. A
+post-Milestone-9 gate-closure tranche now installs the public typed native
+`__DestroyLifetime` listener, sends one root-independent background teardown,
+and closes main PAPI plus background effect/ref/worklet ownership. Source tests
+observe main PAPI and background effect/ref cleanup across ordinary,
+registration-failure, delivery-failure, duplicate, and reentrant-commit paths;
+the same source path closes the worklet registry. Native context, delivery, and
+ordering remain unproven on Explorer, Android, and iOS, so this does not close
+the lifecycle device gate. Milestone 6 supplies
+`markFirstScreenSyncReady()` as the explicit main-entry initialization gate
+before a first-tree snapshot is offered to the background runtime.
 
 Native Modules stay background-thread-only. The compiler diagnoses statically
 visible Native Module access and `@octanejs/lynx/platform` imports from
@@ -746,8 +758,9 @@ contract. No test uses private snapshot fields or command order as its oracle.
 > `lynx.getJSModule()` surface. App-owned Android/iOS module and custom
 > element examples document the intended seam but have not run on devices.
 > Formal exit remains blocked on Android/iOS allocation, scroll, module,
-> element, lifecycle, and teardown evidence; a public native event, destroy,
-> and reload receiver; and the existing Milestone 0 gates. The initial slice
+> element, lifecycle, and teardown evidence; a public native event and reload
+> receiver; native verification of the typed destroy path; and the existing
+> Milestone 0 gates. The initial slice
 > excludes nested lists, portals, Lynx Suspense proof, lazy bundles, gestures,
 > animations, full boolean-`defer` parity, and `defer.unmountRecycled`
 > semantics.
@@ -756,7 +769,8 @@ contract. No test uses private snapshot fields or command order as its oracle.
   detach refs, item reuse, reorder, and destruction.
 - Add init data, global props, global events, page reload/destroy, lifecycle and
   error reporting. A public reload request is not evidence for the still-missing
-  framework reload/destroy receiver.
+  framework reload receiver, and source integration is not native proof of the
+  typed destroy path.
 - Type Native Modules and diagnose thread misuse. Add one Android and one iOS
   native module example plus one custom native element fixture; do not ship
   application-native code inside the renderer.
@@ -902,6 +916,33 @@ once; removed or reloaded worklets cannot run.
 
 ### Milestone 8 — Suspense, lazy bundles, portals, scheduling, and HMR (3–5 engineer-weeks)
 
+> **Progress (2026-07-22): private source/test/build implementation complete;
+> formal exit blocked.** The host-neutral runtime now caches renderer-checked
+> lazy components, starts compiler-proven independent lazy trees in one warm
+> stratum, retains accepted content across suspending transition work, publishes
+> transition pending state, defers preview/final values, and applies conservative
+> owner-local `memo()` bailouts that invalidate for local updates and observed
+> context. The Lynx first-screen specialization can synchronously commit authored
+> pending/catch arms, while the pinned Rspeedy fixture emits and decodes a
+> content-hashed lazy bundle containing both main and background specializations.
+> Background portals accept only current, physically attached, acknowledged
+> `LynxPublicHandle` targets from the same transported and universal root; opaque
+> root/host/generation provenance rejects stale, detached, cross-root, text, and
+> native-list targets before mutation. Official JavaScript-host tests cover
+> first-tree fallback/error/hidden-Activity adoption, later retain/reveal/reject,
+> exact identity and lifecycle, abandoned suspension, pre-ACK rejection,
+> accepted faults, portal ordering/retargeting, and teardown. Compatible HMR
+> keeps a stable renderer wrapper and reconcilable owner/key/host topology, so
+> background hook state and surviving host identity can remain live; compiler
+> disposal unregisters removed thread sites, including modules without component
+> exports. Renderer/root/snapshot, owner/key/host-shape, list/resource-schema, or
+> receiver-lifecycle changes are reconstructing edits and require root/resource
+> recreation; the end-to-end native reload receiver is not implemented. There is
+> no Lynx Web, Explorer, Android, or iOS proof of native chunk execution, portal
+> placement, retained visibility, transition timing, reload reconstruction, or
+> stale resource cleanup, and no device performance evidence. The formal
+> Milestone 8 and stable/IFR gates therefore remain blocked.
+
 - Prove retained Suspense/errors/Activity through first render, adoption, later
   updates, transport rejection/fault, and visibility changes.
 - Integrate Rspeedy lazy bundles and dynamic imports without serial waterfalls.
@@ -919,6 +960,48 @@ observable behavioral tests; stale work/resources are released across both
 runtimes.
 
 ### Milestone 9 — parity and release stabilization (2–3 engineer-weeks)
+
+> **Progress (2026-07-22): repository-side stabilization implemented; formal
+> exit blocked.** The exact `@lynx-js/react@0.123.0` / `b6b809cd` oracle now has
+> a generated, validated Vitest runner crosswalk for all 1,725 runnable
+> JavaScript/TypeScript cases with zero unclassified entries. The source
+> inventory separately classifies all 89 source-defined Rust compiler cases as out of scope;
+> every classification, including `port` and `differential`, is a disposition
+> describing intended handling. Classification counts do not prove that the
+> corresponding Octane behavior is implemented, that tests ran against Octane,
+> or that parity passed. Octane permanently keeps `defer` boolean only: the
+> ReactLynx `defer.unmountRecycled` object form is rejected, physical cell
+> recycling detaches refs, and the logical item retains state and effects until
+> logical removal. A deterministic pinned-Rspeedy benchmark builds the
+> same semantic-checksummed app in background-preview and dual-thread IFR
+> shapes, verifies thread ownership and identical background semantics, and
+> records decoded/encoded raw, gzip, and Brotli bytes. It requires exact
+> background raw/gzip/Brotli metrics and guards whole-artifact gzip plus
+> decoded-main gzip ratios. This is source/build size evidence, not native
+> timing or first-paint evidence. Required `Lynx compatibility (minimum)` and
+> `Lynx compatibility (current)` CI lanes pack the Octane packages into strict
+> external consumers and perform two deterministic builds. They keep the
+> atomic Rspeedy `0.16.0` / Rsbuild `2.1.4` graph while covering Rspack `2.1.3`
+> and `2.1.5`; the current lane also checks live registry drift. The immutable
+> `audit/toolchain.json` provenance covers the Phase 0/Milestone 5 subset,
+> including the minimum Rspack edge, while the complete Milestone 9 lane maps
+> live in plugin source. It does not record every lane dependency or the current
+> Rspack artifact's integrity. These are source/build lanes, not native-engine
+> runs. The package surface, provenance, status, pack boundary, and experimental
+> universal ABI were reviewed for this private phase; both Lynx packages remain
+> `0.0.0` and `private` rather than becoming a technical preview.
+>
+> Formal exit still requires a public framework-neutral native string-event,
+> reload, and current init-data receiver contract; native verification of the
+> typed page/background-destroy path; a working Lynx Web transport; Explorer,
+> Android, and iOS execution;
+> minimum/current toolchain execution on native engines; native proof of first
+> paint and node identity adoption, worklet/ref/call execution, list allocation
+> and lifecycle, lazy-chunk execution, portal placement, Native Modules/custom
+> elements, source maps, and reconstructing reload cleanup; and comparable
+> native semantic performance baselines. Until those gates exist, the
+> universal renderer ABI remains experimental and Milestone 9 has no formal
+> release exit.
 
 - Complete the upstream export/test crosswalk with zero unclassified cases.
 - Run minimum and current supported Lynx/Rspeedy/engine lanes.

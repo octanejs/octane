@@ -14,6 +14,7 @@ import type {
 	UniversalTransportRejectMessage,
 } from 'octane/universal/native';
 import type { LynxFirstTreeSnapshot } from './first-screen.js';
+import { decodeLynxPortalTargetId } from './portal.js';
 
 /**
  * Kept as a local literal so the main-thread protocol graph does not evaluate
@@ -56,13 +57,28 @@ export interface LynxMainReadyReply {
 	readonly firstTree?: LynxFirstTreeSnapshot;
 }
 
+/** Root-independent native page lifetime teardown broadcast to the background runtime. */
+export interface LynxPageDestroyMessage {
+	readonly protocol: typeof LYNX_TRANSPORT_PROTOCOL_VERSION;
+	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
+	readonly type: 'page-destroy';
+}
+
 export interface LynxPublicHandleUpsert {
 	readonly op: 'upsert';
 	readonly id: number;
 	readonly type: string;
 	readonly generation: number;
 	readonly attached: boolean;
+	readonly listDescendant: boolean;
 	readonly snapshot: UniversalSerializableValue;
+}
+
+export interface LynxPublicHandleListAncestry {
+	readonly op: 'list-ancestry';
+	readonly id: number;
+	readonly generation: number;
+	readonly listDescendant: boolean;
 }
 
 export interface LynxPublicHandleRemoval {
@@ -71,7 +87,8 @@ export interface LynxPublicHandleRemoval {
 	readonly generation: number;
 }
 
-export type LynxPublicHandleDelta = LynxPublicHandleUpsert | LynxPublicHandleRemoval;
+export type LynxPublicHandleDelta =
+	LynxPublicHandleUpsert | LynxPublicHandleListAncestry | LynxPublicHandleRemoval;
 
 export interface LynxTransportAcknowledgement extends UniversalTransportAcknowledgement {
 	readonly handles: readonly LynxPublicHandleDelta[];
@@ -205,6 +222,7 @@ export type LynxBackgroundOutboundMessage =
 
 export type LynxBackgroundInboundMessage =
 	| LynxMainReadyReply
+	| LynxPageDestroyMessage
 	| LynxCallBackgroundMessage
 	| LynxCancelBackgroundCallMessage
 	| LynxCallMainResultMessage
@@ -280,6 +298,25 @@ function nonNegativeInteger(value: unknown, label: string): asserts value is num
 
 function nullableHostId(value: unknown, label: string): asserts value is number | null {
 	if (value !== null) positiveInteger(value, label);
+}
+
+function hostParent(value: unknown, label: string): void {
+	if (value === null || typeof value === 'number') {
+		nullableHostId(value, label);
+		return;
+	}
+	const handle = record(value, label);
+	exactKeys(handle, ['$$kind', 'renderer', 'root', 'id'], label);
+	if (handle.$$kind !== 'octane.universal.portal-target') {
+		fail(`${label}.$$kind`, 'must identify a universal portal target.');
+	}
+	if (handle.renderer !== LYNX_TRANSPORT_RENDERER) {
+		fail(`${label}.renderer`, `must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+	}
+	positiveInteger(handle.root, `${label}.root`);
+	if (decodeLynxPortalTargetId(handle.id) === null) {
+		fail(`${label}.id`, 'must be an opaque Lynx portal target ID.');
+	}
 }
 
 function assertWireValue(value: unknown, label: string, seen = new Set<object>()): void {
@@ -392,7 +429,7 @@ function assertCommand(value: unknown, index: number): asserts value is Universa
 		case 'insert':
 		case 'move':
 			exactKeys(command, ['op', 'parent', 'id', 'before'], label);
-			nullableHostId(command.parent, `${label}.parent`);
+			hostParent(command.parent, `${label}.parent`);
 			positiveInteger(command.id, `${label}.id`);
 			nullableHostId(command.before, `${label}.before`);
 			return;
@@ -414,7 +451,7 @@ function assertCommand(value: unknown, index: number): asserts value is Universa
 			return;
 		case 'remove':
 			exactKeys(command, ['op', 'parent', 'id'], label);
-			nullableHostId(command.parent, `${label}.parent`);
+			hostParent(command.parent, `${label}.parent`);
 			positiveInteger(command.id, `${label}.id`);
 			return;
 		case 'destroy':
@@ -532,13 +569,29 @@ function assertHandleDelta(
 	const label = `ack.handles[${index}]`;
 	const delta = record(value, label);
 	if (delta.op === 'upsert') {
-		exactKeys(delta, ['op', 'id', 'type', 'generation', 'attached', 'snapshot'], label);
+		exactKeys(
+			delta,
+			['op', 'id', 'type', 'generation', 'attached', 'listDescendant', 'snapshot'],
+			label,
+		);
 		positiveInteger(delta.id, `${label}.id`);
 		nonEmptyString(delta.type, `${label}.type`);
 		positiveInteger(delta.generation, `${label}.generation`);
 		if (typeof delta.attached !== 'boolean') fail(`${label}.attached`, 'must be a boolean.');
+		if (typeof delta.listDescendant !== 'boolean') {
+			fail(`${label}.listDescendant`, 'must be a boolean.');
+		}
 		assertWireValue(delta.snapshot, `${label}.snapshot`);
 		assertSnapshotIdentity(delta.snapshot, delta, identity, label);
+		return;
+	}
+	if (delta.op === 'list-ancestry') {
+		exactKeys(delta, ['op', 'id', 'generation', 'listDescendant'], label);
+		positiveInteger(delta.id, `${label}.id`);
+		positiveInteger(delta.generation, `${label}.generation`);
+		if (typeof delta.listDescendant !== 'boolean') {
+			fail(`${label}.listDescendant`, 'must be a boolean.');
+		}
 		return;
 	}
 	if (delta.op === 'remove') {
@@ -700,6 +753,16 @@ export function validateLynxBackgroundOutboundMessage(
 export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgroundInboundMessage {
 	const message = record(value, 'inbound message');
 	if (message.type === 'main-ready') return assertReady(message, true) as LynxMainReadyReply;
+	if (message.type === 'page-destroy') {
+		exactKeys(message, ['protocol', 'renderer', 'type'], 'page-destroy');
+		if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
+			fail('page-destroy', `protocol must be ${LYNX_TRANSPORT_PROTOCOL_VERSION}.`);
+		}
+		if (message.renderer !== LYNX_TRANSPORT_RENDERER) {
+			fail('page-destroy', `renderer must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+		}
+		return message as unknown as LynxPageDestroyMessage;
+	}
 	assertIdentity(message, 'inbound message');
 	if (message.type === 'call-background') {
 		exactKeys(

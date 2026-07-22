@@ -9,6 +9,7 @@ import {
 	type LynxContextProxy,
 	type LynxContextProxyEvent,
 } from '../src/core/protocol.js';
+import { NativeListLifecycleFixture } from './_fixtures/native-list-lifecycle.lynx.tsrx';
 import { NativeListFixture } from './_fixtures/native-list.lynx.tsrx';
 
 interface NativeListItem {
@@ -28,6 +29,11 @@ interface NativeEventRegistration {
 }
 
 const fixture = NativeListFixture as UniversalComponent<NativeListProps>;
+const lifecycleFixture = NativeListLifecycleFixture as UniversalComponent<{
+	readonly items: readonly NativeListItem[];
+	readonly captureIncrement: (id: string, increment: () => void) => void;
+	readonly log: (entry: string) => void;
+}>;
 let root: LynxRoot | null = null;
 let main: LynxMainThreadController | null = null;
 let dom: JSDOM | null = null;
@@ -52,6 +58,72 @@ afterEach(async () => {
 });
 
 describe.sequential('Lynx recycled list background integration', () => {
+	it('retains logical state and effects while recycling a physical cell', async () => {
+		dom = new JSDOM('<!doctype html><html><body></body></html>');
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.switchToMainThread();
+		main = installLynxMainThread();
+		environment.switchToBackgroundThread();
+
+		const lifecycleLog: string[] = [];
+		const increments = new Map<string, () => void>();
+		const captureIncrement = (id: string, next: () => void) => {
+			increments.set(id, next);
+		};
+		const log = (entry: string) => {
+			lifecycleLog.push(entry);
+		};
+		root = createLynxRoot();
+		await root.render(lifecycleFixture, {
+			items: [
+				{ id: 'retained', label: 'Retained' },
+				{ id: 'replacement', label: 'Replacement' },
+			],
+			captureIncrement,
+			log,
+		});
+		await root.flushTransport();
+
+		const list = dom.window.document.querySelector('#stateful-feed')!;
+		expect(list.children).toHaveLength(0);
+		environment.switchToMainThread();
+		const firstSign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+		expect(list.firstElementChild?.textContent).toBe('Retained: 0');
+
+		environment.switchToBackgroundThread();
+		await root.flushTransport();
+		expect(lifecycleLog.filter((entry) => entry === 'effect:retained')).toHaveLength(1);
+		const increment = increments.get('retained');
+		if (increment === undefined) throw new Error('Expected the retained list item action.');
+		increment();
+		await root.flushTransport();
+
+		environment.switchToMainThread();
+		expect(list.firstElementChild?.textContent).toBe('Retained: 1');
+		globalThis.elementTree.leaveListItem(list as never, firstSign);
+		expect(globalThis.elementTree.enterListItemAtIndex(list as never, 1)).toBe(firstSign);
+		expect(list.firstElementChild?.textContent).toBe('Replacement: 0');
+		expect(lifecycleLog.filter((entry) => entry === 'cleanup:retained')).toHaveLength(0);
+		globalThis.elementTree.leaveListItem(list as never, firstSign);
+		expect(globalThis.elementTree.enterListItemAtIndex(list as never, 0)).toBe(firstSign);
+		expect(list.firstElementChild?.textContent).toBe('Retained: 1');
+		expect(lifecycleLog.filter((entry) => entry === 'effect:retained')).toHaveLength(1);
+
+		environment.switchToBackgroundThread();
+		await root.render(lifecycleFixture, {
+			items: [{ id: 'replacement', label: 'Replacement' }],
+			captureIncrement,
+			log,
+		});
+		await root.flushTransport();
+		expect(lifecycleLog.filter((entry) => entry === 'cleanup:retained')).toHaveLength(1);
+
+		await root.unmount();
+		root = null;
+		expect(lifecycleLog.filter((entry) => entry === 'cleanup:retained')).toHaveLength(1);
+	});
+
 	it('keeps cells lazy and rebinds native identity, events, and refs across reuse', async () => {
 		dom = new JSDOM('<!doctype html><html><body></body></html>');
 		installLynxTestingEnv(globalThis, { window: dom.window as never });

@@ -436,6 +436,10 @@ jobs:
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
     runs-on: ubuntu-latest
+    # This matrix intentionally rewrites one importer without changing the
+    # repository lockfile after the frozen base install.
+    env:
+      PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
 
     strategy:
       fail-fast: false
@@ -488,6 +492,49 @@ jobs:
 
       - name: Run Three compatibility behavior tests
         run: pnpm --dir packages/three test:compat
+
+  lynx_compat:
+    name: Lynx compatibility (${{ matrix.lane }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: minimum
+            registry_check: ""
+          - lane: current
+            registry_check: --check-registry
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - name: Install pinned repository dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The script packs the four Octane packages, installs one exact Lynx
+      # graph into a temporary external consumer without a lockfile, verifies
+      # physical dependency identity, and performs two clean native builds.
+      # The current lane additionally proves its exact versions still follow
+      # the registry graph exposed by Rspeedy/Rsbuild dependency constraints.
+      - name: Pack and build Lynx ${{ matrix.lane }} compatibility graph
+        run: >-
+          node packages/rspeedy-plugin-octane/scripts/compatibility-smoke.mjs
+          --lane "${{ matrix.lane }}"
+          ${{ matrix.registry_check }}
+
+      - name: Verify the repository lockfile stayed immutable
+        run: git diff --exit-code -- pnpm-lock.yaml
 
   package:
     name: validate publishable packages

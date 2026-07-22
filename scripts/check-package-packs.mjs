@@ -25,6 +25,7 @@ import {
 	NATIVE_GRAPH_FORBIDDEN_MODULE,
 	renderPackedExampleWorkspace,
 } from './package-pack-canaries.mjs';
+import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
 
 const privatePackScaffolds = new Set(['@octanejs/lynx', '@octanejs/rspeedy-plugin']);
 const packages = getWorkspacePackages().filter(
@@ -653,9 +654,10 @@ process.stdout.write(output, () => process.exit(0));
 }
 
 /**
- * Exercise the private Milestone 6 Lynx packages exactly as an external
- * application consumes them. This builds and decodes the native artifact but
- * remains a source/build check, not a device-runtime claim.
+ * Exercise the private Lynx packages on the Milestone 9 minimum lane exactly
+ * as an external application consumes them. This builds and decodes the native
+ * artifact but remains a source/build check, not a device-runtime claim. The
+ * dedicated compatibility matrix separately exercises the current lane.
  */
 function validatePackedLynxConsumer(tempRoot, archives) {
 	const consumerDirectory = path.join(tempRoot, 'external-lynx-consumer');
@@ -679,14 +681,10 @@ function validatePackedLynxConsumer(tempRoot, archives) {
 				type: 'module',
 				engines: { node: '>=22' },
 				dependencies: {
-					'@lynx-js/tasm': '0.0.39',
-					'@lynx-js/rspeedy': '0.16.0',
-					'@lynx-js/testing-environment': '0.3.0',
+					...LYNX_TOOLCHAIN_LANES.minimum.packages,
 					'@octanejs/lynx': archiveSpecs['@octanejs/lynx'],
 					'@octanejs/rspack-plugin': archiveSpecs['@octanejs/rspack-plugin'],
 					'@octanejs/rspeedy-plugin': archiveSpecs['@octanejs/rspeedy-plugin'],
-					'@rsbuild/core': '2.1.4',
-					'@rspack/core': '2.1.3',
 					octane: archiveSpecs.octane,
 				},
 			},
@@ -930,6 +928,7 @@ try {
 			'--ignore-scripts',
 			'--no-frozen-lockfile',
 			'--config.auto-install-peers=false',
+			'--strict-peer-dependencies',
 		],
 		{
 			cwd: consumerDirectory,
@@ -945,7 +944,7 @@ try {
 	});
 
 	console.log(
-		'built and decoded one packed Lynx Milestone 6 native bundle outside the workspace; exact toolchain, singleton Octane/native core, public subpaths, and DOM/React exclusions passed',
+		'built and decoded one packed Lynx minimum-lane native bundle outside the workspace; exact toolchain, singleton Octane/native core, public subpaths, and DOM/React exclusions passed',
 	);
 }
 

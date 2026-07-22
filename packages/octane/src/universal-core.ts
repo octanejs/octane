@@ -36,6 +36,8 @@ const UNIVERSAL_KEYED = Symbol.for('octane.universal.keyed');
 const UNIVERSAL_PORTAL = Symbol.for('octane.universal.portal');
 const UNIVERSAL_RENDERER_REGION = Symbol.for('octane.universal.renderer-region');
 const RENDERER_REGION_OWNER = Symbol.for('octane.renderer-region.owner');
+const LAZY_COMPONENT = Symbol.for('octane.lazy');
+const UNIVERSAL_COMPONENT_REVISION = Symbol('octane.universal.component-revision');
 
 const NO_CHILDREN = Symbol('octane.universal.no-children');
 const NO_KEY = Symbol('octane.universal.no-key');
@@ -64,6 +66,11 @@ export interface UniversalRendererMetadata {
 	readonly module?: string;
 	readonly target: 'universal';
 }
+
+const UNIVERSAL_LAZY_METADATA: UniversalRendererMetadata = Object.freeze({
+	id: '<lazy>',
+	target: 'universal',
+});
 
 export interface UniversalBoundaryMetadata {
 	readonly id: string;
@@ -767,6 +774,15 @@ interface MemoHook<T = unknown> {
 	deps: readonly unknown[] | null;
 }
 
+interface ComponentMemoHook<P = any> {
+	kind: 'component-memo';
+	component: UniversalComponent<P>;
+	revision: number;
+	props: P;
+	value: UniversalRenderable;
+	contextReads: Map<UniversalContext<any>, unknown> | null;
+}
+
 interface RefHook<T = unknown> {
 	kind: 'ref';
 	current: T;
@@ -806,6 +822,7 @@ type UniversalHook =
 	| StateHook<any>
 	| ReducerHook<any, any>
 	| MemoHook
+	| ComponentMemoHook
 	| RefHook
 	| IdHook
 	| EffectHook
@@ -824,7 +841,7 @@ interface UniversalOwnerRecord {
 	effectOrder: EffectHook[];
 	children: UniversalOwnerRecord[];
 	contextValues: Map<UniversalContext<any>, unknown> | null;
-	updates: Map<unknown, unknown[]>;
+	updates: Map<unknown, UniversalHookUpdateQueue>;
 	isBoundary: boolean;
 	canHandleSuspense: boolean;
 	boundaryError: unknown;
@@ -849,6 +866,9 @@ interface RenderAttempt {
 	retryThenables: Set<PromiseLike<unknown>>;
 	nextUniversalId: number;
 	implicitSlot: number;
+	transitionBatches: ReadonlySet<UniversalTransitionBatch>;
+	transitionRender: boolean;
+	bridgeContextReads: Map<UniversalContext<any>, unknown> | null;
 }
 
 const UNIVERSAL_TREE_PORTAL = 1 << 0;
@@ -872,7 +892,7 @@ interface DraftOwner {
 	childClaimCursors: OwnerIdentityIndex<number> | null;
 	childReplayOrdinals: OwnerIdentityIndex<number> | null;
 	contextValues: Map<UniversalContext<any>, unknown> | null;
-	appliedUpdates: Map<unknown, number>;
+	appliedUpdates: Map<unknown, AppliedUniversalHookUpdates>;
 	needsRender: boolean;
 	implicitSlot: number;
 	boundaryError: unknown;
@@ -909,6 +929,8 @@ interface SuspendedMemoReplay {
 	readonly entries: readonly SuspendedMemoEntry[];
 	readonly component: UniversalComponent<any>;
 	readonly props: any;
+	readonly transitionBatches: ReadonlySet<UniversalTransitionBatch>;
+	readonly transitionRender: boolean;
 	active: boolean;
 	asyncWorkQueued: boolean;
 }
@@ -925,10 +947,18 @@ interface OwnerIdentityIndex<T> {
 let CURRENT_ATTEMPT: RenderAttempt | null = null;
 let CURRENT_OWNER: DraftOwner | null = null;
 let CURRENT_LAZY_LEAF_OWNER: LazyLeafOwnerScope | null = null;
+let CURRENT_MEMO_CONTEXT_READS: Map<UniversalContext<any>, unknown> | null = null;
 const SCHEDULED_UNIVERSAL_ROOTS = new Set<UniversalRootImpl<any, any>>();
 const PENDING_UNIVERSAL_PASSIVE_ROOTS = new Set<UniversalRootImpl<any, any>>();
 let UNIVERSAL_SYNC_DEPTH = 0;
 let UNIVERSAL_COMMIT_TASK_DEPTH = 0;
+let UNIVERSAL_TRANSITION_DEPTH = 0;
+let UNIVERSAL_ASYNC_TRANSITION_COUNT = 0;
+let UNIVERSAL_DISCRETE_EVENT_DEPTH = 0;
+let UNIVERSAL_TRANSITION_PENDING_COUNT = 0;
+let ACTIVE_UNIVERSAL_TRANSITION_BATCH: UniversalTransitionBatch | null = null;
+let IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH: UniversalTransitionBatch | null = null;
+const UNIVERSAL_TRANSITION_LISTENERS = new Set<() => void>();
 const UNIVERSAL_SYNC_DRAIN_LIMIT = 100;
 let NEXT_HOOK_SLOT = 0;
 let NEXT_OWNER_ID = 1;
@@ -939,6 +969,48 @@ let NEXT_PORTAL_ROOT = 1;
 let NEXT_TRANSPORT_ROOT = 1;
 const EVENT_DISPATCHERS = new Map<number, (payload: unknown) => unknown>();
 const UNIVERSAL_SLOT_STACK: unknown[] = [];
+interface UniversalTransitionUpdate {
+	readonly kind: 'state' | 'reducer';
+}
+
+interface UniversalHookUpdateQueue extends Array<unknown> {
+	kind?: 'state' | 'reducer';
+	baseState?: unknown;
+	batches?: (UniversalTransitionBatch | null)[];
+	rebases?: boolean[];
+}
+
+interface AppliedUniversalUrgentUpdates {
+	readonly lane: false;
+	readonly queue: UniversalHookUpdateQueue;
+	readonly consumed: number;
+	readonly baseState: unknown;
+}
+
+interface AppliedUniversalLaneUpdates {
+	readonly lane: true;
+	readonly queue: UniversalHookUpdateQueue;
+	readonly consumed: number;
+	readonly baseState: unknown;
+	readonly remainingValues: unknown[];
+	readonly remainingBatches: (UniversalTransitionBatch | null)[];
+	readonly remainingRebases: boolean[];
+}
+
+type AppliedUniversalHookUpdates = AppliedUniversalUrgentUpdates | AppliedUniversalLaneUpdates;
+
+interface UniversalTransitionBatch {
+	readonly updates: Map<UniversalOwnerRecord, Map<unknown, UniversalTransitionUpdate>>;
+	readonly roots: Set<UniversalRootImpl<any, any>>;
+	pendingActions: number;
+	pendingSignals: number;
+	closed: boolean;
+	promotionScheduled: boolean;
+	promoted: boolean;
+	settled: boolean;
+}
+
+const EMPTY_UNIVERSAL_TRANSITION_BATCHES: ReadonlySet<UniversalTransitionBatch> = new Set();
 
 interface RendererRegionBridgeCell {
 	active: boolean;
@@ -1064,6 +1136,9 @@ class UniversalSuspendedAttemptImpl implements UniversalSuspendedAttempt {
 		readonly component: UniversalComponent<any>,
 		readonly props: any,
 		readonly replayEntries: readonly SuspendedMemoEntry[],
+		readonly transitionBatches: ReadonlySet<UniversalTransitionBatch>,
+		readonly transitionRender: boolean,
+		readonly bridgeContextReads: ReadonlyMap<UniversalContext<any>, unknown> | null,
 	) {
 		thenable.then(
 			() => this.settle(),
@@ -1080,10 +1155,10 @@ class UniversalSuspendedAttemptImpl implements UniversalSuspendedAttempt {
 		this.root.finishSuspension(this, true);
 	}
 
-	abort(): void {
+	abort(preserveTransitions = false): void {
 		if (this.state !== 'suspended') return;
 		this.state = 'aborted';
-		this.root.finishSuspension(this, false);
+		this.root.finishSuspension(this, false, preserveTransitions);
 	}
 }
 
@@ -1502,6 +1577,7 @@ export const UNIVERSAL_HMR: unique symbol = Symbol.for('octane.universal.hmr');
 interface UniversalHmrMeta {
 	component: UniversalComponent<any>;
 	readonly owners: Set<UniversalOwnerRecord>;
+	revision: number;
 	update(incoming: UniversalComponent<any>): void;
 }
 
@@ -1524,6 +1600,7 @@ export function hmrUniversalComponent<P>(
 	const meta: UniversalHmrMeta = {
 		component,
 		owners,
+		revision: 0,
 		update(incoming) {
 			const incomingMeta = (incoming as UniversalHmrComponent<any>)[UNIVERSAL_HMR];
 			const next = incomingMeta?.component ?? incoming;
@@ -1534,6 +1611,7 @@ export function hmrUniversalComponent<P>(
 				);
 			}
 			meta.component = next;
+			meta.revision++;
 			__profileComponentSource(wrapper, next);
 			if ((next as any).__warm === undefined) delete (wrapper as any).__warm;
 			else (wrapper as any).__warm = (next as any).__warm;
@@ -1556,7 +1634,10 @@ export function hmrUniversalComponent<P>(
 		},
 		{ module: metadata.module },
 	) as UniversalHmrComponent<P>;
-	Object.defineProperty(wrapper, UNIVERSAL_HMR, { value: meta });
+	Object.defineProperties(wrapper, {
+		[UNIVERSAL_HMR]: { value: meta },
+		[UNIVERSAL_COMPONENT_REVISION]: { get: () => meta.revision },
+	});
 	__profileComponentSource(wrapper, component);
 	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
 	return wrapper;
@@ -1565,6 +1646,7 @@ export function hmrUniversalComponent<P>(
 function getComponentMetadata(component: UniversalComponent): UniversalRendererMetadata {
 	const metadata = component?.[UNIVERSAL_COMPONENT];
 	if (metadata === undefined) {
+		if ((component as any)?.[LAZY_COMPONENT] === true) return UNIVERSAL_LAZY_METADATA;
 		throw new Error('Universal roots accept only compiler-defined universal components.');
 	}
 	return metadata;
@@ -1779,11 +1861,22 @@ function activateLazyLeafOwner(): DraftOwner | null {
 	return owner;
 }
 
-function readOwnerContext<T>(owner: DraftOwner | null, context: UniversalContext<T>): T {
+function readOwnerContext<T>(
+	owner: DraftOwner | null,
+	context: UniversalContext<T>,
+	trackMemoRead = true,
+): T {
+	let value: T;
 	for (let current = owner; current !== null; current = current.parent) {
-		if (current.contextValues?.has(context)) return current.contextValues.get(context) as T;
+		if (current.contextValues?.has(context)) {
+			value = current.contextValues.get(context) as T;
+			if (trackMemoRead) CURRENT_MEMO_CONTEXT_READS?.set(context, value);
+			return value;
+		}
 	}
-	return currentAttempt().root.readBridgeContext(context);
+	value = currentAttempt().root.readBridgeContext(context);
+	if (trackMemoRead) CURRENT_MEMO_CONTEXT_READS?.set(context, value);
+	return value;
 }
 
 function executeOwner(
@@ -1896,7 +1989,7 @@ function materializeComponentValue(
 		);
 	}
 	const metadata = getComponentMetadata(value.component);
-	if (metadata.id !== expectedRenderer) {
+	if (metadata !== UNIVERSAL_LAZY_METADATA && metadata.id !== expectedRenderer) {
 		throw new Error(
 			`Universal renderer mismatch: owner ${JSON.stringify(expectedRenderer)} cannot render nested component ${JSON.stringify(metadata.id)}.`,
 		);
@@ -1942,6 +2035,7 @@ function disposeUncommittedDraft(owner: DraftOwner): void {
 	for (const child of owner.children) disposeUncommittedDraft(child);
 	if (!owner.record.mounted) {
 		owner.record.disposed = true;
+		owner.record.updates.clear();
 		for (const hook of owner.hooks.values()) {
 			if (hook.kind === 'effect-event') hook.cell.active = false;
 		}
@@ -2533,6 +2627,7 @@ function materializeValue(
 			if (error instanceof UniversalSuspense) {
 				const retained = retainCommittedTryArm(owner);
 				if (retained !== null) {
+					if (currentAttempt().transitionRender) throw error;
 					if (boundary.pending === null) throw error;
 					if (currentAttempt().root.driverCapabilities().visibility !== true) {
 						throw new Error(
@@ -3140,6 +3235,182 @@ export function withSlot<T>(slot: unknown, fn: (...args: any[]) => T, ...args: a
 	}
 }
 
+function createUniversalTransitionBatch(): UniversalTransitionBatch {
+	const batch: UniversalTransitionBatch = {
+		updates: new Map(),
+		roots: new Set(),
+		pendingActions: 0,
+		pendingSignals: 0,
+		closed: false,
+		promotionScheduled: false,
+		promoted: false,
+		settled: false,
+	};
+	return batch;
+}
+
+function tickUniversalTransitionCount(delta: number): void {
+	UNIVERSAL_TRANSITION_PENDING_COUNT += delta;
+	if (UNIVERSAL_TRANSITION_PENDING_COUNT < 0) UNIVERSAL_TRANSITION_PENDING_COUNT = 0;
+	UNIVERSAL_DISCRETE_EVENT_DEPTH++;
+	try {
+		for (const listener of [...UNIVERSAL_TRANSITION_LISTENERS]) listener();
+	} finally {
+		UNIVERSAL_DISCRETE_EVENT_DEPTH--;
+	}
+}
+
+function settleUniversalTransitionBatch(batch: UniversalTransitionBatch): void {
+	if (batch.settled) return;
+	batch.settled = true;
+	if (ACTIVE_UNIVERSAL_TRANSITION_BATCH === batch) ACTIVE_UNIVERSAL_TRANSITION_BATCH = null;
+	if (IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH === batch) {
+		IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH = null;
+	}
+	tickUniversalTransitionCount(-batch.pendingSignals);
+}
+
+function finishUniversalTransitionRoot(
+	batch: UniversalTransitionBatch,
+	root: UniversalRootImpl<any, any>,
+): void {
+	if (batch.settled) return;
+	const rehomePromotion = !batch.promoted && batch.promotionScheduled;
+	root.discardTransitionBatch(batch);
+	batch.roots.delete(root);
+	if (batch.closed && batch.pendingActions === 0 && batch.roots.size === 0) {
+		settleUniversalTransitionBatch(batch);
+	} else if (rehomePromotion) {
+		// The original promotion callback may belong to a root that can no longer
+		// run it. Re-home the callback onto the first remaining staged owner; the
+		// stale callback is harmless because promotion and settlement are idempotent.
+		batch.promotionScheduled = false;
+		queueUniversalTransitionPromotion(batch);
+	}
+}
+
+function promoteUniversalTransitionBatch(batch: UniversalTransitionBatch): void {
+	if (batch.promoted || batch.settled || !batch.closed || batch.pendingActions !== 0) return;
+	batch.promoted = true;
+	const scheduledRoots = new Set<UniversalRootImpl<any, any>>();
+	for (const [owner, bySlot] of batch.updates) {
+		if (owner.disposed) continue;
+		let hasUpdates = false;
+		for (const slot of bySlot.keys()) {
+			const queue = owner.updates.get(slot);
+			if (queue?.batches?.some((queuedBatch) => queuedBatch === batch)) {
+				hasUpdates = true;
+				break;
+			}
+		}
+		if (!hasUpdates) continue;
+		if (!scheduledRoots.has(owner.root)) {
+			scheduledRoots.add(owner.root);
+			owner.root.scheduleTransition(batch);
+		}
+	}
+	// Promoted updates now live in their owner-local ordered queues. Retaining this
+	// staging index until every root settles would unnecessarily keep owners and
+	// updater closures from already-committed roots alive.
+	batch.updates.clear();
+	for (const root of [...batch.roots]) {
+		if (!scheduledRoots.has(root)) finishUniversalTransitionRoot(batch, root);
+	}
+	if (batch.roots.size === 0) settleUniversalTransitionBatch(batch);
+}
+
+function queueUniversalTransitionPromotion(batch: UniversalTransitionBatch): void {
+	if (
+		batch.promotionScheduled ||
+		batch.promoted ||
+		batch.settled ||
+		!batch.closed ||
+		batch.pendingActions !== 0
+	) {
+		return;
+	}
+	batch.promotionScheduled = true;
+	const firstOwner = batch.updates.keys().next().value as UniversalOwnerRecord | undefined;
+	const promote = () => {
+		batch.promotionScheduled = false;
+		promoteUniversalTransitionBatch(batch);
+	};
+	if (firstOwner !== undefined && !firstOwner.disposed) {
+		firstOwner.root.__scheduleMicrotask(promote);
+		return;
+	}
+	const scheduler = readGlobalMicrotaskScheduler();
+	if (scheduler !== undefined) scheduler.call(globalThis, promote);
+	else void Promise.resolve().then(promote);
+}
+
+function universalTransitionBatchForUpdate(): UniversalTransitionBatch | null {
+	if (UNIVERSAL_TRANSITION_DEPTH > 0) return ACTIVE_UNIVERSAL_TRANSITION_BATCH;
+	if (UNIVERSAL_DISCRETE_EVENT_DEPTH > 0) return null;
+	if (UNIVERSAL_ASYNC_TRANSITION_COUNT > 0) return IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH;
+	return null;
+}
+
+function stageUniversalTransitionUpdate(
+	batch: UniversalTransitionBatch,
+	owner: UniversalOwnerRecord,
+	slot: unknown,
+	kind: 'state' | 'reducer',
+	value: unknown,
+): void {
+	enqueueUniversalHookUpdate(owner, slot, kind, value, batch);
+	batch.roots.add(owner.root);
+	let bySlot = batch.updates.get(owner);
+	if (bySlot === undefined) {
+		bySlot = new Map();
+		batch.updates.set(owner, bySlot);
+	}
+	let update = bySlot.get(slot);
+	if (update === undefined) {
+		update = { kind };
+		bySlot.set(slot, update);
+	} else if (update.kind !== kind) {
+		throw new Error('A universal transition cannot stage incompatible hook updates.');
+	}
+}
+
+function enqueueUniversalHookUpdate(
+	owner: UniversalOwnerRecord,
+	slot: unknown,
+	kind: 'state' | 'reducer',
+	value: unknown,
+	batch: UniversalTransitionBatch | null,
+): void {
+	let queue = owner.updates.get(slot);
+	if (queue === undefined) {
+		const hook = owner.hooks.get(slot);
+		if (hook?.kind !== kind) {
+			throw new Error(`Cannot queue a universal ${kind} update for an inactive hook.`);
+		}
+		queue = [];
+		owner.updates.set(slot, queue);
+		if (batch !== null) {
+			queue.kind = kind;
+			queue.baseState = hook.value;
+			queue.batches = [];
+		}
+	} else if (queue.kind !== undefined && queue.kind !== kind) {
+		throw new Error('A universal hook cannot queue incompatible update kinds.');
+	}
+	if (batch !== null && queue.batches === undefined) {
+		const hook = owner.hooks.get(slot);
+		if (hook?.kind !== kind) {
+			throw new Error(`Cannot queue a universal ${kind} update for an inactive hook.`);
+		}
+		queue.kind = kind;
+		queue.baseState = hook.value;
+		queue.batches = new Array(queue.length).fill(null);
+	}
+	queue.push(value);
+	queue.batches?.push(batch);
+	queue.rebases?.push(false);
+}
+
 function scheduleOwner(owner: UniversalOwnerRecord, slot?: unknown): void {
 	if (owner.disposed) return;
 	__profileSchedule(
@@ -3168,12 +3439,90 @@ function findDraftOwner(record: UniversalOwnerRecord): DraftOwner | null {
 	return null;
 }
 
-function applyStateUpdates<T>(value: T, updates: readonly unknown[]): T {
-	let next = value;
-	for (const update of updates) {
-		next = typeof update === 'function' ? (update as (previous: T) => T)(next) : (update as T);
+function applyUniversalHookUpdateQueue<T>(
+	owner: DraftOwner,
+	slot: unknown,
+	kind: 'state' | 'reducer',
+	fallback: T,
+	apply: (state: T, update: unknown) => T,
+): T {
+	const queue = owner.record.updates.get(slot);
+	if (queue === undefined) return fallback;
+	if (queue.kind !== undefined && queue.kind !== kind) {
+		throw new Error('A universal hook encountered an incompatible queued update kind.');
 	}
-	return next;
+	const consumed = queue.length;
+	const batches = queue.batches;
+	let value = batches === undefined ? fallback : (queue.baseState as T);
+	if (batches === undefined) {
+		for (let index = 0; index < consumed; index++) value = apply(value, queue[index]);
+		owner.appliedUpdates.set(slot, {
+			lane: false,
+			queue,
+			consumed,
+			baseState: value,
+		});
+		return value;
+	}
+	let baseState = value;
+	let skipped = false;
+	const remainingValues: unknown[] = [];
+	const remainingBatches: (UniversalTransitionBatch | null)[] = [];
+	const remainingRebases: boolean[] = [];
+	const attempt = currentAttempt();
+	for (let index = 0; index < consumed; index++) {
+		const update = queue[index];
+		const batch = batches[index];
+		const included =
+			batch === null || (attempt.transitionRender && attempt.transitionBatches.has(batch));
+		if (!included) {
+			if (!skipped) {
+				skipped = true;
+				baseState = value;
+			}
+			remainingValues.push(update);
+			remainingBatches.push(batch);
+			remainingRebases.push(queue.rebases?.[index] ?? false);
+			continue;
+		}
+		value = apply(value, update);
+		// Once an earlier lane was skipped, every later applied update must remain
+		// as a lane-free rebase entry so the eventual transition observes the same
+		// ordering without replaying from the already-published urgent state.
+		if (skipped) {
+			remainingValues.push(update);
+			remainingBatches.push(null);
+			remainingRebases.push(true);
+		}
+	}
+	owner.appliedUpdates.set(slot, {
+		lane: true,
+		queue,
+		consumed,
+		baseState: skipped ? baseState : value,
+		remainingValues,
+		remainingBatches,
+		remainingRebases,
+	});
+	return value;
+}
+
+function hasUniversalUpdatesForAttempt(owner: UniversalOwnerRecord): boolean {
+	if (owner.updates.size === 0) return false;
+	const attempt = currentAttempt();
+	for (const queue of owner.updates.values()) {
+		const batches = queue.batches;
+		if (batches === undefined) {
+			if (queue.length !== 0) return true;
+			continue;
+		}
+		for (const batch of batches) {
+			if (batch === null || (attempt.transitionRender && attempt.transitionBatches.has(batch))) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 function cloneStateHook<T>(owner: DraftOwner, slot: unknown): StateHook<T> | undefined {
@@ -3183,11 +3532,9 @@ function cloneStateHook<T>(owner: DraftOwner, slot: unknown): StateHook<T> | und
 		hook = { ...hook };
 		owner.hooks.set(slot, hook);
 		owner.clonedHooks.add(slot);
-		const updates = owner.record.updates.get(slot);
-		if (updates !== undefined && updates.length > 0) {
-			hook.value = applyStateUpdates(hook.value, updates);
-			owner.appliedUpdates.set(slot, updates.length);
-		}
+		hook.value = applyUniversalHookUpdateQueue(owner, slot, 'state', hook.value, (value, update) =>
+			typeof update === 'function' ? (update as (previous: T) => T)(value) : (update as T),
+		);
 	}
 	return hook;
 }
@@ -3197,8 +3544,39 @@ function projectedStateValue<T>(record: UniversalOwnerRecord, slot: unknown, fal
 	const draftHook = draft?.hooks.get(slot) as StateHook<T> | undefined;
 	if (draftHook?.kind === 'state') return draftHook.value;
 	const hook = record.hooks.get(slot) as StateHook<T> | undefined;
-	const value = hook?.kind === 'state' ? hook.value : fallback;
-	return applyStateUpdates(value, record.updates.get(slot) ?? []);
+	const queue = record.updates.get(slot);
+	if (queue === undefined) return hook?.kind === 'state' ? hook.value : fallback;
+	let value =
+		queue.batches === undefined
+			? hook?.kind === 'state'
+				? hook.value
+				: fallback
+			: (queue.baseState as T);
+	for (const update of queue) {
+		value = typeof update === 'function' ? (update as (previous: T) => T)(value) : (update as T);
+	}
+	return value;
+}
+
+function visibleStateValue<T>(record: UniversalOwnerRecord, slot: unknown, fallback: T): T {
+	const draft = findDraftOwner(record);
+	const draftHook = draft?.hooks.get(slot) as StateHook<T> | undefined;
+	if (draftHook?.kind === 'state') return draftHook.value;
+	const hook = record.hooks.get(slot) as StateHook<T> | undefined;
+	const queue = record.updates.get(slot);
+	if (queue === undefined) return hook?.kind === 'state' ? hook.value : fallback;
+	let value =
+		queue.batches === undefined
+			? hook?.kind === 'state'
+				? hook.value
+				: fallback
+			: (queue.baseState as T);
+	for (let index = 0; index < queue.length; index++) {
+		if (queue.batches !== undefined && queue.batches[index] !== null) continue;
+		const update = queue[index];
+		value = typeof update === 'function' ? (update as (previous: T) => T)(value) : (update as T);
+	}
+	return value;
 }
 
 export function useState<T>(
@@ -3227,12 +3605,21 @@ export function useState<T>(
 					draft.needsRender = true;
 					return;
 				}
-				const previous = projectedStateValue(record, resolved, initialValue);
+				const transition = universalTransitionBatchForUpdate();
+				const previous =
+					transition === null
+						? visibleStateValue(record, resolved, initialValue)
+						: projectedStateValue(record, resolved, initialValue);
 				const next = typeof value === 'function' ? (value as (previous: T) => T)(previous) : value;
-				if (Object.is(next, previous)) return;
-				const updates = record.updates.get(resolved) ?? [];
-				updates.push(value);
-				record.updates.set(resolved, updates);
+				const queue = record.updates.get(resolved);
+				const needsUrgentRebase =
+					transition === null && queue?.batches?.some((batch) => batch !== null) === true;
+				if (Object.is(next, previous) && !needsUrgentRebase) return;
+				if (transition !== null) {
+					stageUniversalTransitionUpdate(transition, record, resolved, 'state', value);
+					return;
+				}
+				enqueueUniversalHookUpdate(record, resolved, 'state', value, null);
 				scheduleOwner(record, resolved);
 			},
 			get() {
@@ -3282,9 +3669,12 @@ export function useReducer<S, A, I = S>(
 					draft.needsRender = true;
 					return;
 				}
-				const updates = record.updates.get(resolved) ?? [];
-				updates.push(action);
-				record.updates.set(resolved, updates);
+				const transition = universalTransitionBatchForUpdate();
+				if (transition !== null) {
+					stageUniversalTransitionUpdate(transition, record, resolved, 'reducer', action);
+					return;
+				}
+				enqueueUniversalHookUpdate(record, resolved, 'reducer', action, null);
 				scheduleOwner(record, resolved);
 			},
 			get() {
@@ -3292,9 +3682,21 @@ export function useReducer<S, A, I = S>(
 				const draftHook = draft?.hooks.get(resolved) as ReducerHook<S, A> | undefined;
 				if (draftHook?.kind === 'reducer') return draftHook.value;
 				const committed = record.hooks.get(resolved) as ReducerHook<S, A> | undefined;
-				let value = committed?.kind === 'reducer' ? committed.value : initialValue;
-				for (const update of record.updates.get(resolved) ?? []) {
-					value = (committed?.reducer ?? reducer)(value, update as A);
+				const queue = record.updates.get(resolved);
+				let value =
+					queue === undefined
+						? committed?.kind === 'reducer'
+							? committed.value
+							: initialValue
+						: queue.batches === undefined
+							? committed?.kind === 'reducer'
+								? committed.value
+								: initialValue
+							: (queue.baseState as S);
+				if (queue !== undefined) {
+					for (const update of queue) {
+						value = (committed?.reducer ?? reducer)(value, update as A);
+					}
 				}
 				return value;
 			},
@@ -3306,11 +3708,13 @@ export function useReducer<S, A, I = S>(
 			hook = { ...hook };
 			owner.hooks.set(resolved, hook);
 			owner.clonedHooks.add(resolved);
-			const updates = owner.record.updates.get(resolved);
-			if (updates !== undefined && updates.length > 0) {
-				for (const action of updates) hook.value = reducer(hook.value, action as A);
-				owner.appliedUpdates.set(resolved, updates.length);
-			}
+			hook.value = applyUniversalHookUpdateQueue(
+				owner,
+				resolved,
+				'reducer',
+				hook.value,
+				(value, action) => reducer(value, action as A),
+			);
 		}
 		hook.reducer = reducer;
 	}
@@ -3511,12 +3915,51 @@ export function useSyncExternalStore<T>(
 	});
 }
 
-export function useDeferredValue<T>(value: T, _initialValue?: T, _slot?: unknown): T {
-	return value;
+export function useDeferredValue<T>(value: T, ...initialValueAndSlot: unknown[]): T {
+	const slot = initialValueAndSlot[initialValueAndSlot.length - 1];
+	const hasInitialValue = initialValueAndSlot.length >= 2;
+	const initialValue = initialValueAndSlot[0] as T;
+	const base = resolveHookSlot(slot);
+	return withSlot(base, () => {
+		const owner = currentDraftOwner();
+		const transitionRender = currentAttempt().transitionRender;
+		const inactive = owner.visibility !== 'visible' || owner.record.visibility !== 'visible';
+		const [deferred, setDeferred] = useState(
+			hasInitialValue && !transitionRender && !inactive ? initialValue : value,
+			'value',
+		);
+		if ((transitionRender || inactive) && !Object.is(deferred, value)) {
+			setDeferred(value);
+			return value;
+		}
+		useLayoutEffect(
+			() => {
+				if (Object.is(deferred, value)) return;
+				startTransition(() => setDeferred(value));
+			},
+			[value, deferred],
+			'defer',
+		);
+		return deferred;
+	});
 }
 
-export function useTransition(_slot?: unknown): [boolean, typeof startTransition] {
-	return [false, startTransition];
+export function useTransition(slot?: unknown): [boolean, typeof startTransition] {
+	const base = resolveHookSlot(slot);
+	return withSlot(base, () => {
+		const [pending, setPending] = useState(UNIVERSAL_TRANSITION_PENDING_COUNT > 0, 'pending');
+		useLayoutEffect(
+			() => {
+				const update = () => setPending(UNIVERSAL_TRANSITION_PENDING_COUNT > 0);
+				UNIVERSAL_TRANSITION_LISTENERS.add(update);
+				update();
+				return () => UNIVERSAL_TRANSITION_LISTENERS.delete(update);
+			},
+			[],
+			'subscribe',
+		);
+		return [pending, startTransition];
+	});
 }
 
 export function useActionState<State, Payload>(
@@ -3839,6 +4282,110 @@ export function warmChild(component: any, props: any): void {
 	}
 }
 
+function universalLazyResolvedProps(
+	component: UniversalComponent<any>,
+	props: any,
+): Readonly<Record<string, unknown>> {
+	const defaults = (component as any).defaultProps;
+	if (defaults == null || typeof defaults !== 'object') return props;
+	let resolved = props;
+	for (const key of Object.keys(defaults)) {
+		if (props == null || props[key] === undefined) {
+			if (resolved === props) resolved = props == null ? {} : { ...props };
+			resolved[key] = defaults[key];
+		}
+	}
+	return resolved;
+}
+
+function resolveUniversalLazyModule(module: unknown, renderer: string): UniversalComponent<any> {
+	let component = module;
+	if (module != null) {
+		const defaultExport = (module as { readonly default?: unknown }).default;
+		if (defaultExport !== undefined) component = defaultExport;
+	}
+	if (typeof component !== 'function' || (component as any)[LAZY_COMPONENT] === true) {
+		throw new Error(
+			`Universal lazy expected a component function or module default, got ${
+				(component as any)?.[LAZY_COMPONENT] === true ? 'a lazy component' : typeof component
+			}.`,
+		);
+	}
+	const resolved = component as UniversalComponent<any>;
+	const metadata = getComponentMetadata(resolved);
+	if (metadata === UNIVERSAL_LAZY_METADATA || metadata.id !== renderer) {
+		throw new Error(
+			`Universal lazy for renderer ${JSON.stringify(renderer)} cannot render component ${JSON.stringify(metadata.id)}.`,
+		);
+	}
+	return resolved;
+}
+
+/**
+ * Host-neutral code-splitting component. The loader runs at most once after it
+ * successfully returns a thenable; fulfillment and rejection are cached for
+ * every owner of the wrapper. Compiler-generated warm plans call `__warm`
+ * before an adjacent lazy child suspends, starting independent chunks in one
+ * stratum without putting module namespaces in hydration or host payloads.
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export function lazy<C extends UniversalComponent<any>>(
+	load: () => PromiseLike<{ default: C } | C>,
+): C {
+	let status: 'uninitialized' | 'pending' | 'fulfilled' | 'rejected' = 'uninitialized';
+	let result: unknown = null;
+	let thenable: UniversalTrackedThenable<{ default: C } | C> | null = null;
+
+	const initialize = (): void => {
+		if (status !== 'uninitialized') return;
+		try {
+			const loaded = load();
+			thenable = loaded as UniversalTrackedThenable<{ default: C } | C>;
+			loaded.then(
+				(module) => {
+					if (status === 'uninitialized' || status === 'pending') {
+						result = module;
+						status = 'fulfilled';
+					}
+				},
+				(error) => {
+					if (status === 'uninitialized' || status === 'pending') {
+						result = error;
+						status = 'rejected';
+					}
+				},
+			);
+		} catch (error) {
+			if (status === 'uninitialized') thenable = null;
+			throw error;
+		}
+		if (status === 'uninitialized') status = 'pending';
+	};
+
+	const wrapper = ((props: any, context: UniversalRenderContext): UniversalRenderable => {
+		if (status === 'uninitialized') initialize();
+		let settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
+		if (settledStatus === 'fulfilled') {
+			const component = resolveUniversalLazyModule(result, context.renderer);
+			return component(universalLazyResolvedProps(component, props), context);
+		}
+		if (settledStatus === 'rejected') throw result;
+		useBatch([thenable!]);
+		settledStatus = status as 'pending' | 'fulfilled' | 'rejected';
+		if (settledStatus === 'fulfilled') {
+			const component = resolveUniversalLazyModule(result, context.renderer);
+			return component(universalLazyResolvedProps(component, props), context);
+		}
+		if (settledStatus === 'rejected') throw result;
+		throw new UniversalSuspense(thenable!);
+	}) as UniversalComponent<any>;
+	Object.defineProperties(wrapper, {
+		[LAZY_COMPONENT]: { value: true },
+		__warm: { value: initialize },
+	});
+	return wrapper as C;
+}
+
 export function use<T>(usable: UniversalContext<T> | PromiseLike<T>): T {
 	currentDraftOwner();
 	if ((usable as UniversalContext<T>)?.$$kind === Symbol.for('octane.context')) {
@@ -3894,7 +4441,62 @@ export function useEffectEvent<T extends (...args: any[]) => any>(fn: T, slot?: 
 export function useDebugValue(): void {}
 
 export function startTransition(fn: () => void | Promise<unknown>): void {
-	void fn();
+	if (typeof fn !== 'function') throw new TypeError('startTransition expected a function.');
+	tickUniversalTransitionCount(+1);
+	const parentBatch = ACTIVE_UNIVERSAL_TRANSITION_BATCH;
+	const pendingBatch = IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH;
+	const batch = parentBatch ?? pendingBatch ?? createUniversalTransitionBatch();
+	const ownsBatch = parentBatch === null && pendingBatch === null;
+	batch.pendingSignals++;
+	ACTIVE_UNIVERSAL_TRANSITION_BATCH = batch;
+	UNIVERSAL_TRANSITION_DEPTH++;
+	let result: void | Promise<unknown>;
+	let then: ((resolve: () => void, reject: () => void) => unknown) | null = null;
+	try {
+		result = fn();
+		if ((result !== null && typeof result === 'object') || typeof result === 'function') {
+			const candidate = (result as any).then;
+			if (typeof candidate === 'function') then = candidate;
+		}
+		if (then !== null) {
+			batch.pendingActions++;
+			IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH = batch;
+		}
+	} catch (error) {
+		batch.pendingSignals--;
+		tickUniversalTransitionCount(-1);
+		if (ownsBatch) {
+			batch.closed = true;
+			queueUniversalTransitionPromotion(batch);
+		}
+		throw error;
+	} finally {
+		ACTIVE_UNIVERSAL_TRANSITION_BATCH = parentBatch;
+		UNIVERSAL_TRANSITION_DEPTH--;
+	}
+	if (ownsBatch) batch.closed = true;
+	if (then !== null) {
+		UNIVERSAL_ASYNC_TRANSITION_COUNT++;
+		let settled = false;
+		const settle = () => {
+			if (settled) return;
+			settled = true;
+			batch.pendingActions--;
+			UNIVERSAL_ASYNC_TRANSITION_COUNT--;
+			if (batch.pendingActions === 0 && IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH === batch) {
+				IN_FLIGHT_UNIVERSAL_TRANSITION_BATCH = null;
+			}
+			queueUniversalTransitionPromotion(batch);
+		};
+		try {
+			then.call(result, settle, settle);
+		} catch (error) {
+			settle();
+			throw error;
+		}
+	} else {
+		queueUniversalTransitionPromotion(batch);
+	}
 }
 
 export function requestFormReset(): void {
@@ -3902,11 +4504,111 @@ export function requestFormReset(): void {
 	// layer reset behavior above this host-neutral no-op.
 }
 
+function universalShallowEqual(previous: unknown, next: unknown): boolean {
+	if (Object.is(previous, next)) return true;
+	if (
+		previous === null ||
+		next === null ||
+		typeof previous !== 'object' ||
+		typeof next !== 'object'
+	) {
+		return false;
+	}
+	const previousKeys = Object.keys(previous);
+	const nextKeys = Object.keys(next);
+	if (previousKeys.length !== nextKeys.length) return false;
+	for (const key of previousKeys) {
+		if (
+			!Object.prototype.hasOwnProperty.call(next, key) ||
+			!Object.is((previous as any)[key], (next as any)[key])
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function universalComponentRevision(component: UniversalComponent<any>): number {
+	const revision = (component as any)[UNIVERSAL_COMPONENT_REVISION];
+	return typeof revision === 'number' ? revision : 0;
+}
+
+function mergeMemoContextReads(contextReads: Map<UniversalContext<any>, unknown> | null): void {
+	if (CURRENT_MEMO_CONTEXT_READS === null || contextReads === null) return;
+	for (const [context, value] of contextReads) CURRENT_MEMO_CONTEXT_READS.set(context, value);
+}
+
 export function memo<P>(
 	component: UniversalComponent<P>,
-	_compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
+	compare?: (previous: Readonly<P>, next: Readonly<P>) => boolean,
 ): UniversalComponent<P> {
-	return component;
+	if (typeof component !== 'function') throw new TypeError('memo expected a component function.');
+	if (compare !== undefined && typeof compare !== 'function') {
+		throw new TypeError('memo compare must be a function.');
+	}
+	const metadata = getComponentMetadata(component);
+	const equal = compare ?? universalShallowEqual;
+	const memoSlot = Symbol('octane.universal.component-memo');
+	const renderMemo = (props: P, context: UniversalRenderContext) => {
+		const owner = currentDraftOwner();
+		const previous = owner.record.hooks.get(memoSlot) as ComponentMemoHook<P> | undefined;
+		const revision = universalComponentRevision(component);
+		let contextsEqual = true;
+		if (
+			previous?.kind === 'component-memo' &&
+			previous.component === component &&
+			previous.revision === revision &&
+			!hasUniversalUpdatesForAttempt(owner.record) &&
+			equal(previous.props, props)
+		) {
+			for (const [readContext, previousValue] of previous.contextReads ?? []) {
+				if (!Object.is(readOwnerContext(owner, readContext, false), previousValue)) {
+					contextsEqual = false;
+					break;
+				}
+			}
+			if (contextsEqual) {
+				owner.seenEffects = [...owner.record.effectOrder];
+				owner.hooks.set(memoSlot, previous);
+				mergeMemoContextReads(previous.contextReads);
+				return previous.value;
+			}
+		}
+		const parentContextReads = CURRENT_MEMO_CONTEXT_READS;
+		const contextReads = new Map<UniversalContext<any>, unknown>();
+		CURRENT_MEMO_CONTEXT_READS = contextReads;
+		let value: UniversalRenderable;
+		try {
+			value = component(props, context);
+		} finally {
+			CURRENT_MEMO_CONTEXT_READS = parentContextReads;
+		}
+		mergeMemoContextReads(contextReads.size === 0 ? null : contextReads);
+		owner.hooks.set(memoSlot, {
+			kind: 'component-memo',
+			component,
+			revision,
+			props,
+			value,
+			contextReads: contextReads.size === 0 ? null : contextReads,
+		});
+		return value;
+	};
+	let wrapper: UniversalComponent<P>;
+	if (metadata === UNIVERSAL_LAZY_METADATA) {
+		// The wrapper remains renderer-neutral until the lazy module resolves; the
+		// wrapped lazy component still owns loader caching and renderer validation.
+		wrapper = renderMemo as UniversalComponent<P>;
+		Object.defineProperty(wrapper, LAZY_COMPONENT, { value: true });
+	} else {
+		wrapper = defineUniversalComponent<P>(metadata.id, renderMemo, { module: metadata.module });
+	}
+	Object.defineProperty(wrapper, UNIVERSAL_COMPONENT_REVISION, {
+		get: () => universalComponentRevision(component),
+	});
+	__profileComponentSource(wrapper, component);
+	if ((component as any).__warm !== undefined) (wrapper as any).__warm = (component as any).__warm;
+	return wrapper;
 }
 
 export function createPortal(children: UniversalRenderable, target: unknown): UniversalPortalValue {
@@ -4113,6 +4815,12 @@ interface UniversalHostAttachmentState {
 	flushScheduled: boolean;
 }
 
+interface UniversalPortalHandleEntry {
+	readonly handle: UniversalPortalTargetHandle;
+	registrations: number;
+	pending: number;
+}
+
 class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any> {
 	readonly renderer: string;
 	private readonly rootRecord: LogicalRecord;
@@ -4120,9 +4828,10 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private readonly resourceRoot = NEXT_RESOURCE_ROOT++;
 	private readonly portalRoot = NEXT_PORTAL_ROOT++;
 	private readonly transportRoot = NEXT_TRANSPORT_ROOT++;
-	private readonly portalHandles = new Map<string | number, UniversalPortalTargetHandle>();
+	private readonly portalHandles = new Map<string | number, UniversalPortalHandleEntry>();
 	private owner: UniversalOwnerRecord | null = null;
 	private bridge: BoundaryOwner | null = null;
+	private bridgeContextReads: Map<UniversalContext<any>, unknown> | null = null;
 	private unmounted = false;
 	private unmounting = false;
 	private unmountPromise: Promise<void> | null = null;
@@ -4139,12 +4848,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	private readonly publishedListeners = new Set<number>();
 	private pending: UniversalTransactionImpl<Container, PublicInstance> | null = null;
 	private suspended: UniversalSuspendedAttemptImpl | null = null;
+	private urgentBoundarySuspension: UniversalSuspendedAttemptImpl | null = null;
 	private awaitingReplay: SuspendedMemoReplay | null = null;
 	private queuedReplay: SuspendedMemoReplay | null = null;
 	private rootRetryAttempt: UniversalSuspendedAttemptImpl | null = null;
 	private lastComponent: UniversalComponent<any> | null = null;
 	private lastProps: any;
+	private retryRenderInput: readonly [UniversalComponent<any>, any] | null = null;
 	private scheduled = false;
+	private scheduledUrgent = false;
+	private scheduledPreparationDepth = 0;
+	private readonly scheduledTransitionBatches = new Set<UniversalTransitionBatch>();
+	private readonly unattemptedTransitionBatches = new Set<UniversalTransitionBatch>();
 	private eventScopeDepth = 0;
 	private eventScopePriority: UniversalEventPriority | null = null;
 	private eventScopeHandlers: ReadonlyMap<number, CommittedEvent> | null = null;
@@ -4535,8 +5250,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	readBridgeContext<T>(context: UniversalContext<T>): T {
-		if (this.bridge === null) return context.defaultValue;
-		return this.bridge.readContext(context);
+		const value = this.bridge === null ? context.defaultValue : this.bridge.readContext(context);
+		if (this.bridge !== null && CURRENT_ATTEMPT?.root === this) {
+			(CURRENT_ATTEMPT.bridgeContextReads ??= new Map()).set(context, value);
+		}
+		return value;
 	}
 
 	rootRecordForRetention(): LogicalRecord {
@@ -4580,22 +5298,42 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		);
 	}
 
-	private createPortalTargetHandle(id: string | number): UniversalPortalTargetHandle {
+	private acquirePortalTargetHandle(
+		id: string | number,
+		pendingEntries: UniversalPortalHandleEntry[],
+	): UniversalPortalTargetHandle {
 		if ((typeof id !== 'string' && typeof id !== 'number') || String(id).length === 0) {
 			throw new TypeError(
 				'A universal portal target handle ID must be a non-empty string or number.',
 			);
 		}
-		const previous = this.portalHandles.get(id);
-		if (previous !== undefined) return previous;
-		const handle = Object.freeze({
-			$$kind: 'octane.universal.portal-target' as const,
-			renderer: this.renderer,
-			root: this.portalRoot,
-			id,
-		});
-		this.portalHandles.set(id, handle);
-		return handle;
+		let entry = this.portalHandles.get(id);
+		if (entry === undefined) {
+			entry = {
+				handle: Object.freeze({
+					$$kind: 'octane.universal.portal-target' as const,
+					renderer: this.renderer,
+					root: this.portalRoot,
+					id,
+				}),
+				registrations: 0,
+				pending: 0,
+			};
+			this.portalHandles.set(id, entry);
+		}
+		entry.pending++;
+		pendingEntries.push(entry);
+		return entry.handle;
+	}
+
+	private releasePortalHandleEntry(entry: UniversalPortalHandleEntry): void {
+		if (
+			entry.registrations === 0 &&
+			entry.pending === 0 &&
+			this.portalHandles.get(entry.handle.id) === entry
+		) {
+			this.portalHandles.delete(entry.handle.id);
+		}
 	}
 
 	private preparePortalTarget(target: unknown): UniversalPortalTargetRegistration {
@@ -4605,46 +5343,60 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				`Universal renderer ${JSON.stringify(this.renderer)} does not declare the portal capability.`,
 			);
 		}
-		const registration = capability.prepareTarget({
-			container: this.container,
-			renderer: this.renderer,
-			target,
-			transported: this.transport !== null,
-			createPortalTargetHandle: (id) => this.createPortalTargetHandle(id),
-		});
-		const release =
-			registration !== null &&
-			typeof registration === 'object' &&
-			typeof registration.release === 'function'
-				? registration.release.bind(registration)
-				: null;
+		const pendingEntries: UniversalPortalHandleEntry[] = [];
+		let release: (() => void) | null = null;
 		try {
+			const registration = capability.prepareTarget({
+				container: this.container,
+				renderer: this.renderer,
+				target,
+				transported: this.transport !== null,
+				createPortalTargetHandle: (id) => this.acquirePortalTargetHandle(id, pendingEntries),
+			});
+			release =
+				registration !== null &&
+				typeof registration === 'object' &&
+				typeof registration.release === 'function'
+					? registration.release.bind(registration)
+					: null;
 			if (registration === null || typeof registration !== 'object' || release === null) {
 				throw new TypeError(
 					'A universal portal capability must return a valid target registration.',
 				);
 			}
 			const handle = registration.handle;
+			const entry =
+				handle !== null && typeof handle === 'object'
+					? this.portalHandles.get(handle.id)
+					: undefined;
 			if (
 				handle?.$$kind !== 'octane.universal.portal-target' ||
 				handle.renderer !== this.renderer ||
 				handle.root !== this.portalRoot ||
 				(typeof handle.id !== 'string' && typeof handle.id !== 'number') ||
-				this.portalHandles.get(handle.id) !== handle
+				entry?.handle !== handle
 			) {
 				throw new Error(
 					`Universal portal target handle does not belong to renderer ${JSON.stringify(this.renderer)} and this root.`,
 				);
 			}
+			const registrationRelease = release;
 			let released = false;
-			return Object.freeze({
+			const prepared = Object.freeze({
 				handle,
-				release() {
+				release: () => {
 					if (released) return;
 					released = true;
-					release();
+					try {
+						registrationRelease();
+					} finally {
+						entry.registrations--;
+						this.releasePortalHandleEntry(entry);
+					}
 				},
 			});
+			entry.registrations++;
+			return prepared;
 		} catch (error) {
 			try {
 				release?.();
@@ -4652,6 +5404,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				// Preserve the capability-contract diagnostic that invalidated the registration.
 			}
 			throw error;
+		} finally {
+			for (const entry of pendingEntries) {
+				entry.pending--;
+				this.releasePortalHandleEntry(entry);
+			}
 		}
 	}
 
@@ -4734,9 +5491,11 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		this.eventScopeDepth = 1;
 		this.eventScopePriority = priority;
 		this.eventScopeHandlers = this.handlers;
+		if (priority === 'discrete') UNIVERSAL_DISCRETE_EVENT_DEPTH++;
 		try {
 			return run();
 		} finally {
+			if (priority === 'discrete') UNIVERSAL_DISCRETE_EVENT_DEPTH--;
 			this.eventScopeDepth = 0;
 			this.eventScopePriority = null;
 			this.eventScopeHandlers = null;
@@ -4836,6 +5595,73 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		return () => runOwnedCommit(callback.owner, cleanup);
 	}
 
+	private scheduledRenderInput(): readonly [UniversalComponent<any>, any] | null {
+		// A transition retry can inherit newer explicit props from an urgent
+		// suspension. Preserve that desired input if another urgent state update
+		// arrives before the resource settles; falling back to lastProps would
+		// accidentally recommit the older accepted input.
+		const pendingInput =
+			this.suspended ?? (this.queuedReplay?.active === true ? this.queuedReplay : null);
+		const component = pendingInput?.component ?? this.retryRenderInput?.[0] ?? this.lastComponent;
+		if (component === null) return null;
+		return [component, pendingInput?.props ?? this.retryRenderInput?.[1] ?? this.lastProps];
+	}
+
+	private retryRejectedScheduledAttempt(
+		attempt: UniversalPreparedAttempt,
+		component: UniversalComponent<any>,
+		props: any,
+	): void {
+		if (attempt.status !== 'aborted' || this.unmounted || this.unmounting) return;
+		// A pre-ACK rejection publishes neither the cloned hook cells nor their
+		// consumed queues. Keep the desired input and raise a fresh urgent pass;
+		// post-ACK errors report a committed status and must never replay. A
+		// transition-only abort may take one harmless urgent pass before its requeued
+		// lane runs, which is preferable to missing coalesced lane-free work.
+		this.retryRenderInput = [component, props];
+		this.schedule();
+	}
+
+	private restoreRejectedReplay(
+		attempt: UniversalPreparedAttempt,
+		replay: SuspendedMemoReplay,
+	): void {
+		if (attempt.status !== 'aborted' || this.unmounted || this.unmounting) return;
+		if (this.queuedReplay !== null && this.queuedReplay !== replay && this.queuedReplay.active) {
+			return;
+		}
+		// Transaction.finish() requeues transition batches after a pre-ACK abort.
+		// A transition replay can coalesce all of them into its cached retry. An
+		// urgent replay must remain urgent: suppress the transition callback until
+		// this replay commits or suspends, then ensureScheduledTransitionWork()
+		// restores it without withholding already-prepared urgent content.
+		let transitionBatches: ReadonlySet<UniversalTransitionBatch> = replay.transitionBatches;
+		if (replay.transitionRender) {
+			const merged = new Set(replay.transitionBatches);
+			for (const batch of this.takeScheduledTransitionBatches()) merged.add(batch);
+			transitionBatches = merged;
+		} else {
+			for (const batch of replay.transitionBatches) {
+				this.scheduledTransitionBatches.delete(batch);
+				this.unattemptedTransitionBatches.delete(batch);
+			}
+		}
+		if (!this.scheduledUrgent) {
+			this.scheduled = false;
+			SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+		}
+		const restored: SuspendedMemoReplay = {
+			entries: replay.entries,
+			component: replay.component,
+			props: replay.props,
+			transitionBatches,
+			transitionRender: replay.transitionRender,
+			active: true,
+			asyncWorkQueued: false,
+		};
+		this.queueReplay(restored);
+	}
+
 	flushScheduledWork(): void {
 		if (!this.scheduled) return;
 		// A transported teardown is provisional until acknowledgement. Keep work
@@ -4863,12 +5689,23 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				}
 				if (this.unmounting) await this.waitForProvisionalUnmount();
 				if (this.unmounted) return;
-				const component = this.lastComponent;
-				if (component === null) return;
-				await this.renderAsync(component, this.lastProps);
+				const input = this.scheduledRenderInput();
+				if (input === null) return;
+				const attempt = this.__prepareScheduled(input[0], input[1]);
+				if (attempt.status === 'prepared') {
+					try {
+						await attempt.commitAsync();
+					} catch (error) {
+						this.retryRejectedScheduledAttempt(attempt, input[0], input[1]);
+						throw error;
+					}
+				}
 			});
 		} else {
-			this.render(this.lastComponent, this.lastProps);
+			const input = this.scheduledRenderInput();
+			if (input === null) return;
+			const attempt = this.__prepareScheduled(input[0], input[1]);
+			if (attempt.status === 'prepared') attempt.commit();
 		}
 	}
 
@@ -4886,19 +5723,195 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	}
 
 	schedule(): void {
-		if (this.unmounted || this.owner?.disposed || this.lastComponent === null || this.scheduled)
-			return;
+		if (this.unmounted || this.owner?.disposed || this.lastComponent === null) return;
+		this.scheduledUrgent = true;
+		if (this.scheduled) return;
 		this.scheduled = true;
 		SCHEDULED_UNIVERSAL_ROOTS.add(this);
 		if (this.eventScopeDepth === 0 && UNIVERSAL_SYNC_DEPTH === 0) this.queueScheduledWork();
 	}
 
-	private cancelSuspendedReplays(): void {
+	/** @internal Associates promoted transition work with its accepting transaction. */
+	scheduleTransition(batch: UniversalTransitionBatch): void {
+		if (batch.settled || this.unmounted || this.owner?.disposed || this.lastComponent === null) {
+			finishUniversalTransitionRoot(batch, this);
+			return;
+		}
+		this.scheduledTransitionBatches.add(batch);
+		// A newly promoted batch gets one attempt even when its target currently
+		// belongs to retained Suspense content. The update itself may be what makes
+		// that content renderable again; only a residual queue after an accepted
+		// attempt proves that retained work is genuinely blocked.
+		this.unattemptedTransitionBatches.add(batch);
+		this.ensureScheduledTransitionWork();
+	}
+
+	private ensureScheduledTransitionWork(): void {
+		if (
+			this.scheduledTransitionBatches.size === 0 ||
+			this.unmounted ||
+			this.owner?.disposed ||
+			this.lastComponent === null
+		) {
+			return;
+		}
+		let runnable = false;
+		for (const batch of [...this.scheduledTransitionBatches]) {
+			const state = this.transitionQueueState(batch);
+			if (state === 'none') {
+				this.scheduledTransitionBatches.delete(batch);
+				finishUniversalTransitionRoot(batch, this);
+			} else if (state === 'runnable') {
+				runnable = true;
+			}
+		}
+		if (!runnable) return;
+		if (this.scheduled) return;
+		this.scheduled = true;
+		SCHEDULED_UNIVERSAL_ROOTS.add(this);
+		if (this.eventScopeDepth === 0 && UNIVERSAL_SYNC_DEPTH === 0) this.queueScheduledWork();
+	}
+
+	private requeueTransitionBatches(batches: ReadonlySet<UniversalTransitionBatch>): void {
+		for (const batch of batches) {
+			if (batch.settled) continue;
+			this.scheduledTransitionBatches.add(batch);
+			// An aborted or rejected attempt published no state. Its queues must get a
+			// fresh chance even if the last accepted owner tree is Suspense-hidden.
+			this.unattemptedTransitionBatches.add(batch);
+		}
+	}
+
+	private transitionQueueState(batch: UniversalTransitionBatch): 'none' | 'blocked' | 'runnable' {
+		let state: 'none' | 'blocked' | 'runnable' = 'none';
+		const needsFirstAttempt = this.unattemptedTransitionBatches.has(batch);
+		const visit = (owner: UniversalOwnerRecord): void => {
+			if (state === 'runnable') return;
+			for (const queue of owner.updates.values()) {
+				if (queue.batches?.includes(batch) !== true) continue;
+				state =
+					needsFirstAttempt || owner.visibility !== 'suspense-hidden' ? 'runnable' : 'blocked';
+				if (state === 'runnable') return;
+			}
+			for (const child of owner.children) visit(child);
+		};
+		if (this.owner !== null) visit(this.owner);
+		return state;
+	}
+
+	private detachCompletedTransitionBatch(batch: UniversalTransitionBatch): void {
+		const visit = (owner: UniversalOwnerRecord): void => {
+			// Retained Suspense owners were not executed by the accepted attempt. Keep
+			// their lane provenance so the boundary retry can finish the same batch.
+			if (owner.visibility !== 'suspense-hidden') {
+				for (const queue of owner.updates.values()) {
+					const batches = queue.batches;
+					if (batches === undefined || !batches.includes(batch)) continue;
+					for (let index = 0; index < batches.length; index++) {
+						if (batches[index] === batch) batches[index] = null;
+					}
+					// Keep lane metadata even when every tag is now null. A conditional hook
+					// may already have published later urgent entries as rebase clones. When
+					// the slot reappears, replaying from baseState preserves chronological
+					// replacement and functional-update ordering without double-applying them.
+				}
+			}
+			for (const child of owner.children) visit(child);
+		};
+		if (this.owner !== null) visit(this.owner);
+	}
+
+	private completeTransitionBatches(batches: ReadonlySet<UniversalTransitionBatch>): void {
+		for (const batch of batches) {
+			if (batch.settled) continue;
+			// A tagged update left on an owner that participated in the accepted tree
+			// belongs to a currently inactive conditional hook. Settle this transition
+			// without losing the update: it becomes ordinary pending work and applies if
+			// that hook call site appears again. Activity-hidden owners still execute;
+			// only Suspense-retained trees remain batch-blocking.
+			this.detachCompletedTransitionBatch(batch);
+			if (this.transitionQueueState(batch) === 'none') {
+				finishUniversalTransitionRoot(batch, this);
+			} else {
+				this.scheduledTransitionBatches.add(batch);
+			}
+		}
+	}
+
+	private takeScheduledTransitionBatches(): ReadonlySet<UniversalTransitionBatch> {
+		if (this.scheduledTransitionBatches.size === 0) return EMPTY_UNIVERSAL_TRANSITION_BATCHES;
+		const batches = new Set(this.scheduledTransitionBatches);
+		this.scheduledTransitionBatches.clear();
+		for (const batch of batches) this.unattemptedTransitionBatches.delete(batch);
+		return batches;
+	}
+
+	private finishTransitionBatches(batches: ReadonlySet<UniversalTransitionBatch>): void {
+		for (const batch of batches) finishUniversalTransitionRoot(batch, this);
+	}
+
+	/** @internal Drops canceled lane entries without disturbing later rebase updates. */
+	discardTransitionBatch(batch: UniversalTransitionBatch): void {
+		this.scheduledTransitionBatches.delete(batch);
+		this.unattemptedTransitionBatches.delete(batch);
+		for (const owner of batch.updates.keys()) {
+			if (owner.root === this) batch.updates.delete(owner);
+		}
+		const visit = (owner: UniversalOwnerRecord): void => {
+			for (const [slot, queue] of owner.updates) {
+				const batches = queue.batches;
+				if (batches === undefined || !batches.includes(batch)) continue;
+				const values: unknown[] = [];
+				const remainingBatches: (UniversalTransitionBatch | null)[] = [];
+				const rebases: boolean[] = [];
+				for (let index = 0; index < queue.length; index++) {
+					if (batches[index] === batch) continue;
+					values.push(queue[index]);
+					remainingBatches.push(batches[index]);
+					rebases.push(queue.rebases?.[index] ?? false);
+				}
+				if (values.length === 0) {
+					owner.updates.delete(slot);
+				} else if (
+					remainingBatches.every((remaining) => remaining === null) &&
+					rebases.every(Boolean)
+				) {
+					// Every survivor is an urgent rebase already reflected in the committed
+					// hook. With no lane update left to replay, retaining them would apply the
+					// same urgent work twice.
+					owner.updates.delete(slot);
+				} else {
+					queue.length = 0;
+					queue.push(...values);
+					queue.batches = remainingBatches;
+					if (rebases.some(Boolean)) queue.rebases = rebases;
+					else delete queue.rebases;
+				}
+			}
+			for (const child of owner.children) visit(child);
+		};
+		if (this.owner !== null) visit(this.owner);
+	}
+
+	private cancelSuspendedReplays(preserveTransitions = false): void {
+		if (
+			this.awaitingReplay === null &&
+			this.queuedReplay === null &&
+			this.rootRetryAttempt === null
+		) {
+			return;
+		}
+		const batches = new Set<UniversalTransitionBatch>();
+		for (const batch of this.awaitingReplay?.transitionBatches ?? []) batches.add(batch);
+		for (const batch of this.queuedReplay?.transitionBatches ?? []) batches.add(batch);
+		for (const batch of this.rootRetryAttempt?.transitionBatches ?? []) batches.add(batch);
 		if (this.awaitingReplay !== null) this.awaitingReplay.active = false;
 		if (this.queuedReplay !== null) this.queuedReplay.active = false;
 		this.awaitingReplay = null;
 		this.queuedReplay = null;
 		this.rootRetryAttempt = null;
+		if (preserveTransitions) this.requeueTransitionBatches(batches);
+		else this.finishTransitionBatches(batches);
 	}
 
 	private runReplay(replay: SuspendedMemoReplay): void {
@@ -4918,8 +5931,34 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					this.queuedReplay = null;
 					replay.active = false;
 					this.rootRetryAttempt = null;
-					const attempt = this.prepareWithReplay(replay.component, replay.props, replay.entries);
-					if (attempt.status === 'prepared') await attempt.commitAsync();
+					let attempt: UniversalPreparedAttempt;
+					try {
+						attempt = this.prepareWithReplay(
+							replay.component,
+							replay.props,
+							replay.entries,
+							replay.transitionBatches,
+							replay.transitionRender,
+						);
+					} catch (error) {
+						const batches = new Set(replay.transitionBatches);
+						for (const batch of this.takeScheduledTransitionBatches()) batches.add(batch);
+						this.finishTransitionBatches(batches);
+						throw error;
+					}
+					// Commit errors have transaction-owned acceptance semantics. In
+					// particular, do not cancel unrelated blocked transitions after a
+					// post-accept lifecycle or host fault.
+					if (attempt.status === 'prepared') {
+						try {
+							await attempt.commitAsync();
+						} catch (error) {
+							this.restoreRejectedReplay(attempt, replay);
+							throw error;
+						}
+					} else {
+						this.ensureScheduledTransitionWork();
+					}
 				} finally {
 					replay.asyncWorkQueued = false;
 				}
@@ -4929,15 +5968,33 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		this.queuedReplay = null;
 		replay.active = false;
 		this.rootRetryAttempt = null;
-		const attempt = this.prepareWithReplay(replay.component, replay.props, replay.entries);
+		let attempt: UniversalPreparedAttempt;
+		try {
+			attempt = this.prepareWithReplay(
+				replay.component,
+				replay.props,
+				replay.entries,
+				replay.transitionBatches,
+				replay.transitionRender,
+			);
+		} catch (error) {
+			const batches = new Set(replay.transitionBatches);
+			for (const batch of this.takeScheduledTransitionBatches()) batches.add(batch);
+			this.finishTransitionBatches(batches);
+			throw error;
+		}
 		if (attempt.status === 'prepared') attempt.commit();
+		else this.ensureScheduledTransitionWork();
 	}
 
 	private queueReplay(replay: SuspendedMemoReplay): void {
 		if (!replay.active || this.unmounted) return;
 		if (this.awaitingReplay === replay) this.awaitingReplay = null;
 		if (this.queuedReplay === replay) return;
-		if (this.queuedReplay !== null) this.queuedReplay.active = false;
+		if (this.queuedReplay !== null) {
+			this.queuedReplay.active = false;
+			this.finishTransitionBatches(this.queuedReplay.transitionBatches);
+		}
 		this.queuedReplay = replay;
 		if (this.bridge !== null) {
 			// Keep the cache published before invalidating the owning renderer. Its
@@ -4988,6 +6045,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			entries,
 			component,
 			props,
+			transitionBatches: EMPTY_UNIVERSAL_TRANSITION_BATCHES,
+			transitionRender: false,
 			active: true,
 			asyncWorkQueued: false,
 		};
@@ -5005,6 +6064,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		component: UniversalComponent<any>,
 		props: any,
 		replayEntries: readonly SuspendedMemoEntry[],
+		transitionBatches: ReadonlySet<UniversalTransitionBatch>,
+		transitionRender: boolean,
+		bridgeContextReads: ReadonlyMap<UniversalContext<any>, unknown> | null,
 	): UniversalSuspendedAttempt {
 		const attempt = new UniversalSuspendedAttemptImpl(
 			this,
@@ -5012,12 +6074,31 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			component,
 			props,
 			replayEntries,
+			transitionBatches,
+			transitionRender,
+			bridgeContextReads,
 		);
 		this.suspended = attempt;
+		if (!transitionRender && this.bridge !== null) {
+			this.urgentBoundarySuspension = attempt;
+			const releaseProjection = () => {
+				if (this.urgentBoundarySuspension !== attempt) return;
+				this.urgentBoundarySuspension = null;
+				this.ensureScheduledTransitionWork();
+			};
+			thenable.then(releaseProjection, releaseProjection);
+		}
 		return attempt;
 	}
 
-	finishSuspension(attempt: UniversalSuspendedAttemptImpl, schedule: boolean): void {
+	finishSuspension(
+		attempt: UniversalSuspendedAttemptImpl,
+		schedule: boolean,
+		preserveTransitions = false,
+	): void {
+		if (schedule && this.urgentBoundarySuspension === attempt) {
+			this.urgentBoundarySuspension = null;
+		}
 		if (this.suspended === attempt) this.suspended = null;
 		else if (this.rootRetryAttempt !== attempt) return;
 		if (!schedule || this.unmounted) {
@@ -5026,6 +6107,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				if (this.queuedReplay !== null) this.queuedReplay.active = false;
 				this.queuedReplay = null;
 			}
+			if (preserveTransitions) this.requeueTransitionBatches(attempt.transitionBatches);
+			else this.finishTransitionBatches(attempt.transitionBatches);
 			return;
 		}
 		this.rootRetryAttempt = attempt;
@@ -5033,6 +6116,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			entries: attempt.replayEntries,
 			component: attempt.component,
 			props: attempt.props,
+			transitionBatches: attempt.transitionBatches,
+			transitionRender: attempt.transitionRender,
 			active: true,
 			asyncWorkQueued: false,
 		});
@@ -5071,33 +6156,142 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		for (const draft of owners) {
 			if (committed.has(draft.record)) continue;
 			draft.record.disposed = true;
+			draft.record.updates.clear();
 			for (const hook of draft.hooks.values()) {
 				if (hook.kind === 'effect-event') hook.cell.active = false;
 			}
 		}
 	}
 
+	/** @internal Preserves scheduler lane provenance through host-boundary renders. */
+	__prepareScheduled(component: UniversalComponent<any>, props: any): UniversalPreparedAttempt {
+		this.scheduledPreparationDepth++;
+		try {
+			return this.prepare(component, props);
+		} finally {
+			this.scheduledPreparationDepth--;
+		}
+	}
+
+	/** @internal Separates renderer-root invalidation from coalesced host input updates. */
+	__prepareBoundaryScheduled(
+		component: UniversalComponent<any>,
+		props: any,
+	): {
+		readonly attempt: UniversalPreparedAttempt;
+		readonly transition: boolean;
+		readonly projectedThenable: PromiseLike<unknown> | null;
+	} {
+		const urgentSuspension =
+			this.suspended !== null && !this.suspended.transitionRender ? this.suspended : null;
+		const urgentProjection = this.urgentBoundarySuspension;
+		const previousUrgentAttempt = urgentProjection ?? urgentSuspension;
+		const previousComponent = previousUrgentAttempt?.component ?? this.lastComponent;
+		const previousProps = previousUrgentAttempt?.props ?? this.lastProps;
+		const previousContextReads =
+			previousUrgentAttempt?.bridgeContextReads ?? this.bridgeContextReads;
+		let inputsChanged =
+			component !== previousComponent || !universalShallowEqual(previousProps, props);
+		if (!inputsChanged && previousContextReads !== null) {
+			for (const [context, previousValue] of previousContextReads) {
+				const value =
+					this.bridge === null ? context.defaultValue : this.bridge.readContext(context);
+				if (!Object.is(value, previousValue)) {
+					inputsChanged = true;
+					break;
+				}
+			}
+		}
+		const urgentReplay = this.queuedReplay?.active === true && !this.queuedReplay.transitionRender;
+		if (urgentProjection !== null && !this.scheduledUrgent && !urgentReplay && !inputsChanged) {
+			return {
+				attempt: urgentProjection,
+				transition: false,
+				projectedThenable: urgentProjection.thenable,
+			};
+		}
+		const transition =
+			urgentSuspension === null && !this.scheduledUrgent && !urgentReplay && !inputsChanged;
+		return {
+			attempt: transition
+				? this.__prepareScheduled(component, props)
+				: this.prepare(component, props),
+			transition,
+			projectedThenable: null,
+		};
+	}
+
 	prepare(component: UniversalComponent<any>, props: any): UniversalPreparedAttempt {
+		const scheduledUrgent = this.scheduledUrgent || this.scheduledPreparationDepth === 0;
+		this.scheduledUrgent = false;
+		if (scheduledUrgent) this.urgentBoundarySuspension = null;
 		const bridgeReplay = this.bridge === null ? null : this.queuedReplay;
-		if (bridgeReplay !== null && bridgeReplay.component === component && bridgeReplay.active) {
+		if (
+			!scheduledUrgent &&
+			bridgeReplay !== null &&
+			bridgeReplay.component === component &&
+			bridgeReplay.active
+		) {
+			const scheduledTransitions = this.takeScheduledTransitionBatches();
 			this.queuedReplay = null;
 			bridgeReplay.active = false;
 			this.rootRetryAttempt = null;
-			return this.prepareWithReplay(component, props, bridgeReplay.entries);
+			const transitions = new Set([...bridgeReplay.transitionBatches, ...scheduledTransitions]);
+			try {
+				return this.prepareWithReplay(
+					component,
+					props,
+					bridgeReplay.entries,
+					transitions,
+					!scheduledUrgent && (bridgeReplay.transitionRender || scheduledTransitions.size !== 0),
+				);
+			} catch (error) {
+				this.finishTransitionBatches(transitions);
+				throw error;
+			}
 		}
-		this.suspended?.abort();
-		this.cancelSuspendedReplays();
+		// A fresh attempt invalidates the old replay cache, but its transition
+		// updates remain queued. Non-urgent work consumes every promoted batch in
+		// one ordered rebase; urgent work leaves them scheduled for the next pass.
+		this.suspended?.abort(true);
+		this.cancelSuspendedReplays(true);
+		const scheduledTransitions = scheduledUrgent
+			? EMPTY_UNIVERSAL_TRANSITION_BATCHES
+			: this.takeScheduledTransitionBatches();
 		// A fresh render is a new suspension episode. Keep consumed warm entries
 		// across automatic retries, but never let their tombstones suppress a later
 		// update or remount that returns to the same dependency values.
 		UNIVERSAL_WARM_CACHES.delete(this);
-		return this.prepareWithReplay(component, props, []);
+		try {
+			const attempt = this.prepareWithReplay(
+				component,
+				props,
+				[],
+				scheduledTransitions,
+				!scheduledUrgent && scheduledTransitions.size !== 0,
+			);
+			if (scheduledUrgent && attempt.status === 'suspended') {
+				this.ensureScheduledTransitionWork();
+			}
+			return attempt;
+		} catch (error) {
+			this.finishTransitionBatches(scheduledTransitions);
+			// An uncaught urgent render has no automatic retry owner. Cancel promoted
+			// transition work that it deliberately left queued so global pending state
+			// and owner-local lane entries cannot remain stranded forever.
+			if (scheduledUrgent) {
+				this.finishTransitionBatches(this.takeScheduledTransitionBatches());
+			}
+			throw error;
+		}
 	}
 
 	private prepareWithReplay(
 		component: UniversalComponent<any>,
 		props: any,
 		replayEntries: readonly SuspendedMemoEntry[],
+		transitionBatches: ReadonlySet<UniversalTransitionBatch>,
+		transitionRender: boolean,
 	): UniversalPreparedAttempt {
 		if (this.unmounted || this.unmounting) {
 			throw new Error('Cannot render an unmounted universal root.');
@@ -5107,7 +6301,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		// synchronous universal commits from collapsing the first commit's effects.
 		this.flushPassivesBeforeRender();
 		const metadata = getComponentMetadata(component);
-		if (metadata.id !== this.renderer) {
+		if (metadata !== UNIVERSAL_LAZY_METADATA && metadata.id !== this.renderer) {
 			throw new Error(
 				`Universal renderer mismatch: root ${JSON.stringify(this.renderer)} cannot render component ${JSON.stringify(metadata.id)}.`,
 			);
@@ -5136,6 +6330,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			retryThenables: new Set(),
 			nextUniversalId: this.nextUniversalId,
 			implicitSlot: 0,
+			transitionBatches,
+			transitionRender,
+			bridgeContextReads: null,
 		};
 		// A nested universal root is a separate render attempt. Do not let the
 		// caller's active component plans or speculative cache leak into it; child
@@ -5155,7 +6352,15 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			const suspendedMemos = collectSuspendedMemos(attempt);
 			this.discardDraftOwners(attempt.owners);
 			if (error instanceof UniversalSuspense) {
-				return this.suspend(error.thenable, component, props, suspendedMemos);
+				return this.suspend(
+					error.thenable,
+					component,
+					props,
+					suspendedMemos,
+					transitionBatches,
+					transitionRender,
+					attempt.bridgeContextReads,
+				);
 			}
 			throw error;
 		} finally {
@@ -5466,6 +6671,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.owner = attempt.owner.record;
 				this.lastComponent = component;
 				this.lastProps = props;
+				this.retryRenderInput = null;
+				this.urgentBoundarySuspension = null;
+				this.bridgeContextReads = attempt.bridgeContextReads;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.treeFeatures = 0;
 			},
@@ -5476,6 +6684,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			null,
 			() => preparedHost.abort(),
 			() => this.discardDraftOwners(attempt.owners),
+			attempt.transitionBatches,
 		);
 	}
 
@@ -5596,6 +6805,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.owner = attempt.owner.record;
 				this.lastComponent = component;
 				this.lastProps = props;
+				this.retryRenderInput = null;
+				this.urgentBoundarySuspension = null;
+				this.bridgeContextReads = attempt.bridgeContextReads;
 				this.nextUniversalId = attempt.nextUniversalId;
 				this.treeFeatures = 0;
 			},
@@ -5606,6 +6818,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			null,
 			() => preparedHost.abort(),
 			() => this.discardDraftOwners(attempt.owners),
+			attempt.transitionBatches,
 		);
 		return transaction;
 	}
@@ -5791,14 +7004,29 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		if (topologyChanged) findRemoved(this.rootRecord);
 		const previousPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
 		const nextPortalRegistrations = new Set<UniversalPortalTargetRegistration>();
+		let reorderedPortalRecords: Set<LogicalRecord> | null = null;
 		if ((treeFeatures & UNIVERSAL_TREE_PORTAL) !== 0) {
+			const previousPortalsByTarget = topologyChanged
+				? new Map<UniversalPortalTargetHandle, LogicalRecord[]>()
+				: null;
 			for (const child of this.rootRecord.children) {
 				walkLogical(child, (record) => {
 					if (record.kind === 'portal' && record.portalRegistration !== null) {
 						previousPortalRegistrations.add(record.portalRegistration);
+						if (previousPortalsByTarget !== null) {
+							let records = previousPortalsByTarget.get(record.portalRegistration.handle);
+							if (records === undefined) {
+								records = [];
+								previousPortalsByTarget.set(record.portalRegistration.handle, records);
+							}
+							records.push(record);
+						}
 					}
 				});
 			}
+			const nextPortalsByTarget = topologyChanged
+				? new Map<UniversalPortalTargetHandle, DraftRecord[]>()
+				: null;
 			walkDraft(draftRoot, (draft) => {
 				if (draft.blueprint.kind !== 'portal') return;
 				const registration = draft.blueprint.registration;
@@ -5806,7 +7034,32 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					throw new Error('A universal portal target was not prepared before reconciliation.');
 				}
 				nextPortalRegistrations.add(registration);
+				if (nextPortalsByTarget !== null) {
+					let records = nextPortalsByTarget.get(registration.handle);
+					if (records === undefined) {
+						records = [];
+						nextPortalsByTarget.set(registration.handle, records);
+					}
+					records.push(draft);
+				}
 			});
+			if (nextPortalsByTarget !== null && previousPortalsByTarget !== null) {
+				for (const [target, nextPortals] of nextPortalsByTarget) {
+					const previousPortals = previousPortalsByTarget.get(target);
+					if (
+						previousPortals?.length === nextPortals.length &&
+						nextPortals.every((draft, index) => draft.record === previousPortals[index])
+					) {
+						continue;
+					}
+					// Portal boundaries are logical records and therefore disappear from
+					// their ordinary parent's physical child list. When multiple keyed
+					// portals share a target, reorder their physical child ranges in the
+					// next logical order explicitly instead of leaving the old target order.
+					const reordered = (reorderedPortalRecords ??= new Set());
+					for (const draft of nextPortals) reordered.add(draft.record);
+				}
+			}
 		}
 
 		const previousRegionBridges = new Set<UniversalRendererRegionOwnerBridge>();
@@ -5959,7 +7212,8 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						draft.record.children,
 						draft.children,
 						previousRegistration?.handle ?? nextRegistration.handle,
-						previousRegistration !== null && !retainedTarget,
+						(previousRegistration !== null && !retainedTarget) ||
+							reorderedPortalRecords?.has(draft.record) === true,
 					);
 				}
 			});
@@ -6413,6 +7667,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				for (const owner of removedOwners) {
 					owner.disposed = true;
 					owner.mounted = false;
+					owner.updates.clear();
 				}
 				for (const draft of draftOwnersParentFirst) {
 					const record = draft.record;
@@ -6429,11 +7684,45 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					record.visibility = draft.visibility;
 					record.mounted = true;
 					record.disposed = false;
-					for (const [slot, count] of draft.appliedUpdates) {
-						const updates = record.updates.get(slot);
-						if (updates === undefined) continue;
-						updates.splice(0, count);
-						if (updates.length === 0) record.updates.delete(slot);
+					for (const [slot, applied] of draft.appliedUpdates) {
+						const queue = record.updates.get(slot);
+						if (queue !== applied.queue) continue;
+						if (!applied.lane) {
+							queue.splice(0, applied.consumed);
+							if (queue.batches !== undefined) {
+								queue.batches.splice(0, applied.consumed);
+								queue.rebases?.splice(0, applied.consumed);
+								queue.baseState = applied.baseState;
+							}
+							if (queue.length === 0) record.updates.delete(slot);
+							continue;
+						}
+						const appendedValues = queue.slice(applied.consumed);
+						const appendedBatches =
+							queue.batches?.slice(applied.consumed) ??
+							new Array<UniversalTransitionBatch | null>(appendedValues.length).fill(null);
+						const appendedRebases =
+							queue.rebases?.slice(applied.consumed) ??
+							new Array<boolean>(appendedValues.length).fill(false);
+						queue.length = 0;
+						queue.push(...applied.remainingValues, ...appendedValues);
+						queue.baseState = applied.baseState;
+						queue.batches = [...applied.remainingBatches, ...appendedBatches];
+						const rebases = [...applied.remainingRebases, ...appendedRebases];
+						if (rebases.some(Boolean)) queue.rebases = rebases;
+						else delete queue.rebases;
+						if (queue.length === 0) {
+							record.updates.delete(slot);
+						} else if (queue.batches.every((batch) => batch === null)) {
+							const pendingValues = queue.filter((_, index) => !rebases[index]);
+							queue.length = 0;
+							queue.push(...pendingValues);
+							delete queue.kind;
+							delete queue.baseState;
+							delete queue.batches;
+							delete queue.rebases;
+							if (queue.length === 0) record.updates.delete(slot);
+						}
 					}
 					for (const hook of record.hooks.values()) {
 						if (hook.kind === 'effect-event') {
@@ -6445,6 +7734,9 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				this.owner = attempt.owner.record;
 				this.lastComponent = component;
 				this.lastProps = props;
+				this.retryRenderInput = null;
+				this.urgentBoundarySuspension = null;
+				this.bridgeContextReads = attempt.bridgeContextReads;
 				if (retryThenables.length > 0) {
 					this.publishLocalReplay(retryThenables, retryMemos, component, props);
 				}
@@ -6567,6 +7859,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				tasks.push(() => this.discardDraftOwners(draftOwnersParentFirst));
 				runCommitTasks(tasks);
 			},
+			attempt.transitionBatches,
 		);
 		return transaction;
 	}
@@ -6574,7 +7867,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 	finish(transaction: UniversalTransactionImpl<Container, PublicInstance>): void {
 		if (this.pending === transaction) {
 			this.pending = null;
+			if (transaction.status === 'committed') {
+				this.completeTransitionBatches(transaction.transitionBatches);
+			} else {
+				this.requeueTransitionBatches(transaction.transitionBatches);
+			}
 			if (this.hostAttachments !== null) this.queueHostAttachmentFlush();
+			this.ensureScheduledTransitionWork();
 		}
 	}
 
@@ -6757,6 +8056,14 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			for (const child of owner.children) collectOwners(child);
 		};
 		collectOwners(this.owner);
+		const stagedTransitionBatches = new Set<UniversalTransitionBatch>();
+		for (const owner of owners) {
+			for (const queue of owner.updates.values()) {
+				for (const transition of queue.batches ?? []) {
+					if (transition !== null) stagedTransitionBatches.add(transition);
+				}
+			}
+		}
 		const effectEventCells = collectEffectEventCells(owners);
 		const effects = owners.flatMap((owner) => owner.effectOrder);
 		const children = [...this.rootRecord.children];
@@ -6829,9 +8136,18 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 			batch,
 			finalize: (acceptedHostError) => {
 				this.scheduled = false;
+				this.scheduledUrgent = false;
 				SCHEDULED_UNIVERSAL_ROOTS.delete(this);
+				const transitionBatches = new Set(this.takeScheduledTransitionBatches());
+				for (const transition of stagedTransitionBatches) transitionBatches.add(transition);
+				this.finishTransitionBatches(transitionBatches);
 				this.suspended?.abort();
 				this.cancelSuspendedReplays();
+				// Settling transition observers above can briefly enqueue this still-live
+				// root. Teardown owns the final scheduler state and drops that stale wave.
+				this.scheduled = false;
+				this.scheduledUrgent = false;
+				SCHEDULED_UNIVERSAL_ROOTS.delete(this);
 				let attachmentUnsubscribeError: unknown = NO_PENDING_PASSIVE_ERROR;
 				if (this.hostAttachments !== null) {
 					try {
@@ -6849,6 +8165,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 						if (portalReleaseError === NO_PENDING_PASSIVE_ERROR) portalReleaseError = error;
 					}
 				}
+				this.portalHandles.clear();
 				for (const listener of this.publishedListeners) EVENT_DISPATCHERS.delete(listener);
 				this.publishedListeners.clear();
 				this.handlers = new Map();
@@ -6856,6 +8173,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				for (const owner of owners) {
 					owner.disposed = true;
 					owner.mounted = false;
+					owner.updates.clear();
 				}
 				const deactivatedRegionCells = new Set<RendererRegionBridgeCell>();
 				for (const bridge of regionBridges) {
@@ -6865,10 +8183,13 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 					bridge.deactivate();
 				}
 				this.owner = null;
+				this.urgentBoundarySuspension = null;
+				this.bridgeContextReads = null;
 				this.treeFeatures = 0;
 				this.unmounted = true;
 				this.unmounting = false;
 				this.lastComponent = null;
+				this.retryRenderInput = null;
 				let pendingPassiveError: unknown = NO_PENDING_PASSIVE_ERROR;
 				try {
 					this.flushPassiveTasks();
@@ -6966,6 +8287,7 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 		private readonly passive: (() => void) | null,
 		private readonly abortHost: () => void,
 		private readonly onAbort: () => void,
+		readonly transitionBatches: ReadonlySet<UniversalTransitionBatch>,
 	) {}
 
 	get status(): 'prepared' | 'committed' | 'aborted' {
