@@ -169,7 +169,7 @@ describe('client output mapping (compiler source map)', () => {
 		});
 	});
 
-	it('keeps nested and self-closing tags exact when attribute text looks like markup', () => {
+	it('keeps nested tags, attribute text, and self-closing tags in distinct ranges', () => {
 		const source = `export function App() @{
 	<div data-label="<span">
 		<span><div /></span>
@@ -180,9 +180,12 @@ describe('client output mapping (compiler source map)', () => {
 		const nested = mappingFromSourceMap(compiled.map, source, compiled.code!);
 		const fakeGeneratedTag = compiled.code!.indexOf('<span') + 1;
 		const realGeneratedTag = compiled.code!.indexOf('<span', fakeGeneratedTag) + 1;
+		const sourceAttributeText = source.indexOf('<span') + 1;
 		const sourceTag = source.indexOf('<span', source.indexOf('<span') + 1) + 1;
 
-		expect(nested?.pairFromGenerated(fakeGeneratedTag)).toBeNull();
+		expect(nested?.pairFromGenerated(fakeGeneratedTag)?.source).toEqual([
+			{ from: sourceAttributeText, to: sourceAttributeText + 4 },
+		]);
 		expect(nested?.pairFromGenerated(realGeneratedTag)?.source).toEqual([
 			{ from: sourceTag, to: sourceTag + 4 },
 		]);
@@ -196,6 +199,33 @@ describe('client output mapping (compiler source map)', () => {
 				{ from: generatedSelfClosing + 7, to: generatedSelfClosing + 10 },
 			],
 		});
+	});
+
+	it('maps authored static attribute names and values but not scoped class additions', () => {
+		const source = `export function App() @{
+	<div class="demo">
+		<h2>Title</h2>
+		<style>div { color: red; }</style>
+	</div>
+}`;
+		const compiled = compileAst(source, 'App.tsrx', 'client-output');
+		if (!compiled.ok) throw new Error(compiled.error);
+		const scoped = mappingFromSourceMap(compiled.map, source, compiled.code!);
+		const sourceClass = source.indexOf('class=');
+		const sourceDemo = source.indexOf('demo', sourceClass);
+		const generatedClass = compiled.code!.indexOf('class=');
+		const generatedDemo = compiled.code!.indexOf('demo', generatedClass);
+		const generatedScope = compiled.code!.indexOf('tsrx-', generatedDemo);
+
+		expect(scoped?.pairFromSource(sourceClass)).toEqual({
+			source: [{ from: sourceClass, to: sourceClass + 'class'.length }],
+			output: [{ from: generatedClass, to: generatedClass + 'class'.length }],
+		});
+		expect(scoped?.pairFromSource(sourceDemo)).toEqual({
+			source: [{ from: sourceDemo, to: sourceDemo + 'demo'.length }],
+			output: [{ from: generatedDemo, to: generatedDemo + 'demo'.length }],
+		});
+		expect(scoped?.pairFromGenerated(generatedScope)).toBeNull();
 	});
 
 	it('does not interpolate across source text without an anchor', () => {

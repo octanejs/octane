@@ -28,7 +28,7 @@ function nthIndexOf(text: string, needle: string, occurrence: number) {
 }
 
 describe('client compiler source maps', () => {
-	it('maps nested template tag names without treating attribute text as an element', () => {
+	it('maps nested tags and attribute values without confusing their coordinates', () => {
 		const source = `export function App() @{
 	<div data-label="<span">
 		<span><div /></span>
@@ -37,18 +37,23 @@ describe('client compiler source maps', () => {
 		const defaultOutput = compile(source, 'App.tsrx', { mode: 'client' });
 		const output = compile(source, 'App.tsrx', {
 			mode: 'client',
-			sourceMapHostTags: true,
+			astTrace: true,
 		});
 		expect(output.code).toBe(defaultOutput.code);
+		expect(defaultOutput).not.toHaveProperty('astTrace');
+		expect(output.astTrace?.generatedAst).toMatchObject({ type: 'Program' });
 
 		const generatedAttributeText = nthIndexOf(output.code, '<span', 0) + 1;
 		const generatedSpanOpen = nthIndexOf(output.code, '<span', 1) + 1;
 		const generatedSpanClose = output.code.indexOf('</span>') + 2;
+		const sourceAttributeText = source.indexOf('<span');
 		const sourceSpanOpen = nthIndexOf(source, '<span', 1) + 1;
 		const sourceSpanClose = source.indexOf('</span>') + 2;
 
 		expect(originalPosition(defaultOutput.code, defaultOutput.map, generatedSpanOpen)).toBeNull();
-		expect(originalPosition(output.code, output.map, generatedAttributeText)).toBeNull();
+		expect(originalPosition(output.code, output.map, generatedAttributeText)).toEqual(
+			offsetPosition(source, sourceAttributeText),
+		);
 		expect(originalPosition(output.code, output.map, generatedSpanOpen)).toEqual(
 			offsetPosition(source, sourceSpanOpen),
 		);
@@ -66,5 +71,37 @@ describe('client compiler source maps', () => {
 		expect(originalPosition(output.code, output.map, generatedSelfClosing + 7)).toEqual(
 			offsetPosition(source, sourceSelfClosing),
 		);
+	});
+
+	it('maps authored static attributes without claiming compiler-injected class text', () => {
+		const source = `export function App() @{
+	<div class="demo">
+		<h2 title="a&b">Title</h2>
+		<style>div { color: red; }</style>
+	</div>
+}`;
+		const defaultOutput = compile(source, 'App.tsrx', { mode: 'client' });
+		const output = compile(source, 'App.tsrx', {
+			mode: 'client',
+			astTrace: true,
+		});
+		expect(output.code).toBe(defaultOutput.code);
+
+		const generatedClass = output.code.indexOf('class=');
+		const generatedDemo = output.code.indexOf('demo', generatedClass);
+		const generatedScope = output.code.indexOf('tsrx-', generatedDemo);
+		const generatedEscapedValue = output.code.indexOf('a&amp;b');
+		const sourceClass = source.indexOf('class=');
+		const sourceDemo = source.indexOf('demo', sourceClass);
+
+		expect(originalPosition(defaultOutput.code, defaultOutput.map, generatedClass)).toBeNull();
+		expect(originalPosition(output.code, output.map, generatedClass)).toEqual(
+			offsetPosition(source, sourceClass),
+		);
+		expect(originalPosition(output.code, output.map, generatedDemo)).toEqual(
+			offsetPosition(source, sourceDemo),
+		);
+		expect(originalPosition(output.code, output.map, generatedScope)).toBeNull();
+		expect(originalPosition(output.code, output.map, generatedEscapedValue)).toBeNull();
 	});
 });

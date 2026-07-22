@@ -14,7 +14,7 @@
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile, type CompileDiagnostic } from 'octane/compiler';
-import { __parseGeneratedModuleAst, compileToVolarMappings } from 'octane/compiler/volar';
+import { compileToVolarMappings } from 'octane/compiler/volar';
 import {
 	sandboxSrcdoc,
 	RUNTIME_MANIFEST_PATH,
@@ -93,13 +93,12 @@ export interface AstSuccess {
 
 export type PlaygroundAstStage = 'source' | 'type-transform' | 'type-output' | 'client-output';
 
-const parseGeneratedAst = (code: string): unknown => __parseGeneratedModuleAst(code);
-
 /**
- * Build one stage of the AST trace shown by the playground. Source and
- * type-only transform trees come directly from the compiler. The client output
- * tree is parsed from the exact emitted code because that emitter does not
- * maintain one complete transformed AST. Never throws.
+ * Build one stage of the AST trace shown by the playground. Every tree comes
+ * directly from its owning compiler pipeline. Client output parses the exact
+ * artifact and enriches its hoisted literals under the compiler's inspection
+ * gate because runtime codegen deliberately does not retain a full tree.
+ * Never throws.
  */
 export function compileAst(
 	source: string,
@@ -110,15 +109,15 @@ export function compileAst(
 		if (stage === 'client-output') {
 			const result = compile(source, filename, {
 				mode: 'client',
-				sourceMapHostTags: true,
-			});
+				astTrace: true,
+			}) as ReturnType<typeof compile> & { astTrace: { generatedAst: unknown } };
 			return {
 				ok: true,
-				ast: parseGeneratedAst(result.code),
+				ast: result.astTrace.generatedAst,
 				space: 'generated',
 				label: 'Client output AST',
 				notice:
-					'Parsed from the exact client output. Source navigation is limited to compiler source-map anchors.',
+					'Parsed from the exact client output. Hoisted template literals include inspection-only element, attribute, text, and marker nodes with exact output ranges.',
 				code: result.code,
 				map: result.map,
 			};

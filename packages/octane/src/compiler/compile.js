@@ -35,7 +35,12 @@ import {
 	renderStylesheets,
 	annotateWithHash,
 	createStyleClassMapFromStylesheet,
+	builders as b,
+	clone_ast_node as cloneAstNode,
+	acorn,
+	setLocation,
 	strongHash,
+	tsPlugin,
 } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
@@ -3674,6 +3679,103 @@ function closingTagSourceLoc(ctx, node, tag) {
 	return { line: lineIndex + 1, column: nameOffset - starts[lineIndex] };
 }
 
+function staticAttributeOrigin(ctx, attr) {
+	const origins = ctx.hostTagMap?.attributeOrigins;
+	if (!origins) return null;
+	if (origins.has(attr)) return origins.get(attr);
+	const nameLoc = attr.name?.loc?.start;
+	if (!nameLoc) {
+		origins.set(attr, null);
+		return null;
+	}
+	const origin = { nameLoc, valueLoc: null, valueToken: null };
+	const valueNode =
+		attr.value?.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
+	const valueLoc = valueNode?.loc?.start;
+	const starts = ctx.hostTagMap.lineStarts;
+	if (valueLoc && starts) {
+		const sourceOffset = starts[valueLoc.line - 1] + valueLoc.column;
+		const quote = ctx.mapSource.charCodeAt(sourceOffset);
+		if (quote === 34 || quote === 39) {
+			const sourceEnd = Number.isInteger(valueNode.end) ? valueNode.end : sourceOffset;
+			const sourceLiteral = ctx.mapSource.slice(
+				sourceOffset + 1,
+				Math.max(sourceOffset + 1, sourceEnd - 1),
+			);
+			// JS- or HTML-escaped literals need a character-level source-to-HTML table.
+			// Keep them unmapped rather than attaching an approximate span.
+			const escapedLiteral = escapeAttr(sourceLiteral);
+			if (sourceLiteral && !sourceLiteral.includes('\\') && escapedLiteral === sourceLiteral) {
+				origin.valueLoc = { line: valueLoc.line, column: (valueLoc.column | 0) + 1 };
+				origin.valueToken = sourceLiteral;
+			}
+		}
+	}
+	origins.set(attr, origin);
+	return origin;
+}
+
+function captureStaticAttributeOrigins(ctx, root) {
+	if (!ctx.hostTagMap?.attributeOrigins) return;
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (
+			(node.type === 'FunctionDeclaration' ||
+				node.type === 'FunctionExpression' ||
+				node.type === 'ArrowFunctionExpression') &&
+			node.metadata?.tsrx_dynamic_wrapper !== true
+		)
+			return;
+		for (const attr of node.openingElement?.attributes || []) staticAttributeOrigin(ctx, attr);
+		for (const key of Object.keys(node)) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata' || key === 'css')
+				continue;
+			const value = node[key];
+			if (Array.isArray(value)) {
+				for (const child of value) visit(child);
+			} else {
+				visit(value);
+			}
+		}
+	};
+	visit(root);
+}
+
+function recordStaticAttributeSource(ctx, attr, emitted) {
+	const sources = ctx.hostTagMap?.current;
+	const origin = staticAttributeOrigin(ctx, attr);
+	if (!sources || !origin || !emitted) return;
+
+	let nameStart = 0;
+	while (nameStart < emitted.length && emitted.charCodeAt(nameStart) <= 32) nameStart++;
+	let nameEnd = nameStart;
+	while (nameEnd < emitted.length) {
+		const character = emitted.charCodeAt(nameEnd);
+		if (character <= 32 || character === 61 || character === 47 || character === 62) break;
+		nameEnd++;
+	}
+	if (nameEnd === nameStart) return;
+	sources.push({
+		kind: 'attr-name',
+		tag: emitted.slice(nameStart, nameEnd),
+		srcLine0: origin.nameLoc.line - 1,
+		srcCol0: origin.nameLoc.column | 0,
+	});
+
+	if (!origin.valueLoc || !origin.valueToken) return;
+	const emittedValueStart = emitted.indexOf('=', nameEnd);
+	if (emittedValueStart === -1) return;
+	if (emitted.indexOf(origin.valueToken, emittedValueStart + 1) === -1) return;
+	sources.push({
+		kind: 'attr-value',
+		tag: origin.valueToken,
+		srcLine0: origin.valueLoc.line - 1,
+		srcCol0: origin.valueLoc.column,
+	});
+}
+
 /**
  * Build a v3 source map from a flat list of mapping segments. The segments come
  * from esrap itself — we print each user statement/expression via esrap with
@@ -3682,8 +3784,8 @@ function closingTagSourceLoc(ctx, node, tag) {
  * coordinates. Generated runtime plumbing (mount/update DOM ops) is left
  * unmapped — never mapped to a wrong position. Opt-in inspection compiles also
  * record exact authored and generated positions for baked client template tag
- * names. `sourcesContent` is inlined so the original `.tsrx` is visible in
- * devtools.
+ * names and static attributes. `sourcesContent` is inlined so the original
+ * `.tsrx` is visible in devtools.
  *
  * @param {string} source original .tsrx text
  * @param {string} sourceName basename used as the map's single source entry
@@ -4208,7 +4310,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, sourceMapHostTags?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, astTrace?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -4223,13 +4325,14 @@ function instrumentProfileComponents(ast, ctx) {
  *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
  *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
  *   client `hydrateRoot` adopts.
- *   `sourceMapHostTags: true` adds exact source-map anchors for host tag
- *   names baked into client template strings. It is opt-in for inspection
- *   tooling; normal compiles skip all tag-location collection and scanning.
+ *   `astTrace: true` returns an immutable AST parsed from the exact client
+ *   artifact and enriches template literals with granular element, attribute,
+ *   text, and marker nodes. It also adds their exact source-map anchors. Normal
+ *   compiles skip the clone, collection, template scan, and output parse.
  *   `rendererBoundaries` and `rendererRegistry` are the normalized static
  *   boundary table and renderer registry. Pass them together when a client
  *   module may contain an explicitly renderer-owned component prop.
- * @returns {{ code: string, map: any, diagnostics: readonly unknown[] }}
+ * @returns {{ code: string, map: any, diagnostics: readonly unknown[], astTrace?: { generatedAst: unknown } }}
  */
 // --- Authored scoped-style hashes across source rewrites -------------------
 //
@@ -4355,6 +4458,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 
 function compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata) {
 	const authoredSource = source;
+	const astTraceRequested = mode === 'client' && options?.astTrace === true;
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
@@ -4589,10 +4693,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			diagnostics: rendererAuthoredDiagnostics ?? [],
 		};
 	}
-	const ast =
+	const parsedAst =
 		rendererBoundaryPreparation === null && analyzedAst !== null
 			? analyzedAst
 			: parseModule(source, filename);
+	// The normal compiler keeps its allocation-free in-place transform. Inspection
+	// transforms an official TSRX clone, so the parser tree is never modified and
+	// every subsequent mutation remains confined to compiler-owned nodes.
+	const ast = astTraceRequested ? cloneAstNode(parsedAst) : parsedAst;
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(ast, source, filename, {
@@ -4661,7 +4769,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// inline-cache-vs-elsewhere in one line.
 	const inlineHookMemoEnabled =
 		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
-	const sourceMapHostTags = mode === 'client' && options?.sourceMapHostTags === true;
+	const astTraceEnabled = astTraceRequested;
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -4730,10 +4838,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// the top-level (autoCallback) pass and drained per component below.
 		_setupMaps: null,
 	};
-	if (sourceMapHostTags) {
+	if (astTraceEnabled) {
 		// Inspection-only state stays completely absent from the normal compiler
 		// context shape. `current` is swapped per nested JSX plan.
-		ctx.hostTagMap = { current: null, lineStarts: sourceLineStarts(source) };
+		ctx.hostTagMap = {
+			current: null,
+			lineStarts: sourceLineStarts(source),
+			attributeOrigins: new WeakMap(),
+		};
 	}
 	{
 		const imports = collectOctaneImportBindings(ast.body);
@@ -5339,7 +5451,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		.map((i) => `_$injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
 		.join('\n');
 	const styleBlock = styleInjections ? styleInjections + '\n\n' : '';
-	const templateSegments = sourceMapHostTags ? [] : null;
+	const templateSegments = astTraceEnabled ? [] : null;
 	const templateLines = [];
 	for (let templateLine = 0; templateLine < ctx.hoistedTemplates.length; templateLine++) {
 		const t = ctx.hoistedTemplates[templateLine];
@@ -5540,6 +5652,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			authoredSource,
 			rendererBoundaryPreparation.mappingNeedles,
 		);
+	}
+	if (astTraceEnabled) {
+		result.astTrace = { generatedAst: createClientOutputAst(result.code, ctx.hoistedTemplates) };
 	}
 	return result;
 }
@@ -7498,6 +7613,11 @@ function applyCssScoping(componentNode, ctx) {
 	// Mutate every owned render root: add the canonical hash class to native
 	// elements and strip JSXStyleElement nodes from DOM output.
 	for (const root of roots) {
+		if (ctx.hostTagMap) {
+			// Preserve authored attribute origins before scoped hashes rewrite class
+			// literals on the inspection clone. Synthetic suffixes remain unmapped.
+			captureStaticAttributeOrigins(ctx, root.node);
+		}
 		// Normalize dynamic class exprs BEFORE the hash is appended (see helper), so
 		// clsx array/object values compose correctly alongside the scope hash.
 		wrapScopedClassExprs(root.node, ctx);
@@ -12939,9 +13059,9 @@ function planJsx(
 		ctx._elemLocs = _prevElemLocs;
 		return { mount: '', update: '', after: '', head: emitHeadClient(headNodes, ctx, 0) };
 	}
-	// Source positions for host tags emitted into THIS plan's template. Nested
-	// plans temporarily replace this list and restore it before the outer walk
-	// continues, matching the other plan-local compiler state below.
+	// Source positions for host tags and static attributes emitted into THIS
+	// plan's template. Nested plans temporarily replace this list and restore it
+	// before the outer walk continues, matching the other plan-local state below.
 	const hostTagMap = ctx.hostTagMap;
 	const previousHostTagSources = hostTagMap?.current ?? null;
 	if (hostTagMap) hostTagMap.current = [];
@@ -15148,7 +15268,9 @@ function emitElementHtml(
 			) {
 				inner = { type: 'Literal', value: true, raw: 'true' };
 			} else {
-				attrHtml += bakeStaticAttr(attrName, true, tag, hostNs);
+				const emitted = bakeStaticAttr(attrName, true, tag, hostNs);
+				if (hostTagSources) recordStaticAttributeSource(ctx, attr, emitted);
+				attrHtml += emitted;
 				continue;
 			}
 		} else {
@@ -15163,12 +15285,18 @@ function emitElementHtml(
 		// values become a setStyle binding.
 		if (attrName === 'style') {
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
-				attrHtml += ` style="${escapeAttr(inner.value)}"`;
+				const emitted = ` style="${escapeAttr(inner.value)}"`;
+				if (hostTagSources) recordStaticAttributeSource(ctx, attr, emitted);
+				attrHtml += emitted;
 				continue;
 			}
 			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
 				const css = staticObjectToCssString(inner);
-				if (css) attrHtml += ` style="${escapeAttr(css)}"`;
+				if (css) {
+					const emitted = ` style="${escapeAttr(css)}"`;
+					if (hostTagSources) recordStaticAttributeSource(ctx, attr, emitted);
+					attrHtml += emitted;
+				}
 				continue;
 			}
 			const expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
@@ -15188,7 +15316,9 @@ function emitElementHtml(
 			!classBeforeSpread &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, hostNs))
 		) {
-			attrHtml += bakeStaticAttr(attrName, inner.value, tag, hostNs);
+			const emitted = bakeStaticAttr(attrName, inner.value, tag, hostNs);
+			if (hostTagSources) recordStaticAttributeSource(ctx, attr, emitted);
+			attrHtml += emitted;
 			continue;
 		}
 
@@ -17248,73 +17378,407 @@ function walkExprH(rootVar, path) {
 	return expr;
 }
 
-function mapTemplateTags(html, sources) {
-	if (!sources || sources.length === 0) return sources || [];
+// Octane template nodes are inspection metadata, not executable ESTree. Keep
+// their construction behind one local builder; standard generated-JS nodes
+// below use @tsrx/core builders and setLocation instead.
+function inspectionNode(type, fields = null) {
+	return fields === null ? { type } : { type, ...fields };
+}
+
+function inspectionName(type, name) {
+	return inspectionNode(type, { name });
+}
+
+function rawTextClosingTag(html, from, tag) {
+	const expected = tag.toLowerCase();
+	let candidate = from;
+	while ((candidate = html.indexOf('</', candidate)) !== -1) {
+		const nameEnd = candidate + 2 + expected.length;
+		const boundary = html.charCodeAt(nameEnd);
+		if (
+			html.slice(candidate + 2, nameEnd).toLowerCase() === expected &&
+			(boundary <= 32 || boundary === 62)
+		) {
+			return candidate;
+		}
+		candidate += 2;
+	}
+	return -1;
+}
+
+function inspectTemplateHtml(html, sources) {
+	const root = inspectionNode('OctaneTemplate', { children: [] });
+	const ranges = [{ node: root, start: 0, end: html.length }];
+	const stack = [{ tag: null, node: root, range: ranges[0] }];
 	let sourceIndex = 0;
 	let index = 0;
-	while (index < html.length && sourceIndex < sources.length) {
-		const opening = html.indexOf('<', index);
-		if (opening === -1) break;
-		if (html.startsWith('<!--', opening)) {
-			const end = html.indexOf('-->', opening + 4);
-			index = end === -1 ? html.length : end + 3;
+	const append = (node, start, end) => {
+		stack[stack.length - 1].node.children.push(node);
+		const range = { node, start, end };
+		ranges.push(range);
+		return range;
+	};
+	const match = (kind, from, to) => {
+		const source = sources[sourceIndex];
+		if (!source || source.kind !== kind) return;
+		let tokenStart = from;
+		if (kind === 'attr-value') {
+			tokenStart = html.indexOf(source.tag, from);
+			if (tokenStart === -1 || tokenStart + source.tag.length > to) return;
+		} else if (to - from !== source.tag.length || !html.startsWith(source.tag, from)) {
+			return;
+		}
+		source.htmlOffset = tokenStart;
+		source.length = source.tag.length;
+		sourceIndex++;
+	};
+	while (index < html.length) {
+		const active = stack[stack.length - 1];
+		if (active.tag?.toLowerCase() === 'script') {
+			const closing = rawTextClosingTag(html, index, active.tag);
+			if (closing !== index) {
+				const end = closing === -1 ? html.length : closing;
+				if (end > index) {
+					append(
+						inspectionNode('OctaneTemplateText', { value: html.slice(index, end) }),
+						index,
+						end,
+					);
+				}
+				index = end;
+				continue;
+			}
+		}
+
+		if (html.charCodeAt(index) !== 60) {
+			const next = html.indexOf('<', index);
+			const end = next === -1 ? html.length : next;
+			append(inspectionNode('OctaneTemplateText', { value: html.slice(index, end) }), index, end);
+			index = end;
 			continue;
 		}
 
-		let nameStart = opening + 1;
-		let kind = 'open';
-		if (html.charCodeAt(nameStart) === 47) {
-			kind = 'close';
-			nameStart++;
+		if (html.startsWith('<!--', index)) {
+			const commentEnd = html.indexOf('-->', index + 4);
+			const end = commentEnd === -1 ? html.length : commentEnd + 3;
+			append(
+				inspectionNode('OctaneTemplateComment', {
+					value: html.slice(index + 4, commentEnd === -1 ? html.length : commentEnd),
+				}),
+				index,
+				end,
+			);
+			index = end;
+			continue;
 		}
+
+		if (html.startsWith('<!>', index)) {
+			append(inspectionNode('OctaneTemplateMarker', { value: '<!>' }), index, index + 3);
+			index += 3;
+			continue;
+		}
+
+		if (html.startsWith('</', index)) {
+			const nameStart = index + 2;
+			let nameEnd = nameStart;
+			while (nameEnd < html.length) {
+				const character = html.charCodeAt(nameEnd);
+				if (character <= 32 || character === 62) break;
+				nameEnd++;
+			}
+			const close = html.indexOf('>', nameEnd);
+			const end = close === -1 ? html.length : close + 1;
+			match('close', nameStart, nameEnd);
+			const name = inspectionName('OctaneTemplateIdentifier', html.slice(nameStart, nameEnd));
+			const closingElement = inspectionNode('OctaneTemplateClosingElement', { name });
+			ranges.push(
+				{ node: closingElement, start: index, end },
+				{ node: name, start: nameStart, end: nameEnd },
+			);
+			let matchIndex = stack.length - 1;
+			while (matchIndex > 0 && stack[matchIndex].tag.toLowerCase() !== name.name.toLowerCase()) {
+				matchIndex--;
+			}
+			if (matchIndex > 0) {
+				const entry = stack[matchIndex];
+				entry.node.closingElement = closingElement;
+				entry.range.end = end;
+				stack.length = matchIndex;
+			} else {
+				append(closingElement, index, end);
+			}
+			index = end;
+			continue;
+		}
+
+		if (html.startsWith('<!', index)) {
+			const markerEnd = html.indexOf('>', index + 2);
+			const end = markerEnd === -1 ? html.length : markerEnd + 1;
+			append(inspectionNode('OctaneTemplateMarker', { value: html.slice(index, end) }), index, end);
+			index = end;
+			continue;
+		}
+
+		const nameStart = index + 1;
 		let nameEnd = nameStart;
 		while (nameEnd < html.length) {
 			const character = html.charCodeAt(nameEnd);
 			if (character <= 32 || character === 47 || character === 62) break;
 			nameEnd++;
 		}
-
-		const source = sources[sourceIndex];
-		if (
-			kind === source.kind &&
-			nameEnd - nameStart === source.tag.length &&
-			html.startsWith(source.tag, nameStart)
-		) {
-			source.htmlOffset = nameStart;
-			source.length = source.tag.length;
-			sourceIndex++;
-		}
-
-		// Advance past the complete tag so a `<tag` substring inside a quoted
-		// attribute value can never be mistaken for a nested element.
-		let quote = 0;
+		match('open', nameStart, nameEnd);
+		const tag = html.slice(nameStart, nameEnd);
+		const name = inspectionName('OctaneTemplateIdentifier', tag);
+		const attributes = [];
 		let cursor = nameEnd;
-		for (; cursor < html.length; cursor++) {
-			const character = html.charCodeAt(cursor);
-			if (quote !== 0) {
-				if (character === quote) quote = 0;
-			} else if (character === 34 || character === 39) {
-				quote = character;
-			} else if (character === 62) {
+		let selfClosing = false;
+		while (cursor < html.length) {
+			while (cursor < html.length && html.charCodeAt(cursor) <= 32) cursor++;
+			if (html.charCodeAt(cursor) === 47) {
+				selfClosing = true;
+				cursor++;
+				continue;
+			}
+			if (html.charCodeAt(cursor) === 62) {
 				cursor++;
 				break;
 			}
+			const attrStart = cursor;
+			const attrNameStart = cursor;
+			while (cursor < html.length) {
+				const character = html.charCodeAt(cursor);
+				if (character <= 32 || character === 61 || character === 47 || character === 62) break;
+				cursor++;
+			}
+			const attrNameEnd = cursor;
+			if (attrNameEnd === attrNameStart) {
+				cursor++;
+				continue;
+			}
+			match('attr-name', attrNameStart, attrNameEnd);
+			const attrName = inspectionName(
+				'OctaneTemplateAttributeName',
+				html.slice(attrNameStart, attrNameEnd),
+			);
+			let value = null;
+			while (cursor < html.length && html.charCodeAt(cursor) <= 32) cursor++;
+			if (html.charCodeAt(cursor) === 61) {
+				cursor++;
+				while (cursor < html.length && html.charCodeAt(cursor) <= 32) cursor++;
+				const quote = html.charCodeAt(cursor);
+				if (quote === 34 || quote === 39) {
+					const valueStart = ++cursor;
+					while (cursor < html.length && html.charCodeAt(cursor) !== quote) cursor++;
+					const valueEnd = cursor;
+					match('attr-value', valueStart, valueEnd);
+					value = inspectionNode('OctaneTemplateAttributeValue', {
+						value: html.slice(valueStart, valueEnd),
+						raw: html.slice(valueStart - 1, cursor < html.length ? cursor + 1 : cursor),
+					});
+					ranges.push({ node: value, start: valueStart, end: valueEnd });
+					if (cursor < html.length) cursor++;
+				} else {
+					const valueStart = cursor;
+					while (cursor < html.length) {
+						const character = html.charCodeAt(cursor);
+						if (character <= 32 || character === 47 || character === 62) break;
+						cursor++;
+					}
+					match('attr-value', valueStart, cursor);
+					value = inspectionNode('OctaneTemplateAttributeValue', {
+						value: html.slice(valueStart, cursor),
+						raw: html.slice(valueStart, cursor),
+					});
+					ranges.push({ node: value, start: valueStart, end: cursor });
+				}
+			}
+			const attribute = inspectionNode('OctaneTemplateAttribute', { name: attrName, value });
+			attributes.push(attribute);
+			ranges.push(
+				{ node: attribute, start: attrStart, end: cursor },
+				{ node: attrName, start: attrNameStart, end: attrNameEnd },
+			);
 		}
-		index = cursor > opening ? cursor : opening + 1;
+		const openingElement = inspectionNode('OctaneTemplateOpeningElement', {
+			name,
+			attributes,
+			selfClosing,
+		});
+		const element = inspectionNode('OctaneTemplateElement', {
+			openingElement,
+			closingElement: null,
+			children: [],
+		});
+		const elementRange = append(element, index, cursor);
+		ranges.push(
+			{ node: openingElement, start: index, end: cursor },
+			{ node: name, start: nameStart, end: nameEnd },
+		);
+		if (!selfClosing && !VOID_ELEMENTS.has(tag.toLowerCase())) {
+			stack.push({ tag, node: element, range: elementRange });
+		}
+		index = cursor;
 	}
-	// The matched prefix already contains the mapping objects. Truncate any
-	// unmatched tail instead of allocating a second per-template array.
+
 	sources.length = sourceIndex;
-	return sources;
+	return { mappings: sources, ast: root, ranges };
 }
 
 function allocTemplate(ctx, html, ns = 0, frag = 0, tagSources = null) {
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
 	const template = { name, html, ns, frag };
-	if (tagSources !== null) template.tagMappings = mapTemplateTags(html, tagSources);
+	if (tagSources !== null) {
+		const inspection = inspectTemplateHtml(html, tagSources);
+		template.tagMappings = inspection.mappings;
+		template.inspectionAst = inspection.ast;
+		template.inspectionRanges = inspection.ranges;
+	}
 	ctx.hoistedTemplates.push(template);
 	return name;
+}
+
+let generatedOutputParser = null;
+
+function parseGeneratedOutputAst(code) {
+	if (generatedOutputParser === null) {
+		generatedOutputParser = acorn.Parser.extend(tsPlugin({ jsx: true }));
+	}
+	return generatedOutputParser.parse(code, {
+		sourceType: 'module',
+		ecmaVersion: 'latest',
+		allowReturnOutsideFunction: true,
+		locations: true,
+		preserveParens: true,
+	});
+}
+
+function encodedTemplateBoundaries(raw, ranges) {
+	const boundaries = [];
+	for (const range of ranges) boundaries.push(range.start, range.end);
+	boundaries.sort((a, b) => a - b);
+	const offsets = new Map();
+	let htmlOffset = 0;
+	let encodedOffset = 1;
+	for (const boundary of boundaries) {
+		if (offsets.has(boundary)) continue;
+		while (htmlOffset < boundary) {
+			if (raw.charCodeAt(encodedOffset) === 92) {
+				encodedOffset += raw.charCodeAt(encodedOffset + 1) === 117 ? 6 : 2;
+			} else {
+				encodedOffset++;
+			}
+			htmlOffset++;
+		}
+		offsets.set(boundary, encodedOffset);
+	}
+	return offsets;
+}
+
+function generatedLineStarts(code) {
+	const starts = [0];
+	for (let index = 0; index < code.length; index++) {
+		const character = code.charCodeAt(index);
+		if (character === 13) {
+			if (code.charCodeAt(index + 1) === 10) index++;
+			starts.push(index + 1);
+		} else if (character === 10 || character === 0x2028 || character === 0x2029) {
+			starts.push(index + 1);
+		}
+	}
+	return starts;
+}
+
+function generatedLocation(lineStarts, offset) {
+	let low = 0;
+	let high = lineStarts.length;
+	while (low < high) {
+		const middle = (low + high) >> 1;
+		if (lineStarts[middle] <= offset) low = middle + 1;
+		else high = middle;
+	}
+	const lineIndex = low - 1;
+	return { line: lineIndex + 1, column: offset - lineStarts[lineIndex] };
+}
+
+function materializeTemplateAst(template, literal, lineStarts) {
+	const rangeByNode = new Map();
+	for (const range of template.inspectionRanges) rangeByNode.set(range.node, range);
+	const offsets = encodedTemplateBoundaries(literal.raw, template.inspectionRanges);
+	const visit = (value) => {
+		if (Array.isArray(value)) return value.map(visit);
+		if (!value || typeof value !== 'object') return value;
+		const node = inspectionNode(value.type);
+		for (const key of Object.keys(value)) {
+			if (key !== 'type') node[key] = visit(value[key]);
+		}
+		const range = rangeByNode.get(value);
+		if (range) {
+			const relativeStart = offsets.get(range.start);
+			const relativeEnd = offsets.get(range.end);
+			const start = literal.start + relativeStart;
+			const end = literal.start + relativeEnd;
+			return setLocation(
+				node,
+				{
+					start,
+					end,
+					loc: {
+						start: generatedLocation(lineStarts, start),
+						end: generatedLocation(lineStarts, end),
+					},
+				},
+				true,
+			);
+		}
+		return node;
+	};
+	return visit(template.inspectionAst);
+}
+
+function createClientOutputAst(code, templates) {
+	const parsed = parseGeneratedOutputAst(code);
+	const byName = new Map(templates.map((template) => [template.name, template]));
+	const lineStarts = generatedLineStarts(code);
+	let changed = false;
+	// Rebuild only declaration paths that contain a hoisted template. The parsed
+	// output tree is never mutated, and all unrelated branches retain identity.
+	const body = parsed.body.map((statement) => {
+		if (statement.type !== 'VariableDeclaration') return statement;
+		let declarationChanged = false;
+		const declarations = statement.declarations.map((declaration) => {
+			const template = byName.get(declaration.id?.name);
+			const init = declaration.init;
+			const literal = init?.type === 'CallExpression' ? init.arguments?.[0] : null;
+			if (
+				!template?.inspectionAst ||
+				literal?.type !== 'Literal' ||
+				typeof literal.value !== 'string'
+			) {
+				return declaration;
+			}
+			declarationChanged = true;
+			changed = true;
+			const nextLiteral = {
+				...setLocation(b.literal(literal.value, literal.raw), literal, true),
+				template: materializeTemplateAst(template, literal, lineStarts),
+			};
+			const nextInit = setLocation(
+				b.call(
+					cloneAstNode(init.callee),
+					nextLiteral,
+					...init.arguments.slice(1).map((argument) => cloneAstNode(argument)),
+				),
+				init,
+				true,
+			);
+			return setLocation(b.declarator(cloneAstNode(declaration.id), nextInit), declaration, true);
+		});
+		return declarationChanged
+			? setLocation(b.declaration(statement.kind, declarations), statement, true)
+			: statement;
+	});
+	return changed ? { ...parsed, body } : parsed;
 }
 
 function escapeHtml(s) {

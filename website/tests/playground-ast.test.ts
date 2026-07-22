@@ -112,6 +112,39 @@ describe('playground AST preparation', () => {
 		expect(ranges.at(-1)).toBeNull();
 		preview.destroy();
 	});
+
+	it('exposes granular client template nodes at exact generated ranges', () => {
+		const source = `export function App() @{
+	<div class="demo"><h2>Title</h2></div>
+}`;
+		const output = compileAst(source, 'App.tsrx', 'client-output');
+		if (!output.ok) throw new Error(output.error);
+		const prepared = preparePlaygroundAst(output.ast);
+		const h2 = output.code!.indexOf('<h2>') + 1;
+		const className = output.code!.indexOf('class=');
+		const classValue = output.code!.indexOf('demo', className);
+
+		expect(findDeepestAstNode(prepared, h2)?.type).toBe('OctaneTemplateIdentifier');
+		expect(findDeepestAstNode(prepared, className)?.type).toBe('OctaneTemplateAttributeName');
+		expect(findDeepestAstNode(prepared, classValue)?.type).toBe('OctaneTemplateAttributeValue');
+	});
+
+	it('keeps escaped attributes, raw script text, and dynamic markers distinct', () => {
+		const source = `export function App() @{
+	const value = 'ready';
+	<div title="a&b"><script>if (a < b) x()</script>{value}</div>
+}`;
+		const output = compileAst(source, 'App.tsrx', 'client-output');
+		if (!output.ok) throw new Error(output.error);
+		const prepared = preparePlaygroundAst(output.ast);
+		const escapedValue = output.code!.indexOf('a&amp;b');
+		const scriptComparison = output.code!.indexOf('a < b');
+		const marker = output.code!.indexOf('<!>');
+
+		expect(findDeepestAstNode(prepared, escapedValue)?.type).toBe('OctaneTemplateAttributeValue');
+		expect(findDeepestAstNode(prepared, scriptComparison + 2)?.type).toBe('OctaneTemplateText');
+		expect(findDeepestAstNode(prepared, marker)?.type).toBe('OctaneTemplateMarker');
+	});
 });
 
 describe.each([

@@ -336,6 +336,7 @@ export function Playground() @{
 					};
 				} else {
 					const result = pg.compileTypes(source, name);
+					if (!result.ok && cached) return cached;
 					entry = result.ok
 						? { source, code: result.code, volarMappings: result.mappings, mapping: undefined }
 						: {
@@ -565,10 +566,6 @@ export function Playground() @{
 					return;
 				}
 				astPreview.reveal(pair.output[0].from, scroll);
-				// Client templates are parsed as one string Literal. Revealing that
-				// AST node reports its whole range back through onNodeRange, whose
-				// first source anchor may be a different tag. Restore the exact
-				// source-side range that initiated navigation after the reveal.
 				revealRanges(sourceView, pair.source, false);
 			};
 

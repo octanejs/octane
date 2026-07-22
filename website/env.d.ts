@@ -29,10 +29,15 @@ declare module 'octane/compiler' {
 			mode?: 'client' | 'server';
 			hmr?: boolean;
 			dev?: boolean;
-			/** Inspection-only anchors for host tags baked into client templates. */
-			sourceMapHostTags?: boolean;
+			/** Inspection-only generated AST and template source-map anchors. */
+			astTrace?: boolean;
 		},
-	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
+	): {
+		code: string;
+		map: unknown;
+		diagnostics: CompileDiagnostic[];
+		astTrace?: { generatedAst: unknown };
+	};
 }
 
 // The Volar (language-service) pipeline — the playground's TYPES output pane.
