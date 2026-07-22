@@ -1,27 +1,15 @@
-// Source ↔ output position mapping for the playground's compiled panes —
+// Source ↔ output position mapping for the playground's TYPES pane —
 // clicking in the editor reveals the corresponding output, and vice versa
-// (the Svelte-playground interaction). Two constructors, one query shape:
+// (the Svelte-playground interaction). `octane/compiler/volar` emits per-token
+// offset mappings (sourceOffsets/generatedOffsets/lengths) for the language
+// service; those lengths are exact, so ranges are used verbatim.
 //
-//   mappingFromSourceMap — the PROD pane. `octane/compiler`'s `compile()`
-//     returns a standard V3 source map (esrap-printed, composed across the
-//     compiler's internal rewrites); its VLQ segments are decoded into
-//     absolute-offset pairs. Segments carry positions but no lengths, so
-//     highlight ranges are expanded to the identifier/word at the position.
-//
-//   mappingFromVolar — the TYPES pane. `octane/compiler/volar` emits
-//     per-token offset mappings (sourceOffsets/generatedOffsets/lengths)
-//     for the language service; those lengths are exact, so ranges are used
-//     verbatim.
-//
-// Queries match the nearest preceding anchor, BOUNDED to that anchor's token
-// span — the exact token for Volar segments, the identifier/word at the
-// anchor for source-map segments. An offset past the span (whitespace, a
-// keyword, compiler-generated plumbing with no anchor of its own) is
-// unmapped and returns null so the highlight clears instead of lighting an
-// unrelated node. A match returns EVERY range mapped from the anchor — one
-// source expression can lower to several places in the compiled output
-// (e.g. a value read in both the create and update paths), and all of them
-// should light up.
+// Queries select the narrowest range containing the hovered/cursor offset.
+// This matters for Volar's nested mappings: a JSX expression maps as one
+// range while its identifiers map as smaller ranges. Positions between those
+// identifiers must fall back to the containing expression instead of becoming
+// spuriously unmapped. A match returns EVERY range mapped from the selected
+// source range because one expression can appear in several output locations.
 //
 // Pure string/offset math — no CodeMirror or DOM imports, so tests can run
 // it directly and the editor wiring stays in the page component.
@@ -49,98 +37,39 @@ export interface VolarTokenMapping {
 interface Segment {
 	src: number;
 	gen: number;
-	/** Exact lengths when known (Volar); -1 means expand to the word at the offset. */
 	srcLen: number;
 	genLen: number;
 }
 
-const B64 = new Int8Array(128).fill(-1);
-for (let i = 0; i < 64; i++) {
-	B64['ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.charCodeAt(i)] = i;
-}
-
-/** Decode a V3 `mappings` string into per-generated-line delta segments. */
-function decodeVlqLines(encoded: string): number[][][] | null {
-	const lines: number[][][] = [];
-	let line: number[][] = [];
-	let segment: number[] = [];
-	let value = 0;
-	let shift = 0;
-	for (let i = 0; i < encoded.length; i++) {
-		const ch = encoded.charCodeAt(i);
-		if (ch === 59 /* ; */ || ch === 44 /* , */) {
-			if (shift !== 0) return null; // truncated VLQ group
-			if (segment.length > 0) line.push(segment);
-			segment = [];
-			if (ch === 59) {
-				lines.push(line);
-				line = [];
-			}
-			continue;
-		}
-		const digit = ch < 128 ? B64[ch] : -1;
-		if (digit < 0) return null;
-		value += (digit & 31) << shift;
-		if (digit & 32) {
-			shift += 5;
-		} else {
-			segment.push(value & 1 ? -(value >>> 1) : value >>> 1);
-			value = 0;
-			shift = 0;
-		}
-	}
-	if (shift !== 0) return null;
-	if (segment.length > 0) line.push(segment);
-	lines.push(line);
-	return lines;
-}
-
-function lineStartOffsets(text: string): number[] {
-	const starts = [0];
-	for (let i = 0; i < text.length; i++) {
-		if (text.charCodeAt(i) === 10) starts.push(i + 1);
-	}
-	return starts;
-}
-
-const WORD_CHAR = /[A-Za-z0-9_$]/;
-
-/**
- * The identifier/word span at `offset`, or the single character there. Map
- * segments frequently anchor on the punctuation JUST BEFORE an identifier
- * (e.g. the `(` in `(setCount)`), so a non-word position steps forward to an
- * adjacent word before expanding — highlighting the identifier, not the paren.
- */
-function expandWord(text: string, offset: number): MappedRange {
-	if (text.length === 0) return { from: 0, to: 0 };
-	if (offset >= text.length) offset = text.length - 1;
-	if (
-		!WORD_CHAR.test(text[offset]) &&
-		offset + 1 < text.length &&
-		WORD_CHAR.test(text[offset + 1])
-	) {
-		offset += 1;
-	}
-	let from = offset;
-	let to = offset + 1;
-	if (WORD_CHAR.test(text[offset])) {
-		while (from > 0 && WORD_CHAR.test(text[from - 1])) from--;
-		while (to < text.length && WORD_CHAR.test(text[to])) to++;
-	}
-	return { from, to };
-}
-
-function createMapping(
-	segments: Segment[],
-	sourceText: string,
-	generatedText: string,
-): CodeMapping | null {
+function createMapping(segments: Segment[]): CodeMapping | null {
 	if (segments.length === 0) return null;
 	const bySrc = [...segments].sort((a, b) => a.src - b.src || a.gen - b.gen);
 	const byGen = [...segments].sort((a, b) => a.gen - b.gen || a.src - b.src);
 
-	// Greatest anchor ≤ offset, plus every segment sharing that anchor.
-	const group = (list: Segment[], key: 'src' | 'gen', offset: number): Segment[] | null => {
+	const prefixEnds = (list: Segment[], key: 'src' | 'gen'): number[] => {
+		const result: number[] = [];
+		let maximum = -1;
+		for (const segment of list) {
+			const length = key === 'src' ? segment.srcLen : segment.genLen;
+			maximum = Math.max(maximum, segment[key] + length);
+			result.push(maximum);
+		}
+		return result;
+	};
+	const srcPrefixEnds = prefixEnds(bySrc, 'src');
+	const genPrefixEnds = prefixEnds(byGen, 'gen');
+
+	// Find every range containing the offset, then select the narrowest one.
+	// Prefix maxima stop the backwards scan when no earlier range can overlap.
+	// At a shared boundary prefer a range STARTING at the cursor; otherwise a
+	// cursor parked just after a token still belongs to that token.
+	const containing = (
+		list: Segment[],
+		ends: number[],
+		key: 'src' | 'gen',
+		offset: number,
+	): Segment[] | null => {
+		if (!Number.isSafeInteger(offset) || offset < 0) return null;
 		let lo = 0;
 		let hi = list.length - 1;
 		let found = -1;
@@ -154,39 +83,43 @@ function createMapping(
 			}
 		}
 		if (found < 0) return null;
-		const anchor = list[found][key];
-		let first = found;
-		while (first > 0 && list[first - 1][key] === anchor) first--;
-		return list.slice(first, found + 1);
-	};
 
-	// A query hits only within the matched anchor's own token span — the exact
-	// token for Volar segments, the word at the anchor for source-map segments
-	// (group() guarantees anchor ≤ offset, so only the upper edge needs
-	// checking; the end is inclusive so a cursor parked right after a word
-	// still counts). Past the span the offset belongs to unmapped text and the
-	// highlight must clear rather than borrow a farther anchor.
-	const withinAnchor = (matched: Segment[], side: 'src' | 'gen', offset: number): boolean => {
-		const text = side === 'gen' ? generatedText : sourceText;
-		for (const segment of matched) {
-			const start = side === 'gen' ? segment.gen : segment.src;
-			const length = side === 'gen' ? segment.genLen : segment.srcLen;
-			if (offset <= (length >= 0 ? start + length : expandWord(text, start).to)) return true;
+		const candidates: Segment[] = [];
+		for (let i = found; i >= 0 && ends[i] >= offset; i--) {
+			const segment = list[i];
+			const length = key === 'src' ? segment.srcLen : segment.genLen;
+			if (offset <= segment[key] + length) candidates.push(segment);
 		}
-		return false;
+		if (candidates.length === 0) return null;
+
+		const startsHere = candidates.some((segment) => segment[key] === offset);
+		let selected: Segment | null = null;
+		let selectedLength = Infinity;
+		for (const segment of candidates) {
+			if (startsHere && segment[key] !== offset) continue;
+			const length = key === 'src' ? segment.srcLen : segment.genLen;
+			if (length < selectedLength) {
+				selected = segment;
+				selectedLength = length;
+			}
+		}
+		if (!selected) return null;
+		const selectedStart = selected[key];
+		return candidates.filter((segment) => {
+			const length = key === 'src' ? segment.srcLen : segment.genLen;
+			return segment[key] === selectedStart && length === selectedLength;
+		});
 	};
 
 	const ranges = (matched: Segment[], side: 'src' | 'gen'): MappedRange[] | null => {
-		const text = side === 'gen' ? generatedText : sourceText;
-		const seen = new Set<number>();
+		const seen = new Set<string>();
 		const result: MappedRange[] = [];
 		for (const segment of matched) {
 			const start = side === 'gen' ? segment.gen : segment.src;
 			const length = side === 'gen' ? segment.genLen : segment.srcLen;
-			const range = length >= 0 ? { from: start, to: start + length } : expandWord(text, start);
+			const range = { from: start, to: start + length };
 			if (range.to <= range.from) continue;
-			// Ranges are small; a from<<20|to key would overflow long docs — use both.
-			const key = range.from * 0x100000000 + range.to;
+			const key = range.from + ':' + range.to;
 			if (seen.has(key)) continue;
 			seen.add(key);
 			result.push(range);
@@ -197,55 +130,14 @@ function createMapping(
 
 	return {
 		toGenerated(offset) {
-			const matched = group(bySrc, 'src', offset);
-			return matched && withinAnchor(matched, 'src', offset) ? ranges(matched, 'gen') : null;
+			const matched = containing(bySrc, srcPrefixEnds, 'src', offset);
+			return matched ? ranges(matched, 'gen') : null;
 		},
 		toSource(offset) {
-			const matched = group(byGen, 'gen', offset);
-			return matched && withinAnchor(matched, 'gen', offset) ? ranges(matched, 'src') : null;
+			const matched = containing(byGen, genPrefixEnds, 'gen', offset);
+			return matched ? ranges(matched, 'src') : null;
 		},
 	};
-}
-
-/**
- * Build a mapping from a compiler source map (the `map` field `compile()`
- * returns) plus the exact source/generated text the map describes. Returns
- * null when the map is missing, malformed, or empty — navigation simply
- * stays off.
- */
-export function mappingFromSourceMap(
-	map: unknown,
-	sourceText: string,
-	generatedText: string,
-): CodeMapping | null {
-	const mappings = (map as { mappings?: unknown } | null | undefined)?.mappings;
-	if (typeof mappings !== 'string' || mappings.length === 0) return null;
-	const lines = decodeVlqLines(mappings);
-	if (!lines) return null;
-	const srcStarts = lineStartOffsets(sourceText);
-	const genStarts = lineStartOffsets(generatedText);
-	const segments: Segment[] = [];
-	let srcIndex = 0;
-	let srcLine = 0;
-	let srcCol = 0;
-	for (let genLine = 0; genLine < lines.length && genLine < genStarts.length; genLine++) {
-		let genCol = 0;
-		for (const segment of lines[genLine]) {
-			genCol += segment[0];
-			if (segment.length < 4) continue;
-			srcIndex += segment[1];
-			srcLine += segment[2];
-			srcCol += segment[3];
-			// The playground compiles one virtual file per map; skip anything else.
-			if (srcIndex !== 0) continue;
-			if (srcLine < 0 || srcLine >= srcStarts.length || srcCol < 0 || genCol < 0) continue;
-			const src = srcStarts[srcLine] + srcCol;
-			const gen = genStarts[genLine] + genCol;
-			if (src >= sourceText.length || gen >= generatedText.length) continue;
-			segments.push({ src, gen, srcLen: -1, genLen: -1 });
-		}
-	}
-	return createMapping(segments, sourceText, generatedText);
 }
 
 /**
@@ -271,5 +163,5 @@ export function mappingFromVolar(
 			segments.push({ src: sourceOffsets[i], gen: generatedOffsets[i], srcLen, genLen });
 		}
 	}
-	return createMapping(segments, '', '');
+	return createMapping(segments);
 }

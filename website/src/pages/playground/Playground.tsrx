@@ -1,11 +1,11 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
 // LIVE rendered app or the compiled output, switchable with a tab. The
-// compiled pane has two modes: PROD (the client-runtime emit of `compile()`)
-// and TYPES (the typed virtual TSX the IDE language service sees, via
-// `octane/compiler/volar`). Both modes support position mapping — placing the
-// cursor in the source highlights and scrolls the corresponding output ranges
-// into view, and vice versa (prod uses the compiler's real source map, types
-// uses the Volar token mappings; see src/lib/playground-mapping.ts). The
+// compiled pane has two modes: AST (the compiler's parser tree for the
+// authored file) and TYPES (the typed virtual TSX the IDE language service
+// sees via `octane/compiler/volar`). Like Svelte's AST output, hovering or
+// selecting source reveals the deepest containing AST node and hovering a
+// tree node highlights its source range. Types uses the Volar token mappings
+// bidirectionally (see src/lib/playground-mapping.ts). The
 // whole pipeline runs in the browser: `octane/compiler` (and sucrase for
 // React-host `.react.tsx` files) compiles the virtual files on a debounce, the
 // module graph executes inside a SANDBOXED IFRAME with an opaque origin (see
@@ -63,9 +63,8 @@ export function Playground() @{
 	useTitle('Octane — Playground');
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
-	// Which artifact the compiled pane shows: the prod client-runtime emit or
-	// the typed virtual TSX (a dev-emit option can join later).
-	const [compiledMode, setCompiledMode] = useState<'prod' | 'types'>('prod');
+	// Which compiler artifact the right pane shows.
+	const [compiledMode, setCompiledMode] = useState<'ast' | 'types'>('ast');
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
@@ -85,13 +84,17 @@ export function Playground() @{
 
 	const sourceHostRef = useRef<HTMLDivElement | null>(null);
 	const outputHostRef = useRef<HTMLDivElement | null>(null);
+	const astHostRef = useRef<HTMLDivElement | null>(null);
 	const previewHostRef = useRef<HTMLDivElement | null>(null);
 	// The boot closure runs once, so it can't read the view/mode STATE — this
 	// ref mirrors it (updated by the same handlers that set state) for the
 	// closure's output-refresh and position-mapping paths.
-	const resultModeRef = useRef<{ view: 'preview' | 'compiled'; compiledMode: 'prod' | 'types' }>({
+	const resultModeRef = useRef<{
+		view: 'preview' | 'compiled';
+		compiledMode: 'ast' | 'types';
+	}>({
 		view: 'preview',
-		compiledMode: 'prod',
+		compiledMode: 'ast',
 	});
 	// Imperative bridge into the boot closure below — populated once the editor
 	// stack has loaded; the toolbar buttons (and the consent overlay's Run
@@ -110,7 +113,7 @@ export function Playground() @{
 		resultModeRef.current.view = next;
 		controllerRef.current.syncOutput?.();
 	};
-	const selectCompiledMode = (next: 'prod' | 'types') => {
+	const selectCompiledMode = (next: 'ast' | 'types') => {
 		setCompiledMode(next);
 		resultModeRef.current.compiledMode = next;
 		controllerRef.current.syncOutput?.();
@@ -119,12 +122,14 @@ export function Playground() @{
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
 		const outputHost = outputHostRef.current;
+		const astHost = astHostRef.current;
 		const previewHost = previewHostRef.current;
-		if (!sourceHost || !outputHost || !previewHost) return;
+		if (!sourceHost || !outputHost || !astHost || !previewHost) return;
 
 		let disposed = false;
 		let sourceView: any;
 		let outputView: any;
+		let astPreview: any;
 		let preview: any = null;
 		let compileDebounceId = 0;
 		let hashDebounceId = 0;
@@ -138,9 +143,9 @@ export function Playground() @{
 
 		(async () => {
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
-			let pgExamples: any, pgMapping: any;
+			let pgExamples: any, pgMapping: any, pgAst: any;
 			try {
-				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgExamples, pgMapping] =
+				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgExamples, pgMapping, pgAst] =
 					await Promise.all([
 						import('@codemirror/state'),
 						import('@codemirror/commands'),
@@ -150,6 +155,7 @@ export function Playground() @{
 						import('../../lib/playground-modules.ts'),
 						import('../../lib/playground-examples.ts'),
 						import('../../lib/playground-mapping.ts'),
+						import('../../lib/playground-ast.ts'),
 					]);
 			} catch (bootError) {
 				// A load failure after unmount (e.g. a test env torn down mid-import)
@@ -285,22 +291,18 @@ export function Playground() @{
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
 			};
 
-			// The compiled-output pane tracks the ACTIVE file and the selected
-			// mode (prod emit vs typed virtual TSX); the last good graph is kept
-			// so tab/mode switches don't need a recompile. `mapping` is derived
-			// lazily per artifact on first navigation and cached on it under an
-			// undefined/null sentinel (undefined = not built yet, null = built
-			// and absent); compiled-module identity is stable across rebuilds
-			// while a file's source is unchanged, so the cache survives them.
+			// The last good graph still drives preview execution. AST and Types
+			// are generated lazily for only the active file when their tab opens.
 			let lastCompiled: Map<string, any> | null = null;
 			// name → { source, code, volarMappings, mapping } — the types view is
 			// generated on demand for the active file only, keyed by the exact
 			// source. Raw volar mappings are kept so the CodeMapping is built
-			// lazily, exactly like the prod pane's source-map path.
+			// lazily on first Types navigation.
 			const typesCache = new Map<
 				string,
 				{ source: string; code: string; volarMappings: any; mapping: any }
 			>();
+			const astCache = new Map<string, { source: string; ast: unknown }>();
 
 			const typesEntry = (name: string) => {
 				const source = fileSource(name);
@@ -329,23 +331,51 @@ export function Playground() @{
 				typesCache.set(name, entry);
 				return entry;
 			};
+			const astEntry = (name: string) => {
+				if (pgModules.isReactHostFile(name)) return null;
+				const source = fileSource(name);
+				const cached = astCache.get(name);
+				if (cached && cached.source === source) return cached;
+				const result = pg.compileAst(source, name);
+				if (!result.ok) {
+					setError(`AST generation failed: ${result.error}`);
+					return null;
+				}
+				const entry = { source, ast: result.ast };
+				astCache.set(name, entry);
+				return entry;
+			};
 
 			// The exact string the output editor currently displays. The output
 			// view is read-only and written ONLY here, so this makes both the
 			// refresh no-op check and activeMapping's staleness check a string
 			// reference compare instead of an O(doc) toString per call.
-			const OUTPUT_PLACEHOLDER = '// Compiled output appears here.';
+			const OUTPUT_PLACEHOLDER = '// Types output appears here.';
 			let lastShownOutput = OUTPUT_PLACEHOLDER;
+			let lastShownAst: object | null = null;
 			const showOutput = () => {
 				// The compiled pane is not visible: skip entirely — no types
 				// generation, no doc replacement, and (the dominant cost) no Shiki
 				// re-tokenize of the output document. syncOutput re-runs this when
 				// the pane is revealed, so it refreshes exactly once, on demand.
 				if (resultModeRef.current.view !== 'compiled') return;
-				const code =
-					resultModeRef.current.compiledMode === 'types'
-						? typesEntry(currentFile).code
-						: lastCompiled?.get(currentFile)?.code;
+				if (resultModeRef.current.compiledMode === 'ast') {
+					const entry = astEntry(currentFile);
+					if (entry && entry !== lastShownAst) {
+						astPreview.setAst(entry.ast, currentFile);
+						lastShownAst = entry;
+					} else if (!entry && pgModules.isReactHostFile(currentFile)) {
+						astPreview.setUnavailable(
+							'AST trace covers Octane-owned .tsrx and .tsx files. React-host files use the separate Sucrase pipeline.',
+							currentFile,
+						);
+						lastShownAst = null;
+					}
+					clearMappedPair();
+					astPreview.clear();
+					return;
+				}
+				const code = typesEntry(currentFile).code;
 				if (typeof code !== 'string' || code === lastShownOutput) return;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
@@ -395,23 +425,24 @@ export function Playground() @{
 			// Only the first navigation against a fresh artifact builds the
 			// CodeMapping (undefined = not built, null = built, none available).
 			const activeMapping = () => {
-				if (resultModeRef.current.view !== 'compiled') return null;
-				const types = resultModeRef.current.compiledMode === 'types';
-				const entry =
-					types ? typesCache.get(currentFile) : lastCompiled?.get(currentFile);
+				if (
+					resultModeRef.current.view !== 'compiled' ||
+						resultModeRef.current.compiledMode !== 'types'
+				) return null;
+				const entry = typesCache.get(currentFile);
 				if (!entry || entry.source !== fileSource(currentFile)) return null;
 				if (entry.code !== lastShownOutput) return null;
 				if (entry.mapping === undefined) {
-					entry.mapping = types
-						? pgMapping.mappingFromVolar(entry.volarMappings)
-						: entry.map
-							? pgMapping.mappingFromSourceMap(entry.map, entry.source, entry.code)
-							: null;
+					entry.mapping = pgMapping.mappingFromVolar(entry.volarMappings);
 				}
 				return entry.mapping;
 			};
 
-			const revealRanges = (targetView: any, ranges: { from: number; to: number }[]) => {
+			const revealRanges = (
+				targetView: any,
+				ranges: { from: number; to: number }[],
+				scroll: boolean,
+			) => {
 				const limit = targetView.state.doc.length;
 				const clamped = ranges.filter((range: { from: number }) => range.from < limit).map(
 					(range: { from: number; to: number }) => ({
@@ -424,19 +455,57 @@ export function Playground() @{
 					clearMappedIn(targetView);
 					return;
 				}
-				targetView.dispatch({
-					effects: [
-						setMapped.of(
-							Decoration.set(
-								clamped.map(
-									(range: { from: number; to: number }) => mappedMark.range(range.from, range.to),
-								),
+				const effects = [
+					setMapped.of(
+						Decoration.set(
+							clamped.map(
+								(range: { from: number; to: number }) => mappedMark.range(range.from, range.to),
 							),
 						),
-						EditorView.scrollIntoView(clamped[0].from, { y: 'center' }),
-					],
-				});
+					),
+				];
+				if (scroll) effects.push(EditorView.scrollIntoView(clamped[0].from, { y: 'center' }));
+				targetView.dispatch({ effects });
 			};
+
+			const mappedPair = (side: 'source' | 'output', offset: number) => {
+				const mapping = activeMapping();
+				if (!mapping) return null;
+				if (side === 'source') {
+					const output = mapping.toGenerated(offset);
+					const source =
+						output ? mapping.toSource(output[0].from) : null;
+					return source && output ? { source, output } : null;
+				}
+				const source = mapping.toSource(offset);
+				const output =
+					source ? mapping.toGenerated(source[0].from) : null;
+				return source && output ? { source, output } : null;
+			};
+			const clearMappedPair = () => {
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
+			};
+			const revealPair = (
+				pair: { source: { from: number; to: number }[]; output: { from: number; to: number }[] },
+				scrollSide: 'source' | 'output' | null,
+			) => {
+				revealRanges(sourceView, pair.source, scrollSide === 'source');
+				revealRanges(outputView, pair.output, scrollSide === 'output');
+			};
+			const revealAstRange = (range: { from: number; to: number } | null, scroll: boolean) => {
+				if (resultModeRef.current.compiledMode !== 'ast') return;
+				if (!range) {
+					clearMappedPair();
+					return;
+				}
+				clearMappedIn(outputView);
+				revealRanges(sourceView, [range], scroll);
+			};
+
+			astPreview = pgAst.createAstPreview(astHost, {
+				onNodeRange: revealAstRange,
+			});
 
 			const crossNavigate = (side: 'source' | 'output') => EditorView.updateListener.of((
 				update: any,
@@ -446,19 +515,38 @@ export function Playground() @{
 				// (doc replacement, highlight effects) must not feed back.
 				if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
 				if (resultModeRef.current.view !== 'compiled') return;
-				const target =
-					side === 'source' ? outputView : sourceView;
-				const mapping = activeMapping();
 				const offset = update.state.selection.main.head;
-				const ranges =
-					mapping
-						? side === 'source'
-							? mapping.toGenerated(offset)
-							: mapping.toSource(offset)
-						: null;
+				if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
+					astPreview.reveal(offset, true);
+					return;
+				}
+				const pair = mappedPair(side, offset);
 				// Marks reflect the CURRENT selection — an unmapped one clears.
-				if (ranges) revealRanges(target, ranges);
-				else clearMappedIn(target);
+				if (pair) revealPair(pair, side === 'source' ? 'output' : 'source');
+				else clearMappedPair();
+			});
+
+			// Match Svelte's playground interaction: hovering either document
+			// highlights the corresponding ranges without moving its scroll
+			// position; clicking/cursor movement above additionally reveals them.
+			const crossHover = (side: 'source' | 'output') => EditorView.domEventObservers({
+				mousemove(event: MouseEvent, view: any) {
+					if (resultModeRef.current.view !== 'compiled') return;
+					const offset = view.posAtCoords({ x: event.clientX, y: event.clientY });
+					if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
+						if (offset == null) clearMappedPair();
+						else astPreview.reveal(offset, false);
+						return;
+					}
+					const pair =
+						offset == null ? null : mappedPair(side, offset);
+					if (pair) revealPair(pair, null);
+					else clearMappedPair();
+				},
+				mouseleave() {
+					clearMappedPair();
+					astPreview.clear();
+				},
 			});
 
 			let compileSeq = 0;
@@ -575,6 +663,7 @@ export function Playground() @{
 					shikiHighlight(grammarFor(name)),
 					sharedTheme,
 					mappedField,
+					crossHover('source'),
 					crossNavigate('source'),
 					EditorView.updateListener.of((update: any) => {
 						if (!update.docChanged) return;
@@ -582,6 +671,10 @@ export function Playground() @{
 						// shown in the output (this field self-clears; a failed
 						// recompile would otherwise leave the output's marks forever).
 						clearMappedIn(outputView);
+						if (resultModeRef.current.compiledMode === 'ast') {
+							astPreview.setUnavailable('Waiting for the next successful compile…', currentFile);
+							lastShownAst = null;
+						}
 						const next = update.state.doc.toString();
 						const file = workspace().files.find(
 							(candidate: { name: string }) => candidate.name === currentFile,
@@ -628,6 +721,7 @@ export function Playground() @{
 						shikiHighlight('tsx'),
 						sharedTheme,
 						mappedField,
+						crossHover('output'),
 						crossNavigate('output'),
 					],
 				}),
@@ -677,6 +771,7 @@ export function Playground() @{
 				currentFile = workspace().entry;
 				editorStates.clear();
 				typesCache.clear();
+				astCache.clear();
 				sourceView.setState(makeEditorState(currentFile, fileSource(currentFile)));
 				clearMappedIn(outputView);
 				// Picking an example is the visitor's own action — never gated.
@@ -753,6 +848,7 @@ export function Playground() @{
 			window.clearTimeout(hashDebounceId);
 			sourceView?.destroy();
 			outputView?.destroy();
+			astPreview?.destroy();
 			preview?.destroy();
 		};
 	}, []);
@@ -881,17 +977,17 @@ export function Playground() @{
 					<span>
 						{view === 'preview'
 							? 'Live preview'
-							: (compiledMode === 'types' ? 'Types output · ' : 'Compiled output · ') +
+							: (compiledMode === 'types' ? 'Types output · ' : 'AST output · ') +
 								(activeFile || '…')}
 					</span>
 					@if (view === 'compiled') {
 						<div class="pg-seg pg-seg-sm" role="group" aria-label="Compiled output mode">
 							<button
 								type="button"
-								class={['pg-seg-btn', compiledMode === 'prod' && 'active']}
-								onClick={() => selectCompiledMode('prod')}
+								class={['pg-seg-btn', compiledMode === 'ast' && 'active']}
+								onClick={() => selectCompiledMode('ast')}
 							>
-								Prod
+								AST
 							</button>
 							<button
 								type="button"
@@ -925,7 +1021,12 @@ export function Playground() @{
 						</div>
 					}
 				</div>
-				<div class={['pg-editor', view !== 'compiled' && 'hidden']} ref={outputHostRef} />
+				<div class={['pg-compiled', view !== 'compiled' && 'hidden']}>
+					<div class={['pg-ast-host', compiledMode !== 'ast' && 'hidden']} ref={astHostRef} />
+					<div class={['pg-output', compiledMode !== 'types' && 'hidden']}>
+						<div class="pg-editor" ref={outputHostRef} />
+					</div>
+				</div>
 			</section>
 		</div>
 
@@ -1022,7 +1123,7 @@ export function Playground() @{
 				border: 1px solid var(--border);
 				background: var(--surface-subtle);
 			}
-			/* Compact variant for the panel-head Prod/Types switch. */
+			/* Compact variant for the panel-head AST/Types switch. */
 			.pg-seg-sm {
 				padding: 2px;
 			}
@@ -1159,8 +1260,115 @@ export function Playground() @{
 				min-height: 0;
 			}
 			.pg-editor.hidden,
+			.pg-compiled.hidden,
 			.pg-result.hidden {
 				display: none;
+			}
+			.pg-compiled {
+				display: flex;
+				flex: 1;
+				min-height: 0;
+				flex-direction: column;
+			}
+			.pg-output {
+				display: flex;
+				flex: 1;
+				min-height: 0;
+				flex-direction: column;
+			}
+			.pg-output.hidden {
+				display: none;
+			}
+			.pg-ast-host {
+				flex: 1;
+				min-height: 0;
+				overflow: hidden;
+			}
+			.pg-ast-host.hidden {
+				display: none;
+			}
+			.pg-ast-host :global(.pg-ast-shell) {
+				display: flex;
+				height: 100%;
+				min-height: 0;
+				flex-direction: column;
+				background: var(--code-bg);
+				color: var(--text);
+				font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+				font-size: 0.75rem;
+			}
+			.pg-ast-host :global(.pg-ast-status),
+			.pg-ast-host :global(.pg-ast-notice) {
+				padding: 0.18rem 0.45rem;
+				border-bottom: 1px solid var(--border);
+				color: var(--text-secondary);
+				font-family: var(--font-sans, system-ui, sans-serif);
+				font-size: 0.65rem;
+			}
+			.pg-ast-host :global(.pg-ast-status) {
+				color: var(--text);
+				font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+			}
+			.pg-ast-host :global(.pg-ast-notice) {
+				border-top: 1px solid var(--border);
+				border-bottom: 0;
+			}
+			.pg-ast-host :global(.pg-ast-scroll) {
+				flex: 1;
+				min-height: 0;
+				overflow: auto;
+				padding: 0.35rem 0.45rem 0.65rem;
+			}
+			.pg-ast-host :global(.pg-ast-tree),
+			.pg-ast-host :global(.pg-ast-node ul) {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			.pg-ast-host :global(.pg-ast-node ul) {
+				padding-left: 1rem;
+			}
+			.pg-ast-host :global(.pg-ast-node summary),
+			.pg-ast-host :global(.pg-ast-value),
+			.pg-ast-host :global(.pg-ast-closing) {
+				display: block;
+				width: max-content;
+				padding: 0 0.1rem;
+				border-radius: 2px;
+				white-space: pre;
+			}
+			.pg-ast-host :global(.pg-ast-node summary) {
+				cursor: pointer;
+			}
+			.pg-ast-host :global(.pg-ast-node[data-ast-path='true'] > details:not([open]) > summary),
+			.pg-ast-host :global(.pg-ast-node[data-ast-leaf='true'] > details > summary) {
+				background: rgba(255, 234, 0, 0.2);
+				box-shadow: inset 0 0 0 1px rgba(214, 185, 0, 0.2);
+			}
+			.pg-ast-host :global(.pg-ast-node[data-ast-leaf='true'] > details > summary) {
+				background: rgba(255, 234, 0, 0.34);
+			}
+			.pg-ast-host :global(.pg-ast-key) {
+				color: var(--text);
+				text-decoration: underline;
+				text-decoration-color: var(--border-strong);
+			}
+			.pg-ast-host :global(.pg-ast-type) {
+				color: var(--accent-text);
+			}
+			.pg-ast-host :global(.pg-ast-range),
+			.pg-ast-host :global(.pg-ast-reference),
+			.pg-ast-host :global(.pg-ast-undefined),
+			.pg-ast-host :global(.pg-ast-null) {
+				color: var(--text-secondary);
+			}
+			.pg-ast-host :global(.pg-ast-string) {
+				color: var(--syntax-string, #a56a12);
+			}
+			.pg-ast-host :global(.pg-ast-number),
+			.pg-ast-host :global(.pg-ast-boolean),
+			.pg-ast-host :global(.pg-ast-bigint) {
+				color: var(--syntax-number, #2f8f46);
 			}
 			.pg-grid:not(.ready) :global(.cm-editor) {
 				opacity: 0;
@@ -1170,7 +1378,8 @@ export function Playground() @{
 			}
 			/* Ranges revealed by source↔output position mapping. */
 			.pg-editor :global(.cm-mapped) {
-				background: rgba(255, 221, 0, 0.55);
+				background: rgba(255, 234, 0, 0.42);
+				box-shadow: inset 0 0 0 1px rgba(214, 185, 0, 0.28);
 				border-radius: 2px;
 			}
 			.pg-result {
