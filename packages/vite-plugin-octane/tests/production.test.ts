@@ -223,6 +223,10 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 			expect(prodHtml).toContain('fixture-nav');
 			expect(prodHtml).toContain(url === '/' ? 'Fixture page home' : 'Fixture page hello');
 			expect(prodHtml).toContain(`<p class="url">${url}</p>`);
+			// GuardedConst is imported extensionlessly from a .tsrx module. Reaching
+			// its rendered output proves both dev and production SSR resolved that edge.
+			expect(prodHtml).toContain('class="vite-guarded-const"');
+			expect(prodHtml).toContain('vite-guarded-const-proof');
 			expect(prodHtml).toContain(`<link rel="stylesheet" href="/${deferredCss}">`);
 			expect(prodHtml).not.toContain(`src="/${deferredJavaScript}"`);
 			expect(prodHtml).not.toContain(`<link rel="modulepreload" href="/${deferredJavaScript}">`);

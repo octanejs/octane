@@ -51,6 +51,27 @@ export function PropChainHost({
 	}
 }
 
+function ComputedPropChainReader(props: {
+	'data-a': string;
+	'data-b': string;
+	load: (a: string, b: string) => Promise<string>;
+}) @{
+	const request = props.load(props['data-a'], props['data-b']);
+	<p id="computed-prop-chain">{use(request) as string}</p>
+}
+
+export function ComputedPropChainHost(props: {
+	'data-a': string;
+	'data-b': string;
+	load: (a: string, b: string) => Promise<string>;
+}) @{
+	@try {
+		<ComputedPropChainReader data-a={props['data-a']} data-b={props['data-b']} load={props.load} />
+	} @pending {
+		<p>loading</p>
+	}
+}
+
 function SwitchingChainReader({
 	fetchA,
 	fetchB,

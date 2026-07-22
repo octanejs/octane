@@ -4,6 +4,7 @@ import {
 	BracelessVarChainHost,
 	BranchChainHost,
 	ChainHost,
+	ComputedPropChainHost,
 	NestedBranchChainHost,
 	PropChainHost,
 	SetupShadowHost,
@@ -87,6 +88,35 @@ describe('use()-fed const chain memoization', () => {
 		expect(r.html()).toContain('<img src="thumb-a"');
 		expect(userCalls).toEqual(['a']);
 		expect(thumbCalls).toEqual(['a']);
+		r.unmount();
+	});
+
+	it('tracks distinct static computed prop dependencies in a local creation chain', () => {
+		const calls: string[] = [];
+		const load = (a: string, b: string) => {
+			const value = a + ':' + b;
+			calls.push(value);
+			return {
+				status: 'fulfilled',
+				value,
+				then() {},
+			} as unknown as Promise<string>;
+		};
+		const r = mount(ComputedPropChainHost, {
+			'data-a': 'stable',
+			'data-b': 'first',
+			load,
+		});
+		expect(r.find('#computed-prop-chain').textContent).toBe('stable:first');
+		expect(calls).toEqual(['stable:first']);
+
+		r.update(ComputedPropChainHost, {
+			'data-a': 'stable',
+			'data-b': 'second',
+			load,
+		});
+		expect(r.find('#computed-prop-chain').textContent).toBe('stable:second');
+		expect(calls).toEqual(['stable:first', 'stable:second']);
 		r.unmount();
 	});
 
