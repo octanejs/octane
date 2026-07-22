@@ -1158,6 +1158,21 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// Clicking keeps that bidirectional mapping and scrolls it into view.
 			await clickToken(1, 'setCount', 1);
 			await mappedIn(0, 'setCount');
+			// A cached Types document must not retain the source highlight from
+			// AST when the user switches back to it.
+			await page.locator('[aria-label="Compiled output mode"] button', { hasText: 'AST' }).click();
+			await clickToken(0, 'useState', 2);
+			await page.waitForFunction(
+				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
+				null,
+				{ timeout: 10_000 },
+			);
+			await page
+				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
+				.click();
+			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+				timeout: 5_000,
+			});
 			// Switching to Preview clears every mark; Compiled returns clean.
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
 			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
@@ -1186,6 +1201,17 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				null,
 				{ timeout: 10_000 },
 			);
+			// A failed AST generation replaces the prior tree and cannot map
+			// source hover through its stale ranges.
+			await page.locator('[aria-label="Compiled output mode"] button', { hasText: 'AST' }).click();
+			await page
+				.getByText('AST generation failed. Fix the source to generate a new tree.')
+				.waitFor();
+			expect(await page.locator('.pg-ast-tree').count()).toBe(0);
+			await hoverToken(0, 'import', 1);
+			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+				timeout: 5_000,
+			});
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
