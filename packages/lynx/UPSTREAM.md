@@ -85,10 +85,20 @@ background root; it does not copy ReactLynx's teardown implementation or use
 Octane cleanup contract only. Explorer, Android, and iOS must still establish
 that the typed event is delivered on the expected context with safe ordering.
 
+The same public type surface includes `CommonLynx.getEngine()`. At exact Lynx
+SDK 3.9.0 commit `d7f13487df0d69497148e93b71aded676a8fe243`,
+`TemplateAssembler::DispatchEventFromEngineToCoreContext` tries that Engine
+`ContextProxy` listener before the legacy global-function fallback, and routes
+`__RenderPage`, `__UpdatePage`, and `__UpdateGlobalProps` through the helper.
+Octane's typed listener and root-independent data protocol are original code;
+source and JavaScript-host tests establish their replace, merge, reset, and
+global-patch behavior only. Explorer, Android, and iOS must still establish the
+actual context, delivery order, payload completeness, and bootstrap timing.
+
 The intrinsic declarations and JavaScript-environment host tests are not a
-native layout or device claim. The Phase 0 public event hook, reload, typed
-destroy delivery, Web, and Android/iOS gates remain authoritative until later
-production/device milestones satisfy them.
+native layout or device claim. The Phase 0 public event hook, reconstructing
+reload, typed data/destroy delivery, Web, and Android/iOS gates remain
+authoritative until later production/device milestones satisfy them.
 
 Milestone 1–4 syntax, built-in, and runtime-ownership assumptions for the exact
 Rspeedy graph are recorded in

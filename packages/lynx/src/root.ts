@@ -12,6 +12,7 @@ import {
 	type LynxClientContainer,
 	type LynxPublicHandle,
 } from './core/client-driver.js';
+import { prepareLynxBackgroundLifecycleReceiver } from './core/background-lifecycle.js';
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
 import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
@@ -21,6 +22,7 @@ import {
 	type LynxBackgroundFunctionDescriptor,
 	type LynxWorkletValue,
 } from './core/worklets.js';
+import type { Lynx } from './platform.js';
 
 interface LynxBackgroundGlobals {
 	readonly lynx?: {
@@ -204,10 +206,23 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 				: undefined,
 		worklets,
 	});
+	const lifecycleInstallation = (() => {
+		try {
+			return prepareLynxBackgroundLifecycleReceiver(
+				target.lynx as unknown as Lynx,
+				context,
+				options.onDiagnostic,
+			);
+		} catch (error) {
+			worklets.close();
+			throw error;
+		}
+	})();
 	const transport = (() => {
 		try {
 			return createLynxBackgroundTransport(context, container, {
 				onDiagnostic: options.onDiagnostic,
+				isPageDestroyed: lifecycleInstallation.isPageDestroyed,
 				prepareWorkletBatch: (batch) => prepareLynxClientWorkletBatch(container, batch),
 				onWorkletBatchAccepted: acceptWorkletBatch,
 				onWorkletBatchRejected: rejectWorkletBatch,
@@ -216,6 +231,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 				},
 			});
 		} catch (error) {
+			lifecycleInstallation.rollback();
 			worklets.close();
 			throw error;
 		}
@@ -230,6 +246,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 			transport.bindRoot(root);
 			return root;
 		} catch (error) {
+			lifecycleInstallation.rollback();
 			transport.close(error);
 			worklets.close();
 			throw error;
@@ -260,6 +277,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 			},
 		});
 	} catch (error) {
+		lifecycleInstallation.rollback();
 		transport.close(error);
 		closeWorklets();
 		throw error;
@@ -344,6 +362,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 					disposeError = error;
 				} finally {
 					transport.close(disposeFailed ? disposeError : unmountFailed ? unmountError : undefined);
+					lifecycleInstallation.release();
 					state.closeWorklets();
 					state.status = 'unmounted';
 				}
@@ -354,6 +373,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 		},
 	};
 	transport.bindPageDestroy(() => facade.unmount());
+	lifecycleInstallation.commit();
 	return Object.freeze(facade);
 }
 
