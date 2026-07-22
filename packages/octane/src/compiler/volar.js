@@ -24,6 +24,7 @@
  */
 
 import {
+	analyzeTsrx,
 	createJsxTransform,
 	createVolarMappingsResult,
 	dedupeMappings,
@@ -203,6 +204,13 @@ export function compileToVolarMappings(source, filename, options) {
 		loose: !!options?.loose,
 		preserveParens: true,
 		keywordTokens: true,
+		errors,
+		comments,
+	});
+	analyzeTsrx(ast, filename, {
+		collect: true,
+		loose: !!options?.loose,
+		to_ts: true,
 		errors,
 		comments,
 	});

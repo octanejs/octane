@@ -3,7 +3,8 @@
  * runtime.
  *
  * Architecture:
- *   1. Parse TSRX via @tsrx/core's parseModule.
+ *   1. Parse TSRX via @tsrx/core's parseModule and run its target-neutral
+ *      semantic analysis on the authored module.
  *   2. For each top-level node:
  *        - Component (`@{ … }` body or a return-JSX function) → compile to a
  *          function taking the props-first ABI `(…userParams, __s, __extra)`.
@@ -27,8 +28,9 @@
  */
 
 import {
-	parseModule,
 	analyzeCss,
+	analyzeTsrx,
+	parseModule,
 	prepareStylesheetForRender,
 	renderStylesheets,
 	annotateWithHash,
@@ -4281,23 +4283,48 @@ function restampAuthoredStyleHashes(ast, styleRemap, filename) {
 	}
 }
 
+function cleanCompileFilename(filename) {
+	const query = filename.indexOf('?');
+	// A leading `#` is a Node package-import alias, not a URL fragment.
+	const hash = filename.indexOf('#', filename.startsWith('#') ? 1 : 0);
+	let end = filename.length;
+	if (query !== -1) end = query;
+	if (hash !== -1 && hash < end) end = hash;
+	return filename.slice(0, end);
+}
+
 export function compile(source, filename, options) {
-	const authoredSource = source;
+	return compileAuthored(source, filename, options, null);
+}
+
+// Internal bundler entry point. Unlike the old __hydratePrepared handoff, this
+// always validates authored source and only exposes the hydrate slice that the
+// same compilation already prepared for production void-export classification.
+export function compileForBundler(source, filename, options) {
+	const metadata = { hydrateSource: source };
+	const result = compileAuthored(source, filename, options, metadata);
+	return { result, hydrateSource: metadata.hydrateSource };
+}
+
+function compileAuthored(source, filename, options, bundlerMetadata) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
+	const cleanFilename = cleanCompileFilename(filename);
+	const analyzedAst = parseModule(source, cleanFilename);
+	analyzeTsrx(analyzedAst, cleanFilename);
+	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
+}
+
+function compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata) {
+	const authoredSource = source;
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
 	}
 	if (!options?.__hydratePrepared) {
-		const query = filename.indexOf('?');
-		const hash = filename.indexOf('#');
-		let filenameEnd = filename.length;
-		if (query !== -1) filenameEnd = query;
-		if (hash !== -1 && hash < filenameEnd) filenameEnd = hash;
-		const cleanFilename = filename.slice(0, filenameEnd);
+		const cleanFilename = cleanCompileFilename(filename);
 		const hydratePreparation =
 			mode === 'client'
 				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
@@ -4305,23 +4332,38 @@ export function compile(source, filename, options) {
 		if (hydratePreparation !== null) {
 			const nativeChangeDiagnostics =
 				options?.__nativeChangeDiagnostics ??
-				analyzeNativeChangeDiagnostics(parseModule(source, cleanFilename), source, cleanFilename, {
-					dom: options?.renderer?.target !== 'universal',
-					renderer: options?.renderer,
-					rendererBoundaries: options?.rendererBoundaries,
-					rendererRegistry: options?.rendererRegistry,
-				}).diagnostics;
-			const compiled = compile(hydratePreparation.source, cleanFilename, {
-				...options,
-				__hydratePrepared: true,
-				__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
-				__nativeChangeDiagnostics: nativeChangeDiagnostics,
-				__styleRemap: composeStyleRemap(
-					options?.__styleRemap ?? null,
-					authoredSource,
-					hydratePreparation.origins ?? null,
-				),
-			});
+				analyzeNativeChangeDiagnostics(
+					analyzedAst ?? parseModule(source, cleanFilename),
+					source,
+					cleanFilename,
+					{
+						dom: options?.renderer?.target !== 'universal',
+						renderer: options?.renderer,
+						rendererBoundaries: options?.rendererBoundaries,
+						rendererRegistry: options?.rendererRegistry,
+					},
+				).diagnostics;
+			if (bundlerMetadata !== null) {
+				bundlerMetadata.hydrateSource = hydratePreparation.source;
+			}
+			const compiled = compileInternal(
+				hydratePreparation.source,
+				cleanFilename,
+				{
+					...options,
+					__hydratePrepared: true,
+					__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
+					__nativeChangeDiagnostics: nativeChangeDiagnostics,
+					__styleRemap: composeStyleRemap(
+						options?.__styleRemap ?? null,
+						authoredSource,
+						hydratePreparation.origins ?? null,
+					),
+				},
+				null,
+				mode,
+				null,
+			);
 			if (hydratePreparation.map && compiled.map) {
 				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
 				compiled.map = addSourceMapNeedles(
@@ -4355,7 +4397,7 @@ export function compile(source, filename, options) {
 			(serverBoundaryPreparation === null
 				? undefined
 				: analyzeNativeChangeDiagnostics(
-						parseModule(authoredSource, filename),
+						analyzedAst ?? parseModule(authoredSource, filename),
 						authoredSource,
 						filename,
 						{
@@ -4387,6 +4429,7 @@ export function compile(source, filename, options) {
 					: { __nativeChangeDiagnostics: serverAuthoredDiagnostics }),
 			},
 			serverStyleRemap,
+			serverBoundaryPreparation === null ? analyzedAst : null,
 		);
 		if (serverBoundaryPreparation?.map && compiled.map) {
 			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
@@ -4407,7 +4450,7 @@ export function compile(source, filename, options) {
 		(rendererBoundaryPreparation === null
 			? null
 			: analyzeNativeChangeDiagnostics(
-					parseModule(authoredSource, filename),
+					analyzedAst ?? parseModule(authoredSource, filename),
 					authoredSource,
 					filename,
 					{
@@ -4456,24 +4499,31 @@ export function compile(source, filename, options) {
 					domSource = expanded.source;
 					expansionMap = expanded.map;
 				}
-				const compiled = compile(domSource, filename, {
-					...options,
-					renderer: undefined,
-					universalRuntime: undefined,
-					rendererBoundaries: undefined,
-					rendererRegistry: undefined,
-					__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
-					__rendererBoundariesLowered: true,
-					__universal: universal,
-					__universalUnits: rendererBoundaryPreparation?.universalUnits,
-					// The owning universal source is outside the DOM diagnostic contract.
-					// Runtime-created DOM boundary hosts retain the development fallback.
-					__nativeChangeDiagnostics: [],
-					// The lowered/expanded text has its own coordinates, and
-					// universal targets are client-only (no server hash to agree
-					// with) — do not restamp against stale origins.
-					__styleRemap: undefined,
-				});
+				const compiled = compileInternal(
+					domSource,
+					filename,
+					{
+						...options,
+						renderer: undefined,
+						universalRuntime: undefined,
+						rendererBoundaries: undefined,
+						rendererRegistry: undefined,
+						__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
+						__rendererBoundariesLowered: true,
+						__universal: universal,
+						__universalUnits: rendererBoundaryPreparation?.universalUnits,
+						// The owning universal source is outside the DOM diagnostic contract.
+						// Runtime-created DOM boundary hosts retain the development fallback.
+						__nativeChangeDiagnostics: [],
+						// The lowered/expanded text has its own coordinates, and
+						// universal targets are client-only (no server hash to agree
+						// with) — do not restamp against stale origins.
+						__styleRemap: undefined,
+					},
+					null,
+					mode,
+					null,
+				);
 				if (expansionMap !== null) {
 					compiled.map = composeSourceMaps(compiled.map, expansionMap);
 					compiled.__universalSourceMapComposed = true;
@@ -4481,9 +4531,11 @@ export function compile(source, filename, options) {
 				}
 				return compiled;
 			},
-			validationRemap !== null
-				? { ...options, __universalValidationRemap: validationRemap }
-				: options,
+			{
+				...options,
+				...(validationRemap === null ? null : { __universalValidationRemap: validationRemap }),
+			},
+			rendererBoundaryPreparation === null ? analyzedAst : null,
 		);
 		if (rendererBoundaryPreparation !== null && result.map && !reverseSourceMapComposed) {
 			result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
@@ -4501,7 +4553,10 @@ export function compile(source, filename, options) {
 			diagnostics: rendererAuthoredDiagnostics ?? [],
 		};
 	}
-	const ast = parseModule(source, filename);
+	const ast =
+		rendererBoundaryPreparation === null && analyzedAst !== null
+			? analyzedAst
+			: parseModule(source, filename);
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(ast, source, filename, {
@@ -5437,8 +5492,8 @@ function ssrUnsupported(what) {
 	);
 }
 
-function compileServer(source, filename, options, styleRemap = null) {
-	const ast = parseModule(source, filename);
+function compileServer(source, filename, options, styleRemap = null, analyzedAst = null) {
+	const ast = analyzedAst ?? parseModule(source, filename);
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(ast, source, filename, {

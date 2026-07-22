@@ -3700,8 +3700,16 @@ export function lowerUniversalRendererRegion(
  * @param {{ id: string, module: string, target: 'universal', text?: 'host'|'ignore'|'reject', capabilities?: readonly string[], firstScreenEvents?: readonly string[] }} renderer
  * @param {(source: string, metadata: any) => { code: string, map: any }} compileClient
  * @param {Record<string, any>} [options]
+ * @param {import('@tsrx/core/types').AST.Program | null} [parsedAst]
  */
-export function compileUniversal(source, filename, renderer, compileClient, options = {}) {
+export function compileUniversal(
+	source,
+	filename,
+	renderer,
+	compileClient,
+	options = {},
+	parsedAst = null,
+) {
 	if (
 		!renderer ||
 		typeof renderer.id !== 'string' ||
@@ -3711,7 +3719,7 @@ export function compileUniversal(source, filename, renderer, compileClient, opti
 		throw new TypeError('Octane universal compiler requires a resolved universal renderer.');
 	}
 	const universalRuntime = normalizeUniversalRuntime(options.universalRuntime);
-	const ast = parseModule(source, filename);
+	const ast = parsedAst ?? parseModule(source, filename);
 	const hmrDialect = options.hmr === true ? 'vite' : options.hmr || false;
 	const state = {
 		source,

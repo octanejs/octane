@@ -14,17 +14,14 @@ import * as nodeFs from 'node:fs';
 import * as nodeModule from 'node:module';
 import * as nodePath from 'node:path';
 import { parseModule } from '@tsrx/core';
-import { compile, hasOnlyLowerableNullishExits, isVoidJsxCodeBlockFunction } from './compile.js';
 import {
-	addSourceMapNeedles,
-	composeSourceMaps,
-	validateRendererModuleSource,
-} from './compile-universal.js';
-import {
-	hydrateBoundaryPathFromId,
-	prepareHydrateBoundaries,
-	prepareServerHydrateBoundaries,
-} from './hydrate-boundaries.js';
+	compile,
+	compileForBundler,
+	hasOnlyLowerableNullishExits,
+	isVoidJsxCodeBlockFunction,
+} from './compile.js';
+import { validateRendererModuleSource } from './compile-universal.js';
+import { HYDRATE_QUERY_PARAM, hydrateBoundaryPathFromId } from './hydrate-boundaries.js';
 import {
 	DOM_RENDERER_MODULE,
 	normalizeRendererConfig,
@@ -32,10 +29,7 @@ import {
 } from './renderers.js';
 import { findLeadingJsxImportSourcePragma } from './pragma.js';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
-import {
-	analyzeNativeChangeDiagnostics,
-	formatCompileDiagnostic,
-} from './native-change-diagnostics.js';
+import { formatCompileDiagnostic } from './native-change-diagnostics.js';
 import { findVoidComponentImports, findVoidRootImports, slotHooks } from './slot-hooks.js';
 import {
 	assertNoLiveClientOnlyImports,
@@ -883,36 +877,11 @@ class OctaneBundlerCompiler {
 				};
 			}
 			const hasRendererBoundaries = Object.keys(this.renderers.boundaries).length > 0;
-			const nativeChangeAnalysis = analyzeNativeChangeDiagnostics(
-				parseModule(code, filename),
-				code,
-				filename,
-				{
-					dom: renderer.target === 'dom',
-					renderer,
-					rendererBoundaries: this.renderers.boundaries,
-					rendererRegistry: this.renderers.registry,
-				},
-			);
-			const nativeChangeDiagnostics = nativeChangeAnalysis.diagnostics;
-			const hydratePreparation =
-				environment === 'client'
-					? prepareHydrateBoundaries(code, filename, hydrateBoundaryPath)
-					: prepareServerHydrateBoundaries(code, filename);
-			const compileSource = hydratePreparation?.source ?? code;
-			const out = compile(compileSource, filename, {
-				__hydratePrepared: true,
-				__hydrateBoundaryModule: typeof hydratePreparation?.boundaryPath === 'string',
-				__nativeChangeDiagnostics: nativeChangeDiagnostics,
-				...(hydratePreparation === null && !hasRendererBoundaries
-					? { __nativeChangeAnalysis: nativeChangeAnalysis }
-					: null),
-				// Scoped-style hashes are position-derived; after the extraction
-				// rewrite the compiler restamps them from these authored
-				// coordinates so client and server compiles agree (compile.js).
-				...(hydratePreparation?.origins != null
-					? { __styleRemap: { authored: code, origins: hydratePreparation.origins } }
-					: null),
+			const compileFilename =
+				hydrateBoundaryPath === null
+					? filename
+					: `${filename}?${HYDRATE_QUERY_PARAM}=${encodeURIComponent(hydrateBoundaryPath)}`;
+			const compileOptions = {
 				hmr,
 				mode: environment,
 				dev,
@@ -933,10 +902,17 @@ class OctaneBundlerCompiler {
 				...(environment === 'client' && typeof options.isVoidComponentImport === 'function'
 					? { isVoidComponentImport: options.isVoidComponentImport }
 					: null),
-			});
-			if (hydratePreparation?.map && out.map) {
-				out.map = composeSourceMaps(out.map, hydratePreparation.map);
-				out.map = addSourceMapNeedles(out.map, out.code, code, hydratePreparation.mappingNeedles);
+			};
+			const collectVoidComponentExports =
+				environment === 'client' && options.collectVoidComponentExports === true;
+			let out;
+			let voidComponentSource = null;
+			if (collectVoidComponentExports) {
+				const compilation = compileForBundler(code, compileFilename, compileOptions);
+				out = compilation.result;
+				voidComponentSource = compilation.hydrateSource;
+			} else {
+				out = compile(code, compileFilename, compileOptions);
 			}
 			this._forwardCompileDiagnostics(out.diagnostics);
 			return {
@@ -947,9 +923,11 @@ class OctaneBundlerCompiler {
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
-				...(environment === 'client' && options.collectVoidComponentExports === true
-					? { voidComponentExports: findVoidComponentExports(compileSource, filename) }
-					: {}),
+				...(voidComponentSource === null
+					? null
+					: {
+							voidComponentExports: findVoidComponentExports(voidComponentSource, filename),
+						}),
 				...finishMetadata(collected),
 			};
 		}
