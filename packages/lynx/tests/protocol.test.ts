@@ -16,6 +16,7 @@ import {
 import {
 	createLynxClientContainer,
 	createLynxClientDriver,
+	prepareLynxHandleDeltas,
 	type LynxPublicHandle,
 } from '../src/core/client-driver.js';
 import {
@@ -152,6 +153,7 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 					type: command.type,
 					generation,
 					attached: true,
+					listDescendant: false,
 					snapshot: handleSnapshot(commit.root, command.id, command.type, generation, {
 						props: command.props,
 					}),
@@ -163,6 +165,7 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 					type: types.get(command.id)!,
 					generation: generations.get(command.id)!,
 					attached: true,
+					listDescendant: false,
 					snapshot: handleSnapshot(
 						commit.root,
 						command.id,
@@ -181,6 +184,7 @@ function installMainHarness(context: FakeContextProxy, autoReady = true): MainHa
 					type: command.type,
 					generation,
 					attached: true,
+					listDescendant: false,
 					snapshot: handleSnapshot(commit.root, command.id, command.type, generation, {
 						props: command.props,
 					}),
@@ -241,6 +245,52 @@ describe('@octanejs/lynx transported protocol', () => {
 			},
 		};
 		expect(validateLynxBackgroundOutboundMessage(commit)).toBe(commit);
+		const portalParent = Object.freeze({
+			$$kind: 'octane.universal.portal-target',
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: 41,
+			id: 'octane.lynx.portal:1:7:2',
+		});
+		const portalCommit = {
+			...commit,
+			batch: {
+				...commit.batch,
+				commands: [{ op: 'insert', parent: portalParent, id: 9, before: null }],
+			},
+		};
+		expect(validateLynxBackgroundOutboundMessage(portalCommit)).toBe(portalCommit);
+		expect(() =>
+			validateLynxBackgroundOutboundMessage({
+				...portalCommit,
+				batch: {
+					...portalCommit.batch,
+					commands: [
+						{
+							op: 'insert',
+							parent: { ...portalParent, id: 'r1-h7-g2' },
+							id: 9,
+							before: null,
+						},
+					],
+				},
+			}),
+		).toThrow(/opaque Lynx portal target ID/);
+		expect(() =>
+			validateLynxBackgroundOutboundMessage({
+				...portalCommit,
+				batch: {
+					...portalCommit.batch,
+					commands: [
+						{
+							op: 'insert',
+							parent: { ...portalParent, publicHandle: true },
+							id: 9,
+							before: null,
+						},
+					],
+				},
+			}),
+		).toThrow(/unknown field "publicHandle"/);
 		expect(
 			validateLynxBackgroundInboundMessage({
 				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
@@ -260,11 +310,43 @@ describe('@octanejs/lynx transported protocol', () => {
 						type: 'view',
 						generation: 1,
 						attached: true,
+						listDescendant: false,
 						snapshot: handleSnapshot(1, 1, 'view', 1, { value: 1 }),
 					},
 				],
 			}),
 		).toMatchObject({ type: 'ack' });
+		expect(() =>
+			validateLynxBackgroundInboundMessage({
+				...identity(1, 1),
+				type: 'ack',
+				handles: [
+					{
+						op: 'upsert',
+						id: 1,
+						type: 'view',
+						generation: 1,
+						attached: true,
+						listDescendant: null,
+						snapshot: handleSnapshot(1, 1, 'view', 1),
+					},
+				],
+			}),
+		).toThrow(/ack\.handles\[0\]\.listDescendant/);
+		expect(
+			validateLynxBackgroundInboundMessage({
+				...identity(1, 1),
+				type: 'ack',
+				handles: [{ op: 'list-ancestry', id: 1, generation: 1, listDescendant: true }],
+			}),
+		).toMatchObject({ type: 'ack' });
+		expect(() =>
+			validateLynxBackgroundInboundMessage({
+				...identity(1, 1),
+				type: 'ack',
+				handles: [{ op: 'list-ancestry', id: 1, generation: 1, listDescendant: 'yes' }],
+			}),
+		).toThrow(/ack\.handles\[0\]\.listDescendant/);
 
 		expect(() =>
 			validateLynxBackgroundOutboundMessage({
@@ -311,6 +393,7 @@ describe('@octanejs/lynx transported protocol', () => {
 						type: 'view',
 						generation: 1,
 						attached: true,
+						listDescendant: false,
 						snapshot: { ...(handleSnapshot(1, 1, 'view', 1) as object), root: 99 },
 					},
 				],
@@ -330,6 +413,166 @@ describe('@octanejs/lynx transported protocol', () => {
 				error: { name: 'Error', message: 'retry cleanup' },
 			}),
 		).toMatchObject({ type: 'dispose-retry' });
+	});
+
+	it('uses only current same-root acknowledged public handles as portal targets', () => {
+		const firstContainer = createLynxClientContainer();
+		const secondContainer = createLynxClientContainer();
+		const driver = createLynxClientDriver();
+		const createPortalTargetHandle = (id: string | number) =>
+			Object.freeze({
+				$$kind: 'octane.universal.portal-target' as const,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				root: 41,
+				id,
+			});
+		const prepareTarget = (
+			container: ReturnType<typeof createLynxClientContainer>,
+			target: unknown,
+			transported = true,
+		) =>
+			driver.portals!.prepareTarget({
+				container,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				target,
+				transported,
+				createPortalTargetHandle,
+			});
+
+		expect(() => prepareTarget(firstContainer, null)).toThrow(
+			/Initial portals must wait for the target ref acknowledgement/,
+		);
+		const mountBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 1,
+			commands: [
+				{ op: 'create', id: 1, type: 'view', props: {} },
+				{ op: 'create', id: 2, type: 'list', props: {} },
+				{ op: 'create', id: 3, type: 'view', props: {} },
+			],
+		};
+		prepareLynxHandleDeltas(
+			firstContainer,
+			mountBatch,
+			[
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 1,
+					attached: true,
+					listDescendant: false,
+					snapshot: handleSnapshot(17, 1, 'view', 1),
+				},
+				{
+					op: 'upsert',
+					id: 2,
+					type: 'list',
+					generation: 1,
+					attached: true,
+					listDescendant: false,
+					snapshot: handleSnapshot(17, 2, 'list', 1),
+				},
+				{
+					op: 'upsert',
+					id: 3,
+					type: 'view',
+					generation: 1,
+					attached: true,
+					listDescendant: true,
+					snapshot: handleSnapshot(17, 3, 'view', 1),
+				},
+			],
+			identity(17, 1),
+		).apply();
+		const target = firstContainer.getPublicHandle(1)!;
+		const registration = prepareTarget(firstContainer, target);
+		expect(registration.handle).toEqual({
+			$$kind: 'octane.universal.portal-target',
+			renderer: LYNX_TRANSPORT_RENDERER,
+			root: 41,
+			id: 'octane.lynx.portal:17:1:1',
+		});
+		expect(Object.keys(registration.handle)).toEqual(['$$kind', 'renderer', 'root', 'id']);
+		expect(() => registration.release()).not.toThrow();
+
+		expect(() => prepareTarget(secondContainer, target)).toThrow(/from this root/);
+		expect(() => prepareTarget(firstContainer, target, false)).toThrow(/from this root/);
+		expect(() => prepareTarget(firstContainer, firstContainer.getPublicHandle(2))).toThrow(
+			/target type "list" is not supported/,
+		);
+		expect(() => prepareTarget(firstContainer, firstContainer.getPublicHandle(3))).toThrow(
+			/native-list descendant/,
+		);
+
+		const enterListBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 2,
+			commands: [{ op: 'move', parent: 3, id: 1, before: null }],
+		};
+		prepareLynxHandleDeltas(
+			firstContainer,
+			enterListBatch,
+			[{ op: 'list-ancestry', id: 1, generation: 1, listDescendant: true }],
+			identity(17, 2),
+		).apply();
+		expect(() => prepareTarget(firstContainer, target)).toThrow(/native-list descendant/);
+
+		const leaveListBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 3,
+			commands: [{ op: 'move', parent: null, id: 1, before: null }],
+		};
+		prepareLynxHandleDeltas(
+			firstContainer,
+			leaveListBatch,
+			[{ op: 'list-ancestry', id: 1, generation: 1, listDescendant: false }],
+			identity(17, 3),
+		).apply();
+		expect(() => prepareTarget(firstContainer, target)).not.toThrow();
+
+		const rolledBack = prepareLynxHandleDeltas(
+			firstContainer,
+			{ ...enterListBatch, version: 4 },
+			[{ op: 'list-ancestry', id: 1, generation: 1, listDescendant: true }],
+			identity(17, 4),
+		);
+		rolledBack.apply();
+		expect(() => prepareTarget(firstContainer, target)).toThrow(/native-list descendant/);
+		rolledBack.rollback();
+		expect(() => prepareTarget(firstContainer, target)).not.toThrow();
+		expect(() =>
+			prepareLynxHandleDeltas(
+				firstContainer,
+				{ ...enterListBatch, version: 4 },
+				[{ op: 'list-ancestry', id: 1, generation: 2, listDescendant: true }],
+				identity(17, 4),
+			),
+		).toThrow(/stale or transitioning handle 1:2/);
+
+		const recreateBatch: UniversalHostBatch = {
+			renderer: LYNX_TRANSPORT_RENDERER,
+			version: 5,
+			commands: [{ op: 'recreate', id: 1, type: 'view', props: {} }],
+		};
+		prepareLynxHandleDeltas(
+			firstContainer,
+			recreateBatch,
+			[
+				{
+					op: 'upsert',
+					id: 1,
+					type: 'view',
+					generation: 2,
+					attached: true,
+					listDescendant: false,
+					snapshot: handleSnapshot(17, 1, 'view', 2),
+				},
+			],
+			identity(17, 5),
+		).apply();
+		expect(target.active).toBe(false);
+		expect(() => prepareTarget(firstContainer, target)).toThrow(/current, active/);
 	});
 
 	it('validates the root-scoped worklet call subprotocol without accepting executable values', () => {
@@ -869,6 +1112,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					type: 'view',
 					generation: 1,
 					attached: false,
+					listDescendant: false,
 					snapshot: handleSnapshot(72, 1, 'view', 1),
 				},
 			],
@@ -1055,6 +1299,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					type: 'view',
 					generation: 1,
 					attached: false,
+					listDescendant: false,
 					snapshot: handleSnapshot(mount.root, 1, 'view', 1),
 				},
 			],
@@ -1139,6 +1384,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					type: 'view',
 					generation: 1,
 					attached: false,
+					listDescendant: false,
 					snapshot: handleSnapshot(update.root, 1, 'view', 1, { value: 2 }),
 				},
 			],
@@ -1425,6 +1671,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					type: 'view',
 					generation: 2,
 					attached: true,
+					listDescendant: false,
 					snapshot: handleSnapshot(88, 1, 'view', 2, { value: 1 }),
 				},
 			],
@@ -1447,6 +1694,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					type: 'view',
 					generation: 4,
 					attached: true,
+					listDescendant: false,
 					snapshot: handleSnapshot(88, 1, 'view', 4, { value: 3 }),
 				},
 			],
@@ -1491,6 +1739,7 @@ describe('@octanejs/lynx transported protocol', () => {
 					type: 'view',
 					generation: 4,
 					attached: true,
+					listDescendant: false,
 					snapshot: handleSnapshot(88, 1, 'view', 4, { value: 5 }),
 				},
 			],

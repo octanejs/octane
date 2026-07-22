@@ -1297,6 +1297,9 @@ function currentThreadDefinitionRevision(kind: LynxThreadFunctionKind, id: strin
 function assertThreadFunctionCurrent(state: TaggedThreadFunctionState): void {
 	const revision = currentThreadDefinitionRevision(state.kind, state.id);
 	if (revision === null) {
+		if (state.revision !== null) {
+			throw new Error(`Octane Lynx ${state.kind} function ${state.id} is stale.`);
+		}
 		throw new Error(
 			`Octane Lynx ${state.kind} function ${state.id} cannot run in this thread layer.`,
 		);
@@ -1402,6 +1405,19 @@ export function registerThreadFunction(
 			},
 			source,
 		);
+		return;
+	}
+	fail('thread function kind', 'must be main-thread or background.');
+}
+
+/** Remove one compiler-owned definition when its module leaves the active HMR graph. */
+export function unregisterThreadFunction(kind: LynxThreadFunctionKind, id: string): void {
+	if (kind === 'main-thread') {
+		unregisterMainThreadWorklet(id);
+		return;
+	}
+	if (kind === 'background') {
+		unregisterBackgroundFunction(id);
 		return;
 	}
 	fail('thread function kind', 'must be main-thread or background.');

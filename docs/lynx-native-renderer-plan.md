@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–7 have private source/test/build implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–8 have private source/test/build implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-18**
 
@@ -17,6 +17,8 @@ Milestone 5 source/build evidence date: **2026-07-20**
 Milestone 6 source/build evidence date: **2026-07-21**
 
 Milestone 7 source/test evidence date: **2026-07-21**
+
+Milestone 8 source/test/build evidence date: **2026-07-22**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -901,6 +903,33 @@ to the adopted native nodes; bidirectional calls return values/errors exactly
 once; removed or reloaded worklets cannot run.
 
 ### Milestone 8 — Suspense, lazy bundles, portals, scheduling, and HMR (3–5 engineer-weeks)
+
+> **Progress (2026-07-22): private source/test/build implementation complete;
+> formal exit blocked.** The host-neutral runtime now caches renderer-checked
+> lazy components, starts compiler-proven independent lazy trees in one warm
+> stratum, retains accepted content across suspending transition work, publishes
+> transition pending state, defers preview/final values, and applies conservative
+> owner-local `memo()` bailouts that invalidate for local updates and observed
+> context. The Lynx first-screen specialization can synchronously commit authored
+> pending/catch arms, while the pinned Rspeedy fixture emits and decodes a
+> content-hashed lazy bundle containing both main and background specializations.
+> Background portals accept only current, physically attached, acknowledged
+> `LynxPublicHandle` targets from the same transported and universal root; opaque
+> root/host/generation provenance rejects stale, detached, cross-root, text, and
+> native-list targets before mutation. Official JavaScript-host tests cover
+> first-tree fallback/error/hidden-Activity adoption, later retain/reveal/reject,
+> exact identity and lifecycle, abandoned suspension, pre-ACK rejection,
+> accepted faults, portal ordering/retargeting, and teardown. Compatible HMR
+> keeps a stable renderer wrapper and reconcilable owner/key/host topology, so
+> background hook state and surviving host identity can remain live; compiler
+> disposal unregisters removed thread sites, including modules without component
+> exports. Renderer/root/snapshot, owner/key/host-shape, list/resource-schema, or
+> receiver-lifecycle changes are reconstructing edits and require root/resource
+> recreation; the end-to-end native reload receiver is not implemented. There is
+> no Lynx Web, Explorer, Android, or iOS proof of native chunk execution, portal
+> placement, retained visibility, transition timing, reload reconstruction, or
+> stale resource cleanup, and no device performance evidence. The formal
+> Milestone 8 and stable/IFR gates therefore remain blocked.
 
 - Prove retained Suspense/errors/Activity through first render, adoption, later
   updates, transport rejection/fault, and visibility changes.

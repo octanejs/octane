@@ -479,6 +479,103 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 		}
 	}, 120_000);
 
+	it('emits a production lazy bundle specialized for both native threads', async () => {
+		const temporaryRoot = mkdtempSync(join(tmpdir(), 'octane-rspeedy-lazy-'));
+		const outputRoot = join(temporaryRoot, 'dist');
+		const moduleIdentifiers: string[] = [];
+		const layeredModules: { identifier: string; layer?: string | null }[] = [];
+		const debugMetadata: string[] = [];
+		const rspeedy = await createRspeedy({
+			cwd: APPLICATION_FIXTURE,
+			loadEnv: false,
+			environment: ['lynx'],
+			rspeedyConfig: {
+				mode: 'production',
+				environments: { lynx: {} },
+				dev: { hmr: false, liveReload: false },
+				output: {
+					cleanDistPath: true,
+					distPath: { root: outputRoot },
+					filenameHash: true,
+					sourceMap: { css: false, js: 'source-map' },
+				},
+				source: { entry: { main: './src/lazy.ts' } },
+				splitChunks: false,
+				plugins: [
+					pluginOctane({ hmr: false, dev: false }),
+					metadataProbe([], moduleIdentifiers, layeredModules),
+					nativeArtifactProbe([], debugMetadata),
+				],
+			},
+		});
+		let result: Awaited<ReturnType<typeof rspeedy.build>> | undefined;
+		try {
+			result = await rspeedy.build();
+			const decoded = await decodeNativeBundle(readFileSync(join(outputRoot, 'main.lynx.bundle')));
+			const mainThread = nativeScriptText(decoded['main-thread-script']);
+			const background = nativeScriptText(decoded['background-thread-script']);
+			expect(mainThread).toContain('octane-m8-lazy-pending');
+			expect(background).toContain('octane-m8-lazy-pending');
+
+			const lazyBundlePath = outputFiles(outputRoot).find((filename) =>
+				/[\\/]async[\\/]src[\\/]LazyCard\.tsrx\.[A-Fa-f0-9]+\.bundle$/.test(filename),
+			);
+			expect(lazyBundlePath).toBeDefined();
+			const lazyBundle = readFileSync(lazyBundlePath!);
+			expect(containsEncodedText(lazyBundle, 'octane-m8-lazy-chunk')).toBe(true);
+			expect(lazyBundlePath).not.toBe(join(outputRoot, 'main.lynx.bundle'));
+
+			const canonicalLayeredModules = layeredModules.map((module) => ({
+				identifier: module.identifier
+					.slice(module.identifier.lastIndexOf('!') + 1)
+					.replace(/\|octane:(?:background|main-thread)$/, '')
+					.split('?', 1)[0]
+					.replaceAll('\\', '/'),
+				layer: module.layer,
+			}));
+			const lazyModuleSuffix =
+				'/packages/rspeedy-plugin-octane/tests/_fixtures/application/src/LazyCard.tsrx';
+			for (const layer of ['octane:background', 'octane:main-thread']) {
+				expect(
+					canonicalLayeredModules.some(
+						(module) => module.layer === layer && module.identifier.endsWith(lazyModuleSuffix),
+					),
+					`expected the lazy module in ${layer}`,
+				).toBe(true);
+			}
+			const canonicalModules = moduleIdentifiers.map((identifier) =>
+				identifier.split(/[?!]/, 1)[0].replaceAll('\\', '/'),
+			);
+			expect(canonicalModules.some((identifier) => identifier.endsWith(lazyModuleSuffix))).toBe(
+				true,
+			);
+			expect(canonicalModules.some((identifier) => FORBIDDEN_MODULE.test(identifier))).toBe(false);
+
+			const metadataRecords = debugMetadata.map((value) => JSON.parse(value));
+			const lazyMetadata = metadataRecords.find((value) =>
+				value.buildInfo?.rspeedy?.entryFiles?.some((filename: string) =>
+					filename.endsWith('/src/LazyCard.tsrx'),
+				),
+			);
+			expect(lazyMetadata?.artifacts).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({
+						kind: 'background',
+						path: expect.stringMatching(/^\.rspeedy\/async\/src\/LazyCard\.tsrx\/background\.js$/),
+					}),
+					expect.objectContaining({
+						kind: 'main-thread',
+						path: expect.stringMatching(/^\.rspeedy\/async\/src\/LazyCard\.tsrx\/main-thread\.js$/),
+					}),
+				]),
+			);
+			expect(JSON.stringify(lazyMetadata)).toContain('LazyCard.tsrx');
+		} finally {
+			await result?.close();
+			rmSync(temporaryRoot, { recursive: true, force: true });
+		}
+	}, 120_000);
+
 	it('emits one self-contained native bundle for each authored entry', async () => {
 		const temporaryRoot = mkdtempSync(join(tmpdir(), 'octane-rspeedy-multiple-entries-'));
 		const outputRoot = join(temporaryRoot, 'dist');

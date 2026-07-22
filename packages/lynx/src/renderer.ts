@@ -21,6 +21,7 @@ export {
 	registerThreadFunction,
 	runOnBackground,
 	runOnMainThread,
+	unregisterThreadFunction,
 } from './core/worklets.js';
 export type {
 	LynxBackgroundFunctionDescriptor,

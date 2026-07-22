@@ -12,12 +12,14 @@ import {
 	createLynxHostDriver,
 	disposeLynxFirstTree,
 	disposeLynxHostContainer,
+	getLynxHostPublicState,
 	getLynxHostEventListener,
 	isLynxHostAttached,
 	prepareLynxHostBatch,
 	resolveLynxHostNativeEvent,
 	type LynxHostContainer,
 	type LynxHostDriver,
+	type LynxHostPublicState,
 	type LynxHostAttachmentDelta,
 	type LynxHostHandle,
 	type LynxPreparedHostBatch,
@@ -250,13 +252,17 @@ function resolveContext(
 	return getJSContext.call(target.lynx);
 }
 
-function publicHandleUpsert(handle: LynxHostHandle, attached: boolean): LynxPublicHandleDelta {
+function publicHandleUpsert(
+	handle: LynxHostHandle,
+	state: LynxHostPublicState,
+): LynxPublicHandleDelta {
 	return Object.freeze({
 		op: 'upsert',
 		id: handle.id,
 		type: handle.type,
 		generation: handle.generation,
-		attached,
+		attached: state.attached,
+		listDescendant: state.listDescendant,
 		snapshot: handle as unknown as UniversalSerializableValue,
 	});
 }
@@ -281,7 +287,7 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 		} else {
 			handles.set(
 				delta.handle.id,
-				publicHandleUpsert(delta.handle, isLynxHostAttached(container, delta.handle.id)),
+				publicHandleUpsert(delta.handle, getLynxHostPublicState(container, delta.handle.id)),
 			);
 		}
 	}
@@ -291,9 +297,21 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 		if (handle !== null) {
 			handles.set(
 				command.id,
-				publicHandleUpsert(handle, isLynxHostAttached(container, command.id)),
+				publicHandleUpsert(handle, getLynxHostPublicState(container, command.id)),
 			);
 		}
+	}
+	for (const delta of prepared.listAncestryDelta) {
+		if (handles.has(delta.id)) continue;
+		handles.set(
+			delta.id,
+			Object.freeze({
+				op: 'list-ancestry',
+				id: delta.id,
+				generation: delta.generation,
+				listDescendant: delta.listDescendant,
+			}),
+		);
 	}
 	return Object.freeze([...handles.values()]);
 }

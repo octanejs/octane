@@ -5,10 +5,18 @@ import {
 	uninstallLynxTestingEnv,
 } from '@lynx-js/testing-environment';
 import {
+	createContext,
+	createPortal,
 	defineUniversalComponent,
+	universalComponent,
+	universalContext,
+	universalKey,
 	universalPlan,
 	universalProps,
+	universalTry,
 	universalValue,
+	use,
+	useContext,
 	useLayoutEffect,
 	type UniversalComponent,
 	type UniversalTransportIdentity,
@@ -17,6 +25,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createLynxRoot, type LynxPublicHandle, type LynxRoot } from '../src/index.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
 import { LYNX_NODES_REF_ATTRIBUTE } from '../src/core/nodes-ref.js';
+import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
@@ -69,6 +78,124 @@ const SimpleScene = defineUniversalComponent(
 	(props: { readonly id: string }) =>
 		universalValue(simplePlan, [universalProps([['set', 'id', props.id]])]),
 );
+const PortalTheme = createContext('missing');
+const portalShellPlan = universalPlan(LYNX_TRANSPORT_RENDERER, {
+	kind: 'range',
+	children: [
+		{
+			kind: 'host',
+			type: 'view',
+			bindings: [
+				['id', 0],
+				['ref', 1],
+				[LYNX_CSS_SCOPE_PROP, 2],
+			],
+			children: [
+				{ kind: 'host', type: 'view', bindings: [['id', 3]] },
+				{ kind: 'host', type: 'view', bindings: [['id', 4]] },
+			],
+		},
+		{
+			kind: 'host',
+			type: 'view',
+			bindings: [
+				['id', 5],
+				['ref', 6],
+			],
+			children: [
+				{ kind: 'host', type: 'view', bindings: [['id', 7]] },
+				{ kind: 'host', type: 'view', bindings: [['id', 8]] },
+			],
+		},
+		{ kind: 'slot', slot: 9 },
+	],
+});
+const portalLeafPlan = universalPlan(LYNX_TRANSPORT_RENDERER, {
+	kind: 'host',
+	type: 'view',
+	bindings: [
+		['id', 0],
+		['data-theme', 1],
+		['ref', 2],
+	],
+	children: [
+		{
+			kind: 'host',
+			type: 'text',
+			children: [{ kind: 'host', type: '#text', bindings: [['value', 3]] }],
+		},
+	],
+});
+const portalFallbackPlan = universalPlan(LYNX_TRANSPORT_RENDERER, {
+	kind: 'host',
+	type: 'view',
+	bindings: [['id', 0]],
+});
+
+interface PortalLeafProps {
+	readonly pending: Promise<string> | null;
+	readonly value: string;
+	readonly capture: (handle: LynxPublicHandle | null) => void;
+}
+
+const PortalLeaf = defineUniversalComponent(LYNX_TRANSPORT_RENDERER, (props: PortalLeafProps) => {
+	const theme = useContext(PortalTheme);
+	const value = props.pending === null ? props.value : use(props.pending);
+	return universalValue(portalLeafPlan, ['portal-content', theme, props.capture, value]);
+});
+
+interface PortalSceneProps extends PortalLeafProps {
+	readonly target: LynxPublicHandle | null;
+	readonly theme: string;
+	readonly targetScope: Readonly<{ cssId: number }> | null;
+	readonly order?: readonly string[];
+	readonly captureTargetA: (handle: LynxPublicHandle | null) => void;
+	readonly captureTargetB: (handle: LynxPublicHandle | null) => void;
+}
+
+const PortalScene = defineUniversalComponent(LYNX_TRANSPORT_RENDERER, (props: PortalSceneProps) => {
+	const portal =
+		props.target === null
+			? null
+			: universalTry(
+					() =>
+						props.order === undefined
+							? createPortal(
+									universalComponent(LYNX_TRANSPORT_RENDERER, PortalLeaf, {
+										pending: props.pending,
+										value: props.value,
+										capture: props.capture,
+									}),
+									props.target,
+								)
+							: props.order.map((label) =>
+									universalKey(
+										label,
+										createPortal(
+											universalValue(portalFallbackPlan, [`portal-${label}`]),
+											props.target,
+										),
+									),
+								),
+					() => universalValue(portalFallbackPlan, ['portal-fallback']),
+				);
+	return universalContext(
+		PortalTheme,
+		props.theme,
+		universalValue(portalShellPlan, [
+			'target-a',
+			props.captureTargetA,
+			props.targetScope,
+			'ordinary-a-1',
+			'ordinary-a-2',
+			'target-b',
+			props.captureTargetB,
+			'ordinary-b-1',
+			'ordinary-b-2',
+			portal,
+		]),
+	);
+});
 let installed: InstalledEnvironment | null = null;
 let backgroundRoot: LynxRoot | null = null;
 
@@ -681,6 +808,186 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		expect(page.innerHTML).toBe('');
 		expect(inbound.at(-1)).toMatchObject({ root: 603, version: 2, type: 'dispose-ack' });
 		expect(main.activeIdentity()).toBeNull();
+	});
+
+	it('places same-root portals without surrendering target ordering or retained identity', async () => {
+		const { dom, main } = installEnvironment();
+		const targetARefs: Array<LynxPublicHandle | null> = [];
+		const targetBRefs: Array<LynxPublicHandle | null> = [];
+		const portalRefs: Array<LynxPublicHandle | null> = [];
+		const captureTargetA = (handle: LynxPublicHandle | null) => targetARefs.push(handle);
+		const captureTargetB = (handle: LynxPublicHandle | null) => targetBRefs.push(handle);
+		const capturePortal = (handle: LynxPublicHandle | null) => portalRefs.push(handle);
+		const scope = Object.freeze({ cssId: 19 });
+		const props = (
+			target: LynxPublicHandle | null,
+			overrides: Partial<
+				Pick<PortalSceneProps, 'pending' | 'targetScope' | 'theme' | 'value'>
+			> = {},
+		): PortalSceneProps => ({
+			target,
+			pending: overrides.pending ?? null,
+			targetScope: overrides.targetScope === undefined ? scope : overrides.targetScope,
+			theme: overrides.theme ?? 'warm',
+			value: overrides.value ?? 'ready',
+			capture: capturePortal,
+			captureTargetA,
+			captureTargetB,
+		});
+		const InitialPortal = defineUniversalComponent(LYNX_TRANSPORT_RENDERER, () =>
+			createPortal(universalValue(portalFallbackPlan, ['never-mounted']), null),
+		);
+
+		backgroundRoot = createLynxRoot();
+		await expect(backgroundRoot.render(InitialPortal, undefined)).rejects.toThrow(
+			/Initial portals must wait for the target ref acknowledgement/,
+		);
+		const page = dom.window.document.querySelector('page')!;
+		expect(page.children).toHaveLength(0);
+
+		await backgroundRoot.render(PortalScene, props(null));
+		const targetA = targetARefs.at(-1)!;
+		const targetB = targetBRefs.at(-1)!;
+		expect(targetA).toMatchObject({ active: true, attached: true, type: 'view' });
+		expect(targetB).toMatchObject({ active: true, attached: true, type: 'view' });
+
+		await backgroundRoot.render(PortalScene, props(targetA));
+		const targetAElement = page.querySelector('#target-a')!;
+		const targetBElement = page.querySelector('#target-b')!;
+		const portalElement = page.querySelector('#portal-content')!;
+		const portalHandle = portalRefs.at(-1)!;
+		expect([...targetAElement.children].map((child) => child.id)).toEqual([
+			'ordinary-a-1',
+			'ordinary-a-2',
+			'portal-content',
+		]);
+		expect(portalElement.getAttribute('data-theme')).toBe('warm');
+		expect(portalElement.textContent).toBe('ready');
+
+		await backgroundRoot.render(
+			PortalScene,
+			props(targetA, { theme: 'cool', value: 'context-updated' }),
+		);
+		expect(page.querySelector('#portal-content')).toBe(portalElement);
+		expect(portalRefs.at(-1)).toBe(portalHandle);
+		expect(portalElement.getAttribute('data-theme')).toBe('cool');
+		expect(portalElement.textContent).toBe('context-updated');
+
+		await backgroundRoot.render(
+			PortalScene,
+			props(targetB, { theme: 'cool', value: 'retargeted' }),
+		);
+		expect(targetAElement.querySelector('#portal-content')).toBeNull();
+		expect(targetBElement.querySelector('#portal-content')).toBe(portalElement);
+		expect([...targetBElement.children].map((child) => child.id)).toEqual([
+			'ordinary-b-1',
+			'ordinary-b-2',
+			'portal-content',
+		]);
+		expect(portalRefs.at(-1)).toBe(portalHandle);
+
+		let resolve!: (value: string) => void;
+		const pending = new Promise<string>((done) => {
+			resolve = done;
+		});
+		await backgroundRoot.render(
+			PortalScene,
+			props(targetB, { pending, theme: 'cool', value: 'ignored' }),
+		);
+		expect(page.querySelector('#portal-content')).toBe(portalElement);
+		expect(portalElement.hasAttribute('hidden')).toBe(true);
+		expect(page.querySelector('#portal-fallback')).not.toBeNull();
+
+		resolve('resolved');
+		await pending;
+		await Promise.resolve();
+		await Promise.resolve();
+		await backgroundRoot.flushTransport();
+		expect(page.querySelector('#portal-content')).toBe(portalElement);
+		expect(portalElement.hasAttribute('hidden')).toBe(false);
+		expect(portalElement.textContent).toBe('resolved');
+		expect(page.querySelector('#portal-fallback')).toBeNull();
+
+		await backgroundRoot.render(
+			PortalScene,
+			props(targetA, { theme: 'cool', value: 'before-target-recreate' }),
+		);
+		expect(targetAElement.querySelector('#portal-content')).toBe(portalElement);
+
+		await backgroundRoot.render(PortalScene, props(null, { targetScope: null }));
+		expect(page.querySelector('#portal-content')).toBeNull();
+		expect(portalHandle.active).toBe(false);
+
+		const replacementTargetA = targetARefs.at(-1)!;
+		expect(replacementTargetA).not.toBe(targetA);
+		expect(targetA.active).toBe(false);
+		await expect(
+			backgroundRoot.render(PortalScene, props(targetA, { targetScope: null })),
+		).rejects.toThrow(/current, active LynxPublicHandle from this root/);
+		expect(page.querySelector('#portal-content')).toBeNull();
+
+		await backgroundRoot.render(
+			PortalScene,
+			props(replacementTargetA, { targetScope: null, value: 'final' }),
+		);
+		const finalPortalHandle = portalRefs.at(-1)!;
+		expect(page.querySelector('#target-a #portal-content')?.textContent).toBe('final');
+
+		await backgroundRoot.unmount();
+		backgroundRoot = null;
+		expect(page.children).toHaveLength(0);
+		expect(replacementTargetA.active).toBe(false);
+		expect(targetB.active).toBe(false);
+		expect(finalPortalHandle.active).toBe(false);
+		expect(portalRefs.at(-1)).toBeNull();
+		expect(main.activeIdentity()).toBeNull();
+	});
+
+	it('reorders keyed portal siblings within one acknowledged Lynx target', async () => {
+		const { dom } = installEnvironment();
+		const targetRefs: Array<LynxPublicHandle | null> = [];
+		const props = (
+			target: LynxPublicHandle | null,
+			order: readonly string[],
+		): PortalSceneProps => ({
+			target,
+			order,
+			pending: null,
+			value: 'unused',
+			theme: 'unused',
+			targetScope: Object.freeze({ cssId: 23 }),
+			capture() {},
+			captureTargetA: (handle) => targetRefs.push(handle),
+			captureTargetB() {},
+		});
+
+		backgroundRoot = createLynxRoot();
+		await backgroundRoot.render(PortalScene, props(null, []));
+		const target = targetRefs.at(-1)!;
+		await backgroundRoot.render(PortalScene, props(target, ['first', 'second']));
+		const targetElement = dom.window.document.querySelector('#target-a')!;
+		const first = targetElement.querySelector('#portal-first')!;
+		const second = targetElement.querySelector('#portal-second')!;
+		expect([...targetElement.children].map((child) => child.id)).toEqual([
+			'ordinary-a-1',
+			'ordinary-a-2',
+			'portal-first',
+			'portal-second',
+		]);
+
+		await backgroundRoot.render(PortalScene, props(target, ['second', 'first']));
+		expect([...targetElement.children].map((child) => child.id)).toEqual([
+			'ordinary-a-1',
+			'ordinary-a-2',
+			'portal-second',
+			'portal-first',
+		]);
+		expect(targetElement.children[2]).toBe(second);
+		expect(targetElement.children[3]).toBe(first);
+
+		await backgroundRoot.unmount();
+		backgroundRoot = null;
+		expect(dom.window.document.querySelector('page')?.children).toHaveLength(0);
 	});
 
 	it('serializes a commit dispatched reentrantly from Element PAPI application', () => {

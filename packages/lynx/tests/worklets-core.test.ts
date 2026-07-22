@@ -17,6 +17,7 @@ import {
 	registerMainThreadWorklet,
 	registerThreadFunction,
 	runOnMainThread,
+	unregisterThreadFunction,
 	unwrapThreadFunctionDescriptor,
 	type LynxMainThreadRefCell,
 	type LynxWorkletRecord,
@@ -463,6 +464,42 @@ describe('Lynx compiled thread functions', () => {
 		expect(() => (tagged as () => string)()).toThrow(/was reloaded/);
 		await expect(call()).rejects.toThrow(/was reloaded/);
 		uninstall();
+	});
+
+	it('makes unactivated descriptors stale when their compiled module is removed', () => {
+		registerThreadFunction('main-thread', 'test:removed-before-activation', () => 'old');
+		const tagged = bindThreadFunction('main-thread', 'test:removed-before-activation', () => []);
+		const descriptor = unwrapThreadFunctionDescriptor(tagged);
+		const registry = createLynxMainThreadWorkletRegistry();
+
+		unregisterThreadFunction('main-thread', 'test:removed-before-activation');
+
+		expect(() => (tagged as () => string)()).toThrow(/stale/);
+		expect(() => registry.activate(descriptor)).toThrow(/not registered|stale/);
+		expect(() =>
+			unregisterThreadFunction('main-thread', 'test:removed-before-activation'),
+		).not.toThrow();
+		registry.close();
+	});
+
+	it('keeps active and retained executions stale after compiled definitions are replaced', () => {
+		registerThreadFunction('main-thread', 'test:active-replacement', () => 'old-main');
+		const main = bindThreadFunction('main-thread', 'test:active-replacement', () => []);
+		const mainRegistry = createLynxMainThreadWorkletRegistry();
+		const active = mainRegistry.activate(unwrapThreadFunctionDescriptor(main));
+
+		registerThreadFunction('background', 'test:retained-replacement', () => 'old-background');
+		const background = bindThreadFunction('background', 'test:retained-replacement', () => []);
+		const backgroundRegistry = createLynxBackgroundFunctionRegistry();
+		const retained = backgroundRegistry.retain(unwrapThreadFunctionDescriptor(background));
+
+		registerThreadFunction('main-thread', 'test:active-replacement', () => 'new-main');
+		registerThreadFunction('background', 'test:retained-replacement', () => 'new-background');
+
+		expect(() => mainRegistry.runWorklet(active)).toThrow(/reloaded/);
+		expect(() => backgroundRegistry.run(retained)).toThrow(/stale or foreign/);
+		mainRegistry.close();
+		backgroundRegistry.close();
 	});
 
 	it('retains background captures atomically only at the transport boundary', () => {

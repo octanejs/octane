@@ -1,4 +1,4 @@
-# `@octanejs/rspeedy-plugin` (private Milestone 6 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestones 6–8 source/build path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
@@ -11,14 +11,16 @@ programs required by a Lynx template:
 
 The plugin configures the framework-neutral Lynx template, CSS extraction,
 runtime-wrapper, and native encoding packages and emits one `.lynx.bundle` per
-authored entry. CSS, CSS Modules, referenced assets, source maps, and Rspeedy's
-debug metadata remain in Rspeedy's normal build graph. Development builds wire
-the pinned Lynx dev transport when Rspeedy enables HMR or live reload.
+authored entry. CSS, CSS Modules, referenced assets, source maps, lazy dynamic
+imports, and Rspeedy's debug metadata remain in Rspeedy's normal build graph.
+Development builds wire the pinned Lynx dev transport when Rspeedy enables HMR
+or live reload.
 
 This is a **private source/build milestone**, not a published technical preview.
-The repository proves graph specialization, bundle construction, and decoding;
-it does not yet prove first paint or adoption on Lynx Web, Android Explorer, or
-iOS Explorer, nor does it prove state-preserving HMR on those targets.
+The repository proves graph specialization, bundle construction, decoding, and
+dual-layer lazy-chunk emission; it does not yet prove first paint, adoption, or
+dynamic chunk execution on Lynx Web, Android Explorer, or iOS Explorer, nor
+does it prove state-preserving HMR on those targets.
 
 ## Application mode
 
@@ -55,6 +57,14 @@ configuration.
 Compatible Rspack entry metadata is copied to both generated graphs so they see
 the same entry initialization inputs. Development-only CSS HMR setup runs after
 the receiver install and before the authored imports.
+
+An authored `lazy(() => import('./Card.tsrx'))` remains a real Rspack dynamic
+import. The pinned production fixture emits a content-hashed async `.bundle`;
+its module is specialized independently in the `octane:main-thread` and
+`octane:background` layers. The synchronous first-screen renderer may commit an
+authored pending arm and prewarm independent imports, while the retained
+background root owns later reveal or rejection. This is decoded artifact and
+graph evidence, not proof that a native runtime fetches or executes the chunk.
 
 Explicit `thread: 'background'` and `thread: 'main-thread'` are retained as
 isolated compiler-graph diagnostic modes. They stamp and compile the supplied

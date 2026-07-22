@@ -8,12 +8,16 @@ import {
 	flushUniversalSync,
 	isRendererRegion,
 	rendererRegion,
+	startTransition,
 	universalContext,
 	universalPlan,
 	universalTry,
 	universalValue,
+	use,
+	useContext,
 	useLayoutEffect,
 	useState,
+	useTransition,
 	type RendererRegion,
 } from '../src/universal.js';
 import { mount } from './_helpers.js';
@@ -32,12 +36,40 @@ import {
 	SequentialProjectedBoundaryApp,
 } from './_fixtures/universal-projected-boundary.tsrx';
 import { Canvas } from './_fixtures/universal-renderer-boundaries.tsrx';
-import { UniversalSchedulerBridgeApp, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
+import {
+	UniversalBoundaryFixture,
+	UniversalPendingBoundaryFixture,
+	UniversalSchedulerBridgeApp,
+	UniversalTheme,
+} from './_fixtures/universal-boundary.tsrx';
 
 function objectRoot() {
 	const container = createObjectContainer();
 	const root = createUniversalRoot(container, createObjectDriver());
 	return { container, root };
+}
+
+function controlledObjectRoot() {
+	const container = createObjectContainer();
+	const scheduled: Array<() => void> = [];
+	const root = createUniversalRoot(container, createObjectDriver(), {
+		scheduleMicrotask(callback) {
+			scheduled.push(callback);
+		},
+	});
+	return { container, root, scheduled };
+}
+
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((accept) => {
+		resolve = accept;
+	});
+	return { promise, resolve };
+}
+
+function fulfilled<T>(value: T): Promise<T> {
+	return Object.assign(Promise.resolve(value), { status: 'fulfilled' as const, value });
 }
 
 interface ReverseOwnerProps {
@@ -49,6 +81,7 @@ interface ReverseOwnerProps {
 	throwCleanup?: boolean;
 	hostRef?: (value: unknown) => void;
 	capture?: (region: RendererRegion) => void;
+	captureUpdate?: (update: (value: number) => void) => void;
 }
 
 const reverseRegionPlan = universalPlan('object', {
@@ -65,6 +98,8 @@ const ReverseOwnerScene = defineUniversalComponent('object', (props: ReverseOwne
 	universalContext(UniversalTheme, props.theme as string, () =>
 		universalTry(
 			() => {
+				const [count, setCount] = useState(0, 'reverse-owner-count');
+				props.captureUpdate?.(setCount);
 				const region = rendererRegion('object', 'dom', ReverseOwnerDom, {
 					log: props.log,
 					version: props.version ?? 0,
@@ -72,6 +107,7 @@ const ReverseOwnerScene = defineUniversalComponent('object', (props: ReverseOwne
 					thenable: props.thenable,
 					throwCleanup: props.throwCleanup,
 					hostRef: props.hostRef,
+					count,
 				});
 				props.capture?.(region);
 				return universalValue(reverseRegionPlan, [region]);
@@ -180,6 +216,157 @@ describe('compiler-owned renderer child regions', () => {
 
 		mounted.unmount();
 		direct.root.unmount();
+	});
+
+	it('keeps coalesced DOM prop updates urgent while bridged transition work suspends', async () => {
+		const first = fulfilled('first');
+		const second = deferred<string>();
+		const bridgedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'bridged',
+			bindings: [
+				['version', 0],
+				['value', 1],
+			],
+		});
+		let setDomVersion!: (value: number) => void;
+		let begin!: () => void;
+		const BridgedScene = defineUniversalComponent<{
+			version: number;
+			onLayout: (version: number) => void;
+		}>('object', (props) => {
+			const [resource, setResource] = useState<Promise<string>>(first, 'resource');
+			begin = () => startTransition(() => setResource(second.promise));
+			return universalValue(bridgedPlan, [props.version, use(resource)]);
+		});
+		const bridged = controlledObjectRoot();
+		const mounted = mount(UniversalSchedulerBridgeApp, {
+			root: bridged.root,
+			component: BridgedScene,
+			captureUpdate(update: (value: number) => void) {
+				setDomVersion = update;
+			},
+			onUniversalLayout() {},
+		});
+		while (bridged.scheduled.length > 0) bridged.scheduled.shift()!();
+
+		begin();
+		expect(bridged.scheduled).toHaveLength(1);
+		flushSync(() => {
+			bridged.scheduled.shift()!();
+			setDomVersion(1);
+		});
+		expect(bridged.container.children[0].props).toMatchObject({ version: 1, value: 'first' });
+
+		second.resolve('second');
+		await flushBridgeWork();
+		flushSync(() => {});
+		expect(bridged.container.children[0].props).toMatchObject({ version: 1, value: 'second' });
+		mounted.unmount();
+	});
+
+	it('keeps coalesced DOM context updates urgent while bridged transition work suspends', async () => {
+		const first = fulfilled('first');
+		const second = deferred<string>();
+		const childProps = {};
+		const bridgedPlan = universalPlan('object', {
+			kind: 'host',
+			type: 'bridged',
+			bindings: [
+				['theme', 0],
+				['value', 1],
+			],
+		});
+		let begin!: () => void;
+		const BridgedScene = defineUniversalComponent('object', () => {
+			const [resource, setResource] = useState<Promise<string>>(first, 'resource');
+			begin = () => startTransition(() => setResource(second.promise));
+			return universalValue(bridgedPlan, [useContext(UniversalTheme), use(resource)]);
+		});
+		const bridged = controlledObjectRoot();
+		const initialProps = {
+			root: bridged.root,
+			component: BridgedScene,
+			childProps,
+			theme: 'light',
+			log() {},
+			failAfterPrepare: false,
+		};
+		const mounted = mount(UniversalBoundaryFixture, initialProps);
+		while (bridged.scheduled.length > 0) bridged.scheduled.shift()!();
+
+		begin();
+		expect(bridged.scheduled).toHaveLength(1);
+		flushSync(() => {
+			bridged.scheduled.shift()!();
+			mounted.root.render(UniversalBoundaryFixture, { ...initialProps, theme: 'dark' });
+		});
+		expect(bridged.container.children[0].props).toMatchObject({ theme: 'dark', value: 'first' });
+
+		second.resolve('second');
+		await flushBridgeWork();
+		flushSync(() => {});
+		expect(bridged.container.children[0].props).toMatchObject({ theme: 'dark', value: 'second' });
+		mounted.unmount();
+	});
+
+	it('keeps an urgent DOM pending projection visible across bridged transition invalidation', async () => {
+		const first = fulfilled('first');
+		const second = deferred<string>();
+		const plan = universalPlan('object', {
+			kind: 'host',
+			type: 'bridged',
+			bindings: [
+				['value', 0],
+				['count', 1],
+			],
+		});
+		let begin!: () => void;
+		const BridgedScene = defineUniversalComponent<{
+			resource: Promise<string>;
+		}>('object', (props) => {
+			const [count, setCount] = useState(0, 'count');
+			begin = () => startTransition(() => setCount(1));
+			return universalValue(plan, [use(props.resource), count]);
+		});
+		const bridged = controlledObjectRoot();
+		const mounted = mount(UniversalPendingBoundaryFixture, {
+			root: bridged.root,
+			component: BridgedScene,
+			childProps: { resource: first },
+		});
+		while (bridged.scheduled.length > 0) bridged.scheduled.shift()!();
+
+		mounted.update(UniversalPendingBoundaryFixture, {
+			root: bridged.root,
+			component: BridgedScene,
+			childProps: { resource: second.promise },
+		});
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+
+		begin();
+		expect(bridged.scheduled.length).toBeGreaterThanOrEqual(2);
+		bridged.scheduled.shift()!(); // Abandon the root attempt after the DOM fallback owns retry.
+		flushSync(() => bridged.scheduled.shift()!()); // Promotion must preserve that projection.
+		expect(mounted.find('.projected-pending').textContent).toBe('pending');
+		expect(bridged.container.children[0].props).toMatchObject({ value: 'first', count: 0 });
+
+		second.resolve('second');
+		await flushBridgeWork();
+		flushSync(() => {});
+		expect(mounted.container.querySelector('.projected-pending')).toBeNull();
+		expect(bridged.container.children[0].props).toMatchObject({ value: 'second', count: 1 });
+
+		mounted.unmount();
+		expect(bridged.container.children).toEqual([]);
+		const Probe = defineUniversalComponent('object', () => {
+			const [pending] = useTransition('transition');
+			return universalValue(plan, ['probe', pending]);
+		});
+		const probe = objectRoot();
+		probe.root.render(Probe, undefined);
+		expect(probe.container.children[0].props.count).toBe(false);
+		probe.root.unmount();
 	});
 
 	it('projects an initial host suspension and clears its abandoned owner bridge', async () => {
@@ -647,6 +834,117 @@ describe('reverse renderer owner bridge', () => {
 		});
 		dom.unmount();
 		root.unmount();
+	});
+
+	it('retains transition updates owned by a renderer region while its try arm is pending', async () => {
+		const { container, root } = objectRoot();
+		const pending = deferred<void>();
+		let update!: (value: number) => void;
+		root.render(ReverseOwnerScene, {
+			theme: 'dark',
+			log: () => {},
+			thenable: pending.promise,
+			captureUpdate(value) {
+				update = value;
+			},
+		});
+		const first = committedDomRegion(container);
+		const dom = mount(first.component as ComponentBody<any>, first.props);
+		await flushBridgeWork();
+		expect(container.children[0].visible).toBe(false);
+
+		startTransition(() => update(1));
+		await flushBridgeWork();
+		expect((committedDomRegion(container).props as any).count).toBe(0);
+
+		pending.resolve();
+		await pending.promise;
+		await flushBridgeWork();
+		await flushBridgeWork();
+		expect(container.children).toHaveLength(1);
+		expect((committedDomRegion(container).props as any).count).toBe(1);
+
+		dom.unmount();
+		root.unmount();
+	});
+
+	it('settles blocked transitions when an unrelated retained replay throws', async () => {
+		const controlled = controlledObjectRoot();
+		const routed = deferred<void>();
+		let rejectReplay!: (error: Error) => void;
+		const replayFailure = new Promise<string>((_resolve, reject) => {
+			rejectReplay = reject;
+		});
+		let updateCount!: (value: number) => void;
+		let suspendReplay!: () => void;
+		let captured!: RendererRegion<any>;
+		const Scene = defineUniversalComponent('object', () => [
+			universalTry(
+				() => {
+					const [count, setCount] = useState(0, 'blocked-count');
+					updateCount = setCount;
+					captured = rendererRegion('object', 'dom', ReverseOwnerDom, {
+						log() {},
+						thenable: routed.promise,
+						count,
+					});
+					return universalValue(reverseRegionPlan, [captured]);
+				},
+				() => universalValue(reverseStatusPlan, ['routed-pending']),
+			),
+			universalTry(
+				() => {
+					const [resource, setResource] = useState<Promise<string>>(
+						fulfilled('ready'),
+						'replay-resource',
+					);
+					suspendReplay = () => setResource(replayFailure);
+					return universalValue(reverseStatusPlan, [use(resource)]);
+				},
+				() => universalValue(reverseStatusPlan, ['local-pending']),
+			),
+		]);
+		const flushControlled = () => {
+			for (let count = 0; controlled.scheduled.length > 0; count++) {
+				if (count === 25) throw new Error('Controlled boundary scheduler did not stabilize.');
+				controlled.scheduled.shift()!();
+			}
+		};
+
+		controlled.root.render(Scene, undefined);
+		const dom = mount(captured.component as ComponentBody<any>, captured.props);
+		await flushBridgeWork();
+		flushControlled();
+		expect(controlled.container.children[0]).toMatchObject({
+			type: 'html-region',
+			visible: false,
+		});
+
+		startTransition(() => updateCount(1));
+		flushControlled();
+		expect((committedDomRegion(controlled.container).props as any).count).toBe(0);
+
+		const PendingProbe = defineUniversalComponent('object', () => {
+			const [pending] = useTransition('transition');
+			return universalValue(reverseStatusPlan, [pending]);
+		});
+		const probe = objectRoot();
+		probe.root.render(PendingProbe, undefined);
+		expect(probe.container.children[0].props.value).toBe(true);
+
+		suspendReplay();
+		flushControlled();
+		rejectReplay(new Error('unrelated replay failed'));
+		await replayFailure.catch(() => undefined);
+		await Promise.resolve();
+		expect(controlled.scheduled).not.toHaveLength(0);
+		expect(() => controlled.scheduled.shift()!()).toThrow('unrelated replay failed');
+		await flushBridgeWork();
+		expect(probe.container.children[0].props.value).toBe(false);
+
+		probe.root.unmount();
+		dom.unmount();
+		controlled.root.unmount();
 	});
 
 	it('automatically unmounts a committed DOM child root exactly once', () => {

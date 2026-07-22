@@ -11,6 +11,7 @@ import {
 	type UniversalPortalTargetHandle,
 	universalComponent,
 	universalContext,
+	universalKey,
 	universalPlan,
 	universalTry,
 	universalValue,
@@ -42,9 +43,14 @@ interface PortalContainer {
 	instances: Map<number, PortalHostInstance>;
 	readonly targets: Map<string | number, ActivePortalTarget>;
 	readonly commits: UniversalHostBatch[];
-	readonly preparedTargets: { id: string; transported: boolean }[];
+	readonly preparedTargets: {
+		id: string;
+		transported: boolean;
+		handle: UniversalPortalTargetHandle;
+	}[];
 	readonly releasedTargets: string[];
 	rejectNextPrepare: boolean;
+	rejectTargetAfterHandle: boolean;
 }
 
 interface SimulatedHost {
@@ -69,6 +75,7 @@ function createPortalContainer(): PortalContainer {
 		preparedTargets: [],
 		releasedTargets: [],
 		rejectNextPrepare: false,
+		rejectTargetAfterHandle: false,
 	};
 }
 
@@ -223,7 +230,12 @@ function createPortalDriver(): UniversalHostDriver<PortalContainer, PortalHostIn
 				const portalTarget = target as PortalTarget;
 				if (portalTarget.reject === true)
 					throw new Error(`Rejected portal target ${portalTarget.id}.`);
-				container.preparedTargets.push({ id: portalTarget.id, transported });
+				const handle = createPortalTargetHandle(portalTarget.id);
+				container.preparedTargets.push({ id: portalTarget.id, transported, handle });
+				if (container.rejectTargetAfterHandle) {
+					container.rejectTargetAfterHandle = false;
+					throw new Error(`Rejected prepared portal handle ${portalTarget.id}.`);
+				}
 				const previous = container.targets.get(portalTarget.id);
 				if (previous !== undefined && previous.target !== portalTarget) {
 					throw new Error(`Portal test driver: duplicate target id ${portalTarget.id}.`);
@@ -232,7 +244,7 @@ function createPortalDriver(): UniversalHostDriver<PortalContainer, PortalHostIn
 				entry.count++;
 				container.targets.set(portalTarget.id, entry);
 				return {
-					handle: createPortalTargetHandle(portalTarget.id),
+					handle,
 					release() {
 						container.releasedTargets.push(portalTarget.id);
 						entry.count--;
@@ -344,6 +356,38 @@ describe('universal portals', () => {
 		expect(container.instances.size).toBe(0);
 	});
 
+	it('reorders keyed portal siblings that share a target without remounting their hosts', () => {
+		const container = createPortalContainer();
+		const root = createUniversalRoot(container, createPortalDriver());
+		const target = portalTarget('shared');
+		const Scene = defineUniversalComponent('portal-test', (props: { order: readonly string[] }) =>
+			props.order.map((label) =>
+				universalKey(label, createPortal(universalValue(leafPlan, [label]), target)),
+			),
+		);
+
+		root.render(Scene, { order: ['first', 'second'] });
+		const first = target.children[0];
+		const second = target.children[1];
+		expect(target.children.map((child) => child.props.value)).toEqual(['first', 'second']);
+
+		root.render(Scene, { order: ['second', 'first'] });
+		expect(target.children.map((child) => child.props.value)).toEqual(['second', 'first']);
+		expect(target.children).toEqual([second, first]);
+
+		root.render(Scene, { order: ['third', 'second', 'first'] });
+		const third = target.children[0];
+		expect(target.children.map((child) => child.props.value)).toEqual(['third', 'second', 'first']);
+		expect(target.children.slice(1)).toEqual([second, first]);
+
+		root.render(Scene, { order: ['first', 'third'] });
+		expect(target.children.map((child) => child.props.value)).toEqual(['first', 'third']);
+		expect(target.children).toEqual([first, third]);
+
+		root.unmount();
+		expect(target.children).toEqual([]);
+	});
+
 	it('releases staged targets on abort, supersession, target failure, and host rejection', () => {
 		const container = createPortalContainer();
 		const root = createUniversalRoot(container, createPortalDriver());
@@ -356,11 +400,13 @@ describe('universal portals', () => {
 
 		const aborted = root.prepare(Scene, { target: targetA });
 		expect(activeRegistrations(container, targetA)).toBe(1);
+		const abortedHandle = container.preparedTargets.at(-1)!.handle;
 		aborted.abort();
 		expect(activeRegistrations(container, targetA)).toBe(0);
 		expect(container.instances.size).toBe(0);
 
 		const superseded = root.prepare(Scene, { target: targetA });
+		expect(container.preparedTargets.at(-1)!.handle).not.toBe(abortedHandle);
 		const winner = root.prepare(Scene, { target: targetB });
 		expect(superseded.status).toBe('aborted');
 		expect(activeRegistrations(container, targetA)).toBe(0);
@@ -387,6 +433,58 @@ describe('universal portals', () => {
 
 		root.unmount();
 		expect(activeRegistrations(container, targetB)).toBe(0);
+	});
+
+	it('retains target handles only while a committed or staged registration can reuse them', () => {
+		const container = createPortalContainer();
+		const root = createUniversalRoot(container, createPortalDriver());
+		const Scene = defineUniversalComponent(
+			'portal-test',
+			(props: { target: PortalTarget | null }) =>
+				props.target === null
+					? null
+					: createPortal(universalValue(leafPlan, [props.target.id]), props.target),
+		);
+		const target = portalTarget('reused');
+
+		root.render(Scene, { target });
+		const firstHandle = container.preparedTargets.at(-1)!.handle;
+
+		root.render(Scene, { target });
+		expect(container.preparedTargets.at(-1)!.handle).toBe(firstHandle);
+		expect(activeRegistrations(container, target)).toBe(1);
+
+		root.render(Scene, { target: null });
+		expect(activeRegistrations(container, target)).toBe(0);
+
+		root.render(Scene, { target });
+		expect(container.preparedTargets.at(-1)!.handle).not.toBe(firstHandle);
+		expect(activeRegistrations(container, target)).toBe(1);
+
+		root.unmount();
+		expect(activeRegistrations(container, target)).toBe(0);
+	});
+
+	it('drops an unregistered handle when target preparation fails after minting it', () => {
+		const container = createPortalContainer();
+		const root = createUniversalRoot(container, createPortalDriver());
+		const Scene = defineUniversalComponent('portal-test', (props: { target: PortalTarget }) =>
+			createPortal(universalValue(leafPlan, [props.target.id]), props.target),
+		);
+		const target = portalTarget('failed-handle');
+
+		container.rejectTargetAfterHandle = true;
+		expect(() => root.render(Scene, { target })).toThrow(
+			'Rejected prepared portal handle failed-handle.',
+		);
+		const failedHandle = container.preparedTargets.at(-1)!.handle;
+		expect(activeRegistrations(container, target)).toBe(0);
+
+		root.render(Scene, { target });
+		expect(container.preparedTargets.at(-1)!.handle).not.toBe(failedHandle);
+
+		root.unmount();
+		expect(activeRegistrations(container, target)).toBe(0);
 	});
 
 	it('rejects a portal handle that was not minted by the current renderer root', () => {

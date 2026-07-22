@@ -16,6 +16,7 @@ const UNIVERSAL_RUNTIME_IMPORTS = new Set([
 	'Activity',
 	'createContext',
 	'createPortal',
+	'lazy',
 	'memo',
 	'requestFormReset',
 	'startTransition',
@@ -1232,6 +1233,7 @@ function prepareThreadFunctionReplacements(ast, state) {
 	state.sourceNodeReplacements ??= new WeakMap();
 	state.threadFunctionNodes = new WeakSet(sites.map((site) => site.fn));
 	state.threadFunctionRegistrations = [];
+	state.threadFunctionDisposals = [];
 	state.threadErasedRanges = sites
 		.filter((site) => site.kind !== state.universalRuntime.thread)
 		.map((site) => ({ start: site.fn.loc?.start, end: site.fn.loc?.end }))
@@ -1241,6 +1243,12 @@ function prepareThreadFunctionReplacements(ast, state) {
 			state,
 			`${state.planPrefix ?? '__octane'}RegisterThreadFunction`,
 		);
+		if (state.hmr) {
+			state.helpers.unregisterThreadFunction = allocName(
+				state,
+				`${state.planPrefix ?? '__octane'}UnregisterThreadFunction`,
+			);
+		}
 	}
 	if (sites.some((site) => site.fn.type !== 'FunctionDeclaration')) {
 		state.helpers.bindThreadFunction = allocName(
@@ -1321,6 +1329,7 @@ function prepareThreadFunctionReplacements(ast, state) {
 					id,
 				)}, function (${captureParameter}, ${receiverParameter}, ${argumentParameter}) { ${captureSetup}return (${strippedSource}).apply(${receiverParameter}, ${argumentParameter}); }, ${metadata});`,
 			);
+			if (state.hmr) state.threadFunctionDisposals.push({ kind: site.kind, id });
 		}
 	}
 	state.sourceNodePrefixes ??= new WeakMap();
@@ -2243,6 +2252,7 @@ function rendererHasCapability(state, capability) {
 function threadHelperImports(state) {
 	return [
 		['registerThreadFunction', state.helpers.registerThreadFunction],
+		['unregisterThreadFunction', state.helpers.unregisterThreadFunction],
 		['bindThreadFunction', state.helpers.bindThreadFunction],
 		['attachThreadFunction', state.helpers.attachThreadFunction],
 		['invokeThreadFunction', state.helpers.invokeThreadFunction],
@@ -3236,8 +3246,16 @@ export function retargetRuntimeImportAliases(code, moduleId, aliases) {
 	);
 }
 
-function buildUniversalHmrBlock(state) {
-	if (state.hmrComponents.length === 0) return '';
+function buildUniversalHmrBlocks(state) {
+	const disposals = (state.threadFunctionDisposals ?? [])
+		.map(
+			(site) =>
+				`${state.helpers.unregisterThreadFunction}(${JSON.stringify(site.kind)}, ${JSON.stringify(site.id)});`,
+		)
+		.join('\n');
+	if (state.hmrComponents.length === 0 && disposals === '') {
+		return { prelude: '', tail: '' };
+	}
 	if (state.hmrDialect === 'webpack') {
 		const handoffs = state.hmrComponents
 			.map(
@@ -3249,13 +3267,48 @@ function buildUniversalHmrBlock(state) {
 			)
 			.join('\n');
 		const bindings = state.hmrComponents.map((component) => component.name).join(', ');
-		return (
-			'if (import.meta.webpackHot) {\n' +
-			handoffs +
-			'\n  import.meta.webpackHot.dispose((data) => {\n' +
-			`    data.__octaneUniversalComponents = { ...data.__octaneUniversalComponents, ${bindings} };\n` +
-			'  });\n  import.meta.webpackHot.accept();\n}\n'
-		);
+		if (disposals === '') {
+			return {
+				prelude: '',
+				tail:
+					'if (import.meta.webpackHot) {\n' +
+					(handoffs === '' ? '' : `${handoffs}\n`) +
+					'  import.meta.webpackHot.dispose((data) => {\n' +
+					`    data.__octaneUniversalComponents = { ...data.__octaneUniversalComponents, ${bindings} };\n` +
+					'  });\n' +
+					'  import.meta.webpackHot.accept();\n' +
+					'}\n',
+			};
+		}
+		const ready = bindings === '' ? null : allocName(state, '__octaneUniversalHmrComponentsReady');
+		const componentDisposal =
+			ready === null
+				? ''
+				: `    if (${ready}) {\n      data.__octaneUniversalComponents = { ...data.__octaneUniversalComponents, ${bindings} };\n    }\n`;
+		return {
+			// Thread registrations are hoisted ahead of authored statements. Install
+			// their cleanup before those registrations so an evaluation that throws
+			// partway through the module cannot leave callable definitions behind.
+			prelude:
+				(ready === null ? '' : `let ${ready} = false;\n`) +
+				'if (import.meta.webpackHot) {\n' +
+				'  import.meta.webpackHot.dispose((data) => {\n' +
+				componentDisposal +
+				disposals
+					.split('\n')
+					.map((line) => `    ${line}`)
+					.join('\n') +
+				'\n  });\n' +
+				'}\n',
+			tail:
+				ready === null
+					? ''
+					: 'if (import.meta.webpackHot) {\n' +
+						(handoffs === '' ? '' : `${handoffs}\n`) +
+						`  ${ready} = true;\n` +
+						'  import.meta.webpackHot.accept();\n' +
+						'}\n',
+		};
 	}
 	const updates = state.hmrComponents
 		.map((component) => {
@@ -3264,9 +3317,26 @@ function buildUniversalHmrBlock(state) {
 			return `    ${component.name}[${state.helpers.hmrSymbol}].update(${incoming});`;
 		})
 		.join('\n');
-	return (
-		'if (import.meta.hot) {\n  import.meta.hot.accept((module) => {\n' + updates + '\n  });\n}\n'
-	);
+	const prelude =
+		disposals === ''
+			? ''
+			: 'if (import.meta.hot) {\n' +
+				'  import.meta.hot.dispose(() => {\n' +
+				disposals
+					.split('\n')
+					.map((line) => `    ${line}`)
+					.join('\n') +
+				'\n  });\n' +
+				'}\n';
+	const tail =
+		state.hmrComponents.length === 0
+			? ''
+			: 'if (import.meta.hot) {\n' +
+				'  import.meta.hot.accept((module) => {\n' +
+				updates +
+				'\n  });\n' +
+				'}\n';
+	return { prelude, tail };
 }
 
 function authoredPosition(source, offset) {
@@ -3628,17 +3698,18 @@ export function lowerUniversalRendererRegion(
 	const declaration = state.hmrDialect === 'webpack' ? 'let' : 'const';
 	const component = `export ${declaration} ${componentName} = ${componentValue};`;
 	specializationBindings.add(componentName);
-	const hmrBlock = buildUniversalHmrBlock(state);
+	const hmrBlocks = buildUniversalHmrBlocks(state);
 	const threadRegistrations = (state.threadFunctionRegistrations ?? []).join('\n');
 	const prelude = [
 		helperImport,
 		profileImport,
 		runtimeImport,
+		hmrBlocks.prelude,
 		plans,
 		threadRegistrations,
 		emittedComponents.join('\n'),
 		component,
-		hmrBlock,
+		hmrBlocks.tail,
 	]
 		.filter(Boolean)
 		.join('\n');
@@ -3810,43 +3881,11 @@ export function compileUniversal(
 				`const ${name} = ${state.helpers.plan}(${JSON.stringify(renderer.id)}, ${JSON.stringify(root)});`,
 		)
 		.join('\n');
-	let hmrBlock = '';
-	if (state.hmrComponents.length > 0) {
-		if (state.hmrDialect === 'webpack') {
-			const handoffs = state.hmrComponents
-				.map(
-					(component) =>
-						`  if (import.meta.webpackHot.data?.__octaneUniversalComponents?.${component.name}) {\n` +
-						`    import.meta.webpackHot.data.__octaneUniversalComponents.${component.name}[${state.helpers.hmrSymbol}].update(${component.name});\n` +
-						`    ${component.name} = import.meta.webpackHot.data.__octaneUniversalComponents.${component.name};\n` +
-						'  }',
-				)
-				.join('\n');
-			const bindings = state.hmrComponents.map((component) => component.name).join(', ');
-			hmrBlock =
-				'if (import.meta.webpackHot) {\n' +
-				handoffs +
-				'\n  import.meta.webpackHot.dispose((data) => {\n' +
-				`    data.__octaneUniversalComponents = { ...data.__octaneUniversalComponents, ${bindings} };\n` +
-				'  });\n  import.meta.webpackHot.accept();\n}\n';
-		} else {
-			const updates = state.hmrComponents
-				.map((component) => {
-					const incoming =
-						component.exportKind === 'default' ? 'module.default' : `module.${component.name}`;
-					return `    ${component.name}[${state.helpers.hmrSymbol}].update(${incoming});`;
-				})
-				.join('\n');
-			hmrBlock =
-				'if (import.meta.hot) {\n  import.meta.hot.accept((module) => {\n' +
-				updates +
-				'\n  });\n}\n';
-		}
-	}
+	const hmrBlocks = buildUniversalHmrBlocks(state);
 	const threadRegistrations = (state.threadFunctionRegistrations ?? []).join('\n');
-	const lowered = `${helperImport}\n${profileImport}\n${plans}\n${threadRegistrations}\n${emitted.join(
+	const lowered = `${helperImport}\n${profileImport}\n${hmrBlocks.prelude}\n${plans}\n${threadRegistrations}\n${emitted.join(
 		'\n',
-	)}\n${hmrBlock}`;
+	)}\n${hmrBlocks.tail}`;
 	const intermediateMap = buildIntermediateMap(lowered, source, filename, state.mappingNeedles);
 	const result = compileClient(lowered, {
 		componentHelper: state.helpers.component,
