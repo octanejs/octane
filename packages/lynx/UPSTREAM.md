@@ -76,9 +76,18 @@ The testing environment models complete dataset application with
 `Object.assign` and does not implement native `invoke`, `fields`, or `path`;
 dataset-key deletion and asynchronous query results are not native claims.
 
+`@lynx-js/types@4.0.0` also types `CommonLynx.getNative()` and the native
+`__DestroyLifetime` message. The pinned ReactLynx main runtime listens to that
+same public context. Octane now installs an independent listener, closes its
+main PAPI state, and broadcasts root-independent logical teardown to the
+background root; it does not copy ReactLynx's teardown implementation or use
+`lynxCoreInject.tt.callDestroyLifetimeFun`. JavaScript-host tests prove the
+Octane cleanup contract only. Explorer, Android, and iOS must still establish
+that the typed event is delivered on the expected context with safe ordering.
+
 The intrinsic declarations and JavaScript-environment host tests are not a
-native layout or device claim. The Phase 0 public hook, reload/background
-teardown, Web, and Android/iOS gates remain authoritative until later
+native layout or device claim. The Phase 0 public event hook, reload, typed
+destroy delivery, Web, and Android/iOS gates remain authoritative until later
 production/device milestones satisfy them.
 
 Milestone 1–4 syntax, built-in, and runtime-ownership assumptions for the exact

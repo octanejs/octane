@@ -299,6 +299,15 @@ describe('@octanejs/lynx transported protocol', () => {
 				request: 0,
 			}),
 		).toMatchObject({ type: 'main-ready', request: 0 });
+		const pageDestroy = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-destroy',
+		};
+		expect(validateLynxBackgroundInboundMessage(pageDestroy)).toBe(pageDestroy);
+		expect(() => validateLynxBackgroundInboundMessage({ ...pageDestroy, root: 1 })).toThrow(
+			/page-destroy.*unknown field "root"/,
+		);
 		expect(
 			validateLynxBackgroundInboundMessage({
 				...identity(1, 1),
@@ -905,6 +914,34 @@ describe('@octanejs/lynx transported protocol', () => {
 			transport.diagnostics().filter((error) => /duplicate background call/.test(error.message)),
 		).toHaveLength(3);
 		transport.close();
+	});
+
+	it('buffers one root-independent page destroy until logical cleanup is bound', async () => {
+		const context = new FakeContextProxy();
+		installMainHarness(context, false);
+		const transport = createLynxBackgroundTransport(context, createLynxClientContainer());
+		let cleanupCalls = 0;
+		const pageDestroy = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-destroy' as const,
+		};
+
+		context.sendToBackground(pageDestroy);
+		expect(transport.closedReason()?.message).toBe(
+			'Octane Lynx native page lifetime was destroyed.',
+		);
+		await expect(transport.ready).rejects.toThrow(/native page lifetime was destroyed/);
+
+		transport.bindPageDestroy(() => {
+			cleanupCalls++;
+		});
+		await flushMicrotasks();
+		expect(cleanupCalls).toBe(1);
+
+		context.sendToBackground(pageDestroy);
+		await flushMicrotasks();
+		expect(cleanupCalls).toBe(1);
 	});
 
 	it('terminally closes only the exact accepted root for an unsolicited host fault', async () => {

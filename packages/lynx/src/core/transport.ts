@@ -68,6 +68,8 @@ export interface LynxBackgroundTransport extends UniversalAsyncCommitTransport<L
 	readonly mode: 'async';
 	readonly ready: Promise<void>;
 	bindRoot(root: Pick<UniversalRoot, 'dispatchTransportEvent'>): void;
+	/** Bind logical background cleanup to the native page lifetime broadcast. */
+	bindPageDestroy(handler: () => void | Promise<void>): void;
 	acceptedIdentity(): UniversalTransportIdentity | null;
 	/** Cancel commits that have not crossed the readiness/send boundary. */
 	cancelPendingBeforeReady(reason?: unknown): Promise<boolean>;
@@ -243,6 +245,9 @@ export function createLynxBackgroundTransport(
 	let logicalTeardownEnabled = false;
 	let nextThreadCall = 1;
 	let lastBackgroundCall = 0;
+	let pageDestroyReceived = false;
+	let pageDestroyHandler: (() => void | Promise<void>) | null = null;
+	let pageDestroyHandlerInvoked = false;
 	const finalizedWorkletBatches = new WeakSet<object>();
 
 	const report = (error: unknown, fallback = 'Octane Lynx transport protocol error.') => {
@@ -499,10 +504,10 @@ export function createLynxBackgroundTransport(
 		}
 	};
 
-	const closeThreadCalls = (error: Error): void => {
+	const closeThreadCalls = (error: Error, notifyMain = true): void => {
 		for (const entry of [...pendingMainCalls.values()]) {
 			pendingMainCalls.delete(entry.call);
-			if (entry.state === 'sent' && entry.identity !== null) {
+			if (notifyMain && entry.state === 'sent' && entry.identity !== null) {
 				try {
 					dispatch({ ...entry.identity, type: 'cancel-main', call: entry.call });
 				} catch (cancelError) {
@@ -515,9 +520,13 @@ export function createLynxBackgroundTransport(
 		runningBackgroundCalls.clear();
 	};
 
-	const closeClientState = (error: Error, preserveDisposeResolution: boolean): boolean => {
+	const closeClientState = (
+		error: Error,
+		preserveDisposeResolution: boolean,
+		notifyMain = true,
+	): boolean => {
 		if (closedError !== null) return false;
-		closeThreadCalls(error);
+		closeThreadCalls(error, notifyMain);
 		closedError = error;
 		readyDeferred.reject(error);
 		for (const entry of [...pending.values()]) closeEntry(entry, error);
@@ -533,6 +542,31 @@ export function createLynxBackgroundTransport(
 	const closeInternal = (error: Error, preserveDisposeResolution: boolean) => {
 		if (!closeClientState(error, preserveDisposeResolution)) return;
 		detachReceiver();
+	};
+
+	const queuePageDestroyHandler = (): void => {
+		if (!pageDestroyReceived || pageDestroyHandler === null || pageDestroyHandlerInvoked) return;
+		pageDestroyHandlerInvoked = true;
+		const handler = pageDestroyHandler;
+		// Let a synchronously rejected commit unwind before universal teardown stages
+		// its logical remove batch. This keeps a destroy fired during PAPI work from
+		// racing the transaction that was active when the lifetime ended.
+		void Promise.resolve()
+			.then(() => handler())
+			.catch((error) => {
+				report(error, 'Octane Lynx background page-destroy cleanup failed.');
+			});
+	};
+
+	const handlePageDestroy = (): void => {
+		if (pageDestroyReceived) return;
+		pageDestroyReceived = true;
+		terminalDisposeIdentity = null;
+		terminalDisposeRetryQueued = false;
+		logicalTeardownEnabled = true;
+		closeClientState(new Error('Octane Lynx native page lifetime was destroyed.'), false, false);
+		detachReceiver();
+		queuePageDestroyHandler();
 	};
 
 	const finishTerminalDispose = (): void => {
@@ -722,7 +756,8 @@ export function createLynxBackgroundTransport(
 			message.type === 'host-fault' ||
 			message.type === 'dispose-ack' ||
 			message.type === 'dispose-retry' ||
-			message.type === 'main-ready'
+			message.type === 'main-ready' ||
+			message.type === 'page-destroy'
 		) {
 			return;
 		}
@@ -1055,6 +1090,10 @@ export function createLynxBackgroundTransport(
 			rejectExpectedMalformed(event.data, normalized);
 			return;
 		}
+		if (message.type === 'page-destroy') {
+			handlePageDestroy();
+			return;
+		}
 		if (closedError !== null) {
 			if (message.type === 'dispose-ack') handleDisposeAcknowledgement(message);
 			else if (message.type === 'dispose-retry') handleDisposeRetry(message);
@@ -1270,6 +1309,16 @@ export function createLynxBackgroundTransport(
 				throw new Error('Octane Lynx transport is already bound to another root.');
 			}
 			boundRoot = root;
+		},
+		bindPageDestroy(handler) {
+			if (typeof handler !== 'function') {
+				throw new TypeError('Octane Lynx page-destroy handler must be a function.');
+			}
+			if (pageDestroyHandler !== null && pageDestroyHandler !== handler) {
+				throw new Error('Octane Lynx transport already has a page-destroy handler.');
+			}
+			pageDestroyHandler = handler;
+			queuePageDestroyHandler();
 		},
 		acceptedIdentity() {
 			return accepted;
