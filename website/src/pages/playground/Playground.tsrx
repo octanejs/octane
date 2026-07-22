@@ -1,11 +1,11 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
 // LIVE rendered app or the compiled output, switchable with a tab. The
-// compiled pane has two modes: AST (the compiler's parser tree for the
-// authored file) and TYPES (the typed virtual TSX the IDE language service
-// sees via `octane/compiler/volar`). Hovering or selecting source reveals the
-// deepest containing AST node and hovering a
-// tree node highlights its source range. Types uses the Volar token mappings
-// bidirectionally (see src/lib/playground-mapping.ts). The
+// compiled pane has two modes: AST (parsed source, type transform, and exact
+// emitted client/server/type-output trees) and TYPES (the typed virtual TSX
+// the IDE language service sees via `octane/compiler/volar`). Hovering or
+// selecting source reveals the corresponding AST node where the compiler has
+// a mapping; hovering a tree node highlights its source origin. Types uses
+// the Volar token mappings bidirectionally (see playground-mapping.ts). The
 // whole pipeline runs in the browser: `octane/compiler` (and sucrase for
 // React-host `.react.tsx` files) compiles the virtual files on a debounce, the
 // module graph executes inside a SANDBOXED IFRAME with an opaque origin (see
@@ -65,6 +65,9 @@ export function Playground() @{
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
 	// Which compiler artifact the right pane shows.
 	const [compiledMode, setCompiledMode] = useState<'ast' | 'types'>('ast');
+	const [astStage, setAstStage] = useState<
+		'source' | 'type-transform' | 'type-output' | 'client-output' | 'server-output'
+	>('source');
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
@@ -92,9 +95,11 @@ export function Playground() @{
 	const resultModeRef = useRef<{
 		view: 'preview' | 'compiled';
 		compiledMode: 'ast' | 'types';
+		astStage: 'source' | 'type-transform' | 'type-output' | 'client-output' | 'server-output';
 	}>({
 		view: 'preview',
 		compiledMode: 'ast',
+		astStage: 'source',
 	});
 	// Imperative bridge into the boot closure below — populated once the editor
 	// stack has loaded; the toolbar buttons (and the consent overlay's Run
@@ -116,6 +121,11 @@ export function Playground() @{
 	const selectCompiledMode = (next: 'ast' | 'types') => {
 		setCompiledMode(next);
 		resultModeRef.current.compiledMode = next;
+		controllerRef.current.syncOutput?.();
+	};
+	const selectAstStage = (next: typeof astStage) => {
+		setAstStage(next);
+		resultModeRef.current.astStage = next;
 		controllerRef.current.syncOutput?.();
 	};
 
@@ -299,7 +309,19 @@ export function Playground() @{
 				string,
 				{ source: string; code: string; volarMappings: any; mapping: any }
 			>();
-			const astCache = new Map<string, { source: string; ast: unknown }>();
+			type AstEntry = {
+				source: string;
+				ast: unknown;
+				space: 'source' | 'generated';
+				label: string;
+				notice: string;
+				code?: string;
+				volarMappings?: any;
+				map?: unknown;
+				mapping?: any;
+			};
+			const astCache = new Map<string, AstEntry>();
+			const astCacheKey = (name: string) => name + '::' + resultModeRef.current.astStage;
 
 			const typesEntry = (name: string) => {
 				const source = fileSource(name);
@@ -331,15 +353,26 @@ export function Playground() @{
 			const astEntry = (name: string) => {
 				if (pgModules.isReactHostFile(name)) return null;
 				const source = fileSource(name);
-				const cached = astCache.get(name);
+				const key = astCacheKey(name);
+				const cached = astCache.get(key);
 				if (cached && cached.source === source) return cached;
-				const result = pg.compileAst(source, name);
+				const result = pg.compileAst(source, name, resultModeRef.current.astStage);
 				if (!result.ok) {
 					setError(`AST generation failed: ${result.error}`);
 					return null;
 				}
-				const entry = { source, ast: result.ast };
-				astCache.set(name, entry);
+				const entry: AstEntry = {
+					source,
+					ast: result.ast,
+					space: result.space,
+					label: result.label,
+					notice: result.notice,
+					code: result.code,
+					volarMappings: result.mappings,
+					map: result.map,
+					mapping: undefined,
+				};
+				astCache.set(key, entry);
 				return entry;
 			};
 
@@ -359,7 +392,10 @@ export function Playground() @{
 				if (resultModeRef.current.compiledMode === 'ast') {
 					const entry = astEntry(currentFile);
 					if (entry && entry !== lastShownAst) {
-						astPreview.setAst(entry.ast, currentFile);
+						astPreview.setAst(entry.ast, currentFile, {
+							label: entry.label,
+							notice: entry.notice,
+						});
 						lastShownAst = entry;
 					} else if (!entry) {
 						const message = pgModules.isReactHostFile(currentFile)
@@ -425,16 +461,32 @@ export function Playground() @{
 			// source tracks every edit, and lastShownOutput mirrors the pane.
 			// Only the first navigation against a fresh artifact builds the
 			// CodeMapping (undefined = not built, null = built, none available).
-			const activeMapping = () => {
+			const activeAstEntry = (): AstEntry | null => {
 				if (
-					resultModeRef.current.view !== 'compiled' ||
-						resultModeRef.current.compiledMode !== 'types'
+					resultModeRef.current.view !== 'compiled' || resultModeRef.current.compiledMode !== 'ast'
 				) return null;
-				const entry = typesCache.get(currentFile);
-				if (!entry || entry.source !== fileSource(currentFile)) return null;
-				if (entry.code !== lastShownOutput) return null;
+				const entry = astCache.get(astCacheKey(currentFile));
+				return entry && entry.source === fileSource(currentFile) && entry === lastShownAst
+					? entry
+					: null;
+			};
+			const activeMapping = () => {
+				if (resultModeRef.current.view !== 'compiled') return null;
+				if (resultModeRef.current.compiledMode === 'types') {
+					const entry = typesCache.get(currentFile);
+					if (!entry || entry.source !== fileSource(currentFile)) return null;
+					if (entry.code !== lastShownOutput) return null;
+					if (entry.mapping === undefined) {
+						entry.mapping = pgMapping.mappingFromVolar(entry.volarMappings);
+					}
+					return entry.mapping;
+				}
+				const entry = activeAstEntry();
+				if (!entry || entry.space !== 'generated') return null;
 				if (entry.mapping === undefined) {
-					entry.mapping = pgMapping.mappingFromVolar(entry.volarMappings);
+					entry.mapping = entry.volarMappings
+						? pgMapping.mappingFromVolar(entry.volarMappings)
+						: pgMapping.mappingFromSourceMap(entry.map, entry.source, entry.code ?? '');
 				}
 				return entry.mapping;
 			};
@@ -496,12 +548,19 @@ export function Playground() @{
 			};
 			const revealAstRange = (range: { from: number; to: number } | null, scroll: boolean) => {
 				if (resultModeRef.current.compiledMode !== 'ast') return;
-				if (!range) {
+				const entry = activeAstEntry();
+				if (!range || !entry) {
 					clearMappedPair();
 					return;
 				}
 				clearMappedIn(outputView);
-				revealRanges(sourceView, [range], scroll);
+				if (entry.space === 'source') {
+					revealRanges(sourceView, [range], scroll);
+					return;
+				}
+				const sourceRanges = activeMapping()?.toSourceRange(range.from, range.to) ?? null;
+				if (sourceRanges) revealRanges(sourceView, sourceRanges, scroll);
+				else clearMappedIn(sourceView);
 			};
 
 			astPreview = pgAst.createAstPreview(astHost, {
@@ -518,7 +577,16 @@ export function Playground() @{
 				if (resultModeRef.current.view !== 'compiled') return;
 				const offset = update.state.selection.main.head;
 				if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
-					astPreview.reveal(offset, true);
+					const entry = activeAstEntry();
+					if (entry?.space === 'source') astPreview.reveal(offset, true);
+					else {
+						const generated = activeMapping()?.toGenerated(offset);
+						if (generated) astPreview.reveal(generated[0].from, true);
+						else {
+							astPreview.clear();
+							clearMappedPair();
+						}
+					}
 					return;
 				}
 				const pair = mappedPair(side, offset);
@@ -534,8 +602,17 @@ export function Playground() @{
 					if (resultModeRef.current.view !== 'compiled') return;
 					const offset = view.posAtCoords({ x: event.clientX, y: event.clientY });
 					if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
-						if (offset == null) clearMappedPair();
-						else astPreview.reveal(offset, false);
+						const entry = activeAstEntry();
+						if (offset == null || !entry) clearMappedPair();
+						else if (entry.space === 'source') astPreview.reveal(offset, false);
+						else {
+							const generated = activeMapping()?.toGenerated(offset);
+							if (generated) astPreview.reveal(generated[0].from, false);
+							else {
+								astPreview.clear();
+								clearMappedPair();
+							}
+						}
 						return;
 					}
 					const pair =
@@ -980,21 +1057,37 @@ export function Playground() @{
 								(activeFile || '…')}
 					</span>
 					@if (view === 'compiled') {
-						<div class="pg-seg pg-seg-sm" role="group" aria-label="Compiled output mode">
-							<button
-								type="button"
-								class={['pg-seg-btn', compiledMode === 'ast' && 'active']}
-								onClick={() => selectCompiledMode('ast')}
-							>
-								AST
-							</button>
-							<button
-								type="button"
-								class={['pg-seg-btn', compiledMode === 'types' && 'active']}
-								onClick={() => selectCompiledMode('types')}
-							>
-								Types
-							</button>
+						<div class="pg-compiled-controls">
+							@if (compiledMode === 'ast') {
+								<select
+									class="pg-ast-stage-select"
+									aria-label="AST compiler stage"
+									value={astStage}
+									onChange={(event) => selectAstStage(event.currentTarget.value as typeof astStage)}
+								>
+									<option value="source">Parsed source</option>
+									<option value="type-transform">Type transform</option>
+									<option value="type-output">Types output</option>
+									<option value="client-output">Client output</option>
+									<option value="server-output">Server output</option>
+								</select>
+							}
+							<div class="pg-seg pg-seg-sm" role="group" aria-label="Compiled output mode">
+								<button
+									type="button"
+									class={['pg-seg-btn', compiledMode === 'ast' && 'active']}
+									onClick={() => selectCompiledMode('ast')}
+								>
+									AST
+								</button>
+								<button
+									type="button"
+									class={['pg-seg-btn', compiledMode === 'types' && 'active']}
+									onClick={() => selectCompiledMode('types')}
+								>
+									Types
+								</button>
+							</div>
 						</div>
 					}
 				</div>
@@ -1130,6 +1223,23 @@ export function Playground() @{
 				font-size: 0.68rem;
 				padding: 0.12rem 0.6rem;
 				letter-spacing: 0.06em;
+			}
+			.pg-compiled-controls {
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+			}
+			.pg-ast-stage-select {
+				max-width: 9.5rem;
+				padding: 0.18rem 0.35rem;
+				border: 1px solid var(--border);
+				border-radius: 5px;
+				background: var(--code-bg);
+				color: var(--text-secondary);
+				font: inherit;
+				font-size: 0.68rem;
+				letter-spacing: 0;
+				text-transform: none;
 			}
 			.pg-seg-btn {
 				border: none;

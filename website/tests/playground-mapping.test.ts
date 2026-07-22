@@ -4,8 +4,8 @@
 // offset in the output resolves back to its source range. It is exercised
 // against real Volar token mappings, not synthetic fixtures.
 import { describe, it, expect } from 'vitest';
-import { compileTypes } from '../src/lib/playground.ts';
-import { mappingFromVolar } from '../src/lib/playground-mapping.ts';
+import { compilePlayground, compileTypes } from '../src/lib/playground.ts';
+import { mappingFromSourceMap, mappingFromVolar } from '../src/lib/playground-mapping.ts';
 
 const SOURCE = `import { useState } from 'octane';
 
@@ -55,8 +55,8 @@ describe('types mapping (Volar token mappings)', () => {
 	});
 
 	it('clears on positions past the mapped token instead of reusing it', () => {
-		// Same contract as the prod pane: an offset beyond the anchored token's
-		// exact span (here the blank line before the JSX) is unmapped and must
+		// An offset beyond the anchored token's exact span (here the blank line
+		// before the JSX) is unmapped and must
 		// clear the highlight, not resolve to the preceding token's image.
 		const offset = SOURCE.indexOf('\n\n\t<div>') + 1;
 		expect(mapping!.toGenerated(offset)).toBeNull();
@@ -73,5 +73,51 @@ describe('types mapping (Volar token mappings)', () => {
 		expect(mappingFromVolar([])).toBeNull();
 		expect(mappingFromVolar(null)).toBeNull();
 		expect(mappingFromVolar(undefined)).toBeNull();
+	});
+});
+
+describe('client output mapping (compiler source map)', () => {
+	const output = compilePlayground(SOURCE, 'App.tsrx');
+	if (!output.ok) throw new Error(output.error);
+	const mapping = mappingFromSourceMap(output.map, SOURCE, output.code);
+
+	it('maps only tokens backed by compiler source-map anchors', () => {
+		const count = SOURCE.indexOf('count, setCount');
+		const generated = mapping?.toGenerated(count);
+		expect(generated).not.toBeNull();
+		expect(generated!.some((range) => textAt(output.code, range) === 'count')).toBe(true);
+		expect(mapping?.toSourceRange(0, output.code.length)).not.toBeNull();
+	});
+
+	it('does not interpolate across source text without an anchor', () => {
+		const blankLine = SOURCE.indexOf('\n\n\t<div>') + 1;
+		expect(mapping?.toGenerated(blankLine)).toBeNull();
+	});
+
+	it('returns null for the server-style empty map', () => {
+		expect(mappingFromSourceMap({ mappings: '' }, SOURCE, '')).toBeNull();
+	});
+});
+
+it('keeps type mappings after a scoped-style statement terminator', () => {
+	const source = `export function App() @{
+	<button>Styled</button>
+	<style>button { color: red; }</style>
+}
+export const afterStyle = 1;`;
+	const output = compileTypes(source, 'App.tsrx');
+	if (!output.ok) throw new Error(output.error);
+	const mapping = mappingFromVolar(output.mappings);
+	const sourceOffset = source.indexOf('afterStyle');
+	const generatedOffset = output.code.indexOf('afterStyle');
+
+	expect(output.code).toContain('<style></style>;');
+	expect(mapping?.toGenerated(sourceOffset)).toContainEqual({
+		from: generatedOffset,
+		to: generatedOffset + 'afterStyle'.length,
+	});
+	expect(mapping?.toSource(generatedOffset)).toContainEqual({
+		from: sourceOffset,
+		to: sourceOffset + 'afterStyle'.length,
 	});
 });
