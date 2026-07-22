@@ -1041,7 +1041,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 30_000);
 
-	it('playground compiled pane offers Svelte-style AST and types mapping', async () => {
+	it('playground compiled pane offers AST and types mapping', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
@@ -1119,8 +1119,8 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					[paneIndex, token] as const,
 					{ timeout: 10_000 },
 				);
-			// AST is the default compiler artifact. Like Svelte's playground it
-			// shows one source AST and reveals the deepest containing node.
+			// AST is the default compiler artifact. It shows one source AST and
+			// reveals the deepest containing node.
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
 			await page.locator('.pg-ast-tree').waitFor();
 			expect(

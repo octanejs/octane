@@ -1,6 +1,6 @@
 // Source ↔ output position mapping for the playground's TYPES pane —
-// clicking in the editor reveals the corresponding output, and vice versa
-// (the Svelte-playground interaction). `octane/compiler/volar` emits per-token
+// clicking in the editor reveals the corresponding output, and vice versa.
+// `octane/compiler/volar` emits per-token
 // offset mappings (sourceOffsets/generatedOffsets/lengths) for the language
 // service; those lengths are exact, so ranges are used verbatim.
 //
