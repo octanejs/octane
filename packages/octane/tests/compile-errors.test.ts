@@ -219,21 +219,21 @@ describe('compile errors — slot-keyed hooks in plain JS loops', () => {
 		expect(() => compile(src, 'custom-hook-loop.tsrx')).toThrow(/`useState`.*`for` loop.*useMany/);
 	});
 
-	it('rejects a hook behind a directive-shaped statement inside a plain loop', () => {
-		// A bare-JSX `if` (or a directive-shaped `for…of`) nested in a plain JS
-		// loop is NOT a template position — the construct's own per-call-site slot
-		// repeats each iteration exactly like a hook slot, so hooks reached through
-		// it collide all the same. The walker must not treat these as template
-		// directives and skip them (found by review on the initial guard).
+	it('rejects a hook inside JSX values nested in a plain loop', () => {
+		// JSX used as a value inside a plain JS loop still repeats each hook's
+		// compiler-assigned call-site slot on every iteration. Keep the values
+		// consumed by the final output so target-neutral unused-output validation
+		// does not preempt the loop-specific diagnostic this test protects.
 		const ifSrc = `
       import { useMemo } from 'octane';
       export function C(props) @{
+        const output = [];
         for (let i = 0; i < props.n; i++) {
           if (props.flag) {
-            <div>{useMemo(() => i, [i])}</div>
+            output.push(<div>{useMemo(() => i, [i])}</div>);
           }
         }
-        <div>{'x'}</div>
+        <div>{output}</div>
       }
     `;
 		expect(() => compile(ifSrc, 'if-jsx-loop.tsrx')).toThrow(/`useMemo`.*`for` loop/);
@@ -241,12 +241,13 @@ describe('compile errors — slot-keyed hooks in plain JS loops', () => {
 		const forOfSrc = `
       import { useState } from 'octane';
       export function C(props) @{
+        const output = [];
         for (let i = 0; i < props.n; i++) {
           for (const x of props.items) {
-            <li>{useState(0)[0] + ''}</li>
+            output.push(<li>{useState(0)[0] + ''}</li>);
           }
         }
-        <div>{'x'}</div>
+        <div>{output}</div>
       }
     `;
 		expect(() => compile(forOfSrc, 'forof-jsx-loop.tsrx')).toThrow(/`useState`.*`for` loop/);
