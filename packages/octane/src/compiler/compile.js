@@ -4283,6 +4283,15 @@ function restampAuthoredStyleHashes(ast, styleRemap, filename) {
 	}
 }
 
+function cleanCompileFilename(filename) {
+	const query = filename.indexOf('?');
+	const hash = filename.indexOf('#');
+	let end = filename.length;
+	if (query !== -1) end = query;
+	if (hash !== -1 && hash < end) end = hash;
+	return filename.slice(0, end);
+}
+
 export function compile(source, filename, options) {
 	return compileAuthored(source, filename, options, null);
 }
@@ -4301,8 +4310,9 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
-	const analyzedAst = parseModule(source, filename);
-	analyzeTsrx(analyzedAst, filename);
+	const cleanFilename = cleanCompileFilename(filename);
+	const analyzedAst = parseModule(source, cleanFilename);
+	analyzeTsrx(analyzedAst, cleanFilename);
 	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
 }
 
@@ -4313,12 +4323,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
 	}
 	if (!options?.__hydratePrepared) {
-		const query = filename.indexOf('?');
-		const hash = filename.indexOf('#');
-		let filenameEnd = filename.length;
-		if (query !== -1) filenameEnd = query;
-		if (hash !== -1 && hash < filenameEnd) filenameEnd = hash;
-		const cleanFilename = filename.slice(0, filenameEnd);
+		const cleanFilename = cleanCompileFilename(filename);
 		const hydratePreparation =
 			mode === 'client'
 				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
