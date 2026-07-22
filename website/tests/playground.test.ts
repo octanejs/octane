@@ -13,6 +13,7 @@ import { getRouter } from '../src/router.ts';
 import {
 	compilePlayground,
 	compileTypes,
+	resolvePlaygroundError,
 	createPreview,
 	PREVIEW_READY_TIMEOUT_MS,
 	PREVIEW_RUN_TIMEOUT_MS,
@@ -41,6 +42,15 @@ async function renderRoute(url: string) {
 }
 
 describe('playground compile pipeline', () => {
+	it('keeps an AST inspection error when the runnable graph succeeds', () => {
+		expect(resolvePlaygroundError(null, 'AST generation failed: invalid output')).toBe(
+			'AST generation failed: invalid output',
+		);
+		expect(resolvePlaygroundError('Module graph failed', 'AST generation failed')).toBe(
+			'Module graph failed',
+		);
+	});
+
 	it('compiles the default TSRX workspace to client runtime code', () => {
 		const result = compilePlayground(DEFAULT_WORKSPACES.tsrx.files[0].source, 'App.tsrx');
 		expect(result.ok).toBe(true);

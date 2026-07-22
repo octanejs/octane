@@ -18,7 +18,16 @@ export interface MappedRange {
 	to: number;
 }
 
+export interface MappedPair {
+	source: MappedRange[];
+	output: MappedRange[];
+}
+
 export interface CodeMapping {
+	/** Source and output ranges selected by one source-side lookup. */
+	pairFromSource(offset: number): MappedPair | null;
+	/** Source and output ranges selected by one generated-side lookup. */
+	pairFromGenerated(offset: number): MappedPair | null;
 	/** Ranges in the generated output mapped from a source offset (document order). */
 	toGenerated(offset: number): MappedRange[] | null;
 	/** Ranges in the source mapped from a generated-output offset (document order). */
@@ -194,8 +203,20 @@ function createMapping(segments: Segment[]): CodeMapping | null {
 		result.sort((a, b) => a.from - b.from || a.to - b.to);
 		return result.length > 0 ? result : null;
 	};
+	const pair = (matched: Segment[] | null): MappedPair | null => {
+		if (!matched) return null;
+		const source = ranges(matched, 'src');
+		const output = ranges(matched, 'gen');
+		return source && output ? { source, output } : null;
+	};
 
 	return {
+		pairFromSource(offset) {
+			return pair(containing(bySrc, srcPrefixEnds, 'src', offset));
+		},
+		pairFromGenerated(offset) {
+			return pair(containing(byGen, genPrefixEnds, 'gen', offset));
+		},
 		toGenerated(offset) {
 			const matched = containing(bySrc, srcPrefixEnds, 'src', offset);
 			return matched ? ranges(matched, 'gen') : null;

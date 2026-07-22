@@ -82,6 +82,26 @@ describe('types mapping (Volar token mappings)', () => {
 		expect(nested?.toSourceRange(8, 13)).toEqual([{ from: 5, to: 8 }]);
 	});
 
+	it('keeps both highlights on the same mapping at shared boundaries', () => {
+		const sharedOutputBoundary = mappingFromVolar([
+			{ sourceOffsets: [0], generatedOffsets: [10], lengths: [20] },
+			{ sourceOffsets: [5], generatedOffsets: [10], lengths: [3] },
+		]);
+		expect(sharedOutputBoundary?.pairFromSource(15)).toEqual({
+			source: [{ from: 0, to: 20 }],
+			output: [{ from: 10, to: 30 }],
+		});
+
+		const sharedSourceBoundary = mappingFromVolar([
+			{ sourceOffsets: [0], generatedOffsets: [10], lengths: [20] },
+			{ sourceOffsets: [0], generatedOffsets: [15], lengths: [3] },
+		]);
+		expect(sharedSourceBoundary?.pairFromGenerated(25)).toEqual({
+			source: [{ from: 0, to: 20 }],
+			output: [{ from: 10, to: 30 }],
+		});
+	});
+
 	it('returns null for empty or absent mappings instead of throwing', () => {
 		expect(mappingFromVolar([])).toBeNull();
 		expect(mappingFromVolar(null)).toBeNull();
