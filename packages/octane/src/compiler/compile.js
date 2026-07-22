@@ -17378,15 +17378,21 @@ function walkExprH(rootVar, path) {
 	return expr;
 }
 
-// Octane template nodes are inspection metadata, not executable ESTree. Keep
-// their construction behind one local builder; standard generated-JS nodes
-// below use @tsrx/core builders and setLocation instead.
-function inspectionNode(type, fields = null) {
-	return fields === null ? { type } : { type, ...fields };
+// Octane template nodes are compiler-owned inspection metadata, not executable
+// ESTree. Their initial ranges are relative to the decoded template and are
+// relocated in place after output parsing; standard generated-JS nodes below
+// still use @tsrx/core builders and never mutate the parsed output tree.
+function inspectionNode(type, fields = null, start = null, end = null) {
+	const node = fields === null ? { type } : { type, ...fields };
+	if (start !== null) {
+		node.start = start;
+		node.end = end;
+	}
+	return node;
 }
 
-function inspectionName(type, name) {
-	return inspectionNode(type, { name });
+function inspectionName(type, name, start, end) {
+	return inspectionNode(type, { name }, start, end);
 }
 
 function rawTextClosingTag(html, from, tag) {
@@ -17407,16 +17413,17 @@ function rawTextClosingTag(html, from, tag) {
 }
 
 function inspectTemplateHtml(html, sources) {
-	const root = inspectionNode('OctaneTemplate', { children: [] });
-	const ranges = [{ node: root, start: 0, end: html.length }];
-	const stack = [{ tag: null, node: root, range: ranges[0] }];
+	const offsets = [0, html.length];
+	const root = inspectionNode('OctaneTemplate', { children: [] }, 0, html.length);
+	const stack = [{ tag: null, node: root }];
 	let sourceIndex = 0;
 	let index = 0;
 	const append = (node, start, end) => {
+		node.start = start;
+		node.end = end;
+		offsets.push(start, end);
 		stack[stack.length - 1].node.children.push(node);
-		const range = { node, start, end };
-		ranges.push(range);
-		return range;
+		return node;
 	};
 	const match = (kind, from, to) => {
 		const source = sources[sourceIndex];
@@ -17489,12 +17496,14 @@ function inspectTemplateHtml(html, sources) {
 			const close = html.indexOf('>', nameEnd);
 			const end = close === -1 ? html.length : close + 1;
 			match('close', nameStart, nameEnd);
-			const name = inspectionName('OctaneTemplateIdentifier', html.slice(nameStart, nameEnd));
-			const closingElement = inspectionNode('OctaneTemplateClosingElement', { name });
-			ranges.push(
-				{ node: closingElement, start: index, end },
-				{ node: name, start: nameStart, end: nameEnd },
+			const name = inspectionName(
+				'OctaneTemplateIdentifier',
+				html.slice(nameStart, nameEnd),
+				nameStart,
+				nameEnd,
 			);
+			const closingElement = inspectionNode('OctaneTemplateClosingElement', { name }, index, end);
+			offsets.push(nameStart, nameEnd, index, end);
 			let matchIndex = stack.length - 1;
 			while (matchIndex > 0 && stack[matchIndex].tag.toLowerCase() !== name.name.toLowerCase()) {
 				matchIndex--;
@@ -17502,7 +17511,8 @@ function inspectTemplateHtml(html, sources) {
 			if (matchIndex > 0) {
 				const entry = stack[matchIndex];
 				entry.node.closingElement = closingElement;
-				entry.range.end = end;
+				entry.node.end = end;
+				offsets.push(end);
 				stack.length = matchIndex;
 			} else {
 				append(closingElement, index, end);
@@ -17528,7 +17538,8 @@ function inspectTemplateHtml(html, sources) {
 		}
 		match('open', nameStart, nameEnd);
 		const tag = html.slice(nameStart, nameEnd);
-		const name = inspectionName('OctaneTemplateIdentifier', tag);
+		const name = inspectionName('OctaneTemplateIdentifier', tag, nameStart, nameEnd);
+		offsets.push(nameStart, nameEnd);
 		const attributes = [];
 		let cursor = nameEnd;
 		let selfClosing = false;
@@ -17559,7 +17570,10 @@ function inspectTemplateHtml(html, sources) {
 			const attrName = inspectionName(
 				'OctaneTemplateAttributeName',
 				html.slice(attrNameStart, attrNameEnd),
+				attrNameStart,
+				attrNameEnd,
 			);
+			offsets.push(attrNameStart, attrNameEnd);
 			let value = null;
 			while (cursor < html.length && html.charCodeAt(cursor) <= 32) cursor++;
 			if (html.charCodeAt(cursor) === 61) {
@@ -17571,11 +17585,16 @@ function inspectTemplateHtml(html, sources) {
 					while (cursor < html.length && html.charCodeAt(cursor) !== quote) cursor++;
 					const valueEnd = cursor;
 					match('attr-value', valueStart, valueEnd);
-					value = inspectionNode('OctaneTemplateAttributeValue', {
-						value: html.slice(valueStart, valueEnd),
-						raw: html.slice(valueStart - 1, cursor < html.length ? cursor + 1 : cursor),
-					});
-					ranges.push({ node: value, start: valueStart, end: valueEnd });
+					value = inspectionNode(
+						'OctaneTemplateAttributeValue',
+						{
+							value: html.slice(valueStart, valueEnd),
+							raw: html.slice(valueStart - 1, cursor < html.length ? cursor + 1 : cursor),
+						},
+						valueStart,
+						valueEnd,
+					);
+					offsets.push(valueStart, valueEnd);
 					if (cursor < html.length) cursor++;
 				} else {
 					const valueStart = cursor;
@@ -17585,43 +17604,52 @@ function inspectTemplateHtml(html, sources) {
 						cursor++;
 					}
 					match('attr-value', valueStart, cursor);
-					value = inspectionNode('OctaneTemplateAttributeValue', {
-						value: html.slice(valueStart, cursor),
-						raw: html.slice(valueStart, cursor),
-					});
-					ranges.push({ node: value, start: valueStart, end: cursor });
+					value = inspectionNode(
+						'OctaneTemplateAttributeValue',
+						{
+							value: html.slice(valueStart, cursor),
+							raw: html.slice(valueStart, cursor),
+						},
+						valueStart,
+						cursor,
+					);
+					offsets.push(valueStart, cursor);
 				}
 			}
-			const attribute = inspectionNode('OctaneTemplateAttribute', { name: attrName, value });
-			attributes.push(attribute);
-			ranges.push(
-				{ node: attribute, start: attrStart, end: cursor },
-				{ node: attrName, start: attrNameStart, end: attrNameEnd },
+			const attribute = inspectionNode(
+				'OctaneTemplateAttribute',
+				{ name: attrName, value },
+				attrStart,
+				cursor,
 			);
+			offsets.push(attrStart, cursor);
+			attributes.push(attribute);
 		}
-		const openingElement = inspectionNode('OctaneTemplateOpeningElement', {
-			name,
-			attributes,
-			selfClosing,
-		});
+		const openingElement = inspectionNode(
+			'OctaneTemplateOpeningElement',
+			{
+				name,
+				attributes,
+				selfClosing,
+			},
+			index,
+			cursor,
+		);
+		offsets.push(index, cursor);
 		const element = inspectionNode('OctaneTemplateElement', {
 			openingElement,
 			closingElement: null,
 			children: [],
 		});
-		const elementRange = append(element, index, cursor);
-		ranges.push(
-			{ node: openingElement, start: index, end: cursor },
-			{ node: name, start: nameStart, end: nameEnd },
-		);
+		append(element, index, cursor);
 		if (!selfClosing && !VOID_ELEMENTS.has(tag.toLowerCase())) {
-			stack.push({ tag, node: element, range: elementRange });
+			stack.push({ tag, node: element });
 		}
 		index = cursor;
 	}
 
 	sources.length = sourceIndex;
-	return { mappings: sources, ast: root, ranges };
+	return { mappings: sources, ast: root, offsets };
 }
 
 function allocTemplate(ctx, html, ns = 0, frag = 0, tagSources = null) {
@@ -17632,7 +17660,7 @@ function allocTemplate(ctx, html, ns = 0, frag = 0, tagSources = null) {
 		const inspection = inspectTemplateHtml(html, tagSources);
 		template.tagMappings = inspection.mappings;
 		template.inspectionAst = inspection.ast;
-		template.inspectionRanges = inspection.ranges;
+		template.inspectionOffsets = inspection.offsets;
 	}
 	ctx.hoistedTemplates.push(template);
 	return name;
@@ -17653,9 +17681,7 @@ function parseGeneratedOutputAst(code) {
 	});
 }
 
-function encodedTemplateBoundaries(raw, ranges) {
-	const boundaries = [];
-	for (const range of ranges) boundaries.push(range.start, range.end);
+function encodedTemplateBoundaries(raw, boundaries) {
 	boundaries.sort((a, b) => a - b);
 	const offsets = new Map();
 	let htmlOffset = 0;
@@ -17702,24 +17728,23 @@ function generatedLocation(lineStarts, offset) {
 }
 
 function materializeTemplateAst(template, literal, lineStarts) {
-	const rangeByNode = new Map();
-	for (const range of template.inspectionRanges) rangeByNode.set(range.node, range);
-	const offsets = encodedTemplateBoundaries(literal.raw, template.inspectionRanges);
+	const offsets = encodedTemplateBoundaries(literal.raw, template.inspectionOffsets);
 	const visit = (value) => {
-		if (Array.isArray(value)) return value.map(visit);
-		if (!value || typeof value !== 'object') return value;
-		const node = inspectionNode(value.type);
-		for (const key of Object.keys(value)) {
-			if (key !== 'type') node[key] = visit(value[key]);
+		if (Array.isArray(value)) {
+			for (const child of value) visit(child);
+			return value;
 		}
-		const range = rangeByNode.get(value);
-		if (range) {
-			const relativeStart = offsets.get(range.start);
-			const relativeEnd = offsets.get(range.end);
-			const start = literal.start + relativeStart;
-			const end = literal.start + relativeEnd;
+		if (!value || typeof value !== 'object') return value;
+		const relativeStart = value.start;
+		const relativeEnd = value.end;
+		for (const key of Object.keys(value)) {
+			if (key !== 'start' && key !== 'end' && key !== 'loc') visit(value[key]);
+		}
+		if (Number.isInteger(relativeStart)) {
+			const start = literal.start + offsets.get(relativeStart);
+			const end = literal.start + offsets.get(relativeEnd);
 			return setLocation(
-				node,
+				value,
 				{
 					start,
 					end,
@@ -17731,7 +17756,7 @@ function materializeTemplateAst(template, literal, lineStarts) {
 				true,
 			);
 		}
-		return node;
+		return value;
 	};
 	return visit(template.inspectionAst);
 }
