@@ -406,7 +406,7 @@ export function Playground() @{
 					}
 					clearMappedPair();
 					astPreview.clear();
-					if (error) setError(error);
+					setError(error || '');
 					return error;
 				}
 				const code = typesEntry(currentFile).code;
@@ -414,6 +414,8 @@ export function Playground() @{
 				// pair even when the cached Types document needs no replacement.
 				clearMappedPair();
 				astPreview.clear();
+				// Clear any stale error from a previous stage/mode.
+				setError('');
 				if (typeof code !== 'string' || code === lastShownOutput) return null;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
