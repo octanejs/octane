@@ -4285,7 +4285,8 @@ function restampAuthoredStyleHashes(ast, styleRemap, filename) {
 
 function cleanCompileFilename(filename) {
 	const query = filename.indexOf('?');
-	const hash = filename.indexOf('#');
+	// A leading `#` is a Node package-import alias, not a URL fragment.
+	const hash = filename.indexOf('#', filename.startsWith('#') ? 1 : 0);
 	let end = filename.length;
 	if (query !== -1) end = query;
 	if (hash !== -1 && hash < end) end = hash;
