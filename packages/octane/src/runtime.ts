@@ -2575,6 +2575,15 @@ function commitEffects(): void {
 	// added to this function must also add its has-work condition here, or its
 	// work is silently skipped whenever the other queues are empty.
 	if (
+		// INVARIANT: profile/devtools builds must emit the inspection commit signal
+		// at the end of this function on EVERY commit (a no-effect structural update
+		// still ends a batch the bridge/profiler must observe), so they never take
+		// the no-work fast path. Both defines fold to `false` in normal builds,
+		// erasing this guard and preserving the fast path with zero overhead.
+		!(
+			(typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) ||
+			(typeof __OCTANE_DEVTOOLS_ENABLED__ !== 'undefined' && __OCTANE_DEVTOOLS_ENABLED__)
+		) &&
 		effectEventQueue.length === 0 &&
 		effectEventCommitActions.length === 0 &&
 		effectQueues[INSERTION].length === 0 &&
