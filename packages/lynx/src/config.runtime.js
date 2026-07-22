@@ -47,6 +47,12 @@ const LYNX_STANDARD_PROPS = [
 	'capture-bind*',
 	'capture-catch*',
 	'global-bind*',
+	'main-thread:ref',
+	'main-thread:bind*',
+	'main-thread:catch*',
+	'main-thread:capture-bind*',
+	'main-thread:capture-catch*',
+	'main-thread:global-bind*',
 ];
 
 const LYNX_BACKGROUND_VALIDATION = {
@@ -213,18 +219,19 @@ export const lynxBackgroundRenderer = {
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['class-name-alias', 'visibility'],
+	capabilities: ['class-name-alias', 'visibility', 'thread-functions'],
 	validation: LYNX_BACKGROUND_VALIDATION,
 };
 
 /** Main-thread renderer that rejects APIs owned by the background runtime. */
 export const lynxMainThreadRenderer = {
-	module: '@octanejs/lynx/renderer',
+	module: '@octanejs/lynx/main-renderer',
 	target: 'universal',
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['class-name-alias', 'visibility'],
+	capabilities: ['class-name-alias', 'visibility', 'main-thread-render-only', 'thread-functions'],
+	firstScreenEvents: ['bind*', 'catch*', 'capture-bind*', 'capture-catch*', 'global-bind*'],
 	validation: LYNX_MAIN_THREAD_VALIDATION,
 };
 

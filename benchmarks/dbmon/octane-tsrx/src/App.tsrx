@@ -18,27 +18,13 @@ export default function App() @{
 		<tbody>
 			@for (const db of data; key db.id) {
 				<tr>
-					<td class="dbname">
-						{db.name as string}
-					</td>
-					<td class={db.countClass}>
-						{db.count as string}
-					</td>
-					<td class={db.queries[0].className}>
-						{db.queries[0].elapsed as string}
-					</td>
-					<td class={db.queries[1].className}>
-						{db.queries[1].elapsed as string}
-					</td>
-					<td class={db.queries[2].className}>
-						{db.queries[2].elapsed as string}
-					</td>
-					<td class={db.queries[3].className}>
-						{db.queries[3].elapsed as string}
-					</td>
-					<td class={db.queries[4].className}>
-						{db.queries[4].elapsed as string}
-					</td>
+					<td class="dbname">{db.name as string}</td>
+					<td class={db.countClass}>{db.count as string}</td>
+					<td class={db.queries[0].className}>{db.queries[0].elapsed as string}</td>
+					<td class={db.queries[1].className}>{db.queries[1].elapsed as string}</td>
+					<td class={db.queries[2].className}>{db.queries[2].elapsed as string}</td>
+					<td class={db.queries[3].className}>{db.queries[3].elapsed as string}</td>
+					<td class={db.queries[4].className}>{db.queries[4].elapsed as string}</td>
 				</tr>
 			}
 		</tbody>

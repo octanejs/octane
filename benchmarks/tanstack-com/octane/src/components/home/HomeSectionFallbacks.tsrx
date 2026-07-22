@@ -2,9 +2,10 @@ import { Card } from '~/components/Card.tsrx';
 
 function SectionTitle({ id, title }: { id: string; title: string }) {
 	return <h3 id={id} class="text-3xl font-bold mb-6 scroll-mt-24">
-		<a href={`#${id}`} class="hover:underline decoration-gray-400 dark:decoration-gray-600">
-			{title as string}
-		</a>
+		<a
+			href={`#${id}`}
+			class="hover:underline decoration-gray-400 dark:decoration-gray-600"
+		>{title as string}</a>
 	</h3>;
 }
 

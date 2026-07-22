@@ -1,12 +1,5 @@
 export type HydrationWhen =
-	| 'load'
-	| 'idle'
-	| 'visible'
-	| 'media'
-	| 'interaction'
-	| 'condition'
-	| 'never'
-	| 'dynamic';
+	'load' | 'idle' | 'visible' | 'media' | 'interaction' | 'condition' | 'never' | 'dynamic';
 
 export type HydrationInteractionEvent =
 	| 'auxclick'
@@ -26,8 +19,7 @@ export type HydrationInteractionEvent =
 	| 'pointerup';
 
 export type HydrationInteractionEvents =
-	| HydrationInteractionEvent
-	| ReadonlyArray<HydrationInteractionEvent>;
+	HydrationInteractionEvent | ReadonlyArray<HydrationInteractionEvent>;
 
 export type HydrationMarkerAttributes = Record<string, string | undefined>;
 
@@ -121,5 +113,5 @@ export type HydrateOptions =
 	  });
 
 export type HydrateProps = HydrateOptions & {
-	children: unknown;
+	children?: unknown;
 };

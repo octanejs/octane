@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-07-19",
+  "recordedAt": "2026-07-21",
   "selectedSdk": "3.9.0",
   "selectedRspeedy": "0.16.0",
-  "purpose": "Milestones 1–4 source-level production-entry and runtime-ownership evidence for Octane's DOM-free Lynx graphs. This is JavaScript build/source evidence, not a .lynx.bundle or native device execution.",
+  "purpose": "Milestones 1–6 source/build runtime-ownership evidence for Octane's DOM-free Lynx graphs, including the dual-layer first-screen specialization. This is JavaScript graph, decoded-bundle, and host-emulator evidence, not Lynx Web or native device execution.",
   "sources": [
     {
       "url": "https://lynxjs.org/guide/scripting-runtime/",
@@ -28,16 +28,16 @@
       "engine": "PrimJS",
       "documentedSyntaxCeiling": "ES2019",
       "compileGraph": "packages/rspeedy-plugin-octane/tests/build.test.ts",
-      "entry": "packages/rspeedy-plugin-octane/tests/_fixtures/background/src/main-thread.ts",
-      "graphContract": "Consumes @octanejs/lynx/main-thread and contains the receiver, Element PAPI adapter, Lynx-specific list host, host-prop/event/NodesRef boundary modules, and shared attachment protocol without the universal core.",
+      "entry": "packages/rspeedy-plugin-octane/tests/_fixtures/application/src/background.ts (preceded and followed by generated receiver/sync modules)",
+      "graphContract": "Evaluates the same authored entry as the background layer after installing @octanejs/lynx/main-thread. The exact @octanejs/lynx package-root import resolves to @octanejs/lynx/first-screen, compiled components use @octanejs/lynx/main-renderer, and the graph contains the receiver, Element PAPI adapter, first-tree journal, Lynx-specific list host, and host prop/event boundary without the universal core, background client driver, or background root.",
       "nativeExecution": "blocked by the Phase 0 Explorer/Android/iOS gates"
     },
     "background": {
       "engines": ["PrimJS (Android default)", "JavaScriptCore (iOS default)"],
       "documentedSyntaxCeiling": "ES2015",
       "compileGraph": "packages/rspeedy-plugin-octane/tests/build.test.ts",
-      "entry": "packages/rspeedy-plugin-octane/tests/_fixtures/background/src/background.ts",
-      "graphContract": "Consumes the public Lynx root and a compiled TSRX component and contains the client driver, transport, shared host-attachment protocol, host-prop/event/NodesRef client modules, and Octane universal native core without main-thread host or list PAPI code.",
+      "entry": "packages/rspeedy-plugin-octane/tests/_fixtures/application/src/background.ts",
+      "graphContract": "Evaluates the same authored entry as the main layer through the public Lynx root and contains the client driver, transport, shared host-attachment protocol, host-prop/event/NodesRef client modules, and Octane universal native core without the main-thread host, first-screen renderer, or list PAPI code.",
       "platformSubpathContract": "@octanejs/lynx/platform is a separate background-only entry. Source tests cover init/global snapshot hooks, public GlobalEventEmitter subscriptions, typed Native Modules, reload request forwarding, and error reporting; compiler tests reject its import in main-thread specialization. It is not exercised by this default-root production graph fixture.",
       "nativeExecution": "blocked by the Phase 0 Explorer/Android/iOS gates"
     }
@@ -45,6 +45,15 @@
   "emittedSyntax": {
     "rspeedyTarget": "ES2017",
     "checkedForBothLayers": ["optional chaining is lowered", "nullish coalescing is lowered"]
+  },
+  "mainThreadRenderOnlyContract": {
+    "runtime": "@octanejs/lynx/main-renderer",
+    "facade": "@octanejs/lynx/first-screen",
+    "sync": "The generated receiver opens background readiness only after the authored entry's synchronous initialization returns.",
+    "ownership": "The main renderer emits one initial host batch and event markers. Effects, refs, state ownership, listener closures, scheduling, and later updates remain background-owned.",
+    "handoff": "A clone-safe snapshot is paired with a main-local host journal. Compatible background batches transfer the existing host tree without allocation or structural mutation; ordinary events replay in FIFO order after background listener ownership; typed mismatches repair from the background tree.",
+    "excluded": "Native list hosts and materializations are not captured for adoption. Boolean list defer has no eager-main versus deferred-background claim.",
+    "evidence": "Compiler, source-graph, decoded-bundle, and official JavaScript host-emulator tests only; no native first-paint, identity, device, or performance evidence."
   },
   "universalCoreBuiltins": {
     "documentedOrBaseline": [
@@ -76,5 +85,5 @@
       "WeakRef"
     ]
   },
-  "qualification": "The exact pinned Rspeedy toolchain builds isolated Milestone 4 background and main-thread JavaScript entries in production mode. The background entry consumes the public root plus compiled App and includes the universal native core and asynchronous query/event/attachment client boundary; the main entry consumes the public main-thread receiver and PAPI prop/event/list host boundary and excludes the universal core. Both graphs exclude DOM and React modules. This is a JavaScript graph/build smoke only: the separate platform entry, .lynx.bundle assembly, main-thread bytecode encoding, native event and lifecycle receiver wiring, native list allocation/scrolling, and all native runtime/device execution remain blocked gates."
+  "qualification": "The exact pinned Rspeedy toolchain specializes one authored Milestone 6 application entry into production background and main-thread graphs and emits a decoded .lynx.bundle. The background graph contains the full universal runtime and asynchronous client boundary; the main graph contains the one-shot first-screen renderer, receiver, and PAPI host while excluding the universal core. Both graphs exclude DOM, React, Preact, and ReactLynx runtime modules. Source and JavaScript-host tests cover snapshot adoption, event handoff, mismatch repair, and cleanup. This does not prove main-thread bytecode execution, native first paint, native identity retention, event/lifecycle receiver wiring, list allocation/scrolling, Lynx Web, Android, iOS, or performance; every corresponding formal gate remains blocked."
 }

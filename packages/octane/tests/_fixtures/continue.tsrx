@@ -8,9 +8,7 @@ export function FilterList(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
 			@if (!item.hidden) {
-				<li>
-					{item.label as string}
-				</li>
+				<li>{item.label as string}</li>
 			}
 		}
 	</ul>
@@ -22,18 +20,12 @@ export function MultiContinue(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
 			<>
-				<span class={'badge id-' + item.id}>
-					{'r' + item.id as string}
-				</span>
+				<span class={'badge id-' + item.id}>{'r' + item.id as string}</span>
 				@if (!item.skipA) {
 					<>
-						<span class="a">
-							{'A:' + item.label as string}
-						</span>
+						<span class="a">{'A:' + item.label as string}</span>
 						@if (!item.skipB) {
-							<span class="b">
-								{'B:' + item.label as string}
-							</span>
+							<span class="b">{'B:' + item.label as string}</span>
 						}
 					</>
 				}
@@ -47,9 +39,7 @@ export function NoBraces(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
 			@if (!item.hidden) {
-				<li>
-					{item.label as string}
-				</li>
+				<li>{item.label as string}</li>
 			}
 		}
 	</ul>
@@ -74,9 +64,7 @@ export function Stateful() @{
 		<ul>
 			@for (const item of items; key item.id) {
 				@if (!item.hidden) {
-					<li class={'l-' + item.id}>
-						{item.label as string}
-					</li>
+					<li class={'l-' + item.id}>{item.label as string}</li>
 				}
 			}
 		</ul>
@@ -90,9 +78,7 @@ export function ReturnInComponentContinueInLoop(props) @{
 			<ul>
 				@for (const item of props.items; key item.id) {
 					@if (!item.skip) {
-						<li>
-							{item.label as string}
-						</li>
+						<li>{item.label as string}</li>
 					}
 				}
 			</ul>

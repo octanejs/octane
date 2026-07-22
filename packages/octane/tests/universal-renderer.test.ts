@@ -93,6 +93,75 @@ function objectRoot(compilerLeafProps = false) {
 	return { container, root };
 }
 
+function walkCompiledAst(root: unknown, visit: (node: any) => void): void {
+	const seen = new WeakSet<object>();
+	const walk = (node: any): void => {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) walk(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		visit(node);
+		for (const [key, child] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata' || key === 'parent') continue;
+			walk(child);
+		}
+	};
+	walk(root);
+}
+
+function callsByImportedName(code: string, request: string): Map<string, any[]> {
+	const ast = parseModule(code, '/dist/compiled.js');
+	const imports = new Map<string, string>();
+	for (const statement of ast.body as any[]) {
+		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== request) continue;
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.type !== 'ImportSpecifier') continue;
+			imports.set(specifier.local.name, specifier.imported.name ?? specifier.imported.value);
+		}
+	}
+	const calls = new Map<string, any[]>();
+	walkCompiledAst(ast, (node) => {
+		if (node.type !== 'CallExpression' || node.callee?.type !== 'Identifier') return;
+		const imported = imports.get(node.callee.name);
+		if (imported === undefined) return;
+		const entries = calls.get(imported);
+		if (entries === undefined) calls.set(imported, [node]);
+		else entries.push(node);
+	});
+	return calls;
+}
+
+function importedLocalName(
+	code: string,
+	request: string,
+	importedName: string,
+): string | undefined {
+	const ast = parseModule(code, '/dist/compiled.js');
+	for (const statement of ast.body as any[]) {
+		if (statement.type !== 'ImportDeclaration' || statement.source?.value !== request) continue;
+		for (const specifier of statement.specifiers ?? []) {
+			if (specifier.type !== 'ImportSpecifier') continue;
+			if ((specifier.imported.name ?? specifier.imported.value) === importedName) {
+				return specifier.local.name;
+			}
+		}
+	}
+	return undefined;
+}
+
+function comparableCompiledAst(node: any): unknown {
+	if (Array.isArray(node)) return node.map(comparableCompiledAst);
+	if (node === null || typeof node !== 'object') return node;
+	return Object.fromEntries(
+		Object.entries(node)
+			.filter(([key]) => !['start', 'end', 'loc', 'metadata', 'parent'].includes(key))
+			.map(([key, value]) => [key, comparableCompiledAst(value)]),
+	);
+}
+
 describe('universal compiler target', () => {
 	it('leaves the DOM compiler byte-identical when renderer selection stays DOM', () => {
 		const source =
@@ -117,7 +186,7 @@ describe('universal compiler target', () => {
 		expect(optionalValidation).toEqual(baseline);
 	});
 
-	it('carries frozen runtime/thread metadata without changing emitted code', () => {
+	it('carries frozen runtime/thread metadata without changing emitted code by default', () => {
 		const source = 'export function Scene() @{ <view id="root" /> }';
 		const baseline = compile(source, '/src/Scene.object.tsrx', { hmr: false, renderer });
 		const background = compile(source, '/src/Scene.object.tsrx', {
@@ -156,6 +225,929 @@ describe('universal compiler target', () => {
 				universalRuntime: { runtime: 'object', thread: 'background' },
 			}),
 		).toThrow(/universalRuntime is available only in client mode/);
+	});
+
+	it('lowers thread directives with deterministic identities, captures, and per-layer import DCE', () => {
+		const source = `
+import { mainDependency } from './main-only.js';
+import { backgroundDependency } from './background-only.js';
+
+export function Scene({ prefix }) @{
+  const suffix = '!';
+  const onTap = (value) => {
+    'main thread';
+    return mainDependency(prefix, value, suffix);
+  };
+  const onBackground = function (value) {
+    'background only';
+    return backgroundDependency(value, prefix);
+  };
+  <view main-thread:bindtap={onTap} bindtap={onBackground} />
+}`;
+		const threadRenderer = {
+			...renderer,
+			capabilities: ['thread-functions'],
+		} as const;
+		const mainThread = compile(source, '/src/ThreadFunctions.object.tsrx', {
+			hmr: false,
+			renderer: threadRenderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+		const background = compile(source, '/src/ThreadFunctions.object.tsrx', {
+			hmr: false,
+			renderer: threadRenderer,
+			universalRuntime: { runtime: 'object', thread: 'background' },
+		});
+
+		expect(mainThread.code).toContain("from './main-only.js'");
+		expect(mainThread.code).not.toContain("from './background-only.js'");
+		expect(background.code).not.toContain("from './main-only.js'");
+		expect(background.code).toContain("from './background-only.js'");
+		const mainCalls = callsByImportedName(mainThread.code, 'octane/universal');
+		const backgroundCalls = callsByImportedName(background.code, 'octane/universal');
+		const mainRegistrations = mainCalls.get('registerThreadFunction') ?? [];
+		const backgroundRegistrations = backgroundCalls.get('registerThreadFunction') ?? [];
+		expect(mainRegistrations).toHaveLength(1);
+		expect(backgroundRegistrations).toHaveLength(1);
+		expect(mainRegistrations[0].arguments[0].value).toBe('main-thread');
+		expect(backgroundRegistrations[0].arguments[0].value).toBe('background');
+
+		const mainBindings = mainCalls.get('bindThreadFunction') ?? [];
+		const backgroundBindings = backgroundCalls.get('bindThreadFunction') ?? [];
+		expect(mainBindings).toHaveLength(2);
+		expect(backgroundBindings).toHaveLength(2);
+		expect(mainBindings.map((call) => call.arguments[1].value)).toEqual(
+			backgroundBindings.map((call) => call.arguments[1].value),
+		);
+		expect(mainBindings[0].arguments[2].body.elements.map((node: any) => node.name)).toEqual([
+			'prefix',
+			'suffix',
+		]);
+		expect(mainBindings[1].arguments[2].body.elements.map((node: any) => node.name)).toEqual([
+			'prefix',
+		]);
+		const plan = mainCalls.get('universalPlan')?.[0]?.arguments[1];
+		expect(plan.properties).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					key: expect.objectContaining({ value: 'bindings' }),
+					value: expect.objectContaining({
+						elements: expect.arrayContaining([
+							expect.objectContaining({
+								elements: [
+									expect.objectContaining({ value: 'main-thread:bindtap' }),
+									expect.anything(),
+								],
+							}),
+						]),
+					}),
+				}),
+			]),
+		);
+	});
+
+	it('preserves thread function declarations through attach/invoke wrappers', () => {
+		const source = `
+export function onTap(value) {
+  'main thread';
+  return value + 1;
+}`;
+		const result = compile(source, '/src/DeclaredThreadFunction.object.ts', {
+			hmr: false,
+			renderer: { ...renderer, capabilities: ['thread-functions'] },
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+		const calls = callsByImportedName(result.code, 'octane/universal');
+		const registration = calls.get('registerThreadFunction')?.[0];
+		const attachment = calls.get('attachThreadFunction')?.[0];
+		const invocation = calls.get('invokeThreadFunction')?.[0];
+
+		expect(registration).toBeDefined();
+		expect(attachment).toBeDefined();
+		expect(invocation).toBeDefined();
+		expect(attachment.arguments[2].value).toBe(registration.arguments[1].value);
+		expect(result.code).toContain('export function onTap');
+		expect(result.code).not.toContain("'main thread'");
+	});
+
+	it('supports thread declarations inside TSRX shorthand component blocks', () => {
+		const source = `export function Scene() @{
+  function onTap() {
+    'main thread';
+    return 1;
+  }
+  <view main-thread:bindtap={onTap} />
+}`;
+		expect(() =>
+			compile(source, '/src/ShorthandThreadFunction.object.tsrx', {
+				hmr: false,
+				renderer: { ...renderer, capabilities: ['thread-functions'] },
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}),
+		).not.toThrow();
+	});
+
+	it('attaches thread declarations before nested component setup transformations', () => {
+		const source = `export function Scene() @{
+  function Helper() @{ <view /> }
+  function onTap() {
+    'main thread';
+    return 1;
+  }
+  <view main-thread:bindtap={onTap}><Helper /></view>
+}`;
+		const result = compile(source, '/src/NestedComponentThreadFunction.object.tsrx', {
+			hmr: false,
+			renderer: { ...renderer, capabilities: ['thread-functions'] },
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+		const calls = callsByImportedName(result.code, 'octane/universal');
+		const attachLocal = importedLocalName(result.code, 'octane/universal', 'attachThreadFunction');
+
+		expect(calls.get('attachThreadFunction')).toHaveLength(2);
+		expect(attachLocal).toBeDefined();
+		expect(result.code.indexOf(`${attachLocal}(onTap`)).toBeLessThan(
+			result.code.indexOf('const Helper'),
+		);
+	});
+
+	it('registers active thread implementations before authored calls and defers captures', () => {
+		const source = `
+export const immediate = () => {
+  'main thread';
+  return 3;
+};
+export const immediateValue = immediate();
+export const hoistedValue = hoisted();
+export function hoisted() {
+  'main thread';
+  return 4;
+}
+export function declared() {
+  'main thread';
+  return 5;
+}
+export const declaredValue = declared();
+export let forwardValue = 0;
+{
+  const readLater = () => {
+    'main thread';
+    return later;
+  };
+  const later = 7;
+  forwardValue = readLater();
+}
+export function setupCapturedDeclaration() {
+  const call = () => {
+    'main thread';
+    return later();
+  };
+  const value = call();
+  function later() {
+    'main thread';
+    return 9;
+  }
+  return value;
+}
+export const capturedDeclarationValue = setupCapturedDeclaration();`;
+		const result = compile(source, '/src/ExecutableThreadFunctions.object.ts', {
+			hmr: false,
+			renderer: { ...renderer, capabilities: ['thread-functions'] },
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+		const executable = result.code
+			.replace(
+				/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/,
+				(_statement, specifiers: string) =>
+					`const { ${specifiers.replace(/\s+as\s+/g, ': ')} } = runtime;`,
+			)
+			.replace(/\bexport\s+(const|let|var|function|class)\s+/g, '$1 ');
+		const definitions = new Map<string, (...args: any[]) => unknown>();
+		const runtime = {
+			registerThreadFunction(
+				_kind: string,
+				id: string,
+				implementation: (...args: any[]) => unknown,
+			) {
+				definitions.set(id, implementation);
+			},
+			bindThreadFunction(_kind: string, id: string, readCaptures: () => readonly unknown[]) {
+				return function (this: unknown, ...args: unknown[]) {
+					const implementation = definitions.get(id);
+					if (implementation === undefined) throw new Error(`missing registration ${id}`);
+					return implementation(readCaptures(), this, args);
+				};
+			},
+			attachThreadFunction(
+				fn: (...args: unknown[]) => unknown,
+				_kind: string,
+				id: string,
+				readCaptures: () => readonly unknown[],
+			) {
+				Object.assign(fn, { __thread: { id, readCaptures } });
+			},
+			invokeThreadFunction(
+				fn: ((...args: unknown[]) => unknown) & {
+					__thread?: { id: string; readCaptures: () => readonly unknown[] };
+				},
+				receiver: unknown,
+				args: readonly unknown[],
+			) {
+				const thread = fn.__thread!;
+				const implementation = definitions.get(thread.id);
+				if (implementation === undefined) throw new Error(`missing registration ${thread.id}`);
+				return implementation(thread.readCaptures(), receiver, args);
+			},
+		};
+		const values = new Function(
+			'runtime',
+			`${executable}\nreturn { immediateValue, hoistedValue, declaredValue, forwardValue, capturedDeclarationValue };`,
+		)(runtime);
+
+		expect(values).toEqual({
+			immediateValue: 3,
+			hoistedValue: 4,
+			declaredValue: 5,
+			forwardValue: 7,
+			capturedDeclarationValue: 9,
+		});
+	});
+
+	it('keeps thread site identities stable across body-only edits', () => {
+		const compileSite = (body: string) =>
+			compile(
+				`export const value = () => { 'main thread'; return ${body}; };`,
+				'/src/ReloadableThreadFunction.object.ts',
+				{
+					hmr: false,
+					renderer: { ...renderer, capabilities: ['thread-functions'] },
+					universalRuntime: { runtime: 'object', thread: 'main-thread' },
+				},
+			);
+		const first = callsByImportedName(compileSite('1').code, 'octane/universal');
+		const second = callsByImportedName(compileSite('200').code, 'octane/universal');
+
+		expect(first.get('registerThreadFunction')?.[0].arguments[1].value).toBe(
+			second.get('registerThreadFunction')?.[0].arguments[1].value,
+		);
+	});
+
+	it('supports hoisted declaration references and export specifiers', () => {
+		const source = `
+export { onTap };
+export const invokeLater = () => onTap(1);
+function onTap(value) {
+  'main thread';
+  return value + 1;
+}`;
+		expect(() =>
+			compile(source, '/src/HoistedThreadFunction.object.ts', {
+				hmr: false,
+				renderer: { ...renderer, capabilities: ['thread-functions'] },
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}),
+		).not.toThrow();
+	});
+
+	it('lowers thread captures in renderer-owned regions for both runtime layers', () => {
+		const threadRenderer = {
+			...renderer,
+			capabilities: ['thread-functions'],
+		} as const;
+		const region = `<view main-thread:bindtap={(value) => {
+  'main thread';
+  return outside + value;
+}} />`;
+		const mainThread = lowerUniversalRendererRegion(
+			region,
+			'/src/ThreadRegion.object.tsrx',
+			threadRenderer,
+			threadRenderer,
+			0,
+			'children',
+			{
+				hmr: false,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			},
+		);
+		const background = lowerUniversalRendererRegion(
+			region,
+			'/src/ThreadRegion.object.tsrx',
+			threadRenderer,
+			threadRenderer,
+			0,
+			'children',
+			{
+				hmr: false,
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			},
+		);
+		const mainCalls = callsByImportedName(mainThread.prelude, 'octane/universal');
+		const backgroundCalls = callsByImportedName(background.prelude, 'octane/universal');
+		const mainBinding = mainCalls.get('bindThreadFunction')?.[0];
+		const backgroundBinding = backgroundCalls.get('bindThreadFunction')?.[0];
+
+		expect(mainBinding.arguments[1].value).toBe(backgroundBinding.arguments[1].value);
+		expect(mainBinding.arguments[2].body.elements.map((node: any) => node.name)).toEqual([
+			'outside',
+		]);
+		expect(mainCalls.get('registerThreadFunction')).toHaveLength(1);
+		expect(backgroundCalls.get('registerThreadFunction')).toBeUndefined();
+		expect(mainThread.expression).toContain('captures: [outside]');
+	});
+
+	it('keeps realm globals out of renderer-region and thread capture payloads', () => {
+		const threadRenderer = {
+			...renderer,
+			capabilities: ['thread-functions'],
+		} as const;
+		const region = `<view main-thread:bindtap={() => {
+  'main thread';
+  return Math.max(1, 2) + Number.NaN;
+}} />`;
+		const lowered = lowerUniversalRendererRegion(
+			region,
+			'/src/GlobalThreadRegion.object.tsrx',
+			threadRenderer,
+			threadRenderer,
+			0,
+			'children',
+			{
+				hmr: false,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			},
+		);
+		const calls = callsByImportedName(lowered.prelude, 'octane/universal');
+		const binding = calls.get('bindThreadFunction')?.[0];
+
+		expect(binding.arguments[2].body.elements).toEqual([]);
+		expect(lowered.expression).not.toMatch(/captures:\s*\[(?:Math|Number)/);
+	});
+
+	it('keeps inline thread bindings local while retaining true outer captures', () => {
+		const threadRenderer = {
+			...renderer,
+			capabilities: ['thread-functions'],
+		} as const;
+		const region = `<view main-thread:bindtap={() => {
+  'main thread';
+  const base = 1;
+  let total = base;
+  {
+    const blockValue = 2;
+    total += blockValue;
+  }
+  try {
+    throw 3;
+  } catch (caught) {
+    total += caught;
+  }
+  for (let index = 0; index < 2; index++) total += index;
+  function readTotal() {
+    return total;
+  }
+  class Box {
+    value = base;
+  }
+  return readTotal() + new Box().value + outside;
+}} />`;
+		const authoredSource = `function Owner() { const outside = 4; return ${region}; }`;
+		const regionStart = authoredSource.indexOf(region);
+		const regionOrigins = Int32Array.from(
+			{ length: region.length },
+			(_value, index) => regionStart + index,
+		);
+		const lowered = lowerUniversalRendererRegion(
+			region,
+			'/src/LocalThreadBindings.object.tsrx',
+			'dom',
+			threadRenderer,
+			0,
+			'children',
+			{
+				authoredSource,
+				hmr: false,
+				regionOrigins,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			},
+		);
+		const executable = lowered.prelude
+			.replace(
+				/import\s*\{([\s\S]*?)\}\s*from\s*["']octane\/universal["'];/,
+				(_statement, specifiers: string) =>
+					`const { ${specifiers.replace(/\s+as\s+/g, ': ')} } = runtime;`,
+			)
+			.replace(/\bexport\s+(const|let|var|function|class)\s+/g, '$1 ');
+		const definitions = new Map<string, (...args: any[]) => unknown>();
+		const runtime = {
+			...UniversalRuntime,
+			registerThreadFunction(
+				_kind: string,
+				id: string,
+				implementation: (...args: any[]) => unknown,
+			) {
+				definitions.set(id, implementation);
+			},
+			bindThreadFunction(_kind: string, id: string, readCaptures: () => readonly unknown[]) {
+				return function (this: unknown, ...args: unknown[]) {
+					const implementation = definitions.get(id);
+					if (implementation === undefined) throw new Error(`missing registration ${id}`);
+					return implementation(readCaptures(), this, args);
+				};
+			},
+		};
+		const regionValue = new Function(
+			'runtime',
+			'outside',
+			`${executable}\nreturn (${lowered.expression});`,
+		)(runtime, 4) as any;
+
+		expect(UniversalRuntime.isRendererRegion(regionValue)).toBe(true);
+		expect(regionValue.props).toEqual({ captures: [4] });
+		const rendered = regionValue.component(regionValue.props);
+		expect(rendered.values[0]()).toBe(12);
+	});
+
+	it('keeps thread syntax inert when the renderer does not advertise the capability', () => {
+		const source = `export const onTap = (value) => {
+  'main thread';
+  return value + 1;
+};`;
+		const baseline = compile(source, '/src/InertThreadFunction.object.ts', {
+			hmr: false,
+			renderer,
+		});
+		const mainThread = compile(source, '/src/InertThreadFunction.object.ts', {
+			hmr: false,
+			renderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+
+		expect(mainThread.code).toBe(baseline.code);
+		expect(importedLocalName(mainThread.code, 'octane/universal', 'bindThreadFunction')).toBe(
+			undefined,
+		);
+	});
+
+	it('validates thread directives and reports the authored source location', () => {
+		const threadRenderer = { ...renderer, capabilities: ['thread-functions'] } as const;
+		const compileThreadSource = (source: string) =>
+			compile(source, '/src/InvalidThreadFunction.object.ts', {
+				hmr: false,
+				renderer: threadRenderer,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			});
+
+		expect(() =>
+			compile(`export const value = () => { 'use strict'; 'main thread'; };`, '/src/Late.ts', {
+				hmr: false,
+				renderer: threadRenderer,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}),
+		).toThrow(/"main thread" must be the first statement.*Late\.ts:1:43/);
+		expect(() =>
+			compileThreadSource(`export const value = async () => { 'main thread'; };`),
+		).toThrow(/main-thread functions cannot be async.*InvalidThreadFunction\.object\.ts:1:35/);
+		const asyncBackground = compile(
+			`export const value = async () => { 'background only'; return await Promise.resolve(1); };`,
+			'/src/AsyncBackgroundThreadFunction.object.ts',
+			{
+				hmr: false,
+				renderer: threadRenderer,
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			},
+		);
+		expect(asyncBackground.code).toContain('return (async () =>');
+		expect(() =>
+			compileThreadSource(`export const value = function* () { 'background only'; };`),
+		).toThrow(/thread functions cannot be generator.*InvalidThreadFunction\.object\.ts:1:36/);
+		expect(() =>
+			compileThreadSource(`export const value = () => { 'main thread'; return this.x; };`),
+		).toThrow(/cannot reference this or super.*InvalidThreadFunction\.object\.ts:1:51/);
+		expect(() =>
+			compileThreadSource(
+				`import { useState } from 'octane'; export const value = () => { 'main thread'; return useState(0); };`,
+			),
+		).toThrow(/thread functions cannot call hooks.*InvalidThreadFunction\.object\.ts:1:86/);
+		expect(() =>
+			compileThreadSource(`const value = () => { 'main thread'; return <view />; };`),
+		).toThrow(/thread functions cannot contain JSX.*InvalidThreadFunction\.object\.ts:1:44/);
+		expect(() =>
+			compileThreadSource(`const value = () => { 'main thread'; return eval('1'); };`),
+		).toThrow(/thread functions cannot call direct eval.*InvalidThreadFunction\.object\.ts:1:44/);
+		expect(() =>
+			compile(`export const value = () => { 'main thread'; };`, '/src/MissingLayer.ts', {
+				hmr: false,
+				renderer: threadRenderer,
+			}),
+		).toThrow(/thread directives require universalRuntime\.thread.*MissingLayer\.ts:1:29/);
+	});
+
+	it('permits forbidden dependencies only when opposite-layer thread code is erased', () => {
+		const threadValidationRenderer = {
+			...validationRenderer,
+			capabilities: ['thread-functions'],
+			validation: {
+				...validationRenderer.validation,
+				hostProps: {
+					...validationRenderer.validation.hostProps,
+					view: ['bind*', 'main-thread:*'],
+				},
+			},
+		} as const;
+		const erasedSource = `import { read } from 'browser-only';
+export const readOnMain = () => {
+  'main thread';
+  return read(document.title);
+};`;
+		const background = compile(erasedSource, '/src/ErasedThreadImport.object.ts', {
+			hmr: false,
+			renderer: threadValidationRenderer,
+			universalRuntime: { runtime: 'object', thread: 'background' },
+		});
+
+		expect(background.code).not.toContain('browser-only');
+		expect(background.code).not.toContain('document.title');
+		expect(() =>
+			compile(erasedSource, '/src/ActiveThreadImport.object.ts', {
+				hmr: false,
+				renderer: threadValidationRenderer,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}),
+		).toThrow(/forbids static import "browser-only".*ActiveThreadImport\.object\.ts:1:21/);
+		expect(() =>
+			compile(`import 'browser-only';`, '/src/SideEffectThreadImport.object.ts', {
+				hmr: false,
+				renderer: threadValidationRenderer,
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			}),
+		).toThrow(/forbids static import "browser-only"/);
+	});
+
+	it('keeps imports shared by erased thread code and active JSX components', () => {
+		const source = `import { Widget } from 'widgets';
+export const onTap = () => { 'main thread'; return Widget.version; };
+export function Scene() @{ <Widget /> }`;
+		const background = compile(source, '/src/SharedThreadImport.object.tsrx', {
+			hmr: false,
+			renderer: { ...renderer, capabilities: ['thread-functions'] },
+			universalRuntime: { runtime: 'object', thread: 'background' },
+		});
+		const ast = parseModule(background.code, '/dist/SharedThreadImport.js');
+		const widgetImport = (ast.body as any[]).find(
+			(node) => node.type === 'ImportDeclaration' && node.source?.value === 'widgets',
+		);
+
+		expect(widgetImport?.specifiers.map((specifier: any) => specifier.local.name)).toEqual([
+			'Widget',
+		]);
+
+		const hostNameCollision = compile(
+			`import { view } from 'browser-only';
+export const onTap = () => { 'main thread'; return view(); };
+export function Scene() @{ <view /> }`,
+			'/src/HostNameThreadImport.object.tsrx',
+			{
+				hmr: false,
+				renderer: { ...validationRenderer, capabilities: ['thread-functions'] },
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			},
+		);
+		expect(hostNameCollision.code).not.toContain('browser-only');
+	});
+
+	it.each([
+		['TypeScript import-equals', `import dependency = require('browser-only');`, null],
+		['CommonJS require', `const dependency = require('browser-only'), retained = 1;`, 'retained'],
+		[
+			'CommonJS module.require',
+			`const dependency = module.require('browser-only'), retained = 1;`,
+			'retained',
+		],
+	])(
+		'erases an opposite-layer %s binding but keeps active and shared bindings',
+		(_name, declaration, retained) => {
+			const threadRenderer = {
+				...validationRenderer,
+				capabilities: ['thread-functions'],
+			} as const;
+			const threadOnly = `${declaration}
+export const run = () => { 'main thread'; return dependency(); };`;
+			const shared = `${declaration}
+export const shared = dependency;
+export const run = () => { 'main thread'; return dependency(); };`;
+			const compileLayer = (source: string, thread: 'background' | 'main-thread') =>
+				compile(source, '/src/StaticThreadBinding.object.ts', {
+					hmr: false,
+					renderer: threadRenderer,
+					universalRuntime: { runtime: 'object', thread },
+				});
+
+			const oppositeLayer = compileLayer(threadOnly, 'background');
+			expect(oppositeLayer.code).not.toContain('browser-only');
+			if (retained !== null) expect(oppositeLayer.code).toContain(retained);
+			expect(() => compileLayer(threadOnly, 'main-thread')).toThrow(
+				/forbids static (?:CommonJS require |import )?"browser-only"/,
+			);
+			expect(() => compileLayer(shared, 'background')).toThrow(
+				/forbids static (?:CommonJS require |import )?"browser-only"/,
+			);
+		},
+	);
+
+	it('applies renderer-region import policy after opposite-layer thread DCE', () => {
+		const threadValidationRenderer = {
+			...validationRenderer,
+			capabilities: ['thread-functions'],
+			validation: {
+				...validationRenderer.validation,
+				hostProps: {
+					...validationRenderer.validation.hostProps,
+					view: ['bind*', 'main-thread:*'],
+				},
+			},
+		} as const;
+		const region = `<view main-thread:bindtap={() => {
+  'background only';
+  return platformApi();
+}} />`;
+		const authoredSource = `import { platformApi } from 'browser-only';\nconst node = ${region};`;
+		const regionStart = authoredSource.indexOf(region);
+		const regionOrigins = new Int32Array(region.length);
+		for (let index = 0; index < region.length; index++) regionOrigins[index] = regionStart + index;
+		const lower = (thread: 'background' | 'main-thread') =>
+			lowerUniversalRendererRegion(
+				region,
+				'/src/ThreadImportRegion.object.tsrx',
+				threadValidationRenderer,
+				threadValidationRenderer,
+				0,
+				'children',
+				{
+					authoredSource,
+					hmr: false,
+					regionOrigins,
+					universalRuntime: { runtime: 'object', thread },
+				},
+			);
+
+		expect(() => lower('main-thread')).not.toThrow();
+		expect(() => lower('background')).toThrow(/forbids static import "browser-only"/);
+	});
+
+	it('validates remapped erased thread ranges in authored order', () => {
+		const threadValidationRenderer = {
+			...renderer,
+			capabilities: ['thread-functions'],
+			validation: {
+				forbiddenGlobals: ['document'],
+				hostProps: { '*': ['main-thread:*'] },
+			},
+		} as const;
+		const region = `<view main-thread:bindtap={() => { 'main thread'; return document.title; }} />`;
+		const component = `export const later = () => { 'main thread'; return document.title; };`;
+		const authoredSource = `const node = ${region};\n${component}`;
+		const mapped = (code: string, start: number) => {
+			const origins = new Int32Array(code.length);
+			for (let index = 0; index < code.length; index++) origins[index] = start + index;
+			return { code, origins };
+		};
+		const lower = (thread: 'background' | 'main-thread') =>
+			lowerUniversalRendererRegion(
+				region,
+				'/src/RemappedThreadRanges.object.tsrx',
+				threadValidationRenderer,
+				threadValidationRenderer,
+				0,
+				'children',
+				{
+					authoredSource,
+					components: [mapped(component, authoredSource.indexOf(component))],
+					hmr: false,
+					regionOrigins: mapped(region, authoredSource.indexOf(region)).origins,
+					universalRuntime: { runtime: 'object', thread },
+				},
+			);
+
+		expect(() => lower('background')).not.toThrow();
+		expect(() => lower('main-thread')).toThrow(/forbids unbound global "document"/);
+	});
+
+	it('erases background callbacks from opted-in main-thread first-screen output', () => {
+		const source = `
+import {
+  useEffect as usePassive,
+  useEffectEvent,
+  useImperativeHandle,
+  useInsertionEffect,
+  useLayoutEffect,
+  useState,
+} from 'octane';
+
+function preserveLocalUseEffect(useEffect) {
+  useEffect(() => console.log('non-runtime-use-effect-callback'));
+}
+
+export function Scene({ id, ref }) @{
+  const [count] = useState(0);
+  usePassive(() => console.log('passive-main-thread-capture', id), [id]);
+  useLayoutEffect(() => console.log('layout-main-thread-capture', id));
+  useInsertionEffect(() => console.log('insertion-main-thread-capture', id), null);
+  const update = useEffectEvent(() => console.log('effect-event-main-thread-capture', id));
+  useImperativeHandle(ref, () => ({ id }), [id]);
+
+  <>
+    <view id={id} bindtap={() => console.log('event-main-thread-capture', count)} ref={ref} onUpdate={update} catchtap={null} />
+    <view key="ordered" bindlongpress={() => console.log('ordered-main-thread-capture', count)} ref={ref} />
+  </>
+}`;
+		const firstScreenRenderer = {
+			...renderer,
+			capabilities: ['main-thread-render-only'],
+			firstScreenEvents: ['bind*', 'catch*', 'onUpdate'],
+		} as const;
+		const baseline = compile(source, '/src/FirstScreen.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+		});
+		const background = compile(source, '/src/FirstScreen.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+			universalRuntime: { runtime: 'object', thread: 'background' },
+		});
+		const mainThread = compile(source, '/src/FirstScreen.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+
+		// The capability is inert outside the main-thread specialization.
+		expect(background.code).toBe(baseline.code);
+		expect(() => parseModule(mainThread.code, '/dist/FirstScreen.js')).not.toThrow();
+		expect(mainThread.code).toContain('non-runtime-use-effect-callback');
+		for (const marker of [
+			'passive-main-thread-capture',
+			'layout-main-thread-capture',
+			'insertion-main-thread-capture',
+			'effect-event-main-thread-capture',
+			'event-main-thread-capture',
+			'ordered-main-thread-capture',
+		]) {
+			expect(baseline.code).toContain(marker);
+			expect(mainThread.code).not.toContain(marker);
+		}
+
+		const baselineCalls = callsByImportedName(baseline.code, 'octane/universal');
+		const mainCalls = callsByImportedName(mainThread.code, 'octane/universal');
+		const baselinePlan = baselineCalls.get('universalPlan')?.[0];
+		const mainPlan = mainCalls.get('universalPlan')?.[0];
+		expect(comparableCompiledAst(mainPlan?.arguments[1])).toEqual(
+			comparableCompiledAst(baselinePlan?.arguments[1]),
+		);
+		expect(mainCalls.get('hookSlots')?.[0]?.arguments[0]?.value).toBe(
+			baselineCalls.get('hookSlots')?.[0]?.arguments[0]?.value,
+		);
+
+		for (const hook of [
+			'useEffect',
+			'useEffectEvent',
+			'useImperativeHandle',
+			'useInsertionEffect',
+			'useLayoutEffect',
+		]) {
+			const call = mainCalls.get(hook)?.[0];
+			expect(call, `expected ${hook} to retain its compiler-owned slot`).toBeDefined();
+			expect(call.arguments.at(-1)?.type).toBe('Identifier');
+			expect(call.arguments.slice(0, -1)).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ type: 'Identifier', name: 'undefined' }),
+				]),
+			);
+		}
+
+		const mainValues = mainCalls.get('universalValue') ?? [];
+		const baselineValues = baselineCalls.get('universalValue') ?? [];
+		const firstScreenEvent = importedLocalName(
+			mainThread.code,
+			'octane/universal',
+			'firstScreenEvent',
+		);
+		expect(firstScreenEvent).toBeDefined();
+		expect(
+			importedLocalName(baseline.code, 'octane/universal', 'firstScreenEvent'),
+		).toBeUndefined();
+		expect(mainValues).toHaveLength(baselineValues.length);
+		expect(mainValues[0].arguments[1].elements.map((element: any) => element.type)).toEqual([
+			'Identifier',
+			'Identifier',
+			'Identifier',
+			'ConditionalExpression',
+			'Literal',
+			'CallExpression',
+		]);
+		expect(mainValues[0].arguments[1].elements[1].name).toBe(firstScreenEvent);
+		expect(mainValues[0].arguments[1].elements[2].name).toBe('undefined');
+		expect(mainValues[0].arguments[1].elements[3]).toMatchObject({
+			type: 'ConditionalExpression',
+			consequent: { type: 'Identifier', name: 'undefined' },
+			alternate: { type: 'Identifier', name: firstScreenEvent },
+		});
+		expect(mainValues[0].arguments[1].elements[4].value).toBeNull();
+		const orderedEntries = mainCalls.get('universalProps')?.[0]?.arguments[0]?.elements;
+		expect(orderedEntries.at(-2).elements[2]).toMatchObject({
+			type: 'Identifier',
+			name: firstScreenEvent,
+		});
+		expect(orderedEntries.at(-1).elements[2]).toMatchObject({
+			type: 'Identifier',
+			name: 'undefined',
+		});
+	});
+
+	it('preserves nullish optional event reads while erasing inline callback bodies', () => {
+		const source = `
+import { runBackgroundOnly } from './background-only.js';
+
+export function Scene({ onTap, handlers }) @{
+  <view
+    bindtap={onTap}
+    catchtap={handlers.catchtap}
+    bindlongpress={() => runBackgroundOnly('optional-event-inline-capture')}
+  />
+}`;
+		const firstScreenRenderer = {
+			...renderer,
+			capabilities: ['main-thread-render-only'],
+			firstScreenEvents: ['bind*', 'catch*'],
+		} as const;
+		const mainThread = compile(source, '/src/OptionalEvents.object.tsrx', {
+			hmr: false,
+			renderer: firstScreenRenderer,
+			universalRuntime: { runtime: 'object', thread: 'main-thread' },
+		});
+
+		expect(() => parseModule(mainThread.code, '/dist/OptionalEvents.js')).not.toThrow();
+		expect(mainThread.code).not.toContain('optional-event-inline-capture');
+		const calls = callsByImportedName(mainThread.code, 'octane/universal');
+		const values = calls.get('universalValue')?.[0]?.arguments[1]?.elements;
+		const firstScreenEvent = importedLocalName(
+			mainThread.code,
+			'octane/universal',
+			'firstScreenEvent',
+		);
+		expect(firstScreenEvent).toBeDefined();
+		expect(values).toHaveLength(3);
+		for (const optional of values.slice(0, 2)) {
+			expect(optional).toMatchObject({
+				type: 'ConditionalExpression',
+				test: {
+					type: 'BinaryExpression',
+					operator: '==',
+					right: { type: 'Literal', value: null },
+				},
+				consequent: { type: 'Identifier', name: 'undefined' },
+				alternate: { type: 'Identifier', name: firstScreenEvent },
+			});
+		}
+		expect(values[0].test.left).toMatchObject({ type: 'Identifier', name: 'onTap' });
+		expect(values[1].test.left).toMatchObject({
+			type: 'MemberExpression',
+			property: { type: 'Identifier', name: 'catchtap' },
+		});
+		expect(values[2]).toMatchObject({ type: 'Identifier', name: firstScreenEvent });
+	});
+
+	it('rejects host spreads only in the main-thread render-only specialization', () => {
+		const source = `
+export function Scene({ hostProps }) @{
+  <view {...hostProps} />
+}`;
+		const firstScreenRenderer = {
+			...renderer,
+			capabilities: ['main-thread-render-only'],
+			firstScreenEvents: ['bind*', 'catch*'],
+		} as const;
+
+		expect(() =>
+			compile(source, '/src/SpreadEvents.object.tsrx', {
+				hmr: false,
+				renderer: firstScreenRenderer,
+			}),
+		).not.toThrow();
+		expect(() =>
+			compile(source, '/src/SpreadEvents.object.tsrx', {
+				hmr: false,
+				renderer: firstScreenRenderer,
+				universalRuntime: { runtime: 'object', thread: 'background' },
+			}),
+		).not.toThrow();
+		expect(() =>
+			compile(source, '/src/SpreadEvents.object.tsrx', {
+				hmr: false,
+				renderer: firstScreenRenderer,
+				universalRuntime: { runtime: 'object', thread: 'main-thread' },
+			}),
+		).toThrow(/main-thread render-only host spreads.*statically named.*expand the spread/);
 	});
 
 	it('accepts allowed hosts and props while respecting lexical bindings and property keys', () => {

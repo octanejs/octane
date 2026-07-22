@@ -1,4 +1,12 @@
-import { Activity, Fragment, createContext, createElement, use, useState } from 'octane';
+import {
+	Activity,
+	Fragment,
+	cloneElement,
+	createContext,
+	createElement,
+	use,
+	useState,
+} from 'octane';
 
 // return-JSX form: a host element containing `@if` — folds to the return-based
 // fragment model (the branch helpers stay in the component for their closure; the
@@ -41,9 +49,7 @@ export function ReturnedMailbox(props) {
 			<section id="drafts">
 				<h2>Saved drafts</h2>
 				@for (const draft of props.drafts; key draft.id) {
-					<article class="draft" data-id={draft.id as string}>
-						{draft.subject as string}
-					</article>
+					<article class="draft" data-id={draft.id as string}>{draft.subject as string}</article>
 				} @empty {
 					<p id="empty-drafts">No saved drafts</p>
 				}
@@ -79,9 +85,7 @@ export function ReturnedDashboard(props) {
 			}
 		}
 		@for (const event of props.events; key event.id) {
-			<article class="delivery-event" data-id={event.id as string}>
-				{event.label as string}
-			</article>
+			<article class="delivery-event" data-id={event.id as string}>{event.label as string}</article>
 		} @empty {
 			<p id="empty-events">No delivery events</p>
 		}
@@ -141,9 +145,8 @@ export function ReturnedMemberEvaluationOrder(props) {
 
 function ActivityDraft(props) {
 	const [edits, setEdits] = useState(0);
-	return <button id={props.id} onClick={() => setEdits((count) => count + 1)}>
-		{props.prefix + edits as string}
-	</button>;
+	return <button id={props.id} onClick={() => setEdits((count) => count + 1)}>{props.prefix +
+		edits as string}</button>;
 }
 
 // Activity is compiler-owned template control flow, even when it is the only
@@ -165,9 +168,10 @@ export function DirectReturnedActivityMailbox(props) {
 	return <Activity mode={props.observe('mode', props.mode)}>
 		<h2 id="direct-activity-title">Direct focused draft</h2>
 		<ActivityDraft id="direct-activity-draft" prefix="Direct edits: " />
-		<span id="direct-activity-tail">
-			{props.observe('child', 'Direct mailbox ready') as string}
-		</span>
+		<span id="direct-activity-tail">{props.observe(
+			'child',
+			'Direct mailbox ready',
+		) as string}</span>
 	</Activity>;
 }
 
@@ -175,25 +179,19 @@ export function DirectReturnedActivityMailbox(props) {
 // document-head channel. Dynamic values make update/adoption behavior observable.
 export function ReturnedHeadMailbox(props) {
 	return <>
-		<title data-returned-fragment-head="title">
-			{props.title as string}
-		</title>
+		<title data-returned-fragment-head="title">{props.title as string}</title>
 		<meta
 			name="returned-fragment-description"
 			content={props.description}
 			data-returned-fragment-head="meta"
 		/>
 		<link rel="canonical" href={props.canonical} data-returned-fragment-head="link" />
-		<main id="head-mailbox">
-			{props.body as string}
-		</main>
+		<main id="head-mailbox">{props.body as string}</main>
 	</>;
 }
 
 export function DirectReturnedTitle(props) {
-	return <title data-direct-returned-head="title">
-		{props.title as string}
-	</title>;
+	return <title data-direct-returned-head="title">{props.title as string}</title>;
 }
 
 export function DirectReturnedMeta(props) {
@@ -243,9 +241,7 @@ export function DescriptorHostWithKeyedFragment() {
 }
 
 function DescriptorComponentLeaf(props) {
-	return <button id={props.id}>
-		{props.label as string}
-	</button>;
+	return <button id={props.id}>{props.label as string}</button>;
 }
 
 export function DescriptorHostWithKeyedComponents() {
@@ -271,9 +267,108 @@ export function ReturnedChildCodeBlock(props) {
 	return <>
 		<h2 id="child-code-block-title">Quick action</h2>
 		@{
-			<button id="child-code-block-action" onClick={props.onAction}>
-				{props.label as string}
-			</button>
+			<button id="child-code-block-action" onClick={props.onAction}>{props.label as string}</button>
 		}
 	</>;
+}
+
+// The object wrapper mirrors component-slot composition used by consumers. Its
+// outer JSX remains a descriptor; only the compiler-owned directive child folds
+// into a fragment renderer.
+export function ValueTemplateSlot(props: {
+	showHeading: boolean;
+	heading: string;
+}) @{
+	const slots = {
+		composer: <div id="composer">
+			<span id="before-heading">Before</span>
+
+			@if (props.showHeading) {
+				<h1 id="heading">{props.heading}</h1>
+			}
+			@{
+				<small id="setup-value-code-block">{props.heading + ' action'}</small>
+			}
+
+			<span id="after-heading">After</span>
+		</div>,
+	};
+
+	<main>{slots.composer}</main>
+}
+
+// A setup JSX value remains the authored host descriptor even when one child
+// needs template lowering. cloneElement must therefore still target <section>,
+// not the compiler-owned fragment inserted for the directive child.
+export function ClonedValueTemplateSlot(props: {
+	showHeading: boolean;
+	heading: string;
+	slotKey: string;
+	hostRef: { current: HTMLElement | null };
+}) {
+	const composer = <section id="original-composer" data-source="original">
+		<span id="clone-before">Before</span>
+
+		@if (props.showHeading) {
+			const [count, setCount] = useState(0);
+			<h2 id="cloned-heading">
+				<button id="cloned-counter" onClick={() => setCount((value) => value + 1)}>
+					{props.heading + ':' + count}
+				</button>
+			</h2>
+		}
+
+		<span id="clone-after">After</span>
+	</section>;
+	const cloned = cloneElement(composer, {
+		id: 'cloned-composer',
+		'data-source': 'clone',
+		key: props.slotKey,
+		ref: props.hostRef,
+	});
+	return <main>{cloned}</main>;
+}
+
+// The stored descriptor can be inserted under any namespace. A directive child
+// must defer ambiguous <title> placement to its actual SVG parent at runtime.
+export function ValueTemplateSvg(props: { showTitle: boolean; title: string }) @{
+	const icon = <svg id="setup-value-svg" viewBox="0 0 10 10">
+		@if (props.showTitle) {
+			<title id="setup-value-svg-title">{props.title}</title>
+		}
+		<circle id="setup-value-circle" cx="5" cy="5" r="4" />
+	</svg>;
+
+	<main>{icon}</main>
+}
+
+export function ValueTemplateMatrix(props: {
+	items: Array<{ id: string; label: string }>;
+	mode: string;
+}) @{
+	const panel = <section id="setup-value-matrix">
+		@for (const item of props.items; key item.id) {
+			const [count, setCount] = useState(0);
+			<button
+				class="setup-value-row"
+				data-id={item.id as string}
+				onClick={() => setCount((value) => value + 1)}
+			>
+				{item.label + ':' + count}
+			</button>
+		} @empty {
+			<i id="setup-value-empty">empty</i>
+		}
+
+		@switch (props.mode) {
+			@case 'primary': {
+				<strong id="setup-value-mode">Primary</strong>
+			}
+			@default: {
+				<strong id="setup-value-mode">Secondary</strong>
+			}
+		}
+	</section>;
+
+	<main>{panel}</main>
 }

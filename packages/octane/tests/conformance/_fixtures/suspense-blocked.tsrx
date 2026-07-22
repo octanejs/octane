@@ -16,9 +16,7 @@ export function UseInsideMemo(props) @{
 	<>
 		@try {
 			const v = useMemo(() => 'm:' + use(props.promise), [props.depKey]);
-			<span class="resolved">
-				{v as string}
-			</span>
+			<span class="resolved">{v as string}</span>
 		} @pending {
 			<span class="fallback">{'pending'}</span>
 		}
@@ -44,16 +42,12 @@ export function PendingThrowBubblesUp(props) @{
 		@try {
 			@try {
 				const v = use(props.promise);
-				<span class="resolved">
-					{v as string}
-				</span>
+				<span class="resolved">{v as string}</span>
 			} @pending {
 				<ThrowOnRender bang={true} />
 			}
 		} @catch (err) {
-			<span class="outer-caught">
-				{err.message as string}
-			</span>
+			<span class="outer-caught">{err.message as string}</span>
 		}
 	</>
 }
@@ -69,9 +63,7 @@ export function PendingThrowBubblesUp(props) @{
 export function DeferredWithInitial(props) @{
 	const v = useDeferredValue(props.value, props.initialValue);
 	props.observe(v);
-	<span class="out" data-tag={v.tag}>
-		{v.tag as string}
-	</span>
+	<span class="out" data-tag={v.tag}>{v.tag as string}</span>
 }
 
 // The initialValue→value swap must run at TRANSITION priority (same as the
@@ -83,9 +75,7 @@ function SuspendOnReal(props) @{
 	if (props.value === 'real') {
 		use(props.promise);
 	}
-	<span class="out">
-		{props.value as string}
-	</span>
+	<span class="out">{props.value as string}</span>
 }
 
 export function DeferredInitialSuspends(props) @{

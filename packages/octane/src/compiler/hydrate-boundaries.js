@@ -85,6 +85,20 @@ function applyMappedReplacements(source, start, end, replacements) {
 	return concatMapped(parts);
 }
 
+/** Keep a containing deletion/rewrite instead of edits wholly nested inside it. */
+function outermostReplacements(replacements) {
+	const outermost = [];
+	let coveredUntil = -1;
+	for (const replacement of [...replacements].sort(
+		(left, right) => left.start - right.start || right.end - left.end,
+	)) {
+		if (replacement.start < coveredUntil) continue;
+		outermost.push(replacement);
+		coveredUntil = replacement.end;
+	}
+	return outermost;
+}
+
 function nameOf(node) {
 	if (node?.type === 'Identifier' || node?.type === 'JSXIdentifier') return node.name;
 	if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
@@ -93,6 +107,10 @@ function nameOf(node) {
 
 function collectBindingNames(pattern, output) {
 	if (!pattern) return;
+	if (pattern.type === 'TSParameterProperty') {
+		collectBindingNames(pattern.parameter, output);
+		return;
+	}
 	if (pattern.type === 'Identifier' || pattern.type === 'JSXIdentifier') {
 		output.add(pattern.name);
 		return;
@@ -177,7 +195,11 @@ function functionVarBindings(body) {
 			!root &&
 			(node.type === 'FunctionDeclaration' ||
 				node.type === 'FunctionExpression' ||
-				node.type === 'ArrowFunctionExpression')
+				node.type === 'ArrowFunctionExpression' ||
+				node.type === 'ClassDeclaration' ||
+				node.type === 'ClassExpression' ||
+				node.type === 'StaticBlock' ||
+				node.type === 'TSModuleDeclaration')
 		) {
 			return;
 		}
@@ -196,6 +218,7 @@ function functionVarBindings(body) {
 function collectImports(ast) {
 	const hydrateNames = new Set();
 	const hookNames = new Set();
+	const neverNames = new Set();
 	const importBindings = new Set();
 	const declarations = [];
 	for (const statement of ast.body ?? []) {
@@ -223,9 +246,19 @@ function collectImports(ast) {
 			) {
 				hookNames.add(specifier.local.name);
 			}
+			if (
+				statement.source?.value === 'octane/hydration' &&
+				statement.importKind !== 'type' &&
+				specifier.type === 'ImportSpecifier' &&
+				specifier.importKind !== 'type' &&
+				nameOf(specifier.imported) === 'never' &&
+				specifier.local?.name
+			) {
+				neverNames.add(specifier.local.name);
+			}
 		}
 	}
-	return { declarations, hookNames, hydrateNames, importBindings };
+	return { declarations, hookNames, hydrateNames, neverNames, importBindings };
 }
 
 function rewrittenImport(input, declaration, keptSpecifiers) {
@@ -348,12 +381,114 @@ function literalSplitDisabled(node) {
 	return value?.type === 'Literal' && value.value === false;
 }
 
+/**
+ * Recognize only the exact server-only form whose client subtree may be erased.
+ * Spreads and indirect strategies stay on the ordinary persistent-wrapper path:
+ * either could change the final `split`, `when`, or `children` value at runtime.
+ */
+function isPermanentStaticBoundary(node, neverNames, shadowedImports) {
+	let split = null;
+	let when = null;
+	const attributes = node.openingElement?.attributes ?? [];
+	if (attributes.length !== 2) return false;
+	for (const attribute of attributes) {
+		if (attribute.type === 'JSXSpreadAttribute' || attribute.type === 'SpreadAttribute') {
+			return false;
+		}
+		const name = jsxAttributeName(attribute);
+		if (name === 'children') return false;
+		if (name === 'split') split = attribute;
+		else if (name === 'when') when = attribute;
+	}
+	if (split === null || when === null || !literalSplitDisabled(node)) return false;
+	const raw = when.value?.type === 'JSXExpressionContainer' ? when.value.expression : when.value;
+	const expression = unwrapExpression(raw);
+	if (expression?.type !== 'CallExpression' || (expression.arguments?.length ?? 0) !== 0) {
+		return false;
+	}
+	const callee = unwrapExpression(expression.callee);
+	return (
+		callee?.type === 'Identifier' &&
+		neverNames.has(callee.name) &&
+		!shadowedImports.has(callee.name)
+	);
+}
+
 function openingInsertOffset(source, opening) {
 	const text = source.slice(opening.start, opening.end);
 	if (!text.endsWith('>')) {
 		throw new Error('Octane Hydrate compiler found an invalid JSX opening tag.');
 	}
 	return opening.end - (text.endsWith('/>') ? 2 : 1);
+}
+
+/**
+ * Keep compile-time scoped styles owned by the component that contains an
+ * erased static range. CSS scoping annotates every host in that component, not
+ * just hosts lexically beside the `<style>`, so dropping these nodes before the
+ * style pass would give the client and server different scope hashes/classes.
+ * Styles inside nested function bodies belong to those functions and leave with
+ * the server-only descendant graph instead.
+ */
+function permanentStaticStyleChildren(source, boundary) {
+	const styles = [];
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression'
+		) {
+			return;
+		}
+		if (node.type === 'JSXStyleElement') {
+			styles.push(node);
+			return;
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (SKIP_KEYS.has(key)) continue;
+			visit(value);
+		}
+	};
+	visit(boundary.node.children);
+	styles.sort((left, right) => left.start - right.start);
+	return concatMapped(
+		styles.flatMap((style, index) => [
+			...(index === 0 ? [] : [generatedText('\n')]),
+			authoredText(source, style.start, style.end),
+		]),
+	);
+}
+
+const PERMANENT_STATIC_HYDRATE_MEMBER = '__octanePermanentStatic';
+
+/** Route compiler-proven exact forms through the runtime's hidden component. */
+function permanentStaticTagReplacements(boundary) {
+	const replacements = [];
+	const openingName = boundary.node.openingElement?.name;
+	if (openingName?.end != null) {
+		replacements.push({
+			start: openingName.end,
+			end: openingName.end,
+			value: generatedText('.' + PERMANENT_STATIC_HYDRATE_MEMBER),
+		});
+	}
+	const closingName = boundary.node.closingElement?.name;
+	if (closingName?.end != null) {
+		replacements.push({
+			start: closingName.end,
+			end: closingName.end,
+			value: generatedText('.' + PERMANENT_STATIC_HYDRATE_MEMBER),
+		});
+	}
+	return replacements;
 }
 
 function formatLocation(filename, node) {
@@ -561,6 +696,7 @@ export function analyzeHydrateBoundaries(source, filename = 'unknown.tsrx') {
 				boundary = {
 					children: [],
 					disabled: literalSplitDisabled(node),
+					permanentStatic: isPermanentStaticBoundary(node, imports.neverNames, shadowed),
 					node,
 					parent: parentBoundary,
 					path,
@@ -759,11 +895,20 @@ function collectCaptures(nodes, importBindings, shadowedImports = new Set()) {
 			node.type === 'FunctionExpression' ||
 			node.type === 'ArrowFunctionExpression'
 		) {
-			const bindings = functionVarBindings(node.body);
-			collectBindingNames(node.id, bindings);
-			for (const parameter of node.params ?? []) collectBindingNames(parameter, bindings);
-			scopes.push(bindings);
+			const parameterBindings = new Set();
+			collectBindingNames(node.id, parameterBindings);
+			for (const parameter of node.params ?? []) {
+				collectBindingNames(parameter, parameterBindings);
+			}
+			// A non-simple parameter list executes outside the function body's `var`
+			// environment. Defaults and computed parameter keys can therefore still
+			// reference a module binding with the same name as a body-local `var`.
+			scopes.push(parameterBindings);
 			for (const parameter of node.params ?? []) visitPatternDefaults(parameter);
+			scopes.pop();
+			const bodyBindings = new Set(parameterBindings);
+			for (const binding of functionVarBindings(node.body)) bodyBindings.add(binding);
+			scopes.push(bodyBindings);
 			visit(node.body);
 			scopes.pop();
 			return;
@@ -847,9 +992,117 @@ function declarationBindingSet(node) {
 	return bindings;
 }
 
+// `collectCaptures` deliberately ignores erased TypeScript syntax, but these
+// nodes either emit JavaScript or contain runtime initializers. The permanent-
+// static declaration pruner must not prove exclusivity with an analysis that
+// cannot see those references. Keep the direct subtree erasure/import pruning,
+// but leave module declarations intact whenever one of these forms is present.
+const PRIVATE_DECLARATION_PRUNING_UNSAFE_TS_NODES = new Set([
+	'TSEnumDeclaration',
+	'TSExportAssignment',
+	'TSImportEqualsDeclaration',
+	'TSModuleDeclaration',
+	'TSParameterProperty',
+]);
+
+function canPrunePrivateModuleDeclarations(ast) {
+	let safe = true;
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!safe || !node || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (seen.has(node)) return;
+		seen.add(node);
+		// Direct eval can observe module/function lexical bindings that do not
+		// appear as identifier nodes in the parsed AST. Treat even a shadowed
+		// syntactic `eval(...)` conservatively rather than deleting a declaration
+		// whose name may be read from the string payload.
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			node.callee.name === 'eval'
+		) {
+			safe = false;
+			return;
+		}
+		if (PRIVATE_DECLARATION_PRUNING_UNSAFE_TS_NODES.has(node.type)) {
+			safe = false;
+			return;
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (SKIP_KEYS.has(key)) continue;
+			visit(value);
+		}
+	};
+	visit(ast);
+	return safe;
+}
+
+function localExportBindings(ast) {
+	const bindings = new Set();
+	for (const statement of ast.body ?? []) {
+		if (statement.type === 'ExportNamedDeclaration' && statement.source == null) {
+			for (const specifier of statement.specifiers ?? []) {
+				if (specifier.local?.name) bindings.add(specifier.local.name);
+			}
+		} else if (
+			statement.type === 'ExportDefaultDeclaration' &&
+			statement.declaration?.type === 'Identifier'
+		) {
+			bindings.add(statement.declaration.name);
+		}
+	}
+	return bindings;
+}
+
+/** Private module declarations that can disappear with a proven server-only graph. */
+function privateModuleDeclarationGraph(ast, importBindings) {
+	const records = [];
+	const exportedBindings = localExportBindings(ast);
+	for (const node of ast.body ?? []) {
+		if (
+			node.type !== 'VariableDeclaration' &&
+			node.type !== 'FunctionDeclaration' &&
+			node.type !== 'ClassDeclaration'
+		) {
+			continue;
+		}
+		if (node.declare === true || (node.type === 'FunctionDeclaration' && node.body == null)) {
+			continue;
+		}
+		const bindings = declarationBindingSet(node);
+		if (bindings.size === 0) continue;
+		records.push({
+			bindings,
+			dependencies: new Set(),
+			// Removing one declarator must not discard an unrelated initializer in
+			// the same authored statement. Keep multi-declarator declarations whole.
+			removable:
+				![...bindings].some((binding) => exportedBindings.has(binding)) &&
+				(node.type !== 'VariableDeclaration' ||
+					((node.declarations?.length ?? 0) === 1 && bindings.size === 1)),
+			node,
+		});
+	}
+	const byBinding = new Map();
+	for (const record of records) {
+		for (const binding of record.bindings) byBinding.set(binding, record);
+	}
+	for (const record of records) {
+		for (const dependency of collectCaptures([record.node], importBindings)) {
+			if (byBinding.has(dependency)) record.dependencies.add(dependency);
+		}
+	}
+	return { byBinding, records };
+}
+
 function movableModuleDeclarations(analysis) {
 	const records = [];
 	const moduleBindings = topLevelBindingNames(analysis.ast);
+	const exportedBindings = localExportBindings(analysis.ast);
 	for (const node of analysis.ast.body ?? []) {
 		if (
 			node.type !== 'VariableDeclaration' &&
@@ -873,6 +1126,7 @@ function movableModuleDeclarations(analysis) {
 		}
 		const bindings = declarationBindingSet(node);
 		if (bindings.size === 0) continue;
+		if ([...bindings].some((binding) => exportedBindings.has(binding))) continue;
 		records.push({
 			bindings,
 			dependencies: new Set(),
@@ -968,11 +1222,13 @@ function createModuleMovePlan(source, filename, analysis, request) {
 
 	const allBindingsByPath = new Map();
 	for (const boundary of analysis.boundaries) {
-		if (!boundary.disabled) allBindingsByPath.set(boundary.path, allBindings);
+		if (!boundary.disabled && !hasPermanentStaticAncestor(boundary)) {
+			allBindingsByPath.set(boundary.path, allBindings);
+		}
 	}
 	const referencesByPath = new Map();
 	for (const boundary of analysis.boundaries) {
-		if (boundary.disabled) continue;
+		if (boundary.disabled || hasPermanentStaticAncestor(boundary)) continue;
 		const provisionalChild = extractedModule(
 			source,
 			filename,
@@ -1030,7 +1286,7 @@ function createModuleMovePlan(source, filename, analysis, request) {
 	const declarationsByPath = new Map();
 	const movedRecords = new Set();
 	for (const boundary of analysis.boundaries) {
-		if (boundary.disabled) continue;
+		if (boundary.disabled || hasPermanentStaticAncestor(boundary)) continue;
 		const records = recordsForReferences(referencesByPath.get(boundary.path) ?? []);
 		if (records.size === 0) continue;
 		const ordered = candidates.records.filter((record) => records.has(record));
@@ -1044,6 +1300,133 @@ function createModuleMovePlan(source, filename, analysis, request) {
 		declarationsByPath,
 		movedRecords: candidates.records.filter((record) => movedRecords.has(record)),
 	};
+}
+
+/**
+ * Delete private declaration chains used only by permanent-static descendants.
+ *
+ * The ordinary import-pruner sees references inside a now-unreachable local
+ * wrapper and conservatively keeps its imports. Build two declaration graphs:
+ * the authored graph identifies the transitive server-only closure, while the
+ * prepared client graph omits references erased by static boundaries. Anything
+ * still referenced by retained client code is protected; the remaining closure
+ * can be removed before import pruning, including side-effectful module edges.
+ */
+function createPermanentStaticRemovalPlan(source, filename, analysis, request, moduleMovePlan) {
+	const staticBoundaries = analysis.boundaries.filter(
+		(boundary) => boundary.permanentStatic && !hasPermanentStaticAncestor(boundary),
+	);
+	if (staticBoundaries.length === 0) return [];
+	if (!canPrunePrivateModuleDeclarations(analysis.ast)) return [];
+
+	const authored = privateModuleDeclarationGraph(analysis.ast, analysis.imports.importBindings);
+	if (authored.records.length === 0) return [];
+	const staticRecords = new Set();
+	const staticQueue = [];
+	const enqueueStatic = (record) => {
+		if (record === undefined || staticRecords.has(record)) return;
+		staticRecords.add(record);
+		staticQueue.push(record);
+	};
+	for (const boundary of staticBoundaries) {
+		for (const reference of collectCaptures(
+			boundary.node.children,
+			analysis.imports.importBindings,
+			boundary.shadowedImports,
+		)) {
+			enqueueStatic(authored.byBinding.get(reference));
+		}
+	}
+	for (let index = 0; index < staticQueue.length; index++) {
+		for (const dependency of staticQueue[index].dependencies) {
+			enqueueStatic(authored.byBinding.get(dependency));
+		}
+	}
+	if (staticRecords.size === 0) return [];
+
+	const preparedReplacements = extractionFrontier(analysis.roots).flatMap((boundary) =>
+		boundaryReplacements(
+			source,
+			boundary,
+			request,
+			analysis.imports.importBindings,
+			moduleMovePlan.bindingsByPath.get(boundary.path),
+		),
+	);
+	for (const record of moduleMovePlan.movedRecords) {
+		preparedReplacements.push({
+			start: record.node.start,
+			end: record.node.end,
+			value: generatedText(''),
+		});
+	}
+	const preparedSource = applyMappedReplacements(
+		source,
+		0,
+		source.length,
+		preparedReplacements,
+	).code;
+	const preparedAst = parseModule(preparedSource, filename);
+	const preparedImports = collectImports(preparedAst);
+	const client = privateModuleDeclarationGraph(preparedAst, preparedImports.importBindings);
+
+	const withoutPrivateDeclarations = applyMappedReplacements(
+		preparedSource,
+		0,
+		preparedSource.length,
+		client.records
+			.filter((record) => record.removable)
+			.map((record) => ({
+				start: record.node.start,
+				end: record.node.end,
+				value: generatedText(''),
+			})),
+	).code;
+	const eagerAst = parseModule(withoutPrivateDeclarations, filename);
+	const eagerReferences = collectCaptures(
+		(eagerAst.body ?? []).filter((node) => node.type !== 'ImportDeclaration'),
+		preparedImports.importBindings,
+	);
+
+	const protectedRecords = new Set();
+	const protectedQueue = [];
+	const enqueueProtected = (record) => {
+		if (record === undefined || protectedRecords.has(record)) return;
+		protectedRecords.add(record);
+		protectedQueue.push(record);
+	};
+	// Declarations outside the static closure remain authored client code even if
+	// a bundler may later prove them dead. Preserve every dependency they still
+	// reference after the boundary rewrite so this pass never leaves a dangling
+	// identifier or changes unrelated module-initialization semantics.
+	for (const record of authored.records) {
+		if (!staticRecords.has(record) || !record.removable) enqueueProtected(record);
+	}
+	for (const reference of eagerReferences) enqueueProtected(authored.byBinding.get(reference));
+	const movedBindings = new Set(
+		moduleMovePlan.movedRecords.flatMap((record) => [...record.bindings]),
+	);
+	for (const binding of movedBindings) enqueueProtected(authored.byBinding.get(binding));
+	for (let index = 0; index < protectedQueue.length; index++) {
+		const authoredRecord = protectedQueue[index];
+		let clientRecord;
+		for (const binding of authoredRecord.bindings) {
+			clientRecord = client.byBinding.get(binding);
+			if (clientRecord !== undefined) break;
+		}
+		if (clientRecord === undefined) continue;
+		for (const dependency of clientRecord.dependencies) {
+			enqueueProtected(authored.byBinding.get(dependency));
+		}
+	}
+
+	return authored.records.filter(
+		(record) =>
+			record.removable &&
+			staticRecords.has(record) &&
+			!protectedRecords.has(record) &&
+			![...record.bindings].some((binding) => movedBindings.has(binding)),
+	);
 }
 
 function sameSourceRequest(filename) {
@@ -1097,6 +1480,25 @@ function boundaryReplacements(
 	importBindings,
 	additionalModuleBindings = new Set(),
 ) {
+	if (boundary.permanentStatic) {
+		const insert = openingInsertOffset(source, boundary.node.openingElement);
+		const replacements = [
+			...permanentStaticTagReplacements(boundary),
+			{
+				start: insert,
+				end: insert,
+				value: generatedText(' children={null}'),
+			},
+		];
+		if (boundary.node.closingElement != null) {
+			replacements.push({
+				start: boundary.node.openingElement.end,
+				end: boundary.node.closingElement.start,
+				value: permanentStaticStyleChildren(source, boundary),
+			});
+		}
+		return replacements;
+	}
 	if (boundary.disabled) return [];
 	assertDirectChildren(boundary, boundary.filename);
 	validateBoundary(boundary, boundary.filename, boundary.hookNames);
@@ -1128,7 +1530,9 @@ function boundaryReplacements(
 function extractionFrontier(boundaries) {
 	const output = [];
 	const visit = (boundary) => {
-		if (boundary.disabled) {
+		if (boundary.permanentStatic) {
+			output.push(boundary);
+		} else if (boundary.disabled) {
 			for (const child of boundary.children) visit(child);
 		} else {
 			output.push(boundary);
@@ -1136,6 +1540,13 @@ function extractionFrontier(boundaries) {
 	};
 	for (const boundary of boundaries) visit(boundary);
 	return output;
+}
+
+function hasPermanentStaticAncestor(boundary) {
+	for (let parent = boundary.parent; parent !== null; parent = parent.parent) {
+		if (parent.permanentStatic) return true;
+	}
+	return false;
 }
 
 function uniqueGeneratedName(source, preferred) {
@@ -1262,6 +1673,10 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null) 
 	}
 	const request = sameSourceRequest(filename);
 	const moduleMovePlan = createModuleMovePlan(source, filename, analysis, request);
+	const permanentStaticRemoved =
+		boundaryPath === null
+			? createPermanentStaticRemovalPlan(source, filename, analysis, request, moduleMovePlan)
+			: [];
 	let transformed;
 	if (boundaryPath === null) {
 		const replacements = extractionFrontier(analysis.roots).flatMap((boundary) =>
@@ -1280,8 +1695,20 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null) 
 				value: generatedText(''),
 			});
 		}
+		for (const record of permanentStaticRemoved) {
+			replacements.push({
+				start: record.node.start,
+				end: record.node.end,
+				value: generatedText(''),
+			});
+		}
 		if (replacements.length === 0) return null;
-		transformed = applyMappedReplacements(source, 0, source.length, replacements);
+		transformed = applyMappedReplacements(
+			source,
+			0,
+			source.length,
+			permanentStaticRemoved.length === 0 ? replacements : outermostReplacements(replacements),
+		);
 		transformed = pruneUnusedImports(transformed, filename, true);
 	} else {
 		const boundary = analysis.boundaries.find((candidate) => candidate.path === boundaryPath);
@@ -1310,7 +1737,7 @@ export function prepareHydrateBoundaries(source, filename, boundaryPath = null) 
 		mappingNeedles:
 			boundaryPath === null
 				? extractionFrontier(analysis.roots).flatMap((boundary) =>
-						boundaryMappingNeedles(source, boundary),
+						boundary.permanentStatic ? [] : boundaryMappingNeedles(source, boundary),
 					)
 				: boundaryMappingNeedles(
 						source,
@@ -1330,7 +1757,7 @@ function fallbackObjectReplacements(object) {
 		(property) => property.type !== 'SpreadElement' && nameOf(property.key) === 'fallback',
 	);
 	const replacements = [];
-	for (let index = 0; index < properties.length; ) {
+	for (let index = 0; index < properties.length;) {
 		if (!removed[index]) {
 			index++;
 			continue;
@@ -1450,6 +1877,9 @@ export function prepareServerHydrateBoundaries(source, filename) {
 	const constObjects = collectSingleUseConstObjects(analysis.ast);
 	const replacements = [];
 	for (const boundary of analysis.boundaries) {
+		if (boundary.permanentStatic) {
+			replacements.push(...permanentStaticTagReplacements(boundary));
+		}
 		for (const attribute of boundary.node.openingElement?.attributes ?? []) {
 			if (jsxAttributeName(attribute) === 'fallback') {
 				replacements.push({
@@ -1483,16 +1913,12 @@ export function prepareServerHydrateBoundaries(source, filename) {
 	// Removing an outer fallback also removes any Hydrate authored inside that
 	// fallback. Keep only outermost ranges so nested client-only fallbacks cannot
 	// produce overlapping textual edits.
-	const outermost = [];
-	let coveredUntil = -1;
-	for (const replacement of replacements.sort(
-		(left, right) => left.start - right.start || right.end - left.end,
-	)) {
-		if (replacement.start < coveredUntil) continue;
-		outermost.push(replacement);
-		coveredUntil = replacement.end;
-	}
-	const transformed = applyMappedReplacements(source, 0, source.length, outermost);
+	const transformed = applyMappedReplacements(
+		source,
+		0,
+		source.length,
+		outermostReplacements(replacements),
+	);
 	return {
 		boundaryPath: null,
 		map: sourceMapFromOrigins(transformed.code, transformed.origins, source, filename),

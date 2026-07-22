@@ -10,12 +10,8 @@ import { useState } from 'octane';
 export function Item(props) @{
 	const [n, setN] = useState(0);
 	<li class="item">
-		<span class="label">
-			{props.label as string}
-		</span>
-		<button class="bump" onClick={() => setN(n + 1)}>
-			{'x' + n as string}
-		</button>
+		<span class="label">{props.label as string}</span>
+		<button class="bump" onClick={() => setN(n + 1)}>{'x' + n as string}</button>
 	</li>
 }
 
@@ -23,9 +19,7 @@ export function Item(props) @{
 // hole template → child/sibling navigation).
 export function Panel(props) @{
 	<div id="panel">
-		<h2>
-			{props.title as string}
-		</h2>
+		<h2>{props.title as string}</h2>
 		<Item label={props.label} />
 	</div>
 }

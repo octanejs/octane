@@ -4,19 +4,35 @@ import type {
 	UniversalHostCommitContext,
 	UniversalHostDriver,
 	UniversalPreparedHostBatch,
+	UniversalSerializableValue,
 } from 'octane/universal/native';
 import { LYNX_RENDERER_ID } from '../config.js';
 import {
 	decodeLynxNativeEventToken,
 	encodeLynxNativeEventToken,
+	parseLynxMainThreadEventProp,
 	parseLynxNativeEventProp,
+	type LynxMainThreadEventBinding,
 	type LynxNativeEventBinding,
 	type LynxNativeEventToken,
 } from './native-events.js';
 import {
+	createLynxFirstTree,
+	LYNX_FIRST_TREE_STATE,
+	LynxFirstTreeMismatchError,
+	type CaptureLynxFirstTreeOptions,
+	type LynxFirstTree,
+	type LynxFirstTreeEventSnapshot,
+	type LynxFirstTreeNodeSnapshot,
+	type LynxFirstTreeSnapshot,
+	type LynxResolvedFirstTreeEvent,
+} from './first-screen.js';
+import {
 	LYNX_CSS_SCOPE_PROP,
 	planLynxHostPropPatch,
 	type LynxHostPropPatch,
+	type LynxMainThreadRefDescriptor,
+	type LynxMainThreadWorkletDescriptor,
 } from './host-props.js';
 import {
 	createLynxListItemDescriptor,
@@ -27,12 +43,14 @@ import {
 } from './list.js';
 import { createLynxNodesRefSelector } from './nodes-ref.js';
 import type {
+	LynxElementEventListener,
 	LynxElementPAPI,
 	LynxElementRef,
 	LynxListComponentAtIndex,
 	LynxListComponentAtIndexes,
 	LynxListEnqueueComponent,
 } from './papi.js';
+import type { LynxActivatedMainThreadWorklet, LynxMainThreadWorkletRegistry } from './worklets.js';
 
 const LYNX_HOST_STATE: unique symbol = Symbol('octane.lynx.host-state');
 
@@ -127,6 +145,7 @@ interface LynxNativeListState<Node extends LynxElementRef> {
 
 interface LynxHostState<Node extends LynxElementRef> {
 	readonly papi: LynxElementPAPI<Node>;
+	readonly worklets?: LynxMainThreadWorkletRegistry;
 	records: Map<number, LynxHostRecord<Node>>;
 	rootChildren: number[];
 	generations: Map<number, number>;
@@ -134,6 +153,9 @@ interface LynxHostState<Node extends LynxElementRef> {
 	readonly ownedPageRoots: Set<Node>;
 	/** Physical listener journal retained until native removal succeeds. */
 	readonly nativeEvents: Map<Node, Map<string, LynxNativeEventRegistration>>;
+	/** Main-thread refs retained until their native node is cleared successfully. */
+	readonly mainThreadRefs: Map<Node, LynxMainThreadRefDescriptor>;
+	readonly mainThreadRefOwners: Map<string, Node>;
 	readonly lists: Map<number, LynxNativeListState<Node>>;
 	readonly onAttachments?: (version: number, deltas: readonly LynxHostAttachmentDelta[]) => void;
 	readonly onCallbackFault?: (version: number, error: unknown) => void;
@@ -143,12 +165,21 @@ interface LynxHostState<Node extends LynxElementRef> {
 	faulted: boolean;
 	applying: boolean;
 	cleanupNeedsFlush: boolean;
+	firstTree: LynxFirstTree<Node> | null;
 }
 
-interface LynxNativeEventRegistration {
-	readonly binding: LynxNativeEventBinding;
-	readonly token: LynxNativeEventToken;
-}
+type LynxNativeEventRegistration =
+	| {
+			readonly source: 'background';
+			readonly binding: LynxNativeEventBinding;
+			readonly listener: LynxNativeEventToken;
+	  }
+	| {
+			readonly source: 'main-thread';
+			readonly binding: LynxMainThreadEventBinding;
+			readonly listener: Exclude<LynxElementEventListener, string | undefined>;
+			readonly descriptor: LynxMainThreadWorkletDescriptor;
+	  };
 
 export interface LynxHostContainer<Node extends LynxElementRef = LynxElementRef> {
 	readonly renderer: typeof LYNX_RENDERER_ID;
@@ -166,6 +197,8 @@ export interface CreateLynxHostContainerOptions<Node extends LynxElementRef = Ly
 	readonly componentId?: string;
 	readonly cssId?: number;
 	readonly page?: Node;
+	/** Main-local execution and ref lifetime registry shared across first-screen adoption. */
+	readonly worklets?: LynxMainThreadWorkletRegistry;
 	/** Main-thread bridge for callback-driven list ref/query attachment state. */
 	readonly onAttachments?: (version: number, deltas: readonly LynxHostAttachmentDelta[]) => void;
 	/** Accepted-root fault bridge for native callbacks that run after a commit settles. */
@@ -177,6 +210,13 @@ export interface LynxPreparedHostBatch extends UniversalPreparedHostBatch {
 	readonly mutationStarted: boolean;
 	/** Clone-safe public-handle changes that must be published before acknowledgement. */
 	readonly handleDelta: readonly LynxHostHandleDelta[];
+	/** First-screen path selected during clone-safe preparation. */
+	readonly firstTreeAction: 'none' | 'adopt' | 'repair';
+}
+
+export interface PrepareLynxHostBatchOptions<Node extends LynxElementRef> {
+	readonly firstTree?: LynxFirstTree<Node>;
+	readonly onMismatch?: (error: LynxFirstTreeMismatchError) => void;
 }
 
 export interface LynxHostDriver<
@@ -247,6 +287,8 @@ type LynxApplyOperation<Node extends LynxElementRef> =
 			readonly parent: number | null;
 			readonly before: number | null;
 			readonly previousParent: LynxHostParent;
+			readonly wasConnected: boolean;
+			readonly willBeConnected: boolean;
 	  }
 	| {
 			readonly op: 'remove';
@@ -292,7 +334,7 @@ function assertHostType(value: unknown, label: string): asserts value is string 
 	}
 }
 
-function cloneHostValue(value: unknown, seen: WeakSet<object>): unknown {
+function cloneHostValue(value: unknown, clones: WeakMap<object, object>): unknown {
 	if (
 		value === null ||
 		value === undefined ||
@@ -306,38 +348,54 @@ function cloneHostValue(value: unknown, seen: WeakSet<object>): unknown {
 	if (typeof value !== 'object') {
 		throw hostError(`host props contain unsupported value ${String(value)}.`);
 	}
-	if (seen.has(value)) throw hostError('host props cannot contain cycles.');
-	seen.add(value);
-	try {
-		if (Array.isArray(value)) {
-			return Object.freeze(value.map((entry) => cloneHostValue(entry, seen)));
-		}
+	const existing = clones.get(value);
+	if (existing !== undefined) {
+		if (!Object.isFrozen(existing)) throw hostError('host props cannot contain cycles.');
+		return existing;
+	}
+	let clone: unknown[] | Record<string, unknown>;
+	if (Array.isArray(value)) {
+		clone = [];
+	} else {
 		const prototype = Object.getPrototypeOf(value);
 		if (prototype !== Object.prototype && prototype !== null) {
 			throw hostError(
 				`host props require plain objects, received ${Object.prototype.toString.call(value)}.`,
 			);
 		}
-		const clone = Object.create(null) as Record<string, unknown>;
-		for (const [name, entry] of Object.entries(value)) {
-			Object.defineProperty(clone, name, {
+		clone = Object.create(null) as Record<string, unknown>;
+	}
+	clones.set(value, clone);
+	if (Array.isArray(value)) {
+		const output = clone as unknown[];
+		output.length = value.length;
+		for (let index = 0; index < value.length; index++) {
+			if (!(index in value)) continue;
+			Object.defineProperty(output, index, {
 				configurable: true,
 				enumerable: true,
-				value: cloneHostValue(entry, seen),
+				value: cloneHostValue(value[index], clones),
 				writable: true,
 			});
 		}
-		return Object.freeze(clone);
-	} finally {
-		seen.delete(value);
+	} else {
+		for (const [name, item] of Object.entries(value)) {
+			Object.defineProperty(clone, name, {
+				configurable: true,
+				enumerable: true,
+				value: cloneHostValue(item, clones),
+				writable: true,
+			});
+		}
 	}
+	return Object.freeze(clone);
 }
 
 function cloneProps(value: unknown, label: string): Readonly<Record<string, unknown>> {
 	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
 		throw hostError(`${label} must be a plain object.`);
 	}
-	const clone = cloneHostValue(value, new WeakSet());
+	const clone = cloneHostValue(value, new WeakMap());
 	if (clone === null || typeof clone !== 'object' || Array.isArray(clone)) {
 		throw hostError(`${label} must be a plain object.`);
 	}
@@ -355,6 +413,25 @@ function assertTextProps(
 		Object.keys(props).some((name) => name !== 'value' && name !== LYNX_CSS_SCOPE_PROP)
 	) {
 		throw hostError(`${label} for #text must contain a string value and optional CSS scope.`);
+	}
+}
+
+function assertNoMainThreadEventCollision(
+	props: Readonly<Record<string, unknown>>,
+	events: ReadonlyMap<string, UniversalEventListenerDescriptor>,
+): void {
+	if (events.size === 0) return;
+	for (const name of Object.keys(props)) {
+		if (props[name] === null || props[name] === undefined) continue;
+		const main = parseLynxMainThreadEventProp(name);
+		if (main === null) continue;
+		for (const type of events.keys()) {
+			const ordinary = parseLynxNativeEventProp(type);
+			if (ordinary?.type !== main.type || ordinary.name !== main.name) continue;
+			throw hostError(
+				`main-thread event ${JSON.stringify(name)} conflicts with background event ${JSON.stringify(type)} on the same native channel.`,
+			);
+		}
 	}
 }
 
@@ -425,6 +502,22 @@ function isRootConnected<Node extends LynxElementRef>(
 	return current === null;
 }
 
+function isAcceptedHostConnected<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	id: number,
+): boolean {
+	let current: number | null | undefined = id;
+	const visited = new Set<number>();
+	while (typeof current === 'number') {
+		if (visited.has(current)) throw hostError(`existing topology contains a cycle at ${current}.`);
+		visited.add(current);
+		const record = state.records.get(current);
+		if (record === undefined) return false;
+		current = record.parent;
+	}
+	return current === null;
+}
+
 function nodeFor<Node extends LynxElementRef>(
 	nodes: Map<number, Node>,
 	id: number,
@@ -452,7 +545,7 @@ function effectiveHiddenValue(visible: boolean, props: Readonly<Record<string, u
 }
 
 function applyProps<Node extends LynxElementRef>(
-	papi: LynxElementPAPI<Node>,
+	state: LynxHostState<Node>,
 	node: Node,
 	type: string,
 	previous: Readonly<Record<string, unknown>>,
@@ -460,7 +553,9 @@ function applyProps<Node extends LynxElementRef>(
 	patch: LynxHostPropPatch,
 	creating: boolean,
 	visible: boolean,
+	interactive: boolean,
 ): void {
+	const papi = state.papi;
 	if (patch.cssScope !== undefined) {
 		papi.setCssId(node, patch.cssScope.value.cssId, patch.cssScope.value.entryName);
 	}
@@ -474,6 +569,18 @@ function applyProps<Node extends LynxElementRef>(
 	if (patch.classes !== undefined) papi.setClasses(node, patch.classes.value);
 	if (patch.inlineStyles !== undefined) papi.setInlineStyles(node, patch.inlineStyles.value);
 	if (patch.dataset !== undefined) papi.setDataset(node, patch.dataset.value);
+	for (const event of patch.mainThreadEvents) {
+		removeNativeEvent(state, node, event.binding.prop);
+		if (interactive && event.value !== null) {
+			installMainThreadEvent(state, node, event.binding, event.value);
+		}
+	}
+	if (patch.mainThreadRef !== undefined) {
+		removeMainThreadRef(state, node);
+		if (interactive && patch.mainThreadRef.value !== null) {
+			installMainThreadRef(state, node, patch.mainThreadRef.value);
+		}
+	}
 	for (const attribute of patch.attributes) {
 		papi.setAttribute(
 			node,
@@ -506,6 +613,15 @@ function nativeEventMap<Node extends LynxElementRef>(
 	return events;
 }
 
+function requireWorkletRegistry<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+): LynxMainThreadWorkletRegistry {
+	if (state.worklets === undefined) {
+		throw hostError('main-thread props require a main-thread worklet registry.');
+	}
+	return state.worklets;
+}
+
 function removeNativeEvent<Node extends LynxElementRef>(
 	state: LynxHostState<Node>,
 	node: Node,
@@ -514,7 +630,34 @@ function removeNativeEvent<Node extends LynxElementRef>(
 	const events = state.nativeEvents.get(node);
 	const registration = events?.get(type);
 	if (registration === undefined) return;
-	state.papi.setEvent(node, registration.binding.type, registration.binding.name, undefined);
+	if (registration.source === 'main-thread') {
+		// Invalidate before native unbind so an engine-retained callback cannot
+		// execute after its host lifetime ends. release() is idempotent for retry.
+		requireWorkletRegistry(state).release(
+			registration.listener.value as LynxActivatedMainThreadWorklet,
+		);
+	}
+	let replacement: LynxNativeEventRegistration | undefined;
+	for (const [candidateType, candidate] of events!) {
+		if (
+			candidateType !== type &&
+			candidate.binding.type === registration.binding.type &&
+			candidate.binding.name === registration.binding.name
+		) {
+			replacement = candidate;
+			break;
+		}
+	}
+	// A single universal commit can transfer one PAPI tuple between the ordinary
+	// background channel and a direct main-thread prop. Those semantic commands
+	// are intentionally journaled separately, so removing the superseded entry
+	// must preserve the already-installed replacement instead of unbinding it.
+	state.papi.setEvent(
+		node,
+		registration.binding.type,
+		registration.binding.name,
+		replacement?.listener,
+	);
 	events!.delete(type);
 	if (events!.size === 0) state.nativeEvents.delete(node);
 }
@@ -532,11 +675,171 @@ function installNativeEvent<Node extends LynxElementRef>(
 	if (binding === null) throw hostError(`event ${JSON.stringify(type)} is not a Lynx event prop.`);
 	const token = encodeLynxNativeEventToken({ root, id, generation, listener: listener.id });
 	const events = nativeEventMap(state, node);
-	if (events.get(type)?.token === token) return;
+	const current = events.get(type);
+	if (current?.source === 'background' && current.listener === token) return;
 	// Journal the intended token before entering PAPI. If native replacement
 	// mutates and then throws, terminal cleanup still knows which tuple to clear.
-	events.set(type, Object.freeze({ binding, token }));
+	events.set(type, Object.freeze({ source: 'background', binding, listener: token }));
 	state.papi.setEvent(node, binding.type, binding.name, token);
+}
+
+function installMainThreadEvent<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+	binding: LynxMainThreadEventBinding,
+	worklet: LynxMainThreadWorkletDescriptor,
+): void {
+	let events = state.nativeEvents.get(node);
+	const current = events?.get(binding.prop);
+	if (current?.source === 'main-thread' && sameSnapshotValue(current.descriptor, worklet)) {
+		return;
+	}
+	const registry = requireWorkletRegistry(state);
+	const active = registry.activate(worklet);
+	const listener = Object.freeze({ type: 'worklet' as const, value: active });
+	// The direct callback has no background resolver to reject stale identities.
+	// Unbind the accepted listener before publishing its replacement.
+	if (current !== undefined) {
+		try {
+			removeNativeEvent(state, node, binding.prop);
+		} catch (error) {
+			registry.release(active);
+			throw error;
+		}
+		events = nativeEventMap(state, node);
+	} else if (events === undefined) {
+		events = nativeEventMap(state, node);
+	}
+	events.set(
+		binding.prop,
+		Object.freeze({ source: 'main-thread', binding, listener, descriptor: worklet }),
+	);
+	state.papi.setEvent(node, binding.type, binding.name, listener);
+}
+
+function removeMainThreadEvents<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+): void {
+	const events = state.nativeEvents.get(node);
+	if (events === undefined) return;
+	for (const [type, registration] of [...events]) {
+		if (registration.source === 'main-thread') removeNativeEvent(state, node, type);
+	}
+}
+
+function removeMainThreadRef<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+): void {
+	const ref = state.mainThreadRefs.get(node);
+	if (ref === undefined) return;
+	const registry = requireWorkletRegistry(state);
+	registry.updateRef(ref, null);
+	registry.releaseRef(ref);
+	state.mainThreadRefs.delete(node);
+	if (state.mainThreadRefOwners.get(ref._wvid) === node) {
+		state.mainThreadRefOwners.delete(ref._wvid);
+	}
+}
+
+function invalidateMainThreadLifetimesAfterFault<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+): void {
+	const registry = state.worklets;
+	if (registry === undefined) return;
+	// An accepted host fault is terminal. Background listener tokens are rejected
+	// through state.faulted, but direct PAPI worklets bypass that resolver and must
+	// be invalidated explicitly. Keep physical event journals so terminal disposal
+	// can retry native unbinding; refs have no PAPI binding and can be released now.
+	for (const events of state.nativeEvents.values()) {
+		for (const registration of events.values()) {
+			if (registration.source !== 'main-thread') continue;
+			try {
+				registry.release(registration.listener.value as LynxActivatedMainThreadWorklet);
+			} catch {
+				// Preserve the accepted application error. The retained journal retries
+				// release during terminal disposal and reports any persistent failure.
+			}
+		}
+	}
+	for (const node of [...state.mainThreadRefs.keys()]) {
+		try {
+			removeMainThreadRef(state, node);
+		} catch {
+			// A partially failed registry update retains its journal for disposal.
+		}
+	}
+}
+
+function installMainThreadRef<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+	ref: LynxMainThreadRefDescriptor,
+): void {
+	const current = state.mainThreadRefs.get(node);
+	if (current !== undefined && sameSnapshotValue(current, ref)) return;
+	const owner = state.mainThreadRefOwners.get(ref._wvid);
+	if (owner !== undefined && owner !== node) {
+		let ownerIsInteractive = false;
+		for (const [id, record] of state.records) {
+			if (record.node !== owner) continue;
+			const authored = record.props['main-thread:ref'] as
+				LynxMainThreadRefDescriptor | null | undefined;
+			ownerIsInteractive =
+				record.visible && authored?._wvid === ref._wvid && isAcceptedHostConnected(state, id);
+			break;
+		}
+		if (ownerIsInteractive) {
+			throw hostError(`main-thread ref ${JSON.stringify(ref._wvid)} is already mounted.`);
+		}
+		removeMainThreadRef(state, owner);
+	}
+	if (current !== undefined) removeMainThreadRef(state, node);
+	const registry = requireWorkletRegistry(state);
+	registry.retainRef(ref, null);
+	// Journal first: a native update may mutate and then throw, in which case
+	// terminal cleanup must still clear the ref identity.
+	state.mainThreadRefs.set(node, ref);
+	state.mainThreadRefOwners.set(ref._wvid, node);
+	registry.updateRef(ref, node);
+}
+
+function installMainThreadProps<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	node: Node,
+	type: string,
+	props: Readonly<Record<string, unknown>>,
+): void {
+	const patch = planLynxHostPropPatch(type, {}, props);
+	for (const event of patch.mainThreadEvents) {
+		if (event.value !== null) installMainThreadEvent(state, node, event.binding, event.value);
+	}
+	if (patch.mainThreadRef?.value !== null && patch.mainThreadRef?.value !== undefined) {
+		installMainThreadRef(state, node, patch.mainThreadRef.value);
+	}
+}
+
+function deactivateMainThreadSubtree<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	id: number,
+): void {
+	const record = state.records.get(id);
+	if (record === undefined) return;
+	for (const child of record.children) deactivateMainThreadSubtree(state, child);
+	if (record.node === null) return;
+	removeMainThreadEvents(state, record.node);
+	removeMainThreadRef(state, record.node);
+}
+
+function activateMainThreadSubtree<Node extends LynxElementRef>(
+	state: LynxHostState<Node>,
+	id: number,
+): void {
+	const record = state.records.get(id);
+	if (record === undefined || !record.visible || !isAcceptedHostConnected(state, id)) return;
+	if (record.node !== null) installMainThreadProps(state, record.node, record.type, record.props);
+	for (const child of record.children) activateMainThreadSubtree(state, child);
 }
 
 function removeAllNativeEvents<Node extends LynxElementRef>(
@@ -674,7 +977,7 @@ function createPhysicalTree<Node extends LynxElementRef>(
 	record.node = node;
 	installNodesRefSelector(state.papi, node, record.handle);
 	applyProps(
-		state.papi,
+		state,
 		node,
 		record.type,
 		{},
@@ -682,6 +985,7 @@ function createPhysicalTree<Node extends LynxElementRef>(
 		planLynxHostPropPatch(record.type, {}, record.props),
 		true,
 		record.visible,
+		record.visible && isAcceptedHostConnected(state, id),
 	);
 	if (record.visible) {
 		installNativeEvents(state, node, container.root, id, record.handle.generation, record.events);
@@ -733,6 +1037,7 @@ function disposePhysicalTree<Node extends LynxElementRef>(
 	for (const child of tree.children) disposePhysicalTree(state, child);
 	if (tree.type === 'list') disposeNativeListState(state, tree.logicalId);
 	removeAllNativeEvents(state, tree.node);
+	removeMainThreadRef(state, tree.node);
 	const record = state.records.get(tree.logicalId);
 	if (record?.node === tree.node) record.node = null;
 	state.ownedNodes.delete(tree.node);
@@ -772,6 +1077,7 @@ function clearPhysicalTreeAttachment<Node extends LynxElementRef>(
 		);
 	}
 	removeAllNativeEvents(state, tree.node);
+	removeMainThreadRef(state, tree.node);
 	if (tree.type !== '#text' && tree.type !== 'raw-text') state.papi.setRefSelector(tree.node, '');
 	if (record?.node === tree.node) record.node = null;
 	for (const child of tree.children) clearPhysicalTreeAttachment(state, child, deltas);
@@ -826,10 +1132,11 @@ function rebindPhysicalTree<Node extends LynxElementRef>(
 	if (previousRecord?.node === tree.node && tree.logicalId !== desiredId)
 		previousRecord.node = null;
 	removeAllNativeEvents(state, tree.node);
+	removeMainThreadRef(state, tree.node);
 	desired.node = tree.node;
 	installNodesRefSelector(state.papi, tree.node, desired.handle);
 	applyProps(
-		state.papi,
+		state,
 		tree.node,
 		desired.type,
 		tree.props,
@@ -837,9 +1144,12 @@ function rebindPhysicalTree<Node extends LynxElementRef>(
 		patch,
 		false,
 		desired.visible,
+		desired.visible && isAcceptedHostConnected(state, desiredId),
 	);
 	if (!desired.visible) state.papi.setAttribute(tree.node, 'hidden', true);
 	else {
+		const interactive = isAcceptedHostConnected(state, desiredId);
+		if (interactive) installMainThreadProps(state, tree.node, desired.type, desired.props);
 		installNativeEvents(
 			state,
 			tree.node,
@@ -1012,6 +1322,7 @@ function invokeNativeListCallback<Node extends LynxElementRef, Result>(
 		if (state.applying) throw error;
 		if (!state.disposed && !state.disposing && !state.faulted) {
 			state.faulted = true;
+			invalidateMainThreadLifetimesAfterFault(state);
 			state.cleanupNeedsFlush = true;
 			try {
 				state.onCallbackFault?.(state.acceptedVersion, error);
@@ -1233,12 +1544,15 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 	}
 	const state: LynxHostState<Node> = {
 		papi,
+		worklets: options.worklets,
 		records: new Map(),
 		rootChildren: [],
 		generations: new Map(),
 		ownedNodes: new Set(),
 		ownedPageRoots: new Set(),
 		nativeEvents: new Map(),
+		mainThreadRefs: new Map(),
+		mainThreadRefOwners: new Map(),
 		lists: new Map(),
 		onAttachments: options.onAttachments,
 		onCallbackFault: options.onCallbackFault,
@@ -1248,6 +1562,7 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 		faulted: false,
 		applying: false,
 		cleanupNeedsFlush: false,
+		firstTree: null,
 	};
 	return Object.freeze({
 		renderer: LYNX_RENDERER_ID,
@@ -1267,13 +1582,601 @@ export function createLynxHostContainer<Node extends LynxElementRef>(
 	});
 }
 
+interface SnapshotValuePairs {
+	readonly firstToSecond: WeakMap<object, object>;
+	readonly secondToFirst: WeakMap<object, object>;
+}
+
+function sameSnapshotValueWithPairs(
+	first: unknown,
+	second: unknown,
+	pairs: SnapshotValuePairs,
+): boolean {
+	if (Object.is(first, second)) return true;
+	if (Array.isArray(first)) {
+		if (!Array.isArray(second) || first.length !== second.length) return false;
+		const pairedSecond = pairs.firstToSecond.get(first);
+		if (pairedSecond !== undefined) return pairedSecond === second;
+		const pairedFirst = pairs.secondToFirst.get(second);
+		if (pairedFirst !== undefined) return pairedFirst === first;
+		pairs.firstToSecond.set(first, second);
+		pairs.secondToFirst.set(second, first);
+		for (let index = 0; index < first.length; index++) {
+			if (!sameSnapshotValueWithPairs(first[index], second[index], pairs)) return false;
+		}
+		return true;
+	}
+	if (
+		first === null ||
+		second === null ||
+		typeof first !== 'object' ||
+		typeof second !== 'object' ||
+		Array.isArray(second)
+	) {
+		return false;
+	}
+	const pairedSecond = pairs.firstToSecond.get(first);
+	if (pairedSecond !== undefined) return pairedSecond === second;
+	const pairedFirst = pairs.secondToFirst.get(second);
+	if (pairedFirst !== undefined) return pairedFirst === first;
+	pairs.firstToSecond.set(first, second);
+	pairs.secondToFirst.set(second, first);
+	const firstKeys = Object.keys(first).sort();
+	const secondKeys = Object.keys(second).sort();
+	if (firstKeys.length !== secondKeys.length) return false;
+	for (let index = 0; index < firstKeys.length; index++) {
+		const key = firstKeys[index]!;
+		if (
+			key !== secondKeys[index] ||
+			!sameSnapshotValueWithPairs(
+				(first as Record<string, unknown>)[key],
+				(second as Record<string, unknown>)[key],
+				pairs,
+			)
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function sameSnapshotValue(first: unknown, second: unknown): boolean {
+	if (Object.is(first, second)) return true;
+	return sameSnapshotValueWithPairs(first, second, {
+		firstToSecond: new WeakMap(),
+		secondToFirst: new WeakMap(),
+	});
+}
+
+/** First-screen and background graphs assign different local execution tokens. */
+function sameAdoptableSnapshotValueWithPairs(
+	first: unknown,
+	second: unknown,
+	pairs: SnapshotValuePairs,
+): boolean {
+	if (Object.is(first, second)) return true;
+	if (
+		first === null ||
+		second === null ||
+		typeof first !== 'object' ||
+		typeof second !== 'object'
+	) {
+		return false;
+	}
+	const pairedSecond = pairs.firstToSecond.get(first);
+	if (pairedSecond !== undefined) return pairedSecond === second;
+	const pairedFirst = pairs.secondToFirst.get(second);
+	if (pairedFirst !== undefined) return pairedFirst === first;
+	pairs.firstToSecond.set(first, second);
+	pairs.secondToFirst.set(second, first);
+	if (Array.isArray(first) || Array.isArray(second)) {
+		if (!Array.isArray(first) || !Array.isArray(second) || first.length !== second.length)
+			return false;
+		for (let index = 0; index < first.length; index++) {
+			if (!sameAdoptableSnapshotValueWithPairs(first[index], second[index], pairs)) return false;
+		}
+		return true;
+	}
+	const firstRecord = first as Record<string, unknown>;
+	const secondRecord = second as Record<string, unknown>;
+	const backgroundHandle =
+		typeof firstRecord._jsFnId === 'string' && typeof secondRecord._jsFnId === 'string';
+	const firstNames = Object.keys(firstRecord)
+		.filter((name) => !backgroundHandle || name !== '_execId')
+		.sort();
+	const secondNames = Object.keys(secondRecord)
+		.filter((name) => !backgroundHandle || name !== '_execId')
+		.sort();
+	if (firstNames.length !== secondNames.length) return false;
+	for (let index = 0; index < firstNames.length; index++) {
+		const name = firstNames[index]!;
+		if (
+			name !== secondNames[index] ||
+			!sameAdoptableSnapshotValueWithPairs(firstRecord[name], secondRecord[name], pairs)
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function sameAdoptableSnapshotValue(first: unknown, second: unknown): boolean {
+	if (Object.is(first, second)) return true;
+	return sameAdoptableSnapshotValueWithPairs(first, second, {
+		firstToSecond: new WeakMap(),
+		secondToFirst: new WeakMap(),
+	});
+}
+
+function sameIds(first: readonly number[], second: readonly number[]): boolean {
+	if (first.length !== second.length) return false;
+	for (let index = 0; index < first.length; index++) {
+		if (first[index] !== second[index]) return false;
+	}
+	return true;
+}
+
+interface FirstTreeSnapshotCloneState {
+	readonly active: Set<object>;
+	readonly clones: Map<object, UniversalSerializableValue>;
+}
+
+function snapshotFirstTreeValue(
+	value: UniversalSerializableValue,
+	state: FirstTreeSnapshotCloneState,
+): UniversalSerializableValue {
+	if (value === null || typeof value !== 'object') return value;
+	if (state.active.has(value)) throw hostError('first-tree props cannot contain cycles.');
+	const existing = state.clones.get(value);
+	if (existing !== undefined) return existing;
+	state.active.add(value);
+	try {
+		if (Array.isArray(value)) {
+			const output: UniversalSerializableValue[] = [];
+			state.clones.set(value, output);
+			for (const entry of value) output.push(snapshotFirstTreeValue(entry, state));
+			return Object.freeze(output);
+		}
+		const output: Record<string, UniversalSerializableValue> = {};
+		state.clones.set(value, output);
+		for (const key of Object.keys(value)) {
+			const entry = snapshotFirstTreeValue(
+				(value as Readonly<Record<string, UniversalSerializableValue>>)[key]!,
+				state,
+			);
+			if (key === '__proto__') {
+				Object.defineProperty(output, key, {
+					configurable: false,
+					enumerable: true,
+					value: entry,
+					writable: false,
+				});
+			} else {
+				output[key] = entry;
+			}
+		}
+		return Object.freeze(output);
+	} finally {
+		state.active.delete(value);
+	}
+}
+
+function snapshotFirstTreeProps(
+	props: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, UniversalSerializableValue>> {
+	return snapshotFirstTreeValue(props as Readonly<Record<string, UniversalSerializableValue>>, {
+		active: new Set(),
+		clones: new Map(),
+	}) as Readonly<Record<string, UniversalSerializableValue>>;
+}
+
+function mismatch(
+	firstTree: LynxFirstTree,
+	path: string,
+	message: string,
+): LynxFirstTreeMismatchError {
+	return new LynxFirstTreeMismatchError(path, message, firstTree.snapshot.plan);
+}
+
+function firstTreeOwner<Node extends LynxElementRef>(
+	firstTree: LynxFirstTree<Node>,
+): LynxHostContainer<Node> {
+	if (firstTree === null || typeof firstTree !== 'object') {
+		throw hostError('firstTree must be a captured Lynx first tree.');
+	}
+	const journal = firstTree[LYNX_FIRST_TREE_STATE];
+	if (journal === undefined || journal.status !== 'available') {
+		throw hostError('firstTree is no longer available for adoption.');
+	}
+	const owner = journal.owner;
+	if (
+		owner === null ||
+		typeof owner !== 'object' ||
+		!(LYNX_HOST_STATE in owner) ||
+		(owner as LynxHostContainer<Node>).renderer !== LYNX_RENDERER_ID
+	) {
+		throw hostError('firstTree has no valid Lynx host owner.');
+	}
+	const source = owner as LynxHostContainer<Node>;
+	if (source[LYNX_HOST_STATE].firstTree !== firstTree) {
+		throw hostError('firstTree is not the current journal for its Lynx host owner.');
+	}
+	return source;
+}
+
+/**
+ * Freeze the accepted main-runtime tree into a clone-safe description while
+ * retaining PAPI references in a single-consumer, main-local journal.
+ */
+export function captureLynxFirstTree<Node extends LynxElementRef>(
+	container: LynxHostContainer<Node>,
+	options: CaptureLynxFirstTreeOptions = {},
+): LynxFirstTree<Node> {
+	const state = container[LYNX_HOST_STATE];
+	if (state.disposed || state.disposing || state.faulted || state.applying) {
+		throw hostError('first tree can only be captured from a stable accepted root.');
+	}
+	if (state.firstTree !== null) throw hostError('the root already owns a first-tree journal.');
+	if (state.acceptedVersion === 0)
+		throw hostError('cannot capture a first tree before a batch is accepted.');
+	if (
+		options.plan !== undefined &&
+		(typeof options.plan !== 'string' || options.plan.length === 0)
+	) {
+		throw hostError('first-tree plan must be a non-empty string when provided.');
+	}
+	if (state.lists.size !== 0) {
+		throw hostError('native list materializations cannot be captured as a first tree.');
+	}
+	const eventsByToken = new Map<string, LynxResolvedFirstTreeEvent>();
+	const nodes: LynxFirstTreeNodeSnapshot[] = [];
+	const ids = [...state.records.keys()].sort((first, second) => first - second);
+	for (const id of ids) {
+		const record = state.records.get(id)!;
+		if (record.node === null || record.parent === undefined) {
+			throw hostError(`first-tree host ${id} must own an attached physical node.`);
+		}
+		if (record.type === 'list') {
+			throw hostError('native list hosts cannot be captured as a first tree.');
+		}
+		if (!state.ownedNodes.has(record.node)) {
+			throw hostError(`first-tree host ${id} is missing from the physical ownership journal.`);
+		}
+		const nativeId = state.papi.getUniqueId(record.node);
+		assertSafeId(nativeId, `first-tree host ${id} native ID`);
+		const events: LynxFirstTreeEventSnapshot[] = [];
+		const eventEntries = [...record.events].sort(([first], [second]) =>
+			first < second ? -1 : first > second ? 1 : 0,
+		);
+		for (const [type, descriptor] of eventEntries) {
+			const event = Object.freeze({
+				host: id,
+				generation: record.handle.generation,
+				type,
+				listener: descriptor.id,
+				priority: descriptor.priority,
+			});
+			events.push(event);
+			const registration = state.nativeEvents.get(record.node)?.get(type);
+			if (record.visible) {
+				if (registration?.source !== 'background') {
+					throw hostError(`first-tree host ${id} is missing native event ${JSON.stringify(type)}.`);
+				}
+				eventsByToken.set(registration.listener, event);
+			} else if (registration !== undefined) {
+				throw hostError(
+					`hidden first-tree host ${id} retains native event ${JSON.stringify(type)}.`,
+				);
+			}
+		}
+		const mainThreadPatch = planLynxHostPropPatch(record.type, {}, record.props);
+		for (const event of mainThreadPatch.mainThreadEvents) {
+			if (event.value === null) continue;
+			const registration = state.nativeEvents.get(record.node)?.get(event.binding.prop);
+			if (
+				record.visible &&
+				(registration?.source !== 'main-thread' ||
+					!sameSnapshotValue(registration.descriptor, event.value))
+			) {
+				throw hostError(
+					`first-tree host ${id} is missing main-thread event ${JSON.stringify(event.binding.prop)}.`,
+				);
+			}
+			if (!record.visible && registration !== undefined) {
+				throw hostError(
+					`hidden first-tree host ${id} retains main-thread event ${JSON.stringify(event.binding.prop)}.`,
+				);
+			}
+		}
+		const expectedRef = mainThreadPatch.mainThreadRef?.value ?? null;
+		const mountedRef = state.mainThreadRefs.get(record.node) ?? null;
+		if (
+			(record.visible && !sameSnapshotValue(expectedRef, mountedRef)) ||
+			(!record.visible && mountedRef !== null)
+		) {
+			throw hostError(`first-tree host ${id} has inconsistent main-thread ref ownership.`);
+		}
+		nodes.push(
+			Object.freeze({
+				id,
+				nativeId,
+				type: record.type,
+				generation: record.handle.generation,
+				parent: record.parent,
+				children: Object.freeze([...record.children]),
+				props: snapshotFirstTreeProps(record.props),
+				visible: record.visible,
+				events: Object.freeze(events),
+			}),
+		);
+	}
+	if (state.ownedNodes.size !== state.records.size) {
+		throw hostError('first-tree physical ownership contains untracked nodes.');
+	}
+	if (state.ownedPageRoots.size !== state.rootChildren.length) {
+		throw hostError('first-tree page-root ownership does not match logical roots.');
+	}
+	for (const id of state.rootChildren) {
+		const node = state.records.get(id)?.node;
+		if (node === null || node === undefined || !state.ownedPageRoots.has(node)) {
+			throw hostError(`first-tree root ${id} is missing from page-root ownership.`);
+		}
+	}
+	const snapshot: LynxFirstTreeSnapshot = Object.freeze({
+		format: 1,
+		renderer: LYNX_RENDERER_ID,
+		root: container.root,
+		version: state.acceptedVersion,
+		plan: options.plan ?? null,
+		roots: Object.freeze([...state.rootChildren]),
+		nodes: Object.freeze(nodes),
+	});
+	const firstTree = createLynxFirstTree<Node>(snapshot, container, eventsByToken);
+	state.firstTree = firstTree;
+	return firstTree;
+}
+
+function compareFirstTree<Node extends LynxElementRef>(
+	target: LynxHostContainer<Node>,
+	batch: UniversalHostBatch,
+	firstTree: LynxFirstTree<Node>,
+	source: LynxHostContainer<Node>,
+	finalIds: ReadonlySet<number>,
+	finalRoots: readonly number[],
+	getRecord: (id: number) => LynxHostRecord<Node> | undefined,
+	operations: readonly LynxApplyOperation<Node>[],
+	listUpdates: readonly LynxPreparedListUpdate[],
+): LynxFirstTreeMismatchError | null {
+	const snapshot = firstTree.snapshot;
+	const targetState = target[LYNX_HOST_STATE];
+	const sourceState = source[LYNX_HOST_STATE];
+	if (snapshot.format !== 1 || snapshot.renderer !== LYNX_RENDERER_ID) {
+		return mismatch(
+			firstTree,
+			'snapshot.format',
+			'the snapshot format or renderer is unsupported.',
+		);
+	}
+	if (snapshot.root !== target.root || source.root !== target.root) {
+		return mismatch(firstTree, 'snapshot.root', 'the captured and background root IDs differ.');
+	}
+	if (source.page !== target.page) {
+		return mismatch(
+			firstTree,
+			'snapshot.page',
+			'the captured and background page references differ.',
+		);
+	}
+	let sourceHasMainThreadEvents = false;
+	for (const events of sourceState.nativeEvents.values()) {
+		if ([...events.values()].some((registration) => registration.source === 'main-thread')) {
+			sourceHasMainThreadEvents = true;
+			break;
+		}
+	}
+	if (
+		(sourceHasMainThreadEvents || sourceState.mainThreadRefs.size !== 0) &&
+		sourceState.worklets !== targetState.worklets
+	) {
+		return mismatch(
+			firstTree,
+			'snapshot.worklets',
+			'the captured and background roots use different main-thread worklet registries.',
+		);
+	}
+	if (snapshot.version !== batch.version || sourceState.acceptedVersion !== snapshot.version) {
+		return mismatch(
+			firstTree,
+			'snapshot.version',
+			'the captured and background batch versions differ.',
+		);
+	}
+	if (
+		sourceState.disposed ||
+		sourceState.disposing ||
+		sourceState.faulted ||
+		sourceState.applying
+	) {
+		return mismatch(firstTree, 'snapshot.owner', 'the captured host owner is not stable.');
+	}
+	if (sourceState.lists.size !== 0 || listUpdates.length !== 0) {
+		return mismatch(firstTree, 'snapshot.nodes', 'native list materializations require repair.');
+	}
+	for (let index = 0; index < operations.length; index++) {
+		const operation = operations[index]!;
+		if (
+			operation.op !== 'create' &&
+			operation.op !== 'insert' &&
+			operation.op !== 'event' &&
+			operation.op !== 'visibility'
+		) {
+			return mismatch(
+				firstTree,
+				`batch.operations[${index}]`,
+				`initial adoption cannot replay a ${operation.op} operation.`,
+			);
+		}
+	}
+	if (snapshot.nodes.length !== finalIds.size || sourceState.records.size !== finalIds.size) {
+		return mismatch(firstTree, 'snapshot.nodes', 'the host counts differ.');
+	}
+	if (!sameIds(snapshot.roots, finalRoots)) {
+		return mismatch(firstTree, 'snapshot.roots', 'the root child order differs.');
+	}
+	const snapshotsById = new Map(snapshot.nodes.map((node) => [node.id, node]));
+	for (const id of [...finalIds].sort((first, second) => first - second)) {
+		const captured = snapshotsById.get(id);
+		const next = getRecord(id);
+		const sourceRecord = sourceState.records.get(id);
+		if (captured === undefined || next === undefined || sourceRecord === undefined) {
+			return mismatch(firstTree, `snapshot.nodes[${id}]`, 'the logical host identity differs.');
+		}
+		if (captured.type !== next.type || sourceRecord.type !== captured.type) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].type`, 'the host type differs.');
+		}
+		if (
+			captured.generation !== next.handle.generation ||
+			sourceRecord.handle.generation !== captured.generation
+		) {
+			return mismatch(
+				firstTree,
+				`snapshot.nodes[${id}].generation`,
+				'the host generation differs.',
+			);
+		}
+		if (captured.parent !== next.parent || sourceRecord.parent !== captured.parent) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].parent`, 'the host parent differs.');
+		}
+		if (
+			!sameIds(captured.children, next.children) ||
+			!sameIds(captured.children, sourceRecord.children)
+		) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].children`, 'the child order differs.');
+		}
+		if (captured.visible !== next.visible || sourceRecord.visible !== captured.visible) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].visible`, 'the visibility state differs.');
+		}
+		if (
+			!sameAdoptableSnapshotValue(captured.props, next.props) ||
+			!sameSnapshotValue(captured.props, sourceRecord.props)
+		) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].props`, 'the host props differ.');
+		}
+		if (
+			sourceRecord.node === null ||
+			sourceState.papi.getUniqueId(sourceRecord.node) !== captured.nativeId
+		) {
+			return mismatch(
+				firstTree,
+				`snapshot.nodes[${id}].nativeId`,
+				'the physical node identity changed.',
+			);
+		}
+		const physicalParent =
+			captured.parent === null ? source.page : sourceState.records.get(captured.parent)?.node;
+		if (physicalParent == null || !sourceState.papi.isChild(physicalParent, sourceRecord.node)) {
+			return mismatch(firstTree, `snapshot.nodes[${id}].parent`, 'the physical parent changed.');
+		}
+		const nextEvents = [...next.events].sort(([first], [second]) =>
+			first < second ? -1 : first > second ? 1 : 0,
+		);
+		const sourceEvents = [...sourceRecord.events].sort(([first], [second]) =>
+			first < second ? -1 : first > second ? 1 : 0,
+		);
+		if (
+			captured.events.length !== nextEvents.length ||
+			captured.events.length !== sourceEvents.length
+		) {
+			return mismatch(
+				firstTree,
+				`snapshot.nodes[${id}].events`,
+				'the event binding count differs.',
+			);
+		}
+		for (let index = 0; index < captured.events.length; index++) {
+			const event = captured.events[index]!;
+			const nextEntry = nextEvents[index]!;
+			const sourceEntry = sourceEvents[index]!;
+			if (
+				event.host !== id ||
+				event.generation !== captured.generation ||
+				event.type !== nextEntry[0] ||
+				event.type !== sourceEntry[0] ||
+				event.priority !== nextEntry[1].priority ||
+				event.listener !== sourceEntry[1].id ||
+				event.priority !== sourceEntry[1].priority
+			) {
+				return mismatch(
+					firstTree,
+					`snapshot.nodes[${id}].events[${index}]`,
+					'the event binding differs.',
+				);
+			}
+		}
+	}
+	return null;
+}
+
+function transferFirstTree<Node extends LynxElementRef>(
+	target: LynxHostContainer<Node>,
+	firstTree: LynxFirstTree<Node>,
+	source: LynxHostContainer<Node>,
+	activeNodes: Map<number, Node>,
+): void {
+	const targetState = target[LYNX_HOST_STATE];
+	const sourceState = source[LYNX_HOST_STATE];
+	for (const [id, targetRecord] of targetState.records) {
+		const sourceRecord = sourceState.records.get(id);
+		if (sourceRecord?.node === null || sourceRecord?.node === undefined) {
+			throw hostError(`captured first-tree host ${id} lost its physical node.`);
+		}
+		const node = sourceRecord.node;
+		targetRecord.node = node;
+		activeNodes.set(id, node);
+		targetState.ownedNodes.add(node);
+		if (targetRecord.parent === null) targetState.ownedPageRoots.add(node);
+		const nativeEvents = sourceState.nativeEvents.get(node);
+		if (nativeEvents !== undefined) targetState.nativeEvents.set(node, nativeEvents);
+		const mainThreadRef = sourceState.mainThreadRefs.get(node);
+		if (mainThreadRef !== undefined) {
+			targetState.mainThreadRefs.set(node, mainThreadRef);
+			targetState.mainThreadRefOwners.set(mainThreadRef._wvid, node);
+		}
+	}
+
+	// From this point the background journal is the only disposal authority.
+	// Carry every native placeholder registration into that journal before the
+	// background tokens below replace them. If selector/event installation faults
+	// partway through adoption, terminal cleanup must still clear registrations on
+	// nodes the replacement loop did not reach.
+	sourceState.ownedNodes.clear();
+	sourceState.ownedPageRoots.clear();
+	sourceState.nativeEvents.clear();
+	sourceState.mainThreadRefs.clear();
+	sourceState.mainThreadRefOwners.clear();
+	sourceState.records.clear();
+	sourceState.rootChildren.length = 0;
+	sourceState.generations.clear();
+	sourceState.firstTree = null;
+	sourceState.cleanupNeedsFlush = false;
+	sourceState.disposing = false;
+	sourceState.disposed = true;
+	const journal = firstTree[LYNX_FIRST_TREE_STATE];
+	journal.owner = null;
+	journal.status = 'transferred';
+}
+
 export function prepareLynxHostBatch<Node extends LynxElementRef>(
 	container: LynxHostContainer<Node>,
 	batch: UniversalHostBatch,
+	options?: PrepareLynxHostBatchOptions<Node>,
 ): LynxPreparedHostBatch {
 	const state = container[LYNX_HOST_STATE];
 	if (state.disposed) throw hostError('cannot prepare a batch for a disposed root.');
 	if (state.disposing) throw hostError('cannot prepare a batch while root cleanup is pending.');
+	if (state.firstTree !== null) {
+		throw hostError('a captured first-tree root cannot accept another batch.');
+	}
 	if (container.renderer !== LYNX_RENDERER_ID || batch.renderer !== LYNX_RENDERER_ID) {
 		throw hostError(
 			`renderer mismatch: expected ${JSON.stringify(LYNX_RENDERER_ID)}, received ${JSON.stringify(batch.renderer)}.`,
@@ -1286,6 +2189,30 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		);
 	}
 	if (!Array.isArray(batch.commands)) throw hostError('batch.commands must be an array.');
+	if (options?.onMismatch !== undefined && typeof options.onMismatch !== 'function') {
+		throw hostError('onMismatch must be a function when provided.');
+	}
+	const firstTree = options?.firstTree;
+	let firstTreeSource: LynxHostContainer<Node> | null = null;
+	if (firstTree !== undefined) {
+		if (
+			state.acceptedVersion !== 0 ||
+			state.records.size !== 0 ||
+			state.generations.size !== 0 ||
+			state.ownedNodes.size !== 0 ||
+			state.ownedPageRoots.size !== 0 ||
+			state.nativeEvents.size !== 0 ||
+			state.mainThreadRefs.size !== 0 ||
+			state.mainThreadRefOwners.size !== 0 ||
+			state.lists.size !== 0
+		) {
+			throw hostError('firstTree may only be prepared against an empty background root.');
+		}
+		firstTreeSource = firstTreeOwner(firstTree);
+		if (firstTreeSource === container) {
+			throw hostError('firstTree must be adopted by a different Lynx host container.');
+		}
+	}
 	const logicalTeardown = state.faulted;
 	if (
 		logicalTeardown &&
@@ -1498,6 +2425,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 				}
 			}
 			assertNoCycle(getRecord, command.id, command.parent);
+			const wasConnected = isRootConnected(getRecord, command.id);
 			const previousParent = record.parent;
 			if (previousParent !== undefined) {
 				const previousChildren = childrenForWrite(previousParent);
@@ -1517,12 +2445,15 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			}
 			children.splice(beforeIndex, 0, command.id);
 			record.parent = command.parent;
+			const willBeConnected = isRootConnected(getRecord, command.id);
 			operations.push({
 				op: command.op,
 				id: command.id,
 				parent: command.parent,
 				before: command.before,
 				previousParent,
+				wasConnected,
+				willBeConnected,
 			});
 		} else if (command.op === 'remove') {
 			assertSafeId(command.id, `command ${index} remove.id`);
@@ -1638,11 +2569,24 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		if (!deletedRecords.has(id)) finalIds.add(id);
 	}
 	const listIds = new Set<number>();
+	const finalMainThreadRefOwners = new Map<string, number>();
 	for (const [id, record] of state.records) {
 		if (record.type === 'list') listIds.add(id);
 	}
 	for (const id of finalIds) {
 		const record = getRecord(id)!;
+		assertNoMainThreadEventCollision(record.props, record.events);
+		const mainThreadRef = record.props['main-thread:ref'] as
+			LynxMainThreadRefDescriptor | null | undefined;
+		if (mainThreadRef != null && record.visible && isRootConnected(getRecord, id)) {
+			const previousOwner = finalMainThreadRefOwners.get(mainThreadRef._wvid);
+			if (previousOwner !== undefined && previousOwner !== id) {
+				throw hostError(
+					`main-thread ref ${JSON.stringify(mainThreadRef._wvid)} is assigned to hosts ${previousOwner} and ${id}.`,
+				);
+			}
+			finalMainThreadRefOwners.set(mainThreadRef._wvid, id);
+		}
 		if (record.type === 'list') listIds.add(id);
 		if (record.type === 'list' && directListItem(getRecord, id) !== null) {
 			throw hostError('nested <list> hosts are not supported by the initial recycling contract.');
@@ -1684,6 +2628,23 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 		}
 	}
 	Object.freeze(handleDelta);
+	let firstTreeAction: LynxPreparedHostBatch['firstTreeAction'] = 'none';
+	let firstTreeMismatch: LynxFirstTreeMismatchError | null = null;
+	if (firstTree !== undefined && firstTreeSource !== null) {
+		firstTreeMismatch = compareFirstTree(
+			container,
+			batch,
+			firstTree,
+			firstTreeSource,
+			finalIds,
+			childrenForRead(null),
+			getRecord,
+			operations,
+			listUpdates,
+		);
+		firstTreeAction = firstTreeMismatch === null ? 'adopt' : 'repair';
+		if (firstTreeMismatch !== null) options?.onMismatch?.(firstTreeMismatch);
+	}
 	let status: 'prepared' | 'applying' | 'applied' | 'aborted' | 'faulted' = 'prepared';
 	let mutationStarted = false;
 	let fault: unknown;
@@ -1693,6 +2654,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			return mutationStarted;
 		},
 		handleDelta,
+		firstTreeAction,
 		apply() {
 			if (status === 'aborted' || status === 'applied') return;
 			if (status === 'faulted') throw fault;
@@ -1700,15 +2662,35 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 			if (state.disposed || state.disposing) {
 				throw hostError('cannot apply a batch while root cleanup is pending.');
 			}
+			if (state.firstTree !== null) {
+				throw hostError('a captured first-tree root cannot apply a prepared batch.');
+			}
 			if (state.acceptedVersion !== baseVersion) {
 				throw hostError(
 					`prepared batch ${batch.version} was superseded by version ${state.acceptedVersion}.`,
 				);
 			}
+			if (
+				firstTree !== undefined &&
+				(firstTreeSource === null || firstTreeOwner(firstTree) !== firstTreeSource)
+			) {
+				throw hostError('firstTree ownership changed after preparation.');
+			}
 			status = 'applying';
 			state.applying = true;
 			try {
 				mutationStarted = true;
+				if (firstTreeAction === 'repair') {
+					const cleanup = disposeLynxFirstTree(firstTree!);
+					if (!cleanup.complete) {
+						const error =
+							cleanup.errors[0] ?? hostError('first-tree repair cleanup did not complete.');
+						state.faulted = true;
+						status = 'faulted';
+						fault = error;
+						throw error;
+					}
+				}
 				const retiredPhysicalIds = new Set<number>();
 				let preApplicationFailed = false;
 				let preApplicationError: unknown;
@@ -1764,7 +2746,28 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 					let applicationError: unknown = preApplicationError;
 					try {
 						if (applicationFailed) throw applicationError;
-						for (const operation of operations) {
+						if (firstTreeAction === 'adopt') {
+							transferFirstTree(container, firstTree!, firstTreeSource!, activeNodes);
+							for (const [id, record] of state.records) {
+								const node = nodeFor(activeNodes, id, 'first-tree adoption');
+								installNodesRefSelector(state.papi, node, record.handle);
+								if (record.visible) {
+									installNativeEvents(
+										state,
+										node,
+										container.root,
+										id,
+										record.handle.generation,
+										record.events,
+									);
+									if (isAcceptedHostConnected(state, id)) {
+										installMainThreadProps(state, node, record.type, record.props);
+									}
+								}
+							}
+						}
+						const applicationOperations = firstTreeAction === 'adopt' ? [] : operations;
+						for (const operation of applicationOperations) {
 							if (retiredPhysicalIds.has(operation.id)) continue;
 							if (operation.op === 'create') {
 								const membership = directListItem((id) => state.records.get(id), operation.id);
@@ -1787,7 +2790,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								operation.record.node = node;
 								installNodesRefSelector(state.papi, node, operation.handle);
 								applyProps(
-									state.papi,
+									state,
 									node,
 									operation.type,
 									{},
@@ -1795,11 +2798,12 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 									operation.patch,
 									true,
 									operation.visible,
+									operation.visible && isAcceptedHostConnected(state, operation.id),
 								);
 							} else if (operation.op === 'update') {
 								if (!activeNodes.has(operation.id)) continue;
 								applyProps(
-									state.papi,
+									state,
 									nodeFor(activeNodes, operation.id, 'update'),
 									operation.type,
 									operation.previous,
@@ -1807,10 +2811,13 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 									operation.patch,
 									false,
 									operation.visible,
+									operation.visible && isAcceptedHostConnected(state, operation.id),
 								);
 							} else if (operation.op === 'recreate') {
 								if (!activeNodes.has(operation.id)) continue;
 								const previous = nodeFor(activeNodes, operation.id, 'recreate');
+								removeAllNativeEvents(state, previous);
+								removeMainThreadRef(state, previous);
 								if (operation.type === 'list') disposeNativeListState(state, operation.id);
 								const replacement =
 									operation.type === 'list'
@@ -1825,7 +2832,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								operation.record.node = replacement;
 								installNodesRefSelector(state.papi, replacement, operation.handle);
 								applyProps(
-									state.papi,
+									state,
 									replacement,
 									operation.type,
 									{},
@@ -1833,6 +2840,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 									operation.patch,
 									true,
 									operation.visible,
+									operation.visible && isAcceptedHostConnected(state, operation.id),
 								);
 								if (!operation.visible) state.papi.setAttribute(replacement, 'hidden', true);
 								if (operation.visible) {
@@ -1857,7 +2865,6 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 									state.papi.replace(replacement, previous);
 									if (operation.parent === null) state.ownedPageRoots.delete(previous);
 								}
-								removeAllNativeEvents(state, previous);
 								state.ownedNodes.delete(previous);
 							} else if (operation.op === 'insert' || operation.op === 'move') {
 								const parentRecord =
@@ -1876,7 +2883,13 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 										? null
 										: nodeFor(activeNodes, operation.before, `${operation.op} before`);
 								if (operation.parent === null) state.ownedPageRoots.add(node);
+								if (operation.wasConnected && !operation.willBeConnected) {
+									deactivateMainThreadSubtree(state, operation.id);
+								}
 								state.papi.insertBefore(parent, node, before);
+								if (!operation.wasConnected && operation.willBeConnected) {
+									activateMainThreadSubtree(state, operation.id);
+								}
 								if (operation.previousParent === null && operation.parent !== null) {
 									state.ownedPageRoots.delete(node);
 								}
@@ -1891,18 +2904,30 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 									operation.parent === null
 										? container.page
 										: nodeFor(activeNodes, operation.parent, 'remove parent');
+								deactivateMainThreadSubtree(state, operation.id);
 								state.papi.remove(parent, node);
 								if (operation.parent === null) state.ownedPageRoots.delete(node);
 							} else if (operation.op === 'visibility') {
 								if (!activeNodes.has(operation.id)) continue;
 								const node = nodeFor(activeNodes, operation.id, 'visibility');
-								if (operation.state === 'hidden') removeAllNativeEvents(state, node);
+								if (operation.state === 'hidden') {
+									removeAllNativeEvents(state, node);
+									removeMainThreadRef(state, node);
+								}
 								state.papi.setAttribute(
 									node,
 									'hidden',
 									operation.state === 'hidden' ? true : operation.authoredHidden,
 								);
 								if (operation.state === 'visible') {
+									if (isAcceptedHostConnected(state, operation.id)) {
+										installMainThreadProps(
+											state,
+											node,
+											state.records.get(operation.id)!.type,
+											state.records.get(operation.id)!.props,
+										);
+									}
 									installNativeEvents(
 										state,
 										node,
@@ -1933,6 +2958,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 								if (node !== undefined) {
 									if (state.lists.has(operation.id)) disposeNativeListState(state, operation.id);
 									removeAllNativeEvents(state, node);
+									removeMainThreadRef(state, node);
 									state.ownedNodes.delete(node);
 								}
 								activeNodes.delete(operation.id);
@@ -1964,6 +2990,7 @@ export function prepareLynxHostBatch<Node extends LynxElementRef>(
 					status = 'applied';
 				} catch (error) {
 					state.faulted = true;
+					invalidateMainThreadLifetimesAfterFault(state);
 					status = 'faulted';
 					fault = error;
 					throw error;
@@ -2090,7 +3117,14 @@ export function resolveLynxHostNativeEvent<Node extends LynxElementRef>(
 	const physical = state.nativeEvents.get(record.node);
 	if (physical === undefined || typeof token !== 'string') return null;
 	for (const [type, descriptor] of record.events) {
-		if (descriptor.id !== identity.listener || physical.get(type)?.token !== token) continue;
+		const registration = physical.get(type);
+		if (
+			descriptor.id !== identity.listener ||
+			registration?.source !== 'background' ||
+			registration.listener !== token
+		) {
+			continue;
+		}
 		return Object.freeze({ listener: descriptor.id, priority: descriptor.priority });
 	}
 	return null;
@@ -2098,6 +3132,66 @@ export function resolveLynxHostNativeEvent<Node extends LynxElementRef>(
 
 function normalizeCleanupError(error: unknown): Error {
 	return error instanceof Error ? error : new Error(String(error));
+}
+
+function indexPhysicalNodes<Node extends LynxElementRef>(
+	papi: LynxElementPAPI<Node>,
+	nodes: ReadonlySet<Node>,
+): ReadonlyMap<number, Node> {
+	const byNativeId = new Map<number, Node>();
+	for (const node of nodes) {
+		const nativeId = papi.getUniqueId(node);
+		if (!Number.isSafeInteger(nativeId)) {
+			throw hostError('cleanup native ID must be a safe integer.');
+		}
+		const previous = byNativeId.get(nativeId);
+		if (previous !== undefined && previous !== node && !papi.isEqual(previous, node)) {
+			throw hostError(`cleanup native ID ${nativeId} is not unique.`);
+		}
+		if (previous === undefined) byNativeId.set(nativeId, node);
+	}
+	return byNativeId;
+}
+
+function containsPhysicalNode<Node extends LynxElementRef>(
+	papi: LynxElementPAPI<Node>,
+	byNativeId: ReadonlyMap<number, Node>,
+	candidate: Node,
+): boolean {
+	const nativeId = papi.getUniqueId(candidate);
+	if (!Number.isSafeInteger(nativeId)) {
+		throw hostError('cleanup parent native ID must be a safe integer.');
+	}
+	const owned = byNativeId.get(nativeId);
+	if (owned === undefined) return false;
+	// Native parent lookup may return a different opaque wrapper for the same
+	// element. The unique native-ID index keeps this equality fallback O(1)
+	// instead of rescanning the complete owned tree.
+	return owned === candidate || papi.isEqual(owned, candidate);
+}
+
+function completedFirstTreeCleanup(): LynxHostCleanupResult {
+	return Object.freeze({
+		complete: true,
+		removedRoots: 0,
+		remainingRoots: 0,
+		flushed: false,
+		errors: Object.freeze([]),
+	});
+}
+
+/** Dispose a captured tree unless its physical nodes were already transferred. */
+export function disposeLynxFirstTree<Node extends LynxElementRef>(
+	firstTree: LynxFirstTree<Node>,
+): LynxHostCleanupResult {
+	if (firstTree === null || typeof firstTree !== 'object') {
+		throw hostError('firstTree must be a captured Lynx first tree.');
+	}
+	const journal = firstTree[LYNX_FIRST_TREE_STATE];
+	if (journal === undefined) throw hostError('firstTree has no Lynx ownership journal.');
+	if (journal.status !== 'available') return completedFirstTreeCleanup();
+	const owner = firstTreeOwner(firstTree);
+	return disposeLynxHostContainer(owner);
 }
 
 /**
@@ -2119,12 +3213,29 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 		});
 	}
 	state.disposing = true;
-	const roots = [...state.ownedPageRoots];
 	const errors: Error[] = [];
+	// Snapshot every physical reference before list teardown releases its ordinary
+	// journals. Failed external-edge removal re-adds that node to ownedNodes so a
+	// later dispose attempt can retry it.
+	const cleanupNodes = new Set(state.ownedNodes);
+	for (const node of state.ownedPageRoots) cleanupNodes.add(node);
+	let cleanupNodeIndex: ReadonlyMap<number, Node> | null = null;
+	try {
+		cleanupNodeIndex = indexPhysicalNodes(state.papi, cleanupNodes);
+	} catch (error) {
+		errors.push(normalizeCleanupError(error));
+	}
 	for (const listId of [...state.lists.keys()]) {
 		try {
 			disposeNativeListState(state, listId);
 			state.cleanupNeedsFlush = true;
+		} catch (error) {
+			errors.push(normalizeCleanupError(error));
+		}
+	}
+	for (const node of [...state.mainThreadRefs.keys()]) {
+		try {
+			removeMainThreadRef(state, node);
 		} catch (error) {
 			errors.push(normalizeCleanupError(error));
 		}
@@ -2140,35 +3251,76 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 		}
 	}
 	let removedRoots = 0;
-	for (const node of roots) {
-		let attached: boolean;
-		try {
-			attached = state.papi.isChild(container.page, node);
-		} catch (error) {
-			errors.push(normalizeCleanupError(error));
-			continue;
-		}
-		if (attached) {
-			try {
-				state.papi.remove(container.page, node);
-			} catch (error) {
-				try {
-					// Native removal may detach and then throw. Forget ownership only
-					// when public parent inspection proves the mutation completed.
-					if (state.papi.isChild(container.page, node)) {
-						errors.push(normalizeCleanupError(error));
-						continue;
-					}
-				} catch (inspectionError) {
-					errors.push(normalizeCleanupError(error));
-					errors.push(normalizeCleanupError(inspectionError));
-					continue;
-				}
-			}
-		}
-		state.ownedPageRoots.delete(node);
+	let unresolvedExternalRoots = 0;
+	const releaseRootOwnership = (node: Node): void => {
+		if (!state.ownedPageRoots.delete(node)) return;
 		state.cleanupNeedsFlush = true;
 		removedRoots += 1;
+	};
+	const retainUnresolvedOwnership = (node: Node): void => {
+		state.ownedNodes.add(node);
+		// Logical page roots already remain counted in ownedPageRoots. A child
+		// reparented beneath a non-owned native node is itself another physical
+		// cleanup root until that external edge can be removed.
+		if (!state.ownedPageRoots.has(node)) unresolvedExternalRoots += 1;
+	};
+	for (const node of cleanupNodes) {
+		let parent: Node | null;
+		try {
+			parent = state.papi.getParent(node);
+		} catch (error) {
+			errors.push(normalizeCleanupError(error));
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		if (parent === null) {
+			releaseRootOwnership(node);
+			continue;
+		}
+		if (cleanupNodeIndex === null) {
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		let parentIsOwned: boolean;
+		try {
+			parentIsOwned = containsPhysicalNode(state.papi, cleanupNodeIndex, parent);
+		} catch (error) {
+			errors.push(normalizeCleanupError(error));
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		if (parentIsOwned) {
+			// Nested ownership is released by removing the one external edge above
+			// this subtree. Do not turn normal cleanup into one native removal per host.
+			releaseRootOwnership(node);
+			continue;
+		}
+
+		let externalEdgeRemoved = false;
+		try {
+			state.papi.remove(parent, node);
+			externalEdgeRemoved = true;
+		} catch (error) {
+			try {
+				// Native removal may detach and then throw. It is also safe if the node
+				// ended up beneath another owned node: the remaining owned boundary edge
+				// will release that complete subtree.
+				const currentParent = state.papi.getParent(node);
+				externalEdgeRemoved =
+					currentParent === null ||
+					containsPhysicalNode(state.papi, cleanupNodeIndex, currentParent);
+				if (!externalEdgeRemoved) errors.push(normalizeCleanupError(error));
+			} catch (inspectionError) {
+				errors.push(normalizeCleanupError(error));
+				errors.push(normalizeCleanupError(inspectionError));
+			}
+		}
+		if (!externalEdgeRemoved) {
+			retainUnresolvedOwnership(node);
+			continue;
+		}
+		state.cleanupNeedsFlush = true;
+		releaseRootOwnership(node);
 	}
 	let flushed = false;
 	if (state.cleanupNeedsFlush) {
@@ -2180,25 +3332,37 @@ export function disposeLynxHostContainer<Node extends LynxElementRef>(
 			errors.push(normalizeCleanupError(error));
 		}
 	}
+	const remainingRoots = state.ownedPageRoots.size + unresolvedExternalRoots;
 	const complete =
-		state.ownedPageRoots.size === 0 &&
+		remainingRoots === 0 &&
 		state.nativeEvents.size === 0 &&
+		state.mainThreadRefs.size === 0 &&
+		state.mainThreadRefOwners.size === 0 &&
 		state.lists.size === 0 &&
 		!state.cleanupNeedsFlush;
 	if (complete) {
+		const firstTree = state.firstTree;
 		state.ownedNodes.clear();
 		state.nativeEvents.clear();
+		state.mainThreadRefs.clear();
+		state.mainThreadRefOwners.clear();
 		state.lists.clear();
 		state.records.clear();
 		state.rootChildren.length = 0;
 		state.generations.clear();
+		state.firstTree = null;
 		state.disposing = false;
 		state.disposed = true;
+		if (firstTree !== null) {
+			const journal = firstTree[LYNX_FIRST_TREE_STATE];
+			journal.owner = null;
+			journal.status = 'disposed';
+		}
 	}
 	return Object.freeze({
 		complete,
 		removedRoots,
-		remainingRoots: state.ownedPageRoots.size,
+		remainingRoots,
 		flushed,
 		errors: Object.freeze(errors),
 	});

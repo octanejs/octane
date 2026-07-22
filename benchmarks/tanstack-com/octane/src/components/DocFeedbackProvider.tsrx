@@ -579,13 +579,11 @@ function CreatingFeedbackNote({
 			};
 
 			// Optimistically add the note to all matching queries
-			queryClient.setQueriesData<
-				{
-					userFeedback: DocFeedback[];
-					detachedFeedback: any[];
-					isModerator: boolean;
-				}
-			>({ queryKey: ['docFeedback'] }, (old) => {
+			queryClient.setQueriesData<{
+				userFeedback: DocFeedback[];
+				detachedFeedback: any[];
+				isModerator: boolean;
+			}>({ queryKey: ['docFeedback'] }, (old) => {
 				if (!old) return old;
 				return {
 					...old,

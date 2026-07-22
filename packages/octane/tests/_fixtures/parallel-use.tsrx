@@ -17,9 +17,7 @@ import {
 export function ChainLevel(props) @{
 	const data = use(props.fetch(props.level, props.version));
 	<div class="lvl">
-		<span class="val">
-			{data as string}
-		</span>
+		<span class="val">{data as string}</span>
 		@if (props.level < props.max - 1) {
 			<ChainLevel
 				level={props.level + 1}
@@ -48,9 +46,7 @@ export function DependentChain(props) @{
 		@try {
 			const a = use(props.fetchA());
 			const b = use(props.fetchB(a));
-			<div class="dep">
-				{a + '/' + b as string}
-			</div>
+			<div class="dep">{a + '/' + b as string}</div>
 		} @pending {
 			<div class="fallback">{'dep-loading'}</div>
 		}
@@ -64,9 +60,7 @@ export function BatchCatch(props) @{
 		@try {
 			const a = use(props.a);
 			const b = use(props.b);
-			<div class="ok">
-				{a + '/' + b as string}
-			</div>
+			<div class="ok">{a + '/' + b as string}</div>
 		} @pending {
 			<div class="fallback">{'w'}</div>
 		} @catch (err) {
@@ -138,9 +132,7 @@ export function ConditionalDirectUseWarmHost({
 // compiler must NOT prefetch it — its fetch correctly starts on resume.
 export function GatedLeaf(props) @{
 	const v = use(props.fetch(props.id));
-	<span class="leaf">
-		{v as string}
-	</span>
+	<span class="leaf">{v as string}</span>
 }
 
 export function GatedHost(props) @{
@@ -159,12 +151,8 @@ export function ImportedHookHost(props) @{
 		@try {
 			const pair = useImportedPair(props.load, props.version);
 			<div class="imported-pair">
-				<span class="project">
-					{pair.project as string}
-				</span>
-				<span class="viewer">
-					{pair.viewer as string}
-				</span>
+				<span class="project">{pair.project as string}</span>
+				<span class="viewer">{pair.viewer as string}</span>
 			</div>
 		} @pending {
 			<div class="fallback">{'pair-loading'}</div>
@@ -177,9 +165,9 @@ export function ImportedHookTwiceHost(props) @{
 		@try {
 			const left = useImportedPair(props.load, props.version);
 			const right = useImportedPair(props.load, props.version);
-			<div class="imported-pair-twice">
-				{left.project + '|' + left.viewer + '|' + right.project + '|' + right.viewer as string}
-			</div>
+			<div class="imported-pair-twice">{left.project + '|' + left.viewer + '|' + right.project +
+				'|' +
+				right.viewer as string}</div>
 		} @pending {
 			<div class="fallback">{'pairs-loading'}</div>
 		}
@@ -190,9 +178,7 @@ export function ImportedDependentHookHost(props) @{
 	<>
 		@try {
 			const result = useImportedDependent(props.loadProject, props.loadOwner);
-			<div class="imported-dependent">
-				{result.project.ownerId + '/' + result.owner as string}
-			</div>
+			<div class="imported-dependent">{result.project.ownerId + '/' + result.owner as string}</div>
 		} @pending {
 			<div class="fallback">{'dependent-loading'}</div>
 		}
@@ -203,9 +189,7 @@ export function ImportedCapturedHookHost(props) @{
 	<>
 		@try {
 			const captured = useImportedCaptured(props.load, props.version);
-			<div class="imported-captured">
-				{captured as string}
-			</div>
+			<div class="imported-captured">{captured as string}</div>
 		} @pending {
 			<div class="fallback">{'captured-loading'}</div>
 		}
@@ -214,16 +198,12 @@ export function ImportedCapturedHookHost(props) @{
 
 function AlternatePanel(props) @{
 	const value = use(props.load('alternate', props.version));
-	<span class="alternate-panel">
-		{value as string}
-	</span>
+	<span class="alternate-panel">{value as string}</span>
 }
 
 function FinalPanel(props) @{
 	const value = use(props.load('final', props.version));
-	<span class="final-panel">
-		{value as string}
-	</span>
+	<span class="final-panel">{value as string}</span>
 }
 
 function EarlyReturnPanels(props) @{
@@ -243,34 +223,26 @@ export function EarlyReturnPanelsHost(props) @{
 
 function ActivitySummary(props) @{
 	const summary = use(props.load('activity-summary', props.version));
-	<span class="activity-summary">
-		{summary as string}
-	</span>
+	<span class="activity-summary">{summary as string}</span>
 }
 
 function ActivityPanel(props) @{
 	const activity = use(props.load('activity', props.version));
 	<section class="activity">
-		<span class="activity-value">
-			{activity as string}
-		</span>
+		<span class="activity-value">{activity as string}</span>
 		<ActivitySummary load={props.load} version={props.version} />
 	</section>
 }
 
 function InsightsChart(props) @{
 	const chart = use(props.load('insights-chart', props.version));
-	<span class="insights-chart">
-		{chart as string}
-	</span>
+	<span class="insights-chart">{chart as string}</span>
 }
 
 function InsightsPanel(props) @{
 	const insights = use(props.load('insights', props.version));
 	<section class="insights">
-		<span class="insights-value">
-			{insights as string}
-		</span>
+		<span class="insights-value">{insights as string}</span>
 		<InsightsChart load={props.load} version={props.version} />
 	</section>
 }
@@ -286,9 +258,7 @@ function AdjacentPanels(props) @{
 
 function VersionedPanel(props) @{
 	const value = use(props.load(props.resource, props.version));
-	<span class={props.resource}>
-		{value as string}
-	</span>
+	<span class={props.resource}>{value as string}</span>
 }
 
 function VersionedSiblings(props) @{
@@ -314,9 +284,7 @@ export function VersionedSiblingsHost(props) @{
 
 function RepeatedPanel(props) @{
 	const value = use(props.load('repeated', props.version));
-	<span class="repeated-panel">
-		{value as string}
-	</span>
+	<span class="repeated-panel">{value as string}</span>
 }
 
 function RepeatedPanels(props) @{
@@ -428,4 +396,21 @@ export function AdjacentPanelsHost(props) @{
 			<div class="fallback">{'panels-loading'}</div>
 		}
 	</>
+}
+
+// A directive nested in a first-class JSX value is lowered after the owning
+// component's ordinary render-tree walk. Its async creations must still receive
+// Pass A before the synthetic branch helper runs Pass B.
+export function SetupValueParallelHost(props) @{
+	const slot = <section class="setup-value-slot">
+		@try {
+			const a = use(props.load('a'));
+			const b = use(props.load('b'));
+			<p class="setup-value-result">{a + '|' + b as string}</p>
+		} @pending {
+			<i class="setup-value-fallback">loading</i>
+		}
+	</section>;
+
+	<main>{slot}</main>
 }

@@ -3,9 +3,7 @@ import type { Editor } from '@tiptap/core';
 import type { ContentComponent } from './Editor';
 
 export type EditorContentRef<T> =
-	| { current: T | null }
-	| ((value: T | null) => void | (() => void))
-	| null;
+	{ current: T | null } | ((value: T | null) => void | (() => void)) | null;
 
 /**
  * Props accepted by the Octane editor host. Unknown host attributes are passed

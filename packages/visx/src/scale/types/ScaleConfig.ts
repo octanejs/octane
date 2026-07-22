@@ -157,13 +157,7 @@ export type TimeScaleType = 'time' | 'utc';
 
 /** Scales that take continuous domains and return continuous ranges */
 export type ContinuousScaleType =
-	| 'linear'
-	| 'log'
-	| 'pow'
-	| 'sqrt'
-	| 'symlog'
-	| 'radial'
-	| TimeScaleType;
+	'linear' | 'log' | 'pow' | 'sqrt' | 'symlog' | 'radial' | TimeScaleType;
 /** Scales that convert continuous domains to discrete ranges */
 export type DiscretizingScaleType = 'quantile' | 'quantize' | 'threshold';
 /** Scales that take discrete domains and return discrete ranges */

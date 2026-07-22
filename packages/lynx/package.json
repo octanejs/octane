@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 5 source/build implementation of Octane's Lynx native renderer.",
+  "description": "Private Milestone 7 source/test/build implementation of Octane's Lynx native renderer.",
   "author": {
     "name": "Dominic Gannaway",
     "email": "dg@domgan.com"
@@ -39,6 +39,8 @@
       "default": "./src/config.runtime.js"
     },
     "./renderer": "./src/renderer.ts",
+    "./main-renderer": "./src/main-renderer.ts",
+    "./first-screen": "./src/first-screen.ts",
     "./intrinsics": "./src/intrinsics.ts",
     "./intrinsics/jsx-runtime": "./src/intrinsics.ts",
     "./main-thread": "./src/main-thread.ts",

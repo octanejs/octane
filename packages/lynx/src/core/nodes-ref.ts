@@ -158,8 +158,7 @@ interface PendingOperation {
 }
 
 type OperationOutcome<Value> =
-	| { readonly ok: true; readonly value: Value }
-	| { readonly ok: false; readonly error: Error };
+	{ readonly ok: true; readonly value: Value } | { readonly ok: false; readonly error: Error };
 
 const FIELD_NAMES = new Set([
 	'id',

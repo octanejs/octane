@@ -6,9 +6,7 @@ import { createPortal } from 'octane';
 
 export function PortalledWithTsrx(props) @{
 	const slot = () => @{
-		<div class="from-tsrx">
-			{props.label as string}
-		</div>
+		<div class="from-tsrx">{props.label as string}</div>
 	};
 	<div class="host">{createPortal(slot, props.target)}</div>
 }

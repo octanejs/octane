@@ -62,9 +62,7 @@ export function KeyboardDragFixture() @{
 		<Controls />
 		<output id="events">{events}</output>
 		<DragOverlay dropAnimation={null}>
-			{(source) => <span id="overlay">
-				{String(source.id) as string}
-			</span>}
+			{(source) => <span id="overlay">{String(source.id) as string}</span>}
 		</DragOverlay>
 	</DragDropProvider>
 }

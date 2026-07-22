@@ -71,6 +71,31 @@ describe('production client assets', () => {
 			},
 		});
 	});
+
+	it('recovers a route entry that Vite promotes into a shared chunk', () => {
+		const assets = createClientAssetMap(
+			{
+				'_Page-hash.js': {
+					file: 'assets/Page-hash.js',
+					dynamicImports: ['src/Page.tsrx?octane-hydrate=0'],
+				},
+				'src/Page.tsrx?octane-hydrate=0': {
+					file: 'assets/Page-deferred.js',
+					src: 'src/Page.tsrx?octane-hydrate=0',
+					css: ['assets/Page-deferred.css'],
+				},
+			},
+			['/src/Page.tsrx'],
+			{ '/src/Page.tsrx': 'assets/Page-hash.js' },
+		);
+
+		expect(assets).toEqual({
+			'/src/Page.tsrx': {
+				js: 'assets/Page-hash.js',
+				css: ['assets/Page-deferred.css'],
+			},
+		});
+	});
 });
 
 describe('isViteOwnedUrl', () => {
@@ -297,6 +322,10 @@ export default { compiler: { renderers } };
 		const userRenderBuiltUrl = vi.fn<RenderBuiltAssetUrl>((filename) =>
 			filename === 'assets/custom.js' ? 'https://cdn.example/custom.js' : undefined,
 		);
+		const userResolveDependencies = vi.fn((_filename: string, dependencies: string[]) => [
+			...dependencies,
+			'assets/custom-dependency.js',
+		]);
 		try {
 			await writeFile(join(root, 'index.html'), '<main id="root"></main>');
 			await writeFile(
@@ -316,6 +345,12 @@ export default { compiler: { renderers } };
 			const result = await config(
 				{
 					root,
+					build: {
+						modulePreload: {
+							polyfill: false,
+							resolveDependencies: userResolveDependencies,
+						},
+					},
 					experimental: {
 						importGlobRestoreExtension: true,
 						renderBuiltUrl: userRenderBuiltUrl,
@@ -325,6 +360,23 @@ export default { compiler: { renderers } };
 			);
 
 			expect(result.experimental?.importGlobRestoreExtension).toBe(true);
+			const modulePreload = result.build?.modulePreload;
+			expect(modulePreload).toMatchObject({ polyfill: false });
+			if (!modulePreload || typeof modulePreload !== 'object') {
+				throw new Error('expected modulePreload options');
+			}
+			expect(
+				modulePreload.resolveDependencies?.('assets/index.js', ['assets/runtime.js'], {
+					hostId: 'index.html',
+					hostType: 'html',
+				}),
+			).toEqual([]);
+			expect(
+				modulePreload.resolveDependencies?.('assets/Page.js', ['assets/runtime.js'], {
+					hostId: 'assets/index.js',
+					hostType: 'js',
+				}),
+			).toEqual(['assets/runtime.js', 'assets/custom-dependency.js']);
 			const renderBuiltUrl = result.experimental?.renderBuiltUrl;
 			expect(renderBuiltUrl).toBeTypeOf('function');
 			const clientJsAsset = {

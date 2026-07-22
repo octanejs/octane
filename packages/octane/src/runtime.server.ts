@@ -35,9 +35,12 @@ import {
 	REJECTION_SENTINEL_KEY,
 	EXTERNAL_HYDRATION_PROMISE,
 	HYDRATION_RANGE_BOUNDARY,
+	HYDRATE_STATIC_ID_COUNT_PREFIX,
+	HYDRATE_STATIC_END,
 	HYDRATE_ID_ATTR,
 	HYDRATE_WHEN_ATTR,
 	HYDRATE_ID_COUNT_ATTR,
+	HYDRATE_STREAM_TOKEN_ATTR,
 	HYDRATE_SEED_ATTR,
 	STREAM_BOUNDARY_ATTR,
 	STREAM_SEGMENT_ATTR,
@@ -126,6 +129,11 @@ let NONCE_ATTR = '';
 // non-hydratable HTML (emails / static pages). It is part of the ambient pass
 // snapshot so a nested hydratable render cannot inherit a static outer pass.
 let MARKERS = true;
+// Exact wrapper-free permanent-static Hydrate children are server-owned. Any
+// ordinary Hydrate reached beneath them keeps its layout wrapper and SSR try
+// shape, but publishes a never marker so pre-root interaction capture cannot
+// enqueue work whose client component graph was erased.
+let PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 // Accumulates hoisted `<head>` content (`<title>`/`<meta>`/`<link>`) during the
 // active render pass (a mutable container, mirroring CSS's mutable Map, so a
 // per-pass local capture keeps accumulating via `HEAD.html +=` even though
@@ -2915,17 +2923,32 @@ function ssrChildrenHtml(children: unknown, scope: SSRScope): string {
 	return ssrChild(children, scope);
 }
 
+function streamTokenForPendingHtml(html: string): string | null {
+	const stream = STREAM;
+	return stream !== null && html.includes(STREAM_BOUNDARY_ATTR + '="' + stream.token + '-')
+		? stream.token
+		: null;
+}
+
 /** Serialize runtime-owned and strategy-supplied attributes for `<Hydrate>`. */
 function ssrHydrateAttrs(
 	id: string,
 	when: HydrationStrategy | (() => HydrationStrategy),
 	idCount: number,
+	permanentStaticAncestor: boolean = false,
+	streamToken: string | null = null,
 ): string {
 	const direct = typeof when !== 'function' && when !== null ? when : null;
 	let attrs =
 		ssrAttr(HYDRATE_ID_ATTR, id, 'div') +
-		ssrAttr(HYDRATE_WHEN_ATTR, direct?._t ?? 'dynamic', 'div') +
+		ssrAttr(
+			HYDRATE_WHEN_ATTR,
+			permanentStaticAncestor ? 'never' : (direct?._t ?? 'dynamic'),
+			'div',
+		) +
 		ssrAttr(HYDRATE_ID_COUNT_ATTR, idCount, 'div');
+	if (streamToken !== null) attrs += ssrAttr(HYDRATE_STREAM_TOKEN_ATTR, streamToken, 'div');
+	if (permanentStaticAncestor) return attrs;
 	const strategyAttrs = direct?._a?.();
 	if (strategyAttrs === undefined) return attrs;
 
@@ -2936,6 +2959,7 @@ function ssrHydrateAttrs(
 			name === HYDRATE_ID_ATTR ||
 			name === HYDRATE_WHEN_ATTR ||
 			name === HYDRATE_ID_COUNT_ATTR ||
+			name === HYDRATE_STREAM_TOKEN_ATTR ||
 			name === HYDRATE_SEED_ATTR ||
 			!VALID_ATTR_NAME.test(name)
 		)
@@ -2957,10 +2981,50 @@ function ssrHydrateAttrs(
  * read browser state, so only a direct strategy descriptor contributes `_a()`
  * attributes and its concrete strategy kind.
  */
-export const Hydrate = /* @__PURE__ */ markComponentFlags(
+const PermanentStaticHydrate = /* @__PURE__ */ markComponentFlags(
+	function PermanentStaticHydrate(props: HydrateProps, scope: SSRScope): string {
+		// Match ordinary Hydrate's own useId. Child IDs are counted separately and
+		// reserved by the client-side paired private range marker.
+		useId();
+		const inheritedPermanentStatic = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
+		PERMANENT_STATIC_HYDRATE_DEPTH++;
+		try {
+			// The outer static range already erases this client subtree and reserves
+			// all descendant IDs. Collapse nested exact boundaries to their authored
+			// children instead of leaving orphaned private sidecars.
+			if (inheritedPermanentStatic || !MARKERS) return ssrChildrenHtml(props.children, scope);
+			const childIdStart = ID_COUNTER;
+			const serialStart = SERIAL?.length ?? 0;
+			const children = ssrBlock(
+				ssrTry(
+					scope,
+					'jsx-static-hydrate',
+					(_arg, childScope) => ssrChildrenHtml(props.children, childScope),
+					null,
+					null,
+				),
+			);
+			const idCount = ID_COUNTER - childIdStart;
+			if (SERIAL !== null) SERIAL.splice(serialStart);
+			const streamToken = streamTokenForPendingHtml(children);
+			const markerToken = streamToken === null ? '' : streamToken + ':';
+			const endToken = streamToken === null ? '' : ':' + streamToken;
+			return (
+				`<!--${HYDRATE_STATIC_ID_COUNT_PREFIX}${markerToken}${idCount}-->` +
+				children +
+				`<!--${HYDRATE_STATIC_END}${endToken}-->`
+			);
+		} finally {
+			PERMANENT_STATIC_HYDRATE_DEPTH--;
+		}
+	},
+	COMPONENT_FLAG_BOUNDARY,
+	'PermanentStaticHydrate',
+);
+
+const hydrate = /* @__PURE__ */ markComponentFlags(
 	function Hydrate(props: HydrateProps, scope: SSRScope): string {
 		const id = useId();
-
 		// The client always creates an HTMLDivElement. Force the same namespace for
 		// SSR children and attribute semantics instead of inheriting SVG/MathML from
 		// the call site. Direct placement in foreign content remains unsupported: an
@@ -2992,9 +3056,16 @@ export const Hydrate = /* @__PURE__ */ markComponentFlags(
 					);
 					const idCount = ID_COUNTER - childIdStart;
 					const childSeeds = SERIAL === null ? [] : SERIAL.splice(serialStart);
-					const attrs = ssrHydrateAttrs(id, props.when, idCount);
+					const permanentStaticAncestor = PERMANENT_STATIC_HYDRATE_DEPTH !== 0;
+					const attrs = ssrHydrateAttrs(
+						id,
+						props.when,
+						idCount,
+						permanentStaticAncestor,
+						streamTokenForPendingHtml(children),
+					);
 					const seedSidecar =
-						childSeeds.length === 0
+						permanentStaticAncestor || childSeeds.length === 0
 							? ''
 							: '<script type="application/json" ' +
 								HYDRATE_SEED_ATTR +
@@ -3011,6 +3082,9 @@ export const Hydrate = /* @__PURE__ */ markComponentFlags(
 	COMPONENT_FLAG_BOUNDARY,
 	'Hydrate',
 );
+
+Object.defineProperty(hydrate, '__octanePermanentStatic', { value: PermanentStaticHydrate });
+export const Hydrate: ServerComponent = hydrate;
 
 /**
  * `<Suspense fallback={…}>…</Suspense>` — the JSX built-in mirror of the
@@ -4764,6 +4838,7 @@ interface Ambient {
 	css: Map<string, string> | null;
 	nonceAttr: string;
 	markers: boolean;
+	permanentStaticHydrateDepth: number;
 	head: HeadBuffer | null;
 	susp: SuspendedList | null;
 	res: ResolvedMap | null;
@@ -4790,6 +4865,7 @@ function saveAmbient(): Ambient {
 		css: CSS,
 		nonceAttr: NONCE_ATTR,
 		markers: MARKERS,
+		permanentStaticHydrateDepth: PERMANENT_STATIC_HYDRATE_DEPTH,
 		head: HEAD,
 		susp: SUSPENDED,
 		res: RESOLVED,
@@ -4817,6 +4893,7 @@ function restoreAmbient(a: Ambient): void {
 	CSS = a.css;
 	NONCE_ATTR = a.nonceAttr;
 	MARKERS = a.markers;
+	PERMANENT_STATIC_HYDRATE_DEPTH = a.permanentStaticHydrateDepth;
 	HEAD = a.head;
 	SUSPENDED = a.susp;
 	RESOLVED = a.res;
@@ -4863,6 +4940,7 @@ function runFullFramedPass(
 	NONCE_ATTR = nonceAttr;
 	ASYNC_SCOPE = '';
 	MARKERS = markers;
+	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
@@ -4954,6 +5032,7 @@ function runDiscoveryRound(
 	NONCE_ATTR = '';
 	ASYNC_SCOPE = '';
 	MARKERS = true;
+	PERMANENT_STATIC_HYDRATE_DEPTH = 0;
 	VT_SSR_TRY_SEQ = 0;
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
@@ -5599,6 +5678,8 @@ interface StreamBoundary {
 	errorReported?: boolean;
 	/** Whether its client-render recovery instruction was accepted by the transport. */
 	errorFlushed?: boolean;
+	/** The client graph is erased, so failure retains the authored server fallback. */
+	serverOwnedStatic: boolean;
 	/** Inner branch-range html (`<!--[-->…<!--]-->`) from the resolving pass. */
 	html: string;
 	/** This boundary's `use()` seed slice from the resolving pass. */
@@ -5914,7 +5995,7 @@ export function ssrTry(
 								])
 							: inner;
 					if (SERIAL !== null) {
-						entry.seeds = SERIAL.slice(serialStart);
+						if (!entry.serverOwnedStatic) entry.seeds = SERIAL.slice(serialStart);
 						SERIAL.length = serialStart;
 					}
 					pruneUnrepresentedStreamDescendants(stream!, key, entry.html);
@@ -5941,6 +6022,7 @@ export function ssrTry(
 							id: stream.token + '-' + order.toString(36),
 							order,
 							state: 'pending',
+							serverOwnedStatic: PERMANENT_STATIC_HYDRATE_DEPTH !== 0,
 							html: '',
 							seeds: [],
 							pendingIdOffset,
@@ -5961,13 +6043,18 @@ export function ssrTry(
 				// record. The client replays that exact seed order, throws at the same
 				// use(), then hydrates the already-streamed catch arm (whose own use() calls
 				// consume any seeds appended while rendering it below).
-				const caughtSeeds = entry !== undefined && SERIAL !== null ? SERIAL.slice(serialStart) : [];
+				const caughtSeeds =
+					entry !== undefined && !entry.serverOwnedStatic && SERIAL !== null
+						? SERIAL.slice(serialStart)
+						: [];
 				if (entry !== undefined && SERIAL !== null) SERIAL.length = serialStart;
 				const inner = ssrBlock(withCatchArm(() => catchFn(e, scope, NOOP)));
 				if (entry !== undefined) {
 					if (entry.state !== 'done') {
 						if (SERIAL !== null) {
-							caughtSeeds.push(...SERIAL.slice(serialStart));
+							if (!entry.serverOwnedStatic) {
+								caughtSeeds.push(...SERIAL.slice(serialStart));
+							}
 							SERIAL.length = serialStart;
 						}
 						entry.state = 'done';
@@ -5988,6 +6075,7 @@ export function ssrTry(
 				// client render. Buffered renderers still rethrow below because they have
 				// no progressive recovery channel.
 				if (SERIAL !== null) SERIAL.length = serialStart;
+				if (entry === undefined && PERMANENT_STATIC_HYDRATE_DEPTH !== 0) throw e;
 				if (entry === undefined) {
 					const pendingIdOffset = Math.max(0, ID_COUNTER - outerIdCounter);
 					restoreOuterIds();
@@ -5996,6 +6084,7 @@ export function ssrTry(
 						id: stream.token + '-' + order.toString(36),
 						order,
 						state: 'errored',
+						serverOwnedStatic: false,
 						error: e,
 						html: '',
 						seeds: [],
@@ -6034,7 +6123,9 @@ export function ssrTry(
 // `<!--oct-seed:id-->` scoping comment. `id` is the full render-scoped opaque
 // key, so both document queries and the seed stash remain disjoint when output
 // from multiple streams is composed into one page. $OCTRX(id) marks the
-// boundary errored (hydration client-renders it via mismatch recovery).
+// boundary errored (hydration client-renders it via mismatch recovery). A
+// truthy second argument removes only a server-owned permanent-static sentinel,
+// retaining its already-flushed fallback because no client graph can recover it.
 const STREAM_RUNTIME_JS =
 	'(function(){var d=document;var S=window.$OCTS=window.$OCTS||{};' +
 	// Legacy `[` / `]` means one physical range; `[N` / `]N` is canonical only
@@ -6066,11 +6157,11 @@ const STREAM_RUNTIME_JS =
 	STREAM_SEED_COMMENT +
 	'"+id),t);' +
 	's.parentNode.removeChild(s);};' +
-	'window.$OCTRX=function(id){' +
+	'window.$OCTRX=function(id,so){' +
 	"var t=d.querySelector('template[" +
 	STREAM_BOUNDARY_ATTR +
 	"=\"'+id+'\"]');" +
-	'if(t)t.setAttribute("data-oct-err","");};' +
+	'if(t){if(so)t.remove();else t.setAttribute("data-oct-err","");}};' +
 	'})();';
 
 interface StreamSink {
@@ -6247,12 +6338,14 @@ function segmentChunk(b: StreamBoundary, nonceAttr: string): string {
 }
 
 function boundaryErrorChunk(b: StreamBoundary, nonceAttr: string): string {
+	const serverOwnedStatic = b.serverOwnedStatic ? ',1' : '';
 	return (
 		'<script ' +
 		STREAM_SCRIPT_ATTR +
 		nonceAttr +
 		'>$OCTRX(' +
 		JSON.stringify(b.id).replace(/</g, '\\u003c') +
+		serverOwnedStatic +
 		')</script>'
 	);
 }

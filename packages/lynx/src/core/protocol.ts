@@ -13,6 +13,7 @@ import type {
 	UniversalTransportIdentity,
 	UniversalTransportRejectMessage,
 } from 'octane/universal/native';
+import type { LynxFirstTreeSnapshot } from './first-screen.js';
 
 /**
  * Kept as a local literal so the main-thread protocol graph does not evaluate
@@ -52,6 +53,7 @@ export interface LynxMainReadyReply {
 	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
 	readonly type: 'main-ready';
 	readonly request: number;
+	readonly firstTree?: LynxFirstTreeSnapshot;
 }
 
 export interface LynxPublicHandleUpsert {
@@ -73,6 +75,12 @@ export type LynxPublicHandleDelta = LynxPublicHandleUpsert | LynxPublicHandleRem
 
 export interface LynxTransportAcknowledgement extends UniversalTransportAcknowledgement {
 	readonly handles: readonly LynxPublicHandleDelta[];
+	readonly adoption?: 'adopted' | 'repaired';
+}
+
+/** Background listener ownership is live; buffered first-screen events may replay. */
+export interface LynxAdoptionReadyMessage extends UniversalTransportIdentity {
+	readonly type: 'adoption-ready';
 }
 
 export interface LynxHostAttachmentChange {
@@ -111,8 +119,85 @@ export interface LynxDisposeRetryMessage extends UniversalTransportIdentity {
 	readonly error: UniversalTransportError;
 }
 
+/** Clone-safe compiler descriptor for code registered in the main-thread graph. */
+export interface LynxMainThreadWorkletWireDescriptor {
+	readonly _wkltId: string;
+	readonly _c?: Readonly<Record<string, UniversalSerializableValue>>;
+}
+
+/** Clone-safe compiler descriptor for code registered in the background graph. */
+export interface LynxBackgroundFunctionWireDescriptor {
+	readonly _jsFnId: string;
+	readonly _execId?: string;
+	readonly _c?: Readonly<Record<string, UniversalSerializableValue>>;
+}
+
+export interface LynxCallMainMessage extends UniversalTransportIdentity {
+	readonly type: 'call-main';
+	readonly call: number;
+	readonly worklet: LynxMainThreadWorkletWireDescriptor;
+	readonly args: readonly UniversalSerializableValue[];
+}
+
+/**
+ * Bounds the acknowledgement-time call wave. ContextProxy preserves sender
+ * order, so main can defer collecting an activation-only ref until every
+ * owner retain/release published by the same commit has arrived.
+ */
+export interface LynxMainCallPublicationMessage extends UniversalTransportIdentity {
+	readonly type: 'main-call-publication';
+	readonly phase: 'open' | 'close';
+}
+
+export interface LynxCancelMainCallMessage extends UniversalTransportIdentity {
+	readonly type: 'cancel-main';
+	readonly call: number;
+}
+
+export interface LynxCallBackgroundMessage extends UniversalTransportIdentity {
+	readonly type: 'call-background';
+	readonly call: number;
+	readonly fn: LynxBackgroundFunctionWireDescriptor;
+	readonly args: readonly UniversalSerializableValue[];
+}
+
+export interface LynxCancelBackgroundCallMessage extends UniversalTransportIdentity {
+	readonly type: 'cancel-background';
+	readonly call: number;
+}
+
+export interface LynxCallMainResultMessage extends UniversalTransportIdentity {
+	readonly type: 'call-main-result';
+	readonly call: number;
+	readonly value: UniversalSerializableValue;
+}
+
+export interface LynxCallMainErrorMessage extends UniversalTransportIdentity {
+	readonly type: 'call-main-error';
+	readonly call: number;
+	readonly error: UniversalTransportError;
+}
+
+export interface LynxCallBackgroundResultMessage extends UniversalTransportIdentity {
+	readonly type: 'call-background-result';
+	readonly call: number;
+	readonly value: UniversalSerializableValue;
+}
+
+export interface LynxCallBackgroundErrorMessage extends UniversalTransportIdentity {
+	readonly type: 'call-background-error';
+	readonly call: number;
+	readonly error: UniversalTransportError;
+}
+
 export type LynxBackgroundOutboundMessage =
 	| LynxMainReadyRequest
+	| LynxAdoptionReadyMessage
+	| LynxMainCallPublicationMessage
+	| LynxCallMainMessage
+	| LynxCancelMainCallMessage
+	| LynxCallBackgroundResultMessage
+	| LynxCallBackgroundErrorMessage
 	| UniversalTransportCommitMessage
 	| UniversalTransportAbortMessage
 	| LynxDisposeMessage
@@ -120,6 +205,10 @@ export type LynxBackgroundOutboundMessage =
 
 export type LynxBackgroundInboundMessage =
 	| LynxMainReadyReply
+	| LynxCallBackgroundMessage
+	| LynxCancelBackgroundCallMessage
+	| LynxCallMainResultMessage
+	| LynxCallMainErrorMessage
 	| LynxTransportAcknowledgement
 	| UniversalTransportCompleteMessage
 	| UniversalTransportRejectMessage
@@ -141,6 +230,16 @@ function record(value: unknown, label: string): Record<string, unknown> {
 	const prototype = Object.getPrototypeOf(value);
 	if (prototype !== Object.prototype && prototype !== null) {
 		return fail(label, 'must be a plain object.');
+	}
+	if (Object.getOwnPropertySymbols(value).length !== 0) {
+		return fail(label, 'contains symbol fields.');
+	}
+	for (const key of Object.getOwnPropertyNames(value)) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, key)!;
+		if (!descriptor.enumerable) fail(`${label}.${key}`, 'must be enumerable.');
+		if (!Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+			fail(`${label}.${key}`, 'must not be an accessor.');
+		}
 	}
 	return value as Record<string, unknown>;
 }
@@ -202,17 +301,30 @@ function assertWireValue(value: unknown, label: string, seen = new Set<object>()
 	seen.add(value);
 	try {
 		if (Array.isArray(value)) {
+			if (Object.getOwnPropertySymbols(value).length !== 0) {
+				fail(label, 'contains symbol fields.');
+			}
+			const names = Object.getOwnPropertyNames(value);
+			if (names.length !== value.length + 1) {
+				fail(label, 'must be a dense array without extra fields.');
+			}
 			for (let index = 0; index < value.length; index++) {
-				assertWireValue(value[index], `${label}[${index}]`, seen);
+				const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+				if (
+					descriptor === undefined ||
+					!descriptor.enumerable ||
+					!Object.prototype.hasOwnProperty.call(descriptor, 'value')
+				) {
+					fail(`${label}[${index}]`, 'must be an enumerable data property.');
+				}
+				assertWireValue(descriptor.value, `${label}[${index}]`, seen);
 			}
 			return;
 		}
-		const prototype = Object.getPrototypeOf(value);
-		if (prototype !== Object.prototype && prototype !== null) {
-			fail(label, 'requires arrays or plain objects.');
-		}
-		for (const [name, child] of Object.entries(value)) {
-			assertWireValue(child, `${label}.${name}`, seen);
+		const object = record(value, label);
+		for (const name of Object.keys(object)) {
+			const descriptor = Object.getOwnPropertyDescriptor(object, name)!;
+			assertWireValue(descriptor.value, `${label}.${name}`, seen);
 		}
 	} finally {
 		seen.delete(value);
@@ -339,6 +451,57 @@ function assertRemoteError(
 	if (typeof error.message !== 'string') fail(`${label}.message`, 'must be a string.');
 }
 
+function assertCallArgs(value: unknown, label: string): void {
+	if (!Array.isArray(value)) fail(label, 'must be an array.');
+	assertWireValue(value, label);
+}
+
+function assertMainThreadWorklet(value: unknown, label: string): void {
+	const worklet = record(value, label);
+	const hasCaptures = Object.prototype.hasOwnProperty.call(worklet, '_c');
+	exactKeys(worklet, hasCaptures ? ['_wkltId', '_c'] : ['_wkltId'], label);
+	nonEmptyString(worklet._wkltId, `${label}._wkltId`);
+	if (hasCaptures) {
+		const captures = record(worklet._c, `${label}._c`);
+		assertWireValue(captures, `${label}._c`);
+	}
+}
+
+function assertBackgroundFunction(value: unknown, label: string): void {
+	const fn = record(value, label);
+	const hasExecution = Object.prototype.hasOwnProperty.call(fn, '_execId');
+	const hasCaptures = Object.prototype.hasOwnProperty.call(fn, '_c');
+	exactKeys(
+		fn,
+		['_jsFnId', ...(hasExecution ? ['_execId'] : []), ...(hasCaptures ? ['_c'] : [])],
+		label,
+	);
+	nonEmptyString(fn._jsFnId, `${label}._jsFnId`);
+	if (hasExecution) nonEmptyString(fn._execId, `${label}._execId`);
+	if (hasCaptures) {
+		const captures = record(fn._c, `${label}._c`);
+		assertWireValue(captures, `${label}._c`);
+	}
+}
+
+function assertCallResult(
+	message: Record<string, unknown>,
+	type: 'call-main-result' | 'call-background-result',
+): void {
+	exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'call', 'value'], type);
+	positiveInteger(message.call, `${type}.call`);
+	assertWireValue(message.value, `${type}.value`);
+}
+
+function assertCallError(
+	message: Record<string, unknown>,
+	type: 'call-main-error' | 'call-background-error',
+): void {
+	exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'call', 'error'], type);
+	positiveInteger(message.call, `${type}.call`);
+	assertRemoteError(message.error, `${type}.error`);
+}
+
 function assertSnapshotIdentity(
 	snapshot: unknown,
 	delta: Record<string, unknown>,
@@ -387,10 +550,69 @@ function assertHandleDelta(
 	fail(`${label}.op`, `uses unsupported operation ${JSON.stringify(delta.op)}.`);
 }
 
+function assertFirstTreeSnapshot(value: unknown, label: string): void {
+	const snapshot = record(value, label);
+	exactKeys(snapshot, ['format', 'renderer', 'root', 'version', 'plan', 'roots', 'nodes'], label);
+	if (snapshot.format !== 1) fail(`${label}.format`, 'must be 1.');
+	if (snapshot.renderer !== LYNX_TRANSPORT_RENDERER) {
+		fail(`${label}.renderer`, `must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+	}
+	positiveInteger(snapshot.root, `${label}.root`);
+	positiveInteger(snapshot.version, `${label}.version`);
+	if (snapshot.plan !== null && (typeof snapshot.plan !== 'string' || snapshot.plan.length === 0)) {
+		fail(`${label}.plan`, 'must be null or a non-empty string.');
+	}
+	if (!Array.isArray(snapshot.roots)) fail(`${label}.roots`, 'must be an array.');
+	for (let index = 0; index < snapshot.roots.length; index++) {
+		positiveInteger(snapshot.roots[index], `${label}.roots[${index}]`);
+	}
+	if (!Array.isArray(snapshot.nodes)) fail(`${label}.nodes`, 'must be an array.');
+	for (let index = 0; index < snapshot.nodes.length; index++) {
+		const nodeLabel = `${label}.nodes[${index}]`;
+		const node = record(snapshot.nodes[index], nodeLabel);
+		exactKeys(
+			node,
+			['id', 'nativeId', 'type', 'generation', 'parent', 'children', 'props', 'visible', 'events'],
+			nodeLabel,
+		);
+		positiveInteger(node.id, `${nodeLabel}.id`);
+		positiveInteger(node.nativeId, `${nodeLabel}.nativeId`);
+		nonEmptyString(node.type, `${nodeLabel}.type`);
+		positiveInteger(node.generation, `${nodeLabel}.generation`);
+		nullableHostId(node.parent, `${nodeLabel}.parent`);
+		if (!Array.isArray(node.children)) fail(`${nodeLabel}.children`, 'must be an array.');
+		for (let child = 0; child < node.children.length; child++) {
+			positiveInteger(node.children[child], `${nodeLabel}.children[${child}]`);
+		}
+		assertProps(node.props, `${nodeLabel}.props`);
+		if (typeof node.visible !== 'boolean') fail(`${nodeLabel}.visible`, 'must be a boolean.');
+		if (!Array.isArray(node.events)) fail(`${nodeLabel}.events`, 'must be an array.');
+		for (let eventIndex = 0; eventIndex < node.events.length; eventIndex++) {
+			const eventLabel = `${nodeLabel}.events[${eventIndex}]`;
+			const event = record(node.events[eventIndex], eventLabel);
+			exactKeys(event, ['host', 'generation', 'type', 'listener', 'priority'], eventLabel);
+			positiveInteger(event.host, `${eventLabel}.host`);
+			positiveInteger(event.generation, `${eventLabel}.generation`);
+			nonEmptyString(event.type, `${eventLabel}.type`);
+			positiveInteger(event.listener, `${eventLabel}.listener`);
+			if (!['continuous', 'default', 'discrete'].includes(event.priority as string)) {
+				fail(`${eventLabel}.priority`, 'must be discrete, continuous, or default.');
+			}
+		}
+	}
+}
+
 function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | LynxMainReadyReply {
 	const label = reply ? 'main-ready reply' : 'main-ready request';
 	const message = record(value, label);
-	exactKeys(message, ['protocol', 'renderer', 'type', 'request'], label);
+	const hasFirstTree = reply && Object.prototype.hasOwnProperty.call(message, 'firstTree');
+	exactKeys(
+		message,
+		hasFirstTree
+			? ['protocol', 'renderer', 'type', 'request', 'firstTree']
+			: ['protocol', 'renderer', 'type', 'request'],
+		label,
+	);
 	if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
 		fail(label, `protocol must be ${LYNX_TRANSPORT_PROTOCOL_VERSION}.`);
 	}
@@ -405,6 +627,7 @@ function assertReady(value: unknown, reply: boolean): LynxMainReadyRequest | Lyn
 	}
 	if (reply) nonNegativeInteger(message.request, `${label}.request`);
 	else positiveInteger(message.request, `${label}.request`);
+	if (hasFirstTree) assertFirstTreeSnapshot(message.firstTree, `${label}.firstTree`);
 	return message as unknown as LynxMainReadyRequest | LynxMainReadyReply;
 }
 
@@ -415,6 +638,45 @@ export function validateLynxBackgroundOutboundMessage(
 	if (message.type === 'main-ready-request')
 		return assertReady(message, false) as LynxMainReadyRequest;
 	assertIdentity(message, 'outbound message');
+	if (message.type === 'adoption-ready') {
+		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type'], 'adoption-ready');
+		return message as unknown as LynxAdoptionReadyMessage;
+	}
+	if (message.type === 'main-call-publication') {
+		exactKeys(
+			message,
+			['protocol', 'renderer', 'root', 'version', 'type', 'phase'],
+			'main-call-publication',
+		);
+		if (message.phase !== 'open' && message.phase !== 'close') {
+			fail('main-call-publication.phase', 'must be open or close.');
+		}
+		return message as unknown as LynxMainCallPublicationMessage;
+	}
+	if (message.type === 'call-main') {
+		exactKeys(
+			message,
+			['protocol', 'renderer', 'root', 'version', 'type', 'call', 'worklet', 'args'],
+			'call-main',
+		);
+		positiveInteger(message.call, 'call-main.call');
+		assertMainThreadWorklet(message.worklet, 'call-main.worklet');
+		assertCallArgs(message.args, 'call-main.args');
+		return message as unknown as LynxCallMainMessage;
+	}
+	if (message.type === 'cancel-main') {
+		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'call'], 'cancel-main');
+		positiveInteger(message.call, 'cancel-main.call');
+		return message as unknown as LynxCancelMainCallMessage;
+	}
+	if (message.type === 'call-background-result') {
+		assertCallResult(message, 'call-background-result');
+		return message as unknown as LynxCallBackgroundResultMessage;
+	}
+	if (message.type === 'call-background-error') {
+		assertCallError(message, 'call-background-error');
+		return message as unknown as LynxCallBackgroundErrorMessage;
+	}
 	if (message.type === 'commit') {
 		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'batch'], 'commit');
 		assertBatch(message.batch, message);
@@ -439,8 +701,46 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 	const message = record(value, 'inbound message');
 	if (message.type === 'main-ready') return assertReady(message, true) as LynxMainReadyReply;
 	assertIdentity(message, 'inbound message');
+	if (message.type === 'call-background') {
+		exactKeys(
+			message,
+			['protocol', 'renderer', 'root', 'version', 'type', 'call', 'fn', 'args'],
+			'call-background',
+		);
+		positiveInteger(message.call, 'call-background.call');
+		assertBackgroundFunction(message.fn, 'call-background.fn');
+		assertCallArgs(message.args, 'call-background.args');
+		return message as unknown as LynxCallBackgroundMessage;
+	}
+	if (message.type === 'cancel-background') {
+		exactKeys(
+			message,
+			['protocol', 'renderer', 'root', 'version', 'type', 'call'],
+			'cancel-background',
+		);
+		positiveInteger(message.call, 'cancel-background.call');
+		return message as unknown as LynxCancelBackgroundCallMessage;
+	}
+	if (message.type === 'call-main-result') {
+		assertCallResult(message, 'call-main-result');
+		return message as unknown as LynxCallMainResultMessage;
+	}
+	if (message.type === 'call-main-error') {
+		assertCallError(message, 'call-main-error');
+		return message as unknown as LynxCallMainErrorMessage;
+	}
 	if (message.type === 'ack') {
-		exactKeys(message, ['protocol', 'renderer', 'root', 'version', 'type', 'handles'], 'ack');
+		const hasAdoption = Object.prototype.hasOwnProperty.call(message, 'adoption');
+		exactKeys(
+			message,
+			hasAdoption
+				? ['protocol', 'renderer', 'root', 'version', 'type', 'handles', 'adoption']
+				: ['protocol', 'renderer', 'root', 'version', 'type', 'handles'],
+			'ack',
+		);
+		if (hasAdoption && message.adoption !== 'adopted' && message.adoption !== 'repaired') {
+			fail('ack.adoption', 'must be adopted or repaired.');
+		}
 		if (!Array.isArray(message.handles)) fail('ack.handles', 'must be an array.');
 		for (let index = 0; index < message.handles.length; index++) {
 			assertHandleDelta(message.handles[index], index, message);

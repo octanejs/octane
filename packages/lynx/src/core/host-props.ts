@@ -1,5 +1,19 @@
 import { LYNX_NODES_REF_ATTRIBUTE } from './nodes-ref.js';
-import { parseLynxNativeEventProp } from './native-events.js';
+import {
+	parseLynxMainThreadEventProp,
+	parseLynxNativeEventProp,
+	type LynxMainThreadEventBinding,
+} from './native-events.js';
+import {
+	assertLynxWorkletValue,
+	isLynxMainThreadRefDescriptor,
+	isLynxMainThreadWorkletDescriptor,
+	unwrapThreadFunctionDescriptor,
+	type LynxMainThreadRefDescriptor,
+	type LynxMainThreadWorkletDescriptor,
+} from './worklets.js';
+
+export type { LynxMainThreadRefDescriptor, LynxMainThreadWorkletDescriptor } from './worklets.js';
 
 /**
  * Compiler-owned prop carrying the CSS scope selected for one Lynx host node.
@@ -50,6 +64,8 @@ export type LynxHostPropRoute =
 	| 'event'
 	| 'id'
 	| 'inline-styles'
+	| 'main-thread-event'
+	| 'main-thread-ref'
 	| 'reserved';
 
 export interface LynxValuePatch<T> {
@@ -67,6 +83,12 @@ export interface LynxAttributePatch {
 	readonly value: unknown;
 }
 
+export interface LynxMainThreadEventPatch {
+	readonly binding: LynxMainThreadEventBinding;
+	/** `null` removes the direct main-thread handler. */
+	readonly value: LynxMainThreadWorkletDescriptor | null;
+}
+
 /**
  * Semantic PAPI channels changed by a host prop update. Channel order is not a
  * public contract; a driver may apply these in its own accepted-batch order.
@@ -77,6 +99,8 @@ export interface LynxHostPropPatch {
 	readonly inlineStyles?: LynxValuePatch<string>;
 	readonly dataset?: LynxDatasetPatch;
 	readonly cssScope?: LynxValuePatch<NormalizedLynxCSSScope>;
+	readonly mainThreadEvents: readonly LynxMainThreadEventPatch[];
+	readonly mainThreadRef?: LynxValuePatch<LynxMainThreadRefDescriptor | null>;
 	readonly attributes: readonly LynxAttributePatch[];
 	/** The public PAPI has no operation that removes a previously applied CSS ID. */
 	readonly requiresRecreate: boolean;
@@ -84,6 +108,7 @@ export interface LynxHostPropPatch {
 
 const NAMESPACED_EVENT_PROP =
 	/^[A-Za-z-]+:(?:global-bind|bind|catch|capture-bind|capture-catch)[A-Za-z]+$/;
+const MAIN_THREAD_PROP = /^main-thread:/;
 const NUMBER_WITH_OPTIONAL_UNIT =
 	/^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?([A-Za-z%]*)$/;
 const SUPPORTED_LENGTH =
@@ -262,8 +287,10 @@ export function classifyLynxHostPropName(name: string): LynxHostPropRoute {
 	if (name === 'style') return 'inline-styles';
 	if (name.startsWith('data-')) return 'dataset';
 	if (name === LYNX_CSS_SCOPE_PROP) return 'css-scope';
+	if (name === 'main-thread:ref') return 'main-thread-ref';
+	if (parseLynxMainThreadEventProp(name) !== null) return 'main-thread-event';
 	if (parseLynxNativeEventProp(name) !== null) return 'event';
-	if (NAMESPACED_EVENT_PROP.test(name)) return 'reserved';
+	if (MAIN_THREAD_PROP.test(name) || NAMESPACED_EVENT_PROP.test(name)) return 'reserved';
 	if (
 		name === 'children' ||
 		name === 'css-id' ||
@@ -274,6 +301,117 @@ export function classifyLynxHostPropName(name: string): LynxHostPropRoute {
 		return 'reserved';
 	}
 	return 'attribute';
+}
+
+function decodeMainThreadWorklet(
+	value: unknown,
+	name: string,
+): LynxMainThreadWorkletDescriptor | null {
+	if (value === null || value === undefined) return null;
+	let descriptor = value;
+	if (typeof value === 'function') {
+		try {
+			descriptor = unwrapThreadFunctionDescriptor(value);
+		} catch {
+			throw propError(
+				`${JSON.stringify(name)} must be a main-thread worklet descriptor with a non-empty _wkltId.`,
+			);
+		}
+	}
+	assertLynxWorkletValue(descriptor, JSON.stringify(name));
+	if (!isLynxMainThreadWorkletDescriptor(descriptor)) {
+		throw propError(
+			`${JSON.stringify(name)} must be a main-thread worklet descriptor with a non-empty _wkltId.`,
+		);
+	}
+	if (descriptor._owlt !== undefined) {
+		throw propError(`${JSON.stringify(name)} cannot contain a main-local _owlt activation.`);
+	}
+	return descriptor;
+}
+
+function decodeMainThreadRef(value: unknown): LynxMainThreadRefDescriptor | null {
+	if (value === null || value === undefined) return null;
+	assertLynxWorkletValue(value, '"main-thread:ref"');
+	if (!isLynxMainThreadRefDescriptor(value)) {
+		throw propError(
+			'"main-thread:ref" must be a main-thread ref descriptor with a non-empty _wvid.',
+		);
+	}
+	return value;
+}
+
+interface StructuredValuePairs {
+	readonly firstToSecond: WeakMap<object, object>;
+	readonly secondToFirst: WeakMap<object, object>;
+}
+
+function sameStructuredValueWithPairs(
+	first: unknown,
+	second: unknown,
+	pairs: StructuredValuePairs,
+): boolean {
+	if (Object.is(first, second)) return true;
+	if (
+		first === null ||
+		second === null ||
+		typeof first !== 'object' ||
+		typeof second !== 'object'
+	) {
+		return false;
+	}
+	const pairedSecond = pairs.firstToSecond.get(first);
+	if (pairedSecond !== undefined) return pairedSecond === second;
+	const pairedFirst = pairs.secondToFirst.get(second);
+	if (pairedFirst !== undefined) return pairedFirst === first;
+	pairs.firstToSecond.set(first, second);
+	pairs.secondToFirst.set(second, first);
+	if (Array.isArray(first) || Array.isArray(second)) {
+		if (!Array.isArray(first) || !Array.isArray(second) || first.length !== second.length)
+			return false;
+		for (let index = 0; index < first.length; index++) {
+			if (!sameStructuredValueWithPairs(first[index], second[index], pairs)) return false;
+		}
+		return true;
+	}
+	const firstNames = Object.keys(first);
+	const secondNames = Object.keys(second);
+	if (firstNames.length !== secondNames.length) return false;
+	for (const name of firstNames) {
+		if (
+			!hasOwn(second as Readonly<Record<string, unknown>>, name) ||
+			!sameStructuredValueWithPairs(
+				(first as Readonly<Record<string, unknown>>)[name],
+				(second as Readonly<Record<string, unknown>>)[name],
+				pairs,
+			)
+		) {
+			return false;
+		}
+	}
+	return true;
+}
+
+function sameStructuredValue(first: unknown, second: unknown): boolean {
+	if (Object.is(first, second)) return true;
+	return sameStructuredValueWithPairs(first, second, {
+		firstToSecond: new WeakMap(),
+		secondToFirst: new WeakMap(),
+	});
+}
+
+function mainThreadEventPropNames(
+	previous: Readonly<Record<string, unknown>>,
+	next: Readonly<Record<string, unknown>>,
+): readonly string[] {
+	const names = new Set<string>();
+	for (const name of Object.keys(previous)) {
+		if (parseLynxMainThreadEventProp(name) !== null) names.add(name);
+	}
+	for (const name of Object.keys(next)) {
+		if (parseLynxMainThreadEventProp(name) !== null) names.add(name);
+	}
+	return [...names].sort();
 }
 
 function classProp(value: Readonly<Record<string, unknown>>): unknown {
@@ -338,15 +476,25 @@ export function planLynxHostPropPatch(
 	previous: Readonly<Record<string, unknown>>,
 	next: Readonly<Record<string, unknown>>,
 ): LynxHostPropPatch {
+	if (type === '#text' || type === 'raw-text') {
+		const directProp = [...Object.keys(previous), ...Object.keys(next)].find(
+			(name) => name === 'main-thread:ref' || parseLynxMainThreadEventProp(name) !== null,
+		);
+		if (directProp !== undefined) {
+			throw propError(
+				`raw-text hosts cannot own direct main-thread prop ${JSON.stringify(directProp)}.`,
+			);
+		}
+	}
 	if (hasOwn(next, LYNX_NODES_REF_ATTRIBUTE)) {
 		throw propError(
 			`${JSON.stringify(LYNX_NODES_REF_ATTRIBUTE)} is reserved for generation-scoped query handles.`,
 		);
 	}
 	for (const name of Object.keys(next)) {
-		if (NAMESPACED_EVENT_PROP.test(name)) {
+		if (classifyLynxHostPropName(name) === 'reserved' && name.includes(':')) {
 			throw propError(
-				`namespaced event prop ${JSON.stringify(name)} is reserved for a later main-thread capability.`,
+				`namespaced prop ${JSON.stringify(name)} is not a supported Lynx host capability.`,
 			);
 		}
 	}
@@ -356,9 +504,32 @@ export function planLynxHostPropPatch(
 		inlineStyles?: LynxValuePatch<string>;
 		dataset?: LynxDatasetPatch;
 		cssScope?: LynxValuePatch<NormalizedLynxCSSScope>;
+		mainThreadEvents: LynxMainThreadEventPatch[];
+		mainThreadRef?: LynxValuePatch<LynxMainThreadRefDescriptor | null>;
 		attributes: LynxAttributePatch[];
 		requiresRecreate: boolean;
-	} = { attributes: [], requiresRecreate: false };
+	} = { attributes: [], mainThreadEvents: [], requiresRecreate: false };
+
+	for (const name of mainThreadEventPropNames(previous, next)) {
+		const binding = parseLynxMainThreadEventProp(name)!;
+		const previousValue = decodeMainThreadWorklet(previous[name], name);
+		const nextValue = decodeMainThreadWorklet(next[name], name);
+		const ordinaryName = `${binding.prefix}${binding.name}`;
+		if (nextValue !== null && next[ordinaryName] !== null && next[ordinaryName] !== undefined) {
+			throw propError(
+				`${JSON.stringify(name)} conflicts with ${JSON.stringify(ordinaryName)} on the same native event channel.`,
+			);
+		}
+		if (!sameStructuredValue(previousValue, nextValue)) {
+			patch.mainThreadEvents.push(Object.freeze({ binding, value: nextValue }));
+		}
+	}
+
+	const previousMainThreadRef = decodeMainThreadRef(previous['main-thread:ref']);
+	const nextMainThreadRef = decodeMainThreadRef(next['main-thread:ref']);
+	if (!sameStructuredValue(previousMainThreadRef, nextMainThreadRef)) {
+		patch.mainThreadRef = Object.freeze({ value: nextMainThreadRef });
+	}
 
 	const previousId = previous.id == null ? null : String(previous.id);
 	const nextId = next.id == null ? null : String(next.id);
@@ -404,5 +575,6 @@ export function planLynxHostPropPatch(
 	}
 
 	Object.freeze(patch.attributes);
+	Object.freeze(patch.mainThreadEvents);
 	return Object.freeze(patch);
 }

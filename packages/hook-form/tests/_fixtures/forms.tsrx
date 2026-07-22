@@ -50,8 +50,7 @@ export function ControllerForm() {
 				<p id="pet-error">
 					{fieldState.error ? fieldState.error.message as string : 'ok'}
 				</p>
-			</div>
-			}
+			</div>}
 		/>
 		<button id="reset" type="button" onClick={() => reset({ pet: 'dog' })}>{'reset'}</button>
 	</div>;

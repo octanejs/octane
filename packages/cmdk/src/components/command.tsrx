@@ -342,8 +342,9 @@ export function CommandRoot(props: CommandProps) @{
 		// unmount from their original positions anyway, so the visible result —
 		// matching items in score order — is identical.
 		getValidItems().filter((item) => (scores.get(item.getAttribute('id') ?? '') ?? 0) > 0).sort(
-			(a, b) => (scores.get(b.getAttribute('id') ?? '') ?? 0) -
-				(scores.get(a.getAttribute('id') ?? '') ?? 0),
+			(a, b) =>
+				(scores.get(b.getAttribute('id') ?? '') ?? 0) -
+					(scores.get(a.getAttribute('id') ?? '') ?? 0),
 		).forEach((item) => {
 			const group = item.closest(GROUP_ITEMS_SELECTOR);
 			if (group) {

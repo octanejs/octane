@@ -5,9 +5,4 @@ import type {
 } from 'react';
 
 export type EventType =
-	| MouseEvent
-	| TouchEvent
-	| FocusEvent
-	| ReactFocusEvent
-	| ReactMouseEvent
-	| ReactTouchEvent;
+	MouseEvent | TouchEvent | FocusEvent | ReactFocusEvent | ReactMouseEvent | ReactTouchEvent;

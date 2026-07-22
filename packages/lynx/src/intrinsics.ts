@@ -7,6 +7,10 @@ import type {
 	LynxStandardProps as NativeLynxStandardProps,
 } from './native-types.js';
 import type { LynxPublicHandle } from './core/client-driver.js';
+import type {
+	LynxMainThreadRefDescriptor,
+	LynxMainThreadWorkletDescriptor,
+} from './core/worklets.js';
 
 /**
  * Renderer-local adaptation of the first Lynx intrinsic slice.
@@ -19,13 +23,23 @@ import type { LynxPublicHandle } from './core/client-driver.js';
 export type LynxRefCallback<T = LynxPublicHandle> = (value: T | null) => void | (() => void);
 export type LynxRefObject<T = LynxPublicHandle> = { current: T | null };
 export type LynxRef<T = LynxPublicHandle> =
-	| LynxRefCallback<T>
-	| LynxRefObject<T>
-	| readonly LynxRef<T>[];
+	LynxRefCallback<T> | LynxRefObject<T> | readonly LynxRef<T>[];
 
-export type LynxStandardProps = NativeLynxStandardProps & {
-	ref?: LynxRef;
+type LynxMainThreadEventPrefix =
+	'bind' | 'catch' | 'capture-bind' | 'capture-catch' | 'global-bind';
+
+export type LynxMainThreadEventHandler<Event = LynxEvent> =
+	((event: Event) => unknown) | LynxMainThreadWorkletDescriptor;
+
+export type LynxMainThreadEventProps = {
+	[Property in `main-thread:${LynxMainThreadEventPrefix}${string}`]?: LynxMainThreadEventHandler;
 };
+
+export type LynxStandardProps = NativeLynxStandardProps &
+	LynxMainThreadEventProps & {
+		ref?: LynxRef;
+		'main-thread:ref'?: LynxMainThreadRefDescriptor;
+	};
 export type LynxEventTarget = NativeLynxEventTarget;
 export type LynxEvent<Kind extends string = string, Detail = unknown> = NativeLynxEvent<
 	Kind,
@@ -45,8 +59,9 @@ export type LynxTextProps = LynxStandardProps & {
 	'text-selection'?: boolean;
 };
 
-export type LynxRawTextProps = LynxStandardProps & {
+export type LynxRawTextProps = {
 	text: number | string;
+	ref?: LynxRef;
 };
 
 export type LynxImageProps = LynxStandardProps & {

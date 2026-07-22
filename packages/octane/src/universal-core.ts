@@ -186,8 +186,7 @@ export type UniversalComponent<P = any> = ((
 };
 
 export type UniversalPropEntry =
-	| readonly ['set', name: string, value: unknown]
-	| readonly ['spread', value: unknown];
+	readonly ['set', name: string, value: unknown] | readonly ['spread', value: unknown];
 
 export interface UniversalPropsValue {
 	readonly $$kind: typeof UNIVERSAL_PROPS;
@@ -536,8 +535,7 @@ export interface UniversalTransportEventMessage extends UniversalTransportIdenti
 }
 
 export type UniversalTransportOutboundMessage =
-	| UniversalTransportCommitMessage
-	| UniversalTransportAbortMessage;
+	UniversalTransportCommitMessage | UniversalTransportAbortMessage;
 
 export type UniversalTransportInboundMessage =
 	| UniversalTransportAcknowledgement
@@ -3417,8 +3415,7 @@ export function useRef<T>(initial: T, slot?: unknown): { current: T } {
 			get() {
 				const draft = findDraftOwner(record);
 				const live = (draft?.hooks.get(resolved) ?? record.hooks.get(resolved)) as
-					| RefHook<T>
-					| undefined;
+					RefHook<T> | undefined;
 				return live?.kind === 'ref' ? live.current : initial;
 			},
 			set(next: T) {
@@ -4159,9 +4156,7 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 		private readonly container: Container,
 		private readonly driver: UniversalHostDriver<Container, PublicInstance>,
 		private readonly transport:
-			| UniversalCommitTransport<Container>
-			| UniversalAsyncCommitTransport<Container>
-			| null,
+			UniversalCommitTransport<Container> | UniversalAsyncCommitTransport<Container> | null,
 		private readonly microtaskScheduler: ((callback: () => void) => void) | null,
 	) {
 		assertRendererId(driver.id, 'Universal driver id');
@@ -6798,34 +6793,28 @@ class UniversalRootImpl<Container, PublicInstance> implements UniversalRoot<any>
 				? null
 				: freezeUniversalHostBatch(this.renderer, this.nextBatchVersion++, [
 						...removedHosts.flatMap((record) =>
-							[...record.events.keys()].map(
-								(type): UniversalHostCommand => ({
-									op: 'event',
-									id: record.id,
-									type,
-									listener: null,
-								}),
-							),
+							[...record.events.keys()].map((type): UniversalHostCommand => ({
+								op: 'event',
+								id: record.id,
+								type,
+								listener: null,
+							})),
 						),
 						...removedHosts.flatMap((record) =>
-							[...record.lifecycles.keys()].map(
-								(type): UniversalHostCommand => ({
-									op: 'lifecycle',
-									id: record.id,
-									type,
-									listener: null,
-								}),
-							),
+							[...record.lifecycles.keys()].map((type): UniversalHostCommand => ({
+								op: 'lifecycle',
+								id: record.id,
+								type,
+								listener: null,
+							})),
 						),
 						...removedHosts.flatMap((record) =>
-							[...record.localCallbacks.keys()].map(
-								(type): UniversalHostCommand => ({
-									op: 'local-callback',
-									id: record.id,
-									type,
-									listener: null,
-								}),
-							),
+							[...record.localCallbacks.keys()].map((type): UniversalHostCommand => ({
+								op: 'local-callback',
+								id: record.id,
+								type,
+								listener: null,
+							})),
 						),
 						...physical.map((record) => ({
 							op: 'remove' as const,
@@ -6967,8 +6956,7 @@ class UniversalTransactionImpl<Container, PublicInstance> implements UniversalTr
 		readonly batch: UniversalHostBatch,
 		private readonly applyHost: (() => void) | null,
 		private readonly applyHostAsync:
-			| ((acknowledge: (message: UniversalTransportAcknowledgement) => void) => Promise<void>)
-			| null,
+			((acknowledge: (message: UniversalTransportAcknowledgement) => void) => Promise<void>) | null,
 		private readonly transportIdentity: UniversalTransportIdentity,
 		private readonly publishHost: () => void,
 		private readonly afterHostAccept: () => void,

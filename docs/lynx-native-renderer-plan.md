@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–5 have private source/test/build implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–7 have private source/test/build implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-18**
 
@@ -13,6 +13,10 @@ Milestone 3 source/test evidence date: **2026-07-19**
 Milestone 4 source/test evidence date: **2026-07-19**
 
 Milestone 5 source/build evidence date: **2026-07-20**
+
+Milestone 6 source/build evidence date: **2026-07-21**
+
+Milestone 7 source/test evidence date: **2026-07-21**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -147,8 +151,8 @@ The Lynx package owns:
 - background-to-main transport, main-to-background event delivery, page
   lifecycle, init data, global props, native query/ref handles, and UI methods;
   and
-- main-thread first rendering, adoption, main-thread worklets, and cross-thread
-  function calls once those milestones land.
+- main-thread first rendering and adoption; main-thread worklets and
+  cross-thread function calls remain a later milestone.
 
 Rspeedy and Lynx's lower-level framework-neutral packages own bundle assembly,
 CSS serialization, native template encoding, and engine loading. The Octane
@@ -310,7 +314,9 @@ packages/lynx/
     config.ts
     intrinsics.ts
     renderer.ts
+    main-renderer.ts
     root.ts
+    first-screen.ts
     main-thread.ts
     platform.ts
     testing.ts
@@ -357,6 +363,8 @@ Required `@octanejs/lynx` exports:
 @octanejs/lynx
 @octanejs/lynx/config
 @octanejs/lynx/renderer
+@octanejs/lynx/main-renderer
+@octanejs/lynx/first-screen
 @octanejs/lynx/intrinsics
 @octanejs/lynx/intrinsics/jsx-runtime
 @octanejs/lynx/main-thread
@@ -489,8 +497,10 @@ seed from public `__presetData` and consume the framework-maintained current
 render-to-layout subscription race. The native update receiver that maintains
 that current snapshot is still uninstalled and remains part of the formal
 device gate. The source also does not install a framework reload or page-destroy
-receiver. `markFirstScreenSyncReady()` remains deferred until Milestone 6's
-dual-thread adoption protocol exists.
+receiver. Milestone 6 now supplies `markFirstScreenSyncReady()` as the explicit
+main-entry initialization gate before a first-tree snapshot is offered to the
+background runtime. This source contract has not been exercised by a native
+lifecycle receiver.
 
 Native Modules stay background-thread-only. The compiler diagnoses statically
 visible Native Module access and `@octanejs/lynx/platform` imports from
@@ -773,11 +783,11 @@ leaves no native nodes, listeners, callbacks, or resource handles.
 > public `@octanejs/lynx/testing` subpath is now a thin facade over the pinned
 > JavaScript testing environment, and production smoke evidence builds and
 > decodes the bundle without a React, Preact, or ReactLynx runtime. This does not
-> render the application on the main thread and does not implement first-paint
-> adoption (Milestone 6). No Lynx Web, Android, or iOS execution; device error
-> capture; authored-source-map resolution in an engine; or state-preserving HMR
-> evidence has landed. The packages therefore remain private and are not a
-> technical preview.
+> itself establish main-thread rendering or first-paint adoption; those now
+> have separate Milestone 6 source/build evidence. No Lynx Web, Android, or iOS
+> execution; device error capture; authored-source-map resolution in an engine;
+> or state-preserving HMR evidence has landed. The packages therefore remain
+> private and are not a technical preview.
 
 Both packages already appear in the generated private-package inventory. The
 public bindings-status generator intentionally excludes private packages, so
@@ -805,6 +815,26 @@ React/Preact. Publish only as a **background-rendered technical preview**.
 
 ### Milestone 6 — main-thread first paint and background adoption (4–7 engineer-weeks)
 
+> **Progress (2026-07-21): private source/build implementation complete; formal
+> exit blocked.** Rspeedy application mode now builds the same authored entry
+> in two Rspack layers. The generated main graph installs the receiver, resolves
+> the exact `@octanejs/lynx` package root to a synchronous first-screen facade,
+> runs authored imports through a PrimJS-safe one-shot renderer, and releases an
+> explicit manual synchronization gate after synchronous initialization. The
+> main renderer emits deterministic initial host IDs and event markers without
+> publishing effects, refs, state ownership, or later updates; the background
+> graph retains the full Octane runtime. A clone-safe snapshot and opaque local
+> journal support compatible transfer without host allocation or structural
+> mutation, FIFO ordinary-event replay after background listener ownership,
+> typed deterministic mismatch repair, and teardown. Source, compiler, graph,
+> and official-JavaScript-host tests cover these contracts. Native list hosts,
+> list materializations, and background-root-scoped native-resource props
+> remain excluded from first-tree capture, and boolean `defer` keeps only its
+> Milestone 4 metadata behavior. There is no Lynx Web,
+> Explorer, Android, or iOS proof of first paint, native node identity, or
+> handoff, and no native performance evidence. The formal exit and IFR claim
+> therefore remain blocked.
+
 - Add a PrimJS-safe, render-only main-thread specialization and automatic DCE
   for effects, ordinary handlers, background-only functions, and unused imports.
 - Compile the same entry for main and background runtimes with identical init
@@ -828,6 +858,30 @@ mismatches are repaired or diagnosed deterministically. At this point Octane
 may claim Lynx IFR support.
 
 ### Milestone 7 — main-thread scripts, refs, and cross-thread calls (4–6 engineer-weeks)
+
+> **Progress (2026-07-21): private source/test implementation complete; formal
+> exit blocked.** The Octane universal compiler now recognizes leading
+> `'main thread'` and `'background only'` function directives for renderers that
+> opt into thread functions. It assigns source-stable IDs, removes
+> opposite-layer definitions and imports, serializes captures in deterministic
+> order, and reports source-attributed diagnostics for unsupported placement,
+> captures, hooks, async main-thread functions, `this`, JSX, and unavailable
+> layer imports.
+> `@octanejs/lynx` owns the descriptor registries, capture isolation, activation
+> and ref lifetimes, host prop/event/ref routing, and root-scoped bidirectional
+> call protocol. Main-thread event props use the pinned Lynx-compatible worklet
+> envelope, while refs are updated only with main-local Element PAPI nodes.
+> Calls support pre-adoption queuing, async values/errors, cancellation,
+> exactly-once settlement, and stale-root plus active/retained
+> definition-revision rejection. Raw descriptors that were never activated or
+> retained, removed module sites, and end-to-end runtime HMR remain Milestone 8
+> work. No ReactLynx component, Preact, transform, or worklet runtime is a
+> dependency. Compiler, protocol, driver, and official-JavaScript-host tests
+> cover those boundaries, but there is no Lynx Web, Explorer, Android, or iOS
+> proof that worklets execute on the native main thread, refs retain the adopted
+> native identity, or gestures and continuous events avoid a background round
+> trip. There is also no native latency, memory, or cleanup benchmark, so the
+> formal Milestone 7 and stable/IFR gates remain blocked.
 
 - Support `'main thread'` and `'background only'` directives, including import
   DCE and source-attributed diagnostics.

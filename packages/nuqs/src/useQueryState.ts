@@ -14,9 +14,7 @@ export type UseQueryStateReturn<Parsed, Default> = [
 		: Parsed,
 	(
 		value:
-			| null
-			| Parsed
-			| ((old: Default extends Parsed ? Parsed : Parsed | null) => Parsed | null),
+			null | Parsed | ((old: Default extends Parsed ? Parsed : Parsed | null) => Parsed | null),
 		options?: Options,
 	) => Promise<URLSearchParams>,
 ];

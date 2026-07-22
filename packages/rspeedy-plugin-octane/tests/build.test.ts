@@ -15,6 +15,7 @@ import { pluginOctane } from '../src/index.js';
 
 const FIXTURE = resolve(import.meta.dirname, '_fixtures/background');
 const APPLICATION_FIXTURE = resolve(import.meta.dirname, '_fixtures/application');
+const BACKGROUND_ONLY_MARKER = 'octane-milestone-six-background-only-callback';
 const FORBIDDEN_MODULE =
 	/(?:^|[\\/])(?:runtime(?:\.server)?|universal-dom-boundary|dom-tables)\.[cm]?[jt]sx?$|(?:^|[\\/])hydration(?:[\\/]|\.[cm]?[jt]sx?$)|(?:^|[\\/])(?:react|react-dom|preact)(?:[\\/]|$)|@lynx-js[\\/]react/i;
 
@@ -102,10 +103,17 @@ function containsEncodedText(content: Buffer, value: string): boolean {
 	return content.includes(Buffer.from(value)) || content.includes(Buffer.from(value, 'utf16le'));
 }
 
+function withoutKnownDiagnosticText(content: string): string {
+	// The native decoder includes receiver string tables. This describes a
+	// first-screen render phase; it is not a reference to the browser global.
+	return content.replaceAll('render window has closed', 'render phase has closed');
+}
+
 class MetadataProbePlugin {
 	constructor(
 		private readonly observed: unknown[],
 		private readonly moduleIdentifiers: string[],
+		private readonly layeredModules: { identifier: string; layer?: string | null }[],
 	) {}
 
 	apply(compiler: any): void {
@@ -114,8 +122,16 @@ class MetadataProbePlugin {
 				for (const module of modules) {
 					const record = module as {
 						identifier?: () => string;
+						layer?: string | null;
 						nameForCondition?: () => string | null;
 					};
+					const moduleIdentifier = record.identifier?.();
+					if (typeof moduleIdentifier === 'string') {
+						this.layeredModules.push({
+							identifier: moduleIdentifier,
+							...(record.layer === undefined ? null : { layer: record.layer }),
+						});
+					}
 					for (const identifier of [record.identifier?.(), record.nameForCondition?.()]) {
 						if (typeof identifier === 'string') this.moduleIdentifiers.push(identifier);
 					}
@@ -127,14 +143,18 @@ class MetadataProbePlugin {
 	}
 }
 
-function metadataProbe(observed: unknown[], moduleIdentifiers: string[]) {
+function metadataProbe(
+	observed: unknown[],
+	moduleIdentifiers: string[],
+	layeredModules: { identifier: string; layer?: string | null }[] = [],
+) {
 	return {
 		name: 'octane:lynx-runtime-graph-probe',
 		setup(api: any) {
 			api.modifyBundlerChain((chain: any) => {
 				chain
 					.plugin('octane:lynx-runtime-graph-probe')
-					.use(MetadataProbePlugin, [observed, moduleIdentifiers]);
+					.use(MetadataProbePlugin, [observed, moduleIdentifiers, layeredModules]);
 			});
 		},
 	};
@@ -250,7 +270,9 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 				const output = readJavaScript(outputRoot);
 				if (thread === 'background') expect(output).toContain('octane-phase1-es2017');
 				expect(output).not.toMatch(/\?\.|\?\?/);
-				expect(output).not.toMatch(/\b(?:document|window|HTMLElement|MutationObserver)\b/);
+				expect(withoutKnownDiagnosticText(output)).not.toMatch(
+					/\b(?:document|window|HTMLElement|MutationObserver)\b/,
+				);
 			} finally {
 				await result?.close();
 				rmSync(temporaryRoot, { recursive: true, force: true });
@@ -264,6 +286,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 		const outputRoot = join(temporaryRoot, 'dist');
 		const observed: unknown[] = [];
 		const moduleIdentifiers: string[] = [];
+		const layeredModules: { identifier: string; layer?: string | null }[] = [];
 		const styleSheets: string[] = [];
 		const debugMetadata: string[] = [];
 		const rspeedy = await createRspeedy({
@@ -285,7 +308,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 				splitChunks: false,
 				plugins: [
 					pluginOctane({ hmr: false, dev: false }),
-					metadataProbe(observed, moduleIdentifiers),
+					metadataProbe(observed, moduleIdentifiers, layeredModules),
 					nativeArtifactProbe(styleSheets, debugMetadata),
 				],
 			},
@@ -305,11 +328,19 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 			expect(mainThread).not.toMatch(/getCoreContext/);
 			expect(background).toMatch(/getCoreContext/);
 			expect(background).not.toMatch(/getJSContext/);
+			expect(mainThread).toContain('milestone-five');
+			expect(mainThread).toContain('Native bundle');
+			expect(mainThread).toContain('octane-m7-main-thread-worklet');
+			expect(mainThread).not.toContain('octane-m7-background-function');
+			expect(mainThread).not.toContain(BACKGROUND_ONLY_MARKER);
 			expect(background).toContain('milestone-five');
+			expect(background).not.toContain('octane-m7-main-thread-worklet');
+			expect(background).toContain('octane-m7-background-function');
+			expect(background).toContain(BACKGROUND_ONLY_MARKER);
 			expect(completeBundleText).not.toMatch(
 				/@lynx-js[\\/]react|ReactLynx|\b(?:react-dom|preact)\b/i,
 			);
-			expect(completeBundleText).not.toMatch(
+			expect(withoutKnownDiagnosticText(completeBundleText)).not.toMatch(
 				/\b(?:document|window|HTMLElement|MutationObserver)\b/,
 			);
 
@@ -336,8 +367,64 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 						transformKind: 'compile',
 						universalRuntime: { runtime: 'lynx', thread: 'background' },
 					}),
+					expect.objectContaining({
+						transformKind: 'compile',
+						universalRuntime: { runtime: 'lynx', thread: 'main-thread' },
+					}),
 				]),
 			);
+			const modulesForLayer = (layer: string) =>
+				new Set(
+					layeredModules
+						.filter((module) => module.layer === layer)
+						.map((module) =>
+							module.identifier
+								.slice(module.identifier.lastIndexOf('!') + 1)
+								.replace(/\|octane:(?:background|main-thread)$/, '')
+								.split('?', 1)[0]
+								.replaceAll('\\', '/'),
+						),
+				);
+			const hasSuffix = (modules: Set<string>, suffix: string) =>
+				[...modules].some((identifier) => identifier.endsWith(suffix));
+			const backgroundModules = modulesForLayer('octane:background');
+			const mainModules = modulesForLayer('octane:main-thread');
+			for (const suffix of [
+				'/packages/rspeedy-plugin-octane/tests/_fixtures/application/src/background.ts',
+				'/packages/rspeedy-plugin-octane/tests/_fixtures/application/src/App.tsrx',
+				'/packages/lynx/src/root.ts',
+			]) {
+				expect(hasSuffix(backgroundModules, suffix), `missing ${suffix} from background`).toBe(
+					true,
+				);
+			}
+			for (const suffix of [
+				'/packages/rspeedy-plugin-octane/tests/_fixtures/application/src/background.ts',
+				'/packages/rspeedy-plugin-octane/tests/_fixtures/application/src/App.tsrx',
+				'/packages/rspeedy-plugin-octane/src/main-thread-entry.js',
+				'/packages/rspeedy-plugin-octane/src/main-thread-ready.js',
+				'/packages/lynx/src/first-screen.ts',
+				'/packages/lynx/src/main-renderer.ts',
+			]) {
+				expect(hasSuffix(mainModules, suffix), `missing ${suffix} from main thread`).toBe(true);
+			}
+			for (const suffix of [
+				'/packages/rspeedy-plugin-octane/src/main-thread-entry.js',
+				'/packages/rspeedy-plugin-octane/src/main-thread-ready.js',
+				'/packages/lynx/src/first-screen.ts',
+				'/packages/lynx/src/main-renderer.ts',
+			]) {
+				expect(hasSuffix(backgroundModules, suffix), `unexpected ${suffix} in background`).toBe(
+					false,
+				);
+			}
+			for (const suffix of [
+				'/packages/lynx/src/root.ts',
+				'/packages/lynx/src/core/client-driver.ts',
+				'/packages/octane/src/universal-core.ts',
+			]) {
+				expect(hasSuffix(mainModules, suffix), `unexpected ${suffix} in main thread`).toBe(false);
+			}
 
 			const extractedCSS = styleSheets.join('\n');
 			expect(extractedCSS).toContain('#123456');
@@ -350,6 +437,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 			expect(moduleClass).toBeDefined();
 			expect(moduleClass).not.toBe('card');
 			expect(background).toContain(moduleClass!);
+			expect(mainThread).toContain(moduleClass!);
 			expect(bundle.includes(Buffer.from('#123456'))).toBe(true);
 			expect(bundle.includes(Buffer.from('application-shell'))).toBe(true);
 
@@ -357,6 +445,7 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 			expect(emittedAsset).toBeDefined();
 			expect(readFileSync(emittedAsset!, 'utf8')).toContain('data-octane-asset="milestone-five"');
 			expect(bundle.includes(Buffer.from(emittedAsset!.split(/[\\/]/).at(-1)!))).toBe(true);
+			expect(mainThread).toContain(emittedAsset!.split(/[\\/]/).at(-1)!);
 
 			expect(debugMetadata).toHaveLength(1);
 			const metadata = JSON.parse(debugMetadata[0]);
@@ -420,21 +509,25 @@ describe('@octanejs/rspeedy-plugin native production entries', () => {
 		let result: Awaited<ReturnType<typeof rspeedy.build>> | undefined;
 		try {
 			result = await rspeedy.build();
-			const main = nativeScriptText(
-				(await decodeNativeBundle(readFileSync(join(outputRoot, 'main.lynx.bundle'))))[
-					'background-thread-script'
-				],
+			const mainBundle = await decodeNativeBundle(
+				readFileSync(join(outputRoot, 'main.lynx.bundle')),
 			);
-			const secondary = nativeScriptText(
-				(await decodeNativeBundle(readFileSync(join(outputRoot, 'secondary.lynx.bundle'))))[
-					'background-thread-script'
-				],
+			const secondaryBundle = await decodeNativeBundle(
+				readFileSync(join(outputRoot, 'secondary.lynx.bundle')),
 			);
+			const main = nativeScriptText(mainBundle['background-thread-script']);
+			const mainFirstScreen = nativeScriptText(mainBundle['main-thread-script']);
+			const secondary = nativeScriptText(secondaryBundle['background-thread-script']);
+			const secondaryFirstScreen = nativeScriptText(secondaryBundle['main-thread-script']);
 
 			expect(main).toContain('Native bundle');
 			expect(main).not.toContain('Secondary bundle');
+			expect(mainFirstScreen).toContain('Native bundle');
+			expect(mainFirstScreen).not.toContain('Secondary bundle');
 			expect(secondary).toContain('Secondary bundle');
 			expect(secondary).not.toContain('Native bundle');
+			expect(secondaryFirstScreen).toContain('Secondary bundle');
+			expect(secondaryFirstScreen).not.toContain('Native bundle');
 		} finally {
 			await result?.close();
 			rmSync(temporaryRoot, { recursive: true, force: true });

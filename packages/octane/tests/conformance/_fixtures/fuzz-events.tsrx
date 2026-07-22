@@ -55,8 +55,6 @@ export function FuzzCounter() @{
 		<button id="b-two" onClick={handlerTwo}>{'two'}</button>
 		<button id="b-three" onClick={handlerThree}>{'three'}</button>
 		<button id="b-flush" onClick={handlerFlush}>{'flush'}</button>
-		<span id="out">
-			{n as number}
-		</span>
+		<span id="out">{n as number}</span>
 	</div>
 }

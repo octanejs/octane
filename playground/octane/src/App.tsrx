@@ -27,9 +27,10 @@ export function App() @{
 		</header>
 		<nav class="demo-nav">
 			@for (const d of DEMOS; key d.id) {
-				<button class={active === d.id ? 'active' : ''} onClick={() => setActive(d.id)}>
-					{d.label as string}
-				</button>
+				<button
+					class={active === d.id ? 'active' : ''}
+					onClick={() => setActive(d.id)}
+				>{d.label as string}</button>
 			}
 		</nav>
 		<main class="demo-stage">

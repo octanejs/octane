@@ -6,9 +6,7 @@ import { useState } from 'octane';
 export function IdentityList(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
-			<li data-k={String(item.id) as string}>
-				{item.label as string}
-			</li>
+			<li data-k={String(item.id) as string}>{item.label as string}</li>
 		}
 	</ul>
 }
@@ -21,9 +19,7 @@ export function StatefulIdentityList(props) @{
 	props.expose?.(setItems);
 	<ul>
 		@for (const item of items; key item.id) {
-			<li data-k={String(item.id) as string}>
-				{item.label as string}
-			</li>
+			<li data-k={String(item.id) as string}>{item.label as string}</li>
 		}
 	</ul>
 }

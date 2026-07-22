@@ -11,9 +11,7 @@ export function PromiseChildrenHost(props) @{
 		} @pending {
 			<span class="children-pending">{'Loading...'}</span>
 		} @catch (error) {
-			<span class="children-error">
-				{String(error.message) as string}
-			</span>
+			<span class="children-error">{String(error.message) as string}</span>
 		}
 	</>
 }
@@ -30,15 +28,11 @@ export function LazyChildrenHost(props) @{
 		} @pending {
 			<span class="children-pending">{'Loading...'}</span>
 		} @catch (error) {
-			<span class="children-error">
-				{String(error.message) as string}
-			</span>
+			<span class="children-error">{String(error.message) as string}</span>
 		}
 	</>
 }
 
 export function LazyChild(props) @{
-	<div class="lazy-child">
-		{String(props.children) as string}
-	</div>
+	<div class="lazy-child">{String(props.children) as string}</div>
 }

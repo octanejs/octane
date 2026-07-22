@@ -102,6 +102,7 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/nodes-ref.ts',
 				'src/core/protocol.ts',
 				'src/core/transport.ts',
+				'src/core/worklets.ts',
 				'src/resource.ts',
 				'src/root.ts',
 			],
@@ -110,6 +111,7 @@ describe('Lynx runtime compatibility evidence', () => {
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/main-thread.ts'))).toEqual({
 			files: [
 				'src/config.ts',
+				'src/core/first-screen.ts',
 				'src/core/host-driver.ts',
 				'src/core/host-props.ts',
 				'src/core/list.ts',
@@ -117,7 +119,11 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/nodes-ref.ts',
 				'src/core/papi.ts',
 				'src/core/protocol.ts',
+				'src/core/worklets.ts',
+				'src/first-screen.ts',
+				'src/main-renderer.ts',
 				'src/main-thread.ts',
+				'src/resource.ts',
 			],
 			packages: [],
 		});

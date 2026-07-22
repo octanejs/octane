@@ -1,16 +1,8 @@
 export type LynxNativeEventPrefix =
-	| 'bind'
-	| 'catch'
-	| 'capture-bind'
-	| 'capture-catch'
-	| 'global-bind';
+	'bind' | 'catch' | 'capture-bind' | 'capture-catch' | 'global-bind';
 
 export type LynxNativeEventPAPIType =
-	| 'bindEvent'
-	| 'catchEvent'
-	| 'capture-bind'
-	| 'capture-catch'
-	| 'global-bindEvent';
+	'bindEvent' | 'catchEvent' | 'capture-bind' | 'capture-catch' | 'global-bindEvent';
 
 export interface LynxNativeEventBinding {
 	readonly prefix: LynxNativeEventPrefix;
@@ -18,7 +10,13 @@ export interface LynxNativeEventBinding {
 	readonly name: string;
 }
 
+export interface LynxMainThreadEventBinding extends LynxNativeEventBinding {
+	readonly prop: string;
+}
+
 const EVENT_PROP = /^(capture-bind|capture-catch|global-bind|bind|catch)([A-Za-z]+)$/;
+const MAIN_THREAD_EVENT_PROP =
+	/^main-thread:(capture-bind|capture-catch|global-bind|bind|catch)([A-Za-z]+)$/;
 
 const EVENT_PAPI_TYPES: Readonly<Record<LynxNativeEventPrefix, LynxNativeEventPAPIType>> =
 	Object.freeze({
@@ -36,6 +34,20 @@ export function parseLynxNativeEventProp(name: string): LynxNativeEventBinding |
 	if (match === null) return null;
 	const prefix = match[1] as LynxNativeEventPrefix;
 	return Object.freeze({
+		prefix,
+		type: EVENT_PAPI_TYPES[prefix],
+		name: match[2]!,
+	});
+}
+
+/** Parse one direct main-thread worklet event prop into its Element PAPI tuple. */
+export function parseLynxMainThreadEventProp(name: string): LynxMainThreadEventBinding | null {
+	if (typeof name !== 'string') return null;
+	const match = MAIN_THREAD_EVENT_PROP.exec(name);
+	if (match === null) return null;
+	const prefix = match[1] as LynxNativeEventPrefix;
+	return Object.freeze({
+		prop: name,
 		prefix,
 		type: EVENT_PAPI_TYPES[prefix],
 		name: match[2]!,

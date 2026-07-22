@@ -14,9 +14,10 @@ import type { CardData } from './deopt-data';
 // the plain/compiled render-time ratio (the intra-octane authoring cliff).
 
 export function Avatar(props: { initials: string; hue: number }) @{
-	<span class="avatar" style={{ background: 'hsl(' + props.hue + ',60%,50%)' }}>
-		{props.initials as string}
-	</span>
+	<span
+		class="avatar"
+		style={{ background: 'hsl(' + props.hue + ',60%,50%)' }}
+	>{props.initials as string}</span>
 }
 
 export function Card(props: { c: CardData }) @{
@@ -28,17 +29,11 @@ export function Card(props: { c: CardData }) @{
 		style={{ width: c.width + 'px' }}
 	>
 		<Avatar initials={c.initials} hue={c.hue} />
-		<h3 class="name">
-			{c.name as string}
-		</h3>
-		<p class="role">
-			{c.role as string}
-		</p>
+		<h3 class="name">{c.name as string}</h3>
+		<p class="role">{c.role as string}</p>
 		<ul class="tags">
 			@for (const t of c.tags; key t) {
-				<li class="tag">
-					{t as string}
-				</li>
+				<li class="tag">{t as string}</li>
 			}
 		</ul>
 	</article>

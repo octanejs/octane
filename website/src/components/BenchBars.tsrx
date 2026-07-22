@@ -153,12 +153,8 @@ export function BenchBars(props: { card: BenchCard }) @{
 
 	<figure class="bench-card">
 		<figcaption class="bench-card-head">
-			<span class="bench-card-title">
-				{card.title as string}
-			</span>
-			<span class="bench-card-desc">
-				{card.description as string}
-			</span>
+			<span class="bench-card-title">{card.title as string}</span>
+			<span class="bench-card-desc">{card.description as string}</span>
 		</figcaption>
 		@if (compare) {
 			<div class="bench-ops" role="group" aria-label="Operation">
@@ -167,27 +163,21 @@ export function BenchBars(props: { card: BenchCard }) @{
 					class={['bench-op', { 'bench-op-on': overall }]}
 					aria-pressed={overall}
 					onClick={() => setOp(OVERALL_OP)}
-				>
-					{OVERALL_OP as string}
-				</button>
+				>{OVERALL_OP as string}</button>
 				@for (const r of card.rows; key r.op) {
 					<button
 						type="button"
 						class={['bench-op', { 'bench-op-on': r.op === op }]}
 						aria-pressed={r.op === op}
 						onClick={() => setOp(r.op as string)}
-					>
-						{r.op as string}
-					</button>
+					>{r.op as string}</button>
 				}
 			</div>
 		}
 		<div class="bench-plot" aria-hidden="true">
 			@for (const item of bars.present; key item.key) {
 				<div class="bench-row">
-					<span class="bench-row-label" title={item.label}>
-						{item.label as string}
-					</span>
+					<span class="bench-row-label" title={item.label}>{item.label as string}</span>
 					<div class="bench-track">
 						<div
 							class="bench-fill"
@@ -199,17 +189,13 @@ export function BenchBars(props: { card: BenchCard }) @{
 								item.value / bars.scaleMax > 0.62 ? 'bench-val-in' : 'bench-val-out',
 							]}
 							style={'left:' + (item.value / bars.scaleMax) * 100 + '%'}
-						>
-							{valueFormat(item.value) as string}
-						</span>
+						>{valueFormat(item.value) as string}</span>
 					</div>
 				</div>
 			}
 			@for (const item of bars.missing; key item.key) {
 				<div class="bench-row bench-row-empty">
-					<span class="bench-row-label" title={item.label}>
-						{item.label as string}
-					</span>
+					<span class="bench-row-label" title={item.label}>{item.label as string}</span>
 					<div class="bench-track">
 						<span class="bench-val bench-val-out bench-muted" style="left:0">{'—'}</span>
 					</div>
@@ -223,26 +209,20 @@ export function BenchBars(props: { card: BenchCard }) @{
 			</p>
 		}
 		<details class="bench-table">
-			<summary>
-				{tableCaption as string}
-			</summary>
+			<summary>{tableCaption as string}</summary>
 			<table>
 				<thead>
 					<tr>
 						<th scope="col">operation</th>
 						@for (const s of card.series; key s.key) {
-							<th scope="col">
-								{s.label as string}
-							</th>
+							<th scope="col">{s.label as string}</th>
 						}
 					</tr>
 				</thead>
 				<tbody>
 					@for (const row of card.rows; key row.op) {
 						<tr>
-							<th scope="row">
-								{row.op as string}
-							</th>
+							<th scope="row">{row.op as string}</th>
 							@for (const s of card.series; key s.key) {
 								<td>{format(row[s.key])}</td>
 							}

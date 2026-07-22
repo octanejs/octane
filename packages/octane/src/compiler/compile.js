@@ -3,7 +3,8 @@
  * runtime.
  *
  * Architecture:
- *   1. Parse TSRX via @tsrx/core's parseModule.
+ *   1. Parse TSRX via @tsrx/core's parseModule and run its target-neutral
+ *      semantic analysis on the authored module.
  *   2. For each top-level node:
  *        - Component (`@{ … }` body or a return-JSX function) → compile to a
  *          function taking the props-first ABI `(…userParams, __s, __extra)`.
@@ -27,8 +28,9 @@
  */
 
 import {
-	parseModule,
 	analyzeCss,
+	analyzeTsrx,
+	parseModule,
 	prepareStylesheetForRender,
 	renderStylesheets,
 	annotateWithHash,
@@ -69,6 +71,8 @@ import {
 	MUST_USE_PROPERTY_PROPS,
 	POSITIVE_NUMERIC_ATTR_PROPS,
 	SVG_ONLY_TAGS,
+	HTML_ONLY_TAGS,
+	MATHML_ONLY_TAGS,
 	ATTRIBUTE_ALIASES,
 	isEnumeratedBooleanAttr,
 	cssStyleValue,
@@ -1334,6 +1338,23 @@ function nsForRootTag(node, parentNs) {
 	if (t === 'math') return 'mathml';
 	if (t !== null && SVG_ONLY_TAGS.has(t)) return 'svg';
 	return parentNs;
+}
+
+// Static namespace of one root of an 'opaque' (component-destination) template
+// whose tag didn't already imply SVG/MathML via nsForRootTag. A root tag that
+// exists in exactly one namespace parses the same way at every destination, so
+// the template can bake the concrete flag and skip clone()'s per-destination
+// namespace resolution. Non-element roots (text, `<!>` anchors, comments) are
+// namespace-neutral — the HTML5 parser produces identical nodes for them under
+// any wrapper — so they resolve as HTML. Ambiguous names (`a`, `script`,
+// `style`, `title`, `font`), custom elements, and unknown/legacy tags return
+// 'opaque': only clone()'s actual-parent walk can namespace those correctly.
+function staticNsForOpaqueRoot(node) {
+	const t = elementTagName(node);
+	if (t === null) return 'html';
+	if (HTML_ONLY_TAGS.has(t)) return 'html';
+	if (MATHML_ONLY_TAGS.has(t)) return 'mathml';
+	return 'opaque';
 }
 
 // ---------------------------------------------------------------------------
@@ -4262,23 +4283,48 @@ function restampAuthoredStyleHashes(ast, styleRemap, filename) {
 	}
 }
 
+function cleanCompileFilename(filename) {
+	const query = filename.indexOf('?');
+	// A leading `#` is a Node package-import alias, not a URL fragment.
+	const hash = filename.indexOf('#', filename.startsWith('#') ? 1 : 0);
+	let end = filename.length;
+	if (query !== -1) end = query;
+	if (hash !== -1 && hash < end) end = hash;
+	return filename.slice(0, end);
+}
+
 export function compile(source, filename, options) {
-	const authoredSource = source;
+	return compileAuthored(source, filename, options, null);
+}
+
+// Internal bundler entry point. Unlike the old __hydratePrepared handoff, this
+// always validates authored source and only exposes the hydrate slice that the
+// same compilation already prepared for production void-export classification.
+export function compileForBundler(source, filename, options) {
+	const metadata = { hydrateSource: source };
+	const result = compileAuthored(source, filename, options, metadata);
+	return { result, hydrateSource: metadata.hydrateSource };
+}
+
+function compileAuthored(source, filename, options, bundlerMetadata) {
 	const mode = (options && options.mode) || 'client';
 	if (mode !== 'client' && mode !== 'server') {
 		throw new Error(`Unknown compile mode "${mode}" — expected 'client' or 'server'.`);
 	}
+	const cleanFilename = cleanCompileFilename(filename);
+	const analyzedAst = parseModule(source, cleanFilename);
+	analyzeTsrx(analyzedAst, cleanFilename);
+	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
+}
+
+function compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata) {
+	const authoredSource = source;
 	const universalRuntime = normalizeUniversalRuntime(options?.universalRuntime);
 	if (!options?.__rendererBoundariesLowered) {
 		assertUniversalRuntimeTarget(universalRuntime, mode, options?.renderer);
 	}
 	if (!options?.__hydratePrepared) {
-		const query = filename.indexOf('?');
-		const hash = filename.indexOf('#');
-		let filenameEnd = filename.length;
-		if (query !== -1) filenameEnd = query;
-		if (hash !== -1 && hash < filenameEnd) filenameEnd = hash;
-		const cleanFilename = filename.slice(0, filenameEnd);
+		const cleanFilename = cleanCompileFilename(filename);
 		const hydratePreparation =
 			mode === 'client'
 				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
@@ -4286,23 +4332,38 @@ export function compile(source, filename, options) {
 		if (hydratePreparation !== null) {
 			const nativeChangeDiagnostics =
 				options?.__nativeChangeDiagnostics ??
-				analyzeNativeChangeDiagnostics(parseModule(source, cleanFilename), source, cleanFilename, {
-					dom: options?.renderer?.target !== 'universal',
-					renderer: options?.renderer,
-					rendererBoundaries: options?.rendererBoundaries,
-					rendererRegistry: options?.rendererRegistry,
-				}).diagnostics;
-			const compiled = compile(hydratePreparation.source, cleanFilename, {
-				...options,
-				__hydratePrepared: true,
-				__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
-				__nativeChangeDiagnostics: nativeChangeDiagnostics,
-				__styleRemap: composeStyleRemap(
-					options?.__styleRemap ?? null,
-					authoredSource,
-					hydratePreparation.origins ?? null,
-				),
-			});
+				analyzeNativeChangeDiagnostics(
+					analyzedAst ?? parseModule(source, cleanFilename),
+					source,
+					cleanFilename,
+					{
+						dom: options?.renderer?.target !== 'universal',
+						renderer: options?.renderer,
+						rendererBoundaries: options?.rendererBoundaries,
+						rendererRegistry: options?.rendererRegistry,
+					},
+				).diagnostics;
+			if (bundlerMetadata !== null) {
+				bundlerMetadata.hydrateSource = hydratePreparation.source;
+			}
+			const compiled = compileInternal(
+				hydratePreparation.source,
+				cleanFilename,
+				{
+					...options,
+					__hydratePrepared: true,
+					__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
+					__nativeChangeDiagnostics: nativeChangeDiagnostics,
+					__styleRemap: composeStyleRemap(
+						options?.__styleRemap ?? null,
+						authoredSource,
+						hydratePreparation.origins ?? null,
+					),
+				},
+				null,
+				mode,
+				null,
+			);
 			if (hydratePreparation.map && compiled.map) {
 				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
 				compiled.map = addSourceMapNeedles(
@@ -4336,7 +4397,7 @@ export function compile(source, filename, options) {
 			(serverBoundaryPreparation === null
 				? undefined
 				: analyzeNativeChangeDiagnostics(
-						parseModule(authoredSource, filename),
+						analyzedAst ?? parseModule(authoredSource, filename),
 						authoredSource,
 						filename,
 						{
@@ -4368,6 +4429,7 @@ export function compile(source, filename, options) {
 					: { __nativeChangeDiagnostics: serverAuthoredDiagnostics }),
 			},
 			serverStyleRemap,
+			serverBoundaryPreparation === null ? analyzedAst : null,
 		);
 		if (serverBoundaryPreparation?.map && compiled.map) {
 			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
@@ -4388,7 +4450,7 @@ export function compile(source, filename, options) {
 		(rendererBoundaryPreparation === null
 			? null
 			: analyzeNativeChangeDiagnostics(
-					parseModule(authoredSource, filename),
+					analyzedAst ?? parseModule(authoredSource, filename),
 					authoredSource,
 					filename,
 					{
@@ -4437,24 +4499,31 @@ export function compile(source, filename, options) {
 					domSource = expanded.source;
 					expansionMap = expanded.map;
 				}
-				const compiled = compile(domSource, filename, {
-					...options,
-					renderer: undefined,
-					universalRuntime: undefined,
-					rendererBoundaries: undefined,
-					rendererRegistry: undefined,
-					__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
-					__rendererBoundariesLowered: true,
-					__universal: universal,
-					__universalUnits: rendererBoundaryPreparation?.universalUnits,
-					// The owning universal source is outside the DOM diagnostic contract.
-					// Runtime-created DOM boundary hosts retain the development fallback.
-					__nativeChangeDiagnostics: [],
-					// The lowered/expanded text has its own coordinates, and
-					// universal targets are client-only (no server hash to agree
-					// with) — do not restamp against stale origins.
-					__styleRemap: undefined,
-				});
+				const compiled = compileInternal(
+					domSource,
+					filename,
+					{
+						...options,
+						renderer: undefined,
+						universalRuntime: undefined,
+						rendererBoundaries: undefined,
+						rendererRegistry: undefined,
+						__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
+						__rendererBoundariesLowered: true,
+						__universal: universal,
+						__universalUnits: rendererBoundaryPreparation?.universalUnits,
+						// The owning universal source is outside the DOM diagnostic contract.
+						// Runtime-created DOM boundary hosts retain the development fallback.
+						__nativeChangeDiagnostics: [],
+						// The lowered/expanded text has its own coordinates, and
+						// universal targets are client-only (no server hash to agree
+						// with) — do not restamp against stale origins.
+						__styleRemap: undefined,
+					},
+					null,
+					mode,
+					null,
+				);
 				if (expansionMap !== null) {
 					compiled.map = composeSourceMaps(compiled.map, expansionMap);
 					compiled.__universalSourceMapComposed = true;
@@ -4462,9 +4531,11 @@ export function compile(source, filename, options) {
 				}
 				return compiled;
 			},
-			validationRemap !== null
-				? { ...options, __universalValidationRemap: validationRemap }
-				: options,
+			{
+				...options,
+				...(validationRemap === null ? null : { __universalValidationRemap: validationRemap }),
+			},
+			rendererBoundaryPreparation === null ? analyzedAst : null,
 		);
 		if (rendererBoundaryPreparation !== null && result.map && !reverseSourceMapComposed) {
 			result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
@@ -4482,7 +4553,10 @@ export function compile(source, filename, options) {
 			diagnostics: rendererAuthoredDiagnostics ?? [],
 		};
 	}
-	const ast = parseModule(source, filename);
+	const ast =
+		rendererBoundaryPreparation === null && analyzedAst !== null
+			? analyzedAst
+			: parseModule(source, filename);
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(ast, source, filename, {
@@ -5418,8 +5492,8 @@ function ssrUnsupported(what) {
 	);
 }
 
-function compileServer(source, filename, options, styleRemap = null) {
-	const ast = parseModule(source, filename);
+function compileServer(source, filename, options, styleRemap = null, analyzedAst = null) {
+	const ast = analyzedAst ?? parseModule(source, filename);
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(ast, source, filename, {
@@ -5753,7 +5827,55 @@ function ssrCompileBody(
 		ctx._pendingWarm = warm.warmSrc;
 	}
 	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
-	const rewritten = workingStatements
+	const preparedStatements = workingStatements.map((statement) =>
+		lowerSetupValueDirectives(statement, (directive) => {
+			const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
+			const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
+			const sub = ssrCompileSub(
+				[preparedDirective],
+				ctx,
+				'__sfragment',
+				[],
+				cssHash,
+				'opaque',
+				null,
+				true,
+				true,
+			);
+			inlinedSubs.push(sub.fn + ';');
+			// The fragment body stays local so it can close over setup values, while
+			// this per-site module wrapper gives server replays a stable component
+			// identity. Its descriptor also preserves the component-bearing child
+			// marker shape expected by hostElementBody hydration on the client.
+			ctx.hoistedHelpers.push(
+				`function ${wrapperName}(props, __s) { return props.body(undefined, __s); }`,
+			);
+			ctx.runtimeNeeded.add('createElement');
+			return {
+				type: 'CallExpression',
+				callee: { type: 'Identifier', name: '_$createElement' },
+				arguments: [
+					{ type: 'Identifier', name: wrapperName },
+					{
+						type: 'ObjectExpression',
+						properties: [
+							{
+								type: 'Property',
+								key: { type: 'Identifier', name: 'body' },
+								value: { type: 'Identifier', name: sub.fnName },
+								kind: 'init',
+								method: false,
+								shorthand: false,
+								computed: false,
+							},
+						],
+					},
+				],
+				optional: false,
+			};
+		}),
+	);
+	const rewritten = preparedStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
 	const setupCode = rewritten.map((s) => '  ' + printNode(s).replace(/\n/g, '\n  ')).join('\n');
@@ -7643,12 +7765,24 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	}
 	ctx._puInlineLowering = prevPuInlineLowering;
 
+	const preparedStatements = workingStatements.map((statement) =>
+		lowerSetupValueDirectives(statement, (directive) =>
+			lowerHostFragment(
+				setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+				ctx,
+				inlinedSubs,
+				'opaque',
+				cssHash,
+			),
+		),
+	);
+
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
 	// is hoisted as a render function in inlinedSubs and replaced with an
 	// identifier reference. Suitable for top-level render-prop patterns where
 	// the block doesn't capture local arrow params.
-	const rewrittenStatements = workingStatements
+	const rewrittenStatements = preparedStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, options?.localHookSlots === true))
 		.map((s) => rewriteTsrxBlocks(s, ctx, name, inlinedSubs))
 		// JSX component element at VALUE position in setup (e.g. `const el = <App/>`)
@@ -10607,9 +10741,21 @@ function compileReturnJsxFunction(node, ctx, options) {
 		// void-body signal at runtime. Preserve JSX roots for the specialized lowering
 		// below, but normalize every other owned return to an explicit empty value.
 		const s = normalizeOwnRenderableReturns(sourceStatement, true);
+		const prepared =
+			s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument)
+				? s
+				: lowerSetupValueDirectives(s, (directive) =>
+						lowerHostFragment(
+							setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+							ctx,
+							compInlinedSubs,
+							'opaque',
+							cssHash,
+						),
+					);
 		// Same hook handling as the `@{}` path: base hooks take a trailing hook slot,
 		// custom hooks are wrapped in withSlot (unified across both component forms).
-		const h = rewriteHookCalls(s, ctx, name);
+		const h = rewriteHookCalls(prepared, ctx, name);
 		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
@@ -11322,6 +11468,101 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 		}
 		return null;
 	});
+}
+
+const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
+	'JSXIfExpression',
+	'JSXForExpression',
+	'JSXSwitchExpression',
+	'JSXTryExpression',
+	'JSXCodeBlock',
+]);
+
+function setupDirectiveFragment(directive) {
+	return {
+		type: 'JSXFragment',
+		children: [directive],
+		loc: directive.loc,
+		start: directive.start,
+		end: directive.end,
+	};
+}
+
+function prepareSetupValueDirective(directive, ctx, componentName) {
+	// These descriptor-backed directives become synthetic branch bodies after the
+	// owning component's render-tree pass has already run. Give eligible @if/@try
+	// arms Pass A now (the walk deliberately retains its @for/@switch v1 exclusions)
+	// so use()-argument creations keep the same replay-safe identity as directives
+	// in returned JSX. The descriptor may never be rendered, so keep its creation
+	// and warm records out of the owner's speculative warm plan.
+	const prevPuInlineLowering = ctx._puInlineLowering;
+	ctx._puInlineLowering =
+		ctx.inlineHookMemo && ctx.mode !== 'server' && ctx._universalRuntimeUnit == null;
+	try {
+		const prepared = parallelUseWalkJsx([directive], ctx, componentName, [], [], [], new Set())[0];
+		// A first-class descriptor can be inserted under HTML, SVG, or MathML.
+		// Preserve that runtime namespace decision for ambiguous descendants such
+		// as <title>, exactly like returned descriptor-backed fragments do.
+		const opaque = rewriteOpaqueTitles(prepared, ctx, 'opaque');
+		if (opaque.type !== 'JSXCodeBlock') return opaque;
+		// Render-only child blocks are transparent grouping; normalize them now so
+		// the server does not mistake the code-block node for another setup value
+		// and recurse indefinitely. normalizeChildren also owns the durable error
+		// for setup-bearing child blocks, keeping client/server diagnostics aligned.
+		return {
+			type: 'JSXFragment',
+			children: normalizeChildren([opaque]),
+			loc: opaque.loc,
+			start: opaque.start,
+			end: opaque.end,
+		};
+	} finally {
+		ctx._puInlineLowering = prevPuInlineLowering;
+	}
+}
+
+// Setup JSX is still a first-class element value: keep its authored outer
+// host/component descriptor (including key/ref/cloneElement behavior) and
+// replace only compiler-owned directive children with a renderable fragment.
+// Nested functions are separate lexical owners; lowering them with the outer
+// component's helper list would strand callback params outside their scope.
+function lowerSetupValueDirectives(node, lowerDirective) {
+	return visit(node);
+
+	function visit(current) {
+		if (current == null || typeof current !== 'object') return current;
+		if (Array.isArray(current)) {
+			let out = current;
+			for (let index = 0; index < current.length; index++) {
+				const value = visit(current[index]);
+				if (value !== current[index]) {
+					if (out === current) out = current.slice();
+					out[index] = value;
+				}
+			}
+			return out;
+		}
+		if (isFunctionNode(current)) return current;
+		if (SETUP_VALUE_DIRECTIVE_TYPES.has(current.type)) {
+			return {
+				type: 'JSXExpressionContainer',
+				expression: lowerDirective(current),
+				loc: current.loc,
+				start: current.start,
+				end: current.end,
+			};
+		}
+		let out = current;
+		for (const key in current) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			const value = visit(current[key]);
+			if (value !== current[key]) {
+				if (out === current) out = { ...current };
+				out[key] = value;
+			}
+		}
+		return out;
+	}
 }
 
 /**
@@ -12782,9 +13023,14 @@ function planJsx(
 		//     the inner root.
 		//   - SVG/MathML multi-root: pass ns + frag=1; runtime wraps and returns
 		//     the wrap itself (caller drains its children — no <octane-frag>).
-		//   - Opaque component bodies/children: pass flag 3 (+ frag=1 for multiple
-		//     roots); clone() resolves and caches the concrete namespace from the
-		//     render block's actual parent.
+		//   - Opaque component bodies/children whose root tags pin the namespace
+		//     statically (every root exists in exactly one namespace — see
+		//     staticNsForOpaqueRoot) compile like fixed HTML/SVG/MathML templates:
+		//     the parse is identical at every destination, so pay nothing per
+		//     clone. Only genuinely ambiguous roots (`a`, `title`, custom/unknown
+		//     tags, mixed fragments) pass flag 3 (+ frag=1 for multiple roots);
+		//     clone() resolves and caches the concrete namespace from the render
+		//     block's actual parent.
 		// Multi-root fragments at an HTML parent imply SVG only when EVERY element
 		// root does (an all-SVG fragment — e.g. portal children `<rect/><g/>` — must
 		// parse in foreign content; a MIXED fragment can't share one wrapper, so it
@@ -12798,16 +13044,41 @@ function planJsx(
 			(single
 				? !isNonHtmlRootTag(jsxNodes[0]) // svg/math/SVG-only root means non-HTML ns
 				: !fragImpliesSvg);
-		const tplNs = isHtmlNs
+		let tplNs = isHtmlNs
 			? 'html'
 			: single
 				? nsForRootTag(jsxNodes[0], parentNs)
 				: (parentNs === 'html' || parentNs === 'opaque') && fragImpliesSvg
 					? 'svg'
 					: parentNs;
+		// A resolved-HTML multi-root ships raw markup + frag=1 (parseTemplate adds
+		// the <octane-frag> wrapper) instead of the fixed-HTML path's pre-wrapped
+		// string: same parsed DOM, but the template literal stays as small as the
+		// opaque form it replaces.
+		let resolvedFrag = false;
+		if (tplNs === 'opaque') {
+			// Component-destination template whose root tags didn't imply SVG:
+			// resolve the namespace statically when every root pins the same one.
+			if (single) {
+				tplNs = staticNsForOpaqueRoot(jsxNodes[0]);
+			} else {
+				let resolved = null; // null = only namespace-neutral roots so far
+				for (const root of elementRoots) {
+					const ns = staticNsForOpaqueRoot(root);
+					if (ns === 'opaque' || (resolved !== null && ns !== resolved)) {
+						resolved = 'opaque';
+						break;
+					}
+					resolved = ns;
+				}
+				tplNs = resolved === null ? 'html' : resolved;
+				resolvedFrag = tplNs !== 'opaque';
+			}
+		}
 		const flag = nsFlag(tplNs);
-		const fragArg = !single && flag !== 0 ? 1 : 0;
-		const tplHtml = single || flag !== 0 ? html : `<octane-frag>${html}</octane-frag>`;
+		const fragArg = !single && (flag !== 0 || resolvedFrag) ? 1 : 0;
+		const tplHtml =
+			single || flag !== 0 || resolvedFrag ? html : `<octane-frag>${html}</octane-frag>`;
 		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root

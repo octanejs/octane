@@ -79,9 +79,7 @@ export function SearchResults(props) @{
 	} @else {
 		<ul>
 			@for (const result of props.results; key result.id) {
-				<li>
-					{result.name as string}
-				</li>
+				<li>{result.name as string}</li>
 			} @empty {
 				<li>No matches</li>
 			}

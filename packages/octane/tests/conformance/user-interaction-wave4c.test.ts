@@ -160,9 +160,7 @@ function preservesPreHydrationState(
 	try {
 		container.innerHTML = renderToString(server[component], renderProps).html;
 		const field = container.querySelector(selector) as
-			| HTMLInputElement
-			| HTMLTextAreaElement
-			| HTMLSelectElement;
+			HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 		expect(field[key]).toBe(initial);
 
 		if (key === 'value' && field instanceof HTMLSelectElement) {

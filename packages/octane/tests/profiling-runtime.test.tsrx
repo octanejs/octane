@@ -14,9 +14,7 @@ import { App as ContextApp } from './_fixtures/context-bailout.tsrx';
 import { makeStore, Reader } from './_fixtures/sync-external-store.tsrx';
 
 function CounterLeaf(props) @{
-	<span>
-		{props.count as string}
-	</span>
+	<span>{props.count as string}</span>
 }
 
 function StaticBadgeImpl() @{
@@ -35,9 +33,7 @@ function CounterApp() @{
 
 function SuspendingChild(props) @{
 	const value = use(props.promise);
-	<strong>
-		{value as string}
-	</strong>
+	<strong>{value as string}</strong>
 }
 
 function SuspenseApp(props) @{
@@ -66,9 +62,7 @@ function useCounter() {
 
 function CustomHookCounter() @{
 	const [count, setCount] = useCounter();
-	<button onClick={() => setCount(count + 1)}>
-		{count as string}
-	</button>
+	<button onClick={() => setCount(count + 1)}>{count as string}</button>
 }
 
 function DeferredLabel() @{
@@ -90,9 +84,7 @@ function TransitionRebaseApp(props) @{
 		>
 			{isPending ? 'pending' : 'stage'}
 		</button>
-		<button id="urgent" onClick={() => setValue(0)}>
-			{value as string}
-		</button>
+		<button id="urgent" onClick={() => setValue(0)}>{value as string}</button>
 	</>
 }
 
@@ -101,9 +93,7 @@ let updateMemoChild = () => {};
 function MemoChildImpl() @{
 	const [count, setCount] = useState(0);
 	updateMemoChild = () => setCount(count + 1);
-	<span>
-		{count as string}
-	</span>
+	<span>{count as string}</span>
 }
 const MemoChild = memo(MemoChildImpl);
 
@@ -115,9 +105,7 @@ function ParentAndChildUpdateApp() @{
 				setCount(count + 1);
 				updateMemoChild();
 			}}
-		>
-			{count as string}
-		</button>
+		>{count as string}</button>
 		<MemoChild />
 	</>
 }

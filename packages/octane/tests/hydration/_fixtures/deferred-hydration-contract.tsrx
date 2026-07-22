@@ -1,9 +1,7 @@
 import { Hydrate, use } from 'octane';
 
 function ContractButton(props) @{
-	<button id={props.id} onClick={props.onClick}>
-		{props.label as string}
-	</button>
+	<button id={props.id} onClick={props.onClick}>{props.label as string}</button>
 }
 
 export function EarlyInteractionHydration(props) @{
@@ -25,9 +23,7 @@ function ActivationSuspendingChild(props) @{
 
 export function ActivationSuspendingHydration(props) @{
 	<>
-		<span id="activation-shell">
-			{props.shellLabel as string}
-		</span>
+		<span id="activation-shell">{props.shellLabel as string}</span>
 		<Hydrate
 			when={props.when}
 			split={false}

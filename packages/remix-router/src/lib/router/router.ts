@@ -810,8 +810,7 @@ interface ShortCircuitable {
 // processRouteLoaderData
 //
 type PendingActionResult =
-	| [string, SuccessResult | ErrorResult]
-	| [string, SuccessResult | ErrorResult, string];
+	[string, SuccessResult | ErrorResult] | [string, SuccessResult | ErrorResult, string];
 
 interface HandleActionResult extends ShortCircuitable {
 	/**
@@ -3578,9 +3577,7 @@ export function createRouter(init: RouterInit): Router {
 	};
 	type DiscoverRoutesAbortedResult = { type: 'aborted' };
 	type DiscoverRoutesResult =
-		| DiscoverRoutesSuccessResult
-		| DiscoverRoutesErrorResult
-		| DiscoverRoutesAbortedResult;
+		DiscoverRoutesSuccessResult | DiscoverRoutesErrorResult | DiscoverRoutesAbortedResult;
 
 	async function discoverRoutes(
 		matches: DataRouteMatch[],
@@ -5448,13 +5445,11 @@ function isSameRoute(newRoute: RouteObject, existingRoute: RouteObject): boolean
 	}
 
 	// Second is by pathing differences
-	if (
-		!(
-			newRoute.index === existingRoute.index &&
-			newRoute.path === existingRoute.path &&
-			newRoute.caseSensitive === existingRoute.caseSensitive
-		)
-	) {
+	if (!(
+		newRoute.index === existingRoute.index &&
+		newRoute.path === existingRoute.path &&
+		newRoute.caseSensitive === existingRoute.caseSensitive
+	)) {
 		return false;
 	}
 
