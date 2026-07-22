@@ -56,26 +56,20 @@ export function DuplicateReadIsland() @{
 export function ConditionalHostReadIsland(props) @{
 	const theme =
 		props.read ? use(HostTheme) : '(off)';
-	<p class="cond-read">
-		{'theme:' + theme as string}
-	</p>
+	<p class="cond-read">{'theme:' + theme as string}</p>
 }
 
 /** Discovers the React context AND suspends in the same attempt (§6.2 step 7). */
 export function ThemeAndResourceIsland(props) @{
 	const theme = use(HostTheme);
 	const value = use(props.resource);
-	<p class="theme-resource">
-		{theme + ':' + value as string}
-	</p>
+	<p class="theme-resource">{theme + ':' + value as string}</p>
 }
 
 function GuardedReader(props) @{
 	const theme =
 		props.read === false ? '(off)' : use(HostTheme);
-	<p class="guard-theme">
-		{'theme:' + theme as string}
-	</p>
+	<p class="guard-theme">{'theme:' + theme as string}</p>
 }
 
 /**

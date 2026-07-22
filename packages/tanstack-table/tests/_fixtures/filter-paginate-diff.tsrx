@@ -48,9 +48,7 @@ export function FilterPaginate() @{
 		<button id="ps-20" onClick={() => table.setPageSize(20)}>20</button>
 		<ul>
 			@for (const row of table.getRowModel().rows; key row.id) {
-				<li>
-					{row.original.name as string}
-				</li>
+				<li>{row.original.name as string}</li>
 			}
 		</ul>
 	</div>

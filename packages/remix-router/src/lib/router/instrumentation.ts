@@ -49,8 +49,7 @@ export type InstrumentationResultMeta = {
  * instrumented loaders, actions, middleware, and lazy route functions.
  */
 export type InstrumentationHandlerResult =
-	| { status: 'success'; error: undefined }
-	| { status: 'error'; error: Error };
+	{ status: 'success'; error: undefined } | { status: 'error'; error: Error };
 
 /**
  * Result returned by client-side router instrumented navigation and fetcher
@@ -561,8 +560,7 @@ export function consumeInstrumentationClientResultMetaReceiver(
 }
 
 type RecurseResult<TResult> =
-	| { type: 'success'; value: TResult }
-	| { type: 'error'; value: unknown };
+	{ type: 'success'; value: TResult } | { type: 'error'; value: unknown };
 
 function throwOrReturnResult<TResult>(result: RecurseResult<TResult>): TResult {
 	if (result.type === 'error') {

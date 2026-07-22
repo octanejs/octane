@@ -23,9 +23,7 @@ export function LazyHost(props) @{
 		} @pending {
 			<div class="fallback">{'loading'}</div>
 		} @catch (err) {
-			<div class="error">
-				{'caught: ' + err.message as string}
-			</div>
+			<div class="error">{'caught: ' + err.message as string}</div>
 		}
 	</>
 }

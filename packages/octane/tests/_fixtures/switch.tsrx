@@ -23,9 +23,7 @@ export function PickKind(props) @{
 export function Cycle() @{
 	const [n, setN] = useState(0);
 	<div>
-		<button id="bump" onClick={() => setN(n + 1)}>
-			{n as string}
-		</button>
+		<button id="bump" onClick={() => setN(n + 1)}>{n as string}</button>
 		@switch (n % 3) {
 			@case 0: {
 				<span class="out" data-step="0">{'zero'}</span>
@@ -58,21 +56,15 @@ export function NoDefault(props) @{
 export function HookInCase() @{
 	const [outer, setOuter] = useState('x');
 	<div>
-		<button id="swap" onClick={() => setOuter(outer === 'x' ? 'y' : 'x')}>
-			{outer as string}
-		</button>
+		<button id="swap" onClick={() => setOuter(outer === 'x' ? 'y' : 'x')}>{outer as string}</button>
 		@switch (outer) {
 			@case 'x': {
 				const [a, setA] = useState(0);
-				<button id="inc-a" onClick={() => setA(a + 1)}>
-					{'a:' + a as string}
-				</button>
+				<button id="inc-a" onClick={() => setA(a + 1)}>{'a:' + a as string}</button>
 			}
 			@case 'y': {
 				const [b, setB] = useState(0);
-				<button id="inc-b" onClick={() => setB(b + 10)}>
-					{'b:' + b as string}
-				</button>
+				<button id="inc-b" onClick={() => setB(b + 10)}>{'b:' + b as string}</button>
 			}
 		}
 	</div>

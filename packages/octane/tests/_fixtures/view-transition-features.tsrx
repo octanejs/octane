@@ -10,18 +10,14 @@ export function TypedUpdateApp(props) @{
 		update={{ 'nav-forward': 'slide-left', default: 'auto' }}
 		onUpdate={props.onUpdate}
 	>
-		<div>
-			{props.text as string}
-		</div>
+		<div>{props.text as string}</div>
 	</ViewTransition>
 }
 
 // The 'instant' type resolves 'none' (deactivates); the default is 'auto'.
 export function NoneMapApp(props) @{
 	<ViewTransition update={{ instant: 'none', default: 'auto' }} onUpdate={props.onUpdate}>
-		<div>
-			{props.text as string}
-		</div>
+		<div>{props.text as string}</div>
 	</ViewTransition>
 }
 
@@ -43,9 +39,7 @@ export function NamedShareApp(props) @{
 // Cleanup-before-next-fire coverage.
 export function CleanupApp(props) @{
 	<ViewTransition onUpdate={props.onUpdate}>
-		<div>
-			{props.text as string}
-		</div>
+		<div>{props.text as string}</div>
 	</ViewTransition>
 }
 
@@ -55,9 +49,7 @@ export function RevealApp(props) @{
 	<ViewTransition onUpdate={props.onUpdate}>
 		<>
 			@try {
-				<div>
-					{use(props.promise) as string}
-				</div>
+				<div>{use(props.promise) as string}</div>
 			} @pending {
 				<div>{'Loading...'}</div>
 			}
@@ -73,9 +65,7 @@ export function FirstBoundaryRevealApp(props) @{
 		@try {
 			const value = use(props.promise);
 			<ViewTransition onEnter={props.onEnter}>
-				<div>
-					{value as string}
-				</div>
+				<div>{value as string}</div>
 			</ViewTransition>
 		} @pending {
 			<div>{'Waiting...'}</div>

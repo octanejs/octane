@@ -220,9 +220,7 @@ function RouteComp() {
 								.
 								{tenet.title as string}
 							</h2>
-							<p class="text-gray-600 dark:text-gray-400 mt-1">
-								{tenet.description as string}
-							</p>
+							<p class="text-gray-600 dark:text-gray-400 mt-1">{tenet.description as string}</p>
 						</div>
 					</div>
 
@@ -238,9 +236,9 @@ function RouteComp() {
 									:
 								</span>
 								{' '}
-								<span class="text-gray-600 dark:text-gray-400">
-									{principle.description as string}
-								</span>
+								<span
+									class="text-gray-600 dark:text-gray-400"
+								>{principle.description as string}</span>
 							</div>
 						</div>,
 					)}</div>
@@ -280,12 +278,8 @@ function RouteComp() {
 						>
 							<Icon className="w-5 h-5 text-white" />
 						</div>
-						<h3 class="font-bold mb-2">
-							{audience.title as string}
-						</h3>
-						<p class="text-sm text-gray-600 dark:text-gray-400">
-							{audience.description as string}
-						</p>
+						<h3 class="font-bold mb-2">{audience.title as string}</h3>
+						<p class="text-sm text-gray-600 dark:text-gray-400">{audience.description as string}</p>
 					</Card>;
 				})}</div>
 

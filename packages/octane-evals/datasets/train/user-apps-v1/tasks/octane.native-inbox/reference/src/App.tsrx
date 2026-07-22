@@ -31,9 +31,7 @@ export function MessageRow(props: {
 			select();
 		}}
 	>
-		<span>
-			{props.message.title as string}
-		</span>
+		<span>{props.message.title as string}</span>
 		<button
 			aria-label={'Delete ' + props.message.title}
 			onClick={(event: MouseEvent) => {

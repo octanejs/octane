@@ -32,9 +32,7 @@ export function ExitApp(props) @{
 // a tracked mutation AND a rect change).
 export function UpdateApp(props) @{
 	<ViewTransition onUpdate={props.onUpdate} onEnter={props.onEnter}>
-		<div>
-			{props.text as string}
-		</div>
+		<div>{props.text as string}</div>
 	</ViewTransition>
 }
 
@@ -59,9 +57,7 @@ export function SuspenseRevealApp(props) @{
 	<ViewTransition onEnter={props.onEnter}>
 		<>
 			@try {
-				<div>
-					{use(props.promise) as string}
-				</div>
+				<div>{use(props.promise) as string}</div>
 			} @pending {
 				<div>{'Loading...'}</div>
 			}

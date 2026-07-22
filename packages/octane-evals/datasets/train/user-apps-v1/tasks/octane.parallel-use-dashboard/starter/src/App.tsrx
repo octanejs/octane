@@ -20,15 +20,9 @@ export function App(props: {
 			const team = use(props.loadTeam(props.teamId));
 			const stats = use(props.loadStats(team.id));
 			<article aria-label="Team dashboard">
-				<h2>
-					{team.name as string}
-				</h2>
-				<output aria-label="Open issues">
-					{stats.open as string}
-				</output>
-				<output aria-label="Closed issues">
-					{stats.closed as string}
-				</output>
+				<h2>{team.name as string}</h2>
+				<output aria-label="Open issues">{stats.open as string}</output>
+				<output aria-label="Closed issues">{stats.closed as string}</output>
 			</article>
 		} @pending {
 			<p role="status">Loading dashboard…</p>

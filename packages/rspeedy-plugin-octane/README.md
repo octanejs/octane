@@ -1,12 +1,13 @@
-# `@octanejs/rspeedy-plugin` (private Milestone 5 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestone 6 source/build path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
 
-- the authored application runs in the background runtime with Octane's Lynx
-  universal renderer; and
-- a generated main-thread receiver installs `installLynxMainThread()` before
-  the first transported background commit arrives.
+- the generated main-thread graph installs `installLynxMainThread()` and then
+  evaluates the authored entry with Octane's render-only first-screen runtime;
+  and
+- the same authored entry runs in the background runtime with Octane's full
+  Lynx renderer, which adopts or deterministically repairs the first tree.
 
 The plugin configures the framework-neutral Lynx template, CSS extraction,
 runtime-wrapper, and native encoding packages and emits one `.lynx.bundle` per
@@ -15,9 +16,9 @@ debug metadata remain in Rspeedy's normal build graph. Development builds wire
 the pinned Lynx dev transport when Rspeedy enables HMR or live reload.
 
 This is a **private source/build milestone**, not a published technical preview.
-The repository proves bundle construction and decoding; it does not yet prove
-the bundle in Lynx Web, Android Explorer, or iOS Explorer, nor does it prove
-state-preserving HMR or native reload/teardown behavior.
+The repository proves graph specialization, bundle construction, and decoding;
+it does not yet prove first paint or adoption on Lynx Web, Android Explorer, or
+iOS Explorer, nor does it prove state-preserving HMR on those targets.
 
 ## Application mode
 
@@ -34,17 +35,26 @@ export default defineConfig({
 ```
 
 ```ts
-// src/index.ts — background runtime
+// src/index.ts — evaluated by both specialized thread graphs
 import { root } from '@octanejs/lynx';
 import { App } from './App.lynx.tsrx';
 
 void root.render(App);
 ```
 
-Each authored entry is split into an Octane background graph and an internal,
-generated main-thread receiver graph. The main graph does not render `App` and
-does not implement main-thread first paint or background adoption; those remain
-Milestone 6 work.
+Each authored entry is split into an Octane background graph and an internal
+main-thread graph. The main graph always installs the receiver in manual
+first-screen synchronization mode, resolves the exact `@octanejs/lynx` package
+root to the first-screen facade, and then evaluates the authored imports in
+their original order. A generated tail module marks the first screen ready only
+after synchronous authored initialization returns. Subpath imports are not
+rewritten. The compiler selects the render-only main renderer and main-thread
+runtime metadata by Rspack layer; unconfigured layers retain the background
+configuration.
+
+Compatible Rspack entry metadata is copied to both generated graphs so they see
+the same entry initialization inputs. Development-only CSS HMR setup runs after
+the receiver install and before the authored imports.
 
 Explicit `thread: 'background'` and `thread: 'main-thread'` are retained as
 isolated compiler-graph diagnostic modes. They stamp and compile the supplied
@@ -56,7 +66,7 @@ pluginOctane({ thread: 'main-thread' });
 
 ## Exact compatibility set
 
-Milestone 5 supports one exact set while the packages remain private:
+Milestone 6 supports one exact set while the packages remain private:
 
 | Component | Version |
 | --- | ---: |

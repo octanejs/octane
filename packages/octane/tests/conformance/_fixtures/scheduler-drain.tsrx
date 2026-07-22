@@ -29,9 +29,7 @@ export function Thrower() @{
 	const [n, setN] = useState(0);
 	_throwerSet = setN;
 	if (n === 1) throw new Error('boom during render');
-	<div id="thrower">
-		{n as number}
-	</div>
+	<div id="thrower">{n as number}</div>
 }
 
 // A sibling root that records each render and each layout-effect commit so the
@@ -43,7 +41,5 @@ export function Sibling() @{
 	useLayoutEffect(() => {
 		_siblingLayoutRuns++;
 	}, [n]);
-	<div id="sibling">
-		{n as number}
-	</div>
+	<div id="sibling">{n as number}</div>
 }

@@ -10,9 +10,7 @@ export function MessageRow(props: {
 	onDelete: (id: number) => void;
 }) @{
 	<li data-message-id={props.message.id} tabIndex={0}>
-		<span>
-			{props.message.title as string}
-		</span>
+		<span>{props.message.title as string}</span>
 		<button aria-label={'Delete ' + props.message.title}>Delete</button>
 	</li>
 }

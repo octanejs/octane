@@ -6,9 +6,7 @@
 export function FuzzList(props) @{
 	<div id="list">
 		@for (const item of props.items; key item.id) {
-			<span class="row" data-k={item.id as number}>
-				{item.label as string}
-			</span>
+			<span class="row" data-k={item.id as number}>{item.label as string}</span>
 		}
 	</div>
 }
@@ -19,12 +17,8 @@ export function FuzzListNested(props) @{
 	<div id="list">
 		@for (const item of props.items; key item.id) {
 			<span class="row" data-k={item.id as number}>
-				<b>
-					{item.label as string}
-				</b>
-				<i>
-					{item.tag as string}
-				</i>
+				<b>{item.label as string}</b>
+				<i>{item.tag as string}</i>
 			</span>
 		}
 	</div>

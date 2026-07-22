@@ -22,8 +22,7 @@ export type SerializationAdapterByRuntime = Partial<
 	Record<SerializationRuntime, SerializationAdapterModuleRef>
 >;
 export type SerializationAdapterConfig =
-	| SerializationAdapterModuleRef
-	| SerializationAdapterByRuntime;
+	SerializationAdapterModuleRef | SerializationAdapterByRuntime;
 export type StartCompilerEnvironment = 'client' | 'server';
 export interface StartCompilerImportTransformImport {
 	libName: string;

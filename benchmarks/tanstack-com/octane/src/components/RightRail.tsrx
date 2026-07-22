@@ -74,13 +74,16 @@ export function RightRail({
 	</div>;
 }
 
-const railTierLayout: Record<PartnerTier, {
-	flexBasis: string;
-	minHeight: string;
-	logoMaxWidth: string;
-	logoMaxHeight: string;
-	padding: string;
-}> = {
+const railTierLayout: Record<
+	PartnerTier,
+	{
+		flexBasis: string;
+		minHeight: string;
+		logoMaxWidth: string;
+		logoMaxHeight: string;
+		padding: string;
+	}
+> = {
 	gold: {
 		flexBasis: 'basis-full',
 		minHeight: 'min-h-[72px]',
@@ -130,9 +133,10 @@ export function PartnersRail({
 		<div
 			class="w-full flex gap-2 justify-between items-center border-b border-gray-500/20 px-3 py-2"
 		>
-			<Link className="font-medium opacity-60 hover:opacity-100 text-xs" to={titleTo}>
-				{title as string}
-			</Link>
+			<Link
+				className="font-medium opacity-60 hover:opacity-100 text-xs"
+				to={titleTo}
+			>{title as string}</Link>
 			<a
 				href="https://docs.google.com/document/d/1Hg2MzY2TU6U3hFEZ3MLe2oEOM3JS4-eByti3kdJU3I8"
 				target="_blank"
@@ -157,9 +161,7 @@ export function PartnersRail({
 					class={`absolute top-0.5 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-px rounded-full bg-white dark:bg-gray-900 z-10 ${flare.labelColor} text-[8px] uppercase tracking-[0.14em] font-semibold`}
 				>
 					<span class={flare.iconColor}>{flare.icon}</span>
-					<span>
-						{partnerTierLabels[row.tier] as string}
-					</span>
+					<span>{partnerTierLabels[row.tier] as string}</span>
 				</div>
 				{row.partners.map((partner) => {
 					const index = slotIndex++;

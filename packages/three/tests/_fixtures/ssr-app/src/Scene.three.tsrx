@@ -12,7 +12,8 @@ let pendingAsset: Promise<string> | undefined;
 
 function loadPendingAsset(): Promise<string> {
 	if (pendingAsset !== undefined) return pendingAsset;
-	const fixture = globalThis as typeof globalThis & {
+	const fixture = globalThis as
+		typeof globalThis & {
 			__octaneThreeSsrProof?: ThreeSsrFixtureProof;
 		};
 	const proof = fixture.__octaneThreeSsrProof ??= {};
@@ -24,7 +25,8 @@ function loadPendingAsset(): Promise<string> {
 }
 
 function recordSceneRef(value: unknown): void {
-	const fixture = globalThis as typeof globalThis & {
+	const fixture = globalThis as
+		typeof globalThis & {
 			__octaneThreeSsrProof?: ThreeSsrFixtureProof;
 		};
 	const proof = fixture.__octaneThreeSsrProof ??= {};

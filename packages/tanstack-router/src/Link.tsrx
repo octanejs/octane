@@ -16,9 +16,15 @@ import type { LinkComponentProps, OctaneAnchorProps, UseLinkPropsOptions } from 
 // Keep the generic implementation signature visible to `.tsrx` consumers so
 // route-aware `to`/`params`/`search` inference and native anchor event types are
 // available before declaration emit.
-export function Link<TRouter extends AnyRouter = RegisteredRouter, TFrom extends string = string, TTo extends | string
-| undefined = undefined, TMaskFrom extends string = TFrom, TMaskTo extends string = ''>(props: LinkComponentProps<'a', TRouter, TFrom, TTo, TMaskFrom, TMaskTo>) @{
-	const { _asChild: AsChild, children, ...rest } = props as typeof props & {
+export function Link<
+	TRouter extends AnyRouter = RegisteredRouter,
+	TFrom extends string = string,
+	TTo extends string | undefined = undefined,
+	TMaskFrom extends string = TFrom,
+	TMaskTo extends string = '',
+>(props: LinkComponentProps<'a', TRouter, TFrom, TTo, TMaskFrom, TMaskTo>) @{
+	const { _asChild: AsChild, children, ...rest } = props as
+		typeof props & {
 			_asChild?: any;
 		};
 	const linkProps = useLinkProps(

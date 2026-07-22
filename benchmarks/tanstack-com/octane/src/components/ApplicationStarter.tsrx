@@ -94,8 +94,9 @@ function getHostingDeployPartnerId(partnerId: string): HostingDeployPartnerId | 
 	}
 }
 
-function getPromptDeployProvider(partnerId: HostingDeployPartnerId): | StarterPromptDeployProvider
-| undefined {
+function getPromptDeployProvider(
+	partnerId: HostingDeployPartnerId,
+): StarterPromptDeployProvider | undefined {
 	switch (partnerId) {
 		case 'lovable':
 		case 'netlify':
@@ -1108,9 +1109,7 @@ function SubmitShortcutHint({ isMac }: { isMac: boolean }) {
 	return <span class="ml-1 inline-flex items-center gap-0.5">
 		<span
 			class="inline-flex h-5 min-w-5 items-center justify-center rounded bg-white px-1 text-[10px] leading-none text-gray-950 dark:bg-gray-900 dark:text-white"
-		>
-			{(isMac ? '⌘' : '⌃') as string}
-		</span>
+		>{(isMac ? '⌘' : '⌃') as string}</span>
 		<span
 			class="inline-flex h-5 min-w-5 items-center justify-center rounded bg-white px-1 text-[10px] leading-none text-gray-950 dark:bg-gray-900 dark:text-white"
 		>

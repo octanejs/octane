@@ -74,9 +74,7 @@ export function TwoContextIsland() @{
 /** Suspends at the hosted root with NO local boundary — must escape to React. */
 export function SuspendingIsland(props) @{
 	const value = use(props.resource);
-	<p class="resolved">
-		{'value:' + value as string}
-	</p>
+	<p class="resolved">{'value:' + value as string}</p>
 }
 
 /**
@@ -92,34 +90,26 @@ export function PendingFaultIsland(props) @{
 	}, []);
 	if (props.faults.length > 0) throw new Error(props.faults.shift());
 	const value = use(props.resource);
-	<p class="pf-resolved">
-		{'value:' + value as string}
-	</p>
+	<p class="pf-resolved">{'value:' + value as string}</p>
 }
 
 /** Discovers the mirror context AND suspends in the same initial attempt (§6.2 step 7 / OQ15). */
 export function ThemedSuspendingIsland(props) @{
 	const theme = use(MirrorTheme);
 	const value = use(props.resource);
-	<p class="themed-resolved">
-		{theme + ':' + value as string}
-	</p>
+	<p class="themed-resolved">{theme + ':' + value as string}</p>
 }
 
 /** Two sequential dependencies: A settles, the retry suspends again on B. */
 export function ChainedIsland(props) @{
 	const first = use(props.first);
 	const second = use(props.second);
-	<p class="chained">
-		{first as string + '+' + second as string}
-	</p>
+	<p class="chained">{first as string + '+' + second as string}</p>
 }
 
 function InnerAwait(props) @{
 	const value = use(props.resource);
-	<p class="resolved">
-		{'value:' + value as string}
-	</p>
+	<p class="resolved">{'value:' + value as string}</p>
 }
 
 /** Local Octane boundary — the throw must be handled here, never reaching React. */
@@ -192,8 +182,6 @@ export function StatefulSuspendingIsland(props) @{
 	const value = use(props.resource);
 	<div class="ss-island">
 		<button class="ss-count" onClick={() => setCount(count + 1)}>{'count:' + count}</button>
-		<p class="ss-value">
-			{'value:' + value as string}
-		</p>
+		<p class="ss-value">{'value:' + value as string}</p>
 	</div>
 }

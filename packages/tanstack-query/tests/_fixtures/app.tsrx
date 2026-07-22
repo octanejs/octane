@@ -8,13 +8,11 @@ import {
 // Reads a query through the CONTEXT client (no explicit client arg).
 export function Reader(props: { queryFn: () => Promise<string> }) @{
 	const q = useQuery({ queryKey: ['k'], queryFn: props.queryFn, retry: false });
-	<div id="status">
-		{(q.isPending
-			? 'pending'
-			: q.isError
-				? 'error:' + (q.error as Error).message
-				: 'data:' + q.data) as string}
-	</div>
+	<div id="status">{(q.isPending
+		? 'pending'
+		: q.isError
+			? 'error:' + (q.error as Error).message
+			: 'data:' + q.data) as string}</div>
 }
 
 export function App(props: { client: unknown; queryFn: () => Promise<string> }) @{
@@ -40,15 +38,13 @@ export function ProbeApp(props: { client: unknown; onClient: (c: unknown) => voi
 export function Mutator(props: { mutationFn: (v: string) => Promise<string> }) @{
 	const m = useMutation({ mutationFn: props.mutationFn });
 	<div>
-		<span id="mstatus">
-			{(m.isIdle
-				? 'idle'
-				: m.isPending
-					? 'pending'
-					: m.isError
-						? 'error'
-						: 'data:' + m.data) as string}
-		</span>
+		<span id="mstatus">{(m.isIdle
+			? 'idle'
+			: m.isPending
+				? 'pending'
+				: m.isError
+					? 'error'
+					: 'data:' + m.data) as string}</span>
 		<button id="go" onClick={() => m.mutate('x')}>go</button>
 	</div>
 }

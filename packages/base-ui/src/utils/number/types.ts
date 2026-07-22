@@ -2,11 +2,7 @@
 export type Direction = -1 | 1;
 
 export type DirectionalChangeReason =
-	| 'increment-press'
-	| 'decrement-press'
-	| 'wheel'
-	| 'scrub'
-	| 'keyboard';
+	'increment-press' | 'decrement-press' | 'wheel' | 'scrub' | 'keyboard';
 
 export interface ChangeEventCustomProperties {
 	direction?: Direction;

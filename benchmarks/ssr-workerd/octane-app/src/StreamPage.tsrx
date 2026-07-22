@@ -26,31 +26,19 @@ for (let i = 0; i < CARD_COUNT; i++) INDICES.push(i);
 function CardBody(props: { scenario: Scenario; index: number }) @{
 	const data = use(loadCard(props.scenario, props.index));
 	<article class="card">
-		<h3 class="title">
-			{data.title as string}
-		</h3>
-		<p class="sub">
-			{data.subtitle as string}
-		</p>
+		<h3 class="title">{data.title as string}</h3>
+		<p class="sub">{data.subtitle as string}</p>
 		<ul class="specs">
 			@for (const it of data.items; key it.label) {
 				<li class="spec">
-					<span class="label">
-						{it.label as string}
-					</span>
-					<span class="value">
-						{it.value as string}
-					</span>
+					<span class="label">{it.label as string}</span>
+					<span class="value">{it.value as string}</span>
 				</li>
 			}
 		</ul>
 		<div class="meta">
-			<span class="tag">
-				{data.tag as string}
-			</span>
-			<span class="note">
-				{data.note as string}
-			</span>
+			<span class="tag">{data.tag as string}</span>
+			<span class="note">{data.note as string}</span>
 		</div>
 	</article>
 }
@@ -72,12 +60,8 @@ function Card(props: { scenario: Scenario; index: number }) @{
 export function StreamPage(props: { scenario: Scenario }) @{
 	<div class="site">
 		<header class="masthead">
-			<h1 class="brand">
-				{'Octane Outfitters' as string}
-			</h1>
-			<p class="tagline">
-				{'streaming SSR benchmark storefront' as string}
-			</p>
+			<h1 class="brand">{'Octane Outfitters' as string}</h1>
+			<p class="tagline">{'streaming SSR benchmark storefront' as string}</p>
 			<nav class="nav">
 				<ul class="links">
 					@for (const n of [
@@ -91,45 +75,29 @@ export function StreamPage(props: { scenario: Scenario }) @{
 						'help',
 					]; key n) {
 						<li class="link">
-							<a href={'/' + n}>
-								{n as string}
-							</a>
+							<a href={'/' + n}>{n as string}</a>
 						</li>
 					}
 				</ul>
 			</nav>
 		</header>
 		<section class="hero">
-			<h2 class="pitch">
-				{'Ten cards, one stream' as string}
-			</h2>
-			<p class="blurb">
-				{'The shell flushes immediately; each card streams when its data resolves.' as string}
-			</p>
+			<h2 class="pitch">{'Ten cards, one stream' as string}</h2>
+			<p
+				class="blurb"
+			>{'The shell flushes immediately; each card streams when its data resolves.' as string}</p>
 			<div class="stats">
 				<div class="stat">
-					<span class="num">
-						{'10' as string}
-					</span>
-					<span class="cap">
-						{'boundaries' as string}
-					</span>
+					<span class="num">{'10' as string}</span>
+					<span class="cap">{'boundaries' as string}</span>
 				</div>
 				<div class="stat">
-					<span class="num">
-						{'50' as string}
-					</span>
-					<span class="cap">
-						{'shell elements' as string}
-					</span>
+					<span class="num">{'50' as string}</span>
+					<span class="cap">{'shell elements' as string}</span>
 				</div>
 				<div class="stat">
-					<span class="num">
-						{'20' as string}
-					</span>
-					<span class="cap">
-						{'elements per card' as string}
-					</span>
+					<span class="num">{'20' as string}</span>
+					<span class="cap">{'elements per card' as string}</span>
 				</div>
 			</div>
 		</section>
@@ -139,12 +107,10 @@ export function StreamPage(props: { scenario: Scenario }) @{
 			}
 		</main>
 		<footer class="foot">
-			<p class="fine">
-				{'Octane Outfitters — streaming SSR benchmark' as string}
-			</p>
-			<small class="legal">
-				{'same DOM shape and data schedule across all frameworks' as string}
-			</small>
+			<p class="fine">{'Octane Outfitters — streaming SSR benchmark' as string}</p>
+			<small
+				class="legal"
+			>{'same DOM shape and data schedule across all frameworks' as string}</small>
 		</footer>
 	</div>
 }

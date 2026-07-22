@@ -24,9 +24,7 @@ export function ScrollNonFocusable(props) @{
 // (TSRX text expressions become Text nodes between the markers.)
 export function TextOnly(props) @{
 	<div id="parent">
-		<Fragment ref={props.fragRef}>
-			{'just text' as string}
-		</Fragment>
+		<Fragment ref={props.fragRef}>{'just text' as string}</Fragment>
 	</div>
 }
 

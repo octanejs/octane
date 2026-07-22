@@ -7,9 +7,7 @@
 // "Cannot read properties of null (reading 'parentNode')".
 
 function Tag(props) @{
-	<b class="tag">
-		{props.label as string}
-	</b>
+	<b class="tag">{props.label as string}</b>
 }
 
 export function Interleaved(props) @{

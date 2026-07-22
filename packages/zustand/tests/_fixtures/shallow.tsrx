@@ -16,9 +16,7 @@ export const useObj = create(
 export function RawObject(props: { onRender: () => void }) @{
 	const slice = useObj((s) => ({ a: s.a }));
 	props.onRender();
-	<span id="a">
-		{slice.a as string}
-	</span>
+	<span id="a">{slice.a as string}</span>
 }
 
 // Same selection WITH useShallow: the slice is memoized by shallow equality, so it
@@ -26,7 +24,5 @@ export function RawObject(props: { onRender: () => void }) @{
 export function ShallowObject(props: { onRender: () => void }) @{
 	const slice = useObj(useShallow((s) => ({ a: s.a })));
 	props.onRender();
-	<span id="a">
-		{slice.a as string}
-	</span>
+	<span id="a">{slice.a as string}</span>
 }

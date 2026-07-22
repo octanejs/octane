@@ -91,9 +91,7 @@ interface PortalContextValue {
 	portalNode: HTMLElement | null;
 	setFocusManagerState: (
 		state:
-			| FocusManagerState
-			| null
-			| ((prev: FocusManagerState | null) => FocusManagerState | null),
+			FocusManagerState | null | ((prev: FocusManagerState | null) => FocusManagerState | null),
 	) => void;
 	beforeInsideRef: MutableRefObject<HTMLSpanElement | null>;
 	afterInsideRef: MutableRefObject<HTMLSpanElement | null>;

@@ -17,9 +17,7 @@ export function SpreadWithExplicit(props) @{
 
 // Component-level spread — merged into the props object.
 function SpreadChild(props) @{
-	<span id="child" class={props.cls}>
-		{props.label + (props.tag || '') as string}
-	</span>
+	<span id="child" class={props.cls}>{props.label + (props.tag || '') as string}</span>
 }
 
 export function SpreadOnComponent(props) @{
@@ -63,9 +61,7 @@ export function NamespacedAttr(props) @{
 export function ForOfIndexOnly(props) @{
 	<ul>
 		@for (const item of props.items; index i) {
-			<li class={'i-' + i}>
-				{i + ':' + item as string}
-			</li>
+			<li class={'i-' + i}>{i + ':' + item as string}</li>
 		}
 	</ul>
 }
@@ -73,9 +69,7 @@ export function ForOfIndexOnly(props) @{
 export function ForOfIndexAndKey(props) @{
 	<ul>
 		@for (const item of props.items; index i; key item.id) {
-			<li class={'k-' + item.id}>
-				{i + ':' + item.label as string}
-			</li>
+			<li class={'k-' + item.id}>{i + ':' + item.label as string}</li>
 		}
 	</ul>
 }
@@ -111,12 +105,8 @@ export function KeyedFragmentItems(props) @{
 	<ul>
 		@for (const x of props.items; key x.id) {
 			<>
-				<li class={'a-' + x.id}>
-					{x.label + '-a' as string}
-				</li>
-				<li class={'b-' + x.id}>
-					{x.label + '-b' as string}
-				</li>
+				<li class={'a-' + x.id}>{x.label + '-a' as string}</li>
+				<li class={'b-' + x.id}>{x.label + '-b' as string}</li>
 			</>
 		}
 	</ul>
@@ -131,24 +121,18 @@ export function KeyedFragmentItems(props) @{
 
 export function LazyObjectDestructure(props) @{
 	const &{ first, last } = props.user;
-	<div id="lazy-obj">
-		{first + ' ' + last as string}
-	</div>
+	<div id="lazy-obj">{first + ' ' + last as string}</div>
 }
 
 export function LazyArrayDestructure(props) @{
 	const &[head, ...tail] = props.items;
-	<div id="lazy-arr">
-		{'head=' + head + ' rest=' + tail.length as string}
-	</div>
+	<div id="lazy-arr">{'head=' + head + ' rest=' + tail.length as string}</div>
 }
 
 // Lazy destructuring as a COMPONENT PARAMETER — the body sees fields
 // destructured directly from the props object.
 export function LazyParamDestructure(&{ greeting, name }) @{
-	<div id="lazy-param">
-		{greeting + ', ' + name as string}
-	</div>
+	<div id="lazy-param">{greeting + ', ' + name as string}</div>
 }
 
 // Lazy destructuring inside a FOR-OF HEAD — keyFn picks up the same
@@ -156,9 +140,7 @@ export function LazyParamDestructure(&{ greeting, name }) @{
 export function LazyForOfHead(props) @{
 	<ul>
 		@for (const &{ id, label } of props.items; key id) {
-			<li class={'item-' + id}>
-				{label as string}
-			</li>
+			<li class={'item-' + id}>{label as string}</li>
 		}
 	</ul>
 }
@@ -171,9 +153,7 @@ export function LazyForOfHead(props) @{
 // ---------------------------------------------------------------------------
 
 function ShorthandChild(props) @{
-	<span id="child">
-		{props.label + ':' + props.count as string}
-	</span>
+	<span id="child">{props.label + ':' + props.count as string}</span>
 }
 
 export function ShorthandComponentProp() @{
@@ -187,9 +167,7 @@ export function ShorthandComponentProp() @{
 export function PureForOf(props) @{
 	<ul>
 		@for (const row of props.items; key row.id) {
-			<li class={'r-' + row.id}>
-				{row.label as string}
-			</li>
+			<li class={'r-' + row.id}>{row.label as string}</li>
 		}
 	</ul>
 }
@@ -197,9 +175,7 @@ export function PureForOf(props) @{
 export function ImpureForOf(props) @{
 	<ul>
 		@for (const row of props.items; key row.id) {
-			<li class={props.selected === row.id ? 'sel' : ''}>
-				{row.label as string}
-			</li>
+			<li class={props.selected === row.id ? 'sel' : ''}>{row.label as string}</li>
 		}
 	</ul>
 }

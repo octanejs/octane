@@ -19,9 +19,7 @@ import type { LynxPublicHandle } from './core/client-driver.js';
 export type LynxRefCallback<T = LynxPublicHandle> = (value: T | null) => void | (() => void);
 export type LynxRefObject<T = LynxPublicHandle> = { current: T | null };
 export type LynxRef<T = LynxPublicHandle> =
-	| LynxRefCallback<T>
-	| LynxRefObject<T>
-	| readonly LynxRef<T>[];
+	LynxRefCallback<T> | LynxRefObject<T> | readonly LynxRef<T>[];
 
 export type LynxStandardProps = NativeLynxStandardProps & {
 	ref?: LynxRef;

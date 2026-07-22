@@ -54,11 +54,4 @@ export type ShapeStyleAccessor<Datum, Output> = (
 ) => CSSProperties | undefined; // TODO: ideally this would support SVGProps, but this is invalid for Rect/Circle shapes
 
 export type FlexDirection =
-	| 'inherit'
-	| 'initial'
-	| 'revert'
-	| 'unset'
-	| 'column'
-	| 'column-reverse'
-	| 'row'
-	| 'row-reverse';
+	'inherit' | 'initial' | 'revert' | 'unset' | 'column' | 'column-reverse' | 'row' | 'row-reverse';

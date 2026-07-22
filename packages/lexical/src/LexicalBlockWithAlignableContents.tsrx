@@ -21,7 +21,8 @@ import type { ElementFormatType, NodeKey } from 'lexical';
 import { useEffect, useRef } from 'octane';
 import type { OctaneNode } from 'octane';
 
-type Props = Readonly<{
+type Props =
+	Readonly<{
 		children: OctaneNode;
 		format?: ElementFormatType | null;
 		nodeKey: NodeKey;

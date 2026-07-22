@@ -219,12 +219,13 @@ export const lynxBackgroundRenderer = {
 
 /** Main-thread renderer that rejects APIs owned by the background runtime. */
 export const lynxMainThreadRenderer = {
-	module: '@octanejs/lynx/renderer',
+	module: '@octanejs/lynx/main-renderer',
 	target: 'universal',
 	server: 'unsupported',
 	intrinsics: '@octanejs/lynx/intrinsics',
 	text: 'host',
-	capabilities: ['class-name-alias', 'visibility'],
+	capabilities: ['class-name-alias', 'visibility', 'main-thread-render-only'],
+	firstScreenEvents: ['bind*', 'catch*', 'capture-bind*', 'capture-catch*', 'global-bind*'],
 	validation: LYNX_MAIN_THREAD_VALIDATION,
 } as const;
 

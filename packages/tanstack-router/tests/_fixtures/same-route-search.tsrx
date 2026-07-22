@@ -62,9 +62,7 @@ export function resetDeferreds(): void {
 // search-param commit.
 function PageView(props: { page: number }) @{
 	const value = use(deferredFor(props.page).promise);
-	<h1 class="stories" data-page={String(props.page)}>
-		{value as string}
-	</h1>
+	<h1 class="stories" data-page={String(props.page)}>{value as string}</h1>
 }
 
 // The route component reads the `?page` search param and passes it to PageView.

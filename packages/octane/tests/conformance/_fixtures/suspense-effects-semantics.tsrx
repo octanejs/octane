@@ -16,9 +16,7 @@ function Before(props) @{
 
 function Async(props) @{
 	const v = use(props.promise);
-	<span class="async">
-		{'Async-' + v as string}
-	</span>
+	<span class="async">{'Async-' + v as string}</span>
 }
 
 export function App(props) @{
@@ -43,9 +41,7 @@ export function App(props) @{
 // must NOT re-destroy or recreate them).
 function AsyncN(props) @{
 	const v = use(props.promiseFor(props.id));
-	<span class="async">
-		{'A-' + v as string}
-	</span>
+	<span class="async">{'A-' + v as string}</span>
 }
 export function MultiApp(props) @{
 	const [show, setShow] = useState(false);
@@ -76,9 +72,7 @@ function InnerC(props) @{
 		log.push('Inner create');
 		return () => log.push('Inner destroy');
 	}, [props.log]);
-	<span class="inner">
-		{'I-' + v as string}
-	</span>
+	<span class="inner">{'I-' + v as string}</span>
 }
 export function NestedApp(props) @{
 	@try {

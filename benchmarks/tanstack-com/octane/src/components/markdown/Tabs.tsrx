@@ -91,8 +91,8 @@ const Tab = memo(
 	}) {
 		const option = useMemo(
 			() => frameworkOptions.find(
-				(o) => o.value === tab.slug.toLowerCase() ||
-					o.label.toLowerCase() === tab.name.toLowerCase(),
+				(o) =>
+					o.value === tab.slug.toLowerCase() || o.label.toLowerCase() === tab.name.toLowerCase(),
 			),
 			[tab.slug, tab.name],
 		);

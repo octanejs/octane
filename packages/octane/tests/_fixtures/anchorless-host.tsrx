@@ -5,9 +5,7 @@ import { createElement, createPortal } from 'octane';
 // return-slot kind, so flipping host ⇄ Solo exercises disposeReturnSlot on an
 // ANCHORLESS childSlot.
 function Solo(props) @{
-	<p class="solo">
-		{props.label as string}
-	</p>
+	<p class="solo">{props.label as string}</p>
 }
 
 // Return-slot flipper. `mode === 'host'` returns a LONE PURE-HOST descriptor —

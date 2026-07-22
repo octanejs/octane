@@ -12,12 +12,7 @@ type Binding = ModuleInfoBinding & {
 };
 type Kind = 'None' | `Root` | `Builder` | LookupKind;
 export type BuiltInLookupKind =
-	| 'ServerFn'
-	| 'Middleware'
-	| 'IsomorphicFn'
-	| 'ServerOnlyFn'
-	| 'ClientOnlyFn'
-	| 'ClientOnlyJSX';
+	'ServerFn' | 'Middleware' | 'IsomorphicFn' | 'ServerOnlyFn' | 'ClientOnlyFn' | 'ClientOnlyJSX';
 export type ExternalLookupKind = `External:${string}`;
 export type LookupKind = BuiltInLookupKind | ExternalLookupKind;
 export declare function getExternalLookupKind(

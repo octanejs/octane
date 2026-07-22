@@ -616,9 +616,7 @@ export function App() @{
 					/>
 				</form>
 				<div class="selection-summary" aria-label="Current selection">
-					<strong>
-						{rangeLabel(currentRange) as string}
-					</strong>
+					<strong>{rangeLabel(currentRange) as string}</strong>
 					<span>
 						{selectionSize(currentRange) === 1
 							? selectedDisplay
@@ -646,9 +644,7 @@ export function App() @{
 										width: column.size + 'px',
 										transform: 'translateX(' + column.start + 'px)',
 									}}
-								>
-									{columnLabel(column.index) as string}
-								</div>
+								>{columnLabel(column.index) as string}</div>
 							}
 						</div>
 					</div>
@@ -788,9 +784,7 @@ export function App() @{
 												}}
 											/>
 										} @else {
-											<span>
-												{display as string}
-											</span>
+											<span>{display as string}</span>
 										}
 									</div>
 								}
@@ -801,9 +795,7 @@ export function App() @{
 			</main>
 
 			<footer class="status-bar">
-				<div role="status" aria-live="polite" data-testid="activity">
-					{activity as string}
-				</div>
+				<div role="status" aria-live="polite" data-testid="activity">{activity as string}</div>
 				<div class="status-hints">
 					<span>
 						<kbd>Enter</kbd>

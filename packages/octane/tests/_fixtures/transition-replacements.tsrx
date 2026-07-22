@@ -18,9 +18,7 @@ function B(props) @{
 function SusB(props) @{
 	props.log('SusB');
 	const v = use(props.promise);
-	<span class="content">
-		{'B-' + v as string}
-	</span>
+	<span class="content">{'B-' + v as string}</span>
 }
 
 export function IfSwap(props) @{

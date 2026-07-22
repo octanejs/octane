@@ -13,9 +13,7 @@ export function UserPage() @{
 	<div data-testid="user-page" {...stylex.props(styles.user)}>
 		<div {...stylex.props(styles.userRow)}>
 			<span {...stylex.props(styles.label)}>{'user:'}</span>
-			<span>
-				{data.id as string}
-			</span>
+			<span>{data.id as string}</span>
 		</div>
 		<div {...stylex.props(styles.userRow)}>
 			<span {...stylex.props(styles.label)}>{'created:'}</span>

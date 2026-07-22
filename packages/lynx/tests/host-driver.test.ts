@@ -3,13 +3,20 @@ import { installLynxTestingEnv, uninstallLynxTestingEnv } from '@lynx-js/testing
 import { JSDOM } from 'jsdom';
 import { describe, expect, it } from 'vitest';
 import {
+	captureLynxFirstTree,
 	createLynxHostContainer,
 	createLynxHostDriver,
 	disposeLynxHostContainer,
+	disposeLynxFirstTree,
 	getLynxHostEventListener,
 	prepareLynxHostBatch,
 	resolveLynxHostNativeEvent,
 } from '../src/core/host-driver.js';
+import {
+	LYNX_FIRST_TREE_MISMATCH,
+	releaseLynxFirstTree,
+	resolveLynxFirstTreeEvent,
+} from '../src/core/first-screen.js';
 import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import { createLynxElementPAPI, type LynxElementPAPI } from '../src/core/papi.js';
 
@@ -29,7 +36,15 @@ interface FakeNode {
 	text: string;
 }
 
-type FaultMethod = 'flush' | 'insertBefore' | 'remove' | 'replace' | 'setAttribute';
+type FaultMethod =
+	| 'flush'
+	| 'getParent'
+	| 'insertBefore'
+	| 'remove'
+	| 'replace'
+	| 'setAttribute'
+	| 'setEvent'
+	| 'setRefSelector';
 
 interface FakePAPI extends LynxElementPAPI<FakeNode> {
 	readonly calls: string[];
@@ -58,19 +73,20 @@ function createFakePAPI(): FakePAPI {
 		id: null,
 		text,
 	});
-	const run = (method: FaultMethod, mutation: () => void): void => {
+	const run = <Result>(method: FaultMethod, mutation: () => Result): Result => {
 		calls.push(method);
 		if (fault?.method === method && fault.timing === 'before') {
 			const error = fault.error;
 			fault = null;
 			throw error;
 		}
-		mutation();
+		const result = mutation();
 		if (fault?.method === method && fault.timing === 'after') {
 			const error = fault.error;
 			fault = null;
 			throw error;
 		}
+		return result;
 	};
 	const detach = (node: FakeNode): void => {
 		if (node.parent === null) return;
@@ -95,6 +111,12 @@ function createFakePAPI(): FakePAPI {
 		getUniqueId(node) {
 			calls.push('getUniqueId');
 			return node.uid;
+		},
+		getParent(node) {
+			return run('getParent', () => node.parent);
+		},
+		isEqual(first, second) {
+			return first === second;
 		},
 		isChild(parent, child) {
 			calls.push('isChild');
@@ -160,14 +182,16 @@ function createFakePAPI(): FakePAPI {
 			Object.assign(node.dataset, value);
 		},
 		setEvent(node, kind, name, listener) {
-			calls.push('setEvent');
-			const key = `${kind}:${name}`;
-			if (listener === undefined) node.events.delete(key);
-			else node.events.set(key, listener);
+			run('setEvent', () => {
+				const key = `${kind}:${name}`;
+				if (listener === undefined) node.events.delete(key);
+				else node.events.set(key, listener);
+			});
 		},
 		setRefSelector(node, value) {
-			calls.push('setRefSelector');
-			node.selector = value;
+			run('setRefSelector', () => {
+				node.selector = value;
+			});
 		},
 		setId(node, id) {
 			calls.push('setId');
@@ -259,6 +283,369 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(papi.calls).toEqual(['getUniqueId']);
 	});
 
+	it('transfers a compatible first tree without allocating or restructuring native nodes', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const source = createLynxHostContainer(papi, { root: 7, page });
+		prepareLynxHostBatch(
+			source,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'button' } },
+				{ op: 'create', id: 2, type: 'text', props: { class: ['label', 'active'] } },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 101, priority: 'discrete' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+			]),
+		).apply();
+		const sourceRoot = page.children[0]!;
+		const sourceChild = sourceRoot.children[0]!;
+		const placeholderToken = sourceRoot.events.get('bindEvent:tap')!;
+		const preparedBeforeCapture = prepareLynxHostBatch(
+			source,
+			batch(2, [{ op: 'update', id: 1, props: { id: 'too-late' } }]),
+		);
+		const firstTree = captureLynxFirstTree(source, { plan: 'scene:compatible' });
+
+		expect(JSON.parse(JSON.stringify(firstTree.snapshot))).toEqual(firstTree.snapshot);
+		expect(firstTree.snapshot).toMatchObject({
+			format: 1,
+			renderer: 'lynx',
+			root: 7,
+			version: 1,
+			plan: 'scene:compatible',
+			roots: [1],
+		});
+		const capturedClass = firstTree.snapshot.nodes.find((node) => node.id === 2)?.props.class;
+		expect(capturedClass).toEqual(['label', 'active']);
+		expect(Object.isFrozen(capturedClass)).toBe(true);
+		expect(() => (capturedClass as string[]).push('mutated')).toThrow();
+		expect(resolveLynxFirstTreeEvent(firstTree, placeholderToken)).toEqual({
+			host: 1,
+			generation: 1,
+			type: 'bindtap',
+			listener: 101,
+			priority: 'discrete',
+		});
+		expect(() => prepareLynxHostBatch(source, batch(2, []))).toThrow(/captured first-tree root/);
+		expect(() => preparedBeforeCapture.apply()).toThrow(/captured first-tree root/);
+		preparedBeforeCapture.abort();
+
+		const target = createLynxHostContainer(papi, { root: 7, page });
+		const driver = createLynxHostDriver<FakeNode>();
+		papi.resetCalls();
+		const prepared = prepareLynxHostBatch(
+			target,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'button' } },
+				{ op: 'create', id: 2, type: 'text', props: { class: ['label', 'active'] } },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 202, priority: 'discrete' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+			]),
+			{ firstTree },
+		);
+
+		expect(prepared.firstTreeAction).toBe('adopt');
+		expect(prepared.handleDelta.map((entry) => entry.op)).toEqual(['create', 'create']);
+		prepared.apply();
+
+		expect(page.children).toEqual([sourceRoot]);
+		expect(sourceRoot.children).toEqual([sourceChild]);
+		expect(source.disposed).toBe(true);
+		expect(target.instanceCount).toBe(2);
+		expect(driver.getPublicInstance(target, 1)).toMatchObject({
+			root: 7,
+			id: 1,
+			generation: 1,
+		});
+		expect(papi.calls.some((call) => call.startsWith('create:'))).toBe(false);
+		expect(papi.calls).not.toContain('insertBefore');
+		expect(papi.calls).not.toContain('remove');
+		const adoptedToken = sourceRoot.events.get('bindEvent:tap')!;
+		expect(adoptedToken).not.toBe(placeholderToken);
+		expect(resolveLynxHostNativeEvent(target, adoptedToken)).toEqual({
+			listener: 202,
+			priority: 'discrete',
+		});
+		expect(disposeLynxFirstTree(firstTree).complete).toBe(true);
+		expect(target.disposed).toBe(false);
+		releaseLynxFirstTree(firstTree);
+		expect(resolveLynxFirstTreeEvent(firstTree, placeholderToken)).toBeNull();
+	});
+
+	it.each([
+		['setRefSelector', 'before'],
+		['setRefSelector', 'after'],
+		['setEvent', 'before'],
+		['setEvent', 'after'],
+	] as const)(
+		'cleans every transferred placeholder event when adoption %s fails %s mutation',
+		(method, timing) => {
+			const papi = createFakePAPI();
+			const page = papi.createPage('entry', 0);
+			const source = createLynxHostContainer(papi, { root: 7, page });
+			const sourceBatch = batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'parent' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'child' } },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 101, priority: 'discrete' } },
+				{ op: 'event', id: 2, type: 'bindtap', listener: { id: 102, priority: 'discrete' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+			]);
+			prepareLynxHostBatch(source, sourceBatch).apply();
+			const sourceRoot = page.children[0]!;
+			const sourceChild = sourceRoot.children[0]!;
+			const firstTree = captureLynxFirstTree(source);
+			const target = createLynxHostContainer(papi, { root: 7, page });
+			const targetBatch = batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'parent' } },
+				{ op: 'create', id: 2, type: 'view', props: { id: 'child' } },
+				{ op: 'event', id: 1, type: 'bindtap', listener: { id: 201, priority: 'discrete' } },
+				{ op: 'event', id: 2, type: 'bindtap', listener: { id: 202, priority: 'discrete' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+				{ op: 'insert', parent: 1, id: 2, before: null },
+			]);
+			const prepared = prepareLynxHostBatch(target, targetBatch, { firstTree });
+			const failure = new Error(`${method} failed ${timing} mutation`);
+			papi.failNext(method, timing, failure);
+
+			expect(() => prepared.apply()).toThrow(failure);
+			expect(prepared.mutationStarted).toBe(true);
+			expect(source.disposed).toBe(true);
+			expect(disposeLynxFirstTree(firstTree).complete).toBe(true);
+
+			const cleanup = disposeLynxHostContainer(target);
+			expect(cleanup.complete).toBe(true);
+			expect(cleanup.errors).toEqual([]);
+			expect(page.children).toEqual([]);
+			expect(sourceRoot.events.size).toBe(0);
+			expect(sourceChild.events.size).toBe(0);
+			expect(target.disposed).toBe(true);
+			releaseLynxFirstTree(firstTree);
+		},
+	);
+
+	it('repairs a captured first tree whose page root was physically detached', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const source = createLynxHostContainer(papi, { root: 5, page });
+		const commands = batch(1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'root' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+		prepareLynxHostBatch(source, commands).apply();
+		const painted = page.children[0]!;
+		const firstTree = captureLynxFirstTree(source);
+		papi.remove(page, painted);
+		const target = createLynxHostContainer(papi, { root: 5, page });
+		const mismatches: Error[] = [];
+
+		const prepared = prepareLynxHostBatch(target, commands, {
+			firstTree,
+			onMismatch(error) {
+				mismatches.push(error);
+			},
+		});
+
+		expect(prepared.firstTreeAction).toBe('repair');
+		expect(mismatches).toEqual([
+			expect.objectContaining({
+				code: LYNX_FIRST_TREE_MISMATCH,
+				path: 'snapshot.nodes[1].parent',
+			}),
+		]);
+		prepared.apply();
+		expect(source.disposed).toBe(true);
+		expect(page.children).toHaveLength(1);
+		expect(page.children[0]).not.toBe(painted);
+		expect(page.children[0]!.id).toBe('root');
+	});
+
+	it('repairs a captured first tree whose page root was reparented under an external host', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const source = createLynxHostContainer(papi, { root: 5, page });
+		const commands = batch(1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'root' } },
+			{ op: 'event', id: 1, type: 'bindtap', listener: { id: 101, priority: 'discrete' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+		prepareLynxHostBatch(source, commands).apply();
+		const painted = page.children[0]!;
+		const firstTree = captureLynxFirstTree(source);
+		const external = papi.createElement('view', page.uid, '');
+		papi.insertBefore(page, external, null);
+		papi.insertBefore(external, painted, null);
+		const target = createLynxHostContainer(papi, { root: 5, page });
+		const mismatches: Error[] = [];
+
+		const prepared = prepareLynxHostBatch(target, commands, {
+			firstTree,
+			onMismatch(error) {
+				mismatches.push(error);
+			},
+		});
+
+		expect(prepared.firstTreeAction).toBe('repair');
+		expect(mismatches).toEqual([
+			expect.objectContaining({
+				code: LYNX_FIRST_TREE_MISMATCH,
+				path: 'snapshot.nodes[1].parent',
+			}),
+		]);
+		prepared.apply();
+		expect(source.disposed).toBe(true);
+		expect(external.children).toEqual([]);
+		expect(painted.parent).toBeNull();
+		expect(painted.events.size).toBe(0);
+		expect(page.children).toHaveLength(2);
+		expect(page.children[0]).toBe(external);
+		expect(page.children[1]).not.toBe(painted);
+		expect(page.children[1]!.id).toBe('root');
+	});
+
+	it('repairs a captured first tree whose child was physically reparented', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const source = createLynxHostContainer(papi, { root: 5, page });
+		const commands = batch(1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'root' } },
+			{ op: 'create', id: 2, type: 'view', props: { id: 'first' } },
+			{ op: 'create', id: 3, type: 'view', props: { id: 'second' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+			{ op: 'insert', parent: 1, id: 2, before: null },
+			{ op: 'insert', parent: 1, id: 3, before: null },
+		]);
+		prepareLynxHostBatch(source, commands).apply();
+		const painted = page.children[0]!;
+		const firstChild = painted.children[0]!;
+		const secondChild = painted.children[1]!;
+		const firstTree = captureLynxFirstTree(source);
+		papi.insertBefore(secondChild, firstChild, null);
+		const target = createLynxHostContainer(papi, { root: 5, page });
+		const mismatches: Error[] = [];
+
+		const prepared = prepareLynxHostBatch(target, commands, {
+			firstTree,
+			onMismatch(error) {
+				mismatches.push(error);
+			},
+		});
+
+		expect(prepared.firstTreeAction).toBe('repair');
+		expect(mismatches).toEqual([
+			expect.objectContaining({
+				code: LYNX_FIRST_TREE_MISMATCH,
+				path: 'snapshot.nodes[2].parent',
+			}),
+		]);
+		prepared.apply();
+		expect(source.disposed).toBe(true);
+		expect(page.children).toHaveLength(1);
+		expect(page.children[0]).not.toBe(painted);
+		expect(page.children[0]!.children.map((node) => node.id)).toEqual(['first', 'second']);
+	});
+
+	it('repairs a captured first tree whose child was reparented under an external host', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const source = createLynxHostContainer(papi, { root: 5, page });
+		const commands = batch(1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'root' } },
+			{ op: 'create', id: 2, type: 'view', props: { id: 'child' } },
+			{ op: 'event', id: 2, type: 'bindtap', listener: { id: 102, priority: 'discrete' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+			{ op: 'insert', parent: 1, id: 2, before: null },
+		]);
+		prepareLynxHostBatch(source, commands).apply();
+		const painted = page.children[0]!;
+		const paintedChild = painted.children[0]!;
+		const firstTree = captureLynxFirstTree(source);
+		const external = papi.createElement('view', page.uid, '');
+		papi.insertBefore(page, external, null);
+		papi.insertBefore(external, paintedChild, null);
+		const target = createLynxHostContainer(papi, { root: 5, page });
+		const mismatches: Error[] = [];
+
+		const prepared = prepareLynxHostBatch(target, commands, {
+			firstTree,
+			onMismatch(error) {
+				mismatches.push(error);
+			},
+		});
+
+		expect(prepared.firstTreeAction).toBe('repair');
+		expect(mismatches).toEqual([
+			expect.objectContaining({
+				code: LYNX_FIRST_TREE_MISMATCH,
+				path: 'snapshot.nodes[2].parent',
+			}),
+		]);
+		prepared.apply();
+		expect(source.disposed).toBe(true);
+		expect(external.children).toEqual([]);
+		expect(painted.parent).toBeNull();
+		expect(paintedChild.parent).toBeNull();
+		expect(paintedChild.events.size).toBe(0);
+		expect(page.children).toHaveLength(2);
+		expect(page.children[0]).toBe(external);
+		expect(page.children[1]).not.toBe(painted);
+		expect(page.children[1]!.children.map((node) => node.id)).toEqual(['child']);
+	});
+
+	it('reports a deterministic mismatch and repairs only when the batch is applied', () => {
+		const papi = createFakePAPI();
+		const page = papi.createPage('entry', 0);
+		const source = createLynxHostContainer(papi, { root: 3, page });
+		prepareLynxHostBatch(
+			source,
+			batch(1, [
+				{ op: 'create', id: 1, type: 'view', props: { id: 'main-value' } },
+				{ op: 'insert', parent: null, id: 1, before: null },
+			]),
+		).apply();
+		const painted = page.children[0]!;
+		const firstTree = captureLynxFirstTree(source, { plan: 'scene:mismatch' });
+		const target = createLynxHostContainer(papi, { root: 3, page });
+		const mismatches: Error[] = [];
+		const commands = batch(1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'background-value' } },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+		const aborted = prepareLynxHostBatch(target, commands, {
+			firstTree,
+			onMismatch(error) {
+				mismatches.push(error);
+			},
+		});
+
+		expect(aborted.firstTreeAction).toBe('repair');
+		expect(mismatches[0]).toMatchObject({
+			code: LYNX_FIRST_TREE_MISMATCH,
+			path: 'snapshot.nodes[1].props',
+			plan: 'scene:mismatch',
+		});
+		papi.resetCalls();
+		aborted.abort();
+		expect(papi.calls).toEqual([]);
+		expect(page.children).toEqual([painted]);
+		expect(source.disposed).toBe(false);
+
+		const repaired = prepareLynxHostBatch(target, commands, { firstTree });
+		papi.resetCalls();
+		repaired.apply();
+
+		expect(repaired.firstTreeAction).toBe('repair');
+		expect(source.disposed).toBe(true);
+		expect(painted.parent).toBeNull();
+		expect(page.children).toHaveLength(1);
+		expect(page.children[0]).not.toBe(painted);
+		expect(page.children[0]!.id).toBe('background-value');
+		expect(papi.calls.indexOf('remove')).toBeLessThan(papi.calls.indexOf('create:view'));
+		expect(papi.calls.filter((call) => call === 'flush')).toHaveLength(2);
+		expect(disposeLynxFirstTree(firstTree).complete).toBe(true);
+	});
+
 	it('applies every structural command with complete props and one flush per batch', () => {
 		const { container, driver, page, papi } = createHost();
 		const mount = prepareLynxHostBatch(
@@ -276,6 +663,7 @@ describe('Lynx Element PAPI host driver', () => {
 		);
 
 		expect(mount.mutationStarted).toBe(false);
+		expect(mount.firstTreeAction).toBe('none');
 		expect(mount.handleDelta.map((entry) => entry.op)).toEqual(['create', 'create', 'create']);
 		mount.apply();
 
@@ -841,6 +1229,91 @@ describe('Lynx Element PAPI host driver', () => {
 		expect(container.instanceCount).toBe(0);
 		expect(container.disposed).toBe(true);
 	});
+
+	it.each([
+		['root', 'before', false],
+		['root', 'after', true],
+		['child', 'before', false],
+		['child', 'after', true],
+	] as const)(
+		'handles external %s removal faults %s mutation without losing retry ownership',
+		(scope, timing, completesImmediately) => {
+			const { container, page, papi } = createHost();
+			prepareLynxHostBatch(
+				container,
+				batch(1, [
+					{ op: 'create', id: 1, type: 'view', props: { id: 'root' } },
+					{ op: 'create', id: 2, type: 'view', props: { id: 'child' } },
+					{ op: 'insert', parent: null, id: 1, before: null },
+					{ op: 'insert', parent: 1, id: 2, before: null },
+				]),
+			).apply();
+			const root = page.children[0]!;
+			const child = root.children[0]!;
+			const external = papi.createElement('view', page.uid, '');
+			papi.insertBefore(page, external, null);
+			if (scope === 'root') {
+				papi.insertBefore(external, root, null);
+			} else {
+				papi.insertBefore(external, child, null);
+				papi.remove(page, root);
+			}
+			const failure = new Error(`external ${scope} removal failed ${timing} mutation`);
+			papi.failNext('remove', timing, failure);
+
+			const first = disposeLynxHostContainer(container);
+			expect(first.complete).toBe(completesImmediately);
+			expect(first.remainingRoots).toBe(completesImmediately ? 0 : 1);
+			expect(first.errors).toEqual(completesImmediately ? [] : [failure]);
+			expect(container.disposed).toBe(completesImmediately);
+			expect(external.children).toHaveLength(completesImmediately ? 0 : 1);
+
+			if (!completesImmediately) {
+				const retry = disposeLynxHostContainer(container);
+				expect(retry.complete).toBe(true);
+				expect(retry.remainingRoots).toBe(0);
+				expect(retry.errors).toEqual([]);
+				expect(container.disposed).toBe(true);
+				expect(external.children).toEqual([]);
+			}
+		},
+	);
+
+	it.each(['before', 'after'] as const)(
+		'retains ownership when native parentage cannot be resolved %s inspection',
+		(timing) => {
+			const { container, page, papi } = createHost();
+			prepareLynxHostBatch(
+				container,
+				batch(1, [
+					{ op: 'create', id: 1, type: 'view', props: { id: 'retry-parent' } },
+					{ op: 'insert', parent: null, id: 1, before: null },
+				]),
+			).apply();
+			const failure = new Error('parent inspection failed');
+			papi.failNext('getParent', timing, failure);
+
+			expect(disposeLynxHostContainer(container)).toEqual({
+				complete: false,
+				removedRoots: 0,
+				remainingRoots: 1,
+				flushed: false,
+				errors: [failure],
+			});
+			expect(page.children).toHaveLength(1);
+			expect(container.disposed).toBe(false);
+
+			expect(disposeLynxHostContainer(container)).toEqual({
+				complete: true,
+				removedRoots: 1,
+				remainingRoots: 0,
+				flushed: true,
+				errors: [],
+			});
+			expect(page.children).toHaveLength(0);
+			expect(container.disposed).toBe(true);
+		},
+	);
 
 	it('completes cleanup when parent inspection proves a throwing removal detached the root', () => {
 		const { container, page, papi } = createHost();

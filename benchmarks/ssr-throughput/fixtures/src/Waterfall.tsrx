@@ -36,9 +36,7 @@ export function WaterfallApp(props: { depth: number }) @{
 			@for (const r of ROWS; key r.id) {
 				<li class="row">
 					<span class="rid">{'#' + r.id}</span>
-					<span class="label">
-						{r.label as string}
-					</span>
+					<span class="label">{r.label as string}</span>
 					<em class="score">{'score ' + r.score}</em>
 				</li>
 			}

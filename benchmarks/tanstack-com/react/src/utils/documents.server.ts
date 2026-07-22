@@ -17,12 +17,7 @@ import { env } from './env';
 import { fetchWithTimeout } from './outbound-fetch.server';
 
 type FrontMatterValue =
-	| string
-	| number
-	| boolean
-	| null
-	| Array<FrontMatterValue>
-	| { [key: string]: FrontMatterValue };
+	string | number | boolean | null | Array<FrontMatterValue> | { [key: string]: FrontMatterValue };
 
 type FrontMatterData = Record<string, FrontMatterValue | undefined> & {
 	description: string;
@@ -41,11 +36,7 @@ type FrontMatterFile = {
 };
 
 export type GitHubContentErrorKind =
-	| 'forbidden'
-	| 'invalid-response'
-	| 'network'
-	| 'rate-limit'
-	| 'server';
+	'forbidden' | 'invalid-response' | 'network' | 'rate-limit' | 'server';
 
 export class GitHubContentError extends Error {
 	kind: GitHubContentErrorKind;

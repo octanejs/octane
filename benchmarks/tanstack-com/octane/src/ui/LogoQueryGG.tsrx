@@ -1,4 +1,5 @@
-type LogoQueryGGProps = Record<string, any> & {
+type LogoQueryGGProps =
+	Record<string, any> & {
 		/** Size variant. 'small' uses compact viewBox. Defaults to 'default'. */
 		size?: 'default' | 'small';
 	};

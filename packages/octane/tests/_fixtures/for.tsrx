@@ -3,9 +3,7 @@ import { useState } from 'octane';
 export function List(props) @{
 	<ul>
 		@for (const item of props.items; key item.id) {
-			<li>
-				{item.label as string}
-			</li>
+			<li>{item.label as string}</li>
 		}
 	</ul>
 }
@@ -16,9 +14,7 @@ export function List(props) @{
 export function ListWithEmpty(props) @{
 	<ul class="outer">
 		@for (const item of props.items; key item.id) {
-			<li class="row">
-				{item.label as string}
-			</li>
+			<li class="row">{item.label as string}</li>
 		} @empty {
 			<li class="empty">{'No items'}</li>
 		}
@@ -43,9 +39,7 @@ export function ToggleableEmpty() @{
 		>{'restore'}</button>
 		<ul class="outer">
 			@for (const item of items; key item.id) {
-				<li class="row">
-					{item.label as string}
-				</li>
+				<li class="row">{item.label as string}</li>
 			} @empty {
 				<li class="empty">{'No items'}</li>
 			}
@@ -90,9 +84,7 @@ export function MutableList() @{
 		<button id="clear" onClick={() => setItems([])}>{'clear'}</button>
 		<ul>
 			@for (const item of items; key item.id) {
-				<li>
-					{item.label as string}
-				</li>
+				<li>{item.label as string}</li>
 			}
 		</ul>
 	</div>

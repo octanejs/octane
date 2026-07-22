@@ -28,9 +28,7 @@ function ParityPanelView(props) @{
 
 	<NodeViewWrapper data-parity-node-view="true">
 		<output data-parity-node-theme="true">{theme}</output>
-		<output data-parity-node-label="true">
-			{props.node.attrs.label as string}
-		</output>
+		<output data-parity-node-label="true">{props.node.attrs.label as string}</output>
 		<output data-parity-node-selection="true">
 			{props.selected ? 'selected' : 'unselected'}
 		</output>
@@ -106,9 +104,7 @@ function ParityBadgeView(props) @{
 
 	<span data-parity-mark-view="true">
 		<output data-parity-mark-theme="true">{theme}</output>
-		<output data-parity-mark-tone="true">
-			{props.mark.attrs.tone as string}
-		</output>
+		<output data-parity-mark-tone="true">{props.mark.attrs.tone as string}</output>
 		<button
 			type="button"
 			contentEditable={false}
@@ -189,9 +185,7 @@ function DirectParityWidget(props) @{
 
 	<div data-parity-renderer-view="true">
 		<output data-parity-renderer-theme="true">{theme}</output>
-		<output data-parity-renderer-label="true">
-			{props.label as string}
-		</output>
+		<output data-parity-renderer-label="true">{props.label as string}</output>
 		<button
 			type="button"
 			data-parity-renderer-increment="true"

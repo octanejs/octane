@@ -430,18 +430,12 @@ function DemoFrame(props: DemoFrameProps) @{
 				<span class="demo-dot" aria-hidden="true"></span>
 				<span class="demo-kicker">Live example</span>
 			</div>
-			<span class="demo-hint">
-				{props.hint as string}
-			</span>
+			<span class="demo-hint">{props.hint as string}</span>
 		</div>
 		<div class="demo-preview">
 			<div class="demo-copy">
-				<p id={props.id + '-title'} class="demo-title">
-					{props.title as string}
-				</p>
-				<p class="demo-description">
-					{props.description as string}
-				</p>
+				<p id={props.id + '-title'} class="demo-title">{props.title as string}</p>
+				<p class="demo-description">{props.description as string}</p>
 			</div>
 			{props.children}
 		</div>
@@ -539,9 +533,7 @@ export function ListConditionsDemo() @{
 					<label
 						for={'packing-item-' + item.id}
 						class={['packing-label', item.packed && demoStyles.packedLabel]}
-					>
-						{item.label as string}
-					</label>
+					>{item.label as string}</label>
 				</li>
 			} @empty {
 				<li class="packing-empty">No items yet. Restore the list to keep packing.</li>
@@ -667,16 +659,10 @@ function ProfileResult(props: { request: Promise<DemoProfile> }) @{
 	const profile = use(props.request);
 
 	<article class="profile-card">
-		<span class="profile-avatar" aria-hidden="true">
-			{profile.initials as string}
-		</span>
+		<span class="profile-avatar" aria-hidden="true">{profile.initials as string}</span>
 		<div>
-			<strong class="profile-name">
-				{profile.name as string}
-			</strong>
-			<span class="profile-role">
-				{profile.role as string}
-			</span>
+			<strong class="profile-name">{profile.name as string}</strong>
+			<span class="profile-role">{profile.role as string}</span>
 		</div>
 	</article>
 }
@@ -775,16 +761,10 @@ function DashboardReportPanel(props: { value: DashboardReport | Promise<Dashboar
 		data-report={report.id}
 	>
 		<div>
-			<p class="report-name">
-				{report.label as string}
-			</p>
-			<p class="report-detail">
-				{report.detail as string}
-			</p>
+			<p class="report-name">{report.label as string}</p>
+			<p class="report-detail">{report.detail as string}</p>
 		</div>
-		<p class="report-metric">
-			{report.metric as string}
-		</p>
+		<p class="report-metric">{report.metric as string}</p>
 	</article>
 }
 
@@ -830,9 +810,7 @@ export function TransitionDemo() @{
 						aria-selected={selection.id === tab}
 						disabled={isLoading}
 						onClick={() => openReport(tab)}
-					>
-						{DASHBOARD_REPORTS[tab].label as string}
-					</button>
+					>{DASHBOARD_REPORTS[tab].label as string}</button>
 				}
 			</div>
 			<p class="demo-status transition-status" aria-live="polite">
@@ -1015,9 +993,7 @@ export function FormActionDemo() @{
 					result.status === 'error' && demoStyles.error,
 				]}
 				aria-live="polite"
-			>
-				{result.message as string}
-			</p>
+			>{result.message as string}</p>
 		</form>
 	</DemoFrame>
 }

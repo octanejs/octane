@@ -16,6 +16,8 @@ export const options = {
 			object: {
 				module: '/src/object-renderer.js',
 				server: 'client-only',
+				capabilities: ['main-thread-render-only'],
+				firstScreenEvents: ['bind*', 'catch*'],
 				validation: {
 					textParents: ['text'],
 					forbiddenGlobals: ['document'],

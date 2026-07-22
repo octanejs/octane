@@ -1,13 +1,7 @@
 // Shop items that can be purchased with coins
 
 export type ShopItemType =
-	| 'compass'
-	| 'speedBoost'
-	| 'healthPack'
-	| 'permSpeed'
-	| 'permAccel'
-	| 'permHealth'
-	| 'rapidFire';
+	'compass' | 'speedBoost' | 'healthPack' | 'permSpeed' | 'permAccel' | 'permHealth' | 'rapidFire';
 
 export interface ShopItem {
 	type: ShopItemType;

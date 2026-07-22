@@ -7,9 +7,7 @@ export function List(props) @{
 	<ul id="list">
 		@for (const item of props.items; key item.id) {
 			<li class="row">
-				<span class="name">
-					{item.name as string}
-				</span>
+				<span class="name">{item.name as string}</span>
 				<button class="pick" onClick={() => props.onPick(item.id)}>{'pick'}</button>
 			</li>
 		}

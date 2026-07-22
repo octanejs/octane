@@ -1330,7 +1330,7 @@ function fallbackObjectReplacements(object) {
 		(property) => property.type !== 'SpreadElement' && nameOf(property.key) === 'fallback',
 	);
 	const replacements = [];
-	for (let index = 0; index < properties.length; ) {
+	for (let index = 0; index < properties.length;) {
 		if (!removed[index]) {
 			index++;
 			continue;

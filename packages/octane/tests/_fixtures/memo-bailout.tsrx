@@ -13,9 +13,7 @@ import { useState, createContext, use, memo } from 'octane';
 // --- Case :66 — bails out on shallow-equal props -----------------------------
 function CounterImpl(props) @{
 	props.log('render:' + props.count);
-	<span class="val">
-		{props.count as string}
-	</span>
+	<span class="val">{props.count as string}</span>
 }
 const Counter = memo(CounterImpl);
 
@@ -35,9 +33,7 @@ const CountContext = createContext(0);
 function CtxCounterImpl(props) @{
 	const count = use(CountContext);
 	props.log(props.label + ': ' + count);
-	<span class="ctxval">
-		{props.label + ': ' + count as string}
-	</span>
+	<span class="ctxval">{props.label + ': ' + count as string}</span>
 }
 const CtxCounter = memo(CtxCounterImpl);
 
@@ -60,9 +56,7 @@ export function ContextHost(props) @{
 // `count` values are equal — exactly like the React fixture.
 function CustomCounterImpl(props) @{
 	props.log('render:' + props.count);
-	<span class="customval">
-		{props.count as string}
-	</span>
+	<span class="customval">{props.count as string}</span>
 }
 const CustomCounter = memo(CustomCounterImpl, (oldProps, newProps) => {
 	oldProps.log('compare:' + oldProps.count + '->' + newProps.count);

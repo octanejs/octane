@@ -36,9 +36,7 @@ export function Consumer(props) @{
 	const subscribe = useCallback(props.store.subscribe, [props.store]);
 	const getState = useCallback(props.store.getState, [props.store]);
 	const value = useSyncExternalStore(subscribe, getState);
-	<span class={props.cls}>
-		{value as string}
-	</span>
+	<span class={props.cls}>{value as string}</span>
 }
 
 // App that mounts three consumers of one shared store. Used to assert
@@ -66,9 +64,7 @@ export function CachedMirror(props) @{
 	const value = useSyncExternalStore(subscribe, getState);
 	const [mirror, setMirror] = useState(value);
 	if (value !== mirror) setMirror(value);
-	<span id="mirror">
-		{value + '|' + mirror as string}
-	</span>
+	<span id="mirror">{value + '|' + mirror as string}</span>
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +122,5 @@ export function ChurnConsumer(props) @{
 		// Set the store value once on mount (empty deps).
 		if (snap.value.text === '(not set)') props.store.set('B');
 	}, []);
-	<span id="churn">
-		{(snap.value.text) as string}
-	</span>
+	<span id="churn">{(snap.value.text) as string}</span>
 }

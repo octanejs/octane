@@ -1,4 +1,5 @@
 import type {
+	UniversalComponent,
 	UniversalHostBatch,
 	UniversalEventPriority,
 	UniversalSerializableValue,
@@ -6,9 +7,12 @@ import type {
 	UniversalTransportIdentity,
 } from 'octane/universal/native';
 import {
+	captureLynxFirstTree,
 	createLynxHostContainer,
 	createLynxHostDriver,
+	disposeLynxFirstTree,
 	disposeLynxHostContainer,
+	getLynxHostEventListener,
 	isLynxHostAttached,
 	prepareLynxHostBatch,
 	resolveLynxHostNativeEvent,
@@ -18,6 +22,13 @@ import {
 	type LynxHostHandle,
 	type LynxPreparedHostBatch,
 } from './core/host-driver.js';
+import {
+	releaseLynxFirstTree,
+	resolveLynxFirstTreeEvent,
+	type LynxFirstTree,
+	type LynxFirstTreeEventSnapshot,
+	type LynxFirstTreeSnapshot,
+} from './core/first-screen.js';
 import {
 	snapshotLynxNativeEventPayload,
 	type LynxNativeEventPayloadSnapshot,
@@ -32,6 +43,7 @@ import {
 	validateLynxBackgroundInboundMessage,
 	validateLynxBackgroundOutboundMessage,
 	type LynxBackgroundInboundMessage,
+	type LynxAdoptionReadyMessage,
 	type LynxContextProxy,
 	type LynxContextProxyEvent,
 	type LynxDisposeAcknowledgement,
@@ -45,6 +57,8 @@ import {
 	type LynxTerminalDisposeMessage,
 } from './core/protocol.js';
 import { createLynxElementPAPI, type LynxElementPAPI, type LynxElementRef } from './core/papi.js';
+import { installLynxFirstScreenHost } from './first-screen.js';
+import { renderLynxFirstScreen, type LynxFirstScreenRenderResult } from './main-renderer.js';
 
 interface LynxMainThreadGlobals {
 	readonly lynx?: {
@@ -58,6 +72,13 @@ export interface InstallLynxMainThreadOptions {
 	readonly context?: LynxContextProxy;
 	readonly componentId?: string;
 	readonly cssId?: number;
+	/** Enable the synchronous, one-shot main-thread first-screen renderer. */
+	readonly firstScreen?: boolean;
+	/**
+	 * `manual` waits for `markFirstScreenSyncReady()` after authored synchronous
+	 * initialization. `automatic` releases background work after `root.render()`.
+	 */
+	readonly firstScreenSync?: 'automatic' | 'manual';
 	readonly onDiagnostic?: (error: Error) => void;
 }
 
@@ -68,6 +89,10 @@ export interface LynxMainThreadController {
 	dispatchNativeEvent(token: LynxNativeEventToken | string, payload: unknown): void;
 	/** Preserve one native propagation path as a single Octane event scope. */
 	dispatchNativeEventBatch(deliveries: readonly LynxNativeEventDelivery[]): void;
+	/** Clone-safe snapshot retained while background adoption is pending. */
+	firstScreenSnapshot(): LynxFirstTreeSnapshot | null;
+	/** Release a receiver configured with manual first-screen synchronization. */
+	markFirstScreenSyncReady(): void;
 	close(): void;
 }
 
@@ -79,6 +104,7 @@ export interface LynxNativeEventDelivery {
 interface LynxQueuedNativeEventDelivery {
 	readonly token: LynxNativeEventToken | string;
 	readonly payload: LynxNativeEventPayloadSnapshot;
+	readonly firstTreeTarget?: Omit<LynxFirstTreeEventSnapshot, 'listener'>;
 }
 
 interface ActiveLynxMainRoot<Node extends LynxElementRef> {
@@ -95,6 +121,8 @@ type LynxCommitMessage = Extract<
 const MAX_ABORT_TOMBSTONES = 128;
 const MAX_DISPOSED_ROOT_TOMBSTONES = 128;
 const MAX_CLOSE_CLEANUP_ATTEMPTS = 3;
+const MAX_FIRST_SCREEN_EVENT_DELIVERIES = 128;
+const FIRST_SCREEN_ROOT_ID = 1;
 
 function normalizedError(value: unknown, fallback: string): Error {
 	if (value instanceof Error) return value;
@@ -200,6 +228,21 @@ function acknowledgementHandles<Node extends LynxElementRef>(
 export function installLynxMainThread<Node extends LynxElementRef = LynxElementRef>(
 	options: InstallLynxMainThreadOptions = {},
 ): LynxMainThreadController {
+	if (options.firstScreen !== undefined && typeof options.firstScreen !== 'boolean') {
+		throw new TypeError('Octane Lynx firstScreen must be a boolean when provided.');
+	}
+	if (
+		options.firstScreenSync !== undefined &&
+		options.firstScreenSync !== 'automatic' &&
+		options.firstScreenSync !== 'manual'
+	) {
+		throw new TypeError('Octane Lynx firstScreenSync must be automatic or manual.');
+	}
+	if (options.firstScreen !== true && options.firstScreenSync !== undefined) {
+		throw new TypeError('Octane Lynx firstScreenSync requires firstScreen: true.');
+	}
+	const firstScreenEnabled = options.firstScreen === true;
+	const firstScreenSync = options.firstScreenSync ?? 'automatic';
 	const rawTarget = options.target ?? globalThis;
 	if (rawTarget === null || typeof rawTarget !== 'object') {
 		throw new TypeError('Octane Lynx main-thread target must be a global object.');
@@ -236,8 +279,18 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let active: ActiveLynxMainRoot<Node> | null = null;
 	let closed = false;
 	let commitInProgress = false;
+	let firstScreenState: 'open' | 'painted' | 'skipped' | 'failed' | 'cleanup-pending' =
+		firstScreenEnabled ? 'open' : 'skipped';
+	let firstScreenSyncReady = !firstScreenEnabled;
+	let firstTree: LynxFirstTree<Node> | null = null;
+	let failedFirstScreenSource: LynxHostContainer<Node> | null = null;
+	let awaitingAdoption: UniversalTransportIdentity | null = null;
+	let readyAnnouncementSent = false;
+	let firstTreeSnapshotSent = false;
+	let uninstallFirstScreenHost: (() => void) | null = null;
 	const queuedCommits: LynxCommitMessage[] = [];
 	const queuedNativeEvents: Array<readonly LynxQueuedNativeEventDelivery[]> = [];
+	const queuedReadyRequests = new Set<number>();
 	const queuedHostAttachments: Array<{
 		readonly version: number;
 		readonly deltas: readonly LynxHostAttachmentDelta[];
@@ -261,6 +314,89 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: validated });
 	};
 
+	const canAnnounceReady = () =>
+		!firstScreenEnabled ||
+		(firstScreenState !== 'open' && firstScreenState !== 'cleanup-pending' && firstScreenSyncReady);
+
+	const dispatchReady = (request: number): void => {
+		// Request 0 is an unsolicited availability hint and can be emitted before a
+		// background listener exists. Put the clone-safe tree on the first correlated
+		// reply so the O(tree) clone happens once and always has a receiver.
+		const snapshot =
+			request === LYNX_READY_ANNOUNCEMENT_REQUEST || firstTreeSnapshotSent || firstTree === null
+				? null
+				: firstTree.snapshot;
+		const reply: LynxMainReadyReply = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'main-ready',
+			request,
+			...(snapshot == null ? null : { firstTree: snapshot }),
+		};
+		dispatch(reply);
+		if (snapshot !== null) firstTreeSnapshotSent = true;
+	};
+
+	const announceReady = (): void => {
+		if (!canAnnounceReady()) return;
+		try {
+			if (!readyAnnouncementSent && queuedReadyRequests.size === 0) {
+				// A queued request already proves the background listener is present, so
+				// answer it directly instead of cloning the first-tree snapshot into both
+				// an unsolicited announcement and the correlated reply.
+				dispatchReady(LYNX_READY_ANNOUNCEMENT_REQUEST);
+				readyAnnouncementSent = true;
+			}
+			for (const request of [...queuedReadyRequests]) {
+				dispatchReady(request);
+				queuedReadyRequests.delete(request);
+				readyAnnouncementSent = true;
+			}
+		} catch (error) {
+			throw report(error, 'Octane Lynx could not dispatch the main-ready reply.');
+		}
+	};
+
+	const releaseFirstTree = (): void => {
+		if (firstTree === null) return;
+		try {
+			releaseLynxFirstTree(firstTree);
+		} catch (error) {
+			report(error, 'Octane Lynx could not release its first-screen journal.');
+			return;
+		}
+		firstTree = null;
+	};
+
+	const disposeAvailableFirstTree = (): boolean => {
+		if (firstTree === null) return true;
+		const cleanup = disposeLynxFirstTree(firstTree);
+		for (const error of cleanup.errors) {
+			report(error, 'Octane Lynx first-screen cleanup failed.');
+		}
+		if (cleanup.complete) releaseFirstTree();
+		return cleanup.complete && firstTree === null;
+	};
+
+	const disposeFailedFirstScreenSource = (): boolean => {
+		if (failedFirstScreenSource === null) return true;
+		const cleanup = disposeLynxHostContainer(failedFirstScreenSource);
+		for (const error of cleanup.errors) {
+			report(error, 'Octane Lynx failed first-screen cleanup retry.');
+		}
+		if (cleanup.complete) failedFirstScreenSource = null;
+		return cleanup.complete;
+	};
+
+	const retryFirstScreenCleanup = (): boolean => {
+		for (let attempt = 0; attempt < MAX_CLOSE_CLEANUP_ATTEMPTS; attempt++) {
+			const treeComplete = disposeAvailableFirstTree();
+			const sourceComplete = disposeFailedFirstScreenSource();
+			if (treeComplete && sourceComplete) return true;
+		}
+		return false;
+	};
+
 	const snapshotNativeEventBatch = (
 		deliveries: readonly LynxNativeEventDelivery[],
 	): readonly LynxQueuedNativeEventDelivery[] => {
@@ -275,9 +411,21 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				if (typeof delivery.token !== 'string') {
 					throw new TypeError(`Octane Lynx native event delivery ${index} token must be a string.`);
 				}
+				const resolved =
+					firstTree === null ? null : resolveLynxFirstTreeEvent(firstTree, delivery.token);
 				return Object.freeze({
 					token: delivery.token,
 					payload: snapshotLynxNativeEventPayload(delivery.payload),
+					...(resolved === null
+						? null
+						: {
+								firstTreeTarget: Object.freeze({
+									host: resolved.host,
+									generation: resolved.generation,
+									type: resolved.type,
+									priority: resolved.priority,
+								}),
+							}),
 				});
 			}),
 		);
@@ -290,7 +438,27 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 		let priority: UniversalEventPriority | null = null;
 		const transported = deliveries.map((delivery) => {
-			const resolved = resolveLynxHostNativeEvent(active!.container, delivery.token);
+			const firstTarget = delivery.firstTreeTarget;
+			const resolved =
+				firstTarget === undefined
+					? resolveLynxHostNativeEvent(active!.container, delivery.token)
+					: (() => {
+							const handle = driver.getPublicInstance(active!.container, firstTarget.host);
+							if (
+								handle === null ||
+								handle.generation !== firstTarget.generation ||
+								!isLynxHostAttached(active!.container, firstTarget.host)
+							) {
+								return null;
+							}
+							const listener = getLynxHostEventListener(
+								active!.container,
+								firstTarget.host,
+								firstTarget.type,
+							);
+							if (listener === null || listener.priority !== firstTarget.priority) return null;
+							return Object.freeze({ listener: listener.id, priority: listener.priority });
+						})();
 			if (resolved === null) {
 				throw new Error('Octane Lynx received a stale, hidden, removed, or foreign native event.');
 			}
@@ -324,6 +492,31 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			return;
 		}
 		if (commitInProgress) {
+			const queuedCount = queuedNativeEvents.reduce((count, queued) => count + queued.length, 0);
+			if (
+				(firstTree !== null || awaitingAdoption !== null) &&
+				queuedCount + snapshot.length > MAX_FIRST_SCREEN_EVENT_DELIVERIES
+			) {
+				report(
+					new Error(
+						`Octane Lynx dropped a first-screen event batch after ${MAX_FIRST_SCREEN_EVENT_DELIVERIES} buffered deliveries.`,
+					),
+				);
+				return;
+			}
+			queuedNativeEvents.push(snapshot);
+			return;
+		}
+		if (firstTree !== null || awaitingAdoption !== null) {
+			const queuedCount = queuedNativeEvents.reduce((count, queued) => count + queued.length, 0);
+			if (queuedCount + snapshot.length > MAX_FIRST_SCREEN_EVENT_DELIVERIES) {
+				report(
+					new Error(
+						`Octane Lynx dropped a first-screen event batch after ${MAX_FIRST_SCREEN_EVENT_DELIVERIES} buffered deliveries.`,
+					),
+				);
+				return;
+			}
 			queuedNativeEvents.push(snapshot);
 			return;
 		}
@@ -476,17 +669,72 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const abortKey = (identity: UniversalTransportIdentity) => `${identity.root}:${identity.version}`;
 
 	const handleReady = (message: LynxMainReadyRequest): void => {
-		const reply: LynxMainReadyReply = {
-			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
-			renderer: LYNX_TRANSPORT_RENDERER,
-			type: 'main-ready',
-			request: message.request,
-		};
-		try {
-			dispatch(reply);
-		} catch (error) {
-			throw report(error, 'Octane Lynx could not dispatch the main-ready reply.');
+		queuedReadyRequests.add(message.request);
+		if (firstScreenState === 'cleanup-pending' && retryFirstScreenCleanup()) {
+			firstScreenState = 'failed';
 		}
+		if (canAnnounceReady()) announceReady();
+	};
+
+	const renderFirstScreen = <Props>(
+		component: UniversalComponent<Props>,
+		props: Props,
+	): LynxFirstScreenRenderResult => {
+		if (closed) throw new Error('Octane Lynx first-screen root rendered after receiver close.');
+		if (firstScreenState !== 'open') {
+			throw new Error(
+				'Octane Lynx first-screen root is one-shot and its render window has closed.',
+			);
+		}
+		let source: LynxHostContainer<Node> | null = null;
+		try {
+			const result = renderLynxFirstScreen(component, props);
+			source = createLynxHostContainer(papi, {
+				root: FIRST_SCREEN_ROOT_ID,
+				page,
+			});
+			const prepared = prepareLynxHostBatch(source, result.batch);
+			prepared.apply();
+			if (!prepared.mutationStarted) {
+				throw new Error('Octane Lynx first-screen host batch did not cross its apply boundary.');
+			}
+			firstTree = captureLynxFirstTree(source);
+			firstScreenState = 'painted';
+			if (firstScreenSync === 'automatic') firstScreenSyncReady = true;
+			announceReady();
+			return result;
+		} catch (error) {
+			firstScreenState = 'cleanup-pending';
+			firstScreenSyncReady = true;
+			if (firstTree === null && source !== null) {
+				// Retain the only native ownership journal before cleanup. A throwing
+				// remove/flush must remain retryable rather than leaking an unreachable
+				// first tree and allowing the background root to duplicate it.
+				failedFirstScreenSource = source;
+			}
+			if (retryFirstScreenCleanup()) {
+				firstScreenState = 'failed';
+			} else {
+				report(
+					new Error(
+						'Octane Lynx withheld background readiness because failed first-screen cleanup remains incomplete.',
+					),
+				);
+			}
+			announceReady();
+			throw report(error, 'Octane Lynx could not render its synchronous first screen.');
+		}
+	};
+
+	const markFirstScreenSyncReady = (): void => {
+		if (!firstScreenEnabled) {
+			throw new Error('Octane Lynx first-screen synchronization is not enabled.');
+		}
+		if (closed) throw new Error('Octane Lynx first-screen synchronization ran after close.');
+		if (firstScreenSyncReady) return;
+		firstScreenSyncReady = true;
+		if (firstScreenState === 'open') firstScreenState = 'skipped';
+		announceReady();
 	};
 
 	const handleAbort = (identity: UniversalTransportIdentity): void => {
@@ -555,8 +803,23 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		let prepared: LynxPreparedHostBatch;
+		// The opaque journal remains live after transfer only so first-screen event
+		// tokens can be resolved until background confirms listener ownership. It
+		// must never be offered to an already-populated background container again.
+		const candidateFirstTree = provisional ? firstTree : null;
 		try {
-			prepared = prepareLynxHostBatch(record.container, message.batch);
+			prepared = prepareLynxHostBatch(
+				record.container,
+				message.batch,
+				candidateFirstTree === null
+					? undefined
+					: {
+							firstTree: candidateFirstTree,
+							onMismatch(error) {
+								report(error, 'Octane Lynx repaired a first-screen mismatch.');
+							},
+						},
+			);
 		} catch (error) {
 			if (provisional) disposeRecord(record);
 			reject(identity, error);
@@ -583,16 +846,30 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		record.acceptedVersion = message.version;
+		if (!applyFailed && prepared.firstTreeAction === 'adopt') {
+			awaitingAdoption = Object.freeze({ ...identity });
+		} else if (candidateFirstTree !== null) {
+			queuedNativeEvents.length = 0;
+			if (prepared.firstTreeAction === 'repair' || applyFailed) {
+				disposeAvailableFirstTree();
+			}
+		}
 		const handles = acknowledgementHandles(driver, record.container, prepared, message.batch);
 		const acknowledgement: LynxTransportAcknowledgement = {
 			...identity,
 			type: 'ack',
 			handles,
+			...(prepared.firstTreeAction === 'none'
+				? null
+				: {
+						adoption: prepared.firstTreeAction === 'adopt' ? 'adopted' : 'repaired',
+					}),
 		};
 		try {
 			dispatch(acknowledgement);
 		} catch (error) {
 			queuedNativeEvents.length = 0;
+			awaitingAdoption = null;
 			const cleanup = disposeRecord(record);
 			if (!cleanup.complete) {
 				report(
@@ -604,15 +881,18 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				rememberDisposed(record.root, record.acceptedVersion);
 				active = null;
 			}
+			if (firstTree !== null) {
+				disposeAvailableFirstTree();
+			}
 			throw report(error, 'Octane Lynx could not dispatch an accepted batch acknowledgement.');
 		}
 
 		if (!applyFailed) {
 			if (!drainHostAttachments()) return;
-			drainNativeEvents();
+			if (awaitingAdoption === null) drainNativeEvents();
 			try {
 				dispatch({ ...identity, type: 'complete' });
-				drainNativeEvents();
+				if (awaitingAdoption === null) drainNativeEvents();
 			} catch (error) {
 				throw report(error, 'Octane Lynx could not dispatch accepted batch completion.');
 			}
@@ -621,6 +901,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 
 		queuedNativeEvents.length = 0;
 		queuedHostAttachments.length = 0;
+		awaitingAdoption = null;
+		if (firstTree !== null) disposeAvailableFirstTree();
 		try {
 			dispatch({
 				...identity,
@@ -664,9 +946,30 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 	};
 
+	const handleAdoptionReady = (message: LynxAdoptionReadyMessage): void => {
+		if (
+			awaitingAdoption === null ||
+			active === null ||
+			message.root !== awaitingAdoption.root ||
+			message.version !== awaitingAdoption.version ||
+			message.root !== active.root ||
+			message.version > active.acceptedVersion
+		) {
+			report(new Error('Octane Lynx received a stale or foreign adoption-ready message.'));
+			return;
+		}
+		try {
+			drainNativeEvents();
+		} finally {
+			awaitingAdoption = null;
+			releaseFirstTree();
+		}
+	};
+
 	const handleDispose = (message: LynxDisposeMessage | LynxTerminalDisposeMessage): void => {
 		queuedNativeEvents.length = 0;
 		queuedHostAttachments.length = 0;
+		awaitingAdoption = null;
 		const terminal = message.type === 'terminal-dispose';
 		const acknowledge = () => {
 			const acknowledgement: LynxDisposeAcknowledgement = {
@@ -679,11 +982,32 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				throw report(error, 'Octane Lynx could not dispatch dispose acknowledgement.');
 			}
 		};
+		const requestRetry = (error: Error) => {
+			try {
+				dispatch({
+					...message,
+					type: 'dispose-retry',
+					error: wireError(error, 'Octane Lynx native cleanup is incomplete.'),
+				});
+			} catch (dispatchError) {
+				throw report(dispatchError, 'Octane Lynx could not dispatch a dispose retry request.');
+			}
+		};
 		if (disposedRoots.get(message.root) === message.version) {
 			acknowledge();
 			return;
 		}
 		if (terminal && active === null) {
+			if (!retryFirstScreenCleanup()) {
+				requestRetry(
+					report(
+						new Error(
+							`Octane Lynx withheld dispose acknowledgement for root ${message.root}; first-screen cleanup remains incomplete.`,
+						),
+					),
+				);
+				return;
+			}
 			rememberDisposed(message.root, message.version);
 			acknowledge();
 			return;
@@ -706,18 +1030,17 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					`Octane Lynx withheld dispose acknowledgement for root ${record.root}; ${cleanup.remainingRoots} native root(s) remain attached.`,
 				),
 			);
-			try {
-				dispatch({
-					...message,
-					type: 'dispose-retry',
-					error: wireError(
-						cleanup.errors[0] ?? unresolvedError,
-						'Octane Lynx native cleanup is incomplete.',
+			requestRetry(cleanup.errors[0] ?? unresolvedError);
+			return;
+		}
+		if (!retryFirstScreenCleanup()) {
+			requestRetry(
+				report(
+					new Error(
+						`Octane Lynx withheld dispose acknowledgement for root ${record.root}; first-screen cleanup remains incomplete.`,
 					),
-				});
-			} catch (error) {
-				throw report(error, 'Octane Lynx could not dispatch a dispose retry request.');
-			}
+				),
+			);
 			return;
 		}
 		rememberDisposed(record.root, terminal ? message.version : record.acceptedVersion);
@@ -745,6 +1068,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 		if (message.type === 'main-ready-request') {
 			handleReady(message);
+		} else if (message.type === 'adoption-ready') {
+			handleAdoptionReady(message);
 		} else if (message.type === 'abort') {
 			handleAbort(message);
 		} else if (message.type === 'dispose' || message.type === 'terminal-dispose') {
@@ -756,19 +1081,47 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 
 	context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, receive);
 	try {
-		dispatch({
-			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
-			renderer: LYNX_TRANSPORT_RENDERER,
-			type: 'main-ready',
-			request: LYNX_READY_ANNOUNCEMENT_REQUEST,
-		});
+		if (firstScreenEnabled) {
+			uninstallFirstScreenHost = installLynxFirstScreenHost({
+				render: renderFirstScreen,
+				markSyncReady: markFirstScreenSyncReady,
+				unmount() {
+					queuedNativeEvents.length = 0;
+					awaitingAdoption = null;
+					// Unmount closes the authored synchronous window immediately. Cleanup
+					// can still gate readiness until a retry succeeds.
+					firstScreenSyncReady = true;
+					if (!retryFirstScreenCleanup()) {
+						firstScreenState = 'cleanup-pending';
+						report(
+							new Error(
+								'Octane Lynx withheld background readiness because first-screen unmount cleanup remains incomplete.',
+							),
+						);
+						return;
+					}
+					if (
+						firstScreenState === 'open' ||
+						firstScreenState === 'painted' ||
+						firstScreenState === 'cleanup-pending'
+					) {
+						firstScreenState = 'skipped';
+					}
+					announceReady();
+				},
+			});
+		}
+		announceReady();
 	} catch (error) {
 		closed = true;
 		context.removeEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, receive);
+		uninstallFirstScreenHost?.();
+		uninstallFirstScreenHost = null;
 		if (active !== null) {
 			disposeRecord(active);
 			active = null;
 		}
+		if (firstTree !== null) disposeAvailableFirstTree();
 		throw report(error, 'Octane Lynx could not announce main-thread readiness.');
 	}
 
@@ -791,9 +1144,17 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		dispatchNativeEventBatch(deliveries) {
 			submitNativeEventBatch(deliveries);
 		},
+		firstScreenSnapshot() {
+			return firstTree?.snapshot ?? null;
+		},
+		markFirstScreenSyncReady,
 		close() {
 			queuedNativeEvents.length = 0;
 			queuedHostAttachments.length = 0;
+			queuedReadyRequests.clear();
+			awaitingAdoption = null;
+			uninstallFirstScreenHost?.();
+			uninstallFirstScreenHost = null;
 			if (!closed) {
 				closed = true;
 				try {
@@ -815,6 +1176,13 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					rememberDisposed(record.root, record.acceptedVersion);
 					active = null;
 				}
+			}
+			if (!retryFirstScreenCleanup()) {
+				report(
+					new Error(
+						'Octane Lynx retained incomplete first-screen cleanup for a later close retry.',
+					),
+				);
 			}
 		},
 	};

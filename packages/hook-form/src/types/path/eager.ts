@@ -19,8 +19,7 @@ type AnyIsEqual<T1, T2> = T1 extends T2 ? (IsEqual<T1, T2> extends true ? true :
  * See {@link Path}
  */
 type PathImpl<K extends string | number, V, TraversedTypes> = V extends
-	| Primitive
-	| BrowserNativeObject
+	Primitive | BrowserNativeObject
 	? `${K}`
 	: // Check so that we don't recurse into the same type
 		// by ensuring that the types are mutually assignable
@@ -71,8 +70,7 @@ export type FieldPath<TFieldValues extends FieldValues> = Path<TFieldValues>;
  * See {@link ArrayPath}
  */
 type ArrayPathImpl<K extends string | number, V, TraversedTypes> = V extends
-	| Primitive
-	| BrowserNativeObject
+	Primitive | BrowserNativeObject
 	? IsAny<V> extends true
 		? string
 		: never

@@ -200,6 +200,7 @@ try {
 			const background = nativeScriptText(decoded['background-thread-script']);
 			expect(decoded['engine-version']).toBe('3.9');
 			expect(mainThread).toMatch(/getJSContext/);
+			expect(mainThread).toContain('milestone-five');
 			expect(background).toMatch(/getCoreContext/);
 			expect(background).toContain('milestone-five');
 			expect(readdirSync(join(outputRoot, 'static/svg'))).toContain('badge.svg');
@@ -213,9 +214,11 @@ try {
 			const developmentBundlePath = join(developmentOutputRoot, 'main.lynx.bundle');
 			expect(existsSync(developmentBundlePath)).toBe(true);
 			const developmentDecoded = await decodeNativeBundle(readFileSync(developmentBundlePath));
+			const developmentMainThread = nativeScriptText(developmentDecoded['main-thread-script']);
 			const developmentBackground = nativeScriptText(
 				developmentDecoded['background-thread-script'],
 			);
+			expect(developmentMainThread).toContain('milestone-five');
 			expect(developmentBackground).toMatch(/pathname=(?:\/|%2F)rsbuild-hmr/);
 			expect(developmentBackground).toContain('hot=true');
 			expect(developmentBackground).toContain('live-reload=true');

@@ -175,9 +175,10 @@ function KeyboardSortableItem(props) @{
 	});
 
 	<li id={`keyboard-sort-${props.id}`} ref={sortable.ref}>
-		<button id={`keyboard-sort-${props.id}-handle`} ref={sortable.handleRef}>
-			{props.id as string}
-		</button>
+		<button
+			id={`keyboard-sort-${props.id}-handle`}
+			ref={sortable.handleRef}
+		>{props.id as string}</button>
 	</li>
 }
 
@@ -244,12 +245,8 @@ function InteractionBody(props) @{
 			drag
 		</button>
 		<div id="drop" ref={droppable.ref}>drop</div>
-		<output id="operation-source">
-			{String(operation.source?.id ?? 'none') as string}
-		</output>
-		<output id="operation-target">
-			{String(operation.target?.id ?? 'none') as string}
-		</output>
+		<output id="operation-source">{String(operation.source?.id ?? 'none') as string}</output>
+		<output id="operation-target">{String(operation.target?.id ?? 'none') as string}</output>
 	</main>
 }
 
@@ -273,9 +270,7 @@ export function InteractionFixture(props) @{
 			dropAnimation={null}
 			disabled={props.overlayDisabled}
 		>
-			{(source) => <span id="overlay-content">
-				{String(source.id) as string}
-			</span>}
+			{(source) => <span id="overlay-content">{String(source.id) as string}</span>}
 		</DragOverlay>
 	</DragDropProvider>
 }
