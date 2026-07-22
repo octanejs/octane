@@ -1,0 +1,1802 @@
+{
+  "$schema": "./redact-adversarial-ledger.schema.json",
+  "schemaVersion": 1,
+  "upstream": {
+    "repository": "https://github.com/TanStack/redact",
+    "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+    "capturedOn": "2026-07-22",
+    "scope": {
+      "issueNumbers": [17],
+      "pullRequestNumbers": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+      "paths": [
+        "packages/redact/src/core",
+        "packages/redact/src/dom",
+        "packages/redact/src/react",
+        "packages/redact/src/scheduler",
+        "packages/redact/src/server",
+        "packages/redact/src/vite",
+        "scripts",
+        "tests"
+      ],
+      "artifacts": [
+        {
+          "path": "tests/callback-ref-commit-phase.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-REF-001"]
+        },
+        {
+          "path": "tests/child-reorder.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-REC-001"]
+        },
+        {
+          "path": "tests/controlled-input.test.tsx",
+          "disposition": "folded",
+          "entryIds": ["RDX-EVT-001"],
+          "note": "The native-event observation boundary transfers; Redact's synthetic onChange mapping is an explicit Octane divergence."
+        },
+        {
+          "path": "tests/create-root-clear-container.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-ROOT-001"]
+        },
+        {
+          "path": "tests/document-hydration.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-HYD-001", "RDX-HYD-002", "RDX-HYD-003", "RDX-HYD-004"]
+        },
+        {
+          "path": "tests/event-replay.test.ts",
+          "disposition": "mapped",
+          "entryIds": ["RDX-EVT-002"]
+        },
+        {
+          "path": "tests/external-store-unmount.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-STORE-001"]
+        },
+        {
+          "path": "tests/floating-ui-pattern.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-PORT-002"]
+        },
+        {
+          "path": "tests/hydration-mismatch-recovery.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-HYD-006"]
+        },
+        {
+          "path": "tests/hydration.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-ID-001"]
+        },
+        {
+          "path": "tests/memo-state-rerender.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-MEM-001"]
+        },
+        {
+          "path": "tests/place-children-anchor.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-REC-002"]
+        },
+        {
+          "path": "tests/portal-doctype.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-PORT-001", "RDX-SSR-002"]
+        },
+        {
+          "path": "tests/public-exports.test.ts",
+          "disposition": "mapped",
+          "entryIds": ["RDX-PKG-001"]
+        },
+        {
+          "path": "tests/react-integration/reconnecting.test.tsx",
+          "disposition": "folded",
+          "entryIds": ["RDX-HYD-006", "RDX-NON-001"],
+          "note": "Host reconnecting outcomes transfer; class-component cases are explicit non-goals."
+        },
+        {
+          "path": "tests/security.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-SEC-001"]
+        },
+        {
+          "path": "tests/ssr-context.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-SSR-001"]
+        },
+        {
+          "path": "tests/ssr.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-SSR-001"]
+        },
+        {
+          "path": "tests/streaming-hydration.test.tsx",
+          "disposition": "folded",
+          "entryIds": ["RDX-HYD-001", "RDX-SSR-001"],
+          "note": "The cases reinforce streamed-boundary recovery and transactional streaming entries."
+        },
+        {
+          "path": "tests/suspense-preserves-dom.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-SUS-001"]
+        },
+        {
+          "path": "tests/use-effect-coalesced-renders.test.tsx",
+          "disposition": "mapped",
+          "entryIds": ["RDX-LIF-001"]
+        },
+        {
+          "path": "tests/vite-plugin.test.ts",
+          "disposition": "folded",
+          "entryIds": ["RDX-CFG-001", "RDX-PKG-002"],
+          "note": "Redact-specific React aliases are excluded; option-to-output and environment-routing lessons transfer."
+        }
+      ]
+    }
+  },
+  "idRegistry": [
+    { "id": "RDX-CFG-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-DOC-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-EVT-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-EVT-002", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-002", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-003", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-004", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-005", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-006", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-ID-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-LIF-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-MEM-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-NON-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-PERF-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-PKG-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-PKG-002", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-PORT-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-PORT-002", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-REC-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-REC-002", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-REF-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-ROOT-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-SEC-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-SSR-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-SSR-002", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-STORE-001", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-SUS-001", "status": "active", "introducedOn": "2026-07-22" }
+  ],
+  "entries": [
+    {
+      "id": "RDX-CFG-001",
+      "area": "build-configuration",
+      "title": "Public options must change the emitted build at their observation boundary",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 15,
+          "url": "https://github.com/TanStack/redact/pull/15",
+          "title": "fix(redact/vite): respect 'forwardRef' and 'classComponents' feature flags"
+        },
+        {
+          "kind": "commit",
+          "commit": "04f39662123a2ca9c896dca0a35429b0554a4847",
+          "url": "https://github.com/TanStack/redact/commit/04f39662123a2ca9c896dca0a35429b0554a4847"
+        }
+      ],
+      "symptom": "A documented false-valued feature flag silently left the full implementation in the bundle because an internal folder name was cast to an unrelated public option key.",
+      "octaneContract": "Every public compiler or bundler boolean must have a test proving the option changes emitted code, resolution, bundle contents, or runtime behavior in each environment where it is supported.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "medium",
+      "owner": "Octane compiler and Vite/Rspack/Rsbuild integrations",
+      "applicableModes": ["production-compile", "vite-client", "vite-ssr", "rspack", "rsbuild"],
+      "observables": ["markup", "package-resolution"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hmr.test.ts",
+          "testName": "hmr option off → no wrapping, no accept block",
+          "note": "Representative direct option-to-output coverage; not yet a complete public-option matrix."
+        },
+        {
+          "kind": "test",
+          "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
+          "testName": "erases profiling and full diagnostics from a real production bundle"
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": [
+          "packages/octane/tests",
+          "packages/vite-plugin-octane/tests",
+          "packages/rspack-plugin-octane/tests",
+          "packages/rsbuild-plugin-octane/tests"
+        ],
+        "acceptance": "Inventory public booleans and renderer mappings, then prove both enabled and disabled behavior at emitted-output or resolved-module boundaries without relying on unchecked name casts."
+      },
+      "rationale": "Redact's forwardRef and class-component flags are out of scope; the transferable lesson is to test configuration where consumers observe it."
+    },
+    {
+      "id": "RDX-DOC-001",
+      "area": "documentation",
+      "title": "Surface, protocol, and size documentation must follow executable evidence",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 3,
+          "url": "https://github.com/TanStack/redact/pull/3",
+          "title": "docs: update SURFACE.md and SAVINGS_ANALYSIS.md for @tanstack/redact"
+        },
+        {
+          "kind": "pull_request",
+          "number": 13,
+          "url": "https://github.com/TanStack/redact/pull/13",
+          "title": "docs(redact/server): correct fallback wire-format comment — fallback '<div>' is visible, not hidden"
+        }
+      ],
+      "symptom": "Published size numbers, package layout, or streaming wire-format commentary drifted away from the scripts and bytes that users actually received.",
+      "octaneContract": "Measured claims and protocol descriptions must cite the live generator, benchmark, emitted fixture, or focused test that makes them reviewable.",
+      "classification": "portable",
+      "status": "documented",
+      "risk": "medium",
+      "owner": "Octane documentation and release tooling",
+      "applicableModes": ["server-stream", "benchmark"],
+      "observables": ["streaming", "performance"],
+      "octaneReferences": [
+        {
+          "kind": "documentation",
+          "file": "docs/project-analysis-concerns.md",
+          "note": "Distinguishes current source-backed claims from historical plans."
+        },
+        {
+          "kind": "documentation",
+          "file": "benchmarks/README.md",
+          "note": "Defines comparable baselines and the repository benchmark contract."
+        }
+      ],
+      "rationale": "This is a maintenance rule rather than an independent runtime workstream."
+    },
+    {
+      "id": "RDX-EVT-001",
+      "area": "events",
+      "title": "Native form events must be exercised, without importing synthetic onChange",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 1,
+          "url": "https://github.com/TanStack/redact/pull/1",
+          "title": "fix(react-dom): fire onChange on every keystroke for text inputs"
+        },
+        {
+          "kind": "commit",
+          "commit": "1da7232dbe1658971219b6a83f2f44a4f1b5ff16",
+          "url": "https://github.com/TanStack/redact/commit/1da7232dbe1658971219b6a83f2f44a4f1b5ff16"
+        }
+      ],
+      "symptom": "Initial form markup looked correct while real editing was dead because the tests never dispatched the platform event that drives the control.",
+      "octaneContract": "Controlled-property tests must dispatch real native input/change events and assert handler delivery, live-property reassertion, and dynamic input-type behavior.",
+      "classification": "divergence",
+      "status": "documented",
+      "risk": "high",
+      "owner": "Octane DOM events and forms",
+      "applicableModes": ["client", "hydrate-match", "production-compile", "real-browser"],
+      "observables": ["events", "live-properties", "markup"],
+      "octaneReferences": [
+        {
+          "kind": "documentation",
+          "file": "docs/differences-from-react.md",
+          "note": "Octane deliberately uses onInput per edit and native change on commit."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/native-change/native-change.test.ts",
+          "testName": "fires Octane change on focus commit while React derives it from each input",
+          "note": "Real-browser native change contract."
+        }
+      ],
+      "rationale": "Adopt Redact's event-level observation boundary, but reject its synthetic onChange-to-input mapping because that conflicts with Octane's documented native-event model."
+    },
+    {
+      "id": "RDX-EVT-002",
+      "area": "event-replay",
+      "title": "Hydration event replay preserves platform event shape and queue semantics",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/event-replay.test.ts",
+          "testName": "replays buffered events with browser-compatible event subclasses",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/event-replay.test.ts#L12-L68"
+        }
+      ],
+      "symptom": "A replay queue delivered the right event names but degraded keyboard and input events to generic Event objects, lost target/default semantics, changed order, or replayed an item twice.",
+      "octaneContract": "For every event Octane buffers, replay must preserve the documented platform subclass and supported metadata, original target, FIFO order, bubbling/cancelability/default behavior, and exactly-once delivery.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane deferred hydration and DOM events",
+      "applicableModes": ["deferred-hydration", "real-browser"],
+      "observables": ["events"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "notifyHydrateBoundary",
+          "note": "Mouse and focus families retain subclasses; other buffered families currently fall back to Event."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "replays pre-root interaction after the pending stream reveals",
+          "note": "Covers click delivery and target survival, not the cross-family event-shape matrix."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": [
+          "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
+          "packages/octane/tests/browser"
+        ],
+        "acceptance": "Exercise every public HydrationInteractionEvent family in a real browser: click/auxclick/contextmenu/dblclick, focusin, keydown/keyup, mouse, and pointer events. Assert subclass, supported metadata, target, FIFO ordering, preventDefault visibility, queue drain, and no duplicate replay; keep input/change/submit excluded unless a separate API decision expands the public union."
+      },
+      "rationale": "Octane replays interaction intent rather than cloning every native event field, so the transferable contract must explicitly define which event shape it promises instead of silently copying Redact's implementation."
+    },
+    {
+      "id": "RDX-HYD-001",
+      "area": "hydration",
+      "title": "Suspending hydration recovery must not leak an uncaught mismatch",
+      "sources": [
+        {
+          "kind": "issue",
+          "number": 17,
+          "url": "https://github.com/TanStack/redact/issues/17",
+          "title": "Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/document-hydration.test.tsx",
+          "testName": "recovers a mismatch when lazy hydration resumes inside Suspense",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/document-hydration.test.tsx#L120-L169"
+        }
+      ],
+      "symptom": "A mismatch reached after a lazy hydration suspension reported as recoverable and then escaped through the global error channel, abandoning interaction setup.",
+      "octaneContract": "A client suspension encountered during hydration must converge to exactly one live client arm, report through Octane's chosen hydration channel only, preserve unaffected siblings, and never emit an uncaught error or rejection.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "critical",
+      "owner": "Octane runtime hydration and browser tests",
+      "applicableModes": [
+        "hydrate-mismatch",
+        "deferred-hydration",
+        "production-compile",
+        "real-browser"
+      ],
+      "observables": ["markup", "node-identity", "events", "errors"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch",
+          "note": "Already proves one final client arm and one expected diagnostic in development and production compile modes."
+        },
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "hideTryContentAndMountPending"
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": [
+          "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "packages/octane/tests/browser"
+        ],
+        "acceptance": "Retain the existing one-final-arm oracle, add global error/unhandled-rejection capture, and prove an outside sibling keeps identity and remains interactive after resolution."
+      },
+      "rationale": "Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly; only the missing global-error and outside-sibling observations remain."
+    },
+    {
+      "id": "RDX-HYD-002",
+      "area": "head-hydration",
+      "title": "Hoisted head markers must only claim the intended element",
+      "sources": [
+        {
+          "kind": "issue",
+          "number": 17,
+          "url": "https://github.com/TanStack/redact/issues/17",
+          "title": "Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/document-hydration.test.tsx",
+          "testName": "claims typeless and typed head scripts in document order",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/document-hydration.test.tsx#L171-L206"
+        }
+      ],
+      "symptom": "Weak head-node identity allowed one logical head entry to adopt a different server node and validate or update the wrong content.",
+      "octaneContract": "A compiled head marker may adopt only an element with the expected tag and ownership; missing, duplicated, reordered, or corrupted markers must create or recover the expected node without mutating unrelated head content.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "critical",
+      "owner": "Octane compiler and runtime head hydration",
+      "applicableModes": [
+        "hydrate-match",
+        "hydrate-mismatch",
+        "production-compile",
+        "real-browser"
+      ],
+      "observables": ["markup", "node-identity", "errors"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "adoptServerHeadEl",
+          "note": "The current helper returns the first element after a matching marker without validating the expected tag."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount",
+          "note": "Happy-path adoption only."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/tests/hydration/head-hydrate.test.ts"],
+        "acceptance": "Cover a foreign wrong-tag node between marker and target, missing target, duplicate marker, reordered metadata, and preservation of unrelated head nodes before deciding whether runtime validation is needed."
+      },
+      "rationale": "Redact matches scripts by attributes while Octane uses compiler markers; the portable contract is ownership-safe claiming, not Redact's matching algorithm."
+    },
+    {
+      "id": "RDX-HYD-003",
+      "area": "raw-text-hydration",
+      "title": "Raw script and style hydration must use their parsing contexts",
+      "sources": [
+        {
+          "kind": "issue",
+          "number": 17,
+          "url": "https://github.com/TanStack/redact/issues/17",
+          "title": "Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/document-hydration.test.tsx",
+          "testName": "hydrates matching raw script content without HTML normalization",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/document-hydration.test.tsx#L208-L223"
+        }
+      ],
+      "symptom": "Byte-equivalent script or style text containing ampersands or less-than signs was parsed through a generic div and falsely reported as mismatched.",
+      "octaneContract": "Hydration comparison must respect script-data and style raw-text parsing, preserve node identity for equivalent server bytes, avoid false diagnostics, and remain safe against closing-tag injection.",
+      "classification": "portable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane DOM hydration and SSR serialization",
+      "applicableModes": [
+        "server-string",
+        "server-stream",
+        "hydrate-match",
+        "production-compile",
+        "real-browser"
+      ],
+      "observables": ["markup", "node-identity", "errors"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "setHTML",
+          "note": "Script uses textContent; other hosts use a same-tag contextual probe."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/script-innerhtml.test.ts",
+          "testName": "hydrates the server-safe script spelling by adoption and applies later updates",
+          "note": "Script coverage is already strong."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps raw style text in one element when it contains closing-tag-like tokens",
+          "note": "Current style evidence is server-only."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": [
+          "packages/octane/tests/script-innerhtml.test.ts",
+          "packages/octane/tests/browser"
+        ],
+        "acceptance": "Add server-render, parse, hydrate, and update coverage for raw style text containing &&, <, entity-like text, and closing-tag-like tokens; assert adoption and no warning in the unit lane, then use Chromium/CSSOM to prove intact stylesheet semantics."
+      },
+      "rationale": "The Redact script failure is already prevented; the remaining gap is direct hydration evidence for style's distinct raw-text and SSR-escape behavior."
+    },
+    {
+      "id": "RDX-HYD-004",
+      "area": "root-ownership",
+      "title": "Foreign document nodes do not weaken ordinary element-root ownership",
+      "sources": [
+        {
+          "kind": "issue",
+          "number": 17,
+          "url": "https://github.com/TanStack/redact/issues/17",
+          "title": "Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness"
+        },
+        {
+          "kind": "pull_request",
+          "number": 10,
+          "url": "https://github.com/TanStack/redact/pull/10",
+          "title": "Project document head elements"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/document-hydration.test.tsx",
+          "testName": "preserves foreign nodes after expected document body children",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/document-hydration.test.tsx#L87-L118"
+        }
+      ],
+      "symptom": "A hidden iframe injected at the open document boundary caused whole-document hydration to fail, even though it was not application-owned content.",
+      "octaneContract": "The element passed to hydrateRoot remains strictly owned: ordinary unclaimed content inside it is diagnosed and removed, while ordinary nodes outside it are untouched. Explicit portal targets and compiler-owned head hoists follow their own ownership contracts. Document/body tolerance requires a separate explicit API and ownership decision.",
+      "classification": "non_goal",
+      "status": "documented",
+      "risk": "medium",
+      "owner": "Octane root API and metaframework integrations",
+      "applicableModes": ["hydrate-mismatch", "real-browser"],
+      "observables": ["markup", "node-identity", "errors"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "finishRoot",
+          "note": "Intentionally diagnoses and removes unclaimed root siblings."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
+          "testName": "server renders an extra element the client omits (Per :834)"
+        }
+      ],
+      "rationale": "Octane hydrates a supplied Element rather than Document. Redact's body-level tolerance must not become blanket permissiveness inside an application-owned container. Revisit only if Octane introduces document/body hydration."
+    },
+    {
+      "id": "RDX-HYD-005",
+      "area": "hydration-errors",
+      "title": "Hydration recovery reporting has an explicit public contract",
+      "sources": [
+        {
+          "kind": "issue",
+          "number": 17,
+          "url": "https://github.com/TanStack/redact/issues/17",
+          "title": "Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness"
+        },
+        {
+          "kind": "commit",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "url": "https://github.com/TanStack/redact/commit/e1620a13aab8935c806238f117ba58559b7cd002",
+          "title": "fix(redact): harden document hydration recovery"
+        }
+      ],
+      "symptom": "The same hydration failure appeared on both a recoverable callback and the global error channel, making recovery behavior ambiguous to framework integrations.",
+      "octaneContract": "Octane must document whether hydration diagnostics are console-only or root-callback-addressable and ensure every initial, deferred, and streamed recovery path follows that decision exactly once.",
+      "classification": "adaptable",
+      "status": "decision_required",
+      "risk": "medium",
+      "owner": "Octane public root API",
+      "applicableModes": [
+        "hydrate-match",
+        "hydrate-mismatch",
+        "deferred-hydration",
+        "production-compile"
+      ],
+      "observables": ["errors"],
+      "octaneReferences": [
+        {
+          "kind": "documentation",
+          "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
+          "note": "Documents that onRecoverableError is not currently an Octane root option."
+        }
+      ],
+      "nextAction": {
+        "kind": "decision",
+        "targets": ["packages/octane/src/runtime.ts", "docs/ssr.md"],
+        "acceptance": "Choose and document console-only diagnostics versus recoverable/caught/uncaught root callbacks, including exact deduplication and production behavior, before adding an API."
+      },
+      "rationale": "Redact's callback surface should not be copied implicitly; frameworks need a deliberate Octane contract if error callbacks become public."
+    },
+    {
+      "id": "RDX-HYD-006",
+      "area": "hydration-recovery",
+      "title": "Mismatch recovery is bounded to the failed ownership scope",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/hydration-mismatch-recovery.test.tsx",
+          "testName": "root fallback produces one clean client tree for wrong element type",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/hydration-mismatch-recovery.test.tsx#L53-L64"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/hydration-mismatch-recovery.test.tsx",
+          "testName": "Suspense-scoped extra server node recovery preserves siblings outside the boundary",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/hydration-mismatch-recovery.test.tsx#L183-L208"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/hydration-mismatch-recovery.test.tsx",
+          "testName": "Suspense-scoped missing server node recovery preserves siblings outside the boundary",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/hydration-mismatch-recovery.test.tsx#L209-L233"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/hydration-mismatch-recovery.test.tsx",
+          "testName": "Suspense-scoped recovery attaches events to the client-rendered subtree",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/hydration-mismatch-recovery.test.tsx#L234-L260"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/hydration-mismatch-recovery.test.tsx",
+          "testName": "nearest host recovery preserves siblings outside the failed host subtree",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/hydration-mismatch-recovery.test.tsx#L262-L297"
+        }
+      ],
+      "symptom": "Recovering one mismatched host or Suspense subtree could remount unaffected siblings, abandon the hydration cursor, or leave the regenerated subtree without live handlers.",
+      "octaneContract": "A structural hydration mismatch rebuilds only its owning failed range, preserves the object identity of unaffected siblings outside that range, and installs events on regenerated content.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane hydration cursor and ownership ranges",
+      "applicableModes": ["hydrate-mismatch", "production-compile", "real-browser"],
+      "observables": ["markup", "node-identity", "events"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/hydration-mismatch.test.ts",
+          "testName": "hydration continues past a mismatch: the next sibling adopts + is interactive",
+          "note": "Proves final content and sibling interactivity, but does not retain and compare the sibling object across the recovery."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/mismatch-structural.test.ts",
+          "testName": "PROD build: @if branch swap rebuilds SILENTLY (recovery is not gated on the dev loc)",
+          "note": "Proves production recovery but not a nearest-host/Suspense containment matrix."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": [
+          "packages/octane/tests/conformance/hydration-mismatch.test.ts",
+          "packages/octane/tests/browser"
+        ],
+        "acceptance": "For root, nearest-host, and Suspense-scoped structural mismatches, capture outside siblings before hydration and assert the same objects and handlers survive while the failed subtree is regenerated and its handlers become live in development and production."
+      },
+      "rationale": "Octane recovers ranges in place instead of following Redact's checkpoint stack, so the transferable requirement is the observable containment boundary rather than checkpoint implementation parity."
+    },
+    {
+      "id": "RDX-ID-001",
+      "area": "use-id",
+      "title": "Each root owns a deterministic useId sequence",
+      "sources": [
+        {
+          "kind": "commit",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "url": "https://github.com/TanStack/redact/commit/e1620a13aab8935c806238f117ba58559b7cd002",
+          "title": "fix(redact): harden document hydration recovery"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/hydration.test.tsx",
+          "testName": "starts hydrated useId sequences from each server-rendered root",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/hydration.test.tsx#L232-L266"
+        }
+      ],
+      "symptom": "A prior root's allocations shifted the next root's hydrated IDs away from the server sequence.",
+      "octaneContract": "Sibling client roots are independently namespaced, server IDs hydrate byte-for-byte, and explicit identifier prefixes compose with root-local allocation.",
+      "classification": "portable",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane root and SSR identity",
+      "applicableModes": [
+        "client",
+        "server-string",
+        "server-stream",
+        "hydrate-match",
+        "production-compile"
+      ],
+      "observables": ["markup"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
+          "testName": "automatically namespaces sibling createRoot roots"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
+          "testName": "server useId is preserved byte-for-byte after hydrateRoot()"
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
+          "testName": "automatically namespaces sibling createRoot roots",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
+          "testName": "server useId is preserved byte-for-byte after hydrateRoot()",
+          "modes": ["server-string", "hydrate-match", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "hydrates completed boundary useId values in its opaque stream namespace",
+          "modes": ["server-stream", "hydrate-match", "production-compile"],
+          "observables": ["markup"]
+        }
+      ]
+    },
+    {
+      "id": "RDX-LIF-001",
+      "area": "effects",
+      "title": "Coalesced dependency changes leave one live passive side effect",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/use-effect-coalesced-renders.test.tsx",
+          "testName": "does not leak side-effects when two deps-changing renders coalesce before passive drain",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/use-effect-coalesced-renders.test.tsx#L13-L57"
+        }
+      ],
+      "symptom": "Two renders before the passive queue drained installed multiple imperative artifacts because cleanup ownership was cleared before the intermediate body ran.",
+      "octaneContract": "After any coalesced dependency-changing render sequence, at most one passive side effect is live; each installed effect is cleaned exactly once, including final unmount.",
+      "classification": "portable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane scheduler and effect hooks",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup", "effects"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/effect-timing.test.ts",
+          "testName": "phase order on re-render: cleanups fire before bodies of same phase",
+          "note": "Strong ordering coverage, but not the exact two-renders-before-passive-drain race."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/tests/effect-timing.test.ts"],
+        "acceptance": "Drive a→b→c before passive drain, assert one live imperative artifact, exact cleanup order through c, and one final cleanup on unmount in development and production compile modes."
+      }
+    },
+    {
+      "id": "RDX-MEM-001",
+      "area": "memo-scheduling",
+      "title": "Memo prop bailouts do not swallow owned updates or revive removed work",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/memo-state-rerender.test.tsx",
+          "testName": "re-renders a memo component when its useSyncExternalStore fires, even with unchanged props",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/memo-state-rerender.test.tsx#L51-L74"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/memo-state-rerender.test.tsx",
+          "testName": "does not mount DOM when a pending fiber was unmounted between scheduling and flush",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/memo-state-rerender.test.tsx#L131-L180"
+        }
+      ],
+      "symptom": "A stable-prop memo gate swallowed the component's own store update, while stale queued work could render after an ancestor removed it.",
+      "octaneContract": "A memoized component processes its own state/store updates without disabling descendant memo bailouts, and pending work beneath a removed ancestor cannot mount new DOM.",
+      "classification": "portable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane memo and scheduler",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup", "effects"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "should update children even if parent blocks updates"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not call render after a component as been deleted"
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": [
+          "packages/octane/tests/conformance/memo-bailout.test.ts",
+          "packages/octane/tests/conformance/update-reconciliation.test.ts"
+        ],
+        "acceptance": "Combine memo with useSyncExternalStore, prove the owner updates while a stable memo grandchild bails, then queue/remove work and prove no zombie DOM or effects appear."
+      }
+    },
+    {
+      "id": "RDX-NON-001",
+      "area": "redact-specific-surfaces",
+      "title": "React package shims, RSC internals, and private debug names are not Octane targets",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 5,
+          "url": "https://github.com/TanStack/redact/pull/5",
+          "title": "fix(redact): scope resolve.alias to client+ssr envs so RSC stays on real React"
+        },
+        {
+          "kind": "pull_request",
+          "number": 8,
+          "url": "https://github.com/TanStack/redact/pull/8",
+          "title": "Add React DOM edge server aliases"
+        },
+        {
+          "kind": "pull_request",
+          "number": 11,
+          "url": "https://github.com/TanStack/redact/pull/11",
+          "title": "Expose ReactDOM Flight hint internals"
+        },
+        {
+          "kind": "pull_request",
+          "number": 12,
+          "url": "https://github.com/TanStack/redact/pull/12",
+          "title": "chore(redact/hydration): rename internal '__tdom*' scroll-guard globals to '__redact*'"
+        },
+        {
+          "kind": "pull_request",
+          "number": 14,
+          "url": "https://github.com/TanStack/redact/pull/14",
+          "title": "feat(redact): vinext SSR/hydration compatibility — 0.0.9"
+        }
+      ],
+      "symptom": "Redact needed compatibility with React package names, Flight private internals, RSC environment routing, and legacy internal global names.",
+      "octaneContract": "Octane remains responsible for its public runtime, compiler, SSR, hydration, and documented bundler integrations, not for impersonating React private package or Flight surfaces.",
+      "classification": "non_goal",
+      "status": "documented",
+      "risk": "low",
+      "owner": "Octane architecture",
+      "applicableModes": ["vite-client", "vite-ssr", "packaged-consumer"],
+      "observables": ["package-resolution"],
+      "octaneReferences": [
+        {
+          "kind": "documentation",
+          "file": "docs/differences-from-react.md",
+          "note": "Records unsupported React-only surfaces."
+        }
+      ],
+      "rationale": "Class components, forwardRef, Server Components/Flight, React package aliases, Redact's renderer registry, and private debug globals are architecture-specific exclusions. Portable packaging or SSR lessons are tracked separately."
+    },
+    {
+      "id": "RDX-PERF-001",
+      "area": "performance",
+      "title": "Performance claims use real browsers and multiple controlled workloads",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 6,
+          "url": "https://github.com/TanStack/redact/pull/6",
+          "title": "perf(redact): close ~85% of the render-bench gap to React"
+        },
+        {
+          "kind": "pull_request",
+          "number": 7,
+          "url": "https://github.com/TanStack/redact/pull/7",
+          "title": "perf(redact): four more render-bench wins — now ~18% faster than React"
+        }
+      ],
+      "symptom": "JSDOM suggested the opposite performance result from real Chrome, and a single workload hid regressions in keyed reorder, mount/unmount, deep trees, or state churn.",
+      "octaneContract": "Framework performance changes require same-machine comparable baselines, semantic controls, real-browser measurement for DOM work, representative workload coverage, and bundle/codegen accounting.",
+      "classification": "portable",
+      "status": "documented",
+      "risk": "high",
+      "owner": "Octane core engineering",
+      "applicableModes": ["benchmark", "real-browser", "production-compile"],
+      "observables": ["performance", "markup", "node-identity"],
+      "octaneReferences": [
+        {
+          "kind": "documentation",
+          "file": ".agents/memories/core-engineering.md",
+          "note": "Requires relevant baselines and forbids unsupported performance claims."
+        },
+        {
+          "kind": "benchmark",
+          "file": "benchmarks/README.md",
+          "note": "Defines browser/Node runners, correctness gates, ratios, and workload inventory."
+        }
+      ],
+      "rationale": "Octane already follows this discipline. Add or run only the benchmark relevant to a future hot-path change; do not port Redact's optimizations."
+    },
+    {
+      "id": "RDX-PKG-001",
+      "area": "public-exports",
+      "title": "Advertised named exports are locked at the consumer boundary",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 2,
+          "url": "https://github.com/TanStack/redact/pull/2",
+          "title": "refactor!: rename to @tanstack/redact and consolidate into single package"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/public-exports.test.ts",
+          "testName": "exposes hooks needed by use-sync-external-store/shim/* aliases",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/public-exports.test.ts#L170-L180"
+        }
+      ],
+      "symptom": "A hook existed in source but was omitted from the package entrypoint, producing a link-time failure only in a downstream consumer.",
+      "octaneContract": "Every intended value export for each public Octane subpath is checked from the built or packed artifact, so removing a re-export is an explicit review event rather than a downstream surprise.",
+      "classification": "portable",
+      "status": "planned",
+      "risk": "medium",
+      "owner": "Octane package surface",
+      "applicableModes": ["packaged-consumer", "production-compile"],
+      "observables": ["package-resolution"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/scripts/verify-dist.mjs",
+          "symbol": "smokeDist",
+          "note": "Proves every JS entry imports, but not that a specific named export remains present."
+        },
+        {
+          "kind": "integration",
+          "file": "scripts/check-package-packs.mjs",
+          "note": "Builds isolated consumers from packed workspace artifacts."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/scripts/verify-dist.mjs", "scripts/check-package-packs.mjs"],
+        "acceptance": "Derive or explicitly declare intended named-export sets for public core subpaths and validate them from the built or packed artifact without making harmless additive exports unnecessarily brittle."
+      }
+    },
+    {
+      "id": "RDX-PKG-002",
+      "area": "package-resolution",
+      "title": "Packed Vite consumers and supported integration graphs resolve one runtime",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 2,
+          "url": "https://github.com/TanStack/redact/pull/2",
+          "title": "refactor!: rename to @tanstack/redact and consolidate into single package"
+        },
+        {
+          "kind": "pull_request",
+          "number": 4,
+          "url": "https://github.com/TanStack/redact/pull/4",
+          "title": "fix(redact): switch exports to `default` so RSC + other conditions resolve"
+        },
+        {
+          "kind": "pull_request",
+          "number": 5,
+          "url": "https://github.com/TanStack/redact/pull/5",
+          "title": "fix(redact): scope resolve.alias to client+ssr envs so RSC stays on real React"
+        },
+        {
+          "kind": "pull_request",
+          "number": 8,
+          "url": "https://github.com/TanStack/redact/pull/8",
+          "title": "Add React DOM edge server aliases"
+        },
+        {
+          "kind": "pull_request",
+          "number": 14,
+          "url": "https://github.com/TanStack/redact/pull/14",
+          "title": "feat(redact): vinext SSR/hydration compatibility — 0.0.9"
+        }
+      ],
+      "symptom": "Source-level tests passed while published export conditions or top-level aliases failed in a real framework environment or selected the wrong runtime graph.",
+      "octaneContract": "Outside-workspace consumers built from packed Octane artifacts resolve one runtime through Vite client and SSR graphs; supported Rspack and Rsbuild environment routing is exercised by their integration builds. This does not claim an external packed-consumer lane for every plugin.",
+      "classification": "adaptable",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane packaging and bundler integrations",
+      "applicableModes": [
+        "packaged-consumer",
+        "vite-client",
+        "vite-ssr",
+        "rspack",
+        "rsbuild",
+        "production-compile"
+      ],
+      "observables": ["package-resolution", "markup"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/package.json",
+          "note": "Published subpaths provide default conditions."
+        },
+        {
+          "kind": "integration",
+          "file": "scripts/check-package-packs.mjs",
+          "note": "Packs, installs, resolves, builds, and executes consumers outside the workspace."
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/vite-integration.test.ts",
+          "testName": "discovers a parent package and routes raw dependency imports to the SSR runtime",
+          "modes": ["vite-ssr", "production-compile"],
+          "observables": ["package-resolution", "markup"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
+          "testName": "builds client and server graphs with maps, raw dependencies, and one target runtime",
+          "modes": ["rspack"],
+          "observables": ["package-resolution"]
+        },
+        {
+          "file": "packages/rsbuild-plugin-octane/tests/rsbuild.integration.test.ts",
+          "testName": "builds routed client/server environments and serves the production SSR handler",
+          "modes": ["rsbuild", "production-compile"],
+          "observables": ["package-resolution", "markup"]
+        },
+        {
+          "kind": "command",
+          "script": "packages:pack:check",
+          "modes": ["packaged-consumer", "vite-client", "vite-ssr", "production-compile"],
+          "observables": ["package-resolution", "markup"]
+        }
+      ],
+      "rationale": "The exact React/RSC aliases are Redact-only. Octane's packed canary proves the external Vite boundary, while Rspack and Rsbuild remain honestly labeled workspace integration evidence rather than external packed coverage."
+    },
+    {
+      "id": "RDX-PORT-001",
+      "area": "portals",
+      "title": "Portal content mounts in its target and cleans up with its owner",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/portal-doctype.test.tsx",
+          "testName": "mounts portal children into the supplied container",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/portal-doctype.test.tsx#L32-L59"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/portal-doctype.test.tsx",
+          "testName": "unmounts portal children when the parent stops rendering them",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/portal-doctype.test.tsx#L61-L81"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/portal-doctype.test.tsx",
+          "testName": "renders portal alongside sibling elements correctly",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/portal-doctype.test.tsx#L83-L113"
+        }
+      ],
+      "symptom": "Portal content mounted outside its supplied target or remained there after the logical owner stopped rendering it.",
+      "octaneContract": "Portal content mounts in the supplied foreign target, and closing or unmounting its logical owner removes that content.",
+      "classification": "portable",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane portals and UI bindings",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "compiles and renders an inline host-element body into the target, updating reactively"
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "compiles and renders an inline host-element body into the target, updating reactively",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "unmounts portal content when the if-branch closes",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup"]
+        }
+      ]
+    },
+    {
+      "id": "RDX-PORT-002",
+      "area": "portal-updates",
+      "title": "A stateful portal descendant resolves its foreign host for owned updates",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/floating-ui-pattern.test.tsx",
+          "testName": "re-renders a Portal descendant when its own state updates (getHostParent on Portal)",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/floating-ui-pattern.test.tsx#L133-L163"
+        }
+      ],
+      "symptom": "A component inside a portal scheduled its own state update, resolved the logical parent as its host, and inserted or replaced DOM outside the portal target.",
+      "octaneContract": "A descendant component rendered inside a portal may own and schedule updates while all of its host mutations remain anchored in the supplied portal target and preserve surrounding target siblings.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane portal host resolution",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup", "node-identity"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "compiles and renders an inline host-element body into the target, updating reactively",
+          "note": "Updates state owned outside the portal, so it does not exercise descendant-owned host resolution."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/tests/portal.test.ts"],
+        "acceptance": "Render a child component with its own useState inside a portal, schedule its update from that child, and assert the same target and unaffected target siblings retain identity while only the child's host content changes in development and production compile modes."
+      }
+    },
+    {
+      "id": "RDX-REC-001",
+      "area": "reconciliation",
+      "title": "Keyed reorders preserve survivor identity and final order",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/child-reorder.test.tsx",
+          "testName": "reorders keyed list items preserving DOM identity",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/child-reorder.test.tsx#L95-L128"
+        }
+      ],
+      "symptom": "A keyed reorder produced the right text but recreated survivor DOM nodes or left them in the wrong final order.",
+      "octaneContract": "Keyed survivors retain object identity and reach the requested final order; Octane's LIS-selected physical move set need not match React or Redact.",
+      "classification": "adaptable",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane reconciler",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup", "node-identity"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/multichild-identity.test.ts",
+          "testName": "reverse preserves all instances (pure moves)"
+        },
+        {
+          "kind": "integration",
+          "file": "packages/octane/tests/conformance/fuzz-keyed-list.test.ts",
+          "note": "Exercises prefix, tail, small-displacement, and LIS paths across deterministic mutation streams."
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/multichild-identity.test.ts",
+          "testName": "reverse preserves all instances (pure moves)",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/multichild-identity.test.ts",
+          "testName": "inserting in the middle preserves existing instances",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        }
+      ],
+      "rationale": "Physical move-sequence parity is intentionally excluded because Octane's LIS reconciler promises final order and survivor identity with fewer moves."
+    },
+    {
+      "id": "RDX-REC-002",
+      "area": "reconciliation-placement",
+      "title": "Topology transitions use the correct absolute anchor without stable reattachment",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/place-children-anchor.test.tsx",
+          "testName": "Sidebar Portal→div via Provider cascade: new div lands BEFORE chat",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/place-children-anchor.test.tsx#L31-L99"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/place-children-anchor.test.tsx",
+          "testName": "first child swaps Portal→div with multiple later siblings",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/place-children-anchor.test.tsx#L101-L158"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/place-children-anchor.test.tsx",
+          "testName": "first child goes null→div via Provider cascade: new div at index 0",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/place-children-anchor.test.tsx#L160-L202"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/place-children-anchor.test.tsx",
+          "testName": "stable re-render does not reorder stable DOM",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/place-children-anchor.test.tsx#L204-L242"
+        }
+      ],
+      "symptom": "A Portal-to-element or null-to-element transition inserted new output after the wrong sibling, while a no-op rerender could detach and reinsert otherwise stable DOM.",
+      "octaneContract": "When a child changes topology, each newly materialized range lands at its absolute logical anchor around portal and ordinary siblings; a stable rerender emits no child-list mutations and preserves every existing host object.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane reconciler and portal placement",
+      "applicableModes": ["client", "production-compile", "real-browser"],
+      "observables": ["markup", "node-identity", "dom-mutations"],
+      "octaneReferences": [
+        {
+          "kind": "integration",
+          "file": "packages/octane/tests/differential/anchor-order.test.ts",
+          "note": "Covers final source order across control-flow transitions, but differential HTML cannot see host reattachment and has no portal topology case."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/portal.test.ts",
+          "testName": "unmounts portal content when the if-branch closes",
+          "note": "Covers removal/recreation, not Portal→ordinary replacement around stable siblings."
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/tests/portal.test.ts", "packages/octane/tests/browser"],
+        "acceptance": "Port Portal→element and null→element first-child transitions with multiple stable later siblings; retain every survivor object, assert exact final order, and use MutationObserver in Chromium to prove a stable rerender produces no child-list records."
+      },
+      "rationale": "The existing keyed identity suite proves a different reconciler contract. Redact's topology cases require portal-aware absolute placement plus a mutation-level oracle, so they remain an explicit gap instead of being hidden under RDX-REC-001."
+    },
+    {
+      "id": "RDX-REF-001",
+      "area": "refs",
+      "title": "Callback refs run in commit order and clean up exactly once",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/callback-ref-commit-phase.test.tsx",
+          "testName": "does not invoke a callback ref during render",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/callback-ref-commit-phase.test.tsx#L33-L65"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/callback-ref-commit-phase.test.tsx",
+          "testName": "runs the cleanup ref(null) on unmount",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/callback-ref-commit-phase.test.tsx#L67-L85"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/callback-ref-commit-phase.test.tsx",
+          "testName": "runs the user-provided cleanup function returned from a callback ref",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/callback-ref-commit-phase.test.tsx#L87-L113"
+        }
+      ],
+      "symptom": "A callback ref fired during render or received both its returned cleanup and a redundant null detach call.",
+      "octaneContract": "Refs attach only after connected DOM exists, precede layout-effect bodies, detach in the documented commit order, and use either cleanup-return or legacy null notification exactly once.",
+      "classification": "portable",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane refs and commit phase",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["refs", "effects"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/ref-timing.test.ts",
+          "testName": "ref attaches before the layout effect body (mount), layout cleanup before ref detach (unmount)"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/refs.test.ts",
+          "testName": "handles detaching refs with either cleanup function or null argument"
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ref-timing.test.ts",
+          "testName": "a callback ref fires with a node already connected to the document",
+          "modes": ["client", "production-compile"],
+          "observables": ["refs"]
+        },
+        {
+          "file": "packages/octane/tests/ref-timing.test.ts",
+          "testName": "ref attaches before the layout effect body (mount), layout cleanup before ref detach (unmount)",
+          "modes": ["client", "production-compile"],
+          "observables": ["refs", "effects"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/refs.test.ts",
+          "testName": "handles detaching refs with either cleanup function or null argument",
+          "modes": ["client", "production-compile"],
+          "observables": ["refs"]
+        }
+      ]
+    },
+    {
+      "id": "RDX-ROOT-001",
+      "area": "root-ownership",
+      "title": "The first root render clears foreign children exactly once",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/create-root-clear-container.test.tsx",
+          "testName": "clears pre-existing children on the first render",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/create-root-clear-container.test.tsx#L27-L37"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/create-root-clear-container.test.tsx",
+          "testName": "does not re-clear on subsequent renders (preserves reconciled DOM)",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/create-root-clear-container.test.tsx#L39-L55"
+        }
+      ],
+      "symptom": "A root either left stale foreign children in its managed container or cleared the entire container again on an update, destroying reconciled host identity.",
+      "octaneContract": "The first createRoot render removes pre-existing unowned children before mounting the client tree; later renders reconcile that managed tree without clearing the container and preserve stable host objects.",
+      "classification": "portable",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane root lifecycle",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup", "node-identity"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/root-semantics.test.ts",
+          "testName": "clears existing children"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/root-semantics.test.ts",
+          "testName": "should reuse markup if rendering to the same target twice"
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/root-semantics.test.ts",
+          "testName": "clears existing children",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/root-semantics.test.ts",
+          "testName": "should reuse markup if rendering to the same target twice",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        }
+      ]
+    },
+    {
+      "id": "RDX-SEC-001",
+      "area": "host-serialization-security",
+      "title": "Untrusted host values remain inside their parser and execution boundaries",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "escapes <, >, & in text children",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L15-L19"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "escapes quotes in attribute values",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L34-L40"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "breaks an attempted </script> inside script body",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L52-L64"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "breaks an attempted </style> inside style body",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L66-L78"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "does not allow CSS injection via style values containing quotes",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L123-L132"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "only attaches function event handlers — string handlers are silently ignored",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L134-L157"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/security.test.tsx",
+          "testName": "only honors the `__html` key — extra keys are ignored",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/security.test.tsx#L159-L174"
+        }
+      ],
+      "symptom": "Untrusted text, attributes, styles, raw-text bodies, event props, or malformed raw-HTML objects crossed into executable markup or a neighboring parser context.",
+      "octaneContract": "Untrusted values remain within their owning text, attribute, style, or raw-text parser context at each tested serialization boundary; streamed raw script and style bodies remain confined as chunks are emitted. Raw HTML requires the __html shape, and non-function delegated event values never execute as handlers.",
+      "classification": "adaptable",
+      "status": "covered",
+      "risk": "critical",
+      "owner": "Octane DOM application and server serialization",
+      "applicableModes": [
+        "client",
+        "server-string",
+        "server-static",
+        "server-stream",
+        "production-compile"
+      ],
+      "observables": ["markup", "events", "errors"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/dom-component-ssr.test.ts",
+          "testName": "escapes text content and attribute values (round-trip)"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps valid inline script characters while preventing closing-tag injection"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "a $label listener warns at render and reports an Error at dispatch"
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/dom-component-ssr.test.ts",
+          "testName": "escapes text content and attribute values (round-trip)",
+          "modes": ["server-static", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps valid inline script characters while preventing closing-tag injection",
+          "modes": ["server-string", "server-stream", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
+          "testName": "keeps raw style text in one element when it contains closing-tag-like tokens",
+          "modes": ["server-string", "server-stream", "production-compile"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/invalid-listeners.test.ts",
+          "testName": "a $label listener warns at render and reports an Error at dispatch",
+          "modes": ["client", "production-compile"],
+          "observables": ["events", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/dom-component-children.test.ts",
+          "testName": "throws for a malformed dangerouslySetInnerHTML value",
+          "modes": ["client", "production-compile"],
+          "observables": ["errors"]
+        }
+      ],
+      "rationale": "Octane follows React's whole-inline-script escape rather than Redact's exact comment/token spelling, reports invalid listeners instead of silently ignoring them, and rejects malformed raw HTML instead of ignoring extra shapes. The parser/execution containment is covered; byte-level Redact parity is intentionally not claimed."
+    },
+    {
+      "id": "RDX-SSR-001",
+      "area": "ssr-streaming",
+      "title": "SSR retries and render replays are transactional and request-scoped",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 9,
+          "url": "https://github.com/TanStack/redact/pull/9",
+          "title": "Support vinext SSR stream bootstrap"
+        },
+        {
+          "kind": "pull_request",
+          "number": 14,
+          "url": "https://github.com/TanStack/redact/pull/14",
+          "title": "feat(redact): vinext SSR/hydration compatibility — 0.0.9"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/ssr-context.test.tsx",
+          "testName": "restores nested providers",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/ssr-context.test.tsx#L52-L83"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/ssr.test.tsx",
+          "testName": "retries when the root render suspends before any boundary",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/ssr.test.tsx#L160-L174"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/streaming-hydration.test.tsx",
+          "testName": "hydrates a resolved boundary against the streamed real content",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/streaming-hydration.test.tsx#L43-L90"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/streaming-hydration.test.tsx",
+          "testName": "re-hydrates a pending boundary when the server reveal fires",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/streaming-hydration.test.tsx#L92-L157"
+        }
+      ],
+      "symptom": "A root-level suspension or boundary replay could leak partial chunks, IDs, boundary records, or provider values into the retry or another request.",
+      "octaneContract": "Buffered render replays and streamed retries isolate render state, retire discarded boundary records, preserve provider stacks and stable IDs, hydrate revealed ranges in place, and report terminal root failure once.",
+      "classification": "portable",
+      "status": "covered",
+      "risk": "critical",
+      "owner": "Octane server renderer and streaming transports",
+      "applicableModes": ["server-string", "server-static", "server-stream", "hydrate-match"],
+      "observables": ["markup", "node-identity", "streaming", "errors"],
+      "octaneReferences": [
+        {
+          "kind": "integration",
+          "file": "packages/octane/tests/ssr-stream-state-regressions.test.ts",
+          "note": "Covers discarded passes, stable IDs, retired boundaries, and late errors."
+        },
+        {
+          "kind": "integration",
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "note": "Covers stream/hydration interleavings, reveal replacement, failure reporting, and seed scopes."
+        },
+        {
+          "kind": "documentation",
+          "file": "docs/ssr.md",
+          "note": "Bootstrap modules/import maps remain a metaframework concern rather than a core renderer option."
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/ssr-render-phase-state.test.ts",
+          "testName": "settled output is byte-identical to a single-pass render of the final state (useId, markers, sibling order)",
+          "modes": ["server-string"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-render-phase-state.test.ts",
+          "testName": "rewinds the suspense seed stream — one use() seeds exactly once across the passes",
+          "modes": ["server-static"],
+          "observables": ["markup"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "restores each Provider value across suspended concurrent streams",
+          "modes": ["server-stream"],
+          "observables": ["markup", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "delivers a boundary that resolves while a bare Promise delays the shell",
+          "modes": ["server-stream"],
+          "observables": ["markup", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/ssr-stream-state-regressions.test.ts",
+          "testName": "does not retain a boundary registered by a discarded render-phase pass",
+          "modes": ["server-stream"],
+          "observables": ["streaming"]
+        },
+        {
+          "file": "packages/octane/tests/streaming-ssr.test.ts",
+          "testName": "swaps the segment into place, scopes its seeds, and hydrates byte-for-byte",
+          "modes": ["server-stream", "hydrate-match"],
+          "observables": ["markup", "node-identity", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/fizz-streaming.test.ts",
+          "testName": "reports a root failure through the shell callbacks and rejects a readable stream",
+          "modes": ["server-stream"],
+          "observables": ["errors", "streaming"]
+        }
+      ],
+      "rationale": "Redact's inline bootstrap API belongs at Octane's plugin/adapter boundary; the portable transactional retry and request-isolation contracts are already strongly covered."
+    },
+    {
+      "id": "RDX-SSR-002",
+      "area": "document-serialization",
+      "title": "Doctype ownership is explicit for each server rendering API",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/portal-doctype.test.tsx",
+          "testName": "prepends a DOCTYPE when the root element is <html>",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/portal-doctype.test.tsx#L115-L135"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/portal-doctype.test.tsx",
+          "testName": "does not prepend a DOCTYPE for non-html roots",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/portal-doctype.test.tsx#L137-L150"
+        }
+      ],
+      "symptom": "A document response omitted or misplaced its doctype and entered quirks mode, or a fragment unexpectedly received a document preamble.",
+      "octaneContract": "Pipeable <html> document streams contain exactly one <!DOCTYPE html>, and readable <html> streams begin with that doctype; the shared serializer emits none for non-document roots, directly exercised through the pipeable API; renderToString and renderToStaticMarkup remain doctype-free so the embedding framework owns buffered preambles.",
+      "classification": "divergence",
+      "status": "covered",
+      "risk": "high",
+      "owner": "Octane server render APIs",
+      "applicableModes": ["server-string", "server-static", "server-stream"],
+      "observables": ["markup", "streaming"],
+      "octaneReferences": [
+        {
+          "kind": "documentation",
+          "file": "docs/ssr.md",
+          "note": "Documents streaming-only doctype ownership and buffered framework composition."
+        },
+        {
+          "kind": "integration",
+          "file": "packages/octane/tests/streaming-ssr-injection.test.ts",
+          "note": "Covers injected/non-injected document streams, fragments, web streams, and buffered APIs."
+        }
+      ],
+      "evidence": [
+        {
+          "file": "packages/octane/tests/streaming-ssr-injection.test.ts",
+          "testName": "streamed documents lead with <!DOCTYPE html> without any injection source",
+          "modes": ["server-stream"],
+          "observables": ["markup", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/streaming-ssr-injection.test.ts",
+          "testName": "streamed documents lead with <!DOCTYPE html> through the web-stream API",
+          "modes": ["server-stream"],
+          "observables": ["markup", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/streaming-ssr-injection.test.ts",
+          "testName": "streamed fragments never receive a doctype",
+          "modes": ["server-stream"],
+          "observables": ["markup", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/streaming-ssr-injection.test.ts",
+          "testName": "buffered renderers stay doctype-free for document roots, matching React",
+          "modes": ["server-string", "server-static"],
+          "observables": ["markup"]
+        }
+      ],
+      "rationale": "Redact's buffered renderer prepends a doctype for an <html> root. Octane intentionally matches React's API split: streaming owns the document preamble, while buffered output remains composable. The transferable contract is explicit API ownership, not identical bytes across unlike APIs."
+    },
+    {
+      "id": "RDX-STORE-001",
+      "area": "external-store",
+      "title": "External-store subscription races cannot create zombie DOM",
+      "sources": [
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/external-store-unmount.test.tsx",
+          "testName": "subscribes after render when the store synchronously notifies",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/external-store-unmount.test.tsx#L47-L81"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/external-store-unmount.test.tsx",
+          "testName": "store notifications after unmount do not resurrect DOM",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/external-store-unmount.test.tsx#L116-L156"
+        }
+      ],
+      "symptom": "Subscription ran during render or a stale listener scheduled an unmounted component, causing removed UI to reappear in its former host.",
+      "octaneContract": "useSyncExternalStore subscribes after render, converges when subscribe synchronously notifies, unsubscribes on conditional/root removal, and ignores every post-unmount notification.",
+      "classification": "portable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane useSyncExternalStore and scheduler",
+      "applicableModes": ["client", "production-compile"],
+      "observables": ["markup", "effects"],
+      "octaneReferences": [
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "post-unmount store mutations do NOT trigger any work",
+          "note": "Covers root unmount but not synchronous subscribe notification or conditional stale-listener delivery."
+        },
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "useSyncExternalStore"
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/tests/sync-external-store.test.ts"],
+        "acceptance": "Prove subscription occurs outside render, a synchronous notifier converges without looping, conditional removal unsubscribes, and a retained stale callback cannot resurrect DOM."
+      }
+    },
+    {
+      "id": "RDX-SUS-001",
+      "area": "suspense-preservation",
+      "title": "Re-suspension preserves browser-owned state in committed UI",
+      "sources": [
+        {
+          "kind": "pull_request",
+          "number": 16,
+          "url": "https://github.com/TanStack/redact/pull/16",
+          "title": "fix(redact): preserve committed DOM across Suspense re-suspension"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/suspense-preserves-dom.test.tsx",
+          "testName": "preserves focus on an input across a sibling suspension",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L170-L220"
+        }
+      ],
+      "symptom": "Navigating through a suspension destroyed a committed sidebar, resetting scroll and focus even though the logical UI survived.",
+      "octaneContract": "An already committed Suspense primary tree preserves node identity, component state, scroll, focus, selection, uncontrolled values, and other browser-owned state through urgent and transitioned re-suspension, while refs/effects follow Octane's documented lifecycle.",
+      "classification": "portable",
+      "status": "planned",
+      "risk": "critical",
+      "owner": "Octane Suspense runtime and browser tests",
+      "applicableModes": ["client", "production-compile", "real-browser"],
+      "observables": [
+        "node-identity",
+        "focus",
+        "selection",
+        "scroll",
+        "live-properties",
+        "effects",
+        "refs"
+      ],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "softDetachTryBlock",
+          "note": "Ordinary Suspense currently parks committed DOM in savedDom before reinsertion."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/suspense-refs.test.ts",
+          "testName": "detaches host refs on suspend and re-attaches on reveal",
+          "note": "Proves reuse of the same node, not browser focus/scroll preservation."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/conformance/suspense-effects-semantics.test.ts",
+          "testName": "destroys the committed layout effect on re-suspend, recreates on reveal"
+        }
+      ],
+      "nextAction": {
+        "kind": "test",
+        "targets": ["packages/octane/tests/browser", "packages/octane/tests/suspense.test.ts"],
+        "acceptance": "In real Chromium, cover same-tree and route-swap re-suspension with identity, scrollTop, activeElement, selection, uncontrolled value, state, refs, and effect logs for urgent and transitioned paths before changing the hiding mechanism."
+      },
+      "rationale": "The observable preservation contract transfers; Redact's display:none and detached-fallback fiber implementation does not. JSDOM is insufficient for the browser-owned state assertions."
+    }
+  ]
+}
