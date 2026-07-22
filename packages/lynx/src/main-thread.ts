@@ -130,6 +130,7 @@ export interface LynxMainThreadController {
 		fn: LynxBackgroundFunctionWireDescriptor,
 		args: readonly UniversalSerializableValue[],
 	): LynxMainThreadCall;
+	/** Irreversibly close this native page lifetime and notify the background runtime. */
 	close(): void;
 }
 
@@ -1089,7 +1090,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		!firstScreenEnabled ||
 		(firstScreenState !== 'open' && firstScreenState !== 'cleanup-pending' && firstScreenSyncReady);
 
-	const dispatchReady = (request: number): void => {
+	const dispatchReady = (request: number): boolean => {
 		// Request 0 is an unsolicited availability hint and can be emitted before a
 		// background listener exists. Put the clone-safe tree on the first correlated
 		// reply so the O(tree) clone happens once and always has a receiver.
@@ -1108,9 +1109,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			correlatedReadySent = true;
 			drainLifecycleMessages();
 		}
-		if (lifecycleClosed) return;
+		if (lifecycleClosed) return false;
 		dispatch(reply);
 		if (snapshot !== null) firstTreeSnapshotSent = true;
+		return true;
 	};
 
 	const announceReady = (): void => {
@@ -1121,28 +1123,38 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				// A queued request already proves the background listener is present, so
 				// answer it directly instead of cloning the first-tree snapshot into both
 				// an unsolicited announcement and the correlated reply.
-				readyAnnouncementSent = true;
-				dispatchReady(LYNX_READY_ANNOUNCEMENT_REQUEST);
+				readyAnnouncementSent = dispatchReady(LYNX_READY_ANNOUNCEMENT_REQUEST);
 			}
 			while (!closed && !lifecycleClosed && queuedReadyRequests.size !== 0) {
 				const request = queuedReadyRequests.values().next().value!;
-				// Consume before dispatch: ContextProxy delivery can synchronously reenter
-				// with the same request while lifecycle data is still draining.
+				// ContextProxy delivery can synchronously reenter with the same request
+				// while lifecycle data is still draining. The dispatching guard suppresses
+				// that reentry; keep the request queued until the reply is accepted.
+				dispatchingReadyRequest = request;
+				let delivered = false;
+				try {
+					delivered = dispatchReady(request);
+				} finally {
+					dispatchingReadyRequest = null;
+				}
+				if (!delivered) break;
 				queuedReadyRequests.delete(request);
 				completedReadyRequests.add(request);
 				if (completedReadyRequests.size > MAX_READY_REQUEST_TOMBSTONES) {
 					completedReadyRequests.delete(completedReadyRequests.values().next().value!);
 				}
 				readyAnnouncementSent = true;
-				dispatchingReadyRequest = request;
-				try {
-					dispatchReady(request);
-				} finally {
-					dispatchingReadyRequest = null;
-				}
 			}
 		} catch (error) {
-			throw report(error, 'Octane Lynx could not dispatch the main-ready reply.');
+			const readyError = normalizedError(
+				error,
+				'Octane Lynx could not dispatch the main-ready reply.',
+			);
+			terminateLifecycleDelivery(
+				readyError,
+				'Octane Lynx could not dispatch the main-ready reply.',
+			);
+			throw readyError;
 		} finally {
 			readyAnnouncementInProgress = false;
 		}
@@ -2148,7 +2160,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	};
 	finalizeDeferredClose = closeMainThread;
 
-	const onNativeDestroy = (): void => {
+	const notifyBackgroundPageDestroy = (): void => {
 		if (!nativeDestroyReceived && !closed) {
 			nativeDestroyReceived = true;
 			try {
@@ -2161,6 +2173,13 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				report(error, 'Octane Lynx could not notify the background page lifetime.');
 			}
 		}
+	};
+	const closePageController = (): void => {
+		notifyBackgroundPageDestroy();
+		closeMainThread();
+	};
+	const onNativeDestroy = (): void => {
+		notifyBackgroundPageDestroy();
 		try {
 			closeMainThread();
 		} catch (error) {
@@ -2280,7 +2299,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		},
 		markFirstScreenSyncReady,
 		callBackground,
-		close: closeMainThread,
+		// Closing the public page controller is terminal for both runtimes. Route it
+		// through the same one-shot notification as the native lifetime callback so
+		// a background transport waiting for readiness cannot be stranded.
+		close: closePageController,
 	};
 	return Object.freeze(controller);
 }

@@ -1025,7 +1025,7 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		backgroundRoot = null;
 	});
 
-	it('propagates a requested readiness reply delivery failure', () => {
+	it('fail-stops a requested readiness reply delivery failure', async () => {
 		let failReadyReply = false;
 		const deliveryError = new Error('injected readiness delivery failure');
 		const { main } = installEnvironment(undefined, (delegate) =>
@@ -1048,20 +1048,19 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 				},
 			}),
 		);
+		const deliveredTypes: string[] = [];
+		backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+			const type = (event.data as { readonly type?: unknown }).type;
+			if (typeof type === 'string') deliveredTypes.push(type);
+		});
 		failReadyReply = true;
 
-		expect(() => {
-			backgroundContext().dispatchEvent({
-				type: LYNX_BACKGROUND_TO_MAIN_EVENT,
-				data: {
-					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
-					renderer: LYNX_TRANSPORT_RENDERER,
-					type: 'main-ready-request',
-					request: 1,
-				},
-			});
-		}).toThrow(deliveryError);
+		backgroundRoot = createLynxRoot();
+		await expect(backgroundRoot.ready).rejects.toThrow(/native page lifetime was destroyed/);
+		expect(deliveredTypes).toEqual(['page-destroy']);
 		expect(main.diagnostics()).toContain(deliveryError);
+		await backgroundRoot.unmount();
+		backgroundRoot = null;
 	});
 
 	it('tears down background ownership when the public native page lifetime ends', async () => {

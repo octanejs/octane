@@ -1058,7 +1058,7 @@ describe.sequential('Lynx main-thread engine lifecycle bridge', () => {
 		);
 	});
 
-	it('makes lifecycle delivery terminal when close reenters a queued drain', () => {
+	it('settles background readiness when close reenters a queued lifecycle drain', async () => {
 		const engine = createEngineHarness();
 		let main: LynxMainThreadController | null = null;
 		const environment = installEnvironment(
@@ -1066,8 +1066,9 @@ describe.sequential('Lynx main-thread engine lifecycle bridge', () => {
 			(delegate) =>
 				Object.freeze({
 					dispatchEvent(event) {
+						const result = delegate.dispatchEvent(event);
 						if ((event.data as { readonly type?: unknown }).type === 'page-data') main?.close();
-						return delegate.dispatchEvent(event);
+						return result;
 					},
 					addEventListener(type, listener) {
 						delegate.addEventListener(type, listener);
@@ -1083,15 +1084,18 @@ describe.sequential('Lynx main-thread engine lifecycle bridge', () => {
 		engine.dispatch('__UpdatePage', [{ sequence: 1 }, {}]);
 		engine.dispatch('__UpdatePage', [{ sequence: 2 }, {}]);
 		globalThis.lynxTestingEnv.switchToBackgroundThread();
-		requestMainReady(backgroundContext(), 81);
+		backgroundRoot = createLynxRoot();
+		await expect(backgroundRoot.ready).rejects.toThrow(/native page lifetime was destroyed/);
 
-		expect(captured.messages).toEqual([
-			expect.objectContaining({ type: 'page-data', data: { sequence: 1 } }),
-		]);
+		expect(captured.messages.map(({ type }) => type)).toEqual(['page-data', 'page-destroy']);
+		expect(captured.messages[0]).toMatchObject({ data: { sequence: 1 } });
 		expect(engine.listenerCount()).toBe(0);
 		globalThis.lynxTestingEnv.switchToMainThread();
 		engine.dispatch('__UpdatePage', [{ sequence: 3 }, {}]);
-		expect(captured.messages).toHaveLength(1);
+		expect(captured.messages).toHaveLength(2);
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		await backgroundRoot.unmount();
+		backgroundRoot = null;
 	});
 
 	it('fail-stops readiness when queued lifecycle delivery fails', () => {
