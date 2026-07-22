@@ -1562,6 +1562,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	};
 
 	const handleCommit = (message: LynxCommitMessage): void => {
+		if (closePending) return;
 		if (commitInProgress) {
 			queuedCommits.push(message);
 			return;
@@ -1576,6 +1577,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					root: next.root,
 					version: next.version,
 				});
+				if (closePending) {
+					queuedCommits.length = 0;
+					break;
+				}
 				next = queuedCommits.shift();
 			} while (next !== undefined);
 		} catch (error) {
@@ -1786,6 +1791,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const closeMainThread = (): void => {
 		if (commitInProgress || firstScreenRenderInProgress) {
 			closePending = true;
+			queuedCommits.length = 0;
 			return;
 		}
 		closePending = false;
@@ -1800,6 +1806,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 		resetThreadCalls(new Error('Octane Lynx main-thread receiver was closed.'));
 		finishMainCallPublication();
+		queuedCommits.length = 0;
 		queuedNativeEvents.length = 0;
 		queuedHostAttachments.length = 0;
 		queuedReadyRequests.clear();

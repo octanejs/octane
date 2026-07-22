@@ -271,33 +271,68 @@ describe.sequential('Lynx main-thread native event bridge', () => {
 		expect(main.diagnostics()).toContain(deliveryError);
 	});
 
-	it('defers destructive lifetime cleanup until a reentrant PAPI commit unwinds', () => {
+	it('lets active PAPI work unwind without applying later host work after lifetime teardown', async () => {
 		let destroyOnFlush = true;
 		let destroyBroadcasts = 0;
+		let observedPostDestroyAddition = false;
+		let observer: MutationObserver | null = null;
+		const queuedCommitResponses: string[] = [];
 		const { dom, main } = installEnvironment(
 			(target) => {
-				const flush = target.__FlushElementTree as () => void;
-				target.__FlushElementTree = () => {
-					flush.call(target);
+				const flush = target.__FlushElementTree as (node?: object) => void;
+				target.__FlushElementTree = (node?: object) => {
+					flush.call(target, node);
 					if (!destroyOnFlush) return;
 					destroyOnFlush = false;
-					const native = (
-						target as {
-							lynx: { getNative(): LynxContextProxy };
+					const page = node as Element;
+					const MutationObserver = page.ownerDocument.defaultView!.MutationObserver;
+					observer = new MutationObserver((records) => {
+						for (const record of records) {
+							for (const added of record.addedNodes) {
+								if (
+									added instanceof page.ownerDocument.defaultView!.Element &&
+									(added.id === 'queued-after-destroy' ||
+										added.querySelector('#queued-after-destroy') !== null)
+								) {
+									observedPostDestroyAddition = true;
+								}
+							}
 						}
-					).lynx.getNative();
-					native.dispatchEvent({ type: '__DestroyLifetime', data: [1] });
-					native.dispatchEvent({ type: '__DestroyLifetime', data: [1] });
+					});
+					observer.observe(page, { childList: true, subtree: true });
+					const lynx = (
+						target as {
+							lynx: {
+								getJSContext(): LynxContextProxy;
+								getNative(): LynxContextProxy;
+							};
+						}
+					).lynx;
+					dispatchCommit(lynx.getJSContext(), 87, 2, [
+						{ op: 'create', id: 2, type: 'view', props: { id: 'queued-after-destroy' } },
+						{ op: 'insert', parent: null, id: 2, before: null },
+					]);
+					lynx.getNative().dispatchEvent({ type: '__DestroyLifetime', data: [1] });
+					lynx.getNative().dispatchEvent({ type: '__DestroyLifetime', data: [1] });
 				};
 			},
 			(delegate) =>
 				Object.freeze({
 					dispatchEvent(event) {
-						if (
-							event.type === LYNX_MAIN_TO_BACKGROUND_EVENT &&
-							(event.data as { readonly type?: unknown }).type === 'page-destroy'
-						) {
-							destroyBroadcasts++;
+						if (event.type === LYNX_MAIN_TO_BACKGROUND_EVENT) {
+							const message = event.data as {
+								readonly root?: unknown;
+								readonly version?: unknown;
+								readonly type?: unknown;
+							};
+							if (message.type === 'page-destroy') destroyBroadcasts++;
+							if (
+								message.root === 87 &&
+								message.version === 2 &&
+								typeof message.type === 'string'
+							) {
+								queuedCommitResponses.push(message.type);
+							}
 						}
 						return delegate.dispatchEvent(event);
 					},
@@ -320,10 +355,14 @@ describe.sequential('Lynx main-thread native event bridge', () => {
 		expect(main.activeIdentity()).toBeNull();
 		expect(main.diagnostics()).toEqual([]);
 		expect(destroyBroadcasts).toBe(1);
+		await new Promise<void>((resolve) => dom.window.setTimeout(resolve, 0));
+		observer?.disconnect();
+		expect(observedPostDestroyAddition).toBe(false);
+		expect(queuedCommitResponses).toEqual([]);
 
-		dispatchCommit(context, 87, 2, [
-			{ op: 'create', id: 2, type: 'view', props: { id: 'late-root' } },
-			{ op: 'insert', parent: null, id: 2, before: null },
+		dispatchCommit(context, 87, 3, [
+			{ op: 'create', id: 3, type: 'view', props: { id: 'late-root' } },
+			{ op: 'insert', parent: null, id: 3, before: null },
 		]);
 		expect(dom.window.document.querySelector('#late-root')).toBeNull();
 	});
