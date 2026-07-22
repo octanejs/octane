@@ -124,6 +124,11 @@ const listItemProps: RendererElements['list-item'] = {
 	'item-key': 'account-7',
 	recyclable: true,
 };
+const unmountRecycledListItemProps: RendererElements['list-item'] = {
+	'item-key': 'account-8',
+	// @ts-expect-error Octane retains logical list state and does not accept ReactLynx unmount-on-recycle semantics.
+	defer: { unmountRecycled: true },
+};
 const nativeMapProps: RendererElements['native-map'] = {
 	region: '51.5072,-0.1276',
 };
@@ -157,6 +162,7 @@ void rawTextProps;
 void imageProps;
 void inputProps;
 void listItemProps;
+void unmountRecycledListItemProps;
 void nativeMapProps;
 void publicHandleRoot;
 void viewWithObjectRef;

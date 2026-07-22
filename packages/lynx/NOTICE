@@ -10,5 +10,17 @@ contracts from:
   See LICENSE-APACHE-2.0 in this package.
 
 The adapted declarations retain the upstream notice and mark their
-module-scoping modification. No Lynx or ReactLynx implementation source is
-vendored in @octanejs/lynx.
+module-scoping modification.
+
+The generated audit/upstream-runner-cases.json records test titles, source
+paths, source locations, and task identities collected from:
+
+  lynx-family/lynx-stack b6b809cdbec99d20e51aa9521257644dc9db5272
+  Lynx Project
+  Copyright (c) 2018-2024 ByteDance Inc.
+  Copyright (c) 2024 TikTok Inc.
+  Licensed under the Apache License, Version 2.0.
+  See LICENSE-APACHE-2.0 in this package.
+
+No Lynx or ReactLynx implementation or test body is vendored in
+@octanejs/lynx.
