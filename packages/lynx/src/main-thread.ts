@@ -40,16 +40,20 @@ import {
 	LYNX_READY_ANNOUNCEMENT_REQUEST,
 	LYNX_TRANSPORT_PROTOCOL_VERSION,
 	LYNX_TRANSPORT_RENDERER,
+	sameLynxTransportIdentity,
 	validateLynxBackgroundInboundMessage,
 	validateLynxBackgroundOutboundMessage,
 	type LynxBackgroundInboundMessage,
+	type LynxBackgroundFunctionWireDescriptor,
 	type LynxAdoptionReadyMessage,
+	type LynxCallMainMessage,
 	type LynxContextProxy,
 	type LynxContextProxyEvent,
 	type LynxDisposeAcknowledgement,
 	type LynxDisposeMessage,
 	type LynxHostAttachmentMessage,
 	type LynxHostFaultMessage,
+	type LynxMainCallPublicationMessage,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
 	type LynxPublicHandleDelta,
@@ -57,6 +61,15 @@ import {
 	type LynxTerminalDisposeMessage,
 } from './core/protocol.js';
 import { createLynxElementPAPI, type LynxElementPAPI, type LynxElementRef } from './core/papi.js';
+import {
+	createLynxMainThreadWorkletRegistry,
+	installLynxMainThreadWorkletRegistry,
+	installMainThreadCallBridge,
+	isLynxBackgroundFunctionDescriptor,
+	isolateLynxWorkletValue,
+	type LynxMainThreadWorkletRegistry,
+	type LynxWorkletValue,
+} from './core/worklets.js';
 import { installLynxFirstScreenHost } from './first-screen.js';
 import { renderLynxFirstScreen, type LynxFirstScreenRenderResult } from './main-renderer.js';
 
@@ -80,6 +93,15 @@ export interface InstallLynxMainThreadOptions {
 	 */
 	readonly firstScreenSync?: 'automatic' | 'manual';
 	readonly onDiagnostic?: (error: Error) => void;
+	readonly executeMainThreadWorklet?: (
+		worklet: import('./core/protocol.js').LynxMainThreadWorkletWireDescriptor,
+		args: readonly UniversalSerializableValue[],
+	) => unknown;
+}
+
+export interface LynxMainThreadCall<Result = UniversalSerializableValue> {
+	readonly promise: Promise<Result>;
+	cancel(reason?: unknown): void;
 }
 
 export interface LynxMainThreadController {
@@ -93,6 +115,10 @@ export interface LynxMainThreadController {
 	firstScreenSnapshot(): LynxFirstTreeSnapshot | null;
 	/** Release a receiver configured with manual first-screen synchronization. */
 	markFirstScreenSyncReady(): void;
+	callBackground(
+		fn: LynxBackgroundFunctionWireDescriptor,
+		args: readonly UniversalSerializableValue[],
+	): LynxMainThreadCall;
 	close(): void;
 }
 
@@ -111,6 +137,31 @@ interface ActiveLynxMainRoot<Node extends LynxElementRef> {
 	readonly root: number;
 	readonly container: LynxHostContainer<Node>;
 	acceptedVersion: number;
+	lastMainCall: number;
+	lastMainCallPublication: number;
+	faulted: boolean;
+}
+
+interface Deferred<T> {
+	readonly promise: Promise<T>;
+	readonly settled: boolean;
+	resolve(value: T): void;
+	reject(error: unknown): void;
+}
+
+interface PendingBackgroundCall {
+	readonly call: number;
+	readonly fn: LynxBackgroundFunctionWireDescriptor;
+	readonly args: readonly UniversalSerializableValue[];
+	readonly deferred: Deferred<UniversalSerializableValue>;
+	identity: UniversalTransportIdentity | null;
+	state: 'queued' | 'sent';
+}
+
+interface RunningMainCall {
+	readonly identity: UniversalTransportIdentity;
+	release(): void;
+	cancelled: boolean;
 }
 
 type LynxCommitMessage = Extract<
@@ -122,7 +173,34 @@ const MAX_ABORT_TOMBSTONES = 128;
 const MAX_DISPOSED_ROOT_TOMBSTONES = 128;
 const MAX_CLOSE_CLEANUP_ATTEMPTS = 3;
 const MAX_FIRST_SCREEN_EVENT_DELIVERIES = 128;
+const MAX_QUEUED_THREAD_CALLS = 128;
 const FIRST_SCREEN_ROOT_ID = 1;
+
+function createDeferred<T>(): Deferred<T> {
+	let resolvePromise!: (value: T) => void;
+	let rejectPromise!: (error: unknown) => void;
+	let settled = false;
+	const promise = new Promise<T>((resolve, reject) => {
+		resolvePromise = resolve;
+		rejectPromise = reject;
+	});
+	return {
+		promise,
+		get settled() {
+			return settled;
+		},
+		resolve(value) {
+			if (settled) return;
+			settled = true;
+			resolvePromise(value);
+		},
+		reject(error) {
+			if (settled) return;
+			settled = true;
+			rejectPromise(error);
+		},
+	};
+}
 
 function normalizedError(value: unknown, fallback: string): Error {
 	if (value instanceof Error) return value;
@@ -295,6 +373,15 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		readonly version: number;
 		readonly deltas: readonly LynxHostAttachmentDelta[];
 	}> = [];
+	const pendingBackgroundCalls = new Map<number, PendingBackgroundCall>();
+	const runningMainCalls = new Map<number, RunningMainCall>();
+	let backgroundCallsOpen = false;
+	let nextThreadCall = 1;
+	let uninstallWorkletRegistry: (() => void) | null = null;
+	let uninstallCallBridge: (() => void) | null = null;
+	let restoreRunWorklet: (() => void) | null = null;
+	let worklets: LynxMainThreadWorkletRegistry;
+	let mainCallPublication: UniversalTransportIdentity | null = null;
 
 	const report = (value: unknown, fallback = 'Octane Lynx main-thread receiver failed.') => {
 		const error = normalizedError(value, fallback);
@@ -312,6 +399,384 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const dispatch = (message: LynxBackgroundInboundMessage): void => {
 		const validated = validateLynxBackgroundInboundMessage(message);
 		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: validated });
+	};
+
+	const currentIdentity = (): UniversalTransportIdentity | null =>
+		active === null
+			? null
+			: Object.freeze({
+					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+					renderer: LYNX_TRANSPORT_RENDERER,
+					root: active.root,
+					version: active.acceptedVersion,
+				});
+
+	const sendBackgroundCall = (entry: PendingBackgroundCall): void => {
+		const identity = currentIdentity();
+		if (
+			!backgroundCallsOpen ||
+			identity === null ||
+			active?.faulted === true ||
+			entry.state !== 'queued'
+		) {
+			return;
+		}
+		entry.identity = identity;
+		entry.state = 'sent';
+		try {
+			dispatch({
+				...identity,
+				type: 'call-background',
+				call: entry.call,
+				fn: entry.fn,
+				args: entry.args,
+			});
+		} catch (error) {
+			if (pendingBackgroundCalls.get(entry.call) !== entry) return;
+			pendingBackgroundCalls.delete(entry.call);
+			entry.deferred.reject(report(error, 'Octane Lynx could not deliver a background call.'));
+		}
+	};
+
+	const drainBackgroundCalls = (): void => {
+		if (!backgroundCallsOpen || closed) return;
+		for (const entry of [...pendingBackgroundCalls.values()]) {
+			if (entry.state === 'queued') sendBackgroundCall(entry);
+		}
+	};
+
+	const openBackgroundCalls = (): void => {
+		if (closed || active === null || active.faulted) return;
+		backgroundCallsOpen = true;
+		drainBackgroundCalls();
+	};
+
+	const settleBackgroundCall = (
+		message: Extract<
+			ReturnType<typeof validateLynxBackgroundOutboundMessage>,
+			{ type: 'call-background-result' | 'call-background-error' }
+		>,
+	): void => {
+		const entry = pendingBackgroundCalls.get(message.call);
+		if (entry === undefined) {
+			report(
+				new Error(
+					`Octane Lynx received a late or duplicate background call result ${message.call}.`,
+				),
+			);
+			return;
+		}
+		if (entry.identity === null || !sameLynxTransportIdentity(entry.identity, message)) {
+			report(
+				new Error(
+					`Octane Lynx received a stale or foreign background call result ${message.call}.`,
+				),
+			);
+			return;
+		}
+		pendingBackgroundCalls.delete(message.call);
+		if (message.type === 'call-background-result') {
+			try {
+				entry.deferred.resolve(
+					isolateLynxWorkletValue(
+						message.value as LynxWorkletValue,
+						'background call result',
+					) as UniversalSerializableValue,
+				);
+			} catch (error) {
+				entry.deferred.reject(report(error, 'Octane Lynx received an invalid background result.'));
+			}
+		} else {
+			const error = new Error(message.error.message);
+			error.name = message.error.name;
+			entry.deferred.reject(error);
+		}
+	};
+
+	const dispatchMainCallError = (message: LynxCallMainMessage, value: unknown): void => {
+		try {
+			dispatch({
+				protocol: message.protocol,
+				renderer: message.renderer,
+				root: message.root,
+				version: message.version,
+				type: 'call-main-error',
+				call: message.call,
+				error: wireError(value, 'Octane Lynx main-thread worklet failed.'),
+			});
+		} catch (error) {
+			report(error, 'Octane Lynx could not deliver a main-thread call error.');
+		}
+	};
+
+	const handleMainCall = (message: LynxCallMainMessage): void => {
+		if (
+			active === null ||
+			message.root !== active.root ||
+			message.version > active.acceptedVersion ||
+			awaitingAdoption !== null
+		) {
+			report(
+				new Error(`Octane Lynx received a stale or foreign main-thread call ${message.call}.`),
+			);
+			dispatchMainCallError(message, new Error('Octane Lynx main-thread call is stale.'));
+			return;
+		}
+		// Call IDs are allocated monotonically and ContextProxy preserves sender
+		// order. Keep the high-water mark on the active root so a settled or
+		// cancelled request cannot be replayed, without retaining one tombstone per
+		// call for the lifetime of the page.
+		if (message.call <= active.lastMainCall) {
+			report(new Error(`Octane Lynx received duplicate main-thread call ${message.call}.`));
+			return;
+		}
+		active.lastMainCall = message.call;
+		if (active.faulted) {
+			report(
+				new Error(`Octane Lynx rejected main-thread call ${message.call} for a faulted root.`),
+			);
+			dispatchMainCallError(message, new Error('Octane Lynx main-thread root is faulted.'));
+			return;
+		}
+		const running: RunningMainCall = {
+			identity: Object.freeze({
+				protocol: message.protocol,
+				renderer: message.renderer,
+				root: message.root,
+				version: message.version,
+			}),
+			release() {},
+			cancelled: false,
+		};
+		runningMainCalls.set(message.call, running);
+		let result: unknown;
+		try {
+			if (options.executeMainThreadWorklet === undefined) {
+				const activeWorklet = worklets.activate(
+					message.worklet as import('./core/worklets.js').LynxMainThreadWorkletDescriptor,
+				);
+				let retained = true;
+				running.release = () => {
+					if (!retained) return;
+					retained = false;
+					worklets.release(activeWorklet);
+				};
+				result = worklets.runWorklet(activeWorklet, message.args);
+			} else {
+				result = options.executeMainThreadWorklet(message.worklet, message.args);
+			}
+		} catch (error) {
+			runningMainCalls.delete(message.call);
+			running.release();
+			dispatchMainCallError(message, error);
+			return;
+		}
+		void Promise.resolve(result).then(
+			(value) => {
+				if (runningMainCalls.get(message.call) !== running || running.cancelled || closed) {
+					return;
+				}
+				runningMainCalls.delete(message.call);
+				running.release();
+				try {
+					const isolated = isolateLynxWorkletValue(
+						value as LynxWorkletValue,
+						'main-thread call result',
+					);
+					dispatch({
+						...running.identity,
+						type: 'call-main-result',
+						call: message.call,
+						value: isolated as UniversalSerializableValue,
+					});
+				} catch (error) {
+					dispatchMainCallError(message, error);
+				}
+			},
+			(error) => {
+				if (runningMainCalls.get(message.call) !== running || running.cancelled || closed) {
+					return;
+				}
+				runningMainCalls.delete(message.call);
+				running.release();
+				dispatchMainCallError(message, error);
+			},
+		);
+	};
+
+	const handleCancelMainCall = (
+		message: Extract<
+			ReturnType<typeof validateLynxBackgroundOutboundMessage>,
+			{ type: 'cancel-main' }
+		>,
+	): void => {
+		const running = runningMainCalls.get(message.call);
+		if (running === undefined) {
+			report(
+				new Error(
+					`Octane Lynx received a late or duplicate main-thread cancellation ${message.call}.`,
+				),
+			);
+			return;
+		}
+		if (!sameLynxTransportIdentity(running.identity, message)) {
+			report(
+				new Error(
+					`Octane Lynx received a stale or foreign main-thread cancellation ${message.call}.`,
+				),
+			);
+			return;
+		}
+		runningMainCalls.delete(message.call);
+		running.cancelled = true;
+		running.release();
+	};
+
+	const resetThreadCalls = (reason: unknown): void => {
+		const error = normalizedError(reason, 'Octane Lynx thread calls were disposed.');
+		backgroundCallsOpen = false;
+		for (const entry of [...pendingBackgroundCalls.values()]) {
+			pendingBackgroundCalls.delete(entry.call);
+			if (entry.state === 'sent' && entry.identity !== null && !closed) {
+				try {
+					dispatch({ ...entry.identity, type: 'cancel-background', call: entry.call });
+				} catch (cancelError) {
+					report(cancelError, 'Octane Lynx could not cancel a closing background call.');
+				}
+			}
+			entry.deferred.reject(error);
+		}
+		for (const running of runningMainCalls.values()) {
+			running.cancelled = true;
+			running.release();
+		}
+		runningMainCalls.clear();
+	};
+
+	const callBackground = (
+		fn: LynxBackgroundFunctionWireDescriptor,
+		args: readonly UniversalSerializableValue[],
+	): LynxMainThreadCall => {
+		if (closed) {
+			const deferred = createDeferred<UniversalSerializableValue>();
+			deferred.reject(new Error('Octane Lynx main-thread receiver is closed.'));
+			return Object.freeze({ promise: deferred.promise, cancel() {} });
+		}
+		if (active?.faulted === true) {
+			const deferred = createDeferred<UniversalSerializableValue>();
+			deferred.reject(new Error('Octane Lynx main-thread root is faulted.'));
+			return Object.freeze({ promise: deferred.promise, cancel() {} });
+		}
+		if (pendingBackgroundCalls.size >= MAX_QUEUED_THREAD_CALLS) {
+			const deferred = createDeferred<UniversalSerializableValue>();
+			deferred.reject(
+				new Error(
+					`Octane Lynx background call queue is limited to ${MAX_QUEUED_THREAD_CALLS} entries.`,
+				),
+			);
+			return Object.freeze({ promise: deferred.promise, cancel() {} });
+		}
+		if (nextThreadCall > Number.MAX_SAFE_INTEGER) {
+			const deferred = createDeferred<UniversalSerializableValue>();
+			deferred.reject(new Error('Octane Lynx background call identity space is exhausted.'));
+			return Object.freeze({ promise: deferred.promise, cancel() {} });
+		}
+		const isolatedFn = isolateLynxWorkletValue(
+			fn as LynxWorkletValue,
+			'background function call target',
+		);
+		if (!isLynxBackgroundFunctionDescriptor(isolatedFn)) {
+			throw new TypeError('Octane Lynx background function call target is invalid.');
+		}
+		const isolatedArgs = isolateLynxWorkletValue(
+			args as unknown as LynxWorkletValue[],
+			'background function call arguments',
+		);
+		const entry: PendingBackgroundCall = {
+			call: nextThreadCall++,
+			fn: isolatedFn as LynxBackgroundFunctionWireDescriptor,
+			args: isolatedArgs as readonly UniversalSerializableValue[],
+			deferred: createDeferred<UniversalSerializableValue>(),
+			identity: null,
+			state: 'queued',
+		};
+		pendingBackgroundCalls.set(entry.call, entry);
+		if (backgroundCallsOpen) sendBackgroundCall(entry);
+		return Object.freeze({
+			promise: entry.deferred.promise,
+			cancel(reason?: unknown) {
+				if (pendingBackgroundCalls.get(entry.call) !== entry) return;
+				pendingBackgroundCalls.delete(entry.call);
+				if (entry.state === 'sent' && entry.identity !== null && !closed) {
+					try {
+						dispatch({ ...entry.identity, type: 'cancel-background', call: entry.call });
+					} catch (error) {
+						report(error, 'Octane Lynx could not deliver a background cancellation.');
+					}
+				}
+				const cancellation = normalizedError(reason, 'Octane Lynx background call was cancelled.');
+				if (reason === undefined) cancellation.name = 'AbortError';
+				entry.deferred.reject(cancellation);
+			},
+		});
+	};
+
+	worklets = createLynxMainThreadWorkletRegistry({
+		callBackground(fn, args) {
+			return callBackground(
+				fn as LynxBackgroundFunctionWireDescriptor,
+				args as readonly UniversalSerializableValue[],
+			).promise;
+		},
+	});
+	const runWorkletTarget = rawTarget as Record<string, unknown>;
+	const previousRunWorklet = runWorkletTarget.runWorklet;
+	const installedRunWorklet = (
+		descriptor: import('./core/worklets.js').LynxMainThreadWorkletDescriptor,
+		args?: readonly unknown[],
+	) => worklets.runWorklet(descriptor, args);
+	restoreRunWorklet = () => {
+		if (runWorkletTarget.runWorklet !== installedRunWorklet) return;
+		if (previousRunWorklet === undefined) delete runWorkletTarget.runWorklet;
+		else runWorkletTarget.runWorklet = previousRunWorklet;
+	};
+	try {
+		uninstallWorkletRegistry = installLynxMainThreadWorkletRegistry(worklets);
+		uninstallCallBridge = installMainThreadCallBridge({
+			callBackground<Result>(
+				fn: import('./core/worklets.js').LynxBackgroundFunctionDescriptor,
+				args: readonly import('./core/worklets.js').LynxWorkletValue[],
+			) {
+				const call = callBackground(
+					fn as LynxBackgroundFunctionWireDescriptor,
+					args as readonly UniversalSerializableValue[],
+				);
+				return {
+					promise: call.promise as Promise<Result>,
+					cancel: call.cancel,
+				};
+			},
+		});
+		runWorkletTarget.runWorklet = installedRunWorklet;
+	} catch (error) {
+		restoreRunWorklet?.();
+		restoreRunWorklet = null;
+		uninstallCallBridge?.();
+		uninstallCallBridge = null;
+		uninstallWorkletRegistry?.();
+		uninstallWorkletRegistry = null;
+		worklets.close();
+		throw error;
+	}
+
+	const finishMainCallPublication = (): void => {
+		if (mainCallPublication === null) return;
+		mainCallPublication = null;
+		try {
+			worklets.finishRefOwnerPublication();
+		} catch (error) {
+			report(error, 'Octane Lynx could not finish main-thread ref owner publication.');
+		}
 	};
 
 	const canAnnounceReady = () =>
@@ -395,6 +860,22 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			if (treeComplete && sourceComplete) return true;
 		}
 		return false;
+	};
+
+	const forceCloseWorkletRuntime = (): void => {
+		restoreRunWorklet?.();
+		restoreRunWorklet = null;
+		uninstallCallBridge?.();
+		uninstallCallBridge = null;
+		uninstallWorkletRegistry?.();
+		uninstallWorkletRegistry = null;
+		worklets.close();
+	};
+
+	const closeWorkletRuntime = (): boolean => {
+		if (active !== null || firstTree !== null || failedFirstScreenSource !== null) return false;
+		forceCloseWorkletRuntime();
+		return true;
 	};
 
 	const snapshotNativeEventBatch = (
@@ -602,8 +1083,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	};
 
 	const reject = (identity: UniversalTransportIdentity, error: unknown): void => {
-		queuedNativeEvents.length = 0;
-		queuedHostAttachments.length = 0;
+		const queuedNativeEventCount = queuedNativeEvents.length;
+		const queuedAttachmentCount = queuedHostAttachments.length;
 		try {
 			dispatch({
 				...identity,
@@ -613,9 +1094,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		} catch (dispatchError) {
 			throw report(dispatchError, 'Octane Lynx could not dispatch a host rejection.');
 		} finally {
-			// ContextProxy listeners run synchronously in the public test model.
-			// Never retain a native event submitted reentrantly from settlement.
-			queuedNativeEvents.length = 0;
+			// Preserve already-buffered events for the accepted/adopting root while
+			// discarding only callbacks fired reentrantly by this rejection.
+			queuedNativeEvents.length = queuedNativeEventCount;
+			queuedHostAttachments.length = queuedAttachmentCount;
 		}
 	};
 
@@ -633,15 +1115,55 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 	};
 
+	const finalizeDisposedRoot = (record: ActiveLynxMainRoot<Node>, version: number): void => {
+		if (active !== record) return;
+		finishMainCallPublication();
+		worklets.releaseOwners();
+		rememberDisposed(record.root, version);
+		active = null;
+	};
+
+	const failAcceptedResponse = (
+		record: ActiveLynxMainRoot<Node>,
+		value: unknown,
+		fallback: string,
+		response: string,
+	): Error => {
+		const error = report(value, fallback);
+		if (active !== record) return error;
+		record.faulted = true;
+		queuedNativeEvents.length = 0;
+		queuedHostAttachments.length = 0;
+		awaitingAdoption = null;
+		resetThreadCalls(error);
+		finishMainCallPublication();
+		const cleanup = disposeRecord(record);
+		const firstScreenComplete = cleanup.complete && retryFirstScreenCleanup();
+		if (cleanup.complete && firstScreenComplete) {
+			finalizeDisposedRoot(record, record.acceptedVersion);
+		} else {
+			report(
+				new Error(
+					`Octane Lynx could not fully clean up root ${record.root} and its first-screen state after ${response} dispatch failed.`,
+				),
+			);
+		}
+		return error;
+	};
+
 	const failAcceptedRoot = (version: number, value: unknown): void => {
 		const error = report(value, 'Octane Lynx accepted host callback failed.');
 		const record = active;
-		if (record === null || record.acceptedVersion !== version) {
+		if (record === null || record.acceptedVersion !== version || record.faulted) {
 			report(new Error('Octane Lynx received a stale or foreign accepted host callback fault.'));
 			return;
 		}
+		record.faulted = true;
 		queuedNativeEvents.length = 0;
 		queuedHostAttachments.length = 0;
+		awaitingAdoption = null;
+		resetThreadCalls(error);
+		finishMainCallPublication();
 		const message: LynxHostFaultMessage = {
 			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
 			renderer: LYNX_TRANSPORT_RENDERER,
@@ -659,11 +1181,63 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		// native tree live while waiting for background to request terminal dispose.
 		if (active === record) {
 			const cleanup = disposeRecord(record);
-			if (cleanup.complete) {
-				rememberDisposed(record.root, record.acceptedVersion);
-				active = null;
+			if (cleanup.complete && retryFirstScreenCleanup()) {
+				finalizeDisposedRoot(record, record.acceptedVersion);
 			}
 		}
+	};
+
+	const handleMainCallPublication = (message: LynxMainCallPublicationMessage): void => {
+		const exactActive =
+			active !== null && message.root === active.root && message.version === active.acceptedVersion;
+		const failExactPhase = (detail: string): void => {
+			const error = new Error(
+				`Octane Lynx received ${detail} for the active main-call publication.`,
+			);
+			if (active === null || !exactActive || active.faulted) {
+				report(error);
+				if (exactActive) finishMainCallPublication();
+				return;
+			}
+			failAcceptedRoot(active.acceptedVersion, error);
+		};
+
+		if (message.phase === 'open') {
+			if (!exactActive) {
+				report(new Error('Octane Lynx received a stale or foreign main-call publication open.'));
+				return;
+			}
+			if (mainCallPublication !== null || message.version <= active!.lastMainCallPublication) {
+				failExactPhase(mainCallPublication === null ? 'a replayed open' : 'a nested open');
+				return;
+			}
+			try {
+				worklets.beginRefOwnerPublication();
+				mainCallPublication = Object.freeze({
+					protocol: message.protocol,
+					renderer: message.renderer,
+					root: message.root,
+					version: message.version,
+				});
+				active!.lastMainCallPublication = message.version;
+			} catch (error) {
+				failAcceptedRoot(active!.acceptedVersion, error);
+			}
+			return;
+		}
+		if (mainCallPublication === null) {
+			if (exactActive) failExactPhase('a close without an open');
+			else
+				report(new Error('Octane Lynx received a stale or foreign main-call publication close.'));
+			return;
+		}
+		if (!sameLynxTransportIdentity(mainCallPublication, message)) {
+			if (exactActive) failExactPhase('a mismatched close');
+			else
+				report(new Error('Octane Lynx received a stale or foreign main-call publication close.'));
+			return;
+		}
+		finishMainCallPublication();
 	};
 
 	const abortKey = (identity: UniversalTransportIdentity) => `${identity.root}:${identity.version}`;
@@ -692,6 +1266,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			source = createLynxHostContainer(papi, {
 				root: FIRST_SCREEN_ROOT_ID,
 				page,
+				worklets,
 			});
 			const prepared = prepareLynxHostBatch(source, result.batch);
 			prepared.apply();
@@ -768,6 +1343,18 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			reject(identity, new Error(`Octane Lynx batch ${message.version} was aborted before apply.`));
 			return;
 		}
+		if (mainCallPublication !== null) {
+			const publication = mainCallPublication;
+			failAcceptedRoot(
+				publication.version,
+				new Error('Octane Lynx commit arrived before main-call publication closed.'),
+			);
+			reject(
+				identity,
+				new Error('Octane Lynx commit arrived before main-call publication closed.'),
+			);
+			return;
+		}
 		if (active !== null && active.root !== message.root) {
 			reject(identity, new Error('Octane Lynx commit belongs to a foreign active root.'));
 			return;
@@ -791,10 +1378,14 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					container: createLynxHostContainer(papi, {
 						root: message.root,
 						page,
+						worklets,
 						onAttachments: submitHostAttachments,
 						onCallbackFault: failAcceptedRoot,
 					}),
 					acceptedVersion: 0,
+					lastMainCall: 0,
+					lastMainCallPublication: 0,
+					faulted: false,
 				};
 			} catch (error) {
 				reject(identity, error);
@@ -846,6 +1437,13 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 
 		record.acceptedVersion = message.version;
+		if (applyFailed) {
+			record.faulted = true;
+			// ACK delivery may synchronously publish effects that issue thread calls.
+			// Close both directions before dispatching it so those calls cannot run
+			// against a host whose accepted native application already failed.
+			resetThreadCalls(applyError);
+		}
 		if (!applyFailed && prepared.firstTreeAction === 'adopt') {
 			awaitingAdoption = Object.freeze({ ...identity });
 		} else if (candidateFirstTree !== null) {
@@ -868,23 +1466,14 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		try {
 			dispatch(acknowledgement);
 		} catch (error) {
-			queuedNativeEvents.length = 0;
-			awaitingAdoption = null;
-			const cleanup = disposeRecord(record);
-			if (!cleanup.complete) {
-				report(
-					new Error(
-						`Octane Lynx could not fully clean up root ${record.root} after acknowledgement dispatch failed.`,
-					),
-				);
-			} else {
-				rememberDisposed(record.root, record.acceptedVersion);
-				active = null;
-			}
-			if (firstTree !== null) {
-				disposeAvailableFirstTree();
-			}
-			throw report(error, 'Octane Lynx could not dispatch an accepted batch acknowledgement.');
+			// ContextProxy may deliver the acknowledgement (and reentrant calls) before
+			// reporting a dispatch failure. Release those activations before owner state.
+			throw failAcceptedResponse(
+				record,
+				error,
+				'Octane Lynx could not dispatch an accepted batch acknowledgement.',
+				'acknowledgement',
+			);
 		}
 
 		if (!applyFailed) {
@@ -893,8 +1482,14 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			try {
 				dispatch({ ...identity, type: 'complete' });
 				if (awaitingAdoption === null) drainNativeEvents();
+				if (awaitingAdoption === null) openBackgroundCalls();
 			} catch (error) {
-				throw report(error, 'Octane Lynx could not dispatch accepted batch completion.');
+				throw failAcceptedResponse(
+					record,
+					error,
+					'Octane Lynx could not dispatch accepted batch completion.',
+					'completion',
+				);
 			}
 			return;
 		}
@@ -953,7 +1548,8 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			message.root !== awaitingAdoption.root ||
 			message.version !== awaitingAdoption.version ||
 			message.root !== active.root ||
-			message.version > active.acceptedVersion
+			message.version > active.acceptedVersion ||
+			active.faulted
 		) {
 			report(new Error('Octane Lynx received a stale or foreign adoption-ready message.'));
 			return;
@@ -964,13 +1560,18 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			awaitingAdoption = null;
 			releaseFirstTree();
 		}
+		openBackgroundCalls();
 	};
 
 	const handleDispose = (message: LynxDisposeMessage | LynxTerminalDisposeMessage): void => {
-		queuedNativeEvents.length = 0;
-		queuedHostAttachments.length = 0;
-		awaitingAdoption = null;
 		const terminal = message.type === 'terminal-dispose';
+		const resetDisposedState = (): void => {
+			queuedNativeEvents.length = 0;
+			queuedHostAttachments.length = 0;
+			awaitingAdoption = null;
+			resetThreadCalls(new Error(`Octane Lynx root ${message.root} was disposed.`));
+			finishMainCallPublication();
+		};
 		const acknowledge = () => {
 			const acknowledgement: LynxDisposeAcknowledgement = {
 				...message,
@@ -998,6 +1599,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			return;
 		}
 		if (terminal && active === null) {
+			resetDisposedState();
 			if (!retryFirstScreenCleanup()) {
 				requestRetry(
 					report(
@@ -1008,6 +1610,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 				);
 				return;
 			}
+			worklets.releaseOwners();
 			rememberDisposed(message.root, message.version);
 			acknowledge();
 			return;
@@ -1022,6 +1625,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			report(new Error('Octane Lynx received a stale or foreign dispose request.'));
 			return;
 		}
+		resetDisposedState();
 		const record = active;
 		const cleanup = disposeRecord(record);
 		if (!cleanup.complete) {
@@ -1043,8 +1647,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			);
 			return;
 		}
-		rememberDisposed(record.root, terminal ? message.version : record.acceptedVersion);
-		active = null;
+		finalizeDisposedRoot(record, terminal ? message.version : record.acceptedVersion);
 		acknowledge();
 	};
 
@@ -1056,12 +1659,51 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		} catch (error) {
 			const normalized = report(error, 'Octane Lynx received a malformed outbound message.');
 			const identity = recoverIdentity(event.data);
+			const raw =
+				event.data !== null && typeof event.data === 'object'
+					? (event.data as Record<string, unknown>)
+					: null;
 			if (
 				identity !== null &&
-				event.data !== null &&
-				typeof event.data === 'object' &&
-				(event.data as { type?: unknown }).type === 'commit'
+				raw !== null &&
+				(raw.type === 'call-background-result' || raw.type === 'call-background-error') &&
+				Number.isSafeInteger(raw.call) &&
+				(raw.call as number) > 0
 			) {
+				const entry = pendingBackgroundCalls.get(raw.call as number);
+				if (
+					entry !== undefined &&
+					entry.identity !== null &&
+					sameLynxTransportIdentity(entry.identity, identity)
+				) {
+					pendingBackgroundCalls.delete(entry.call);
+					entry.deferred.reject(normalized);
+					return;
+				}
+			}
+			if (
+				identity !== null &&
+				raw !== null &&
+				raw.type === 'call-main' &&
+				Number.isSafeInteger(raw.call) &&
+				(raw.call as number) > 0 &&
+				active !== null &&
+				active.root === identity.root &&
+				identity.version <= active.acceptedVersion
+			) {
+				try {
+					dispatch({
+						...identity,
+						type: 'call-main-error',
+						call: raw.call as number,
+						error: wireError(normalized, 'Octane Lynx received a malformed main-thread call.'),
+					});
+				} catch (dispatchError) {
+					report(dispatchError, 'Octane Lynx could not reject a malformed main-thread call.');
+				}
+				return;
+			}
+			if (identity !== null && raw?.type === 'commit') {
 				reject(identity, normalized);
 			}
 			return;
@@ -1070,6 +1712,17 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			handleReady(message);
 		} else if (message.type === 'adoption-ready') {
 			handleAdoptionReady(message);
+		} else if (message.type === 'main-call-publication') {
+			handleMainCallPublication(message);
+		} else if (message.type === 'call-main') {
+			handleMainCall(message);
+		} else if (message.type === 'cancel-main') {
+			handleCancelMainCall(message);
+		} else if (
+			message.type === 'call-background-result' ||
+			message.type === 'call-background-error'
+		) {
+			settleBackgroundCall(message);
 		} else if (message.type === 'abort') {
 			handleAbort(message);
 		} else if (message.type === 'dispose' || message.type === 'terminal-dispose') {
@@ -1122,6 +1775,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			active = null;
 		}
 		if (firstTree !== null) disposeAvailableFirstTree();
+		forceCloseWorkletRuntime();
 		throw report(error, 'Octane Lynx could not announce main-thread readiness.');
 	}
 
@@ -1148,7 +1802,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			return firstTree?.snapshot ?? null;
 		},
 		markFirstScreenSyncReady,
+		callBackground,
 		close() {
+			resetThreadCalls(new Error('Octane Lynx main-thread receiver was closed.'));
+			finishMainCallPublication();
 			queuedNativeEvents.length = 0;
 			queuedHostAttachments.length = 0;
 			queuedReadyRequests.clear();
@@ -1163,28 +1820,42 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 					report(error, 'Octane Lynx could not remove its main-thread listener.');
 				}
 			}
+			let activeCleanupComplete = active === null;
+			let closingRecord: ActiveLynxMainRoot<Node> | null = null;
 			if (active !== null) {
 				const record = active;
-				let complete = false;
+				closingRecord = record;
 				for (let attempt = 0; attempt < MAX_CLOSE_CLEANUP_ATTEMPTS; attempt++) {
 					if (disposeRecord(record).complete) {
-						complete = true;
+						activeCleanupComplete = true;
 						break;
 					}
 				}
-				if (complete) {
-					rememberDisposed(record.root, record.acceptedVersion);
-					active = null;
-				}
 			}
-			if (!retryFirstScreenCleanup()) {
+			const firstScreenCleanupComplete = retryFirstScreenCleanup();
+			if (closingRecord !== null && activeCleanupComplete && firstScreenCleanupComplete) {
+				finalizeDisposedRoot(closingRecord, closingRecord.acceptedVersion);
+			}
+			if (!firstScreenCleanupComplete) {
 				report(
 					new Error(
 						'Octane Lynx retained incomplete first-screen cleanup for a later close retry.',
 					),
 				);
 			}
+			closeWorkletRuntime();
 		},
 	};
 	return Object.freeze(controller);
 }
+
+export {
+	runOnBackground,
+	runOnMainThread,
+	LynxCrossThreadCallCancelledError,
+} from './core/worklets.js';
+export type {
+	LynxBackgroundFunctionDescriptor,
+	LynxCancelablePromise,
+	LynxMainThreadWorkletDescriptor,
+} from './core/worklets.js';

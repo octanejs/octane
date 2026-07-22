@@ -1,7 +1,16 @@
 import { LYNX_NODES_REF_ATTRIBUTE } from './nodes-ref.js';
+import type { LynxMainThreadWorkletDescriptor } from './worklets.js';
 
 /** Opaque Element PAPI reference owned by the Lynx main thread. */
 export type LynxElementRef = object;
+
+/** Public framework-neutral listener shape understood by Lynx's Element PAPI. */
+export interface LynxWorkletEventListener {
+	readonly type: 'worklet';
+	readonly value: LynxMainThreadWorkletDescriptor;
+}
+
+export type LynxElementEventListener = string | LynxWorkletEventListener | undefined;
 
 /** Native list callback invoked when Lynx requests one logical cell. */
 export type LynxListComponentAtIndex<Node extends LynxElementRef = LynxElementRef> = (
@@ -86,7 +95,7 @@ export interface LynxElementPAPIGlobals<Node extends LynxElementRef = LynxElemen
 	__SetCSSId(node: Node | readonly Node[], id: number, entryName?: string): void;
 	__SetAttribute(node: Node, name: string, value: unknown): void;
 	__SetDataset(node: Node, value: Readonly<Record<string, unknown>>): void;
-	__AddEvent(node: Node, kind: string, name: string, listener: string | undefined): void;
+	__AddEvent(node: Node, kind: string, name: string, listener: LynxElementEventListener): void;
 	__SetID(node: Node, id: string | null): void;
 	__FlushElementTree(node?: Node, options?: Readonly<Record<string, unknown>>): void;
 }
@@ -110,7 +119,7 @@ export interface LynxElementPAPI<Node extends LynxElementRef = LynxElementRef> {
 	setAttribute(node: Node, name: string, value: unknown): void;
 	setRefSelector(node: Node, value: string): void;
 	setDataset(node: Node, value: Readonly<Record<string, unknown>>): void;
-	setEvent(node: Node, kind: string, name: string, listener: string | undefined): void;
+	setEvent(node: Node, kind: string, name: string, listener: LynxElementEventListener): void;
 	setId(node: Node, id: string | null): void;
 	flush(node: Node, options?: Readonly<Record<string, unknown>>): void;
 }

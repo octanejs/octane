@@ -13,6 +13,12 @@ import {
 import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import { LYNX_NODES_REF_ATTRIBUTE } from '../src/core/nodes-ref.js';
 import { createLynxElementPAPI, type LynxListComponentAtIndexes } from '../src/core/papi.js';
+import {
+	createLynxMainThreadWorkletRegistry,
+	registerMainThreadWorklet,
+	type LynxActivatedMainThreadWorklet,
+	type LynxMainThreadWorkletRegistry,
+} from '../src/core/worklets.js';
 
 function batch(version: number, commands: readonly UniversalHostCommand[]): UniversalHostBatch {
 	return { renderer: 'lynx', version, commands };
@@ -28,9 +34,12 @@ function idsAt(index: number): ItemIds {
 	return { item: index * 3 + 2, text: index * 3 + 3, raw: index * 3 + 4 };
 }
 
-function largeListMount(itemCount: number): UniversalHostCommand[] {
+function largeListMount(
+	itemCount: number,
+	listProps: Readonly<Record<string, unknown>> = {},
+): UniversalHostCommand[] {
 	const commands: UniversalHostCommand[] = [
-		{ op: 'create', id: 1, type: 'list', props: { id: 'feed' } },
+		{ op: 'create', id: 1, type: 'list', props: { id: 'feed', ...listProps } },
 	];
 	for (let index = 0; index < itemCount; index++) {
 		const ids = idsAt(index);
@@ -51,6 +60,8 @@ function largeListMount(itemCount: number): UniversalHostCommand[] {
 	commands.push({ op: 'insert', parent: null, id: 1, before: null });
 	return commands;
 }
+
+registerMainThreadWorklet('list.tsrx:fault', undefined, () => undefined);
 
 function largeListUnmount(itemCount: number): UniversalHostCommand[] {
 	const commands: UniversalHostCommand[] = [];
@@ -773,8 +784,21 @@ describe('Lynx native list recycling', () => {
 				};
 				const faults: Array<{ readonly version: number; readonly error: unknown }> = [];
 				const attachments: Array<readonly LynxHostAttachmentDelta[]> = [];
+				const registry = createLynxMainThreadWorkletRegistry();
+				const activations: LynxActivatedMainThreadWorklet[] = [];
+				const worklets: LynxMainThreadWorkletRegistry = Object.freeze({
+					...registry,
+					activate(descriptor) {
+						const active = registry.activate(descriptor);
+						activations.push(active);
+						return active;
+					},
+				});
+				const ref = { _wvid: `list:fault:${stage}` };
+				const refCell = registry.retainOwner(ref);
 				const container = createLynxHostContainer(createLynxElementPAPI(globalThis), {
 					root: 9,
+					worklets,
 					onAttachments(_version, deltas) {
 						attachments.push(deltas);
 					},
@@ -784,9 +808,18 @@ describe('Lynx native list recycling', () => {
 				});
 				prepareLynxHostBatch(
 					container,
-					batch(1, largeListMount(stage === 'pooled-rebind' ? 2 : 1)),
+					batch(
+						1,
+						largeListMount(stage === 'pooled-rebind' ? 2 : 1, {
+							'main-thread:bindtap': { _wkltId: 'list.tsrx:fault' },
+							'main-thread:ref': ref,
+						}),
+					),
 				).apply();
 				const list = (container.page as unknown as Element).querySelector('#feed')!;
+				expect(activations).toHaveLength(1);
+				expect(registry.isActive(activations[0]!)).toBe(true);
+				expect(refCell.current).toBe(list);
 				if (stage === 'pooled-rebind') {
 					const sign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
 					globalThis.elementTree.leaveListItem(list as never, sign);
@@ -802,6 +835,10 @@ describe('Lynx native list recycling', () => {
 				).toBe(-1);
 				expect(faults).toEqual([{ version: 1, error: failure }]);
 				expect(attachments).toEqual([]);
+				expect(registry.isActive(activations[0]!)).toBe(false);
+				expect(refCell.current).toBe(null);
+				registry.releaseOwner(ref);
+				expect(() => registry.updateRef(ref, null)).toThrow(/stale/);
 				expect(isLynxHostAttached(container, idsAt(0).item)).toBe(false);
 				expect(globalThis.elementTree.enterListItemAtIndex(list as never, 0)).toBe(-1);
 				expect(faults).toHaveLength(1);

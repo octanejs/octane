@@ -19,6 +19,23 @@ import type {
 	UniversalRenderContext,
 } from 'octane/universal/native';
 import { isLynxNativeResource } from './resource.js';
+import { createLynxMainThreadRefDescriptor, type LynxMainThreadRefCell } from './core/worklets.js';
+
+export {
+	attachThreadFunction,
+	bindThreadFunction,
+	invokeThreadFunction,
+	registerThreadFunction,
+	runOnBackground,
+	runOnMainThread,
+} from './core/worklets.js';
+export type {
+	LynxBackgroundFunctionDescriptor,
+	LynxCancelablePromise,
+	LynxMainThreadRefDescriptor,
+	LynxMainThreadWorkletDescriptor,
+	LynxWorkletValue,
+} from './core/worklets.js';
 
 const UNIVERSAL_PLAN = Symbol.for('octane.universal.plan');
 const UNIVERSAL_VALUE = Symbol.for('octane.universal.value');
@@ -940,6 +957,25 @@ export function useId(_slot?: unknown): string {
 	const sum = 1 + index;
 	const paired = (sum * (sum + 1)) / 2 + index;
 	return `:octane-u${paired.toString(36)}:`;
+}
+
+/** Create the same deterministic main-thread cell as the background specialization. */
+export function useMainThreadRef<T>(initialValue: T): LynxMainThreadRefCell<T>;
+export function useMainThreadRef<T = undefined>(): LynxMainThreadRefCell<T | undefined>;
+export function useMainThreadRef<T>(
+	initialValueOrSlot?: T | unknown,
+	slot?: unknown,
+): LynxMainThreadRefCell<T | undefined> {
+	const hasInitialValue = arguments.length > 1 || typeof initialValueOrSlot !== 'symbol';
+	const resolvedSlot =
+		arguments.length > 1 ? slot : hasInitialValue ? undefined : initialValueOrSlot;
+	const initialValue = hasInitialValue ? (initialValueOrSlot as T) : undefined;
+	const id = useId(resolvedSlot);
+	return useMemo(
+		() => createLynxMainThreadRefDescriptor(`octane:${id}`, initialValue),
+		[],
+		'main-thread-ref-descriptor',
+	) as LynxMainThreadRefCell<T | undefined>;
 }
 
 export function useSyncExternalStore<T>(
