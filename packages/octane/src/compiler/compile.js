@@ -5460,10 +5460,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		if (templateSegments !== null) {
 			let htmlOffset = 0;
 			let encodedOffset = 1; // Skip the serialized string's opening quote.
-			for (const mapping of t.tagMappings) {
-				// Walk the already-serialized string monotonically. An escape sequence
-				// occupies 2 or 6 generated columns but represents one UTF-16 code unit.
-				while (htmlOffset < mapping.htmlOffset) {
+			const advanceTo = (target) => {
+				while (htmlOffset < target) {
 					if (encodedHtml.charCodeAt(encodedOffset) === 92) {
 						encodedOffset += encodedHtml.charCodeAt(encodedOffset + 1) === 117 ? 6 : 2;
 					} else {
@@ -5471,15 +5469,22 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 					}
 					htmlOffset++;
 				}
+			};
+			for (const mapping of t.tagMappings) {
+				// Walk the already-serialized string monotonically. An escape sequence
+				// occupies 2 or 6 generated columns but represents one UTF-16 code unit.
+				advanceTo(mapping.htmlOffset);
+				const encodedStart = encodedOffset;
+				advanceTo(mapping.htmlOffset + mapping.length);
 				templateSegments.push({
 					genLine: templateLine,
-					genCol: prefix.length + encodedOffset,
+					genCol: prefix.length + encodedStart,
 					srcLine0: mapping.srcLine0,
 					srcCol0: mapping.srcCol0,
 				});
 				templateSegments.push({
 					genLine: templateLine,
-					genCol: prefix.length + encodedOffset + mapping.length,
+					genCol: prefix.length + encodedOffset,
 					unmapped: true,
 				});
 			}
@@ -17412,10 +17417,22 @@ function rawTextClosingTag(html, from, tag) {
 	return -1;
 }
 
-function inspectTemplateHtml(html, sources) {
+const TEMPLATE_TEXT_ONLY_ELEMENTS = new Set(['script', 'textarea', 'title']);
+
+function inspectTemplateHtml(html, sources, namespaceFlag = 0) {
 	const offsets = [0, html.length];
 	const root = inspectionNode('OctaneTemplate', { children: [] }, 0, html.length);
-	const stack = [{ tag: null, node: root }];
+	const rootNamespace =
+		namespaceFlag === 1
+			? 'svg'
+			: namespaceFlag === 2
+				? 'mathml'
+				: namespaceFlag === 3
+					? 'opaque'
+					: 'html';
+	const stack = [
+		{ tag: null, node: root, namespace: rootNamespace, childNamespace: rootNamespace },
+	];
 	let sourceIndex = 0;
 	let index = 0;
 	const append = (node, start, end) => {
@@ -17439,9 +17456,21 @@ function inspectTemplateHtml(html, sources) {
 		source.length = source.tag.length;
 		sourceIndex++;
 	};
+	const skipTextOnlySources = (tag) => {
+		const expected = tag.toLowerCase();
+		while (sourceIndex < sources.length) {
+			const source = sources[sourceIndex];
+			if (source.kind === 'close' && source.tag.toLowerCase() === expected) return;
+			sourceIndex++;
+		}
+	};
 	while (index < html.length) {
 		const active = stack[stack.length - 1];
-		if (active.tag?.toLowerCase() === 'script') {
+		if (
+			active.namespace === 'html' &&
+			active.tag &&
+			TEMPLATE_TEXT_ONLY_ELEMENTS.has(active.tag.toLowerCase())
+		) {
 			const closing = rawTextClosingTag(html, index, active.tag);
 			if (closing !== index) {
 				const end = closing === -1 ? html.length : closing;
@@ -17455,6 +17484,7 @@ function inspectTemplateHtml(html, sources) {
 				index = end;
 				continue;
 			}
+			skipTextOnlySources(active.tag);
 		}
 
 		if (html.charCodeAt(index) !== 60) {
@@ -17538,6 +17568,9 @@ function inspectTemplateHtml(html, sources) {
 		}
 		match('open', nameStart, nameEnd);
 		const tag = html.slice(nameStart, nameEnd);
+		const parentNamespace = active.childNamespace;
+		const namespace = nsForSelf(tag, parentNamespace);
+		const childNamespace = nsForChildren(tag, parentNamespace);
 		const name = inspectionName('OctaneTemplateIdentifier', tag, nameStart, nameEnd);
 		offsets.push(nameStart, nameEnd);
 		const attributes = [];
@@ -17642,8 +17675,8 @@ function inspectTemplateHtml(html, sources) {
 			children: [],
 		});
 		append(element, index, cursor);
-		if (!selfClosing && !VOID_ELEMENTS.has(tag.toLowerCase())) {
-			stack.push({ tag, node: element });
+		if (!selfClosing && (namespace !== 'html' || !VOID_ELEMENTS.has(tag.toLowerCase()))) {
+			stack.push({ tag, node: element, namespace, childNamespace });
 		}
 		index = cursor;
 	}
@@ -17657,7 +17690,7 @@ function allocTemplate(ctx, html, ns = 0, frag = 0, tagSources = null) {
 	const name = `_t$${id}`;
 	const template = { name, html, ns, frag };
 	if (tagSources !== null) {
-		const inspection = inspectTemplateHtml(html, tagSources);
+		const inspection = inspectTemplateHtml(html, tagSources, ns);
 		template.tagMappings = inspection.mappings;
 		template.inspectionAst = inspection.ast;
 		template.inspectionOffsets = inspection.offsets;

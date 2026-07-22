@@ -104,4 +104,28 @@ describe('client compiler source maps', () => {
 		expect(originalPosition(output.code, output.map, generatedScope)).toBeNull();
 		expect(originalPosition(output.code, output.map, generatedEscapedValue)).toBeNull();
 	});
+
+	it('bounds encoded template mappings after JSON string escapes', () => {
+		const decodedValue = 'line\nnext\tvalue';
+		const source = `export function App() @{
+	<div data-label="${decodedValue}">Label</div>
+}`;
+		const output = compile(source, 'App.tsrx', {
+			mode: 'client',
+			astTrace: true,
+		});
+		const encodedValue = JSON.stringify(decodedValue).slice(1, -1);
+		const generatedOffset = output.code.indexOf(encodedValue);
+		const generated = offsetPosition(output.code, generatedOffset);
+		const segments = decodeMappings(output.map.mappings)[generated.line] ?? [];
+		const mappedIndex = segments.findIndex(
+			(segment) => segment.length >= 4 && segment[0] === generated.column,
+		);
+
+		expect(mappedIndex).toBeGreaterThanOrEqual(0);
+		expect(segments[mappedIndex + 1]).toEqual([generated.column + encodedValue.length]);
+		expect(originalPosition(output.code, output.map, generatedOffset)).toEqual(
+			offsetPosition(source, source.indexOf(decodedValue)),
+		);
+	});
 });

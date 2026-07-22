@@ -228,6 +228,25 @@ describe('client output mapping (compiler source map)', () => {
 		expect(scoped?.pairFromGenerated(generatedScope)).toBeNull();
 	});
 
+	it('keeps anchors after textarea pseudo-markup synchronized', () => {
+		const source = `export function App() @{
+	<div>
+		<textarea><fake data-x="bad"></fake></textarea>
+		<span data-after="ok">after</span>
+	</div>
+}`;
+		const compiled = compileAst(source, 'App.tsrx', 'client-output');
+		if (!compiled.ok) throw new Error(compiled.error);
+		const textareaMapping = mappingFromSourceMap(compiled.map, source, compiled.code!);
+		const sourceAttribute = source.indexOf('data-after');
+		const generatedAttribute = compiled.code!.indexOf('data-after');
+
+		expect(textareaMapping?.pairFromSource(sourceAttribute)).toEqual({
+			source: [{ from: sourceAttribute, to: sourceAttribute + 'data-after'.length }],
+			output: [{ from: generatedAttribute, to: generatedAttribute + 'data-after'.length }],
+		});
+	});
+
 	it('does not interpolate across source text without an anchor', () => {
 		const blankLine = SOURCE.indexOf('\n\n\t<div>') + 1;
 		expect(mapping?.toGenerated(blankLine)).toBeNull();

@@ -145,6 +145,37 @@ describe('playground AST preparation', () => {
 		expect(findDeepestAstNode(prepared, scriptComparison + 2)?.type).toBe('OctaneTemplateText');
 		expect(findDeepestAstNode(prepared, marker)?.type).toBe('OctaneTemplateMarker');
 	});
+
+	it('keeps textarea content text-only without desynchronizing later nodes', () => {
+		const source = `export function App() @{
+	<div>
+		<textarea><fake data-x="bad"></fake></textarea>
+		<span data-after="ok">after</span>
+	</div>
+}`;
+		const output = compileAst(source, 'App.tsrx', 'client-output');
+		if (!output.ok) throw new Error(output.error);
+		const prepared = preparePlaygroundAst(output.ast);
+		const textareaText = output.code!.indexOf('<fake');
+		const laterAttribute = output.code!.indexOf('data-after');
+
+		expect(findDeepestAstNode(prepared, textareaText + 1)?.type).toBe('OctaneTemplateText');
+		expect(findDeepestAstNode(prepared, laterAttribute)?.type).toBe('OctaneTemplateAttributeName');
+	});
+
+	it('keeps title content structural in the SVG namespace', () => {
+		const source = `export function App() @{
+	<svg><title><fake></fake></title><path /></svg>
+}`;
+		const output = compileAst(source, 'App.tsrx', 'client-output');
+		if (!output.ok) throw new Error(output.error);
+		const prepared = preparePlaygroundAst(output.ast);
+		const nestedTag = output.code!.indexOf('<fake');
+		const laterTag = output.code!.indexOf('<path');
+
+		expect(findDeepestAstNode(prepared, nestedTag + 1)?.type).toBe('OctaneTemplateIdentifier');
+		expect(findDeepestAstNode(prepared, laterTag + 1)?.type).toBe('OctaneTemplateIdentifier');
+	});
 });
 
 describe.each([
