@@ -5772,7 +5772,55 @@ function ssrCompileBody(
 		ctx._pendingWarm = warm.warmSrc;
 	}
 	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
-	const rewritten = workingStatements
+	const preparedStatements = workingStatements.map((statement) =>
+		lowerSetupValueDirectives(statement, (directive) => {
+			const preparedDirective = prepareSetupValueDirective(directive, ctx, name);
+			const wrapperName = allocCompilerName(ctx, `_sfrag$${ctx.nextFragId++}`);
+			const sub = ssrCompileSub(
+				[preparedDirective],
+				ctx,
+				'__sfragment',
+				[],
+				cssHash,
+				'opaque',
+				null,
+				true,
+				true,
+			);
+			inlinedSubs.push(sub.fn + ';');
+			// The fragment body stays local so it can close over setup values, while
+			// this per-site module wrapper gives server replays a stable component
+			// identity. Its descriptor also preserves the component-bearing child
+			// marker shape expected by hostElementBody hydration on the client.
+			ctx.hoistedHelpers.push(
+				`function ${wrapperName}(props, __s) { return props.body(undefined, __s); }`,
+			);
+			ctx.runtimeNeeded.add('createElement');
+			return {
+				type: 'CallExpression',
+				callee: { type: 'Identifier', name: '_$createElement' },
+				arguments: [
+					{ type: 'Identifier', name: wrapperName },
+					{
+						type: 'ObjectExpression',
+						properties: [
+							{
+								type: 'Property',
+								key: { type: 'Identifier', name: 'body' },
+								value: { type: 'Identifier', name: sub.fnName },
+								kind: 'init',
+								method: false,
+								shorthand: false,
+								computed: false,
+							},
+						],
+					},
+				],
+				optional: false,
+			};
+		}),
+	);
+	const rewritten = preparedStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
 	const setupCode = rewritten.map((s) => '  ' + printNode(s).replace(/\n/g, '\n  ')).join('\n');
@@ -7662,12 +7710,24 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	}
 	ctx._puInlineLowering = prevPuInlineLowering;
 
+	const preparedStatements = workingStatements.map((statement) =>
+		lowerSetupValueDirectives(statement, (directive) =>
+			lowerHostFragment(
+				setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+				ctx,
+				inlinedSubs,
+				'opaque',
+				cssHash,
+			),
+		),
+	);
+
 	// Rewrite hook calls and `<tsrx>` blocks in statements before printing them.
 	// A `<tsrx>` block at expression position (e.g. `const f = <tsrx>...</tsrx>`)
 	// is hoisted as a render function in inlinedSubs and replaced with an
 	// identifier reference. Suitable for top-level render-prop patterns where
 	// the block doesn't capture local arrow params.
-	const rewrittenStatements = workingStatements
+	const rewrittenStatements = preparedStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, options?.localHookSlots === true))
 		.map((s) => rewriteTsrxBlocks(s, ctx, name, inlinedSubs))
 		// JSX component element at VALUE position in setup (e.g. `const el = <App/>`)
@@ -10635,9 +10695,21 @@ function compileReturnJsxFunction(node, ctx, options) {
 		// void-body signal at runtime. Preserve JSX roots for the specialized lowering
 		// below, but normalize every other owned return to an explicit empty value.
 		const s = normalizeOwnRenderableReturns(sourceStatement, true);
+		const prepared =
+			s.type === 'ReturnStatement' && s.argument && isJsxNode(s.argument)
+				? s
+				: lowerSetupValueDirectives(s, (directive) =>
+						lowerHostFragment(
+							setupDirectiveFragment(prepareSetupValueDirective(directive, ctx, name)),
+							ctx,
+							compInlinedSubs,
+							'opaque',
+							cssHash,
+						),
+					);
 		// Same hook handling as the `@{}` path: base hooks take a trailing hook slot,
 		// custom hooks are wrapped in withSlot (unified across both component forms).
-		const h = rewriteHookCalls(s, ctx, name);
+		const h = rewriteHookCalls(prepared, ctx, name);
 		// The `return <jsx>` output → a compiled-fragment descriptor (reconcile path),
 		// not the host-string de-opt (rebuild). Other JSX in setup keeps value-lowering.
 		if (h.type === 'ReturnStatement' && h.argument && isJsxNode(h.argument)) {
@@ -11350,6 +11422,101 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 		}
 		return null;
 	});
+}
+
+const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
+	'JSXIfExpression',
+	'JSXForExpression',
+	'JSXSwitchExpression',
+	'JSXTryExpression',
+	'JSXCodeBlock',
+]);
+
+function setupDirectiveFragment(directive) {
+	return {
+		type: 'JSXFragment',
+		children: [directive],
+		loc: directive.loc,
+		start: directive.start,
+		end: directive.end,
+	};
+}
+
+function prepareSetupValueDirective(directive, ctx, componentName) {
+	// These descriptor-backed directives become synthetic branch bodies after the
+	// owning component's render-tree pass has already run. Give eligible @if/@try
+	// arms Pass A now (the walk deliberately retains its @for/@switch v1 exclusions)
+	// so use()-argument creations keep the same replay-safe identity as directives
+	// in returned JSX. The descriptor may never be rendered, so keep its creation
+	// and warm records out of the owner's speculative warm plan.
+	const prevPuInlineLowering = ctx._puInlineLowering;
+	ctx._puInlineLowering =
+		ctx.inlineHookMemo && ctx.mode !== 'server' && ctx._universalRuntimeUnit == null;
+	try {
+		const prepared = parallelUseWalkJsx([directive], ctx, componentName, [], [], [], new Set())[0];
+		// A first-class descriptor can be inserted under HTML, SVG, or MathML.
+		// Preserve that runtime namespace decision for ambiguous descendants such
+		// as <title>, exactly like returned descriptor-backed fragments do.
+		const opaque = rewriteOpaqueTitles(prepared, ctx, 'opaque');
+		if (opaque.type !== 'JSXCodeBlock') return opaque;
+		// Render-only child blocks are transparent grouping; normalize them now so
+		// the server does not mistake the code-block node for another setup value
+		// and recurse indefinitely. normalizeChildren also owns the durable error
+		// for setup-bearing child blocks, keeping client/server diagnostics aligned.
+		return {
+			type: 'JSXFragment',
+			children: normalizeChildren([opaque]),
+			loc: opaque.loc,
+			start: opaque.start,
+			end: opaque.end,
+		};
+	} finally {
+		ctx._puInlineLowering = prevPuInlineLowering;
+	}
+}
+
+// Setup JSX is still a first-class element value: keep its authored outer
+// host/component descriptor (including key/ref/cloneElement behavior) and
+// replace only compiler-owned directive children with a renderable fragment.
+// Nested functions are separate lexical owners; lowering them with the outer
+// component's helper list would strand callback params outside their scope.
+function lowerSetupValueDirectives(node, lowerDirective) {
+	return visit(node);
+
+	function visit(current) {
+		if (current == null || typeof current !== 'object') return current;
+		if (Array.isArray(current)) {
+			let out = current;
+			for (let index = 0; index < current.length; index++) {
+				const value = visit(current[index]);
+				if (value !== current[index]) {
+					if (out === current) out = current.slice();
+					out[index] = value;
+				}
+			}
+			return out;
+		}
+		if (isFunctionNode(current)) return current;
+		if (SETUP_VALUE_DIRECTIVE_TYPES.has(current.type)) {
+			return {
+				type: 'JSXExpressionContainer',
+				expression: lowerDirective(current),
+				loc: current.loc,
+				start: current.start,
+				end: current.end,
+			};
+		}
+		let out = current;
+		for (const key in current) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata') continue;
+			const value = visit(current[key]);
+			if (value !== current[key]) {
+				if (out === current) out = { ...current };
+				out[key] = value;
+			}
+		}
+		return out;
+	}
 }
 
 /**

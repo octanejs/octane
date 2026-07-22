@@ -19206,19 +19206,21 @@ export function switchBlock(
 	if (state === undefined) {
 		let start: Comment | null = null;
 		let end: Node | null = null;
-		if (hydration !== null && hydration.isOpen(anchor ?? null)) {
-			// Hydration: adopt the server's `<!--[-->…<!--]-->` range (the matched
-			// case's content) as the slot markers. Client mounts defer marker creation
-			// (self-mark or mint on demand — see ifBlock).
-			start = anchor as Comment;
-			end = hydration.close(anchor as Node);
+		const passthrough = hydration?.passthroughRanges === true;
+		// Mirror ifBlock's sole-control-flow adoption: when @switch is the only
+		// output of an enclosing component/arm, its compiler anchor is that owner's
+		// END marker while the hydration cursor sits on the switch range's open.
+		const open = passthrough ? null : (hydration?.resolveOpen(anchor ?? null, domParent) ?? null);
+		if (open !== null) {
+			start = open;
+			end = hydration!.close(open);
 		}
 		state = {
 			__kind: 'switchBlockSlot',
 			anchor: anchor ?? null,
 			start,
 			end,
-			borrowed: false,
+			borrowed: passthrough,
 			branch: -1,
 			block: null,
 		};
