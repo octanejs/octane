@@ -53,15 +53,22 @@ import {
 	type LynxContextProxyEvent,
 	type LynxDisposeAcknowledgement,
 	type LynxDisposeMessage,
+	type LynxGlobalPropsMessage,
 	type LynxHostAttachmentMessage,
 	type LynxHostFaultMessage,
 	type LynxMainCallPublicationMessage,
 	type LynxMainReadyReply,
 	type LynxMainReadyRequest,
+	type LynxPageDataMessage,
 	type LynxPublicHandleDelta,
 	type LynxTransportAcknowledgement,
 	type LynxTerminalDisposeMessage,
 } from './core/protocol.js';
+import {
+	compactLynxLifecycleMessages,
+	snapshotLynxLifecycleData,
+	type LynxLifecycleDataRecord,
+} from './core/lifecycle-data.js';
 import { createLynxElementPAPI, type LynxElementPAPI, type LynxElementRef } from './core/papi.js';
 import {
 	createLynxMainThreadWorkletRegistry,
@@ -77,6 +84,7 @@ import { renderLynxFirstScreen, type LynxFirstScreenRenderResult } from './main-
 
 interface LynxMainThreadGlobals {
 	readonly lynx?: {
+		getEngine?(): LynxContextProxy;
 		getJSContext?(): LynxContextProxy;
 		getNative?(): LynxContextProxy;
 	};
@@ -174,11 +182,85 @@ type LynxCommitMessage = Extract<
 
 const MAX_ABORT_TOMBSTONES = 128;
 const MAX_DISPOSED_ROOT_TOMBSTONES = 128;
+const MAX_READY_REQUEST_TOMBSTONES = 128;
 const MAX_CLOSE_CLEANUP_ATTEMPTS = 3;
 const MAX_FIRST_SCREEN_EVENT_DELIVERIES = 128;
 const MAX_QUEUED_THREAD_CALLS = 128;
+const MAX_QUEUED_LIFECYCLE_MESSAGES = 128;
 const FIRST_SCREEN_ROOT_ID = 1;
 const LYNX_DESTROY_LIFETIME_EVENT = '__DestroyLifetime';
+const LYNX_RENDER_PAGE_EVENT = '__RenderPage';
+const LYNX_UPDATE_PAGE_EVENT = '__UpdatePage';
+const LYNX_UPDATE_GLOBAL_PROPS_EVENT = '__UpdateGlobalProps';
+
+type LynxLifecycleMessage = LynxPageDataMessage | LynxGlobalPropsMessage;
+
+function lifecycleRecord(value: unknown, label: string): Record<string, unknown> {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+		throw new TypeError(`Octane Lynx ${label} must be a plain object.`);
+	}
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== Object.prototype && prototype !== null) {
+		throw new TypeError(`Octane Lynx ${label} must be a plain object.`);
+	}
+	if (Object.getOwnPropertySymbols(value).length !== 0) {
+		throw new TypeError(`Octane Lynx ${label} contains symbol fields.`);
+	}
+	return value as Record<string, unknown>;
+}
+
+function lifecycleTuple(
+	event: LynxContextProxyEvent,
+	expectedType: string,
+	length: number,
+): readonly unknown[] {
+	if (event.type !== expectedType) {
+		throw new TypeError(
+			`Octane Lynx engine lifecycle expected ${JSON.stringify(expectedType)}, received ${JSON.stringify(event.type)}.`,
+		);
+	}
+	if (!Array.isArray(event.data) || event.data.length !== length) {
+		throw new TypeError(`Octane Lynx ${expectedType} data must be an exact ${length}-item tuple.`);
+	}
+	const names = Object.getOwnPropertyNames(event.data);
+	if (names.length !== length + 1 || Object.getOwnPropertySymbols(event.data).length !== 0) {
+		throw new TypeError(
+			`Octane Lynx ${expectedType} data must be a dense tuple without extra fields.`,
+		);
+	}
+	const tuple: unknown[] = [];
+	for (let index = 0; index < length; index++) {
+		const descriptor = Object.getOwnPropertyDescriptor(event.data, String(index));
+		if (
+			descriptor === undefined ||
+			!descriptor.enumerable ||
+			!Object.prototype.hasOwnProperty.call(descriptor, 'value')
+		) {
+			throw new TypeError(
+				`Octane Lynx ${expectedType} data[${index}] must be an enumerable data property.`,
+			);
+		}
+		tuple.push(descriptor.value);
+	}
+	return tuple;
+}
+
+function lifecycleBooleanOption(
+	options: Record<string, unknown>,
+	name: string,
+	label: string,
+): boolean {
+	const descriptor = Object.getOwnPropertyDescriptor(options, name);
+	if (descriptor === undefined) return false;
+	if (
+		!descriptor.enumerable ||
+		!Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+		typeof descriptor.value !== 'boolean'
+	) {
+		throw new TypeError(`Octane Lynx ${label}.${name} must be a boolean data property.`);
+	}
+	return descriptor.value;
+}
 
 function createDeferred<T>(): Deferred<T> {
 	let resolvePromise!: (value: T) => void;
@@ -269,6 +351,26 @@ function resolveNativeLifecycleContext(target: LynxMainThreadGlobals): LynxConte
 	) {
 		throw new TypeError(
 			'Octane Lynx native lifecycle requires ContextProxy addEventListener/removeEventListener.',
+		);
+	}
+	return context;
+}
+
+function resolveEngineLifecycleContext(target: LynxMainThreadGlobals): LynxContextProxy | null {
+	const getEngine = target.lynx?.getEngine;
+	if (getEngine === undefined) return null;
+	if (typeof getEngine !== 'function') {
+		throw new TypeError('Octane Lynx main-thread lynx.getEngine must be a function when provided.');
+	}
+	const context = getEngine.call(target.lynx);
+	if (
+		context === null ||
+		typeof context !== 'object' ||
+		typeof context.addEventListener !== 'function' ||
+		typeof context.removeEventListener !== 'function'
+	) {
+		throw new TypeError(
+			'Octane Lynx engine lifecycle requires ContextProxy addEventListener/removeEventListener.',
 		);
 	}
 	return context;
@@ -368,6 +470,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const target = rawTarget as LynxMainThreadGlobals;
 	const context = resolveContext(target, options.context);
 	const nativeLifecycleContext = resolveNativeLifecycleContext(target);
+	const engineLifecycleContext = resolveEngineLifecycleContext(target);
 	if (
 		context === null ||
 		typeof context !== 'object' ||
@@ -397,6 +500,9 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const aborted = new Set<string>();
 	let active: ActiveLynxMainRoot<Node> | null = null;
 	let closed = false;
+	let lifecycleClosed = false;
+	let lifecycleDrainInProgress = false;
+	let lifecycleOverflowReported = false;
 	let commitInProgress = false;
 	let firstScreenRenderInProgress = false;
 	let closePending = false;
@@ -408,11 +514,16 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let failedFirstScreenSource: LynxHostContainer<Node> | null = null;
 	let awaitingAdoption: UniversalTransportIdentity | null = null;
 	let readyAnnouncementSent = false;
+	let readyAnnouncementInProgress = false;
+	let dispatchingReadyRequest: number | null = null;
+	let correlatedReadySent = false;
 	let firstTreeSnapshotSent = false;
 	let uninstallFirstScreenHost: (() => void) | null = null;
 	const queuedCommits: LynxCommitMessage[] = [];
 	const queuedNativeEvents: Array<readonly LynxQueuedNativeEventDelivery[]> = [];
+	const queuedLifecycleMessages: LynxLifecycleMessage[] = [];
 	const queuedReadyRequests = new Set<number>();
+	const completedReadyRequests = new Set<number>();
 	const queuedHostAttachments: Array<{
 		readonly version: number;
 		readonly deltas: readonly LynxHostAttachmentDelta[];
@@ -428,6 +539,7 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	let mainCallPublication: UniversalTransportIdentity | null = null;
 	let nativeDestroyListenerRegistered = false;
 	let nativeDestroyReceived = false;
+	const registeredEngineLifecycleListeners = new Set<string>();
 
 	const report = (value: unknown, fallback = 'Octane Lynx main-thread receiver failed.') => {
 		const error = normalizedError(value, fallback);
@@ -441,11 +553,159 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		}
 		return error;
 	};
+	// Replaced with the terminal page-lifetime path before any host listener is
+	// registered. The bootstrap fallback only protects unexpected early reentry.
+	let terminateLifecycleDelivery = (value: unknown, fallback: string): void => {
+		lifecycleClosed = true;
+		report(value, fallback);
+	};
 
 	const dispatch = (message: LynxBackgroundInboundMessage): void => {
 		const validated = validateLynxBackgroundInboundMessage(message);
 		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: validated });
 	};
+
+	const dispatchLifecycleMessage = (message: LynxLifecycleMessage): void => {
+		if (lifecycleClosed) return;
+		if (!correlatedReadySent || lifecycleDrainInProgress) {
+			if (queuedLifecycleMessages.length >= MAX_QUEUED_LIFECYCLE_MESSAGES) {
+				const compacted = compactLynxLifecycleMessages([...queuedLifecycleMessages, message]);
+				queuedLifecycleMessages.length = 0;
+				queuedLifecycleMessages.push(...compacted);
+				if (!lifecycleOverflowReported) {
+					lifecycleOverflowReported = true;
+					report(
+						new Error(
+							`Octane Lynx engine lifecycle queue exceeded ${MAX_QUEUED_LIFECYCLE_MESSAGES} entries and was compacted to current state.`,
+						),
+					);
+				}
+				return;
+			}
+			queuedLifecycleMessages.push(message);
+			return;
+		}
+		try {
+			dispatch(message);
+		} catch (error) {
+			terminateLifecycleDelivery(
+				error,
+				'Octane Lynx could not deliver an engine lifecycle update.',
+			);
+		}
+	};
+
+	const drainLifecycleMessages = (): void => {
+		if (lifecycleClosed || lifecycleDrainInProgress) return;
+		lifecycleDrainInProgress = true;
+		try {
+			while (!lifecycleClosed && queuedLifecycleMessages.length !== 0) {
+				const message = queuedLifecycleMessages.shift()!;
+				try {
+					dispatch(message);
+				} catch (error) {
+					terminateLifecycleDelivery(
+						error,
+						'Octane Lynx could not deliver a queued engine lifecycle update.',
+					);
+				}
+			}
+		} finally {
+			lifecycleDrainInProgress = false;
+			if (queuedLifecycleMessages.length === 0) lifecycleOverflowReported = false;
+		}
+	};
+
+	const onRenderPage = (event: LynxContextProxyEvent): void => {
+		if (lifecycleClosed) return;
+		try {
+			const tuple = lifecycleTuple(event, LYNX_RENDER_PAGE_EVENT, 2);
+			lifecycleRecord(tuple[1], '__RenderPage render options');
+			const data: LynxLifecycleDataRecord = snapshotLynxLifecycleData(
+				tuple[0],
+				'__RenderPage data',
+			);
+			dispatchLifecycleMessage(
+				Object.freeze({
+					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+					renderer: LYNX_TRANSPORT_RENDERER,
+					type: 'page-data',
+					operation: 'replace',
+					data,
+				}),
+			);
+		} catch (error) {
+			report(error, 'Octane Lynx received malformed __RenderPage data.');
+		}
+	};
+
+	const onUpdatePage = (event: LynxContextProxyEvent): void => {
+		if (lifecycleClosed) return;
+		try {
+			const tuple = lifecycleTuple(event, LYNX_UPDATE_PAGE_EVENT, 2);
+			const options = lifecycleRecord(tuple[1], '__UpdatePage options');
+			const reloadTemplate = lifecycleBooleanOption(
+				options,
+				'reloadTemplate',
+				'__UpdatePage options',
+			);
+			if (reloadTemplate) {
+				report(
+					new Error(
+						'Octane Lynx does not support __UpdatePage reloadTemplate; reconstruct the page instead.',
+					),
+				);
+				return;
+			}
+			const resetPageData = lifecycleBooleanOption(
+				options,
+				'resetPageData',
+				'__UpdatePage options',
+			);
+			const data: LynxLifecycleDataRecord = snapshotLynxLifecycleData(
+				tuple[0],
+				'__UpdatePage data',
+			);
+			dispatchLifecycleMessage(
+				Object.freeze({
+					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+					renderer: LYNX_TRANSPORT_RENDERER,
+					type: 'page-data',
+					operation: resetPageData ? 'reset' : 'update',
+					data,
+				}),
+			);
+		} catch (error) {
+			report(error, 'Octane Lynx received malformed __UpdatePage data.');
+		}
+	};
+
+	const onUpdateGlobalProps = (event: LynxContextProxyEvent): void => {
+		if (lifecycleClosed) return;
+		try {
+			const tuple = lifecycleTuple(event, LYNX_UPDATE_GLOBAL_PROPS_EVENT, 1);
+			const patch: LynxLifecycleDataRecord = snapshotLynxLifecycleData(
+				tuple[0],
+				'__UpdateGlobalProps patch',
+			);
+			dispatchLifecycleMessage(
+				Object.freeze({
+					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+					renderer: LYNX_TRANSPORT_RENDERER,
+					type: 'global-props',
+					patch,
+				}),
+			);
+		} catch (error) {
+			report(error, 'Octane Lynx received malformed __UpdateGlobalProps data.');
+		}
+	};
+
+	const engineLifecycleListeners = Object.freeze([
+		Object.freeze([LYNX_RENDER_PAGE_EVENT, onRenderPage] as const),
+		Object.freeze([LYNX_UPDATE_PAGE_EVENT, onUpdatePage] as const),
+		Object.freeze([LYNX_UPDATE_GLOBAL_PROPS_EVENT, onUpdateGlobalProps] as const),
+	]);
 
 	const currentIdentity = (): UniversalTransportIdentity | null =>
 		active === null
@@ -844,27 +1104,47 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			request,
 			...(snapshot == null ? null : { firstTree: snapshot }),
 		};
+		if (request !== LYNX_READY_ANNOUNCEMENT_REQUEST && !correlatedReadySent) {
+			correlatedReadySent = true;
+			drainLifecycleMessages();
+		}
+		if (lifecycleClosed) return;
 		dispatch(reply);
 		if (snapshot !== null) firstTreeSnapshotSent = true;
 	};
 
 	const announceReady = (): void => {
-		if (!canAnnounceReady()) return;
+		if (!canAnnounceReady() || readyAnnouncementInProgress) return;
+		readyAnnouncementInProgress = true;
 		try {
 			if (!readyAnnouncementSent && queuedReadyRequests.size === 0) {
 				// A queued request already proves the background listener is present, so
 				// answer it directly instead of cloning the first-tree snapshot into both
 				// an unsolicited announcement and the correlated reply.
+				readyAnnouncementSent = true;
 				dispatchReady(LYNX_READY_ANNOUNCEMENT_REQUEST);
-				readyAnnouncementSent = true;
 			}
-			for (const request of [...queuedReadyRequests]) {
-				dispatchReady(request);
+			while (!closed && !lifecycleClosed && queuedReadyRequests.size !== 0) {
+				const request = queuedReadyRequests.values().next().value!;
+				// Consume before dispatch: ContextProxy delivery can synchronously reenter
+				// with the same request while lifecycle data is still draining.
 				queuedReadyRequests.delete(request);
+				completedReadyRequests.add(request);
+				if (completedReadyRequests.size > MAX_READY_REQUEST_TOMBSTONES) {
+					completedReadyRequests.delete(completedReadyRequests.values().next().value!);
+				}
 				readyAnnouncementSent = true;
+				dispatchingReadyRequest = request;
+				try {
+					dispatchReady(request);
+				} finally {
+					dispatchingReadyRequest = null;
+				}
 			}
 		} catch (error) {
 			throw report(error, 'Octane Lynx could not dispatch the main-ready reply.');
+		} finally {
+			readyAnnouncementInProgress = false;
 		}
 	};
 
@@ -1289,6 +1569,12 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	const abortKey = (identity: UniversalTransportIdentity) => `${identity.root}:${identity.version}`;
 
 	const handleReady = (message: LynxMainReadyRequest): void => {
+		if (
+			dispatchingReadyRequest === message.request ||
+			completedReadyRequests.has(message.request)
+		) {
+			return;
+		}
 		queuedReadyRequests.add(message.request);
 		if (firstScreenState === 'cleanup-pending' && retryFirstScreenCleanup()) {
 			firstScreenState = 'failed';
@@ -1789,12 +2075,26 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 	}
 
 	const closeMainThread = (): void => {
+		lifecycleClosed = true;
+		queuedLifecycleMessages.length = 0;
 		if (commitInProgress || firstScreenRenderInProgress) {
 			closePending = true;
 			queuedCommits.length = 0;
 			return;
 		}
 		closePending = false;
+		if (engineLifecycleContext !== null) {
+			for (let index = engineLifecycleListeners.length - 1; index >= 0; index--) {
+				const [type, listener] = engineLifecycleListeners[index]!;
+				if (!registeredEngineLifecycleListeners.has(type)) continue;
+				try {
+					engineLifecycleContext.removeEventListener(type, listener);
+					registeredEngineLifecycleListeners.delete(type);
+				} catch (error) {
+					report(error, `Octane Lynx could not remove its ${type} engine lifecycle listener.`);
+				}
+			}
+		}
 		if (nativeLifecycleContext !== null && nativeDestroyListenerRegistered) {
 			nativeDestroyListenerRegistered = false;
 			try {
@@ -1808,8 +2108,10 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		finishMainCallPublication();
 		queuedCommits.length = 0;
 		queuedNativeEvents.length = 0;
+		queuedLifecycleMessages.length = 0;
 		queuedHostAttachments.length = 0;
 		queuedReadyRequests.clear();
+		completedReadyRequests.clear();
 		awaitingAdoption = null;
 		uninstallFirstScreenHost?.();
 		uninstallFirstScreenHost = null;
@@ -1867,9 +2169,17 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 			report(error, 'Octane Lynx native lifetime cleanup failed.');
 		}
 	};
+	terminateLifecycleDelivery = (value: unknown, fallback: string): void => {
+		if (lifecycleClosed) return;
+		lifecycleClosed = true;
+		// Notify and close before invoking user diagnostics so diagnostic reentry
+		// cannot strand a background transport on stale lifecycle state.
+		onNativeDestroy();
+		report(value, fallback);
+	};
 
 	context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, receive);
-	if (nativeLifecycleContext !== null) {
+	if (!closed && nativeLifecycleContext !== null) {
 		// Set this before registration so a host that mutates and then throws still
 		// gets a best-effort remove during receiver cleanup.
 		nativeDestroyListenerRegistered = true;
@@ -1878,6 +2188,35 @@ export function installLynxMainThread<Node extends LynxElementRef = LynxElementR
 		} catch (error) {
 			onNativeDestroy();
 			throw report(error, 'Octane Lynx could not install its native lifetime listener.');
+		}
+	}
+	if (!closed && engineLifecycleContext !== null) {
+		try {
+			for (const [type, listener] of engineLifecycleListeners) {
+				if (closed || lifecycleClosed) break;
+				// Mark before registration so a host that mutates and then throws is
+				// included in the atomic rollback attempt below.
+				registeredEngineLifecycleListeners.add(type);
+				engineLifecycleContext.addEventListener(type, listener);
+				if (closed || lifecycleClosed) {
+					// A synchronous destroy/terminal delivery can remove the listener
+					// while addEventListener is still on the stack. Remove once more after
+					// it returns and never continue installing later event types.
+					try {
+						engineLifecycleContext.removeEventListener(type, listener);
+						registeredEngineLifecycleListeners.delete(type);
+					} catch (removeError) {
+						report(
+							removeError,
+							`Octane Lynx could not roll back its ${type} engine lifecycle listener.`,
+						);
+					}
+					break;
+				}
+			}
+		} catch (error) {
+			onNativeDestroy();
+			throw report(error, 'Octane Lynx could not install its engine lifecycle listeners.');
 		}
 	}
 	try {

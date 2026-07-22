@@ -48,6 +48,8 @@ import {
 
 export interface LynxBackgroundTransportOptions {
 	readonly onDiagnostic?: (error: Error) => void;
+	/** Page-lifetime tombstone checked after receiver attachment and before readiness. */
+	readonly isPageDestroyed?: () => boolean;
 	/** Transactionally bind renderer-local worklet handles at the complete-batch boundary. */
 	readonly prepareWorkletBatch?: (batch: UniversalHostBatch) => UniversalHostBatch;
 	/** Release or publish background execution lifetimes at the host acceptance boundary. */
@@ -158,6 +160,20 @@ let NEXT_READY_REQUEST = 1;
 const MAX_DISPOSE_ATTEMPTS = 3;
 const MAX_QUEUED_THREAD_CALLS = 128;
 
+function isRootIndependentDataMessage(value: unknown): boolean {
+	if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+	try {
+		const descriptor = Object.getOwnPropertyDescriptor(value, 'type');
+		return (
+			descriptor !== undefined &&
+			Object.prototype.hasOwnProperty.call(descriptor, 'value') &&
+			(descriptor.value === 'page-data' || descriptor.value === 'global-props')
+		);
+	} catch {
+		return false;
+	}
+}
+
 function errorFrom(value: unknown, fallback: string): Error {
 	if (value instanceof Error) return value;
 	return new Error(value === undefined ? fallback : String(value));
@@ -221,6 +237,12 @@ export function createLynxBackgroundTransport(
 	const pendingMainCalls = new Map<number, PendingMainThreadCall>();
 	const runningBackgroundCalls = new Map<number, RunningBackgroundCall>();
 	const readyRequest = NEXT_READY_REQUEST++;
+	const readinessRequest: LynxMainReadyRequest = Object.freeze({
+		protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+		renderer: LYNX_TRANSPORT_RENDERER,
+		type: 'main-ready-request',
+		request: readyRequest,
+	});
 	const readyDeferred = createDeferred<void>();
 	// A transport can be synchronously closed before a root observes `ready`.
 	void readyDeferred.promise.catch(() => {});
@@ -229,6 +251,7 @@ export function createLynxBackgroundTransport(
 	let closedError: Error | null = null;
 	let transportRoot: number | null = null;
 	let readyReceived = false;
+	let readinessRetrySent = false;
 	let disposeDeferred: Deferred<void> | null = null;
 	let disposeIdentity: UniversalTransportIdentity | null = null;
 	let disposeAttempts = 0;
@@ -665,7 +688,19 @@ export function createLynxBackgroundTransport(
 	};
 
 	const handleReady = (message: LynxMainReadyReply) => {
-		if (message.request !== LYNX_READY_ANNOUNCEMENT_REQUEST && message.request !== readyRequest) {
+		if (message.request === LYNX_READY_ANNOUNCEMENT_REQUEST) {
+			if (readyReceived || readyDeferred.settled || readinessRetrySent) return;
+			// Request 0 is only an availability hint. Re-send this transport's
+			// correlation ID so main can order queued page data before the reply.
+			readinessRetrySent = true;
+			try {
+				dispatch(readinessRequest);
+			} catch (error) {
+				closeInternal(report(error, 'Octane Lynx failed to retry main readiness.'), false);
+			}
+			return;
+		}
+		if (message.request !== readyRequest) {
 			report(
 				new Error(`Octane Lynx transport received foreign main-ready request ${message.request}.`),
 			);
@@ -757,7 +792,9 @@ export function createLynxBackgroundTransport(
 			message.type === 'dispose-ack' ||
 			message.type === 'dispose-retry' ||
 			message.type === 'main-ready' ||
-			message.type === 'page-destroy'
+			message.type === 'page-destroy' ||
+			message.type === 'page-data' ||
+			message.type === 'global-props'
 		) {
 			return;
 		}
@@ -1081,6 +1118,7 @@ export function createLynxBackgroundTransport(
 	};
 
 	function receive(event: LynxContextProxyEvent): void {
+		if (isRootIndependentDataMessage(event.data)) return;
 		if (closedError !== null && terminalDisposeIdentity === null) return;
 		let message: LynxBackgroundInboundMessage;
 		try {
@@ -1097,6 +1135,10 @@ export function createLynxBackgroundTransport(
 		if (closedError !== null) {
 			if (message.type === 'dispose-ack') handleDisposeAcknowledgement(message);
 			else if (message.type === 'dispose-retry') handleDisposeRetry(message);
+			return;
+		}
+		if (message.type === 'page-data' || message.type === 'global-props') {
+			// Root-independent data is owned by the page-lifetime background receiver.
 			return;
 		}
 		if (message.type === 'main-ready') {
@@ -1138,18 +1180,36 @@ export function createLynxBackgroundTransport(
 		handleCommitResponse(message);
 	}
 
-	context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, receive);
 	receiverAttached = true;
-	const request: LynxMainReadyRequest = {
-		protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
-		renderer: LYNX_TRANSPORT_RENDERER,
-		type: 'main-ready-request',
-		request: readyRequest,
-	};
 	try {
-		dispatch(request);
+		context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, receive);
 	} catch (error) {
-		closeInternal(report(error, 'Octane Lynx failed to request main readiness.'), false);
+		const registrationError = report(
+			error,
+			'Octane Lynx failed to install its background transport listener.',
+		);
+		closeInternal(registrationError, false);
+		throw registrationError;
+	}
+	let pageDestroyedBeforeReady = false;
+	try {
+		pageDestroyedBeforeReady = options.isPageDestroyed?.() === true;
+	} catch (error) {
+		const tombstoneError = report(
+			error,
+			'Octane Lynx failed to read its native page-lifetime tombstone.',
+		);
+		closeInternal(tombstoneError, false);
+		throw tombstoneError;
+	}
+	if (pageDestroyedBeforeReady) {
+		handlePageDestroy();
+	} else if (closedError === null && !readyReceived && !readinessRetrySent) {
+		try {
+			dispatch(readinessRequest);
+		} catch (error) {
+			closeInternal(report(error, 'Octane Lynx failed to request main readiness.'), false);
+		}
 	}
 
 	const transport: LynxBackgroundTransport = {

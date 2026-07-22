@@ -24,6 +24,7 @@ import {
 	type LynxNativeInvokeOptions,
 	type LynxNativeNodesRef,
 } from '../src/core/nodes-ref.js';
+import { snapshotLynxLifecycleData } from '../src/core/lifecycle-data.js';
 import {
 	LYNX_BACKGROUND_TO_MAIN_EVENT,
 	LYNX_MAIN_TO_BACKGROUND_EVENT,
@@ -422,6 +423,77 @@ describe('@octanejs/lynx transported protocol', () => {
 				error: { name: 'Error', message: 'retry cleanup' },
 			}),
 		).toMatchObject({ type: 'dispose-retry' });
+	});
+
+	it('validates and snapshots root-independent clone-safe lifecycle data', () => {
+		const shared = { enabled: true };
+		const source = {
+			accountId: 'account-a',
+			nested: { count: 1, items: ['a', 2] },
+			left: shared,
+			right: shared,
+		};
+		const pageData = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data' as const,
+			operation: 'update' as const,
+			data: source,
+		};
+		const globalProps = {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'global-props' as const,
+			patch: { locale: 'en-GB' },
+		};
+
+		expect(validateLynxBackgroundInboundMessage(pageData)).toBe(pageData);
+		expect(validateLynxBackgroundInboundMessage(globalProps)).toBe(globalProps);
+		const snapshot = snapshotLynxLifecycleData(source);
+		source.nested.count = 2;
+		shared.enabled = false;
+		expect(snapshot).toEqual({
+			accountId: 'account-a',
+			nested: { count: 1, items: ['a', 2] },
+			left: { enabled: true },
+			right: { enabled: true },
+		});
+		expect(snapshot.left).toBe(snapshot.right);
+		expect(Object.isFrozen(snapshot)).toBe(true);
+		expect(Object.isFrozen(snapshot.nested as object)).toBe(true);
+
+		expect(() => validateLynxBackgroundInboundMessage({ ...pageData, root: 1 })).toThrow(
+			/page-data.*unknown field "root"/,
+		);
+		expect(() => validateLynxBackgroundInboundMessage({ ...pageData, operation: 'merge' })).toThrow(
+			/page-data\.operation/,
+		);
+		expect(() => validateLynxBackgroundInboundMessage({ ...globalProps, patch: [] })).toThrow(
+			/global-props\.patch.*object/,
+		);
+
+		let accessorRead = false;
+		const accessorData = Object.defineProperty({}, 'secret', {
+			enumerable: true,
+			get() {
+				accessorRead = true;
+				return 'not-read';
+			},
+		});
+		expect(() => validateLynxBackgroundInboundMessage({ ...pageData, data: accessorData })).toThrow(
+			/must not be an accessor/,
+		);
+		expect(accessorRead).toBe(false);
+
+		const cyclic: Record<string, unknown> = {};
+		cyclic.self = cyclic;
+		expect(() => snapshotLynxLifecycleData(cyclic)).toThrow(/contains a cycle/);
+		expect(() => snapshotLynxLifecycleData({ date: new Date() })).toThrow(
+			/requires arrays or plain objects/,
+		);
+		const sparse: unknown[] = [];
+		sparse.length = 1;
+		expect(() => snapshotLynxLifecycleData({ sparse })).toThrow(/dense array/);
 	});
 
 	it('uses only current same-root acknowledged public handles as portal targets', () => {

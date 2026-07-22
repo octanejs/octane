@@ -5,8 +5,11 @@ import {
 	uninstallLynxTestingEnv,
 } from '@lynx-js/testing-environment';
 import {
+	createObjectContainer,
+	createObjectDriver,
 	createContext,
 	createPortal,
+	createUniversalRoot,
 	defineUniversalComponent,
 	universalComponent,
 	universalContext,
@@ -24,6 +27,12 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 import { createLynxRoot, type LynxPublicHandle, type LynxRoot } from '../src/index.js';
 import { installLynxMainThread, type LynxMainThreadController } from '../src/main-thread.js';
+import {
+	useGlobalProps,
+	useGlobalPropsChanged,
+	useInitData,
+	useInitDataChanged,
+} from '../src/platform.js';
 import { LYNX_NODES_REF_ATTRIBUTE } from '../src/core/nodes-ref.js';
 import { LYNX_CSS_SCOPE_PROP } from '../src/core/host-props.js';
 import {
@@ -77,6 +86,39 @@ const SimpleScene = defineUniversalComponent(
 	LYNX_TRANSPORT_RENDERER,
 	(props: { readonly id: string }) =>
 		universalValue(simplePlan, [universalProps([['set', 'id', props.id]])]),
+);
+interface LifecycleSnapshot {
+	readonly initData: Record<string, unknown>;
+	readonly globalProps: Record<string, unknown>;
+}
+
+interface LifecycleObserverProps {
+	readonly onRender: (snapshot: LifecycleSnapshot) => void;
+	readonly onInitDataChanged: (data: Record<string, unknown>) => void;
+	readonly onGlobalPropsChanged: (data: Record<string, unknown>) => void;
+}
+
+interface LifecycleTestEmitter {
+	addListener(eventName: string, listener: (data: unknown) => void): void;
+}
+
+interface LifecycleTestRuntime {
+	__initData?: Record<string, unknown>;
+	__presetData: Record<string, unknown>;
+	__globalProps: Record<string, unknown>;
+	getJSModule(name: 'GlobalEventEmitter'): LifecycleTestEmitter;
+}
+
+const LifecycleObserver = defineUniversalComponent(
+	LYNX_TRANSPORT_RENDERER,
+	(props: LifecycleObserverProps) => {
+		const initData = useInitData() as Record<string, unknown>;
+		const globalProps = useGlobalProps() as Record<string, unknown>;
+		useInitDataChanged(props.onInitDataChanged);
+		useGlobalPropsChanged(props.onGlobalPropsChanged);
+		props.onRender({ initData, globalProps });
+		return null;
+	},
 );
 const PortalTheme = createContext('missing');
 const portalShellPlan = universalPlan(LYNX_TRANSPORT_RENDERER, {
@@ -236,6 +278,16 @@ function mainContext(target: Record<string, unknown>): LynxContextProxy {
 	).lynx.getJSContext();
 }
 
+function sendLifecycleToBackground(env: LynxTestingEnv, message: Record<string, unknown>): void {
+	const context = backgroundContext();
+	env.switchToMainThread();
+	try {
+		context.dispatchEvent({ type: LYNX_MAIN_TO_BACKGROUND_EVENT, data: message });
+	} finally {
+		env.switchToBackgroundThread();
+	}
+}
+
 function identity(root: number, version: number): UniversalTransportIdentity {
 	return {
 		protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
@@ -301,6 +353,431 @@ describe.sequential('@octanejs/lynx background root in the official JS environme
 		expect(
 			dom.window.document.querySelector('#component-class-name')?.getAttribute('data-received'),
 		).toBe('component-value');
+	});
+
+	it('publishes copy-on-write page data and complete global snapshots through platform hooks', async () => {
+		const { env } = installEnvironment();
+		const runtime = (
+			globalThis as typeof globalThis & {
+				lynx: LifecycleTestRuntime;
+			}
+		).lynx;
+		runtime.__presetData = { accountId: 'preset', presetOnly: true };
+		runtime.__initData = undefined;
+		runtime.__globalProps = {
+			locale: 'en-GB',
+			theme: 'light',
+			preferences: { density: 'compact' },
+		};
+		const rawDataEvents: Record<string, unknown>[] = [];
+		const rawGlobalEvents: Record<string, unknown>[] = [];
+		const emitter = runtime.getJSModule('GlobalEventEmitter');
+		emitter.addListener('onDataChanged', (data) => {
+			rawDataEvents.push(data as Record<string, unknown>);
+		});
+		emitter.addListener('onGlobalPropsChanged', (data) => {
+			rawGlobalEvents.push(data as Record<string, unknown>);
+		});
+
+		backgroundRoot = createLynxRoot();
+		const seed = { accountId: 'account-a', stale: true, nested: { count: 1 } };
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data',
+			operation: 'replace',
+			data: seed,
+		});
+		seed.accountId = 'mutated-after-delivery';
+		seed.nested.count = 9;
+		expect(runtime.__initData).toEqual({
+			accountId: 'account-a',
+			stale: true,
+			nested: { count: 1 },
+		});
+		expect(runtime.__initData).not.toBe(seed);
+		expect(rawDataEvents).toEqual([]);
+
+		const renders: LifecycleSnapshot[] = [];
+		const initChanges: Record<string, unknown>[] = [];
+		const globalChanges: Record<string, unknown>[] = [];
+		await backgroundRoot.render(LifecycleObserver, {
+			onRender(snapshot) {
+				renders.push(snapshot);
+			},
+			onInitDataChanged(data) {
+				initChanges.push(data);
+			},
+			onGlobalPropsChanged(data) {
+				globalChanges.push(data);
+			},
+		});
+		expect(renders.at(-1)).toEqual({
+			initData: { accountId: 'account-a', stale: true, nested: { count: 1 } },
+			globalProps: {
+				locale: 'en-GB',
+				theme: 'light',
+				preferences: { density: 'compact' },
+			},
+		});
+
+		const beforeUpdate = runtime.__initData;
+		const retainedPageBranch = beforeUpdate?.nested;
+		const update = { count: 2 };
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data',
+			operation: 'update',
+			data: update,
+		});
+		update.count = 99;
+		await Promise.resolve();
+		await Promise.resolve();
+		await backgroundRoot.flushTransport();
+		expect(runtime.__initData).not.toBe(beforeUpdate);
+		expect(beforeUpdate).toEqual({
+			accountId: 'account-a',
+			stale: true,
+			nested: { count: 1 },
+		});
+		expect(runtime.__initData).toEqual({
+			accountId: 'account-a',
+			stale: true,
+			nested: { count: 1 },
+			count: 2,
+		});
+		expect(runtime.__initData?.nested).toBe(retainedPageBranch);
+		expect(rawDataEvents).toEqual([{ count: 2 }]);
+		expect(initChanges.at(-1)).toEqual(runtime.__initData);
+
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data',
+			operation: 'reset',
+			data: { accountId: 'account-b' },
+		});
+		await Promise.resolve();
+		await Promise.resolve();
+		await backgroundRoot.flushTransport();
+		expect(runtime.__initData).toEqual({ accountId: 'account-b' });
+		expect(rawDataEvents).toEqual([{ count: 2 }, { accountId: 'account-b' }]);
+		expect(initChanges).toHaveLength(2);
+		expect(initChanges.at(-1)).toEqual({ accountId: 'account-b' });
+
+		const beforeGlobalUpdate = runtime.__globalProps;
+		const retainedGlobalBranch = beforeGlobalUpdate.preferences;
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'global-props',
+			patch: { theme: 'dark' },
+		});
+		await Promise.resolve();
+		await Promise.resolve();
+		await backgroundRoot.flushTransport();
+		expect(runtime.__globalProps).not.toBe(beforeGlobalUpdate);
+		expect(beforeGlobalUpdate).toEqual({
+			locale: 'en-GB',
+			theme: 'light',
+			preferences: { density: 'compact' },
+		});
+		expect(runtime.__globalProps).toEqual({
+			locale: 'en-GB',
+			theme: 'dark',
+			preferences: { density: 'compact' },
+		});
+		expect(runtime.__globalProps.preferences).toBe(retainedGlobalBranch);
+		expect(rawGlobalEvents).toEqual([
+			{ locale: 'en-GB', theme: 'dark', preferences: { density: 'compact' } },
+		]);
+		expect(globalChanges).toEqual([
+			{ locale: 'en-GB', theme: 'dark', preferences: { density: 'compact' } },
+		]);
+		expect(renders.at(-1)).toEqual({
+			initData: { accountId: 'account-b' },
+			globalProps: {
+				locale: 'en-GB',
+				theme: 'dark',
+				preferences: { density: 'compact' },
+			},
+		});
+
+		await backgroundRoot.unmount();
+		backgroundRoot = null;
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data',
+			operation: 'reset',
+			data: { accountId: 'late' },
+		});
+		expect(runtime.__initData).toEqual({ accountId: 'late' });
+		expect(rawDataEvents).toHaveLength(3);
+
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-destroy',
+		});
+		const destroyedData = runtime.__initData;
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data',
+			operation: 'update',
+			data: { accountId: 'ignored' },
+		});
+		expect(runtime.__initData).toBe(destroyedData);
+		expect(rawDataEvents).toHaveLength(3);
+	});
+
+	it('compacts reentrant background lifecycle overflow to the newest state', async () => {
+		const { env } = installEnvironment();
+		const runtime = (
+			globalThis as typeof globalThis & {
+				lynx: LifecycleTestRuntime;
+			}
+		).lynx;
+		runtime.__presetData = { count: -1, retained: true };
+		runtime.__initData = { count: -1, retained: true };
+		runtime.__globalProps = {};
+		const changes: Record<string, unknown>[] = [];
+		const diagnostics: Error[] = [];
+		let injected = false;
+		runtime.getJSModule('GlobalEventEmitter').addListener('onDataChanged', (data) => {
+			changes.push(data as Record<string, unknown>);
+			if (injected) return;
+			injected = true;
+			for (let count = 1; count <= 129; count++) {
+				sendLifecycleToBackground(env, {
+					protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+					renderer: LYNX_TRANSPORT_RENDERER,
+					type: 'page-data',
+					operation: 'update',
+					data: { count },
+				});
+			}
+		});
+
+		backgroundRoot = createLynxRoot({
+			onDiagnostic(error) {
+				diagnostics.push(error);
+			},
+		});
+		await backgroundRoot.ready;
+		sendLifecycleToBackground(env, {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'page-data',
+			operation: 'update',
+			data: { count: 0 },
+		});
+
+		expect(runtime.__initData).toEqual({ count: 129, retained: true });
+		expect(changes).toEqual([{ count: 0 }, { count: 129 }]);
+		expect(
+			diagnostics.filter((error) => error.message.includes('compacted to current state')),
+		).toHaveLength(1);
+	});
+
+	it('keeps one page receiver across overlap rejection and sequential roots', async () => {
+		const { env } = installEnvironment();
+		const runtime = (
+			globalThis as typeof globalThis & {
+				lynx: LifecycleTestRuntime;
+			}
+		).lynx;
+		runtime.__presetData = { count: 0 };
+		runtime.__initData = { count: 0 };
+		runtime.__globalProps = {};
+		const initChanges: Record<string, unknown>[] = [];
+		const observerRoot = createUniversalRoot(
+			createObjectContainer(LYNX_TRANSPORT_RENDERER),
+			createObjectDriver(LYNX_TRANSPORT_RENDERER),
+		);
+		observerRoot.render(LifecycleObserver, {
+			onRender() {},
+			onInitDataChanged(data) {
+				initChanges.push(data);
+			},
+			onGlobalPropsChanged() {},
+		});
+
+		const firstRoot = createLynxRoot();
+		let secondRoot: LynxRoot | null = null;
+		backgroundRoot = firstRoot;
+		try {
+			await firstRoot.ready;
+			expect(() => createLynxRoot()).toThrow(/already has an installed background call bridge/);
+			sendLifecycleToBackground(env, {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'update',
+				data: { count: 1 },
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+			expect(runtime.__initData).toEqual({ count: 1 });
+			expect(initChanges).toEqual([{ count: 1 }]);
+
+			await firstRoot.unmount();
+			backgroundRoot = null;
+			sendLifecycleToBackground(env, {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'update',
+				data: { count: 2 },
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+			expect(runtime.__initData).toEqual({ count: 2 });
+			expect(initChanges).toEqual([{ count: 1 }, { count: 2 }]);
+
+			const delegate = backgroundContext();
+			const differentContext: LynxContextProxy = Object.freeze({
+				dispatchEvent: (event) => delegate.dispatchEvent(event),
+				addEventListener: (type, listener) => delegate.addEventListener(type, listener),
+				removeEventListener: (type, listener) => delegate.removeEventListener(type, listener),
+			});
+			expect(() => createLynxRoot({ context: differentContext })).toThrow(/different ContextProxy/);
+
+			secondRoot = createLynxRoot();
+			backgroundRoot = secondRoot;
+			await secondRoot.ready;
+			sendLifecycleToBackground(env, {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'update',
+				data: { count: 3 },
+			});
+			await Promise.resolve();
+			await Promise.resolve();
+			expect(runtime.__initData).toEqual({ count: 3 });
+			expect(initChanges).toEqual([{ count: 1 }, { count: 2 }, { count: 3 }]);
+			await secondRoot.unmount();
+			backgroundRoot = null;
+		} finally {
+			await firstRoot.unmount().catch(() => {});
+			await secondRoot?.unmount().catch(() => {});
+			if (backgroundRoot === firstRoot) backgroundRoot = null;
+			if (backgroundRoot === secondRoot) backgroundRoot = null;
+			observerRoot.unmount();
+		}
+	});
+
+	it('atomically rolls back a mutating background lifecycle registration failure', () => {
+		const dom = new JSDOM('<!doctype html><html><body></body></html>');
+		installLynxTestingEnv(globalThis, {
+			window: dom.window as unknown as Window & typeof globalThis,
+		});
+		const env = globalThis.lynxTestingEnv;
+		const registrationError = new Error('injected background lifecycle registration failure');
+		try {
+			env.switchToBackgroundThread();
+			const runtime = (
+				globalThis as typeof globalThis & {
+					lynx: LifecycleTestRuntime;
+				}
+			).lynx;
+			runtime.__initData = { count: 0 };
+			const delegate = backgroundContext();
+			const listeners = new Set<
+				(event: { readonly type: string; readonly data: unknown }) => void
+			>();
+			let failRegistration = true;
+			const context: LynxContextProxy = Object.freeze({
+				dispatchEvent: (event) => delegate.dispatchEvent(event),
+				addEventListener(type, listener) {
+					delegate.addEventListener(type, listener);
+					listeners.add(listener);
+					if (type === LYNX_MAIN_TO_BACKGROUND_EVENT && failRegistration) {
+						failRegistration = false;
+						throw registrationError;
+					}
+				},
+				removeEventListener(type, listener) {
+					listeners.delete(listener);
+					delegate.removeEventListener(type, listener);
+				},
+			});
+
+			expect(() => createLynxRoot({ context })).toThrow(registrationError);
+			expect(listeners.size).toBe(0);
+			sendLifecycleToBackground(env, {
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'update',
+				data: { count: 1 },
+			});
+			expect(runtime.__initData).toEqual({ count: 0 });
+		} finally {
+			env.switchToBackgroundThread();
+			env.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
+	it('carries a reentrant page-destroy tombstone into transport startup', async () => {
+		const dom = new JSDOM('<!doctype html><html><body></body></html>');
+		installLynxTestingEnv(globalThis, {
+			window: dom.window as unknown as Window & typeof globalThis,
+		});
+		const env = globalThis.lynxTestingEnv;
+		let root: LynxRoot | null = null;
+		try {
+			env.switchToBackgroundThread();
+			const delegate = backgroundContext();
+			const listeners = new Set<
+				(event: { readonly type: string; readonly data: unknown }) => void
+			>();
+			let replayDestroy = true;
+			const context: LynxContextProxy = Object.freeze({
+				dispatchEvent: (event) => delegate.dispatchEvent(event),
+				addEventListener(type, listener) {
+					listeners.add(listener);
+					delegate.addEventListener(type, listener);
+					if (type === LYNX_MAIN_TO_BACKGROUND_EVENT && replayDestroy) {
+						replayDestroy = false;
+						listener({
+							type,
+							data: {
+								protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+								renderer: LYNX_TRANSPORT_RENDERER,
+								type: 'page-destroy',
+							},
+						});
+					}
+				},
+				removeEventListener(type, listener) {
+					listeners.delete(listener);
+					delegate.removeEventListener(type, listener);
+				},
+			});
+
+			root = createLynxRoot({ context });
+			backgroundRoot = root;
+			const rendering = root.render(SimpleScene, { id: 'destroyed-before-ready' });
+			void rendering.catch(() => {});
+			await expect(root.ready).rejects.toThrow(/native page lifetime was destroyed/);
+			await expect(rendering).rejects.toThrow(/native page lifetime was destroyed/);
+			await root.unmount();
+			backgroundRoot = null;
+			expect(listeners.size).toBe(0);
+		} finally {
+			await root?.unmount().catch(() => {});
+			backgroundRoot = null;
+			env.switchToBackgroundThread();
+			env.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
 	});
 
 	it('starts when the background root is created before the main receiver', async () => {

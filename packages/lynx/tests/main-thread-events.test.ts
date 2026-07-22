@@ -18,6 +18,7 @@ import {
 	LYNX_TRANSPORT_RENDERER,
 	type LynxBackgroundInboundMessage,
 	type LynxContextProxy,
+	type LynxContextProxyEvent,
 } from '../src/core/protocol.js';
 import { encodeLynxPortalTargetId } from '../src/core/portal.js';
 
@@ -40,6 +41,68 @@ interface InstalledEnvironment {
 	readonly dom: JSDOM;
 	readonly main: LynxMainThreadController;
 	readonly registrations: EventRegistration[];
+}
+
+interface EngineRegistration {
+	readonly type: string;
+	readonly listener: (event: LynxContextProxyEvent) => void;
+}
+
+interface EngineHarness {
+	readonly context: LynxContextProxy;
+	readonly registrations: readonly EngineRegistration[];
+	readonly removals: readonly EngineRegistration[];
+	dispatch(type: string, data: unknown): void;
+	listenerCount(): number;
+}
+
+function createEngineHarness(
+	throwOnAdd?: {
+		readonly type: string;
+		readonly error: Error;
+	},
+	onAdd?: (type: string) => void,
+): EngineHarness {
+	const listeners = new Map<string, Set<(event: LynxContextProxyEvent) => void>>();
+	const registrations: EngineRegistration[] = [];
+	const removals: EngineRegistration[] = [];
+	const context: LynxContextProxy = {
+		dispatchEvent(event) {
+			for (const listener of [...(listeners.get(event.type) ?? [])]) listener(event);
+		},
+		addEventListener(type, listener) {
+			registrations.push({ type, listener });
+			let entries = listeners.get(type);
+			if (entries === undefined) listeners.set(type, (entries = new Set()));
+			entries.add(listener);
+			onAdd?.(type);
+			if (throwOnAdd?.type === type) throw throwOnAdd.error;
+		},
+		removeEventListener(type, listener) {
+			removals.push({ type, listener });
+			const entries = listeners.get(type);
+			entries?.delete(listener);
+			if (entries?.size === 0) listeners.delete(type);
+		},
+	};
+	return {
+		context,
+		registrations,
+		removals,
+		dispatch(type, data) {
+			context.dispatchEvent({ type, data });
+		},
+		listenerCount() {
+			let count = 0;
+			for (const entries of listeners.values()) count += entries.size;
+			return count;
+		},
+	};
+}
+
+function installEngine(target: Record<string, unknown>, engine: EngineHarness): void {
+	const lynx = target.lynx as Record<string, unknown>;
+	lynx.getEngine = () => engine.context;
 }
 
 const eventPlan = universalPlan('lynx', {
@@ -157,6 +220,36 @@ function backgroundContext(): LynxContextProxy {
 	).lynx.getCoreContext();
 }
 
+function captureMainMessages(): {
+	readonly messages: LynxBackgroundInboundMessage[];
+	stop(): void;
+} {
+	const context = backgroundContext();
+	const messages: LynxBackgroundInboundMessage[] = [];
+	const listener = (event: LynxContextProxyEvent) => {
+		messages.push(event.data as LynxBackgroundInboundMessage);
+	};
+	context.addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, listener);
+	return {
+		messages,
+		stop() {
+			context.removeEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, listener);
+		},
+	};
+}
+
+function requestMainReady(context: LynxContextProxy, request: number): void {
+	context.dispatchEvent({
+		type: LYNX_BACKGROUND_TO_MAIN_EVENT,
+		data: {
+			protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+			renderer: LYNX_TRANSPORT_RENDERER,
+			type: 'main-ready-request',
+			request,
+		},
+	});
+}
+
 function nativeContext(): LynxContextProxy {
 	globalThis.lynxTestingEnv.switchToMainThread();
 	return (
@@ -205,7 +298,14 @@ afterEach(async () => {
 
 describe.sequential('Lynx main-thread native event bridge', () => {
 	it('tears down the active page when the public native lifetime is destroyed', () => {
-		const { dom, main } = installEnvironment();
+		const engine = createEngineHarness();
+		const { dom, main } = installEnvironment((target) => installEngine(target, engine));
+		const engineRegistrations = [...engine.registrations];
+		expect(engineRegistrations.map(({ type }) => type)).toEqual([
+			'__RenderPage',
+			'__UpdatePage',
+			'__UpdateGlobalProps',
+		]);
 		dispatchCommit(backgroundContext(), 89, 1, [
 			{ op: 'create', id: 1, type: 'view', props: { id: 'lifetime-root' } },
 			{ op: 'create', id: 2, type: 'text', props: {} },
@@ -228,6 +328,17 @@ describe.sequential('Lynx main-thread native event bridge', () => {
 		expect(page.innerHTML).toBe('');
 		expect(main.activeIdentity()).toBeNull();
 		expect(main.diagnostics()).toEqual([]);
+		expect(engine.listenerCount()).toBe(0);
+		expect(engine.removals.map(({ type }) => type)).toEqual([
+			'__UpdateGlobalProps',
+			'__UpdatePage',
+			'__RenderPage',
+		]);
+		for (const removal of engine.removals) {
+			expect(removal.listener).toBe(
+				engineRegistrations.find(({ type }) => type === removal.type)?.listener,
+			);
+		}
 
 		// A late delivery is inert and diagnosable after lifetime teardown.
 		main.dispatchNativeEvent('late-native-event', { detail: { phase: 'late' } });
@@ -672,5 +783,465 @@ describe.sequential('Lynx main-thread native event bridge', () => {
 		).rejects.toThrow('injected accepted flush fault');
 		expect(faultLog).toEqual([]);
 		expect(faulted.main.activeIdentity()).toMatchObject({ version: 1 });
+	});
+});
+
+describe.sequential('Lynx main-thread engine lifecycle bridge', () => {
+	it('re-correlates a background-first handshake before forwarding late engine data', async () => {
+		const dom = new JSDOM('<!doctype html><html><body></body></html>');
+		installLynxTestingEnv(globalThis, {
+			window: dom.window as unknown as Window & typeof globalThis,
+		});
+		const env = globalThis.lynxTestingEnv;
+		try {
+			env.switchToBackgroundThread();
+			const inbound: LynxBackgroundInboundMessage[] = [];
+			backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+				inbound.push(event.data as LynxBackgroundInboundMessage);
+			});
+			backgroundRoot = createLynxRoot();
+			const rendering = backgroundRoot.render(EventScene, {});
+			void rendering.catch(() => {});
+
+			env.switchToMainThread();
+			const engine = createEngineHarness();
+			const target = globalThis as unknown as Record<string, unknown>;
+			installEngine(target, engine);
+			const outbound: Array<{ readonly type?: unknown; readonly request?: unknown }> = [];
+			const context = (
+				target as {
+					lynx: { getJSContext(): LynxContextProxy };
+				}
+			).lynx.getJSContext();
+			context.addEventListener(LYNX_BACKGROUND_TO_MAIN_EVENT, (event) => {
+				outbound.push(event.data as { readonly type?: unknown; readonly request?: unknown });
+			});
+			const main = installLynxMainThread();
+			installed = { dom, main, registrations: [] };
+			engine.dispatch('__RenderPage', [{ accountId: 'late-main', nested: { retained: true } }, {}]);
+			engine.dispatch('__UpdatePage', [{ count: 2 }, {}]);
+
+			env.switchToBackgroundThread();
+			await rendering;
+			const runtime = (
+				globalThis as typeof globalThis & {
+					lynx: { __initData?: Record<string, unknown> };
+				}
+			).lynx;
+			expect(runtime.__initData).toEqual({
+				accountId: 'late-main',
+				nested: { retained: true },
+				count: 2,
+			});
+			expect(dom.window.document.querySelector('#event-target')).not.toBeNull();
+
+			const readyReplies = inbound.filter((message) => message.type === 'main-ready');
+			expect(readyReplies).toHaveLength(2);
+			expect(readyReplies.map(({ request }) => request)).toContain(0);
+			const correlated = readyReplies.find(({ request }) => request !== 0);
+			expect(correlated).toBeDefined();
+			const retries = outbound.filter(({ type }) => type === 'main-ready-request');
+			expect(retries).toEqual([expect.objectContaining({ request: correlated?.request })]);
+			expect(
+				inbound.filter((message) => message.type === 'page-data').map((message) => message.type),
+			).toEqual(['page-data', 'page-data']);
+		} finally {
+			env.switchToBackgroundThread();
+			if (installed === null) {
+				if (backgroundRoot !== null) {
+					try {
+						await backgroundRoot.unmount();
+					} catch {
+						// Failed startup may already have closed the root.
+					}
+				}
+				backgroundRoot = null;
+				env.clearGlobal();
+				uninstallLynxTestingEnv(globalThis);
+				dom.window.close();
+			}
+		}
+	});
+
+	it('snapshots and forwards lifecycle data in source order before correlated readiness', () => {
+		const engine = createEngineHarness();
+		let reentered = false;
+		let reentryContext: LynxContextProxy | null = null;
+		const { main } = installEnvironment(
+			(target) => installEngine(target, engine),
+			(delegate) =>
+				Object.freeze({
+					dispatchEvent(event) {
+						const data = event.data as { readonly type?: unknown };
+						if (data.type === 'page-data' && !reentered) {
+							reentered = true;
+							engine.dispatch('__UpdatePage', [{ sequence: 'reentrant' }, {}]);
+							requestMainReady(reentryContext!, 77);
+							requestMainReady(reentryContext!, 78);
+						}
+						return delegate.dispatchEvent(event);
+					},
+					addEventListener(type, listener) {
+						delegate.addEventListener(type, listener);
+					},
+					removeEventListener(type, listener) {
+						delegate.removeEventListener(type, listener);
+					},
+				}),
+		);
+		reentryContext = backgroundContext();
+		const captured = captureMainMessages();
+		const renderData = { profile: { name: 'Ada' } };
+		const updateData = { count: 1 };
+		const resetData = { count: 2 };
+		const globalProps = { theme: { mode: 'dark' } };
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		engine.dispatch('__RenderPage', [renderData, { initPage: true }]);
+		engine.dispatch('__UpdatePage', [updateData, {}]);
+		engine.dispatch('__UpdatePage', [resetData, { resetPageData: true }]);
+		engine.dispatch('__UpdateGlobalProps', [globalProps]);
+		expect(captured.messages).toEqual([]);
+
+		renderData.profile.name = 'mutated';
+		updateData.count = 99;
+		resetData.count = 99;
+		globalProps.theme.mode = 'mutated';
+
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		requestMainReady(backgroundContext(), 77);
+
+		expect(captured.messages.map(({ type }) => type)).toEqual([
+			'page-data',
+			'page-data',
+			'page-data',
+			'global-props',
+			'page-data',
+			'main-ready',
+			'main-ready',
+		]);
+		expect(
+			captured.messages
+				.filter((message) => message.type === 'main-ready')
+				.map(({ request }) => request),
+		).toEqual([77, 78]);
+		expect(captured.messages.slice(0, 5)).toEqual([
+			{
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'replace',
+				data: { profile: { name: 'Ada' } },
+			},
+			{
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'update',
+				data: { count: 1 },
+			},
+			{
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'reset',
+				data: { count: 2 },
+			},
+			{
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'global-props',
+				patch: { theme: { mode: 'dark' } },
+			},
+			{
+				protocol: LYNX_TRANSPORT_PROTOCOL_VERSION,
+				renderer: LYNX_TRANSPORT_RENDERER,
+				type: 'page-data',
+				operation: 'update',
+				data: { sequence: 'reentrant' },
+			},
+		]);
+		const renderMessage = captured.messages[0];
+		expect(renderMessage?.type).toBe('page-data');
+		if (renderMessage?.type !== 'page-data') throw new Error('Expected page data.');
+		expect(Object.isFrozen(renderMessage.data)).toBe(true);
+		expect(Object.isFrozen(renderMessage.data.profile)).toBe(true);
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		engine.dispatch('__UpdatePage', [{ sequence: 'direct' }, {}]);
+		expect(captured.messages.at(-1)).toMatchObject({
+			type: 'page-data',
+			operation: 'update',
+			data: { sequence: 'direct' },
+		});
+		expect(main.diagnostics()).toEqual([]);
+	});
+
+	it('rejects malformed tuples and reloadTemplate without mutating the active host', () => {
+		const engine = createEngineHarness();
+		const { dom, main } = installEnvironment((target) => installEngine(target, engine));
+		dispatchCommit(backgroundContext(), 121, 1, [
+			{ op: 'create', id: 1, type: 'view', props: { id: 'lifecycle-host' } },
+			{ op: 'create', id: 2, type: 'text', props: {} },
+			{ op: 'create', id: 3, type: '#text', props: { value: 'stable' } },
+			{ op: 'insert', parent: 2, id: 3, before: null },
+			{ op: 'insert', parent: 1, id: 2, before: null },
+			{ op: 'insert', parent: null, id: 1, before: null },
+		]);
+		const captured = captureMainMessages();
+		requestMainReady(backgroundContext(), 78);
+		const page = dom.window.document.querySelector('page')!;
+		const identity = main.activeIdentity();
+		let getterRead = false;
+		const accessorOptions = Object.defineProperty({}, 'reloadTemplate', {
+			enumerable: true,
+			get() {
+				getterRead = true;
+				return false;
+			},
+		});
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		expect(() => engine.dispatch('__RenderPage', [{ invalid: true }])).not.toThrow();
+		expect(() => engine.dispatch('__UpdatePage', [{ safe: true }, accessorOptions])).not.toThrow();
+		expect(() =>
+			engine.dispatch('__UpdateGlobalProps', [{ invalid: () => undefined }]),
+		).not.toThrow();
+		expect(() =>
+			engine.dispatch('__UpdatePage', [{ ignored: true }, { reloadTemplate: true }]),
+		).not.toThrow();
+		const symbolicTuple: unknown[] = [{ ignored: true }];
+		Object.defineProperty(symbolicTuple, Symbol('extra'), { value: true });
+		expect(() => engine.dispatch('__UpdateGlobalProps', symbolicTuple)).not.toThrow();
+
+		expect(getterRead).toBe(false);
+		expect(page.querySelector('#lifecycle-host')?.textContent).toBe('stable');
+		expect(main.activeIdentity()).toEqual(identity);
+		expect(captured.messages.map(({ type }) => type)).toEqual(['main-ready']);
+		const diagnostics = main.diagnostics().map(({ message }) => message);
+		expect(diagnostics.some((message) => message.includes('exact 2-item tuple'))).toBe(true);
+		expect(diagnostics.some((message) => message.includes('boolean data property'))).toBe(true);
+		expect(diagnostics.some((message) => message.includes('non-clone-safe'))).toBe(true);
+		expect(diagnostics.some((message) => message.includes('reloadTemplate'))).toBe(true);
+		expect(diagnostics.some((message) => message.includes('dense tuple'))).toBe(true);
+	});
+
+	it('compacts an overflowing pre-ready lifecycle queue to authoritative current state', async () => {
+		const engine = createEngineHarness();
+		const { main } = installEnvironment((target) => installEngine(target, engine));
+		const captured = captureMainMessages();
+		globalThis.lynxTestingEnv.switchToMainThread();
+		for (let sequence = 0; sequence < 129; sequence++) {
+			engine.dispatch('__UpdatePage', [{ sequence }, {}]);
+		}
+		expect(captured.messages).toEqual([]);
+
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		const runtime = (
+			globalThis as typeof globalThis & {
+				lynx: { __initData?: Record<string, unknown> };
+			}
+		).lynx;
+		runtime.__initData = {};
+		backgroundRoot = createLynxRoot();
+		await backgroundRoot.ready;
+		const updates = captured.messages.filter(
+			(message): message is Extract<LynxBackgroundInboundMessage, { type: 'page-data' }> =>
+				message.type === 'page-data',
+		);
+		expect(updates).toHaveLength(1);
+		expect(updates[0]).toMatchObject({ operation: 'update', data: { sequence: 128 } });
+		expect(captured.messages.at(-1)).toMatchObject({ type: 'main-ready' });
+		expect(runtime.__initData).toEqual({ sequence: 128 });
+		expect(main.diagnostics().map(({ message }) => message)).toContain(
+			'Octane Lynx engine lifecycle queue exceeded 128 entries and was compacted to current state.',
+		);
+	});
+
+	it('makes lifecycle delivery terminal when close reenters a queued drain', () => {
+		const engine = createEngineHarness();
+		let main: LynxMainThreadController | null = null;
+		const environment = installEnvironment(
+			(target) => installEngine(target, engine),
+			(delegate) =>
+				Object.freeze({
+					dispatchEvent(event) {
+						if ((event.data as { readonly type?: unknown }).type === 'page-data') main?.close();
+						return delegate.dispatchEvent(event);
+					},
+					addEventListener(type, listener) {
+						delegate.addEventListener(type, listener);
+					},
+					removeEventListener(type, listener) {
+						delegate.removeEventListener(type, listener);
+					},
+				}),
+		);
+		main = environment.main;
+		const captured = captureMainMessages();
+		globalThis.lynxTestingEnv.switchToMainThread();
+		engine.dispatch('__UpdatePage', [{ sequence: 1 }, {}]);
+		engine.dispatch('__UpdatePage', [{ sequence: 2 }, {}]);
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		requestMainReady(backgroundContext(), 81);
+
+		expect(captured.messages).toEqual([
+			expect.objectContaining({ type: 'page-data', data: { sequence: 1 } }),
+		]);
+		expect(engine.listenerCount()).toBe(0);
+		globalThis.lynxTestingEnv.switchToMainThread();
+		engine.dispatch('__UpdatePage', [{ sequence: 3 }, {}]);
+		expect(captured.messages).toHaveLength(1);
+	});
+
+	it('fail-stops readiness when queued lifecycle delivery fails', () => {
+		const engine = createEngineHarness();
+		const deliveryError = new Error('injected lifecycle delivery failure');
+		const { main } = installEnvironment(
+			(target) => installEngine(target, engine),
+			(delegate) =>
+				Object.freeze({
+					dispatchEvent(event) {
+						const data = event.data as {
+							readonly type?: unknown;
+							readonly data?: { readonly count?: unknown };
+						};
+						if (data.type === 'page-data' && data.data?.count !== 1) {
+							throw deliveryError;
+						}
+						return delegate.dispatchEvent(event);
+					},
+					addEventListener(type, listener) {
+						delegate.addEventListener(type, listener);
+					},
+					removeEventListener(type, listener) {
+						delegate.removeEventListener(type, listener);
+					},
+				}),
+		);
+		const captured = captureMainMessages();
+		globalThis.lynxTestingEnv.switchToMainThread();
+		engine.dispatch('__UpdatePage', [{ count: 0 }, {}]);
+		engine.dispatch('__UpdatePage', [{ count: 1 }, {}]);
+		globalThis.lynxTestingEnv.switchToBackgroundThread();
+		requestMainReady(backgroundContext(), 80);
+		expect(captured.messages.map(({ type }) => type)).toEqual(['page-destroy']);
+		expect(engine.listenerCount()).toBe(0);
+		expect(main.diagnostics()).toContain(deliveryError);
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		expect(() => engine.dispatch('__UpdatePage', [{ count: 2 }, {}])).not.toThrow();
+		expect(captured.messages.map(({ type }) => type)).toEqual(['page-destroy']);
+		const registrations = [...engine.registrations];
+		main.close();
+		for (const removal of engine.removals) {
+			expect(removal.listener).toBe(
+				registrations.find(({ type }) => type === removal.type)?.listener,
+			);
+		}
+	});
+
+	it('fail-stops an already-ready page when direct lifecycle delivery fails', () => {
+		const engine = createEngineHarness();
+		const deliveryError = new Error('injected direct lifecycle delivery failure');
+		const { main } = installEnvironment(
+			(target) => installEngine(target, engine),
+			(delegate) =>
+				Object.freeze({
+					dispatchEvent(event) {
+						if ((event.data as { readonly type?: unknown }).type === 'page-data') {
+							throw deliveryError;
+						}
+						return delegate.dispatchEvent(event);
+					},
+					addEventListener(type, listener) {
+						delegate.addEventListener(type, listener);
+					},
+					removeEventListener(type, listener) {
+						delegate.removeEventListener(type, listener);
+					},
+				}),
+		);
+		const captured = captureMainMessages();
+		requestMainReady(backgroundContext(), 82);
+		expect(captured.messages.map(({ type }) => type)).toEqual(['main-ready']);
+
+		globalThis.lynxTestingEnv.switchToMainThread();
+		expect(() => engine.dispatch('__UpdatePage', [{ count: 1 }, {}])).not.toThrow();
+		expect(captured.messages.map(({ type }) => type)).toEqual(['main-ready', 'page-destroy']);
+		expect(engine.listenerCount()).toBe(0);
+		expect(main.diagnostics()).toContain(deliveryError);
+	});
+
+	it('does not continue engine registration after synchronous native destroy', () => {
+		let destroyDuringRegistration = true;
+		const engine = createEngineHarness(undefined, (type) => {
+			if (type !== '__RenderPage' || !destroyDuringRegistration) return;
+			destroyDuringRegistration = false;
+			nativeContext().dispatchEvent({ type: '__DestroyLifetime', data: [1] });
+		});
+		const { main } = installEnvironment((target) => installEngine(target, engine));
+
+		expect(engine.registrations.map(({ type }) => type)).toEqual(['__RenderPage']);
+		expect(engine.listenerCount()).toBe(0);
+		expect(main.activeIdentity()).toBeNull();
+		for (const removal of engine.removals) {
+			expect(removal.listener).toBe(engine.registrations[0]?.listener);
+		}
+	});
+
+	it('terminates a background-first root and rolls back partial engine registration', async () => {
+		const dom = new JSDOM('<!doctype html><html><body></body></html>');
+		const registrationError = new Error('injected engine registration failure');
+		const engine = createEngineHarness({ type: '__UpdatePage', error: registrationError });
+		installLynxTestingEnv(globalThis, {
+			window: dom.window as unknown as Window & typeof globalThis,
+		});
+		const env = globalThis.lynxTestingEnv;
+		try {
+			env.switchToBackgroundThread();
+			const inbound: LynxBackgroundInboundMessage[] = [];
+			backgroundContext().addEventListener(LYNX_MAIN_TO_BACKGROUND_EVENT, (event) => {
+				inbound.push(event.data as LynxBackgroundInboundMessage);
+			});
+			backgroundRoot = createLynxRoot();
+			const rendering = backgroundRoot.render(EventScene, {});
+			void rendering.catch(() => {});
+
+			env.switchToMainThread();
+			installEngine(globalThis as unknown as Record<string, unknown>, engine);
+			expect(() => installLynxMainThread()).toThrow(registrationError);
+			env.switchToBackgroundThread();
+			await expect(rendering).rejects.toThrow(/native page lifetime was destroyed/);
+			await backgroundRoot.unmount();
+			backgroundRoot = null;
+
+			expect(inbound.map(({ type }) => type)).toEqual(['page-destroy']);
+			expect(engine.registrations.map(({ type }) => type)).toEqual([
+				'__RenderPage',
+				'__UpdatePage',
+			]);
+			expect(engine.removals.map(({ type }) => type)).toEqual(['__UpdatePage', '__RenderPage']);
+			for (const removal of engine.removals) {
+				expect(removal.listener).toBe(
+					engine.registrations.find(({ type }) => type === removal.type)?.listener,
+				);
+			}
+			expect(engine.listenerCount()).toBe(0);
+			expect(dom.window.document.querySelector('page')?.innerHTML).toBe('');
+		} finally {
+			env.switchToBackgroundThread();
+			if (backgroundRoot !== null) {
+				try {
+					await backgroundRoot.unmount();
+				} catch {
+					// Registration failure may already have completed logical teardown.
+				}
+			}
+			backgroundRoot = null;
+			env.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
 	});
 });
