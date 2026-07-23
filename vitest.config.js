@@ -17,6 +17,11 @@ import { websiteMdxOptions } from './website/mdx-options.ts';
 // which `test.env` cannot reach; workers inherit it from this process.
 // `??=` keeps an explicit OCTANE_COMPILE_FROZEN_AST=0 override working.
 process.env.OCTANE_COMPILE_FROZEN_AST ??= '1';
+// Origin-loc completeness (see assertNodeLocs in compile.js): every node the
+// compiler prints must carry an origin location — the basis for trustworthy
+// source maps and playground source↔output navigation. Same wiring and
+// override convention as the freeze flag above.
+process.env.OCTANE_COMPILE_ASSERT_LOC ??= '1';
 
 const USER_APP_EVAL_PREFIX = '@octane-eval-submission/';
 const USER_APP_EVAL_ALLOWED_IMPORTS = new Map([

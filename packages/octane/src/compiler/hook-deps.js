@@ -2,6 +2,8 @@
 // omitted. The same analysis feeds the full TSRX/TSX compiler and the
 // surgical plain-TS hook pass, keeping custom hooks and components aligned.
 
+import { builders as b } from '@tsrx/core';
+
 const DEPENDENCY_HOOKS = new Map([
 	['useEffect', { callback: 0, deps: 1 }],
 	['useLayoutEffect', { callback: 0, deps: 1 }],
@@ -1100,11 +1102,17 @@ function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
 			if (result !== undefined) {
 				if (insertDeps) {
 					const args = out.arguments.slice();
+					// The synthesized array maps to the hook call it belongs to; each
+					// dependency clone keeps its authored position.
 					args.splice(result.depsIndex, 0, {
-						type: 'ArrayExpression',
-						elements: result.dependencies.map((/** @type {any} */ dependency) =>
-							cloneDependency(dependency.node),
+						...b.array(
+							result.dependencies.map((/** @type {any} */ dependency) =>
+								cloneDependency(dependency.node),
+							),
 						),
+						start: node.start,
+						end: node.end,
+						loc: node.loc,
 					});
 					out.arguments = args;
 				}

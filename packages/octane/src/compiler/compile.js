@@ -125,6 +125,118 @@ function adoptParserAst(ast) {
 	return freezeAdoptedAsts() ? deepFreezeAst(ast) : ast;
 }
 
+// --- Origin-location completeness enforcement --------------------------------
+//
+// Source mapping (and the playground's source↔output navigation) is only as
+// accurate as the `loc` data on the nodes esrap prints: a printed node without
+// a loc emits no mapping segment, silently orphaning that output span from the
+// authored source. Copy-on-write spreads keep authored locs for free; NEWLY
+// built nodes must carry their origin via `setLocation(built, originNode)`
+// (pure scaffolding inherits the nearest enclosing origin).
+//
+// Enforcement is test-only (OCTANE_COMPILE_ASSERT_LOC=1): every node handed to
+// esrap is walked post-TS-strip — exactly what the printer sees — and printing
+// throws listing each loc-less node with its type and nearest located
+// ancestor. Production compiles skip the walk entirely.
+const assertPrintedLocs = () =>
+	typeof process !== 'undefined' && process.env?.OCTANE_COMPILE_ASSERT_LOC === '1';
+
+function assertNodeLocs(root) {
+	const missing = [];
+	const visit = (node, ancestor) => {
+		if (node === null || typeof node !== 'object') return;
+		if (Array.isArray(node)) {
+			for (const item of node) visit(item, ancestor);
+			return;
+		}
+		let nearest = ancestor;
+		if (typeof node.type === 'string') {
+			if (node.loc == null) {
+				if (missing.length < 20) {
+					const at = ancestor?.loc?.start;
+					const detail =
+						node.name != null
+							? ` "${node.name}"`
+							: node.value !== undefined
+								? ` ${JSON.stringify(node.value)}`
+								: '';
+					missing.push(
+						`${node.type}${detail} (under ${
+							ancestor ? `${ancestor.type}${at ? ` at ${at.line}:${at.column}` : ''}` : 'root'
+						})`,
+					);
+				} else {
+					missing.push(null);
+				}
+			} else {
+				nearest = node;
+			}
+		}
+		for (const key of Object.keys(node)) {
+			if (key === 'loc' || key === 'start' || key === 'end' || key === 'range') continue;
+			if (key === 'parent' || key === 'metadata' || key === 'css') continue;
+			const child = node[key];
+			if (child !== null && typeof child === 'object') visit(child, nearest);
+		}
+	};
+	visit(root, null);
+	if (missing.length > 0) {
+		const listed = missing.filter(Boolean);
+		const extra = missing.length - listed.length;
+		throw new Error(
+			`OCTANE_COMPILE_ASSERT_LOC: ${missing.length} printed node(s) missing origin loc — ` +
+				`stamp with setLocation(built, origin):\n  ${listed.join('\n  ')}` +
+				(extra > 0 ? `\n  … and ${extra} more` : ''),
+		);
+	}
+	return root;
+}
+
+/**
+ * Deep-stamp an origin position onto compiler-built scaffolding: every node in
+ * the subtree that lacks a `loc` inherits `origin`'s, so generated helpers map
+ * back to the authored construct they serve. Existing locations are NEVER
+ * overwritten — authored subtrees grafted into the scaffold, and scaffolding
+ * already stamped with a more precise inner origin, keep their exact
+ * positions. Reuses mapAst as the traversal; loc-less nodes are compiler-owned
+ * by construction (parser output always carries locations), so the in-place
+ * stamp never touches a shared tree.
+ */
+function inheritOriginLoc(root, origin) {
+	if (origin == null || origin.loc == null) return root;
+	const { start, end, loc } = origin;
+	mapAst(root, (node) => {
+		// Only real AST nodes are stamped — mapAst also visits typeless data
+		// objects (TemplateElement.value, Literal.regex, embedded config), which
+		// must stay untouched (and may be frozen).
+		if (typeof node.type === 'string' && node.loc == null) {
+			node.start = start;
+			node.end = end;
+			node.loc = loc;
+		}
+		return null;
+	});
+	return root;
+}
+
+/**
+ * Clear positions from a (compiler-owned) tree parsed out of GENERATED text:
+ * its parse locations are snippet-relative and would emit bogus mappings
+ * against the authored module. Callers follow with inheritOriginLoc to give
+ * the subtree a correct coarse origin.
+ */
+function stripParseLocs(root) {
+	mapAst(root, (node) => {
+		if (typeof node.type === 'string') {
+			node.start = undefined;
+			node.end = undefined;
+			node.loc = undefined;
+		}
+		return null;
+	});
+	return root;
+}
+
 // React parity: a void element must neither have children nor use
 // `dangerouslySetInnerHTML` — React throws (ReactDOMComponent-test.js:1794/:1807).
 // Without this guard the failure is SILENT: the template parser drops the
@@ -808,19 +920,15 @@ function errorBoundaryFallback(node, fallbackAttribute) {
 				)
 					return null;
 				const returned = fallback.body.body[0].argument;
-				body = isJsxNode(returned)
-					? [returned]
-					: [{ type: 'JSXExpressionContainer', expression: returned }];
+				body = isJsxNode(returned) ? [returned] : [b.jsx_expression_container(returned)];
 			} else if (fallback.body != null) {
 				body = isJsxNode(fallback.body)
 					? [fallback.body]
-					: [{ type: 'JSXExpressionContainer', expression: fallback.body }];
+					: [b.jsx_expression_container(fallback.body)];
 			}
 		} else if (fallback != null) {
 			if (!isJsxNode(fallback) && fallback.type !== 'Literal') return null;
-			body = isJsxNode(fallback)
-				? [fallback]
-				: [{ type: 'JSXExpressionContainer', expression: fallback }];
+			body = isJsxNode(fallback) ? [fallback] : [b.jsx_expression_container(fallback)];
 		}
 	}
 	return { errorName, resetName, body };
@@ -917,23 +1025,28 @@ function lowerImportedErrorBoundaries(ast) {
 		const fallback = errorBoundaryFallback(node, fallbackAttribute);
 		if (fallback === null) return null;
 		lowered = true;
-		return {
-			type: 'JSXTryExpression',
-			start: node.start,
-			end: node.end,
-			loc: node.loc,
-			block: { type: 'BlockStatement', body: node.children || [] },
-			handler: {
-				type: 'CatchClause',
-				param: { type: 'Identifier', name: fallback.errorName },
-				resetParam:
-					fallback.resetName == null ? null : { type: 'Identifier', name: fallback.resetName },
-				body: { type: 'BlockStatement', body: fallback.body },
+		// Lowered scaffolding (handler clause, block shells, params) maps to the
+		// authored <ErrorBoundary> element; children and fallback bodies keep
+		// their exact authored positions.
+		return inheritOriginLoc(
+			{
+				type: 'JSXTryExpression',
+				start: node.start,
+				end: node.end,
+				loc: node.loc,
+				block: b.block(node.children || []),
+				handler: {
+					type: 'CatchClause',
+					param: b.id(fallback.errorName),
+					resetParam: fallback.resetName == null ? null : b.id(fallback.resetName),
+					body: b.block(fallback.body),
+				},
+				pending: null,
+				finalizer: null,
+				propagateSuspense: true,
 			},
-			pending: null,
-			finalizer: null,
-			propagateSuspense: true,
-		};
+			node,
+		);
 	});
 	if (!lowered) return { ast, consumed: new Set() };
 	const consumed = new Set();
@@ -1790,20 +1903,18 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 		// by the inline hook-memo tier never need it.
 		return {
 			...decl,
-			init: {
-				type: 'CallExpression',
-				// `_octaneGenerated` tells rewriteHookCalls (which slots this call next)
-				// that the callee is compiler-inserted — it renames it to the shadow-proof
-				// `_$useCallback` alias instead of treating it as a user identifier.
-				callee: { type: 'Identifier', name: 'useCallback', _octaneGenerated: true },
-				arguments: [
+			// The minted stability wrapper maps to the authored arrow it caches.
+			init: inheritOriginLoc(
+				b.call(
+					// `_octaneGenerated` tells rewriteHookCalls (which slots this call next)
+					// that the callee is compiler-inserted — it renames it to the shadow-proof
+					// `_$useCallback` alias instead of treating it as a user identifier.
+					{ ...b.id('useCallback'), _octaneGenerated: true },
 					arrow,
-					{
-						type: 'ArrayExpression',
-						elements: deps.map((n) => ({ type: 'Identifier', name: n })),
-					},
-				],
-			},
+					b.array(deps.map((n) => b.id(n))),
+				),
+				arrow,
+			),
 		};
 	});
 	return modified ? { ...stmt, declarations: newDecls } : stmt;
@@ -2747,7 +2858,7 @@ function wrapAsBlockStmt(node) {
 	if (!node) return null;
 	// null / Literal(null) / Literal(false) → no branch
 	if (node.type === 'Literal' && (node.value === null || node.value === false)) return null;
-	return { type: 'BlockStatement', body: [node] };
+	return b.block([node]);
 }
 
 /** `xs.map(x => <li/>)` — detect so we can throw a useful "use for-of" error. */
@@ -2813,13 +2924,9 @@ function mapCallToForOf(expr) {
 	}
 	return {
 		type: 'ForOfStatement',
-		left: {
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: [{ type: 'VariableDeclarator', id: params[0], init: null }],
-		},
+		left: b.const(params[0], null),
 		right: expr.callee.object,
-		body: { type: 'BlockStatement', body: [bodyEl] },
+		body: b.block([bodyEl]),
 		await: false,
 		key: keyExpr,
 		index: params[1] || null,
@@ -2853,15 +2960,14 @@ function resolveStyleExpr(node, cssHash) {
 	const inner = node.arguments[0];
 	if (inner.type === 'Literal' && typeof inner.value === 'string') {
 		const combined = inner.value ? `${cssHash} ${inner.value}` : cssHash;
-		return { type: 'Literal', value: combined, raw: JSON.stringify(combined) };
+		// The resolved class string maps to the authored `{style (…)}` call.
+		return b.literal(combined, JSON.stringify(combined), node);
 	}
 	// Dynamic: emit `(<hash> + ' ' + (expr))` so absent/null produces "<hash> ".
-	return {
-		type: 'BinaryExpression',
-		operator: '+',
-		left: { type: 'Literal', value: cssHash + ' ', raw: JSON.stringify(cssHash + ' ') },
-		right: inner,
-	};
+	return inheritOriginLoc(
+		b.binary('+', b.literal(cssHash + ' ', JSON.stringify(cssHash + ' ')), inner),
+		node,
+	);
 }
 
 /**
@@ -3013,17 +3119,16 @@ function normalizeOwnRenderableReturns(statement, preserveJsx = false) {
 		) {
 			return {
 				...node,
-				argument: { type: 'Literal', value: null, raw: 'null' },
+				argument: b.literal(null, 'null', node),
 			};
 		}
+		// The `?? null` normalization maps to the authored return argument.
 		return {
 			...node,
-			argument: {
-				type: 'LogicalExpression',
-				operator: '??',
-				left: node.argument,
-				right: { type: 'Literal', value: null, raw: 'null' },
-			},
+			argument: inheritOriginLoc(
+				b.logical('??', node.argument, b.literal(null, 'null')),
+				node.argument,
+			),
 		};
 	});
 }
@@ -3787,10 +3892,9 @@ function stampAnonymousDefaultFunctionLoc(node, ctx) {
 		/'/g,
 		'%27',
 	);
-	const marker = {
-		type: 'ExpressionStatement',
-		expression: { type: 'Literal', value: `__octane_loc:${payload}` },
-	};
+	// The inert loc directive (and any block promotion below) maps to the
+	// anonymous default function it annotates.
+	const marker = inheritOriginLoc(b.stmt(b.literal(`__octane_loc:${payload}`)), declaration);
 	let stamped;
 	if (
 		declaration.type === 'ArrowFunctionExpression' &&
@@ -3799,10 +3903,7 @@ function stampAnonymousDefaultFunctionLoc(node, ctx) {
 		stamped = {
 			...declaration,
 			expression: false,
-			body: {
-				type: 'BlockStatement',
-				body: [marker, { type: 'ReturnStatement', argument: declaration.body }],
-			},
+			body: inheritOriginLoc(b.block([marker, b.return(declaration.body)]), declaration.body),
 		};
 	} else if (declaration.body?.type === 'BlockStatement') {
 		stamped = {
@@ -3875,39 +3976,25 @@ function recordProfileComponent(ctx, node, name, identityName = name) {
 }
 
 function profileMetadataAst(metadata) {
-	return {
-		type: 'ObjectExpression',
-		properties: Object.entries(metadata).map(([key, value]) => ({
-			type: 'Property',
-			key: { type: 'Identifier', name: key },
-			value: { type: 'Literal', value, raw: JSON.stringify(value) },
-			kind: 'init',
-			method: false,
-			shorthand: false,
-			computed: false,
-		})),
-	};
+	return b.object(
+		Object.entries(metadata).map(([key, value]) =>
+			b.prop('init', b.id(key), b.literal(value, JSON.stringify(value))),
+		),
+	);
 }
 
-function profileRegistrationAst(bindingName, metadata) {
-	return {
-		type: 'ExpressionStatement',
-		expression: {
-			type: 'CallExpression',
-			callee: { type: 'Identifier', name: '_$__profileComponent' },
-			arguments: [{ type: 'Identifier', name: bindingName }, profileMetadataAst(metadata)],
-			optional: false,
-		},
-	};
+function profileRegistrationAst(bindingName, metadata, origin) {
+	return inheritOriginLoc(
+		b.stmt(b.call('_$__profileComponent', b.id(bindingName), profileMetadataAst(metadata))),
+		origin,
+	);
 }
 
 function profileComponentCallAst(value, metadata) {
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$__profileComponent' },
-		arguments: [value, profileMetadataAst(metadata)],
-		optional: false,
-	};
+	return inheritOriginLoc(
+		b.call('_$__profileComponent', value, profileMetadataAst(metadata)),
+		value,
+	);
 }
 
 function nodeContainsJsx(node) {
@@ -4148,11 +4235,15 @@ function instrumentProfileComponents(ast, ctx) {
 					// top-level statement. Register it here so that first mount has
 					// authored metadata; the retained module-tail registration still
 					// reattaches metadata to Rspack's post-handoff HMR wrapper.
-					output.push(profileRegistrationAst(name, metadata));
+					output.push(profileRegistrationAst(name, metadata, declaration));
 				} else {
 					ctx.profileRuntimeNeeded.add('__profileComponent');
 					output.push(
-						profileRegistrationAst(name, profileComponentMetadata(ctx, declaration, name)),
+						profileRegistrationAst(
+							name,
+							profileComponentMetadata(ctx, declaration, name),
+							declaration,
+						),
 					);
 				}
 			}
@@ -5012,7 +5103,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// collectFreeIdentifiers sees the same identifier scope the runtime would.
 		const stmts = (compNode.body.body || []).slice();
 		if (compNode.body.render) stmts.push(compNode.body.render);
-		const root = { type: 'BlockStatement', body: stmts };
+		const root = b.block(stmts);
 		const free = collectFreeIdentifiers(root, locals);
 		const autoMemoImportedComponents = collectImportedComponentReferences(root, ctx.importedNames);
 		let autoMemoCallsitesSafe =
@@ -5973,28 +6064,11 @@ function ssrCompileBody(
 				`function ${wrapperName}(props, __s) { return props.body(undefined, __s); }`,
 			);
 			ctx.runtimeNeeded.add('createElement');
-			return {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: '_$createElement' },
-				arguments: [
-					{ type: 'Identifier', name: wrapperName },
-					{
-						type: 'ObjectExpression',
-						properties: [
-							{
-								type: 'Property',
-								key: { type: 'Identifier', name: 'body' },
-								value: { type: 'Identifier', name: sub.fnName },
-								kind: 'init',
-								method: false,
-								shorthand: false,
-								computed: false,
-							},
-						],
-					},
-				],
-				optional: false,
-			};
+			return b.call(
+				'_$createElement',
+				b.id(wrapperName),
+				b.object([b.prop('init', b.id('body'), b.id(sub.fnName))]),
+			);
 		}),
 	);
 	const rewritten = preparedStatements
@@ -6903,8 +6977,8 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			// block deeper than the client and desyncing the hydration cursor.
 			const kids = children.map((c) => lowerJsxChild(c, ctx)).filter((e) => e != null);
 			if (kids.length > 0) {
-				const childrenExpr =
-					kids.length === 1 ? kids[0] : { type: 'ArrayExpression', elements: kids };
+				// The children array shell maps to the authored component element.
+				const childrenExpr = kids.length === 1 ? kids[0] : inheritOriginLoc(b.array(kids), node);
 				propParts.push(
 					`"children": (${printExprWithTsrx(resolveStyleExpr(childrenExpr, cssHash), ctx, name, inlinedSubs)})`,
 				);
@@ -7083,12 +7157,8 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	if (explicitKey !== null) {
 		const keyParams = [itemId];
 		if (node.index) keyParams.push(node.index);
-		const keyFn = printExpr({
-			type: 'ArrowFunctionExpression',
-			params: keyParams,
-			body: explicitKey,
-			expression: true,
-		});
+		// The synthesized key arrow maps to the authored key expression.
+		const keyFn = printExpr(inheritOriginLoc(b.arrow(keyParams, explicitKey), explicitKey));
 		itemKey = `(${keyFn})(__it${node.index ? ', __i' : ''})`;
 	} else if (node.index) {
 		itemKey = '__i';
@@ -7340,8 +7410,12 @@ function applyStyleMap(stmt, ctx) {
 			const css = renderStylesheets([sheet]);
 			ctx.cssInjections.push({ hash, css, order: styleNode.start ?? stmt.start ?? 0 });
 			ctx.runtimeNeeded.add('injectStyle');
-			// Replace the JSXStyleElement init with the class-map ObjectExpression.
-			next = { ...decl, init: createStyleClassMapFromStylesheet(sheet) };
+			// Replace the JSXStyleElement init with the class-map ObjectExpression
+			// (built loc-less by the core helper — it maps to the authored <style>).
+			next = {
+				...decl,
+				init: inheritOriginLoc(createStyleClassMapFromStylesheet(sheet), styleNode),
+			};
 		}
 		if (newDeclarations === null && next !== decl) newDeclarations = declarations.slice(0, i);
 		if (newDeclarations !== null) newDeclarations.push(next);
@@ -7408,12 +7482,8 @@ function wrapScopedClassExprs(node, ctx) {
 							...attr,
 							value: {
 								...attr.value,
-								expression: {
-									type: 'CallExpression',
-									callee: { type: 'Identifier', name: '_$normalizeClass' },
-									arguments: [expr],
-									optional: false,
-								},
+								// The wrapper maps to the class expression it normalizes.
+								expression: inheritOriginLoc(b.call('_$normalizeClass', expr), expr),
 							},
 						};
 						ctx.runtimeNeeded.add('normalizeClass');
@@ -7470,25 +7540,36 @@ function addHashClassToElement(element, hash, classAttrName) {
 	);
 	let newAttrs;
 	if (index === -1) {
+		// A synthesized class attribute maps to the element's opening tag.
 		newAttrs = [
 			...attrs,
-			b.jsx_attribute(b.jsx_id(classAttrName), b.literal(hash, JSON.stringify(hash))),
+			inheritOriginLoc(
+				b.jsx_attribute(b.jsx_id(classAttrName), b.literal(hash, JSON.stringify(hash))),
+				openingElement,
+			),
 		];
 	} else {
 		const existing = attrs[index];
 		const value = existing.value;
 		let newAttr;
 		if (!value) {
-			newAttr = { ...existing, value: { type: 'Literal', value: hash, raw: JSON.stringify(hash) } };
+			newAttr = {
+				...existing,
+				value: inheritOriginLoc(b.literal(hash, JSON.stringify(hash)), existing),
+			};
 		} else if (value.type === 'Literal' && typeof value.value === 'string') {
 			const merged = `${value.value} ${hash}`;
 			newAttr = { ...existing, value: { ...value, value: merged, raw: JSON.stringify(merged) } };
 		} else {
 			const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+			// The template-literal bake maps to the authored class value it wraps.
 			newAttr = {
 				...existing,
-				value: b.jsx_expression_container(
-					b.template([b.quasi('', false), b.quasi(` ${hash}`, true)], [expression]),
+				value: inheritOriginLoc(
+					b.jsx_expression_container(
+						b.template([b.quasi('', false), b.quasi(` ${hash}`, true)], [expression]),
+					),
+					value,
 				),
 			};
 		}
@@ -8373,6 +8454,7 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 							props,
 							guards: [],
 							locals: null,
+							origin: node,
 						});
 					}
 				}
@@ -8443,34 +8525,18 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 		};
 		visit(fn.body);
 	};
-	const assignWarmPlan = (fn, source) => ({
-		type: 'CallExpression',
-		callee: {
-			type: 'MemberExpression',
-			object: { type: 'Identifier', name: 'Object' },
-			property: { type: 'Identifier', name: 'assign' },
-			computed: false,
-			optional: false,
-		},
-		arguments: [
+	// The warm-plan attach maps to the component function it decorates. The
+	// parsed warm expression is compiler text — its parse locs are meaningless
+	// against the authored module — so it inherits the same origin.
+	const assignWarmPlan = (fn, source) =>
+		inheritOriginLoc(
+			b.call(
+				b.member(b.id('Object'), 'assign'),
+				fn,
+				b.object([b.prop('init', b.id('__warm'), stripParseLocs(parseWarmExpression(source)))]),
+			),
 			fn,
-			{
-				type: 'ObjectExpression',
-				properties: [
-					{
-						type: 'Property',
-						key: { type: 'Identifier', name: '__warm' },
-						value: parseWarmExpression(source),
-						kind: 'init',
-						method: false,
-						shorthand: false,
-						computed: false,
-					},
-				],
-			},
-		],
-		optional: false,
-	});
+		);
 
 	const transformFunction = (fn, name, component) => {
 		if (!isFunction(fn) || transformed.has(fn)) return fn;
@@ -8756,25 +8822,20 @@ function collectDepPaths(expr) {
 		}
 		switch (n.type) {
 			case 'Identifier':
-				if (!bound.has(n.name)) push({ type: 'Identifier', name: n.name }, n.name);
+				if (!bound.has(n.name)) push(b.id(n.name), n.name);
 				return;
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
 					if (!bound.has(n.object.name)) {
-						const member = {
-							type: 'MemberExpression',
-							object: { type: 'Identifier', name: n.object.name },
-							property: n.computed
-								? {
-										type: 'Literal',
-										value: propertyName,
-										raw: JSON.stringify(propertyName),
-									}
-								: { type: 'Identifier', name: propertyName },
-							computed: n.computed,
-							optional: n.optional === true,
-						};
+						const member = b.member(
+							b.id(n.object.name),
+							n.computed
+								? b.literal(propertyName, JSON.stringify(propertyName))
+								: b.id(propertyName),
+							n.computed,
+							n.optional === true,
+						);
 						// Optional MemberExpressions must remain inside a ChainExpression.
 						// Besides keeping the synthesized tree valid ESTree, the wrapper
 						// preserves optional-evaluation semantics through later AST passes.
@@ -8947,12 +9008,7 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 			return { ...stmt, expression: rewritten };
 		}
 		if (stmt.type === 'IfStatement') {
-			const not = {
-				type: 'UnaryExpression',
-				operator: '!',
-				prefix: true,
-				argument: stmt.test,
-			};
+			const not = b.unary('!', stmt.test);
 			return {
 				...stmt,
 				consequent: rewriteStmt(stmt.consequent, [...activeGuards, stmt.test]),
@@ -9036,7 +9092,7 @@ function makeCreationMemoCall(
 			const member = depPathMember(dep);
 			const next =
 				member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)
-					? { type: 'Identifier', name: member.object.name }
+					? b.id(member.object.name)
 					: dep;
 			const key = depPathKey(next);
 			if (key !== null && seen.has(key)) continue;
@@ -9060,20 +9116,17 @@ function makeCreationMemoCall(
 			? rtAlias(memoHelper)
 			: requireRuntimeForContext(ctx, memoHelper);
 	creations.push({ symVar, expr, deps, guards: [...guards], locals });
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: memoAlias },
-		arguments: [
-			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: expr },
-			{ type: 'ArrayExpression', elements: deps },
-			{ type: 'Identifier', name: symVar },
-		],
-		optional: false,
-		// Marks a compiler-minted creation memo so the inline hook-memo tier
-		// can later lower the `const x = _$useMemo(…)` statement form to the
-		// closure-free puTake/puPub ABI (production client compile).
-		_octanePuMemo: true,
-	};
+	// The minted memo wrapper maps to the authored creation expression.
+	return inheritOriginLoc(
+		{
+			...b.call(memoAlias, b.arrow([], expr), b.array(deps), b.id(symVar)),
+			// Marks a compiler-minted creation memo so the inline hook-memo tier
+			// can later lower the `const x = _$useMemo(…)` statement form to the
+			// closure-free puTake/puPub ABI (production client compile).
+			_octanePuMemo: true,
+		},
+		expr,
+	);
 }
 
 // ── Pass A′: memoize use()-fed local-const creation chains ─────────────────
@@ -9224,7 +9277,7 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 	// the ordinary collector too: a braceless `var` declaration is a body-local
 	// binding whose identity must coarsen downstream member dependencies.
 	function collectIfCandidates(stmt, guards) {
-		const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+		const not = (e) => b.unary('!', e);
 		collectIfArm(stmt.consequent, [...guards, stmt.test]);
 		if (stmt.alternate) collectIfArm(stmt.alternate, [...guards, not(stmt.test)]);
 	}
@@ -9438,7 +9491,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 					),
 				};
 			case 'JSXIfExpression': {
-				const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+				const not = (e) => b.unary('!', e);
 				const consequent = walkArm(node.consequent, [...guards, node.test]);
 				const alternate = node.alternate
 					? walkArm(node.alternate, [...guards, not(node.test)])
@@ -9532,27 +9585,18 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			const deps = collectDepPaths(expr);
 			const memoAlias = requireRuntimeForContext(ctx, 'puMemo');
 			changed = true;
+			// The minted prop-memo wrapper maps to the authored prop expression.
 			return {
 				...a,
-				value: {
-					type: 'JSXExpressionContainer',
-					expression: {
-						type: 'CallExpression',
-						callee: { type: 'Identifier', name: memoAlias },
-						arguments: [
-							{
-								type: 'ArrowFunctionExpression',
-								params: [],
-								expression: true,
-								async: false,
-								body: expr,
-							},
-							{ type: 'ArrayExpression', elements: deps },
-							{ type: 'Identifier', name: symVar },
-						],
-						optional: false,
-					},
-				},
+				value: inheritOriginLoc(
+					b.jsx_expression_container(
+						inheritOriginLoc(
+							b.call(memoAlias, b.arrow([], expr), b.array(deps), b.id(symVar)),
+							expr,
+						),
+					),
+					a.value,
+				),
 				_octanePropMemo: { expr, deps, symVar },
 			};
 		});
@@ -9569,19 +9613,15 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			const key = a.name.name;
 			if (key === 'ref' || key === 'key') return; // instance-wired props — skip this slot
 			let value;
-			if (a.value == null) value = { type: 'Literal', value: true, raw: 'true' };
+			if (a.value == null) value = b.literal(true, 'true', a);
 			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
 			else if (typeof a.value.value === 'string')
 				// JSX string attrs may hold raw newlines — re-derive a valid raw.
-				value = {
-					type: 'Literal',
-					value: a.value.value,
-					raw: JSON.stringify(a.value.value),
-				};
+				value = b.literal(a.value.value, JSON.stringify(a.value.value), a.value);
 			else value = a.value; // Literal
 			props.push({ key, value, memo: a._octanePropMemo });
 		}
-		warmChildren.push({ compName, props, guards: [...guards], locals });
+		warmChildren.push({ compName, props, guards: [...guards], locals, origin: node });
 	}
 }
 
@@ -9660,15 +9700,10 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 		// same thunk below so it can still warm before setup reaches this registration.
 		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
 		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
-		const registration = {
-			type: 'ExpressionStatement',
-			expression: {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: batchAlias },
-				arguments: [{ type: 'ArrayExpression', elements: [] }, warmThunk],
-				optional: false,
-			},
-		};
+		const registration = inheritOriginLoc(
+			b.stmt(b.call(batchAlias, b.array([]), warmThunk)),
+			warmThunk,
+		);
 		const finalIndex =
 			output.length > 0 && output[output.length - 1].type === 'ReturnStatement'
 				? output.length - 1
@@ -9757,7 +9792,8 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 		// expands that one statement into hoist + batch + unwrap statements, so
 		// introduce the lexical block required to keep them in the guarded arm.
 		const body = transformList([s]);
-		return body.length === 1 ? body[0] : { type: 'BlockStatement', body };
+		// The introduced lexical block maps to the authored arm statement.
+		return body.length === 1 ? body[0] : inheritOriginLoc(b.block(body), s);
 	}
 
 	function emitRun(run, out) {
@@ -9777,46 +9813,25 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 			tempOf.set(m.call, name);
 		}
 		for (const t of temps) {
-			out.push({
-				type: 'VariableDeclaration',
-				kind: 'const',
-				declarations: [
-					{
-						type: 'VariableDeclarator',
-						id: { type: 'Identifier', name: t.name },
-						init: t.init,
-					},
-				],
-			});
+			// The hoisted temp maps to the creation expression it captures.
+			out.push(inheritOriginLoc(b.const(t.name, t.init), t.init));
 		}
 		// Server mirror: `puBatch` registers every unresolved thenable of the run
 		// with the render loop and suspends ONCE (identity-resolved on the next
 		// pass — see runtime.server.ts).
 		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
 		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
-		const batchArgs = [
-			{
-				type: 'ArrayExpression',
-				elements: temps.map((t) => ({ type: 'Identifier', name: t.name })),
-			},
-		];
+		const batchArgs = [b.array(temps.map((t) => b.id(t.name)))];
 		if (firstBatch && warmThunk) batchArgs.push(warmThunk);
 		firstBatch = false;
-		out.push({
-			type: 'ExpressionStatement',
-			expression: {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: batchAlias },
-				arguments: batchArgs,
-				optional: false,
-			},
-		});
+		// The batch registration maps to the run's first creation.
+		out.push(inheritOriginLoc(b.stmt(b.call(batchAlias, ...batchArgs)), temps[0]?.init));
 		for (const m of run.members) {
 			if (!m.call) {
 				out.push(m.stmt);
 				continue;
 			}
-			const tempId = { type: 'Identifier', name: tempOf.get(m.call) };
+			const tempId = inheritOriginLoc(b.id(tempOf.get(m.call)), m.creation);
 			const newCall = { ...m.call, arguments: [tempId, ...m.call.arguments.slice(1)] };
 			if (m.stmt.type === 'VariableDeclaration') {
 				out.push({
@@ -9844,11 +9859,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	const andChain = (guards) =>
 		guards.length === 0
 			? null
-			: guards.reduce(
-					(acc, g) =>
-						acc ? { type: 'LogicalExpression', operator: '&&', left: acc, right: g } : g,
-					null,
-				);
+			: guards.reduce((acc, g) => (acc ? b.logical('&&', acc, g) : g), null);
 
 	const warmMemos = creations.filter(
 		(c) => guardOk(c.guards, c.locals) && isWarmSafeExpr(c.expr, paramNames, locals, c.locals),
@@ -9881,68 +9892,55 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 
 	const stmtFor = (guards, callExpr) => {
 		const g = andChain(guards);
-		const call = { type: 'ExpressionStatement', expression: callExpr };
-		return g ? { type: 'IfStatement', test: g, consequent: call, alternate: null } : call;
+		const call = b.stmt(callExpr);
+		const stmt = g ? b.if(g, call, null) : call;
+		// Statement scaffolding maps to the warmed construct it wraps.
+		return inheritOriginLoc(stmt, callExpr);
 	};
 	const warmMemoAlias = runtimeAliasForContext(ctx, 'warmMemo');
 	const warmChildAlias = runtimeAliasForContext(ctx, 'warmChild');
-	const memoCall = (c) => ({
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: warmMemoAlias },
-		arguments: [
-			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: c.expr },
-			{ type: 'ArrayExpression', elements: c.deps },
-			{ type: 'Identifier', name: c.symVar },
-		],
-		optional: false,
-	});
+	const memoCall = (c) =>
+		inheritOriginLoc(
+			b.call(warmMemoAlias, b.arrow([], c.expr), b.array(c.deps), b.id(c.symVar)),
+			c.expr,
+		);
 	// A memoized prop prints through the value-returning warmMemo form: at warm
 	// time it CLAIMS the render pass's creation for the same slot (or creates
 	// once, adoptable by the render's puMemo) instead of re-evaluating the raw
 	// expression — the warm walk and the render path share one creation.
 	const warmPropValue = (p) =>
 		p.memo
-			? {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: warmMemoAlias },
-					arguments: [
-						{
-							type: 'ArrowFunctionExpression',
-							params: [],
-							expression: true,
-							async: false,
-							body: p.memo.expr,
-						},
-						{ type: 'ArrayExpression', elements: p.memo.deps },
-						{ type: 'Identifier', name: p.memo.symVar },
-					],
-					optional: false,
-				}
+			? inheritOriginLoc(
+					b.call(
+						warmMemoAlias,
+						b.arrow([], p.memo.expr),
+						b.array(p.memo.deps),
+						b.id(p.memo.symVar),
+					),
+					p.memo.expr,
+				)
 			: p.value;
-	const childCall = (w) => ({
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: warmChildAlias },
-		arguments: [
-			{ type: 'Identifier', name: w.compName },
-			{
-				type: 'ObjectExpression',
-				properties: w.props.map((p) => ({
-					type: 'Property',
-					// Non-identifier prop names (aria-*, data-*) must print as
-					// quoted string keys — a bare Identifier would emit `aria-hidden:`.
-					key: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(p.key)
-						? { type: 'Identifier', name: p.key }
-						: { type: 'Literal', value: p.key, raw: JSON.stringify(p.key) },
-					value: warmPropValue(p),
-					kind: 'init',
-					method: false,
-					shorthand: false,
-					computed: false,
-				})),
-			},
-		],
-		optional: false,
-	});
+	const childCall = (w) =>
+		inheritOriginLoc(
+			b.call(
+				warmChildAlias,
+				b.id(w.compName),
+				b.object(
+					w.props.map((p) =>
+						b.prop(
+							'init',
+							// Non-identifier prop names (aria-*, data-*) must print as
+							// quoted string keys — a bare Identifier would emit `aria-hidden:`.
+							/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(p.key)
+								? b.id(p.key)
+								: b.literal(p.key, JSON.stringify(p.key)),
+							warmPropValue(p),
+						),
+					),
+				),
+			),
+			w.origin,
+		);
 
 	if (warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo)))
 		requireRuntimeForContext(ctx, 'warmMemo');
@@ -9953,16 +9951,10 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	const thunk =
 		warmKids.length === 0
 			? null
-			: {
-					type: 'ArrowFunctionExpression',
-					params: [],
-					expression: false,
-					async: false,
-					body: {
-						type: 'BlockStatement',
-						body: warmKids.map((w) => stmtFor(w.guards, childCall(w))),
-					},
-				};
+			: inheritOriginLoc(
+					b.arrow([], b.block(warmKids.map((w) => stmtFor(w.guards, childCall(w))))),
+					node,
+				);
 
 	// The hoisted fetch plan: creations + child calls, params destructured
 	// from the incoming props object. Single-param components only (the norm).
@@ -10174,13 +10166,13 @@ const NUMERIC_HOOK_SLOT_POSITION = {
 	useOptimistic: 2,
 };
 
-function appendHookSlotArgument(name, args, slot, numeric) {
+function appendHookSlotArgument(name, args, slot, numeric, origin) {
 	const out = [...args];
 	const position = numeric ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
 	if (position !== undefined) {
-		while (out.length < position) out.push({ type: 'Identifier', name: 'undefined' });
+		while (out.length < position) out.push(b.id('undefined', origin));
 	}
-	out.push(typeof slot === 'string' ? { type: 'Identifier', name: slot } : slot);
+	out.push(typeof slot === 'string' ? b.id(slot, origin) : inheritOriginLoc(slot, origin));
 	return out;
 }
 
@@ -10456,18 +10448,10 @@ function replaceOwnReturns(node, names) {
 		if (!n.type) return n;
 		if (FN_TYPES.has(n.type)) return n;
 		if (n.type === 'ReturnStatement') {
-			return {
-				type: 'BlockStatement',
-				body: [
-					hkExprStmt(
-						hkAssign(
-							{ type: 'Identifier', name: names.result },
-							n.argument ?? { type: 'Identifier', name: 'undefined' },
-						),
-					),
-					{ type: 'BreakStatement', label: { type: 'Identifier', name: names.label } },
-				],
-			};
+			return b.block([
+				hkExprStmt(hkAssign(b.id(names.result), n.argument ?? b.id('undefined'))),
+				{ type: 'BreakStatement', label: b.id(names.label) },
+			]);
 		}
 		const out = {};
 		for (const key in n) {
@@ -10479,30 +10463,19 @@ function replaceOwnReturns(node, names) {
 }
 
 function hkNumLit(value) {
-	return { type: 'Literal', value, raw: String(value) };
+	return b.literal(value, String(value));
 }
 
 function hkAssign(left, right) {
-	return { type: 'AssignmentExpression', operator: '=', left, right };
+	return b.assignment('=', left, right);
 }
 
 function hkExprStmt(expression) {
-	return { type: 'ExpressionStatement', expression };
+	return b.stmt(expression);
 }
 
-function hkObjectIs(a, b) {
-	return {
-		type: 'CallExpression',
-		callee: {
-			type: 'MemberExpression',
-			object: { type: 'Identifier', name: 'Object' },
-			property: { type: 'Identifier', name: 'is' },
-			computed: false,
-			optional: false,
-		},
-		arguments: [a, b],
-		optional: false,
-	};
+function hkObjectIs(left, right) {
+	return b.call(b.member(b.id('Object'), 'is'), left, right);
 }
 
 // `const x = useMemo(fn, deps)` / `useCallback(fn, deps)` with trustworthy
@@ -10559,23 +10532,9 @@ function hookMemoComputeStatements(entry, ctx, target) {
 	if (fn.body.type !== 'BlockStatement') return [hkExprStmt(hkAssign(target, fn.body))];
 	const names = hookMemoNames(ctx);
 	return [
-		{
-			type: 'VariableDeclaration',
-			kind: 'let',
-			declarations: [
-				{
-					type: 'VariableDeclarator',
-					id: { type: 'Identifier', name: names.result },
-					init: null,
-				},
-			],
-		},
-		{
-			type: 'LabeledStatement',
-			label: { type: 'Identifier', name: names.label },
-			body: replaceOwnReturns(fn.body, names),
-		},
-		hkExprStmt(hkAssign(target, { type: 'Identifier', name: names.result })),
+		b.let(names.result, null),
+		b.labeled(names.label, replaceOwnReturns(fn.body, names)),
+		hkExprStmt(hkAssign(target, b.id(names.result))),
 	];
 }
 
@@ -10603,61 +10562,34 @@ function lowerPuMemoDecl(stmt, ctx) {
 	const takeAlias = requireRuntimeForContext(ctx, `puTake${deps.length}`);
 	const pubAlias = requireRuntimeForContext(ctx, 'puPub');
 	const missAlias = requireRuntimeForContext(ctx, 'puMiss');
-	const temp = (i) => ({ type: 'Identifier', name: hookMemoTemp(ctx, i) });
+	const temp = (i) => b.id(hookMemoTemp(ctx, i));
 	const body = [];
 	if (deps.length > 0) {
-		body.push({
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: deps.map((dep, i) => ({
-				type: 'VariableDeclarator',
-				id: temp(i),
-				init: dep,
-			})),
-		});
+		body.push(
+			b.declaration(
+				'const',
+				deps.map((dep, i) => b.declarator(temp(i), dep)),
+			),
+		);
 	}
 	body.push(
 		hkExprStmt(
-			hkAssign(
-				{ ...decl.id },
-				{
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: takeAlias },
-					arguments: [{ ...slotId }, ...deps.map((_, i) => temp(i))],
-					optional: false,
-				},
-			),
+			hkAssign({ ...decl.id }, b.call(takeAlias, { ...slotId }, ...deps.map((_, i) => temp(i)))),
 		),
 	);
-	body.push({
-		type: 'IfStatement',
-		test: {
-			type: 'BinaryExpression',
-			operator: '===',
-			left: { ...decl.id },
-			right: { type: 'Identifier', name: missAlias },
-		},
-		consequent: hkExprStmt(
-			hkAssign(
-				{ ...decl.id },
-				{
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: pubAlias },
-					arguments: [{ ...slotId }, arrow.body, ...deps.map((_, i) => temp(i))],
-					optional: false,
-				},
+	body.push(
+		b.if(
+			b.binary('===', { ...decl.id }, b.id(missAlias)),
+			hkExprStmt(
+				hkAssign(
+					{ ...decl.id },
+					b.call(pubAlias, { ...slotId }, arrow.body, ...deps.map((_, i) => temp(i))),
+				),
 			),
+			null,
 		),
-		alternate: null,
-	});
-	return [
-		{
-			type: 'VariableDeclaration',
-			kind: 'let',
-			declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
-		},
-		{ type: 'BlockStatement', body },
-	];
+	);
+	return [b.let(decl.id, null), b.block(body)];
 }
 
 function lowerAuthoredHookMemo(stmt, ctx) {
@@ -10673,87 +10605,41 @@ function lowerAuthoredHookMemo(stmt, ctx) {
 			return [{ ...stmt, declarations: [{ ...decl, init }] }];
 		}
 		return [
-			{
-				type: 'VariableDeclaration',
-				kind: 'let',
-				declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
-			},
-			{
-				type: 'BlockStatement',
-				body: [...hookMemoComputeStatements(entry, ctx, { ...decl.id })],
-			},
+			b.let(decl.id, null),
+			b.block([...hookMemoComputeStatements(entry, ctx, { ...decl.id })]),
 		];
 	}
 	const names = hookMemoNames(ctx);
 	const base = ctx.currentHookMemoOffset;
 	const k = deps.length;
 	ctx.currentHookMemoOffset = base + k + 2;
-	const cellRef = (i) => ({
-		type: 'MemberExpression',
-		object: { type: 'Identifier', name: names.cache },
-		property: hkNumLit(i),
-		computed: true,
-		optional: false,
-	});
+	const cellRef = (i) => b.member(b.id(names.cache), hkNumLit(i), true);
 	const valueCell = () => cellRef(base + 1 + k);
 	const body = [];
 	if (k > 0) {
-		body.push({
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: deps.map((dep, i) => ({
-				type: 'VariableDeclarator',
-				id: { type: 'Identifier', name: hookMemoTemp(ctx, i) },
-				init: dep,
-			})),
-		});
-	}
-	let missTest = {
-		type: 'BinaryExpression',
-		operator: '!==',
-		left: cellRef(base),
-		right: { type: 'Literal', value: true, raw: 'true' },
-	};
-	for (let i = 0; i < k; i++) {
-		missTest = {
-			type: 'LogicalExpression',
-			operator: '||',
-			left: missTest,
-			right: {
-				type: 'UnaryExpression',
-				operator: '!',
-				prefix: true,
-				argument: hkObjectIs(cellRef(base + 1 + i), {
-					type: 'Identifier',
-					name: hookMemoTemp(ctx, i),
-				}),
-			},
-		};
-	}
-	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
-	for (let i = 0; i < k; i++) {
-		missBody.push(
-			hkExprStmt(
-				hkAssign(cellRef(base + 1 + i), { type: 'Identifier', name: hookMemoTemp(ctx, i) }),
+		body.push(
+			b.declaration(
+				'const',
+				deps.map((dep, i) => b.declarator(b.id(hookMemoTemp(ctx, i)), dep)),
 			),
 		);
 	}
-	missBody.push(hkExprStmt(hkAssign(cellRef(base), { type: 'Literal', value: true, raw: 'true' })));
-	body.push({
-		type: 'IfStatement',
-		test: missTest,
-		consequent: { type: 'BlockStatement', body: missBody },
-		alternate: null,
-	});
+	let missTest = b.binary('!==', cellRef(base), b.literal(true, 'true'));
+	for (let i = 0; i < k; i++) {
+		missTest = b.logical(
+			'||',
+			missTest,
+			b.unary('!', hkObjectIs(cellRef(base + 1 + i), b.id(hookMemoTemp(ctx, i)))),
+		);
+	}
+	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
+	for (let i = 0; i < k; i++) {
+		missBody.push(hkExprStmt(hkAssign(cellRef(base + 1 + i), b.id(hookMemoTemp(ctx, i)))));
+	}
+	missBody.push(hkExprStmt(hkAssign(cellRef(base), b.literal(true, 'true'))));
+	body.push(b.if(missTest, b.block(missBody), null));
 	body.push(hkExprStmt(hkAssign({ ...decl.id }, valueCell())));
-	return [
-		{
-			type: 'VariableDeclaration',
-			kind: 'let',
-			declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
-		},
-		{ type: 'BlockStatement', body },
-	];
+	return [b.let(decl.id, null), b.block(body)];
 }
 
 // The statement walker: recurses into conditional blocks (conditional hooks
@@ -10783,11 +10669,14 @@ function inlineHookMemoPass(stmts, ctx, authoredTier) {
 		if (stmt.type === 'BlockStatement') {
 			return [{ ...stmt, body: inlineHookMemoPass(stmt.body, ctx, authoredTier) }];
 		}
+		// Lowered scaffolding inherits the authored statement's origin; authored
+		// subtrees grafted into it keep their exact positions (inheritOriginLoc
+		// stops at located nodes).
 		const pu = lowerPuMemoDecl(stmt, ctx);
-		if (pu !== null) return pu;
+		if (pu !== null) return pu.map((lowered) => inheritOriginLoc(lowered, stmt));
 		if (authoredTier) {
 			const lowered = lowerAuthoredHookMemo(stmt, ctx);
-			if (lowered !== null) return lowered;
+			if (lowered !== null) return lowered.map((s) => inheritOriginLoc(s, stmt));
 		}
 		return [stmt];
 	}
@@ -10806,7 +10695,17 @@ function inlineHookMemoPass(stmts, ctx, authoredTier) {
 function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 	const stateGetterMarks = markStateGetterUsage(node, ctx);
 	const localSlotMarks = markHookSlotLocality(node, localRoot);
-	return mapAst(node, (n) => {
+	// Every replacement's minted scaffolding (withSlot wrappers, getter-helper
+	// callees, slot identifiers) inherits the rewritten call's origin; inner
+	// nodes already carrying a location — authored args and nested rewrites —
+	// keep theirs.
+	const rewrite = (n) => {
+		const replaced = rewriteHookCallNode(n);
+		return replaced == null || replaced === n ? replaced : inheritOriginLoc(replaced, n);
+	};
+	return mapAst(node, rewrite);
+
+	function rewriteHookCallNode(n) {
 		// First-class subtemplates have their own compileFunctionBody pass. Leave
 		// their contents untouched here so hook sites are slotted exactly once and
 		// conservatively retain the globally composable helper ABI.
@@ -10887,7 +10786,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				let slot;
 				if (numericSlot) {
 					const id = ctx.nextHookSymId++;
-					slot = { type: 'Literal', value: id, raw: String(id) };
+					slot = b.literal(id, String(id));
 				} else {
 					const debug = isServerUse
 						? `${profileOwner}.use#${ctx.nextHookSymId}`
@@ -10922,27 +10821,17 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					// need no wrapper). The TRAILING `sym` is retained so existing library
 					// bindings that extract the slot from their last argument keep working.
 					const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
-					return {
-						type: 'CallExpression',
-						callee: { type: 'Identifier', name: withSlotAlias },
-						arguments: [
-							{ type: 'Identifier', name: symVar },
-							n.callee,
-							...args,
-							{ type: 'Identifier', name: symVar },
-						],
-						optional: false,
-					};
+					return b.call(withSlotAlias, b.id(symVar), n.callee, ...args, b.id(symVar));
 				}
 				return {
 					...n,
 					callee:
 						getterHelper !== null
-							? { type: 'Identifier', name: runtimeAliasForContext(ctx, getterHelper) }
+							? b.id(runtimeAliasForContext(ctx, getterHelper))
 							: n.callee._octaneGenerated
-								? { type: 'Identifier', name: runtimeAliasForContext(ctx, name) }
+								? b.id(runtimeAliasForContext(ctx, name))
 								: n.callee,
-					arguments: appendHookSlotArgument(name, args, slot, numericSlot),
+					arguments: appendHookSlotArgument(name, args, slot, numericSlot, n),
 				};
 			}
 		}
@@ -10975,7 +10864,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				let slot;
 				if (numericSlot) {
 					const id = ctx.nextHookSymId++;
-					slot = { type: 'Literal', value: id, raw: String(id) };
+					slot = b.literal(id, String(id));
 				} else {
 					slot = allocHookSymbol(
 						ctx,
@@ -10994,10 +10883,8 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				return {
 					...n,
 					callee:
-						getterHelper !== null
-							? { type: 'Identifier', name: runtimeAliasForContext(ctx, getterHelper) }
-							: n.callee,
-					arguments: appendHookSlotArgument(name, args, slot, numericSlot),
+						getterHelper !== null ? b.id(runtimeAliasForContext(ctx, getterHelper)) : n.callee,
+					arguments: appendHookSlotArgument(name, args, slot, numericSlot, n),
 				};
 			}
 		}
@@ -11036,29 +10923,14 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 			const object = rewriteHookCalls(n.callee.object, ctx, componentName, localRoot);
 			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, localRoot));
-			return {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: withSlotAlias },
-				arguments: [
-					{ type: 'Identifier', name: symVar },
-					{
-						type: 'ArrowFunctionExpression',
-						params: [],
-						expression: true,
-						async: false,
-						body: {
-							type: 'CallExpression',
-							callee: { ...n.callee, object },
-							arguments: [...args, { type: 'Identifier', name: symVar }],
-							optional: false,
-						},
-					},
-				],
-				optional: false,
-			};
+			return b.call(
+				withSlotAlias,
+				b.id(symVar),
+				b.arrow([], b.call({ ...n.callee, object }, ...args, b.id(symVar))),
+			);
 		}
 		return null;
-	});
+	}
 }
 
 // Compile a plain return-JSX function "as just a function": slot its hooks (withSlot)
@@ -11103,14 +10975,11 @@ function compileReturnJsxFunction(node, ctx, options) {
 		}
 		return rewriteJsxValues(h, ctx);
 	});
-	const fn = {
-		type: 'FunctionDeclaration',
-		id: node.id,
-		params: node.params,
-		async: false,
-		generator: false,
-		body: { type: 'BlockStatement', body: newStatements },
-	};
+	// The rebuilt function shell maps to the authored declaration.
+	const fn = inheritOriginLoc(
+		b.function_declaration(node.id, node.params, b.block(newStatements)),
+		node,
+	);
 	// Print with esrap's real per-token map (same output bytes as printNode) so
 	// this function contributes segments to the module map — compile() drains
 	// them via ctx._setupMaps, exactly like a component's setup statements.
@@ -11278,11 +11147,7 @@ function lowerReturnJsx(node, ctx, compInlinedSubs, cssHash = null) {
 
 function memberProps(hn, src) {
 	return {
-		type: 'MemberExpression',
-		object: { type: 'Identifier', name: 'props' },
-		property: { type: 'Identifier', name: hn },
-		computed: false,
-		optional: false,
+		...b.member(b.id('props'), hn),
 		// Carry the ORIGINAL expression's source position onto the synthetic `props.hN`
 		// node so the extracted fragment keeps it (dev hydration LOC / DevTools). Without
 		// this, fragment extraction would silently drop the upstream position.
@@ -11290,15 +11155,7 @@ function memberProps(hn, src) {
 	};
 }
 function objectProp(hn, valNode) {
-	return {
-		type: 'Property',
-		key: { type: 'Identifier', name: hn },
-		value: valNode,
-		kind: 'init',
-		method: false,
-		shorthand: false,
-		computed: false,
-	};
+	return b.prop('init', b.id(hn), valNode);
 }
 
 // Walk a host element or JSX fragment, replacing each DYNAMIC part (an
@@ -11350,7 +11207,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				...attr,
 				value:
 					v.type === 'JSXExpressionContainer'
-						? { type: 'JSXExpressionContainer', expression: memberProps(hn, inner) }
+						? b.jsx_expression_container(memberProps(hn, inner))
 						: memberProps(hn, inner),
 			});
 		}
@@ -11385,14 +11242,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			if (expr && expr.type === 'TSAsExpression') {
 				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
 				holeProps.push(objectProp(hn, rewriteJsxValues(expr.expression, ctx)));
-				newChildren.push({
-					type: 'JSXExpressionContainer',
-					expression: {
-						type: 'TSAsExpression',
-						expression: memberProps(hn, expr.expression),
-						typeAnnotation: expr.typeAnnotation,
-					},
-				});
+				newChildren.push(
+					b.jsx_expression_container(
+						b.ts_as(memberProps(hn, expr.expression), expr.typeAnnotation),
+					),
+				);
 			} else {
 				holeProps.push(objectProp(hn, rewriteJsxValues(expr, ctx)));
 				// A hole the compiler proved is a string (concat / template / tracked
@@ -11402,13 +11256,9 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				// a renderable childSlot, preserving byte-equality with the inline form.
 				const member = memberProps(hn, expr);
 				const rendered = isKnownStringExpression(expr, ctx.knownStringLocals)
-					? {
-							type: 'TSAsExpression',
-							expression: member,
-							typeAnnotation: { type: 'TSStringKeyword' },
-						}
+					? b.ts_as(member, b.ts_keyword_type('string'))
 					: member;
-				newChildren.push({ type: 'JSXExpressionContainer', expression: rendered });
+				newChildren.push(b.jsx_expression_container(rendered));
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
 			if (isLongFormTemplateSentinel(child, childNs)) {
@@ -11428,7 +11278,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			} else if (isComponentTag(child)) {
 				const hn = `h${holeProps.length}`;
 				holeProps.push(objectProp(hn, jsxElementToCreateElement(child, ctx)));
-				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn, child) });
+				newChildren.push(b.jsx_expression_container(memberProps(hn, child)));
 			} else {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			}
@@ -11469,11 +11319,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const condHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(condHole, rewriteJsxValues(ic.condTest, ctx)));
 			const thenHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(thenHole, { type: 'Identifier', name: ic.thenHelper }));
+			holeProps.push(objectProp(thenHole, b.id(ic.thenHelper)));
 			let elseHoleName = null;
 			if (ic.elseHelper) {
 				elseHoleName = `h${holeProps.length}`;
-				holeProps.push(objectProp(elseHoleName, { type: 'Identifier', name: ic.elseHelper }));
+				holeProps.push(objectProp(elseHoleName, b.id(ic.elseHelper)));
 			}
 			// Renderer-side, the call reads everything from `props.hN`.
 			ic.condExpr = `props.${condHole}`;
@@ -11484,12 +11334,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// renderer-side call passes current values (same as deps for @for).
 			if (ic.envNames && ic.envNames.length) {
 				const envHole = `h${holeProps.length}`;
-				holeProps.push(
-					objectProp(envHole, {
-						type: 'ArrayExpression',
-						elements: ic.envNames.map((n) => ({ type: 'Identifier', name: n })),
-					}),
-				);
+				holeProps.push(objectProp(envHole, b.array(ic.envNames.map((n) => b.id(n)))));
 				ic.envExpr = `props.${envHole}`;
 			}
 			fc.directiveCalls.ifCalls.push(ic);
@@ -11524,12 +11369,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const itemsHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
 			const bodyHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(bodyHole, { type: 'Identifier', name: rec.bodyHelper }));
+			holeProps.push(objectProp(bodyHole, b.id(rec.bodyHelper)));
 			rec.itemsExpr = `props.${itemsHole}`;
 			rec.bodyHelper = `props.${bodyHole}`;
 			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
 				const emptyHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(emptyHole, { type: 'Identifier', name: rec.emptyHelper }));
+				holeProps.push(objectProp(emptyHole, b.id(rec.emptyHelper)));
 				rec.emptyHelper = `props.${emptyHole}`;
 			}
 			const dependencyHoles = new Map();
@@ -11537,7 +11382,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				const existing = dependencyHoles.get(name);
 				if (existing !== undefined) return existing;
 				const depHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(depHole, { type: 'Identifier', name }));
+				holeProps.push(objectProp(depHole, b.id(name)));
 				const expression = `props.${depHole}`;
 				dependencyHoles.set(name, expression);
 				return expression;
@@ -11581,29 +11426,25 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			rec.discExpr = `props.${discHole}`;
 			const casesHole = `h${holeProps.length}`;
 			holeProps.push(
-				objectProp(casesHole, {
-					type: 'ArrayExpression',
-					elements: rec.caseRecords.map((cr) => ({
-						type: 'ArrayExpression',
-						elements: [rewriteJsxValues(cr.testNode, ctx), { type: 'Identifier', name: cr.helper }],
-					})),
-				}),
+				objectProp(
+					casesHole,
+					b.array(
+						rec.caseRecords.map((cr) =>
+							b.array([rewriteJsxValues(cr.testNode, ctx), b.id(cr.helper)]),
+						),
+					),
+				),
 			);
 			rec.casesArrayExpr = `props.${casesHole}`;
 			if (rec.defaultHelper && rec.defaultHelper !== 'null') {
 				const defHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(defHole, { type: 'Identifier', name: rec.defaultHelper }));
+				holeProps.push(objectProp(defHole, b.id(rec.defaultHelper)));
 				rec.defaultHelper = `props.${defHole}`;
 			}
 			// Phase 2: env tuple hole (see the @if fold above).
 			if (rec.envNames && rec.envNames.length) {
 				const envHole = `h${holeProps.length}`;
-				holeProps.push(
-					objectProp(envHole, {
-						type: 'ArrayExpression',
-						elements: rec.envNames.map((n) => ({ type: 'Identifier', name: n })),
-					}),
-				);
+				holeProps.push(objectProp(envHole, b.array(rec.envNames.map((n) => b.id(n)))));
 				rec.envExpr = `props.${envHole}`;
 			}
 			fc.directiveCalls.switchCalls.push(rec);
@@ -11630,27 +11471,22 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 					: child;
 			const rec = makeTryCall(tryNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const tryHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(tryHole, { type: 'Identifier', name: rec.tryHelper }));
+			holeProps.push(objectProp(tryHole, b.id(rec.tryHelper)));
 			rec.tryHelper = `props.${tryHole}`;
 			if (rec.catchHelper && rec.catchHelper !== 'null') {
 				const catchHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(catchHole, { type: 'Identifier', name: rec.catchHelper }));
+				holeProps.push(objectProp(catchHole, b.id(rec.catchHelper)));
 				rec.catchHelper = `props.${catchHole}`;
 			}
 			if (rec.pendingHelper && rec.pendingHelper !== 'null') {
 				const pendHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(pendHole, { type: 'Identifier', name: rec.pendingHelper }));
+				holeProps.push(objectProp(pendHole, b.id(rec.pendingHelper)));
 				rec.pendingHelper = `props.${pendHole}`;
 			}
 			// Phase 2: env tuple hole (see the @if fold above).
 			if (rec.envNames && rec.envNames.length) {
 				const envHole = `h${holeProps.length}`;
-				holeProps.push(
-					objectProp(envHole, {
-						type: 'ArrayExpression',
-						elements: rec.envNames.map((n) => ({ type: 'Identifier', name: n })),
-					}),
-				);
+				holeProps.push(objectProp(envHole, b.array(rec.envNames.map((n) => b.id(n)))));
 				rec.envExpr = `props.${envHole}`;
 			}
 			fc.directiveCalls.tryCalls.push(rec);
@@ -11680,8 +11516,7 @@ function extractFragmentComponent(node, ctx, holeProps, parentNs = 'html') {
 	holeProps.push(objectProp(componentHole, rewriteJsxValues(jsxNameToExpr(sourceName), ctx)));
 	const extracted = extractFragment(node, ctx, holeProps, parentNs);
 	const dynamicName = {
-		type: 'JSXExpressionContainer',
-		expression: memberProps(componentHole, sourceName),
+		...b.jsx_expression_container(memberProps(componentHole, sourceName)),
 		isDynamic: true,
 	};
 	const out = { ...extracted, id: dynamicName };
@@ -11730,16 +11565,18 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 	const rendererEl = extractFragmentRoot(node, ctx, holeProps, parentNs);
 	ctx._foldCtx = prevFold;
 	const fragName = `_frag$${ctx.nextFragId++}`;
-	const synthFn = {
-		type: 'FunctionDeclaration',
-		id: { type: 'Identifier', name: fragName },
-		params: [{ type: 'Identifier', name: 'props' }],
-		async: false,
-		generator: false,
-		// `foldedDirectives` carries the pre-built directive records to the renderer's
-		// compileFunctionBody → emitElementHtml (via ctx._foldedDirectiveCalls).
-		body: { type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
-	};
+	// The synthetic fragment renderer shell maps to the fragment's root node.
+	const synthFn = inheritOriginLoc(
+		b.function_declaration(b.id(fragName), [b.id('props')], {
+			// `foldedDirectives` carries the pre-built directive records to the renderer's
+			// compileFunctionBody → emitElementHtml (via ctx._foldedDirectiveCalls).
+			type: 'JSXCodeBlock',
+			body: [],
+			render: rendererEl,
+			foldedDirectives: directiveCalls,
+		}),
+		node,
+	);
 	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
@@ -11751,15 +11588,8 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		ctx.hoistedHelpers.push(renderer);
 	}
 	ctx.runtimeNeeded.add('createElement');
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$createElement' },
-		arguments: [
-			{ type: 'Identifier', name: fragName },
-			{ type: 'ObjectExpression', properties: holeProps },
-		],
-		optional: false,
-	};
+	// The fragment-renderer call maps to the authored fragment root.
+	return inheritOriginLoc(b.call('_$createElement', b.id(fragName), b.object(holeProps)), node);
 }
 
 /**
@@ -11783,13 +11613,14 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 			const helperName = `__tsrx$${ctx.nextHelperId++}`;
 			const fakeBody = {
 				type: 'Component',
-				id: { type: 'Identifier', name: helperName },
+				id: b.id(helperName),
 				params: [],
 				body: n.children || [],
 			};
 			const fn = compileFunctionBody(fakeBody, ctx, helperName);
 			inlinedSubs.push(fn + ';');
-			return { type: 'Identifier', name: helperName };
+			// The hoisted-helper reference maps to the authored sub-template.
+			return inheritOriginLoc(b.id(helperName), n);
 		}
 		if (n.type === 'ArrowFunctionExpression' && n.body && n.body.type === 'JSXCodeBlock') {
 			// `() => @{ … }` — new sub-template form. Hoist as a regular component
@@ -11798,13 +11629,13 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 			const helperName = `__tsrx$${ctx.nextHelperId++}`;
 			const fakeBody = {
 				type: 'FunctionDeclaration',
-				id: { type: 'Identifier', name: helperName },
+				id: b.id(helperName),
 				params: n.params || [],
 				body: n.body,
 			};
 			const fn = compileFunctionBody(fakeBody, ctx, helperName);
 			inlinedSubs.push(fn + ';');
-			return { type: 'Identifier', name: helperName };
+			return inheritOriginLoc(b.id(helperName), n);
 		}
 		return null;
 	});
@@ -11884,13 +11715,7 @@ function lowerSetupValueDirectives(node, lowerDirective) {
 		}
 		if (isFunctionNode(current)) return current;
 		if (SETUP_VALUE_DIRECTIVE_TYPES.has(current.type)) {
-			return {
-				type: 'JSXExpressionContainer',
-				expression: lowerDirective(current),
-				loc: current.loc,
-				start: current.start,
-				end: current.end,
-			};
+			return b.jsx_expression_container(lowerDirective(current), current);
 		}
 		let out = current;
 		for (const key in current) {
@@ -11951,7 +11776,7 @@ function lowerJsxChild(child, ctx) {
 		const v = child.value != null ? child.value : child.raw;
 		if (v == null) return null;
 		if (/^\s*$/.test(v) && /[\n\r]/.test(v)) return null;
-		return { type: 'Literal', value: v };
+		return b.literal(v, undefined, child);
 	}
 	if (t === 'JSXExpressionContainer') {
 		if (!child.expression || child.expression.type === 'JSXEmptyExpression') return null;
@@ -11970,12 +11795,7 @@ function lowerJsxChild(child, ctx) {
 		// runtime-built arrays (`.map()` results). Emitted in BOTH modes — the
 		// server export is the identity (`ssrChild` just renders the array).
 		ctx.runtimeNeeded.add('positionalChildren');
-		return {
-			type: 'CallExpression',
-			callee: { type: 'Identifier', name: rtAlias('positionalChildren') },
-			arguments: [{ type: 'ArrayExpression', elements: els }],
-			optional: false,
-		};
+		return inheritOriginLoc(b.call(rtAlias('positionalChildren'), b.array(els)), child);
 	}
 	return null; // Comment / unknown — drop.
 }
@@ -11983,22 +11803,18 @@ function lowerJsxChild(child, ctx) {
 // Convert a JSX tag name node to a plain expression node esrap can print.
 function jsxNameToExpr(name) {
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
-		return { type: 'Identifier', name: name.name };
+		return inheritOriginLoc(b.id(name.name), name);
 	}
 	if (name.type === 'MemberExpression' || name.type === 'JSXMemberExpression') {
 		const prop = name.property;
-		return {
-			type: 'MemberExpression',
-			object: jsxNameToExpr(name.object),
-			property:
-				prop && prop.type ? jsxNameToExpr(prop) : { type: 'Identifier', name: String(prop) },
-			computed: false,
-			optional: false,
-		};
+		return b.member(
+			jsxNameToExpr(name.object),
+			prop && prop.type ? jsxNameToExpr(prop) : b.id(String(prop)),
+		);
 	}
 	// `<{expr}/>` — dynamic tag carries the expression directly.
 	if (name.type === 'JSXExpressionContainer') return name.expression;
-	return { type: 'Identifier', name: String(name.name || name) };
+	return b.id(String(name.name || name));
 }
 
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
@@ -12011,7 +11827,10 @@ function jsxElementToCreateElement(node, ctx) {
 	// component (capitalized / member / dynamic) → the identifier/member ref.
 	const compNode = componentTag
 		? jsxNameToExpr(nameNode)
-		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
+		: inheritOriginLoc(
+				b.literal(nameNode.name != null ? nameNode.name : String(nameNode)),
+				nameNode,
+			);
 	if (!componentTag) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
@@ -12020,7 +11839,7 @@ function jsxElementToCreateElement(node, ctx) {
 	const properties = [];
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			properties.push({ type: 'SpreadElement', argument: rewriteJsxValues(attr.argument, ctx) });
+			properties.push(b.spread(rewriteJsxValues(attr.argument, ctx)));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -12030,7 +11849,7 @@ function jsxElementToCreateElement(node, ctx) {
 		// renderer's applyDeoptProps attaches it).
 		let valNode;
 		if (attr.value == null) {
-			valNode = { type: 'Literal', value: true };
+			valNode = inheritOriginLoc(b.literal(true), attr);
 		} else if (
 			attr.value.type !== 'JSXExpressionContainer' &&
 			typeof attr.value.value === 'string'
@@ -12038,49 +11857,44 @@ function jsxElementToCreateElement(node, ctx) {
 			// JSX string attributes may contain raw newlines (multi-line class
 			// strings); the parser's `raw` is the raw JSX slice, which is not a
 			// valid JS string literal. Re-derive raw from the cooked value.
-			valNode = {
-				type: 'Literal',
-				value: attr.value.value,
-				raw: JSON.stringify(attr.value.value),
-			};
+			valNode = inheritOriginLoc(
+				b.literal(attr.value.value, JSON.stringify(attr.value.value)),
+				attr.value,
+			);
 		} else {
 			const inner =
 				attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
 			valNode = rewriteJsxValues(inner, ctx);
 		}
 		const keyIsIdent = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName);
-		properties.push({
-			type: 'Property',
-			key: keyIsIdent
-				? { type: 'Identifier', name: attrName }
-				: { type: 'Literal', value: attrName },
-			value: valNode,
-			kind: 'init',
-			method: false,
-			shorthand: false,
-			computed: false,
-		});
+		properties.push(
+			inheritOriginLoc(
+				b.prop(
+					'init',
+					keyIsIdent
+						? inheritOriginLoc(b.id(attrName), attr.name)
+						: inheritOriginLoc(b.literal(attrName), attr.name),
+					valNode,
+				),
+				attr,
+			),
+		);
 	}
 	if (ctx.dev && !componentTag) {
 		const classification = ctx.nativeChangeClassifications?.get(
 			node.start ?? node.openingElement?.start,
 		);
 		if (classification === 'statically-warned' || classification === 'runtime-check') {
-			properties.push({
-				type: 'Property',
-				key: { type: 'Identifier', name: '__octaneNativeChangeDiagnostic' },
-				value: {
-					type: 'Literal',
-					value: classification === 'statically-warned' ? 'static' : 'runtime',
-				},
-				kind: 'init',
-				method: false,
-				shorthand: false,
-				computed: false,
-			});
+			properties.push(
+				b.prop(
+					'init',
+					b.id('__octaneNativeChangeDiagnostic'),
+					b.literal(classification === 'statically-warned' ? 'static' : 'runtime'),
+				),
+			);
 		}
 	}
-	const args = [compNode, { type: 'ObjectExpression', properties }];
+	const args = [compNode, b.object(properties)];
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
 	// string). The runtime collects these into `descriptor.children`.
@@ -12093,7 +11907,7 @@ function jsxElementToCreateElement(node, ctx) {
 		// the same whole-script neutralization.
 		const content = normalizeStaticScriptDescriptorContent(authoredStaticScriptContent);
 		if (content !== '') {
-			args.push({ type: 'Literal', value: content });
+			args.push(b.literal(content));
 		}
 	} else {
 		for (const child of node.children || []) {
@@ -12104,12 +11918,9 @@ function jsxElementToCreateElement(node, ctx) {
 			if (lowered !== null) args.push(lowered);
 		}
 	}
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$createElement' },
-		arguments: args,
-		optional: false,
-	};
+	// Remaining scaffolding (callee, props object, spread/diagnostic wrappers,
+	// static-content literals) maps to the authored JSX element.
+	return inheritOriginLoc(b.call('_$createElement', ...args), node);
 }
 
 // Short, unique, path-free slot description for non-HMR output: a djb2 hash of
@@ -12331,22 +12142,18 @@ function headTextExpression(el) {
 				.replace(/^\n+/, '')
 				.replace(/\n+$/, '')
 				.replace(/\n+/g, ' ');
-			if (normalized !== '') parts.push({ type: 'Literal', value: normalized });
+			if (normalized !== '') parts.push(b.literal(normalized, undefined, c));
 		} else if (c.type === 'JSXExpressionContainer') {
 			if (c.expression && c.expression.type !== 'JSXEmptyExpression') parts.push(c.expression);
 		} else if (c.type === 'Literal' || c.type === 'StringLiteral') {
-			parts.push({ type: 'Literal', value: c.value });
+			parts.push(b.literal(c.value, undefined, c));
 		}
 	}
-	if (parts.length === 0) return { type: 'Literal', value: null };
+	if (parts.length === 0) return b.literal(null, undefined, el);
 	let expression = parts[0];
 	for (let i = 1; i < parts.length; i++) {
-		expression = {
-			type: 'BinaryExpression',
-			operator: '+',
-			left: expression,
-			right: parts[i],
-		};
+		// The concat spine maps to the authored element the text belongs to.
+		expression = inheritOriginLoc(b.binary('+', expression, parts[i]), el);
 	}
 	return expression;
 }
@@ -12360,28 +12167,24 @@ function deferredHeadAttrs(el) {
 	const properties = [];
 	for (const attr of el.openingElement.attributes || []) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			properties.push({ type: 'SpreadElement', argument: attr.argument });
+			properties.push(b.spread(attr.argument));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
 		if (attrName === 'key') continue;
 		let value;
-		if (attr.value == null) value = { type: 'Literal', value: true };
+		if (attr.value == null) value = b.literal(true);
 		else value = attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
-		properties.push({
-			type: 'Property',
-			key: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName)
-				? { type: 'Identifier', name: attrName }
-				: { type: 'Literal', value: attrName },
-			value,
-			kind: 'init',
-			method: false,
-			shorthand: false,
-			computed: false,
-		});
+		properties.push(
+			b.prop(
+				'init',
+				/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName) ? b.id(attrName) : b.literal(attrName),
+				value,
+			),
+		);
 	}
-	return { type: 'ObjectExpression', properties };
+	return b.object(properties);
 }
 
 // Replace a namespace-ambiguous <title> with an internal component. A normal
@@ -12404,28 +12207,24 @@ function deferredTitleElement(el, ctx) {
 		}
 	}
 	const args = [
-		{ type: 'Literal', value: headKey(el, 0) },
-		{ type: 'Literal', value: 'title' },
+		b.literal(headKey(el, 0)),
+		b.literal('title'),
 		deferredHeadAttrs(el),
 		headTextExpression(el),
 	];
 	if (authoredKey !== null) args.push(authoredKey);
-	const expression = {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: rtAlias('namespaceHeadElement') },
-		arguments: args,
-		optional: false,
-		loc: el.openingElement.loc,
-		start: el.openingElement.start,
-		end: el.openingElement.end,
-	};
-	return {
-		type: 'JSXExpressionContainer',
-		expression,
-		loc: el.loc,
-		start: el.start,
-		end: el.end,
-	};
+	// Scaffolding (key/tag literals, attr-object wrappers) maps to the
+	// authored opening tag; authored attr values keep their exact positions.
+	const expression = inheritOriginLoc(
+		{
+			...b.call(rtAlias('namespaceHeadElement'), ...args),
+			loc: el.openingElement.loc,
+			start: el.openingElement.start,
+			end: el.openingElement.end,
+		},
+		el.openingElement,
+	);
+	return b.jsx_expression_container(expression, el);
 }
 
 function opaqueHostChildNamespace(tag, namespace) {
@@ -12628,10 +12427,16 @@ function normalizeChildren(nodes, inSvg = false) {
 		if (!n) continue;
 		if (n.type === 'JSXText') {
 			if (/^\s*$/.test(n.value)) continue;
-			out.push({
-				type: 'Text',
-				expression: { type: 'Literal', value: n.value, raw: JSON.stringify(n.value) },
-			});
+			// The Text node and its literal map to the authored JSX text.
+			out.push(
+				inheritOriginLoc(
+					{
+						type: 'Text',
+						expression: b.literal(n.value, JSON.stringify(n.value), n),
+					},
+					n,
+				),
+			);
 		} else if (n.type === 'JSXExpressionContainer') {
 			// A JSX comment — `{/* … */}` — parses as a container wrapping a
 			// `JSXEmptyExpression`. It produces NO child (React drops it); emitting it
@@ -15401,7 +15206,7 @@ function emitElementHtml(
 				classBeforeSpread ||
 				(ctx.dev && needsDevStaticAttrValidation(attrName, true, tag, hostNs))
 			) {
-				inner = { type: 'Literal', value: true, raw: 'true' };
+				inner = b.literal(true, 'true', attr);
 			} else {
 				attrHtml += bakeStaticAttr(attrName, true, tag, hostNs);
 				continue;
@@ -15944,10 +15749,7 @@ function emitElementHtml(
 					// Lower `{cond ? A : B}` (where A or B is JSX) to an IfStatement so
 					// each branch renders real DOM via the existing ifBlock machinery.
 					const asIf = {
-						type: 'IfStatement',
-						test: expr.test,
-						consequent: wrapAsBlockStmt(expr.consequent),
-						alternate: wrapAsBlockStmt(expr.alternate),
+						...b.if(expr.test, wrapAsBlockStmt(expr.consequent), wrapAsBlockStmt(expr.alternate)),
 						loc: expr.loc, // carry source position for dev hydration-mismatch LOC
 					};
 					const ic = makeIfCall(asIf, ctx, inlinedSubs, childNs, cssHash);
@@ -16067,7 +15869,7 @@ function helperCaptures(ctx, stmts, params) {
 	if (!ctx.currentComponentLocals) return null;
 	const scope = new Set();
 	for (const p of params || []) collectBindings(p, scope);
-	const free = collectFreeIdentifiers({ type: 'BlockStatement', body: stmts }, scope);
+	const free = collectFreeIdentifiers(b.block(stmts), scope);
 	const env = [];
 	for (const n of free) {
 		if (ctx.currentComponentLocals.has(n) || /^__pu\$\d+$/.test(n)) env.push(n);
@@ -16118,29 +15920,25 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 		// across the construct's helpers. An arm leaves holes for union-only names:
 		// binding them could collide with a same-named local that shadows a capture
 		// used only by another arm.
+		// The env destructure maps to the construct body it feeds.
+		const envOrigin =
+			(Array.isArray(stmts) && stmts.find((s) => s != null && s.loc != null)) ||
+			(params || []).find((p) => p != null && p.loc != null) ||
+			null;
 		bodyStmts = [
-			{
-				type: 'VariableDeclaration',
-				kind: 'const',
-				declarations: [
-					{
-						type: 'VariableDeclarator',
-						id: {
-							type: 'ArrayPattern',
-							elements: envNames.map((n) =>
-								ownEnv.has(n) ? { type: 'Identifier', name: n } : null,
-							),
-						},
-						init: { type: 'Identifier', name: '__extra' },
-					},
-				],
-			},
+			inheritOriginLoc(
+				b.const(
+					b.array_pattern(envNames.map((n) => (ownEnv.has(n) ? b.id(n) : null))),
+					b.id('__extra'),
+				),
+				envOrigin,
+			),
 			...stmts,
 		];
 	}
 	const fake = {
 		type: 'Component',
-		id: { type: 'Identifier', name: helperName },
+		id: b.id(helperName),
 		params: params || [],
 		body: bodyStmts,
 	};
@@ -16718,43 +16516,18 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// tryBlock-supplied props object. We synthesize a small destructuring
 		// VariableDeclaration at the top of the body so the user's identifiers
 		// resolve. The body is otherwise compiled like any component body.
-		const destructure = {
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: [
-				{
-					type: 'VariableDeclarator',
-					id: {
-						type: 'ObjectPattern',
-						properties: [
-							{
-								type: 'Property',
-								key: { type: 'Identifier', name: 'err' },
-								value: { type: 'Identifier', name: errName },
-								kind: 'init',
-								shorthand: errName === 'err',
-								computed: false,
-								method: false,
-							},
-							{
-								type: 'Property',
-								key: { type: 'Identifier', name: 'reset' },
-								value: { type: 'Identifier', name: resetName },
-								kind: 'init',
-								shorthand: resetName === 'reset',
-								computed: false,
-								method: false,
-							},
-						],
-					},
-					init: { type: 'Identifier', name: '__props' },
-				},
-			],
-		};
-		catchBodyStmts = [destructure, ...catchStmts];
+		const destructure = b.const(
+			b.object_pattern([
+				b.prop('init', b.id('err'), b.id(errName), false, errName === 'err'),
+				b.prop('init', b.id('reset'), b.id(resetName), false, resetName === 'reset'),
+			]),
+			b.id('__props'),
+		);
+		// The synthesized err/reset destructure maps to the authored catch clause.
+		catchBodyStmts = [inheritOriginLoc(destructure, handler.param ?? handler), ...catchStmts];
 	}
 
-	const catchParams = [{ type: 'Identifier', name: '__props' }];
+	const catchParams = [b.id('__props', node.handler ?? node)];
 	const envNames = unionEnv(ctx, [
 		{ stmts: tryStmts, params: [] },
 		pendingStmts && { stmts: pendingStmts, params: [] },
@@ -16913,13 +16686,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// the same destructure pattern as the arg so the user's `key id` (where
 	// `id` is a destructured field) actually resolves.
 	function mkKeyFn(keyExpr) {
-		const param = isDestructured ? leftDeclId : { type: 'Identifier', name: itemName };
-		return printExpr({
-			type: 'ArrowFunctionExpression',
-			params: [param],
-			body: keyExpr,
-			expression: true,
-		});
+		// The synthesized key arrow maps to the authored key expression; its item
+		// param maps to the for-of binding it mirrors.
+		const param = isDestructured ? leftDeclId : b.id(itemName, leftDeclId);
+		return printExpr(inheritOriginLoc(b.arrow([param], keyExpr), keyExpr));
 	}
 
 	let keyFn = null;
@@ -16961,22 +16731,10 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// current position.
 	const indexInjection = node.index
 		? [
-				{
-					type: 'VariableDeclaration',
-					kind: 'const',
-					declarations: [
-						{
-							type: 'VariableDeclarator',
-							id: { type: 'Identifier', name: node.index.name },
-							init: {
-								type: 'MemberExpression',
-								object: { type: 'Identifier', name: '__block' },
-								property: { type: 'Identifier', name: 'itemIndex' },
-								computed: false,
-							},
-						},
-					],
-				},
+				inheritOriginLoc(
+					b.const(b.id(node.index.name), b.member(b.id('__block'), 'itemIndex')),
+					node.index,
+				),
 			]
 		: [];
 
@@ -16984,17 +16742,11 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// at the top of the body so the user fields bind from the synthetic item.
 	const destructureInjection = isDestructured
 		? [
-				{
-					type: 'VariableDeclaration',
-					kind: 'const',
-					declarations: [
-						{
-							type: 'VariableDeclarator',
-							id: leftDeclId, // ObjectPattern / ArrayPattern (lazy flag dropped by printer)
-							init: { type: 'Identifier', name: itemName },
-						},
-					],
-				},
+				inheritOriginLoc(
+					// leftDeclId: ObjectPattern / ArrayPattern (lazy flag dropped by printer)
+					b.const(leftDeclId, b.id(itemName)),
+					leftDeclId,
+				),
 			]
 		: [];
 
@@ -17023,7 +16775,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	if (ctx.currentComponentLocals) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
-		const bodyAst = { type: 'BlockStatement', body: subStmts };
+		const bodyAst = b.block(subStmts);
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
 		let hasParentClosure = false;
 		let hasHook = false;
@@ -17110,7 +16862,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// body/key/@empty capture are unchanged. Direct render-time calls, refs,
 		// mutations, effects, portals, and opaque module/global reads fail closed.
 		const regionStmts = emptyStmts ? [...subStmts, ...emptyStmts] : subStmts;
-		const regionAst = { type: 'BlockStatement', body: regionStmts };
+		const regionAst = b.block(regionStmts);
 		const regionFree = collectFreeIdentifiers(regionAst, bodyScope);
 		if (node.key) {
 			for (const name of collectFreeIdentifiers(node.key, bodyScope)) regionFree.add(name);
@@ -17189,7 +16941,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// on every item/empty block). The union may widen deps with @empty-only
 	// captures — a conservative, correct deps for promotion purposes.
 	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
-	const itemParams = [{ type: 'Identifier', name: itemName }];
+	// The synthetic item param maps to the authored for-of binding.
+	const itemParams = [b.id(itemName, leftDeclId)];
 	const envNames = unionEnv(ctx, [
 		{ stmts: itemAllStmts, params: itemParams },
 		emptyStmts && { stmts: emptyStmts, params: [] },
@@ -17368,12 +17121,8 @@ function rewriteEarlyExits(body, allowExplicitNull = false) {
 		if (isEarlyExitIf(stmt, allowExplicitNull)) {
 			const rest = rewriteEarlyExits(body.slice(i + 1), allowExplicitNull);
 			if (rest.length > 0) {
-				out.push({
-					type: 'IfStatement',
-					test: { type: 'UnaryExpression', operator: '!', argument: stmt.test, prefix: true },
-					consequent: { type: 'BlockStatement', body: rest },
-					alternate: null,
-				});
+				// The synthetic negated guard maps to the authored early-exit test.
+				out.push(inheritOriginLoc(b.if(b.unary('!', stmt.test), b.block(rest), null), stmt.test));
 			}
 			return out;
 		}
@@ -17528,7 +17277,9 @@ function printNode(node) {
 	// files"). Centralizing here covers every emit path (statement-level
 	// rewrittenStatements, planJsx-emitted bindings, attribute / prop
 	// values via printExprWithTsrx) — no per-call-site strip needed.
-	const { code } = esrapPrint(stripTsOnlyWrappers(node), esrapTsx(esrapCommentOptions));
+	const printable = stripTsOnlyWrappers(node);
+	if (assertPrintedLocs()) assertNodeLocs(printable);
+	const { code } = esrapPrint(printable, esrapTsx(esrapCommentOptions));
 	return code;
 }
 
@@ -17542,7 +17293,9 @@ function printNode(node) {
  * `.tsrx`, via the node's `.loc`).
  */
 function printNodeWithMap(node, ctx) {
-	const { code, map } = esrapPrint(stripTsOnlyWrappers(node), esrapTsx(esrapCommentOptions), {
+	const printable = stripTsOnlyWrappers(node);
+	if (assertPrintedLocs()) assertNodeLocs(printable);
+	const { code, map } = esrapPrint(printable, esrapTsx(esrapCommentOptions), {
 		sourceMapSource: ctx.mapSourceName,
 		sourceMapContent: ctx.mapSource,
 		sourceMapEncodeMappings: false,
@@ -17551,10 +17304,14 @@ function printNodeWithMap(node, ctx) {
 }
 
 function printExpr(node) {
-	// Wrap in an ExpressionStatement to get a printable form, then strip trailing `;`.
+	// Wrap in an ExpressionStatement to get a printable form, then strip trailing
+	// `;`. Print scaffolding inherits the expression's own origin loc.
+	const expression = escapeMultilineStringLiterals(node);
 	const wrapped = {
-		type: 'ExpressionStatement',
-		expression: escapeMultilineStringLiterals(node),
+		...b.stmt(expression),
+		start: expression?.start,
+		end: expression?.end,
+		loc: expression?.loc,
 	};
 	return printNode(wrapped).trim().replace(/;$/, '');
 }
