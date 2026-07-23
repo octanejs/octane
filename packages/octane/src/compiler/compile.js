@@ -28,6 +28,7 @@
  */
 
 import {
+	builders,
 	analyzeCss,
 	analyzeTsrx,
 	parseModule,
@@ -763,19 +764,15 @@ function errorBoundaryFallback(node, fallbackAttribute) {
 				)
 					return null;
 				const returned = fallback.body.body[0].argument;
-				body = isJsxNode(returned)
-					? [returned]
-					: [{ type: 'JSXExpressionContainer', expression: returned }];
+				body = isJsxNode(returned) ? [returned] : [builders.jsx_expression_container(returned)];
 			} else if (fallback.body != null) {
 				body = isJsxNode(fallback.body)
 					? [fallback.body]
-					: [{ type: 'JSXExpressionContainer', expression: fallback.body }];
+					: [builders.jsx_expression_container(fallback.body)];
 			}
 		} else if (fallback != null) {
 			if (!isJsxNode(fallback) && fallback.type !== 'Literal') return null;
-			body = isJsxNode(fallback)
-				? [fallback]
-				: [{ type: 'JSXExpressionContainer', expression: fallback }];
+			body = isJsxNode(fallback) ? [fallback] : [builders.jsx_expression_container(fallback)];
 		}
 	}
 	return { errorName, resetName, body };
@@ -883,14 +880,12 @@ function lowerImportedErrorBoundaries(ast) {
 			start: node.start,
 			end: node.end,
 			loc: node.loc,
-			block: { type: 'BlockStatement', body: node.children || [] },
-			handler: {
-				type: 'CatchClause',
-				param: { type: 'Identifier', name: fallback.errorName },
-				resetParam:
-					fallback.resetName == null ? null : { type: 'Identifier', name: fallback.resetName },
-				body: { type: 'BlockStatement', body: fallback.body },
-			},
+			block: builders.block(node.children || []),
+			handler: builders.catch_clause(
+				builders.id(fallback.errorName),
+				fallback.resetName == null ? null : builders.id(fallback.resetName),
+				builders.block(fallback.body),
+			),
 			pending: null,
 			finalizer: null,
 			propagateSuspense: true,
@@ -1749,21 +1744,17 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 		// No eager runtimeNeeded.add here: surviving generated calls re-add the
 		// import in rewriteHookCalls' generated-callee branch, and calls consumed
 		// by the inline hook-memo tier never need it.
+		const callee = {
+			...builders.id('useCallback'),
+			_octaneGenerated: true,
+		};
 		return {
 			...decl,
 			init: {
-				type: 'CallExpression',
+				...builders.call(callee, arrow, builders.array(deps.map((n) => builders.id(n)))),
 				// `_octaneGenerated` tells rewriteHookCalls (which slots this call next)
 				// that the callee is compiler-inserted — it renames it to the shadow-proof
 				// `_$useCallback` alias instead of treating it as a user identifier.
-				callee: { type: 'Identifier', name: 'useCallback', _octaneGenerated: true },
-				arguments: [
-					arrow,
-					{
-						type: 'ArrayExpression',
-						elements: deps.map((n) => ({ type: 'Identifier', name: n })),
-					},
-				],
 			},
 		};
 	});
@@ -2709,7 +2700,7 @@ function wrapAsBlockStmt(node) {
 	if (!node) return null;
 	// null / Literal(null) / Literal(false) → no branch
 	if (node.type === 'Literal' && (node.value === null || node.value === false)) return null;
-	return { type: 'BlockStatement', body: [node] };
+	return builders.block([node]);
 }
 
 /** `xs.map(x => <li/>)` — detect so we can throw a useful "use for-of" error. */
@@ -2774,15 +2765,11 @@ function mapCallToForOf(expr) {
 			: { ...body, attributes: kept };
 	}
 	return {
-		type: 'ForOfStatement',
-		left: {
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: [{ type: 'VariableDeclarator', id: params[0], init: null }],
-		},
-		right: expr.callee.object,
-		body: { type: 'BlockStatement', body: [bodyEl] },
-		await: false,
+		...builders.for_of(
+			builders.declaration('const', [builders.declarator(params[0], null)]),
+			expr.callee.object,
+			builders.block([bodyEl]),
+		),
 		key: keyExpr,
 		index: params[1] || null,
 		empty: null,
@@ -2815,15 +2802,14 @@ function resolveStyleExpr(node, cssHash) {
 	const inner = node.arguments[0];
 	if (inner.type === 'Literal' && typeof inner.value === 'string') {
 		const combined = inner.value ? `${cssHash} ${inner.value}` : cssHash;
-		return { type: 'Literal', value: combined, raw: JSON.stringify(combined) };
+		return builders.literal(combined, JSON.stringify(combined));
 	}
 	// Dynamic: emit `(<hash> + ' ' + (expr))` so absent/null produces "<hash> ".
-	return {
-		type: 'BinaryExpression',
-		operator: '+',
-		left: { type: 'Literal', value: cssHash + ' ', raw: JSON.stringify(cssHash + ' ') },
-		right: inner,
-	};
+	return builders.binary(
+		'+',
+		builders.literal(cssHash + ' ', JSON.stringify(cssHash + ' ')),
+		inner,
+	);
 }
 
 /**
@@ -2975,17 +2961,12 @@ function normalizeOwnRenderableReturns(statement, preserveJsx = false) {
 		) {
 			return {
 				...node,
-				argument: { type: 'Literal', value: null, raw: 'null' },
+				argument: builders.literal(null, 'null'),
 			};
 		}
 		return {
 			...node,
-			argument: {
-				type: 'LogicalExpression',
-				operator: '??',
-				left: node.argument,
-				right: { type: 'Literal', value: null, raw: 'null' },
-			},
+			argument: builders.logical('??', node.argument, builders.literal(null, 'null')),
 		};
 	});
 }
@@ -3121,11 +3102,7 @@ function arrowComponentToFunctionDecl(varDecl) {
 		return null;
 	}
 	return {
-		type: 'FunctionDeclaration',
-		id: d.id,
-		params: init.params || [],
-		body: init.body,
-		async: !!init.async,
+		...builders.function_declaration(d.id, init.params || [], init.body, !!init.async),
 		generator: !!init.generator,
 		// Preserve source position for hashing / source maps / decl anchors.
 		start: varDecl.start,
@@ -3745,10 +3722,7 @@ function stampAnonymousDefaultFunctionLoc(node, ctx) {
 		/'/g,
 		'%27',
 	);
-	const marker = {
-		type: 'ExpressionStatement',
-		expression: { type: 'Literal', value: `__octane_loc:${payload}` },
-	};
+	const marker = builders.stmt(builders.literal(`__octane_loc:${payload}`));
 	let stamped;
 	if (
 		declaration.type === 'ArrowFunctionExpression' &&
@@ -3757,10 +3731,7 @@ function stampAnonymousDefaultFunctionLoc(node, ctx) {
 		stamped = {
 			...declaration,
 			expression: false,
-			body: {
-				type: 'BlockStatement',
-				body: [marker, { type: 'ReturnStatement', argument: declaration.body }],
-			},
+			body: builders.block([marker, builders.return(declaration.body)]),
 		};
 	} else if (declaration.body?.type === 'BlockStatement') {
 		stamped = {
@@ -3831,39 +3802,25 @@ function recordProfileComponent(ctx, node, name, identityName = name) {
 }
 
 function profileMetadataAst(metadata) {
-	return {
-		type: 'ObjectExpression',
-		properties: Object.entries(metadata).map(([key, value]) => ({
-			type: 'Property',
-			key: { type: 'Identifier', name: key },
-			value: { type: 'Literal', value, raw: JSON.stringify(value) },
-			kind: 'init',
-			method: false,
-			shorthand: false,
-			computed: false,
-		})),
-	};
+	return builders.object(
+		Object.entries(metadata).map(([key, value]) =>
+			builders.prop('init', builders.id(key), builders.literal(value, JSON.stringify(value))),
+		),
+	);
 }
 
 function profileRegistrationAst(bindingName, metadata) {
-	return {
-		type: 'ExpressionStatement',
-		expression: {
-			type: 'CallExpression',
-			callee: { type: 'Identifier', name: '_$__profileComponent' },
-			arguments: [{ type: 'Identifier', name: bindingName }, profileMetadataAst(metadata)],
-			optional: false,
-		},
-	};
+	return builders.stmt(
+		builders.call(
+			builders.id('_$__profileComponent'),
+			builders.id(bindingName),
+			profileMetadataAst(metadata),
+		),
+	);
 }
 
 function profileComponentCallAst(value, metadata) {
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$__profileComponent' },
-		arguments: [value, profileMetadataAst(metadata)],
-		optional: false,
-	};
+	return builders.call(builders.id('_$__profileComponent'), value, profileMetadataAst(metadata));
 }
 
 function nodeContainsJsx(node) {
@@ -4908,7 +4865,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// collectFreeIdentifiers sees the same identifier scope the runtime would.
 		const stmts = (compNode.body.body || []).slice();
 		if (compNode.body.render) stmts.push(compNode.body.render);
-		const root = { type: 'BlockStatement', body: stmts };
+		const root = builders.block(stmts);
 		const free = collectFreeIdentifiers(root, locals);
 		const autoMemoImportedComponents = collectImportedComponentReferences(root, ctx.importedNames);
 		let autoMemoCallsitesSafe =
@@ -6781,8 +6738,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			// block deeper than the client and desyncing the hydration cursor.
 			const kids = children.map((c) => lowerJsxChild(c, ctx)).filter((e) => e != null);
 			if (kids.length > 0) {
-				const childrenExpr =
-					kids.length === 1 ? kids[0] : { type: 'ArrayExpression', elements: kids };
+				const childrenExpr = kids.length === 1 ? kids[0] : builders.array(kids);
 				propParts.push(
 					`"children": (${printExprWithTsrx(resolveStyleExpr(childrenExpr, cssHash), ctx, name, inlinedSubs)})`,
 				);
@@ -6961,12 +6917,7 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	if (explicitKey !== null) {
 		const keyParams = [itemId];
 		if (node.index) keyParams.push(node.index);
-		const keyFn = printExpr({
-			type: 'ArrowFunctionExpression',
-			params: keyParams,
-			body: explicitKey,
-			expression: true,
-		});
+		const keyFn = printExpr(builders.arrow(keyParams, explicitKey));
 		itemKey = `(${keyFn})(__it${node.index ? ', __i' : ''})`;
 	} else if (node.index) {
 		itemKey = '__i';
@@ -7256,12 +7207,7 @@ function wrapScopedClassExprs(node, ctx) {
 						!(expr.type === 'Literal' && typeof expr.value === 'string') &&
 						!isStyleCall(expr)
 					) {
-						attr.value.expression = {
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: '_$normalizeClass' },
-							arguments: [expr],
-							optional: false,
-						};
+						attr.value.expression = builders.call(builders.id('_$normalizeClass'), expr);
 						ctx.runtimeNeeded.add('normalizeClass');
 					}
 				}
@@ -8147,34 +8093,12 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 		};
 		visit(fn.body);
 	};
-	const assignWarmPlan = (fn, source) => ({
-		type: 'CallExpression',
-		callee: {
-			type: 'MemberExpression',
-			object: { type: 'Identifier', name: 'Object' },
-			property: { type: 'Identifier', name: 'assign' },
-			computed: false,
-			optional: false,
-		},
-		arguments: [
+	const assignWarmPlan = (fn, source) =>
+		builders.call(
+			builders.member(builders.id('Object'), builders.id('assign')),
 			fn,
-			{
-				type: 'ObjectExpression',
-				properties: [
-					{
-						type: 'Property',
-						key: { type: 'Identifier', name: '__warm' },
-						value: parseWarmExpression(source),
-						kind: 'init',
-						method: false,
-						shorthand: false,
-						computed: false,
-					},
-				],
-			},
-		],
-		optional: false,
-	});
+			builders.object([builders.prop('init', builders.id('__warm'), parseWarmExpression(source))]),
+		);
 
 	const transformFunction = (fn, name, component) => {
 		if (!isFunction(fn) || transformed.has(fn)) return fn;
@@ -8460,25 +8384,20 @@ function collectDepPaths(expr) {
 		}
 		switch (n.type) {
 			case 'Identifier':
-				if (!bound.has(n.name)) push({ type: 'Identifier', name: n.name }, n.name);
+				if (!bound.has(n.name)) push(builders.id(n.name), n.name);
 				return;
 			case 'MemberExpression': {
 				const propertyName = staticDepMemberName(n);
 				if (n.object.type === 'Identifier' && propertyName !== null) {
 					if (!bound.has(n.object.name)) {
-						const member = {
-							type: 'MemberExpression',
-							object: { type: 'Identifier', name: n.object.name },
-							property: n.computed
-								? {
-										type: 'Literal',
-										value: propertyName,
-										raw: JSON.stringify(propertyName),
-									}
-								: { type: 'Identifier', name: propertyName },
-							computed: n.computed,
-							optional: n.optional === true,
-						};
+						const member = builders.member(
+							builders.id(n.object.name),
+							n.computed
+								? builders.literal(propertyName, JSON.stringify(propertyName))
+								: builders.id(propertyName),
+							n.computed,
+							n.optional === true,
+						);
 						// Optional MemberExpressions must remain inside a ChainExpression.
 						// Besides keeping the synthesized tree valid ESTree, the wrapper
 						// preserves optional-evaluation semantics through later AST passes.
@@ -8651,12 +8570,7 @@ function parallelUseMemoizePass(stmts, ctx, componentName, creations, guards, lo
 			return { ...stmt, expression: rewritten };
 		}
 		if (stmt.type === 'IfStatement') {
-			const not = {
-				type: 'UnaryExpression',
-				operator: '!',
-				prefix: true,
-				argument: stmt.test,
-			};
+			const not = builders.unary('!', stmt.test);
 			return {
 				...stmt,
 				consequent: rewriteStmt(stmt.consequent, [...activeGuards, stmt.test]),
@@ -8740,7 +8654,7 @@ function makeCreationMemoCall(
 			const member = depPathMember(dep);
 			const next =
 				member?.object.type === 'Identifier' && coarsenDepRoots.has(member.object.name)
-					? { type: 'Identifier', name: member.object.name }
+					? builders.id(member.object.name)
 					: dep;
 			const key = depPathKey(next);
 			if (key !== null && seen.has(key)) continue;
@@ -8765,14 +8679,12 @@ function makeCreationMemoCall(
 			: requireRuntimeForContext(ctx, memoHelper);
 	creations.push({ symVar, expr, deps, guards: [...guards], locals });
 	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: memoAlias },
-		arguments: [
-			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: expr },
-			{ type: 'ArrayExpression', elements: deps },
-			{ type: 'Identifier', name: symVar },
-		],
-		optional: false,
+		...builders.call(
+			builders.id(memoAlias),
+			builders.arrow([], expr),
+			builders.array(deps),
+			builders.id(symVar),
+		),
 		// Marks a compiler-minted creation memo so the inline hook-memo tier
 		// can later lower the `const x = _$useMemo(…)` statement form to the
 		// closure-free puTake/puPub ABI (production client compile).
@@ -8928,7 +8840,7 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 	// the ordinary collector too: a braceless `var` declaration is a body-local
 	// binding whose identity must coarsen downstream member dependencies.
 	function collectIfCandidates(stmt, guards) {
-		const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+		const not = (e) => builders.unary('!', e);
 		collectIfArm(stmt.consequent, [...guards, stmt.test]);
 		if (stmt.alternate) collectIfArm(stmt.alternate, [...guards, not(stmt.test)]);
 	}
@@ -9142,7 +9054,7 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 					),
 				};
 			case 'JSXIfExpression': {
-				const not = (e) => ({ type: 'UnaryExpression', operator: '!', prefix: true, argument: e });
+				const not = (e) => builders.unary('!', e);
 				const consequent = walkArm(node.consequent, [...guards, node.test]);
 				const alternate = node.alternate
 					? walkArm(node.alternate, [...guards, not(node.test)])
@@ -9238,25 +9150,14 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			changed = true;
 			return {
 				...a,
-				value: {
-					type: 'JSXExpressionContainer',
-					expression: {
-						type: 'CallExpression',
-						callee: { type: 'Identifier', name: memoAlias },
-						arguments: [
-							{
-								type: 'ArrowFunctionExpression',
-								params: [],
-								expression: true,
-								async: false,
-								body: expr,
-							},
-							{ type: 'ArrayExpression', elements: deps },
-							{ type: 'Identifier', name: symVar },
-						],
-						optional: false,
-					},
-				},
+				value: builders.jsx_expression_container(
+					builders.call(
+						builders.id(memoAlias),
+						builders.arrow([], expr),
+						builders.array(deps),
+						builders.id(symVar),
+					),
+				),
 				_octanePropMemo: { expr, deps, symVar },
 			};
 		});
@@ -9273,15 +9174,11 @@ function parallelUseWalkJsx(nodes, ctx, componentName, creations, warmChildren, 
 			const key = a.name.name;
 			if (key === 'ref' || key === 'key') return; // instance-wired props — skip this slot
 			let value;
-			if (a.value == null) value = { type: 'Literal', value: true, raw: 'true' };
+			if (a.value == null) value = builders.literal(true, 'true');
 			else if (a.value.type === 'JSXExpressionContainer') value = a.value.expression;
 			else if (typeof a.value.value === 'string')
 				// JSX string attrs may hold raw newlines — re-derive a valid raw.
-				value = {
-					type: 'Literal',
-					value: a.value.value,
-					raw: JSON.stringify(a.value.value),
-				};
+				value = builders.literal(a.value.value, JSON.stringify(a.value.value));
 			else value = a.value; // Literal
 			props.push({ key, value, memo: a._octanePropMemo });
 		}
@@ -9364,15 +9261,9 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 		// same thunk below so it can still warm before setup reaches this registration.
 		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
 		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
-		const registration = {
-			type: 'ExpressionStatement',
-			expression: {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: batchAlias },
-				arguments: [{ type: 'ArrayExpression', elements: [] }, warmThunk],
-				optional: false,
-			},
-		};
+		const registration = builders.stmt(
+			builders.call(builders.id(batchAlias), builders.array([]), warmThunk),
+		);
 		const finalIndex =
 			output.length > 0 && output[output.length - 1].type === 'ReturnStatement'
 				? output.length - 1
@@ -9461,7 +9352,7 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 		// expands that one statement into hoist + batch + unwrap statements, so
 		// introduce the lexical block required to keep them in the guarded arm.
 		const body = transformList([s]);
-		return body.length === 1 ? body[0] : { type: 'BlockStatement', body };
+		return body.length === 1 ? body[0] : builders.block(body);
 	}
 
 	function emitRun(run, out) {
@@ -9481,46 +9372,23 @@ function rewriteParallelUse(statements, ctx, componentName, warmThunk) {
 			tempOf.set(m.call, name);
 		}
 		for (const t of temps) {
-			out.push({
-				type: 'VariableDeclaration',
-				kind: 'const',
-				declarations: [
-					{
-						type: 'VariableDeclarator',
-						id: { type: 'Identifier', name: t.name },
-						init: t.init,
-					},
-				],
-			});
+			out.push(builders.declaration('const', [builders.declarator(builders.id(t.name), t.init)]));
 		}
 		// Server mirror: `puBatch` registers every unresolved thenable of the run
 		// with the render loop and suspends ONCE (identity-resolved on the next
 		// pass — see runtime.server.ts).
 		const batchHelper = ctx.mode === 'server' ? 'puBatch' : 'useBatch';
 		const batchAlias = requireRuntimeForContext(ctx, batchHelper);
-		const batchArgs = [
-			{
-				type: 'ArrayExpression',
-				elements: temps.map((t) => ({ type: 'Identifier', name: t.name })),
-			},
-		];
+		const batchArgs = [builders.array(temps.map((t) => builders.id(t.name)))];
 		if (firstBatch && warmThunk) batchArgs.push(warmThunk);
 		firstBatch = false;
-		out.push({
-			type: 'ExpressionStatement',
-			expression: {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: batchAlias },
-				arguments: batchArgs,
-				optional: false,
-			},
-		});
+		out.push(builders.stmt(builders.call(builders.id(batchAlias), ...batchArgs)));
 		for (const m of run.members) {
 			if (!m.call) {
 				out.push(m.stmt);
 				continue;
 			}
-			const tempId = { type: 'Identifier', name: tempOf.get(m.call) };
+			const tempId = builders.id(tempOf.get(m.call));
 			const newCall = { ...m.call, arguments: [tempId, ...m.call.arguments.slice(1)] };
 			if (m.stmt.type === 'VariableDeclaration') {
 				out.push({
@@ -9548,11 +9416,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	const andChain = (guards) =>
 		guards.length === 0
 			? null
-			: guards.reduce(
-					(acc, g) =>
-						acc ? { type: 'LogicalExpression', operator: '&&', left: acc, right: g } : g,
-					null,
-				);
+			: guards.reduce((acc, g) => (acc ? builders.logical('&&', acc, g) : g), null);
 
 	const warmMemos = creations.filter(
 		(c) => guardOk(c.guards, c.locals) && isWarmSafeExpr(c.expr, paramNames, locals, c.locals),
@@ -9585,68 +9449,49 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 
 	const stmtFor = (guards, callExpr) => {
 		const g = andChain(guards);
-		const call = { type: 'ExpressionStatement', expression: callExpr };
-		return g ? { type: 'IfStatement', test: g, consequent: call, alternate: null } : call;
+		const call = builders.stmt(callExpr);
+		return g ? builders.if(g, call, null) : call;
 	};
 	const warmMemoAlias = runtimeAliasForContext(ctx, 'warmMemo');
 	const warmChildAlias = runtimeAliasForContext(ctx, 'warmChild');
-	const memoCall = (c) => ({
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: warmMemoAlias },
-		arguments: [
-			{ type: 'ArrowFunctionExpression', params: [], expression: true, async: false, body: c.expr },
-			{ type: 'ArrayExpression', elements: c.deps },
-			{ type: 'Identifier', name: c.symVar },
-		],
-		optional: false,
-	});
+	const memoCall = (c) =>
+		builders.call(
+			builders.id(warmMemoAlias),
+			builders.arrow([], c.expr),
+			builders.array(c.deps),
+			builders.id(c.symVar),
+		);
 	// A memoized prop prints through the value-returning warmMemo form: at warm
 	// time it CLAIMS the render pass's creation for the same slot (or creates
 	// once, adoptable by the render's puMemo) instead of re-evaluating the raw
 	// expression — the warm walk and the render path share one creation.
 	const warmPropValue = (p) =>
 		p.memo
-			? {
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: warmMemoAlias },
-					arguments: [
-						{
-							type: 'ArrowFunctionExpression',
-							params: [],
-							expression: true,
-							async: false,
-							body: p.memo.expr,
-						},
-						{ type: 'ArrayExpression', elements: p.memo.deps },
-						{ type: 'Identifier', name: p.memo.symVar },
-					],
-					optional: false,
-				}
+			? builders.call(
+					builders.id(warmMemoAlias),
+					builders.arrow([], p.memo.expr),
+					builders.array(p.memo.deps),
+					builders.id(p.memo.symVar),
+				)
 			: p.value;
-	const childCall = (w) => ({
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: warmChildAlias },
-		arguments: [
-			{ type: 'Identifier', name: w.compName },
-			{
-				type: 'ObjectExpression',
-				properties: w.props.map((p) => ({
-					type: 'Property',
-					// Non-identifier prop names (aria-*, data-*) must print as
-					// quoted string keys — a bare Identifier would emit `aria-hidden:`.
-					key: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(p.key)
-						? { type: 'Identifier', name: p.key }
-						: { type: 'Literal', value: p.key, raw: JSON.stringify(p.key) },
-					value: warmPropValue(p),
-					kind: 'init',
-					method: false,
-					shorthand: false,
-					computed: false,
-				})),
-			},
-		],
-		optional: false,
-	});
+	const childCall = (w) =>
+		builders.call(
+			builders.id(warmChildAlias),
+			builders.id(w.compName),
+			builders.object(
+				w.props.map((p) =>
+					builders.prop(
+						'init',
+						// Non-identifier prop names (aria-*, data-*) must print as
+						// quoted string keys — a bare Identifier would emit `aria-hidden:`.
+						/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(p.key)
+							? builders.id(p.key)
+							: builders.literal(p.key, JSON.stringify(p.key)),
+						warmPropValue(p),
+					),
+				),
+			),
+		);
 
 	if (warmMemos.length > 0 || warmKids.some((w) => w.props.some((p) => p.memo)))
 		requireRuntimeForContext(ctx, 'warmMemo');
@@ -9657,16 +9502,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	const thunk =
 		warmKids.length === 0
 			? null
-			: {
-					type: 'ArrowFunctionExpression',
-					params: [],
-					expression: false,
-					async: false,
-					body: {
-						type: 'BlockStatement',
-						body: warmKids.map((w) => stmtFor(w.guards, childCall(w))),
-					},
-				};
+			: builders.arrow([], builders.block(warmKids.map((w) => stmtFor(w.guards, childCall(w)))));
 
 	// The hoisted fetch plan: creations + child calls, params destructured
 	// from the incoming props object. Single-param components only (the norm).
@@ -9882,9 +9718,9 @@ function appendHookSlotArgument(name, args, slot, numeric) {
 	const out = [...args];
 	const position = numeric ? NUMERIC_HOOK_SLOT_POSITION[name] : undefined;
 	if (position !== undefined) {
-		while (out.length < position) out.push({ type: 'Identifier', name: 'undefined' });
+		while (out.length < position) out.push(builders.id('undefined'));
 	}
-	out.push(typeof slot === 'string' ? { type: 'Identifier', name: slot } : slot);
+	out.push(typeof slot === 'string' ? builders.id(slot) : slot);
 	return out;
 }
 
@@ -10156,18 +9992,10 @@ function replaceOwnReturns(node, names) {
 		if (!n.type) return n;
 		if (FN_TYPES.has(n.type)) return n;
 		if (n.type === 'ReturnStatement') {
-			return {
-				type: 'BlockStatement',
-				body: [
-					hkExprStmt(
-						hkAssign(
-							{ type: 'Identifier', name: names.result },
-							n.argument ?? { type: 'Identifier', name: 'undefined' },
-						),
-					),
-					{ type: 'BreakStatement', label: { type: 'Identifier', name: names.label } },
-				],
-			};
+			return builders.block([
+				hkExprStmt(hkAssign(builders.id(names.result), n.argument ?? builders.id('undefined'))),
+				{ ...builders.break, label: builders.id(names.label) },
+			]);
 		}
 		const out = {};
 		for (const key in n) {
@@ -10179,30 +10007,19 @@ function replaceOwnReturns(node, names) {
 }
 
 function hkNumLit(value) {
-	return { type: 'Literal', value, raw: String(value) };
+	return builders.literal(value, String(value));
 }
 
 function hkAssign(left, right) {
-	return { type: 'AssignmentExpression', operator: '=', left, right };
+	return builders.assignment('=', left, right);
 }
 
 function hkExprStmt(expression) {
-	return { type: 'ExpressionStatement', expression };
+	return builders.stmt(expression);
 }
 
 function hkObjectIs(a, b) {
-	return {
-		type: 'CallExpression',
-		callee: {
-			type: 'MemberExpression',
-			object: { type: 'Identifier', name: 'Object' },
-			property: { type: 'Identifier', name: 'is' },
-			computed: false,
-			optional: false,
-		},
-		arguments: [a, b],
-		optional: false,
-	};
+	return builders.call(builders.member(builders.id('Object'), builders.id('is')), a, b);
 }
 
 // `const x = useMemo(fn, deps)` / `useCallback(fn, deps)` with trustworthy
@@ -10259,23 +10076,9 @@ function hookMemoComputeStatements(entry, ctx, target) {
 	if (fn.body.type !== 'BlockStatement') return [hkExprStmt(hkAssign(target, fn.body))];
 	const names = hookMemoNames(ctx);
 	return [
-		{
-			type: 'VariableDeclaration',
-			kind: 'let',
-			declarations: [
-				{
-					type: 'VariableDeclarator',
-					id: { type: 'Identifier', name: names.result },
-					init: null,
-				},
-			],
-		},
-		{
-			type: 'LabeledStatement',
-			label: { type: 'Identifier', name: names.label },
-			body: replaceOwnReturns(fn.body, names),
-		},
-		hkExprStmt(hkAssign(target, { type: 'Identifier', name: names.result })),
+		builders.declaration('let', [builders.declarator(builders.id(names.result), null)]),
+		builders.labeled(names.label, replaceOwnReturns(fn.body, names)),
+		hkExprStmt(hkAssign(target, builders.id(names.result))),
 	];
 }
 
@@ -10303,61 +10106,42 @@ function lowerPuMemoDecl(stmt, ctx) {
 	const takeAlias = requireRuntimeForContext(ctx, `puTake${deps.length}`);
 	const pubAlias = requireRuntimeForContext(ctx, 'puPub');
 	const missAlias = requireRuntimeForContext(ctx, 'puMiss');
-	const temp = (i) => ({ type: 'Identifier', name: hookMemoTemp(ctx, i) });
+	const temp = (i) => builders.id(hookMemoTemp(ctx, i));
 	const body = [];
 	if (deps.length > 0) {
-		body.push({
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: deps.map((dep, i) => ({
-				type: 'VariableDeclarator',
-				id: temp(i),
-				init: dep,
-			})),
-		});
+		body.push(
+			builders.declaration(
+				'const',
+				deps.map((dep, i) => builders.declarator(temp(i), dep)),
+			),
+		);
 	}
 	body.push(
 		hkExprStmt(
 			hkAssign(
 				{ ...decl.id },
-				{
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: takeAlias },
-					arguments: [{ ...slotId }, ...deps.map((_, i) => temp(i))],
-					optional: false,
-				},
+				builders.call(builders.id(takeAlias), { ...slotId }, ...deps.map((_, i) => temp(i))),
 			),
 		),
 	);
-	body.push({
-		type: 'IfStatement',
-		test: {
-			type: 'BinaryExpression',
-			operator: '===',
-			left: { ...decl.id },
-			right: { type: 'Identifier', name: missAlias },
-		},
-		consequent: hkExprStmt(
-			hkAssign(
-				{ ...decl.id },
-				{
-					type: 'CallExpression',
-					callee: { type: 'Identifier', name: pubAlias },
-					arguments: [{ ...slotId }, arrow.body, ...deps.map((_, i) => temp(i))],
-					optional: false,
-				},
+	body.push(
+		builders.if(
+			builders.binary('===', { ...decl.id }, builders.id(missAlias)),
+			hkExprStmt(
+				hkAssign(
+					{ ...decl.id },
+					builders.call(
+						builders.id(pubAlias),
+						{ ...slotId },
+						arrow.body,
+						...deps.map((_, i) => temp(i)),
+					),
+				),
 			),
+			null,
 		),
-		alternate: null,
-	});
-	return [
-		{
-			type: 'VariableDeclaration',
-			kind: 'let',
-			declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
-		},
-		{ type: 'BlockStatement', body },
-	];
+	);
+	return [builders.declaration('let', [builders.declarator(decl.id, null)]), builders.block(body)];
 }
 
 function lowerAuthoredHookMemo(stmt, ctx) {
@@ -10373,87 +10157,41 @@ function lowerAuthoredHookMemo(stmt, ctx) {
 			return [{ ...stmt, declarations: [{ ...decl, init }] }];
 		}
 		return [
-			{
-				type: 'VariableDeclaration',
-				kind: 'let',
-				declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
-			},
-			{
-				type: 'BlockStatement',
-				body: [...hookMemoComputeStatements(entry, ctx, { ...decl.id })],
-			},
+			builders.declaration('let', [builders.declarator(decl.id, null)]),
+			builders.block([...hookMemoComputeStatements(entry, ctx, { ...decl.id })]),
 		];
 	}
 	const names = hookMemoNames(ctx);
 	const base = ctx.currentHookMemoOffset;
 	const k = deps.length;
 	ctx.currentHookMemoOffset = base + k + 2;
-	const cellRef = (i) => ({
-		type: 'MemberExpression',
-		object: { type: 'Identifier', name: names.cache },
-		property: hkNumLit(i),
-		computed: true,
-		optional: false,
-	});
+	const cellRef = (i) => builders.member(builders.id(names.cache), hkNumLit(i), true);
 	const valueCell = () => cellRef(base + 1 + k);
 	const body = [];
 	if (k > 0) {
-		body.push({
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: deps.map((dep, i) => ({
-				type: 'VariableDeclarator',
-				id: { type: 'Identifier', name: hookMemoTemp(ctx, i) },
-				init: dep,
-			})),
-		});
-	}
-	let missTest = {
-		type: 'BinaryExpression',
-		operator: '!==',
-		left: cellRef(base),
-		right: { type: 'Literal', value: true, raw: 'true' },
-	};
-	for (let i = 0; i < k; i++) {
-		missTest = {
-			type: 'LogicalExpression',
-			operator: '||',
-			left: missTest,
-			right: {
-				type: 'UnaryExpression',
-				operator: '!',
-				prefix: true,
-				argument: hkObjectIs(cellRef(base + 1 + i), {
-					type: 'Identifier',
-					name: hookMemoTemp(ctx, i),
-				}),
-			},
-		};
-	}
-	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
-	for (let i = 0; i < k; i++) {
-		missBody.push(
-			hkExprStmt(
-				hkAssign(cellRef(base + 1 + i), { type: 'Identifier', name: hookMemoTemp(ctx, i) }),
+		body.push(
+			builders.declaration(
+				'const',
+				deps.map((dep, i) => builders.declarator(builders.id(hookMemoTemp(ctx, i)), dep)),
 			),
 		);
 	}
-	missBody.push(hkExprStmt(hkAssign(cellRef(base), { type: 'Literal', value: true, raw: 'true' })));
-	body.push({
-		type: 'IfStatement',
-		test: missTest,
-		consequent: { type: 'BlockStatement', body: missBody },
-		alternate: null,
-	});
+	let missTest = builders.binary('!==', cellRef(base), builders.literal(true, 'true'));
+	for (let i = 0; i < k; i++) {
+		missTest = builders.logical(
+			'||',
+			missTest,
+			builders.unary('!', hkObjectIs(cellRef(base + 1 + i), builders.id(hookMemoTemp(ctx, i)))),
+		);
+	}
+	const missBody = [...hookMemoComputeStatements(entry, ctx, valueCell())];
+	for (let i = 0; i < k; i++) {
+		missBody.push(hkExprStmt(hkAssign(cellRef(base + 1 + i), builders.id(hookMemoTemp(ctx, i)))));
+	}
+	missBody.push(hkExprStmt(hkAssign(cellRef(base), builders.literal(true, 'true'))));
+	body.push(builders.if(missTest, builders.block(missBody), null));
 	body.push(hkExprStmt(hkAssign({ ...decl.id }, valueCell())));
-	return [
-		{
-			type: 'VariableDeclaration',
-			kind: 'let',
-			declarations: [{ type: 'VariableDeclarator', id: decl.id, init: null }],
-		},
-		{ type: 'BlockStatement', body },
-	];
+	return [builders.declaration('let', [builders.declarator(decl.id, null)]), builders.block(body)];
 }
 
 // The statement walker: recurses into conditional blocks (conditional hooks
@@ -10587,7 +10325,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				let slot;
 				if (numericSlot) {
 					const id = ctx.nextHookSymId++;
-					slot = { type: 'Literal', value: id, raw: String(id) };
+					slot = builders.literal(id, String(id));
 				} else {
 					const debug = isServerUse
 						? `${profileOwner}.use#${ctx.nextHookSymId}`
@@ -10622,25 +10360,21 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					// need no wrapper). The TRAILING `sym` is retained so existing library
 					// bindings that extract the slot from their last argument keep working.
 					const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
-					return {
-						type: 'CallExpression',
-						callee: { type: 'Identifier', name: withSlotAlias },
-						arguments: [
-							{ type: 'Identifier', name: symVar },
-							n.callee,
-							...args,
-							{ type: 'Identifier', name: symVar },
-						],
-						optional: false,
-					};
+					return builders.call(
+						builders.id(withSlotAlias),
+						builders.id(symVar),
+						n.callee,
+						...args,
+						builders.id(symVar),
+					);
 				}
 				return {
 					...n,
 					callee:
 						getterHelper !== null
-							? { type: 'Identifier', name: runtimeAliasForContext(ctx, getterHelper) }
+							? builders.id(runtimeAliasForContext(ctx, getterHelper))
 							: n.callee._octaneGenerated
-								? { type: 'Identifier', name: runtimeAliasForContext(ctx, name) }
+								? builders.id(runtimeAliasForContext(ctx, name))
 								: n.callee,
 					arguments: appendHookSlotArgument(name, args, slot, numericSlot),
 				};
@@ -10675,7 +10409,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				let slot;
 				if (numericSlot) {
 					const id = ctx.nextHookSymId++;
-					slot = { type: 'Literal', value: id, raw: String(id) };
+					slot = builders.literal(id, String(id));
 				} else {
 					slot = allocHookSymbol(
 						ctx,
@@ -10695,7 +10429,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 					...n,
 					callee:
 						getterHelper !== null
-							? { type: 'Identifier', name: runtimeAliasForContext(ctx, getterHelper) }
+							? builders.id(runtimeAliasForContext(ctx, getterHelper))
 							: n.callee,
 					arguments: appendHookSlotArgument(name, args, slot, numericSlot),
 				};
@@ -10736,26 +10470,11 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const withSlotAlias = requireRuntimeForContext(ctx, 'withSlot');
 			const object = rewriteHookCalls(n.callee.object, ctx, componentName, localRoot);
 			const args = n.arguments.map((a) => rewriteHookCalls(a, ctx, componentName, localRoot));
-			return {
-				type: 'CallExpression',
-				callee: { type: 'Identifier', name: withSlotAlias },
-				arguments: [
-					{ type: 'Identifier', name: symVar },
-					{
-						type: 'ArrowFunctionExpression',
-						params: [],
-						expression: true,
-						async: false,
-						body: {
-							type: 'CallExpression',
-							callee: { ...n.callee, object },
-							arguments: [...args, { type: 'Identifier', name: symVar }],
-							optional: false,
-						},
-					},
-				],
-				optional: false,
-			};
+			return builders.call(
+				builders.id(withSlotAlias),
+				builders.id(symVar),
+				builders.arrow([], builders.call({ ...n.callee, object }, ...args, builders.id(symVar))),
+			);
 		}
 		return null;
 	});
@@ -10801,14 +10520,7 @@ function compileReturnJsxFunction(node, ctx, options) {
 		}
 		return rewriteJsxValues(h, ctx);
 	});
-	const fn = {
-		type: 'FunctionDeclaration',
-		id: node.id,
-		params: node.params,
-		async: false,
-		generator: false,
-		body: { type: 'BlockStatement', body: newStatements },
-	};
+	const fn = builders.function_declaration(node.id, node.params, builders.block(newStatements));
 	// Print with esrap's real per-token map (same output bytes as printNode) so
 	// this function contributes segments to the module map — compile() drains
 	// them via ctx._setupMaps, exactly like a component's setup statements.
@@ -10976,11 +10688,7 @@ function lowerReturnJsx(node, ctx, compInlinedSubs, cssHash = null) {
 
 function memberProps(hn, src) {
 	return {
-		type: 'MemberExpression',
-		object: { type: 'Identifier', name: 'props' },
-		property: { type: 'Identifier', name: hn },
-		computed: false,
-		optional: false,
+		...builders.member(builders.id('props'), builders.id(hn)),
 		// Carry the ORIGINAL expression's source position onto the synthetic `props.hN`
 		// node so the extracted fragment keeps it (dev hydration LOC / DevTools). Without
 		// this, fragment extraction would silently drop the upstream position.
@@ -10988,15 +10696,7 @@ function memberProps(hn, src) {
 	};
 }
 function objectProp(hn, valNode) {
-	return {
-		type: 'Property',
-		key: { type: 'Identifier', name: hn },
-		value: valNode,
-		kind: 'init',
-		method: false,
-		shorthand: false,
-		computed: false,
-	};
+	return builders.prop('init', builders.id(hn), valNode);
 }
 
 // Walk a host element or JSX fragment, replacing each DYNAMIC part (an
@@ -11048,7 +10748,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				...attr,
 				value:
 					v.type === 'JSXExpressionContainer'
-						? { type: 'JSXExpressionContainer', expression: memberProps(hn, inner) }
+						? builders.jsx_expression_container(memberProps(hn, inner))
 						: memberProps(hn, inner),
 			});
 		}
@@ -11083,14 +10783,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			if (expr && expr.type === 'TSAsExpression') {
 				// Preserve the `as T` cast in the renderer (it marks a dynamic TEXT hole).
 				holeProps.push(objectProp(hn, rewriteJsxValues(expr.expression, ctx)));
-				newChildren.push({
-					type: 'JSXExpressionContainer',
-					expression: {
-						type: 'TSAsExpression',
-						expression: memberProps(hn, expr.expression),
-						typeAnnotation: expr.typeAnnotation,
-					},
-				});
+				newChildren.push(
+					builders.jsx_expression_container(
+						builders.ts_as(memberProps(hn, expr.expression), expr.typeAnnotation),
+					),
+				);
 			} else {
 				holeProps.push(objectProp(hn, rewriteJsxValues(expr, ctx)));
 				// A hole the compiler proved is a string (concat / template / tracked
@@ -11100,13 +10797,9 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				// a renderable childSlot, preserving byte-equality with the inline form.
 				const member = memberProps(hn, expr);
 				const rendered = isKnownStringExpression(expr, ctx.knownStringLocals)
-					? {
-							type: 'TSAsExpression',
-							expression: member,
-							typeAnnotation: { type: 'TSStringKeyword' },
-						}
+					? builders.ts_as(member, builders.ts_keyword_type('string'))
 					: member;
-				newChildren.push({ type: 'JSXExpressionContainer', expression: rendered });
+				newChildren.push(builders.jsx_expression_container(rendered));
 			}
 		} else if (t === 'Element' || t === 'JSXElement') {
 			if (isLongFormTemplateSentinel(child, childNs)) {
@@ -11126,7 +10819,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			} else if (isComponentTag(child)) {
 				const hn = `h${holeProps.length}`;
 				holeProps.push(objectProp(hn, jsxElementToCreateElement(child, ctx)));
-				newChildren.push({ type: 'JSXExpressionContainer', expression: memberProps(hn, child) });
+				newChildren.push(builders.jsx_expression_container(memberProps(hn, child)));
 			} else {
 				newChildren.push(extractFragment(child, ctx, holeProps, childNs));
 			}
@@ -11156,10 +10849,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const ifNode =
 				t === 'JSXIfExpression'
 					? {
-							type: 'IfStatement',
-							test: child.test,
-							consequent: child.consequent,
-							alternate: child.alternate || null,
+							...builders.if(child.test, child.consequent, child.alternate || null),
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
@@ -11167,11 +10857,11 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const condHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(condHole, rewriteJsxValues(ic.condTest, ctx)));
 			const thenHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(thenHole, { type: 'Identifier', name: ic.thenHelper }));
+			holeProps.push(objectProp(thenHole, builders.id(ic.thenHelper)));
 			let elseHoleName = null;
 			if (ic.elseHelper) {
 				elseHoleName = `h${holeProps.length}`;
-				holeProps.push(objectProp(elseHoleName, { type: 'Identifier', name: ic.elseHelper }));
+				holeProps.push(objectProp(elseHoleName, builders.id(ic.elseHelper)));
 			}
 			// Renderer-side, the call reads everything from `props.hN`.
 			ic.condExpr = `props.${condHole}`;
@@ -11182,12 +10872,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			// renderer-side call passes current values (same as deps for @for).
 			if (ic.envNames && ic.envNames.length) {
 				const envHole = `h${holeProps.length}`;
-				holeProps.push(
-					objectProp(envHole, {
-						type: 'ArrayExpression',
-						elements: ic.envNames.map((n) => ({ type: 'Identifier', name: n })),
-					}),
-				);
+				holeProps.push(objectProp(envHole, builders.array(ic.envNames.map((n) => builders.id(n)))));
 				ic.envExpr = `props.${envHole}`;
 			}
 			fc.directiveCalls.ifCalls.push(ic);
@@ -11207,11 +10892,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const forNode =
 				t === 'JSXForExpression'
 					? {
-							type: 'ForOfStatement',
-							left: child.left,
-							right: child.right,
-							body: child.body,
-							await: !!child.await,
+							...builders.for_of(child.left, child.right, child.body, !!child.await),
 							key: child.key || null,
 							index: child.index || null,
 							empty: child.empty || null,
@@ -11222,12 +10903,12 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const itemsHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
 			const bodyHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(bodyHole, { type: 'Identifier', name: rec.bodyHelper }));
+			holeProps.push(objectProp(bodyHole, builders.id(rec.bodyHelper)));
 			rec.itemsExpr = `props.${itemsHole}`;
 			rec.bodyHelper = `props.${bodyHole}`;
 			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
 				const emptyHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(emptyHole, { type: 'Identifier', name: rec.emptyHelper }));
+				holeProps.push(objectProp(emptyHole, builders.id(rec.emptyHelper)));
 				rec.emptyHelper = `props.${emptyHole}`;
 			}
 			const dependencyHoles = new Map();
@@ -11235,7 +10916,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				const existing = dependencyHoles.get(name);
 				if (existing !== undefined) return existing;
 				const depHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(depHole, { type: 'Identifier', name }));
+				holeProps.push(objectProp(depHole, builders.id(name)));
 				const expression = `props.${depHole}`;
 				dependencyHoles.set(name, expression);
 				return expression;
@@ -11267,9 +10948,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const swNode =
 				t === 'JSXSwitchExpression'
 					? {
-							type: 'SwitchStatement',
-							discriminant: child.discriminant,
-							cases: child.cases || [],
+							...builders.switch(child.discriminant, child.cases || []),
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
@@ -11279,28 +10958,26 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			rec.discExpr = `props.${discHole}`;
 			const casesHole = `h${holeProps.length}`;
 			holeProps.push(
-				objectProp(casesHole, {
-					type: 'ArrayExpression',
-					elements: rec.caseRecords.map((cr) => ({
-						type: 'ArrayExpression',
-						elements: [rewriteJsxValues(cr.testNode, ctx), { type: 'Identifier', name: cr.helper }],
-					})),
-				}),
+				objectProp(
+					casesHole,
+					builders.array(
+						rec.caseRecords.map((cr) =>
+							builders.array([rewriteJsxValues(cr.testNode, ctx), builders.id(cr.helper)]),
+						),
+					),
+				),
 			);
 			rec.casesArrayExpr = `props.${casesHole}`;
 			if (rec.defaultHelper && rec.defaultHelper !== 'null') {
 				const defHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(defHole, { type: 'Identifier', name: rec.defaultHelper }));
+				holeProps.push(objectProp(defHole, builders.id(rec.defaultHelper)));
 				rec.defaultHelper = `props.${defHole}`;
 			}
 			// Phase 2: env tuple hole (see the @if fold above).
 			if (rec.envNames && rec.envNames.length) {
 				const envHole = `h${holeProps.length}`;
 				holeProps.push(
-					objectProp(envHole, {
-						type: 'ArrayExpression',
-						elements: rec.envNames.map((n) => ({ type: 'Identifier', name: n })),
-					}),
+					objectProp(envHole, builders.array(rec.envNames.map((n) => builders.id(n)))),
 				);
 				rec.envExpr = `props.${envHole}`;
 			}
@@ -11318,36 +10995,34 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const tryNode =
 				t === 'JSXTryExpression'
 					? {
-							type: 'TryStatement',
-							block: child.block,
-							handler: child.handler || null,
-							finalizer: child.finalizer || null,
-							pending: child.pending || null,
+							...builders.try(
+								child.block,
+								child.handler || null,
+								child.finalizer || null,
+								child.pending || null,
+							),
 							loc: child.loc, // preserve position for dev hydration LOC
 						}
 					: child;
 			const rec = makeTryCall(tryNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const tryHole = `h${holeProps.length}`;
-			holeProps.push(objectProp(tryHole, { type: 'Identifier', name: rec.tryHelper }));
+			holeProps.push(objectProp(tryHole, builders.id(rec.tryHelper)));
 			rec.tryHelper = `props.${tryHole}`;
 			if (rec.catchHelper && rec.catchHelper !== 'null') {
 				const catchHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(catchHole, { type: 'Identifier', name: rec.catchHelper }));
+				holeProps.push(objectProp(catchHole, builders.id(rec.catchHelper)));
 				rec.catchHelper = `props.${catchHole}`;
 			}
 			if (rec.pendingHelper && rec.pendingHelper !== 'null') {
 				const pendHole = `h${holeProps.length}`;
-				holeProps.push(objectProp(pendHole, { type: 'Identifier', name: rec.pendingHelper }));
+				holeProps.push(objectProp(pendHole, builders.id(rec.pendingHelper)));
 				rec.pendingHelper = `props.${pendHole}`;
 			}
 			// Phase 2: env tuple hole (see the @if fold above).
 			if (rec.envNames && rec.envNames.length) {
 				const envHole = `h${holeProps.length}`;
 				holeProps.push(
-					objectProp(envHole, {
-						type: 'ArrayExpression',
-						elements: rec.envNames.map((n) => ({ type: 'Identifier', name: n })),
-					}),
+					objectProp(envHole, builders.array(rec.envNames.map((n) => builders.id(n)))),
 				);
 				rec.envExpr = `props.${envHole}`;
 			}
@@ -11378,8 +11053,7 @@ function extractFragmentComponent(node, ctx, holeProps, parentNs = 'html') {
 	holeProps.push(objectProp(componentHole, rewriteJsxValues(jsxNameToExpr(sourceName), ctx)));
 	const extracted = extractFragment(node, ctx, holeProps, parentNs);
 	const dynamicName = {
-		type: 'JSXExpressionContainer',
-		expression: memberProps(componentHole, sourceName),
+		...builders.jsx_expression_container(memberProps(componentHole, sourceName)),
 		isDynamic: true,
 	};
 	const out = { ...extracted, id: dynamicName };
@@ -11428,16 +11102,13 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 	const rendererEl = extractFragmentRoot(node, ctx, holeProps, parentNs);
 	ctx._foldCtx = prevFold;
 	const fragName = `_frag$${ctx.nextFragId++}`;
-	const synthFn = {
-		type: 'FunctionDeclaration',
-		id: { type: 'Identifier', name: fragName },
-		params: [{ type: 'Identifier', name: 'props' }],
-		async: false,
-		generator: false,
+	const synthFn = builders.function_declaration(
+		builders.id(fragName),
+		[builders.id('props')],
 		// `foldedDirectives` carries the pre-built directive records to the renderer's
 		// compileFunctionBody → emitElementHtml (via ctx._foldedDirectiveCalls).
-		body: { type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
-	};
+		{ type: 'JSXCodeBlock', body: [], render: rendererEl, foldedDirectives: directiveCalls },
+	);
 	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
@@ -11449,15 +11120,11 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		ctx.hoistedHelpers.push(renderer);
 	}
 	ctx.runtimeNeeded.add('createElement');
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$createElement' },
-		arguments: [
-			{ type: 'Identifier', name: fragName },
-			{ type: 'ObjectExpression', properties: holeProps },
-		],
-		optional: false,
-	};
+	return builders.call(
+		builders.id('_$createElement'),
+		builders.id(fragName),
+		builders.object(holeProps),
+	);
 }
 
 /**
@@ -11481,28 +11148,27 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 			const helperName = `__tsrx$${ctx.nextHelperId++}`;
 			const fakeBody = {
 				type: 'Component',
-				id: { type: 'Identifier', name: helperName },
+				id: builders.id(helperName),
 				params: [],
 				body: n.children || [],
 			};
 			const fn = compileFunctionBody(fakeBody, ctx, helperName);
 			inlinedSubs.push(fn + ';');
-			return { type: 'Identifier', name: helperName };
+			return builders.id(helperName);
 		}
 		if (n.type === 'ArrowFunctionExpression' && n.body && n.body.type === 'JSXCodeBlock') {
 			// `() => @{ … }` — new sub-template form. Hoist as a regular component
 			// body so its body.body (setup) + body.render (JSX) feed back through
 			// the standard compileFunctionBody path.
 			const helperName = `__tsrx$${ctx.nextHelperId++}`;
-			const fakeBody = {
-				type: 'FunctionDeclaration',
-				id: { type: 'Identifier', name: helperName },
-				params: n.params || [],
-				body: n.body,
-			};
+			const fakeBody = builders.function_declaration(
+				builders.id(helperName),
+				n.params || [],
+				n.body,
+			);
 			const fn = compileFunctionBody(fakeBody, ctx, helperName);
 			inlinedSubs.push(fn + ';');
-			return { type: 'Identifier', name: helperName };
+			return builders.id(helperName);
 		}
 		return null;
 	});
@@ -11649,7 +11315,7 @@ function lowerJsxChild(child, ctx) {
 		const v = child.value != null ? child.value : child.raw;
 		if (v == null) return null;
 		if (/^\s*$/.test(v) && /[\n\r]/.test(v)) return null;
-		return { type: 'Literal', value: v };
+		return builders.literal(v);
 	}
 	if (t === 'JSXExpressionContainer') {
 		if (!child.expression || child.expression.type === 'JSXEmptyExpression') return null;
@@ -11668,12 +11334,7 @@ function lowerJsxChild(child, ctx) {
 		// runtime-built arrays (`.map()` results). Emitted in BOTH modes — the
 		// server export is the identity (`ssrChild` just renders the array).
 		ctx.runtimeNeeded.add('positionalChildren');
-		return {
-			type: 'CallExpression',
-			callee: { type: 'Identifier', name: rtAlias('positionalChildren') },
-			arguments: [{ type: 'ArrayExpression', elements: els }],
-			optional: false,
-		};
+		return builders.call(builders.id(rtAlias('positionalChildren')), builders.array(els));
 	}
 	return null; // Comment / unknown — drop.
 }
@@ -11681,22 +11342,19 @@ function lowerJsxChild(child, ctx) {
 // Convert a JSX tag name node to a plain expression node esrap can print.
 function jsxNameToExpr(name) {
 	if (name.type === 'Identifier' || name.type === 'JSXIdentifier') {
-		return { type: 'Identifier', name: name.name };
+		return builders.id(name.name);
 	}
 	if (name.type === 'MemberExpression' || name.type === 'JSXMemberExpression') {
 		const prop = name.property;
-		return {
-			type: 'MemberExpression',
-			object: jsxNameToExpr(name.object),
-			property:
-				prop && prop.type ? jsxNameToExpr(prop) : { type: 'Identifier', name: String(prop) },
-			computed: false,
-			optional: false,
-		};
+		return builders.member(
+			jsxNameToExpr(name.object),
+			prop && prop.type ? jsxNameToExpr(prop) : builders.id(String(prop)),
+			false,
+		);
 	}
 	// `<{expr}/>` — dynamic tag carries the expression directly.
 	if (name.type === 'JSXExpressionContainer') return name.expression;
-	return { type: 'Identifier', name: String(name.name || name) };
+	return builders.id(String(name.name || name));
 }
 
 // Build a `createElement(Comp, { ...props })` CallExpression AST node from a
@@ -11709,7 +11367,7 @@ function jsxElementToCreateElement(node, ctx) {
 	// component (capitalized / member / dynamic) → the identifier/member ref.
 	const compNode = componentTag
 		? jsxNameToExpr(nameNode)
-		: { type: 'Literal', value: nameNode.name != null ? nameNode.name : String(nameNode) };
+		: builders.literal(nameNode.name != null ? nameNode.name : String(nameNode));
 	if (!componentTag) {
 		rejectVoidElementContent(compNode.value, node, ctx);
 		rejectDangerouslySetInnerHTMLChildren(compNode.value, node, ctx);
@@ -11718,7 +11376,7 @@ function jsxElementToCreateElement(node, ctx) {
 	const properties = [];
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			properties.push({ type: 'SpreadElement', argument: rewriteJsxValues(attr.argument, ctx) });
+			properties.push(builders.spread(rewriteJsxValues(attr.argument, ctx)));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -11728,7 +11386,7 @@ function jsxElementToCreateElement(node, ctx) {
 		// renderer's applyDeoptProps attaches it).
 		let valNode;
 		if (attr.value == null) {
-			valNode = { type: 'Literal', value: true };
+			valNode = builders.literal(true);
 		} else if (
 			attr.value.type !== 'JSXExpressionContainer' &&
 			typeof attr.value.value === 'string'
@@ -11736,49 +11394,38 @@ function jsxElementToCreateElement(node, ctx) {
 			// JSX string attributes may contain raw newlines (multi-line class
 			// strings); the parser's `raw` is the raw JSX slice, which is not a
 			// valid JS string literal. Re-derive raw from the cooked value.
-			valNode = {
-				type: 'Literal',
-				value: attr.value.value,
-				raw: JSON.stringify(attr.value.value),
-			};
+			valNode = builders.literal(attr.value.value, JSON.stringify(attr.value.value));
 		} else {
 			const inner =
 				attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
 			valNode = rewriteJsxValues(inner, ctx);
 		}
 		const keyIsIdent = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName);
-		properties.push({
-			type: 'Property',
-			key: keyIsIdent
-				? { type: 'Identifier', name: attrName }
-				: { type: 'Literal', value: attrName },
-			value: valNode,
-			kind: 'init',
-			method: false,
-			shorthand: false,
-			computed: false,
-		});
+		properties.push(
+			builders.prop(
+				'init',
+				keyIsIdent ? builders.id(attrName) : builders.literal(attrName),
+				valNode,
+			),
+		);
 	}
 	if (ctx.dev && !componentTag) {
 		const classification = ctx.nativeChangeClassifications?.get(
 			node.start ?? node.openingElement?.start,
 		);
 		if (classification === 'statically-warned' || classification === 'runtime-check') {
-			properties.push({
-				type: 'Property',
-				key: { type: 'Identifier', name: '__octaneNativeChangeDiagnostic' },
-				value: {
-					type: 'Literal',
-					value: classification === 'statically-warned' ? 'static' : 'runtime',
-				},
-				kind: 'init',
-				method: false,
-				shorthand: false,
-				computed: false,
-			});
+			properties.push(
+				builders.prop(
+					'init',
+					builders.id('__octaneNativeChangeDiagnostic'),
+					builders.literal(classification === 'statically-warned' ? 'static' : 'runtime'),
+					false,
+					false,
+				),
+			);
 		}
 	}
-	const args = [compNode, { type: 'ObjectExpression', properties }];
+	const args = [compNode, builders.object(properties)];
 	// Children → trailing `createElement(type, props, ...children)` args, each
 	// lowered recursively (host child → createElement, `{expr}` → expr, text →
 	// string). The runtime collects these into `descriptor.children`.
@@ -11791,7 +11438,7 @@ function jsxElementToCreateElement(node, ctx) {
 		// the same whole-script neutralization.
 		const content = normalizeStaticScriptDescriptorContent(authoredStaticScriptContent);
 		if (content !== '') {
-			args.push({ type: 'Literal', value: content });
+			args.push(builders.literal(content));
 		}
 	} else {
 		for (const child of node.children || []) {
@@ -11802,12 +11449,7 @@ function jsxElementToCreateElement(node, ctx) {
 			if (lowered !== null) args.push(lowered);
 		}
 	}
-	return {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: '_$createElement' },
-		arguments: args,
-		optional: false,
-	};
+	return builders.call(builders.id('_$createElement'), ...args);
 }
 
 // Short, unique, path-free slot description for non-HMR output: a djb2 hash of
@@ -12029,22 +11671,17 @@ function headTextExpression(el) {
 				.replace(/^\n+/, '')
 				.replace(/\n+$/, '')
 				.replace(/\n+/g, ' ');
-			if (normalized !== '') parts.push({ type: 'Literal', value: normalized });
+			if (normalized !== '') parts.push(builders.literal(normalized));
 		} else if (c.type === 'JSXExpressionContainer') {
 			if (c.expression && c.expression.type !== 'JSXEmptyExpression') parts.push(c.expression);
 		} else if (c.type === 'Literal' || c.type === 'StringLiteral') {
-			parts.push({ type: 'Literal', value: c.value });
+			parts.push(builders.literal(c.value));
 		}
 	}
-	if (parts.length === 0) return { type: 'Literal', value: null };
+	if (parts.length === 0) return builders.literal(null);
 	let expression = parts[0];
 	for (let i = 1; i < parts.length; i++) {
-		expression = {
-			type: 'BinaryExpression',
-			operator: '+',
-			left: expression,
-			right: parts[i],
-		};
+		expression = builders.binary('+', expression, parts[i]);
 	}
 	return expression;
 }
@@ -12058,28 +11695,28 @@ function deferredHeadAttrs(el) {
 	const properties = [];
 	for (const attr of el.openingElement.attributes || []) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			properties.push({ type: 'SpreadElement', argument: attr.argument });
+			properties.push(builders.spread(attr.argument));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
 		const attrName = attr.name.name || attr.name;
 		if (attrName === 'key') continue;
 		let value;
-		if (attr.value == null) value = { type: 'Literal', value: true };
+		if (attr.value == null) value = builders.literal(true);
 		else value = attr.value.type === 'JSXExpressionContainer' ? attr.value.expression : attr.value;
-		properties.push({
-			type: 'Property',
-			key: /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName)
-				? { type: 'Identifier', name: attrName }
-				: { type: 'Literal', value: attrName },
-			value,
-			kind: 'init',
-			method: false,
-			shorthand: false,
-			computed: false,
-		});
+		properties.push(
+			builders.prop(
+				'init',
+				/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(attrName)
+					? builders.id(attrName)
+					: builders.literal(attrName),
+				value,
+				false,
+				false,
+			),
+		);
 	}
-	return { type: 'ObjectExpression', properties };
+	return builders.object(properties);
 }
 
 // Replace a namespace-ambiguous <title> with an internal component. A normal
@@ -12102,28 +11739,17 @@ function deferredTitleElement(el, ctx) {
 		}
 	}
 	const args = [
-		{ type: 'Literal', value: headKey(el, 0) },
-		{ type: 'Literal', value: 'title' },
+		builders.literal(headKey(el, 0)),
+		builders.literal('title'),
 		deferredHeadAttrs(el),
 		headTextExpression(el),
 	];
 	if (authoredKey !== null) args.push(authoredKey);
-	const expression = {
-		type: 'CallExpression',
-		callee: { type: 'Identifier', name: rtAlias('namespaceHeadElement') },
-		arguments: args,
-		optional: false,
-		loc: el.openingElement.loc,
-		start: el.openingElement.start,
-		end: el.openingElement.end,
-	};
-	return {
-		type: 'JSXExpressionContainer',
-		expression,
-		loc: el.loc,
-		start: el.start,
-		end: el.end,
-	};
+	const expression = builders.set_location(
+		builders.call(builders.id(rtAlias('namespaceHeadElement')), ...args),
+		el.openingElement,
+	);
+	return builders.set_location(builders.jsx_expression_container(expression), el);
 }
 
 function opaqueHostChildNamespace(tag, namespace) {
@@ -12328,7 +11954,7 @@ function normalizeChildren(nodes, inSvg = false) {
 			if (/^\s*$/.test(n.value)) continue;
 			out.push({
 				type: 'Text',
-				expression: { type: 'Literal', value: n.value, raw: JSON.stringify(n.value) },
+				expression: builders.literal(n.value, JSON.stringify(n.value)),
 			});
 		} else if (n.type === 'JSXExpressionContainer') {
 			// A JSX comment — `{/* … */}` — parses as a container wrapping a
@@ -12466,11 +12092,8 @@ function normalizeChildren(nodes, inSvg = false) {
 			// shape so the existing makeIfCall path picks it up. `consequent` and
 			// `alternate` are already BlockStatements per the new AST.
 			out.push({
-				type: 'IfStatement',
+				...builders.if(n.test, n.consequent, n.alternate || null),
 				loc: n.loc, // preserve template directive position for dev hydration LOC
-				test: n.test,
-				consequent: n.consequent,
-				alternate: n.alternate || null,
 			});
 		} else if (n.type === 'JSXForExpression') {
 			// `@for (const x of items; index i; key x.id) { ... }` — lower to
@@ -12478,12 +12101,8 @@ function normalizeChildren(nodes, inSvg = false) {
 			// us on the directive node. makeForCall reads these off the synthetic
 			// ForOfStatement to plan keyed reconciliation.
 			out.push({
-				type: 'ForOfStatement',
+				...builders.for_of(n.left, n.right, n.body, !!n.await),
 				loc: n.loc, // preserve template directive position for dev hydration LOC
-				left: n.left,
-				right: n.right,
-				body: n.body,
-				await: !!n.await,
 				key: n.key || null,
 				index: n.index || null,
 				empty: n.empty || null,
@@ -12493,24 +12112,18 @@ function normalizeChildren(nodes, inSvg = false) {
 			// with the optional `pending` field tagged on (consumed by makeTryCall
 			// as the Suspense fallback branch).
 			out.push({
-				type: 'TryStatement',
+				...builders.try(n.block, n.handler || null, n.finalizer || null, n.pending || null),
 				start: n.start,
 				end: n.end,
 				loc: n.loc, // preserve template directive position for dev hydration LOC
-				block: n.block,
-				handler: n.handler || null,
-				finalizer: n.finalizer || null,
-				pending: n.pending || null,
 				propagateSuspense: n.propagateSuspense === true,
 			});
 		} else if (n.type === 'JSXSwitchExpression') {
 			// `@switch (d) { @case 1: { ... } @default: { ... } }` — lower to a
 			// synthetic SwitchStatement for makeSwitchCall to consume.
 			out.push({
-				type: 'SwitchStatement',
+				...builders.switch(n.discriminant, n.cases || []),
 				loc: n.loc, // preserve template directive position for dev hydration LOC
-				discriminant: n.discriminant,
-				cases: n.cases || [],
 			});
 		} else if (n.type === 'JSXCodeBlock') {
 			// `@{ … }` at child position — tsrx 0.1.29 lets `@{}` appear here as
@@ -15080,7 +14693,7 @@ function emitElementHtml(
 				classBeforeSpread ||
 				(ctx.dev && needsDevStaticAttrValidation(attrName, true, tag, hostNs))
 			) {
-				inner = { type: 'Literal', value: true, raw: 'true' };
+				inner = builders.literal(true, 'true');
 			} else {
 				attrHtml += bakeStaticAttr(attrName, true, tag, hostNs);
 				continue;
@@ -15623,10 +15236,11 @@ function emitElementHtml(
 					// Lower `{cond ? A : B}` (where A or B is JSX) to an IfStatement so
 					// each branch renders real DOM via the existing ifBlock machinery.
 					const asIf = {
-						type: 'IfStatement',
-						test: expr.test,
-						consequent: wrapAsBlockStmt(expr.consequent),
-						alternate: wrapAsBlockStmt(expr.alternate),
+						...builders.if(
+							expr.test,
+							wrapAsBlockStmt(expr.consequent),
+							wrapAsBlockStmt(expr.alternate),
+						),
 						loc: expr.loc, // carry source position for dev hydration-mismatch LOC
 					};
 					const ic = makeIfCall(asIf, ctx, inlinedSubs, childNs, cssHash);
@@ -15746,7 +15360,7 @@ function helperCaptures(ctx, stmts, params) {
 	if (!ctx.currentComponentLocals) return null;
 	const scope = new Set();
 	for (const p of params || []) collectBindings(p, scope);
-	const free = collectFreeIdentifiers({ type: 'BlockStatement', body: stmts }, scope);
+	const free = collectFreeIdentifiers(builders.block(stmts), scope);
 	const env = [];
 	for (const n of free) {
 		if (ctx.currentComponentLocals.has(n) || /^__pu\$\d+$/.test(n)) env.push(n);
@@ -15798,28 +15412,18 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 		// binding them could collide with a same-named local that shadows a capture
 		// used only by another arm.
 		bodyStmts = [
-			{
-				type: 'VariableDeclaration',
-				kind: 'const',
-				declarations: [
-					{
-						type: 'VariableDeclarator',
-						id: {
-							type: 'ArrayPattern',
-							elements: envNames.map((n) =>
-								ownEnv.has(n) ? { type: 'Identifier', name: n } : null,
-							),
-						},
-						init: { type: 'Identifier', name: '__extra' },
-					},
-				],
-			},
+			builders.declaration('const', [
+				builders.declarator(
+					builders.array_pattern(envNames.map((n) => (ownEnv.has(n) ? builders.id(n) : null))),
+					builders.id('__extra'),
+				),
+			]),
 			...stmts,
 		];
 	}
 	const fake = {
 		type: 'Component',
-		id: { type: 'Identifier', name: helperName },
+		id: builders.id(helperName),
 		params: params || [],
 		body: bodyStmts,
 	};
@@ -16397,43 +16001,25 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// tryBlock-supplied props object. We synthesize a small destructuring
 		// VariableDeclaration at the top of the body so the user's identifiers
 		// resolve. The body is otherwise compiled like any component body.
-		const destructure = {
-			type: 'VariableDeclaration',
-			kind: 'const',
-			declarations: [
-				{
-					type: 'VariableDeclarator',
-					id: {
-						type: 'ObjectPattern',
-						properties: [
-							{
-								type: 'Property',
-								key: { type: 'Identifier', name: 'err' },
-								value: { type: 'Identifier', name: errName },
-								kind: 'init',
-								shorthand: errName === 'err',
-								computed: false,
-								method: false,
-							},
-							{
-								type: 'Property',
-								key: { type: 'Identifier', name: 'reset' },
-								value: { type: 'Identifier', name: resetName },
-								kind: 'init',
-								shorthand: resetName === 'reset',
-								computed: false,
-								method: false,
-							},
-						],
-					},
-					init: { type: 'Identifier', name: '__props' },
-				},
-			],
-		};
+		const destructure = builders.declaration('const', [
+			builders.declarator(
+				builders.object_pattern([
+					builders.prop('init', builders.id('err'), builders.id(errName), false, errName === 'err'),
+					builders.prop(
+						'init',
+						builders.id('reset'),
+						builders.id(resetName),
+						false,
+						resetName === 'reset',
+					),
+				]),
+				builders.id('__props'),
+			),
+		]);
 		catchBodyStmts = [destructure, ...catchStmts];
 	}
 
-	const catchParams = [{ type: 'Identifier', name: '__props' }];
+	const catchParams = [builders.id('__props')];
 	const envNames = unionEnv(ctx, [
 		{ stmts: tryStmts, params: [] },
 		pendingStmts && { stmts: pendingStmts, params: [] },
@@ -16592,13 +16178,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// the same destructure pattern as the arg so the user's `key id` (where
 	// `id` is a destructured field) actually resolves.
 	function mkKeyFn(keyExpr) {
-		const param = isDestructured ? leftDeclId : { type: 'Identifier', name: itemName };
-		return printExpr({
-			type: 'ArrowFunctionExpression',
-			params: [param],
-			body: keyExpr,
-			expression: true,
-		});
+		const param = isDestructured ? leftDeclId : builders.id(itemName);
+		return printExpr(builders.arrow([param], keyExpr));
 	}
 
 	let keyFn = null;
@@ -16640,22 +16221,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// current position.
 	const indexInjection = node.index
 		? [
-				{
-					type: 'VariableDeclaration',
-					kind: 'const',
-					declarations: [
-						{
-							type: 'VariableDeclarator',
-							id: { type: 'Identifier', name: node.index.name },
-							init: {
-								type: 'MemberExpression',
-								object: { type: 'Identifier', name: '__block' },
-								property: { type: 'Identifier', name: 'itemIndex' },
-								computed: false,
-							},
-						},
-					],
-				},
+				builders.declaration('const', [
+					builders.declarator(
+						builders.id(node.index.name),
+						builders.member(builders.id('__block'), builders.id('itemIndex')),
+					),
+				]),
 			]
 		: [];
 
@@ -16663,17 +16234,12 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// at the top of the body so the user fields bind from the synthetic item.
 	const destructureInjection = isDestructured
 		? [
-				{
-					type: 'VariableDeclaration',
-					kind: 'const',
-					declarations: [
-						{
-							type: 'VariableDeclarator',
-							id: leftDeclId, // ObjectPattern / ArrayPattern (lazy flag dropped by printer)
-							init: { type: 'Identifier', name: itemName },
-						},
-					],
-				},
+				builders.declaration('const', [
+					builders.declarator(
+						leftDeclId, // ObjectPattern / ArrayPattern (lazy flag dropped by printer)
+						builders.id(itemName),
+					),
+				]),
 			]
 		: [];
 
@@ -16702,7 +16268,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	if (ctx.currentComponentLocals) {
 		const bodyScope = new Set([itemName]);
 		if (node.index) bodyScope.add(node.index.name);
-		const bodyAst = { type: 'BlockStatement', body: subStmts };
+		const bodyAst = builders.block(subStmts);
 		const free = collectFreeIdentifiers(bodyAst, bodyScope);
 		let hasParentClosure = false;
 		let hasHook = false;
@@ -16789,7 +16355,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// body/key/@empty capture are unchanged. Direct render-time calls, refs,
 		// mutations, effects, portals, and opaque module/global reads fail closed.
 		const regionStmts = emptyStmts ? [...subStmts, ...emptyStmts] : subStmts;
-		const regionAst = { type: 'BlockStatement', body: regionStmts };
+		const regionAst = builders.block(regionStmts);
 		const regionFree = collectFreeIdentifiers(regionAst, bodyScope);
 		if (node.key) {
 			for (const name of collectFreeIdentifiers(node.key, bodyScope)) regionFree.add(name);
@@ -16868,7 +16434,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// on every item/empty block). The union may widen deps with @empty-only
 	// captures — a conservative, correct deps for promotion purposes.
 	const itemAllStmts = [...indexInjection, ...destructureInjection, ...subStmts];
-	const itemParams = [{ type: 'Identifier', name: itemName }];
+	const itemParams = [builders.id(itemName)];
 	const envNames = unionEnv(ctx, [
 		{ stmts: itemAllStmts, params: itemParams },
 		emptyStmts && { stmts: emptyStmts, params: [] },
@@ -17047,12 +16613,7 @@ function rewriteEarlyExits(body, allowExplicitNull = false) {
 		if (isEarlyExitIf(stmt, allowExplicitNull)) {
 			const rest = rewriteEarlyExits(body.slice(i + 1), allowExplicitNull);
 			if (rest.length > 0) {
-				out.push({
-					type: 'IfStatement',
-					test: { type: 'UnaryExpression', operator: '!', argument: stmt.test, prefix: true },
-					consequent: { type: 'BlockStatement', body: rest },
-					alternate: null,
-				});
+				out.push(builders.if(builders.unary('!', stmt.test), builders.block(rest), null));
 			}
 			return out;
 		}
@@ -17220,10 +16781,7 @@ function printNodeWithMap(node, ctx) {
 
 function printExpr(node) {
 	// Wrap in an ExpressionStatement to get a printable form, then strip trailing `;`.
-	const wrapped = {
-		type: 'ExpressionStatement',
-		expression: escapeMultilineStringLiterals(node),
-	};
+	const wrapped = builders.stmt(escapeMultilineStringLiterals(node));
 	return printNode(wrapped).trim().replace(/;$/, '');
 }
 

@@ -1,3 +1,4 @@
+import { builders } from '@tsrx/core';
 import { nsForChildren, nsForSelf } from './jsx-namespace.js';
 import { analyzeRendererBoundaries } from './renderer-boundaries.js';
 
@@ -154,7 +155,7 @@ function attributeName(attribute) {
 }
 
 function attributeExpression(attribute) {
-	if (attribute?.value == null) return { type: 'Literal', value: true };
+	if (attribute?.value == null) return builders.literal(true);
 	return unwrapExpression(
 		attribute.value.type === 'JSXExpressionContainer'
 			? attribute.value.expression

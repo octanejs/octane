@@ -7,7 +7,7 @@
  * through the existing client hook/dependency pass, then its Octane runtime
  * import is retargeted to the selected renderer module.
  */
-import { parseModule } from '@tsrx/core';
+import { builders, parseModule } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { normalizeUniversalRuntime } from './universal-runtime.js';
@@ -199,7 +199,7 @@ function printNode(node) {
 }
 
 function printExpression(node) {
-	return printNode({ type: 'ExpressionStatement', expression: node }).trim().replace(/;$/, '');
+	return printNode(builders.stmt(node)).trim().replace(/;$/, '');
 }
 
 function isTemplateNode(node) {

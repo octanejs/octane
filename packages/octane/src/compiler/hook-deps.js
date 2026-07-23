@@ -2,6 +2,8 @@
 // omitted. The same analysis feeds the full TSRX/TSX compiler and the
 // surgical plain-TS hook pass, keeping custom hooks and components aligned.
 
+import { builders } from '@tsrx/core';
+
 const DEPENDENCY_HOOKS = new Map([
 	['useEffect', { callback: 0, deps: 1 }],
 	['useLayoutEffect', { callback: 0, deps: 1 }],
@@ -1048,10 +1050,11 @@ export function analyzeHookDependencies(ast, options = {}) {
 export function applyHookDependencies(ast, options = {}) {
 	const inferred = analyzeHookDependencies(ast, options);
 	for (const [call, result] of inferred) {
-		call.arguments.splice(result.depsIndex, 0, {
-			type: 'ArrayExpression',
-			elements: result.dependencies.map((dependency) => cloneDependency(dependency.node)),
-		});
+		call.arguments.splice(
+			result.depsIndex,
+			0,
+			builders.array(result.dependencies.map((dependency) => cloneDependency(dependency.node))),
+		);
 	}
 	return inferred;
 }
