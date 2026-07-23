@@ -737,8 +737,8 @@ catalogs:
       specifier: 0.3.0
       version: 0.3.0
     '@lynx-js/types':
-      specifier: 4.0.0
-      version: 4.0.0
+      specifier: 4.1.0
+      version: 4.1.0
     '@lynx-js/webpack-dev-transport':
       specifier: 0.3.0
       version: 0.3.0
@@ -3991,7 +3991,7 @@ importers:
     dependencies:
       '@lynx-js/types':
         specifier: catalog:lynx
-        version: 4.0.0
+        version: 4.1.0
     devDependencies:
       '@lynx-js/testing-environment':
         specifier: catalog:lynx
@@ -6997,8 +6997,8 @@ packages:
   '@lynx-js/testing-environment@0.3.0':
     resolution: {integrity: sha512-a08y6fmEZZHNva/bCs4UT8SavTPFnH8j0wb01gnnC6RA28r0139I5ApjAzaPi+LSaj1pH+A5o41bDts2iV+ulw==}
 
-  '@lynx-js/types@4.0.0':
-    resolution: {integrity: sha512-FBtBV8wt+9/CAUbTdZwvbhGjJEnyzKLWVpq5gaTHTbhDztbhdP0avZ0nHD6I5HSgAhzYNB9oDrqMt/r6YqBkng==}
+  '@lynx-js/types@4.1.0':
+    resolution: {integrity: sha512-WLWnMpGZMrjffSR62PYesSfjD0RWumPyT21iMTi7GySGkOSOGdv4q4wWkarg8zNI7SxcCFM6kpXFhyIERADBPQ==}
 
   '@lynx-js/web-core@0.22.2':
     resolution: {integrity: sha512-pJY0/h/7GcP6O2NYAwpTXe8ZT5tAq91aECSvRcAyvS/7YCW/3JMYuOtZLgOfF+Nan45PjSMVLn5NmLx9cSRj7Q==}
@@ -17164,7 +17164,7 @@ snapshots:
 
   '@lynx-js/testing-environment@0.3.0': {}
 
-  '@lynx-js/types@4.0.0':
+  '@lynx-js/types@4.1.0':
     dependencies:
       csstype: 3.1.3
 
