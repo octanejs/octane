@@ -3674,8 +3674,8 @@ importers:
   packages/cmdk:
     dependencies:
       '@octanejs/radix':
-        specifier: workspace:*
-        version: link:../radix
+        specifier: 0.1.12
+        version: 0.1.12(octane@packages+octane)
     devDependencies:
       '@octanejs/testing-library':
         specifier: workspace:*
@@ -7120,6 +7120,18 @@ packages:
   '@observablehq/plot@0.6.17':
     resolution: {integrity: sha512-/qaXP/7mc4MUS0s4cPPFASDRjtsWp85/TbfsciqDgU1HwYixbSbbytNuInD8AcTYC3xaxACgVX06agdfQy9W+g==}
     engines: {node: '>=12'}
+
+  '@octanejs/floating-ui@0.1.12':
+    resolution: {integrity: sha512-3K/Zjj3YwTQDWwbq7RdbGA11Ne8NJxCKaoUNr/NXFQlxq6PD3NBJrl+CMihGMcwpXcfitH4GD3O8W2tPsXZd8g==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: 0.1.13
+
+  '@octanejs/radix@0.1.12':
+    resolution: {integrity: sha512-LMj8Cmj+XHiUT8v+/rgcY6WMCQfruoIYQ7nZAOtA8X5aWOTqZK3wPdksGqCviJXEHncyQRwj8V77Am/SPlURJA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: 0.1.13
 
   '@octokit/auth-token@6.0.0':
     resolution: {integrity: sha512-P4YJBPdPSpWTQ1NU4XYdvHvXJJDxM6YwpS0FZHRgP7YFkdVxsWcpWGy/NVqlAA7PcPCnMacXlRm1y2PFZRWL/w==}
@@ -17330,6 +17342,19 @@ snapshots:
       d3: 7.9.0
       interval-tree-1d: 1.0.4
       isoformat: 0.2.1
+
+  '@octanejs/floating-ui@0.1.12(octane@packages+octane)':
+    dependencies:
+      '@floating-ui/dom': 1.8.0
+      '@floating-ui/utils': 0.2.12
+      octane: link:packages/octane
+      tabbable: 6.5.0
+
+  '@octanejs/radix@0.1.12(octane@packages+octane)':
+    dependencies:
+      '@octanejs/floating-ui': 0.1.12(octane@packages+octane)
+      aria-hidden: 1.2.6
+      octane: link:packages/octane
 
   '@octokit/auth-token@6.0.0': {}
 

@@ -33,7 +33,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@octanejs/radix": "workspace:*"
+    "@octanejs/radix": "0.1.12"
   },
   "peerDependencies": {
     "octane": "workspace:*"
