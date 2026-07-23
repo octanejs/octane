@@ -1,10 +1,12 @@
+import { LYNX_RENDERER_ID } from './core/renderer-id.js';
+
 /**
  * Serializable compiler metadata for Lynx-rendered TSRX modules.
  *
  * This entry is deliberately data-only. It can be loaded by compiler and
  * language tooling without evaluating either Lynx runtime or an Octane host.
  */
-export const LYNX_RENDERER_ID = 'lynx';
+export { LYNX_RENDERER_ID };
 
 const LYNX_STANDARD_PROPS = [
 	'id',
