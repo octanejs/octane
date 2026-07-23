@@ -1,5 +1,32 @@
 # Octane on Lynx demo
 
+## macOS native demo
+
+On an arm64 or x64 Mac, run:
+
+```bash
+pnpm lynx:demo:native
+```
+
+This downloads the matching official Lynx 3.9.0 Explorer archive into
+`~/Library/Caches/octane/lynx-explorer/3.9.0` when absent, verifies the pinned
+SHA-256 digest and builds an isolated temporary application on every launch,
+starts the demo on an available strict localhost port, and opens its verified
+Lynx bundle in Explorer. The archive remains cached; the extraction is removed
+after Explorer stops. Closing Explorer or pressing Ctrl-C shuts down the
+development server.
+
+Set `OCTANE_LYNX_EXPLORER_CACHE_DIR` to use another cache directory,
+`OCTANE_LYNX_EXPLORER_EXECUTABLE` to use a particular executable, or
+`OCTANE_LYNX_DEMO_PORT` to request a particular free port.
+
+The committed Milestone 11 evidence records the official arm64 Explorer
+visibly painting this demo at `Count 0` with both Octane thread programs active.
+The native tap is not yet automated, and this macOS lane does not substitute
+for Android or iOS acceptance.
+
+## Device or separately installed Explorer
+
 From the repository root, run:
 
 ```bash

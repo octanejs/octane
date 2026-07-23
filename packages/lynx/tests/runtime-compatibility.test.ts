@@ -100,6 +100,7 @@ describe('Lynx runtime compatibility evidence', () => {
 			files: [
 				'src/core/background-lifecycle.ts',
 				'src/core/client-driver.ts',
+				'src/core/environment.ts',
 				'src/core/host-props.ts',
 				'src/core/lifecycle-data.ts',
 				'src/core/native-events.ts',

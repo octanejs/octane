@@ -93,6 +93,32 @@ function removeListItem(index: number): UniversalHostCommand[] {
 }
 
 describe('Lynx native list recycling', () => {
+	it('uses the exact two-function list API published by Lynx 3.9', () => {
+		const dom = new JSDOM();
+		installLynxTestingEnv(globalThis, { window: dom.window as never });
+		const environment = globalThis.lynxTestingEnv;
+		environment.clearGlobal();
+		environment.switchToMainThread();
+		try {
+			const target = globalThis as unknown as Record<string, unknown>;
+			delete target.__UpdateListComponents;
+			const papi = createLynxElementPAPI(globalThis);
+			const container = createLynxHostContainer(papi, { root: 39 });
+
+			prepareLynxHostBatch(container, batch(1, largeListMount(1))).apply();
+			const list = (container.page as unknown as Element).querySelector('#feed')!;
+			const sign = globalThis.elementTree.enterListItemAtIndex(list as never, 0);
+
+			expect(list.firstElementChild?.textContent).toBe('Row 0');
+			expect(sign).toBeGreaterThanOrEqual(0);
+			expect(disposeLynxHostContainer(container).errors).toEqual([]);
+		} finally {
+			environment.clearGlobal();
+			uninstallLynxTestingEnv(globalThis);
+			dom.window.close();
+		}
+	});
+
 	it('reports retained subtree ancestry changes and omits same-list reorders', () => {
 		const dom = new JSDOM();
 		installLynxTestingEnv(globalThis, { window: dom.window as never });

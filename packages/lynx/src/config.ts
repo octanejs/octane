@@ -11,6 +11,7 @@ export { LYNX_RENDERER_ID };
 const LYNX_STANDARD_PROPS = [
 	'id',
 	'ref',
+	'lynx-test-tag',
 	'class',
 	'className',
 	'style',

@@ -21,6 +21,7 @@
     "bench:all": "node benchmarks/bench.mjs",
     "bench:svelte-check": "pnpm --filter './benchmarks/**/svelte' exec svelte-check --workspace .",
     "lynx:demo": "pnpm --filter @octanejs/rspeedy-plugin demo",
+    "lynx:demo:native": "pnpm --filter @octanejs/rspeedy-plugin demo:native",
     "lynx:demo:build": "pnpm --filter @octanejs/rspeedy-plugin demo:build",
     "lynx:demo:typecheck": "pnpm --filter @octanejs/rspeedy-plugin demo:typecheck",
     "lynx:demo:check": "pnpm --filter @octanejs/rspeedy-plugin demo:check",

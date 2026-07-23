@@ -1,4 +1,4 @@
-import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { execFileSync, spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -173,6 +173,44 @@ it('starts the advertised development command, serves its bundle, and shuts down
 	}
 }, 90_000);
 
+it('fails instead of moving the demo when its requested port is occupied', async () => {
+	const server = createServer();
+	await new Promise<void>((resolveListen, reject) => {
+		server.once('error', reject);
+		server.listen(0, '0.0.0.0', resolveListen);
+	});
+	const address = server.address();
+	if (address === null || typeof address === 'string') {
+		server.close();
+		throw new Error('Could not reserve a TCP port for the strict-port test.');
+	}
+	try {
+		const result = spawnSync('pnpm', ['lynx:demo'], {
+			cwd: WORKSPACE_ROOT,
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				CI: '1',
+				NO_COLOR: '1',
+				OCTANE_LYNX_DEMO_PORT: String(address.port),
+			},
+			stdio: ['ignore', 'pipe', 'pipe'],
+			timeout: 20_000,
+		});
+
+		expect(result.error).toBeUndefined();
+		expect(result.status).not.toBe(0);
+		expect(`${result.stdout}\n${result.stderr}`).toMatch(/port.*(?:in use|occupied|unavailable)/iu);
+	} finally {
+		await new Promise<void>((resolveClose, reject) => {
+			server.close((error) => {
+				if (error) reject(error);
+				else resolveClose();
+			});
+		});
+	}
+}, 30_000);
+
 function withoutKnownDiagnosticText(content: string): string {
 	// The native decoder includes receiver string tables. This describes a
 	// first-screen render phase; it is not a reference to the browser global.
@@ -202,6 +240,7 @@ it('builds the one-command demo as a React-free Octane Lynx application', async 
 
 		expect(decoded['engine-version']).toBe('3.9');
 		expect(mainThread).toMatch(/getJSContext/);
+		expect(mainThread).toContain('processData');
 		expect(background).toMatch(/getCoreContext/);
 		for (const program of [mainThread, background]) {
 			expect(program).toContain('octane-lynx-demo');
