@@ -5,6 +5,7 @@ import {
 	type UniversalPreparedAttempt,
 	type UniversalTransportIdentity,
 } from 'octane/universal/native';
+import type { LynxComponent } from './intrinsics.js';
 import {
 	createLynxClientContainer,
 	createLynxClientDriver,
@@ -47,10 +48,7 @@ export interface CreateLynxRootOptions {
 export interface LynxRoot {
 	readonly renderer: 'lynx';
 	readonly ready: Promise<void>;
-	render<Props>(
-		component: UniversalComponent<Props>,
-		props?: Props,
-	): Promise<UniversalPreparedAttempt>;
+	render<Props>(component: LynxComponent<Props>, props?: Props): Promise<UniversalPreparedAttempt>;
 	flushTransport(): Promise<void>;
 	unmount(): Promise<void>;
 }
@@ -291,14 +289,17 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 	};
 
 	const facade: LynxRoot = {
-		render(component, props) {
+		render<Props>(component: LynxComponent<Props>, props?: Props) {
 			if (state.status !== 'active') {
 				return Promise.reject(new Error('Cannot render an unmounting or unmounted Lynx root.'));
 			}
 			if (typeof component !== 'function') {
 				return Promise.reject(new TypeError('Lynx root render() requires a component function.'));
 			}
-			return universalRoot.renderAsync(component, props === undefined ? ({} as never) : props);
+			return universalRoot.renderAsync(
+				component as UniversalComponent<Props>,
+				props === undefined ? ({} as Props) : props,
+			);
 		},
 		flushTransport() {
 			return universalRoot.flushTransport();
@@ -391,7 +392,7 @@ export const root: LynxRoot = Object.freeze({
 	get ready() {
 		return getDefaultRoot().ready;
 	},
-	render<Props>(component: UniversalComponent<Props>, props?: Props) {
+	render<Props>(component: LynxComponent<Props>, props?: Props) {
 		return getDefaultRoot().render(component, props);
 	},
 	flushTransport() {

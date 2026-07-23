@@ -1,6 +1,6 @@
 # Octane Lynx
 
-This directory now contains seven deliberately separate pieces of the
+This directory now contains eight deliberately separate pieces of the
 ReactLynx-to-Octane migration:
 
 - the immutable Milestone 0 audit and React-free framework probe;
@@ -14,17 +14,33 @@ ReactLynx-to-Octane migration:
 - the private Milestone 7 Octane-owned thread-function transform, worklet/ref
   lifetime, and bidirectional call protocol; and
 - the private Milestone 8 retained-boundary, lazy-bundle, same-root portal,
-  scheduling, memo, and compatible-HMR slice; and
+  scheduling, memo, and compatible-HMR slice;
 - the Milestone 9 repository-side runner crosswalk, permanent list-lifecycle
   decision, deterministic preview/IFR size guards, and private API/status
   review, plus post-Milestone-9 typed page-destroy and Engine data-lifecycle
-  source/test candidates.
+  source/test candidates; and
+- the private Milestone 10 one-command Explorer demo, authored-component type
+  contract, and decoded dual-thread bundle gate.
 
 The package is `0.0.0`, marked `private`, and is not a native renderer release.
 Milestone 9's API/package review keeps the subpaths below unchanged and the
 universal renderer ABI experimental: public stabilization waits for the native
 event/reload contracts, verified typed data/destroy delivery, native
 bootstrap/first-paint, and device evidence listed under Current decision.
+
+## Run the repository demo
+
+From the repository root, `pnpm lynx:demo` starts the pinned Rspeedy server and
+prints a LAN URL and QR code for `main.lynx.bundle`. Load it with the official
+[Lynx 3.9.0 Explorer](https://github.com/lynx-family/lynx/releases/tag/3.9.0)
+on a device that can reach the development computer. The demo renders a styled
+native screen and increments a counter through `bindtap`.
+
+`pnpm lynx:demo:check` is the non-interactive typecheck/build command. The CI
+demo test additionally starts the development command on an isolated port,
+fetches and decodes its bundle, and verifies server teardown. Neither path is
+evidence of native first paint, adoption, event delivery, or live reload. Those
+observations remain part of the Milestone 10 Explorer/device exit.
 
 ## Milestones 3–9 private surface
 
@@ -372,17 +388,18 @@ The production Web control and transport bundles currently fail before
 rendering under `@lynx-js/web-core@0.22.2` with a `MutationObserver` target type
 error; the transported path additionally reports that Web `postMessage` is not
 implemented. Explorer, Android, and iOS execution were unavailable on the
-capture host. These remain explicit gates. The private Milestones 6–9 source/build
-path does not waive them and must not be described as a preview or production
-renderer.
+capture host. These remain explicit gates. The private Milestones 6–10
+source/build and demo path does not waive them and must not be described as a
+preview or production renderer.
 
-Milestones 3–9 have host/build-side private source and official-JavaScript
+Milestones 3–10 have host/build-side private source and official-JavaScript
 evidence, but their formal exits remain unmet. Milestone 6 specifically lacks
 native proof that the synchronous tree paints before background readiness or
 that adoption retains platform node identity. Milestones 7–8 lack native proof
 of main-thread event execution, adopted-node ref identity, gesture/continuous-event
 latency, cross-thread call cleanup, portal placement, lazy-chunk execution, and
-transition timing. The unresolved Milestone 0 native
+transition timing. Milestone 10 additionally lacks a completed Explorer run of
+its visible first screen and `bindtap` counter. The unresolved Milestone 0 native
 event receiver and reconstructing-reload hook, typed data/destroy native
 verification, native bootstrap/first-paint, Web failure, Android/iOS evidence,
 real selector-query/layout/list allocation behavior, app-native module/element

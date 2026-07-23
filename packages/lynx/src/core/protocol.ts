@@ -15,14 +15,12 @@ import type {
 } from 'octane/universal/native';
 import type { LynxFirstTreeSnapshot } from './first-screen.js';
 import { decodeLynxPortalTargetId } from './portal.js';
+import { LYNX_RENDERER_ID } from './renderer-id.js';
 
-/**
- * Kept as a local literal so the main-thread protocol graph does not evaluate
- * Octane's background universal runtime. The type pins it to the core ABI.
- */
+/** Kept local to the main-thread protocol graph; the type pins it to the core ABI. */
 export const LYNX_TRANSPORT_PROTOCOL_VERSION: typeof UNIVERSAL_TRANSPORT_PROTOCOL_VERSION = 1;
 
-export const LYNX_TRANSPORT_RENDERER = 'lynx' as const;
+export const LYNX_TRANSPORT_RENDERER: typeof LYNX_RENDERER_ID = LYNX_RENDERER_ID;
 
 /** Named ContextProxy events; this protocol never falls back to `postMessage`. */
 export const LYNX_BACKGROUND_TO_MAIN_EVENT = 'octane-lynx:background-to-main';
