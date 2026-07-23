@@ -19,7 +19,7 @@ const SHARED_PACKAGES = Object.freeze({
 	'@rsbuild/plugin-css-minimizer': '2.0.0',
 	'@rsdoctor/rspack-plugin': '1.5.18',
 	typescript: '5.9.3',
-	webpack: '5.108.4',
+	webpack: '5.109.0',
 });
 
 function lane(description, rspack) {

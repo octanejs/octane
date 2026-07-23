@@ -131,7 +131,7 @@ metadata was checked on 2026-07-23:
 | `@lynx-js/types` | `4.1.0` | `4.1.0` |
 | `@lynx-js/web-core` | `0.22.2` | `0.22.2` |
 | TypeScript | `5.9.3` | `5.9.3` |
-| Webpack (tooling peer only) | `5.108.4` | `5.108.4` |
+| Webpack (tooling peer only) | `5.109.0` | `5.109.0` |
 
 Rspeedy `0.16.0` requires Rsbuild `2.1.4` exactly. That Rsbuild release accepts
 Rspack `~2.1.2`, so the current lane advances only Rspack to the newest allowed
