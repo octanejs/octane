@@ -395,26 +395,32 @@ export function Playground() @{
 							notice: entry.notice,
 						});
 						lastShownAst = entry;
+						// The AST artifact changed — marks were computed against
+						// the previous tree. Clear both editors and tree selection.
+						clearMappedPair();
+						astPreview.clear();
 					} else if (!entry) {
 						const message = pgModules.isReactHostFile(currentFile)
 							? 'AST trace covers Octane-owned .tsrx and .tsx files. React-host files use the separate Sucrase pipeline.'
 							: 'AST generation failed. Fix the source to generate a new tree.';
 						astPreview.setUnavailable(message, currentFile);
 						lastShownAst = null;
+						// No valid AST — clear stale highlights from the prior tree.
+						clearMappedPair();
+						astPreview.clear();
 					}
-					clearMappedPair();
-					astPreview.clear();
+					// entry === lastShownAst: unchanged cache hit — preserve highlights.
 					setError(error || '');
 					return error;
 				}
 				const code = typesEntry(currentFile).code;
-				// AST and Types highlights describe different artifacts. Clear the
-				// pair even when the cached Types document needs no replacement.
-				clearMappedPair();
-				astPreview.clear();
 				// Clear any stale error from a previous stage/mode.
 				setError('');
 				if (typeof code !== 'string' || code === lastShownOutput) return null;
+				// The Types artifact changed — marks were computed against the
+				// previous document. Clear highlights before replacing the doc.
+				clearMappedPair();
+				astPreview.clear();
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
 				// The output half of the pair changed — source marks were computed
