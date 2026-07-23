@@ -105,7 +105,7 @@ pluginOctane({ thread: 'main-thread' });
 ## Compatibility lanes
 
 Milestone 9 covers two exact, indivisible source/build graphs. Registry
-metadata was checked on 2026-07-22:
+metadata was checked on 2026-07-23:
 
 | Component | Minimum | Current |
 | --- | ---: | ---: |
@@ -128,7 +128,7 @@ metadata was checked on 2026-07-22:
 | `@lynx-js/webpack-runtime-globals` | `0.0.7` | `0.0.7` |
 | `@lynx-js/tasm` | `0.0.39` | `0.0.39` |
 | `@lynx-js/testing-environment` | `0.3.0` | `0.3.0` |
-| `@lynx-js/types` | `4.0.0` | `4.0.0` |
+| `@lynx-js/types` | `4.1.0` | `4.1.0` |
 | `@lynx-js/web-core` | `0.22.2` | `0.22.2` |
 | TypeScript | `5.9.3` | `5.9.3` |
 | Webpack (tooling peer only) | `5.108.4` | `5.108.4` |

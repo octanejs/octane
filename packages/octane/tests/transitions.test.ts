@@ -222,13 +222,16 @@ describe('useTransition — urgent preempts', () => {
 			nextPromise: d2.promise,
 		});
 		await act(() => {});
-		expect(r.find('#value').textContent).toBe('alpha');
+		const value = r.find('#value') as HTMLElement;
+		expect(value.textContent).toBe('alpha');
 
 		// Urgent swap: no transition wrapping → suspending render falls back to
-		// the pending arm immediately (no DOM preservation).
+		// the pending arm immediately while retaining the committed primary host.
 		r.click('#swap-urgent');
 		expect(r.find('#fallback').textContent).toBe('fallback');
-		expect(r.findAll('#value')).toHaveLength(0);
+		expect(r.find('#value')).toBe(value);
+		expect(value.isConnected).toBe(true);
+		expect(value.style.display).toBe('none');
 		r.unmount();
 	});
 });

@@ -43,7 +43,7 @@
         {
           "path": "tests/document-hydration.test.tsx",
           "disposition": "mapped",
-          "entryIds": ["RDX-HYD-001", "RDX-HYD-002", "RDX-HYD-003", "RDX-HYD-004"]
+          "entryIds": ["RDX-HYD-001", "RDX-HYD-002", "RDX-HYD-003", "RDX-HYD-004", "RDX-HYD-007"]
         },
         {
           "path": "tests/event-replay.test.ts",
@@ -147,6 +147,7 @@
     { "id": "RDX-HYD-004", "status": "active", "introducedOn": "2026-07-22" },
     { "id": "RDX-HYD-005", "status": "active", "introducedOn": "2026-07-22" },
     { "id": "RDX-HYD-006", "status": "active", "introducedOn": "2026-07-22" },
+    { "id": "RDX-HYD-007", "status": "active", "introducedOn": "2026-07-22" },
     { "id": "RDX-ID-001", "status": "active", "introducedOn": "2026-07-22" },
     { "id": "RDX-LIF-001", "status": "active", "introducedOn": "2026-07-22" },
     { "id": "RDX-MEM-001", "status": "active", "introducedOn": "2026-07-22" },
@@ -364,22 +365,29 @@
       "symptom": "A mismatch reached after a lazy hydration suspension reported as recoverable and then escaped through the global error channel, abandoning interaction setup.",
       "octaneContract": "A client suspension encountered during hydration must converge to exactly one live client arm, report through Octane's chosen hydration channel only, preserve unaffected siblings, and never emit an uncaught error or rejection.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "critical",
       "owner": "Octane runtime hydration and browser tests",
       "applicableModes": [
+        "server-stream",
         "hydrate-mismatch",
         "deferred-hydration",
         "production-compile",
         "real-browser"
       ],
-      "observables": ["markup", "node-identity", "events", "errors"],
+      "observables": ["markup", "node-identity", "events", "errors", "streaming"],
       "octaneReferences": [
         {
           "kind": "test",
           "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
           "testName": "reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch",
-          "note": "Already proves one final client arm and one expected diagnostic in development and production compile modes."
+          "note": "Proves one final client arm, one expected diagnostic, and identity plus continued interactivity of a stateful sibling outside the recovered boundary."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "contains async hydration recovery and preserves an interactive outside sibling",
+          "note": "Captures browser error and unhandled-rejection channels before hydration and exercises the streamed reveal script in Chromium."
         },
         {
           "kind": "source",
@@ -387,15 +395,26 @@
           "symbol": "hideTryContentAndMountPending"
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": [
-          "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
-          "packages/octane/tests/browser"
-        ],
-        "acceptance": "Retain the existing one-final-arm oracle, add global error/unhandled-rejection capture, and prove an outside sibling keeps identity and remains interactive after resolution."
-      },
-      "rationale": "Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly; only the missing global-error and outside-sibling observations remain."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/fizz-readiness-hydration.test.ts",
+          "testName": "reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch",
+          "modes": [
+            "server-stream",
+            "hydrate-mismatch",
+            "deferred-hydration",
+            "production-compile"
+          ],
+          "observables": ["markup", "node-identity", "events", "errors", "streaming"]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "contains async hydration recovery and preserves an interactive outside sibling",
+          "modes": ["server-stream", "hydrate-mismatch", "deferred-hydration", "real-browser"],
+          "observables": ["markup", "node-identity", "events", "errors", "streaming"]
+        }
+      ],
+      "rationale": "Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly. The transferred risk is covered at Octane's observation boundary by the one-arm, outside-sibling, and real-browser global-error evidence."
     },
     {
       "id": "RDX-HYD-002",
@@ -417,38 +436,63 @@
         }
       ],
       "symptom": "Weak head-node identity allowed one logical head entry to adopt a different server node and validate or update the wrong content.",
-      "octaneContract": "A compiled head marker may adopt only an element with the expected tag and ownership; missing, duplicated, reordered, or corrupted markers must create or recover the expected node without mutating unrelated head content.",
+      "octaneContract": "Within a matching head-marker interval, hydration adopts only an element with the expected tag. It preserves interposed wrong-tag nodes and, when no expected-tag candidate exists before the next Octane marker, creates the expected node without claiming unrelated head content.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "critical",
       "owner": "Octane compiler and runtime head hydration",
       "applicableModes": [
+        "server-string",
         "hydrate-match",
         "hydrate-mismatch",
-        "production-compile",
-        "real-browser"
+        "production-compile"
       ],
-      "observables": ["markup", "node-identity", "errors"],
+      "observables": ["markup", "node-identity", "dom-mutations"],
       "octaneReferences": [
         {
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
           "symbol": "adoptServerHeadEl",
-          "note": "The current helper returns the first element after a matching marker without validating the expected tag."
+          "note": "Claims only a matching tag inside the ownership interval closed by the next Octane head marker."
         },
         {
           "kind": "test",
           "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
           "testName": "adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount",
-          "note": "Happy-path adoption only."
+          "note": "Happy-path adoption and lifecycle ownership."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "skips an interposed foreign element and adopts the intended head element"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "creates a missing expected head element without claiming a wrong-tag neighbor"
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/tests/hydration/head-hydrate.test.ts"],
-        "acceptance": "Cover a foreign wrong-tag node between marker and target, missing target, duplicate marker, reordered metadata, and preservation of unrelated head nodes before deciding whether runtime validation is needed."
-      },
-      "rationale": "Redact matches scripts by attributes while Octane uses compiler markers; the portable contract is ownership-safe claiming, not Redact's matching algorithm."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount",
+          "modes": ["server-string", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "skips an interposed foreign element and adopts the intended head element",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "creates a missing expected head element without claiming a wrong-tag neighbor",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        }
+      ],
+      "rationale": "Redact matches scripts by attributes while Octane uses compiler markers, so the transferable contract is ownership-safe claiming rather than Redact's matcher. This closes wrong-tag and missing-target corruption within one marker interval. Compiler key uniqueness and ambiguous same-tag collisions remain explicitly tracked by RDX-HYD-007."
     },
     {
       "id": "RDX-HYD-003",
@@ -678,6 +722,64 @@
         "acceptance": "For root, nearest-host, and Suspense-scoped structural mismatches, capture outside siblings before hydration and assert the same objects and handlers survive while the failed subtree is regenerated and its handlers become live in development and production."
       },
       "rationale": "Octane recovers ranges in place instead of following Redact's checkpoint stack, so the transferable requirement is the observable containment boundary rather than checkpoint implementation parity."
+    },
+    {
+      "id": "RDX-HYD-007",
+      "area": "head-hydration",
+      "title": "Head ownership keys are unique across compiled modules and tags",
+      "sources": [
+        {
+          "kind": "issue",
+          "number": 17,
+          "url": "https://github.com/TanStack/redact/issues/17",
+          "title": "Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/document-hydration.test.tsx",
+          "testName": "claims typeless and typed head scripts in document order",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/document-hydration.test.tsx#L171-L206"
+        }
+      ],
+      "symptom": "A marker derived only from a source offset can collide across modules or tags, making same-tag ownership ambiguous even when runtime claiming validates the element tag.",
+      "octaneContract": "Compiler-emitted head ownership keys are stable between server and client builds and collision-resistant across modules, tags, and multiple roots; duplicate, reordered, or missing markers cannot make one logical entry claim another same-tag element.",
+      "classification": "adaptable",
+      "status": "planned",
+      "risk": "high",
+      "owner": "Octane compiler and runtime head hydration",
+      "applicableModes": [
+        "server-string",
+        "server-stream",
+        "hydrate-match",
+        "hydrate-mismatch",
+        "production-compile"
+      ],
+      "observables": ["markup", "node-identity", "dom-mutations"],
+      "octaneReferences": [
+        {
+          "kind": "source",
+          "file": "packages/octane/src/compiler/compile.js",
+          "symbol": "headKey",
+          "note": "The current key hashes only the element source position, which is unique within one file but not across modules."
+        },
+        {
+          "kind": "source",
+          "file": "packages/octane/src/runtime.ts",
+          "symbol": "adoptServerHeadEl",
+          "note": "Tag validation closes wrong-tag claiming but cannot distinguish colliding same-tag owners."
+        }
+      ],
+      "nextAction": {
+        "kind": "implementation",
+        "targets": [
+          "packages/octane/src/compiler/compile.js",
+          "packages/octane/tests/compiler.test.ts",
+          "packages/octane/tests/hydration/head-hydrate.test.ts"
+        ],
+        "acceptance": "Define a server/client-stable module-aware key, prove identical compilation modes emit the same key, and cover cross-module same-tag collisions plus duplicate, missing, and reordered markers without claiming or deleting unrelated head nodes."
+      },
+      "rationale": "RDX-HYD-002 deliberately closes the runtime's wrong-tag corruption without overstating marker identity. Redact's ownership failure exposed this distinct Octane compiler protocol risk, which needs a cross-module fixture rather than another adjacent-node unit case."
     },
     {
       "id": "RDX-ID-001",
@@ -1752,32 +1854,145 @@
           "kind": "test",
           "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
           "path": "tests/suspense-preserves-dom.test.tsx",
+          "testName": "keeps the same scrollable DOM node when Suspense suspends after initial commit",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L29-L102"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/suspense-preserves-dom.test.tsx",
+          "testName": "preserves a sibling scrollable when the swapped-in child suspends",
+          "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L108-L167"
+        },
+        {
+          "kind": "test",
+          "commit": "e1620a13aab8935c806238f117ba58559b7cd002",
+          "path": "tests/suspense-preserves-dom.test.tsx",
           "testName": "preserves focus on an input across a sibling suspension",
           "url": "https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L170-L220"
         }
       ],
-      "symptom": "Navigating through a suspension destroyed a committed sidebar, resetting scroll and focus even though the logical UI survived.",
-      "octaneContract": "An already committed Suspense primary tree preserves node identity, component state, scroll, focus, selection, uncontrolled values, and other browser-owned state through urgent and transitioned re-suspension, while refs/effects follow Octane's documented lifecycle.",
-      "classification": "portable",
-      "status": "planned",
+      "symptom": "Navigating through a suspension detached committed hosts, resetting scroll and DOM Range anchors even though the logical UI and host objects survived.",
+      "octaneContract": "Once primary content has committed, a fallback-visible re-suspension keeps its host tree connected but visually hidden. Replacement work is proven before the prior committed range is destroyed across control-flow, component, value-child, and returned-output slots, and reentrant deletion cannot resurrect discarded work. Stable hosts, component state, uncontrolled values, input selection offsets, DOM Range anchors, and scroll offsets survive reveal. Focus remains browser-managed rather than being explicitly blurred or restored; a transition that continues showing prior content retains focus. Refs and layout effects detach or clean up once on hide and reattach or recreate in source order on reveal; passive effects remain connected until actual deletion.",
+      "classification": "adaptable",
+      "status": "covered",
       "risk": "critical",
       "owner": "Octane Suspense runtime and browser tests",
       "applicableModes": ["client", "production-compile", "real-browser"],
       "observables": [
+        "markup",
         "node-identity",
+        "dom-mutations",
         "focus",
         "selection",
         "scroll",
         "live-properties",
         "effects",
-        "refs"
+        "refs",
+        "errors"
       ],
       "octaneReferences": [
         {
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
-          "symbol": "softDetachTryBlock",
-          "note": "Ordinary Suspense currently parks committed DOM in savedDom before reinsertion."
+          "symbol": "hideTryBlock",
+          "note": "Keeps primary hosts connected, hides logical portal ranges, preserves authored display state, and composes nested hidden ownership."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps same-tree primary hosts connected and restores authored display/text",
+          "note": "A companion covers a route-swap tree; the file also covers portals, direct text, nested ownership, and hidden unmount cleanup in development and production compilation."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "reconnects memoized effects at their source position without re-running the body",
+          "note": "Proves reveal reconnects a bailed memo descendant in source order without defeating memo semantics."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "reconnects memo-bailed effects in declaration order after staggered updates",
+          "note": "Prevents historical changed-dependency commit time from reordering effect recreation on reveal."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps passive effects connected across hide and reveal",
+          "note": "Distinguishes passive subscriptions, which remain live while content is hidden, from layout effects, which disconnect and reconnect."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not detach a hidden primary ref again when its retry enters catch",
+          "note": "A React-19 callback-ref cleanup fires exactly once when fallback-visible work rejects into the terminal catch arm."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not suppress ref teardown in an independent root during hidden cleanup",
+          "note": "Ref-detach suppression is scoped to exact hidden hosts, so reentrant cleanup still detaches unrelated roots normally."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "never detaches a completed child from an aborted parent mount",
+          "note": "Exact-host suppression spans recursive teardown so a child whose attach never committed cannot receive a manufactured detach."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "stops a reveal when fallback cleanup unmounts the owning root",
+          "note": "A reentrant root deletion during fallback cleanup prevents the prepared primary and captured lifecycle from publishing."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "stops a catch commit when primary cleanup unmounts the owning root",
+          "note": "Terminal error routing cannot insert a catch arm after cleanup disposes the boundary."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps a superseding markerless branch inside the preserved try range",
+          "note": "A partial first arm is swept before a fulfilled superseding arm mounts, and stale settlement cannot mutate the live branch."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "preserves an urgent componentSlot replacement that suspends",
+          "note": "Companion cases cover value-child and returned-output kind replacements so urgent preservation is not limited to @if branches."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not commit an urgent WIP after old-branch cleanup unmounts the root",
+          "note": "Publishes completed replacement ownership before invoking old-tree user cleanup and proves reentrant root deletion cannot resurrect it."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not commit a transition component WIP after old cleanup unmounts the root",
+          "note": "A value-child companion covers the separate range-move path; neither captured lifecycle nor detached WIP DOM can publish after reentrant deletion."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "preserves same-tree browser state through an urgent fallback",
+          "note": "Chromium observes connectivity, visibility, state, uncontrolled value, input selection, focus, scroll, refs, effects, and subscriptions; a route-swap companion covers the second structure."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "pins React 19.2.7 focus behavior for fallback-visible primary content",
+          "note": "A React DOM reference case in the same Chromium harness proves the hidden primary remains connected and that React does not automatically restore focus after reveal."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "keeps a direct-root boundary empty when ref detach synchronously unmounts it",
+          "note": "Covers reentrant user code during ref cycling and proves a late thenable cannot resurrect disposed fallback state."
         },
         {
           "kind": "test",
@@ -1789,14 +2004,225 @@
           "kind": "test",
           "file": "packages/octane/tests/conformance/suspense-effects-semantics.test.ts",
           "testName": "destroys the committed layout effect on re-suspend, recreates on reveal"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/universal-renderer.test.ts",
+          "testName": "retains suspended ownership for retry and tears it down when the retry errors",
+          "note": "Universal host ownership survives a DOM fallback retry but is permanently released when that retained retry errors; companion boundary coverage proves an abandoned initial suspension leaves an uncommitted root reusable."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/tests/browser", "packages/octane/tests/suspense.test.ts"],
-        "acceptance": "In real Chromium, cover same-tree and route-swap re-suspension with identity, scrollTop, activeElement, selection, uncontrolled value, state, refs, and effect logs for urgent and transitioned paths before changing the hiding mechanism."
-      },
-      "rationale": "The observable preservation contract transfers; Redact's display:none and detached-fallback fiber implementation does not. JSDOM is insufficient for the browser-owned state assertions."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps same-tree primary hosts connected and restores authored display/text",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations", "live-properties"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps swap-tree primary hosts connected and restores authored display/text",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations", "live-properties"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "cycles portal lifecycle once and fully tears a hidden primary down",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects", "refs"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps a nested portal hidden when the inner boundary resolves first",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "reconnects memoized effects at their source position without re-running the body",
+          "modes": ["client", "production-compile"],
+          "observables": ["effects"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "reconnects memo-bailed effects in declaration order after staggered updates",
+          "modes": ["client", "production-compile"],
+          "observables": ["effects"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps passive effects connected across hide and reveal",
+          "modes": ["client", "production-compile"],
+          "observables": ["effects"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not detach a hidden primary ref again when its retry enters catch",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "refs", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not suppress ref teardown in an independent root during hidden cleanup",
+          "modes": ["client", "production-compile"],
+          "observables": ["refs", "effects", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "never detaches a completed child from an aborted parent mount",
+          "modes": ["client", "production-compile"],
+          "observables": ["refs", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "stops a reveal when fallback cleanup unmounts the owning root",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "stops a catch commit when primary cleanup unmounts the owning root",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "keeps a superseding markerless branch inside the preserved try range",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "preserves an urgent componentSlot replacement that suspends",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "preserves an urgent childSlot replacement that suspends",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "preserves an urgent return-slot kind replacement that suspends",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not commit an urgent WIP after old-branch cleanup unmounts the root",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "refs", "effects", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not commit a transition component WIP after old cleanup unmounts the root",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "refs", "effects", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/suspense-preserves-dom.test.ts",
+          "testName": "does not commit a transition child WIP after old cleanup unmounts the root",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "refs", "effects", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "pins React 19.2.7 focus behavior for fallback-visible primary content",
+          "modes": ["client", "real-browser"],
+          "observables": ["node-identity", "focus", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "preserves same-tree browser state through an urgent fallback",
+          "modes": ["client", "real-browser"],
+          "observables": [
+            "node-identity",
+            "focus",
+            "selection",
+            "scroll",
+            "live-properties",
+            "effects",
+            "refs",
+            "errors"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "preserves swap-tree browser state through an urgent fallback",
+          "modes": ["client", "real-browser"],
+          "observables": [
+            "node-identity",
+            "focus",
+            "selection",
+            "scroll",
+            "live-properties",
+            "effects",
+            "refs",
+            "errors"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "preserves a DOM Range anchor through a fallback-visible route swap",
+          "modes": ["client", "real-browser"],
+          "observables": ["node-identity", "selection", "scroll", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "keeps browser state live when a transition resolves before fallback",
+          "modes": ["client", "real-browser"],
+          "observables": [
+            "node-identity",
+            "focus",
+            "selection",
+            "scroll",
+            "live-properties",
+            "effects",
+            "refs",
+            "errors"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "preserves browser state when a transition crosses its fallback timeout",
+          "modes": ["client", "real-browser"],
+          "observables": [
+            "node-identity",
+            "focus",
+            "selection",
+            "scroll",
+            "live-properties",
+            "errors"
+          ]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "keeps a direct-root boundary empty when ref detach synchronously unmounts it",
+          "modes": ["client", "real-browser"],
+          "observables": ["markup", "node-identity", "refs", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/suspense-refs.test.ts",
+          "testName": "detaches host refs on suspend and re-attaches on reveal",
+          "modes": ["client", "production-compile"],
+          "observables": ["node-identity", "refs"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/suspense-effects-semantics.test.ts",
+          "testName": "destroys the committed layout effect on re-suspend, recreates on reveal",
+          "modes": ["client", "production-compile"],
+          "observables": ["effects"]
+        },
+        {
+          "file": "packages/octane/tests/universal-renderer.test.ts",
+          "testName": "retains suspended ownership for retry and tears it down when the retry errors",
+          "modes": ["client", "production-compile"],
+          "observables": ["errors"]
+        }
+      ],
+      "rationale": "The preservation outcome transfers, but Redact's implementation and jsdom-only focus assertion do not. A committed React 19.2.7 Chromium reference case shows the primary stays connected while hidden and that React does not automatically restore focus after reveal; the exact moment Chromium normalizes focus is deliberately not part of the contract. Octane likewise leaves focus browser-managed and promises no automatic refocus. Transitions that resolve before a fallback appears retain focus and do not cycle refs or effects."
     }
   ]
 }

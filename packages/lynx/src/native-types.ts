@@ -8,8 +8,9 @@
  * The upstream `props` entry imports `events`, and `events` imports the
  * main-thread `Element` graph. That graph globally augments JSX, so merely
  * importing otherwise useful event types mutates React's intrinsic namespace.
- * Keep the dependency pinned for provenance, but expose only these local,
- * module-scoped shapes until upstream provides a side-effect-free type entry.
+ * Keep this adapted slice pinned to that provenance, but expose only these
+ * local, module-scoped shapes until upstream provides a side-effect-free type
+ * entry.
  */
 
 export interface LynxEventTarget {
