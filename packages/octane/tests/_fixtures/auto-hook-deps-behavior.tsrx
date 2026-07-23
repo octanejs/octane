@@ -60,6 +60,49 @@ export function EffectFromCleanupOnly(props) @{
 	<span>{props.noise as string}</span>
 }
 
+export function EffectFromDeferredWork(props) @{
+	useEffect(() => {
+		let active = true;
+		props.task.then(() => {
+			if (active) props.log(props.value);
+		});
+		return () => {
+			active = false;
+			props.cleanup(props.value);
+		};
+	});
+	<span>{props.noise as string}</span>
+}
+
+export function EffectFromDestructuring(props) @{
+	useEffect(() => {
+		const { [props.field]: selected = props.fallback } = props.record;
+		props.log(selected);
+	});
+	<span>{props.noise as string}</span>
+}
+
+export function EffectWithConvergingUpdate(props) @{
+	const [value, setValue] = useState(0);
+	useEffect(() => {
+		props.log(value);
+		if (value < props.target) setValue((current) => current + 1);
+	});
+	<span class="value">{value as string}</span>
+}
+
+export function EffectWithFreshFunction(props) @{
+	const notify = () => props.log(props.value);
+	useEffect(() => notify());
+	<span>{props.noise as string}</span>
+}
+
+export function EffectWithFreshObject(props) @{
+	const options = { value: props.value };
+	useEffect(() => props.log(options));
+	<span>{props.noise as string}</span>
+}
+
 export function MemoFromProps(props) @{
 	const value = useMemo(() => props.compute(props.value));
 	<div>

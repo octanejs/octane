@@ -1,15 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { flushEffects, mount } from './_helpers';
+import { act, flushEffects, mount } from './_helpers';
 import { flushSync } from '../src/index.js';
 import {
 	CaptureFreeEffect,
 	CaptureFreeMemo,
 	EffectFromDerivedValue,
 	EffectFromCleanupOnly,
+	EffectFromDeferredWork,
+	EffectFromDestructuring,
 	EffectFromProps,
 	EffectFromReferencedCallback,
 	EffectFromState,
 	EffectWithStableHookResults,
+	EffectWithConvergingUpdate,
+	EffectWithFreshFunction,
+	EffectWithFreshObject,
 	ExternalHookDependencies,
 	MemoFromComputedPath,
 	MemoFromNestedScope,
@@ -239,6 +244,103 @@ describe('inferred useEffect dependencies — behavior', () => {
 		r.unmount();
 		flushEffects();
 		expect(disconnect).toHaveBeenLastCalledWith('b');
+	});
+
+	it('tracks captures in deferred callbacks and cancels stale work through cleanup', async () => {
+		let resolveFirst!: () => void;
+		let resolveSecond!: () => void;
+		const first = new Promise<void>((resolve) => (resolveFirst = resolve));
+		const second = new Promise<void>((resolve) => (resolveSecond = resolve));
+		const log = vi.fn();
+		const cleanup = vi.fn();
+		const r = mount(EffectFromDeferredWork, {
+			task: first,
+			value: 'first',
+			noise: 0,
+			log,
+			cleanup,
+		});
+		flushEffects();
+
+		r.update(EffectFromDeferredWork, {
+			task: second,
+			value: 'second',
+			noise: 1,
+			log,
+			cleanup,
+		});
+		flushEffects();
+		expect(cleanup).toHaveBeenLastCalledWith('first');
+
+		resolveFirst();
+		await first;
+		expect(log).not.toHaveBeenCalled();
+
+		resolveSecond();
+		await second;
+		expect(log).toHaveBeenLastCalledWith('second');
+		r.unmount();
+		flushEffects();
+		expect(cleanup).toHaveBeenLastCalledWith('second');
+	});
+
+	it('tracks computed destructuring keys, defaults, records, and observers', () => {
+		const log = vi.fn();
+		const firstRecord = { primary: 'first' };
+		const r = mount(EffectFromDestructuring, {
+			field: 'primary',
+			fallback: 'missing',
+			record: firstRecord,
+			noise: 0,
+			log,
+		});
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('first');
+
+		r.update(EffectFromDestructuring, {
+			field: 'secondary',
+			fallback: 'fallback',
+			record: firstRecord,
+			noise: 1,
+			log,
+		});
+		flushEffects();
+		expect(log).toHaveBeenLastCalledWith('fallback');
+		expect(log).toHaveBeenCalledTimes(2);
+		r.unmount();
+		flushEffects();
+	});
+
+	it('converges when an inferred dependency effect updates its own state', async () => {
+		const log = vi.fn();
+		const r = mount(EffectWithConvergingUpdate, { target: 3, log });
+		await act(() => {});
+		expect(r.find('.value').textContent).toBe('3');
+		expect(log.mock.calls.map(([value]) => value)).toEqual([0, 1, 2, 3]);
+		r.unmount();
+		flushEffects();
+	});
+
+	it('reruns for a function allocated during every render', () => {
+		const log = vi.fn();
+		const r = mount(EffectWithFreshFunction, { value: 'same', noise: 0, log });
+		flushEffects();
+		r.update(EffectWithFreshFunction, { value: 'same', noise: 1, log });
+		flushEffects();
+		expect(log).toHaveBeenCalledTimes(2);
+		r.unmount();
+		flushEffects();
+	});
+
+	it('reruns for an object allocated during every render', () => {
+		const log = vi.fn();
+		const r = mount(EffectWithFreshObject, { value: 'same', noise: 0, log });
+		flushEffects();
+		r.update(EffectWithFreshObject, { value: 'same', noise: 1, log });
+		flushEffects();
+		expect(log).toHaveBeenCalledTimes(2);
+		r.unmount();
+		flushEffects();
 	});
 });
 

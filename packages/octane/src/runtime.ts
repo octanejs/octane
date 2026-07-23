@@ -143,7 +143,9 @@ function profilePortalComponent(rawBody: unknown): Function | null {
 // ---------------------------------------------------------------------------
 
 export type ComponentBody<P = any, E = any> = (props: P, scope: Scope, extra: E) => void;
-type EffectFn = () => void | (() => void);
+declare const EFFECT_CLEANUP_VOID_ONLY: unique symbol;
+type EffectCleanup = () => void | { [EFFECT_CLEANUP_VOID_ONLY]: never };
+type EffectFn = () => void | EffectCleanup;
 type Cleanup = () => void;
 type HookSlot = symbol | number;
 
