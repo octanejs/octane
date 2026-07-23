@@ -16,7 +16,7 @@ import {
 // timeout fires React commits the @pending body so the user gets visual
 // feedback instead of staring at stale content indefinitely. isPending
 // stays true through the fallback window because the transition is still
-// in progress; on resolve, the saved try-body DOM is reattached.
+// in progress; on resolve, the connected hidden try-body DOM is revealed.
 //
 // Mirrors ReactSuspenseWithNoopRenderer-test.js "eventually shows fallback
 // if transition takes too long".
