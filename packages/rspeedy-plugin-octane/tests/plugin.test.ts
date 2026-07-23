@@ -195,6 +195,10 @@ interface CompilerRendererOptions {
 
 function compilerOptions(state: ReturnType<typeof createChain>) {
 	return state.plugins.get('@octanejs/rspeedy-plugin:compiler')?.options[0] as {
+		dev?: boolean;
+		hmr?: boolean;
+		profile?: boolean;
+		requireDirective?: boolean;
 		runtime: string;
 		universalRuntime: unknown;
 		layerSpecializations?: Record<
@@ -243,6 +247,22 @@ afterEach(() => {
 });
 
 describe('@octanejs/rspeedy-plugin', () => {
+	it('preserves an asymmetric public-boolean matrix in the installed Rspack integration', () => {
+		for (const optionSignature of [
+			{ dev: true, hmr: false, profile: false, requireDirective: false },
+			{ dev: false, hmr: true, profile: false, requireDirective: false },
+			{ dev: false, hmr: false, profile: true, requireDirective: false },
+			{ dev: false, hmr: false, profile: false, requireDirective: true },
+		]) {
+			const state = applyPlugin({
+				thread: 'background',
+				...optionSignature,
+			});
+
+			expect(compilerOptions(state)).toMatchObject(optionSignature);
+		}
+	});
+
 	it('enforces application output invariants without discarding user configuration', () => {
 		const root = createToolchainRoot();
 		const callbacks: EnvironmentConfigCallback[] = [];
@@ -394,6 +414,25 @@ describe('@octanejs/rspeedy-plugin', () => {
 		expect(JSON.stringify([...state.entries.values()])).not.toMatch(
 			/@lynx-js\/react|react-refresh/i,
 		);
+	});
+
+	it('removes hot-update entries when hmr is explicitly false in development', () => {
+		const state = applyPlugin(
+			{ hmr: false },
+			'lynx',
+			{
+				environment: { config: { dev: { hmr: true, liveReload: true } } },
+				isDev: true,
+				isProd: false,
+			},
+			{ app: ['./src/setup.js', './src/App.lynx.tsrx'] },
+		);
+
+		const entryImports = JSON.stringify([...state.entries.values()]);
+		expect(entryImports).toContain('@lynx-js/webpack-dev-transport/client');
+		expect(entryImports).not.toContain('@rspack/core/hot/dev-server');
+		expect(entryImports).not.toContain('hotModuleReplacement.lepus.cjs');
+		expect(compilerOptions(state).hmr).toBe(false);
 	});
 
 	it('replaces only main-layer imports of the exact Lynx package root', () => {

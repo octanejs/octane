@@ -132,40 +132,70 @@ describe('useId determinism', () => {
 		rootB.unmount();
 	});
 
-	// Per ReactDOMUseId-test.js:127/140-146 — the WHOLE point of useId is that the
-	// id produced on the server matches the id produced on the client so the two
-	// trees hydrateRoot without mismatch. We server-render Single, place its HTML in a
-	// container, then hydrateRoot the SAME component and capture the id the CLIENT
-	// actually computed during the hydration render (via the fixture's onId
-	// callback — reading the adopted attribute alone would just echo the server's
-	// id and prove nothing). The two must be byte-for-byte equal.
-	//
-	it('server useId is preserved byte-for-byte after hydrateRoot()', async () => {
-		// Warm a separate root first: root-local hydration state must be unaffected.
-		const warm = mount(Triple);
-		warm.unmount();
-
-		const out = await RT.renderToString(serverMod.Single, undefined, {
-			identifierPrefix: 'profile-',
-		});
-		const serverId = out.html.match(/data-testid="([^"]+)"/)?.[1];
-
+	// Per ReactDOMUseId-test.js:127/140-146 — each server-rendered root starts an
+	// independent useId sequence, and hydration must compute the same id without
+	// replacing the server DOM. Keep the first hydrated root alive while hydrating
+	// the second so allocations from one root cannot leak into the next.
+	it('starts hydrated useId sequences from each server-rendered root', async () => {
+		const options = { identifierPrefix: 'profile-' };
+		const warmContainer = document.createElement('div');
 		const container = document.createElement('div');
-		container.innerHTML = out.html;
-		document.body.appendChild(container);
+		let warmRoot: ReturnType<typeof hydrateRoot> | undefined;
+		let root: ReturnType<typeof hydrateRoot> | undefined;
+		try {
+			const warmOut = await RT.renderToString(serverMod.Triple, undefined, options);
+			const warmServerIds = [...warmOut.html.matchAll(/data-testid="([^"]+)"/g)].map(
+				(match) => match[1],
+			);
+			warmContainer.innerHTML = warmOut.html;
+			document.body.appendChild(warmContainer);
+			const warmOriginalSpans = [...warmContainer.querySelectorAll('span')];
 
-		let clientId: string | undefined;
-		const h = hydrateRoot(
-			container,
-			Single,
-			{ onId: (id: string) => (clientId = id) },
-			{ identifierPrefix: 'profile-' },
-		);
-		h.unmount();
-		container.remove();
+			let warmClientIds: string[] | undefined;
+			warmRoot = hydrateRoot(
+				warmContainer,
+				Triple,
+				{ onIds: (ids: string[]) => (warmClientIds = ids) },
+				options,
+			);
 
-		expect(serverId).toBeTruthy();
-		expect(serverId).toBe(':profile-in-0:');
-		expect(clientId).toBe(serverId);
+			const out = await RT.renderToString(serverMod.Triple, undefined, options);
+			const serverIds = [...out.html.matchAll(/data-testid="([^"]+)"/g)].map((match) => match[1]);
+			container.innerHTML = out.html;
+			document.body.appendChild(container);
+			const originalSpans = [...container.querySelectorAll('span')];
+			const originalButton = container.querySelector('button');
+
+			let clientIds: string[] | undefined;
+			root = hydrateRoot(
+				container,
+				Triple,
+				{ onIds: (ids: string[]) => (clientIds = ids) },
+				options,
+			);
+
+			const expectedIds = [':profile-in-0:', ':profile-in-1:', ':profile-in-2:'];
+			expect(warmServerIds).toEqual(expectedIds);
+			expect(warmClientIds).toEqual(expectedIds);
+			const warmCurrentSpans = [...warmContainer.querySelectorAll('span')];
+			expect(warmCurrentSpans).toHaveLength(warmOriginalSpans.length);
+			for (let i = 0; i < warmCurrentSpans.length; i++) {
+				expect(warmCurrentSpans[i]).toBe(warmOriginalSpans[i]);
+			}
+			expect(serverIds).toEqual(expectedIds);
+			expect(clientIds).toEqual(expectedIds);
+			const currentSpans = [...container.querySelectorAll('span')];
+			expect(currentSpans).toHaveLength(originalSpans.length);
+			for (let i = 0; i < currentSpans.length; i++) {
+				expect(currentSpans[i]).toBe(originalSpans[i]);
+			}
+			expect(originalButton).not.toBeNull();
+			expect(container.querySelector('button')).toBe(originalButton);
+		} finally {
+			root?.unmount();
+			warmRoot?.unmount();
+			container.remove();
+			warmContainer.remove();
+		}
 	});
 });

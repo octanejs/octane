@@ -166,6 +166,92 @@ describe('octane() plugin factory', () => {
 		expect(transform.call({}, code, '/repo/src/useThing.ts')).not.toBeNull();
 	});
 
+	it('preserves both hmr values at the compiler output boundary', async () => {
+		const source = "export function App() @{ <main>{'configured'}</main> }\n";
+		for (const [hmr, expectsHotOutput] of [
+			[true, true],
+			[false, false],
+		] as const) {
+			const [compiler] = octane({ hmr });
+			await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+			(compiler.configResolved as (config: unknown) => void)({
+				root: '/repo',
+				command: 'serve',
+				build: {},
+				define: {},
+			});
+			const output = await (
+				compiler.transform as (source: string, id: string) => Promise<{ code: string }>
+			).call({}, source, '/repo/src/App.tsrx');
+
+			expect(output.code.includes('import.meta.hot')).toBe(expectsHotOutput);
+		}
+	});
+
+	it('preserves both requireDirective values at the compiler ownership boundary', async () => {
+		const source = "export function App() @{ <main>{'configured'}</main> }\n";
+		for (const [requireDirective, expectsCompilation] of [
+			[false, true],
+			[true, false],
+		] as const) {
+			const [compiler] = octane({ hmr: false, requireDirective });
+			await (compiler.config as (config: { root: string }) => unknown)({ root: '/repo' });
+			const output = await (
+				compiler.transform as (
+					source: string,
+					id: string,
+				) => Promise<{ code: string } | null> | { code: string } | null
+			).call({}, source, '/repo/src/App.tsx');
+
+			expect(output !== null).toBe(expectsCompilation);
+		}
+	});
+
+	it.each([true, false])(
+		'preserves build.minify=%s and build.target=false in resolved Vite config',
+		async (minify) => {
+			const root = await mkdtemp(join(tmpdir(), 'octane-vite-build-booleans-'));
+			try {
+				await writeFile(
+					join(root, 'package.json'),
+					JSON.stringify({ private: true, type: 'module' }) + '\n',
+				);
+				await mkdir(join(root, 'src'), { recursive: true });
+				await writeFile(
+					join(root, 'index.html'),
+					'<head><!--ssr-head--></head><body><div id="root"><!--ssr-body--></div></body>\n',
+				);
+				await writeFile(
+					join(root, 'src/Page.tsrx'),
+					"export function Page() @{ <main>{'ready'}</main> }\n",
+				);
+				await mkdir(join(root, 'node_modules/@octanejs'), { recursive: true });
+				await symlink(PKG_ROOT, join(root, 'node_modules/@octanejs/vite-plugin'), 'dir');
+				await writeFile(
+					join(root, 'octane.config.ts'),
+					`import { RenderRoute } from '@octanejs/vite-plugin';
+export default {
+	build: { minify: ${minify}, target: false },
+	router: { routes: [new RenderRoute({ path: '/', entry: '/src/Page.tsrx' })] },
+};
+`,
+				);
+
+				const [, meta] = octane();
+				const resolved = await (
+					meta.config as (
+						config: UserConfig,
+						env: { command: 'build'; mode: string },
+					) => Promise<UserConfig>
+				)({ root }, { command: 'build', mode: 'production' });
+
+				expect(resolved.build).toMatchObject({ minify, target: false });
+			} finally {
+				await rm(root, { recursive: true, force: true });
+			}
+		},
+	);
+
 	it('forwards inline renderer rules to the bundled compiler', () => {
 		const [compiler] = octane({
 			hmr: false,

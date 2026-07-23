@@ -422,6 +422,8 @@ export function App() @{
 		const serverRoot = join(root, 'build/server');
 		const clientCode = readJavaScript(clientRoot);
 		const serverCode = readJavaScript(serverRoot);
+		expect(clientCode).not.toContain('/src/Page.tsrx#Page');
+		expect(serverCode).not.toContain('/src/Page.tsrx#Page');
 		expect(existsSync(join(clientRoot, 'index.html'))).toBe(false);
 		expect(existsSync(join(serverRoot, 'entry.js'))).toBe(true);
 		expect(existsSync(join(serverRoot, 'index.html'))).toBe(true);

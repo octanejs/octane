@@ -53,8 +53,10 @@ await build({
 
 cpSync(join(src, 'compiler'), join(dist, 'compiler'), { recursive: true });
 // Hand-written declarations for the plain-JS dom-tables module (tsc only emits
-// declarations for the .ts sources).
+// declarations for the .ts sources). The JSX runtime is likewise a type-only
+// input declaration: compiled Octane JSX never imports a runtime module.
 cpSync(join(src, 'dom-tables.d.ts'), join(dist, 'dom-tables.d.ts'));
+cpSync(join(src, 'jsx-runtime.d.ts'), join(dist, 'jsx-runtime.d.ts'));
 
 execFileSync(join(root, 'node_modules/.bin/tsc'), ['-p', join(pkgDir, 'tsconfig.build.json')], {
 	stdio: 'inherit',

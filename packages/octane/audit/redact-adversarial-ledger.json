@@ -186,37 +186,204 @@
         }
       ],
       "symptom": "A documented false-valued feature flag silently left the full implementation in the bundle because an internal folder name was cast to an unrelated public option key.",
-      "octaneContract": "Every public compiler or bundler boolean must have a test proving the option changes emitted code, resolution, bundle contents, or runtime behavior in each environment where it is supported.",
+      "octaneContract": "Every public compiler or bundler boolean must be traced through each adapter's resolved host configuration and the owning compiler's emitted code, module resolution, bundle contents, or runtime behavior. Pass-through host build controls lock both values in resolved configuration; options with Octane-owned output also require an executable output or bundle proof.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "medium",
-      "owner": "Octane compiler and Vite/Rspack/Rsbuild integrations",
-      "applicableModes": ["production-compile", "vite-client", "vite-ssr", "rspack", "rsbuild"],
-      "observables": ["markup", "package-resolution"],
+      "owner": "Octane compiler and Vite/Rspack/Rsbuild/Rspeedy integrations",
+      "applicableModes": [
+        "production-compile",
+        "vite-client",
+        "vite-ssr",
+        "rspack",
+        "rsbuild",
+        "rspeedy"
+      ],
+      "observables": [
+        "emitted-code",
+        "resolved-configuration",
+        "bundle-contents",
+        "package-resolution"
+      ],
       "octaneReferences": [
         {
           "kind": "test",
-          "file": "packages/octane/tests/hmr.test.ts",
-          "testName": "hmr option off → no wrapping, no accept block",
-          "note": "Representative direct option-to-output coverage; not yet a complete public-option matrix."
+          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "testName": "changes emitted hot-update support for both hmr values",
+          "note": "Direct Vite integration coverage for explicit HMR, SSR-mode, and ownership booleans."
         },
         {
           "kind": "test",
           "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
-          "testName": "erases profiling and full diagnostics from a real production bundle"
+          "testName": "erases profiling and full diagnostics from a real production bundle",
+          "note": "Real bundle proof for the disabled profiling path; the adjacent profiled-runtime test covers the enabled path."
+        },
+        {
+          "kind": "test",
+          "file": "packages/rsbuild-plugin-octane/tests/target.test.ts",
+          "testName": "maps build.minify=false to webworker optimization",
+          "note": "Preserves both values of the shared app build boolean."
+        },
+        {
+          "kind": "test",
+          "file": "packages/rspeedy-plugin-octane/tests/plugin.test.ts",
+          "testName": "preserves an asymmetric public-boolean matrix in the installed Rspack integration",
+          "note": "Locks the newest public Rspack-backed adapter into an asymmetric option matrix that detects cross-wiring."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": [
-          "packages/octane/tests",
-          "packages/vite-plugin-octane/tests",
-          "packages/rspack-plugin-octane/tests",
-          "packages/rsbuild-plugin-octane/tests"
-        ],
-        "acceptance": "Inventory public booleans and renderer mappings, then prove both enabled and disabled behavior at emitted-output or resolved-module boundaries without relying on unchecked name casts."
-      },
-      "rationale": "Redact's forwardRef and class-component flags are out of scope; the transferable lesson is to test configuration where consumers observe it."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "testName": "changes emitted hot-update support for both hmr values",
+          "modes": ["vite-client"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "testName": "forces server output despite a client transform signal",
+          "modes": ["production-compile", "vite-client", "vite-ssr"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "testName": "forces client output despite a server transform signal",
+          "modes": ["production-compile", "vite-client", "vite-ssr"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/octane/tests/compiler-vite-options.test.ts",
+          "testName": "changes ownership of an unmarked project TSX module for both directive values",
+          "modes": ["vite-client", "vite-ssr"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/vite-plugin-octane/tests/plugin.test.ts",
+          "testName": "preserves both hmr values at the compiler output boundary",
+          "modes": ["vite-client"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/vite-plugin-octane/tests/plugin.test.ts",
+          "testName": "preserves both requireDirective values at the compiler ownership boundary",
+          "modes": ["vite-client"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/vite-plugin-octane/tests/plugin.test.ts",
+          "testName": "preserves build.minify=true and build.target=false in resolved Vite config",
+          "modes": ["production-compile", "vite-client"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/vite-plugin-octane/tests/plugin.test.ts",
+          "testName": "preserves build.minify=false and build.target=false in resolved Vite config",
+          "modes": ["production-compile", "vite-client"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/vite-plugin-octane/tests/profile-bundle.test.ts",
+          "testName": "erases profiling from normal builds and installs it in profile builds",
+          "modes": ["production-compile", "vite-client"],
+          "observables": ["bundle-contents"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/loader.integration.test.ts",
+          "testName": "removes hot-update output when hmr is explicitly false in a hot compilation",
+          "modes": ["rspack"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/loader.integration.test.ts",
+          "testName": "changes development metadata for both explicit dev values",
+          "modes": ["rspack"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/loader.integration.test.ts",
+          "testName": "gates ownership behind requireDirective and reports forgotten pragmas",
+          "modes": ["rspack"],
+          "observables": ["emitted-code"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/plugin.test.ts",
+          "testName": "honors explicit client mode and serializable loader options",
+          "modes": ["rspack"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
+          "testName": "transpiles TypeScript only when plugin transpilation is enabled",
+          "modes": ["rspack"],
+          "observables": ["bundle-contents"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
+          "testName": "splits client-only renderer dependencies from the raw server graph with stable module identity",
+          "modes": ["rspack"],
+          "observables": ["bundle-contents", "package-resolution"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
+          "testName": "erases profiling and full diagnostics from a real production bundle",
+          "modes": ["rspack", "production-compile"],
+          "observables": ["bundle-contents"]
+        },
+        {
+          "file": "packages/rspack-plugin-octane/tests/rspack.test.ts",
+          "testName": "executes the profiled runtime",
+          "modes": ["rspack", "production-compile"],
+          "observables": ["bundle-contents"]
+        },
+        {
+          "file": "packages/rsbuild-plugin-octane/tests/renderer-config.test.ts",
+          "testName": "preserves asymmetric public compiler booleans through custom client/server environments",
+          "modes": ["rsbuild"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rsbuild-plugin-octane/tests/target.test.ts",
+          "testName": "maps build.minify=true to webworker optimization",
+          "modes": ["rsbuild", "production-compile"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rsbuild-plugin-octane/tests/target.test.ts",
+          "testName": "maps build.minify=false to webworker optimization",
+          "modes": ["rsbuild", "production-compile"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rsbuild-plugin-octane/tests/target.test.ts",
+          "testName": "maps build.target=false without dropping the false-valued configuration",
+          "modes": ["rsbuild", "production-compile"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rsbuild-plugin-octane/tests/target.test.ts",
+          "testName": "emits profiling only in the client production bundle",
+          "modes": ["rsbuild", "production-compile"],
+          "observables": ["bundle-contents"]
+        },
+        {
+          "file": "packages/rspeedy-plugin-octane/tests/plugin.test.ts",
+          "testName": "preserves an asymmetric public-boolean matrix in the installed Rspack integration",
+          "modes": ["rspeedy"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rspeedy-plugin-octane/tests/plugin.test.ts",
+          "testName": "removes hot-update entries when hmr is explicitly false in development",
+          "modes": ["rspeedy"],
+          "observables": ["resolved-configuration"]
+        },
+        {
+          "file": "packages/rspeedy-plugin-octane/tests/build.test.ts",
+          "testName": "assembles a normal Octane application and generated receiver into a native bundle",
+          "modes": ["rspeedy"],
+          "observables": ["bundle-contents", "package-resolution"]
+        }
+      ],
+      "rationale": "Redact's forwardRef and class-component flags are out of scope. Octane's inventory composes adapter-level resolved-configuration checks with executable owning-compiler proofs, including real Vite/Rspack/Rsbuild/Rspeedy bundles, renderer routing, shared minification, Rspack transpilation, and the false-valued target sentinel. Diagnostic-only compiler escape hatches and unrelated runtime/server config are excluded."
     },
     {
       "id": "RDX-DOC-001",
@@ -813,7 +980,7 @@
         "hydrate-match",
         "production-compile"
       ],
-      "observables": ["markup"],
+      "observables": ["markup", "node-identity"],
       "octaneReferences": [
         {
           "kind": "test",
@@ -823,7 +990,7 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
-          "testName": "server useId is preserved byte-for-byte after hydrateRoot()"
+          "testName": "starts hydrated useId sequences from each server-rendered root"
         }
       ],
       "evidence": [
@@ -835,15 +1002,15 @@
         },
         {
           "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
-          "testName": "server useId is preserved byte-for-byte after hydrateRoot()",
+          "testName": "starts hydrated useId sequences from each server-rendered root",
           "modes": ["server-string", "hydrate-match", "production-compile"],
-          "observables": ["markup"]
+          "observables": ["markup", "node-identity"]
         },
         {
           "file": "packages/octane/tests/streaming-ssr.test.ts",
           "testName": "hydrates completed boundary useId values in its opaque stream namespace",
           "modes": ["server-stream", "hydrate-match", "production-compile"],
-          "observables": ["markup"]
+          "observables": ["markup", "node-identity"]
         }
       ]
     },
@@ -1059,7 +1226,7 @@
       "symptom": "A hook existed in source but was omitted from the package entrypoint, producing a link-time failure only in a downstream consumer.",
       "octaneContract": "Every intended value export for each public Octane subpath is checked from the built or packed artifact, so removing a re-export is an explicit review event rather than a downstream surprise.",
       "classification": "portable",
-      "status": "planned",
+      "status": "covered",
       "risk": "medium",
       "owner": "Octane package surface",
       "applicableModes": ["packaged-consumer", "production-compile"],
@@ -1068,20 +1235,36 @@
         {
           "kind": "source",
           "file": "packages/octane/scripts/verify-dist.mjs",
-          "symbol": "smokeDist",
-          "note": "Proves every JS entry imports, but not that a specific named export remains present."
+          "symbol": "REQUIRED_PUBLIC_VALUE_EXPORTS",
+          "note": "Defines a required subset for every published JavaScript namespace; additions remain compatible while removals fail the prepack build."
         },
         {
           "kind": "integration",
           "file": "scripts/check-package-packs.mjs",
-          "note": "Builds isolated consumers from packed workspace artifacts."
+          "note": "Builds an isolated packed consumer that imports the JSX type-runtime and TSRX helper subpaths."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/scripts/verify-dist.mjs", "scripts/check-package-packs.mjs"],
-        "acceptance": "Derive or explicitly declare intended named-export sets for public core subpaths and validate them from the built or packed artifact without making harmless additive exports unnecessarily brittle."
-      }
+      "evidence": [
+        {
+          "file": "packages/octane/tests/public-exports.test.ts",
+          "testName": "requires committed names while permitting additive exports",
+          "modes": ["production-compile"],
+          "observables": ["package-resolution"]
+        },
+        {
+          "file": "packages/octane/tests/public-exports.test.ts",
+          "testName": "publishes every subpath advertised to source consumers",
+          "modes": ["production-compile", "packaged-consumer"],
+          "observables": ["package-resolution"]
+        },
+        {
+          "kind": "command",
+          "script": "packages:pack:check",
+          "modes": ["packaged-consumer", "production-compile"],
+          "observables": ["package-resolution"]
+        }
+      ],
+      "rationale": "The audit found four source-advertised subpaths missing from the packed manifest. The package now publishes them, typechecks all four from an outside-workspace tarball consumer, executes the two value-bearing TSRX helpers there, and locks every JavaScript subpath to an additive-friendly required export subset."
     },
     {
       "id": "RDX-PKG-002",
