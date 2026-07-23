@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 9 dual-thread Rspeedy and compatibility-lane integration for Octane Lynx.",
+  "description": "Private Milestone 10 dual-thread Rspeedy integration and one-command demo for Octane Lynx.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
@@ -33,6 +33,10 @@
     }
   },
   "scripts": {
+    "demo": "rspeedy dev --root examples/demo",
+    "demo:build": "rspeedy build --root examples/demo",
+    "demo:typecheck": "tsrx-tsc --noEmit -p examples/demo/tsconfig.json",
+    "demo:check": "pnpm demo:typecheck && pnpm demo:build",
     "test": "vitest run --root ../.. --project rspeedy-plugin",
     "test:compat": "node scripts/compatibility-smoke.mjs"
   },
@@ -51,12 +55,14 @@
     "octane": "workspace:*"
   },
   "devDependencies": {
+    "@lynx-js/qrcode-rsbuild-plugin": "catalog:lynx",
     "@lynx-js/rspeedy": "catalog:lynx",
     "@lynx-js/tasm": "catalog:lynx",
     "@octanejs/lynx": "workspace:*",
     "@octanejs/rspack-plugin": "workspace:*",
     "@rsbuild/core": "catalog:lynx",
     "@rspack/core": "catalog:lynx",
+    "@tsrx/typescript-plugin": "catalog:default",
     "@types/node": "catalog:default",
     "octane": "workspace:*",
     "typescript": "catalog:lynx",

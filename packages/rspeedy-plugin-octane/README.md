@@ -1,4 +1,4 @@
-# `@octanejs/rspeedy-plugin` (private Milestones 6–9 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestones 6–10 source/build path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
@@ -21,6 +21,29 @@ The repository proves graph specialization, bundle construction, decoding, and
 dual-layer lazy-chunk emission; it does not yet prove first paint, adoption, or
 dynamic chunk execution on Lynx Web, Android Explorer, or iOS Explorer, nor
 does it prove state-preserving HMR on those targets.
+
+## One-command repository demo
+
+From the repository root, run:
+
+```bash
+pnpm lynx:demo
+```
+
+The command starts the pinned Rspeedy development server, builds
+`main.lynx.bundle`, and prints its LAN URL and a QR code. Open that URL with the
+official
+[Lynx 3.9.0 Explorer](https://github.com/lynx-family/lynx/releases/tag/3.9.0)
+on a device that can reach the development computer. The demo exercises native
+layout and CSS, dual-thread startup, and a background-owned state update through
+`bindtap`. See the
+[demo README](./examples/demo/README.md) for prerequisites and non-interactive
+checks.
+
+The repository's automated gate starts the development command on an isolated
+port, fetches and decodes this exact bundle, and verifies server teardown. It
+does not replace the Explorer/device acceptance gate or prove native first
+paint, adoption, tap delivery, or live reload.
 
 ## Application mode
 
@@ -57,6 +80,11 @@ configuration.
 Compatible Rspack entry metadata is copied to both generated graphs so they see
 the same entry initialization inputs. Development-only CSS HMR setup runs after
 the receiver install and before the authored imports.
+
+Standalone `.tsrx` application components use a leading
+`/** @jsxImportSource @octanejs/lynx/intrinsics */` pragma for editor and
+`tsrx-tsc` typing. The Rspeedy plugin independently selects Lynx as the default
+compiler renderer for the application build.
 
 An authored `lazy(() => import('./Card.tsrx'))` remains a real Rspack dynamic
 import. The pinned production fixture emits a content-hashed async `.bundle`;

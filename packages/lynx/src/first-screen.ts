@@ -1,4 +1,5 @@
 import type { UniversalComponent } from 'octane/universal/native';
+import type { LynxComponent } from './intrinsics.js';
 import type { LynxFirstScreenRenderResult } from './main-renderer.js';
 
 /** Main-thread root contract installed by the generated receiver entry. */
@@ -36,7 +37,7 @@ function requireHost(): LynxFirstScreenHost {
 export interface LynxFirstScreenRoot {
 	readonly renderer: 'lynx';
 	readonly ready: Promise<void>;
-	render<Props>(component: UniversalComponent<Props>, props?: Props): LynxFirstScreenRenderResult;
+	render<Props>(component: LynxComponent<Props>, props?: Props): LynxFirstScreenRenderResult;
 	flushTransport(): Promise<void>;
 	unmount(): Promise<void>;
 }
@@ -47,11 +48,14 @@ const ready = Promise.resolve();
 export const root: LynxFirstScreenRoot = Object.freeze({
 	renderer: 'lynx' as const,
 	ready,
-	render<Props>(component: UniversalComponent<Props>, props?: Props) {
+	render<Props>(component: LynxComponent<Props>, props?: Props) {
 		if (typeof component !== 'function') {
 			throw new TypeError('Lynx first-screen root.render() requires a component function.');
 		}
-		return requireHost().render(component, props === undefined ? ({} as Props) : props);
+		return requireHost().render(
+			component as UniversalComponent<Props>,
+			props === undefined ? ({} as Props) : props,
+		);
 	},
 	flushTransport() {
 		return ready;

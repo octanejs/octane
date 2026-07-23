@@ -15,6 +15,7 @@ import type {
 import type { JSX as RendererJSX } from '@octanejs/lynx/intrinsics/jsx-runtime';
 import { installLynxMainThread, type LynxMainThreadController } from '@octanejs/lynx/main-thread';
 import type { UniversalComponent } from '@octanejs/lynx/renderer';
+import type { UniversalRenderable } from 'octane/universal/native';
 
 declare module '@octanejs/lynx/intrinsics' {
 	interface LynxCustomIntrinsicElements {
@@ -32,6 +33,7 @@ type Equal<Left, Right> =
 		: false;
 
 type RendererElements = RendererJSX.IntrinsicElements;
+type _ElementIsUniversalRenderable = Assert<Equal<RendererJSX.Element, UniversalRenderable>>;
 type _HasPage = Assert<Equal<'page' extends keyof RendererElements ? true : false, true>>;
 type _HasView = Assert<Equal<'view' extends keyof RendererElements ? true : false, true>>;
 type _HasText = Assert<Equal<'text' extends keyof RendererElements ? true : false, true>>;
@@ -138,6 +140,8 @@ const publicHandleRoot: number = publicHandle.root;
 const viewWithObjectRef: RendererElements['view'] = { ref: handleRef };
 declare const nativeComponent: UniversalComponent<{ label: string }>;
 const renderResult: Promise<unknown> = root.render(nativeComponent, { label: 'ready' });
+declare const authoredComponent: (props: { label: string }) => RendererJSX.Element;
+const authoredRenderResult: Promise<unknown> = root.render(authoredComponent, { label: 'ready' });
 const installMainThread: (options?: { target?: object }) => LynxMainThreadController =
 	installLynxMainThread;
 
@@ -156,6 +160,9 @@ const unregisteredCustomProps: RendererElements['native-video'] = {};
 // @ts-expect-error Root props retain the compiled component contract.
 root.render(nativeComponent, { title: 'wrong' });
 
+// @ts-expect-error Authored component props remain exact before compiler branding.
+root.render(authoredComponent, { title: 'wrong' });
+
 void viewProps;
 void mainThreadViewProps;
 void rawTextProps;
@@ -167,6 +174,7 @@ void nativeMapProps;
 void publicHandleRoot;
 void viewWithObjectRef;
 void renderResult;
+void authoredRenderResult;
 void installMainThread;
 void domOnlyViewProps;
 void booleanStyleProps;

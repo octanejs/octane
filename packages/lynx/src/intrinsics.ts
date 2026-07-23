@@ -1,3 +1,5 @@
+import type { UniversalComponent, UniversalRenderable } from 'octane/universal/native';
+
 import type {
 	LynxEvent as NativeLynxEvent,
 	LynxEventHandler as NativeLynxEventHandler,
@@ -37,9 +39,14 @@ export type LynxMainThreadEventProps = {
 
 export type LynxStandardProps = NativeLynxStandardProps &
 	LynxMainThreadEventProps & {
+		children?: UniversalRenderable;
 		ref?: LynxRef;
 		'main-thread:ref'?: LynxMainThreadRefDescriptor;
 	};
+
+/** Source-level component accepted before the Octane compiler installs runtime metadata. */
+export type LynxComponent<Props = unknown> =
+	UniversalComponent<Props> | ((props: Props) => UniversalRenderable);
 export type LynxEventTarget = NativeLynxEventTarget;
 export type LynxEvent<Kind extends string = string, Detail = unknown> = NativeLynxEvent<
 	Kind,
@@ -288,5 +295,6 @@ export type LynxElements = LynxIntrinsicElements & LynxCustomIntrinsicElements;
 
 /** Renderer-local JSX namespace; no global or React JSX namespace is augmented. */
 export namespace JSX {
+	export type Element = UniversalRenderable;
 	export interface IntrinsicElements extends LynxIntrinsicElements, LynxCustomIntrinsicElements {}
 }
