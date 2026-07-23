@@ -146,6 +146,22 @@ describe('Rsbuild build.target mapping', () => {
 		);
 	});
 
+	it('maps build.target=false without dropping the false-valued configuration', async () => {
+		writeApp(root, 'false');
+		const instance = await createRsbuild({
+			cwd: root,
+			rsbuildConfig: { plugins: [pluginOctane({ hmr: false })] },
+		});
+		const configs = await instance.initConfigs({ action: 'build' });
+
+		expect(configs.map((config) => config.target)).toEqual(
+			expect.arrayContaining([
+				['web', 'es2024'],
+				['node', 'es2024'],
+			]),
+		);
+	});
+
 	it('emits an importable Cloudflare Worker entry only in production', async () => {
 		writeApp(root, JSON.stringify('es2022'), 'cloudflare');
 		const production = await createRsbuild({
@@ -192,7 +208,7 @@ describe('Rsbuild build.target mapping', () => {
 		).toBe(true);
 	}, 120_000);
 
-	it.each([true, false])('honors build.minify=%s for webworker output', async (minify) => {
+	it.each([true, false])('maps build.minify=%s to webworker optimization', async (minify) => {
 		writeApp(root, JSON.stringify('es2022'), 'webworker', minify);
 		const instance = await createRsbuild({
 			cwd: root,

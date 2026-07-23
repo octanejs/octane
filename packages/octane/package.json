@@ -58,6 +58,20 @@
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
       },
+      "./jsx-runtime": {
+        "types": "./dist/jsx-runtime.d.ts"
+      },
+      "./jsx-dev-runtime": {
+        "types": "./dist/jsx-runtime.d.ts"
+      },
+      "./tsrx-iterable": {
+        "types": "./dist/tsrx-iterable.d.ts",
+        "default": "./dist/tsrx-iterable.js"
+      },
+      "./tsrx-spread": {
+        "types": "./dist/tsrx-spread.d.ts",
+        "default": "./dist/tsrx-spread.js"
+      },
       "./react": {
         "types": "./dist/react/index.d.ts",
         "default": "./dist/react/index.js"
