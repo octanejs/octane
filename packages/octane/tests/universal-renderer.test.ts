@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseModule } from '@tsrx/core';
+import { builders as b, parseModule } from '@tsrx/core';
+import { print as esrapPrint } from 'esrap';
+import esrapTsx from 'esrap/languages/tsx';
 import { compile } from '../src/compiler/compile.js';
-import { lowerUniversalRendererRegion } from '../src/compiler/compile-universal.js';
+import { lowerUniversalRendererRegionAst } from '../src/compiler/compile-universal.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import * as UniversalRuntime from '../src/universal.js';
 import {
@@ -27,6 +29,7 @@ import {
 import { mount } from './_helpers.js';
 import { UniversalBoundaryFixture, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 import { CompiledUniversalScene } from './_fixtures/compiled-universal.object.tsrx';
+import { inspectProfileOutput } from './_profile-output.js';
 
 const renderer = {
 	id: 'object',
@@ -49,6 +52,72 @@ const validationRenderer = {
 		},
 	},
 } as const;
+
+function lowerUniversalRendererRegion(
+	regionSource: string,
+	filename: string,
+	ownerRenderer: any,
+	childRenderer: any,
+	index: number,
+	_kind: 'children' | 'expression' = 'children',
+	options: Record<string, any> = {},
+) {
+	const wrapped = parseModule(`const __region = <>${regionSource}</>;`, filename);
+	const regionExpression = wrapped.body[0]?.declarations?.[0]?.init;
+	if (!regionExpression) throw new Error('test region did not parse');
+	const authoredSource =
+		typeof options.authoredSource === 'string' ? options.authoredSource : regionSource;
+	const authoredAst = parseModule(authoredSource, filename);
+	const componentStatements = (options.components ?? []).flatMap((component: any) => {
+		if (component?.type) return [component];
+		const start =
+			component?.origins?.find?.((origin: number) => origin >= 0) ??
+			authoredSource.indexOf(component.code);
+		const authored = authoredAst.body.find(
+			(statement: any) =>
+				statement.start === start && statement.end === start + component.code.length,
+		);
+		return authored === undefined ? parseModule(component.code, filename).body : [authored];
+	});
+	const validationRanges = [
+		{
+			start: Math.max(0, authoredSource.indexOf(regionSource)),
+			end: Math.max(0, authoredSource.indexOf(regionSource)) + regionSource.length,
+		},
+		...(options.components ?? []).map((component: any) => {
+			const start =
+				component?.origins?.find?.((origin: number) => origin >= 0) ??
+				authoredSource.indexOf(component.code);
+			return { start, end: start + component.code.length };
+		}),
+	].filter((range) => range.start >= 0);
+	const lowered = lowerUniversalRendererRegionAst(
+		regionExpression,
+		filename,
+		ownerRenderer,
+		childRenderer,
+		index,
+		{
+			...options,
+			components: componentStatements,
+			authoredAst,
+			authoredSource,
+			validationRanges,
+		},
+	);
+	const prelude = esrapPrint(
+		{
+			type: 'Program',
+			sourceType: 'module',
+			body: [...lowered.statements],
+		},
+		esrapTsx(),
+	).code;
+	const expression = esrapPrint(b.stmt(lowered.expression), esrapTsx())
+		.code.trim()
+		.replace(/;$/, '');
+	return { ...lowered, prelude, expression };
+}
 
 const itemPlan = universalPlan('object', {
 	kind: 'range',
@@ -150,6 +219,38 @@ function importedLocalName(
 		}
 	}
 	return undefined;
+}
+
+function universalPropPrograms(code: string): any[] {
+	return (callsByImportedName(code, 'octane/universal').get('universalProps') ?? [])
+		.map((call) => call.arguments[0])
+		.filter((argument) => argument?.type === 'ArrayExpression');
+}
+
+function hasUniversalPropEntry(
+	code: string,
+	operation: string,
+	name: string,
+	value: string,
+): boolean {
+	return universalPropPrograms(code).some((program) =>
+		program.elements.some((entry: any) => {
+			const elements = entry?.elements;
+			if (operation === 'spread') {
+				return (
+					elements?.[0]?.value === operation &&
+					elements?.[1]?.type === 'Identifier' &&
+					elements[1].name === value
+				);
+			}
+			const actual = elements?.[2];
+			return (
+				elements?.[0]?.value === operation &&
+				elements?.[1]?.value === name &&
+				(actual?.value === value || (actual?.type === 'Identifier' && actual.name === value))
+			);
+		}),
+	);
 }
 
 function comparableCompiledAst(node: any): unknown {
@@ -1688,7 +1789,7 @@ export function Scene() @{
 		`;
 		const output = compile(source, '/src/Scene.object.tsrx', { renderer }).code;
 
-		expect(output).toContain('from "octane/universal"');
+		expect(importedLocalName(output, 'octane/universal', 'universalPlan')).toBeDefined();
 		expect(output).toContain('"kind": "host"');
 		expect(output).toContain('"kind": "range"');
 		expect(output).toContain('"bindings": [["tone", 0]]');
@@ -2207,12 +2308,25 @@ export function Scene() @{
 
 		expect(output.code).toContain('universalComponent as __octaneUniversalComponent');
 		expect(output.code).toContain('universalProps as __octaneUniversalProps');
-		expect(output.code).toContain("['spread', before]");
-		expect(output.code).toContain('[\'set\', "tone", "warm"]');
-		expect(output.code).toContain("['spread', after]");
-		expect(output.code).toContain('[\'set\', "tone", "final"]');
-		expect(output.code).toContain('__octaneUniversalComponent("object", Library.Child');
-		expect(output.code).toContain('__octaneUniversalComponent("object", Current');
+		expect(hasUniversalPropEntry(output.code, 'spread', '', 'before')).toBe(true);
+		expect(hasUniversalPropEntry(output.code, 'set', 'tone', 'warm')).toBe(true);
+		expect(hasUniversalPropEntry(output.code, 'spread', '', 'after')).toBe(true);
+		expect(hasUniversalPropEntry(output.code, 'set', 'tone', 'final')).toBe(true);
+		const componentCalls =
+			callsByImportedName(output.code, 'octane/universal').get('universalComponent') ?? [];
+		expect(
+			componentCalls.some(
+				(call) =>
+					call.arguments[1]?.type === 'MemberExpression' &&
+					call.arguments[1].object?.name === 'Library' &&
+					call.arguments[1].property?.name === 'Child',
+			),
+		).toBe(true);
+		expect(
+			componentCalls.some(
+				(call) => call.arguments[1]?.type === 'Identifier' && call.arguments[1].name === 'Current',
+			),
+		).toBe(true);
 		expect(output.code).not.toMatch(/<[A-Za-z{]/);
 		expect(output.map.sourcesContent).toEqual([source]);
 		expect(output.map.sources).toEqual(['Scene.object.tsrx']);
@@ -2237,13 +2351,22 @@ export function Scene() @{
 			hmr: false,
 		}).code;
 
-		expect(ordinary).toContain('[\'set\', "className", "first"]');
-		expect(ordinary).toContain('[\'set\', "class", "after"]');
-		expect(ordinary).not.toMatch(/\],\s*undefined,\s*true\s*\)/);
-		expect(aliased).toContain('[\'set\', "class", "first"]');
-		expect(aliased).toContain("['spread', middle]");
-		expect(aliased).toMatch(/\['set', "class", last\]\s*\],\s*undefined,\s*true\s*\)/);
-		expect(aliased).toContain('[\'set\', "className", "component-value"]');
+		expect(hasUniversalPropEntry(ordinary, 'set', 'className', 'first')).toBe(true);
+		expect(hasUniversalPropEntry(ordinary, 'set', 'class', 'after')).toBe(true);
+		expect(
+			(callsByImportedName(ordinary, 'octane/universal').get('universalProps') ?? []).some(
+				(call) => call.arguments[2]?.value === true,
+			),
+		).toBe(false);
+		expect(hasUniversalPropEntry(aliased, 'set', 'class', 'first')).toBe(true);
+		expect(hasUniversalPropEntry(aliased, 'spread', '', 'middle')).toBe(true);
+		expect(hasUniversalPropEntry(aliased, 'set', 'class', 'last')).toBe(true);
+		expect(
+			(callsByImportedName(aliased, 'octane/universal').get('universalProps') ?? []).some(
+				(call) => call.arguments[2]?.value === true,
+			),
+		).toBe(true);
+		expect(hasUniversalPropEntry(aliased, 'set', 'className', 'component-value')).toBe(true);
 	});
 
 	it('copies __proto__ as own prop data without polluting universal props', () => {
@@ -2314,8 +2437,8 @@ export function Scene() @{
 		expect(output).toContain('universalSwitch as __octaneUniversalSwitch');
 		expect(output).toContain('universalFor as __octaneUniversalFor');
 		expect(output).toContain('universalTry as __octaneUniversalTry');
-		expect(output).toContain('[\'set\', "key", mode]');
-		expect(output).toContain("['spread', host]");
+		expect(hasUniversalPropEntry(output, 'set', 'key', 'mode')).toBe(true);
+		expect(hasUniversalPropEntry(output, 'spread', '', 'host')).toBe(true);
 		expect(output).toContain('(item, __octaneUniversalIndex) => item.id');
 		expect(output).not.toContain('"key":');
 	});
@@ -2342,8 +2465,13 @@ export function Scene() @{
 		expect(output).toContain('_$useBatch([__pu$0, __pu$1])');
 		expect(output).toContain('__warm:');
 		expect(output).toContain('import.meta.hot.accept');
-		expect(output).toContain('"componentId":"/src/Profiled.object.tsrx#Scene@3:10"');
-		expect(output).toContain('"line":4,"column":14');
+		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toContainEqual(
+			expect.objectContaining({
+				componentId: '/src/Profiled.object.tsrx#Scene@3:10',
+				line: 4,
+				column: 14,
+			}),
+		);
 	});
 
 	it('warms adjacent universal component trees from a parent with no use()', async () => {

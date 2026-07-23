@@ -98,7 +98,7 @@ describe('loader with the neutral compiler', () => {
 		});
 	});
 
-	it('selects server codegen from a node target', () => {
+	it('selects server codegen from a node target', async () => {
 		const resourcePath = write(root, 'src/App.tsrx', `export function App() @{ <p>server</p> }\n`);
 		const result = transform({
 			root,
@@ -108,9 +108,11 @@ describe('loader with the neutral compiler', () => {
 			hot: true,
 		});
 		const code = String(result.content);
-		expect(code).toContain('return "<p>" + "server" + "</p>"');
 		expect(code).not.toContain('_$template');
 		expect(code).not.toContain('webpackHot');
+		const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+		const generated = await import(moduleUrl);
+		expect(generated.App()).toBe('<p>server</p>');
 	});
 
 	it('attaches the same client-reference metadata to client code and its server stub', () => {
@@ -144,6 +146,8 @@ describe('loader with the neutral compiler', () => {
 			clientReference: clientInfo.clientReference,
 		});
 		expect(String(server.content)).not.toContain('authored-setup');
+		expect(server.map).toMatchObject({ version: 3 });
+		expect((server.map as { mappings: string }).mappings.length).toBeGreaterThan(0);
 	});
 
 	it('marks module-server owners in server build metadata', () => {

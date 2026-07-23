@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
-import { decodeMappings } from '../src/compiler/compile-universal.js';
+import { decodeMappings } from './_source-map.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import {
 	createObjectContainer,
@@ -104,6 +105,35 @@ function compileDomBoundary(source: string, options: Record<string, unknown> = {
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	});
+}
+
+function hasCallWithIdentifierArgument(code: string, callee: string, index: number, name: string) {
+	const ast = parseModule(code, '/dist/universal-local-specialization.js');
+	let found = false;
+	const seen = new WeakSet<object>();
+	const visit = (node: any) => {
+		if (found || node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			node.callee.name === callee &&
+			node.arguments?.[index]?.type === 'Identifier' &&
+			node.arguments[index].name === name
+		) {
+			found = true;
+			return;
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!['loc', 'metadata', 'parent'].includes(key)) visit(child);
+		}
+	};
+	visit(ast);
+	return found;
 }
 
 function executeUniversalDisposeMerges(code: string) {
@@ -226,7 +256,14 @@ describe('local universal renderer specialization', () => {
 		expect(result.code).toContain('__octaneRendererRegion0UseMemo');
 		expect(result.code).toContain('__octaneRendererRegion0UseBatch');
 		expect(result.code).toContain('memo$__octaneRendererRegion0(');
-		expect(result.code).toContain('__octaneRendererRegion0Component("object", LocalShadow,');
+		expect(
+			hasCallWithIdentifierArgument(
+				result.code,
+				'__octaneRendererRegion0Component',
+				1,
+				'LocalShadow',
+			),
+		).toBe(true);
 		expect(result.code).not.toContain('__octaneRendererRegion0LocalShadow');
 		expect(result.code).not.toContain('props.render()');
 		expect(result.code).toMatch(

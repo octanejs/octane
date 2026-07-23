@@ -8,7 +8,9 @@
  * regions have been omitted, so any remaining reference receives a source
  * diagnostic before a sentinel can affect server behavior.
  */
-import { parseModule } from '@tsrx/core';
+import { builders as b, parseModule } from '@tsrx/core';
+import { print as esrapPrint } from 'esrap';
+import esrapTsx from 'esrap/languages/tsx';
 
 const CLIENT_REFERENCE_VERSION = 1;
 export const CLIENT_REFERENCE_MANIFEST_FILENAME = 'octane-client-references.json';
@@ -24,10 +26,6 @@ const TRANSPARENT_TS_EXPRESSIONS = new Set([
 function astName(node) {
 	if (node?.type === 'Identifier' || node?.type === 'JSXIdentifier') return node.name;
 	return typeof node?.value === 'string' ? node.value : null;
-}
-
-function printExportName(name) {
-	return /^[$A-Z_a-z][$\w]*$/u.test(name) || name === 'default' ? name : JSON.stringify(name);
 }
 
 function addPatternNames(pattern, output) {
@@ -182,7 +180,10 @@ export function findStaticRuntimeImportRequests(source, filename = 'unknown') {
 }
 
 function collectRuntimeExports(ast, filename) {
-	const exports = new Set();
+	const exports = new Map();
+	const addExport = (name, origin) => {
+		if (!exports.has(name)) exports.set(name, origin);
+	};
 	for (const statement of ast.body ?? []) {
 		if (statement.type === 'ExportDefaultDeclaration') {
 			if (
@@ -190,7 +191,7 @@ function collectRuntimeExports(ast, filename) {
 				statement.declaration?.declare !== true &&
 				statement.declaration?.type !== 'TSInterfaceDeclaration'
 			) {
-				exports.add('default');
+				addExport('default', statement);
 			}
 			continue;
 		}
@@ -208,14 +209,14 @@ function collectRuntimeExports(ast, filename) {
 			statement.importKind !== 'type' &&
 			statement.id?.name
 		) {
-			exports.add(statement.id.name);
+			addExport(statement.id.name, statement.id);
 			continue;
 		}
 		if (statement.type === 'ExportAllDeclaration') {
 			if (statement.exportKind === 'type') continue;
 			const exported = astName(statement.exported);
 			if (exported !== null) {
-				exports.add(exported);
+				addExport(exported, statement.exported ?? statement);
 				continue;
 			}
 			throw diagnosticError(
@@ -230,7 +231,11 @@ function collectRuntimeExports(ast, filename) {
 		const declaration = statement.declaration;
 		if (declaration?.declare === true) continue;
 		if (declaration?.type === 'VariableDeclaration') {
-			for (const item of declaration.declarations ?? []) addPatternNames(item.id, exports);
+			for (const item of declaration.declarations ?? []) {
+				const names = new Set();
+				addPatternNames(item.id, names);
+				for (const name of names) addExport(name, item.id);
+			}
 		} else if (
 			declaration?.id &&
 			(declaration.type === 'FunctionDeclaration' ||
@@ -238,15 +243,92 @@ function collectRuntimeExports(ast, filename) {
 				declaration.type === 'TSEnumDeclaration' ||
 				declaration.type === 'TSModuleDeclaration')
 		) {
-			exports.add(declaration.id.name);
+			addExport(declaration.id.name, declaration.id);
 		}
 		for (const specifier of statement.specifiers ?? []) {
 			if (specifier.exportKind === 'type') continue;
 			const exported = astName(specifier.exported);
-			if (exported !== null) exports.add(exported);
+			if (exported !== null) addExport(exported, specifier.exported ?? specifier);
 		}
 	}
-	return [...exports].sort();
+	return [...exports]
+		.map(([name, origin]) => ({ name, origin }))
+		.sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0));
+}
+
+/**
+ * Generated stub scaffolding has no authored syntax of its own, but every
+ * printed node still inherits a source origin so the auxiliary module carries
+ * a useful esrap map. The tree is compiler-owned; parsed nodes are never
+ * embedded or mutated.
+ */
+function inheritGeneratedOrigin(root, origin) {
+	const seen = new WeakSet();
+	const visit = (value) => {
+		if (!value || typeof value !== 'object' || seen.has(value)) return;
+		seen.add(value);
+		if (Array.isArray(value)) {
+			for (const item of value) visit(item);
+			return;
+		}
+		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+			value.start = origin.start;
+			value.end = origin.end;
+			value.loc = origin.loc;
+		}
+		for (const [key, child] of Object.entries(value)) {
+			if (key !== 'loc' && key !== 'metadata') visit(child);
+		}
+	};
+	visit(root);
+	return root;
+}
+
+function createProgram(body, origin) {
+	return inheritGeneratedOrigin(
+		{
+			type: 'Program',
+			sourceType: 'module',
+			body,
+			metadata: { path: [] },
+		},
+		origin,
+	);
+}
+
+const jsonStringifyCall = (expression) => b.call(b.member(b.id('JSON'), 'stringify'), expression);
+
+function clientOnlyStubVisitors() {
+	const visitors = esrapTsx();
+	const printExportSpecifier = visitors.ExportSpecifier;
+	return {
+		...visitors,
+		ExportSpecifier(node, context) {
+			// ESTree represents quoted export names as Literals. esrap 2.3's TS
+			// visitor currently prints only Identifier→Identifier aliases; retain
+			// the standard AST and teach this one print the missing literal arm.
+			if (node.exported.type === 'Literal') {
+				context.visit(node.local);
+				context.write(' as ');
+				context.visit(node.exported);
+				return;
+			}
+			printExportSpecifier(node, context);
+		},
+	};
+}
+
+function printClientOnlyServerStub(program, source, filename, exports) {
+	const printed = esrapPrint(program, clientOnlyStubVisitors(), {
+		sourceMapSource: filename,
+		sourceMapContent: source,
+	});
+	return {
+		ast: program,
+		code: printed.code,
+		map: printed.map,
+		exports,
+	};
 }
 
 /**
@@ -255,48 +337,102 @@ function collectRuntimeExports(ast, filename) {
  */
 export function createClientOnlyServerStub(source, filename, renderer) {
 	const ast = parseModule(source, filename);
-	const exports = collectRuntimeExports(ast, filename);
-	const lines = [
-		`const __octaneClientOnlyModule = ${JSON.stringify(filename)};`,
-		`const __octaneClientOnlyRenderer = ${JSON.stringify(renderer)};`,
-		'function __octaneClientOnlyExport(name) {',
-		'\tconst fail = () => {',
-		'\t\tconst error = new Error(`Client-only export ${JSON.stringify(name)} from ${JSON.stringify(__octaneClientOnlyModule)} (renderer ${JSON.stringify(__octaneClientOnlyRenderer)}) was used by the server graph.`);',
-		"\t\terror.code = 'OCTANE_CLIENT_ONLY_SERVER_USE';",
-		'\t\terror.filename = __octaneClientOnlyModule;',
-		'\t\tthrow error;',
-		'\t};',
-		'\treturn new Proxy(fail, {',
-		'\t\tapply: fail,',
-		'\t\tconstruct: fail,',
-		'\t\tdefineProperty: fail,',
-		'\t\tdeleteProperty: fail,',
-		'\t\tget: fail,',
-		'\t\tgetOwnPropertyDescriptor: fail,',
-		'\t\tgetPrototypeOf: fail,',
-		'\t\thas: fail,',
-		'\t\tisExtensible: fail,',
-		'\t\townKeys: fail,',
-		'\t\tpreventExtensions: fail,',
-		'\t\tset: fail,',
-		'\t\tsetPrototypeOf: fail,',
-		'\t});',
-		'}',
+	const exportEntries = collectRuntimeExports(ast, filename);
+	const exports = exportEntries.map((entry) => entry.name);
+	if (exportEntries.length === 0) {
+		return printClientOnlyServerStub(createProgram([], ast), source, filename, exports);
+	}
+	const message = b.template(
+		[
+			b.quasi('Client-only export '),
+			b.quasi(' from '),
+			b.quasi(' (renderer '),
+			b.quasi(') was used by the server graph.', true),
+		],
+		[
+			jsonStringifyCall(b.id('name')),
+			jsonStringifyCall(b.id('__octaneClientOnlyModule')),
+			jsonStringifyCall(b.id('__octaneClientOnlyRenderer')),
+		],
+	);
+	const fail = b.arrow(
+		[],
+		b.block([
+			b.const('error', b.new('Error', undefined, message)),
+			b.stmt(
+				b.assignment(
+					'=',
+					b.member(b.id('error'), 'code'),
+					b.literal('OCTANE_CLIENT_ONLY_SERVER_USE'),
+				),
+			),
+			b.stmt(
+				b.assignment('=', b.member(b.id('error'), 'filename'), b.id('__octaneClientOnlyModule')),
+			),
+			{ type: 'ThrowStatement', argument: b.id('error'), metadata: { path: [] } },
+		]),
+	);
+	const traps = [
+		'apply',
+		'construct',
+		'defineProperty',
+		'deleteProperty',
+		'get',
+		'getOwnPropertyDescriptor',
+		'getPrototypeOf',
+		'has',
+		'isExtensible',
+		'ownKeys',
+		'preventExtensions',
+		'set',
+		'setPrototypeOf',
 	];
-	for (let index = 0; index < exports.length; index++) {
-		lines.push(
-			`const __octaneClientOnlyExport${index} = __octaneClientOnlyExport(${JSON.stringify(exports[index])});`,
+	const body = [
+		b.const('__octaneClientOnlyModule', b.literal(filename)),
+		b.const('__octaneClientOnlyRenderer', b.literal(renderer)),
+		b.function_declaration(
+			b.id('__octaneClientOnlyExport'),
+			[b.id('name')],
+			b.block([
+				b.const('fail', fail),
+				b.return(
+					b.new(
+						'Proxy',
+						undefined,
+						b.id('fail'),
+						b.object(traps.map((name) => b.init(name, b.id('fail')))),
+					),
+				),
+			]),
+		),
+	];
+	for (let index = 0; index < exportEntries.length; index++) {
+		body.push(
+			inheritGeneratedOrigin(
+				b.const(
+					`__octaneClientOnlyExport${index}`,
+					b.call('__octaneClientOnlyExport', b.literal(exportEntries[index].name)),
+				),
+				exportEntries[index].origin,
+			),
 		);
 	}
-	if (exports.length === 0) lines.push('export {};');
-	else {
-		lines.push(
-			`export { ${exports
-				.map((name, index) => `__octaneClientOnlyExport${index} as ${printExportName(name)}`)
-				.join(', ')} };`,
-		);
-	}
-	return Object.freeze({ code: lines.join('\n') + '\n', exports: Object.freeze(exports) });
+	const exportSpecifiers = exportEntries.map((entry, index) =>
+		inheritGeneratedOrigin(
+			b.export_specifier(
+				`__octaneClientOnlyExport${index}`,
+				/^[$A-Z_a-z][$\w]*$/u.test(entry.name) ? b.id(entry.name) : b.literal(entry.name),
+			),
+			entry.origin,
+		),
+	);
+	body.push(b.export(null, exportSpecifiers));
+	// A Program can end at column zero when the source has a trailing newline.
+	// Structural nodes need an authored syntax range whose end is a real token:
+	// esrap anchors a generated closing delimiter immediately before `loc.end`.
+	const scaffoldOrigin = exportEntries[0].origin;
+	const program = createProgram(body, scaffoldOrigin);
+	return printClientOnlyServerStub(program, source, filename, exports);
 }
 
 function bindingNames(pattern) {
@@ -371,10 +507,15 @@ function importedName(specifier) {
  * rewrite. Side-effect imports and unused bindings are safe because their
  * target compiles to a no-op stub.
  */
-export function assertNoLiveClientOnlyImports(source, filename, clientOnlyImports = []) {
+export function assertNoLiveClientOnlyImports(
+	source,
+	filename,
+	clientOnlyImports = [],
+	parsedAst = null,
+) {
 	if (!Array.isArray(clientOnlyImports) || clientOnlyImports.length === 0) return;
 	const byRequest = new Map(clientOnlyImports.map((entry) => [entry.request, entry]));
-	const ast = parseModule(source, filename);
+	const ast = parsedAst ?? parseModule(source, filename);
 	const imported = new Map();
 
 	for (const statement of ast.body ?? []) {

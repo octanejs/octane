@@ -324,9 +324,9 @@ export function rendererBoundaryOwnerDiagnostic(boundary, actualRenderer, filena
  */
 export function analyzeRendererBoundaries(
 	source,
-	{ filename = 'unknown.tsrx', renderer, rendererBoundaries = {} } = {},
+	{ ast: parsedAst = null, filename = 'unknown.tsrx', renderer, rendererBoundaries = {} } = {},
 ) {
-	const ast = parseModule(source, filename);
+	const ast = parsedAst ?? parseModule(source, filename);
 	const imports = collectImports(ast, rendererBoundaries);
 	const importNames = new Set([...imports.direct.keys(), ...imports.namespaces.keys()]);
 	const rendererId = typeof renderer === 'string' ? renderer : renderer?.id;

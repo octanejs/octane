@@ -61,6 +61,8 @@ describe('compileToVolarMappings', () => {
 		expect(Array.isArray(result.diagnostics)).toBe(true);
 		expect(result.sourceAst).toBeDefined();
 		expect(result.sourceAst.type).toBe('Program');
+		expect(result.generatedAst).toBeDefined();
+		expect(result.generatedAst.type).toBe('Program');
 	});
 
 	it('preserves user identifiers in the generated TSX', () => {
@@ -95,7 +97,32 @@ describe('compileToVolarMappings', () => {
 		}
 	});
 
-	it('selects renderer intrinsics by canonical filename and shifts virtual-code mappings', () => {
+	it('maps type-only structural closing tokens to their own source boundaries', () => {
+		const src =
+			'const value = { list: [run(input)] };\n' +
+			'export function Foo() @{ <p>{value.list[0] as string}</p> }\n';
+		const result = compileToVolarMappings(src, 'foo.tsrx');
+
+		const expectExactSpan = (text: string): void => {
+			const sourceOffset = src.indexOf(text);
+			const mapping = result.mappings.find(
+				(candidate) =>
+					candidate.sourceOffsets[0] === sourceOffset && candidate.lengths[0] === text.length,
+			);
+			expect(mapping).toBeDefined();
+			const generatedOffset = mapping!.generatedOffsets[0];
+			const generatedLength = mapping!.generatedLengths?.[0] ?? mapping!.lengths[0];
+			expect(result.code.slice(generatedOffset, generatedOffset + generatedLength)).toBe(text);
+		};
+
+		// @tsrx/core's typeOnly print enables esrap `boundaryTokens`: the closing
+		// object brace and computed-member bracket resolve at their own mapped
+		// positions instead of inheriting the preceding token's location.
+		expectExactSpan('{ list: [run(input)] }');
+		expectExactSpan('value.list[0]');
+	});
+
+	it('selects renderer intrinsics by canonical filename in the mapped virtual-code print', () => {
 		const src = 'export function Scene() @{ <line path="route"><mesh /></line> }\n';
 		const baseline = compileToVolarMappings(src, '/src/Scene.object.tsrx');
 		const object = compileToVolarMappings(src, String.raw`\src\Scene.object.tsrx?used`, {
@@ -116,8 +143,16 @@ describe('compileToVolarMappings', () => {
 		expect(baseline.code.startsWith(domPrelude)).toBe(true);
 		expect(object.code.slice(prelude.length)).toBe(baseline.code.slice(domPrelude.length));
 		expect(object.mappings).toHaveLength(baseline.mappings.length);
+		// The synthetic semantic pragma itself maps to the start of the source
+		// and generated file in both variants. Authored tokens after it move by
+		// exactly the difference in pragma length, as recorded by the one print's
+		// native map (no post-print mapping shift).
+		expect(baseline.mappings[0].sourceOffsets).toEqual([0]);
+		expect(baseline.mappings[0].generatedOffsets).toEqual([0]);
+		expect(object.mappings[0].sourceOffsets).toEqual([0]);
+		expect(object.mappings[0].generatedOffsets).toEqual([0]);
 		const shift = prelude.length - domPrelude.length;
-		for (let index = 0; index < object.mappings.length; index++) {
+		for (let index = 1; index < object.mappings.length; index++) {
 			expect(object.mappings[index].sourceOffsets).toEqual(baseline.mappings[index].sourceOffsets);
 			expect(object.mappings[index].generatedOffsets).toEqual(
 				baseline.mappings[index].generatedOffsets.map((offset) => offset + shift),
@@ -393,19 +428,26 @@ declare module '@fixture/object-intrinsics/jsx-runtime' {
 		}
 	});
 
-	it('exposes the (transformed) AST for editor integrations that need to walk it', () => {
+	it('exposes both authored and generated ASTs for editor and playground integrations', () => {
 		const src = "export function Foo() @{ <p>{'x'}</p> }\n";
 		const result = compileToVolarMappings(src, 'foo.tsrx');
-		// The AST is the same node graph the transform pass walked (it mutates
-		// in place, which is why JSXCodeBlock bodies get lowered to plain
-		// BlockStatements en route to TSX). Language plugins use it for symbol
-		// indexing, hover queries, refactorings — they read the post-transform
-		// shape because that's what the `mappings` array points into.
+		// `sourceAst` remains the parsed authored tree used for route-generator
+		// markers and source-side editor queries.
 		expect(result.sourceAst.type).toBe('Program');
 		const fnDecl = (result.sourceAst.body as any[]).find(
 			(n) => n.type === 'ExportNamedDeclaration' && n.declaration?.type === 'FunctionDeclaration',
 		);
 		expect(fnDecl?.declaration?.id?.name).toBe('Foo');
+		expect(fnDecl?.declaration?.body?.type).toBe('JSXCodeBlock');
+
+		// `generatedAst` is the exact transformed Program @tsrx/core printed to
+		// produce `code`; the playground can show the types AST or virtual TSX
+		// without reparsing.
+		expect(result.generatedAst.type).toBe('Program');
+		const generatedFn = (result.generatedAst.body as any[]).find(
+			(n) => n.type === 'ExportNamedDeclaration' && n.declaration?.type === 'FunctionDeclaration',
+		);
+		expect(generatedFn?.declaration?.body?.type).toBe('BlockStatement');
 	});
 
 	it('marks native template bodies on the source AST (route-generator contract)', () => {
