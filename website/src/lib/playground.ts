@@ -14,7 +14,7 @@
 //
 // Client-only: load via dynamic import from an effect (never during SSR).
 import { compile, type CompileDiagnostic } from 'octane/compiler';
-import { compileToVolarMappings } from 'octane/compiler/volar';
+import { __parseGeneratedModuleAst, compileToVolarMappings } from 'octane/compiler/volar';
 import {
 	sandboxSrcdoc,
 	RUNTIME_MANIFEST_PATH,
@@ -40,6 +40,14 @@ export interface CompileFailure {
 	error: string;
 }
 
+/** Preserve an inspection failure unless module-graph compilation has a more direct error. */
+export function resolvePlaygroundError(
+	graphError: string | null,
+	inspectionError: string | null,
+): string {
+	return graphError ?? inspectionError ?? '';
+}
+
 /**
  * Compile one playground file for the client runtime. Never throws. The
  * filename is the virtual file's real name (e.g. `Island.tsrx`) so diagnostics
@@ -63,6 +71,105 @@ export interface TypesSuccess {
 	code: string;
 	/** Per-token source↔generated offset mappings (see playground-mapping.ts). */
 	mappings: VolarTokenMapping[];
+}
+
+export interface AstSuccess {
+	ok: true;
+	/** AST for the selected compiler stage. */
+	ast: unknown;
+	/** Coordinate space used by the AST node start/end offsets. */
+	space: 'source' | 'generated';
+	/** Human-readable stage name shown above the tree. */
+	label: string;
+	/** Explains which tree is displayed and how its positions map. */
+	notice: string;
+	/** Generated artifact corresponding to output AST stages. */
+	code?: string;
+	/** Exact type-only source mappings, when available. */
+	mappings?: VolarTokenMapping[];
+	/** Compiler source map for client output, when available. */
+	map?: unknown;
+}
+
+export type PlaygroundAstStage = 'source' | 'type-transform' | 'type-output' | 'client-output';
+
+const parseGeneratedAst = (code: string): unknown => __parseGeneratedModuleAst(code);
+
+/**
+ * Build one stage of the AST trace shown by the playground. Source and
+ * type-only transform trees come directly from the compiler. The client output
+ * tree is parsed from the exact emitted code because that emitter does not
+ * maintain one complete transformed AST. Never throws.
+ */
+export function compileAst(
+	source: string,
+	filename: string,
+	stage: PlaygroundAstStage = 'source',
+): AstSuccess | CompileFailure {
+	try {
+		if (stage === 'client-output') {
+			const result = compile(source, filename, {
+				mode: 'client',
+				sourceMapHostTags: true,
+			});
+			return {
+				ok: true,
+				ast: parseGeneratedAst(result.code),
+				space: 'generated',
+				label: 'Client output AST',
+				notice:
+					'Parsed from the exact client output. Source navigation is limited to compiler source-map anchors.',
+				code: result.code,
+				map: result.map,
+			};
+		}
+
+		if (stage === 'source') {
+			const result = compileToVolarMappings(source, filename, { loose: true });
+			return {
+				ok: true,
+				ast: result.sourceAst,
+				space: 'source',
+				label: 'Parsed source AST',
+				notice:
+					'The parser tree for the authored source. Node positions refer directly to the source editor.',
+			};
+		}
+
+		const result = compileToVolarMappings(source, filename, {
+			loose: true,
+			astTrace: stage === 'type-transform' ? 'transform' : 'generated',
+		}) as ReturnType<typeof compileToVolarMappings> & {
+			astTrace: { transformedAst: unknown; generatedAst?: unknown };
+		};
+		if (stage === 'type-transform') {
+			return {
+				ok: true,
+				ast: result.astTrace.transformedAst,
+				space: 'source',
+				label: 'Type transform AST',
+				notice:
+					'The type-only transformer tree. Authored nodes retain source ranges; synthetic nodes intentionally have no range.',
+				code: result.code,
+				mappings: result.mappings as VolarTokenMapping[],
+			};
+		}
+		if (stage === 'type-output') {
+			return {
+				ok: true,
+				ast: result.astTrace.generatedAst!,
+				space: 'generated',
+				label: 'Types output AST',
+				notice:
+					'Parsed from the exact typed TSX output. Positions map bidirectionally through the compiler type mappings.',
+				code: result.code,
+				mappings: result.mappings as VolarTokenMapping[],
+			};
+		}
+		throw new Error(`Unknown AST stage: ${stage}`);
+	} catch (error) {
+		return { ok: false, error: error instanceof Error ? error.message : String(error) };
+	}
 }
 
 /**

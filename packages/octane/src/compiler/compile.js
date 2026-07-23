@@ -3648,18 +3648,46 @@ function countNewlines(str) {
 	return n;
 }
 
+function sourceLineStarts(source) {
+	const starts = [0];
+	for (let index = 0; index < source.length; index++) {
+		if (source.charCodeAt(index) === 10) starts.push(index + 1);
+	}
+	return starts;
+}
+
+function closingTagSourceLoc(ctx, node, tag) {
+	const end = node.loc?.end;
+	const starts = ctx.hostTagMap?.lineStarts;
+	if (!end || !starts) return null;
+	const endOffset = starts[end.line - 1] + end.column;
+	const nameOffset = ctx.mapSource.lastIndexOf(`</${tag}`, endOffset) + 2;
+	if (nameOffset < 2) return null;
+	let low = 0;
+	let high = starts.length;
+	while (low < high) {
+		const middle = (low + high) >> 1;
+		if (starts[middle] <= nameOffset) low = middle + 1;
+		else high = middle;
+	}
+	const lineIndex = low - 1;
+	return { line: lineIndex + 1, column: nameOffset - starts[lineIndex] };
+}
+
 /**
  * Build a v3 source map from a flat list of mapping segments. The segments come
  * from esrap itself — we print each user statement/expression via esrap with
  * `sourceMapEncodeMappings: false` (the same machinery the mainline TSRX
  * compilers use) and merge each node's real per-token mappings into module
- * coordinates. Generated runtime plumbing (templates, mount/update DOM ops) is
- * left unmapped — never mapped to a wrong position. `sourcesContent` is inlined
- * so the original `.tsrx` is visible in devtools.
+ * coordinates. Generated runtime plumbing (mount/update DOM ops) is left
+ * unmapped — never mapped to a wrong position. Opt-in inspection compiles also
+ * record exact authored and generated positions for baked client template tag
+ * names. `sourcesContent` is inlined so the original `.tsrx` is visible in
+ * devtools.
  *
  * @param {string} source original .tsrx text
  * @param {string} sourceName basename used as the map's single source entry
- * @param {Array<{ genLine: number, genCol: number, srcLine0: number, srcCol0: number }>} segments
+ * @param {Array<{ genLine: number, genCol: number, srcLine0?: number, srcCol0?: number, unmapped?: boolean }>} segments
  *   genLine/genCol are 0-based ABSOLUTE generated coords; src* are 0-based source coords.
  */
 function buildSourceMap(source, sourceName, segments) {
@@ -3689,6 +3717,11 @@ function buildSourceMap(source, sourceName, segments) {
 		for (const s of arr) {
 			if (s.genCol === lastGenCol) continue;
 			lastGenCol = s.genCol;
+			if (s.unmapped) {
+				group += (group ? ',' : '') + encodeVlq([s.genCol - prevGenCol]);
+				prevGenCol = s.genCol;
+				continue;
+			}
 			// Fields: [genColumn, sourceIndex, sourceLine, sourceColumn] as deltas.
 			// genColumn resets per line; sourceIndex is always 0 (single source).
 			group +=
@@ -4175,7 +4208,7 @@ function instrumentProfileComponents(ast, ctx) {
  * Compile a .tsrx source string into JS targeting `octane`.
  * @param {string} source
  * @param {string} filename
- * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
+ * @param {{ hmr?: boolean | 'vite' | 'webpack', mode?: 'client' | 'server', dev?: boolean, profile?: boolean, profileFilename?: string, autoMemo?: boolean, inlineHookMemo?: boolean, sourceMapHostTags?: boolean, renderer?: { id: string, module: string, target: 'dom' | 'universal', server?: string }, rendererBoundaries?: Readonly<Record<string, Readonly<Record<string, { ownerRenderer: string, childRenderer: string, prop: string, server?: string }>>>>, rendererRegistry?: Readonly<Record<string, { module: string, target: 'dom' | 'universal', server?: string }>>, clientOnlyImports?: readonly unknown[], __hydratePrepared?: boolean, __hydrateBoundaryModule?: boolean, __nativeChangeDiagnostics?: readonly unknown[], __nativeChangeAnalysis?: { diagnostics: readonly unknown[], classifications: Map<number, string> } }} [options] —
  *   `dev: true` emits client hydration source-location metadata (per-component
  *   `__s.locs`/`__s.locFile`) and, in server mode, source-located native-element
  *   scopes for invalid HTML nesting diagnostics. Both are strictly gated so
@@ -4190,6 +4223,9 @@ function instrumentProfileComponents(ast, ctx) {
  *   template-clone DOM runtime; `'server'` emits HTML-string SSR output (static
  *   chunks interleaved with `ssr*` helpers) carrying the hydration markers the
  *   client `hydrateRoot` adopts.
+ *   `sourceMapHostTags: true` adds exact source-map anchors for host tag
+ *   names baked into client template strings. It is opt-in for inspection
+ *   tooling; normal compiles skip all tag-location collection and scanning.
  *   `rendererBoundaries` and `rendererRegistry` are the normalized static
  *   boundary table and renderer registry. Pass them together when a client
  *   module may contain an explicitly renderer-owned component prop.
@@ -4625,6 +4661,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// inline-cache-vs-elsewhere in one line.
 	const inlineHookMemoEnabled =
 		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+	const sourceMapHostTags = mode === 'client' && options?.sourceMapHostTags === true;
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -4647,7 +4684,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
 		consumedRuntimeLocals,
-		hoistedTemplates: [], // { name, html }
+		hoistedTemplates: [], // { name, html, tagMappings? }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
@@ -4693,6 +4730,11 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// the top-level (autoCallback) pass and drained per component below.
 		_setupMaps: null,
 	};
+	if (sourceMapHostTags) {
+		// Inspection-only state stays completely absent from the normal compiler
+		// context shape. `current` is swapped per nested JSX plan.
+		ctx.hostTagMap = { current: null, lineStarts: sourceLineStarts(source) };
+	}
 	{
 		const imports = collectOctaneImportBindings(ast.body);
 		ctx.octaneImportLocals = imports.locals;
@@ -5297,14 +5339,45 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		.map((i) => `_$injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
 		.join('\n');
 	const styleBlock = styleInjections ? styleInjections + '\n\n' : '';
-	const templates = ctx.hoistedTemplates
-		.map((t) => {
-			const args = [JSON.stringify(t.html)];
-			if (t.ns || t.frag) args.push(String(t.ns | 0));
-			if (t.frag) args.push(String(t.frag | 0));
-			return `const ${t.name} = /* @__PURE__ */ _$template(${args.join(', ')});`;
-		})
-		.join('\n');
+	const templateSegments = sourceMapHostTags ? [] : null;
+	const templateLines = [];
+	for (let templateLine = 0; templateLine < ctx.hoistedTemplates.length; templateLine++) {
+		const t = ctx.hoistedTemplates[templateLine];
+		const prefix = `const ${t.name} = /* @__PURE__ */ _$template(`;
+		const encodedHtml = JSON.stringify(t.html);
+		if (templateSegments !== null) {
+			let htmlOffset = 0;
+			let encodedOffset = 1; // Skip the serialized string's opening quote.
+			for (const mapping of t.tagMappings) {
+				// Walk the already-serialized string monotonically. An escape sequence
+				// occupies 2 or 6 generated columns but represents one UTF-16 code unit.
+				while (htmlOffset < mapping.htmlOffset) {
+					if (encodedHtml.charCodeAt(encodedOffset) === 92) {
+						encodedOffset += encodedHtml.charCodeAt(encodedOffset + 1) === 117 ? 6 : 2;
+					} else {
+						encodedOffset++;
+					}
+					htmlOffset++;
+				}
+				templateSegments.push({
+					genLine: templateLine,
+					genCol: prefix.length + encodedOffset,
+					srcLine0: mapping.srcLine0,
+					srcCol0: mapping.srcCol0,
+				});
+				templateSegments.push({
+					genLine: templateLine,
+					genCol: prefix.length + encodedOffset + mapping.length,
+					unmapped: true,
+				});
+			}
+		}
+		let args = encodedHtml;
+		if (t.ns || t.frag) args += `, ${t.ns | 0}`;
+		if (t.frag) args += `, ${t.frag | 0}`;
+		templateLines.push(prefix + args + ');');
+	}
+	const templates = templateLines.join('\n');
 	const templatesBlock = templates ? templates + '\n\n' : '';
 	// No tail slots exist on the client today (prop memos are server-only), but
 	// flush before assembly so a future client-side tail site cannot trip the
@@ -5429,21 +5502,23 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 
 	// Everything before `body` in the output — shifts every body segment's
 	// generated line down by the prelude's line count.
-	const prelude =
-		finalRuntimeImport +
-		finalProfileRuntimeImport +
-		vtHintBlock +
-		delegateCall +
-		styleBlock +
-		templatesBlock +
-		helpersBlock;
+	const beforeTemplates =
+		finalRuntimeImport + finalProfileRuntimeImport + vtHintBlock + delegateCall + styleBlock;
+	const prelude = beforeTemplates + templatesBlock + helpersBlock;
 	const preludeLines = countNewlines(prelude);
-	const segments = bodySegments.map((s) => ({
-		genLine: s.genLine + preludeLines,
-		genCol: s.genCol,
-		srcLine0: s.srcLine0,
-		srcCol0: s.srcCol0,
-	}));
+	const templateLineOffset = countNewlines(beforeTemplates);
+	const segments = templateSegments ?? [];
+	if (templateSegments !== null) {
+		for (const segment of templateSegments) segment.genLine += templateLineOffset;
+	}
+	for (const s of bodySegments) {
+		segments.push({
+			genLine: s.genLine + preludeLines,
+			genCol: s.genCol,
+			srcLine0: s.srcLine0,
+			srcCol0: s.srcCol0,
+		});
+	}
 
 	const result = {
 		code: prelude + body + stampBlock + hmrBlock + profileBlock,
@@ -12864,6 +12939,12 @@ function planJsx(
 		ctx._elemLocs = _prevElemLocs;
 		return { mount: '', update: '', after: '', head: emitHeadClient(headNodes, ctx, 0) };
 	}
+	// Source positions for host tags emitted into THIS plan's template. Nested
+	// plans temporarily replace this list and restore it before the outer walk
+	// continues, matching the other plan-local compiler state below.
+	const hostTagMap = ctx.hostTagMap;
+	const previousHostTagSources = hostTagMap?.current ?? null;
+	if (hostTagMap) hostTagMap.current = [];
 
 	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
 	// a synthetic <octane-frag>).
@@ -13088,7 +13169,7 @@ function planJsx(
 		const fragArg = !single && (flag !== 0 || resolvedFrag) ? 1 : 0;
 		const tplHtml =
 			single || flag !== 0 || resolvedFrag ? html : `<octane-frag>${html}</octane-frag>`;
-		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
+		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg, hostTagMap?.current ?? null);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
@@ -13882,6 +13963,7 @@ function planJsx(
 	ctx._fragRefStack = _prevFragRefStack;
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
+	if (hostTagMap) hostTagMap.current = previousHostTagSources;
 
 	const updateJoined = updateLines.join('\n');
 	const everyRenderJoined = everyRenderLines.join('\n');
@@ -14668,6 +14750,19 @@ function emitElementHtml(
 
 	const tag = node.id?.name || node.openingElement?.name?.name;
 	if (!tag) throw new Error('Element without tag');
+	const hostTagSources = ctx.hostTagMap?.current;
+	let openingTagLoc = null;
+	if (hostTagSources) {
+		openingTagLoc = (node.openingElement?.name ?? node.id)?.loc?.start;
+		if (openingTagLoc) {
+			hostTagSources.push({
+				kind: 'open',
+				tag,
+				srcLine0: openingTagLoc.line - 1,
+				srcCol0: openingTagLoc.column | 0,
+			});
+		}
+	}
 	const authoredStaticScriptContent = staticScriptContent(node, tag);
 	const hasAuthoredStaticScriptBody =
 		authoredStaticScriptContent !== undefined && authoredStaticScriptContent.length > 0;
@@ -15652,7 +15747,22 @@ function emitElementHtml(
 		});
 	}
 
-	if (!isVoid) html += `</${tag}>`;
+	if (!isVoid) {
+		html += `</${tag}>`;
+		if (hostTagSources) {
+			const closingTagLoc =
+				node.closingElement?.name?.loc?.start ??
+				(node.selfClosing ? openingTagLoc : closingTagSourceLoc(ctx, node, tag));
+			if (closingTagLoc) {
+				hostTagSources.push({
+					kind: 'close',
+					tag,
+					srcLine0: closingTagLoc.line - 1,
+					srcCol0: closingTagLoc.column | 0,
+				});
+			}
+		}
+	}
 	return html;
 }
 
@@ -17138,10 +17248,72 @@ function walkExprH(rootVar, path) {
 	return expr;
 }
 
-function allocTemplate(ctx, html, ns = 0, frag = 0) {
+function mapTemplateTags(html, sources) {
+	if (!sources || sources.length === 0) return sources || [];
+	let sourceIndex = 0;
+	let index = 0;
+	while (index < html.length && sourceIndex < sources.length) {
+		const opening = html.indexOf('<', index);
+		if (opening === -1) break;
+		if (html.startsWith('<!--', opening)) {
+			const end = html.indexOf('-->', opening + 4);
+			index = end === -1 ? html.length : end + 3;
+			continue;
+		}
+
+		let nameStart = opening + 1;
+		let kind = 'open';
+		if (html.charCodeAt(nameStart) === 47) {
+			kind = 'close';
+			nameStart++;
+		}
+		let nameEnd = nameStart;
+		while (nameEnd < html.length) {
+			const character = html.charCodeAt(nameEnd);
+			if (character <= 32 || character === 47 || character === 62) break;
+			nameEnd++;
+		}
+
+		const source = sources[sourceIndex];
+		if (
+			kind === source.kind &&
+			nameEnd - nameStart === source.tag.length &&
+			html.startsWith(source.tag, nameStart)
+		) {
+			source.htmlOffset = nameStart;
+			source.length = source.tag.length;
+			sourceIndex++;
+		}
+
+		// Advance past the complete tag so a `<tag` substring inside a quoted
+		// attribute value can never be mistaken for a nested element.
+		let quote = 0;
+		let cursor = nameEnd;
+		for (; cursor < html.length; cursor++) {
+			const character = html.charCodeAt(cursor);
+			if (quote !== 0) {
+				if (character === quote) quote = 0;
+			} else if (character === 34 || character === 39) {
+				quote = character;
+			} else if (character === 62) {
+				cursor++;
+				break;
+			}
+		}
+		index = cursor > opening ? cursor : opening + 1;
+	}
+	// The matched prefix already contains the mapping objects. Truncate any
+	// unmatched tail instead of allocating a second per-template array.
+	sources.length = sourceIndex;
+	return sources;
+}
+
+function allocTemplate(ctx, html, ns = 0, frag = 0, tagSources = null) {
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	ctx.hoistedTemplates.push({ name, html, ns, frag });
+	const template = { name, html, ns, frag };
+	if (tagSources !== null) template.tagMappings = mapTemplateTags(html, tagSources);
+	ctx.hoistedTemplates.push(template);
 	return name;
 }
 

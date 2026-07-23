@@ -29,6 +29,8 @@ declare module 'octane/compiler' {
 			mode?: 'client' | 'server';
 			hmr?: boolean;
 			dev?: boolean;
+			/** Inspection-only anchors for host tags baked into client templates. */
+			sourceMapHostTags?: boolean;
 		},
 	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
 }
@@ -45,13 +47,20 @@ declare module 'octane/compiler/volar' {
 	export function compileToVolarMappings(
 		source: string,
 		filename?: string,
-		options?: { loose?: boolean; renderers?: unknown },
+		options?: {
+			loose?: boolean;
+			renderers?: unknown;
+			astTrace?: boolean | 'transform' | 'generated';
+		},
 	): {
 		code: string;
 		mappings: VolarMapping[];
 		errors: readonly unknown[];
 		diagnostics: readonly unknown[];
+		sourceAst: unknown;
+		astTrace?: { transformedAst: unknown; generatedAst?: unknown };
 	};
+	export function __parseGeneratedModuleAst(code: string): unknown;
 }
 
 // `.mdx` documents compile (via @octanejs/mdx) to octane component modules with

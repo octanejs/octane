@@ -1041,7 +1041,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 30_000);
 
-	it('playground compiled pane offers prod and types output with click-through position mapping', async () => {
+	it('playground compiled pane offers AST and types mapping', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
@@ -1061,7 +1061,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// captured before that flush lands on whatever scrolled into the
 			// stale coordinates (a CI-speed flake). A token outside the
 			// scroller's visible box resolves null instead of clicking through.
-			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+			const tokenPoint = async (paneIndex: number, token: string, occurrence: number) => {
 				const point = await page.evaluate(
 					([index, needle, wanted]) =>
 						new Promise<{ x: number; y: number } | null>((resolve) =>
@@ -1100,7 +1100,15 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					point,
 					`${token} (occurrence ${occurrence}) not visible in pane ${paneIndex}`,
 				).not.toBeNull();
-				await page.mouse.click(point!.x, point!.y);
+				return point!;
+			};
+			const clickToken = async (paneIndex: number, token: string, occurrence: number) => {
+				const point = await tokenPoint(paneIndex, token, occurrence);
+				await page.mouse.click(point.x, point.y);
+			};
+			const hoverToken = async (paneIndex: number, token: string, occurrence: number) => {
+				const point = await tokenPoint(paneIndex, token, occurrence);
+				await page.mouse.move(point.x, point.y);
 			};
 			const mappedIn = (paneIndex: number, token: string) =>
 				page.waitForFunction(
@@ -1111,20 +1119,42 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					[paneIndex, token] as const,
 					{ timeout: 10_000 },
 				);
-			// Prod is the default compiled mode: the real client-runtime emit.
+			// AST is the default compiler artifact. It shows one source AST and
+			// reveals the deepest containing node.
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await outputIncludes("from 'octane'");
-			// Prod navigation places marks; a cursor move to an unmapped position
-			// (the import line sits before the prod map's first anchor) clears
-			// them — marks must always reflect the current selection.
+			await page.locator('.pg-ast-tree').waitFor();
+			expect(
+				await page
+					.locator('[aria-label="Compiled output mode"] button', { hasText: 'Prod' })
+					.count(),
+			).toBe(0);
+			expect(
+				await page
+					.locator('[aria-label="AST compiler stage"] option', { hasText: 'Server output' })
+					.count(),
+			).toBe(0);
 			await clickToken(0, 'useState', 2);
-			await mappedIn(1, 'useState');
-			await clickToken(0, 'import', 1);
 			await page.waitForFunction(
-				() => !document.querySelectorAll('.pg-editor .cm-content')[1]?.querySelector('.cm-mapped'),
+				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
 				null,
 				{ timeout: 10_000 },
 			);
+			expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
+			expect(await page.locator('.cm-mapped').count()).toBe(1);
+			expect(
+				await page
+					.locator('.pg-editor .cm-mapped')
+					.first()
+					.evaluate((element) => getComputedStyle(element).backgroundColor),
+			).toBe('rgba(255, 234, 0, 0.42)');
+			// Client output bakes static JSX into one template Literal. Its AST
+			// reveal must preserve the exact tag that initiated navigation instead
+			// of falling back to the template's first source-map anchor.
+			await page.locator('[aria-label="AST compiler stage"]').selectOption('client-output');
+			await hoverToken(0, 'button', 2);
+			await mappedIn(0, 'button');
+			expect(await page.locator('.pg-ast-status').textContent()).toContain('Literal');
+			await page.locator('[aria-label="AST compiler stage"]').selectOption('source');
 			// Types swaps the pane to the typed virtual TSX (the language-service
 			// view), without recompiling the preview.
 			await page
@@ -1134,9 +1164,28 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			// Clicking a source token reveals the mapped token in the output…
 			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
 			await mappedIn(1, 'useState');
-			// …and clicking the output maps back into the source.
+			// …and hovering the output maps back into the source too.
+			await hoverToken(1, 'setCount', 1);
+			await mappedIn(0, 'setCount');
+			await mappedIn(1, 'setCount');
+			// Clicking keeps that bidirectional mapping and scrolls it into view.
 			await clickToken(1, 'setCount', 1);
 			await mappedIn(0, 'setCount');
+			// A cached Types document must not retain the source highlight from
+			// AST when the user switches back to it.
+			await page.locator('[aria-label="Compiled output mode"] button', { hasText: 'AST' }).click();
+			await clickToken(0, 'useState', 2);
+			await page.waitForFunction(
+				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
+				null,
+				{ timeout: 10_000 },
+			);
+			await page
+				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
+				.click();
+			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+				timeout: 5_000,
+			});
 			// Switching to Preview clears every mark; Compiled returns clean.
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Preview' }).click();
 			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
@@ -1165,11 +1214,70 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				null,
 				{ timeout: 10_000 },
 			);
+			// A failed AST generation replaces the prior tree and cannot map
+			// source hover through its stale ranges.
+			await page.locator('[aria-label="Compiled output mode"] button', { hasText: 'AST' }).click();
+			await page
+				.getByText('AST generation failed. Fix the source to generate a new tree.')
+				.waitFor();
+			expect(await page.locator('.pg-ast-tree').count()).toBe(0);
+			await hoverToken(0, 'import', 1);
+			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
+				timeout: 5_000,
+			});
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
 		}
 	}, 45_000);
+
+	it('playground refreshes the active AST when another workspace file fails', async () => {
+		const appSource =
+			"import { value } from './Value';\nexport default function App() @{ <p>{'Value: ' + value}</p> }";
+		const selectAll = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+		const hash = encodePlaygroundHash({
+			lang: 'tsrx',
+			entry: 'App.tsrx',
+			files: [
+				{
+					name: 'App.tsrx',
+					source: appSource,
+				},
+				{ name: 'Value.tsrx', source: 'export const value = 1;' },
+			],
+		});
+		const { page, errors } = await loadRoute(
+			`http://localhost:${PREVIEW_PORT}`,
+			`/playground#${hash}`,
+		);
+		try {
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await page.locator('.pg-ast-tree').waitFor();
+
+			// Break an inactive dependency so the runnable module graph fails.
+			await page.locator('.pg-tab', { hasText: 'Value.tsrx' }).click();
+			await page.locator('.pg-editor .cm-content').first().click();
+			await page.keyboard.press(selectAll);
+			await page.keyboard.type('export const value = ;');
+			await page.locator('.pg-error').waitFor({ timeout: 10_000 });
+
+			// The active App source still has a valid compiler AST. Editing it
+			// briefly invalidates the tree, then must restore it even though the
+			// dependency keeps the module graph in its failed state.
+			await page.locator('.pg-tab', { hasText: 'App.tsrx' }).click();
+			await page.locator('.pg-ast-tree').waitFor();
+			await page.locator('.pg-editor .cm-content').first().click();
+			await page.keyboard.press(selectAll);
+			await page.keyboard.type(appSource + '\n');
+			await page.getByText('Waiting for the next successful compile…').waitFor({ timeout: 5_000 });
+			await page.locator('.pg-ast-tree').waitFor({ timeout: 10_000 });
+			expect(await page.locator('.pg-error').count()).toBe(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 30_000);
 
 	it('playground shows compiler warnings without treating runnable code as an error', async () => {
 		const source = `export function App() @{ <input onChange={() => {}} /> }`;
