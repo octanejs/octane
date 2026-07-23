@@ -91,18 +91,20 @@ describe('compiler-owned native event callbacks', () => {
 		}).code;
 
 		expect(development).toContain('devEventListener as _$devEventListener');
-		expect(development).toContain('_$devEventListener("onClick", (props.onClick))');
-		expect(development).toContain('_$devEventListener("onClickCapture", (props.onCapture))');
-		expect(development).toContain('_$devEventListener("onDoubleClick", ("bad"))');
-		expect(development).toContain('_$devEventListener("onAuxClick", (true))');
+		expect(development).toMatch(/_\$devEventListener\(["']onClick["'], \(?props\.onClick\)?\)/);
+		expect(development).toMatch(
+			/_\$devEventListener\(["']onClickCapture["'], \(?props\.onCapture\)?\)/,
+		);
+		expect(development).toMatch(/_\$devEventListener\(["']onDoubleClick["'], \(?["']bad["']\)?\)/);
+		expect(development).toMatch(/_\$devEventListener\(["']onAuxClick["'], \(?true\)?\)/);
 		expect(development).not.toContain('onDoubleClick=');
 		expect(development).not.toContain('onAuxClick=');
 		expect(development).not.toContain('<button onclick=');
 		expect(production).not.toContain('devEventListener');
-		expect(production).toContain('["$$click"] = (props.onClick)');
-		expect(production).toContain('["$$capture:click"] = (props.onCapture)');
-		expect(production).toContain('["$$dblclick"] = ("bad")');
-		expect(production).toContain('["$$auxclick"] = (true)');
+		expect(production).toMatch(/\[["']\$\$click["']\] = \(?props\.onClick\)?/);
+		expect(production).toMatch(/\[["']\$\$capture:click["']\] = \(?props\.onCapture\)?/);
+		expect(production).toMatch(/\[["']\$\$dblclick["']\] = \(?["']bad["']\)?/);
+		expect(production).toMatch(/\[["']\$\$auxclick["']\] = \(?true\)?/);
 		expect(production).not.toContain('onDoubleClick=');
 		expect(production).not.toContain('onAuxClick=');
 		expect(production).not.toContain('<button onclick=');
@@ -125,7 +127,7 @@ describe('compiler-owned native event callbacks', () => {
 			dev: false,
 		}).code;
 		const directAssignments = (code: string) =>
-			code.match(/\["\$\$click"\] = \(event\)/g)?.length ?? 0;
+			code.match(/\[["']\$\$click["']\] = \(?event\)?/g)?.length ?? 0;
 		const sourceResolvedWrites = (code: string) =>
 			code.match(/_\$setHostPropSources\(/g)?.length ?? 0;
 

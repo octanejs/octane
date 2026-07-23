@@ -148,8 +148,13 @@ describe.each([
 		// A token INSIDE the handler maps too (per-token fragment mappings).
 		expectMapped(code, map, 'setN(n + 1)', 0, 'setN(n + 1)', 0);
 		// The known-string text hole `{n as string}`: the pasted `n` maps to the
-		// authored `n` in mount (htext) and update (setText) paths alike.
-		expectMapped(code, map, 'const _v = (n)', 'const _v = ('.length, '{n as string}', 1);
+		// authored `n` in mount (htext) and update (setText) paths alike. The
+		// hole may print parenthesized (string emit) or bare (AST emit).
+		if (code.includes('const _v = (n)')) {
+			expectMapped(code, map, 'const _v = (n)', 'const _v = ('.length, '{n as string}', 1);
+		} else {
+			expectMapped(code, map, 'const _v = n', 'const _v = '.length, '{n as string}', 1);
+		}
 	});
 
 	it('maps attribute, control-flow, and component-prop expressions', () => {
@@ -165,9 +170,12 @@ describe.each([
 		// @if condition (the ifBlock call-site paste).
 		at(`items.length > 0`, 0, `items.length > 0`);
 		// @for iterable: pasted bare into the forBlock call, or — under the
-		// prod whole-list cache — evaluated once into `_v` first.
+		// prod whole-list cache — evaluated once into `_v` first (with or
+		// without the string emitter's parens).
 		if (code.includes('const _v = (items)')) {
 			at('const _v = (items)', 'const _v = ('.length, 'items; key');
+		} else if (code.includes('const _v = items')) {
+			at('const _v = items', 'const _v = '.length, 'items; key');
 		} else {
 			at(', items, _key', 2, 'items; key');
 		}
@@ -176,8 +184,13 @@ describe.each([
 		at(`items.length + 10`, 0, `items.length + 10`);
 		at(`cls + '-key'`, 0, `cls + '-key'`);
 		// Event bundle: the callee and each argument map as separate pastes in
-		// the mount (`_$evt1`) and update (`_$evt1u`) emits alike.
-		at(`(setCls), (cls + '?')`, 1, `setCls(cls + '?')`);
+		// the mount (`_$evt1`) and update (`_$evt1u`) emits alike. Args may
+		// print parenthesized (string emit) or bare (AST emit).
+		if (code.includes(`(setCls), (cls + '?')`)) {
+			at(`(setCls), (cls + '?')`, 1, `setCls(cls + '?')`);
+		} else {
+			at(`setCls, cls + '?'`, 0, `setCls(cls + '?')`);
+		}
 		at(`cls + '?'`, 0, `cls + '?'`);
 	});
 });

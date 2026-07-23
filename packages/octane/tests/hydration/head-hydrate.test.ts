@@ -64,9 +64,11 @@ describe('hoisted document metadata — compile', () => {
 		});
 		// The first head element is the <title>; its content key (3rd arg, after the
 		// scope slot index) must match the server `ssrHeadEl` key across modes.
-		const key = clientCode.match(/headBlock\(__s, \d+, "(rnh-[a-z0-9]+)"/)?.[1];
+		const key = clientCode.match(/headBlock\(__s, \d+, ["'](rnh-[a-z0-9]+)["']/)?.[1];
 		expect(key).toBeTruthy();
-		expect(serverCode).toContain(`ssrHeadEl("${key}"`);
+		expect(
+			serverCode.includes(`ssrHeadEl("${key}"`) || serverCode.includes(`ssrHeadEl('${key}'`),
+		).toBe(true);
 	});
 });
 

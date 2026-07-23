@@ -7970,13 +7970,13 @@ function compileComponent(node, ctx, options) {
 	ctx.currentAutoMemoCallsitesSafe = ctx.componentInfo.get(name)?.autoMemoCallsitesSafe !== false;
 	ctx.knownStringLocals = collectKnownStringLocals(node);
 	if (ctx.profile) ctx.currentProfileComponentId = profileComponentId(ctx, name, node);
-	let fn;
+	let fnNode;
 	try {
 		// autoCallback: only top-level component bodies opt in. Item bodies and
 		// other inner compileFunctionBody calls leave their arrows untouched
 		// (they rarely declare arrow consts; if they do, the stability oracle
 		// would need to be redefined relative to the inner scope).
-		fn = compileFunctionBody(node, ctx, name, 'opaque', cssHash, {
+		fnNode = compileFunctionBody(node, ctx, name, 'opaque', cssHash, {
 			autoCallback: true,
 			localHookSlots: true,
 			returnedOutput,
@@ -7998,6 +7998,25 @@ function compileComponent(node, ctx, options) {
 	ctx._pendingWarm = null;
 	const componentInfo = ctx.componentInfo.get(name);
 
+	// ONE esrap print for the whole compiled function — its mappings become the
+	// module map's segments for this component. `emitMaps` threads them to the
+	// emit site (drainSetupMaps) once the function's position inside the final
+	// chunk is known: `prefix` is the text on the chunk's lines before the
+	// function print starts (single-line for every wrapper form).
+	const printed = printNodeWithMap(fnNode, ctx);
+	const fn = printed.code;
+	const stampMaps = (chunk) => {
+		const at = chunk.indexOf(fn);
+		if (at < 0) return chunk;
+		const fnRelLine = countNewlines(chunk.slice(0, at));
+		const colShift = at - chunk.lastIndexOf('\n', at - 1) - 1;
+		ctx._setupMaps = [
+			{ fnRelLine, colShift, mappings: printed.mappings.slice(0, 1) },
+			{ fnRelLine: fnRelLine + 1, colShift: 0, mappings: printed.mappings.slice(1) },
+		];
+		return chunk;
+	};
+
 	// Authored `function` declarations HOIST: a module may reference the
 	// component ABOVE its declaration (the canonical TanStack route-file shape,
 	// `createFileRoute(...)({ component: Home })` before `function Home`). The
@@ -8015,7 +8034,7 @@ function compileComponent(node, ctx, options) {
 	const referencedAboveDeclaration =
 		sourceBeforeNode !== '' &&
 		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(sourceBeforeNode);
-	if (referencedAboveDeclaration && fn.startsWith(`function ${name}(`)) {
+	if (referencedAboveDeclaration) {
 		// Every stamp is `typeof`-guarded: route code-splitters (TanStack's) may
 		// EXTRACT the declaration into its own module and leave these statements
 		// behind — `typeof` on the then-undeclared identifier short-circuits
@@ -8052,7 +8071,7 @@ function compileComponent(node, ctx, options) {
 			// back to a full reload — the capture predates the wrapper).
 			statements.push(`${guard}(${name} = _$hmr(${name}));`);
 		}
-		return statements.join('\n');
+		return stampMaps(statements.join('\n'));
 	}
 
 	const warmedFn = pendingWarm
@@ -8078,14 +8097,14 @@ function compileComponent(node, ctx, options) {
 	const declaration = options && options.hmrMutable ? 'let' : 'const';
 	if (isDefault) {
 		if (options && options.hmrMutable) {
-			return `let ${name} = ${valueExpr};\nexport { ${name} as default };`;
+			return stampMaps(`let ${name} = ${valueExpr};\nexport { ${name} as default };`);
 		}
-		return `const ${name} = ${valueExpr};\nexport default ${name};`;
+		return stampMaps(`const ${name} = ${valueExpr};\nexport default ${name};`);
 	}
 	if (isExported) {
-		return `export ${declaration} ${name} = ${valueExpr};`;
+		return stampMaps(`export ${declaration} ${name} = ${valueExpr};`);
 	}
-	return `const ${name} = ${valueExpr};`;
+	return stampMaps(`const ${name} = ${valueExpr};`);
 }
 
 /**
@@ -8116,7 +8135,6 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentHookMemoOffset = 0;
 	ctx.currentHookMemoCacheProperty = `_k$${ctx.nextHookMemoCacheId++}`;
 	ctx.currentHookMemoNames = null;
-	const params = node.params.map((p) => printNode(p)).join(', ');
 
 	// Body splitting. Two shapes to handle:
 	//   (new TSRX)  node.body is a `JSXCodeBlock { body: Statement[], render: Node|null }`.
@@ -8264,32 +8282,6 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		// JSX component element at VALUE position in setup (e.g. `const el = <App/>`)
 		// → createElement(App, props). Output JSX (jsxNodes) was already split off.
 		.map((s) => rewriteJsxValues(s, ctx));
-	// Capture per-statement source maps for the TOP-LEVEL component body only
-	// (the autoCallback pass). Output stays byte-identical — printNodeWithMap
-	// prints the same code as printNode, it just also returns esrap's real
-	// per-token mappings. Nested for-of / if / try bodies are embedded at
-	// variable offsets and are left unmapped. Function-body layout: line 0 is
-	// `function X(...) {`, line 1 is the `const __block` header, line 2 is the
-	// first setup statement; statements join with '\n' and indent two spaces.
-	const collectSetupMaps = !!(options && options.autoCallback && !(options && options.prologue));
-	const setupMaps = collectSetupMaps ? [] : null;
-	let stmtRelLine = 2;
-	const statementCode = rewrittenStatements
-		.map((s) => {
-			let code;
-			if (collectSetupMaps) {
-				const r = printNodeWithMap(s, ctx);
-				code = r.code;
-				setupMaps.push({ fnRelLine: stmtRelLine, colShift: 2, mappings: r.mappings });
-				stmtRelLine += 1 + countNewlines(code);
-			} else {
-				code = printNode(s);
-			}
-			return '  ' + code.replace(/\n/g, '\n  ');
-		})
-		.join('\n');
-	if (collectSetupMaps) ctx._setupMaps = setupMaps;
-
 	// A folded fragment renderer carries pre-built directive records; expose them so
 	// emitElementHtml resolves each `FoldedDirective` placeholder (instead of calling
 	// makeIfCall again, which would re-compile the branch bodies + re-allocate ids).
@@ -8328,6 +8320,15 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		!returnedOutput &&
 		!ctx.hydrateBoundaryModule &&
 		!!(node.body && node.body.type === 'JSXCodeBlock');
+	// Fallback origin for runtime-glue statements planJsx builds when no body
+	// root carries a location (e.g. a folded-directive root) — the function
+	// node itself always does.
+	const prevFnOrigin = ctx._fnOrigin;
+	ctx._fnOrigin = node.loc ? node : (node.id ?? prevFnOrigin);
+	// Located origin for the function SHELL itself: synthetic helper shapes
+	// (hoisted @for bodies, `__tsrx$N` sub-templates) carry no loc of their
+	// own — their scaffolding inherits the nearest located enclosing origin.
+	const shellOrigin = node.loc ? node : node.id?.loc ? node.id : prevFnOrigin;
 	let plan = null;
 	let returnedExpression = null;
 	if (returnedOutput) {
@@ -8344,14 +8345,26 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	ctx.currentInvariantLocals = prevInvariantLocals;
 	ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	ctx._inheritBody = prevInheritBody;
+	ctx._fnOrigin = prevFnOrigin;
 	ctx._foldedDirectiveCalls = prevFDC;
 
-	const lines = [];
+	const bodyStatements = [];
 	const autoMemoSize = ctx.currentAutoMemoOffset;
+	const slotsMember = (prop) => b.member(b.member(b.id('__s'), 'slots'), prop);
 	if (autoMemoSize > 0) {
-		lines.push(
-			`  const ${autoMemoCommittedName} = __s.slots.${autoMemoCacheProperty};`,
-			`  let ${autoMemoCacheName} = ${autoMemoCommittedName} === undefined ? [] : ${autoMemoCommittedName};`,
+		bodyStatements.push(
+			inheritOriginLoc(b.const(autoMemoCommittedName, slotsMember(autoMemoCacheProperty)), node),
+			inheritOriginLoc(
+				b.let(
+					autoMemoCacheName,
+					b.conditional(
+						b.binary('===', b.id(autoMemoCommittedName), b.id('undefined')),
+						b.array([]),
+						b.id(autoMemoCommittedName),
+					),
+				),
+				node,
+			),
 		);
 	}
 	// Hook-memo cell array (inline useMemo/useCallback regions). Unlike the
@@ -8362,110 +8375,131 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	const hookMemoSize = ctx.currentHookMemoOffset;
 	if (hookMemoSize > 0) {
 		const hkName = hookMemoNames(ctx).cache;
-		lines.push(
-			`  let ${hkName} = __s.slots.${ctx.currentHookMemoCacheProperty};`,
-			`  if (${hkName} === undefined) __s.slots.${ctx.currentHookMemoCacheProperty} = ${hkName} = new Array(${hookMemoSize}).fill(undefined);`,
+		bodyStatements.push(
+			inheritOriginLoc(b.let(hkName, slotsMember(ctx.currentHookMemoCacheProperty)), node),
+			inheritOriginLoc(
+				b.if(
+					b.binary('===', b.id(hkName), b.id('undefined')),
+					b.stmt(
+						b.assignment(
+							'=',
+							slotsMember(ctx.currentHookMemoCacheProperty),
+							b.assignment(
+								'=',
+								b.id(hkName),
+								b.call(
+									b.member(b.new('Array', undefined, b.literal(hookMemoSize)), 'fill'),
+									b.id('undefined'),
+								),
+							),
+						),
+					),
+					null,
+				),
+				node,
+			),
 		);
 	}
-	// Closure-dep snapshot prologue (raw JS string). Used by impure for-of item
-	// bodies that close over parent locals but have no hooks / no component
-	// calls / no control flow — they can short-circuit when every captured
-	// value (deps + item ref) matches the previous render.
-	if (options && options.prologue) lines.push(options.prologue);
-	if (statementCode) lines.push(statementCode);
-	if (inlinedSubs.length > 0)
-		lines.push(inlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n'));
+	bodyStatements.push(...rewrittenStatements);
+	// Inlined sub-helpers (children render fns, legacy-placement construct
+	// bodies, hoisted `<tsrx>` blocks) are function DECLARATION nodes embedded
+	// directly in the body — they hoist, so their placement after the setup
+	// statements matches the historical text splice.
+	bodyStatements.push(...inlinedSubs);
 	// DEV ONLY: stash this component's hydration source-location table on the scope
 	// before any slot calls run (so a mismatch in this render can read it). Set once per
 	// scope instance. Emitted only when `dev` AND the body has located constructs, so prod
 	// output is byte-identical.
 	if (ctx.dev && plan?.locs) {
-		lines.push(
-			`  if (__s.locs === undefined) { __s.locs = ${plan.locs}; __s.locFile = ${JSON.stringify(ctx.mapSourceName)}; }`,
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.if(
+					b.binary('===', b.member(b.id('__s'), 'locs'), b.id('undefined')),
+					b.block([
+						b.stmt(b.assignment('=', b.member(b.id('__s'), 'locs'), plan.locs)),
+						b.stmt(
+							b.assignment(
+								'=',
+								b.member(b.id('__s'), 'locFile'),
+								b.literal(ctx.mapSourceName, JSON.stringify(ctx.mapSourceName)),
+							),
+						),
+					]),
+					null,
+				),
+				node,
+			),
 		);
 	}
-	// Binding-expression fragment maps (docs: 2C). Each plan chunk carries the
-	// chunk-relative paste positions of its mapped expressions (joinChunks);
-	// convert them to function-relative entries at the exact line the chunk is
-	// pushed. Line 0 is `function NAME(sig) {`; +1 assumes the `__block` header,
-	// matching the setup-statement convention (the !needsBlock decrement below
-	// re-aligns both together). Column shifts apply to the first fragment line
-	// only — pasted expressions keep their printed columns on later lines.
-	const fragmentMapEntries = [];
-	const lineOffsetOfLines = () => {
-		let count = 0;
-		for (const entry of lines) count += countNewlines(entry) + 1;
-		return count;
-	};
-	const recordPlanMaps = (maps) => {
-		if (!collectSetupMaps || !maps || maps.length === 0) return;
-		const start = 2 + lineOffsetOfLines();
-		for (const m of maps) {
-			fragmentMapEntries.push({
-				fnRelLine: start + m.line,
-				colShift: m.col,
-				firstLineOnly: true,
-				mappings: m.mappings,
-			});
-		}
-	};
 	if (plan?.hasBag) {
-		lines.push(`  let _b = __s.slots[0];`);
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.let('_b', b.member(b.member(b.id('__s'), 'slots'), b.literal(0), true)),
+				node,
+			),
+		);
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
 		// re-render, so they live after the if/else; the mount branch only clones +
 		// stores refs, and `else` carries the re-render-only diffs (text / refs).
 		// When there are none, drop the empty `else`.
-		if (plan.update) {
-			lines.push(`  if (_b === undefined) {`);
-			recordPlanMaps(plan.mountMaps);
-			lines.push(plan.mount);
-			lines.push(`  } else {`);
-			recordPlanMaps(plan.updateMaps);
-			lines.push(plan.update);
-			lines.push(`  }`);
-		} else {
-			lines.push(`  if (_b === undefined) {`);
-			recordPlanMaps(plan.mountMaps);
-			lines.push(plan.mount);
-			lines.push(`  }`);
-		}
-		if (plan.everyRender) {
-			recordPlanMaps(plan.everyRenderMaps);
-			lines.push(plan.everyRender);
-		}
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.if(
+					b.binary('===', b.id('_b'), b.id('undefined')),
+					b.block(plan.mount),
+					plan.update.length > 0 ? b.block(plan.update) : null,
+				),
+				node,
+			),
+		);
+		bodyStatements.push(...plan.everyRender);
 	}
-	if (plan?.after) {
-		recordPlanMaps(plan.afterMaps);
-		lines.push(plan.after);
-	}
+	if (plan?.after) bodyStatements.push(...plan.after);
 	// Hoisted `<title>`/`<meta>`/`<link>` → headBlock into document.head
 	// (out-of-band; re-applied each render for reactivity, removed on unmount).
-	if (plan?.head) lines.push(plan.head);
+	if (plan?.head) bodyStatements.push(...plan.head);
 	if (autoMemoSize > 0) {
-		lines.push(
-			`  if (${autoMemoCacheName} !== ${autoMemoCommittedName}) __s.slots.${autoMemoCacheProperty} = ${autoMemoCacheName};`,
+		bodyStatements.push(
+			inheritOriginLoc(
+				b.if(
+					b.binary('!==', b.id(autoMemoCacheName), b.id(autoMemoCommittedName)),
+					b.stmt(b.assignment('=', slotsMember(autoMemoCacheProperty), b.id(autoMemoCacheName))),
+					null,
+				),
+				node,
+			),
 		);
 	}
-	if (returnedExpression !== null) lines.push(`  return ${printExpr(returnedExpression)};`);
+	if (returnedExpression !== null) {
+		bodyStatements.push(inheritOriginLoc(b.return(returnedExpression), returnedExpression));
+	}
 
+	// The `__block` header is emitted whenever anything in the assembled body —
+	// including embedded sub-helpers, matching the historical whole-text scan —
+	// references the identifier.
+	const needsBlock = !returnedOutput && hasIdentifierReference(bodyStatements, '__block');
+	if (needsBlock) {
+		bodyStatements.unshift(
+			inheritOriginLoc(b.const('__block', b.member(b.id('__s'), 'block')), node),
+		);
+	}
 	// PROPS-FIRST convention: `(…userProps, __s, __extra)`. The scope is the 2nd arg
 	// (a placeholder leads when there are no user params), so a plain function
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
-	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
-	const bodyCode = lines.join('\n');
-	if (setupMaps && fragmentMapEntries.length > 0) setupMaps.push(...fragmentMapEntries);
-	const needsBlock = !returnedOutput && bodyCode.includes('__block');
-	if (!needsBlock && setupMaps) {
-		// Omitting the header shifts every setup statement up by one generated line.
-		for (const mapping of setupMaps) mapping.fnRelLine--;
-	}
+	const userParams = node.params && node.params.length > 0 ? node.params : [b.id('__props')];
+	const fnParams = [...userParams, b.id('__s'), b.id('__extra')];
 	ctx.currentAutoMemoOffset = prevAutoMemoOffset;
 	ctx.currentAutoMemoCacheName = prevAutoMemoCacheName;
 	ctx.currentAutoMemoCommittedName = prevAutoMemoCommittedName;
 	ctx.currentHookMemoOffset = prevHookMemoOffset;
 	ctx.currentHookMemoCacheProperty = prevHookMemoCacheProperty;
 	ctx.currentHookMemoNames = prevHookMemoNames;
-	return `function ${name}(${sig}) {\n${needsBlock ? '  const __block = __s.block;\n' : ''}${bodyCode}\n}`;
+	// ONE FunctionDeclaration node — the caller prints it (once, with the full
+	// esrap map for top-level components) or embeds it in an enclosing body.
+	return inheritOriginLoc(
+		b.function_declaration(b.id(name, node.id ?? node), fnParams, b.block(bodyStatements)),
+		node.loc ? node : shellOrigin,
+	);
 }
 
 /**
@@ -11108,46 +11142,21 @@ function compileReturnJsxFunction(node, ctx, options) {
 		}
 		return rewriteJsxValues(h, ctx);
 	});
-	// The rebuilt function shell maps to the authored declaration.
+	// The rebuilt function shell maps to the authored declaration. Hoisted
+	// helper fns (compInlinedSubs — filled by the statement mapping above) are
+	// function DECLARATION nodes embedded at the top of the body, matching the
+	// historical after-the-`{` splice.
 	const fn = inheritOriginLoc(
-		b.function_declaration(node.id, node.params, b.block(newStatements)),
+		b.function_declaration(node.id, node.params, b.block([...compInlinedSubs, ...newStatements])),
 		node,
 	);
-	// Print with esrap's real per-token map (same output bytes as printNode) so
-	// this function contributes segments to the module map — compile() drains
-	// them via ctx._setupMaps, exactly like a component's setup statements.
-	// Chained consumers (e.g. @octanejs/mdx's two-stage .mdx map) need segments
-	// on these lines; a map-less print would compose to an empty chain.
+	// Print with esrap's real per-token map so this function contributes
+	// segments to the module map — compile() drains them via ctx._setupMaps,
+	// exactly like a component's setup statements. Chained consumers (e.g.
+	// @octanejs/mdx's two-stage .mdx map) need segments on these lines.
 	const printed = printNodeWithMap(fn, ctx);
 	let code = printed.code;
 	const mappings = printed.mappings;
-	if (compInlinedSubs.length) {
-		// Helpers are hoisted function declarations → position-independent; splice them
-		// in right after the FUNCTION BODY's opening `{` so they're in the component
-		// scope. The first `{` is not necessarily the body: a destructured parameter
-		// (or an object/function default inside one) can contain braces first. Printing
-		// the body alone gives us the exact suffix boundary emitted by esrap without
-		// having to parse the generated function text again.
-		const printedBody = printNode(fn.body);
-		const i = code.length - printedBody.length;
-		if (i < 0 || code.slice(i) !== printedBody) {
-			throw new Error(`Unable to locate the generated body for component \`${name}\`.`);
-		}
-		const subs = compInlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n');
-		// The splice inserts `'\n' + subs` after the `{`: every printed line below
-		// the splice line shifts down by the inserted line count. Keep the map in
-		// sync by inserting that many empty mapping lines at the same point.
-		// Decoded rows are dense up to the LAST line with segments, so when the
-		// array ends at (or before) the splice line, every shifted line has no
-		// segments and there is nothing to realign — skip the padding rather than
-		// append useless empty rows.
-		const spliceLine = countNewlines(code.slice(0, i + 1));
-		const inserted = 1 + countNewlines(subs);
-		if (mappings.length > spliceLine + 1) {
-			mappings.splice(spliceLine + 1, 0, ...Array.from({ length: inserted }, () => []));
-		}
-		code = code.slice(0, i + 1) + '\n' + subs + code.slice(i + 1);
-	}
 	// Thread the mappings back to compile() through the same side-channel the
 	// component path uses (drained by drainSetupMaps at the emit site). The
 	// `export ` prefix shifts only line 0's columns; `export default` appends a
@@ -11458,10 +11467,8 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				elseHoleName = `h${holeProps.length}`;
 				holeProps.push(objectProp(elseHoleName, b.id(ic.elseHelper)));
 			}
-			// Renderer-side, the call reads everything from `props.hN`. The captured
-			// fragment map described the component-side print — drop it.
-			ic.condExpr = `props.${condHole}`;
-			ic.condExprMap = undefined;
+			// Renderer-side, the call reads everything from `props.hN`.
+			ic.condExpr = memberProps(condHole, ic.condTest);
 			ic.thenHelper = `props.${thenHole}`;
 			ic.elseHelper = elseHoleName ? `props.${elseHoleName}` : null;
 			// Phase 2: the hoisted helpers' env values are COMPONENT-scope
@@ -11505,8 +11512,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			holeProps.push(objectProp(itemsHole, rewriteJsxValues(forNode.right, ctx)));
 			const bodyHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(bodyHole, b.id(rec.bodyHelper)));
-			rec.itemsExpr = `props.${itemsHole}`;
-			rec.itemsExprMap = undefined;
+			rec.itemsExpr = memberProps(itemsHole, forNode.right);
 			rec.bodyHelper = `props.${bodyHole}`;
 			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
 				const emptyHole = `h${holeProps.length}`;
@@ -11559,8 +11565,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const rec = makeSwitchCall(swNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const discHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(discHole, rewriteJsxValues(rec.discNode, ctx)));
-			rec.discExpr = `props.${discHole}`;
-			rec.discExprMap = undefined;
+			rec.discExpr = memberProps(discHole, rec.discNode);
 			const casesHole = `h${holeProps.length}`;
 			holeProps.push(
 				objectProp(
@@ -11572,8 +11577,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 					),
 				),
 			);
-			rec.casesArrayExpr = `props.${casesHole}`;
-			rec.casesChunk = null;
+			rec.casesExpr = memberProps(casesHole, rec.discNode);
 			if (rec.defaultHelper && rec.defaultHelper !== 'null') {
 				const defHole = `h${holeProps.length}`;
 				holeProps.push(objectProp(defHole, b.id(rec.defaultHelper)));
@@ -11715,7 +11719,7 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		}),
 		node,
 	);
-	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
+	const renderer = printNode(compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash));
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
 		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
@@ -11755,8 +11759,7 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 				params: [],
 				body: n.children || [],
 			};
-			const fn = compileFunctionBody(fakeBody, ctx, helperName);
-			inlinedSubs.push(fn + ';');
+			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName));
 			// The hoisted-helper reference maps to the authored sub-template.
 			return inheritOriginLoc(b.id(helperName), n);
 		}
@@ -11771,8 +11774,7 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 				params: n.params || [],
 				body: n.body,
 			};
-			const fn = compileFunctionBody(fakeBody, ctx, helperName);
-			inlinedSubs.push(fn + ';');
+			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName));
 			return inheritOriginLoc(b.id(helperName), n);
 		}
 		return null;
@@ -12477,13 +12479,13 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 // metadata is reactive); a `<title>`'s text becomes a string-concat expression;
 // void tags (`<meta>`/`<link>`) pass `null` for text.
 /** @param {any} node @param {number} index @returns {string} */
-function headElementArgs(node, index) {
+function headElementArgNodes(node, index) {
 	const el = node.element;
 	const tag = jsxTagName(el);
-	const attrParts = [];
+	const attrProps = [];
 	for (const a of el.openingElement.attributes || []) {
 		if (a.type === 'SpreadAttribute' || a.type === 'JSXSpreadAttribute') {
-			attrParts.push(`...(${printExpr(a.argument)})`);
+			attrProps.push(b.spread(a.argument));
 			continue;
 		}
 		if (a.type !== 'Attribute' && a.type !== 'JSXAttribute') continue;
@@ -12496,34 +12498,56 @@ function headElementArgs(node, index) {
 		if (attrName === 'key' || attrName === 'ref' || attrName === 'class') continue;
 		const val = a.value;
 		if (val == null) {
-			attrParts.push(`${JSON.stringify(attrName)}: true`);
+			attrProps.push(b.prop('init', b.literal(attrName), b.literal(true, 'true', a)));
 			continue;
 		}
 		const inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 		if (inner.type === 'Literal' || inner.type === 'StringLiteral' || inner.type === 'JSXText') {
-			attrParts.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
+			attrProps.push(
+				b.prop(
+					'init',
+					b.literal(attrName),
+					b.literal(inner.value, JSON.stringify(inner.value), inner),
+				),
+			);
 		} else {
-			attrParts.push(`${JSON.stringify(attrName)}: (${printExpr(inner)})`);
+			attrProps.push(b.prop('init', b.literal(attrName), inner));
 		}
 	}
-	const attrsExpr = attrParts.length ? `{ ${attrParts.join(', ')} }` : 'null';
-
-	const textExpr = VOID_ELEMENTS.has(tag) ? 'null' : printExpr(headTextExpression(el));
-
-	return `${JSON.stringify(headKey(el, index))}, ${JSON.stringify(tag)}, ${attrsExpr}, ${textExpr}`;
+	const attrsExpr = attrProps.length ? b.object(attrProps) : b.literal(null);
+	const textExpr = VOID_ELEMENTS.has(tag) ? b.literal(null) : headTextExpression(el);
+	return [
+		b.literal(headKey(el, index), undefined, el),
+		b.literal(tag, undefined, el),
+		inheritOriginLoc(attrsExpr, el),
+		inheritOriginLoc(textExpr, el),
+	];
 }
 
-// Build the CLIENT `headBlock(__s, …)` statements for a component's hoisted head
-// elements (one per `HeadHoist`). Returns '' when there are none.
-/** @param {any[]} headNodes @param {any} ctx @param {number} slotBase @returns {string} */
+// Printed-argument form for the server emitter (the module frame is still
+// string-assembled — M2).
+function headElementArgs(node, index) {
+	return headElementArgNodes(node, index)
+		.map((argNode) => printExpr(argNode))
+		.join(', ');
+}
+
+// Build the CLIENT `headBlock(__s, …)` statement NODES for a component's
+// hoisted head elements (one per `HeadHoist`). Returns [] when there are none.
+/** @param {any[]} headNodes @param {any} ctx @param {number} slotBase */
 function emitHeadClient(headNodes, ctx, slotBase) {
-	if (!headNodes.length) return '';
+	if (!headNodes.length) return [];
 	ctx.runtimeNeeded.add('headBlock');
 	// Each hoisted head element gets a dense scope slot (after the body's constructs);
 	// the content `key` stays as a later arg for SSR-adoption matching.
-	return headNodes
-		.map((h, i) => `  _$headBlock(__s, ${slotBase + i}, ${headElementArgs(h, i)});`)
-		.join('\n');
+	return headNodes.map((h, i) =>
+		inheritOriginLoc(
+			b.stmt(
+				b.call('_$headBlock', b.id('__s'), b.literal(slotBase + i), ...headElementArgNodes(h, i)),
+			),
+			h.element ?? h,
+		),
+	);
 }
 
 // Build the SERVER `ssrHeadEl(…)` statements for a component's hoisted head
@@ -13093,10 +13117,19 @@ function stripTsOnlyWrappers(node) {
 	return out ?? node;
 }
 
-function emitAutoMemoRegion(ctx, dependencies, slotIndex, statement, extraMiss, contextAware) {
+function emitAutoMemoRegion(
+	ctx,
+	dependencies,
+	slotIndex,
+	statement,
+	extraMiss,
+	contextAware,
+	depNode,
+) {
 	const cell = allocAutoMemoCell(ctx, dependencies.length + (contextAware ? 1 : 0));
 	const contextIndex = contextAware ? cell.base + dependencies.length : null;
 	const cache = ctx.currentAutoMemoCacheName;
+	const cacheAt = (i) => b.member(b.id(cache), b.literal(i), true);
 	// Evaluate every dependency exactly once per render, before the miss test.
 	// The published snapshot is then the exact value the comparison (and the
 	// re-rendered region) observed: a live imported binding that moves while the
@@ -13104,38 +13137,65 @@ function emitAutoMemoRegion(ctx, dependencies, slotIndex, statement, extraMiss, 
 	// consumed, and getter-bearing dependency paths are read once per render
 	// rather than once per guard clause.
 	const depNames = dependencies.map(() => allocCompilerName(ctx, '__memoDep'));
-	const depDecls = dependencies
-		.map((dependency, index) => `const ${depNames[index]} = (${dependency});`)
-		.join(' ');
-	const misses = [`__s.slots[${slotIndex}] === undefined`];
-	if (extraMiss !== null) misses.push(`(${extraMiss})`);
-	misses.push(`${cache}[${cell.init}] !== true`);
+	const depDecls = dependencies.map((dependency, index) =>
+		b.const(depNames[index], depNode ? depNode(dependency) : b.id(dependency)),
+	);
+	const misses = [
+		b.binary(
+			'===',
+			b.member(b.member(b.id('__s'), 'slots'), b.literal(slotIndex), true),
+			b.id('undefined'),
+		),
+	];
+	if (extraMiss !== null) misses.push(extraMiss);
+	misses.push(b.binary('!==', cacheAt(cell.init), b.literal(true)));
 	for (let index = 0; index < depNames.length; index++) {
-		misses.push(`${cache}[${cell.base + index}] !== ${depNames[index]}`);
+		misses.push(b.binary('!==', cacheAt(cell.base + index), b.id(depNames[index])));
 	}
-	const publish = depNames
-		.map((name, index) => `${cache}[${cell.base + index}] = ${name};`)
-		.join(' ');
-	const writable = `if (${cache} === ${ctx.currentAutoMemoCommittedName}) ${cache} = ${cache}.slice();`;
-	// `statement` may be a plain string or an emit chunk carrying expression
-	// pastes (catChunks shape) — compose byte-identically and return the same
-	// shape the caller passed in.
-	const isChunk = typeof statement !== 'string';
+	const publish = () =>
+		depNames.map((name, index) =>
+			b.stmt(b.assignment('=', cacheAt(cell.base + index), b.id(name))),
+		);
+	const writable = () =>
+		b.if(
+			b.binary('===', b.id(cache), b.id(ctx.currentAutoMemoCommittedName)),
+			b.stmt(b.assignment('=', b.id(cache), b.call(b.member(b.id(cache), 'slice')))),
+			null,
+		);
+	const markInit = () => b.stmt(b.assignment('=', cacheAt(cell.init), b.literal(true)));
+	// `statement` is the guarded region's statement NODE; the returned region is
+	// a statement node too — the caller stamps the origin.
 	if (!contextAware) {
-		const region = catChunks([
-			`{ ${depDecls} if (${misses.join(' || ')}) { `,
-			statement,
-			` ${writable} ${publish} ${cache}[${cell.init}] = true; } }`,
+		return b.block([
+			...depDecls,
+			b.if(orChain(misses), b.block([statement, writable(), ...publish(), markInit()]), null),
 		]);
-		return isChunk ? region : region.code;
 	}
 	ctx.runtimeNeeded.add('compilerCacheContext');
-	const region = catChunks([
-		`{ ${depDecls} if (${misses.join(' || ')}) { `,
-		statement,
-		` const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); ${writable} ${publish} ${cache}[${contextIndex}] = _c; ${cache}[${cell.init}] = true; } else { const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); if (_c !== ${cache}[${contextIndex}]) { ${writable} ${cache}[${contextIndex}] = _c; } } }`,
+	const cacheContextCall = () =>
+		b.call('_$compilerCacheContext', b.id('__s'), b.literal(slotIndex), cacheAt(contextIndex));
+	return b.block([
+		...depDecls,
+		b.if(
+			orChain(misses),
+			b.block([
+				statement,
+				b.const('_c', cacheContextCall()),
+				writable(),
+				...publish(),
+				b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c'))),
+				markInit(),
+			]),
+			b.block([
+				b.const('_c', cacheContextCall()),
+				b.if(
+					b.binary('!==', b.id('_c'), cacheAt(contextIndex)),
+					b.block([writable(), b.stmt(b.assignment('=', cacheAt(contextIndex), b.id('_c')))]),
+					null,
+				),
+			]),
+		),
 	]);
-	return isChunk ? region : region.code;
 }
 
 function planJsx(
@@ -13164,12 +13224,26 @@ function planJsx(
 	// `<style>`) is what collapses a `<title> + <style> + <div>` page to single-root.
 	const headNodes = allNodes.filter((n) => n.type === 'HeadHoist');
 	const jsxNodes = allNodes.filter((n) => n.type !== 'HeadHoist');
+	// Origin for runtime-glue statements with no single authored origin (element
+	// walks, bag alloc/commit, anchors): the first located body root, falling
+	// back to the enclosing function's own origin (stashed by compileFunctionBody
+	// — a folded-directive root carries no loc of its own).
+	const planOrigin =
+		jsxNodes.find((n) => n && n.loc) ?? allNodes.find((n) => n && n.loc) ?? ctx._fnOrigin ?? null;
 	// Head-only body: no body template, hence no binding bag — the hoisted head
 	// elements take slots 0..M-1 (packed). The body case allocates head slots AFTER
 	// its constructs (see `headEmit` below), keeping every scope's `slots` packed.
 	if (jsxNodes.length === 0) {
 		ctx._elemLocs = _prevElemLocs;
-		return { mount: '', update: '', after: '', head: emitHeadClient(headNodes, ctx, 0) };
+		return {
+			hasBag: false,
+			mount: [],
+			update: [],
+			everyRender: [],
+			after: [],
+			head: emitHeadClient(headNodes, ctx, 0),
+			locs: null,
+		};
 	}
 
 	// Emit ONE template containing all top-level JSX (wrapping multiple roots in
@@ -13428,12 +13502,23 @@ function planJsx(
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
-		let cloneLoc = '';
+		let cloneLocArg = null;
 		if (ctx.dev && single) {
 			const lc = devLoc(ctx, jsxNodes[0]);
-			if (lc) cloneLoc = `, ${JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`)}`;
+			if (lc) {
+				const locString = `${ctx.mapSourceName}:${lc[0]}:${lc[1]}`;
+				cloneLocArg = b.literal(locString, JSON.stringify(locString));
+			}
 		}
-		mountLines.push(`    const _root = _$clone(${tpl}${cloneLoc});`);
+		mountLines.push(
+			inheritOriginLoc(
+				b.const(
+					'_root',
+					cloneLocArg ? b.call('_$clone', b.id(tpl), cloneLocArg) : b.call('_$clone', b.id(tpl)),
+				),
+				planOrigin,
+			),
+		);
 		elementVars = new Map();
 		let varCounter = 0;
 		// Does this template contain a control-flow / component / portal hole? If so
@@ -13488,14 +13573,15 @@ function planJsx(
 			}
 			let step;
 			if (sibVar !== undefined) {
-				// `sibling(node, n)` skips n logical siblings (hole-aware, like walkExprH);
-				// raw `.nextSibling` for hole-free templates. sibVar already resolves to the
+				// `sibling(node, n)` skips n logical siblings (hole-aware — it skips a
+				// whole `<!--[-->…<!--]-->` block range as one logical step while
+				// hydrating); raw `.nextSibling` for hole-free templates. sibVar already resolves to the
 				// (k−sibSteps)-th child, so n steps across lands on the k-th.
 				if (hasHoles) {
-					step = `_$sibling(${sibVar}, ${sibSteps})`;
+					step = b.call('_$sibling', b.id(sibVar), b.literal(sibSteps));
 				} else {
-					step = sibVar;
-					for (let i = 0; i < sibSteps; i++) step += '.nextSibling';
+					step = b.id(sibVar);
+					for (let i = 0; i < sibSteps; i++) step = b.member(step, 'nextSibling');
 				}
 			} else {
 				// Materialize the ANCESTOR first (cached + reused across siblings), then take
@@ -13505,11 +13591,17 @@ function planJsx(
 				// __block.parentNode (the POST-drain slot host), which is the wrong base for
 				// navigating elements that still live inside `_root` at mount time.
 				const parentVar = prefix.length === 0 ? '_root' : ensureVar(prefix);
-				step = hasHoles ? walkExprH(parentVar, [k]) : walkExpr(parentVar, [k]);
+				if (hasHoles) {
+					step = b.call('_$child', b.id(parentVar));
+					if (k > 0) step = b.call('_$sibling', step, b.literal(k));
+				} else {
+					step = b.member(b.id(parentVar), 'firstChild');
+					for (let n = 0; n < k; n++) step = b.member(step, 'nextSibling');
+				}
 			}
 			const v = `_el${varCounter++}`;
 			elementVars.set(key, v);
-			mountLines.push(`    const ${v} = ${step};`);
+			mountLines.push(inheritOriginLoc(b.const(v, step), planOrigin));
 			return v;
 		};
 	} else {
@@ -13559,33 +13651,28 @@ function planJsx(
 	// this assertion keeps future binding-lowering changes fail-closed.
 	if (mountCallbackSinks?.size) {
 		const matches = new Map();
-		for (const b of elementBindings) {
-			if (!b.mountOnly) continue;
-			const name = b.kind === 'event' ? b.expr : b.kind === 'event-bundle' ? b.fnExpr : null;
+		for (const bind of elementBindings) {
+			if (!bind.mountOnly) continue;
+			const ref =
+				bind.kind === 'event' ? bind.expr : bind.kind === 'event-bundle' ? bind.fnExpr : null;
+			const name = ref && ref.type === 'Identifier' ? ref.name : null;
 			if (!name || !mountCallbackSinks.has(name)) continue;
 			let bindings = matches.get(name);
 			if (!bindings) matches.set(name, (bindings = []));
-			bindings.push(b);
+			bindings.push(bind);
 		}
 		for (const [name, sink] of mountCallbackSinks) {
 			const bindings = matches.get(name) || [];
 			if (bindings.length !== sink.uses) {
 				throw new Error(`octane compiler: mount callback sink mismatch for ${name}`);
 			}
-			const arrow = printNode(sink.arrow);
 			if (bindings.length === 1) {
 				const binding = bindings[0];
-				// The materialized arrow replaces the printed sink reference; the
-				// captured fragment map described the old text — drop it.
-				if (binding.kind === 'event') {
-					binding.expr = arrow;
-					binding.exprMap = undefined;
-				} else {
-					binding.fnExpr = arrow;
-					binding.fnExprMap = undefined;
-				}
+				// The materialized arrow replaces the sink reference in place.
+				if (binding.kind === 'event') binding.expr = sink.arrow;
+				else binding.fnExpr = sink.arrow;
 			} else {
-				mountLines.push(`    const ${name} = ${arrow};`);
+				mountLines.push(inheritOriginLoc(b.const(name, sink.arrow), sink.arrow));
 			}
 		}
 	}
@@ -13604,7 +13691,19 @@ function planJsx(
 		if (!lc) return;
 		_locStamped.add(hostVar);
 		mountLines.push(
-			`    ${hostVar}.__oct_loc = ${JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`)};`,
+			inheritOriginLoc(
+				b.stmt(
+					b.assignment(
+						'=',
+						b.member(hostVarNode(hostVar), '__oct_loc'),
+						b.literal(
+							`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`,
+							JSON.stringify(`${ctx.mapSourceName}:${lc[0]}:${lc[1]}`),
+						),
+					),
+				),
+				planOrigin,
+			),
 		);
 	};
 	// A sibling-position `{x as string}` text hole mounts with `htextSwap`, which REPLACES the
@@ -13689,8 +13788,12 @@ function planJsx(
 			b.endElVar = ensureVar(b.endPath);
 		}
 		// `htextSwap` (sibling text hole) detaches its `<!>`; defer it past all walks (see above).
-		if (b.kind === 'text') deferredTextMounts.push(emitBindingMount(b, elVar, bag));
-		else mountLines.push(emitBindingMount(b, elVar, bag));
+		const mountEmit = emitBindingMount(b, elVar, bag);
+		if (mountEmit !== null) {
+			const target = b.kind === 'text' ? deferredTextMounts : mountLines;
+			if (Array.isArray(mountEmit)) target.push(...mountEmit);
+			else target.push(mountEmit);
+		}
 	}
 	// Shared construct mount-loop (@for/@if/component/@try/@switch/portal):
 	// resolve each record's host element, stash it on the bag under the
@@ -13704,12 +13807,25 @@ function planJsx(
 		for (const c of list) {
 			const elVar = ensureVar(c.hostPath || []);
 			c.elVar = elVar;
-			if (!noTemplate) mountLines.push(`    ${bag.local(`_${hostKey}$${c.id}`)} = ${elVar};`);
+			const org = c.origin ?? planOrigin;
+			if (!noTemplate) {
+				mountLines.push(
+					inheritOriginLoc(
+						b.stmt(b.assignment('=', b.id(bag.local(`_${hostKey}$${c.id}`)), hostVarNode(elVar))),
+						org,
+					),
+				);
+			}
 			if (!noTemplate && stampLoc) stampHostLoc(elVar, c.hostPath, c.loc);
 			if (anchorKey !== null && c.anchorPath) {
 				const anchorVar = ensureVar(c.anchorPath);
 				c.anchorVar = anchorVar;
-				mountLines.push(`    ${bag.local(`_${anchorKey}$${c.id}`)} = ${anchorVar};`);
+				mountLines.push(
+					inheritOriginLoc(
+						b.stmt(b.assignment('=', b.id(bag.local(`_${anchorKey}$${c.id}`)), b.id(anchorVar))),
+						org,
+					),
+				);
 			}
 			if (each) each(c);
 		}
@@ -13752,21 +13868,64 @@ function planJsx(
 			// parent via the runtime helper — a hydration-aware no-op when clone()
 			// adopted the server content in place (virtual wrapper).
 			ctx.runtimeNeeded.add('drainFrag');
-			mountLines.push(`    _$drainFrag(_root, __block.parentNode, __block.endMarker);`);
+			mountLines.push(
+				inheritOriginLoc(
+					b.stmt(
+						b.call(
+							'_$drainFrag',
+							b.id('_root'),
+							b.member(b.id('__block'), 'parentNode'),
+							b.member(b.id('__block'), 'endMarker'),
+						),
+					),
+					planOrigin,
+				),
+			);
 		}
-		const rootArg = single ? '_root' : 'null';
-		const args = bag.fields.map((f) => f.constExpr ?? f.local);
+		// Const-seeded fields keep their registry strings ('null'/'undefined');
+		// resolve them to nodes only here at the factory call.
+		const constArgNode = (expr) => (expr === 'null' ? b.literal(null) : b.id(expr));
+		const bagFieldValue = (f) => (f.constExpr !== null ? constArgNode(f.constExpr) : b.id(f.local));
+		const rootArg = () => (single ? b.id('_root') : b.literal(null));
 		if (bag.fields.length <= BAG_FACTORY_MAX) {
 			ctx.runtimeNeeded.add(`bag${bag.fields.length}`);
 			mountLines.push(
-				`    _b = _$bag${bag.fields.length}(__s, ${rootArg}${args.length ? ', ' + args.join(', ') : ''});`,
+				inheritOriginLoc(
+					b.stmt(
+						b.assignment(
+							'=',
+							b.id('_b'),
+							b.call(
+								`_$bag${bag.fields.length}`,
+								b.id('__s'),
+								rootArg(),
+								...bag.fields.map(bagFieldValue),
+							),
+						),
+					),
+					planOrigin,
+				),
 			);
 		} else {
 			// Spill path — beyond the shared-factory arities: one inline literal
 			// (still real values, single allocation) through the generic commit.
 			ctx.runtimeNeeded.add('bagOf');
 			mountLines.push(
-				`    _b = _$bagOf(__s, ${rootArg}, { ${bag.fields.map((f) => `${f.name}: ${f.constExpr ?? f.local}`).join(', ')} });`,
+				inheritOriginLoc(
+					b.stmt(
+						b.assignment(
+							'=',
+							b.id('_b'),
+							b.call(
+								'_$bagOf',
+								b.id('__s'),
+								rootArg(),
+								b.object(bag.fields.map((f) => b.prop('init', b.id(f.name), bagFieldValue(f)))),
+							),
+						),
+					),
+					planOrigin,
+				),
 			);
 		}
 		// REF MANIFEST (compiled-output plan, ref-manifest phase): bodies with
@@ -13792,7 +13951,12 @@ function planJsx(
 				ctx.hoistedHelpers.push(
 					`const ${rmName} = [${rm.map((x) => JSON.stringify(x)).join(', ')}];`,
 				);
-				mountLines.push(`    __s.refFields = ${rmName};`);
+				mountLines.push(
+					inheritOriginLoc(
+						b.stmt(b.assignment('=', b.member(b.id('__s'), 'refFields'), b.id(rmName))),
+						planOrigin,
+					),
+				);
 			}
 		}
 		// Declare the mount locals the factory args read — patched into the
@@ -13800,8 +13964,15 @@ function planJsx(
 		const locals = bag.fields.filter((f) => f.local !== null).map((f) => f.local);
 		const init = mountLines.indexOf(BAG_LOCALS_PLACEHOLDER);
 		if (init === -1) throw new Error('octane compiler: bag locals placeholder missing');
-		if (locals.length > 0) mountLines[init] = `    let ${locals.join(', ')};`;
-		else mountLines.splice(init, 1);
+		if (locals.length > 0) {
+			mountLines[init] = inheritOriginLoc(
+				b.declaration(
+					'let',
+					locals.map((l) => b.declarator(l)),
+				),
+				planOrigin,
+			);
+		} else mountLines.splice(init, 1);
 	}
 
 	// Update. Deferred property-writes run their diff EVERY render (it does the
@@ -13811,10 +13982,10 @@ function planJsx(
 	const updateLines = [];
 	const everyRenderLines = [];
 	for (const b of elementBindings) {
-		const code = emitBindingUpdate(b, bag);
-		if (!code) continue;
-		if (b.deferred) everyRenderLines.push(code);
-		else updateLines.push(code);
+		const updateEmit = emitBindingUpdate(b, bag);
+		if (!updateEmit) continue;
+		if (b.deferred) everyRenderLines.push(updateEmit);
+		else updateLines.push(updateEmit);
 	}
 
 	// After (forBlock + ifBlock calls run on every render — they reconcile).
@@ -13869,29 +14040,37 @@ function planJsx(
 	//     and content never lands after later siblings).
 	//   - The host is a real in-template element: no anchor — append into it
 	//     (insertBefore(_, null) === appendChild).
-	// Returns the anchor EXPRESSION, or null for the append case. The after-lines
-	// run right after the mount/update branches where `_b` holds the committed
-	// bag, so bag reads go through `_b.<letter>` (shorter than `__s.slots[0].…`).
-	const anchorExprFor = (c, anchorKey) =>
+	// Returns the anchor expression NODE, or null for the append case. The
+	// after-lines run right after the mount/update branches where `_b` holds the
+	// committed bag, so bag reads go through `_b.<letter>` (shorter than
+	// `__s.slots[0].…`).
+	const anchorNodeFor = (c, anchorKey) =>
 		c.anchorVar
-			? `_b.${bag.letter(`_${anchorKey}$${c.id}`)}`
+			? bagFieldNode(bag, `_${anchorKey}$${c.id}`)
 			: !isElHost(c.elVar)
-				? '__block.endMarker'
+				? b.member(b.id('__block'), 'endMarker')
 				: null;
 	// Host expression for a construct's slot call — the bag-stashed host element,
 	// or the block's own parentNode for bagless (control-flow-only) bodies.
-	const hostExprFor = (key) => (noTemplate ? '__block.parentNode' : `_b.${bag.letter(key)}`);
+	const hostNodeFor = (key) =>
+		noTemplate ? b.member(b.id('__block'), 'parentNode') : bagFieldNode(bag, key);
 	// Phase 2: a construct's env argument — the captured-locals tuple its
 	// hoisted helpers destructure from `__extra`. Folded records carry a
-	// pre-built `props.hN` expression (the fold threads the values through the
+	// pre-built `props.hN` reference (the fold threads the values through the
 	// fragment renderer's props); inline records emit the identifier array.
-	const envExprFor = (c) =>
-		c.envExpr ?? (c.envNames && c.envNames.length ? `[${c.envNames.join(', ')}]` : null);
+	const envNodeFor = (c) =>
+		c.envExpr != null
+			? helperRefNode(c.envExpr)
+			: c.envNames && c.envNames.length
+				? b.array(c.envNames.map((n) => b.id(n)))
+				: null;
+	const pushAfterStmt = (id, org, node) => pushAfter(id, inheritOriginLoc(node, org));
 	for (const fc of forCalls) {
 		ctx.runtimeNeeded.add('forBlock');
 		const slotIndex = fc.slotIndex;
+		const org = fc.origin ?? planOrigin;
 		// Control-flow-only bodies have no bag: the host is __block.parentNode directly.
-		const hostExpr = hostExprFor(`_for$${fc.id}`);
+		const hostExpr = () => hostNodeFor(`_for$${fc.id}`);
 		// flags: bit 0 = pure (auto-memo), bit 1 = singleRoot (skip per-item markers),
 		//        bit 2 = depEligible (runtime compares deps array, upgrades to pure
 		//        for survivors when deps unchanged this render),
@@ -13907,159 +14086,263 @@ function planJsx(
 		// Arg layout: forBlock(__s, slot, host, items, keyFn, body, flags?, deps?,
 		// emptyBody?, anchor?, ownEnd?).
 		// Optional args backfill positionally: `flags`/`deps` placeholders
-		// (`0`/`undefined`) when only `emptyHelper` ('null' literal when no
-		// `@empty` branch) or the anchor is present, and a `null` empty-body
-		// placeholder when only the anchor is, so each lands at its positional
-		// parameter.
-		const anchorExpr = anchorExprFor(fc, 'forAnchor');
+		// (`0`/`undefined`) when only `emptyHelper` (`null` when no `@empty`
+		// branch) or the anchor is present, and a `null` empty-body placeholder
+		// when only the anchor is, so each lands at its positional parameter.
+		const anchorExpr = anchorNodeFor(fc, 'forAnchor');
 		const hasAnchor = anchorExpr !== null;
 		const hasEmpty = fc.emptyHelper && fc.emptyHelper !== 'null';
 		// deps doubles as the Phase 2 env tuple — emitted whenever the item/empty
 		// helpers captured anything, not only for the dep-pure promotion. A deps
 		// arg forces the flags placeholder too (positional alignment).
 		const hasDeps = fc.depNames.length > 0;
-		let flagsExpr = String(flags || 0);
+		const depNode = depNodeFor(fc);
+		let flagsExpr = b.literal(flags || 0);
 		if (fc.itemMemoFlags !== 0) {
-			const witnesses = fc.itemMemoWitnesses
-				.map((name) => `${name}.__memo === true && ${name}.__compare === undefined`)
-				.join(' && ');
-			flagsExpr = `(${flags} | ((${witnesses}) ? ${fc.itemMemoFlags} : 0))`;
+			flagsExpr = b.binary(
+				'|',
+				b.literal(flags),
+				b.conditional(
+					witnessOkChain(fc.itemMemoWitnesses),
+					b.literal(fc.itemMemoFlags),
+					b.literal(0),
+				),
+			);
 		}
 		if (fc.singleRootExpr) {
-			flagsExpr = `(${flagsExpr} | (${fc.singleRootExpr}.$$singleRoot === true ? 2 : 0))`;
+			flagsExpr = b.binary(
+				'|',
+				flagsExpr,
+				b.conditional(
+					b.binary('===', b.member(b.id(fc.singleRootExpr), '$$singleRoot'), b.literal(true)),
+					b.literal(2),
+					b.literal(0),
+				),
+			);
 		}
-		const flagsPart =
-			flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor ? ', ' + flagsExpr : '';
-		const depsPart = hasDeps
-			? `, [${fc.depNames.join(', ')}]`
-			: hasEmpty || hasAnchor
-				? ', undefined'
-				: '';
-		const emptyPart = hasEmpty ? `, ${fc.emptyHelper}` : hasAnchor ? ', null' : '';
-		const anchorPart = hasAnchor ? `, ${anchorExpr}` : '';
+		const tailArgs = [helperRefNode(fc.keyHelper), helperRefNode(fc.bodyHelper)];
+		if (flags || fc.singleRootExpr || hasDeps || hasEmpty || hasAnchor) tailArgs.push(flagsExpr);
+		if (hasDeps) tailArgs.push(b.array(fc.depNames.map(depNode)));
+		else if (hasEmpty || hasAnchor) tailArgs.push(undefinedNode());
+		if (hasEmpty) tailArgs.push(helperRefNode(fc.emptyHelper));
+		else if (hasAnchor) tailArgs.push(nullNode());
+		if (hasAnchor) tailArgs.push(anchorExpr);
 		// A dedicated template `<!>` is already a durable comment at exactly the
 		// list's trailing boundary. Let forBlock reuse it as its end marker instead
 		// of retaining it beside a newly-created `/for` comment.
-		const ownEndPart = fc.anchorVar ? ', true' : '';
-		const callTail = `, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart}${ownEndPart});`;
+		if (fc.anchorVar) tailArgs.push(b.literal(true));
 		if (fc.autoMemoDeps !== null) {
 			const witnessMiss = fc.autoMemoWitnesses.length
-				? fc.autoMemoWitnesses
-						.map((name) => `${name}.__memo !== true || ${name}.__compare !== undefined`)
-						.join(' || ')
+				? witnessMissChain(fc.autoMemoWitnesses)
 				: null;
 			const guarded = emitAutoMemoRegion(
 				ctx,
 				['_v', ...fc.autoMemoDeps],
 				slotIndex,
-				`_$forBlock(__s, ${slotIndex}, ${hostExpr}, _v${callTail}`,
+				b.stmt(
+					b.call(
+						'_$forBlock',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						b.id('_v'),
+						...tailArgs,
+					),
+				),
 				witnessMiss,
 				fc.autoMemoContextAware,
+				depNode,
 			);
-			pushAfter(
-				fc.id,
-				catChunks([
-					`  { const _v = (`,
-					exprChunk(fc.itemsExpr, fc.itemsExprMap),
-					`); ${guarded} }`,
-				]),
-			);
+			pushAfterStmt(fc.id, org, b.block([b.const('_v', fc.itemsExpr), guarded]));
 		} else {
-			pushAfter(
+			pushAfterStmt(
 				fc.id,
-				catChunks([
-					`  _$forBlock(__s, ${slotIndex}, ${hostExpr}, `,
-					exprChunk(fc.itemsExpr, fc.itemsExprMap),
-					callTail,
-				]),
+				org,
+				b.stmt(
+					b.call(
+						'_$forBlock',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						fc.itemsExpr,
+						...tailArgs,
+					),
+				),
 			);
 		}
 	}
 	for (const ic of ifCalls) {
 		const slotIndex = ic.slotIndex;
-		const hostExpr = hostExprFor(`_ifHost$${ic.id}`);
-		// Anchor selection — see anchorExprFor.
-		const ifAnchor = anchorExprFor(ic, 'ifAnchor');
-		const anchorArg = ifAnchor ? `, ${ifAnchor}` : '';
-		const ifEnv = envExprFor(ic);
-		// env is positional AFTER anchor — backfill an `undefined` anchor slot.
-		const ifEnvArg = ifEnv ? (anchorArg ? `, ${ifEnv}` : `, undefined, ${ifEnv}`) : '';
+		const org = ic.origin ?? planOrigin;
+		const hostExpr = hostNodeFor(`_ifHost$${ic.id}`);
+		// Anchor selection — see anchorNodeFor. env is positional AFTER anchor —
+		// backfill an `undefined` anchor slot.
+		const ifAnchor = anchorNodeFor(ic, 'ifAnchor');
+		const ifEnv = envNodeFor(ic);
+		const trailing = [];
+		if (ifAnchor) trailing.push(ifAnchor);
+		else if (ifEnv) trailing.push(undefinedNode());
+		if (ifEnv) trailing.push(ifEnv);
 		if (ic.activity) {
 			ctx.runtimeNeeded.add('activityBlock');
-			pushAfter(
+			pushAfterStmt(
 				ic.id,
-				`  _$activityBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.modeExpr}), ${ic.thenHelper}${anchorArg}${ifEnvArg});`,
+				org,
+				b.stmt(
+					b.call(
+						'_$activityBlock',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr,
+						ic.modeExpr,
+						helperRefNode(ic.thenHelper),
+						...trailing,
+					),
+				),
 			);
 			continue;
 		}
 		ctx.runtimeNeeded.add('ifBlock');
-		const elseArg = ic.elseHelper || 'null';
-		pushAfter(
+		pushAfterStmt(
 			ic.id,
-			catChunks([
-				`  _$ifBlock(__s, ${slotIndex}, ${hostExpr}, (`,
-				exprChunk(ic.condExpr, ic.condExprMap),
-				`), ${ic.thenHelper}, ${elseArg}${anchorArg}${ifEnvArg});`,
-			]),
+			org,
+			b.stmt(
+				b.call(
+					'_$ifBlock',
+					b.id('__s'),
+					b.literal(slotIndex),
+					hostExpr,
+					ic.condExpr,
+					helperRefNode(ic.thenHelper),
+					helperRefNode(ic.elseHelper ?? 'null'),
+					...trailing,
+				),
+			),
 		);
 	}
 	for (const cc of compCalls) {
 		const slotIndex = cc.slotIndex;
-		const hostExpr = hostExprFor(`_compHost$${cc.id}`);
+		const org = cc.origin ?? planOrigin;
+		const hostExpr = () => hostNodeFor(`_compHost$${cc.id}`);
 		if (cc.hostChildrenBinding != null) {
-			const props = `_b.${bag.letter(`_host$${cc.hostChildrenBinding.id}`)}`;
-			cc.valueExpr = `Object.prototype.propertyIsEnumerable.call(${props}, "children") ? ${props}.children : undefined`;
+			const props = () => bagFieldNode(bag, `_host$${cc.hostChildrenBinding.id}`);
+			cc.valueExpr = b.conditional(
+				propertyIsEnumerableCall(props(), 'children'),
+				b.member(props(), 'children'),
+				undefinedNode(),
+			);
 		} else if (cc.directChildrenBinding != null) {
-			cc.valueExpr = `_b.${bag.letter(`_prev$${cc.directChildrenBinding.id}`)}`;
+			cc.valueExpr = bagFieldNode(bag, `_prev$${cc.directChildrenBinding.id}`);
 		}
 		// Renderable `{expr}` hole — dispatch the value at runtime (component /
 		// element → block; primitive → text; nullish/boolean/'' → nothing). Shares
 		// the host/`<!>`-anchor resolution + hole-aware hydration walk with real
 		// component calls; only the emitted runtime call differs.
 		if (cc.isChild) {
+			const V = () => b.id('_v');
 			// MARKERLESS only-child renderable: append a primitive as a single Text
 			// node (no `<!>`, no slot state), `setText` it inline on update — exactly
 			// like a `.tsrx` only-child text binding — and fall back to `childTextHole`
 			// (→ childSlot, lazy markers) only for objects / first render / mode switch.
 			if (cc.onlyChildText && !noTemplate) {
 				ctx.runtimeNeeded.add('childTextHole');
-				const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
-				const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
+				const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+				const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
 				// A host that can receive dangerouslySetInnerHTML must validate its
 				// current child on EVERY render. The ordinary primitive fast path can
 				// identity-skip an unchanged child while a raw-HTML writer activates in
 				// the same render, bypassing childTextHole's mutual-exclusion check.
 				if (cc.potentialDangerouslySetInnerHTML) {
-					pushAfter(
+					pushAfterStmt(
 						cc.id,
-						`  { const _v = (${cc.valueExpr}); ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, ${chv}); ${chp} = _v; }`,
+						org,
+						b.block([
+							b.const('_v', cc.valueExpr),
+							b.stmt(
+								b.assignment(
+									'=',
+									chv(),
+									b.call(
+										'_$childTextHole',
+										b.id('__s'),
+										b.literal(slotIndex),
+										hostExpr(),
+										V(),
+										chv(),
+									),
+								),
+							),
+							b.stmt(b.assignment('=', chp(), V())),
+						]),
 					);
 					continue;
 				}
 				ctx.runtimeNeeded.add('setText');
-				pushAfter(
+				pushAfterStmt(
 					cc.id,
-					`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$childTextHole(__s, ${slotIndex}, ${hostExpr}, _v, _t); ${chp} = _v; } }`,
+					org,
+					b.block([
+						b.const('_v', cc.valueExpr),
+						b.const(
+							'_o',
+							b.logical(
+								'&&',
+								b.binary('!==', V(), b.literal(null)),
+								b.logical(
+									'||',
+									b.binary('===', b.unary('typeof', V()), b.literal('object')),
+									b.binary('===', b.unary('typeof', V()), b.literal('function')),
+								),
+							),
+						),
+						b.if(
+							b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
+							b.block([
+								b.const('_t', chv()),
+								b.if(
+									andChain([
+										b.binary('!=', b.id('_t'), b.literal(null)),
+										b.unary('!', b.id('_o')),
+										b.binary('!==', V(), b.literal(null)),
+									]),
+									b.stmt(b.call('_$setText', b.id('_t'), V())),
+									b.stmt(
+										b.assignment(
+											'=',
+											chv(),
+											b.call(
+												'_$childTextHole',
+												b.id('__s'),
+												b.literal(slotIndex),
+												hostExpr(),
+												V(),
+												b.id('_t'),
+											),
+										),
+									),
+								),
+								b.stmt(b.assignment('=', chp(), V())),
+							]),
+							null,
+						),
+					]),
 				);
 				continue;
 			}
-			// Anchor expression (no leading comma; 'null' = append into an
-			// in-template element host) — see anchorExprFor.
-			const anchorExpr = anchorExprFor(cc, 'compAnchor') ?? 'null';
+			// Anchor node (null = append into an in-template element host) — see
+			// anchorNodeFor.
+			const childAnchor = anchorNodeFor(cc, 'compAnchor');
 			if (noTemplate) {
 				// No bag to cache on → the small `textSlot` wrapper (fast inline for a
 				// primitive into a text slot; delegates to `childSlot` otherwise).
 				ctx.runtimeNeeded.add('textSlot');
-				const anchorArg = anchorExpr === 'null' ? '' : `, ${anchorExpr}`;
-				const coalesceArg = cc.coalesceRange
-					? anchorArg
-						? ', undefined, true'
-						: ', undefined, undefined, true'
-					: '';
-				pushAfter(
-					cc.id,
-					`  _$textSlot(__s, ${slotIndex}, ${hostExpr}, ${cc.valueExpr}${anchorArg}${coalesceArg});`,
-				);
+				const args = [b.id('__s'), b.literal(slotIndex), hostExpr(), cc.valueExpr];
+				if (childAnchor) args.push(childAnchor);
+				if (cc.coalesceRange) {
+					if (!childAnchor) args.push(undefinedNode());
+					args.push(undefinedNode(), b.literal(true));
+				}
+				pushAfterStmt(cc.id, org, b.stmt(b.call('_$textSlot', ...args)));
 				continue;
 			}
 			// Template body: INLINE the text-hole hot path. Cache the text node
@@ -14075,60 +14358,113 @@ function planJsx(
 			ctx.runtimeNeeded.add('textHole');
 			// When the slot has its OWN `<!>` placeholder, tell textHole/childSlot to
 			// reuse it as the end marker (no second comment minted) — `ownEnd`.
-			const ownEndArg = cc.anchorVar ? ', true' : '';
-			const coalesceArg = cc.coalesceRange ? (cc.anchorVar ? ', true' : ', undefined, true') : '';
-			const chp = `_b.${bag.letter(`_chp$${cc.id}`)}`;
-			const chv = `_b.${bag.letter(`_chv$${cc.id}`)}`;
+			const chp = () => bagFieldNode(bag, `_chp$${cc.id}`);
+			const chv = () => bagFieldNode(bag, `_chv$${cc.id}`);
+			const textHoleCall = (lastArg) => {
+				const args = [
+					b.id('__s'),
+					b.literal(slotIndex),
+					hostExpr(),
+					lastArg,
+					childAnchor ?? b.literal(null),
+				];
+				if (cc.anchorVar) args.push(b.literal(true));
+				if (cc.coalesceRange) {
+					if (!cc.anchorVar) args.push(undefinedNode());
+					args.push(b.literal(true));
+				}
+				return b.call('_$textHole', ...args);
+			};
 			if (cc.potentialDangerouslySetInnerHTML) {
-				pushAfter(
+				pushAfterStmt(
 					cc.id,
-					`  { const _v = (${cc.valueExpr}); ${chp} = _v; ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); }`,
+					org,
+					b.block([
+						b.const('_v', cc.valueExpr),
+						b.stmt(b.assignment('=', chp(), V())),
+						b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
+					]),
 				);
 				continue;
 			}
 			ctx.runtimeNeeded.add('setText');
-			pushAfter(
+			pushAfterStmt(
 				cc.id,
-				`  { const _v = (${cc.valueExpr}); const _o = _v !== null && (typeof _v === 'object' || typeof _v === 'function'); if (_o || ${chp} !== _v) { ${chp} = _v; const _t = ${chv}; if (_t != null && !_o && _v !== null) _$setText(_t, _v); else ${chv} = _$textHole(__s, ${slotIndex}, ${hostExpr}, _v, ${anchorExpr}${ownEndArg}${coalesceArg}); } }`,
+				org,
+				b.block([
+					b.const('_v', cc.valueExpr),
+					b.const(
+						'_o',
+						b.logical(
+							'&&',
+							b.binary('!==', V(), b.literal(null)),
+							b.logical(
+								'||',
+								b.binary('===', b.unary('typeof', V()), b.literal('object')),
+								b.binary('===', b.unary('typeof', V()), b.literal('function')),
+							),
+						),
+					),
+					b.if(
+						b.logical('||', b.id('_o'), b.binary('!==', chp(), V())),
+						b.block([
+							b.stmt(b.assignment('=', chp(), V())),
+							b.const('_t', chv()),
+							b.if(
+								andChain([
+									b.binary('!=', b.id('_t'), b.literal(null)),
+									b.unary('!', b.id('_o')),
+									b.binary('!==', V(), b.literal(null)),
+								]),
+								b.stmt(b.call('_$setText', b.id('_t'), V())),
+								b.stmt(b.assignment('=', chv(), textHoleCall(V()))),
+							),
+						]),
+						null,
+					),
+				]),
 			);
 			continue;
 		}
 		// Compiler-owned whole-component region cache. The flat array belongs to
 		// this compiled scope; the ordinary component runtime never sees memo deps.
 		if (cc.autoMemoDeps !== null) {
-			const componentHelper = cc.voidComponent ? 'componentSlotVoid' : 'componentSlot';
-			ctx.runtimeNeeded.add(componentHelper);
-			const memoAnchor = anchorExprFor(cc, 'compAnchor');
-			let trailing = memoAnchor ? `, ${memoAnchor}` : '';
+			const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
+			ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
+			const memoAnchor = anchorNodeFor(cc, 'compAnchor');
+			const trailing = memoAnchor ? [memoAnchor] : [];
 			if (cc.inheritRange) {
-				if (trailing === '') trailing = ', undefined';
-				trailing += ', undefined, undefined, true';
+				if (trailing.length === 0) trailing.push(undefinedNode());
+				trailing.push(undefinedNode(), undefinedNode(), b.literal(true));
 			} else if (cc.singleRoot) {
-				if (trailing === '') trailing = ', undefined';
-				trailing += ', undefined, true';
+				if (trailing.length === 0) trailing.push(undefinedNode());
+				trailing.push(undefinedNode(), b.literal(true));
 			}
 			const witnessMiss = cc.autoMemoWitnesses.length
-				? cc.autoMemoWitnesses
-						.map((name) => `${name}.__memo !== true || ${name}.__compare !== undefined`)
-						.join(' || ')
+				? witnessMissChain(cc.autoMemoWitnesses)
 				: null;
-			pushAfter(
+			pushAfterStmt(
 				cc.id,
-				catChunks([
-					`  `,
-					emitAutoMemoRegion(
-						ctx,
-						cc.autoMemoDeps,
-						slotIndex,
-						catChunks([
-							`_$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
-							cc.propsChunk ?? cc.propsExpr,
-							`${trailing});`,
-						]),
-						witnessMiss,
-						cc.autoMemoContextAware,
+				org,
+				emitAutoMemoRegion(
+					ctx,
+					cc.autoMemoDeps,
+					slotIndex,
+					b.stmt(
+						b.call(
+							componentHelper,
+							b.id('__s'),
+							b.literal(slotIndex),
+							hostExpr(),
+							cc.compNode,
+							cc.propsExpr,
+							...trailing,
+						),
 					),
-				]),
+					witnessMiss,
+					cc.autoMemoContextAware,
+					depNodeFor(cc),
+				),
 			);
 			continue;
 		}
@@ -14142,16 +14478,26 @@ function planJsx(
 		// when the borrow is declined (incoherent parent regime) and the probe
 		// anchor for transition swaps.
 		if (cc.inheritRange) {
-			const componentHelper = cc.voidComponent ? 'componentSlotVoid' : 'componentSlot';
-			ctx.runtimeNeeded.add(componentHelper);
-			const inheritAnchor = anchorExprFor(cc, 'compAnchor') ?? 'undefined';
-			pushAfter(
+			const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
+			ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
+			const inheritAnchor = anchorNodeFor(cc, 'compAnchor') ?? undefinedNode();
+			pushAfterStmt(
 				cc.id,
-				catChunks([
-					`  _$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
-					cc.propsChunk ?? cc.propsExpr,
-					`, ${inheritAnchor}, undefined, undefined, true);`,
-				]),
+				org,
+				b.stmt(
+					b.call(
+						componentHelper,
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						cc.compNode,
+						cc.propsExpr,
+						inheritAnchor,
+						undefinedNode(),
+						undefinedNode(),
+						b.literal(true),
+					),
+				),
 			);
 			continue;
 		}
@@ -14162,115 +14508,160 @@ function planJsx(
 		// <span> as a sibling of its parent <div>).
 		if (cc.liteEligible) {
 			ctx.runtimeNeeded.add('componentSlotLite');
-			// Anchor — same rules as componentSlot (see anchorExprFor); the
+			// Anchor — same rules as componentSlot (see anchorNodeFor); the
 			// endMarker case keeps the lite range inside the owning block.
-			const liteAnchor = anchorExprFor(cc, 'compAnchor');
-			const anchorArg = liteAnchor ? `, ${liteAnchor}` : '';
-			pushAfter(
+			const liteAnchor = anchorNodeFor(cc, 'compAnchor');
+			pushAfterStmt(
 				cc.id,
-				catChunks([
-					`  _$componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
-					cc.propsChunk ?? cc.propsExpr,
-					`${anchorArg});`,
-				]),
+				org,
+				b.stmt(
+					b.call(
+						'_$componentSlotLite',
+						b.id('__s'),
+						b.literal(slotIndex),
+						hostExpr(),
+						cc.compNode,
+						cc.propsExpr,
+						...(liteAnchor ? [liteAnchor] : []),
+					),
+				),
 			);
 			continue;
 		}
-		const componentHelper = cc.voidComponent ? 'componentSlotVoid' : 'componentSlot';
-		ctx.runtimeNeeded.add(componentHelper);
-		// Anchor selection — see anchorExprFor (the endMarker case keeps the
+		const componentHelper = cc.voidComponent ? '_$componentSlotVoid' : '_$componentSlot';
+		ctx.runtimeNeeded.add(cc.voidComponent ? 'componentSlotVoid' : 'componentSlot');
+		// Anchor selection — see anchorNodeFor (the endMarker case keeps the
 		// slot's markers inside the block's range so for-of reorder / tryBlock
 		// unmount move the slot DOM along with the block; an element host with
 		// no in-template anchor can safely append).
-		const compAnchor = anchorExprFor(cc, 'compAnchor');
-		let anchorArg = compAnchor ? `, ${compAnchor}` : '';
+		const compAnchor = anchorNodeFor(cc, 'compAnchor');
+		const trailing = [];
+		let anchorFilled = false;
+		if (compAnchor) {
+			trailing.push(compAnchor);
+			anchorFilled = true;
+		}
 		// key arg is positional AFTER anchor in componentSlot's signature. When a
 		// key is present but anchor isn't, supply `undefined` for the anchor slot
 		// so the key lands in the right argument position — the runtime's
 		// `anchor ?? null` still routes through appendChild as before.
-		let keyParts = [];
 		if (cc.keyExpr != null) {
-			if (anchorArg === '') anchorArg = ', undefined';
-			keyParts = [`, (`, exprChunk(cc.keyExpr, cc.keyExprMap), `)`];
+			if (!anchorFilled) {
+				trailing.push(undefinedNode());
+				anchorFilled = true;
+			}
+			trailing.push(cc.keyExpr);
 		}
 		// singleRoot is the 8th positional arg (after anchor, key). It's gated on
 		// no-key, so backfill anchor + key placeholders to land it in the right
 		// slot. `true` = proven same-module single-element root; `2` = the
 		// cross-module sentinel (runtime checks the callee's $$singleRoot stamp).
-		let singleRootArg = '';
 		if (cc.singleRoot || cc.maybeSingleRoot) {
-			if (anchorArg === '') anchorArg = ', undefined';
-			singleRootArg = cc.singleRoot ? ', undefined, true' : ', undefined, 2';
+			if (!anchorFilled) {
+				trailing.push(undefinedNode());
+				anchorFilled = true;
+			}
+			trailing.push(undefinedNode(), cc.singleRoot ? b.literal(true) : b.literal(2));
 		}
 		// Persist key ownership separately from the current key VALUE so
 		// `key={undefined}` remains an independent reconciliation boundary.
-		const keyedArg = cc.keyExpr != null ? ', undefined, undefined, true' : '';
-		pushAfter(
+		if (cc.keyExpr != null) trailing.push(undefinedNode(), undefinedNode(), b.literal(true));
+		pushAfterStmt(
 			cc.id,
-			catChunks([
-				`  _$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
-				cc.propsChunk ?? cc.propsExpr,
-				anchorArg,
-				...keyParts,
-				`${singleRootArg}${keyedArg});`,
-			]),
+			org,
+			b.stmt(
+				b.call(
+					componentHelper,
+					b.id('__s'),
+					b.literal(slotIndex),
+					hostExpr(),
+					cc.compNode,
+					cc.propsExpr,
+					...trailing,
+				),
+			),
 		);
 	}
 	for (const pc of ctx._portalCalls) {
 		const slotIndex = pc.slotIndex;
-		const hostExpr = hostExprFor(`_portalHost$${pc.id}`);
+		const org = pc.origin ?? planOrigin;
 		ctx.runtimeNeeded.add('portal');
-		const portalEnv = envExprFor(pc);
-		pushAfter(
+		const portalEnv = envNodeFor(pc);
+		pushAfterStmt(
 			pc.id,
-			catChunks([
-				`  _$portal(__s, ${slotIndex}, `,
-				exprChunk(pc.targetExpr, pc.targetExprMap),
-				`, `,
-				exprChunk(pc.bodyExpr, pc.bodyExprMap),
-				`, ${pc.propsExpr}, ${hostExpr}${portalEnv ? `, ${portalEnv}` : ''});`,
-			]),
+			org,
+			b.stmt(
+				b.call(
+					'_$portal',
+					b.id('__s'),
+					b.literal(slotIndex),
+					pc.targetExpr,
+					pc.bodyExpr,
+					pc.propsExpr,
+					hostNodeFor(`_portalHost$${pc.id}`),
+					...(portalEnv ? [portalEnv] : []),
+				),
+			),
 		);
 	}
 	// Restore the outer plan's portal-call list — pairs with the save above.
 	ctx._portalCalls = _prevPortalCalls;
 	for (const tc of tryCalls) {
 		const slotIndex = tc.slotIndex;
-		const hostExpr = hostExprFor(`_tryHost$${tc.id}`);
+		const org = tc.origin ?? planOrigin;
 		ctx.runtimeNeeded.add('tryBlock');
-		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
+		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @try).
-		const tryAnchor = anchorExprFor(tc, 'tryAnchor');
-		const tryEnv = envExprFor(tc);
-		const tryArgs = [];
-		if (tryAnchor || tryEnv || tc.propagateSuspense) tryArgs.push(tryAnchor || 'undefined');
-		if (tryEnv || tc.propagateSuspense) tryArgs.push(tryEnv || 'undefined');
-		if (tc.propagateSuspense) tryArgs.push('true');
-		const tryTrailing = tryArgs.length === 0 ? '' : `, ${tryArgs.join(', ')}`;
-		pushAfter(
+		const tryAnchor = anchorNodeFor(tc, 'tryAnchor');
+		const tryEnv = envNodeFor(tc);
+		const trailing = [];
+		if (tryAnchor || tryEnv || tc.propagateSuspense) trailing.push(tryAnchor || undefinedNode());
+		if (tryEnv || tc.propagateSuspense) trailing.push(tryEnv || undefinedNode());
+		if (tc.propagateSuspense) trailing.push(b.literal(true));
+		pushAfterStmt(
 			tc.id,
-			`  _$tryBlock(__s, ${slotIndex}, ${hostExpr}, ${tc.tryHelper}, ${tc.catchHelper}, ${tc.pendingHelper}${tryTrailing});`,
+			org,
+			b.stmt(
+				b.call(
+					'_$tryBlock',
+					b.id('__s'),
+					b.literal(slotIndex),
+					hostNodeFor(`_tryHost$${tc.id}`),
+					helperRefNode(tc.tryHelper),
+					helperRefNode(tc.catchHelper),
+					helperRefNode(tc.pendingHelper),
+					...trailing,
+				),
+			),
 		);
 	}
 	for (const sc of ctx._switchCalls) {
 		const slotIndex = sc.slotIndex;
-		const hostExpr = hostExprFor(`_switchHost$${sc.id}`);
+		const org = sc.origin ?? planOrigin;
 		ctx.runtimeNeeded.add('switchBlock');
-		// Anchor selection — see anchorExprFor (mirrors ifBlock, including the
+		// Anchor selection — see anchorNodeFor (mirrors ifBlock, including the
 		// __block.endMarker fallback for a body that is ONLY a @switch).
-		const switchAnchor = anchorExprFor(sc, 'switchAnchor');
-		const anchorArg = switchAnchor ? `, ${switchAnchor}` : '';
-		const swEnv = envExprFor(sc);
-		const swEnvArg = swEnv ? (anchorArg ? `, ${swEnv}` : `, undefined, ${swEnv}`) : '';
-		pushAfter(
+		const switchAnchor = anchorNodeFor(sc, 'switchAnchor');
+		const swEnv = envNodeFor(sc);
+		const trailing = [];
+		if (switchAnchor) trailing.push(switchAnchor);
+		else if (swEnv) trailing.push(undefinedNode());
+		if (swEnv) trailing.push(swEnv);
+		pushAfterStmt(
 			sc.id,
-			catChunks([
-				`  _$switchBlock(__s, ${slotIndex}, ${hostExpr}, (`,
-				exprChunk(sc.discExpr, sc.discExprMap),
-				`), `,
-				sc.casesChunk ?? sc.casesArrayExpr,
-				`, ${sc.defaultHelper}${anchorArg}${swEnvArg});`,
-			]),
+			org,
+			b.stmt(
+				b.call(
+					'_$switchBlock',
+					b.id('__s'),
+					b.literal(slotIndex),
+					hostNodeFor(`_switchHost$${sc.id}`),
+					sc.discExpr,
+					sc.casesExpr,
+					helperRefNode(sc.defaultHelper),
+					...trailing,
+				),
+			),
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
@@ -14283,44 +14674,41 @@ function planJsx(
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
 
-	const updateJoined = joinChunks(updateLines);
-	const everyRenderJoined = joinChunks(everyRenderLines);
-	const mountJoined = joinChunks(mountLines);
-	const afterJoined = joinChunks(
-		afterCalls
-			.map((c, i) => ({ ...c, i }))
-			.sort((a, b) => a.id - b.id || a.i - b.i)
-			.map((c) => c.line),
-	);
+	// After-lines sorted by source id (see the pushAfter comment): each entry is
+	// a statement node.
+	const afterStatements = afterCalls
+		.map((c, i) => ({ ...c, i }))
+		.sort((x, y) => x.id - y.id || x.i - y.i)
+		.map((c) => c.line);
 
 	return {
 		// Does this body carry a binding bag (`__s.slots[0]`)? Control-flow-only
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
-		mount: mountJoined.code,
-		mountMaps: mountJoined.maps,
-		update: updateJoined.code,
-		updateMaps: updateJoined.maps,
-		everyRender: everyRenderJoined.code,
-		everyRenderMaps: everyRenderJoined.maps,
-		after: afterJoined.code,
-		afterMaps: afterJoined.maps,
+		mount: mountLines,
+		update: updateLines,
+		everyRender: everyRenderLines,
+		after: afterStatements,
 		head: headEmit,
-		// DEV ONLY (`''` in prod → no body emission, byte-identical output): a structured
+		// DEV ONLY (`null` in prod → no body emission, byte-identical output): a structured
 		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future
 		// DevTools element→source layer. Keyed by the slot index the runtime already uses.
-		locs: ctx.dev ? buildLocsLiteral(allConstructs) : '',
+		locs: ctx.dev ? buildLocsLiteral(allConstructs, planOrigin) : null,
 	};
 }
 
-/** Build the dev `__s.locs` object literal from constructs carrying a `.loc` (else ''). */
-function buildLocsLiteral(constructs) {
+/** Build the dev `__s.locs` object-literal NODE from constructs carrying a `.loc` (else null). */
+function buildLocsLiteral(constructs, origin) {
 	const entries = [];
 	for (const c of constructs) {
-		if (c.loc) entries.push(`${c.slotIndex}: [${c.loc[0]}, ${c.loc[1]}]`);
+		if (c.loc) {
+			entries.push(
+				b.prop('init', b.literal(c.slotIndex), b.array([b.literal(c.loc[0]), b.literal(c.loc[1])])),
+			);
+		}
 	}
-	return entries.length ? `{ ${entries.join(', ')} }` : '';
+	return entries.length ? inheritOriginLoc(b.object(entries), origin) : null;
 }
 
 // All `expr` strings get wrapped in `(…)` so ternaries / comma exprs / etc.
@@ -14402,122 +14790,269 @@ function makeBag() {
 	};
 }
 
+// ---------------------------------------------------------------------------
+// AST emit helpers (Stage 2F M1). The client function interior is CONSTRUCTED
+// as statement/expression nodes (printed once per function by esrap) instead
+// of assembled strings. Compiler-built scaffolding is stamped with an origin
+// location per emitted statement (inheritOriginLoc); authored subtrees
+// embedded in the scaffold keep their exact positions.
+// ---------------------------------------------------------------------------
+
+// The node-domain sibling of printExprWithTsrx: apply the same server-mode
+// hook keying and `<tsrx>`/`() => @{…}` hoisting at expression position, but
+// return the REWRITTEN AST for direct embedding instead of a printed string.
+function tsrxExprNode(node, ctx, componentName, inlinedSubs) {
+	const keyed = ctx.mode === 'server' ? rewriteHookCalls(node, ctx, componentName) : node;
+	return rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs);
+}
+
+// Placeholder nodes for positional runtime-call arguments. Fresh per call —
+// origin stamping writes into loc-less nodes, so sharing one instance would
+// cross-stamp origins between statements.
+const undefinedNode = () => b.id('undefined');
+const nullNode = () => b.literal(null);
+
+// Reference a compiled mount local / host var by NAME. ensureVar hands back
+// `__block.parentNode` for bagless hosts — resolve the member chain; every
+// other name (`_root`, `_el3`) is a plain identifier.
+function hostVarNode(name) {
+	return name === '__block.parentNode' ? b.member(b.id('__block'), 'parentNode') : b.id(name);
+}
+
+// `_b.<letter>` — the bag-field read/write target for `key` (update path).
+function bagFieldNode(bag, key) {
+	return b.member(b.id('_b'), bag.letter(key));
+}
+
+// Reference a construct helper by its recorded NAME. The name space is closed:
+// `'null'` (no branch), a module/inline helper identifier (`__then$3`,
+// `_key$7`), or a folded `props.hN` hole (extractFragment threads helpers
+// through the fragment renderer's props).
+function helperRefNode(name) {
+	if (name == null || name === 'null') return b.literal(null);
+	if (name.startsWith('props.')) return b.member(b.id('props'), name.slice('props.'.length));
+	return b.id(name);
+}
+
+// Resolve an auto-memo dependency STRING to its expression node: a captured
+// member-path keeps its recorded AST (rec.autoMemoDepNodes, keyed by the
+// printed form the dedup/sort machinery uses), a folded `props.hN` hole
+// becomes a member read, and everything else is an identifier by construction.
+const depNodeFor = (rec) => (dep) => {
+	const recorded = rec && rec.autoMemoDepNodes ? rec.autoMemoDepNodes.get(dep) : undefined;
+	if (recorded !== undefined) return recorded;
+	return dep.startsWith('props.') ? b.member(b.id('props'), dep.slice('props.'.length)) : b.id(dep);
+};
+
+// `<name>.__memo === true && <name>.__compare === undefined` chains (and the
+// negated miss form) for imported-component memo witnesses.
+function witnessOkChain(names) {
+	return andChain(
+		names.flatMap((name) => [
+			b.binary('===', b.member(b.id(name), '__memo'), b.literal(true)),
+			b.binary('===', b.member(b.id(name), '__compare'), b.id('undefined')),
+		]),
+	);
+}
+function witnessMissChain(names) {
+	return orChain(
+		names.flatMap((name) => [
+			b.binary('!==', b.member(b.id(name), '__memo'), b.literal(true)),
+			b.binary('!==', b.member(b.id(name), '__compare'), b.id('undefined')),
+		]),
+	);
+}
+
+// Left-folded `a || b || c` / `a && b && c` chains (JS parse associativity).
+const orChain = (nodes) => nodes.reduce((acc, n) => b.logical('||', acc, n));
+const andChain = (nodes) => nodes.reduce((acc, n) => b.logical('&&', acc, n));
+
+// `Object.prototype.propertyIsEnumerable.call(<obj>, '<name>')`.
+function propertyIsEnumerableCall(objNode, name) {
+	return b.call(
+		b.member_id('Object.prototype.propertyIsEnumerable.call'),
+		objNode,
+		b.literal(name),
+	);
+}
+
+// `__s.cleanups.push(<fn>)`.
+function cleanupsPush(fnNode) {
+	return b.stmt(b.call(b.member(b.member(b.id('__s'), 'cleanups'), 'push'), fnNode));
+}
+
 // Mount for a DEFERRED property-write binding: store the element ref + seed the
 // diff field to `undefined`. The every-render diff then performs the actual
 // write — including on the first render, since the `undefined` seed makes its
 // `_prev !== _v` guard fire, and `setAttribute(el, name, undefined)` /
 // `setClassName(el, undefined)` no-op on a freshly-cloned element (so the output
 // is byte-identical to the old unconditional mount write).
-function emitDeferredMount(b, elVar, bag) {
+function emitDeferredMount(bind, elVar, bag) {
 	// `style` diffs on `_sty`; attr / class / formAction / htmlOnlyChild on `_prev`.
-	if (!(b.kind === 'class' && b.fresh)) {
-		bag.constField(b.kind === 'style' ? `_sty$${b.id}` : `_prev$${b.id}`, 'undefined');
+	if (!(bind.kind === 'class' && bind.fresh)) {
+		bag.constField(bind.kind === 'style' ? `_sty$${bind.id}` : `_prev$${bind.id}`, 'undefined');
 	}
-	return `    ${bag.local(`_el$${b.id}`)} = ${elVar};`;
+	return inheritOriginLoc(
+		b.stmt(b.assignment('=', b.id(bag.local(`_el$${bind.id}`)), hostVarNode(elVar))),
+		bindingOrigin(bind),
+	);
 }
 
-function emitBindingMount(b, elVar, bag) {
-	if (b.deferred) return emitDeferredMount(b, elVar, bag);
+// The origin node a binding's runtime-glue scaffolding inherits: the embedded
+// expression when the record carries one (its authored position), else the
+// record's creation-site origin (attr / element node).
+function bindingOrigin(bind) {
+	return bind.expr && bind.expr.loc ? bind.expr : bind.origin;
+}
+
+function emitBindingMount(bind, elVar, bag) {
+	if (bind.deferred) return emitDeferredMount(bind, elVar, bag);
+	const org = bindingOrigin(bind);
+	const st = (node) => inheritOriginLoc(node, org);
+	const el = () => hostVarNode(elVar);
+	const local = (key) => b.id(bag.local(key));
+	const V = () => b.id('_v');
 	// `suppressHydrationWarning`: stamp a JS flag (NOT a DOM attribute) the runtime reads to
 	// keep the server value + skip the warning on a hydration mismatch for this element.
-	if (b.kind === 'suppress') return `    ${elVar}.__oct_suppress = true;`;
-	if (b.kind === 'dangerChild') return `    _$markDangerouslySetInnerHTMLChildren(${elVar});`;
-	if (b.kind === 'nativeChangeStatic') {
-		return `    _$markNativeChangeDiagnosticStatic(${elVar});`;
+	if (bind.kind === 'suppress') {
+		return st(b.stmt(b.assignment('=', b.member(el(), '__oct_suppress'), b.literal(true))));
 	}
-	if (b.kind === 'nativeChangeRuntime') {
-		return `    ${bag.local(`_el$${b.id}`)} = ${elVar};\n    _$queueNativeChangeDiagnostic(${elVar});`;
+	if (bind.kind === 'dangerChild') {
+		return st(b.stmt(b.call('_$markDangerouslySetInnerHTMLChildren', el())));
 	}
-	const E = `(${b.expr})`;
-	switch (b.kind) {
+	if (bind.kind === 'nativeChangeStatic') {
+		return st(b.stmt(b.call('_$markNativeChangeDiagnosticStatic', el())));
+	}
+	if (bind.kind === 'nativeChangeRuntime') {
+		return [
+			st(b.stmt(b.assignment('=', local(`_el$${bind.id}`), el()))),
+			st(b.stmt(b.call('_$queueNativeChangeDiagnostic', el()))),
+		];
+	}
+	switch (bind.kind) {
 		case 'textOnlyChild': {
 			// `htext` creates + appends the text node on a fresh mount, ADOPTS the
 			// server text node when hydrating, and coerces the value itself — so the
 			// mount is a bare `htext(el, _v)`. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
 			// hydration mismatch re-render).
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      ${bag.local(`_txt$${b.id}`)} = _$htext(${elVar}, _v);
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.assignment('=', local(`_txt$${bind.id}`), b.call('_$htext', el(), V()))),
+					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+				]),
 			);
 		}
 		case 'htmlOnlyChild': {
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setDangerouslySetInnerHTML(${elVar}, _v);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call('_$setDangerouslySetInnerHTML', el(), V())),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+				]),
 			);
 		}
-		case 'dangerValue': {
-			return pasteChunk(`    ${bag.local(`_prev$${b.id}`)} = (`, b.expr, b.exprMap, `);`);
-		}
+		case 'dangerValue':
 		case 'formValue':
 		case 'hostValue': {
-			return pasteChunk(`    ${bag.local(`_prev$${b.id}`)} = (`, b.expr, b.exprMap, `);`);
+			return st(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), bind.expr)));
 		}
 		case 'hostSpread': {
-			// `expr` is the creation site's `_$snapshotSpread(<inner>)`; re-derive the
-			// wrapper here so the paste position lands on the inner argument print.
-			return pasteChunk(
-				`    ${bag.local(`_sp$${b.id}`)} = (_$snapshotSpread(`,
-				b.exprInner,
-				b.exprMap,
-				`));`,
+			// `expr` is the spread's INNER argument; the `_$snapshotSpread(…)`
+			// wrapper is compiler scaffolding rebuilt here.
+			return st(
+				b.stmt(b.assignment('=', local(`_sp$${bind.id}`), b.call('_$snapshotSpread', bind.expr))),
 			);
 		}
 		case 'dangerCommit': {
-			const sources = b.sources
-				.map(({ spread, binding }) => {
-					const prefix = spread ? '_sp' : '_prev';
-					return `[${spread ? 'true' : 'false'}, ${bag.local(`${prefix}$${binding.id}`)}]`;
-				})
-				.join(', ');
-			return `    {
-      _$setDangerouslySetInnerHTMLSources(${elVar}, [${sources}]);
-			  ${bag.local(`_el$${b.id}`)} = ${elVar};
-    }`;
+			const sources = b.array(
+				bind.sources.map(({ spread, binding }) =>
+					b.array([
+						b.literal(spread === true),
+						b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`)),
+					]),
+				),
+			);
+			return st(
+				b.block([
+					b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', el(), sources)),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+				]),
+			);
 		}
 		case 'formCommit': {
-			const sources = b.sources
-				.map(({ spread, name, binding }) => {
-					const prefix = spread ? '_sp' : '_prev';
-					const value = bag.local(`${prefix}$${binding.id}`);
-					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
-				})
-				.join(', ');
-			return `    {
-      _$setFormControlSources(${elVar}, [${sources}]);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-    }`;
+			const sources = b.array(
+				bind.sources.map(({ spread, name, binding }) => {
+					const value = b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`));
+					return spread
+						? b.array([b.literal(true), value])
+						: b.array([b.literal(false), b.literal(name), value]);
+				}),
+			);
+			return st(
+				b.block([
+					b.stmt(b.call('_$setFormControlSources', el(), sources)),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+				]),
+			);
 		}
 		case 'hostCommit': {
-			const sources = b.sources
-				.map(({ spread, name, binding }) => {
-					const value = bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`);
-					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
-				})
-				.join(', ');
-			const el = bag.local(`_el$${b.id}`);
-			const props = bag.local(`_host$${b.id}`);
-			const propsField = bag.letter(`_host$${b.id}`);
-			const elField = bag.letter(`_el$${b.id}`);
-			return `    {
-      ${el} = ${elVar};
-      ${props} = _$setHostPropSources(${elVar}, [${sources}], undefined, __s, ${b.hasNestedChildren ? 'true' : 'false'});
-      __s.cleanups.push(() => { const _p = _b.${propsField}; if (_p != null && Object.prototype.propertyIsEnumerable.call(_p, 'ref') && _p.ref != null) _$queueRefDetach(_p.ref, _b.${elField}); });
-    }`;
+			const elLocal = local(`_el$${bind.id}`);
+			const propsLocal = local(`_host$${bind.id}`);
+			const sources = b.array(
+				bind.sources.map(({ spread, name, binding }) => {
+					const value = b.id(bag.local(`${spread ? '_sp' : '_prev'}$${binding.id}`));
+					return spread
+						? b.array([b.literal(true), value])
+						: b.array([b.literal(false), b.literal(name), value]);
+				}),
+			);
+			// The cleanup closure reads the bag through the captured `_b` — the bag
+			// exists by the time any cleanup runs (committed at mount end), and the
+			// `_host$` field is re-written by updates, so the read must be live.
+			const cleanup = b.arrow(
+				[],
+				b.block([
+					b.const('_p', bagFieldNode(bag, `_host$${bind.id}`)),
+					b.if(
+						andChain([
+							b.binary('!=', b.id('_p'), nullNode()),
+							propertyIsEnumerableCall(b.id('_p'), 'ref'),
+							b.binary('!=', b.member(b.id('_p'), 'ref'), nullNode()),
+						]),
+						b.stmt(
+							b.call(
+								'_$queueRefDetach',
+								b.member(b.id('_p'), 'ref'),
+								bagFieldNode(bag, `_el$${bind.id}`),
+							),
+						),
+						null,
+					),
+				]),
+			);
+			return st(
+				b.block([
+					b.stmt(b.assignment('=', elLocal, el())),
+					b.stmt(
+						b.assignment(
+							'=',
+							propsLocal,
+							b.call(
+								'_$setHostPropSources',
+								el(),
+								sources,
+								undefinedNode(),
+								b.id('__s'),
+								b.literal(bind.hasNestedChildren === true),
+							),
+						),
+					),
+					cleanupsPush(cleanup),
+				]),
+			);
 		}
 		case 'text': {
 			// `elVar` is the POSITION node for this sibling text hole (resolved with
@@ -14527,67 +15062,31 @@ function emitBindingMount(b, elVar, bag) {
 			// walk starts from `_root`/the cloned fragment). While hydrating it's the
 			// SERVER's text node at that logical position, which htextSwap ADOPTS.
 			// htextSwap coerces the value itself, so the mount is a bare call.
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      ${bag.local(`_txt$${b.id}`)} = _$htextSwap(${elVar}, _v);
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.assignment('=', local(`_txt$${bind.id}`), b.call('_$htextSwap', el(), V()))),
+					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+				]),
 			);
 		}
-		case 'attr': {
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
-			);
-		}
-		case 'stringData': {
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setStringData(${elVar}, ${JSON.stringify(b.name)}, _v);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
-			);
-		}
-		case 'booleanAttr': {
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setBooleanAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
-			);
-		}
+		case 'attr':
+		case 'stringData':
+		case 'booleanAttr':
 		case 'ariaAttr': {
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setAriaAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
+			const helper = {
+				attr: '_$setAttribute',
+				stringData: '_$setStringData',
+				booleanAttr: '_$setBooleanAttribute',
+				ariaAttr: '_$setAriaAttribute',
+			}[bind.kind];
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call(helper, el(), b.literal(bind.name), V())),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+				]),
 			);
 		}
 		case 'value':
@@ -14602,61 +15101,38 @@ function emitBindingMount(b, elVar, bag) {
 			// update must re-run every render to reassert drift (React's
 			// controlled contract). Not in DEFERRABLE_MOUNT_KINDS: the mount
 			// runs inside the hydration window and arms the element.
-			return pasteChunk(
-				`    {
-      _$${CONTROLLED_KIND_HELPERS[b.kind]}(${elVar}, (`,
-				b.expr,
-				b.exprMap,
-				`));
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-    }`,
+			return st(
+				b.block([
+					b.stmt(b.call(`_$${CONTROLLED_KIND_HELPERS[bind.kind]}`, el(), bind.expr)),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+				]),
 			);
 		}
 		case 'autoFocus': {
 			// Mount-only (React ignores later autoFocus changes); the focus
 			// itself fires at commit, after the tree is connected.
-			return `    _$setAutoFocus(${elVar}, ${E});`;
+			return st(b.stmt(b.call('_$setAutoFocus', el(), bind.expr)));
 		}
 		case 'class': {
 			// On SVG/MathML hosts the `className` property is read-only — fall back
 			// to setAttribute. Compile-time choice, zero runtime branching.
-			const setter =
-				b.ns && b.ns !== 'html' ? `_$setClassAttr(${elVar}, _v)` : `_$setClassName(${elVar}, _v)`;
-			if (b.fresh) {
-				return pasteChunk(
-					`    {
-      const _v = (`,
-					b.expr,
-					b.exprMap,
-					`);
-      ${setter};
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-    }`,
-				);
-			}
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      ${setter};
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
-			);
+			const setter = bind.ns && bind.ns !== 'html' ? '_$setClassAttr' : '_$setClassName';
+			const body = [
+				b.const('_v', bind.expr),
+				b.stmt(b.call(setter, el(), V())),
+				b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+			];
+			if (!bind.fresh) body.push(b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())));
+			return st(b.block(body));
 		}
 		case 'style': {
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setStyle(${elVar}, _v, undefined);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_sty$${b.id}`)} = _v;
-    }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call('_$setStyle', el(), V(), undefinedNode())),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					b.stmt(b.assignment('=', local(`_sty$${bind.id}`), V())),
+				]),
 			);
 		}
 		case 'spread': {
@@ -14670,42 +15146,67 @@ function emitBindingMount(b, elVar, bag) {
 			// The cleanup closure reads the bag through the captured `_b` — the bag
 			// exists by the time any cleanup runs (committed at mount end), and the
 			// `_sp$` field is re-written by updates, so the read must be live.
-			const flags = b.skipFormControls
-				? `, ${b.skipDangerouslySetInnerHTML ? 'true' : 'false'}, true`
-				: b.skipDangerouslySetInnerHTML
-					? ', true'
-					: '';
-			return `    {
-      const _v = ${E};
-      _$setSpread(${elVar}, _v, undefined, __s${flags});
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_sp$${b.id}`)} = _v;
-      __s.cleanups.push(() => { const _sp = _b.${bag.letter(`_sp$${b.id}`)}; if (_sp != null && Object.prototype.propertyIsEnumerable.call(Object(_sp), 'ref') && _sp.ref != null) _$queueRefDetach(_sp.ref, _b.${bag.letter(`_el$${b.id}`)}); });
-    }`;
+			const flags = bind.skipFormControls
+				? [b.literal(bind.skipDangerouslySetInnerHTML === true), b.literal(true)]
+				: bind.skipDangerouslySetInnerHTML
+					? [b.literal(true)]
+					: [];
+			// Register the mount locals BEFORE the cleanup closure resolves their
+			// bag letters (letter() throws for a never-mounted field).
+			const elLocal = local(`_el$${bind.id}`);
+			const spLocal = local(`_sp$${bind.id}`);
+			const cleanup = b.arrow(
+				[],
+				b.block([
+					b.const('_sp', bagFieldNode(bag, `_sp$${bind.id}`)),
+					b.if(
+						andChain([
+							b.binary('!=', b.id('_sp'), nullNode()),
+							propertyIsEnumerableCall(b.call('Object', b.id('_sp')), 'ref'),
+							b.binary('!=', b.member(b.id('_sp'), 'ref'), nullNode()),
+						]),
+						b.stmt(
+							b.call(
+								'_$queueRefDetach',
+								b.member(b.id('_sp'), 'ref'),
+								bagFieldNode(bag, `_el$${bind.id}`),
+							),
+						),
+						null,
+					),
+				]),
+			);
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call('_$setSpread', el(), V(), undefinedNode(), b.id('__s'), ...flags)),
+					b.stmt(b.assignment('=', elLocal, el())),
+					b.stmt(b.assignment('=', spLocal, V())),
+					cleanupsPush(cleanup),
+				]),
+			);
 		}
 		case 'event': {
-			const valueBefore = b.dev ? `_$devEventListener(${JSON.stringify(b.name)}, (` : `(`;
-			const valueAfter = b.dev ? `))` : `)`;
-			const before = b.mountOnly
-				? `    ${elVar}[${JSON.stringify(b.slotKey)}] = ${valueBefore}`
-				: `    ${bag.local(`_el$${b.id}`)} = ${elVar};
-    ${elVar}[${JSON.stringify(b.slotKey)}] = ${valueBefore}`;
-			return pasteChunk(before, b.expr, b.exprMap, `${valueAfter};`);
+			const value = bind.dev
+				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
+				: bind.expr;
+			const slotAssign = b.stmt(
+				b.assignment('=', b.member(el(), b.literal(bind.slotKey), true), value),
+			);
+			if (bind.mountOnly) return st(slotAssign);
+			return [st(b.stmt(b.assignment('=', local(`_el$${bind.id}`), el()))), st(slotAssign)];
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
 			// (or fall back to the native attribute for string values). Diffed by
 			// function identity on update.
-			return pasteChunk(
-				`    {
-      const _v = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      _$setFormAction(${elVar}, ${JSON.stringify(b.name)}, _v, undefined);
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      ${bag.local(`_prev$${b.id}`)} = _v;
-    }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.stmt(b.call('_$setFormAction', el(), b.literal(bind.name), V(), undefinedNode())),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					b.stmt(b.assignment('=', local(`_prev$${bind.id}`), V())),
+				]),
 			);
 		}
 		case 'event-bundle': {
@@ -14714,38 +15215,15 @@ function emitBindingMount(b, elVar, bag) {
 			// and returns the descriptor — the ONLY bag field this binding needs (the
 			// update path mutates the descriptor in place; dispatch reads `el[key]`
 			// per event, so the mutation is observed without re-assignment).
-			const n = b.argExprs.length;
-			// One chunk, one paste per pasted expression: the bundle fn plus each arg
-			// (b.argExprMaps parallels b.argExprs; a sink-materialized fn has no map).
-			if (n <= 2) {
-				const head = b.mountOnly
-					? `    _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (`
-					: `    ${bag.local(`_ev$${b.id}`)} = _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (`;
-				const parts = [head, exprChunk(b.fnExpr, b.fnExprMap), `)`];
-				for (let i = 0; i < n; i++) {
-					parts.push(
-						`, (`,
-						exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
-						`)`,
-					);
-				}
-				parts.push(`);`);
-				return catChunks(parts);
-			}
-			const head = b.mountOnly
-				? `    _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (`
-				: `    ${bag.local(`_ev$${b.id}`)} = _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (`;
-			const parts = [head, exprChunk(b.fnExpr, b.fnExprMap), `), [`];
-			for (let i = 0; i < b.argExprs.length; i++) {
-				if (i > 0) parts.push(`, `);
-				parts.push(
-					`(`,
-					exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
-					`)`,
-				);
-			}
-			parts.push(`]);`);
-			return catChunks(parts);
+			const n = bind.argExprs.length;
+			const helper = n <= 2 ? `_$evt${n}` : '_$evtN';
+			const args = [el(), b.literal(bind.slotKey), bind.fnExpr];
+			if (n <= 2) args.push(...bind.argExprs);
+			else args.push(b.array(bind.argExprs.slice()));
+			const call = b.call(helper, ...args);
+			return st(
+				bind.mountOnly ? b.stmt(call) : b.stmt(b.assignment('=', local(`_ev$${bind.id}`), call)),
+			);
 		}
 		case 'ref': {
 			// attachRef handles all three supported shapes: callback (function),
@@ -14764,141 +15242,188 @@ function emitBindingMount(b, elVar, bag) {
 			// releases ITS row's React-19 cleanup, not another row's.
 			// Both deferred closures read through the captured `_b` (committed by the
 			// time attach/cleanup run); `_ref$` must be a LIVE read — updates re-point it.
-			return pasteChunk(
-				`    {
-      const _r = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      ${bag.local(`_ref$${b.id}`)} = _r;
-      ${bag.local(`_el$${b.id}`)} = ${elVar};
-      _$queueRefAttach(__s, () => _$attachRef(_r, _b.${bag.letter(`_el$${b.id}`)}));
-      __s.cleanups.push(() => _$queueRefDetach(_b.${bag.letter(`_ref$${b.id}`)}, _b.${bag.letter(`_el$${b.id}`)}));
-    }`,
+			return st(
+				b.block([
+					b.const('_r', bind.expr),
+					b.stmt(b.assignment('=', local(`_ref$${bind.id}`), b.id('_r'))),
+					b.stmt(b.assignment('=', local(`_el$${bind.id}`), el())),
+					b.stmt(
+						b.call(
+							'_$queueRefAttach',
+							b.id('__s'),
+							b.arrow([], b.call('_$attachRef', b.id('_r'), bagFieldNode(bag, `_el$${bind.id}`))),
+						),
+					),
+					cleanupsPush(
+						b.arrow(
+							[],
+							b.call(
+								'_$queueRefDetach',
+								bagFieldNode(bag, `_ref$${bind.id}`),
+								bagFieldNode(bag, `_el$${bind.id}`),
+							),
+						),
+					),
+				]),
 			);
 		}
 		case 'fragmentRef': {
 			// <Fragment ref={r}>…</Fragment> — markers are two Comment nodes
 			// emitted directly into the parent template HTML (<!--frag--> /
-			// <!--/frag-->), already walked into elVar (start) and b.endElVar
+			// <!--/frag-->), already walked into elVar (start) and bind.endElVar
 			// (end). mountFragmentRef builds the FragmentInstance, attaches
 			// the user's ref, and registers a single cleanup that detaches
 			// the ref + destroys the instance on unmount.
-			return `    {
-      const _r = (${b.expr});
-      ${bag.local(`_fi$${b.id}`)} = _$mountFragmentRef(__s, ${elVar}, ${b.endElVar}, _r);
-    }`;
+			return st(
+				b.block([
+					b.const('_r', bind.expr),
+					b.stmt(
+						b.assignment(
+							'=',
+							local(`_fi$${bind.id}`),
+							b.call(
+								'_$mountFragmentRef',
+								b.id('__s'),
+								el(),
+								hostVarNode(bind.endElVar),
+								b.id('_r'),
+							),
+						),
+					),
+				]),
+			);
 		}
 	}
-	return '';
+	return null;
 }
 
-function emitBindingUpdate(b, bag) {
-	if (b.mountOnly) return '';
-	const E = `(${b.expr})`;
+function emitBindingUpdate(bind, bag) {
+	if (bind.mountOnly) return null;
+	const org = bindingOrigin(bind);
+	const st = (node) => inheritOriginLoc(node, org);
+	const V = () => b.id('_v');
 	// 1-char bag field names (see makeBag) — resolved from the same registry the
 	// mount pass registered them in; an unmounted field throws at compile time.
-	const F = (prefix) => `_b.${bag.letter(`${prefix}$${b.id}`)}`;
-	switch (b.kind) {
+	const F = (prefix) => bagFieldNode(bag, `${prefix}$${bind.id}`);
+	switch (bind.kind) {
 		case 'nativeChangeRuntime': {
-			return `    _$queueNativeChangeDiagnostic(${F('_el')});`;
+			return st(b.stmt(b.call('_$queueNativeChangeDiagnostic', F('_el'))));
 		}
 		case 'textOnlyChild':
 		case 'text': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_prev'), V()),
+						b.block([
+							b.stmt(b.call('_$setText', F('_txt'), V())),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
+						null,
+					),
+				]),
 			);
 		}
 		case 'htmlOnlyChild': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setDangerouslySetInnerHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_prev'), V()),
+						b.block([
+							b.stmt(b.call('_$setDangerouslySetInnerHTML', F('_el'), V())),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
+						null,
+					),
+				]),
 			);
 		}
-		case 'dangerValue': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`,
-			);
-		}
+		case 'dangerValue':
 		case 'formValue':
 		case 'hostValue': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(b.binary('!==', F('_prev'), V()), b.stmt(b.assignment('=', F('_prev'), V())), null),
+				]),
 			);
 		}
 		case 'hostSpread': {
-			// Same wrapper re-derivation as the mount (paste on the inner argument).
-			return pasteChunk(`    ${F('_sp')} = (_$snapshotSpread(`, b.exprInner, b.exprMap, `));`);
+			// Same wrapper re-derivation as the mount.
+			return st(b.stmt(b.assignment('=', F('_sp'), b.call('_$snapshotSpread', bind.expr))));
 		}
 		case 'dangerCommit': {
-			const sources = b.sources
-				.map(({ spread, binding }) => {
-					const prefix = spread ? '_sp' : '_prev';
-					return `[${spread ? 'true' : 'false'}, _b.${bag.letter(`${prefix}$${binding.id}`)}]`;
-				})
-				.join(', ');
-			return `    _$setDangerouslySetInnerHTMLSources(${F('_el')}, [${sources}]);`;
+			const sources = b.array(
+				bind.sources.map(({ spread, binding }) =>
+					b.array([
+						b.literal(spread === true),
+						bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`),
+					]),
+				),
+			);
+			return st(b.stmt(b.call('_$setDangerouslySetInnerHTMLSources', F('_el'), sources)));
 		}
 		case 'formCommit': {
-			const sources = b.sources
-				.map(({ spread, name, binding }) => {
-					const prefix = spread ? '_sp' : '_prev';
-					const value = `_b.${bag.letter(`${prefix}$${binding.id}`)}`;
-					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
-				})
-				.join(', ');
-			return `    _$setFormControlSources(${F('_el')}, [${sources}]);`;
+			const sources = b.array(
+				bind.sources.map(({ spread, name, binding }) => {
+					const value = bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`);
+					return spread
+						? b.array([b.literal(true), value])
+						: b.array([b.literal(false), b.literal(name), value]);
+				}),
+			);
+			return st(b.stmt(b.call('_$setFormControlSources', F('_el'), sources)));
 		}
 		case 'hostCommit': {
-			const sources = b.sources
-				.map(({ spread, name, binding }) => {
-					const value = `_b.${bag.letter(`${spread ? '_sp' : '_prev'}$${binding.id}`)}`;
-					return spread ? `[true, ${value}]` : `[false, ${JSON.stringify(name)}, ${value}]`;
-				})
-				.join(', ');
-			return `    ${F('_host')} = _$setHostPropSources(${F('_el')}, [${sources}], ${F('_host')}, __s, ${b.hasNestedChildren ? 'true' : 'false'});`;
-		}
-		case 'attr': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
+			const sources = b.array(
+				bind.sources.map(({ spread, name, binding }) => {
+					const value = bagFieldNode(bag, `${spread ? '_sp' : '_prev'}$${binding.id}`);
+					return spread
+						? b.array([b.literal(true), value])
+						: b.array([b.literal(false), b.literal(name), value]);
+				}),
+			);
+			return st(
+				b.stmt(
+					b.assignment(
+						'=',
+						F('_host'),
+						b.call(
+							'_$setHostPropSources',
+							F('_el'),
+							sources,
+							F('_host'),
+							b.id('__s'),
+							b.literal(bind.hasNestedChildren === true),
+						),
+					),
+				),
 			);
 		}
-		case 'stringData': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setStringData(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
-			);
-		}
-		case 'booleanAttr': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setBooleanAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
-			);
-		}
+		case 'attr':
+		case 'stringData':
+		case 'booleanAttr':
 		case 'ariaAttr': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setAriaAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
+			const helper = {
+				attr: '_$setAttribute',
+				stringData: '_$setStringData',
+				booleanAttr: '_$setBooleanAttribute',
+				ariaAttr: '_$setAriaAttribute',
+			}[bind.kind];
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_prev'), V()),
+						b.block([
+							b.stmt(b.call(helper, F('_el'), b.literal(bind.name), V())),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
+						null,
+					),
+				]),
 			);
 		}
 		case 'value':
@@ -14912,39 +15437,43 @@ function emitBindingUpdate(b, bag) {
 			// reasserts on every commit — the helper's DOM-diff makes an
 			// unchanged value free, and a prev-guard would skip exactly the
 			// "unrelated re-render while the DOM drifted" reassert case.
-			return pasteChunk(
-				`    _$${CONTROLLED_KIND_HELPERS[b.kind]}(${F('_el')}, (`,
-				b.expr,
-				b.exprMap,
-				`));`,
-			);
+			return st(b.stmt(b.call(`_$${CONTROLLED_KIND_HELPERS[bind.kind]}`, F('_el'), bind.expr)));
 		}
 		case 'class': {
-			const setter =
-				b.ns && b.ns !== 'html'
-					? `_$setClassAttr(${F('_el')}, _v)`
-					: `_$setClassName(${F('_el')}, _v)`;
-			if (b.fresh) {
-				// Byte-equivalent to the historical `setter.replace(', _v)', …)` form.
-				const fn = b.ns && b.ns !== 'html' ? '_$setClassAttr' : '_$setClassName';
-				return pasteChunk(`    ${fn}(${F('_el')}, (`, b.expr, b.exprMap, `));`);
+			const setter = bind.ns && bind.ns !== 'html' ? '_$setClassAttr' : '_$setClassName';
+			if (bind.fresh) {
+				return st(b.stmt(b.call(setter, F('_el'), bind.expr)));
 			}
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_prev'), V()),
+						b.block([
+							b.stmt(b.call(setter, F('_el'), V())),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
+						null,
+					),
+				]),
 			);
 		}
 		case 'style': {
 			// Object styles need per-prop diffing — call setStyle even when the
 			// reference is unchanged it'd just no-op via the internal diff. We DO
 			// skip identity matches to avoid the call overhead.
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_sty')} !== _v) { _$setStyle(${F('_el')}, _v, ${F('_sty')}); ${F('_sty')} = _v; } }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_sty'), V()),
+						b.block([
+							b.stmt(b.call('_$setStyle', F('_el'), V(), F('_sty'))),
+							b.stmt(b.assignment('=', F('_sty'), V())),
+						]),
+						null,
+					),
+				]),
 			);
 		}
 		case 'spread': {
@@ -14954,29 +15483,46 @@ function emitBindingUpdate(b, bag) {
 			// `__s` rides along on updates too so a spread-supplied ref's attach is
 			// deferred to commit (after all queued detaches) — same phasing as the
 			// direct `ref` binding above.
-			const flags = b.skipFormControls
-				? `, ${b.skipDangerouslySetInnerHTML ? 'true' : 'false'}, true`
-				: b.skipDangerouslySetInnerHTML
-					? ', true'
-					: '';
-			return `    { const _v = ${E}; if (${F('_sp')} !== _v) { _$setSpread(${F('_el')}, _v, ${F('_sp')}, __s${flags}); ${F('_sp')} = _v; } }`;
+			const flags = bind.skipFormControls
+				? [b.literal(bind.skipDangerouslySetInnerHTML === true), b.literal(true)]
+				: bind.skipDangerouslySetInnerHTML
+					? [b.literal(true)]
+					: [];
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_sp'), V()),
+						b.block([
+							b.stmt(b.call('_$setSpread', F('_el'), V(), F('_sp'), b.id('__s'), ...flags)),
+							b.stmt(b.assignment('=', F('_sp'), V())),
+						]),
+						null,
+					),
+				]),
+			);
 		}
 		case 'event': {
-			const valueBefore = b.dev ? `_$devEventListener(${JSON.stringify(b.name)}, (` : `(`;
-			const valueAfter = b.dev ? `))` : `)`;
-			return pasteChunk(
-				`    ${F('_el')}[${JSON.stringify(b.slotKey)}] = ${valueBefore}`,
-				b.expr,
-				b.exprMap,
-				`${valueAfter};`,
+			const value = bind.dev
+				? b.call('_$devEventListener', b.literal(bind.name), bind.expr)
+				: bind.expr;
+			return st(
+				b.stmt(b.assignment('=', b.member(F('_el'), b.literal(bind.slotKey), true), value)),
 			);
 		}
 		case 'formAction': {
-			return pasteChunk(
-				`    { const _v = (`,
-				b.expr,
-				b.exprMap,
-				`); if (${F('_prev')} !== _v) { _$setFormAction(${F('_el')}, ${JSON.stringify(b.name)}, _v, ${F('_prev')}); ${F('_prev')} = _v; } }`,
+			return st(
+				b.block([
+					b.const('_v', bind.expr),
+					b.if(
+						b.binary('!==', F('_prev'), V()),
+						b.block([
+							b.stmt(b.call('_$setFormAction', F('_el'), b.literal(bind.name), V(), F('_prev'))),
+							b.stmt(b.assignment('=', F('_prev'), V())),
+						]),
+						null,
+					),
+				]),
 			);
 		}
 		case 'event-bundle': {
@@ -14984,30 +15530,12 @@ function emitBindingUpdate(b, bag) {
 			// plain field writes cost less than the old compare + rebuild +
 			// re-assign, and keyed-list survivors were already skipped one level
 			// up by the pure/deps short-circuit).
-			const n = b.argExprs.length;
-			if (n <= 2) {
-				const parts = [`    _$evt${n}u(${F('_ev')}, (`, exprChunk(b.fnExpr, b.fnExprMap), `)`];
-				for (let i = 0; i < n; i++) {
-					parts.push(
-						`, (`,
-						exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
-						`)`,
-					);
-				}
-				parts.push(`);`);
-				return catChunks(parts);
-			}
-			const parts = [`    _$evtNu(${F('_ev')}, (`, exprChunk(b.fnExpr, b.fnExprMap), `), [`];
-			for (let i = 0; i < b.argExprs.length; i++) {
-				if (i > 0) parts.push(`, `);
-				parts.push(
-					`(`,
-					exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
-					`)`,
-				);
-			}
-			parts.push(`]);`);
-			return catChunks(parts);
+			const n = bind.argExprs.length;
+			const helper = n <= 2 ? `_$evt${n}u` : '_$evtNu';
+			const args = [F('_ev'), bind.fnExpr];
+			if (n <= 2) args.push(...bind.argExprs);
+			else args.push(b.array(bind.argExprs.slice()));
+			return st(b.stmt(b.call(helper, ...args)));
 		}
 		case 'ref': {
 			// Ref expression identity may change across renders. React 19: detach
@@ -15023,19 +15551,34 @@ function emitBindingUpdate(b, bag) {
 			// the hopped ref). The outer `_r !== _b._ref$` guard already prevents
 			// re-firing a stable ref, so this never double-invokes an unchanged
 			// callback ref.
-			return pasteChunk(
-				`    {
-      const _r = (`,
-				b.expr,
-				b.exprMap,
-				`);
-      if (_r !== ${F('_ref')}) {
-        const _old = ${F('_ref')};
-        if (_old != null) _$queueRefDetach(_old, ${F('_el')});
-        if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, ${F('_el')}));
-        ${F('_ref')} = _r;
-      }
-    }`,
+			return st(
+				b.block([
+					b.const('_r', bind.expr),
+					b.if(
+						b.binary('!==', b.id('_r'), F('_ref')),
+						b.block([
+							b.const('_old', F('_ref')),
+							b.if(
+								b.binary('!=', b.id('_old'), nullNode()),
+								b.stmt(b.call('_$queueRefDetach', b.id('_old'), F('_el'))),
+								null,
+							),
+							b.if(
+								b.binary('!=', b.id('_r'), nullNode()),
+								b.stmt(
+									b.call(
+										'_$queueRefAttach',
+										b.id('__s'),
+										b.arrow([], b.call('_$attachRef', b.id('_r'), F('_el'))),
+									),
+								),
+								null,
+							),
+							b.stmt(b.assignment('=', F('_ref'), b.id('_r'))),
+						]),
+						null,
+					),
+				]),
 			);
 		}
 		case 'fragmentRef': {
@@ -15045,18 +15588,40 @@ function emitBindingUpdate(b, bag) {
 			// as element refs, so a ref hopping between fragments never ends null.
 			// _currentRef (read by the mount cleanup) is updated NOW so unmount
 			// detaches the new ref.
-			return `    {
-      const _r = (${b.expr});
-      const _fi = ${F('_fi')};
-      if (_fi && _r !== _fi._currentRef) {
-        if (_fi._currentRef != null) _$queueRefDetach(_fi._currentRef, _fi);
-        if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, _fi));
-        _fi._currentRef = _r;
-      }
-    }`;
+			const fi = () => b.id('_fi');
+			const cur = () => b.member(fi(), '_currentRef');
+			return st(
+				b.block([
+					b.const('_r', bind.expr),
+					b.const('_fi', F('_fi')),
+					b.if(
+						andChain([fi(), b.binary('!==', b.id('_r'), cur())]),
+						b.block([
+							b.if(
+								b.binary('!=', cur(), nullNode()),
+								b.stmt(b.call('_$queueRefDetach', cur(), fi())),
+								null,
+							),
+							b.if(
+								b.binary('!=', b.id('_r'), nullNode()),
+								b.stmt(
+									b.call(
+										'_$queueRefAttach',
+										b.id('__s'),
+										b.arrow([], b.call('_$attachRef', b.id('_r'), fi())),
+									),
+								),
+								null,
+							),
+							b.stmt(b.assignment('=', cur(), b.id('_r'))),
+						]),
+						null,
+					),
+				]),
+			);
 		}
 	}
-	return '';
+	return null;
 }
 
 // ===========================================================================
@@ -15074,7 +15639,7 @@ function emitBindingUpdate(b, bag) {
 // buffer, handed back through `ctx._retOrigins` (a consume-on-read return
 // slot — emitElementHtml's tail sets it, the embedding caller reads and
 // clears it), and shifted by the embed offset — the same idiom
-// pasteChunk/joinChunks use for expression maps, applied to template HTML.
+// the compiled-expression maps used before the AST emit, applied to template HTML.
 // Everything is gated on `ctx.inspect`; the off path allocates and records
 // nothing, and the emitted code is byte-identical in both states.
 // ---------------------------------------------------------------------------
@@ -15163,12 +15728,10 @@ function emitNodeHtml(
 ) {
 	if (node.type === 'Text') {
 		if (isKnownStringExpression(node.expression, ctx.knownStringLocals)) {
-			const textMapped = printExprMapped(resolveStyleExpr(node.expression, cssHash), ctx);
 			bindings.push({
 				id: bindings.length,
 				kind: 'text',
-				expr: textMapped.code,
-				exprMap: textMapped.mappings,
+				expr: resolveStyleExpr(node.expression, cssHash),
 				knownString: true,
 				path: path.slice(0, -1),
 				childIndex: path[path.length - 1],
@@ -15203,15 +15766,15 @@ function emitNodeHtml(
 	// path. Pairing uses ctx._fragRefStack, saved/restored by planJsx so
 	// nested plans never share state.
 	if (node.type === 'FragmentStart') {
-		const b = {
+		const fragBinding = {
 			id: bindings.length,
 			kind: 'fragmentRef',
-			expr: printExprWithTsrx(node.refExpr, ctx, componentName, inlinedSubs),
+			expr: tsrxExprNode(node.refExpr, ctx, componentName, inlinedSubs),
 			path,
 			endPath: null,
 		};
-		bindings.push(b);
-		(ctx._fragRefStack ??= []).push(b);
+		bindings.push(fragBinding);
+		(ctx._fragRefStack ??= []).push(fragBinding);
 		return '<!--frag-->';
 	}
 	if (node.type === 'FragmentEnd') {
@@ -15461,15 +16024,12 @@ function emitElementHtml(
 		// the prior spread object to clear removed keys.
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			ctx.runtimeNeeded.add('snapshotSpread');
-			const spreadMapped = printExprWithTsrxMapped(attr.argument, ctx, componentName, inlinedSubs);
 			const binding = {
 				id: bindings.length,
 				kind: 'hostSpread',
-				expr: `_$snapshotSpread(${spreadMapped.code})`,
-				// The emit re-derives the `_$snapshotSpread(…)` wrapper around this
-				// inner print, so the paste lands on the argument, not the wrapper.
-				exprInner: spreadMapped.code,
-				exprMap: spreadMapped.mappings,
+				// The INNER spread argument; the emit re-derives the
+				// `_$snapshotSpread(…)` wrapper around it.
+				expr: tsrxExprNode(attr.argument, ctx, componentName, inlinedSubs),
 				path,
 				ns: hostNs,
 			};
@@ -15492,24 +16052,20 @@ function emitElementHtml(
 			}
 			const val = attr.value;
 			let expr;
-			let exprMap;
 			if (val == null) {
-				expr = 'true';
+				expr = b.literal(true, 'true', attr);
 			} else {
 				const inner = resolveStyleExpr(
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
-				const hostValMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
-				expr = hostValMapped.code;
-				exprMap = hostValMapped.mappings;
+				expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 			}
 			const binding = {
 				id: bindings.length,
 				kind: 'hostValue',
 				name: rawAttrName,
 				expr,
-				exprMap,
 				path,
 			};
 			bindings.push(binding);
@@ -15536,7 +16092,7 @@ function emitElementHtml(
 			const v = attr.value;
 			const inner = v && v.type === 'JSXExpressionContainer' ? v.expression : v;
 			const isFalse = inner && inner.type === 'Literal' && inner.value === false;
-			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path });
+			if (!isFalse) bindings.push({ id: bindings.length, kind: 'suppress', path, origin: attr });
 			continue;
 		}
 		const attrName = normalizeJsxAttrName(rawAttrName, tag, hostNs);
@@ -15546,42 +16102,38 @@ function emitElementHtml(
 		// Keep it on the ordinary final-prop path so source-order updates and
 		// removal work, but never bake it into template HTML.
 		if (rawAttrName === 'suppressNativeChangeWarning') {
-			const suppressMapped =
-				val == null
-					? null
-					: printExprWithTsrxMapped(
-							val.type === 'JSXExpressionContainer' ? val.expression : val,
-							ctx,
-							componentName,
-							inlinedSubs,
-						);
 			bindings.push({
 				id: bindings.length,
 				kind: 'attr',
 				name: rawAttrName,
-				expr: suppressMapped === null ? 'true' : suppressMapped.code,
-				exprMap: suppressMapped === null ? undefined : suppressMapped.mappings,
+				expr:
+					val == null
+						? b.literal(true, 'true', attr)
+						: tsrxExprNode(
+								val.type === 'JSXExpressionContainer' ? val.expression : val,
+								ctx,
+								componentName,
+								inlinedSubs,
+							),
 				path,
 				ns: hostNs,
 			});
 			continue;
 		}
 		if (rawAttrName === 'children') {
-			const childMapped =
-				val == null
-					? null
-					: printExprWithTsrxMapped(
-							val.type === 'JSXExpressionContainer' ? val.expression : val,
-							ctx,
-							componentName,
-							inlinedSubs,
-						);
 			const binding = {
 				id: bindings.length,
 				kind: 'hostValue',
 				name: 'children',
-				expr: childMapped === null ? 'true' : childMapped.code,
-				exprMap: childMapped === null ? undefined : childMapped.mappings,
+				expr:
+					val == null
+						? b.literal(true, 'true', attr)
+						: tsrxExprNode(
+								val.type === 'JSXExpressionContainer' ? val.expression : val,
+								ctx,
+								componentName,
+								inlinedSubs,
+							),
 				path,
 			};
 			bindings.push(binding);
@@ -15617,12 +16169,10 @@ function emitElementHtml(
 			}
 			sawRef = true;
 			const refInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-			const refMapped = printExprMapped(refInner, ctx);
 			bindings.push({
 				id: bindings.length,
 				kind: 'ref',
-				expr: refMapped.code,
-				exprMap: refMapped.mappings,
+				expr: refInner,
 				path,
 			});
 			continue;
@@ -15636,16 +16186,15 @@ function emitElementHtml(
 		// `dangerouslySetInnerHTML` property path reads `.__html` and sets innerHTML.
 		if (attrName === 'dangerouslySetInnerHTML') {
 			const obj = val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
-			const dangerMapped =
-				obj === null ? null : printExprWithTsrxMapped(obj, ctx, componentName, inlinedSubs);
-			const expr = dangerMapped === null ? 'true' : dangerMapped.code;
-			const dangerExprMap = dangerMapped === null ? undefined : dangerMapped.mappings;
+			const expr =
+				obj === null
+					? b.literal(true, 'true', attr)
+					: tsrxExprNode(obj, ctx, componentName, inlinedSubs);
 			if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
 				const binding = {
 					id: bindings.length,
 					kind: 'dangerValue',
 					expr,
-					exprMap: dangerExprMap,
 					path,
 				};
 				bindings.push(binding);
@@ -15659,7 +16208,6 @@ function emitElementHtml(
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
 					expr,
-					exprMap: dangerExprMap,
 					script: tag === 'script',
 					path,
 				});
@@ -15670,7 +16218,6 @@ function emitElementHtml(
 				kind: 'attr',
 				name: 'dangerouslySetInnerHTML',
 				expr,
-				exprMap: dangerExprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15685,21 +16232,19 @@ function emitElementHtml(
 			resolveFormControlsAcrossSpreads &&
 			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
 		) {
-			const formMapped =
-				val == null
-					? null
-					: printExprWithTsrxMapped(
-							val.type === 'JSXExpressionContainer' ? val.expression : val,
-							ctx,
-							componentName,
-							inlinedSubs,
-						);
 			const binding = {
 				id: bindings.length,
 				kind: 'formValue',
 				name: attrName,
-				expr: formMapped === null ? 'true' : formMapped.code,
-				exprMap: formMapped === null ? undefined : formMapped.mappings,
+				expr:
+					val == null
+						? b.literal(true, 'true', attr)
+						: tsrxExprNode(
+								val.type === 'JSXExpressionContainer' ? val.expression : val,
+								ctx,
+								componentName,
+								inlinedSubs,
+							),
 				path,
 			};
 			bindings.push(binding);
@@ -15712,21 +16257,18 @@ function emitElementHtml(
 			} else if (ctlKind === 'checked' && leanChecked) {
 				ctlKind = 'checkedCheckable';
 			}
-			let ctlExpr;
-			let ctlExprMap;
-			if (val == null) {
-				ctlExpr = 'true';
-			} else {
-				const ctlInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-				const ctlMapped = printExprWithTsrxMapped(ctlInner, ctx, componentName, inlinedSubs);
-				ctlExpr = ctlMapped.code;
-				ctlExprMap = ctlMapped.mappings;
-			}
 			bindings.push({
 				id: bindings.length,
 				kind: ctlKind,
-				expr: ctlExpr,
-				exprMap: ctlExprMap,
+				expr:
+					val == null
+						? b.literal(true, 'true', attr)
+						: tsrxExprNode(
+								val.type === 'JSXExpressionContainer' ? val.expression : val,
+								ctx,
+								componentName,
+								inlinedSubs,
+							),
 				path,
 				ns: hostNs,
 			});
@@ -15743,8 +16285,8 @@ function emitElementHtml(
 				kind: 'autoFocus',
 				expr:
 					val == null
-						? 'true'
-						: printExprWithTsrx(
+						? b.literal(true, 'true', attr)
+						: tsrxExprNode(
 								val.type === 'JSXExpressionContainer' ? val.expression : val,
 								ctx,
 								componentName,
@@ -15803,12 +16345,10 @@ function emitElementHtml(
 				}
 				continue;
 			}
-			const styleMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
 			bindings.push({
 				id: bindings.length,
 				kind: 'style',
-				expr: styleMapped.code,
-				exprMap: styleMapped.mappings,
+				expr: tsrxExprNode(inner, ctx, componentName, inlinedSubs),
 				path,
 				ns: hostNs,
 			});
@@ -15836,9 +16376,7 @@ function emitElementHtml(
 
 		// Dynamic value — record a binding. (Also reached for literal values that
 		// come after a spread, since those need to win over the spread at runtime.)
-		const exprMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
-		const expr = exprMapped.code;
-		const exprMap = exprMapped.mappings;
+		const expr = tsrxExprNode(inner, ctx, componentName, inlinedSubs);
 		if (isEventAttrName(attrName)) {
 			// React-shape: a trailing `Capture` selects the capture phase (fired
 			// root→target before bubble handlers), stamped under `$$capture:<type>`.
@@ -15866,15 +16404,6 @@ function emitElementHtml(
 			// unchanged (e.g. js-framework-benchmark swap rows).
 			const bundleInfo = detectStableEventBundle(inner);
 			if (bundleInfo) {
-				const fnMapped = printExprWithTsrxMapped(
-					bundleInfo.callee,
-					ctx,
-					componentName,
-					inlinedSubs,
-				);
-				const argsMapped = bundleInfo.args.map((a) =>
-					printExprWithTsrxMapped(a, ctx, componentName, inlinedSubs),
-				);
 				bindings.push({
 					id: bindings.length,
 					kind: 'event-bundle',
@@ -15882,10 +16411,8 @@ function emitElementHtml(
 					eventName,
 					slotKey,
 					ns: hostNs,
-					fnExpr: fnMapped.code,
-					fnExprMap: fnMapped.mappings,
-					argExprs: argsMapped.map((a) => a.code),
-					argExprMaps: argsMapped.map((a) => a.mappings),
+					fnExpr: tsrxExprNode(bundleInfo.callee, ctx, componentName, inlinedSubs),
+					argExprs: bundleInfo.args.map((a) => tsrxExprNode(a, ctx, componentName, inlinedSubs)),
 					mountOnly:
 						isEventHandlerInvariantExpr(bundleInfo.callee, ctx) &&
 						bundleInfo.args.every((arg) => isInvariantBindingExpr(arg, ctx)),
@@ -15896,7 +16423,6 @@ function emitElementHtml(
 					kind: 'event',
 					name: attrName,
 					expr,
-					exprMap,
 					path,
 					eventName,
 					slotKey,
@@ -15911,7 +16437,6 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'class',
 				expr,
-				exprMap,
 				path,
 				ns: hostNs,
 				fresh: isFreshBindingExpr(inner),
@@ -15931,7 +16456,6 @@ function emitElementHtml(
 				kind: 'formAction',
 				name: tag === 'form' ? 'action' : 'formaction',
 				expr,
-				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15945,7 +16469,6 @@ function emitElementHtml(
 				kind: 'ariaAttr',
 				name: attrName,
 				expr,
-				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15961,7 +16484,6 @@ function emitElementHtml(
 				kind: 'booleanAttr',
 				name: attrName.toLowerCase(),
 				expr,
-				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15980,7 +16502,6 @@ function emitElementHtml(
 				kind: 'stringData',
 				name: attrName,
 				expr,
-				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15990,7 +16511,6 @@ function emitElementHtml(
 				kind: 'attr',
 				name: attrName,
 				expr,
-				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -16001,6 +16521,7 @@ function emitElementHtml(
 			id: bindings.length,
 			kind: 'hostCommit',
 			path,
+			origin: node,
 			sources: hostClientSources,
 			hasNestedChildren: hasNestedJsxChildren,
 		};
@@ -16010,6 +16531,7 @@ function emitElementHtml(
 			id: bindings.length,
 			kind: 'dangerCommit',
 			path,
+			origin: node,
 			sources: dangerHtmlClientSources,
 		});
 	}
@@ -16018,6 +16540,7 @@ function emitElementHtml(
 			id: bindings.length,
 			kind: 'formCommit',
 			path,
+			origin: node,
 			sources: formControlClientSources,
 		});
 	}
@@ -16030,6 +16553,7 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: classification === 'statically-warned' ? 'nativeChangeStatic' : 'nativeChangeRuntime',
 				path,
+				origin: node,
 				mountOnly: classification === 'statically-warned',
 			});
 		}
@@ -16101,12 +16625,10 @@ function emitElementHtml(
 			}
 			html += escaped;
 		} else if (isKnownStringExpression(txtChild.expression, ctx.knownStringLocals)) {
-			const textMapped = printExprMapped(resolveStyleExpr(txtChild.expression, cssHash), ctx);
 			bindings.push({
 				id: bindings.length,
 				kind: 'textOnlyChild',
-				expr: textMapped.code,
-				exprMap: textMapped.mappings,
+				expr: resolveStyleExpr(txtChild.expression, cssHash),
 				knownString: true,
 				path,
 			});
@@ -16164,15 +16686,15 @@ function emitElementHtml(
 			const prevBaked = prevBakedText;
 			prevBakedText = false;
 			if (child.type === 'FragmentStart') {
-				const b = {
+				const fragBinding = {
 					id: bindings.length,
 					kind: 'fragmentRef',
-					expr: printExprWithTsrx(child.refExpr, ctx, componentName, inlinedSubs),
+					expr: tsrxExprNode(child.refExpr, ctx, componentName, inlinedSubs),
 					path: [...path, childIdx],
 					endPath: null,
 				};
-				bindings.push(b);
-				fragRefStack.push(b);
+				bindings.push(fragBinding);
+				fragRefStack.push(fragBinding);
 				html += '<!--frag-->';
 				childIdx++;
 				continue;
@@ -16216,12 +16738,10 @@ function emitElementHtml(
 					prevBakedText = true;
 					if (!prevBaked) childIdx++;
 				} else if (isKnownStringExpression(child.expression, ctx.knownStringLocals)) {
-					const childTextMapped = printExprMapped(resolveStyleExpr(child.expression, cssHash), ctx);
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
-						expr: childTextMapped.code,
-						exprMap: childTextMapped.mappings,
+						expr: resolveStyleExpr(child.expression, cssHash),
 						knownString: true,
 						path,
 						childIndex: childIdx,
@@ -16418,17 +16938,10 @@ function emitElementHtml(
 					ic.hostPath = path;
 					ifCalls.push(ic);
 				} else if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
-					const holeMapped = printExprWithTsrxMapped(
-						resolveStyleExpr(expr, cssHash),
-						ctx,
-						componentName,
-						inlinedSubs,
-					);
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
-						expr: holeMapped.code,
-						exprMap: holeMapped.mappings,
+						expr: tsrxExprNode(resolveStyleExpr(expr, cssHash), ctx, componentName, inlinedSubs),
 						knownString: true,
 						path,
 						childIndex: childIdx,
@@ -16462,8 +16975,8 @@ function emitElementHtml(
 		bindings.push({
 			id: bindings.length,
 			kind: 'dangerChild',
-			expr: 'true',
 			path,
+			origin: node,
 			mountOnly: true,
 		});
 	}
@@ -16506,38 +17019,28 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	// block, so it must be hoisted here — otherwise the raw JSX would be
 	// printed verbatim into the emitted portal() call (invalid output).
 	let bodyExpr;
-	let bodyExprMap;
 	let envNames = null;
 	const bt = bodyArg ? bodyArg.type : null;
 	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
 		// Phase 2: hoisted portal body + env tuple (see hoistBodyHelper).
 		envNames = unionEnv(ctx, [{ stmts: [bodyArg], params: [] }]);
-		bodyExpr = hoistBodyHelper(
-			ctx,
-			inlinedSubs,
-			'__portal',
-			[bodyArg],
-			[],
-			parentNs,
-			cssHash,
-			envNames,
+		bodyExpr = inheritOriginLoc(
+			b.id(
+				hoistBodyHelper(ctx, inlinedSubs, '__portal', [bodyArg], [], parentNs, cssHash, envNames),
+			),
+			bodyArg,
 		);
 	} else {
-		const bodyMapped = printExprWithTsrxMapped(bodyArg, ctx, componentName, inlinedSubs);
-		bodyExpr = bodyMapped.code;
-		bodyExprMap = bodyMapped.mappings;
+		bodyExpr = tsrxExprNode(bodyArg, ctx, componentName, inlinedSubs);
 	}
-	const targetMapped = printExprMapped(targetArg, ctx);
-	const propsExpr = propsArg ? printExpr(propsArg) : 'undefined';
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, callNode),
+		origin: callNode,
 		envNames,
 		bodyExpr,
-		bodyExprMap,
-		targetExpr: targetMapped.code,
-		targetExprMap: targetMapped.mappings,
-		propsExpr,
+		targetExpr: targetArg,
+		propsExpr: propsArg ?? inheritOriginLoc(b.id('undefined'), callNode),
 	};
 }
 
@@ -16621,14 +17124,22 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 			...stmts,
 		];
 	}
-	const fake = {
-		type: 'Component',
-		id: b.id(helperName),
-		params: params || [],
-		body: bodyStmts,
-	};
+	// The synthetic helper shell maps to the construct body it hoists.
+	const fakeOrigin =
+		(Array.isArray(bodyStmts) && bodyStmts.find((s) => s != null && s.loc != null)) ||
+		(params || []).find((p) => p != null && p.loc != null) ||
+		null;
+	const fake = inheritOriginLoc(
+		{
+			type: 'Component',
+			id: b.id(helperName, fakeOrigin ?? undefined),
+			params: params || [],
+			body: bodyStmts,
+		},
+		fakeOrigin,
+	);
 	if (envNames == null) {
-		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash) + ';');
+		inlinedSubs.push(compileFunctionBody(fake, ctx, helperName, parentNs, cssHash));
 		return helperName;
 	}
 	// Module-scope placement. Nested constructs compiled INSIDE this body
@@ -16648,15 +17159,17 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 	ctx.currentEventInvariantLocals = new Set(
 		(ownEnvNames || []).filter((name) => prevEventInvariantLocals?.has(name) === true),
 	);
-	let code;
+	let helperFn;
 	try {
-		code = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash);
+		helperFn = compileFunctionBody(fake, ctx, helperName, parentNs, cssHash);
 	} finally {
 		ctx.currentComponentLocals = prevLocals;
 		ctx.currentInvariantLocals = prevInvariantLocals;
 		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	}
-	ctx.hoistedHelpers.push(code + ';');
+	// Module-scope placement stays a hoisted-helper STRING until M2 converts the
+	// module frame — print the compiled node here.
+	ctx.hoistedHelpers.push(printNode(helperFn) + ';');
 	return helperName;
 }
 
@@ -16666,8 +17179,6 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 
 function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.test, node.consequent (BlockStatement | Element), node.alternate (BlockStatement | IfStatement | null)
-	const condMapped = printExprMapped(node.test, ctx);
-	const condExpr = condMapped.code;
 
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
@@ -16709,8 +17220,8 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
-		condExpr,
-		condExprMap: condMapped.mappings,
+		origin: node,
+		condExpr: node.test, // the fold replaces this with a `props.hN` member read
 		condTest: node.test, // raw test AST — the fold threads it as a `props.hN` hole
 		envNames,
 		thenHelper: thenHelperName,
@@ -16725,7 +17236,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 // call `activityBlock` instead of `ifBlock`. `mode` is inlined and re-evaluated
 // every parent render (like ifBlock's cond); a missing mode defaults to visible.
 function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
-	const modeExpr = node.mode ? printExpr(node.mode) : "'visible'";
+	const modeExpr = node.mode ?? inheritOriginLoc(b.literal('visible'), node);
 	// Phase 2: hoisted body + env tuple (see hoistBodyHelper).
 	const envNames = unionEnv(ctx, [{ stmts: node.children, params: [] }]);
 	const bodyHelperName = hoistBodyHelper(
@@ -16741,6 +17252,7 @@ function makeActivityCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = n
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
+		origin: node,
 		activity: true,
 		modeExpr,
 		envNames,
@@ -16792,6 +17304,13 @@ function isComponentTag(node) {
 		return !/^[a-z]/.test(name.name) && !name.name.includes('-');
 	}
 	return false;
+}
+
+// Node form of tagExpr: the component tag as an expression AST (identifier,
+// member chain, or the dynamic `<{expr}>` inner expression).
+function tagExprNode(node) {
+	const name = node.openingElement?.name || node.id;
+	return inheritOriginLoc(jsxNameToExpr(name), name.loc ? name : node);
 }
 
 function tagExpr(node) {
@@ -16858,8 +17377,9 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash) {
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, expr),
+		origin: expr,
 		isChild: true,
-		valueExpr: printExprWithTsrx(
+		valueExpr: tsrxExprNode(
 			resolveStyleExpr(rewriteJsxValues(expr, ctx), cssHash),
 			ctx,
 			componentName,
@@ -16870,6 +17390,7 @@ function makeChildCall(expr, ctx, componentName, inlinedSubs, cssHash) {
 
 function collectAutoMemoDependencyExpressions(nodes) {
 	const dependencies = new Set();
+	const dependencyNodes = new Map();
 	const coveredRoots = new Set();
 	const seen = new WeakSet();
 	let safe = true;
@@ -16908,6 +17429,9 @@ function collectAutoMemoDependencyExpressions(nodes) {
 		if (isAutoMemoCalculationDependency(node)) {
 			const expression = printExpr(node);
 			dependencies.add(expression);
+			// Keep the AST alongside the printed key so the emit can embed the
+			// authored expression instead of re-parsing its print.
+			if (!dependencyNodes.has(expression)) dependencyNodes.set(expression, node);
 			for (const name of collectFreeIdentifiers(node, [])) coveredRoots.add(name);
 			return;
 		}
@@ -16930,7 +17454,7 @@ function collectAutoMemoDependencyExpressions(nodes) {
 		}
 	}
 	for (const node of nodes) walk(node);
-	return { dependencies, coveredRoots, safe, hasComponentValue };
+	return { dependencies, dependencyNodes, coveredRoots, safe, hasComponentValue };
 }
 
 function makeCompCall(
@@ -16947,16 +17471,16 @@ function makeCompCall(
 ) {
 	const id = ctx.nextHelperId++;
 	const compExpr = tagExpr(node);
+	const compNode = tagExprNode(node);
 
 	// Build the props object literal from JSX attributes. `<Foo {...rest}/>`
 	// becomes a spread element in the object literal — works because component
 	// bodies receive the merged object as `props` and only care about field
 	// values, not identity.
 	const attrs = node.attributes || node.openingElement?.attributes || [];
-	// Mixed string/chunk parts (catChunks shape): dynamic prop values carry their
-	// fragment maps; `propParts` below stays the derived plain-string view for the
-	// eligibility predicates and any string-only consumer.
-	const propChunks = [];
+	const propNodes = [];
+	let hasSpreadProp = false;
+	let hasChildrenProp = false;
 	const propDependencyNodes = [];
 	// `key={expr}` is consumed by the componentSlot runtime (drives key-driven
 	// remount on identity change), NOT passed as a prop — matches React, where
@@ -16964,13 +17488,10 @@ function makeCompCall(
 	// spread, the spread cannot inject `key` either: we filter it out of the
 	// emitted propsExpr but keep its expression for the slot arg.
 	let keyExpr = null;
-	let keyExprMap;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			const spreadMapped = printExprWithTsrxMapped(attr.argument, ctx, componentName, inlinedSubs);
-			propChunks.push(
-				catChunks([`...(`, exprChunk(spreadMapped.code, spreadMapped.mappings), `)`]),
-			);
+			hasSpreadProp = true;
+			propNodes.push(b.spread(tsrxExprNode(attr.argument, ctx, componentName, inlinedSubs)));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -16980,13 +17501,11 @@ function makeCompCall(
 			// `<Foo key/>` (no value) is meaningless — skip silently.
 			if (val == null) continue;
 			const keyInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-			const keyMapped = printExprWithTsrxMapped(keyInner, ctx, componentName, inlinedSubs);
-			keyExpr = keyMapped.code;
-			keyExprMap = keyMapped.mappings;
+			keyExpr = tsrxExprNode(keyInner, ctx, componentName, inlinedSubs);
 			continue;
 		}
 		if (val == null) {
-			propChunks.push(`${JSON.stringify(attrName)}: true`);
+			propNodes.push(b.prop('init', b.literal(attrName), b.literal(true, 'true', attr)));
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -16995,18 +17514,13 @@ function makeCompCall(
 		// `<Suspense fallback={<span/>}>` or a render-prop returning JSX — so esrap
 		// emits a real descriptor instead of raw (unprintable) JSX.
 		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
-		if (inner.type === 'Literal') {
-			propChunks.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
-		} else {
-			const valueMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
-			propChunks.push(
-				catChunks([
-					`${JSON.stringify(attrName)}: (`,
-					exprChunk(valueMapped.code, valueMapped.mappings),
-					`)`,
-				]),
-			);
-		}
+		propNodes.push(
+			b.prop(
+				'init',
+				b.literal(attrName),
+				inner.type === 'Literal' ? inner : tsrxExprNode(inner, ctx, componentName, inlinedSubs),
+			),
+		);
 	}
 
 	// React-style render-prop child: `<Comp>{(data) => <jsx/>}</Comp>` — the sole
@@ -17021,18 +17535,13 @@ function makeCompCall(
 	const sourceChildren = node.children || [];
 	const renderPropChild = soleRenderPropChild(sourceChildren);
 	if (renderPropChild) {
-		const renderPropMapped = printExprWithTsrxMapped(
-			rewriteJsxValues(renderPropChild, ctx),
-			ctx,
-			componentName,
-			inlinedSubs,
-		);
-		propChunks.push(
-			catChunks([
-				`"children": (`,
-				exprChunk(renderPropMapped.code, renderPropMapped.mappings),
-				`)`,
-			]),
+		hasChildrenProp = true;
+		propNodes.push(
+			b.prop(
+				'init',
+				b.literal('children'),
+				tsrxExprNode(rewriteJsxValues(renderPropChild, ctx), ctx, componentName, inlinedSubs),
+			),
 		);
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
@@ -17059,19 +17568,18 @@ function makeCompCall(
 		// so React-ecosystem `typeof children === 'function'` checks need `isChildrenBlock` to
 		// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
 		ctx.runtimeNeeded.add('markChildrenBlock');
-		propChunks.push(`"children": _$markChildrenBlock(${childrenHelperName})`);
+		hasChildrenProp = true;
+		propNodes.push(
+			b.prop(
+				'init',
+				b.literal('children'),
+				b.call('_$markChildrenBlock', b.id(childrenHelperName)),
+			),
+		);
 	}
 
-	const propParts = propChunks.map((c) => (typeof c === 'string' ? c : c.code));
-	// The props object as ONE chunk (byte-identical to `{ ${propParts.join(', ')} }`).
-	const propsParts = ['{ '];
-	propChunks.forEach((c, i) => {
-		if (i > 0) propsParts.push(', ');
-		propsParts.push(c);
-	});
-	propsParts.push(' }');
-	const propsChunk = catChunks(propsParts);
-	const propsExpr = propsChunk.code;
+	// The props object as a node; the call-site emit embeds it directly.
+	const propsExpr = inheritOriginLoc(b.object(propNodes), node);
 
 	// Design (c) v0: decide whether the call site can use componentSlotLite
 	// (Scope-only, no Block / no Comment markers / no CompSlot wrapper).
@@ -17084,6 +17592,7 @@ function makeCompCall(
 	// Null = ordinary call. An array (including []) selects the production-only
 	// compiler-owned dependency boundary and is emitted as expressions in order.
 	let autoMemoDeps = null;
+	let autoMemoDepNodes = null;
 	let autoMemoWitnesses = [];
 	let autoMemoContextAware = false;
 	// A same-module compiled callee whose JavaScript return is provably void can
@@ -17106,9 +17615,7 @@ function makeCompCall(
 		const isBareIdent =
 			tagName && (tagName.type === 'Identifier' || tagName.type === 'JSXIdentifier');
 		if (isBareIdent) {
-			const hasSpread = propParts.some((p) => p.startsWith('...'));
-			const hasChildrenProp = propParts.some((p) => p.startsWith('"children":'));
-			const callSiteOk = !hasSpread && !hasChildrenProp;
+			const callSiteOk = !hasSpreadProp && !hasChildrenProp;
 			const calleeInfo = ctx.componentInfo.get(compExpr);
 			if (calleeInfo) {
 				voidComponent = !ctx.hmr && calleeInfo.voidOutput === true;
@@ -17158,6 +17665,7 @@ function makeCompCall(
 						}
 						if (depsSafe) {
 							autoMemoDeps = [...deps].sort();
+							autoMemoDepNodes = callsiteDeps.dependencyNodes;
 							autoMemoWitnesses = [...(calleeInfo.autoMemoImportedComponents || [])];
 							autoMemoContextAware = calleeInfo.autoMemoMayReadContext === true;
 							// The cache needs a real context-stamping Block. Preserve the
@@ -17196,19 +17704,20 @@ function makeCompCall(
 	return {
 		id,
 		compExpr,
+		compNode,
 		propsExpr,
-		propsChunk,
 		hostPath: null,
 		keyExpr,
-		keyExprMap,
 		liteEligible,
 		autoMemoDeps,
+		autoMemoDepNodes,
 		autoMemoWitnesses,
 		autoMemoContextAware,
 		voidComponent,
 		singleRoot,
 		maybeSingleRoot,
 		loc: devLoc(ctx, node),
+		origin: node,
 	};
 }
 
@@ -17297,6 +17806,7 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
+		origin: node,
 		envNames,
 		tryHelper: tryHelperName,
 		catchHelper: catchHelperName,
@@ -17317,8 +17827,6 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
  * completion (it's just a function call) and only that case's body renders.
  */
 function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
-	const discMapped = printExprMapped(node.discriminant, ctx);
-	const discExpr = discMapped.code;
 	const caseRecords = [];
 	let defaultHelper = 'null';
 	// Phase 2: one shared env tuple across every case + default (see unionEnv).
@@ -17342,34 +17850,27 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		if (isDefault) {
 			defaultHelper = helperName;
 		} else {
-			const testMapped = printExprMapped(c.test, ctx);
 			caseRecords.push({
-				testExpr: testMapped.code,
-				testExprMap: testMapped.mappings,
 				testNode: c.test,
 				helper: helperName,
 			});
 		}
 	}
-	// The cases array as ONE chunk carrying each test's paste (byte-identical to
-	// the historical `[[(t), helper], …]` join). The fold path replaces the whole
-	// array with a `props.hN` hole and nulls `casesChunk` alongside.
-	const casesParts = ['['];
-	caseRecords.forEach((r, i) => {
-		if (i > 0) casesParts.push(', ');
-		casesParts.push(`[(`, exprChunk(r.testExpr, r.testExprMap), `), ${r.helper}]`);
-	});
-	casesParts.push(']');
-	const casesChunk = catChunks(casesParts);
+	// The cases array as a node — `[[test, helper], …]`. The fold path replaces
+	// the whole array with a `props.hN` hole (the component-side hole carries the
+	// tests, which interleave component-scope expressions with the helper fns).
+	const casesExpr = inheritOriginLoc(
+		b.array(caseRecords.map((r) => b.array([r.testNode, b.id(r.helper)]))),
+		node,
+	);
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
-		discExpr,
-		discExprMap: discMapped.mappings,
+		origin: node,
+		discExpr: node.discriminant, // the fold replaces this with a `props.hN` member read
 		discNode: node.discriminant, // AST — the fold threads it as a `props.hN` hole
 		envNames,
-		casesArrayExpr: casesChunk.code,
-		casesChunk,
+		casesExpr,
 		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
 		hostPath: null,
@@ -17413,8 +17914,6 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// we synthesize a fresh name and emit the destructuring inside the body so
 	// the keyFn still gets the whole item and the body still sees the fields.
 	const itemName = isDestructured ? '_item' : leftDeclId.name;
-	const itemsMapped = printExprMapped(node.right, ctx);
-	const itemsExpr = itemsMapped.code;
 	const subStmts = node.body.body;
 
 	// Key resolution priority (matches @tsrx/core's build_hoisted_for_of_with_hooks):
@@ -17776,8 +18275,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
-		itemsExpr,
-		itemsExprMap: itemsMapped.mappings,
+		origin: node,
+		itemsExpr: node.right, // the fold replaces this with a `props.hN` member read
 		keyHelper,
 		bodyHelper: itemHelperName,
 		pure,
@@ -17962,33 +18461,6 @@ function bodyContainsJsx(node) {
 	return isJsxNode(node);
 }
 
-function walkExpr(rootVar, path) {
-	if (path.length === 0) return rootVar;
-	let expr = rootVar;
-	for (let i = 0; i < path.length; i++) {
-		const idx = path[i];
-		expr = `${expr}.firstChild`;
-		for (let n = 0; n < idx; n++) expr = `${expr}.nextSibling`;
-	}
-	return expr;
-}
-
-// Hole-aware variant of walkExpr: `child(node)` for `.firstChild`, `sibling(node,
-// n)` for n× `.nextSibling`. Identical to walkExpr when not hydrating; while
-// hydrating, `sibling` skips each `<!--[-->…<!--]-->` block range as one logical
-// step so paths that cross a control-flow / component hole resolve to the right
-// server node. Used for templates that contain holes (see `hasHoles`).
-function walkExprH(rootVar, path) {
-	if (path.length === 0) return rootVar;
-	let expr = rootVar;
-	for (let i = 0; i < path.length; i++) {
-		const idx = path[i];
-		expr = `_$child(${expr})`;
-		if (idx > 0) expr = `_$sibling(${expr}, ${idx})`;
-	}
-	return expr;
-}
-
 /** @param {TemplateOrigin[] | null} [origins] */
 function allocTemplate(ctx, html, ns = 0, frag = 0, origins = null) {
 	const id = ctx.nextTemplateId++;
@@ -18019,7 +18491,11 @@ function printNode(node) {
 	// files"). Centralizing here covers every emit path (statement-level
 	// rewrittenStatements, planJsx-emitted bindings, attribute / prop
 	// values via printExprWithTsrx) — no per-call-site strip needed.
-	const printable = stripTsOnlyWrappers(node);
+	// escapeMultilineStringLiterals is centralized here for the same reason:
+	// authored JSX string ATTRIBUTES may contain raw newlines, and any emit path
+	// may embed such a Literal (statement rewrites, binding-expression nodes) —
+	// its raw must be re-derived or the printed string literal is invalid JS.
+	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node));
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const { code } = esrapPrint(printable, esrapTsx(esrapCommentOptions));
 	return code;
@@ -18035,7 +18511,7 @@ function printNode(node) {
  * `.tsrx`, via the node's `.loc`).
  */
 function printNodeWithMap(node, ctx) {
-	const printable = stripTsOnlyWrappers(node);
+	const printable = stripTsOnlyWrappers(escapeMultilineStringLiterals(node));
 	if (assertPrintedLocs()) assertNodeLocs(printable);
 	const { code, map } = esrapPrint(printable, esrapTsx(esrapCommentOptions), {
 		sourceMapSource: ctx.mapSourceName,
@@ -18056,26 +18532,6 @@ function printExpr(node) {
 		loc: expression?.loc,
 	};
 	return printNode(wrapped).trim().replace(/;$/, '');
-}
-
-/**
- * Like printExpr, but also returns esrap's per-token source mappings for the
- * printed expression (fragment-relative generated coordinates, absolute source
- * positions — the printNodeWithMap contract). `code` is byte-identical to
- * printExpr's: the trailing-`;` strip removes a character after the last
- * mapped token and the statement print has no leading whitespace, so the
- * fragment mappings need no adjustment.
- */
-function printExprMapped(node, ctx) {
-	const expression = escapeMultilineStringLiterals(node);
-	const wrapped = {
-		...b.stmt(expression),
-		start: expression?.start,
-		end: expression?.end,
-		loc: expression?.loc,
-	};
-	const { code, mappings } = printNodeWithMap(wrapped, ctx);
-	return { code: code.trim().replace(/;$/, ''), mappings };
 }
 
 /**
@@ -18113,91 +18569,6 @@ function printExprWithTsrx(node, ctx, componentName, inlinedSubs) {
 	const keyed = ctx.mode === 'server' ? rewriteHookCalls(node, ctx, componentName) : node;
 	const rewritten = rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs);
 	return printExpr(rewritten);
-}
-
-/**
- * A generated chunk carrying the paste position of one embedded mapped
- * expression: `{ code, pastes: [{ line, col, mappings }] }` with chunk-relative
- * line/col. Emitters build the chunk from `before + expr + after` so the
- * expression's column is derived, never hand-counted.
- */
-function pasteChunk(before, expr, mappings, after) {
-	const line = countNewlines(before);
-	const lastNl = before.lastIndexOf('\n');
-	const col = lastNl === -1 ? before.length : before.length - lastNl - 1;
-	return { code: before + expr + after, pastes: mappings ? [{ line, col, mappings }] : [] };
-}
-
-/**
- * A leaf chunk carrying ONE mapped expression (paste at its own 0:0). Compose
- * with `catChunks` to embed several mapped fragments in one emit chunk.
- */
-function exprChunk(expr, mappings) {
-	return { code: expr, pastes: mappings ? [{ line: 0, col: 0, mappings }] : [] };
-}
-
-/**
- * Concatenate strings and chunks into ONE chunk, shifting every embedded
- * paste to its concatenated position — pasteChunk generalized to multiple
- * pastes. `code` is byte-identical to plain string concatenation of the
- * parts; a paste on a chunk's first line shifts by the running column, later
- * lines keep their own columns (the firstLineOnly contract downstream).
- */
-function catChunks(parts) {
-	let code = '';
-	let line = 0;
-	let col = 0;
-	const pastes = [];
-	for (const p of parts) {
-		const s = typeof p === 'string' ? p : p.code;
-		if (typeof p !== 'string') {
-			for (const paste of p.pastes) {
-				pastes.push({
-					line: line + paste.line,
-					col: paste.line === 0 ? col + paste.col : paste.col,
-					mappings: paste.mappings,
-				});
-			}
-		}
-		code += s;
-		const nl = countNewlines(s);
-		if (nl > 0) {
-			line += nl;
-			col = s.length - s.lastIndexOf('\n') - 1;
-		} else {
-			col += s.length;
-		}
-	}
-	return { code, pastes };
-}
-
-/**
- * Join mount/update chunk lists (plain strings and pasteChunk records) exactly
- * like `.join('\n')`, additionally collecting each paste's joined-relative
- * position. Returns `{ code, maps }`.
- */
-function joinChunks(chunks) {
-	let line = 0;
-	const maps = [];
-	const parts = [];
-	for (const c of chunks) {
-		const code = typeof c === 'string' ? c : c.code;
-		if (typeof c !== 'string') {
-			for (const paste of c.pastes) {
-				maps.push({ line: line + paste.line, col: paste.col, mappings: paste.mappings });
-			}
-		}
-		parts.push(code);
-		line += countNewlines(code) + 1;
-	}
-	return { code: parts.join('\n'), maps };
-}
-
-/** printExprWithTsrx + fragment mappings (see printExprMapped). */
-function printExprWithTsrxMapped(node, ctx, componentName, inlinedSubs) {
-	const keyed = ctx.mode === 'server' ? rewriteHookCalls(node, ctx, componentName) : node;
-	const rewritten = rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs);
-	return printExprMapped(rewritten, ctx);
 }
 
 // Identity-preserving copy-on-write map: `mutate` returns a replacement node
