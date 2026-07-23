@@ -65,11 +65,12 @@ function activeSource(vscode) {
 function registerOctaneMcpActions(vscode, context, callTool = callOctaneMcpTool, resultViewer) {
 	const commands = [
 		vscode.commands.registerCommand('octane.mcp.compileActive', async () => {
-			const active = activeSource(vscode);
-			if (!active || !/\.(?:tsrx|tsx|jsx)$/.test(active.document.uri.fsPath)) {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor || !/\.(?:tsrx|tsx|jsx)$/.test(editor.document.uri.fsPath)) {
 				await vscode.window.showWarningMessage('Open an Octane .tsrx, .tsx, or .jsx file first.');
 				return;
 			}
+			const active = { document: editor.document, source: editor.document.getText() };
 			const mode = await vscode.window.showQuickPick(
 				[
 					{ label: 'Client', value: 'client' },

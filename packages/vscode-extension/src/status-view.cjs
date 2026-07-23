@@ -215,13 +215,15 @@ function registerOctaneStatusView(vscode, context) {
 				enableScripts: true,
 				localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'assets')],
 			};
-			context.subscriptions.push(
-				webviewView.webview.onDidReceiveMessage(async (message) => {
-					if (typeof message?.command === 'string' && WEBVIEW_COMMANDS.has(message.command)) {
-						await vscode.commands.executeCommand(message.command);
-					}
-				}),
-			);
+			const messageListener = webviewView.webview.onDidReceiveMessage(async (message) => {
+				if (typeof message?.command === 'string' && WEBVIEW_COMMANDS.has(message.command)) {
+					await vscode.commands.executeCommand(message.command);
+				}
+			});
+			webviewView.onDidDispose(() => {
+				messageListener.dispose();
+				if (currentView === webviewView) currentView = undefined;
+			});
 			render();
 		},
 	};

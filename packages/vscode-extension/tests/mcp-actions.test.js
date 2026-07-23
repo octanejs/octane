@@ -3,8 +3,10 @@ import { registerOctaneMcpActions } from '../src/mcp-actions.cjs';
 
 function createVscode() {
 	const commands = new Map();
+	const source = 'export function App() @{}';
+	const selection = '<button>selected fragment</button>';
 	const document = {
-		getText: vi.fn().mockReturnValueOnce('').mockReturnValue('export function App() @{}'),
+		getText: vi.fn((range) => (range ? selection : source)),
 		uri: { fsPath: '/workspace/App.tsrx' },
 	};
 	const vscode = {
@@ -42,7 +44,7 @@ function createVscode() {
 }
 
 describe('Octane MCP actions', () => {
-	it('compiles the active TSRX file through the remote tool and opens its result', async () => {
+	it('compiles the complete active TSRX file even when the editor has a selection', async () => {
 		const mock = createVscode();
 		const callTool = vi.fn(async () =>
 			JSON.stringify({

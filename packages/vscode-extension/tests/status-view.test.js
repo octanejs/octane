@@ -9,8 +9,10 @@ import {
 
 function createVscode({ enabled = true } = {}) {
 	const commands = new Map();
-	let messageHandler;
+	const messageHandlers = new Set();
+	let disposeViewHandler;
 	let registeredProvider;
+	const htmlWrites = [];
 	const configuration = {
 		get: vi.fn(() => enabled),
 		update: vi.fn(),
@@ -48,23 +50,42 @@ function createVscode({ enabled = true } = {}) {
 			onDidChangeConfiguration: vi.fn(disposable),
 		},
 	};
+	let html = '';
 	const webview = {
 		asWebviewUri: vi.fn((uri) => `webview:${uri.path}`),
 		cspSource: 'webview-source',
-		html: '',
+		get html() {
+			return html;
+		},
+		set html(value) {
+			html = value;
+			htmlWrites.push(value);
+		},
 		onDidReceiveMessage: vi.fn((handler) => {
-			messageHandler = handler;
-			return disposable();
+			messageHandlers.add(handler);
+			return { dispose: vi.fn(() => messageHandlers.delete(handler)) };
 		}),
 		options: {},
+	};
+	const webviewView = {
+		onDidDispose: vi.fn((handler) => {
+			disposeViewHandler = handler;
+			return disposable();
+		}),
+		webview,
 	};
 	return {
 		commands,
 		configuration,
-		messageHandler: () => messageHandler,
+		disposeView: () => disposeViewHandler?.(),
+		emitMessage: async (message) => {
+			for (const handler of [...messageHandlers]) await handler(message);
+		},
+		htmlWrites,
 		provider: () => registeredProvider,
 		vscode,
 		webview,
+		webviewView,
 	};
 }
 
@@ -98,19 +119,34 @@ describe('Octane dashboard view', () => {
 			OCTANE_VIEW_ID,
 			provider,
 		);
-		provider.resolveWebviewView({ webview: mock.webview });
+		provider.resolveWebviewView(mock.webviewView);
 		expect(mock.webview.options).toEqual({
 			enableScripts: true,
 			localResourceRoots: [{ path: '/extension/assets' }],
 		});
 
-		await mock.messageHandler()({ command: 'octane.mcp.compileActive' });
-		await mock.messageHandler()({ command: 'malicious.command' });
+		await mock.emitMessage({ command: 'octane.mcp.compileActive' });
+		await mock.emitMessage({ command: 'malicious.command' });
 		expect(mock.vscode.commands.executeCommand).toHaveBeenCalledTimes(1);
 		expect(mock.vscode.commands.executeCommand).toHaveBeenCalledWith('octane.mcp.compileActive');
 
 		await mock.commands.get('octane.mcp.toggle')();
 		expect(mock.configuration.update).toHaveBeenCalledWith('enabled', false, 1);
+	});
+
+	it('stops rendering and receiving commands after the webview is disposed', async () => {
+		const mock = createVscode();
+		const context = { extensionUri: { path: '/extension' }, subscriptions: [] };
+		const provider = registerOctaneStatusView(mock.vscode, context);
+		provider.resolveWebviewView(mock.webviewView);
+
+		expect(mock.htmlWrites).toHaveLength(1);
+		mock.disposeView();
+		await mock.emitMessage({ command: 'octane.mcp.compileActive' });
+		await mock.commands.get('octane.refresh')();
+
+		expect(mock.vscode.commands.executeCommand).not.toHaveBeenCalled();
+		expect(mock.htmlWrites).toHaveLength(1);
 	});
 
 	it('surfaces a wrong language mode for a .tsrx file', () => {
