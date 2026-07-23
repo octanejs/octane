@@ -1,0 +1,91 @@
+.demo-page {
+	min-height: 100vh;
+	padding: 36px 24px;
+	background-color: #08111f;
+	display: flex;
+	flex-direction: column;
+}
+
+.hero-card {
+	padding: 28px 24px;
+	border-radius: 24px;
+	background-color: #132238;
+}
+
+.eyebrow {
+	font-size: 14px;
+	font-weight: 700;
+	letter-spacing: 2px;
+	color: #ff6b35;
+}
+
+.headline {
+	margin-top: 14px;
+	font-size: 34px;
+	font-weight: 700;
+	line-height: 40px;
+	color: #f7f9fc;
+}
+
+.intro {
+	margin-top: 14px;
+	font-size: 17px;
+	line-height: 25px;
+	color: #aebbd0;
+}
+
+.counter-card {
+	margin-top: 20px;
+	padding: 24px;
+	border-width: 1px;
+	border-color: #29405f;
+	border-radius: 24px;
+	background-color: #0d192b;
+}
+
+.counter-label {
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: 1px;
+	color: #7f93b2;
+}
+
+.counter-value {
+	margin-top: 10px;
+	font-size: 44px;
+	font-weight: 700;
+	color: #ffffff;
+}
+
+.increment-button {
+	margin-top: 20px;
+	padding: 17px 20px;
+	border-radius: 16px;
+	background-color: #ff6b35;
+}
+
+.increment-label {
+	font-size: 17px;
+	font-weight: 700;
+	text-align: center;
+	color: #08111f;
+}
+
+.proof-row {
+	margin-top: 20px;
+	display: flex;
+	flex-direction: row;
+}
+
+.proof-pill {
+	margin-right: 10px;
+	padding: 10px 12px;
+	border-radius: 999px;
+	background-color: #18304c;
+}
+
+.proof-label {
+	font-size: 11px;
+	font-weight: 700;
+	color: #8fd5ff;
+}

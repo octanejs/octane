@@ -83,12 +83,13 @@ packageExtensions:
 catalogs:
   lynx:
     '@lynx-js/css-extract-webpack-plugin': 0.9.0
+    '@lynx-js/qrcode-rsbuild-plugin': 0.6.0
     '@lynx-js/rspeedy': 0.16.0
     '@lynx-js/runtime-wrapper-webpack-plugin': 0.2.2
     '@lynx-js/tasm': 0.0.39
     '@lynx-js/template-webpack-plugin': 0.13.0
     '@lynx-js/testing-environment': 0.3.0
-    '@lynx-js/types': 4.0.0
+    '@lynx-js/types': 4.1.0
     '@lynx-js/webpack-dev-transport': 0.3.0
     '@rsbuild/core': 2.1.4
     '@rspack/core': 2.1.3
@@ -357,3 +358,4 @@ minimumReleaseAgeExclude:
   - '@tsrx/vite-plugin-solid@0.0.77'
   - 'ripple@0.3.109'
   - 'octane@0.1.13'
+  - '@lynx-js/types@4.1.0'

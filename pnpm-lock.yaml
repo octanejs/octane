@@ -718,6 +718,9 @@ catalogs:
     '@lynx-js/css-extract-webpack-plugin':
       specifier: 0.9.0
       version: 0.9.0
+    '@lynx-js/qrcode-rsbuild-plugin':
+      specifier: 0.6.0
+      version: 0.6.0
     '@lynx-js/rspeedy':
       specifier: 0.16.0
       version: 0.16.0
@@ -734,8 +737,8 @@ catalogs:
       specifier: 0.3.0
       version: 0.3.0
     '@lynx-js/types':
-      specifier: 4.0.0
-      version: 4.0.0
+      specifier: 4.1.0
+      version: 4.1.0
     '@lynx-js/webpack-dev-transport':
       specifier: 0.3.0
       version: 0.3.0
@@ -3988,7 +3991,7 @@ importers:
     dependencies:
       '@lynx-js/types':
         specifier: catalog:lynx
-        version: 4.0.0
+        version: 4.1.0
     devDependencies:
       '@lynx-js/testing-environment':
         specifier: catalog:lynx
@@ -4416,6 +4419,9 @@ importers:
         specifier: workspace:*
         version: link:../rspack-plugin-octane
     devDependencies:
+      '@lynx-js/qrcode-rsbuild-plugin':
+        specifier: catalog:lynx
+        version: 0.6.0(@lynx-js/rspeedy@0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(webpack@5.108.4(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.20)))
       '@lynx-js/rspeedy':
         specifier: catalog:lynx
         version: 0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(webpack@5.108.4(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.20))
@@ -4428,6 +4434,9 @@ importers:
       '@rspack/core':
         specifier: catalog:lynx
         version: 2.1.3(@swc/helpers@0.5.23)
+      '@tsrx/typescript-plugin':
+        specifier: catalog:default
+        version: 0.3.109(@tsrx/react@0.2.47(react@19.2.7))(@tsrx/ripple@0.1.48)(@tsrx/solid@0.1.47(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)
       '@types/node':
         specifier: catalog:default
         version: 24.13.3
@@ -6956,6 +6965,12 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
+  '@lynx-js/qrcode-rsbuild-plugin@0.6.0':
+    resolution: {integrity: sha512-AjRhjQH5xEJKo5VUIIsjdk6zc6qXMf4QsGvKTDuwBjuGr01sDkLLpAt+wbu9GCJvDlGA7ygNTEsxaPJPYHPmIw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    peerDependencies:
+      '@lynx-js/rspeedy': ^0.16.0
+
   '@lynx-js/rspeedy@0.16.0':
     resolution: {integrity: sha512-j9a25T3we1rtkCQtpKwjVD5Gn7E6YlILWu6xTyR0cHoG01Rmln1i2BK9SoTjtt9SKnUVB7i+eHOVRimXMpVwuw==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -6982,8 +6997,8 @@ packages:
   '@lynx-js/testing-environment@0.3.0':
     resolution: {integrity: sha512-a08y6fmEZZHNva/bCs4UT8SavTPFnH8j0wb01gnnC6RA28r0139I5ApjAzaPi+LSaj1pH+A5o41bDts2iV+ulw==}
 
-  '@lynx-js/types@4.0.0':
-    resolution: {integrity: sha512-FBtBV8wt+9/CAUbTdZwvbhGjJEnyzKLWVpq5gaTHTbhDztbhdP0avZ0nHD6I5HSgAhzYNB9oDrqMt/r6YqBkng==}
+  '@lynx-js/types@4.1.0':
+    resolution: {integrity: sha512-WLWnMpGZMrjffSR62PYesSfjD0RWumPyT21iMTi7GySGkOSOGdv4q4wWkarg8zNI7SxcCFM6kpXFhyIERADBPQ==}
 
   '@lynx-js/web-core@0.22.2':
     resolution: {integrity: sha512-pJY0/h/7GcP6O2NYAwpTXe8ZT5tAq91aECSvRcAyvS/7YCW/3JMYuOtZLgOfF+Nan45PjSMVLn5NmLx9cSRj7Q==}
@@ -17092,6 +17107,10 @@ snapshots:
 
   '@lynx-js/debug-metadata@0.1.0': {}
 
+  '@lynx-js/qrcode-rsbuild-plugin@0.6.0(@lynx-js/rspeedy@0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(webpack@5.108.4(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.20)))':
+    dependencies:
+      '@lynx-js/rspeedy': 0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(webpack@5.108.4(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.20))
+
   '@lynx-js/rspeedy@0.16.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)(@rspack/core@2.1.3(@swc/helpers@0.5.23))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(supports-color@10.2.2)(typescript@5.9.3)(webpack@5.108.4(cssnano@7.1.9(postcss@8.5.20))(csso@5.0.5)(esbuild@0.28.1)(lightningcss@1.33.0)(postcss@8.5.20))':
     dependencies:
       '@lynx-js/cache-events-webpack-plugin': 0.2.0
@@ -17145,7 +17164,7 @@ snapshots:
 
   '@lynx-js/testing-environment@0.3.0': {}
 
-  '@lynx-js/types@4.0.0':
+  '@lynx-js/types@4.1.0':
     dependencies:
       csstype: 3.1.3
 
@@ -20400,6 +20419,17 @@ snapshots:
       '@tsrx/ripple': 0.1.48
       '@tsrx/solid': 0.1.47(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
       octane: 0.1.13(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
+  '@tsrx/typescript-plugin@0.3.109(@tsrx/react@0.2.47(react@19.2.7))(@tsrx/ripple@0.1.48)(@tsrx/solid@0.1.47(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@packages+octane)(typescript@5.9.3)':
+    dependencies:
+      '@volar/language-core': 2.4.28
+      '@volar/typescript': 2.4.28
+      typescript: 5.9.3
+    optionalDependencies:
+      '@tsrx/react': 0.2.47(react@19.2.7)
+      '@tsrx/ripple': 0.1.48
+      '@tsrx/solid': 0.1.47(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15)
+      octane: link:packages/octane
 
   '@tsrx/vite-plugin-react@0.0.79(react@19.2.7)(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))':
     dependencies:

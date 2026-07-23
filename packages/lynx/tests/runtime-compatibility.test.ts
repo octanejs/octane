@@ -98,7 +98,6 @@ describe('Lynx runtime compatibility evidence', () => {
 	it('keeps background and main-thread runtime ownership in separate source graphs', () => {
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/root.ts'))).toEqual({
 			files: [
-				'src/config.ts',
 				'src/core/background-lifecycle.ts',
 				'src/core/client-driver.ts',
 				'src/core/host-props.ts',
@@ -107,6 +106,7 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/nodes-ref.ts',
 				'src/core/portal.ts',
 				'src/core/protocol.ts',
+				'src/core/renderer-id.ts',
 				'src/core/transport.ts',
 				'src/core/worklets.ts',
 				'src/resource.ts',
@@ -116,7 +116,6 @@ describe('Lynx runtime compatibility evidence', () => {
 		});
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/main-thread.ts'))).toEqual({
 			files: [
-				'src/config.ts',
 				'src/core/first-screen.ts',
 				'src/core/host-driver.ts',
 				'src/core/host-props.ts',
@@ -127,6 +126,7 @@ describe('Lynx runtime compatibility evidence', () => {
 				'src/core/papi.ts',
 				'src/core/portal.ts',
 				'src/core/protocol.ts',
+				'src/core/renderer-id.ts',
 				'src/core/worklets.ts',
 				'src/first-screen.ts',
 				'src/main-renderer.ts',

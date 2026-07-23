@@ -7,7 +7,6 @@ import type {
 	UniversalPortalTargetHandle,
 	UniversalSerializableValue,
 } from 'octane/universal/native';
-import { LYNX_RENDERER_ID } from '../config.js';
 import {
 	decodeLynxNativeEventToken,
 	encodeLynxNativeEventToken,
@@ -57,6 +56,7 @@ import {
 	isLynxPortalTargetHandle,
 	lynxPortalTargetKey,
 } from './portal.js';
+import { LYNX_RENDERER_ID } from './renderer-id.js';
 
 const LYNX_HOST_STATE: unique symbol = Symbol('octane.lynx.host-state');
 

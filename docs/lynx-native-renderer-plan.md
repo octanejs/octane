@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–9 have private source/test/build or repository-stabilization implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–10 have private source/test/build, demo-harness, or repository-stabilization implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-22**
 
@@ -21,6 +21,8 @@ Milestone 7 source/test evidence date: **2026-07-21**
 Milestone 8 source/test/build evidence date: **2026-07-22**
 
 Milestone 9 repository-stabilization evidence date: **2026-07-22**
+
+Milestone 10 one-command demo source/build evidence date: **2026-07-22**
 
 Post-Milestone-9 public page-destroy source/test evidence date: **2026-07-22**
 
@@ -89,6 +91,7 @@ export default defineConfig({
 
 ```tsx
 // src/App.tsrx
+/** @jsxImportSource @octanejs/lynx/intrinsics */
 import { useState } from 'octane';
 
 export function App() @{
@@ -181,6 +184,7 @@ to mix freely:
 | `@lynx-js/react` | `0.123.0` | Behavioral oracle, public API/test crosswalk, no production dependency |
 | `@lynx-js/react-rsbuild-plugin` | `0.18.0` | Reference for dual-layer graph and lifecycle wiring only |
 | `@lynx-js/rspeedy` | `0.16.0` | Native toolchain and public plugin host |
+| `@lynx-js/qrcode-rsbuild-plugin` | `0.6.0` | Repository demo LAN URL and Explorer QR code |
 | `@lynx-js/template-webpack-plugin` | `0.13.0` | Framework-neutral `.lynx.bundle` assembly |
 | `@lynx-js/css-extract-webpack-plugin` | `0.9.0` | Framework-neutral stylesheet extraction |
 | `@lynx-js/runtime-wrapper-webpack-plugin` | `0.2.2` | Background runtime wrapping |
@@ -1056,6 +1060,43 @@ no committed test is skipped, todo, or expected-failure; packed apps build and
 run on the stated minimum/current toolchains and Android/iOS runtimes; public
 performance, lifecycle, event, ref, and native capability claims have durable
 evidence.
+
+### Milestone 10 — one-command Lynx Explorer demo harness (1 engineer-week)
+
+> **Progress (2026-07-22): private source/build implementation complete;
+> native exit blocked.** The repository now owns a consumer-shaped Octane Lynx
+> application under the Rspeedy package. `pnpm lynx:demo` starts the pinned
+> Rspeedy development server, serves a stable `main.lynx.bundle`, and uses
+> `@lynx-js/qrcode-rsbuild-plugin@0.6.0` to print the LAN URL and Explorer QR
+> code. The screen includes CSS, stable smoke-test markers, a dual-thread first
+> render, and a native `bindtap` counter update. Its authored component passes
+> directly to `root.render()` without an application cast; the renderer-local
+> JSX and public root types now describe that supported authoring contract.
+> `pnpm lynx:demo:check` type-checks the application and builds the exact entry.
+> The CI demo test also starts the advertised development command on an isolated
+> port, fetches `main.lynx.bundle`, proves the process tree releases the server,
+> and decodes the production artifact. It checks both thread programs and CSS,
+> verifies target SDK `3.9`, and rejects React, Preact, ReactLynx, and DOM runtime
+> leakage. No compatible Explorer or device was available on the evidence host,
+> so this is not yet proof of native first paint, tap delivery, adoption, or live
+> reload.
+
+- Keep the primary repository command discoverable and independent of global
+  Rspeedy installs.
+- Serve a deterministic bundle filename and advertise a reachable LAN address
+  and QR code for the official Lynx `3.9.0` Explorer.
+- Make the demo exercise visible native layout and styling plus one
+  background-owned state update through Lynx's native event spelling.
+- Keep a non-interactive CI path that type-checks, builds, and decodes the exact
+  demo bundle without pretending that artifact inspection is native execution.
+- Record Android and iOS execution separately; one platform does not stand in
+  for both release gates.
+
+Exit: from a clean checkout, `pnpm lynx:demo` produces a URL that the official
+Lynx `3.9.0` Explorer can load; the screen appears once without a duplicate
+tree or runtime error; tapping the control changes `Count 0` to `Count 1`; and
+server teardown leaves no development process behind. Android and iOS each
+need captured evidence before this milestone can claim both native platforms.
 
 ## Validation strategy
 

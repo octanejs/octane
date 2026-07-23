@@ -129,4 +129,66 @@ describe('hoisted document metadata — hydration', () => {
 		expect(document.head.querySelectorAll('title').length).toBe(0);
 		expect(document.head.querySelectorAll('meta[name="description"]').length).toBe(0);
 	});
+
+	it('skips an interposed foreign element and adopts the intended head element', () => {
+		const { html } = ServerRT.renderToString(server.Page, { params: {} });
+		const bodyStart = html.indexOf('<section');
+		document.head.innerHTML = html.slice(0, bodyStart);
+		container.innerHTML = html.slice(bodyStart);
+
+		const title = document.head.querySelector('title')!;
+		const meta = document.head.querySelector('meta[name="description"]')!;
+		const foreign = document.createElement('script');
+		foreign.type = 'application/json';
+		foreign.textContent = '{"foreign":true}';
+		// The title marker remains immediately before this foreign node. A head
+		// claimant must validate the expected tag instead of owning the next element.
+		document.head.insertBefore(foreign, title);
+
+		const root = hydrateRoot(container, Page, { params: {} });
+		flushSync(() => {});
+
+		expect(foreign.isConnected).toBe(true);
+		expect(foreign.textContent).toBe('{"foreign":true}');
+		expect(document.head.querySelector('title')).toBe(title);
+		expect(document.head.querySelector('meta[name="description"]')).toBe(meta);
+		expect(document.head.querySelectorAll('title')).toHaveLength(1);
+		expect(document.head.querySelectorAll('meta[name="description"]')).toHaveLength(1);
+
+		root.unmount();
+		expect(foreign.isConnected).toBe(true);
+		expect(title.isConnected).toBe(false);
+		expect(meta.isConnected).toBe(false);
+	});
+
+	it('creates a missing expected head element without claiming a wrong-tag neighbor', () => {
+		const { html } = ServerRT.renderToString(server.Page, { params: {} });
+		const bodyStart = html.indexOf('<section');
+		document.head.innerHTML = html.slice(0, bodyStart);
+		container.innerHTML = html.slice(bodyStart);
+
+		const missingTitle = document.head.querySelector('title')!;
+		const meta = document.head.querySelector('meta[name="description"]')!;
+		const foreign = document.createElement('script');
+		foreign.type = 'application/json';
+		foreign.textContent = '{"foreign":true}';
+		document.head.insertBefore(foreign, missingTitle);
+		missingTitle.remove();
+
+		const root = hydrateRoot(container, Page, { params: {} });
+		flushSync(() => {});
+
+		const createdTitle = document.head.querySelector('title')!;
+		expect(createdTitle).not.toBe(missingTitle);
+		expect(createdTitle.textContent).toBe('TSRX Page');
+		expect(document.head.querySelectorAll('title')).toHaveLength(1);
+		expect(document.head.querySelector('meta[name="description"]')).toBe(meta);
+		expect(foreign.isConnected).toBe(true);
+		expect(foreign.textContent).toBe('{"foreign":true}');
+
+		root.unmount();
+		expect(createdTitle.isConnected).toBe(false);
+		expect(meta.isConnected).toBe(false);
+		expect(foreign.isConnected).toBe(true);
+	});
 });

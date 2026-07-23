@@ -1,4 +1,4 @@
-# `@octanejs/rspeedy-plugin` (private Milestones 6–9 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestones 6–10 source/build path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
@@ -21,6 +21,29 @@ The repository proves graph specialization, bundle construction, decoding, and
 dual-layer lazy-chunk emission; it does not yet prove first paint, adoption, or
 dynamic chunk execution on Lynx Web, Android Explorer, or iOS Explorer, nor
 does it prove state-preserving HMR on those targets.
+
+## One-command repository demo
+
+From the repository root, run:
+
+```bash
+pnpm lynx:demo
+```
+
+The command starts the pinned Rspeedy development server, builds
+`main.lynx.bundle`, and prints its LAN URL and a QR code. Open that URL with the
+official
+[Lynx 3.9.0 Explorer](https://github.com/lynx-family/lynx/releases/tag/3.9.0)
+on a device that can reach the development computer. The demo exercises native
+layout and CSS, dual-thread startup, and a background-owned state update through
+`bindtap`. See the
+[demo README](./examples/demo/README.md) for prerequisites and non-interactive
+checks.
+
+The repository's automated gate starts the development command on an isolated
+port, fetches and decodes this exact bundle, and verifies server teardown. It
+does not replace the Explorer/device acceptance gate or prove native first
+paint, adoption, tap delivery, or live reload.
 
 ## Application mode
 
@@ -58,6 +81,11 @@ Compatible Rspack entry metadata is copied to both generated graphs so they see
 the same entry initialization inputs. Development-only CSS HMR setup runs after
 the receiver install and before the authored imports.
 
+Standalone `.tsrx` application components use a leading
+`/** @jsxImportSource @octanejs/lynx/intrinsics */` pragma for editor and
+`tsrx-tsc` typing. The Rspeedy plugin independently selects Lynx as the default
+compiler renderer for the application build.
+
 An authored `lazy(() => import('./Card.tsrx'))` remains a real Rspack dynamic
 import. The pinned production fixture emits a content-hashed async `.bundle`;
 its module is specialized independently in the `octane:main-thread` and
@@ -77,7 +105,7 @@ pluginOctane({ thread: 'main-thread' });
 ## Compatibility lanes
 
 Milestone 9 covers two exact, indivisible source/build graphs. Registry
-metadata was checked on 2026-07-22:
+metadata was checked on 2026-07-23:
 
 | Component | Minimum | Current |
 | --- | ---: | ---: |
@@ -100,7 +128,7 @@ metadata was checked on 2026-07-22:
 | `@lynx-js/webpack-runtime-globals` | `0.0.7` | `0.0.7` |
 | `@lynx-js/tasm` | `0.0.39` | `0.0.39` |
 | `@lynx-js/testing-environment` | `0.3.0` | `0.3.0` |
-| `@lynx-js/types` | `4.0.0` | `4.0.0` |
+| `@lynx-js/types` | `4.1.0` | `4.1.0` |
 | `@lynx-js/web-core` | `0.22.2` | `0.22.2` |
 | TypeScript | `5.9.3` | `5.9.3` |
 | Webpack (tooling peer only) | `5.108.4` | `5.108.4` |
@@ -109,10 +137,14 @@ Rspeedy `0.16.0` requires Rsbuild `2.1.4` exactly. That Rsbuild release accepts
 Rspack `~2.1.2`, so the current lane advances only Rspack to the newest allowed
 patch. It does not mix in Rsbuild `2.1.7`. Likewise, template plugin `0.13.0`
 requires tasm `0.0.39` exactly, so the standalone tasm `0.0.48` release is not
-part of this graph. The lane also pins every direct Rspeedy dependency selected
-through a caret or tilde range, the debug-metadata payload, runtime globals, and
-the required Webpack 5 tooling peer. The current registry check recomputes the
-newest version inside each upstream range before accepting the recorded graph.
+part of this graph. `@octanejs/lynx` also remains pinned to its audited
+`@lynx-js/types@4.0.0` compatibility slice; newer standalone types releases are
+reported by the registry check but are not accepted into either lane without a
+new compatibility audit. The lane also pins every direct Rspeedy dependency
+selected through a caret or tilde range, the debug-metadata payload, runtime
+globals, and the required Webpack 5 tooling peer. The current registry check
+recomputes the newest version inside each selected upstream range before
+accepting the recorded graph.
 
 `pnpm test:compat` packs Octane, the Lynx renderer, and both compiler plugins,
 then installs each lane into an external temporary consumer without creating a
