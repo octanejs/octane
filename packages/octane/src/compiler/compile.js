@@ -337,6 +337,12 @@ const CONTROLLED_KIND_HELPERS = {
 // (falsy drops; overloaded download/capture keep string payloads), booleans
 // on non-boolean attrs DROP (React: `title={true}` never renders), everything
 // else escapes as before. Custom elements keep raw semantics.
+//
+// LAYOUT INVARIANT (template-origin recording): every non-empty chunk has the
+// shape ` name` or ` name="value"`, and the emitted name is always exactly
+// `attrName.length` characters (`lower` preserves length). The inspect-mode
+// recorder (recordBakedAttrOrigins) derives the name/value offsets from that
+// shape arithmetically — keep the invariant when adding forms.
 function bakeStaticAttr(attrName, lv, tag, namespace = 'html') {
 	if (lv == null) return '';
 	const isCustom =
@@ -3809,6 +3815,57 @@ function countNewlines(str) {
  * @param {Array<{ genLine: number, genCol: number, srcLine0: number, srcCol0: number }>} segments
  *   genLine/genCol are 0-based ABSOLUTE generated coords; src* are 0-based source coords.
  */
+/**
+ * Inspection-only (`inspect: true`): enrich decoded module-map segments into
+ * "fat segments" `{ genLine, genCol, genEndCol, srcStart, srcEnd }` with
+ * absolute source offsets. `srcEnd` is resolved through a smallest-node-at-
+ * offset index over the parsed AST (read-only walk via mapAst), so a segment
+ * pointing at an identifier gets exactly that identifier's range.
+ */
+/** @param {any[]} segments @param {string} source @param {any} parsedAst */
+function buildFatSegments(segments, source, parsedAst) {
+	const lineStarts = [0];
+	for (let i = 0; i < source.length; i++) {
+		if (source.charCodeAt(i) === 10) lineStarts.push(i + 1);
+	}
+	/** @type {Map<number, number>} */
+	const smallestEndAt = new Map();
+	mapAst(parsedAst, (/** @type {any} */ node) => {
+		if (typeof node.start === 'number' && typeof node.end === 'number') {
+			const prev = smallestEndAt.get(node.start);
+			if (prev === undefined || node.end < prev) smallestEndAt.set(node.start, node.end);
+		}
+		return null;
+	});
+	const fat = segments
+		.map((/** @type {any} */ s) => {
+			const lineStart = lineStarts[s.srcLine0];
+			if (lineStart === undefined) return null;
+			const srcStart = lineStart + s.srcCol0;
+			return {
+				genLine: s.genLine,
+				genCol: s.genCol,
+				genEndCol: null,
+				srcStart,
+				srcEnd: smallestEndAt.get(srcStart) ?? null,
+			};
+		})
+		.filter(Boolean)
+		.sort(
+			(/** @type {any} */ a, /** @type {any} */ b) => a.genLine - b.genLine || a.genCol - b.genCol,
+		);
+	for (let i = 0; i < fat.length; i++) {
+		// Deduped by buildSourceMap on the encoded side; keep raw here but give
+		// each segment the next DISTINCT column on its line as its end.
+		let j = i + 1;
+		while (j < fat.length && fat[j].genLine === fat[i].genLine && fat[j].genCol === fat[i].genCol) {
+			j++;
+		}
+		if (j < fat.length && fat[j].genLine === fat[i].genLine) fat[i].genEndCol = fat[j].genCol;
+	}
+	return fat;
+}
+
 function buildSourceMap(source, sourceName, segments) {
 	const byLine = new Map();
 	let maxLine = -1;
@@ -4797,6 +4854,14 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		);
 	}
 	const hmrEnabled = hmrDialect !== false;
+	// Opt-in template-origin recording (`inspect: true`, client mode only): for
+	// every span baked into a hoisted template's HTML string (tag names, static
+	// attributes, static text), capture the authored source range that produced
+	// it, returned out-of-band as `result.inspect`. The emitted CODE stays
+	// byte-identical in both states; the off path does zero extra work — every
+	// recording site is gated on `ctx.inspect` (see the "Template-origin
+	// recording" section above emitNodeHtml).
+	const inspectEnabled = !!(options && options.inspect);
 	// Dev mode: emit dev-only hydration source-location metadata (a per-component
 	// `__s.locs` table of structured {line,column} keyed by slot index + the module file
 	// name), used by hydration-mismatch warnings and reusable by a future Chrome-DevTools
@@ -4842,7 +4907,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
 		consumedRuntimeLocals,
-		hoistedTemplates: [], // { name, html }
+		inspect: inspectEnabled, // template-origin recording (see above)
+		_retOrigins: null, // inspect-only: completed emitElementHtml frame's origins (return slot)
+		hoistedTemplates: [], // { name, html, ns, frag, origins }
 		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
@@ -5648,11 +5715,35 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		srcCol0: s.srcCol0,
 	}));
 
+	/** @type {{ code: string, map: any, diagnostics: any, inspect?: any, __universalSourceMapComposed?: boolean }} */
 	const result = {
 		code: prelude + body + stampBlock + hmrBlock + profileBlock,
 		map: buildSourceMap(source, ctx.mapSourceName, segments),
 		diagnostics: nativeChangeDiagnostics,
 	};
+	if (ctx.inspect) {
+		// Template-origin recording (opt-in, out-of-band): one entry per hoisted
+		// template. `html` is the logical (pre-backtick-escaping) template HTML;
+		// `origins` maps spans inside it to absolute offsets in the compiled
+		// source. Entries are sorted by `start` by construction (append-ordered,
+		// monotonic embeds).
+		result.inspect = {
+			templates: ctx.hoistedTemplates.map((t) => ({
+				name: t.name,
+				html: t.html,
+				origins: t.origins === null ? [] : t.origins,
+			})),
+			// Fat segments: the module map's decoded segments enriched with
+			// absolute source OFFSETS (start AND end — standard source maps carry
+			// no end, which is what makes precise range highlighting impossible
+			// from a .map alone). `srcEnd` comes from the smallest parsed node
+			// starting at the segment's source offset; null when no node starts
+			// there. `genEndCol` is the next segment's column on the same
+			// generated line (null on the line's last segment — consumers clamp
+			// to the line end).
+			segments: buildFatSegments(segments, source, parsedAst),
+		};
+	}
 	for (const unit of universalUnits) {
 		result.code = retargetRuntimeImportAliases(
 			result.code,
@@ -13151,6 +13242,11 @@ function planJsx(
 	);
 	const partsHtml = [];
 	let htmlIdx = 0;
+	// Template-origin frame for the whole template (inspect only): each root
+	// part's origins shift by the joined length of the parts before it.
+	/** @type {TemplateOrigin[] | null} */
+	const rootOrigins = ctx.inspect ? [] : null;
+	let rootOriginsLen = 0;
 	// Text-adjacency classification of the root nodes (see textAdjacencyKind):
 	// root-level text holes are `<!>` bindings too, so a dynamic hole with a
 	// text neighbour needs the same adjacentText flag as the in-element walk
@@ -13174,6 +13270,9 @@ function planJsx(
 		const nodeNeedsAnchor = nodeIsComp || isConstructNode(node);
 		const nodePath = !single && (nodeNeedsAnchor ? hasStaticRoot : true) ? [htmlIdx] : [];
 		const bindingsBefore = elementBindings.length;
+		// Clear the origin return slot so a stale frame from an earlier node's
+		// nested compiles can never be mis-attributed to this root.
+		if (ctx.inspect) ctx._retOrigins = null;
 		const part = emitNodeHtml(
 			node,
 			nodePath,
@@ -13198,6 +13297,18 @@ function planJsx(
 			}
 		}
 		partsHtml.push(part);
+		// Consume this root's origin frame. Only node types that can hand one
+		// back qualify (a host Element via emitElementHtml's tail; a static
+		// Literal root via emitNodeHtml) — every other node type returns markers
+		// with no baked source content, and any slot value left by ITS nested
+		// compiles was already consumed by their own planJsx runs.
+		if (rootOrigins !== null) {
+			if ((node.type === 'Element' || node.type === 'Literal') && ctx._retOrigins !== null) {
+				appendShiftedOrigins(rootOrigins, ctx._retOrigins, rootOriginsLen);
+			}
+			ctx._retOrigins = null;
+			rootOriginsLen += part.length;
+		}
 		// M3 inherit-range: stamp the sole comp-call root's cc. Its own entry is
 		// the LAST one its emitNodeHtml pushed (nested children/prop ccs are
 		// pushed first, before makeCompCall returns to the root push).
@@ -13304,7 +13415,16 @@ function planJsx(
 		const fragArg = !single && (flag !== 0 || resolvedFrag) ? 1 : 0;
 		const tplHtml =
 			single || flag !== 0 || resolvedFrag ? html : `<octane-frag>${html}</octane-frag>`;
-		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg);
+		if (rootOrigins !== null && tplHtml !== html) {
+			// The synthetic <octane-frag> wrapper shifts every span right by its
+			// open-tag length. The entries are compiler-owned — shift in place.
+			const shift = '<octane-frag>'.length;
+			for (const o of rootOrigins) {
+				o.start += shift;
+				o.end += shift;
+			}
+		}
+		const tpl = allocTemplate(ctx, tplHtml, flag, fragArg, rootOrigins);
 		// DEV: pass the root element's source location so a STRUCTURAL hydration mismatch
 		// (swapped @if/@switch branch, changed tag) warns with `file:line:col`. Single-root
 		// only (a multi-root <octane-frag> wrapper has no source position); prod omits it.
@@ -14943,6 +15063,90 @@ function emitBindingUpdate(b, bag) {
 // HTML emission
 // ===========================================================================
 
+// ---------------------------------------------------------------------------
+// Template-origin recording (`inspect: true`) — maps spans INSIDE a hoisted
+// template's HTML string back to the authored source ranges that produced
+// them (hover/navigation tooling). Recording happens AT APPEND TIME: every
+// site that appends static content to a growing template-HTML buffer knows
+// its own offsets (current buffer length + the appended chunk's internal
+// layout), so no HTML is ever re-lexed or scanned. Frames compose by
+// SHIFTING: a child element's origins are recorded relative to its own
+// buffer, handed back through `ctx._retOrigins` (a consume-on-read return
+// slot — emitElementHtml's tail sets it, the embedding caller reads and
+// clears it), and shifted by the embed offset — the same idiom
+// pasteChunk/joinChunks use for expression maps, applied to template HTML.
+// Everything is gated on `ctx.inspect`; the off path allocates and records
+// nothing, and the emitted code is byte-identical in both states.
+// ---------------------------------------------------------------------------
+
+/**
+ * @typedef {{ start: number, end: number, srcStart: number, srcEnd: number,
+ *   kind: 'tag-open' | 'tag-close' | 'attr-name' | 'attr-value' | 'text' }} TemplateOrigin
+ */
+
+// Shift a completed child frame's origin entries by the parent-buffer offset
+// its HTML was embedded at, appending them to the parent frame's list. Frames
+// embed children at monotonically increasing offsets, so plain appends keep
+// the combined list sorted by `start`.
+/**
+ * @param {TemplateOrigin[]} into
+ * @param {TemplateOrigin[]} child
+ * @param {number} base
+ */
+function appendShiftedOrigins(into, child, base) {
+	for (const o of child) {
+		into.push({
+			start: o.start + base,
+			end: o.end + base,
+			srcStart: o.srcStart,
+			srcEnd: o.srcEnd,
+			kind: o.kind,
+		});
+	}
+}
+
+// Record the origin entries for one static-attribute chunk appended at `base`
+// (a bakeStaticAttr result or the inline ` style="…"` bakes, which share the
+// same layout). Uses bakeStaticAttr's documented LAYOUT INVARIANT — ` name`
+// or ` name="value"` with the emitted name exactly `attrName.length`
+// characters — so the offsets are pure arithmetic. Bare boolean attrs (no
+// authored value node) and empty presence values (`disabled=""`) record their
+// `attr-name` only. The html-side value span excludes the quotes while the
+// source side is the authored value node's full range, so the two sides may
+// differ in length (HTML escaping, quotes) — expected and fine.
+/**
+ * @param {TemplateOrigin[]} origins
+ * @param {number} base
+ * @param {string} chunk
+ * @param {string} attrName
+ */
+function recordBakedAttrOrigins(origins, base, chunk, attrName, nameNode, valueNode) {
+	if (chunk === '') return;
+	const nameStart = base + 1; // past the leading space
+	const nameEnd = nameStart + attrName.length;
+	if (nameNode != null && nameNode.start != null) {
+		origins.push({
+			start: nameStart,
+			end: nameEnd,
+			srcStart: nameNode.start,
+			srcEnd: nameNode.end,
+			kind: 'attr-name',
+		});
+	}
+	if (chunk.length <= 1 + attrName.length) return; // bare ` name` form
+	const valueStart = nameEnd + 2; // past `="`
+	const valueEnd = base + chunk.length - 1; // before the closing quote
+	if (valueEnd > valueStart && valueNode != null && valueNode.start != null) {
+		origins.push({
+			start: valueStart,
+			end: valueEnd,
+			srcStart: valueNode.start,
+			srcEnd: valueNode.end,
+			kind: 'attr-value',
+		});
+	}
+}
+
 function emitNodeHtml(
 	node,
 	path,
@@ -15031,7 +15235,15 @@ function emitNodeHtml(
 			parentNs,
 			cssHash,
 		);
-	if (node.type === 'Literal' && typeof node.value === 'string') return escapeHtml(node.value);
+	if (node.type === 'Literal' && typeof node.value === 'string') {
+		const escaped = escapeHtml(node.value);
+		if (ctx.inspect && node.start != null) {
+			ctx._retOrigins = [
+				{ start: 0, end: escaped.length, srcStart: node.start, srcEnd: node.end, kind: 'text' },
+			];
+		}
+		return escaped;
+	}
 	// Top-level control-flow — register as a call hosted on the body's parent.
 	// When planJsx passed a non-empty `path` (a multi-root body with static
 	// template siblings), the construct emits a `<!>` anchor at its child index
@@ -15237,6 +15449,10 @@ function emitElementHtml(
 		typeWriters.length === 1 &&
 		(staticInputType === 'checkbox' || staticInputType === 'radio');
 	let attrHtml = '';
+	// Template-origin frame for the attribute region (inspect only): entries
+	// relative to `attrHtml`, shifted past `<tag` when `html` is assembled below.
+	/** @type {TemplateOrigin[] | null} */
+	const attrOrigins = ctx.inspect ? [] : null;
 	let sawRef = false;
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
 		const attr = attrs[attrI];
@@ -15553,7 +15769,10 @@ function emitElementHtml(
 			) {
 				inner = b.literal(true, 'true', attr);
 			} else {
-				attrHtml += bakeStaticAttr(attrName, true, tag, hostNs);
+				const baked = bakeStaticAttr(attrName, true, tag, hostNs);
+				if (attrOrigins !== null)
+					recordBakedAttrOrigins(attrOrigins, attrHtml.length, baked, attrName, attr.name, null);
+				attrHtml += baked;
 				continue;
 			}
 		} else {
@@ -15568,12 +15787,20 @@ function emitElementHtml(
 		// values become a setStyle binding.
 		if (attrName === 'style') {
 			if (!isAfterSpread && inner.type === 'Literal' && typeof inner.value === 'string') {
-				attrHtml += ` style="${escapeAttr(inner.value)}"`;
+				const chunk = ` style="${escapeAttr(inner.value)}"`;
+				if (attrOrigins !== null)
+					recordBakedAttrOrigins(attrOrigins, attrHtml.length, chunk, attrName, attr.name, inner);
+				attrHtml += chunk;
 				continue;
 			}
 			if (!isAfterSpread && inner.type === 'ObjectExpression' && objectExprIsStaticLiteral(inner)) {
 				const css = staticObjectToCssString(inner);
-				if (css) attrHtml += ` style="${escapeAttr(css)}"`;
+				if (css) {
+					const chunk = ` style="${escapeAttr(css)}"`;
+					if (attrOrigins !== null)
+						recordBakedAttrOrigins(attrOrigins, attrHtml.length, chunk, attrName, attr.name, inner);
+					attrHtml += chunk;
+				}
 				continue;
 			}
 			const styleMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
@@ -15600,7 +15827,10 @@ function emitElementHtml(
 			!classBeforeSpread &&
 			!(ctx.dev && needsDevStaticAttrValidation(attrName, inner.value, tag, hostNs))
 		) {
-			attrHtml += bakeStaticAttr(attrName, inner.value, tag, hostNs);
+			const baked = bakeStaticAttr(attrName, inner.value, tag, hostNs);
+			if (attrOrigins !== null)
+				recordBakedAttrOrigins(attrOrigins, attrHtml.length, baked, attrName, attr.name, inner);
+			attrHtml += baked;
 			continue;
 		}
 
@@ -15822,6 +16052,27 @@ function emitElementHtml(
 
 	const isVoid = VOID_ELEMENTS.has(tag);
 	let html = isVoid ? `<${tag}${attrHtml}/>` : `<${tag}${attrHtml}>`;
+	// Template-origin frame for THIS element (inspect only): `tag-open` for the
+	// tag name, the attribute frame shifted past `<tag`, then text/child entries
+	// as `html` grows (each records at the current buffer length), and finally a
+	// `tag-close` entry — so the list is sorted by `start` by construction.
+	/** @type {TemplateOrigin[] | null} */
+	let origins = null;
+	let originNameNode = null;
+	if (attrOrigins !== null) {
+		origins = [];
+		originNameNode = node.id || node.openingElement?.name;
+		if (originNameNode != null && originNameNode.start != null) {
+			origins.push({
+				start: 1,
+				end: 1 + tag.length,
+				srcStart: originNameNode.start,
+				srcEnd: originNameNode.end,
+				kind: 'tag-open',
+			});
+		}
+		appendShiftedOrigins(origins, attrOrigins, 1 + tag.length);
+	}
 	if (authoredStaticScriptContent !== undefined) {
 		html += escapeInlineScriptContent(authoredStaticScriptContent);
 	}
@@ -15837,7 +16088,18 @@ function emitElementHtml(
 			// byte-for-byte match with the server's `<el>text</el>` so hydration
 			// adopts it for free. (Sole child → no sibling childIndex / text-node
 			// merge concerns; mirrors the server `Literal` fast path.)
-			html += escapeHtml(staticLit);
+			const escaped = escapeHtml(staticLit);
+			const srcText = txtChild.expression;
+			if (origins !== null && srcText != null && srcText.start != null) {
+				origins.push({
+					start: html.length,
+					end: html.length + escaped.length,
+					srcStart: srcText.start,
+					srcEnd: srcText.end,
+					kind: 'text',
+				});
+			}
+			html += escaped;
 		} else if (isKnownStringExpression(txtChild.expression, ctx.knownStringLocals)) {
 			const textMapped = printExprMapped(resolveStyleExpr(txtChild.expression, cssHash), ctx);
 			bindings.push({
@@ -15939,7 +16201,18 @@ function emitElementHtml(
 					// into a single DOM text node, so FOLD: emit the text without
 					// consuming a new childIndex — matching the server, which serializes
 					// a static run as one merged chunk with no separator.
-					html += escapeHtml(staticLit);
+					const escaped = escapeHtml(staticLit);
+					const srcText = child.expression;
+					if (origins !== null && srcText != null && srcText.start != null) {
+						origins.push({
+							start: html.length,
+							end: html.length + escaped.length,
+							srcStart: srcText.start,
+							srcEnd: srcText.end,
+							kind: 'text',
+						});
+					}
+					html += escaped;
 					prevBakedText = true;
 					if (!prevBaked) childIdx++;
 				} else if (isKnownStringExpression(child.expression, ctx.knownStringLocals)) {
@@ -16001,7 +16274,7 @@ function emitElementHtml(
 						childIdx++;
 					}
 				} else {
-					html += emitElementHtml(
+					const childHtml = emitElementHtml(
 						child,
 						[...path, childIdx],
 						bindings,
@@ -16015,6 +16288,14 @@ function emitElementHtml(
 						childNs,
 						cssHash,
 					);
+					// Consume the child frame's origins (set by its tail) and shift
+					// them to this element's embed offset.
+					if (origins !== null) {
+						if (ctx._retOrigins !== null)
+							appendShiftedOrigins(origins, ctx._retOrigins, html.length);
+						ctx._retOrigins = null;
+					}
+					html += childHtml;
 					childIdx++;
 				}
 			} else if (child.type === 'ForOfStatement') {
@@ -16187,7 +16468,23 @@ function emitElementHtml(
 		});
 	}
 
-	if (!isVoid) html += `</${tag}>`;
+	if (!isVoid) {
+		if (origins !== null && originNameNode != null && originNameNode.start != null) {
+			// The close tag maps to the element's tag name: normalized Elements
+			// don't retain the closing identifier, and the opening name is the
+			// navigation target either way.
+			origins.push({
+				start: html.length + 2,
+				end: html.length + 2 + tag.length,
+				srcStart: originNameNode.start,
+				srcEnd: originNameNode.end,
+				kind: 'tag-close',
+			});
+		}
+		html += `</${tag}>`;
+	}
+	// Hand this frame to the embedding caller (consume-on-read return slot).
+	if (origins !== null) ctx._retOrigins = origins;
 	return html;
 }
 
@@ -17692,10 +17989,11 @@ function walkExprH(rootVar, path) {
 	return expr;
 }
 
-function allocTemplate(ctx, html, ns = 0, frag = 0) {
+/** @param {TemplateOrigin[] | null} [origins] */
+function allocTemplate(ctx, html, ns = 0, frag = 0, origins = null) {
 	const id = ctx.nextTemplateId++;
 	const name = `_t$${id}`;
-	ctx.hoistedTemplates.push({ name, html, ns, frag });
+	ctx.hoistedTemplates.push({ name, html, ns, frag, origins });
 	return name;
 }
 
