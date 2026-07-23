@@ -142,8 +142,10 @@ part of this graph. `@octanejs/lynx` also remains pinned to its audited
 reported by the registry check but are not accepted into either lane without a
 new compatibility audit. The lane also pins every direct Rspeedy dependency
 selected through a caret or tilde range, the debug-metadata payload, runtime
-globals, and the required Webpack 5 tooling peer. The current registry check
-recomputes the newest version inside each selected upstream range before
+globals, and the required Webpack 5 tooling peer. Webpack remains an audited
+tooling pin rather than a moving current-lane edge; the strict external install
+and production builds prove that peer is compatible. The current registry check
+recomputes the newest versions selected by the upstream build graph before
 accepting the recorded graph.
 
 `pnpm test:compat` packs Octane, the Lynx renderer, and both compiler plugins,

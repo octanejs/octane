@@ -14,6 +14,7 @@ import {
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
 import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
+import { decodeMappings } from './_source-map.js';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -271,10 +272,69 @@ export function Named() @{ <node /> }
 			clientOnlyExports: ['Named', 'default', 'metadata'],
 			clientReference: client?.clientReference,
 		});
+		expect(server?.ast).toMatchObject({ type: 'Program', sourceType: 'module' });
+		expect(server?.map).toMatchObject({
+			version: 3,
+			sources: ['/src/scenes/Scene.object.tsrx'],
+			sourcesContent: [source],
+		});
+		expect(server?.map?.mappings.length).toBeGreaterThan(0);
+		for (const line of decodeMappings(server!.map.mappings)) {
+			for (const segment of line) {
+				if (segment.length < 4) continue;
+				expect(segment[2], 'client-only stub source line').toBeGreaterThanOrEqual(0);
+				expect(segment[3], 'client-only stub source column').toBeGreaterThanOrEqual(0);
+			}
+		}
 		expect(server?.code).not.toContain('authored-setup');
 		expect(server?.code).not.toContain('__clientOnlyAuthoredSetup');
 		expect(server?.code).not.toContain("'client'");
-		expect(server?.code.match(/^\t\tset: fail,$/gm)).toHaveLength(1);
+
+		// The exposed Program is the exact stub AST used by the one esrap print.
+		// Assert the complete fail-closed Proxy contract structurally instead of
+		// pinning the printer's indentation/trailing-comma choices.
+		let proxy: any = null;
+		let generatedNodeCount = 0;
+		const seen = new WeakSet<object>();
+		const visit = (value: unknown): void => {
+			if (!value || typeof value !== 'object' || seen.has(value as object)) return;
+			seen.add(value as object);
+			if (Array.isArray(value)) {
+				for (const item of value) visit(item);
+				return;
+			}
+			const node = value as any;
+			if (typeof node.type === 'string') {
+				generatedNodeCount++;
+				expect(node.loc).toBeDefined();
+			}
+			if (node.type === 'NewExpression' && node.callee?.name === 'Proxy') proxy = node;
+			for (const [key, child] of Object.entries(node)) {
+				if (key !== 'loc' && key !== 'metadata') visit(child);
+			}
+		};
+		visit(server?.ast);
+		expect(generatedNodeCount).toBeGreaterThan(0);
+		const traps = new Set(
+			proxy?.arguments?.[1]?.properties?.map((property: any) => property.key?.name),
+		);
+		expect(traps).toEqual(
+			new Set([
+				'apply',
+				'construct',
+				'defineProperty',
+				'deleteProperty',
+				'get',
+				'getOwnPropertyDescriptor',
+				'getPrototypeOf',
+				'has',
+				'isExtensible',
+				'ownKeys',
+				'preventExtensions',
+				'set',
+				'setPrototypeOf',
+			]),
+		);
 
 		const stubUrl = `data:text/javascript;base64,${Buffer.from(server!.code).toString('base64')}`;
 		const execution = spawnSync(
@@ -294,6 +354,70 @@ export function Named() @{ <node /> }
 			filename: '/src/scenes/Scene.object.tsrx',
 		});
 		expect(useError.message).toMatch(/client-only export "default".*renderer "object"/i);
+	});
+
+	it('omits client-only server scaffolding when there are no runtime exports', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		const source = '\n';
+		const server = compiler.transform(source, '/project/src/scenes/Empty.object.tsrx', {
+			environment: 'server',
+		});
+
+		expect(server).toMatchObject({
+			kind: 'client-only-stub',
+			clientOnlyExports: [],
+			code: '',
+			ast: { type: 'Program', sourceType: 'module', body: [] },
+			map: {
+				version: 3,
+				sources: ['/src/scenes/Empty.object.tsrx'],
+				sourcesContent: [source],
+				mappings: '',
+			},
+		});
+	});
+
+	it('preserves quoted runtime export names in the client-only stub AST and module', async () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		const source = 'const internal = 1;\nexport { internal as "scene-name" };\n';
+		const server = compiler.transform(source, '/project/src/Quoted.object.tsrx', {
+			environment: 'server',
+		});
+		expect(server).toMatchObject({
+			kind: 'client-only-stub',
+			clientOnlyExports: ['scene-name'],
+		});
+		const exportDeclaration = (server?.ast as any).body.at(-1);
+		expect(exportDeclaration.specifiers[0].exported).toMatchObject({
+			type: 'Literal',
+			value: 'scene-name',
+		});
+
+		const stubUrl = `data:text/javascript;base64,${Buffer.from(server!.code).toString('base64')}`;
+		const namespace = await import(stubUrl);
+		expect(Object.keys(namespace)).toEqual(['scene-name']);
 	});
 
 	it('fails closed when a client-only renderer rule selects source outside the stub contract', () => {

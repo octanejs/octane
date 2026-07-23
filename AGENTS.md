@@ -323,6 +323,15 @@ required adversarial self-review on the final diff. Do not claim performance
 improvements without comparable measurements, and report residual risk when a
 trustworthy measurement is unavailable.
 
+## Compiler AST Immutability
+
+Never mutate a parsed AST during compilation/transformation. Rewrites are
+copy-on-write (`@tsrx/core` builders / spreads, return the rebuilt node,
+identity-keyed marks in WeakMaps on ctx) — follow the existing patterns in
+`compile.js` (`mapAst`, `adoptParserAst`) and `hook-deps.js`. Tests enforce
+this by deep-freezing every adopted parser AST (`OCTANE_COMPILE_FROZEN_AST`,
+set in `vitest.config.js`): an in-place write throws at the offending line.
+
 ## Changesets
 
 Add a changeset for user-facing changes to `octane` or `@octanejs/vite-plugin`.

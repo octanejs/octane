@@ -10,6 +10,15 @@ import { compile } from 'octane/compiler';
 const dev = (src: string): string => compile(src, 'App.tsrx', { dev: true, autoMemo: false }).code;
 const prod = (src: string): string => compile(src, 'App.tsrx', { autoMemo: false }).code;
 
+// The `__s.locs = { … }` table, independent of statement layout: everything
+// between the assignment and its closing `};`.
+const locsTableOf = (out: string): string => {
+	const start = out.indexOf('__s.locs = ');
+	expect(start).toBeGreaterThan(-1);
+	const end = out.indexOf(';', start);
+	return out.slice(start, end);
+};
+
 describe('dev hydration source-LOC plumbing (P1)', () => {
 	const WITH_CONSTRUCTS = `export function App(props) @{
   <div>
@@ -23,9 +32,9 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		expect(out).toContain('__s.locs =');
 		expect(out).toContain('__s.locFile = "App.tsrx"');
 		// @if is the first construct (slot 1, line 3), @for the second (slot 2, line 4).
-		const locLine = out.split('\n').find((l) => l.includes('__s.locs ='))!;
-		expect(locLine).toMatch(/1: \[3, \d+\]/);
-		expect(locLine).toMatch(/2: \[4, \d+\]/);
+		const locTable = locsTableOf(out);
+		expect(locTable).toMatch(/1: \[3, \d+\]/);
+		expect(locTable).toMatch(/2: \[4, \d+\]/);
 		// Set once per scope instance, before any slot calls.
 		expect(out).toContain('if (__s.locs === undefined)');
 	});
@@ -42,12 +51,37 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		// per-element `__oct_loc` stamps, and the `clone(tpl, "loc")` structural-mismatch loc
 		// argument — all strictly dev-gated. Normalize them away and the two outputs must be
 		// byte-identical (proving production carries zero LOC overhead).
-		const strip = (s: string) =>
-			s
-				.split('\n')
-				.filter((l) => !l.includes('__s.locs') && !l.includes('__oct_loc'))
-				.join('\n')
-				.replace(/clone\((_t\$\d+), "[^"]*"\)/g, 'clone($1)');
+		// Strip is statement-shaped, not line-shaped: the locs stash prints as one
+		// (possibly multi-line) `if (__s.locs === undefined) { … }` statement, and
+		// statement presence can shift the printer's blank-line placement — so
+		// blank lines are normalized away on both sides too.
+		const strip = (s: string) => {
+			// The binding-level `__oct_loc` stamps are try/catch STATEMENTS whose
+			// layout is printer-defined — remove them statement-shaped, not
+			// line-shaped, so the strip is insensitive to one-line vs multi-line
+			// printing of the same guarded assignment.
+			const withoutLocStamps = s.replace(
+				/try\s*\{[^{}]*__oct_loc[^{}]*\}\s*catch\s*\{[^{}]*\}/g,
+				'',
+			);
+			const lines = withoutLocStamps.split('\n');
+			const kept: string[] = [];
+			let skippingDepth = 0;
+			for (const l of lines) {
+				if (skippingDepth > 0) {
+					skippingDepth += (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
+					continue;
+				}
+				if (l.includes('if (__s.locs === undefined)')) {
+					skippingDepth = (l.match(/\{/g) || []).length - (l.match(/\}/g) || []).length;
+					continue;
+				}
+				if (l.includes('__s.locs') || l.includes('__oct_loc')) continue;
+				if (l.trim() === '') continue;
+				kept.push(l);
+			}
+			return kept.join('\n').replace(/clone\((_t\$\d+), "[^"]*"\)/g, 'clone($1)');
+		};
 		expect(strip(prod(WITH_CONSTRUCTS))).toBe(strip(dev(WITH_CONSTRUCTS)));
 	});
 
@@ -69,8 +103,7 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		// The childTextHole construct's slot LOC must point at the `{props.n}` hole (line 2),
 		// not be absent.
 		expect(out).toContain('__s.locs =');
-		const locLine = out.split('\n').find((l) => l.includes('__s.locs ='))!;
-		expect(locLine).toMatch(/\[2, \d+\]/);
+		expect(locsTableOf(out)).toMatch(/\[2, \d+\]/);
 	});
 
 	it('attributes component + child-hole constructs too', () => {
@@ -82,9 +115,9 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 }`);
 		expect(out).toContain('__s.locs =');
 		// Child component (line 3) + renderable child hole (line 4) each get a slot LOC.
-		const locLine = out.split('\n').find((l) => l.includes('__s.locs ='))!;
-		expect(locLine).toMatch(/\[3, \d+\]/);
-		expect(locLine).toMatch(/\[4, \d+\]/);
+		const locTable = locsTableOf(out);
+		expect(locTable).toMatch(/\[3, \d+\]/);
+		expect(locTable).toMatch(/\[4, \d+\]/);
 	});
 
 	it('preserves anonymous default-export function identity while embedding root LOC', () => {
