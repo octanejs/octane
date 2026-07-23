@@ -350,10 +350,12 @@ transport `0.3.0`, tasm `0.0.39`, testing environment `0.3.0`, Lynx types
 `4.1.0`, TypeScript `5.9.3`, and the blocked Web control
 `@lynx-js/web-core@0.22.2`. The minimum lane uses Rspack `2.1.3`; the current
 lane uses Rspack `2.1.5`, the newest patch allowed by Rsbuild `2.1.4`, and
-verifies registry drift. Each required CI job packs the Octane packages,
-installs a strict external consumer without changing the repository lockfile,
-and performs two deterministic production builds. This is minimum/current
-source/build coverage, not native-engine or device execution. The immutable
+verifies registry drift. Newer standalone Lynx types releases remain excluded
+until their renderer-owned compatibility slice is audited. Each required CI
+job packs the Octane packages, installs a strict external consumer without
+changing the repository lockfile, and performs two deterministic production
+builds. This is minimum/current source/build coverage, not native-engine or
+device execution. The immutable
 version and integrity audit in `audit/toolchain.json` covers the Phase 0 and
 Milestone 5 subset, including the minimum Rspack edge; it does not cover every
 Milestone 9 lane dependency, the current Rspack artifact, or the live Lynx types
