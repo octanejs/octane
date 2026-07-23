@@ -1781,6 +1781,51 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'cmdk',
+					include: ['packages/cmdk/tests/**/*.test.ts', '!packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'jsdom',
+					// Fails any test that logs a console.error (octane reports effect
+					// exceptions there without failing the run).
+					setupFiles: ['packages/cmdk/tests/_setup.ts'],
+					// Differential precompile for cmdk fixtures: rewrites
+					// `@octanejs/cmdk` → the real published `cmdk@1.1.1`.
+					globalSetup: ['packages/cmdk/tests/differential/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'cmdk-ssr',
+					include: ['packages/cmdk/tests/ssr/**/*.test.ts'],
+					environment: 'node',
+					setupFiles: ['packages/cmdk/tests/_setup.ts'],
+					globals: false,
+				},
+				plugins: [octane({ ssr: true })],
+				resolve: {
+					alias: [
+						{
+							find: /^octane$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane/src/server/index.ts'),
+						},
+						{
+							find: /^@octanejs\/cmdk$/,
+							replacement: resolve(import.meta.dirname, 'packages/cmdk/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'styled-components',
 					include: [
 						'packages/styled-components/tests/**/*.test.ts',

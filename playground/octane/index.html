@@ -155,6 +155,86 @@
 				font-family: ui-monospace, Menlo, monospace;
 				font-size: 12px;
 			}
+
+			/* @octanejs/cmdk ships unstyled — it exposes a DOM contract of
+				 `cmdk-*` attributes to style against. */
+			.cmdk-shell [cmdk-root] {
+				border: 1px solid var(--border);
+				border-radius: 8px;
+				background: var(--panel);
+				overflow: hidden;
+			}
+			[cmdk-input] {
+				width: 100%;
+				padding: 12px 14px;
+				border: 0;
+				border-bottom: 1px solid var(--border);
+				background: transparent;
+				color: var(--fg);
+				font: inherit;
+				outline: none;
+			}
+			[cmdk-list] {
+				max-height: 320px;
+				overflow: auto;
+				padding: 6px;
+				/* The port keeps this in sync with the results' height. */
+				transition: height 120ms ease;
+			}
+			[cmdk-item] {
+				display: flex;
+				align-items: center;
+				padding: 8px 10px;
+				border-radius: 5px;
+				cursor: pointer;
+				-webkit-user-select: none;
+				user-select: none;
+				font-size: 13px;
+			}
+			[cmdk-item][data-selected='true'] {
+				background: var(--accent);
+				color: #fff;
+			}
+			[cmdk-item][data-disabled='true'] {
+				color: var(--muted);
+				cursor: not-allowed;
+			}
+			[cmdk-group-heading] {
+				padding: 10px 10px 4px;
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--muted);
+			}
+			[cmdk-separator] {
+				height: 1px;
+				margin: 6px 4px;
+				background: var(--border);
+			}
+			[cmdk-empty] {
+				padding: 18px 10px;
+				text-align: center;
+				font-size: 13px;
+				color: var(--muted);
+			}
+			.cmdk-dialog-overlay {
+				position: fixed;
+				inset: 0;
+				background: rgba(0, 0, 0, 0.45);
+			}
+			.cmdk-dialog-content {
+				position: fixed;
+				top: 20%;
+				left: 50%;
+				transform: translateX(-50%);
+				width: min(560px, calc(100vw - 32px));
+				border: 1px solid var(--border);
+				border-radius: 10px;
+				background: var(--bg);
+				box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+				overflow: hidden;
+			}
 		</style>
 	</head>
 	<body>

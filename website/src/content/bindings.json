@@ -26,7 +26,7 @@
   },
   {
     "title": "UI and interaction",
-    "description": "Primitives, positioning, motion, drag and drop, toasts, icons, keyboard shortcuts, and event pacing.",
+    "description": "Primitives, positioning, motion, drag and drop, toasts, command menus, icons, keyboard shortcuts, and event pacing.",
     "packages": [
       "@octanejs/radix",
       "@octanejs/base-ui",
@@ -35,6 +35,7 @@
       "@octanejs/motion",
       "@octanejs/dnd-kit",
       "@octanejs/sonner",
+      "@octanejs/cmdk",
       "@octanejs/lucide",
       "@octanejs/tanstack-hotkeys",
       "@octanejs/tanstack-pacer"

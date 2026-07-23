@@ -266,6 +266,7 @@ catalogs:
     '@rspack/core': ^2.1.4
     classnames: ^2.5.1
     clsx: ^2.1.1
+    cmdk: 1.1.1
     d3-array: 3.2.1
     d3-chord: ^1.0.6
     d3-cloud: ^1.2.9
