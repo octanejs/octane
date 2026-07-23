@@ -17,6 +17,11 @@ function createVscode(entries = []) {
 			Object.assign(this, { isIncomplete, items });
 		}
 	}
+	class SnippetString {
+		constructor(value) {
+			this.value = value;
+		}
+	}
 	class Range {
 		constructor(startLine, startCharacter, endLine, endCharacter) {
 			Object.assign(this, { endCharacter, endLine, startCharacter, startLine });
@@ -37,7 +42,8 @@ function createVscode(entries = []) {
 			Method: 2,
 			Property: 3,
 			Reference: 4,
-			Text: 5,
+			Snippet: 5,
+			Text: 6,
 		},
 		CompletionList,
 		languages: {
@@ -47,6 +53,7 @@ function createVscode(entries = []) {
 			}),
 		},
 		Range,
+		SnippetString,
 		window: {
 			activeTextEditor: undefined,
 			showInformationMessage: vi.fn(),
@@ -86,6 +93,7 @@ describe('Octane IntelliSense bridge', () => {
 			'"',
 			"'",
 			'/',
+			'@',
 		);
 		expect(context.subscriptions).toHaveLength(3);
 
@@ -116,6 +124,81 @@ describe('Octane IntelliSense bridge', () => {
 				sortText: '11',
 			}),
 		]);
+	});
+
+	it('offers TSRX control-flow snippets immediately after @ without calling tsserver', async () => {
+		const mock = createVscode();
+		registerOctaneIntelliSense(mock.vscode, { subscriptions: [] });
+		const document = {
+			lineAt: () => ({ text: '\t@' }),
+			uri: { path: '/workspace/App.tsrx' },
+		};
+
+		const result = await mock
+			.provider()
+			.provideCompletionItems(
+				document,
+				{ character: 2, line: 4 },
+				{ isCancellationRequested: false },
+				{ triggerCharacter: '@', triggerKind: 1 },
+			);
+
+		expect(result.items.map((item) => item.label)).toEqual([
+			'@if',
+			'@ifelse',
+			'@else',
+			'@for',
+			'@forempty',
+			'@empty',
+			'@switch',
+			'@case',
+			'@default',
+			'@try',
+			'@pending',
+			'@catch',
+		]);
+		expect(result.items[0]).toEqual(
+			expect.objectContaining({
+				insertText: { value: '@if (${1:condition}) {\n\t$0\n}' },
+				kind: mock.vscode.CompletionItemKind.Snippet,
+				range: { endCharacter: 2, endLine: 4, startCharacter: 1, startLine: 4 },
+			}),
+		);
+		expect(result.items.find((item) => item.label === '@case').insertText.value).toBe(
+			'@case ${1:value}: {\n\t$0\n}',
+		);
+		expect(result.items.find((item) => item.label === '@default').insertText.value).toBe(
+			'@default: {\n\t$0\n}',
+		);
+		expect(result.items.find((item) => item.label === '@ifelse').insertText.value).toBe(
+			'@if (${1:condition}) {\n\t${2:content}\n} @else {\n\t$0\n}',
+		);
+		expect(result.items.find((item) => item.label === '@forempty').insertText.value).toBe(
+			'@for (const ${1:item} of ${2:items}; key ${1:item}.id) {\n\t${3:content}\n} @empty {\n\t$0\n}',
+		);
+		expect(mock.vscode.commands.executeCommand).not.toHaveBeenCalled();
+	});
+
+	it('replaces a partially typed control-flow directive', async () => {
+		const mock = createVscode();
+		registerOctaneIntelliSense(mock.vscode, { subscriptions: [] });
+
+		const result = await mock
+			.provider()
+			.provideCompletionItems(
+				{ lineAt: () => ({ text: '  @sw' }), uri: {} },
+				{ character: 5, line: 0 },
+				{ isCancellationRequested: false },
+				{ triggerKind: 0 },
+			);
+
+		expect(result.items.find((item) => item.label === '@switch').range).toEqual({
+			endCharacter: 5,
+			endLine: 0,
+			startCharacter: 2,
+			startLine: 0,
+		});
+		expect(mock.vscode.commands.executeCommand).not.toHaveBeenCalled();
 	});
 
 	it('avoids work for cancelled requests and safely maps unknown kinds', async () => {

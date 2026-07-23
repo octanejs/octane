@@ -20,6 +20,9 @@ describe('Octane VS Code extension manifest', () => {
 		expect(manifest.contributes.grammars).toContainEqual(
 			expect.objectContaining({ language: 'octane-tsrx', scopeName: 'source.octane-tsrx' }),
 		);
+		expect(manifest.contributes.configurationDefaults).toEqual({
+			'emmet.includeLanguages': { 'octane-tsrx': 'typescriptreact' },
+		});
 		expect(manifest.contributes.typescriptServerPlugins).toEqual([
 			{
 				name: '@octanejs/typescript-plugin',

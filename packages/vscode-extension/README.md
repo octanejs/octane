@@ -59,6 +59,13 @@ Use **Test IntelliSense** with the cursor on a symbol for a direct health check.
 TSRX also supplies JSX closing tags for multiline elements because VS Code's
 built-in TypeScript tag closer is restricted to its native TSX language mode.
 Disable this behavior with `octane.tsrx.autoClosingTags` if desired.
+Typing `@` opens fast, local snippets for every TSRX control-flow directive,
+including keyed `@for`, `@switch`, and the `@try`/`@pending`/`@catch` boundary.
+Confirm a suggestion with Tab or Enter to expand its placeholders. Composite
+Emmet-style abbreviations such as `@ifelse` and `@forempty` expand a complete
+multi-arm construct in one step.
+Standard VS Code Emmet abbreviations also expand in `.tsrx` files, using the
+TypeScript JSX profile (for example `div.card`, `ul>li*3`, or `button[type=button]`).
 
 The bundled Octane agent skills are generated from the canonical files in
 `packages/octane-mcp-server/skills`:

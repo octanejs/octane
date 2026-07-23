@@ -2,6 +2,52 @@
 
 const OCTANE_TSRX_LANGUAGE_ID = 'octane-tsrx';
 
+const TSRX_CONTROL_FLOW = Object.freeze([
+	{
+		label: '@if',
+		detail: 'TSRX conditional block',
+		snippet: '@if (${1:condition}) {\n\t$0\n}',
+	},
+	{
+		label: '@ifelse',
+		detail: 'TSRX conditional with alternative',
+		snippet: '@if (${1:condition}) {\n\t${2:content}\n} @else {\n\t$0\n}',
+	},
+	{ label: '@else', detail: 'TSRX alternative block', snippet: '@else {\n\t$0\n}' },
+	{
+		label: '@for',
+		detail: 'TSRX keyed iteration block',
+		snippet: '@for (const ${1:item} of ${2:items}; key ${1:item}.id) {\n\t$0\n}',
+	},
+	{
+		label: '@forempty',
+		detail: 'TSRX keyed iteration with empty state',
+		snippet:
+			'@for (const ${1:item} of ${2:items}; key ${1:item}.id) {\n\t${3:content}\n} @empty {\n\t$0\n}',
+	},
+	{ label: '@empty', detail: 'TSRX empty-list block', snippet: '@empty {\n\t$0\n}' },
+	{
+		label: '@switch',
+		detail: 'TSRX switch block',
+		snippet:
+			'@switch (${1:value}) {\n\t@case ${2:caseValue}: {\n\t\t${3:content}\n\t}\n\t@default: {\n\t\t$0\n\t}\n}',
+	},
+	{ label: '@case', detail: 'TSRX switch case', snippet: '@case ${1:value}: {\n\t$0\n}' },
+	{ label: '@default', detail: 'TSRX default case', snippet: '@default: {\n\t$0\n}' },
+	{
+		label: '@try',
+		detail: 'TSRX async and error boundary',
+		snippet:
+			'@try {\n\t${1:content}\n} @pending {\n\t${2:pending}\n} @catch (${3:error}) {\n\t$0\n}',
+	},
+	{ label: '@pending', detail: 'TSRX pending block', snippet: '@pending {\n\t$0\n}' },
+	{
+		label: '@catch',
+		detail: 'TSRX error block',
+		snippet: '@catch (${1:error}) {\n\t$0\n}',
+	},
+]);
+
 /** @type {Readonly<Record<string, keyof typeof import('vscode').CompletionItemKind>>} */
 const TSSERVER_COMPLETION_KINDS = Object.freeze({
 	alias: 'Reference',
@@ -63,6 +109,41 @@ function toRange(vscode, span) {
 }
 
 /**
+ * @param {import('vscode').TextDocument} document
+ * @param {import('vscode').Position} position
+ */
+function controlFlowPrefixAt(document, position) {
+	const beforeCursor = document.lineAt(position.line).text.slice(0, position.character);
+	const match = beforeCursor.match(/@[A-Za-z]*$/);
+	if (!match) return undefined;
+	const characterBeforeAt = beforeCursor[beforeCursor.length - match[0].length - 1];
+	return characterBeforeAt && /[\w$'"`]/.test(characterBeforeAt) ? undefined : match[0];
+}
+
+/**
+ * @param {typeof import('vscode')} vscode
+ * @param {import('vscode').Position} position
+ * @param {string} prefix
+ */
+function createControlFlowCompletionItems(vscode, position, prefix) {
+	const range = new vscode.Range(
+		position.line,
+		position.character - prefix.length,
+		position.line,
+		position.character,
+	);
+	return TSRX_CONTROL_FLOW.map((definition, index) => {
+		const item = new vscode.CompletionItem(definition.label, vscode.CompletionItemKind.Snippet);
+		item.detail = definition.detail;
+		item.filterText = definition.label;
+		item.insertText = new vscode.SnippetString(definition.snippet);
+		item.range = range;
+		item.sortText = `0${String(index).padStart(2, '0')}`;
+		return item;
+	});
+}
+
+/**
  * VS Code's TypeScript extension loads the TSRX tsserver plugin, but does not
  * register its completion UI for custom language identifiers. This small bridge
  * reuses that same tsserver session; it does not parse files or start a second
@@ -86,6 +167,17 @@ function registerOctaneIntelliSense(vscode, context) {
 			 */
 			async provideCompletionItems(document, position, token, completionContext) {
 				if (token.isCancellationRequested) return undefined;
+				const controlFlowPrefix =
+					completionContext.triggerCharacter === '@' ||
+					completionContext.triggerCharacter === undefined
+						? controlFlowPrefixAt(document, position)
+						: undefined;
+				if (controlFlowPrefix !== undefined) {
+					return new vscode.CompletionList(
+						createControlFlowCompletionItems(vscode, position, controlFlowPrefix),
+						false,
+					);
+				}
 				/** @type {any} */
 				const response = await vscode.commands.executeCommand(
 					'typescript.tsserverRequest',
@@ -124,6 +216,7 @@ function registerOctaneIntelliSense(vscode, context) {
 		'"',
 		"'",
 		'/',
+		'@',
 	);
 	let restartRequested = false;
 	/** @param {import('vscode').TextDocument | undefined} document */
@@ -169,6 +262,9 @@ function registerOctaneIntelliSense(vscode, context) {
 
 module.exports = {
 	OCTANE_TSRX_LANGUAGE_ID,
+	TSRX_CONTROL_FLOW,
+	controlFlowPrefixAt,
+	createControlFlowCompletionItems,
 	registerOctaneIntelliSense,
 	toCompletionItemKind,
 };

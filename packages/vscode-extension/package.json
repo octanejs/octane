@@ -82,6 +82,11 @@
         "path": "./syntaxes/octane-tsrx.tmLanguage.json"
       }
     ],
+    "configurationDefaults": {
+      "emmet.includeLanguages": {
+        "octane-tsrx": "typescriptreact"
+      }
+    },
     "typescriptServerPlugins": [
       {
         "name": "@octanejs/typescript-plugin",
