@@ -107,7 +107,6 @@ function checkCurrentRegistry(lane) {
 		'@lynx-js/runtime-wrapper-webpack-plugin',
 		'@lynx-js/template-webpack-plugin',
 		'@lynx-js/testing-environment',
-		'@lynx-js/types',
 		'@lynx-js/webpack-dev-transport',
 	]) {
 		assert.equal(latestVersion(`${packageName}@latest`), lane.packages[packageName]);
@@ -141,10 +140,11 @@ function checkCurrentRegistry(lane) {
 
 	const excluded = {
 		'@lynx-js/tasm': latestVersion('@lynx-js/tasm@latest'),
+		'@lynx-js/types': latestVersion('@lynx-js/types@latest'),
 		'@rsbuild/core': latestVersion('@rsbuild/core@latest'),
 	};
 	console.log(
-		`registry graph verified; standalone releases intentionally excluded by upstream exact edges: ${JSON.stringify(excluded)}`,
+		`registry graph verified; standalone releases intentionally excluded by exact compatibility pins: ${JSON.stringify(excluded)}`,
 	);
 }
 

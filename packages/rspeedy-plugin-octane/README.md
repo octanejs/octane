@@ -105,7 +105,7 @@ pluginOctane({ thread: 'main-thread' });
 ## Compatibility lanes
 
 Milestone 9 covers two exact, indivisible source/build graphs. Registry
-metadata was checked on 2026-07-22:
+metadata was checked on 2026-07-23:
 
 | Component | Minimum | Current |
 | --- | ---: | ---: |
@@ -137,10 +137,14 @@ Rspeedy `0.16.0` requires Rsbuild `2.1.4` exactly. That Rsbuild release accepts
 Rspack `~2.1.2`, so the current lane advances only Rspack to the newest allowed
 patch. It does not mix in Rsbuild `2.1.7`. Likewise, template plugin `0.13.0`
 requires tasm `0.0.39` exactly, so the standalone tasm `0.0.48` release is not
-part of this graph. The lane also pins every direct Rspeedy dependency selected
-through a caret or tilde range, the debug-metadata payload, runtime globals, and
-the required Webpack 5 tooling peer. The current registry check recomputes the
-newest version inside each upstream range before accepting the recorded graph.
+part of this graph. `@octanejs/lynx` also remains pinned to its audited
+`@lynx-js/types@4.0.0` compatibility slice; newer standalone types releases are
+reported by the registry check but are not accepted into either lane without a
+new compatibility audit. The lane also pins every direct Rspeedy dependency
+selected through a caret or tilde range, the debug-metadata payload, runtime
+globals, and the required Webpack 5 tooling peer. The current registry check
+recomputes the newest version inside each selected upstream range before
+accepting the recorded graph.
 
 `pnpm test:compat` packs Octane, the Lynx renderer, and both compiler plugins,
 then installs each lane into an external temporary consumer without creating a
