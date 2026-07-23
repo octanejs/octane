@@ -277,19 +277,24 @@ describe('ReactUpdatePriority-test.js ports', () => {
 		// urgent. Empirically pins the ASYNC-window semantics for the sync case.
 		const p2 = deferred<string>();
 		const r = mount(PassiveSpawnSuspends, { p2: p2.promise });
-		expect(r.find('#ps-value').textContent).toBe('plain0');
+		const value = r.find('#ps-value') as HTMLElement;
+		expect(value.textContent).toBe('plain0');
 		await act(() => {
 			spawnStepInTransition(1); // transition render commits 'plain1'; its
 			// passive effect fires setStep(2), which suspends on p2
 		});
-		// Urgent suspend → fallback (a transition-priority suspend would have
-		// HELD 'plain1' on screen instead).
+		// Urgent suspend → fallback and the committed primary host is hidden (a
+		// transition-priority suspend would keep 'plain1' visible instead).
 		expect(r.findAll('#ps-fallback').length).toBe(1);
-		expect(r.findAll('#ps-value').length).toBe(0);
+		expect(r.find('#ps-value')).toBe(value);
+		expect(value.isConnected).toBe(true);
+		expect(value.style.display).toBe('none');
 		await act(() => {
 			p2.resolve('two');
 		});
-		expect(r.find('#ps-value').textContent).toBe('two');
+		expect(r.find('#ps-value')).toBe(value);
+		expect(value.style.display).toBe('');
+		expect(value.textContent).toBe('two');
 		r.unmount();
 	});
 });

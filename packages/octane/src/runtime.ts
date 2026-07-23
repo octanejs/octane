@@ -143,7 +143,9 @@ function profilePortalComponent(rawBody: unknown): Function | null {
 // ---------------------------------------------------------------------------
 
 export type ComponentBody<P = any, E = any> = (props: P, scope: Scope, extra: E) => void;
-type EffectFn = () => void | (() => void);
+declare const EFFECT_CLEANUP_VOID_ONLY: unique symbol;
+type EffectCleanup = () => void | { [EFFECT_CLEANUP_VOID_ONLY]: never };
+type EffectFn = () => void | EffectCleanup;
 type Cleanup = () => void;
 type HookSlot = symbol | number;
 
@@ -637,6 +639,13 @@ export interface Block extends Scope {
 interface EffectSlot {
 	deps: any[] | undefined;
 	cleanup: Cleanup | undefined;
+	/** Hook key retained so a bailed Suspense descendant can reconnect at commit. */
+	slot: HookSlot;
+	/** Last effect body and args that actually reached commit. */
+	connectedFn: EffectFn | null;
+	connectedArgs: any[] | undefined;
+	/** True after Suspense/Activity disconnected this committed effect. */
+	disconnected: boolean;
 	/** Discriminant so deactivateScope can find effect slots among state/memo/ref. */
 	effect: true;
 	/**
@@ -1964,10 +1973,9 @@ function drainQueue(): { err: any } | null {
 				throw maximumUpdateDepthError();
 			}
 			// An update to a block inside a SUSPENSE-HIDDEN subtree (its boundary's
-			// try content is soft-detached into savedDom while the fallback shows):
-			// don't render it in place — its geometry is detached, and a fresh mount
-			// inside it would insert against dismembered parents. Instead re-attempt
-			// the WHOLE boundary. React parity: setState on a suspended component
+			// committed host content is hidden while the fallback shows) must retry
+			// the WHOLE boundary. The hidden render and fallback/reveal decision stay
+			// one transaction. React parity: setState on a suspended component
 			// retries the render; if it no longer suspends (an external store flipped
 			// before the suspending promise resolved), the boundary reveals now.
 			const hiddenTry = findSuspenseHiddenTry(block);
@@ -2452,16 +2460,47 @@ const refDetachQueue: any[] = [];
  * callback ref shared across elements releases ITS element's React-19 cleanup.
  */
 export function queueRefDetach(ref: any, el: Element | FragmentInstance | null): void {
-	if (ref == null || SUPPRESS_UNCOMMITTED_REF_DETACH) return;
+	if (ref == null || isRefDetachSuppressed(el)) return;
 	// Capture the active teardown boundary (if we're inside an unmount walk) so a
 	// throwing detach at drain time routes there — React's safelyDetachRef →
 	// captureCommitPhaseError (ReactErrorBoundaries:2782).
 	refDetachQueue.push(ref, el, TEARDOWN_HANDLER);
 }
 
-// See unmountScope — true while running the cleanups of a block whose deferred
-// ref attaches never committed (aborted mount).
-let SUPPRESS_UNCOMMITTED_REF_DETACH = false;
+interface RefDetachSuppression {
+	elements: Set<Element | FragmentInstance>;
+	parent: RefDetachSuppression | null;
+}
+
+// Exact host identities whose attach never committed or whose Suspense hide already
+// detached their refs. Host-scoped suppression is crucial: user cleanup can synchronously
+// unmount an independent root, whose unrelated refs must still detach normally.
+let REF_DETACH_SUPPRESSION: RefDetachSuppression | null = null;
+
+function isRefDetachSuppressed(el: Element | FragmentInstance | null): boolean {
+	if (el === null) return false;
+	for (let context = REF_DETACH_SUPPRESSION; context !== null; context = context.parent) {
+		if (context.elements.has(el)) return true;
+	}
+	return false;
+}
+
+function withRefDetachSuppression<T>(entries: SuspenseRefEntry[] | null, fn: () => T): T {
+	if (entries === null || entries.length === 0) return fn();
+	const elements = new Set<Element | FragmentInstance>();
+	for (let i = 0; i < entries.length; i++) {
+		const el = entries[i].el;
+		if (el !== null) elements.add(el);
+	}
+	if (elements.size === 0) return fn();
+	const parent = REF_DETACH_SUPPRESSION;
+	REF_DETACH_SUPPRESSION = { elements, parent };
+	try {
+		return fn();
+	} finally {
+		REF_DETACH_SUPPRESSION = parent;
+	}
+}
 
 function drainRefDetaches(): void {
 	if (refDetachQueue.length === 0) return;
@@ -2646,7 +2685,7 @@ function drainEffectEventUpdates(): void {
 			!entry.cell.active ||
 			blockSubtreeDisposed(block) ||
 			// Independently scheduled siblings may complete before another child
-			// suspends their shared boundary. That boundary soft-detaches the try
+			// suspends their shared boundary. That boundary hides the try
 			// subtree, so its completed payload is still uncommitted. Do not use the
 			// broader inactive check: hidden Activity renders intentionally publish
 			// fresh Effect Event bodies while their DOM/effects stay preserved.
@@ -2804,6 +2843,12 @@ function fireEffectCleanup(e: PendingEffect): void {
 /** Run a queued effect's body and stash its returned cleanup on the slot. */
 function runEffectBody(e: PendingEffect): void {
 	let cleanup: void | Cleanup;
+	const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
+	if (slot) {
+		slot.connectedFn = e.fn;
+		slot.connectedArgs = e.args;
+		slot.disconnected = false;
+	}
 	try {
 		EFFECT_BODY_DEPTH++;
 		try {
@@ -2823,7 +2868,6 @@ function runEffectBody(e: PendingEffect): void {
 		return;
 	}
 	if (typeof cleanup === 'function') {
-		const slot = e.scope.hooks?.get(e.slot) as EffectSlot | undefined;
 		// The slot owns its LATEST cleanup: unmountScope's effect-slot walk (and
 		// deactivateScope's hide walk) read + clear it, so a dep-changed effect's
 		// stale cleanup can never replay at teardown.
@@ -3481,15 +3525,18 @@ function renderReturnedValue(block: Block, out: unknown): void {
 		existingRet.__kind !== (useSingleRoot ? 'componentSlotSlot' : 'childSlot')
 	) {
 		const transitionSwap = TRANSITION_SWAP_DRIVER;
-		// A transition can cross the markerless-single-root optimization boundary
-		// (text/list → compiled host fragment, or the reverse). Probe the incoming
-		// returned value off-screen before disposing the committed slot; a suspend or
-		// error then leaves the old DOM/state intact for the enclosing @try hold.
-		if (
+		const transitionMode = block.currentRenderMode === 'transition';
+		const suspenseSwap =
 			transitionSwap !== null &&
+			!transitionMode &&
 			activeHydration() === null &&
-			block.currentRenderMode === 'transition'
-		) {
+			preservesCommittedSuspense(block);
+		// A transition can cross the markerless-single-root optimization boundary
+		// (text/list → compiled host fragment, or the reverse). A fallback-capable
+		// committed Suspense primary needs the same probe for an urgent replacement.
+		// Probe the incoming returned value off-screen before disposing the committed
+		// slot; a suspend or error then leaves the old DOM/state intact.
+		if (transitionSwap !== null && activeHydration() === null && (transitionMode || suspenseSwap)) {
 			const tail = returnSlotTail(block, existingRet);
 			if (tail !== null) {
 				const probe = transitionSwap.render(
@@ -3506,6 +3553,9 @@ function renderReturnedValue(block: Block, out: unknown): void {
 			}
 		}
 		disposeReturnSlot(block, existingRet);
+		// Slot teardown runs user cleanups. A synchronous owning-root unmount must
+		// not let this render publish a replacement into the disposed container.
+		if (block.disposed) return;
 	}
 	if (useSingleRoot) {
 		const d = out as ElementDescriptor;
@@ -3913,7 +3963,6 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	}
 	// Then the scope's remaining cleanups (ref detaches, listener teardown, slot
 	// state) in REVERSE registration order.
-	const c = scope.cleanups;
 	// Suppress queued ref detaches while unwinding an ABORTED mount (the scope's
 	// render never completed — `mounted` is only set at the successful end of
 	// renderBlock/componentSlotLite): its deferred ref attaches were — or will
@@ -3922,8 +3971,22 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 	// (React never invokes refs for uncommitted work; ReactErrorBoundaries:1158).
 	// De-opt refs are unaffected: their detaches queue from detachDeoptTreeRefs
 	// walks outside this cleanups loop.
-	const prevSuppress = SUPPRESS_UNCOMMITTED_REF_DETACH;
-	SUPPRESS_UNCOMMITTED_REF_DETACH = (scope as any).mounted !== true;
+	let abortedRefs: SuspenseRefEntry[] | null = null;
+	if ((scope as any).mounted !== true) {
+		abortedRefs = [];
+		collectVisibleSubtreeRefs(scope, abortedRefs);
+	}
+	withRefDetachSuppression(abortedRefs, () => {
+		unmountScopeChildrenAndSlots(scope, detachDom);
+	});
+}
+
+// Keep an aborted mount's exact-host ref suppression active for the complete
+// recursive teardown. A child may have finished rendering and queued an attach
+// before a later sibling aborts its parent; that child's attach never commits,
+// so its recursive cleanup must not manufacture a matching detach.
+function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
+	const c = scope.cleanups;
 	for (let i = c.length - 1; i >= 0; i--) {
 		try {
 			runEffectLifecycleCallback(c[i]);
@@ -3935,7 +3998,6 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 			reportTeardownError(err);
 		}
 	}
-	SUPPRESS_UNCOMMITTED_REF_DETACH = prevSuppress;
 	// Then recurse into child scopes (parent → child order).
 	const children = scope.children;
 	for (let i = 0, n = children.length; i < n; i++) unmountScope(children[i].scope, detachDom);
@@ -3988,27 +4050,30 @@ function unmountScope(scope: Scope, detachDom: boolean = true): void {
 				// never reaches it, so portals must always self-detach individually.
 				const childDetach = k === 'portalSlotSlot' ? true : detachDom;
 				if (val.block) unmountBlock(val.block, childDetach);
-				// trySlotSlot keeps an off-screen `tryBlock` ALIVE across suspend/
-				// resume so its hooks Map survives replay. When the surrounding
-				// scope is being torn down (e.g. an @if branch unmounts mid-pending,
-				// or the whole component unmounts while still suspended), mark the
-				// tryBlock disposed AND clear pendingThenable. That makes the
-				// promise's .then-retry callback short-circuit (attachResume's retry
-				// bails when pendingThenable was cleared; commitResume and
-				// flushStagedReveals bail on a disposed tryBlock), preventing late
-				// commits into a torn-down DOM range. We mark via `disposed = true`
-				// rather than calling
-				// unmountBlock because the tryBlock's DOM was already torn down by
-				// its parent's unmount, and a second pass through unmountBlock
-				// would re-walk the same scopes / double-fire cleanups.
+				// A pending trySlot keeps its hidden `tryBlock` ALIVE beside the visible
+				// fallback. Tear that persistent block down explicitly so its effects,
+				// subscriptions, portals, and non-ref cleanups cannot outlive the boundary.
+				// Its refs already cycled to null when the fallback appeared, so suppress
+				// only the duplicate permanent detach while doing the full teardown.
 				if (k === 'trySlotSlot') {
 					discardOffscreenCapture(val.stagedCapture);
 					val.stagedCapture = null;
 					val.stagedEffectDeps = null;
+					const hadDetachedRefs = val.detachedRefs !== null;
 					val.detachedRefs = null;
+					val.pendingThenable = null;
 					if (val.tryBlock && val.tryBlock !== val.block) {
-						val.tryBlock.disposed = true;
-						val.pendingThenable = null;
+						const hiddenTry = val.tryBlock;
+						let suppressedRefs: SuspenseRefEntry[] | null = null;
+						if (hadDetachedRefs) {
+							suppressedRefs = [];
+							collectVisibleSubtreeRefs(hiddenTry, suppressedRefs);
+						}
+						showTryBlock(val);
+						withRefDetachSuppression(suppressedRefs, () => {
+							unmountBlock(hiddenTry, true);
+						});
+						val.tryBlock = null;
 					}
 					// Unmounted while holding for a transition — leave the entangled group
 					// so staged siblings aren't left waiting on a boundary that's now gone.
@@ -4375,20 +4440,34 @@ function enqueueEffect(slot: HookSlot, fn: EffectFn, deps: any[] | undefined, ph
 	if (phase !== INSERTION && inInactiveSubtree(scope.block)) return;
 	const prev = scope.hooks?.get(slot) as EffectSlot | undefined;
 	if (prev && !depsChanged(prev.deps, deps)) return;
+	let effect: EffectSlot;
 	if (!prev) {
-		const slotObj: EffectSlot = { deps, cleanup: undefined, effect: true, phase };
+		const slotObj: EffectSlot = {
+			deps,
+			cleanup: undefined,
+			effect: true,
+			phase,
+			slot,
+			connectedFn: null,
+			connectedArgs: undefined,
+			disconnected: false,
+		};
 		ensureHooks(scope).set(slot, slotObj);
 		// Parallel flat list in declaration order — unmountScope's phase-correct
 		// deletion walk reads it (see Scope.effectSlots).
 		if (scope.effectSlots === null) scope.effectSlots = [slotObj];
 		else scope.effectSlots.push(slotObj);
+		effect = slotObj;
 	} else {
 		prev.deps = deps;
+		effect = prev;
 	}
 	// Tag with the enqueue sequence (DFS pre-order). The commit drains turn this +
 	// the parentBlock chain into React's post-order commit order — see PendingEffect.seq.
 	const entry = { scope, slot, fn, args: deps, phase, seq: commitSeq++ };
-	(WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase]).push(entry);
+	const target = WIP_CAPTURE !== null ? WIP_CAPTURE.effects[phase] : effectQueues[phase];
+	target.push(entry);
+	markEffectReconnectQueued(effect, phase, target);
 }
 
 // ABI: the compiler appends the hook slot as the LAST argument. Generated code
@@ -10301,18 +10380,27 @@ interface HeadSlot {
 	handlers?: Map<string, EventListener>;
 }
 
-// Find the server-rendered element for `key` in <head> (it directly follows the
-// `<!--key-->` marker), remove the marker so a later mount can't re-match it, and
-// return the element. Returns null on a fresh client render (no SSR marker).
-function adoptServerHeadEl(key: string): Element | null {
+// Find the server-rendered `tag` inside `key`'s marker interval in <head>, remove
+// the marker so a later mount can't re-match it, and return the element. A foreign
+// node can be injected between the marker and the server element (extensions,
+// analytics, or document transforms); never claim or mutate it merely because it
+// is adjacent. The next Octane head marker closes this ownership interval.
+// Returns null on a fresh client render or when the expected element is missing.
+function adoptServerHeadEl(key: string, tag: string): Element | null {
 	for (let n: Node | null = document.head.firstChild; n !== null; n = n.nextSibling) {
 		if (n.nodeType === 8 && (n as Comment).data === key) {
-			let el: Node | null = n.nextSibling;
-			while (el !== null && el.nodeType === 3 && /^\s*$/.test((el as Text).data)) {
-				el = el.nextSibling;
-			}
+			let candidate: Node | null = n.nextSibling;
 			(n as Comment).remove();
-			return el !== null && el.nodeType === 1 ? (el as Element) : null;
+			while (candidate !== null) {
+				if (candidate.nodeType === 8 && (candidate as Comment).data.startsWith('rnh-')) {
+					break;
+				}
+				if (candidate.nodeType === 1 && (candidate as Element).localName === tag) {
+					return candidate as Element;
+				}
+				candidate = candidate.nextSibling;
+			}
+			return null;
 		}
 	}
 	return null;
@@ -10332,7 +10420,7 @@ export function headBlock(
 	// matching server-rendered head element on hydration.
 	let state = scope.slots[slot] as HeadSlot | undefined;
 	if (state === undefined) {
-		let el = adoptServerHeadEl(key);
+		let el = adoptServerHeadEl(key, tag);
 		if (el === null) {
 			el = document.createElement(tag);
 			document.head.appendChild(el);
@@ -13493,18 +13581,18 @@ function componentSlotImpl(
 	state.prevKey = key === undefined ? NO_KEY : key;
 	if (identity !== state.currentComp) {
 		const transitionSwap = TRANSITION_SWAP_DRIVER;
-		// Off-screen swap (React WIP model): a TRANSITION swap to a DIFFERENT component
-		// that may suspend → render it off-screen first WITHOUT tearing down the old. If
-		// it suspends, dispose + re-throw so the enclosing tryBlock holds the old component
-		// on screen + resumes (the resume re-renders the boundary, re-driving this swap).
-		// Urgent + hydration keep the legacy path.
-		if (
-			transitionSwap !== null &&
-			state.block !== null &&
-			hydration === null &&
-			parentBlock.currentRenderMode === 'transition'
-		) {
-			if (!state.singleRoot && !state.inherited && state.end !== null) {
+		const transitionMode = parentBlock.currentRenderMode === 'transition';
+		const canSwapOffscreen =
+			transitionSwap !== null && state.block !== null && state.block.mounted && hydration === null;
+		const suspenseSwap =
+			canSwapOffscreen && !transitionMode && preservesCommittedSuspense(parentBlock);
+		const probeOnly = suspenseSwap && !transitionMode;
+		// Off-screen swap (React WIP model): a transition or fallback-capable
+		// committed Suspense primary replacing a DIFFERENT component renders the
+		// incoming tree first WITHOUT tearing down the old. Urgent Suspense uses the
+		// conservative probe path below; transitions can adopt a completed marked WIP.
+		if (canSwapOffscreen && (transitionMode || suspenseSwap)) {
+			if (!probeOnly && !state.singleRoot && !state.inherited && state.end !== null) {
 				// COMMIT the WIP (no double render): the off-screen block already owns a
 				// `<!--wip-->`/`<!--/wip-->` pair, which is EXACTLY componentSlot's non-
 				// singleRoot regime (the slot's start/end ARE the block's owned markers,
@@ -13531,12 +13619,17 @@ function componentSlotImpl(
 				r.wip.end.data = '/comp';
 				// Old block owns state.start/state.end (exclusiveMarkers=false) → removed
 				// inclusive of its markers, leaving the (renamed) wip pair in position.
-				unmountBlock(state.block);
+				const oldBlock = state.block!;
 				state.start = r.wip.start;
 				state.end = r.wip.end;
 				state.block = r.wip.block;
 				state.currentComp = identity;
 				transitionSwap.splice(r.wip);
+				// Publish the incoming range before old-tree cleanups can synchronously
+				// unmount the owner. Reentrant teardown now discovers and disposes the WIP,
+				// and the captured lifecycle queues skip its disposed scope.
+				unmountBlock(oldBlock);
+				if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
 				return;
 			}
 			// singleRoot + INHERITED slots keep the PROBE + discard double render:
@@ -13573,6 +13666,7 @@ function componentSlotImpl(
 				// null-marker dynamic block). Never mint replacements: the remount
 				// below re-renders into the same borrowed range.
 				unmountBlock(state.block);
+				if (parentBlock.disposed) return;
 				if (state.start === null) {
 					while (domParent.firstChild) domParent.removeChild(domParent.firstChild);
 				}
@@ -13580,6 +13674,7 @@ function componentSlotImpl(
 				// Self-marked block — unmountBlock removes exactly the root element
 				// (block.startMarker === endMarker === it); nothing to recreate.
 				unmountBlock(state.block);
+				if (parentBlock.disposed) return;
 			} else {
 				// The slot's `state.start`/`state.end` markers ARE the previous block's
 				// range, so unmountBlock removes them along with the inner DOM. Capture
@@ -13590,6 +13685,7 @@ function componentSlotImpl(
 				// appendChild.
 				const after = state.end!.nextSibling;
 				unmountBlock(state.block);
+				if (parentBlock.disposed) return;
 				const newStart = document.createComment('comp');
 				const newEnd = document.createComment('/comp');
 				domParent.insertBefore(newStart, after);
@@ -13793,7 +13889,7 @@ function coerceChildText(v: unknown): string {
 // is untouched and stays on screen), capturing its effects. If it completes we move
 // it into place + tear down the old (atomic commit). If it suspends we discard the
 // partial and route to the enclosing tryBlock, whose EXISTING transition hold keeps
-// the old content live (branch===1, savedDom===null) and resumes on settle. Urgent
+// the old content live (branch===1, hiddenDom===null) and resumes on settle. Urgent
 // (non-transition) + hydration renders keep the legacy clear-then-render path.
 // ---------------------------------------------------------------------------
 
@@ -13902,10 +13998,8 @@ function discardOffscreenCapture(capture: OffscreenCapture | null): void {
 	for (let i = 0; i < capture.stores.length; i++) capture.stores[i].queued = false;
 }
 
-// Commit a COMPLETED off-screen WIP: move its node range into final position (before
-// `beforeNode`) and splice its captured effects/refs back into the live queues so the
-// surrounding commit drains them (child-first, now that the nodes are connected).
-function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
+/** Move a completed WIP range after its ownership/capture has been published. */
+function moveOffscreenRange(wip: OffscreenWip, beforeNode: Node): void {
 	const parent = wip.domParent;
 	let n: Node | null = wip.start;
 	while (n !== null) {
@@ -13914,6 +14008,13 @@ function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
 		if (n === wip.end) break;
 		n = next;
 	}
+}
+
+// Commit a COMPLETED off-screen WIP: move its node range into final position (before
+// `beforeNode`) and splice its captured effects/refs back into the live queues so the
+// surrounding commit drains them (child-first, now that the nodes are connected).
+function commitOffscreen(wip: OffscreenWip, beforeNode: Node): void {
+	moveOffscreenRange(wip, beforeNode);
 	spliceWipCapture(wip);
 }
 
@@ -13991,6 +14092,33 @@ function clearChildContent(state: ChildSlot): void {
 	// drop the stale reference — a later pure-host render must rebuild, not "reuse" a
 	// detached element.
 	state.hostNode = null;
+}
+
+/**
+ * Tear down a replaced child block while the live slot already owns its incoming
+ * WIP. Keeping this separate from clearChildContent prevents old-tree user cleanup
+ * from hiding the WIP from a reentrant owning-root unmount.
+ */
+function clearReplacedChildBlock(state: ChildSlot, oldBlock: Block): void {
+	unmountBlock(oldBlock, false);
+	if (state.ownerHost !== null) {
+		let node: Node | null = state.ownerHost.firstChild;
+		while (node !== null) {
+			const next = node.nextSibling;
+			state.ownerHost.removeChild(node);
+			node = next;
+		}
+	} else if (state.start !== null) {
+		const parent = state.start.parentNode;
+		if (parent !== null) {
+			let node: Node | null = state.start.nextSibling;
+			while (node !== null && node !== state.end) {
+				const next = node.nextSibling;
+				parent.removeChild(node);
+				node = next;
+			}
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -15763,22 +15891,26 @@ export function childSlot(
 			renderBlock(state.block);
 			return;
 		}
-		// Off-screen transition swap (React WIP model): a TRANSITION render replacing
-		// committed content with a DIFFERENT component that may suspend → render the new
-		// one off-screen and HOLD the old until it's ready, instead of clearing the old
-		// before the new suspends (which would blank the boundary). Only when there's
-		// committed old content to hold; urgent + hydration keep the legacy path below.
+		// Off-screen swap (React WIP model): a transition or fallback-capable
+		// committed Suspense primary replacing content with a DIFFERENT component
+		// renders the new one off-screen and HOLDS the old until it is ready. Urgent
+		// Suspense probes and discards a completed WIP, then uses the in-place path;
+		// transitions can commit the WIP directly.
 		// (`state.end` is non-null on this path for marked slots; an OWNS-PARENT
 		// slot has none — it takes the legacy swap below, like singleRoot
 		// componentSlots.)
 		const transitionSwap = TRANSITION_SWAP_DRIVER;
-		if (
+		const transitionMode = parentBlock.currentRenderMode === 'transition';
+		const canSwapOffscreen =
 			transitionSwap !== null &&
 			state.block !== null &&
+			state.block.mounted &&
 			state.end !== null &&
-			hydration === null &&
-			parentBlock.currentRenderMode === 'transition'
-		) {
+			hydration === null;
+		const suspenseSwap =
+			canSwapOffscreen && !transitionMode && preservesCommittedSuspense(parentBlock);
+		const probeOnly = suspenseSwap && !transitionMode;
+		if (canSwapOffscreen && (transitionMode || suspenseSwap)) {
 			const r =
 				typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' &&
 				__OCTANE_PROFILE_ENABLED__ &&
@@ -15812,20 +15944,24 @@ export function childSlot(
 				if (r.error) throw r.error;
 				throw new SuspenseException(r.suspended);
 			}
-			if (state.borrowed) {
+			if (state.borrowed || probeOnly) {
 				// The retained pair belongs to a coextensive parent range. Probe for
 				// suspension, discard, then use the in-place mount below; committing
 				// a nested WIP pair would split the compacted ownership graph.
 				transitionSwap.dispose(r.wip);
 			} else {
-				// Completed → commit: tear down old (sweeps state.start..state.end; the WIP sits
-				// OUTSIDE that range so it's untouched), then move the WIP into the slot range.
-				// Synchronous, so there is no painted blank between the two.
-				clearChildContent(state);
-				transitionSwap.commit(r.wip, state.end!);
+				// Completed → publish ownership and captured lifecycle first, then tear
+				// down the old block while the WIP still sits outside its range. A cleanup
+				// that synchronously unmounts the owning root can now find the WIP and this
+				// path will not move detached nodes or resurrect lifecycle work afterward.
+				const oldBlock = state.block!;
 				state.block = r.wip.block;
 				state.currentComp = comp;
 				state.currentIsBodyFn = isBodyFn;
+				transitionSwap.splice(r.wip);
+				clearReplacedChildBlock(state, oldBlock);
+				if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
+				moveOffscreenRange(r.wip, state.end!);
 				return;
 			}
 		}
@@ -15889,7 +16025,10 @@ export function childSlot(
 		// (a detached node), desyncing every sibling/descendant below. Mirrors the
 		// array path's `if (!hydrating) clearChildContent` guard above. (A post-
 		// hydration identity swap runs with hydrating=false and clears normally.)
-		if (hydration === null) clearChildContent(state);
+		if (hydration === null) {
+			clearChildContent(state);
+			if (parentBlock.disposed) return;
+		}
 		state.currentComp = comp;
 		state.currentIsBodyFn = isBodyFn;
 		if (state.start === null && state.ownerHost === null && !state.borrowed) {
@@ -16210,6 +16349,7 @@ function tryMemoBail(block: Block, comp: any, props: any): boolean {
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
+	reconnectBailedEffects(block);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileBail(block, comp, 'memo-bailout');
 	return true;
@@ -16231,6 +16371,7 @@ function tryImplicitBail(block: Block): boolean {
 	if (ctxDirectChanged(block)) return false;
 	if (ctxDepsChanged(block)) refreshContextConsumers(block);
 	restampCtxDeps(block);
+	reconnectBailedEffects(block);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileBail(block, block.body, 'implicit-bailout');
 	return true;
@@ -16521,6 +16662,28 @@ export function getTransitionFallbackTimeout(): number {
 	return TRANSITION_FALLBACK_TIMEOUT_MS;
 }
 
+interface SuspenseHiddenDisplay {
+	owners: number;
+	value: string;
+	priority: string;
+	hadStyle: boolean;
+}
+
+interface SuspenseHiddenText {
+	owners: number;
+	data: string;
+}
+
+interface SuspenseHiddenDom {
+	displays: Set<HTMLElement>;
+	texts: Set<Text>;
+}
+
+// Nested Suspense boundaries can own the same physical host (notably a portal
+// range). Restore it only after the last hidden ancestor reveals.
+const SUSPENSE_HIDDEN_DISPLAYS = new WeakMap<HTMLElement, SuspenseHiddenDisplay>();
+const SUSPENSE_HIDDEN_TEXTS = new WeakMap<Text, SuspenseHiddenText>();
+
 interface TrySlot {
 	__kind: 'trySlotSlot';
 	start: Comment;
@@ -16540,8 +16703,8 @@ interface TrySlot {
 	 * and by `reset()` since those are explicit fresh starts.
 	 */
 	tryBlock: Block | null;
-	/** DOM nodes (incl. markers) detached during suspend; reinserted on resume. */
-	savedDom: Node[] | null;
+	/** Connected host content hidden during suspend; restored on resume. */
+	hiddenDom: SuspenseHiddenDom | null;
 	tryBody: ComponentBody;
 	catchBody: ComponentBody | null;
 	pendingBody: ComponentBody | null;
@@ -16741,6 +16904,11 @@ export function tryBlock(
 	// JSX ErrorBoundary must not become a catch-only Suspense boundary.
 	propagateSuspense = false,
 ): void {
+	// A committed Suspense primary needs the same off-screen swap capability for
+	// urgent branch replacements as transitions use: probe the replacement before
+	// disposing browser-owned state, then either commit it or show @pending while
+	// the old arm stays connected and hidden.
+	if (pendingBody !== null) ensureTransitionSwapDriver();
 	const parentBlock = parentScope.block;
 	const hydration = activeHydration();
 	let state = parentScope.slots[slotKey] as TrySlot | undefined;
@@ -16778,7 +16946,7 @@ export function tryBlock(
 			branch: -1,
 			block: null,
 			tryBlock: null,
-			savedDom: null,
+			hiddenDom: null,
 			tryBody,
 			catchBody,
 			pendingBody,
@@ -16818,7 +16986,7 @@ export function tryBlock(
 		s.block!.props = { err: s.err, reset: () => requestReset(s) };
 		s.block!.extra = s.env;
 		renderBlock(s.block!);
-	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.savedDom) {
+	} else if (s.branch === 2 && s.tryBlock && !s.tryBlock.disposed && s.hiddenDom) {
 		// Parent props can supersede the promise that originally hid this body.
 		// Retry the preserved tree now so already-ready replacement data reveals
 		// immediately and a different suspension refreshes the resume listener.
@@ -16875,6 +17043,7 @@ function mountTry(state: TrySlot): void {
 	// second time (it's idempotent, but the second pass is pure waste).
 	const oldTry = state.tryBlock;
 	if (oldTry) {
+		showTryBlock(state);
 		unmountBlock(oldTry);
 		state.tryBlock = null;
 	}
@@ -16882,7 +17051,7 @@ function mountTry(state: TrySlot): void {
 		unmountBlock(state.block);
 	}
 	state.block = null;
-	state.savedDom = null;
+	state.hiddenDom = null;
 	state.hasResolved = false;
 	state.branch = 1;
 	let bStart: Node;
@@ -17023,34 +17192,100 @@ function mountTry(state: TrySlot): void {
 }
 
 /**
- * Detach the try block's DOM range from the document, saving the nodes for
- * later reinsertion. Crucially: does NOT unmount the block, run cleanups, or
- * clear `_b.*` bindings — so `useState`/`useMemo`/`useRef` state AND the
- * `_b._el$N` DOM-node references survive intact (the same DOM nodes will
- * be reinserted into the same parent on resume, so the references stay valid).
- * Mirrors React's "WIP-fiber-discarded-but-committed-state-preserved" contract.
+ * Hide the try block's committed host range without disconnecting it. Elements
+ * receive React's `display:none !important` treatment and direct text children
+ * are blanked because they have no box to style. Keeping the nodes connected is
+ * load-bearing browser state: removal resets scroll positions and other
+ * platform-owned state even when the same node is inserted again later.
+ *
+ * The block, hooks, bindings, and DOM identities remain intact. Effects and refs
+ * are handled separately by hideTryContentAndMountPending. Focus remains owned by
+ * the connected hidden host, matching React DOM's hideInstance behavior.
  */
-function softDetachTryBlock(state: TrySlot): void {
-	if (!state.tryBlock || state.savedDom) return;
-	const saved: Node[] = [];
-	const start = state.tryBlock.startMarker!;
-	const end = state.tryBlock.endMarker!;
-	const parent = start.parentNode!;
-	let n: Node | null = start;
-	while (n) {
-		const next: Node | null = n.nextSibling;
-		saved.push(n);
-		parent.removeChild(n);
-		if (n === end) break;
-		n = next;
+function hideBlockHostRange(block: Block, hidden: SuspenseHiddenDom): void {
+	let node = block.startMarker!.nextSibling as ChildNode | null;
+	while (node !== null && node !== block.endMarker) {
+		if (node.nodeType === 1) {
+			const el = node as HTMLElement;
+			if (!hidden.displays.has(el)) {
+				hidden.displays.add(el);
+				const existing = SUSPENSE_HIDDEN_DISPLAYS.get(el);
+				if (existing === undefined) {
+					SUSPENSE_HIDDEN_DISPLAYS.set(el, {
+						owners: 1,
+						value: el.style.getPropertyValue('display'),
+						priority: el.style.getPropertyPriority('display'),
+						hadStyle: el.hasAttribute('style'),
+					});
+				} else {
+					existing.owners++;
+				}
+			}
+			el.style.setProperty('display', 'none', 'important');
+		} else if (node.nodeType === 3) {
+			const text = node as Text;
+			if (!hidden.texts.has(text)) {
+				hidden.texts.add(text);
+				const existing = SUSPENSE_HIDDEN_TEXTS.get(text);
+				if (existing === undefined) {
+					SUSPENSE_HIDDEN_TEXTS.set(text, { owners: 1, data: text.data });
+				} else {
+					existing.owners++;
+				}
+			}
+			if (text.data !== '') text.data = '';
+		}
+		node = node.nextSibling as ChildNode | null;
 	}
-	state.savedDom = saved;
 }
 
-function reattachTryBlock(state: TrySlot): void {
-	if (!state.savedDom) return;
-	for (const n of state.savedDom) state.domParent.insertBefore(n, state.end);
-	state.savedDom = null;
+function hideSuspensePortalRanges(scope: Scope, hidden: SuspenseHiddenDom): void {
+	forEachSubtreeChild(scope, (child) => {
+		const childBlock = child.block === child ? (child as Block) : null;
+		if (childBlock?.kind === 'portal') hideBlockHostRange(childBlock, hidden);
+		hideSuspensePortalRanges(child, hidden);
+	});
+}
+
+function hideTryBlock(state: TrySlot): void {
+	const block = state.tryBlock;
+	if (block === null || state.hiddenDom !== null) return;
+	const hidden: SuspenseHiddenDom = {
+		displays: new Set(),
+		texts: new Set(),
+	};
+	state.hiddenDom = hidden;
+	hideBlockHostRange(block, hidden);
+	hideSuspensePortalRanges(block, hidden);
+}
+
+/** Restore the host display/text state captured by hideTryBlock. */
+function showTryBlock(state: TrySlot): void {
+	const hidden = state.hiddenDom;
+	if (hidden === null) return;
+	state.hiddenDom = null;
+	for (const el of hidden.displays) {
+		const display = SUSPENSE_HIDDEN_DISPLAYS.get(el);
+		if (display === undefined) continue;
+		if (--display.owners === 0) {
+			SUSPENSE_HIDDEN_DISPLAYS.delete(el);
+			if (display.value === '') el.style.removeProperty('display');
+			else el.style.setProperty('display', display.value, display.priority);
+			if (!display.hadStyle && el.getAttribute('style') === '') el.removeAttribute('style');
+		} else {
+			el.style.setProperty('display', 'none', 'important');
+		}
+	}
+	for (const text of hidden.texts) {
+		const saved = SUSPENSE_HIDDEN_TEXTS.get(text);
+		if (saved === undefined) continue;
+		if (--saved.owners === 0) {
+			SUSPENSE_HIDDEN_TEXTS.delete(text);
+			text.data = saved.data;
+		} else if (text.data !== '') {
+			text.data = '';
+		}
+	}
 }
 
 /**
@@ -17091,17 +17326,17 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// which. What we DO require is that the resolved try content is currently
 	// committed AND intact:
 	//   - branch === 1: the try body (not @pending / @catch) is the visible arm.
-	//   - savedDom === null: that DOM is live in the document, not already
-	//     detached by a prior softDetach.
+	//   - hiddenDom === null: that DOM is live and visible, not already hidden
+	//     behind a committed fallback.
 	// Both together guarantee the prior committed DOM is on screen and untouched.
 	// For `use(thenable)` / `useSuspenseQuery` the suspend is thrown during the
 	// descendant's setup BEFORE it patches any of its own JSX (the body aborts
 	// before its childSlot/componentSlot commit), so no committed DOM was
 	// mid-mutated — holding it as-is is correct. attachResume re-renders the held
 	// tryBlock on resolve, which re-renders the descendant by key with its hook
-	// state intact (same preserved-state contract the softDetach path documents
+	// state intact (same preserved-state contract the connected-hide path documents
 	// below). A NON-transition descendant re-suspend skips this branch and falls
-	// through to softDetach + @pending, unchanged.
+	// through to connected hide + @pending.
 	// A transition-priority suspend STARTS a hold. But once a hold is in effect,
 	// React keeps showing the prior content until the NEW tree is ready — it does
 	// not flash the fallback if that still-committed content re-suspends again,
@@ -17116,10 +17351,10 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	//
 	// This stays safe for a NON-held urgent suspend: the hold (whether started by
 	// a transition OR continued here) still REQUIRES `hasResolved && branch === 1
-	// && savedDom === null`, i.e. the boundary's own committed try content is live
+	// && hiddenDom === null`, i.e. the boundary's own committed try content is live
 	// and intact on screen. A FRESH urgent render that suspends with no prior
 	// content (branch !== 1, or not yet resolved) and `transitionHeld === false`
-	// falls through to softDetach + @pending and shows the fallback — React parity
+	// falls through to connected hide + @pending and shows the fallback — React parity
 	// for urgent suspense. The held DOM is untouched because `use()` /
 	// `useSuspenseQuery` throw during setup BEFORE the descendant patches any of
 	// its JSX, so the committed nodes are not mid-mutated. attachResume tracks the
@@ -17131,7 +17366,7 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		(isTransition || state.transitionHeld) &&
 		state.hasResolved &&
 		state.branch === 1 &&
-		state.savedDom === null
+		state.hiddenDom === null
 	) {
 		if (!state.transitionHeld) {
 			state.transitionHeld = true;
@@ -17144,8 +17379,8 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		// stale content when the transition's promise takes too long. The
 		// counter stays held — `isPending` remains true through the fallback
 		// window because the transition is still in progress, semantically. On
-		// retry resolve, the timeout is cleared and the saved tryBlock is
-		// re-attached. Infinity → fallback never fires (legacy hold-forever).
+		// retry resolve, the timeout is cleared and the hidden tryBlock is
+		// revealed. Infinity → fallback never fires (legacy hold-forever).
 		//
 		// If the held content re-suspends on a DIFFERENT thenable (e.g. the
 		// transition changed the value to 2, holding on d2; then an urgent update
@@ -17177,8 +17412,8 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 		return;
 	}
 
-	// PRESERVE the try-body block's hooks Map, `_b.*` bindings, and DOM (via the
-	// helper's softDetach) — whether the suspend came from the try-body block
+	// PRESERVE the try-body block's hooks Map, `_b.*` bindings, and connected DOM
+	// (via hideTryBlock) — whether the suspend came from the try-body block
 	// itself OR a nested descendant block (e.g. a child component that re-renders
 	// on its own and then suspends). The old nested-case behavior unmounted the
 	// whole try subtree, discarding every descendant `scope.hooks` Map, so
@@ -17188,21 +17423,19 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
 	// their state intact — React's committed-state-preserved-while-suspended
 	// contract. (The transition HOLD path keeps content visible and does NOT
 	// come here, so its effects correctly stay live.)
-	if (!hideTryContentAndMountPending(state)) return;
-	attachResume(state, thenable);
+	hideTryContentAndMountPending(state, thenable);
 }
 
 /**
  * Hide the try content behind the @pending fallback. The single hide-and-mount
  * sequence shared by handleSuspense's suspend path and swapToPendingFallback:
  *
- *  1. softDetach the tryBlock — its hooks Map, `_b.*` bindings, and DOM are
- *     preserved (DOM parked in `savedDom`) for the resume re-attach.
+ *  1. Hide the tryBlock in place — its hooks Map, `_b.*` bindings, DOM identity,
+ *     and browser-owned state remain preserved for the resume reveal.
  *  2. React parity: while the boundary shows its fallback, the hidden subtree's
- *     effects are DESTROYED (cleanups run) and RECREATED on reveal — a suspended
- *     subtree has no active effects. deactivateScope recursively fires the
- *     subtree's effect cleanups + clears their deps so the resume re-render
- *     re-enqueues + re-fires them. Per ReactSuspenseEffectsSemantics-test.js.
+ *     layout effects are DESTROYED and RECREATED on reveal. Passive effects stay
+ *     subscribed until actual deletion. The phase-selective deactivateScope walk
+ *     clears layout deps so the resume re-render re-enqueues them.
  *  3. Detach the hidden subtree's host refs (object → null, callbacks called
  *     with null), recreated on reveal — React cycles refs across a suspend like
  *     layout effects. Only on the FIRST hide; a re-suspend during a partial
@@ -17216,11 +17449,11 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
  *  5. A re-suspend while ALREADY pending (branch === 2, a @pending body mounted)
  *     must REPLACE the prior pending body, not stack a second one. The existing
  *     pending block lives in `state.block` (it is never the tryBlock once we've
- *     soft-detached); unmount it so its DOM is removed exactly once before the
+ *     hidden); unmount it so its DOM is removed exactly once before the
  *     fresh @pending body mounts. Without this, two consecutive suspends on the
  *     same boundary (e.g. two sequential useSuspenseQuery calls) leave both
  *     fallbacks — and ultimately the resolved content alongside a stuck fallback
- *     — in the DOM at once. The tryBlock is preserved separately (savedDom), so
+ *     — in the DOM at once. The tryBlock is preserved separately (hiddenDom), so
  *     this never touches it.
  *  6. Mount the fresh @pending body between minted `pend-b` markers; a throw
  *     while rendering it unwinds to @catch via switchToCatch.
@@ -17228,13 +17461,16 @@ function handleSuspense(state: TrySlot, thenable: TrackedThenable<any>, sourceBl
  * Returns false when the pending body threw and the boundary switched to @catch
  * — the caller must bail out (no resume wiring for a dead boundary).
  */
-function hideTryContentAndMountPending(state: TrySlot): boolean {
+function hideTryContentAndMountPending(
+	state: TrySlot,
+	resumeThenable?: TrackedThenable<any>,
+): boolean {
 	const hydration = activeHydration();
 	if (hydration !== null && !state.hasResolved && state.tryBlock !== null) {
 		// A suspension during the first hydration attempt has no committed client
 		// subtree to preserve. The try block currently owns the adopted server arm;
-		// parking that DOM in savedDom would reattach it on resume and then mount the
-		// resolved client arm alongside it. Discard the abandoned adoption attempt
+		// hiding that adopted DOM for a later reveal would retain the abandoned server
+		// arm and then mount the resolved client arm alongside it. Discard the adoption attempt
 		// now, while its range is still attached, and let the retry mount one fresh
 		// client arm after the fallback. Keep the outer try markers as the cursor
 		// boundary for any following hydrating sibling.
@@ -17244,22 +17480,46 @@ function hideTryContentAndMountPending(state: TrySlot): boolean {
 		if (state.block === abandonedTry) state.block = null;
 		hydration.node = state.end;
 	} else {
-		softDetachTryBlock(state);
+		hideTryBlock(state);
 	}
-	if (state.tryBlock) {
-		deactivateScope(state.tryBlock);
-		if (state.detachedRefs === null) {
-			state.detachedRefs = [];
-			detachSubtreeRefs(state.tryBlock, state.detachedRefs);
-		}
-		state.tryBlock.inactive = true;
-	}
-	if (state.block && state.block !== state.tryBlock) {
-		unmountBlock(state.block);
-	}
+	// Publish fallback ownership before any cleanup/ref callback can run user code.
+	// A reentrant root unmount must see the preserved primary as `tryBlock` only,
+	// not as the visible arm, so its already-detached refs are not detached twice.
+	const previousArm = state.block !== null && state.block !== state.tryBlock ? state.block : null;
 	state.block = null;
 	state.branch = 2;
-	return mountPendingBody(state);
+	if (previousArm !== null) {
+		unmountBlock(previousArm);
+		if (state.parentBlock.disposed || state.block !== null || state.branch !== 2) return false;
+	}
+	if (state.tryBlock) {
+		const persistent = state.tryBlock;
+		deactivateScope(persistent, false);
+		// Effect cleanups are user code and may synchronously replace/unmount this
+		// root. Never continue a half-finished fallback commit into detached markers.
+		if (state.parentBlock.disposed || persistent.disposed || state.tryBlock !== persistent) {
+			return false;
+		}
+		if (state.detachedRefs === null) {
+			state.detachedRefs = [];
+			// Nested boundaries may already have detached their hidden primary refs.
+			// Visit only each nested boundary's visible arm here so an outer hide
+			// cannot detach the preserved inner primary a second time.
+			detachSubtreeRefs(persistent, state.detachedRefs, true, false);
+		}
+		// Callback refs (and React-19 ref cleanups) are user code too. In particular,
+		// ref(null) may synchronously unmount an independent or owning root.
+		if (state.parentBlock.disposed || persistent.disposed || state.tryBlock !== persistent) {
+			return false;
+		}
+		persistent.inactive = true;
+	}
+	if (!mountPendingBody(state)) return false;
+	if (state.parentBlock.disposed || state.branch !== 2) return false;
+	// A custom thenable may synchronously invoke its listener. Install ownership
+	// only after the pending arm is coherent, then re-check for reentrant teardown.
+	if (resumeThenable !== undefined) attachResume(state, resumeThenable);
+	return !state.parentBlock.disposed && state.branch === 2;
 }
 
 /** Mount the current @pending helper without changing the preserved try body. */
@@ -17321,11 +17581,11 @@ function refreshPendingBody(state: TrySlot): void {
 }
 
 /**
- * Soft-detach the held tryBlock (preserving its hook state and DOM in
- * `savedDom`) and mount the @pending body in its place. Used by the
+ * Hide the held tryBlock in place (preserving its hook state, DOM identity, and
+ * browser-owned state in `hiddenDom`) and mount the @pending body after it. Used by the
  * transition-fallback timeout when a held transition runs over budget — by
  * that point the user has waited long enough that React (and we) commit the
- * fallback to give visual feedback. The retry path re-attaches savedDom on
+ * fallback to give visual feedback. The retry path reveals hiddenDom on
  * resolve, so this is recoverable. (The resume listener is already attached —
  * the hold began in handleSuspense — so unlike the suspend path there is no
  * attachResume here.)
@@ -17338,7 +17598,7 @@ function swapToPendingFallback(state: TrySlot): void {
 	hideTryContentAndMountPending(state);
 }
 
-// Commit a resolved boundary's reveal: reattach its held/detached DOM, re-render the
+// Commit a resolved boundary's reveal: show its held/hidden DOM, re-render the
 // try body, re-attach host refs, and drain its effects. Runs in a thenable microtask
 // (outside the normal flush) OR from the entangled-batch flush. Releases the transition
 // hold; a re-suspend during the re-render re-acquires it via handleSuspense.
@@ -17359,6 +17619,7 @@ function commitResume(state: TrySlot): void {
 }
 
 function commitResumeInner(state: TrySlot): void {
+	if (state.parentBlock.disposed) return;
 	const wasHeld = state.transitionHeld;
 	if (wasHeld) state.transitionHeld = false;
 	// Leave the coordination sets — this boundary is committing now (a re-suspend
@@ -17366,34 +17627,48 @@ function commitResumeInner(state: TrySlot): void {
 	HELD_TRANSITIONS.delete(state);
 	STAGED_REVEALS.delete(state);
 	try {
-		if (state.tryBlock && !state.tryBlock.disposed) {
+		const tryBlock = state.tryBlock;
+		if (tryBlock && !tryBlock.disposed) {
+			const reconnectEffects = state.hiddenDom !== null;
 			const stagedCapture = state.stagedCapture;
 			state.stagedCapture = null;
 			state.stagedEffectDeps = null;
-			if (state.savedDom) {
-				if (state.block && state.block !== state.tryBlock) {
-					unmountBlock(state.block);
+			if (state.hiddenDom) {
+				if (state.block && state.block !== tryBlock) {
+					const fallback = state.block;
+					// Publish that no visible fallback is owned before its cleanup can
+					// synchronously unmount or replace this boundary.
 					state.block = null;
+					unmountBlock(fallback);
+					if (
+						state.parentBlock.disposed ||
+						tryBlock.disposed ||
+						state.tryBlock !== tryBlock ||
+						state.block !== null
+					) {
+						discardOffscreenCapture(stagedCapture);
+						return;
+					}
 				}
-				reattachTryBlock(state);
+				showTryBlock(state);
 			}
-			state.block = state.tryBlock;
+			state.block = tryBlock;
 			state.branch = 1;
-			state.tryBlock.body = state.tryBody;
+			tryBlock.body = state.tryBody;
 			// Preserve transition priority on the retry render — the retry is a
 			// continuation of the same transition, so a re-suspend on a different
 			// promise should also keep the prior DOM (and isPending stays true).
-			if (wasHeld) state.tryBlock.pendingMode = 'transition';
+			if (wasHeld) tryBlock.pendingMode = 'transition';
 			// Reveal: clear the hidden-subtree inactive flag (set on hide) so its effects
 			// re-enqueue + re-fire (recreate) during this resume render.
-			state.tryBlock.inactive = false;
+			tryBlock.inactive = false;
 			if (stagedCapture !== null) {
 				// attemptHiddenReveal already completed this exact transition render while
 				// the fallback was visible. Commit its deferred effects/refs/store checks now
 				// that the entangled group is revealing; re-rendering would both duplicate
 				// render work and lose mount-only ref attaches captured by that hidden pass.
-				state.tryBlock.pendingMode = null;
-				state.tryBlock.pendingDeferred = false;
+				tryBlock.pendingMode = null;
+				tryBlock.pendingDeferred = false;
 				// Ref attach closures captured by a hidden pass can be stale after a
 				// later same-node ref supersession. Reveal uses the current manifest.
 				if (state.detachedRefs !== null) stagedCapture.refs.length = 0;
@@ -17404,7 +17679,7 @@ function commitResumeInner(state: TrySlot): void {
 				// and the waterfall diagnostic apply only while a resolved suspension
 				// is being replayed (ordinary updates must keep replacing thenables).
 				const resumeCapture = createOffscreenCapture();
-				const effectDeps = snapshotSubtreeEffectDeps(state.tryBlock);
+				const effectDeps = snapshotSubtreeEffectDeps(tryBlock);
 				const previousCapture = WIP_CAPTURE;
 				const refDetachCheckpoint = refDetachQueue.length;
 				const prevReplay = RESUME_REPLAY;
@@ -17413,7 +17688,11 @@ function commitResumeInner(state: TrySlot): void {
 				let didThrow = false;
 				let renderError: unknown = null;
 				try {
-					renderBlock(state.tryBlock);
+					if (reconnectEffects) {
+						renderWithEffectReconnect(tryBlock, resumeCapture);
+					} else {
+						renderBlock(tryBlock);
+					}
 				} catch (err) {
 					didThrow = true;
 					renderError = err;
@@ -17430,13 +17709,14 @@ function commitResumeInner(state: TrySlot): void {
 					state.hasResolved = true;
 				} else {
 					refDetachQueue.splice(refDetachCheckpoint);
-					restoreSubtreeEffectDeps(state.tryBlock, effectDeps);
+					restoreSubtreeEffectDeps(tryBlock, effectDeps);
 					discardOffscreenCapture(resumeCapture);
 					if (isSuspenseException(renderError)) {
-						handleSuspense(state, renderError.thenable, state.tryBlock);
+						handleSuspense(state, renderError.thenable, tryBlock);
 					} else {
 						switchToCatch(state, renderError);
 					}
+					if (state.parentBlock.disposed) return;
 				}
 			}
 			if (state.branch === 1) {
@@ -17462,16 +17742,16 @@ function commitResumeInner(state: TrySlot): void {
 
 /**
  * Nearest enclosing SUSPENSE-HIDDEN boundary: a tryBlock ancestor whose slot
- * has its try content soft-detached into `savedDom` (fallback showing). The
+ * has its committed try content recorded in `hiddenDom` (fallback showing). The
  * pending arm's own block also carries `__trySlot`, but only the TRY block
  * matches `slot.tryBlock === p`, so updates inside the fallback render
  * normally. <Activity>-hidden subtrees (also `inactive`) are untouched — their
- * DOM stays live, only this savedDom regime is geometry-unsafe to render into.
+ * DOM stays connected, but retries still belong to the whole boundary transaction.
  */
-function findSuspenseHiddenTry(block: Block): TrySlot | null {
+function findSuspenseHiddenTry(block: Block | null): TrySlot | null {
 	for (let p: Block | null = block; p !== null; p = p.parentBlock) {
 		const slot = (p as any).__trySlot as TrySlot | undefined;
-		if (slot !== undefined && slot.tryBlock === p && slot.savedDom !== null) return slot;
+		if (slot !== undefined && slot.tryBlock === p && slot.hiddenDom !== null) return slot;
 	}
 	return null;
 }
@@ -17479,17 +17759,16 @@ function findSuspenseHiddenTry(block: Block): TrySlot | null {
 /**
  * Re-attempt a suspense-hidden boundary's try body because state INSIDE the
  * hidden subtree changed (a setState / external-store update scheduled a render
- * on a soft-detached block). React parity: an update to a suspended component
+ * in a hidden block). React parity: an update to a suspended component
  * RETRIES the render — if it no longer suspends (e.g. a store flipped to ready
  * before the suspending promise resolved), the boundary reveals now, without
  * that promise ever settling.
  *
- * The body must render against LIVE geometry — fresh mounts inside it insert
- * relative to sibling markers, and a mixed live/detached range makes those
- * insertions target dismembered parents. So: reattach savedDom first (the
- * pending arm stays put; nothing paints mid-flush), render, then either commit
+ * Reveal the primary synchronously before its speculative render so authored
+ * display patches and newly-created top-level hosts apply normally (the pending
+ * arm stays put; nothing paints mid-flush), then either commit
  * the reveal (drop the pending arm, reactivate effects + refs — the
- * commitResume choreography) or re-stash and stay on the fallback.
+ * commitResume choreography) or hide it again and stay on the fallback.
  */
 function snapshotSubtreeEffectDeps(scope: Scope): EffectDepsSnapshot {
 	const snapshot: EffectDepsSnapshot = new Map();
@@ -17525,6 +17804,94 @@ function restoreSubtreeEffectDeps(scope: Scope, snapshot: EffectDepsSnapshot): v
 	visit(scope);
 }
 
+interface EffectReconnectContext {
+	root: Block;
+	queues: [PendingEffect[], PendingEffect[], PendingEffect[]];
+	queuedSlots: Set<EffectSlot>;
+	parent: EffectReconnectContext | null;
+}
+
+let EFFECT_RECONNECT_CONTEXT: EffectReconnectContext | null = null;
+
+/** Keep nested reveal contexts aware of effects enqueued by an inner render. */
+function markEffectReconnectQueued(
+	effect: EffectSlot,
+	phase: Phase,
+	target: PendingEffect[],
+): void {
+	for (let context = EFFECT_RECONNECT_CONTEXT; context !== null; context = context.parent) {
+		if (context.queues[phase] === target) context.queuedSlots.add(effect);
+	}
+}
+
+/**
+ * Reconnect committed effects at the exact memo/implicit-bail position in the
+ * reveal render. That preserves source-sibling enqueue order without invoking an
+ * equal-props component body: effects before this bail are already queued, these
+ * retained effects are appended now, and effects in later siblings follow them.
+ */
+function reconnectBailedEffects(block: Block): void {
+	const context = EFFECT_RECONNECT_CONTEXT;
+	if (context === null || (block !== context.root && !blockIsAncestorOf(context.root, block)))
+		return;
+
+	const disconnected: Array<{ scope: Scope; effect: EffectSlot }> = [];
+	const visit = (scope: Scope): void => {
+		const effects = scope.effectSlots;
+		if (effects !== null) {
+			for (let i = 0; i < effects.length; i++) {
+				const effect = effects[i];
+				if (
+					effect.disconnected &&
+					effect.connectedFn !== null &&
+					!context.queuedSlots.has(effect)
+				) {
+					disconnected.push({ scope, effect });
+				}
+			}
+		}
+		forEachSubtreeChild(scope, visit);
+	};
+	visit(block);
+	// The collector preserves each scope's declaration order and the live block
+	// structure's registered order. Do not sort by a slot's most recent enqueue:
+	// staggered dependency updates would turn commit time into a false source-order
+	// key and reconnect earlier-declared effects after later ones.
+	for (let i = 0; i < disconnected.length; i++) {
+		const { scope, effect } = disconnected[i];
+		context.queues[effect.phase].push({
+			scope,
+			slot: effect.slot,
+			fn: effect.connectedFn!,
+			args: effect.connectedArgs,
+			phase: effect.phase,
+			seq: commitSeq++,
+		});
+		context.queuedSlots.add(effect);
+	}
+}
+
+/** Render a reconnecting reveal while leaving ordinary renders allocation-free. */
+function renderWithEffectReconnect(block: Block, capture: OffscreenCapture | null): void {
+	const queues = capture === null ? effectQueues : capture.effects;
+	const queuedSlots = new Set<EffectSlot>();
+	for (let phase = 0; phase < queues.length; phase++) {
+		const queue = queues[phase];
+		for (let i = 0; i < queue.length; i++) {
+			const pending = queue[i];
+			const effect = pending.scope.hooks?.get(pending.slot) as EffectSlot | undefined;
+			if (effect?.effect === true) queuedSlots.add(effect);
+		}
+	}
+	const parent = EFFECT_RECONNECT_CONTEXT;
+	EFFECT_RECONNECT_CONTEXT = { root: block, queues, queuedSlots, parent };
+	try {
+		renderBlock(block);
+	} finally {
+		EFFECT_RECONNECT_CONTEXT = parent;
+	}
+}
+
 /**
  * A hidden retry can mount a ref and then suspend later, or supersede that ref on
  * the same preserved node in a subsequent retry. Captured attach closures are
@@ -17544,7 +17911,15 @@ function queueCurrentHiddenRefs(state: TrySlot): void {
 
 function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transition'): void {
 	const tryBlock = state.tryBlock;
-	if (tryBlock === null || tryBlock.disposed || state.savedDom === null) return;
+	if (tryBlock === null || tryBlock.disposed || state.hiddenDom === null) return;
+	// A nested boundary cannot reveal independently through an ancestor's hidden
+	// primary. Retry the outer transaction; its render will revisit this boundary
+	// and either reveal both atomically or keep the whole subtree hidden.
+	const hiddenAncestor = findSuspenseHiddenTry(tryBlock.parentBlock);
+	if (hiddenAncestor !== null) {
+		attemptHiddenReveal(hiddenAncestor, scheduledMode);
+		return;
+	}
 	// A fresh retry invalidates any readiness proved by an earlier attempt even
 	// when that attempt had no retained capture (e.g. an ordinary thenable settle
 	// added this boundary to STAGED_REVEALS). It becomes ready again only after the
@@ -17562,9 +17937,9 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 			restoreSubtreeEffectDeps(tryBlock, supersededEffectDeps);
 		}
 		discardOffscreenCapture(supersededCapture);
-		deactivateScope(tryBlock);
+		deactivateScope(tryBlock, false);
 	}
-	reattachTryBlock(state);
+	showTryBlock(state);
 	tryBlock.body = state.tryBody;
 	tryBlock.extra = state.env;
 	tryBlock.inactive = false;
@@ -17585,7 +17960,7 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 	let didThrow = false;
 	let thrown: unknown = null;
 	try {
-		renderBlock(tryBlock);
+		renderWithEffectReconnect(tryBlock, hiddenCapture);
 	} catch (err) {
 		didThrow = true;
 		thrown = err;
@@ -17604,10 +17979,10 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 		restoreSubtreeEffectDeps(tryBlock, effectDeps);
 		discardOffscreenCapture(hiddenCapture);
 		if (isSuspenseException(thrown)) {
-			deactivateScope(tryBlock);
-			// Still suspended — re-stash the try DOM (the pending arm never moved)
+			deactivateScope(tryBlock, false);
+			// Still suspended — hide the try DOM again (the pending arm never moved)
 			// and keep/refresh the resume wiring for the (possibly new) thenable.
-			softDetachTryBlock(state);
+			hideTryBlock(state);
 			tryBlock.inactive = true;
 			attachResume(state, thrown.thenable);
 		} else {
@@ -17631,7 +18006,7 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 		state.pendingThenable = null;
 		state.stagedCapture = hiddenCapture;
 		state.stagedEffectDeps = effectDeps;
-		softDetachTryBlock(state);
+		hideTryBlock(state);
 		tryBlock.inactive = true;
 		STAGED_REVEALS.add(state);
 		queueMicrotask(flushStagedRevealsIfReady);
@@ -17788,6 +18163,14 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 			clearTimeout(state.transitionTimeoutId);
 			state.transitionTimeoutId = null;
 		}
+		const persistent = state.tryBlock;
+		if (persistent !== null && !persistent.disposed) {
+			const hiddenAncestor = findSuspenseHiddenTry(persistent.parentBlock);
+			if (hiddenAncestor !== null) {
+				attemptHiddenReveal(hiddenAncestor, persistent.pendingMode ?? 'urgent');
+				return;
+			}
+		}
 		// Entangled-transition commit barrier: a boundary holding prior content for an
 		// in-flight transition does not reveal the moment one input resolves. A hidden
 		// primary proves its whole body below; visible holds retain the documented
@@ -17796,9 +18179,9 @@ function attachResume(state: TrySlot, thenable: TrackedThenable<any>): void {
 		if (HELD_TRANSITIONS.has(state)) {
 			// Once the timeout has exposed @pending, settling one thenable is not
 			// sufficient proof that this member is reveal-ready: a later dependent
-			// use() may still suspend. Retry the detached primary under the hidden
+			// use() may still suspend. Retry the hidden primary under the hidden
 			// capture and enter STAGED_REVEALS only if the whole body completes.
-			if (state.savedDom !== null) {
+			if (state.hiddenDom !== null) {
 				attemptHiddenReveal(state, 'transition');
 				return;
 			}
@@ -18404,6 +18787,7 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	discardOffscreenCapture(state.stagedCapture);
 	state.stagedCapture = null;
 	state.stagedEffectDeps = null;
+	const hadDetachedRefs = state.detachedRefs !== null;
 	state.detachedRefs = null;
 	// Cancel any pending transition-fallback timeout — catch is a terminal
 	// state, so a timeout-driven swap to @pending would conflict with the
@@ -18418,20 +18802,36 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	// body isn't sent through unmountBlock a second time (it's idempotent, but
 	// the second pass is pure waste).
 	const oldTry = state.tryBlock;
+	const priorVisible = state.block;
 	if (oldTry) {
-		unmountBlock(oldTry);
+		let suppressedRefs: SuspenseRefEntry[] | null = null;
+		if (hadDetachedRefs) {
+			suppressedRefs = [];
+			collectVisibleSubtreeRefs(oldTry, suppressedRefs);
+		}
+		showTryBlock(state);
+		// A fallback-visible primary already cycled its refs during hide. Permanent
+		// catch teardown must not invoke those callbacks or React-19 cleanup
+		// functions again; refs in the visible pending/catch arm still detach below.
+		// Publish the terminal ownership change before cleanup callbacks can
+		// synchronously unmount or replace the boundary.
 		state.tryBlock = null;
+		withRefDetachSuppression(suppressedRefs, () => {
+			unmountBlock(oldTry);
+		});
+		if (state.parentBlock.disposed || state.tryBlock !== null || state.block !== priorVisible) {
+			return;
+		}
 	}
-	if (state.savedDom) {
-		// DOM was detached — discard the saved nodes since the block they
-		// belonged to is being torn down (unmountBlock above wouldn't see them
-		// because they're detached from the document).
-		state.savedDom = null;
-	}
+	state.hiddenDom = null;
 	if (state.block && state.block !== oldTry) {
-		unmountBlock(state.block);
+		const visible = state.block;
+		state.block = null;
+		unmountBlock(visible);
+		if (state.parentBlock.disposed || state.block !== null) return;
+	} else {
+		state.block = null;
 	}
-	state.block = null;
 	state.hasResolved = false;
 	state.pendingThenable = null;
 	if (state.transitionHeld) {
@@ -18621,6 +19021,59 @@ interface BranchSlot {
 	borrowed: boolean;
 	branch: number;
 	block: Block | null;
+	/**
+	 * Sibling immediately before a markerless arm's incomplete mount. `undefined`
+	 * means no pending mount; `null` means the pending arm started at the parent edge.
+	 */
+	markerlessBefore: Node | null | undefined;
+}
+
+/** True when a committed primary must survive a replacement that may suspend. */
+function preservesCommittedSuspense(block: Block): boolean {
+	for (let current: Block | null = block; current !== null; current = current.parentBlock) {
+		const state = (current as any).__trySlot as TrySlot | undefined;
+		if (
+			state !== undefined &&
+			state.tryBlock === current &&
+			state.pendingBody !== null &&
+			state.hasResolved &&
+			state.branch === 1 &&
+			state.hiddenDom === null
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/** Publish the DOM boundary of a markerless arm after its body finally completes. */
+function finalizeMarkerlessBranch(
+	state: BranchSlot,
+	domParent: Node,
+	block: Block,
+	marker: string,
+	before: Node | null,
+	after: Node | null,
+): void {
+	state.markerlessBefore = undefined;
+	if (state.borrowed && state.start === null) return;
+	const first = before ? before.nextSibling : domParent.firstChild;
+	const last = after ? after.previousSibling : domParent.lastChild;
+	if (last !== null && first === last && first.nodeType === 1) {
+		block.startMarker = first;
+		block.endMarker = first;
+		state.end = first;
+	} else {
+		const start = document.createComment(marker);
+		const end = document.createComment('/' + marker);
+		domParent.insertBefore(start, first ?? after);
+		domParent.insertBefore(end, after);
+		block.startMarker = start;
+		block.endMarker = end;
+		block.exclusiveMarkers = true;
+		state.start = start;
+		state.end = end;
+	}
 }
 
 /**
@@ -18658,8 +19111,9 @@ function sharesBlockBoundary(parent: Block | null, start: Node | null, end: Node
 
 /**
  * The shared branch-swap core. When `next` differs from the mounted branch:
- * under a transition, render `body` off-screen and COMMIT it in place (adopting
- * the WIP markers — see below); otherwise tear the old branch down and mount
+ * when a transition or committed Suspense primary must preserve the old arm,
+ * render `body` off-screen and COMMIT it in place (adopting the WIP markers —
+ * see below); otherwise tear the old branch down and mount
  * `body` with the dynamic self-marking scheme. When it's the same branch,
  * re-render in place so hook state / event bindings survive. `marker` is the comment
  * label minted for the slot's boundary — `<!--if-->…<!--/if-->` /
@@ -18686,31 +19140,67 @@ function renderBranchSlot(
 	const hydration = activeHydration();
 	if (next !== state.branch) {
 		const transitionSwap = TRANSITION_SWAP_DRIVER;
+		const transitionMode = parentBlock.currentRenderMode === 'transition';
+		const suspenseSwap =
+			transitionSwap !== null &&
+			!transitionMode &&
+			state.block !== null &&
+			state.block.mounted &&
+			state.markerlessBefore === undefined &&
+			body !== null &&
+			hydration === null &&
+			preservesCommittedSuspense(parentBlock);
+		let provisionalAfter: Node | null = null;
+		const markerlessBefore = state.markerlessBefore;
+		if (markerlessBefore !== undefined && state.block !== null) {
+			// The first arm suspended before it could publish a stable boundary. Its
+			// end marker is only the insertion anchor, so normal `.nextSibling`
+			// positioning would mount a superseding arm after the following static
+			// sibling and leave partially-inserted DOM behind. Tear down the aborted
+			// scope without range removal, then sweep exactly its provisional range.
+			const pending = state.block;
+			provisionalAfter = pending.endMarker;
+			let node = markerlessBefore ? markerlessBefore.nextSibling : domParent.firstChild;
+			state.block = null;
+			state.markerlessBefore = undefined;
+			unmountBlock(pending, false);
+			if (parentBlock.disposed) return;
+			while (node !== null && node !== provisionalAfter) {
+				const nextNode = node.nextSibling;
+				if (node.parentNode === domParent) domParent.removeChild(node);
+				node = nextNode;
+			}
+		}
 		// A markerless branch may share its host boundary with a nested sole-root
 		// branch. The nested branch updates Block markers when it replaces that
 		// host, but this slot's cached `end` is intentionally not part of the Block
 		// chain. Follow the live block boundary for positioning/probing so an outer
 		// swap never inserts relative to a detached former root.
 		const liveEnd =
-			state.start === null && state.block !== null && state.block.endMarker !== null
+			provisionalAfter === null &&
+			state.start === null &&
+			state.block !== null &&
+			state.block.endMarker !== null
 				? state.block.endMarker
 				: state.end;
-		// Off-screen swap (React WIP model): on a TRANSITION swap to a new branch that may
-		// suspend, render it off-screen FIRST without tearing down the old branch. If it
+		// Off-screen swap (React WIP model): when a transition or committed Suspense
+		// primary swaps to a new branch that may suspend, render it off-screen FIRST
+		// without tearing down the old branch. If it
 		// suspends, dispose + route to the enclosing tryBlock so its transition hold keeps
 		// the old branch on screen and resumes — the resume re-renders the try body, which
 		// re-drives this swap. On completion we COMMIT the WIP (no double render): the off-
 		// screen block owns a `<!--wip-->`/`<!--/wip-->` pair which we adopt as the slot's
 		// durable markers (renamed in place — descendant slots may anchor on `wip.end`, so
 		// it must survive) and mark exclusiveMarkers=true so the NEXT swap's marker path
-		// finds them still attached after its own unmountBlock. Urgent + hydration, and a
-		// swap TO an empty branch (body === null), keep the legacy in-place path below.
+		// finds them still attached after its own unmountBlock. Hydration, an urgent swap
+		// outside committed Suspense, and a swap TO an empty branch (body === null), keep
+		// the legacy in-place path below.
 		if (
 			transitionSwap !== null &&
 			state.block !== null &&
 			body !== null &&
 			hydration === null &&
-			parentBlock.currentRenderMode === 'transition'
+			(transitionMode || suspenseSwap)
 		) {
 			// Commit path requires a live branch boundary: renderOffscreen
 			// inserts the wip pair AFTER its reference node, which matches "right after the
@@ -18752,13 +19242,7 @@ function renderBranchSlot(
 					// pair was inserted after `probeAfter` (state.end/anchor) and stays put.
 					const oldStart = state.start;
 					const oldEnd = state.end;
-					unmountBlock(state.block);
-					// Orphaned old slot markers (borrowed regime) — nothing references them once
-					// the old block is dead; remove so only the adopted wip pair bounds the slot.
-					if (oldStart !== null) {
-						oldStart.remove();
-						(oldEnd as ChildNode | null)?.remove();
-					}
+					const oldBlock = state.block;
 					state.start = r.wip.start;
 					state.end = r.wip.end;
 					state.block = r.wip.block;
@@ -18773,6 +19257,17 @@ function renderBranchSlot(
 					// Adopted pair is now the slot's durable boundary (see NEXT-swap note above).
 					r.wip.block.exclusiveMarkers = true;
 					transitionSwap.splice(r.wip);
+					// Publish the completed incoming arm before old-tree cleanups can run user
+					// code. A reentrant owning-root unmount can now discover and dispose the
+					// WIP instead of letting this path resurrect it afterward.
+					unmountBlock(oldBlock);
+					// Orphaned old slot markers (borrowed regime) — nothing references them once
+					// the old block is dead; remove so only the adopted wip pair bounds the slot.
+					if (oldStart !== null) {
+						oldStart.remove();
+						(oldEnd as ChildNode | null)?.remove();
+					}
+					if (parentBlock.disposed || state.block !== r.wip.block || r.wip.block.disposed) return;
 					return;
 				}
 			}
@@ -18780,7 +19275,8 @@ function renderBranchSlot(
 		// Position for the new branch: just after the current branch's trailing node,
 		// or the slot anchor on first mount. Captured BEFORE teardown (a self-marked
 		// branch's trailing node is removed by it).
-		const after: Node | null = liveEnd !== null ? liveEnd.nextSibling : state.anchor;
+		const after: Node | null =
+			provisionalAfter ?? (liveEnd !== null ? liveEnd.nextSibling : state.anchor);
 		const oldBlock = state.block;
 		const oldBlockStart = oldBlock?.startMarker ?? null;
 		const oldBlockEnd = oldBlock?.endMarker ?? null;
@@ -18858,35 +19354,16 @@ function renderBranchSlot(
 				env,
 			);
 			state.block = b;
+			state.markerlessBefore = before;
 			renderBlock(b);
-			if (state.borrowed && state.start === null) {
-				// A hydration-range passthrough branch is a logical wrapper above the
-				// selected container owner. Its descendant owns the real DOM boundary.
-				return;
-			}
-			const first = before ? before.nextSibling : domParent.firstChild;
-			const last = after ? after.previousSibling : domParent.lastChild;
-			if (last !== null && first === last && (first as Node).nodeType === 1) {
-				// Single element — self-mark (no markers). Teardown is one removeChild,
-				// and the slot now LOOKS single-element to an enclosing @if, so the
-				// optimization cascades up the tree.
-				b.startMarker = first;
-				b.endMarker = first;
-				state.end = first;
-				replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, first, first);
-			} else {
-				// Multi-node (or rendered nothing) — mint markers around the content.
-				const s = document.createComment(marker);
-				const e = document.createComment('/' + marker);
-				domParent.insertBefore(s, first ?? after);
-				domParent.insertBefore(e, after);
-				b.startMarker = s;
-				b.endMarker = e;
-				b.exclusiveMarkers = true;
-				state.start = s;
-				state.end = e;
-				replaceSharedBlockBoundary(parentBlock, oldBlockStart, oldBlockEnd, s, e);
-			}
+			finalizeMarkerlessBranch(state, domParent, b, marker, before, after);
+			replaceSharedBlockBoundary(
+				parentBlock,
+				oldBlockStart,
+				oldBlockEnd,
+				b.startMarker,
+				b.endMarker,
+			);
 		} else if (!oldBoundaryShared) {
 			// A truly empty client arm needs only its existing insertion anchor.
 			// Keep the markerless regime so a later empty → single-host transition
@@ -18911,6 +19388,17 @@ function renderBranchSlot(
 		state.block.body = body!;
 		state.block.extra = env;
 		renderBlock(state.block);
+		const markerlessBefore = state.markerlessBefore;
+		if (markerlessBefore !== undefined) {
+			finalizeMarkerlessBranch(
+				state,
+				domParent,
+				state.block,
+				marker,
+				markerlessBefore,
+				state.block.endMarker,
+			);
+		}
 	}
 }
 
@@ -18968,6 +19456,7 @@ export function ifBlock(
 			borrowed: passthrough,
 			branch: -1,
 			block: null,
+			markerlessBefore: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -19188,7 +19677,7 @@ export function activityBlock(
 			b.inactive = false;
 			state.hidden = false;
 			state.deactivationPending = false;
-			renderBlock(b);
+			renderWithEffectReconnect(b, null);
 		} else {
 			// visible → visible: ordinary re-render in place.
 			renderBlock(b);
@@ -19204,7 +19693,7 @@ export function activityBlock(
  * each keyed item block plus the optional `@empty` block; every other slot kind
  * contributes its generic `.block`; a `trySlotSlot` additionally contributes the
  * hidden-but-alive `tryBlock` when the boundary is showing @pending/@catch (the
- * content subtree is soft-detached, not disposed, so it must still be visited).
+ * content subtree is hidden, not disposed, so it must still be visited).
  * Shared by detachSubtreeRefs and deactivateScope, which recurse via `visit`.
  */
 function forEachSubtreeChild(
@@ -19221,6 +19710,15 @@ function forEachSubtreeChild(
 			if (val.__kind === 'forBlockSlot') {
 				for (let b: Block | null = val.head; b !== null; b = b.nextSibling) visit(b);
 				if (val.emptyBlock) visit(val.emptyBlock);
+			} else if (val.__kind === 'childSlot') {
+				if (val.block) visit(val.block);
+				if (val.forSlot) {
+					for (let b: Block | null = val.forSlot.head; b !== null; b = b.nextSibling) visit(b);
+					if (val.forSlot.emptyBlock) visit(val.forSlot.emptyBlock);
+				}
+				// Value-position portals keep their Block inside `portal`, not `block`.
+				// They remain logical descendants for Suspense effect/ref visibility.
+				if (val.portal?.block) visit(val.portal.block);
 			} else if (val.block) {
 				visit(val.block);
 				if (
@@ -19365,13 +19863,13 @@ function detachDeoptTreeRefs(
  * Run a subtree's effect CLEANUPS without disposing it, and reset its effect
  * slots so the setups re-fire on reactivation. Used by activityBlock on hide
  * AND by the tryBlock suspense-hide path (hideTryContentAndMountPending):
- * effects are torn down (cleanups run, parent-before-child) while state, DOM and
- * the blocks all stay alive. Refs are intentionally LEFT attached to the
- * preserved (hidden) DOM when hiding an <Activity> — they point at valid,
- * still-present nodes; the suspense path detaches them separately
- * (detachSubtreeRefs) to match React's ref-cycling contract.
+ * Activity disconnects layout + passive effects. Suspense passes
+ * `disconnectPassive=false`: layout effects disconnect, while passive effects
+ * remain subscribed until actual deletion, matching React's hidden-primary
+ * lifetime. State, DOM, and blocks stay alive in either case. Refs remain
+ * attached for Activity; Suspense cycles them separately via detachSubtreeRefs.
  */
-function deactivateScope(scope: Scope): void {
+function deactivateScope(scope: Scope, disconnectPassive: boolean = true): void {
 	const hooks = scope.hooks;
 	if (hooks) {
 		for (const slot of hooks.values()) {
@@ -19382,7 +19880,7 @@ function deactivateScope(scope: Scope): void {
 				// reveal re-render doesn't re-fire them. They own injected styles
 				// that must persist while a tree is merely hidden; only a real
 				// unmount (unmountScope's effect-slot walk) tears them down.
-				if (e.phase === INSERTION) continue;
+				if (e.phase === INSERTION || (!disconnectPassive && e.phase === PASSIVE)) continue;
 				if (typeof e.cleanup === 'function') {
 					const cleanup = e.cleanup;
 					// Clear it BEFORE firing so unmountScope's effect-slot walk sees
@@ -19399,10 +19897,11 @@ function deactivateScope(scope: Scope): void {
 				}
 				// Force the setup to re-enqueue + re-fire when the subtree reactivates.
 				e.deps = undefined;
+				if (e.connectedFn !== null) e.disconnected = true;
 			}
 		}
 	}
-	forEachSubtreeChild(scope, deactivateScope);
+	forEachSubtreeChild(scope, (child) => deactivateScope(child, disconnectPassive));
 }
 
 // ---------------------------------------------------------------------------
@@ -19461,6 +19960,7 @@ export function switchBlock(
 			borrowed: passthrough,
 			branch: -1,
 			block: null,
+			markerlessBefore: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);

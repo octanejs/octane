@@ -4,6 +4,7 @@ import {
 	cloneElement,
 	createContext,
 	createElement,
+	type OctaneNode,
 	use,
 	useState,
 } from 'octane';
@@ -270,6 +271,52 @@ export function ReturnedChildCodeBlock(props) {
 			<button id="child-code-block-action" onClick={props.onAction}>{props.label as string}</button>
 		}
 	</>;
+}
+
+function ValueTemplatePropHost(props: { content: OctaneNode }) {
+	return <main id="setup-value-prop-host">{props.content}</main>;
+}
+
+// Passing a setup JSX value through a component prop must preserve the authored
+// descriptor and the compiler-owned directive region nested inside it.
+export function ValueTemplatePropSlot(props: {
+	showHeading: boolean;
+	heading: string;
+}) @{
+	const content = <section id="setup-value-prop-content">
+		<span id="setup-value-prop-before">Before</span>
+
+		@if (props.showHeading) {
+			<h1 id="setup-value-prop-heading">{props.heading}</h1>
+		}
+
+		<span id="setup-value-prop-after">After</span>
+	</section>;
+
+	<ValueTemplatePropHost content={content} />
+}
+
+// Directive arms retain their ordinary setup/output split when they are nested
+// in a stored descriptor: the callback expression executes but does not render,
+// while the explicit fragment is the rendered value.
+export function ValueTemplateExpressionSemantics(props: {
+	visible: boolean;
+	setupValue: string;
+	output: string;
+	observe: (value: string) => string;
+}) @{
+	const content = <section id="setup-value-expression-semantics">
+		@if (props.visible) {
+			props.observe(props.setupValue);
+		}
+		@if (props.visible) {
+			<>
+				{props.output}
+			</>
+		}
+	</section>;
+
+	<main>{content}</main>
 }
 
 // The object wrapper mirrors component-slot composition used by consumers. Its

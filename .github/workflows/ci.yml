@@ -322,6 +322,14 @@ jobs:
           pnpm react-parity:test
           pnpm react-parity:check
 
+      # Redact's issues, pull requests, and tests are mined at a pinned commit
+      # into an authored contract ledger. This network-free gate validates its
+      # dispositions/local evidence and keeps the generated report current.
+      - name: Check Redact-derived adversarial contract ledger
+        env:
+          OCTANE_REDACT_AUDIT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: pnpm redact-audit:check
+
       # Production error URLs are a public compatibility surface. Keep the
       # append-only catalog, generated client/server formatters, and literal
       # runtime call sites synchronized before a package can be built.

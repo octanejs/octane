@@ -1,5 +1,5 @@
 import type { UniversalPortalTargetHandle } from 'octane/universal/native';
-import { LYNX_RENDERER_ID } from '../config.js';
+import { LYNX_RENDERER_ID } from './renderer-id.js';
 
 const LYNX_PORTAL_TARGET_ID = /^octane\.lynx\.portal:(\d+):(\d+):(\d+)$/;
 

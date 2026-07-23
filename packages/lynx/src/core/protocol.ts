@@ -15,14 +15,12 @@ import type {
 } from 'octane/universal/native';
 import type { LynxFirstTreeSnapshot } from './first-screen.js';
 import { decodeLynxPortalTargetId } from './portal.js';
+import { LYNX_RENDERER_ID } from './renderer-id.js';
 
-/**
- * Kept as a local literal so the main-thread protocol graph does not evaluate
- * Octane's background universal runtime. The type pins it to the core ABI.
- */
+/** Kept local to the main-thread protocol graph; the type pins it to the core ABI. */
 export const LYNX_TRANSPORT_PROTOCOL_VERSION: typeof UNIVERSAL_TRANSPORT_PROTOCOL_VERSION = 1;
 
-export const LYNX_TRANSPORT_RENDERER = 'lynx' as const;
+export const LYNX_TRANSPORT_RENDERER: typeof LYNX_RENDERER_ID = LYNX_RENDERER_ID;
 
 /** Named ContextProxy events; this protocol never falls back to `postMessage`. */
 export const LYNX_BACKGROUND_TO_MAIN_EVENT = 'octane-lynx:background-to-main';
@@ -63,6 +61,30 @@ export interface LynxPageDestroyMessage {
 	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
 	readonly type: 'page-destroy';
 }
+
+export type LynxPageDataOperation = 'replace' | 'update' | 'reset';
+
+/** Immutable, structured-clone-safe record carried by the page data lifecycle. */
+export type LynxLifecycleDataRecord = Readonly<Record<string, UniversalSerializableValue>>;
+
+/** Root-independent page data delivered from the public engine lifecycle. */
+export interface LynxPageDataMessage {
+	readonly protocol: typeof LYNX_TRANSPORT_PROTOCOL_VERSION;
+	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
+	readonly type: 'page-data';
+	readonly operation: LynxPageDataOperation;
+	readonly data: LynxLifecycleDataRecord;
+}
+
+/** Root-independent global-props patch delivered from the public engine lifecycle. */
+export interface LynxGlobalPropsMessage {
+	readonly protocol: typeof LYNX_TRANSPORT_PROTOCOL_VERSION;
+	readonly renderer: typeof LYNX_TRANSPORT_RENDERER;
+	readonly type: 'global-props';
+	readonly patch: LynxLifecycleDataRecord;
+}
+
+export type LynxDataLifecycleMessage = LynxPageDataMessage | LynxGlobalPropsMessage;
 
 export interface LynxPublicHandleUpsert {
 	readonly op: 'upsert';
@@ -223,6 +245,7 @@ export type LynxBackgroundOutboundMessage =
 export type LynxBackgroundInboundMessage =
 	| LynxMainReadyReply
 	| LynxPageDestroyMessage
+	| LynxDataLifecycleMessage
 	| LynxCallBackgroundMessage
 	| LynxCancelBackgroundCallMessage
 	| LynxCallMainResultMessage
@@ -762,6 +785,37 @@ export function validateLynxBackgroundInboundMessage(value: unknown): LynxBackgr
 			fail('page-destroy', `renderer must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
 		}
 		return message as unknown as LynxPageDestroyMessage;
+	}
+	if (message.type === 'page-data') {
+		exactKeys(message, ['protocol', 'renderer', 'type', 'operation', 'data'], 'page-data');
+		if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
+			fail('page-data', `protocol must be ${LYNX_TRANSPORT_PROTOCOL_VERSION}.`);
+		}
+		if (message.renderer !== LYNX_TRANSPORT_RENDERER) {
+			fail('page-data', `renderer must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+		}
+		if (
+			message.operation !== 'replace' &&
+			message.operation !== 'update' &&
+			message.operation !== 'reset'
+		) {
+			fail('page-data.operation', 'must be replace, update, or reset.');
+		}
+		record(message.data, 'page-data.data');
+		assertWireValue(message.data, 'page-data.data');
+		return message as unknown as LynxPageDataMessage;
+	}
+	if (message.type === 'global-props') {
+		exactKeys(message, ['protocol', 'renderer', 'type', 'patch'], 'global-props');
+		if (message.protocol !== LYNX_TRANSPORT_PROTOCOL_VERSION) {
+			fail('global-props', `protocol must be ${LYNX_TRANSPORT_PROTOCOL_VERSION}.`);
+		}
+		if (message.renderer !== LYNX_TRANSPORT_RENDERER) {
+			fail('global-props', `renderer must be ${JSON.stringify(LYNX_TRANSPORT_RENDERER)}.`);
+		}
+		record(message.patch, 'global-props.patch');
+		assertWireValue(message.patch, 'global-props.patch');
+		return message as unknown as LynxGlobalPropsMessage;
 	}
 	assertIdentity(message, 'inbound message');
 	if (message.type === 'call-background') {

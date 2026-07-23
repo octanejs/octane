@@ -39,6 +39,7 @@ export type {
 } from './core/nodes-ref.js';
 
 export type {
+	LynxComponent,
 	LynxCustomIntrinsicElements,
 	LynxElements,
 	LynxIntrinsicElements,

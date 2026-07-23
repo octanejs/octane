@@ -5,6 +5,7 @@ import {
 	type UniversalPreparedAttempt,
 	type UniversalTransportIdentity,
 } from 'octane/universal/native';
+import type { LynxComponent } from './intrinsics.js';
 import {
 	createLynxClientContainer,
 	createLynxClientDriver,
@@ -12,6 +13,7 @@ import {
 	type LynxClientContainer,
 	type LynxPublicHandle,
 } from './core/client-driver.js';
+import { prepareLynxBackgroundLifecycleReceiver } from './core/background-lifecycle.js';
 import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './core/transport.js';
 import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
@@ -21,6 +23,7 @@ import {
 	type LynxBackgroundFunctionDescriptor,
 	type LynxWorkletValue,
 } from './core/worklets.js';
+import type { Lynx } from './platform.js';
 
 interface LynxBackgroundGlobals {
 	readonly lynx?: {
@@ -45,10 +48,7 @@ export interface CreateLynxRootOptions {
 export interface LynxRoot {
 	readonly renderer: 'lynx';
 	readonly ready: Promise<void>;
-	render<Props>(
-		component: UniversalComponent<Props>,
-		props?: Props,
-	): Promise<UniversalPreparedAttempt>;
+	render<Props>(component: LynxComponent<Props>, props?: Props): Promise<UniversalPreparedAttempt>;
 	flushTransport(): Promise<void>;
 	unmount(): Promise<void>;
 }
@@ -204,10 +204,23 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 				: undefined,
 		worklets,
 	});
+	const lifecycleInstallation = (() => {
+		try {
+			return prepareLynxBackgroundLifecycleReceiver(
+				target.lynx as unknown as Lynx,
+				context,
+				options.onDiagnostic,
+			);
+		} catch (error) {
+			worklets.close();
+			throw error;
+		}
+	})();
 	const transport = (() => {
 		try {
 			return createLynxBackgroundTransport(context, container, {
 				onDiagnostic: options.onDiagnostic,
+				isPageDestroyed: lifecycleInstallation.isPageDestroyed,
 				prepareWorkletBatch: (batch) => prepareLynxClientWorkletBatch(container, batch),
 				onWorkletBatchAccepted: acceptWorkletBatch,
 				onWorkletBatchRejected: rejectWorkletBatch,
@@ -216,6 +229,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 				},
 			});
 		} catch (error) {
+			lifecycleInstallation.rollback();
 			worklets.close();
 			throw error;
 		}
@@ -230,6 +244,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 			transport.bindRoot(root);
 			return root;
 		} catch (error) {
+			lifecycleInstallation.rollback();
 			transport.close(error);
 			worklets.close();
 			throw error;
@@ -260,6 +275,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 			},
 		});
 	} catch (error) {
+		lifecycleInstallation.rollback();
 		transport.close(error);
 		closeWorklets();
 		throw error;
@@ -273,14 +289,17 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 	};
 
 	const facade: LynxRoot = {
-		render(component, props) {
+		render<Props>(component: LynxComponent<Props>, props?: Props) {
 			if (state.status !== 'active') {
 				return Promise.reject(new Error('Cannot render an unmounting or unmounted Lynx root.'));
 			}
 			if (typeof component !== 'function') {
 				return Promise.reject(new TypeError('Lynx root render() requires a component function.'));
 			}
-			return universalRoot.renderAsync(component, props === undefined ? ({} as never) : props);
+			return universalRoot.renderAsync(
+				component as UniversalComponent<Props>,
+				props === undefined ? ({} as Props) : props,
+			);
 		},
 		flushTransport() {
 			return universalRoot.flushTransport();
@@ -344,6 +363,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 					disposeError = error;
 				} finally {
 					transport.close(disposeFailed ? disposeError : unmountFailed ? unmountError : undefined);
+					lifecycleInstallation.release();
 					state.closeWorklets();
 					state.status = 'unmounted';
 				}
@@ -354,6 +374,7 @@ export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
 		},
 	};
 	transport.bindPageDestroy(() => facade.unmount());
+	lifecycleInstallation.commit();
 	return Object.freeze(facade);
 }
 
@@ -371,7 +392,7 @@ export const root: LynxRoot = Object.freeze({
 	get ready() {
 		return getDefaultRoot().ready;
 	},
-	render<Props>(component: UniversalComponent<Props>, props?: Props) {
+	render<Props>(component: LynxComponent<Props>, props?: Props) {
 		return getDefaultRoot().render(component, props);
 	},
 	flushTransport() {

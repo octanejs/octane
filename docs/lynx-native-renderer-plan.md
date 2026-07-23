@@ -1,6 +1,6 @@
 # Lynx native renderer and ReactLynx migration plan
 
-Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–9 have private source/test/build or repository-stabilization implementations but their formal exits remain blocked**
+Status: **Milestone 0 blocked; Milestones 1–2 implemented; Milestones 3–10 have private source/test/build, demo-harness, or repository-stabilization implementations but their formal exits remain blocked**
 
 Upstream audit date: **2026-07-22**
 
@@ -22,7 +22,11 @@ Milestone 8 source/test/build evidence date: **2026-07-22**
 
 Milestone 9 repository-stabilization evidence date: **2026-07-22**
 
+Milestone 10 one-command demo source/build evidence date: **2026-07-22**
+
 Post-Milestone-9 public page-destroy source/test evidence date: **2026-07-22**
+
+Post-Milestone-9 typed data-lifecycle source/test evidence date: **2026-07-22**
 
 This plan defines how Octane should become a first-class framework for the
 [Lynx](https://lynxjs.org/) native engine and how applications currently written
@@ -87,6 +91,7 @@ export default defineConfig({
 
 ```tsx
 // src/App.tsrx
+/** @jsxImportSource @octanejs/lynx/intrinsics */
 import { useState } from 'octane';
 
 export function App() @{
@@ -179,6 +184,7 @@ to mix freely:
 | `@lynx-js/react` | `0.123.0` | Behavioral oracle, public API/test crosswalk, no production dependency |
 | `@lynx-js/react-rsbuild-plugin` | `0.18.0` | Reference for dual-layer graph and lifecycle wiring only |
 | `@lynx-js/rspeedy` | `0.16.0` | Native toolchain and public plugin host |
+| `@lynx-js/qrcode-rsbuild-plugin` | `0.6.0` | Repository demo LAN URL and Explorer QR code |
 | `@lynx-js/template-webpack-plugin` | `0.13.0` | Framework-neutral `.lynx.bundle` assembly |
 | `@lynx-js/css-extract-webpack-plugin` | `0.9.0` | Framework-neutral stylesheet extraction |
 | `@lynx-js/runtime-wrapper-webpack-plugin` | `0.2.2` | Background runtime wrapping |
@@ -497,20 +503,44 @@ surface:
 
 The private Milestone 4 source implements those background data hooks, the
 global-event hook, typed `lynx`/`NativeModules` access, `reportError()`, and a
-request-only `reload()` wrapper over the public background API. Init-data hooks
-seed from public `__presetData` and consume the framework-maintained current
-`__initData` snapshot when available; tests cover RESET key removal and the
-render-to-layout subscription race. The native update receiver that maintains
-that current snapshot is still uninstalled and remains part of the formal
-device gate. The source still does not install a framework reload receiver. A
-post-Milestone-9 gate-closure tranche now installs the public typed native
+request-only `reload()` wrapper over the public background API. A
+post-Milestone-9 tranche now makes the current data store source-integrated:
+`installLynxMainThread()` registers `__RenderPage`, `__UpdatePage`, and
+`__UpdateGlobalProps` on public `lynx.getEngine()`. It sends `page-data` with
+operation `replace` to seed from `__RenderPage`; operation `update` to merge an
+ordinary `__UpdatePage`; operation `reset` when
+`updateOptions.resetPageData === true`, removing omitted keys; and
+`global-props` patches for `__UpdateGlobalProps`. A
+`reloadTemplate === true` update is diagnosed and rejected without forwarding,
+rather than being mistaken for the still-missing reconstructing reload path.
+The background store retains public `__presetData` fallback and publishes the
+complete current init/global snapshots to the existing subscriptions.
+
+This candidate follows exact Lynx SDK 3.9.0 commit `d7f13487`: pinned
+[`TemplateAssembler::DispatchEventFromEngineToCoreContext`](https://github.com/lynx-family/lynx/blob/d7f13487df0d69497148e93b71aded676a8fe243/core/renderer/template_assembler.h#L981-L1004)
+tries the Engine `ContextProxy` listener before the legacy global-function
+fallback, and its call sites route
+[`__UpdateGlobalProps`](https://github.com/lynx-family/lynx/blob/d7f13487df0d69497148e93b71aded676a8fe243/core/renderer/template_assembler.cc#L288-L290),
+[`__UpdatePage`](https://github.com/lynx-family/lynx/blob/d7f13487df0d69497148e93b71aded676a8fe243/core/renderer/template_assembler.cc#L670-L672),
+and
+[`__RenderPage`](https://github.com/lynx-family/lynx/blob/d7f13487df0d69497148e93b71aded676a8fe243/core/renderer/template_assembler.cc#L740-L757)
+through that helper. Source/unit tests cover seed, merge, reset, global-props
+updates, subscription timing, cleanup, and data received between an ordinary
+root unmount and the next root on the same page. The main side bounds and
+compacts its pre-ready queue into authoritative page/global state, drains data
+before its correlated ready reply, and fails the page closed if delivery fails.
+They do not prove native context, delivery, ordering, or payload completeness on
+Explorer, Android, or iOS, nor native bootstrap/first-paint.
+
+The source still does not install a reconstructing framework reload receiver. A
+separate post-Milestone-9 gate-closure tranche installs the public typed native
 `__DestroyLifetime` listener, sends one root-independent background teardown,
 and closes main PAPI plus background effect/ref/worklet ownership. Source tests
 observe main PAPI and background effect/ref cleanup across ordinary,
 registration-failure, delivery-failure, duplicate, and reentrant-commit paths;
 the same source path closes the worklet registry. Native context, delivery, and
-ordering remain unproven on Explorer, Android, and iOS, so this does not close
-the lifecycle device gate. Milestone 6 supplies
+ordering remain unproven on Explorer, Android, and iOS, so neither typed tranche
+closes the lifecycle device gate. Milestone 6 supplies
 `markFirstScreenSyncReady()` as the explicit main-entry initialization gate
 before a first-tree snapshot is offered to the background runtime.
 
@@ -752,15 +782,21 @@ contract. No test uses private snapshot fields or command order as its oracle.
 > root-scoped resource handles. A semantic-checksummed source-level benchmark
 > guards a 12-cell window against an eager 1,000-cell reference. The background
 > platform hooks cover init data, global props/events, typed Native Modules,
-> reload requests, and error reporting; the compiler rejects statically visible
-> platform imports and Native Module access in main-thread specialization, while
+> reload requests, and error reporting. The post-Milestone-9 typed
+> data-lifecycle tranche installs the public Engine listeners and bridges
+> render seeding, ordinary merge/reset updates, and global-props patches into
+> those stores; `reloadTemplate` remains rejected because reconstructing reload
+> is not implemented. The compiler rejects statically visible platform imports
+> and Native Module access in main-thread specialization, while
 > `createLynxRoot()` runtime-checks background ownership through the public
-> `lynx.getJSModule()` surface. App-owned Android/iOS module and custom
-> element examples document the intended seam but have not run on devices.
+> `lynx.getJSModule()` surface. App-owned Android/iOS module and custom element
+> examples document the intended seam but have not run on devices.
 > Formal exit remains blocked on Android/iOS allocation, scroll, module,
-> element, lifecycle, and teardown evidence; a public native event and reload
-> receiver; native verification of the typed destroy path; and the existing
-> Milestone 0 gates. The initial slice
+> element, lifecycle, and teardown evidence; a public native event receiver and
+> reconstructing-reload contract; native verification of context, delivery,
+> ordering, and payload completeness for the typed data and destroy paths;
+> native bootstrap/first-paint; and the existing Milestone 0 and Web gates. The
+> initial slice
 > excludes nested lists, portals, Lynx Suspense proof, lazy bundles, gestures,
 > animations, full boolean-`defer` parity, and `defer.unmountRecycled`
 > semantics.
@@ -768,9 +804,10 @@ contract. No test uses private snapshot fields or command order as its oracle.
 - Implement native list item types, keys, recycling, native callbacks, attach/
   detach refs, item reuse, reorder, and destruction.
 - Add init data, global props, global events, page reload/destroy, lifecycle and
-  error reporting. A public reload request is not evidence for the still-missing
-  framework reload receiver, and source integration is not native proof of the
-  typed destroy path.
+  error reporting. The typed data-lifecycle and destroy bridges are
+  source-integrated candidates only: a public reload request is not evidence
+  for the still-missing reconstructing framework reload receiver, and source
+  integration is not native proof of either path.
 - Type Native Modules and diagnose thread misuse. Add one Android and one iOS
   native module example plus one custom native element fixture; do not ship
   application-native code inside the renderer.
@@ -991,12 +1028,13 @@ runtimes.
 > universal ABI were reviewed for this private phase; both Lynx packages remain
 > `0.0.0` and `private` rather than becoming a technical preview.
 >
-> Formal exit still requires a public framework-neutral native string-event,
-> reload, and current init-data receiver contract; native verification of the
-> typed page/background-destroy path; a working Lynx Web transport; Explorer,
-> Android, and iOS execution;
+> Formal exit still requires a public framework-neutral native string-event
+> receiver and reconstructing-reload contract; native verification of context,
+> delivery, ordering, and payload completeness for the source-integrated typed
+> data and page/background-destroy paths; a working Lynx Web transport;
+> Explorer, Android, and iOS execution;
 > minimum/current toolchain execution on native engines; native proof of first
-> paint and node identity adoption, worklet/ref/call execution, list allocation
+> bootstrap/first paint and node identity adoption, worklet/ref/call execution, list allocation
 > and lifecycle, lazy-chunk execution, portal placement, Native Modules/custom
 > elements, source maps, and reconstructing reload cleanup; and comparable
 > native semantic performance baselines. Until those gates exist, the
@@ -1022,6 +1060,43 @@ no committed test is skipped, todo, or expected-failure; packed apps build and
 run on the stated minimum/current toolchains and Android/iOS runtimes; public
 performance, lifecycle, event, ref, and native capability claims have durable
 evidence.
+
+### Milestone 10 — one-command Lynx Explorer demo harness (1 engineer-week)
+
+> **Progress (2026-07-22): private source/build implementation complete;
+> native exit blocked.** The repository now owns a consumer-shaped Octane Lynx
+> application under the Rspeedy package. `pnpm lynx:demo` starts the pinned
+> Rspeedy development server, serves a stable `main.lynx.bundle`, and uses
+> `@lynx-js/qrcode-rsbuild-plugin@0.6.0` to print the LAN URL and Explorer QR
+> code. The screen includes CSS, stable smoke-test markers, a dual-thread first
+> render, and a native `bindtap` counter update. Its authored component passes
+> directly to `root.render()` without an application cast; the renderer-local
+> JSX and public root types now describe that supported authoring contract.
+> `pnpm lynx:demo:check` type-checks the application and builds the exact entry.
+> The CI demo test also starts the advertised development command on an isolated
+> port, fetches `main.lynx.bundle`, proves the process tree releases the server,
+> and decodes the production artifact. It checks both thread programs and CSS,
+> verifies target SDK `3.9`, and rejects React, Preact, ReactLynx, and DOM runtime
+> leakage. No compatible Explorer or device was available on the evidence host,
+> so this is not yet proof of native first paint, tap delivery, adoption, or live
+> reload.
+
+- Keep the primary repository command discoverable and independent of global
+  Rspeedy installs.
+- Serve a deterministic bundle filename and advertise a reachable LAN address
+  and QR code for the official Lynx `3.9.0` Explorer.
+- Make the demo exercise visible native layout and styling plus one
+  background-owned state update through Lynx's native event spelling.
+- Keep a non-interactive CI path that type-checks, builds, and decodes the exact
+  demo bundle without pretending that artifact inspection is native execution.
+- Record Android and iOS execution separately; one platform does not stand in
+  for both release gates.
+
+Exit: from a clean checkout, `pnpm lynx:demo` produces a URL that the official
+Lynx `3.9.0` Explorer can load; the screen appears once without a duplicate
+tree or runtime error; tapping the control changes `Count 0` to `Count 1`; and
+server teardown leaves no development process behind. Android and iOS each
+need captured evidence before this milestone can claim both native platforms.
 
 ## Validation strategy
 

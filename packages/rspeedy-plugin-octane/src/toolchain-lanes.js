@@ -9,7 +9,7 @@ const SHARED_PACKAGES = Object.freeze({
 	'@lynx-js/tasm': '0.0.39',
 	'@lynx-js/template-webpack-plugin': '0.13.0',
 	'@lynx-js/testing-environment': '0.3.0',
-	'@lynx-js/types': '4.0.0',
+	'@lynx-js/types': '4.1.0',
 	'@lynx-js/web-core': '0.22.2',
 	'@lynx-js/web-rsbuild-server-middleware': '0.22.2',
 	'@lynx-js/webpack-dev-transport': '0.3.0',

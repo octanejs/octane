@@ -34,18 +34,19 @@ Octane-specific module-scoping change.
 
 ## Milestone 1–5 package boundary
 
-The private package scaffold keeps `@lynx-js/types@4.0.0` pinned as the type
-provenance authority, but does not import its `./props` or `./events` entries.
-Although those entries appear framework-neutral, `./events` imports the
-main-thread `Element` graph, which reaches the same global JSX augmentation as
-`@lynx-js/types/element` and leaks Lynx tags into unrelated React/DOM authoring
-contexts. `src/native-types.ts` therefore adapts the audited standard-prop and
-event slice into module-scoped Octane declarations. A typetest imports React
-alongside the renderer namespace and proves the two intrinsic maps stay
-independent.
+The renderer-local declaration provenance remains pinned to
+`@lynx-js/types@4.0.0`, while the exact source/build compatibility lanes may
+install a newer registry-verified type package. The package does not import the
+upstream `./props` or `./events` entries. Although those entries appear
+framework-neutral, `./events` imports the main-thread `Element` graph, which
+reaches the same global JSX augmentation as `@lynx-js/types/element` and leaks
+Lynx tags into unrelated React/DOM authoring contexts. `src/native-types.ts`
+therefore adapts the audited standard-prop and event slice into module-scoped
+Octane declarations. A typetest imports React alongside the renderer namespace
+and proves the two intrinsic maps stay independent.
 
-The type package is Apache-2.0 licensed, Copyright 2024–2025 The Lynx Authors.
-Its registry artifact records git commit
+The `4.0.0` provenance artifact is Apache-2.0 licensed, Copyright 2024–2025 The
+Lynx Authors. Its registry metadata records git commit
 `2f20fed315aaba5f47e14e0f2b0f87c4cb1a64d6`; its exact tarball integrity stays
 recorded in [`audit/toolchain.json`](./audit/toolchain.json). No ReactLynx
 runtime or React JSX declaration is a production dependency of the scaffold.
@@ -85,10 +86,20 @@ background root; it does not copy ReactLynx's teardown implementation or use
 Octane cleanup contract only. Explorer, Android, and iOS must still establish
 that the typed event is delivered on the expected context with safe ordering.
 
+The same public type surface includes `CommonLynx.getEngine()`. At exact Lynx
+SDK 3.9.0 commit `d7f13487df0d69497148e93b71aded676a8fe243`,
+`TemplateAssembler::DispatchEventFromEngineToCoreContext` tries that Engine
+`ContextProxy` listener before the legacy global-function fallback, and routes
+`__RenderPage`, `__UpdatePage`, and `__UpdateGlobalProps` through the helper.
+Octane's typed listener and root-independent data protocol are original code;
+source and JavaScript-host tests establish their replace, merge, reset, and
+global-patch behavior only. Explorer, Android, and iOS must still establish the
+actual context, delivery order, payload completeness, and bootstrap timing.
+
 The intrinsic declarations and JavaScript-environment host tests are not a
-native layout or device claim. The Phase 0 public event hook, reload, typed
-destroy delivery, Web, and Android/iOS gates remain authoritative until later
-production/device milestones satisfy them.
+native layout or device claim. The Phase 0 public event hook, reconstructing
+reload, typed data/destroy delivery, Web, and Android/iOS gates remain
+authoritative until later production/device milestones satisfy them.
 
 Milestone 1–4 syntax, built-in, and runtime-ownership assumptions for the exact
 Rspeedy graph are recorded in
@@ -102,15 +113,17 @@ and the repository `pnpm-lock.yaml`.
 
 Milestone 9 keeps the audited Rspack `2.1.3` edge in its atomic minimum
 source/build lane and adds a current lane with Rspack `2.1.5`, the newest patch
-allowed by the same Rspeedy `0.16.0` / Rsbuild `2.1.4` graph. The complete exact
-lane maps live in
+allowed by the same Rspeedy `0.16.0` / Rsbuild `2.1.4` graph. Both live lanes
+install the registry-verified `@lynx-js/types@4.1.0`; the renderer-local
+declarations remain adapted from the audited `4.0.0` artifact. The complete
+exact lane maps live in
 [`toolchain-lanes.js`](../rspeedy-plugin-octane/src/toolchain-lanes.js).
 Required CI jobs pack and install both graphs into external consumers, build
 each twice, and check live registry drift for the current lane. The lane source
 map and registry check do not add committed tarball-integrity provenance to
 `audit/toolchain.json`; in particular, that audit does not record the current
-Rspack `2.1.5` artifact. This also does not establish minimum/current execution
-on a Lynx native engine or device.
+Rspack `2.1.5` or Lynx types `4.1.0` artifacts. This also does not establish
+minimum/current execution on a Lynx native engine or device.
 
 ## Milestone 9 runner inventory
 

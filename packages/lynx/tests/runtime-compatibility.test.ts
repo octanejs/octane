@@ -27,6 +27,7 @@ const universalCore = readFileSync(
 	resolve(REPOSITORY_ROOT, 'packages/octane/src/universal-core.ts'),
 	'utf8',
 );
+const lifecycleData = readFileSync(resolve(LYNX_ROOT, 'src/core/lifecycle-data.ts'), 'utf8');
 
 function runtimeSourceGraph(entry: string): { files: string[]; packages: string[] } {
 	const pending = [entry];
@@ -76,6 +77,7 @@ describe('Lynx runtime compatibility evidence', () => {
 		expect(universalCore).not.toMatch(
 			/\b(?:FinalizationRegistry|structuredClone|WeakRef)\b|\.(?:toReversed|toSorted)\s*\(/,
 		);
+		expect(lifecycleData).not.toMatch(/\.at\s*\(/);
 		expect(universalCore).toContain("typeof AggregateError === 'function'");
 		expect(universalCore).toContain('.description');
 		expect(evidence.universalCoreBuiltins.documentedOrBaseline).toEqual(
@@ -96,13 +98,15 @@ describe('Lynx runtime compatibility evidence', () => {
 	it('keeps background and main-thread runtime ownership in separate source graphs', () => {
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/root.ts'))).toEqual({
 			files: [
-				'src/config.ts',
+				'src/core/background-lifecycle.ts',
 				'src/core/client-driver.ts',
 				'src/core/host-props.ts',
+				'src/core/lifecycle-data.ts',
 				'src/core/native-events.ts',
 				'src/core/nodes-ref.ts',
 				'src/core/portal.ts',
 				'src/core/protocol.ts',
+				'src/core/renderer-id.ts',
 				'src/core/transport.ts',
 				'src/core/worklets.ts',
 				'src/resource.ts',
@@ -112,16 +116,17 @@ describe('Lynx runtime compatibility evidence', () => {
 		});
 		expect(runtimeSourceGraph(resolve(LYNX_ROOT, 'src/main-thread.ts'))).toEqual({
 			files: [
-				'src/config.ts',
 				'src/core/first-screen.ts',
 				'src/core/host-driver.ts',
 				'src/core/host-props.ts',
+				'src/core/lifecycle-data.ts',
 				'src/core/list.ts',
 				'src/core/native-events.ts',
 				'src/core/nodes-ref.ts',
 				'src/core/papi.ts',
 				'src/core/portal.ts',
 				'src/core/protocol.ts',
+				'src/core/renderer-id.ts',
 				'src/core/worklets.ts',
 				'src/first-screen.ts',
 				'src/main-renderer.ts',

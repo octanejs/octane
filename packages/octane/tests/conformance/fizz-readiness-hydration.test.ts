@@ -194,6 +194,7 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 	it('reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch', async () => {
 		const container = await revealServerBoundary(server.MismatchHydrationBoundary, 'initial');
 		const heading = container.querySelector('#hydration-text');
+		const outside = container.querySelector('#hydration-outside') as HTMLButtonElement;
 		const loader = deferred<{ default: typeof client.HydrationLeaf }>();
 		client.setMismatchHydrationModule(loader.promise);
 		const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -206,6 +207,9 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 			expect(hydrationDiagnostics(diagnostic)).toHaveLength(expectedDiagnosticCount(1));
 			expect(container.querySelector('.hydration-fallback')?.textContent).toBe('Loading…');
 			expect(container.querySelector('#hydration-text')).not.toBe(heading);
+			expect(container.querySelector('#hydration-outside')).toBe(outside);
+			flushSync(() => outside.click());
+			expect(outside.textContent?.trim()).toBe('outside:1');
 
 			loader.resolve({ default: client.HydrationLeaf });
 			await flushResolution();
@@ -214,6 +218,9 @@ describe('conformance: Fizz readiness and hydration behavior', () => {
 			expect(
 				Array.from(container.querySelectorAll('#hydration-text'), (node) => node.textContent),
 			).toEqual(['replaced']);
+			expect(container.querySelector('#hydration-outside')).toBe(outside);
+			flushSync(() => outside.click());
+			expect(outside.textContent?.trim()).toBe('outside:2');
 		} finally {
 			root.unmount();
 			diagnostic.mockRestore();
