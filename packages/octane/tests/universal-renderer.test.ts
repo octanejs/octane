@@ -27,6 +27,7 @@ import {
 import { mount } from './_helpers.js';
 import { UniversalBoundaryFixture, UniversalTheme } from './_fixtures/universal-boundary.tsrx';
 import { CompiledUniversalScene } from './_fixtures/compiled-universal.object.tsrx';
+import { inspectProfileOutput } from './_profile-output.js';
 
 const renderer = {
 	id: 'object',
@@ -2342,8 +2343,13 @@ export function Scene() @{
 		expect(output).toContain('_$useBatch([__pu$0, __pu$1])');
 		expect(output).toContain('__warm:');
 		expect(output).toContain('import.meta.hot.accept');
-		expect(output).toContain('"componentId":"/src/Profiled.object.tsrx#Scene@3:10"');
-		expect(output).toContain('"line":4,"column":14');
+		expect(inspectProfileOutput(output).hooks.map(({ metadata }) => metadata)).toContainEqual(
+			expect.objectContaining({
+				componentId: '/src/Profiled.object.tsrx#Scene@3:10',
+				line: 4,
+				column: 14,
+			}),
+		);
 	});
 
 	it('warms adjacent universal component trees from a parent with no use()', async () => {

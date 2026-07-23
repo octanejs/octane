@@ -110,10 +110,9 @@ function expectMapped(
 	expectMappedIn(SOURCE, code, map, genNeedle, genOffset, srcNeedle, srcOffset);
 }
 
-// Attribute values, control-flow call sites, and component props — every
-// render-plan paste that lands INSIDE the component function body. (@for item
-// bodies, key fns, and other module-hoisted helpers are outside the mapped
-// region and deliberately unasserted.)
+// Attribute values, control-flow call sites, component props, and a hoisted
+// @for key function — coverage across both component interiors and the module
+// frame's generated helpers.
 const PLAN_SOURCE = `import { useState } from 'octane';
 
 function Row(props: { label: string; k: number }) @{
@@ -179,6 +178,9 @@ describe.each([
 		} else {
 			at(', items, _key', 2, 'items; key');
 		}
+		// The key arrow is emitted as a module-hoisted helper. Its authored key
+		// expression must remain navigable after the whole module becomes one AST.
+		at('it.id', 0, 'it.id');
 		// Component prop value and key expression (componentSlot call site).
 		at(`cls + '!'`, 0, `cls + '!'`);
 		at(`items.length + 10`, 0, `items.length + 10`);

@@ -56,7 +56,15 @@ describe('dev hydration source-LOC plumbing (P1)', () => {
 		// statement presence can shift the printer's blank-line placement — so
 		// blank lines are normalized away on both sides too.
 		const strip = (s: string) => {
-			const lines = s.split('\n');
+			// The binding-level `__oct_loc` stamps are try/catch STATEMENTS whose
+			// layout is printer-defined — remove them statement-shaped, not
+			// line-shaped, so the strip is insensitive to one-line vs multi-line
+			// printing of the same guarded assignment.
+			const withoutLocStamps = s.replace(
+				/try\s*\{[^{}]*__oct_loc[^{}]*\}\s*catch\s*\{[^{}]*\}/g,
+				'',
+			);
+			const lines = withoutLocStamps.split('\n');
 			const kept: string[] = [];
 			let skippingDepth = 0;
 			for (const l of lines) {

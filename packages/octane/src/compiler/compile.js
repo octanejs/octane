@@ -45,7 +45,7 @@ import {
 	addSourceMapNeedles,
 	compileUniversal,
 	composeSourceMaps,
-	retargetRuntimeImportAliases,
+	retargetRuntimeImportAliasesWithMap,
 } from './compile-universal.js';
 import {
 	expandDomRendererRegions,
@@ -743,6 +743,36 @@ function requireRuntimeForContext(ctx, name) {
 	return rtAlias(name);
 }
 
+// Mark a freshly-built (compiler-owned) node so esrap prints a leading
+// `/* @__PURE__ */` annotation (see esrapCommentOptions). Marker props are
+// compiler-owned and may only ride on rebuilt nodes — the spread guarantees
+// that even when the input is shared.
+function markPure(node) {
+	return { ...node, __octanePure: true };
+}
+
+/**
+ * Build an expression node for a JSON-serializable value (metadata payloads —
+ * profile registrations, hook metadata). Object keys keep identifier form when
+ * legal; everything else is quoted.
+ */
+function jsonValueToNode(value) {
+	if (value === null) return b.literal(null, 'null');
+	const t = typeof value;
+	if (t === 'string' || t === 'number') return b.literal(value, JSON.stringify(value));
+	if (t === 'boolean') return b.literal(value, value ? 'true' : 'false');
+	if (Array.isArray(value)) return b.array(value.map(jsonValueToNode));
+	return b.object(
+		Object.entries(value).map(([key, item]) =>
+			b.prop(
+				'init',
+				/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? b.id(key) : b.literal(key, JSON.stringify(key)),
+				jsonValueToNode(item),
+			),
+		),
+	);
+}
+
 // Merge one import list: user specifiers verbatim (preserving `x as y`
 // aliases) + every generated-code helper aliased to `_$name`.
 function buildRuntimeImport(ctx, moduleName) {
@@ -770,6 +800,55 @@ function buildProfileRuntimeImport(ctx) {
 	return specifiers.length === 0
 		? ''
 		: `import { ${specifiers.sort().join(', ')} } from 'octane/profiling';\n\n`;
+}
+
+// Split a `imported as local` merge key (see buildRuntimeImportNodes) back into
+// its [imported, local] pair — plain names import under their own name.
+function importSpecifierPair(entry) {
+	const at = entry.indexOf(' as ');
+	return at === -1 ? [entry, entry] : [entry.slice(0, at), entry.slice(at + 4)];
+}
+
+/**
+ * Node form of buildRuntimeImport (client AST emit, M2): same specifiers, same
+ * `imported as alias` sort order, returned as ImportDeclaration nodes. The
+ * server pipeline still assembles its import strings via buildRuntimeImport.
+ */
+function buildRuntimeImportNodes(ctx, moduleName, origin) {
+	const nodes = [];
+	for (const local of ctx.userRuntimeNamespaces || []) {
+		nodes.push(b.import_all(local, moduleName));
+	}
+	for (const local of ctx.userRuntimeDefaults || []) {
+		nodes.push(
+			b.import_declaration(
+				[{ type: 'ImportDefaultSpecifier', local: b.id(local), metadata: { path: [] } }],
+				moduleName,
+			),
+		);
+	}
+	const specifiers = new Set(ctx.userRuntimeNames);
+	for (const n of ctx.runtimeNeeded) {
+		const alias =
+			n === 'hookSlots' && ctx._hookSlotsHelperName ? ctx._hookSlotsHelperName : rtAlias(n);
+		specifiers.add(`${n} as ${alias}`);
+	}
+	if (specifiers.size > 0) {
+		nodes.push(b.imports([...specifiers].sort().map(importSpecifierPair), moduleName));
+	}
+	return nodes.map((node) => inheritOriginLoc(node, origin));
+}
+
+/** Node form of buildProfileRuntimeImport (client AST emit, M2). */
+function buildProfileRuntimeImportNodes(ctx, origin) {
+	const specifiers = [...ctx.profileRuntimeNeeded].map((name) => `${name} as ${rtAlias(name)}`);
+	if (specifiers.length === 0) return [];
+	return [
+		inheritOriginLoc(
+			b.imports(specifiers.sort().map(importSpecifierPair), 'octane/profiling'),
+			origin,
+		),
+	];
 }
 
 // Record a user `import { … } from 'octane'` declaration's specifiers so the
@@ -3778,6 +3857,40 @@ function emitServerModulePrelude(info, ctx) {
 	return code === '' ? '' : code + '\n';
 }
 
+/**
+ * Client-mode counterpart of emitServerModulePrelude's RPC-stub branch (M2 AST
+ * emit): each `import { f } from 'server'` local becomes a
+ * `const f = (...args) => _$__serverRpc(hash, args);` statement NODE. The
+ * server pipeline keeps the string emitter above until M3.
+ */
+function emitServerModuleClientStubs(info, ctx) {
+	if (info === null) return [];
+	const nodes = [];
+	for (const node of info.imports) {
+		for (const specifier of node.specifiers) {
+			if (specifier.importKind === 'type') continue;
+			const imported = identifierName(specifier.imported);
+			const local = specifier.local?.name;
+			if (!imported || !local) continue;
+			ctx.runtimeNeeded.add('__serverRpc');
+			const hash = strongHash(info.filename + '#' + imported);
+			nodes.push(
+				inheritOriginLoc(
+					b.const(
+						local,
+						b.arrow(
+							[b.rest(b.id('args'))],
+							b.call('_$__serverRpc', b.literal(hash, JSON.stringify(hash)), b.id('args')),
+						),
+					),
+					specifier,
+				),
+			);
+		}
+	}
+	return nodes;
+}
+
 const VLQ_B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /** Base64-VLQ encode a list of signed integers (source-map v3 segment fields). */
@@ -3795,35 +3908,47 @@ function encodeVlq(values) {
 	return out;
 }
 
-function countNewlines(str) {
-	let n = 0;
-	for (let i = 0; i < str.length; i++) if (str.charCodeAt(i) === 10) n++;
-	return n;
+/**
+ * Encode esrap's decoded per-line mappings (arrays of
+ * `[genCol, srcIdx, srcLine0, srcCol0]` segments, one array per generated
+ * line) into a standard v3 `mappings` string. Duplicate segments at the same
+ * generated column are dropped, matching the historical buildSourceMap
+ * behavior. Single source module — sourceIndex is always 0.
+ */
+function encodeMappings(decodedLines) {
+	let prevSrcLine = 0;
+	let prevSrcCol = 0;
+	const groups = [];
+	for (const line of decodedLines) {
+		let group = '';
+		let prevGenCol = 0;
+		let lastGenCol = -1;
+		for (const seg of line) {
+			if (seg[0] === lastGenCol) continue;
+			lastGenCol = seg[0];
+			// Fields: [genColumn, sourceIndex, sourceLine, sourceColumn] as deltas.
+			group +=
+				(group ? ',' : '') +
+				encodeVlq([seg[0] - prevGenCol, 0, seg[2] - prevSrcLine, seg[3] - prevSrcCol]);
+			prevGenCol = seg[0];
+			prevSrcLine = seg[2];
+			prevSrcCol = seg[3];
+		}
+		groups.push(group);
+	}
+	return groups.join(';');
 }
 
 /**
- * Build a v3 source map from a flat list of mapping segments. The segments come
- * from esrap itself — we print each user statement/expression via esrap with
- * `sourceMapEncodeMappings: false` (the same machinery the mainline TSRX
- * compilers use) and merge each node's real per-token mappings into module
- * coordinates. Generated runtime plumbing (templates, mount/update DOM ops) is
- * left unmapped — never mapped to a wrong position. `sourcesContent` is inlined
- * so the original `.tsrx` is visible in devtools.
- *
- * @param {string} source original .tsrx text
- * @param {string} sourceName basename used as the map's single source entry
- * @param {Array<{ genLine: number, genCol: number, srcLine0: number, srcCol0: number }>} segments
- *   genLine/genCol are 0-based ABSOLUTE generated coords; src* are 0-based source coords.
+ * Inspection-only (`inspect: true`): enrich the module print's decoded mapping
+ * lines into "fat segments" `{ genLine, genCol, genEndCol, srcStart, srcEnd }`
+ * with absolute source offsets. `srcEnd` is resolved through a
+ * smallest-node-at-offset index over the parsed AST (read-only walk via
+ * mapAst), so a segment pointing at an identifier gets exactly that
+ * identifier's range.
  */
-/**
- * Inspection-only (`inspect: true`): enrich decoded module-map segments into
- * "fat segments" `{ genLine, genCol, genEndCol, srcStart, srcEnd }` with
- * absolute source offsets. `srcEnd` is resolved through a smallest-node-at-
- * offset index over the parsed AST (read-only walk via mapAst), so a segment
- * pointing at an identifier gets exactly that identifier's range.
- */
-/** @param {any[]} segments @param {string} source @param {any} parsedAst */
-function buildFatSegments(segments, source, parsedAst) {
+/** @param {number[][][]} decodedLines @param {string} source @param {any} parsedAst */
+function buildFatSegments(decodedLines, source, parsedAst) {
 	const lineStarts = [0];
 	for (let i = 0; i < source.length; i++) {
 		if (source.charCodeAt(i) === 10) lineStarts.push(i + 1);
@@ -3837,25 +3962,26 @@ function buildFatSegments(segments, source, parsedAst) {
 		}
 		return null;
 	});
-	const fat = segments
-		.map((/** @type {any} */ s) => {
-			const lineStart = lineStarts[s.srcLine0];
-			if (lineStart === undefined) return null;
-			const srcStart = lineStart + s.srcCol0;
-			return {
-				genLine: s.genLine,
-				genCol: s.genCol,
+	const fat = [];
+	for (let genLine = 0; genLine < decodedLines.length; genLine++) {
+		for (const seg of decodedLines[genLine]) {
+			const lineStart = lineStarts[seg[2]];
+			if (lineStart === undefined) continue;
+			const srcStart = lineStart + seg[3];
+			fat.push({
+				genLine,
+				genCol: seg[0],
 				genEndCol: null,
 				srcStart,
 				srcEnd: smallestEndAt.get(srcStart) ?? null,
-			};
-		})
-		.filter(Boolean)
-		.sort(
-			(/** @type {any} */ a, /** @type {any} */ b) => a.genLine - b.genLine || a.genCol - b.genCol,
-		);
+			});
+		}
+	}
+	fat.sort(
+		(/** @type {any} */ a, /** @type {any} */ b) => a.genLine - b.genLine || a.genCol - b.genCol,
+	);
 	for (let i = 0; i < fat.length; i++) {
-		// Deduped by buildSourceMap on the encoded side; keep raw here but give
+		// Deduped by encodeMappings on the encoded side; keep raw here but give
 		// each segment the next DISTINCT column on its line as its end.
 		let j = i + 1;
 		while (j < fat.length && fat[j].genLine === fat[i].genLine && fat[j].genCol === fat[i].genCol) {
@@ -4910,7 +5036,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		inspect: inspectEnabled, // template-origin recording (see above)
 		_retOrigins: null, // inspect-only: completed emitElementHtml frame's origins (return slot)
 		hoistedTemplates: [], // { name, html, ns, frag, origins }
-		hoistedHelpers: [], // raw JS strings (sub-components, hook Symbols, key fns)
+		hoistedHelpers: [], // statement NODES (sub-components, hook Symbols, key fns) + hook-slot-base markers
 		delegatedEvents: new Set(), // bubble event names seen in JSX — auto-emits delegateEvents(...)
 		capturedEvents: new Set(), // capture-phase event names (onXxxCapture) — auto-emits delegateCaptureEvents(...)
 		cssInjections: [], // { hash, css } — one entry per component with a <style> block
@@ -4931,7 +5057,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		knownStringLocals: null, // Set<string> of provably-string locals (text-hole inference)
 		nextHookSymId: 0,
 		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
-		_pendingWarm: null, // `X.__warm = …` source, set by compileFunctionBody, drained by compileComponent
+		_pendingWarm: null, // `X.__warm = …` arrow NODE, set by compileFunctionBody, drained by compileComponent
 		nextFragId: 0,
 		nextTemplateId: 0,
 		nextHelperId: 0,
@@ -4951,9 +5077,11 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		// per-token mappings against the original .tsrx.
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
-		// Per-component setup-statement maps, populated by compileFunctionBody on
-		// the top-level (autoCallback) pass and drained per component below.
-		_setupMaps: null,
+		// Coarse origin for module scaffolding with no authored source position
+		// (imports, delegate/style/template consts, hook-slot consts, HMR/stamp
+		// tails): the module's first located statement. Every node handed to the
+		// single module print must carry a loc (OCTANE_COMPILE_ASSERT_LOC).
+		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
 	{
 		const imports = collectOctaneImportBindings(ast.body);
@@ -5377,52 +5505,10 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		}
 	}
 
-	let body = emitServerModulePrelude(serverModuleInfo, ctx);
-	// Source-map bookkeeping. `bodySegments` collects mapping segments in
-	// body-relative coordinates (0-based line within `body`); they're shifted by
-	// the prelude line count and encoded at return. Segments come from esrap's
-	// real per-token maps (component setup statements, top-level passthrough
-	// statements) plus a coarse anchor at each component declaration line.
-	let bodyLine = countNewlines(body);
-	const bodySegments = [];
-	// `firstLineOnly`: the column shift applies to fragment line 0 alone — the
-	// shape of an expression pasted mid-line into generated code, whose
-	// continuation lines keep their printed columns (statement fragments instead
-	// re-indent every line, the default).
-	const pushEsrapSegments = (baseLine, colShift, mappings, firstLineOnly = false) => {
-		for (let i = 0; i < mappings.length; i++) {
-			const shift = firstLineOnly && i > 0 ? 0 : colShift;
-			for (const seg of mappings[i]) {
-				bodySegments.push({
-					genLine: baseLine + i,
-					genCol: seg[0] + shift,
-					srcLine0: seg[2],
-					srcCol0: seg[3],
-				});
-			}
-		}
-	};
-	const pushDeclAnchor = (node, baseLine) => {
-		const loc = node && node.loc && node.loc.start;
-		if (loc) {
-			bodySegments.push({
-				genLine: baseLine,
-				genCol: 0,
-				srcLine0: loc.line - 1,
-				srcCol0: loc.column | 0,
-			});
-		}
-	};
-	// Drain the setup-statement maps compileFunctionBody captured for the
-	// component that starts at body line `base`.
-	const drainSetupMaps = (base) => {
-		if (ctx._setupMaps) {
-			for (const e of ctx._setupMaps) {
-				pushEsrapSegments(base + e.fnRelLine, e.colShift, e.mappings, e.firstLineOnly === true);
-			}
-			ctx._setupMaps = null;
-		}
-	};
+	// M2 AST emit: the module is assembled as an array of top-level statement
+	// NODES — in exactly the historical statement order — and printed ONCE by
+	// esrap at the end, which also yields the entire module source map.
+	const bodyNodes = emitServerModuleClientStubs(serverModuleInfo, ctx);
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrDialect === 'webpack' };
 	for (let node of ast.body) {
 		if (
@@ -5434,71 +5520,37 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		if (isComponentFunction(node)) {
 			// `function Foo() @{ ... }` (new TSRX shape) — non-exported helper. HMR
 			// doesn't wrap these (they're not user-visible across module boundaries).
-			const base = bodyLine;
-			ctx._setupMaps = null;
-			const chunk = compileComponent(node, ctx) + '\n\n';
-			pushDeclAnchor(node, base);
-			drainSetupMaps(base);
-			body += chunk;
-			bodyLine += countNewlines(chunk);
+			bodyNodes.push(...compileComponent(node, ctx).nodes);
 		} else if (node.type === 'ExportDefaultDeclaration' && isComponentFunction(node.declaration)) {
 			// `export default function Foo() @{...}` → emit as named const + `export default Foo;`.
 			const c = node.declaration;
-			const base = bodyLine;
-			ctx._setupMaps = null;
-			const compiled = compileComponent({ ...c, default: true }, ctx, compileOpts);
-			pushDeclAnchor(node, base);
-			drainSetupMaps(base);
-			body += compiled + '\n\n';
-			bodyLine += countNewlines(compiled + '\n\n');
+			bodyNodes.push(...compileComponent({ ...c, default: true }, ctx, compileOpts).nodes);
 			if (hmrEnabled) hmrComponents.push({ name: c.id.name, exportKind: 'default' });
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
 			// `export function Foo() @{...}` → emit as `export const Foo = ...;`.
 			const c = node.declaration;
-			const base = bodyLine;
-			ctx._setupMaps = null;
-			const compiled = compileComponent({ ...c, export: true }, ctx, compileOpts);
-			pushDeclAnchor(node, base);
-			drainSetupMaps(base);
-			body += compiled + '\n\n';
-			bodyLine += countNewlines(compiled + '\n\n');
+			bodyNodes.push(...compileComponent({ ...c, export: true }, ctx, compileOpts).nodes);
 			if (hmrEnabled) hmrComponents.push({ name: c.id.name, exportKind: 'named' });
 		} else if (isReturnJsxFunction(node)) {
 			// `function Foo() { …hooks…; return <jsx>; }` — a plain return-JSX function.
-			const base = bodyLine;
-			ctx._setupMaps = null;
-			const chunk = compileReturnJsxFunction(node, ctx, {}) + '\n\n';
-			pushDeclAnchor(node, base);
-			drainSetupMaps(base);
-			body += chunk;
-			bodyLine += countNewlines(chunk);
+			bodyNodes.push(...compileReturnJsxFunction(node, ctx, {}).nodes);
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
-			const base = bodyLine;
-			ctx._setupMaps = null;
-			const chunk =
-				compileReturnJsxFunction(node.declaration, ctx, {
+			bodyNodes.push(
+				...compileReturnJsxFunction(node.declaration, ctx, {
 					export: true,
 					hmrWrap: hmrEnabled,
 					hmrMutable: hmrDialect === 'webpack',
-				}) + '\n\n';
-			pushDeclAnchor(node, base);
-			drainSetupMaps(base);
-			body += chunk;
-			bodyLine += countNewlines(chunk);
+				}).nodes,
+			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'named' });
 		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
-			const base = bodyLine;
-			ctx._setupMaps = null;
-			const chunk =
-				compileReturnJsxFunction(node.declaration, ctx, {
+			bodyNodes.push(
+				...compileReturnJsxFunction(node.declaration, ctx, {
 					default: true,
 					hmrWrap: hmrEnabled,
 					hmrMutable: hmrDialect === 'webpack',
-				}) + '\n\n';
-			pushDeclAnchor(node, base);
-			drainSetupMaps(base);
-			body += chunk;
-			bodyLine += countNewlines(chunk);
+				}).nodes,
+			);
 			if (hmrEnabled) hmrComponents.push({ name: node.declaration.id.name, exportKind: 'default' });
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// Preserve ALL user-imported names from octane (Portal, createContext,
@@ -5533,13 +5585,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// can't print raw JSX, and this is what makes root.render(<App/>) match
 			// React's shape.
 			const lowered = stampAnonymousDefaultFunctionLoc(rewriteJsxValues(hooked, ctx), ctx);
-			// Top-level passthrough (imports, plain consts/functions): print with
-			// esrap's real map — col 0, no re-indent, single line offset.
-			const base = bodyLine;
-			const { code, mappings } = printNodeWithMap(lowered, ctx);
-			pushEsrapSegments(base, 0, mappings);
-			body += code + '\n';
-			bodyLine += countNewlines(code + '\n');
+			// Top-level passthrough (imports, plain consts/functions): already a
+			// rewritten statement node — embedded directly in the module AST.
+			bodyNodes.push(lowered);
 		}
 	}
 
@@ -5552,37 +5600,62 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		ctx.runtimeNeeded.add('delegateCaptureEvents');
 	}
 
-	// Build prelude. NOTE: `runtimeImport` is built BELOW (after the HMR block
-	// possibly registers more runtime needs); we postpone that so the final
-	// import list includes `hmr` / `HMR` when needed.
-	const delegateCall =
-		(ctx.delegatedEvents.size > 0
-			? `_$delegateEvents(${JSON.stringify([...ctx.delegatedEvents].sort())});\n`
-			: '') +
-		(ctx.capturedEvents.size > 0
-			? `_$delegateCaptureEvents(${JSON.stringify([...ctx.capturedEvents].sort())});\n`
-			: '') +
-		(ctx.delegatedEvents.size > 0 || ctx.capturedEvents.size > 0 ? '\n' : '');
-	const styleInjections = ctx.cssInjections
-		.map((i) => `_$injectStyle(${JSON.stringify(i.hash)}, ${JSON.stringify(i.css)});`)
-		.join('\n');
-	const styleBlock = styleInjections ? styleInjections + '\n\n' : '';
-	const templates = ctx.hoistedTemplates
-		.map((t) => {
-			const args = [JSON.stringify(t.html)];
-			if (t.ns || t.frag) args.push(String(t.ns | 0));
-			if (t.frag) args.push(String(t.frag | 0));
-			return `const ${t.name} = /* @__PURE__ */ _$template(${args.join(', ')});`;
-		})
-		.join('\n');
-	const templatesBlock = templates ? templates + '\n\n' : '';
+	// Build prelude nodes. NOTE: the runtime import is built BELOW (after the
+	// HMR block possibly registers more runtime needs); we postpone that so the
+	// final import list includes `hmr` / `HMR` when needed. Module scaffolding
+	// with no authored origin inherits the module's first located statement.
+	const moduleOrigin = ctx._moduleOrigin;
+	const delegateNodes = [];
+	if (ctx.delegatedEvents.size > 0) {
+		delegateNodes.push(
+			inheritOriginLoc(
+				b.stmt(
+					b.call(
+						'_$delegateEvents',
+						b.array([...ctx.delegatedEvents].sort().map((n) => b.literal(n, JSON.stringify(n)))),
+					),
+				),
+				moduleOrigin,
+			),
+		);
+	}
+	if (ctx.capturedEvents.size > 0) {
+		delegateNodes.push(
+			inheritOriginLoc(
+				b.stmt(
+					b.call(
+						'_$delegateCaptureEvents',
+						b.array([...ctx.capturedEvents].sort().map((n) => b.literal(n, JSON.stringify(n)))),
+					),
+				),
+				moduleOrigin,
+			),
+		);
+	}
+	const styleNodes = ctx.cssInjections.map((i) =>
+		inheritOriginLoc(
+			b.stmt(
+				b.call(
+					'_$injectStyle',
+					b.literal(i.hash, JSON.stringify(i.hash)),
+					b.literal(i.css, JSON.stringify(i.css)),
+				),
+			),
+			moduleOrigin,
+		),
+	);
+	const templateNodes = ctx.hoistedTemplates.map((t) => {
+		const args = [b.literal(t.html, JSON.stringify(t.html))];
+		if (t.ns || t.frag) args.push(b.literal(t.ns | 0));
+		if (t.frag) args.push(b.literal(t.frag | 0));
+		return inheritOriginLoc(b.const(t.name, markPure(b.call('_$template', ...args))), moduleOrigin);
+	});
 	// No tail slots exist on the client today (prop memos are server-only), but
 	// flush before assembly so a future client-side tail site cannot trip the
-	// joinHoistedHelpers assertion — imports are built after this join, so the
+	// tail-slot assertion — imports are built after this collection, so the
 	// timing is safe here.
 	flushTailHookSymbols(ctx);
-	const helpers = joinHoistedHelpers(ctx);
-	const helpersBlock = helpers ? helpers + '\n\n' : '';
+	const helperNodes = hoistedHelperNodes(ctx);
 
 	// HMR plumbing — sits AFTER the component bodies so the wrappers can
 	// reference the `Comp` const that was just declared. Each exported
@@ -5590,13 +5663,19 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// re-exported afterwards (we already emitted the `export default Comp;`
 	// line earlier — re-exporting again would conflict, so the rewrap mutates
 	// the binding in place). Mirrors `tsrx-ripple`'s emit shape.
-	let hmrBlock = '';
+	const hmrNodes = [];
 	if (hmrComponents.length > 0) {
 		// `hmr` is already registered as a needed runtime symbol by the
 		// inline-wrap pass on each exported component. We still need `HMR` (the
 		// Symbol key used to reach the wrapper's meta on `.update(...)`).
 		ctx.runtimeNeeded.add('hmr');
 		ctx.runtimeNeeded.add('HMR');
+		const importMeta = () => ({
+			type: 'MetaProperty',
+			meta: b.id('import'),
+			property: b.id('meta'),
+			metadata: { path: [] },
+		});
 		if (hmrDialect === 'webpack') {
 			// Rspack/webpack re-evaluates the accepted module and exposes the previous
 			// module's dispose data to that NEW evaluation. Hand the fresh body to the
@@ -5604,42 +5683,105 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// it. Persist that canonical identity again for the next update. This keeps
 			// working across any number of edits; accept callbacks in webpack are error
 			// handlers, not Vite-style callbacks carrying the new module namespace.
-			const handoffs = hmrComponents
-				.map(
-					(c) =>
-						`  if (import.meta.webpackHot.data?.__octaneComponents?.${c.name}) {\n` +
-						`    if (!import.meta.webpackHot.data.__octaneComponents.${c.name}[_$HMR].update(${c.name})) {\n` +
-						`      import.meta.webpackHot.invalidate();\n` +
-						`    } else {\n` +
-						`      ${c.name} = import.meta.webpackHot.data.__octaneComponents.${c.name};\n` +
-						`    }\n` +
-						'  }',
-				)
-				.join('\n');
-			const bindings = hmrComponents.map((c) => c.name).join(', ');
-			hmrBlock =
-				'if (import.meta.webpackHot) {\n' +
-				handoffs +
-				'\n' +
-				'  import.meta.webpackHot.dispose((data) => {\n' +
-				`    data.__octaneComponents = { ${bindings} };\n` +
-				'  });\n' +
-				'  import.meta.webpackHot.accept();\n' +
-				'}\n';
+			const webpackHot = () => b.member(importMeta(), 'webpackHot');
+			const previousComponent = (name, optional) =>
+				b.member(
+					b.member(
+						b.member(webpackHot(), b.id('data')),
+						b.id('__octaneComponents'),
+						false,
+						optional,
+					),
+					b.id(name),
+					false,
+					optional,
+				);
+			const handoffs = hmrComponents.map((c) =>
+				b.if(
+					previousComponent(c.name, true),
+					b.block([
+						b.if(
+							b.unary(
+								'!',
+								b.call(
+									b.member(
+										b.member(previousComponent(c.name, false), b.id('_$HMR'), true),
+										'update',
+									),
+									b.id(c.name),
+								),
+							),
+							b.block([b.stmt(b.call(b.member(webpackHot(), 'invalidate')))]),
+							b.block([b.stmt(b.assignment('=', b.id(c.name), previousComponent(c.name, false)))]),
+						),
+					]),
+					null,
+				),
+			);
+			hmrNodes.push(
+				inheritOriginLoc(
+					b.if(
+						webpackHot(),
+						b.block([
+							...handoffs,
+							b.stmt(
+								b.call(
+									b.member(webpackHot(), 'dispose'),
+									b.arrow(
+										[b.id('data')],
+										b.block([
+											b.stmt(
+												b.assignment(
+													'=',
+													b.member(b.id('data'), '__octaneComponents'),
+													b.object(
+														hmrComponents.map((c) =>
+															b.prop('init', b.id(c.name), b.id(c.name), false, true),
+														),
+													),
+												),
+											),
+										]),
+									),
+								),
+							),
+							b.stmt(b.call(b.member(webpackHot(), 'accept'))),
+						]),
+						null,
+					),
+					moduleOrigin,
+				),
+			);
 		} else {
-			const updates = hmrComponents
-				.map((c) => {
-					const accessor = c.exportKind === 'default' ? 'module.default' : `module.${c.name}`;
-					return `    if (!${c.name}[_$HMR].update(${accessor})) import.meta.hot.invalidate();`;
-				})
-				.join('\n');
-			hmrBlock =
-				'if (import.meta.hot) {\n' +
-				'  import.meta.hot.accept((module) => {\n' +
-				updates +
-				'\n' +
-				'  });\n' +
-				'}\n';
+			const hot = () => b.member(importMeta(), 'hot');
+			const updates = hmrComponents.map((c) => {
+				const accessor =
+					c.exportKind === 'default'
+						? b.member(b.id('module'), 'default')
+						: b.member(b.id('module'), c.name);
+				return b.if(
+					b.unary(
+						'!',
+						b.call(b.member(b.member(b.id(c.name), b.id('_$HMR'), true), 'update'), accessor),
+					),
+					b.stmt(b.call(b.member(hot(), 'invalidate'))),
+					null,
+				);
+			});
+			hmrNodes.push(
+				inheritOriginLoc(
+					b.if(
+						hot(),
+						b.block([
+							b.stmt(
+								b.call(b.member(hot(), 'accept'), b.arrow([b.id('module')], b.block(updates))),
+							),
+						]),
+						null,
+					),
+					moduleOrigin,
+				),
+			);
 		}
 	}
 
@@ -5648,13 +5790,15 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// to the previous canonical wrapper during that handoff; registering earlier
 	// would attach the fresh metadata to a short-lived replacement instead. The
 	// runtime helper records metadata without wrapping or replacing the function.
-	let profileBlock = '';
+	let profileNodes = [];
 	if (ctx.profileComponents.length > 0) {
 		ctx.profileRuntimeNeeded.add('__profileComponent');
-		profileBlock =
-			ctx.profileComponents
-				.map((meta) => `_$__profileComponent(${meta.name}, ${JSON.stringify(meta)});`)
-				.join('\n') + '\n';
+		profileNodes = ctx.profileComponents.map((meta) =>
+			inheritOriginLoc(
+				b.stmt(b.call('_$__profileComponent', b.id(meta.name), jsonValueToNode(meta))),
+				moduleOrigin,
+			),
+		);
 	}
 
 	// Cross-module singleRoot fallback stamps (docs/comment-marker-elision-plan.md
@@ -5662,63 +5806,92 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// binding; the tail remains for HMR wrappers and declaration shapes that cannot
 	// safely move the source binding. Also feeds the runtime's existing
 	// value-position `$$singleRoot` descriptor check.
-	let stampBlock = '';
+	const stampNodes = [];
 	if (ctx.componentInfo) {
-		const stamps = [];
+		const locStamp = (target, value) =>
+			inheritOriginLoc(
+				b.try(
+					b.block([b.stmt(b.assignment('=', b.member(b.id(target), '__oct_loc'), value))]),
+					// Empty catch — a frozen component object rejects the stamp.
+					b.catch_clause(null, null, b.block([])),
+				),
+				moduleOrigin,
+			);
 		for (const [name, info] of ctx.componentInfo) {
 			if (info.singleRoot === true && info.singleRootInitialized !== true) {
-				stamps.push(`${name}.$$singleRoot = true;`);
+				stampNodes.push(
+					inheritOriginLoc(
+						b.stmt(
+							b.assignment('=', b.member(b.id(name), '$$singleRoot'), b.literal(true, 'true')),
+						),
+						info.node?.loc ? info.node : moduleOrigin,
+					),
+				);
 			}
 		}
 		for (const entry of ctx.devFunctionLocs) {
-			stamps.push(
-				`try { ${entry.name}.__oct_loc = ${JSON.stringify(entry.loc)}; } catch { /* frozen component */ }`,
-			);
+			stampNodes.push(locStamp(entry.name, b.literal(entry.loc, JSON.stringify(entry.loc))));
 		}
 		for (const entry of ctx.devFunctionLocAliases) {
-			stamps.push(
-				entry.source === undefined
-					? `try { ${entry.name}.__oct_loc = ${JSON.stringify(entry.loc)}; } catch { /* frozen component */ }`
-					: `try { ${entry.name}.__oct_loc = ${entry.source}.__oct_loc; } catch { /* frozen component */ }`,
+			stampNodes.push(
+				locStamp(
+					entry.name,
+					entry.source === undefined
+						? b.literal(entry.loc, JSON.stringify(entry.loc))
+						: b.member(b.id(entry.source), '__oct_loc'),
+				),
 			);
 		}
-		if (stamps.length > 0) stampBlock = stamps.join('\n') + '\n';
 	}
 
 	// Module-load ViewTransition hint (see moduleImportsViewTransition) —
 	// registered before the import list is built so `__vtSeen` gets aliased in.
-	let vtHintBlock = '';
+	const vtHintNodes = [];
 	if (ctx._usesViewTransition) {
 		ctx.runtimeNeeded.add('__vtSeen');
-		vtHintBlock = rtAlias('__vtSeen') + '();\n';
+		vtHintNodes.push(inheritOriginLoc(b.stmt(b.call(rtAlias('__vtSeen'))), moduleOrigin));
 	}
 
 	// Built after HMR wiring so the import list includes `hmr`/`HMR` when needed.
-	const finalRuntimeImport = buildRuntimeImport(ctx, 'octane');
-	const finalProfileRuntimeImport = buildProfileRuntimeImport(ctx);
+	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane', moduleOrigin);
+	const profileRuntimeImportNodes = buildProfileRuntimeImportNodes(ctx, moduleOrigin);
 
-	// Everything before `body` in the output — shifts every body segment's
-	// generated line down by the prelude's line count.
-	const prelude =
-		finalRuntimeImport +
-		finalProfileRuntimeImport +
-		vtHintBlock +
-		delegateCall +
-		styleBlock +
-		templatesBlock +
-		helpersBlock;
-	const preludeLines = countNewlines(prelude);
-	const segments = bodySegments.map((s) => ({
-		genLine: s.genLine + preludeLines,
-		genCol: s.genCol,
-		srcLine0: s.srcLine0,
-		srcCol0: s.srcCol0,
-	}));
+	// ONE module AST, in the historical statement order, printed once — the
+	// print's decoded mappings ARE the module map (encoded below) and feed the
+	// inspection fat segments directly.
+	const program = {
+		type: 'Program',
+		sourceType: 'module',
+		body: [
+			...runtimeImportNodes,
+			...profileRuntimeImportNodes,
+			...vtHintNodes,
+			...delegateNodes,
+			...styleNodes,
+			...templateNodes,
+			...helperNodes,
+			...bodyNodes,
+			...stampNodes,
+			...hmrNodes,
+			...profileNodes,
+		],
+		metadata: { path: [] },
+		start: ast.start,
+		end: ast.end,
+		loc: ast.loc ?? moduleOrigin?.loc,
+	};
+	const printed = printNodeWithMap(program, ctx);
 
 	/** @type {{ code: string, map: any, diagnostics: any, inspect?: any, __universalSourceMapComposed?: boolean }} */
 	const result = {
-		code: prelude + body + stampBlock + hmrBlock + profileBlock,
-		map: buildSourceMap(source, ctx.mapSourceName, segments),
+		code: printed.code,
+		map: {
+			version: 3,
+			sources: [ctx.mapSourceName],
+			sourcesContent: [source],
+			names: [],
+			mappings: encodeMappings(printed.mappings),
+		},
 		diagnostics: nativeChangeDiagnostics,
 	};
 	if (ctx.inspect) {
@@ -5741,15 +5914,18 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// there. `genEndCol` is the next segment's column on the same
 			// generated line (null on the line's last segment — consumers clamp
 			// to the line end).
-			segments: buildFatSegments(segments, source, parsedAst),
+			segments: buildFatSegments(printed.mappings, source, parsedAst),
 		};
 	}
 	for (const unit of universalUnits) {
-		result.code = retargetRuntimeImportAliases(
+		const retargeted = retargetRuntimeImportAliasesWithMap(
 			result.code,
+			result.map,
 			unit.renderer.module,
 			unit.runtimeAliases,
 		);
+		result.code = retargeted.code;
+		result.map = retargeted.map;
 	}
 	if (rendererBoundaryPreparation !== null) {
 		result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
@@ -5852,7 +6028,9 @@ function compileServer(source, filename, options, styleRemap = null, analyzedAst
 		componentInfo: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
-		_setupMaps: null,
+		// Shared push sites (allocHookSymbol) build helper NODES; server assembly
+		// prints them via joinHoistedHelpers. Scaffolding origins fall back here.
+		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
 	{
 		const imports = collectOctaneImportBindings(ast.body);
@@ -7924,7 +8102,7 @@ function stripNonReferenceText(source) {
 // bundlers may therefore discard the initializer together with an unused export.
 function singleRootInitializer(ctx, component) {
 	ctx.runtimeNeeded.add('__s');
-	return `/* @__PURE__ */ _$__s(${component})`;
+	return markPure(b.call('_$__s', component));
 }
 
 function compileComponent(node, ctx, options) {
@@ -7998,24 +8176,16 @@ function compileComponent(node, ctx, options) {
 	ctx._pendingWarm = null;
 	const componentInfo = ctx.componentInfo.get(name);
 
-	// ONE esrap print for the whole compiled function — its mappings become the
-	// module map's segments for this component. `emitMaps` threads them to the
-	// emit site (drainSetupMaps) once the function's position inside the final
-	// chunk is known: `prefix` is the text on the chunk's lines before the
-	// function print starts (single-line for every wrapper form).
-	const printed = printNodeWithMap(fnNode, ctx);
-	const fn = printed.code;
-	const stampMaps = (chunk) => {
-		const at = chunk.indexOf(fn);
-		if (at < 0) return chunk;
-		const fnRelLine = countNewlines(chunk.slice(0, at));
-		const colShift = at - chunk.lastIndexOf('\n', at - 1) - 1;
-		ctx._setupMaps = [
-			{ fnRelLine, colShift, mappings: printed.mappings.slice(0, 1) },
-			{ fnRelLine: fnRelLine + 1, colShift: 0, mappings: printed.mappings.slice(1) },
-		];
-		return chunk;
-	};
+	// The compiled function stays a NODE (M2 AST emit): compileComponent returns
+	// `{ nodes }` — the declaration statement plus any capability-stamp/HMR/
+	// export follow-up statements — and compile() embeds them in the single
+	// module AST printed once by esrap (which yields the whole module map).
+	const objectAssign = (target, key, value) =>
+		b.call(
+			b.member(b.id('Object'), 'assign'),
+			target,
+			b.object([b.prop('init', b.id(key), value)]),
+		);
 
 	// Authored `function` declarations HOIST: a module may reference the
 	// component ABOVE its declaration (the canonical TanStack route-file shape,
@@ -8039,22 +8209,39 @@ function compileComponent(node, ctx, options) {
 		// EXTRACT the declaration into its own module and leave these statements
 		// behind — `typeof` on the then-undeclared identifier short-circuits
 		// harmlessly instead of throwing at module evaluation.
-		const guard = `typeof ${name} === 'function' && `;
+		const guarded = (expr) =>
+			inheritOriginLoc(
+				b.stmt(
+					b.logical(
+						'&&',
+						b.binary('===', b.unary('typeof', b.id(name)), b.literal('function', "'function'")),
+						expr,
+					),
+				),
+				node,
+			);
 		// Exported hoisted components keep declaration-form exports
 		// (`export function` / `export default function`) — hoisted, live-bound,
 		// and free of bare `export { … }` clauses.
-		const declPrefix = isDefault ? 'export default ' : isExported ? 'export ' : '';
-		const statements = [declPrefix + fn];
+		const statements = [
+			isDefault
+				? inheritOriginLoc(b.export_default(fnNode), node)
+				: isExported
+					? inheritOriginLoc(b.export(fnNode), node)
+					: fnNode,
+		];
 		if (pendingWarm) {
-			statements.push(`${guard}Object.assign(${name}, { __warm: ${pendingWarm} });`);
+			statements.push(guarded(objectAssign(b.id(name), '__warm', pendingWarm)));
 		}
 		if (hmrWrap && returnedOutput) {
-			statements.push(`${guard}Object.assign(${name}, { __octaneReturnedOutput: true });`);
+			statements.push(
+				guarded(objectAssign(b.id(name), '__octaneReturnedOutput', b.literal(true, 'true'))),
+			);
 		}
 		if (componentInfo?.singleRoot === true) {
 			ctx.runtimeNeeded.add('__s');
 			// Stamp the RAW function so the pre-declaration capture sees the mark…
-			statements.push(`${guard}_$__s(${name});`);
+			statements.push(guarded(b.call('_$__s', b.id(name))));
 			// …and when an HMR rebind below replaces the binding with the wrapper,
 			// leave singleRootInitialized unset so the module-tail fallback stamps
 			// the WRAPPER too (hmr() does not forward $$singleRoot). The tail
@@ -8069,42 +8256,59 @@ function compileComponent(node, ctx, options) {
 			// keeps later references hot-updatable while the pre-declaration capture
 			// deliberately holds the raw function (edits to such a component fall
 			// back to a full reload — the capture predates the wrapper).
-			statements.push(`${guard}(${name} = _$hmr(${name}));`);
+			statements.push(guarded(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))));
 		}
-		return stampMaps(statements.join('\n'));
+		return { nodes: statements };
 	}
 
+	// The declaration form embeds the compiled function at EXPRESSION position
+	// (`const X = function X(…) {…}`), preserving the user-facing function-name
+	// identity by naming the inner FunctionExpression.
+	const fnExpr = { ...fnNode, type: 'FunctionExpression' };
 	const warmedFn = pendingWarm
-		? `/* @__PURE__ */ Object.assign(${fn}, { __warm: ${pendingWarm} })`
-		: fn;
+		? markPure(inheritOriginLoc(objectAssign(fnExpr, '__warm', pendingWarm), node))
+		: fnExpr;
 	const abiFn =
 		hmrWrap && returnedOutput
-			? `/* @__PURE__ */ Object.assign(${warmedFn}, { __octaneReturnedOutput: true })`
+			? markPure(
+					inheritOriginLoc(
+						objectAssign(warmedFn, '__octaneReturnedOutput', b.literal(true, 'true')),
+						node,
+					),
+				)
 			: warmedFn;
 
 	// HMR-wrap exported components inline so the binding stays a `const` (no
 	// reassignment dance needed in Vite). Webpack/Rspack HMR instead uses a `let`
 	// binding so a re-evaluated module can hand its export back to the previous
-	// canonical wrapper stored in hot dispose data. The wrapper preserves the user-facing
-	// function-name identity by NAMING the inner FunctionExpression — `hmr`
-	// returns a wrapper that delegates to whatever fn is currently committed,
-	// and `module.Foo[HMR].update(...)` swaps it on each accept.
-	let valueExpr = hmrWrap && isExported ? `_$hmr(${abiFn})` : abiFn;
+	// canonical wrapper stored in hot dispose data. `hmr` returns a wrapper that
+	// delegates to whatever fn is currently committed, and
+	// `module.Foo[HMR].update(...)` swaps it on each accept.
+	let valueExpr = hmrWrap && isExported ? inheritOriginLoc(b.call('_$hmr', abiFn), node) : abiFn;
 	if (!hmrWrap && componentInfo?.singleRoot === true) {
-		valueExpr = singleRootInitializer(ctx, valueExpr);
+		valueExpr = inheritOriginLoc(singleRootInitializer(ctx, valueExpr), node);
 		componentInfo.singleRootInitialized = true;
 	}
-	const declaration = options && options.hmrMutable ? 'let' : 'const';
+	const declKind = options && options.hmrMutable ? 'let' : 'const';
+	const declNode = inheritOriginLoc(
+		b.declaration(declKind, [b.declarator(b.id(name, node.id ?? node), valueExpr)]),
+		node,
+	);
 	if (isDefault) {
 		if (options && options.hmrMutable) {
-			return stampMaps(`let ${name} = ${valueExpr};\nexport { ${name} as default };`);
+			return {
+				nodes: [
+					declNode,
+					inheritOriginLoc(b.export(null, [b.export_specifier(name, 'default')]), node),
+				],
+			};
 		}
-		return stampMaps(`const ${name} = ${valueExpr};\nexport default ${name};`);
+		return { nodes: [declNode, inheritOriginLoc(b.export_default(b.id(name)), node)] };
 	}
 	if (isExported) {
-		return stampMaps(`export ${declaration} ${name} = ${valueExpr};`);
+		return { nodes: [inheritOriginLoc(b.export(declNode), node)] };
 	}
-	return stampMaps(`const ${name} = ${valueExpr};`);
+	return { nodes: [declNode] };
 }
 
 /**
@@ -8238,7 +8442,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
 		warmThunk = warm.thunk;
-		ctx._pendingWarm = warm.warmSrc;
+		ctx._pendingWarm = warm.warmNode;
 	}
 	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 
@@ -10054,7 +10258,7 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 		warmKids.length > 0 &&
 		warmKids.every((child) => child.compName === componentName)
 	) {
-		return { thunk: null, warmSrc: null };
+		return { thunk: null, warmSrc: null, warmNode: null };
 	}
 
 	const stmtFor = (guards, callExpr) => {
@@ -10129,18 +10333,32 @@ function buildWarmArtifacts(node, ctx, componentName, creations, warmChildren) {
 	// function object via Object.assign, so the component's own body (where
 	// the function-expression name shadows the module const) sees it too;
 	// hmr() forwards it from the wrapped fn onto the HMR wrapper.
+	// `warmNode` is the client (M2 AST emit) form; `warmSrc` is its printed
+	// twin, still consumed by the server emitter and the universal lowering.
 	let warmSrc = null;
+	let warmNode = null;
 	if ((node.params || []).length <= 1 && (warmMemos.length > 0 || warmKids.length > 0)) {
 		const bodyStmts = [
 			...warmMemos.map((c) => stmtFor(c.guards, memoCall(c))),
 			...warmKids.map((w) => stmtFor(w.guards, childCall(w))),
 		];
+		const destructureNode =
+			node.params.length === 1
+				? inheritOriginLoc(b.const(node.params[0], b.id('__wp')), node.params[0])
+				: null;
+		warmNode = inheritOriginLoc(
+			b.arrow(
+				[b.id('__wp')],
+				b.block(destructureNode === null ? bodyStmts : [destructureNode, ...bodyStmts]),
+			),
+			node,
+		);
 		const destructure =
 			node.params.length === 1 ? `\tconst ${printNode(node.params[0])} = __wp;\n` : '';
 		const body = bodyStmts.map((s) => '\t' + printNode(s).replace(/\n/g, '\n\t')).join('\n');
 		warmSrc = `(__wp) => {\n${destructure}${body}\n}`;
 	}
-	return { thunk, warmSrc };
+	return { thunk, warmSrc, warmNode };
 }
 
 // ===========================================================================
@@ -11150,36 +11368,34 @@ function compileReturnJsxFunction(node, ctx, options) {
 		b.function_declaration(node.id, node.params, b.block([...compInlinedSubs, ...newStatements])),
 		node,
 	);
-	// Print with esrap's real per-token map so this function contributes
-	// segments to the module map — compile() drains them via ctx._setupMaps,
-	// exactly like a component's setup statements. Chained consumers (e.g.
-	// @octanejs/mdx's two-stage .mdx map) need segments on these lines.
-	const printed = printNodeWithMap(fn, ctx);
-	let code = printed.code;
-	const mappings = printed.mappings;
-	// Thread the mappings back to compile() through the same side-channel the
-	// component path uses (drained by drainSetupMaps at the emit site). The
-	// `export ` prefix shifts only line 0's columns; `export default` appends a
-	// trailing (unmapped) line and shifts nothing.
-	ctx._setupMaps =
-		options && options.export && !options.hmrWrap
-			? [
-					{ fnRelLine: 0, colShift: 'export '.length, mappings: mappings.slice(0, 1) },
-					{ fnRelLine: 1, colShift: 0, mappings: mappings.slice(1) },
-				]
-			: [{ fnRelLine: 0, colShift: 0, mappings }];
+	// M2 AST emit: return the function declaration NODE plus any HMR-rebind /
+	// export follow-up statements — compile() embeds them in the single module
+	// AST, whose one esrap print yields the whole module map (chained consumers
+	// like @octanejs/mdx's two-stage .mdx map read segments off that print).
 	if (options && options.hmrWrap) {
-		code += `\n${name} = _$hmr(${name});`;
+		const nodes = [
+			fn,
+			inheritOriginLoc(b.stmt(b.assignment('=', b.id(name), b.call('_$hmr', b.id(name)))), node),
+		];
 		if (options.default) {
-			return options.hmrMutable
-				? `${code}\nexport { ${name} as default };`
-				: `${code}\nexport default ${name};`;
+			nodes.push(
+				inheritOriginLoc(
+					options.hmrMutable
+						? b.export(null, [b.export_specifier(name, 'default')])
+						: b.export_default(b.id(name)),
+					node,
+				),
+			);
+		} else if (options.export) {
+			nodes.push(inheritOriginLoc(b.export(null, [b.export_specifier(name)]), node));
 		}
-		if (options.export) return `${code}\nexport { ${name} };`;
+		return { nodes };
 	}
-	if (options && options.default) return `${code}\nexport default ${name};`;
-	if (options && options.export) return `export ${code}`;
-	return code;
+	if (options && options.default) {
+		return { nodes: [fn, inheritOriginLoc(b.export_default(b.id(name)), node)] };
+	}
+	if (options && options.export) return { nodes: [inheritOriginLoc(b.export(fn), node)] };
+	return { nodes: [fn] };
 }
 
 function hasJsxAttribute(node, name) {
@@ -11719,13 +11935,18 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		}),
 		node,
 	);
-	const renderer = printNode(compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash));
+	const renderer = compileFunctionBody(synthFn, ctx, fragName, parentNs, cssHash);
 	if ((node.type === 'Element' || node.type === 'JSXElement') && !isComponentTag(node)) {
 		// A host fragment is a SINGLE root element, so it can mount markerless (the
 		// element self-delimits) — matching `@{}`'s inline render exactly (no extra
 		// comment markers), which is required for byte-equal DOM when folding `@{}`.
 		// A returned JSX fragment may have multiple roots and must retain its range.
-		ctx.hoistedHelpers.push(`const ${fragName} = ${singleRootInitializer(ctx, renderer)};`);
+		ctx.hoistedHelpers.push(
+			inheritOriginLoc(
+				b.const(fragName, singleRootInitializer(ctx, { ...renderer, type: 'FunctionExpression' })),
+				node,
+			),
+		);
 	} else {
 		ctx.hoistedHelpers.push(renderer);
 	}
@@ -12109,7 +12330,7 @@ function ensureHookSlotBase(ctx) {
 	return { baseName: ctx._hookSlotBaseName, helperName: ctx._hookSlotsHelperName };
 }
 
-function joinHoistedHelpers(ctx) {
+function assertTailHookSlotsFlushed(ctx) {
 	if (ctx._pendingTailHookSlots !== undefined) {
 		// Flushing here would be too late for the server pipeline: its runtime
 		// import list is built BEFORE the helpers join, and a flush-time
@@ -12119,6 +12340,14 @@ function joinHoistedHelpers(ctx) {
 		// memos). Each pipeline flushes explicitly before assembling imports.
 		throw new Error('octane compiler: tail hook slots were not flushed before module assembly.');
 	}
+}
+
+// Server (string) join. Helper entries are statement NODES (shared push sites
+// like allocHookSymbol build nodes for both pipelines since M2) or the
+// hook-slot-base placeholders resolved here, once the module's final site
+// count is known.
+function joinHoistedHelpers(ctx) {
+	assertTailHookSlotsFlushed(ctx);
 	return ctx.hoistedHelpers
 		.map((helper) => {
 			if (helper === HOOK_SLOT_BASE_HELPER) {
@@ -12127,9 +12356,36 @@ function joinHoistedHelpers(ctx) {
 			if (helper?.kind === 'hookSlotBase') {
 				return `const ${helper.baseName} = /* @__PURE__ */ ${helper.helperName}(${ctx.nextHookSymId});`;
 			}
-			return helper;
+			return typeof helper === 'string' ? helper : printNode(helper);
 		})
 		.join('\n');
+}
+
+// Client (M2 AST emit) counterpart of joinHoistedHelpers: the same entries as
+// statement nodes for the single module print.
+function hoistedHelperNodes(ctx) {
+	assertTailHookSlotsFlushed(ctx);
+	return ctx.hoistedHelpers.map((helper) => {
+		if (helper === HOOK_SLOT_BASE_HELPER) {
+			return inheritOriginLoc(
+				b.const(
+					ctx._hookSlotBaseName,
+					markPure(b.call(ctx._hookSlotsHelperName, b.literal(ctx.nextHookSymId))),
+				),
+				ctx._moduleOrigin,
+			);
+		}
+		if (helper?.kind === 'hookSlotBase') {
+			return inheritOriginLoc(
+				b.const(helper.baseName, markPure(b.call(helper.helperName, b.literal(ctx.nextHookSymId)))),
+				ctx._moduleOrigin,
+			);
+		}
+		if (typeof helper === 'string') {
+			throw new Error('octane compiler: string hoisted helper reached the client AST emit path.');
+		}
+		return helper;
+	});
 }
 
 // Server-only slots (prop memos) must not perturb the shared hook-symbol
@@ -12170,14 +12426,18 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 		// name + call-site index — stable provided the user doesn't reorder hooks
 		// between renders (which would violate React's rules anyway).
 		const stableKey = `octane:${ctx.filename || '<anon>'}:${debugName}`;
-		symbolExpr = `Symbol.for(${JSON.stringify(stableKey)})`;
+		symbolExpr = b.call(
+			b.member(b.id('Symbol'), 'for'),
+			b.literal(stableKey, JSON.stringify(stableKey)),
+		);
 	} else if (ctx.profile) {
 		// No HMR (prod builds, SSR, tests): nothing re-imports the module
 		// expecting registry identity. Profiling still needs a Symbol metadata key,
 		// and custom-hook boundaries retain the trailing-Symbol ABI consumed by
 		// published bindings. Both use the short, path-free description.
 		if (ctx._hookHash === undefined) ctx._hookHash = hookSlotHash(ctx.filename);
-		symbolExpr = `/* @__PURE__ */ Symbol(${JSON.stringify(`${ctx._hookHash}#${id}`)})`;
+		const description = `${ctx._hookHash}#${id}`;
+		symbolExpr = markPure(b.call('Symbol', b.literal(description, JSON.stringify(description))));
 	} else {
 		// Direct sites in a compiler-created render Scope only need a tiny local
 		// integer. Arbitrary callable helpers and custom-hook boundaries can share a
@@ -12185,10 +12445,10 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 		// keep a Symbol description that resolveSlot can safely compose.
 		if (forceSymbol) {
 			const { baseName } = ensureHookSlotBase(ctx);
-			const numericExpr = id === 0 ? baseName : `${baseName} + ${id}`;
-			symbolExpr = `/* @__PURE__ */ Symbol(${numericExpr})`;
+			const numericExpr = id === 0 ? b.id(baseName) : b.binary('+', b.id(baseName), b.literal(id));
+			symbolExpr = markPure(b.call('Symbol', numericExpr));
 		} else {
-			symbolExpr = String(id);
+			symbolExpr = b.literal(id);
 		}
 	}
 	if (ctx.profile) {
@@ -12209,9 +12469,16 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 			column: loc.column,
 			index: id,
 		};
-		symbolExpr = `_$__profileHook(${symbolExpr}, ${JSON.stringify(metadata)})`;
+		symbolExpr = b.call('_$__profileHook', symbolExpr, jsonValueToNode(metadata));
 	}
-	ctx.hoistedHelpers.push(`const ${name} = ${symbolExpr};`);
+	// The slot const maps to the authored hook call when profiling captured its
+	// node; other sites are module scaffolding and inherit the module origin.
+	ctx.hoistedHelpers.push(
+		inheritOriginLoc(
+			b.const(name, symbolExpr),
+			profile?.node?.loc ? profile.node : ctx._moduleOrigin,
+		),
+	);
 	return name;
 }
 
@@ -13949,7 +14216,10 @@ function planJsx(
 			if (rm.length > 0) {
 				const rmName = `_rm$${ctx.nextHelperId++}`;
 				ctx.hoistedHelpers.push(
-					`const ${rmName} = [${rm.map((x) => JSON.stringify(x)).join(', ')}];`,
+					inheritOriginLoc(
+						b.const(rmName, b.array(rm.map((x) => b.literal(x, JSON.stringify(x))))),
+						planOrigin,
+					),
 				);
 				mountLines.push(
 					inheritOriginLoc(
@@ -17167,9 +17437,9 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 		ctx.currentInvariantLocals = prevInvariantLocals;
 		ctx.currentEventInvariantLocals = prevEventInvariantLocals;
 	}
-	// Module-scope placement stays a hoisted-helper STRING until M2 converts the
-	// module frame — print the compiled node here.
-	ctx.hoistedHelpers.push(printNode(helperFn) + ';');
+	// Module-scope placement: the compiled helper joins the module AST as a
+	// hoisted statement node (M2 AST emit).
+	ctx.hoistedHelpers.push(helperFn);
 	return helperName;
 }
 
@@ -17928,7 +18198,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		// The synthesized key arrow maps to the authored key expression; its item
 		// param maps to the for-of binding it mirrors.
 		const param = isDestructured ? leftDeclId : b.id(itemName, leftDeclId);
-		return printExpr(inheritOriginLoc(b.arrow([param], keyExpr), keyExpr));
+		return inheritOriginLoc(b.arrow([param], keyExpr), keyExpr);
 	}
 
 	let keyFn = null;
@@ -17956,13 +18226,34 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	}
 	if (!keyFn && node.index) {
 		// Index identifier — caller iterates with index, key by index.
-		keyFn = `(${itemName}, ${node.index.name}) => ${node.index.name}`;
+		keyFn = inheritOriginLoc(
+			b.arrow(
+				[b.id(itemName, leftDeclId), b.id(node.index.name, node.index)],
+				b.id(node.index.name, node.index),
+			),
+			node.index,
+		);
 	}
-	if (!keyFn) keyFn = `(${itemName}) => ${itemName}.id != null ? ${itemName}.id : ${itemName}`;
+	if (!keyFn) {
+		keyFn = inheritOriginLoc(
+			b.arrow(
+				[b.id(itemName, leftDeclId)],
+				b.conditional(
+					b.binary('!=', b.member(b.id(itemName), 'id'), b.literal(null, 'null')),
+					b.member(b.id(itemName), 'id'),
+					b.id(itemName),
+				),
+			),
+			node,
+		);
+	}
 
-	// Key fn is hoisted (it doesn't typically capture parent state).
+	// Key fn is hoisted (it doesn't typically capture parent state). Synthetic
+	// loop nodes (legacy internal callers) may carry no position — fall back to
+	// the key arrow's own origin, then the module origin.
 	const keyHelper = `_key$${ctx.nextHelperId++}`;
-	ctx.hoistedHelpers.push(`const ${keyHelper} = ${keyFn};`);
+	const keyOrigin = node.loc ? node : keyFn.loc ? keyFn : ctx._moduleOrigin;
+	ctx.hoistedHelpers.push(inheritOriginLoc(b.const(keyHelper, keyFn), keyOrigin));
 
 	// When the for-of header declared `index <name>`, expose it as a `const`
 	// at the top of the body — the runtime stamps `block.itemIndex` per item

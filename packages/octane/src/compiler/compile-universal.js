@@ -3201,32 +3201,147 @@ const UNIVERSAL_COMPILER_RUNTIME_IMPORTS = new Set([
 	'withSlot',
 ]);
 
-function retargetRuntimeImport(code, moduleId) {
-	if (moduleId === 'octane') return code;
-	return code.replace(/import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/g, (_match, body) => {
-		const universal = [];
-		const dom = [];
-		for (const raw of body.split(',')) {
-			const specifier = raw.trim();
-			if (specifier === '') continue;
-			const imported = specifier.split(/\s+as\s+/, 1)[0];
-			(UNIVERSAL_COMPILER_RUNTIME_IMPORTS.has(imported) ? universal : dom).push(specifier);
+function rewriteGeneratedCode(code, pattern, replace) {
+	const unchangedRanges = [];
+	const unmappedStarts = [];
+	const chunks = [];
+	let cursor = 0;
+	let nextOffset = 0;
+	const preserve = (start, end, target) => {
+		if (end > start) unchangedRanges.push([start, end, target]);
+	};
+	pattern.lastIndex = 0;
+	let match;
+	while ((match = pattern.exec(code)) !== null) {
+		const start = match.index;
+		const end = start + match[0].length;
+		const unchanged = code.slice(cursor, start);
+		chunks.push(unchanged);
+		preserve(cursor, start, nextOffset);
+		nextOffset += unchanged.length;
+
+		const replacement = replace(match);
+		chunks.push(replacement);
+		if (replacement === match[0]) {
+			preserve(start, end, nextOffset);
+		} else {
+			unmappedStarts.push(nextOffset);
 		}
-		const imports = [];
-		if (dom.length > 0) imports.push(`import { ${dom.join(', ')} } from 'octane';`);
-		if (universal.length > 0) {
-			imports.push(`import { ${universal.join(', ')} } from ${JSON.stringify(moduleId)};`);
-		}
-		return imports.join('\n');
-	});
+		nextOffset += replacement.length;
+		cursor = end;
+		if (match[0].length === 0) pattern.lastIndex++;
+	}
+	const tail = code.slice(cursor);
+	chunks.push(tail);
+	preserve(cursor, code.length, nextOffset);
+	return { code: chunks.join(''), unchangedRanges, unmappedStarts };
 }
 
-export function retargetRuntimeImportAliases(code, moduleId, aliases) {
-	if (!aliases || aliases.length === 0 || moduleId === 'octane') return code;
-	const selected = new Set(aliases);
-	return code.replace(
+function generatedPositionFromStarts(starts, offset) {
+	let low = 0;
+	let high = starts.length;
+	while (low < high) {
+		const middle = (low + high) >>> 1;
+		if (starts[middle] <= offset) low = middle + 1;
+		else high = middle;
+	}
+	const line = Math.max(0, low - 1);
+	return { line, column: offset - starts[line] };
+}
+
+/**
+ * Relocate an existing generated-code map through a textual rewrite. Only
+ * unchanged characters retain segments; replacement scaffolding is explicitly
+ * unmapped. This keeps every later authored expression aligned when an import
+ * rewrite changes the module prelude's line count.
+ */
+function relocateGeneratedMap(map, previousCode, nextCode, rewrite) {
+	if (!map || previousCode === nextCode) return map;
+	const previousStarts = lineStarts(previousCode);
+	const nextStarts = lineStarts(nextCode);
+	const lines = [];
+	const place = (offset, segment) => {
+		const generated = generatedPositionFromStarts(nextStarts, offset);
+		const line = (lines[generated.line] ??= new Map());
+		line.set(generated.column, [generated.column, ...segment]);
+	};
+	const relocateOffset = (offset) => {
+		let low = 0;
+		let high = rewrite.unchangedRanges.length;
+		while (low < high) {
+			const middle = (low + high) >>> 1;
+			if (rewrite.unchangedRanges[middle][0] <= offset) low = middle + 1;
+			else high = middle;
+		}
+		const range = rewrite.unchangedRanges[low - 1];
+		return range !== undefined && offset < range[1] ? range[2] + offset - range[0] : -1;
+	};
+	for (const [line, segments] of decodeMappings(map.mappings).entries()) {
+		const previousStart = previousStarts[line];
+		if (previousStart === undefined) continue;
+		for (const segment of segments) {
+			const previousOffset = previousStart + segment[0];
+			const nextOffset = relocateOffset(previousOffset);
+			if (nextOffset >= 0) place(nextOffset, segment.slice(1));
+		}
+	}
+	for (const offset of rewrite.unmappedStarts) place(offset, []);
+	return {
+		...map,
+		mappings: encodeMappings(
+			Array.from({ length: lines.length }, (_, index) =>
+				lines[index] === undefined
+					? []
+					: [...lines[index].values()].sort((left, right) => left[0] - right[0]),
+			),
+		),
+	};
+}
+
+function retargetRuntimeImportWithMap(code, map, moduleId) {
+	if (moduleId === 'octane') return { code, map };
+	const rewrite = rewriteGeneratedCode(
+		code,
 		/import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/g,
-		(_match, body, quote) => {
+		(match) => {
+			const body = match[1];
+			const universal = [];
+			const dom = [];
+			for (const raw of body.split(',')) {
+				const specifier = raw.trim();
+				if (specifier === '') continue;
+				const imported = specifier.split(/\s+as\s+/, 1)[0];
+				(UNIVERSAL_COMPILER_RUNTIME_IMPORTS.has(imported) ? universal : dom).push(specifier);
+			}
+			const imports = [];
+			if (dom.length > 0) imports.push(`import { ${dom.join(', ')} } from 'octane';`);
+			if (universal.length > 0) {
+				imports.push(`import { ${universal.join(', ')} } from ${JSON.stringify(moduleId)};`);
+			}
+			return imports.join('\n');
+		},
+	);
+	return {
+		code: rewrite.code,
+		map: relocateGeneratedMap(map, code, rewrite.code, rewrite),
+	};
+}
+
+function rewriteRuntimeImportAliases(code, moduleId, aliases) {
+	if (!aliases || aliases.length === 0 || moduleId === 'octane') {
+		return {
+			code,
+			unchangedRanges: [],
+			unmappedStarts: [],
+		};
+	}
+	const selected = new Set(aliases);
+	return rewriteGeneratedCode(
+		code,
+		/import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/g,
+		(match) => {
+			const body = match[1];
+			const quote = match[2];
 			const owner = [];
 			const child = [];
 			for (const raw of body.split(',')) {
@@ -3236,7 +3351,7 @@ export function retargetRuntimeImportAliases(code, moduleId, aliases) {
 				const local = parts[1] ?? parts[0];
 				(selected.has(local) ? child : owner).push(specifier);
 			}
-			if (child.length === 0) return _match;
+			if (child.length === 0) return match[0];
 			const imports = [];
 			if (owner.length > 0)
 				imports.push(`import { ${owner.join(', ')} } from ${quote}octane${quote};`);
@@ -3244,6 +3359,18 @@ export function retargetRuntimeImportAliases(code, moduleId, aliases) {
 			return imports.join(' ');
 		},
 	);
+}
+
+export function retargetRuntimeImportAliases(code, moduleId, aliases) {
+	return rewriteRuntimeImportAliases(code, moduleId, aliases).code;
+}
+
+export function retargetRuntimeImportAliasesWithMap(code, map, moduleId, aliases) {
+	const rewrite = rewriteRuntimeImportAliases(code, moduleId, aliases);
+	return {
+		code: rewrite.code,
+		map: relocateGeneratedMap(map, code, rewrite.code, rewrite),
+	};
 }
 
 function buildUniversalHmrBlocks(state) {
@@ -3903,11 +4030,14 @@ export function compileUniversal(
 		components: state.components,
 		sourceMap: intermediateMap,
 	});
-	return {
-		code: retargetRuntimeImport(result.code, renderer.module),
-		map: result.__universalSourceMapComposed
+	const mapped =
+		result.__universalSourceMapComposed === true
 			? result.map
-			: composeSourceMaps(result.map, intermediateMap),
+			: composeSourceMaps(result.map, intermediateMap);
+	const retargeted = retargetRuntimeImportWithMap(result.code, mapped, renderer.module);
+	return {
+		code: retargeted.code,
+		map: retargeted.map,
 		...(universalRuntime === undefined ? null : { universalRuntime }),
 	};
 }
