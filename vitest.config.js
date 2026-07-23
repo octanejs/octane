@@ -1900,6 +1900,14 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'vscode-extension',
+					include: ['packages/vscode-extension/tests/**/*.test.js'],
+					environment: 'node',
+					globals: false,
+				},
+			},
+			{
+				test: {
 					name: 'octane-evals',
 					include: ['packages/octane-evals/tests/**/*.test.ts'],
 					environment: 'node',

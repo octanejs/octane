@@ -60,6 +60,10 @@ allowBuilds:
   # it ships a bundled rules.json — so its build is not needed (pulled transitively
   # via rulesync). Explicitly declined to silence the ignored-builds warning.
   tldjs: false
+  # VSCE packaging does not publish/sign from this workspace, so neither the
+  # optional native keychain integration nor the signing helper needs to build.
+  '@vscode/vsce-sign': false
+  keytar: false
 
 # Variables
 esrap_common: &esrap_common ^2.3.0

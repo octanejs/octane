@@ -1,3 +1,8 @@
+---
+name: bridge-react-package
+description: Bridge a React ecosystem package to Octane after checking for an official @octanejs binding and classifying required rewrites.
+---
+
 # Skill: Bridge a React package to Octane
 
 Use this when a user wants a React ecosystem library to work in their Octane app.

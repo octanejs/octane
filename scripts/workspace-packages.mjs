@@ -18,6 +18,7 @@ const SPECIAL_ROLES = new Map([
 	['@octanejs/tanstack-start', 'metaframework'],
 	['@octanejs/mcp-server', 'agent tooling'],
 	['@octanejs/evals', 'evaluation tooling'],
+	['octane-vscode', 'editor tooling'],
 ]);
 
 const OCTANE_SINGLETON_CONSUMERS = new Set([

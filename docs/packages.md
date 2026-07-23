@@ -65,3 +65,4 @@ All publishable packages share the enforced Node.js engine baseline `>=22`.
 - `@octanejs/evals` ([`packages/octane-evals`](../packages/octane-evals))
 - `@octanejs/lynx` ([`packages/lynx`](../packages/lynx))
 - `@octanejs/rspeedy-plugin` ([`packages/rspeedy-plugin-octane`](../packages/rspeedy-plugin-octane))
+- `octane-vscode` ([`packages/vscode-extension`](../packages/vscode-extension))

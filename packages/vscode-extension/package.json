@@ -1,0 +1,243 @@
+{
+  "name": "octane-vscode",
+  "displayName": "Octane for VS Code",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Standalone TSRX language intelligence and MCP superpowers for Octane.",
+  "publisher": "octanejs",
+  "license": "MIT",
+  "author": {
+    "name": "Dominic Gannaway",
+    "email": "dg@domgan.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octanejs/octane.git",
+    "directory": "packages/vscode-extension"
+  },
+  "engines": {
+    "node": ">=22",
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "octane",
+    "tsrx",
+    "mcp",
+    "typescript",
+    "ai"
+  ],
+  "main": "./src/extension.cjs",
+  "icon": "assets/icon.png",
+  "activationEvents": [
+    "onLanguage:octane-tsrx",
+    "onMcpCollection:octane.remoteMcp",
+    "onView:octane.overview",
+    "onCommand:octane.mcp.toggle",
+    "onCommand:octane.openSettings",
+    "onCommand:octane.openMcpEndpoint",
+    "onCommand:octane.intellisense.check",
+    "onCommand:octane.mcp.compileActive",
+    "onCommand:octane.mcp.searchDocs",
+    "onCommand:octane.mcp.bindingStatus",
+    "onCommand:octane.mcp.bridgeScan",
+    "onCommand:octane.mcp.loadSkill",
+    "onCommand:octane.restartLanguageServer",
+    "onCommand:octane.refresh"
+  ],
+  "scripts": {
+    "assets": "node scripts/sync-agent-assets.mjs",
+    "assets:check": "node scripts/sync-agent-assets.mjs --check",
+    "bench": "node benchmarks/activation.mjs",
+    "package": "node scripts/sync-agent-assets.mjs --check && node scripts/prepare-package.mjs && vsce package --no-dependencies --out dist/octane-vscode.vsix && node scripts/finalize-package.mjs",
+    "test": "cd ../.. && vitest run --project vscode-extension",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "octane-tsrx",
+        "aliases": [
+          "Octane TSRX",
+          "TSRX"
+        ],
+        "extensions": [
+          ".tsrx"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./assets/icon.png",
+          "dark": "./assets/icon.png"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "octane-tsrx",
+        "scopeName": "source.octane-tsrx",
+        "path": "./syntaxes/octane-tsrx.tmLanguage.json"
+      }
+    ],
+    "typescriptServerPlugins": [
+      {
+        "name": "@octanejs/typescript-plugin",
+        "enableForWorkspaceTypeScriptVersions": true,
+        "languages": [
+          "octane-tsrx"
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "Octane",
+      "properties": {
+        "octane.mcp.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Expose the official Octane MCP server to VS Code agents. Language support remains local and is unaffected by this setting."
+        },
+        "octane.tsrx.autoClosingTags": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically insert matching closing tags while editing TSRX."
+        }
+      }
+    },
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "octane.remoteMcp",
+        "label": "Octane"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "octane",
+          "title": "Octane",
+          "icon": "assets/octane-sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "octane": [
+        {
+          "id": "octane.overview",
+          "name": "Octane",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "octane.mcp.toggle",
+        "title": "Toggle MCP",
+        "category": "Octane",
+        "icon": "$(server)"
+      },
+      {
+        "command": "octane.openSettings",
+        "title": "Open Settings",
+        "category": "Octane",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "octane.openMcpEndpoint",
+        "title": "Open MCP Endpoint",
+        "category": "Octane"
+      },
+      {
+        "command": "octane.restartLanguageServer",
+        "title": "Restart TSRX IntelliSense",
+        "category": "Octane",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "octane.intellisense.check",
+        "title": "Test IntelliSense",
+        "category": "Octane",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "octane.mcp.compileActive",
+        "title": "MCP: Compile Active File",
+        "category": "Octane"
+      },
+      {
+        "command": "octane.mcp.searchDocs",
+        "title": "MCP: Search Documentation",
+        "category": "Octane"
+      },
+      {
+        "command": "octane.mcp.bindingStatus",
+        "title": "MCP: Inspect Binding",
+        "category": "Octane"
+      },
+      {
+        "command": "octane.mcp.bridgeScan",
+        "title": "MCP: Scan React Compatibility",
+        "category": "Octane"
+      },
+      {
+        "command": "octane.mcp.loadSkill",
+        "title": "MCP: Open Skill",
+        "category": "Octane"
+      },
+      {
+        "command": "octane.refresh",
+        "title": "Refresh",
+        "category": "Octane",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "octane.mcp.toggle",
+          "when": "view == octane.overview",
+          "group": "navigation@1"
+        },
+        {
+          "command": "octane.refresh",
+          "when": "view == octane.overview",
+          "group": "navigation@2"
+        }
+      ]
+    },
+    "chatAgents": [
+      {
+        "path": "./assets/agents/octane.agent.md"
+      }
+    ],
+    "chatSkills": [
+      {
+        "path": "./assets/skills/build-octane-software/SKILL.md"
+      },
+      {
+        "path": "./assets/skills/bridge-react-package/SKILL.md"
+      },
+      {
+        "path": "./assets/skills/migrate-react-component/SKILL.md"
+      },
+      {
+        "path": "./assets/skills/react-divergences/SKILL.md"
+      },
+      {
+        "path": "./assets/skills/setup-ssr/SKILL.md"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@volar/language-core": "~2.4.28",
+    "@volar/typescript": "~2.4.28",
+    "@types/node": "catalog:default",
+    "@types/vscode": "1.109.0",
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "catalog:default",
+    "octane": "workspace:*",
+    "typescript": "catalog:default",
+    "vitest": "catalog:default"
+  }
+}

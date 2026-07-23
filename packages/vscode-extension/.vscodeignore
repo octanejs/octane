@@ -1,0 +1,16 @@
+**
+!assets/**
+!dist/compiler.cjs
+!language-configuration.json
+!syntaxes/**
+!src/extension.cjs
+!src/intellisense.cjs
+!src/mcp-actions.cjs
+!src/mcp-client.cjs
+!src/mcp-provider.cjs
+!src/result-viewer.cjs
+!src/status-view.cjs
+!src/tag-closing.cjs
+!LICENSE
+!README.md
+!package.json

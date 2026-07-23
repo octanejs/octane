@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Octane TSRX",
+  "scopeName": "source.octane-tsrx",
+  "patterns": [
+    {
+      "name": "keyword.control.tsrx",
+      "match": "@(if|else|for|empty|switch|case|default|try|pending|catch)\\b"
+    },
+    {
+      "name": "keyword.control.tsrx.block",
+      "match": "@(?=\\{)"
+    },
+    {
+      "include": "source.tsx"
+    }
+  ]
+}

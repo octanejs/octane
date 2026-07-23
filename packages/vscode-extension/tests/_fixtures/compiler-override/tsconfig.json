@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {},
+  "tsrx": {
+    "compiler": "./compiler.cjs"
+  }
+}
