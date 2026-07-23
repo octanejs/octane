@@ -6,6 +6,13 @@
   "engines": {
     "node": ">=22"
   },
+  "octane": {
+    "hookSlots": {
+      "manual": [
+        "src"
+      ]
+    }
+  },
   "description": "TanStack Hotkeys bindings for Octane — reuses the framework-agnostic @tanstack/hotkeys core with an Octane hook adapter.",
   "author": {
     "name": "Dominic Gannaway",
@@ -28,6 +35,10 @@
   ],
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --project tanstack-hotkeys",
+    "typecheck": "tsrx-tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/hotkeys": "0.8.0"

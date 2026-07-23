@@ -4,8 +4,16 @@
   "description": "Octane port of @tanstack/react-router-ssr-query — TanStack Router ⇄ Query SSR integration.",
   "type": "module",
   "main": "src/index.tsrx",
+  "types": "src/index.tsrx.d.ts",
   "exports": {
-    ".": "./src/index.tsrx"
+    ".": {
+      "types": "./src/index.tsrx.d.ts",
+      "default": "./src/index.tsrx"
+    }
+  },
+  "scripts": {
+    "test": "vitest run --project tanstack-router-ssr-query",
+    "typecheck": "tsrx-tsc --noEmit"
   },
   "dependencies": {
     "@tanstack/router-ssr-query-core": "1.169.1"
