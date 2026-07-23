@@ -46,6 +46,22 @@ function segmentsFor(
 }
 
 describe.each([
+	['client', {}, SOURCE],
+	['client dev', { dev: true }, SOURCE],
+	['server', { mode: 'server' as const }, SERVER_SOURCE],
+	['server dev', { mode: 'server' as const, dev: true }, SERVER_SOURCE],
+])('generated program inspection — %s', (_label, options, source) => {
+	it('exposes the Program used by the final module print', () => {
+		const result = compile(source, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
+			typeof compile
+		> & { inspect: { ast: { type: string; sourceType: string; body: unknown[] } } };
+		expect(result.inspect.ast.type).toBe('Program');
+		expect(result.inspect.ast.sourceType).toBe('module');
+		expect(result.inspect.ast.body.length).toBeGreaterThan(0);
+	});
+});
+
+describe.each([
 	['client dev', { dev: true }],
 	['client prod', { hmr: false as const }],
 ])('fat inspection segments — %s', (_label, options) => {

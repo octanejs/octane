@@ -17,8 +17,43 @@ interface Origin {
 	srcEnd: number;
 	kind: OriginKind;
 }
+interface TemplatePart {
+	type: 'TemplatePart';
+	kind:
+		| 'syntax'
+		| 'tag-open'
+		| 'tag-close'
+		| 'attribute'
+		| 'text'
+		| 'anchor'
+		| 'fragment-open'
+		| 'fragment-close'
+		| 'raw';
+	value: string;
+	origins: Origin[] | null;
+	length: number;
+}
+interface TemplateElement {
+	type: 'TemplateElement';
+	tag: string;
+	namespace: string;
+	synthetic: boolean;
+	opening: TemplatePart;
+	attributes: TemplatePart[];
+	openingEnd: TemplatePart;
+	children: TemplateNode[];
+	closing: TemplatePart | null;
+	length: number;
+}
+type TemplateNode = TemplatePart | TemplateElement;
+interface TemplateAst {
+	type: 'Template';
+	parts: TemplateNode[];
+	length: number;
+}
 interface InspectTemplate {
 	name: string;
+	ast: TemplateAst;
 	html: string;
 	origins: Origin[];
 }
@@ -45,6 +80,17 @@ export function Pair() @{
 	</>
 }
 
+export function HasNestedHelper() @{
+	const render = () => @{
+		<>
+			<i>x</i>
+			<b>y</b>
+		</>
+	};
+	void render;
+	<div>host</div>
+}
+
 export function Wrapped(props: { on: boolean }) @{
 	<section>
 		@if (props.on) {
@@ -64,6 +110,32 @@ const escAttr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const KINDS = new Set(['tag-open', 'tag-close', 'attr-name', 'attr-value', 'text']);
+
+function serializeTemplateNode(node: TemplateNode): string {
+	if (node.type === 'TemplatePart') return node.value;
+	return [
+		node.opening.value,
+		...node.attributes.map((attribute) => attribute.value),
+		node.openingEnd.value,
+		...node.children.map(serializeTemplateNode),
+		node.closing?.value ?? '',
+	].join('');
+}
+
+function collectTemplatePartKinds(nodes: TemplateNode[], kinds = new Set<string>()): Set<string> {
+	for (const node of nodes) {
+		if (node.type === 'TemplatePart') {
+			kinds.add(node.kind);
+			continue;
+		}
+		kinds.add(node.opening.kind);
+		for (const attribute of node.attributes) kinds.add(attribute.kind);
+		kinds.add(node.openingEnd.kind);
+		collectTemplatePartKinds(node.children, kinds);
+		if (node.closing !== null) kinds.add(node.closing.kind);
+	}
+	return kinds;
+}
 
 function compileInspect(options: Record<string, unknown> = {}): InspectTemplate[] {
 	const result = compile(SOURCE, 'origins.tsrx', { ...options, inspect: true });
@@ -93,6 +165,41 @@ describe('compiler template-origin recording (inspect: true)', () => {
 			names.add(t.name);
 			expect(result.code).toContain(t.name);
 		}
+	});
+
+	it('exposes the structured template whose single serialization is the runtime HTML', () => {
+		for (const template of compileInspect()) {
+			expect(template.ast.type).toBe('Template');
+			const serialized = template.ast.parts.map(serializeTemplateNode).join('');
+			expect(serialized).toBe(template.html);
+			expect(template.ast.length).toBe(template.html.length);
+		}
+		const app = compileInspect().find((template) => template.html.startsWith('<div class='))!;
+		const root = app.ast.parts[0];
+		expect(root.type).toBe('TemplateElement');
+		if (root.type !== 'TemplateElement') throw new Error('expected a template element');
+		expect(root.tag).toBe('div');
+		// Component-body roots are destination-opaque until planJsx resolves the
+		// template's parse strategy; the element IR preserves that authored context.
+		expect(root.namespace).toBe('opaque');
+		expect(root.synthetic).toBe(false);
+		expect(root.attributes.length).toBe(2);
+		expect(root.children.some((node) => node.type === 'TemplateElement')).toBe(true);
+
+		const kinds = collectTemplatePartKinds(app.ast.parts);
+		for (const kind of ['tag-open', 'tag-close', 'attribute', 'text'] as const) {
+			expect(kinds.has(kind)).toBe(true);
+		}
+
+		const nested = compileInspect().find((template) =>
+			template.html.startsWith('<octane-frag><i>'),
+		)!;
+		const wrapper = nested.ast.parts[0];
+		expect(wrapper.type).toBe('TemplateElement');
+		if (wrapper.type !== 'TemplateElement') throw new Error('expected a template element');
+		expect(wrapper.tag).toBe('octane-frag');
+		expect(wrapper.synthetic).toBe(true);
+		expect(wrapper.children.filter((node) => node.type === 'TemplateElement')).toHaveLength(2);
 	});
 
 	it('every origin entry slices cleanly out of both the template HTML and the source', () => {

@@ -1,12 +1,25 @@
 # AST Emit Plan (Stage 2F)
 
-Replace the compiler's string-assembly emit with AST construction printed by
-esrap, per the original author's direction. The transform layer is already
-AST→AST (builders + enforced copy-on-write and origin-location invariants);
-this plan converts the remaining string domains: the runtime-glue statement
-skeletons, the function/module frames, and eventually the server emitter.
-Template HTML stays a string product in every milestone — its mapping channel
-is the append-time origin recorder (`inspect.templates`), unchanged.
+Replace the compiler's generated-program string assembly with AST construction
+printed by esrap, per the original author's direction. The transform layer is
+already AST→AST (builders + enforced copy-on-write and origin-location
+invariants). The end-state invariant is:
+
+- Generated JavaScript and TypeScript syntax exists only as AST, and each
+  emitted module is printed by esrap exactly once.
+- Static template HTML exists as compiler-owned template IR carrying authored
+  origins. It is serialized exactly once into the compact string consumed by
+  the runtime, then embedded in the generated JavaScript AST as a literal.
+- Runtime data that is inherently textual — HTML, CSS, module specifier values,
+  diagnostics, and ordinary string literals — remains string data. It must not
+  be confused with assembling JavaScript syntax through strings.
+
+esrap prints ESTree JavaScript/TypeScript; it does not print an HTML AST. Passing
+template HTML through a JavaScript `Literal` or expression-free
+`TemplateLiteral` changes only its quote container and does not make the tags,
+attributes, or text visible to esrap. `inspect.templates` therefore remains the
+precise logical-HTML mapping channel, but is derived from and accompanied by the
+template IR rather than being maintained by ad hoc string concatenation.
 
 ## Why
 
@@ -29,6 +42,14 @@ is the append-time origin recorder (`inspect.templates`), unchanged.
   deltas with the milestone. Generated-code size is a tracked cost.
 - `slot-hooks.js` remains text-edit based BY CONTRACT (append-only edits keep
   user line numbers valid without a map). Do not convert it.
+- "One print" means one final program print for each emitted module. No generated
+  JavaScript fragment may be printed, interpolated into source, reparsed, or
+  textually retargeted on the way to that final print. Source-preserving slices
+  of authored code are not generated syntax, but must enter the final pipeline
+  as parsed AST rather than as a second output emitter.
+- The client runtime's `template(html, ns, frag)` string ABI remains unchanged.
+  Shipping template IR as runtime object data would increase generated size and
+  replace the browser's optimized HTML parser/clone path with runtime work.
 - All construction uses `@tsrx/core` builders with origin locations
   (`loc_info` / `inheritOriginLoc`); the frozen-AST and loc-completeness
   enforcement flags stay on and must stay green throughout.
@@ -73,11 +94,74 @@ Same treatment for the SSR codegen (`ssrCompileBody` and friends): JS
 skeletons become nodes; emitted HTML chunks become template-literal quasis.
 This also brings the server map to full density for the first time.
 
-### M4 — cleanup
+### M4 — template IR and main-compiler closure
 
-Delete dead string helpers (`indentCode`, splice machinery, chunk records),
-update `.rulesync` guidance to name AST emit as the norm, and re-baseline the
-codegen-size and compile benches as the new controls.
+Close the remaining string domains in the main DOM client/server compiler:
+
+1. Introduce a compiler-only template IR for static elements, attributes, text,
+   anchors, fragments, and authored origins. `emitNodeHtml`/`emitElementHtml`
+   build and compose this IR instead of growing `html`/`attrHtml` strings or
+   passing origins through `_retOrigins`.
+2. Serialize each completed hoisted template exactly once at `allocTemplate`.
+   The serializer returns both the runtime HTML string and the existing
+   `inspect.templates` spans. The module AST continues to pass that string to
+   `_$template(...)` as a literal.
+3. Expose the exact printable program AST and template IR under `inspect` for
+   the playground. The generated-code pane reads the program AST/map; the
+   template pane reads the template IR/origins.
+4. Remove the residual main-compiler print/reparse bridges (`warmSrc` /
+   `parseWarmExpression`, printed component-name forms, and printed-expression
+   dedupe keys). Use nodes, node identity, or a structural AST key instead.
+5. Delete the now-dead client/server string emitters and helpers
+   (`emitServerModulePrelude`, `indentCode`, splice/chunk machinery, and the
+   superseded string-form helpers).
+
+Exit: ordinary DOM client and server compilation each perform one esrap Program
+print, construct no generated JavaScript syntax as text, expose the AST used for
+that print, and retain byte-identical runtime template HTML with equivalent or
+better template-origin coverage.
+
+### M5 — type and auxiliary module emitters
+
+Bring the smaller module-producing entry points under the same invariant:
+
+1. Add the Volar renderer pragma to the type-only AST/comment set before
+   `@tsrx/core` performs its one print; remove `prelude + result.code` and manual
+   mapping shifts.
+2. Emit client-only server stubs as AST and print each stub once with a map.
+3. Audit other compiler helpers returning generated modules and convert any
+   remaining line-array/template-string emitters.
+
+Exit: every type-only/Volar or auxiliary generated module exposes the AST it
+printed and has no post-print source concatenation.
+
+### M6 — universal, renderer-boundary, and hydrate pipelines
+
+Remove the intermediate generated-source round trips:
+
+1. Make universal lowering produce AST plus origin metadata and hand it directly
+   to the main client transform instead of building `lowered` source, reparsing
+   it, and textually retargeting runtime imports.
+2. Convert renderer-boundary and hydrate generated scaffolds to copy-on-write AST
+   transforms. Preserve authored nodes and their locations; compose origin/map
+   metadata without generated-text needles.
+3. Select the final runtime module/specifiers before the one Program print, so
+   no output is edited after printing.
+
+`slot-hooks.js` is the sole intentional text-edit exception because preserving
+authored line numbers without a source map is its public debugging contract.
+
+Exit: client/dev/HMR/prod/profile, server/SSR, universal renderer, renderer
+boundary, hydrate split-module, type-only/Volar, and client-only-stub outputs all
+follow AST → one final print.
+
+### M7 — cleanup and durable controls
+
+Delete obsolete source-map stitching, mapping needles, generated-text origin
+arrays, and compatibility helpers made dead by M4–M6. Update `.rulesync`
+guidance to name AST emit plus template IR serialization as the norm. Re-baseline
+codegen size and compile benchmarks, and add an audit test that fails when a new
+generated-source/reparse or post-print mutation path is introduced.
 
 ## Test plan
 
