@@ -863,7 +863,7 @@
       "symptom": "Two renders before the passive queue drained installed multiple imperative artifacts because cleanup ownership was cleared before the intermediate body ran.",
       "octaneContract": "After any coalesced dependency-changing render sequence, at most one passive side effect is live; each installed effect is cleaned exactly once, including final unmount.",
       "classification": "portable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane scheduler and effect hooks",
       "applicableModes": ["client", "production-compile"],
@@ -872,15 +872,19 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/effect-timing.test.ts",
-          "testName": "phase order on re-render: cleanups fire before bodies of same phase",
-          "note": "Strong ordering coverage, but not the exact two-renders-before-passive-drain race."
+          "testName": "coalesced dependency changes leave one live passive side effect",
+          "note": "Commits b, requests c before the ordinary passive task drains, and proves Octane settles b's queued passive work before the c render while preserving one live artifact and exactly-once cleanup."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/tests/effect-timing.test.ts"],
-        "acceptance": "Drive a→b→c before passive drain, assert one live imperative artifact, exact cleanup order through c, and one final cleanup on unmount in development and production compile modes."
-      }
+      "evidence": [
+        {
+          "file": "packages/octane/tests/effect-timing.test.ts",
+          "testName": "coalesced dependency changes leave one live passive side effect",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects"]
+        }
+      ],
+      "rationale": "Same-batch root renders coalesce before an intermediate effect can enqueue. When an intermediate revision does commit, Octane drains its pending passive work before the next render begins. The portable single-live-artifact and exactly-once cleanup contract therefore holds without exposing Redact's two-entry queue shape."
     },
     {
       "id": "RDX-MEM-001",
@@ -905,31 +909,40 @@
       "symptom": "A stable-prop memo gate swallowed the component's own store update, while stale queued work could render after an ancestor removed it.",
       "octaneContract": "A memoized component processes its own state/store updates without disabling descendant memo bailouts, and pending work beneath a removed ancestor cannot mount new DOM.",
       "classification": "portable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane memo and scheduler",
       "applicableModes": ["client", "production-compile"],
-      "observables": ["markup", "effects"],
+      "observables": ["markup", "node-identity", "effects"],
       "octaneReferences": [
         {
           "kind": "test",
-          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
-          "testName": "should update children even if parent blocks updates"
+          "file": "packages/octane/tests/conformance/memo-bailout.test.ts",
+          "testName": "processes an owned external-store update while stable descendants bail out",
+          "note": "The memo owner updates from its own subscription while an unchanged memo descendant retains both render and host identity."
         },
         {
           "kind": "test",
           "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
-          "testName": "does not call render after a component as been deleted"
+          "testName": "does not commit a memoized store update after its ancestor removes it",
+          "note": "Queues the deeper store update before the ancestor deletion and proves no committed DOM or effect work can publish from the disposed subtree."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": [
-          "packages/octane/tests/conformance/memo-bailout.test.ts",
-          "packages/octane/tests/conformance/update-reconciliation.test.ts"
-        ],
-        "acceptance": "Combine memo with useSyncExternalStore, prove the owner updates while a stable memo grandchild bails, then queue/remove work and prove no zombie DOM or effects appear."
-      }
+      "evidence": [
+        {
+          "file": "packages/octane/tests/conformance/memo-bailout.test.ts",
+          "testName": "processes an owned external-store update while stable descendants bail out",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity"]
+        },
+        {
+          "file": "packages/octane/tests/conformance/update-reconciliation.test.ts",
+          "testName": "does not commit a memoized store update after its ancestor removes it",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects"]
+        }
+      ],
+      "rationale": "Octane schedules hook-owned work directly on the owning block rather than re-entering through its parent memo gate. Its shallow-first queue and disposed-block guards then discard deeper work after an ancestor removes that subtree."
     },
     {
       "id": "RDX-NON-001",
@@ -1815,17 +1828,33 @@
       "symptom": "Subscription ran during render or a stale listener scheduled an unmounted component, causing removed UI to reappear in its former host.",
       "octaneContract": "useSyncExternalStore subscribes after render, converges when subscribe synchronously notifies, unsubscribes on conditional/root removal, and ignores every post-unmount notification.",
       "classification": "portable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane useSyncExternalStore and scheduler",
       "applicableModes": ["client", "production-compile"],
-      "observables": ["markup", "effects"],
+      "observables": ["markup", "node-identity", "effects"],
       "octaneReferences": [
         {
           "kind": "test",
           "file": "packages/octane/tests/sync-external-store.test.ts",
-          "testName": "post-unmount store mutations do NOT trigger any work",
-          "note": "Covers root unmount but not synchronous subscribe notification or conditional stale-listener delivery."
+          "testName": "subscribes outside render and converges when subscribe notifies synchronously",
+          "note": "Proves subscription timing at the public callback boundary and commits the synchronously published snapshot without resubscribing."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "unsubscribes on unmount (store drops its listener)"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "unsubscribes when its conditional owner removes it"
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "ignores a retained stale callback after conditional removal",
+          "note": "Invokes the exact callback retained by the store and proves the removed reader stays absent while unrelated host and sibling objects survive."
         },
         {
           "kind": "source",
@@ -1833,11 +1862,33 @@
           "symbol": "useSyncExternalStore"
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": ["packages/octane/tests/sync-external-store.test.ts"],
-        "acceptance": "Prove subscription occurs outside render, a synchronous notifier converges without looping, conditional removal unsubscribes, and a retained stale callback cannot resurrect DOM."
-      }
+      "evidence": [
+        {
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "subscribes outside render and converges when subscribe notifies synchronously",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects"]
+        },
+        {
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "unsubscribes on unmount (store drops its listener)",
+          "modes": ["client", "production-compile"],
+          "observables": ["effects"]
+        },
+        {
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "unsubscribes when its conditional owner removes it",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "effects"]
+        },
+        {
+          "file": "packages/octane/tests/sync-external-store.test.ts",
+          "testName": "ignores a retained stale callback after conditional removal",
+          "modes": ["client", "production-compile"],
+          "observables": ["markup", "node-identity", "effects"]
+        }
+      ],
+      "rationale": "Octane subscribes through a passive effect, owns unsubscribe in that effect slot, and schedules notifications onto a block whose disposed guards make stale callbacks inert after removal."
     },
     {
       "id": "RDX-SUS-001",

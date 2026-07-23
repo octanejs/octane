@@ -1,4 +1,4 @@
-import { useState, createContext, use, memo } from 'octane';
+import { useState, useSyncExternalStore, createContext, use, memo } from 'octane';
 
 // ---------------------------------------------------------------------------
 // memo() bailout heuristics — ports of ReactMemo-test.js cases :66, :101, :298.
@@ -70,5 +70,58 @@ export function CustomCompareHost(props) @{
 		<button id="ctick" onClick={() => setTick(tick + 1)}>{'tick'}</button>
 		<button id="ccount" onClick={() => setCount(count + 1)}>{'count'}</button>
 		<CustomCounter count={count} log={props.log} />
+	</div>
+}
+
+// --- Redact RDX-MEM-001 — an owned store update crosses a memo gate ----------
+type MemoStoreListener = () => void;
+type MemoStore = {
+	getSnapshot: () => number;
+	set: (next: number) => void;
+	subscribe: (listener: MemoStoreListener) => () => void;
+	listenerCount: () => number;
+};
+type MemoStoreLog = (message: string) => void;
+
+export function makeMemoStore(initial = 0): MemoStore {
+	let value = initial;
+	const listeners = new Set<MemoStoreListener>();
+	return {
+		getSnapshot: () => value,
+		set(next: number) {
+			value = next;
+			for (const listener of listeners) listener();
+		},
+		subscribe(listener: MemoStoreListener) {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
+		listenerCount: () => listeners.size,
+	};
+}
+
+function StableStoreLeafImpl(props: { label: string; log: MemoStoreLog }) @{
+	props.log('leaf:' + props.label);
+	<span id="memo-store-leaf">{props.label as string}</span>
+}
+const StableStoreLeaf = memo(StableStoreLeafImpl);
+
+function MemoStoreOwnerImpl(props: { store: MemoStore; log: MemoStoreLog }) @{
+	const value = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot);
+	props.log('owner:' + value);
+	<section id="memo-store-owner">
+		<output id="memo-store-value">{value as number}</output>
+		<StableStoreLeaf label="stable" log={props.log} />
+	</section>
+}
+const MemoStoreOwner = memo(MemoStoreOwnerImpl);
+
+export function MemoStoreHost(props: { store: MemoStore; log: MemoStoreLog }) @{
+	const [tick, setTick] = useState(0);
+	<div data-tick={tick as number}>
+		<button id="memo-store-parent-update" onClick={() => setTick(tick + 1)}>{'parent'}</button>
+		<MemoStoreOwner store={props.store} log={props.log} />
 	</div>
 }

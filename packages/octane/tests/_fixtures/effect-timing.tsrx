@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useInsertionEffect, useState } from 'octane';
+import { useEffect, useLayoutEffect, useInsertionEffect, useRef, useState } from 'octane';
 
 // Three-phase ordering: insertion fires sync-before-layout-before-paint;
 // passive fires after paint. Cleanups of each phase fire before that phase's
@@ -41,6 +41,25 @@ export function PassiveDeferred(props) @{
 		props.log.push('passive');
 	}, [props.tick, props.log]);
 	<span>{'z'}</span>
+}
+
+// Models an imperative integration (a chart/canvas library, for example) that
+// installs one artifact and removes exactly that artifact from its cleanup.
+// Back-to-back dependency changes must never leave both revisions installed.
+export function CoalescedPassiveArtifact(props: { label: string; log: string[] }) @{
+	const host = useRef<HTMLDivElement | null>(null);
+	props.log.push('render:' + props.label);
+	useEffect(() => {
+		const artifact = document.createElement('span');
+		artifact.dataset.label = props.label;
+		host.current!.appendChild(artifact);
+		props.log.push('body:' + props.label);
+		return () => {
+			props.log.push('cleanup:' + props.label);
+			artifact.remove();
+		};
+	}, [props.label, props.log]);
+	<div id="coalesced-passive-host" ref={host} />
 }
 
 // React parity: pending PASSIVE effects flush BEFORE the next render pass begins
