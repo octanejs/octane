@@ -18,6 +18,13 @@ export function App() @{
 }
 `;
 
+const SERVER_SOURCE = `import { useState } from 'octane';
+export function App(props: { title: string }) @{
+	const [n] = useState(0);
+	<div title={'title:' + props.title}><span>{'count:' + n}</span></div>
+}
+`;
+
 interface FatSegment {
 	genLine: number;
 	genCol: number;
@@ -26,8 +33,11 @@ interface FatSegment {
 	srcEnd: number | null;
 }
 
-function segmentsFor(options: Record<string, unknown>): { code: string; segments: FatSegment[] } {
-	const result = compile(SOURCE, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
+function segmentsFor(
+	options: Record<string, unknown>,
+	source = SOURCE,
+): { code: string; segments: FatSegment[] } {
+	const result = compile(source, 'App.tsrx', { ...options, inspect: true }) as ReturnType<
 		typeof compile
 	> & { inspect: { segments: FatSegment[] } };
 	expect(result.inspect).toBeDefined();
@@ -98,5 +108,43 @@ describe.each([
 				expect(segment.genEndCol).toBeGreaterThan(segment.genCol);
 			}
 		}
+	});
+});
+
+describe.each([
+	['server', { mode: 'server' as const }],
+	['server dev', { mode: 'server' as const, dev: true }],
+])('server fat inspection segments — %s', (_label, options) => {
+	it('is absent without the inspect option', () => {
+		const plain = compile(SERVER_SOURCE, 'App.tsrx', options) as { inspect?: unknown };
+		expect(plain.inspect).toBeUndefined();
+	});
+
+	it('carries exact ranges through the SSR function and HTML emit', () => {
+		const { segments } = segmentsFor(options, SERVER_SOURCE);
+
+		const useStateStart = SERVER_SOURCE.indexOf('useState(0)');
+		expect(
+			segments.some(
+				(segment) =>
+					segment.srcStart === useStateStart &&
+					segment.srcEnd === useStateStart + 'useState'.length,
+			),
+		).toBe(true);
+
+		const titleStart = SERVER_SOURCE.indexOf('props.title') + 'props.'.length;
+		expect(
+			segments.some(
+				(segment) =>
+					segment.srcStart === titleStart && segment.srcEnd === titleStart + 'title'.length,
+			),
+		).toBe(true);
+
+		const countStart = SERVER_SOURCE.indexOf(`'count:' + n`) + `'count:' + `.length;
+		expect(
+			segments.some(
+				(segment) => segment.srcStart === countStart && segment.srcEnd === countStart + 1,
+			),
+		).toBe(true);
 	});
 });

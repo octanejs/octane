@@ -136,6 +136,13 @@ export function Panel() @{
 }
 `;
 
+const SERVER_SOURCE = `import { useState } from 'octane';
+export function App(props: { title: string }) @{
+	const [n] = useState(0);
+	<div title={'title:' + props.title}><span>{'count:' + n}</span></div>
+}
+`;
+
 describe.each([
 	['client dev', { dev: true }],
 	['client prod', { hmr: false as const }],
@@ -194,5 +201,20 @@ describe.each([
 			at(`setCls, cls + '?'`, 0, `setCls(cls + '?')`);
 		}
 		at(`cls + '?'`, 0, `cls + '?'`);
+	});
+});
+
+describe.each([
+	['server', { mode: 'server' as const }],
+	['server dev', { mode: 'server' as const, dev: true }],
+])('server expression map coverage — %s', (_label, options) => {
+	it('maps setup, attribute, and HTML-hole expressions', () => {
+		const { code, map } = compile(SERVER_SOURCE, 'ServerMap.tsrx', options);
+		const at = (needle: string, sourceNeedle = needle) =>
+			expectMappedIn(SERVER_SOURCE, code, map, needle, 0, sourceNeedle);
+
+		at('useState(0', 'useState(0)');
+		at(`'title:' + props.title`);
+		at(`'count:' + n`);
 	});
 });

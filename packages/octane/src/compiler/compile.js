@@ -3891,6 +3891,135 @@ function emitServerModuleClientStubs(info, ctx) {
 	return nodes;
 }
 
+// Server-mode module-server namespace and local import bindings as statement
+// nodes. Nested `module server` imports stay module-level ESM imports; its
+// declarations execute inside the namespace initializer exactly once.
+function emitServerModuleServerNodes(info, ctx) {
+	if (info === null) return [];
+	const origin = info.declaration?.loc ? info.declaration : ctx._moduleOrigin;
+	const imports = [];
+	const namespaceBody = [];
+	const importLocals = [];
+	let importIndex = 0;
+
+	for (const statement of info.declaration.body?.body || []) {
+		if (isTypeOnlyStatement(statement)) continue;
+		if (statement.type === 'ImportDeclaration') {
+			if (statement.importKind === 'type') continue;
+			const valueSpecifiers = (statement.specifiers || []).filter(
+				(specifier) => specifier.importKind !== 'type',
+			);
+			if ((statement.specifiers || []).length === 0) {
+				imports.push(inheritOriginLoc(b.import_declaration([], statement.source.value), statement));
+				continue;
+			}
+			if (valueSpecifiers.length === 0) continue;
+			const moduleName = `__oct_server_import$${importIndex++}`;
+			imports.push(inheritOriginLoc(b.import_all(moduleName, statement.source.value), statement));
+			for (const specifier of valueSpecifiers) {
+				const local = specifier.local?.name;
+				if (!local) continue;
+				let value;
+				if (specifier.type === 'ImportNamespaceSpecifier') {
+					value = b.id(moduleName);
+				} else if (specifier.type === 'ImportDefaultSpecifier') {
+					value = b.member(b.id(moduleName), 'default');
+				} else {
+					const imported = identifierName(specifier.imported);
+					value = b.member(b.id(moduleName), b.literal(imported, JSON.stringify(imported)), true);
+				}
+				importLocals.push(inheritOriginLoc(b.const(local, value), specifier));
+			}
+			continue;
+		}
+
+		if (statement.type === 'ExportDefaultDeclaration') continue;
+		if (statement.type === 'ExportNamedDeclaration') {
+			if (statement.declaration && !isTypeOnlyStatement(statement.declaration)) {
+				namespaceBody.push(statement.declaration);
+			}
+			continue;
+		}
+		namespaceBody.push(statement);
+	}
+
+	const serverStatements = [
+		inheritOriginLoc(b.const('server', b.object([])), origin),
+		...importLocals,
+		...namespaceBody,
+	];
+	for (const [exported, local] of info.exports) {
+		serverStatements.push(
+			inheritOriginLoc(
+				b.stmt(
+					b.assignment(
+						'=',
+						b.member(b.id('server'), b.literal(exported, JSON.stringify(exported)), true),
+						b.id(local),
+					),
+				),
+				origin,
+			),
+		);
+	}
+	serverStatements.push(inheritOriginLoc(b.return(b.id('server')), origin));
+	const namespace = inheritOriginLoc(
+		b.export(b.const('_$_server_$_', b.call(b.arrow([], b.block(serverStatements))))),
+		origin,
+	);
+	const nodes = [...imports, namespace];
+
+	if (info.exports.size > 0) {
+		nodes.push(
+			inheritOriginLoc(
+				b.const('_$_rpc_modules_$_', b.member(b.id('globalThis'), 'rpc_modules')),
+				origin,
+			),
+		);
+		const registrations = [];
+		for (const exported of info.exports.keys()) {
+			const hash = strongHash(info.filename + '#' + exported);
+			registrations.push(
+				inheritOriginLoc(
+					b.stmt(
+						b.call(
+							b.member(b.id('_$_rpc_modules_$_'), 'set'),
+							b.literal(hash, JSON.stringify(hash)),
+							b.array([
+								b.literal(info.filename, JSON.stringify(info.filename)),
+								b.literal(exported, JSON.stringify(exported)),
+							]),
+						),
+					),
+					origin,
+				),
+			);
+		}
+		nodes.push(
+			inheritOriginLoc(b.if(b.id('_$_rpc_modules_$_'), b.block(registrations), null), origin),
+		);
+	}
+
+	for (const node of info.imports) {
+		for (const specifier of node.specifiers) {
+			if (specifier.importKind === 'type') continue;
+			const imported = identifierName(specifier.imported);
+			const local = specifier.local?.name;
+			if (!imported || !local) continue;
+			nodes.push(
+				inheritOriginLoc(
+					b.const(
+						local,
+						b.member(b.id('_$_server_$_'), b.literal(imported, JSON.stringify(imported)), true),
+					),
+					specifier,
+				),
+			);
+		}
+	}
+	return nodes;
+}
+
 const VLQ_B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /** Base64-VLQ encode a list of signed integers (source-map v3 segment fields). */
@@ -6011,12 +6140,13 @@ function compileServer(source, filename, options, styleRemap = null, analyzedAst
 		// fetches REGISTER before the first suspend and a body stratum costs ONE
 		// network round instead of one per use().
 		nextPuId: 0, // parallel-use `__pu$N` hoisted-creation temps
-		_pendingWarm: null, // `X.__warm = …` source, set by ssrCompileBody, drained by compileServerComponent
+		_pendingWarm: null, // `X.__warm = …` arrow node, drained by compileServerComponent
 		runtimeNeeded: new Set(), // helpers referenced by GENERATED code — imported as `name as _$name`
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // rewritten to the server runtime module
 		userRuntimeDefaults: new Set(),
 		consumedRuntimeLocals,
+		inspect: !!(options && options.inspect),
 		hoistedHelpers: [],
 		cssInjections: [],
 		moduleCssInjections: [],
@@ -6028,8 +6158,7 @@ function compileServer(source, filename, options, styleRemap = null, analyzedAst
 		componentInfo: new Map(),
 		mapSource: source,
 		mapSourceName: (filename || 'module.tsrx').split(/[\\/]/).pop(),
-		// Shared push sites (allocHookSymbol) build helper NODES; server assembly
-		// prints them via joinHoistedHelpers. Scaffolding origins fall back here.
+		// Scaffolding without a more precise authored construct maps here.
 		_moduleOrigin: ast.body.find((n) => n?.loc != null) ?? ast,
 	};
 	{
@@ -6066,7 +6195,7 @@ function compileServer(source, filename, options, styleRemap = null, analyzedAst
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
 
-	let body = emitServerModulePrelude(serverModuleInfo, ctx);
+	const bodyNodes = emitServerModuleServerNodes(serverModuleInfo, ctx);
 	for (const node of ast.body) {
 		if (
 			node === serverModuleInfo?.declaration ||
@@ -6075,42 +6204,61 @@ function compileServer(source, filename, options, styleRemap = null, analyzedAst
 			continue;
 		}
 		if (isComponentFunction(node)) {
-			body += compileServerComponent(node, ctx) + '\n\n';
+			bodyNodes.push(...compileServerComponent(node, ctx));
 		} else if (node.type === 'ExportDefaultDeclaration' && isComponentFunction(node.declaration)) {
-			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
+			bodyNodes.push(...compileServerComponent({ ...node.declaration, default: true }, ctx));
 		} else if (node.type === 'ExportNamedDeclaration' && isComponentFunction(node.declaration)) {
-			body += compileServerComponent({ ...node.declaration, export: true }, ctx) + '\n\n';
+			bodyNodes.push(...compileServerComponent({ ...node.declaration, export: true }, ctx));
 		} else if (isReturnJsxFunction(node)) {
 			// A `function C() { return <jsx> }` form (no `@{}`). SSR it through the same
 			// component path as `@{}` so its host element + directives emit server markup
 			// (the client folds it; the two must agree for hydration).
-			body += compileServerComponent(node, ctx) + '\n\n';
+			bodyNodes.push(...compileServerComponent(node, ctx));
 		} else if (node.type === 'ExportNamedDeclaration' && isReturnJsxFunction(node.declaration)) {
-			body += compileServerComponent({ ...node.declaration, export: true }, ctx) + '\n\n';
+			bodyNodes.push(...compileServerComponent({ ...node.declaration, export: true }, ctx));
 		} else if (node.type === 'ExportDefaultDeclaration' && isReturnJsxFunction(node.declaration)) {
-			body += compileServerComponent({ ...node.declaration, default: true }, ctx) + '\n\n';
+			bodyNodes.push(...compileServerComponent({ ...node.declaration, default: true }, ctx));
 		} else if (node.type === 'ImportDeclaration' && node.source.value === 'octane') {
 			// User imports from 'octane' resolve to the server runtime instead.
 			addUserImportSpecifiers(ctx, node);
 		} else {
-			body += printNode(rewriteJsxValues(node, ctx)) + '\n';
+			bodyNodes.push(rewriteJsxValues(node, ctx));
 		}
 	}
 
 	// Assign deferred (server-only) slot ids BEFORE the import list is built:
 	// the flush may register `hookSlots` as a needed runtime import.
 	flushTailHookSymbols(ctx);
-	const runtimeImport = buildRuntimeImport(ctx, 'octane/server');
-	const joinedHelpers = joinHoistedHelpers(ctx);
-	const helpers = joinedHelpers ? joinedHelpers + '\n\n' : '';
-	const code = runtimeImport + helpers + body;
-	// Minimal (valid, empty-mapping) source map. SSR source maps are a later
-	// refinement; the client path keeps its real per-token maps.
-	return {
-		code,
-		map: buildSourceMap(source, ctx.mapSourceName, []),
+	const runtimeImportNodes = buildRuntimeImportNodes(ctx, 'octane/server', ctx._moduleOrigin);
+	const helperNodes = hoistedHelperNodes(ctx);
+	const program = {
+		type: 'Program',
+		sourceType: 'module',
+		body: [...runtimeImportNodes, ...helperNodes, ...bodyNodes],
+		metadata: { path: [] },
+		start: ast.start,
+		end: ast.end,
+		loc: ast.loc ?? ctx._moduleOrigin?.loc,
+	};
+	const printed = printNodeWithMap(program, ctx);
+	const result = {
+		code: printed.code,
+		map: {
+			version: 3,
+			sources: [ctx.mapSourceName],
+			sourcesContent: [source],
+			names: [],
+			mappings: encodeMappings(printed.mappings),
+		},
 		diagnostics: options?.__nativeChangeDiagnostics ?? nativeChangeAnalysis.diagnostics,
 	};
+	if (ctx.inspect) {
+		result.inspect = {
+			templates: [],
+			segments: buildFatSegments(printed.mappings, source, parsedAst),
+		};
+	}
+	return result;
 }
 
 // Reject async/generator component declarations — shared by the client and
@@ -6178,9 +6326,12 @@ function compileServerComponent(node, ctx) {
 	// SSR parallel-use mirror: attach the compiled fetch plan so a PARENT's warm
 	// walk (`_$warmChild(Comp, props)` activated by a suspending descendant batch) can start
 	// this component's independent creations before its body ever runs.
-	const warmSrc = ctx._pendingWarm;
+	const warmNode = ctx._pendingWarm ?? null;
 	ctx._pendingWarm = null;
-	const warmTail = warmSrc ? `\n${name}.__warm = ${warmSrc};` : '';
+	const warmStatement =
+		warmNode === null
+			? null
+			: inheritOriginLoc(b.stmt(b.assignment('=', b.member(b.id(name), '__warm'), warmNode)), node);
 
 	// Mirror the client emission's hoisting rule (see compileComponent): a
 	// component referenced ABOVE its declaration keeps real function-declaration
@@ -6192,19 +6343,35 @@ function compileServerComponent(node, ctx) {
 			: '';
 	if (
 		ssrSourceBeforeNode !== '' &&
-		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(ssrSourceBeforeNode) &&
-		fn.startsWith(`function ${name}(`)
+		new RegExp(`\\b${name.replace(/\$/g, '\\$')}\\b`).test(ssrSourceBeforeNode)
 	) {
-		const declPrefix = isDefault ? 'export default ' : isExported ? 'export ' : '';
-		const guardedWarmTail = warmSrc
-			? `\ntypeof ${name} === 'function' && (${name}.__warm = ${warmSrc});`
-			: '';
-		return `${declPrefix}${fn}${guardedWarmTail}`;
+		const declaration = isDefault ? b.export_default(fn) : isExported ? b.export(fn) : fn;
+		const nodes = [inheritOriginLoc(declaration, node)];
+		if (warmNode !== null) {
+			nodes.push(
+				inheritOriginLoc(
+					b.stmt(
+						b.logical(
+							'&&',
+							b.binary('===', b.unary('typeof', b.id(name)), b.literal('function', "'function'")),
+							b.assignment('=', b.member(b.id(name), '__warm'), warmNode),
+						),
+					),
+					node,
+				),
+			);
+		}
+		return nodes;
 	}
 
-	if (isDefault) return `const ${name} = ${fn};${warmTail}\nexport default ${name};`;
-	if (isExported) return `export const ${name} = ${fn};${warmTail}`;
-	return `const ${name} = ${fn};${warmTail}`;
+	const initializer = inheritOriginLoc({ ...fn, type: 'FunctionExpression' }, node);
+	const declaration = inheritOriginLoc(b.const(name, initializer), node);
+	const nodes = [
+		isExported && !isDefault ? inheritOriginLoc(b.export(declaration), node) : declaration,
+	];
+	if (warmStatement !== null) nodes.push(warmStatement);
+	if (isDefault) nodes.push(inheritOriginLoc(b.export_default(b.id(name)), node));
+	return nodes;
 }
 
 function ssrReturnedJsxNode(argument) {
@@ -6238,7 +6405,6 @@ function ssrCompileBody(
 	returnedFragmentTemplate = false,
 	returnedFragmentRoot = false,
 ) {
-	const params = node.params.map((p) => printNode(p)).join(', ');
 	const returnedOutput = node.body?.type === 'JSXCodeBlock' && hasOwnValueReturn(node);
 
 	let statements;
@@ -6313,7 +6479,7 @@ function ssrCompileBody(
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
 		warmThunk = warm.thunk;
-		ctx._pendingWarm = warm.warmSrc;
+		ctx._pendingWarm = warm.warmNode ?? null;
 	}
 	workingStatements = rewriteParallelUse(workingStatements, ctx, name, warmThunk);
 	const preparedStatements = workingStatements.map((statement) =>
@@ -6331,13 +6497,22 @@ function ssrCompileBody(
 				true,
 				true,
 			);
-			inlinedSubs.push(sub.fn + ';');
+			inlinedSubs.push(sub.fn);
 			// The fragment body stays local so it can close over setup values, while
 			// this per-site module wrapper gives server replays a stable component
 			// identity. Its descriptor also preserves the component-bearing child
 			// marker shape expected by hostElementBody hydration on the client.
 			ctx.hoistedHelpers.push(
-				`function ${wrapperName}(props, __s) { return props.body(undefined, __s); }`,
+				inheritOriginLoc(
+					b.function_declaration(
+						b.id(wrapperName),
+						[b.id('props'), b.id('__s')],
+						b.block([
+							b.return(b.call(b.member(b.id('props'), 'body'), b.id('undefined'), b.id('__s'))),
+						]),
+					),
+					directive,
+				),
 			);
 			ctx.runtimeNeeded.add('createElement');
 			return b.call(
@@ -6350,7 +6525,6 @@ function ssrCompileBody(
 	const rewritten = preparedStatements
 		.map((s) => rewriteHookCalls(s, ctx, name, localSetupSlots))
 		.map((s) => rewriteJsxValues(s, ctx));
-	const setupCode = rewritten.map((s) => '  ' + printNode(s).replace(/\n/g, '\n  ')).join('\n');
 
 	// Partition hoisted `<title>`/`<meta>`/`<link>` out of the body (mirrors the
 	// client planJsx): they accumulate into render()'s `head` via `ssrHeadEl`, NOT
@@ -6399,25 +6573,44 @@ function ssrCompileBody(
 	ctx._returnedFragmentTemplate = prevReturnedFragmentTemplate;
 	ctx._tsxValuePos = prevValuePos;
 
-	let cssLines = '';
+	const body = [];
 	if (cssEntries && cssEntries.length) {
 		ctx.runtimeNeeded.add('injectStyle');
-		cssLines =
-			cssEntries
-				.map((e) => `  _$injectStyle(${JSON.stringify(e.hash)}, ${JSON.stringify(e.css)});`)
-				.join('\n') + '\n';
+		for (const entry of cssEntries) {
+			body.push(
+				inheritOriginLoc(
+					b.stmt(
+						ssrCall(
+							'injectStyle',
+							[
+								b.literal(entry.hash, JSON.stringify(entry.hash)),
+								b.literal(entry.css, JSON.stringify(entry.css)),
+							],
+							node,
+						),
+					),
+					node,
+				),
+			);
+		}
 	}
 	// `ssrHeadEl(…)` side-effect statements (one per hoisted head element), like injectStyle.
-	const headLines = emitHeadServer(headNodes, ctx);
-	const subsBlock = inlinedSubs.length
-		? inlinedSubs.map((s) => '  ' + s.replace(/\n/g, '\n  ')).join('\n') + '\n'
-		: '';
-	const setupBlock = setupCode ? setupCode + '\n' : '';
+	body.push(...emitHeadServer(headNodes, ctx), ...rewritten, ...inlinedSubs);
 	// PROPS-FIRST ABI (matches the client): `(…userParams, __s, __extra)`. A leading
 	// `__props` placeholder stands in when there are no user params, so a verbatim
 	// `function Foo(props)` and a compiled component both bind props from arg 0.
-	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
-	return `function ${name}(${sig}) {\n${cssLines}${headLines}${setupBlock}${subsBlock}  return ${htmlExpr};\n}`;
+	const params =
+		node.params.length > 0
+			? [...node.params, b.id('__s'), b.id('__extra')]
+			: [b.id('__props'), b.id('__s'), b.id('__extra')];
+	body.push(b.return(htmlExpr));
+	const origin =
+		node.loc != null
+			? node
+			: ([...(node.params || []), ...(Array.isArray(node.body) ? node.body : [])].find(
+					(part) => part?.loc != null,
+				) ?? ctx._moduleOrigin);
+	return inheritOriginLoc(b.function_declaration(b.id(name), params, b.block(body)), origin);
 }
 
 // Classify a normalized JSX child for TEXT-ADJACENCY purposes. Shared by the
@@ -6456,6 +6649,84 @@ function hasTextNeighbor(kinds, i) {
 	return false;
 }
 
+// Build one server HTML template literal. Static HTML runs live in quasis;
+// runtime-produced strings remain expressions. Adjacent static runs are folded
+// before construction so the generated tree stays compact.
+function ssrHtmlTemplate(parts, origin) {
+	const quasis = [];
+	const expressions = [];
+	let staticRun = '';
+	for (const part of parts) {
+		if (typeof part === 'string') {
+			staticRun += part;
+			continue;
+		}
+		quasis.push(b.quasi(staticRun, false));
+		expressions.push(part);
+		staticRun = '';
+	}
+	quasis.push(b.quasi(staticRun, true));
+	return inheritOriginLoc(b.template(quasis, expressions), origin);
+}
+
+function isEmptySsrHtml(expression) {
+	return (
+		expression.type === 'TemplateLiteral' &&
+		expression.expressions.length === 0 &&
+		expression.quasis.length === 1 &&
+		expression.quasis[0].value.cooked === ''
+	);
+}
+
+function ssrVoid(origin) {
+	return inheritOriginLoc(b.unary('void', b.literal(0)), origin);
+}
+
+function ssrCall(helper, args, origin) {
+	return inheritOriginLoc(b.call(`_$${helper}`, ...args), origin);
+}
+
+function ssrThunk(expression, origin) {
+	return inheritOriginLoc(b.arrow([], expression), origin);
+}
+
+function ssrSubCall(fnName, args, origin) {
+	return inheritOriginLoc(b.call(fnName, ...args, b.id('__s')), origin);
+}
+
+function ssrSourcePair(present, value, origin) {
+	return inheritOriginLoc(b.array([present, value]), origin);
+}
+
+function ssrDirectSource(name, value, origin) {
+	return inheritOriginLoc(
+		b.array([b.literal(false, 'false'), b.literal(name, JSON.stringify(name)), value]),
+		origin,
+	);
+}
+
+function ssrAstCallsAny(root, prefixes) {
+	let found = false;
+	const seen = new WeakSet();
+	(function visit(node) {
+		if (found || node == null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			prefixes.some((prefix) => node.callee.name.startsWith(prefix))
+		) {
+			found = true;
+			return;
+		}
+		for (const key in node) {
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
+			visit(node[key]);
+		}
+	})(root);
+	return found;
+}
+
 // Serialize a list of normalized JSX nodes to a JS expression that evaluates to
 // an HTML string (the concatenation of each node's expression).
 // `nlGuardFirst`: the children belong to a newline-eating element (`<pre>`/
@@ -6492,13 +6763,13 @@ function ssrEmitNodes(
 		const p = ssrEmitNode(n, ctx, name, inlinedSubs, parentNs, cssHash, componentNs, nlGuard);
 		if (p) {
 			if (kind !== 'other' && prevText !== null && (kind === 'dyn' || prevText === 'dyn')) {
-				parts.push(JSON.stringify('<!-- -->'));
+				parts.push('<!-- -->');
 			}
 			parts.push(p);
 			prevText = kind === 'other' ? null : kind;
 		}
 	}
-	return parts.length ? parts.join(' + ') : "''";
+	return ssrHtmlTemplate(parts, nodes.find((child) => child?.loc != null) ?? ctx._moduleOrigin);
 }
 
 function ssrEmitNode(
@@ -6519,7 +6790,7 @@ function ssrEmitNode(
 				// first-child position of a newline-eating tag, protect a leading '\n'
 				// by doubling it (the parser eats the first — see ssrEmitNodes).
 				const guard = nlGuard && expr.value.charCodeAt(0) === 10 ? '\n' : '';
-				return JSON.stringify(guard + escapeHtml(expr.value));
+				return guard + escapeHtml(expr.value);
 			}
 			// `{x as string}` / literals / templates / `+`-concats → definite TEXT.
 			// Everything else (`{children}`, `{<Comp/>}`, possibly-renderable values)
@@ -6532,7 +6803,7 @@ function ssrEmitNode(
 				// isn't known at compile time here).
 				const fn = nlGuard ? 'ssrTextPre' : 'ssrText';
 				ctx.runtimeNeeded.add(fn);
-				return `_$${fn}(${printExpr(resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash))})`;
+				return ssrCall(fn, [resolveStyleExpr(rewriteHookCalls(expr, ctx, name), cssHash)], node);
 			}
 			ctx.runtimeNeeded.add('ssrChild');
 			// rewriteJsxValues lowers any JSX embedded in the expression (e.g.
@@ -6540,10 +6811,21 @@ function ssrEmitNode(
 			// createElement(...) descriptors — exactly like ssrEmitTsrxExpression and
 			// the client makeChildCall. Without it the raw JSX leaks into the emitted
 			// ssrChild(...) call as unparseable source.
-			const childExpr = `_$ssrChild(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash))}, __s)`;
+			const childExpr = ssrCall(
+				'ssrChild',
+				[
+					resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx), cssHash),
+					b.id('__s'),
+				],
+				node,
+			);
 			if (componentNs === null) return childExpr;
 			ctx.runtimeNeeded.add('ssrInNamespace');
-			return `_$ssrInNamespace(${JSON.stringify(componentNs)}, () => ${childExpr})`;
+			return ssrCall(
+				'ssrInNamespace',
+				[b.literal(componentNs, JSON.stringify(componentNs)), ssrThunk(childExpr, node)],
+				node,
+			);
 		}
 		case 'Element':
 			if (isComponentTag(node))
@@ -6592,8 +6874,8 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	else if (tag === 'math') childComponentNs = 'mathml';
 	else if (childNs !== 'html' && childNs !== 'opaque') childComponentNs = childNs;
 
-	// `parts` are JS expressions concatenated with `+`. `lit` accumulates the
-	// current static run so adjacent literals fold into one quoted chunk.
+	// `parts` become one template literal. `lit` accumulates the current static
+	// run, which becomes a quasi; runtime serializers remain expression holes.
 	// `<option>` builds its ATTRS-ONLY expression here — ssrOption assembles
 	// the whole tag at runtime so an enclosing controlled `<select>` scope can
 	// mark it ` selected` (see the option branch at the bottom).
@@ -6601,7 +6883,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	let lit = tag === 'option' ? '' : '<' + tag;
 	const flush = () => {
 		if (lit) {
-			parts.push(JSON.stringify(lit));
+			parts.push(lit);
 			lit = '';
 		}
 	};
@@ -6614,7 +6896,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// (never an attribute); <option> captures its `value` for the scope compare.
 	let ctlValue = null; // textarea/select captured `value` expr
 	let ctlDefault = null; // textarea/select captured `defaultValue` expr
-	let selMultiple = 'false'; // select `multiple` expr (constant or temp)
+	let selMultiple = inheritOriginLoc(b.literal(false, 'false'), node); // select `multiple`
 	let optValue = null; // option `value` expr (constant or temp); null = no value attr
 	// TSRX accepts repeated attributes. JSX prop construction is last-writer-wins,
 	// but literal HTML duplicates are parser-first-wins, so duplicate native
@@ -6659,12 +6941,12 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	const bindAttributeEvaluation = (argExpr) => {
 		const tempName = `__sp${spreadTemps.length}`;
 		spreadTemps.push({ tempName, argExpr });
-		return tempName;
+		return inheritOriginLoc(b.id(tempName), argExpr?.loc ? argExpr : node);
 	};
 	const bindDiscardedAttributeValue = (value) => {
 		if (!resolveAttrsAcrossSpreads || value == null) return;
 		const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
-		bindAttributeEvaluation(printExprWithTsrx(expression, ctx, name, inlinedSubs));
+		bindAttributeEvaluation(tsrxExprNode(expression, ctx, name, inlinedSubs));
 	};
 	const ensureAttrPart = () => {
 		if (attrPart !== -1) return;
@@ -6675,10 +6957,18 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// Wrap the assembled string in an IIFE that binds the spread temps when any
 	// exist (so the temp names resolve); otherwise return the bare concatenation.
 	const finalize = () => {
-		let body = parts.join(' + ');
+		let body = ssrHtmlTemplate(parts, node);
 		if (spreadTemps.length > 0) {
-			const decls = spreadTemps.map((t) => `const ${t.tempName} = (${t.argExpr});`).join(' ');
-			body = `(() => { ${decls} return ${body}; })()`;
+			const declarations = spreadTemps.map((temp) =>
+				inheritOriginLoc(
+					b.const(temp.tempName, temp.argExpr),
+					temp.argExpr?.loc ? temp.argExpr : node,
+				),
+			);
+			body = inheritOriginLoc(
+				b.call(b.arrow([], b.block([...declarations, b.return(body)]))),
+				node,
+			);
 		}
 		if (!ctx.dev) return body;
 
@@ -6688,10 +6978,17 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// callback, or runtime work.
 		const loc = node.loc && node.loc.start;
 		const source = loc
-			? JSON.stringify(`${ctx.mapSourceName}:${loc.line}:${loc.column}`)
-			: 'void 0';
+			? b.literal(
+					`${ctx.mapSourceName}:${loc.line}:${loc.column}`,
+					JSON.stringify(`${ctx.mapSourceName}:${loc.line}:${loc.column}`),
+				)
+			: ssrVoid(node);
 		ctx.runtimeNeeded.add('ssrElement');
-		return `_$ssrElement(${JSON.stringify(tag)}, ${source}, () => (${body}))`;
+		return ssrCall(
+			'ssrElement',
+			[b.literal(tag, JSON.stringify(tag)), source, ssrThunk(body, node)],
+			node,
+		);
 	};
 
 	for (let attrI = 0; attrI < attrs.length; attrI++) {
@@ -6701,24 +6998,41 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			ctx.runtimeNeeded.add('ssrAttrs');
 			ctx.runtimeNeeded.add('ssrSnapshotSpread');
 			const tmp = bindAttributeEvaluation(
-				`_$ssrSnapshotSpread(${printExprWithTsrx(attr.argument, ctx, name, inlinedSubs)})`,
+				ssrCall('ssrSnapshotSpread', [tsrxExprNode(attr.argument, ctx, name, inlinedSubs)], attr),
 			);
 			if (resolveFormControlsAcrossSpreads) {
 				if (tag !== 'textarea' && formControlPart === -1) {
 					formControlPart = parts.length;
 					parts.push('');
 				}
-				formControlSources.push(`[true, ${tmp}]`);
+				formControlSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
 			}
-			attrSources.push(`[true, ${tmp}]`);
+			attrSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
 			// The spread may carry `dangerouslySetInnerHTML` — record both own-key
 			// presence and value so an explicit `undefined` overwrites an earlier writer.
+			const spreadHas = (key) =>
+				b.logical(
+					'&&',
+					b.binary('!=', tmp, b.literal(null)),
+					b.call(
+						b.member(
+							b.member(b.member(b.id('Object'), 'prototype'), 'propertyIsEnumerable'),
+							'call',
+						),
+						tmp,
+						b.literal(key, JSON.stringify(key)),
+					),
+				);
+			const spreadValue = (key) =>
+				b.conditional(b.binary('!=', tmp, b.literal(null)), b.member(tmp, key), ssrVoid(attr));
 			htmlSources.push(
-				`[${tmp} != null && Object.prototype.propertyIsEnumerable.call(${tmp}, "dangerouslySetInnerHTML"), ${tmp} != null ? ${tmp}.dangerouslySetInnerHTML : void 0]`,
+				ssrSourcePair(
+					spreadHas('dangerouslySetInnerHTML'),
+					spreadValue('dangerouslySetInnerHTML'),
+					attr,
+				),
 			);
-			childrenPropSources.push(
-				`[${tmp} != null && Object.prototype.propertyIsEnumerable.call(${tmp}, "children"), ${tmp} != null ? ${tmp}.children : void 0]`,
-			);
+			childrenPropSources.push(ssrSourcePair(spreadHas('children'), spreadValue('children'), attr));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -6772,10 +7086,10 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 			const childExpr = bindAttributeEvaluation(
 				childInner === null
-					? 'true'
-					: printExprWithTsrx(rewriteJsxValues(childInner, ctx), ctx, name, inlinedSubs),
+					? inheritOriginLoc(b.literal(true, 'true'), attr)
+					: tsrxExprNode(rewriteJsxValues(childInner, ctx), ctx, name, inlinedSubs),
 			);
-			childrenPropSources.push(`[true, ${childExpr}]`);
+			childrenPropSources.push(ssrSourcePair(b.literal(true, 'true'), childExpr, attr));
 			continue;
 		}
 
@@ -6785,9 +7099,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			// element's (unescaped) inner content.
 			const obj = val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 			const tmp = bindAttributeEvaluation(
-				obj === null ? 'true' : printExpr(rewriteHookCalls(obj, ctx, name)),
+				obj === null
+					? inheritOriginLoc(b.literal(true, 'true'), attr)
+					: rewriteHookCalls(obj, ctx, name),
 			);
-			htmlSources.push(`[true, ${tmp}]`);
+			htmlSources.push(ssrSourcePair(b.literal(true, 'true'), tmp, attr));
 			continue;
 		}
 
@@ -6802,7 +7118,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (tag === 'input') {
 				const ctlExpr =
-					ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs);
+					ctlInner === null
+						? inheritOriginLoc(b.literal(true, 'true'), attr)
+						: tsrxExprNode(ctlInner, ctx, name, inlinedSubs);
 				if (formControlPart === -1) {
 					flush();
 					formControlPart = parts.length;
@@ -6812,13 +7130,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				// ultimately wins over its default. Besides preserving side effects,
 				// this lets spread snapshots run between surrounding direct writers.
 				const tmp = bindAttributeEvaluation(ctlExpr);
-				formControlSources.push(`[false, ${JSON.stringify(attrName)}, ${tmp}]`);
+				formControlSources.push(ssrDirectSource(attrName, tmp, attr));
 				continue;
 			}
 			// textarea / select: value/defaultValue never serialize as attributes —
 			// captured for the content position (textarea) / projection scope (select).
 			const ctlExpr = bindAttributeEvaluation(
-				ctlInner === null ? 'true' : printExprWithTsrx(ctlInner, ctx, name, inlinedSubs),
+				ctlInner === null
+					? inheritOriginLoc(b.literal(true, 'true'), attr)
+					: tsrxExprNode(ctlInner, ctx, name, inlinedSubs),
 			);
 			if (resolveFormControlsAcrossSpreads) {
 				if (tag === 'select' && formControlPart === -1) {
@@ -6826,7 +7146,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 					formControlPart = parts.length;
 					parts.push('');
 				}
-				formControlSources.push(`[false, ${JSON.stringify(attrName)}, ${ctlExpr}]`);
+				formControlSources.push(ssrDirectSource(attrName, ctlExpr, attr));
 			} else if (attrName === 'value') ctlValue = ctlExpr;
 			else ctlDefault = ctlExpr;
 			continue;
@@ -6836,38 +7156,49 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				const mInner =
 					val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 				const multipleExpr = bindAttributeEvaluation(
-					mInner === null ? 'true' : printExprWithTsrx(mInner, ctx, name, inlinedSubs),
+					mInner === null
+						? inheritOriginLoc(b.literal(true, 'true'), attr)
+						: tsrxExprNode(mInner, ctx, name, inlinedSubs),
 				);
 				if (formControlPart === -1) {
 					flush();
 					formControlPart = parts.length;
 					parts.push('');
 				}
-				formControlSources.push(`[false, "multiple", ${multipleExpr}]`);
+				formControlSources.push(ssrDirectSource('multiple', multipleExpr, attr));
 				continue;
 			}
 			// Serialize the attribute normally AND capture the value for the
 			// option-projection scope — a dynamic value binds to a temp so the
 			// expression evaluates once.
 			if (val == null) {
-				selMultiple = 'true';
+				selMultiple = inheritOriginLoc(b.literal(true, 'true'), attr);
 				lit += ' multiple';
 				continue;
 			}
 			const mInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (mInner.type === 'Literal' && !isAfterSpread) {
-				selMultiple = mInner.value ? 'true' : 'false';
+				selMultiple = inheritOriginLoc(b.literal(!!mInner.value), mInner);
 				if (mInner.value === true) lit += ' multiple';
 				else if (typeof mInner.value === 'string') lit += ` multiple="${escapeAttr(mInner.value)}"`;
 				else if (typeof mInner.value === 'number') lit += ` multiple="${mInner.value}"`;
 				continue;
 			}
-			const tmp = bindAttributeEvaluation(printExprWithTsrx(mInner, ctx, name, inlinedSubs));
+			const tmp = bindAttributeEvaluation(tsrxExprNode(mInner, ctx, name, inlinedSubs));
 			selMultiple = tmp;
 			flush();
 			ctx.runtimeNeeded.add('ssrAttr');
 			parts.push(
-				`_$ssrAttr('multiple', ${tmp}, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
+				ssrCall(
+					'ssrAttr',
+					[
+						b.literal('multiple', "'multiple'"),
+						tmp,
+						b.literal(tag, JSON.stringify(tag)),
+						b.literal(selfNs, JSON.stringify(selfNs)),
+					],
+					attr,
+				),
 			);
 			continue;
 		}
@@ -6877,31 +7208,44 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				const oInner =
 					val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
 				const optionExpr = bindAttributeEvaluation(
-					oInner === null ? 'true' : printExprWithTsrx(oInner, ctx, name, inlinedSubs),
+					oInner === null
+						? inheritOriginLoc(b.literal(true, 'true'), attr)
+						: tsrxExprNode(oInner, ctx, name, inlinedSubs),
 				);
-				attrSources.push(`[false, "value", ${optionExpr}]`);
+				attrSources.push(ssrDirectSource('value', optionExpr, attr));
 				continue;
 			}
 			// The option's value feeds BOTH the attribute and the select-scope
 			// compare — a dynamic value binds to a temp for single evaluation.
 			if (val == null) {
-				optValue = '""';
+				optValue = inheritOriginLoc(b.literal('', '""'), attr);
 				lit += ' value';
 				continue;
 			}
 			const oInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
 			if (oInner.type === 'Literal' && !isAfterSpread) {
-				optValue = JSON.stringify(String(oInner.value));
+				optValue = inheritOriginLoc(b.literal(String(oInner.value)), oInner);
 				if (typeof oInner.value === 'string') lit += ` value="${escapeAttr(oInner.value)}"`;
 				else if (typeof oInner.value === 'number') lit += ` value="${oInner.value}"`;
 				else if (oInner.value === true) lit += ' value';
 				continue;
 			}
-			const tmp = bindAttributeEvaluation(printExprWithTsrx(oInner, ctx, name, inlinedSubs));
+			const tmp = bindAttributeEvaluation(tsrxExprNode(oInner, ctx, name, inlinedSubs));
 			optValue = tmp;
 			flush();
 			ctx.runtimeNeeded.add('ssrAttr');
-			parts.push(`_$ssrAttr('value', ${tmp}, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`);
+			parts.push(
+				ssrCall(
+					'ssrAttr',
+					[
+						b.literal('value', "'value'"),
+						tmp,
+						b.literal(tag, JSON.stringify(tag)),
+						b.literal(selfNs, JSON.stringify(selfNs)),
+					],
+					attr,
+				),
+			);
 			continue;
 		}
 
@@ -6909,17 +7253,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			ensureAttrPart();
 			let attrExpr;
 			if (val == null) {
-				attrExpr = 'true';
+				attrExpr = inheritOriginLoc(b.literal(true, 'true'), attr);
 			} else {
 				const attrInner = resolveStyleExpr(
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
-				attrExpr = printExprWithTsrx(attrInner, ctx, name, inlinedSubs);
+				attrExpr = tsrxExprNode(attrInner, ctx, name, inlinedSubs);
 			}
-			attrSources.push(
-				`[false, ${JSON.stringify(rawAttrName)}, ${bindAttributeEvaluation(attrExpr)}]`,
-			);
+			attrSources.push(ssrDirectSource(rawAttrName, bindAttributeEvaluation(attrExpr), attr));
 			continue;
 		}
 
@@ -6930,7 +7272,16 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				flush();
 				ctx.runtimeNeeded.add('ssrAttr');
 				parts.push(
-					`_$ssrAttr(${JSON.stringify(attrName)}, true, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
+					ssrCall(
+						'ssrAttr',
+						[
+							b.literal(attrName, JSON.stringify(attrName)),
+							b.literal(true, 'true'),
+							b.literal(tag, JSON.stringify(tag)),
+							b.literal(selfNs, JSON.stringify(selfNs)),
+						],
+						attr,
+					),
 				);
 			} else {
 				lit += bakeStaticAttr(attrName, true, tag, selfNs);
@@ -6954,7 +7305,11 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			flush();
 			ctx.runtimeNeeded.add('ssrStyle');
 			parts.push(
-				`_$ssrStyle(${bindAttributeEvaluation(printExprWithTsrx(inner, ctx, name, inlinedSubs))})`,
+				ssrCall(
+					'ssrStyle',
+					[bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs))],
+					attr,
+				),
 			);
 			continue;
 		}
@@ -6986,9 +7341,32 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			flush();
 			ctx.runtimeNeeded.add('ssrAttr');
 			const outName = tag === 'form' ? 'action' : 'formaction';
-			const valueExpr = bindAttributeEvaluation(printExprWithTsrx(inner, ctx, name, inlinedSubs));
+			const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
+			const filteredValue = inheritOriginLoc(
+				b.call(
+					b.arrow(
+						[b.id('__v')],
+						b.conditional(
+							b.binary('===', b.unary('typeof', b.id('__v')), b.literal('function')),
+							b.literal(null),
+							b.id('__v'),
+						),
+					),
+					valueExpr,
+				),
+				attr,
+			);
 			parts.push(
-				`_$ssrAttr(${JSON.stringify(outName)}, ((__v) => (typeof __v === 'function' ? null : __v))(${valueExpr}), ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
+				ssrCall(
+					'ssrAttr',
+					[
+						b.literal(outName, JSON.stringify(outName)),
+						filteredValue,
+						b.literal(tag, JSON.stringify(tag)),
+						b.literal(selfNs, JSON.stringify(selfNs)),
+					],
+					attr,
+				),
 			);
 			continue;
 		}
@@ -6996,15 +7374,24 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		// Dynamic attribute (or literal after a spread).
 		flush();
 		ctx.runtimeNeeded.add('ssrAttr');
-		const valueExpr = bindAttributeEvaluation(printExprWithTsrx(inner, ctx, name, inlinedSubs));
+		const valueExpr = bindAttributeEvaluation(tsrxExprNode(inner, ctx, name, inlinedSubs));
 		parts.push(
-			`_$ssrAttr(${JSON.stringify(attrName)}, ${valueExpr}, ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)})`,
+			ssrCall(
+				'ssrAttr',
+				[
+					b.literal(attrName, JSON.stringify(attrName)),
+					valueExpr,
+					b.literal(tag, JSON.stringify(tag)),
+					b.literal(selfNs, JSON.stringify(selfNs)),
+				],
+				attr,
+			),
 		);
 	}
 	if (formControlPart !== -1) {
 		if (tag === 'input') {
 			ctx.runtimeNeeded.add('ssrInputAttrs');
-			const inputAttrs = `_$ssrInputAttrs([${formControlSources.join(', ')}])`;
+			const inputAttrs = ssrCall('ssrInputAttrs', [b.array(formControlSources)], node);
 			// React serializes/coerces ordinary attributes before projecting the
 			// effective checked/value state. Expressions and spread getters have
 			// already run into temps in authored order; move only this serialization
@@ -7015,13 +7402,21 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			parts.push(inputAttrs);
 		} else {
 			ctx.runtimeNeeded.add('ssrSelectAttrs');
-			parts[formControlPart] = `_$ssrSelectAttrs([${formControlSources.join(', ')}])`;
+			parts[formControlPart] = ssrCall('ssrSelectAttrs', [b.array(formControlSources)], node);
 		}
 	}
 	if (attrPart !== -1) {
 		ctx.runtimeNeeded.add('ssrAttrs');
-		parts[attrPart] =
-			`_$ssrAttrs([${attrSources.join(', ')}], ${JSON.stringify(tag)}, ${JSON.stringify(selfNs)}, ${resolveFormControlsAcrossSpreads ? 'true' : 'false'})`;
+		parts[attrPart] = ssrCall(
+			'ssrAttrs',
+			[
+				b.array(attrSources),
+				b.literal(tag, JSON.stringify(tag)),
+				b.literal(selfNs, JSON.stringify(selfNs)),
+				b.literal(resolveFormControlsAcrossSpreads),
+			],
+			node,
+		);
 	}
 
 	// Void elements may contain syntactic whitespace/comments/nullish holes. They
@@ -7036,9 +7431,9 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 				child.expression.type !== 'JSXEmptyExpression'
 			) {
 				const childValue = bindAttributeEvaluation(
-					printExprWithTsrx(rewriteJsxValues(child.expression, ctx), ctx, name, inlinedSubs),
+					tsrxExprNode(rewriteJsxValues(child.expression, ctx), ctx, name, inlinedSubs),
 				);
-				nestedVoidChildrenSources.push(`[true, ${childValue}]`);
+				nestedVoidChildrenSources.push(ssrSourcePair(b.literal(true, 'true'), childValue, child));
 			}
 		}
 		const effectiveVoidChildrenSources = hasSemanticJsxChildren(node.children || [])
@@ -7048,7 +7443,15 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 			flush();
 			ctx.runtimeNeeded.add('ssrVoidContent');
 			parts.push(
-				`_$ssrVoidContent(${JSON.stringify(tag)}, [${htmlSources.join(', ')}], [${effectiveVoidChildrenSources.join(', ')}])`,
+				ssrCall(
+					'ssrVoidContent',
+					[
+						b.literal(tag, JSON.stringify(tag)),
+						b.array(htmlSources),
+						b.array(effectiveVoidChildrenSources),
+					],
+					node,
+				),
 			);
 		}
 		lit += '/>';
@@ -7077,7 +7480,7 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	let childrenExpr;
 	if (authoredStaticScriptContent !== undefined) {
 		const content = escapeInlineScriptContent(authoredStaticScriptContent);
-		childrenExpr = content === '' ? "''" : JSON.stringify(content);
+		childrenExpr = ssrHtmlTemplate(content === '' ? [] : [content], node);
 	} else if (
 		htmlSources.length === 0 &&
 		onlyChild0 !== null &&
@@ -7085,10 +7488,27 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		!isKnownStringExpression(onlyChild0.expression, ctx.knownStringLocals)
 	) {
 		ctx.runtimeNeeded.add('ssrChildText');
-		childrenExpr = `_$ssrChildText(${printExpr(resolveStyleExpr(rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx), cssHash))}, __s)`;
+		childrenExpr = ssrCall(
+			'ssrChildText',
+			[
+				resolveStyleExpr(
+					rewriteJsxValues(rewriteHookCalls(onlyChild0.expression, ctx, name), ctx),
+					cssHash,
+				),
+				b.id('__s'),
+			],
+			onlyChild0,
+		);
 		if (childComponentNs !== null) {
 			ctx.runtimeNeeded.add('ssrInNamespace');
-			childrenExpr = `_$ssrInNamespace(${JSON.stringify(childComponentNs)}, () => ${childrenExpr})`;
+			childrenExpr = ssrCall(
+				'ssrInNamespace',
+				[
+					b.literal(childComponentNs, JSON.stringify(childComponentNs)),
+					ssrThunk(childrenExpr, onlyChild0),
+				],
+				onlyChild0,
+			);
 		}
 	} else {
 		// pre/textarea/listing: the parser eats a '\n' right after the opening tag —
@@ -7111,21 +7531,39 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// writer and therefore leaves these earlier attribute sources inactive.
 	if (effectiveChildrenPropSources.length > 0) {
 		ctx.runtimeNeeded.add('ssrChildrenSources');
-		childrenExpr = `_$ssrChildrenSources([${effectiveChildrenPropSources.join(', ')}], () => (${childrenExpr}), __s)`;
+		childrenExpr = ssrCall(
+			'ssrChildrenSources',
+			[b.array(effectiveChildrenPropSources), ssrThunk(childrenExpr, node), b.id('__s')],
+			node,
+		);
 	}
 	// Controlled `<textarea value/defaultValue>`: the prop IS the content
 	// (children were rejected at compile time) — value wins over defaultValue,
 	// a nullish value falls through to the default (the client cascade).
 	if (tag === 'textarea' && resolveFormControlsAcrossSpreads) {
 		ctx.runtimeNeeded.add('ssrTextareaValueSources');
-		childrenExpr = `(_$ssrTextareaValueSources([${formControlSources.join(', ')}]) ?? (${childrenExpr}))`;
+		childrenExpr = inheritOriginLoc(
+			b.logical(
+				'??',
+				ssrCall('ssrTextareaValueSources', [b.array(formControlSources)], node),
+				childrenExpr,
+			),
+			node,
+		);
 	} else if (tag === 'textarea' && (ctlValue !== null || ctlDefault !== null)) {
 		ctx.runtimeNeeded.add('ssrTextareaValue');
 		const src =
 			ctlValue !== null && ctlDefault !== null
-				? `(${ctlValue}) ?? (${ctlDefault})`
+				? inheritOriginLoc(b.logical('??', ctlValue, ctlDefault), node)
 				: (ctlValue ?? ctlDefault);
-		childrenExpr = `((${src}) == null ? (${childrenExpr}) : _$ssrTextareaValue(${src}))`;
+		childrenExpr = inheritOriginLoc(
+			b.conditional(
+				b.binary('==', src, b.literal(null)),
+				childrenExpr,
+				ssrCall('ssrTextareaValue', [src], node),
+			),
+			node,
+		);
 	}
 	// Controlled `<select value/defaultValue>`: push the option-projection
 	// scope around the children serialization — every compiled/de-opt
@@ -7133,10 +7571,23 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 	// synchronous nested call tree) consults it via ssrOption.
 	if (tag === 'select' && resolveFormControlsAcrossSpreads) {
 		ctx.runtimeNeeded.add('ssrSelectScopeSources');
-		childrenExpr = `_$ssrSelectScopeSources([${formControlSources.join(', ')}], () => (${childrenExpr}))`;
+		childrenExpr = ssrCall(
+			'ssrSelectScopeSources',
+			[b.array(formControlSources), ssrThunk(childrenExpr, node)],
+			node,
+		);
 	} else if (tag === 'select' && (ctlValue !== null || ctlDefault !== null)) {
 		ctx.runtimeNeeded.add('ssrSelectScope');
-		childrenExpr = `_$ssrSelectScope(${ctlValue ?? 'void 0'}, ${ctlDefault ?? 'void 0'}, ${selMultiple}, () => (${childrenExpr}))`;
+		childrenExpr = ssrCall(
+			'ssrSelectScope',
+			[
+				ctlValue ?? ssrVoid(node),
+				ctlDefault ?? ssrVoid(node),
+				selMultiple,
+				ssrThunk(childrenExpr, node),
+			],
+			node,
+		);
 	}
 	// `<option>`: assemble via ssrOption so an active select scope can mark it
 	// ` selected` (returns a plain `<option …>` when no scope is active).
@@ -7144,18 +7595,34 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		let contentExpr = childrenExpr;
 		if (htmlSources.length > 0) {
 			ctx.runtimeNeeded.add('ssrInnerHtml');
-			contentExpr = `(_$ssrInnerHtml([${htmlSources.join(', ')}], () => (${childrenExpr}), ${definitelyHasDangerChild}, [${effectiveChildrenPropSources.join(', ')}]) ?? (${childrenExpr}))`;
+			contentExpr = inheritOriginLoc(
+				b.logical(
+					'??',
+					ssrCall(
+						'ssrInnerHtml',
+						[
+							b.array(htmlSources),
+							ssrThunk(childrenExpr, node),
+							b.literal(definitelyHasDangerChild),
+							b.array(effectiveChildrenPropSources),
+						],
+						node,
+					),
+					childrenExpr,
+				),
+				node,
+			);
 		}
 		flush();
-		const attrsExpr = parts.length > 0 ? parts.join(' + ') : "''";
+		const attrsExpr = ssrHtmlTemplate(parts, node);
 		parts.length = 0;
 		ctx.runtimeNeeded.add('ssrOption');
-		let optionValueExpr = optValue ?? 'void 0';
+		let optionValueExpr = optValue ?? ssrVoid(node);
 		if (resolveAttrsAcrossSpreads) {
 			ctx.runtimeNeeded.add('ssrOptionValueSources');
-			optionValueExpr = `_$ssrOptionValueSources([${attrSources.join(', ')}])`;
+			optionValueExpr = ssrCall('ssrOptionValueSources', [b.array(attrSources)], node);
 		}
-		parts.push(`_$ssrOption(${optionValueExpr}, ${attrsExpr}, ${contentExpr})`);
+		parts.push(ssrCall('ssrOption', [optionValueExpr, attrsExpr, contentExpr], node));
 		return finalize();
 	}
 	if (htmlSources.length > 0) {
@@ -7165,9 +7632,25 @@ function ssrEmitElement(node, ctx, name, inlinedSubs, parentNs, cssHash, compone
 		ctx.runtimeNeeded.add(innerHtmlHelper);
 		flush();
 		parts.push(
-			`(_$${innerHtmlHelper}([${htmlSources.join(', ')}], () => (${childrenExpr}), ${definitelyHasDangerChild}, [${effectiveChildrenPropSources.join(', ')}]) ?? (${childrenExpr}))`,
+			inheritOriginLoc(
+				b.logical(
+					'??',
+					ssrCall(
+						innerHtmlHelper,
+						[
+							b.array(htmlSources),
+							ssrThunk(childrenExpr, node),
+							b.literal(definitelyHasDangerChild),
+							b.array(effectiveChildrenPropSources),
+						],
+						node,
+					),
+					childrenExpr,
+				),
+				node,
+			),
 		);
-	} else if (childrenExpr !== "''") {
+	} else if (!isEmptySsrHtml(childrenExpr)) {
 		flush();
 		parts.push(childrenExpr);
 	}
@@ -7187,13 +7670,13 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	// this context flag. Only this component's immediate children sub inherits the
 	// returned-fragment mode; control-flow arm subs intentionally reset it.
 	const returnedFragmentTemplate = ctx._returnedFragmentTemplate === true;
-	const compExpr = tagExpr(node);
+	const compExpr = tagExprNode(node);
 	const attrs = node.attributes || node.openingElement?.attributes || [];
-	const propParts = [];
+	const propNodes = [];
 	let keyExpr = null;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			propParts.push(`...(${printExprWithTsrx(attr.argument, ctx, name, inlinedSubs)})`);
+			propNodes.push(b.spread(tsrxExprNode(attr.argument, ctx, name, inlinedSubs)));
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -7202,12 +7685,17 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		if (attrName === 'key') {
 			if (val != null) {
 				const inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-				keyExpr = printExprWithTsrx(inner, ctx, name, inlinedSubs);
+				keyExpr = tsrxExprNode(inner, ctx, name, inlinedSubs);
 			}
 			continue;
 		}
 		if (val == null) {
-			propParts.push(`${JSON.stringify(attrName)}: true`);
+			propNodes.push(
+				inheritOriginLoc(
+					b.prop('init', b.literal(attrName, JSON.stringify(attrName)), b.literal(true, 'true')),
+					attr,
+				),
+			);
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -7216,13 +7704,16 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 		// emits a real descriptor instead of raw (unprintable) JSX. Mirrors the
 		// client makeCompCall path; the renderPropChild branch below does the same.
 		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
-		if (inner.type === 'Literal') {
-			propParts.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
-		} else {
-			propParts.push(
-				`${JSON.stringify(attrName)}: (${printExprWithTsrx(inner, ctx, name, inlinedSubs)})`,
-			);
-		}
+		propNodes.push(
+			inheritOriginLoc(
+				b.prop(
+					'init',
+					b.literal(attrName, JSON.stringify(attrName)),
+					inner.type === 'Literal' ? inner : tsrxExprNode(inner, ctx, name, inlinedSubs),
+				),
+				attr,
+			),
+		);
 	}
 	// React-style render-prop child: pass the function through RAW so the consuming
 	// component can call it with data (`props.children(data)`) and ssrChild renders
@@ -7234,8 +7725,15 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 	const sourceChildren = node.children || [];
 	const renderPropChild = soleRenderPropChild(sourceChildren);
 	if (renderPropChild) {
-		propParts.push(
-			`"children": (${printExprWithTsrx(rewriteJsxValues(renderPropChild, ctx), ctx, name, inlinedSubs)})`,
+		propNodes.push(
+			inheritOriginLoc(
+				b.prop(
+					'init',
+					b.literal('children', '"children"'),
+					tsrxExprNode(rewriteJsxValues(renderPropChild, ctx), ctx, name, inlinedSubs),
+				),
+				renderPropChild,
+			),
 		);
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
@@ -7255,8 +7753,15 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			if (kids.length > 0) {
 				// The children array shell maps to the authored component element.
 				const childrenExpr = kids.length === 1 ? kids[0] : inheritOriginLoc(b.array(kids), node);
-				propParts.push(
-					`"children": (${printExprWithTsrx(resolveStyleExpr(childrenExpr, cssHash), ctx, name, inlinedSubs)})`,
+				propNodes.push(
+					inheritOriginLoc(
+						b.prop(
+							'init',
+							b.literal('children', '"children"'),
+							tsrxExprNode(resolveStyleExpr(childrenExpr, cssHash), ctx, name, inlinedSubs),
+						),
+						node,
+					),
 				);
 			}
 		} else {
@@ -7274,7 +7779,7 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 				opaqueChildren ? null : componentNs,
 				returnedFragmentTemplate,
 			);
-			inlinedSubs.push(sub.fn + ';');
+			inlinedSubs.push(sub.fn);
 			// Tag the server children-block like the client does (see the client
 			// emission in lowerComponentCall): a consumer's `typeof children ===
 			// 'function' && !isChildrenBlock(children)` render-prop check must agree
@@ -7282,20 +7787,34 @@ function ssrEmitComponent(node, ctx, name, inlinedSubs, parentNs, cssHash, compo
 			// the block as a render prop server-side, gets its HTML string back, and
 			// the enclosing hole escapes that markup into visible text.
 			ctx.runtimeNeeded.add('markChildrenBlock');
-			propParts.push(`"children": _$markChildrenBlock(${sub.fnName})`);
+			propNodes.push(
+				inheritOriginLoc(
+					b.prop(
+						'init',
+						b.literal('children', '"children"'),
+						ssrCall('markChildrenBlock', [b.id(sub.fnName)], node),
+					),
+					node,
+				),
+			);
 		}
 	}
 	const explicitNamespace = componentNs !== null;
 	const helper = explicitNamespace ? 'ssrComponentNS' : 'ssrComponent';
 	ctx.runtimeNeeded.add(helper);
-	const trailing = explicitNamespace
-		? `, ${JSON.stringify(componentNs)}, ${inherit ? 'true' : 'false'}${keyExpr === null ? '' : `, (${keyExpr})`}`
-		: keyExpr !== null
-			? `, ${inherit ? 'true' : 'false'}, (${keyExpr})`
-			: inherit
-				? ', true'
-				: '';
-	return `_$${helper}(__s, ${compExpr}, { ${propParts.join(', ')} }${trailing})`;
+	const args = [b.id('__s'), compExpr, inheritOriginLoc(b.object(propNodes), node)];
+	if (explicitNamespace) {
+		args.push(
+			b.literal(componentNs, JSON.stringify(componentNs)),
+			b.literal(inherit, inherit ? 'true' : 'false'),
+		);
+		if (keyExpr !== null) args.push(keyExpr);
+	} else if (keyExpr !== null) {
+		args.push(b.literal(inherit, inherit ? 'true' : 'false'), keyExpr);
+	} else if (inherit) {
+		args.push(b.literal(true, 'true'));
+	}
+	return ssrCall(helper, args, node);
 }
 
 // ---------------------------------------------------------------------------
@@ -7341,20 +7860,20 @@ function ssrCompileSub(
 function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @if test (it bypasses the
 	// setup rewrite, so without a stable key it collides with sibling/body use()).
-	const testExpr = printExpr(rewriteHookCalls(node.test, ctx, name));
+	const testExpr = rewriteHookCalls(node.test, ctx, name);
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
 	const thenSub = ssrCompileSub(thenStmts, ctx, '__sif', [], cssHash, parentNs, componentNs);
-	inlinedSubs.push(thenSub.fn + ';');
-	let elseCall = "''";
+	inlinedSubs.push(thenSub.fn);
+	let elseCall = ssrHtmlTemplate([], node);
 	if (node.alternate) {
 		// An `else if` arrives as an IfStatement; wrap it so it recurses through
 		// ssrEmitNode and gets its own marker.
 		const elseStmts =
 			node.alternate.type === 'BlockStatement' ? node.alternate.body : [node.alternate];
 		const elseSub = ssrCompileSub(elseStmts, ctx, '__selse', [], cssHash, parentNs, componentNs);
-		inlinedSubs.push(elseSub.fn + ';');
-		elseCall = `${elseSub.fnName}(undefined, __s)`;
+		inlinedSubs.push(elseSub.fn);
+		elseCall = ssrSubCall(elseSub.fnName, [b.id('undefined')], node.alternate);
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrControl');
@@ -7363,16 +7882,54 @@ function ssrEmitIf(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs)
 	// taken branch's content. The client adopts BOTH on hydration (slot = outer,
 	// branch = inner) so no comment markers are inserted — byte-for-byte, exactly
 	// like @for. The not-taken arm emits no inner range (just `''`).
-	const thenInner = `_$ssrArm("then", () => _$ssrBlock(${thenSub.fnName}(undefined, __s)))`;
-	const elseInner = node.alternate ? `_$ssrArm("else", () => _$ssrBlock(${elseCall}))` : "''";
-	return `_$ssrBlock(_$ssrControl("${ssrControlKey('if', node)}", () => ((${testExpr}) ? ${thenInner} : ${elseInner})))`;
+	const thenInner = ssrCall(
+		'ssrArm',
+		[
+			b.literal('then', '"then"'),
+			ssrThunk(
+				ssrCall(
+					'ssrBlock',
+					[ssrSubCall(thenSub.fnName, [b.id('undefined')], node.consequent)],
+					node.consequent,
+				),
+				node.consequent,
+			),
+		],
+		node.consequent,
+	);
+	const elseInner = node.alternate
+		? ssrCall(
+				'ssrArm',
+				[
+					b.literal('else', '"else"'),
+					ssrThunk(ssrCall('ssrBlock', [elseCall], node.alternate), node.alternate),
+				],
+				node.alternate,
+			)
+		: ssrHtmlTemplate([], node);
+	return ssrCall(
+		'ssrBlock',
+		[
+			ssrCall(
+				'ssrControl',
+				[
+					b.literal(ssrControlKey('if', node)),
+					ssrThunk(b.conditional(testExpr, thenInner, elseInner), node),
+				],
+				node,
+			),
+		],
+		node,
+	);
 }
 
 function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// React's server contract renders visible content and omits hidden content
 	// entirely. Keep the body behind a thunk so a hidden Activity does not execute
 	// child components/hooks or start descendant data work on the server.
-	const modeExpr = node.mode ? printExpr(rewriteHookCalls(node.mode, ctx, name)) : "'visible'";
+	const modeExpr = node.mode
+		? rewriteHookCalls(node.mode, ctx, name)
+		: inheritOriginLoc(b.literal('visible', "'visible'"), node);
 	const bodySub = ssrCompileSub(
 		node.children || [],
 		ctx,
@@ -7382,16 +7939,41 @@ function ssrEmitActivity(node, ctx, name, inlinedSubs, parentNs, cssHash, compon
 		parentNs,
 		componentNs,
 	);
-	inlinedSubs.push(bodySub.fn + ';');
+	inlinedSubs.push(bodySub.fn);
 	ctx.runtimeNeeded.add('ssrActivity');
 	ctx.runtimeNeeded.add('ssrControl');
 	ctx.runtimeNeeded.add('ssrArm');
-	return `_$ssrControl("${ssrControlKey('activity', node)}", () => _$ssrActivity(${modeExpr}, () => _$ssrArm("visible", () => ${bodySub.fnName}(undefined, __s))))`;
+	const bodyCall = ssrSubCall(bodySub.fnName, [b.id('undefined')], node);
+	return ssrCall(
+		'ssrControl',
+		[
+			b.literal(ssrControlKey('activity', node)),
+			ssrThunk(
+				ssrCall(
+					'ssrActivity',
+					[
+						modeExpr,
+						ssrThunk(
+							ssrCall(
+								'ssrArm',
+								[b.literal('visible', '"visible"'), ssrThunk(bodyCall, node)],
+								node,
+							),
+							node,
+						),
+					],
+					node,
+				),
+				node,
+			),
+		],
+		node,
+	);
 }
 
 function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @for iterable expression.
-	const itemsExpr = printExpr(rewriteHookCalls(node.right, ctx, name));
+	const itemsExpr = rewriteHookCalls(node.right, ctx, name);
 	const itemId = node.left.declarations[0].id; // Identifier or destructuring Pattern
 	const params = [itemId];
 	if (node.index) params.push(node.index);
@@ -7404,18 +7986,36 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		parentNs,
 		componentNs,
 	);
-	inlinedSubs.push(itemSub.fn + ';');
-	let emptyCall = "''";
+	inlinedSubs.push(itemSub.fn);
+	let emptyCall = ssrHtmlTemplate([], node);
 	if (node.empty) {
 		const emptyStmts = node.empty.type === 'BlockStatement' ? node.empty.body : [node.empty];
 		const emptySub = ssrCompileSub(emptyStmts, ctx, '__sempty', [], cssHash, parentNs, componentNs);
-		inlinedSubs.push(emptySub.fn + ';');
-		emptyCall = `_$ssrArm("empty", () => ${emptySub.fnName}(undefined, __s))`;
+		inlinedSubs.push(emptySub.fn);
+		emptyCall = ssrCall(
+			'ssrArm',
+			[
+				b.literal('empty', '"empty"'),
+				ssrThunk(ssrSubCall(emptySub.fnName, [b.id('undefined')], node.empty), node.empty),
+			],
+			node.empty,
+		);
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrForBlock');
 	ctx.runtimeNeeded.add('ssrControl');
-	let itemKey = '__it != null && __it.id != null ? __it.id : __it';
+	let itemKey = inheritOriginLoc(
+		b.conditional(
+			b.logical(
+				'&&',
+				b.binary('!=', b.id('__it'), b.literal(null)),
+				b.binary('!=', b.member(b.id('__it'), 'id'), b.literal(null)),
+			),
+			b.member(b.id('__it'), 'id'),
+			b.id('__it'),
+		),
+		node,
+	);
 	let explicitKey = null;
 	const firstEl = (node.body.body || []).find(
 		(child) => child.type === 'Element' || child.type === 'JSXElement',
@@ -7434,10 +8034,13 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 		const keyParams = [itemId];
 		if (node.index) keyParams.push(node.index);
 		// The synthesized key arrow maps to the authored key expression.
-		const keyFn = printExpr(inheritOriginLoc(b.arrow(keyParams, explicitKey), explicitKey));
-		itemKey = `(${keyFn})(__it${node.index ? ', __i' : ''})`;
+		const keyFn = inheritOriginLoc(b.arrow(keyParams, explicitKey), explicitKey);
+		itemKey = inheritOriginLoc(
+			b.call(keyFn, b.id('__it'), ...(node.index ? [b.id('__i')] : [])),
+			explicitKey,
+		);
 	} else if (node.index) {
-		itemKey = '__i';
+		itemKey = inheritOriginLoc(b.id('__i'), node.index);
 	}
 	const markerlessItem = isSsrMarkerlessForItem(node);
 	// ssrArm exists solely to make use()/component identity distinct per item.
@@ -7449,13 +8052,16 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	const itemNeedsIdentity =
 		containsComponentCallOrControlFlow(node.body.body) ||
 		containsRenderCall(node.body.body) ||
-		itemSub.fn.includes('_$ssrChild') ||
-		itemSub.fn.includes('_$ssrComponent');
-	const itemCall = node.index
-		? `${itemSub.fnName}(__it, __i, __s)`
-		: `${itemSub.fnName}(__it, __s)`;
-	const itemHtml = markerlessItem ? itemCall : `_$ssrBlock(${itemCall})`;
-	const renderItem = itemNeedsIdentity ? `_$ssrArm((${itemKey}), () => ${itemHtml})` : itemHtml;
+		ssrAstCallsAny(itemSub.fn, ['_$ssrChild', '_$ssrComponent']);
+	const itemCall = ssrSubCall(
+		itemSub.fnName,
+		node.index ? [b.id('__it'), b.id('__i')] : [b.id('__it')],
+		node,
+	);
+	const itemHtml = markerlessItem ? itemCall : ssrCall('ssrBlock', [itemCall], node);
+	const renderItem = itemNeedsIdentity
+		? ssrCall('ssrArm', [itemKey, ssrThunk(itemHtml, node)], node)
+		: itemHtml;
 	if (node.empty || itemNeedsIdentity) ctx.runtimeNeeded.add('ssrArm');
 	// Render every item into one incrementally-built string. Avoid map().join():
 	// besides the mapper callback, it allocates an N-entry intermediate array and
@@ -7464,14 +8070,42 @@ function ssrEmitFor(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// matching the client's existing singleRoot path; general item shapes retain
 	// their own block pair. Identity-transparent items also skip ssrArm; opaque or
 	// suspending bodies retain it so use() and child component frames stay keyed.
-	return `_$ssrControl("${ssrControlKey('for', node)}", () => { const __items = Array.from((${itemsExpr}) ?? []); if (__items.length === 0) return _$ssrForBlock(${emptyCall}, false); let __html = ''; for (let __i = 0; __i < __items.length; __i++) { const __it = __items[__i]; __html += ${renderItem}; } return _$ssrForBlock(__html, true); })`;
+	const items = b.id('__items');
+	const index = b.id('__i');
+	const loopBody = b.block([
+		b.const('__it', b.member(items, index, true)),
+		b.stmt(b.assignment('+=', b.id('__html'), renderItem)),
+	]);
+	const render = b.arrow(
+		[],
+		b.block([
+			b.const(
+				'__items',
+				b.call(b.member(b.id('Array'), 'from'), b.logical('??', itemsExpr, b.array([]))),
+			),
+			b.if(
+				b.binary('===', b.member(items, 'length'), b.literal(0)),
+				b.return(ssrCall('ssrForBlock', [emptyCall, b.literal(false, 'false')], node)),
+				null,
+			),
+			b.let('__html', b.literal('')),
+			b.for(
+				b.let('__i', b.literal(0)),
+				b.binary('<', index, b.member(items, 'length')),
+				b.update('++', index),
+				loopBody,
+			),
+			b.return(ssrCall('ssrForBlock', [b.id('__html'), b.literal(true, 'true')], node)),
+		]),
+	);
+	return ssrCall('ssrControl', [b.literal(ssrControlKey('for', node)), render], node);
 }
 
 function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	// rewriteHookCalls: key any `use(thenable)` in the @switch discriminant.
-	const discExpr = printExpr(rewriteHookCalls(node.discriminant, ctx, name));
+	const discExpr = rewriteHookCalls(node.discriminant, ctx, name);
 	const arms = [];
-	let defaultCall = "''";
+	let defaultCall = ssrHtmlTemplate([], node);
 	let caseIndex = 0;
 	for (const c of node.cases || []) {
 		const sub = ssrCompileSub(
@@ -7483,32 +8117,56 @@ function ssrEmitSwitch(node, ctx, name, inlinedSubs, parentNs, cssHash, componen
 			parentNs,
 			componentNs,
 		);
-		inlinedSubs.push(sub.fn + ';');
+		inlinedSubs.push(sub.fn);
 		// Inner ssrBlock wraps the matched case's content (see ssrEmitIf) so the
 		// client adopts it as the branch range during hydration (no inserted markers).
-		if (c.test == null)
-			defaultCall = `_$ssrArm("default", () => _$ssrBlock(${sub.fnName}(undefined, __s)))`;
-		else
-			arms.push(
-				`__d === (${printExpr(c.test)}) ? _$ssrArm("case:${caseIndex}", () => _$ssrBlock(${sub.fnName}(undefined, __s)))`,
-			);
+		const renderedArm = ssrCall(
+			'ssrArm',
+			[
+				b.literal(c.test == null ? 'default' : `case:${caseIndex}`),
+				ssrThunk(ssrCall('ssrBlock', [ssrSubCall(sub.fnName, [b.id('undefined')], c)], c), c),
+			],
+			c,
+		);
+		if (c.test == null) defaultCall = renderedArm;
+		else {
+			arms.push({
+				test: b.binary('===', b.id('__d'), c.test),
+				renderedArm,
+				origin: c,
+			});
+		}
 		caseIndex++;
 	}
 	ctx.runtimeNeeded.add('ssrBlock');
 	ctx.runtimeNeeded.add('ssrControl');
 	ctx.runtimeNeeded.add('ssrArm');
 	// First case matching by strict-equality wins (no JS fall-through); else default.
-	const selector = arms.length ? `${arms.join(' : ')} : ${defaultCall}` : defaultCall;
-	return `_$ssrBlock(_$ssrControl("${ssrControlKey('switch', node)}", () => { const __d = (${discExpr}); return ${selector}; }))`;
+	let selector = defaultCall;
+	for (let i = arms.length - 1; i >= 0; i--) {
+		selector = inheritOriginLoc(
+			b.conditional(arms[i].test, arms[i].renderedArm, selector),
+			arms[i].origin,
+		);
+	}
+	const choose = inheritOriginLoc(
+		b.arrow([], b.block([b.const('__d', discExpr), b.return(selector)])),
+		node,
+	);
+	return ssrCall(
+		'ssrBlock',
+		[ssrCall('ssrControl', [b.literal(ssrControlKey('switch', node)), choose], node)],
+		node,
+	);
 }
 
 function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs) {
 	const trySub = ssrCompileSub(node.block.body, ctx, '__stry', [], cssHash, parentNs, componentNs);
-	inlinedSubs.push(trySub.fn + ';');
+	inlinedSubs.push(trySub.fn);
 	// Each arm's content is wrapped in an INNER ssrBlock (see ssrEmitIf) so the
 	// client adopts it as the boundary's branch range during hydration without
 	// inserting comment markers (byte-for-byte). The OUTER ssrBlock is the slot.
-	let pendFnName = 'null'; // no @pending → ssrTry renders an empty slot on suspend
+	let pendFn = inheritOriginLoc(b.literal(null), node); // no @pending → empty slot
 	if (node.pending && node.pending.body && node.pending.body.length > 0) {
 		const pendSub = ssrCompileSub(
 			node.pending.body,
@@ -7519,10 +8177,10 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			parentNs,
 			componentNs,
 		);
-		inlinedSubs.push(pendSub.fn + ';');
-		pendFnName = pendSub.fnName;
+		inlinedSubs.push(pendSub.fn);
+		pendFn = inheritOriginLoc(b.id(pendSub.fnName), node.pending);
 	}
-	let catchFnName = 'null'; // no @catch → ssrTry rethrows non-suspense errors
+	let catchFn = inheritOriginLoc(b.literal(null), node); // no @catch → rethrow
 	if (node.handler) {
 		const params = [];
 		if (node.handler.param) params.push(node.handler.param);
@@ -7536,13 +8194,19 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 			parentNs,
 			componentNs,
 		);
-		inlinedSubs.push(catchSub.fn + ';');
+		inlinedSubs.push(catchSub.fn);
 		// A no-param @catch simply ignores the error argument ssrTry passes.
 		// ssrTry keeps the SSR scope second; adapt the authored reset parameter
 		// around that ABI instead of shifting existing one-parameter helpers.
-		catchFnName = node.handler.resetParam
-			? `(__error, __scope, __reset) => ${catchSub.fnName}(__error, __reset, __scope)`
-			: catchSub.fnName;
+		catchFn = node.handler.resetParam
+			? inheritOriginLoc(
+					b.arrow(
+						[b.id('__error'), b.id('__scope'), b.id('__reset')],
+						b.call(catchSub.fnName, b.id('__error'), b.id('__reset'), b.id('__scope')),
+					),
+					node.handler,
+				)
+			: inheritOriginLoc(b.id(catchSub.fnName), node.handler);
 	}
 	ctx.runtimeNeeded.add('ssrTry');
 	// SSR @try routes through the runtime ssrTry helper: a `use(thenable)`
@@ -7554,11 +8218,20 @@ function ssrEmitTry(node, ctx, name, inlinedSubs, parentNs, cssHash, componentNs
 	// across streaming passes (the runtime adds the frame path per instance).
 	const trailing = [];
 	if (componentNs !== null || node.propagateSuspense === true) {
-		trailing.push(componentNs === null ? 'undefined' : JSON.stringify(componentNs));
+		trailing.push(
+			componentNs === null
+				? inheritOriginLoc(b.id('undefined'), node)
+				: inheritOriginLoc(b.literal(componentNs, JSON.stringify(componentNs)), node),
+		);
 	}
-	if (node.propagateSuspense === true) trailing.push('true');
-	const suffix = trailing.length === 0 ? '' : `, ${trailing.join(', ')}`;
-	return `_$ssrTry(__s, "${ssrTryKey(node)}", ${trySub.fnName}, ${pendFnName}, ${catchFnName}${suffix})`;
+	if (node.propagateSuspense === true) {
+		trailing.push(inheritOriginLoc(b.literal(true, 'true'), node));
+	}
+	return ssrCall(
+		'ssrTry',
+		[b.id('__s'), b.literal(ssrTryKey(node)), b.id(trySub.fnName), pendFn, catchFn, ...trailing],
+		node,
+	);
 }
 
 // Deterministic per-boundary site key for ssrTry — same scheme as headKey:
@@ -7611,9 +8284,9 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 			true,
 			true,
 		);
-		inlinedSubs.push(sub.fn + ';');
+		inlinedSubs.push(sub.fn);
 		ctx.runtimeNeeded.add('ssrComponent');
-		return `_$ssrComponent(__s, ${sub.fnName}, {})`;
+		return ssrCall('ssrComponent', [b.id('__s'), b.id(sub.fnName), b.object([])], node);
 	}
 	if (
 		expr &&
@@ -7623,16 +8296,20 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
 		expr.callee.name === 'createPortal'
 	) {
 		ctx.runtimeNeeded.add('ssrPortal');
-		return '_$ssrPortal()';
+		return ssrCall('ssrPortal', [], node);
 	}
 	ctx.runtimeNeeded.add('ssrChild');
 	// rewriteHookCalls first (key any `use(thenable)` in the hole — it bypasses the
 	// setup rewrite), then rewriteJsxValues (lower nested JSX to createElement).
 	const lowered = rewriteJsxValues(rewriteHookCalls(expr, ctx, name), ctx);
-	const childExpr = `_$ssrChild(${printExpr(resolveStyleExpr(lowered, cssHash))}, __s)`;
+	const childExpr = ssrCall('ssrChild', [resolveStyleExpr(lowered, cssHash), b.id('__s')], node);
 	if (componentNs === null) return childExpr;
 	ctx.runtimeNeeded.add('ssrInNamespace');
-	return `_$ssrInNamespace(${JSON.stringify(componentNs)}, () => ${childExpr})`;
+	return ssrCall(
+		'ssrInNamespace',
+		[b.literal(componentNs, JSON.stringify(componentNs)), ssrThunk(childExpr, node)],
+		node,
+	);
 }
 
 // ===========================================================================
@@ -12817,13 +13494,18 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 	);
 }
 
-// Build the SERVER `ssrHeadEl(…)` statements for a component's hoisted head
-// elements. Returns '' when there are none.
-/** @param {any[]} headNodes @param {any} ctx @returns {string} */
+// Build the SERVER `ssrHeadEl(…)` statement nodes for a component's hoisted
+// head elements.
+/** @param {any[]} headNodes @param {any} ctx @returns {any[]} */
 function emitHeadServer(headNodes, ctx) {
-	if (!headNodes.length) return '';
+	if (!headNodes.length) return [];
 	ctx.runtimeNeeded.add('ssrHeadEl');
-	return headNodes.map((h, i) => `  _$ssrHeadEl(${headElementArgs(h, i)});`).join('\n') + '\n';
+	return headNodes.map((head, index) =>
+		inheritOriginLoc(
+			b.stmt(b.call('_$ssrHeadEl', ...headElementArgNodes(head, index))),
+			head.element ?? head,
+		),
+	);
 }
 
 /**
