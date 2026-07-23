@@ -13,7 +13,7 @@
     "url": "git+https://github.com/octanejs/octane.git"
   },
   "scripts": {
-    "test": "pnpm three:upstream:check && pnpm --dir packages/visx compile:check && pnpm --dir packages/visx types:check && OCTANE_COMPILE_FROZEN_AST=1 vitest run",
+    "test": "pnpm three:upstream:check && pnpm --dir packages/visx compile:check && pnpm --dir packages/visx types:check && vitest run",
     "three:test": "pnpm --filter @octanejs/three test",
     "three:upstream:check": "pnpm --dir packages/three upstream:check",
     "build": "pnpm --filter octane build",

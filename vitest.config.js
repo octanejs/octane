@@ -9,6 +9,15 @@ import { lynxRspeedyRenderers } from './packages/lynx/src/config.runtime.js';
 import { threeRenderers as THREE_RENDERERS } from './packages/three/src/config.ts';
 import { websiteMdxOptions } from './website/mdx-options.ts';
 
+// Parser-AST immutability enforcement (see adoptParserAst in compile.js):
+// every vitest invocation — including ad-hoc single-file and IDE runs — deep-
+// freezes each parser AST the compiler adopts, so any in-place write fails
+// with a stack at the offending line. Set here (not per-project `test.env`)
+// because the octane plugin compiles fixtures in the MAIN vitest process,
+// which `test.env` cannot reach; workers inherit it from this process.
+// `??=` keeps an explicit OCTANE_COMPILE_FROZEN_AST=0 override working.
+process.env.OCTANE_COMPILE_FROZEN_AST ??= '1';
+
 const USER_APP_EVAL_PREFIX = '@octane-eval-submission/';
 const USER_APP_EVAL_ALLOWED_IMPORTS = new Map([
 	['@octanejs/hook-form', resolve(import.meta.dirname, 'packages/hook-form/src/index.ts')],
