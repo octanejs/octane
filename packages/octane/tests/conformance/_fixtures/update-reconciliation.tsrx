@@ -8,6 +8,7 @@ import {
 	useLayoutEffect,
 	useReducer,
 	useState,
+	useSyncExternalStore,
 } from 'octane';
 
 let _setFirst: any = null;
@@ -18,6 +19,7 @@ let _setCrossRootA: any = null;
 let _setCrossRootB: any = null;
 let _setDeleteParent: any = null;
 let _setDeleteChild: any = null;
+let _setDeleteStoreParent: ((value: boolean) => void) | null = null;
 let _setMemoChild: any = null;
 let _setNestedEffectStep: any = null;
 let _setFiniteLayoutStep: any = null;
@@ -49,6 +51,9 @@ export function setDeleteParent(value: any) {
 }
 export function setDeleteChild(value: any) {
 	_setDeleteChild(value);
+}
+export function setDeleteStoreParent(value: boolean) {
+	_setDeleteStoreParent!(value);
 }
 export function setMemoChild(value: any) {
 	_setMemoChild(value);
@@ -245,6 +250,54 @@ export function DeletePendingChild(props) @{
 	_setDeleteParent = setShow;
 	<div>
 		{show ? <DeleteChild log={props.log} /> : <span id="deleted">{'deleted'}</span>}
+	</div>
+}
+
+type DeleteStoreListener = () => void;
+type DeleteStore = {
+	getSnapshot: () => number;
+	set: (next: number) => void;
+	subscribe: (listener: DeleteStoreListener) => () => void;
+	listenerCount: () => number;
+};
+type DeleteStoreLog = (message: string) => void;
+
+export function makeDeleteStore(initial = 0): DeleteStore {
+	let value = initial;
+	const listeners = new Set<DeleteStoreListener>();
+	return {
+		getSnapshot: () => value,
+		set(next: number) {
+			value = next;
+			for (const listener of listeners) listener();
+		},
+		subscribe(listener: DeleteStoreListener) {
+			listeners.add(listener);
+			return () => {
+				listeners.delete(listener);
+			};
+		},
+		listenerCount: () => listeners.size,
+	};
+}
+
+function DeleteStoreChildBody(props: { store: DeleteStore; log: DeleteStoreLog }) @{
+	const value = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot);
+	useEffect(() => {
+		props.log(`store-child-effect:${value}`);
+		return () => props.log(`store-child-cleanup:${value}`);
+	}, [value, props.log]);
+	<span id="delete-store-child">{value as number}</span>
+}
+const DeleteStoreChild = memo(DeleteStoreChildBody);
+
+export function DeletePendingStoreChild(props: { store: DeleteStore; log: DeleteStoreLog }) @{
+	const [show, setShow] = useState(true);
+	_setDeleteStoreParent = setShow;
+	<div>
+		{show
+			? <DeleteStoreChild store={props.store} log={props.log} />
+			: <span id="store-child-deleted">{'deleted'}</span>}
 	</div>
 }
 

@@ -58,9 +58,9 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 | Status | Entries |
 | --- | ---: |
-| planned | 11 |
+| planned | 8 |
 | in progress | 0 |
-| covered | 12 |
+| covered | 15 |
 | documented | 5 |
 | decision required | 1 |
 | blocked | 0 |
@@ -80,11 +80,8 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 | [`RDX-HYD-003`](#rdx-hyd-003) | high | raw-text-hydration | Raw script and style hydration must use their parsing contexts | planned | Octane DOM hydration and SSR serialization |
 | [`RDX-HYD-006`](#rdx-hyd-006) | high | hydration-recovery | Mismatch recovery is bounded to the failed ownership scope | planned | Octane hydration cursor and ownership ranges |
 | [`RDX-HYD-007`](#rdx-hyd-007) | high | head-hydration | Head ownership keys are unique across compiled modules and tags | planned | Octane compiler and runtime head hydration |
-| [`RDX-LIF-001`](#rdx-lif-001) | high | effects | Coalesced dependency changes leave one live passive side effect | planned | Octane scheduler and effect hooks |
-| [`RDX-MEM-001`](#rdx-mem-001) | high | memo-scheduling | Memo prop bailouts do not swallow owned updates or revive removed work | planned | Octane memo and scheduler |
 | [`RDX-PORT-002`](#rdx-port-002) | high | portal-updates | A stateful portal descendant resolves its foreign host for owned updates | planned | Octane portal host resolution |
 | [`RDX-REC-002`](#rdx-rec-002) | high | reconciliation-placement | Topology transitions use the correct absolute anchor without stable reattachment | planned | Octane reconciler and portal placement |
-| [`RDX-STORE-001`](#rdx-store-001) | high | external-store | External-store subscription races cannot create zombie DOM | planned | Octane useSyncExternalStore and scheduler |
 | [`RDX-CFG-001`](#rdx-cfg-001) | medium | build-configuration | Public options must change the emitted build at their observation boundary | planned | Octane compiler and Vite/Rspack/Rsbuild integrations |
 | [`RDX-HYD-005`](#rdx-hyd-005) | medium | hydration-errors | Hydration recovery reporting has an explicit public contract | decision required | Octane public root API |
 | [`RDX-PKG-001`](#rdx-pkg-001) | medium | public-exports | Advertised named exports are locked at the consumer boundary | planned | Octane package surface |
@@ -189,7 +186,7 @@ Targets: `packages/octane/tests`, `packages/vite-plugin-octane/tests`, `packages
 
 #### RDX-LIF-001 — Coalesced dependency changes leave one live passive side effect
 
-**Disposition:** high risk; portable; planned; owner: Octane scheduler and effect hooks.
+**Disposition:** high risk; portable; covered; owner: Octane scheduler and effect hooks.
 
 **Upstream evidence**
 
@@ -203,11 +200,13 @@ Targets: `packages/octane/tests`, `packages/vite-plugin-octane/tests`, `packages
 
 **Octane references**
 
-- [packages/octane/tests/effect-timing.test.ts](../packages/octane/tests/effect-timing.test.ts) — “phase order on re-render: cleanups fire before bodies of same phase” — Strong ordering coverage, but not the exact two-renders-before-passive-drain race.
+- [packages/octane/tests/effect-timing.test.ts](../packages/octane/tests/effect-timing.test.ts) — “coalesced dependency changes leave one live passive side effect” — Commits b, requests c before the ordinary passive task drains, and proves Octane settles b's queued passive work before the c render while preserving one live artifact and exactly-once cleanup.
 
-**Next action (test).** Drive a→b→c before passive drain, assert one live imperative artifact, exact cleanup order through c, and one final cleanup on unmount in development and production compile modes.
+**Executable evidence**
 
-Targets: `packages/octane/tests/effect-timing.test.ts`.
+- [coalesced dependency changes leave one live passive side effect](../packages/octane/tests/effect-timing.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+
+**Rationale.** Same-batch root renders coalesce before an intermediate effect can enqueue. When an intermediate revision does commit, Octane drains its pending passive work before the next render begins. The portable single-live-artifact and exactly-once cleanup contract therefore holds without exposing Redact's two-entry queue shape.
 
 
 ### event-replay
@@ -273,7 +272,7 @@ Targets: `packages/octane/tests/hydration/deferred-hydration-contract.test.ts`, 
 
 #### RDX-STORE-001 — External-store subscription races cannot create zombie DOM
 
-**Disposition:** high risk; portable; planned; owner: Octane useSyncExternalStore and scheduler.
+**Disposition:** high risk; portable; covered; owner: Octane useSyncExternalStore and scheduler.
 
 **Upstream evidence**
 
@@ -284,16 +283,24 @@ Targets: `packages/octane/tests/hydration/deferred-hydration-contract.test.ts`, 
 
 **Octane contract.** useSyncExternalStore subscribes after render, converges when subscribe synchronously notifies, unsubscribes on conditional/root removal, and ignores every post-unmount notification.
 
-**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `effects`.
+**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `node-identity`, `effects`.
 
 **Octane references**
 
-- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “post-unmount store mutations do NOT trigger any work” — Covers root unmount but not synchronous subscribe notification or conditional stale-listener delivery.
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “subscribes outside render and converges when subscribe notifies synchronously” — Proves subscription timing at the public callback boundary and commits the synchronously published snapshot without resubscribing.
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “unsubscribes on unmount (store drops its listener)”
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “unsubscribes when its conditional owner removes it”
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “ignores a retained stale callback after conditional removal” — Invokes the exact callback retained by the store and proves the removed reader stays absent while unrelated host and sibling objects survive.
 - [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `useSyncExternalStore`
 
-**Next action (test).** Prove subscription occurs outside render, a synchronous notifier converges without looping, conditional removal unsubscribes, and a retained stale callback cannot resurrect DOM.
+**Executable evidence**
 
-Targets: `packages/octane/tests/sync-external-store.test.ts`.
+- [subscribes outside render and converges when subscribe notifies synchronously](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+- [unsubscribes on unmount (store drops its listener)](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `effects`
+- [unsubscribes when its conditional owner removes it](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+- [ignores a retained stale callback after conditional removal](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `effects`
+
+**Rationale.** Octane subscribes through a passive effect, owns unsubscribe in that effect slot, and schedules notifications onto a block whose disposed guards make stale callbacks inert after removal.
 
 
 ### head-hydration
@@ -503,7 +510,7 @@ Targets: `packages/octane/tests/conformance/hydration-mismatch.test.ts`, `packag
 
 #### RDX-MEM-001 — Memo prop bailouts do not swallow owned updates or revive removed work
 
-**Disposition:** high risk; portable; planned; owner: Octane memo and scheduler.
+**Disposition:** high risk; portable; covered; owner: Octane memo and scheduler.
 
 **Upstream evidence**
 
@@ -514,16 +521,19 @@ Targets: `packages/octane/tests/conformance/hydration-mismatch.test.ts`, `packag
 
 **Octane contract.** A memoized component processes its own state/store updates without disabling descendant memo bailouts, and pending work beneath a removed ancestor cannot mount new DOM.
 
-**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `effects`.
+**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `node-identity`, `effects`.
 
 **Octane references**
 
-- [packages/octane/tests/conformance/update-reconciliation.test.ts](../packages/octane/tests/conformance/update-reconciliation.test.ts) — “should update children even if parent blocks updates”
-- [packages/octane/tests/conformance/update-reconciliation.test.ts](../packages/octane/tests/conformance/update-reconciliation.test.ts) — “does not call render after a component as been deleted”
+- [packages/octane/tests/conformance/memo-bailout.test.ts](../packages/octane/tests/conformance/memo-bailout.test.ts) — “processes an owned external-store update while stable descendants bail out” — The memo owner updates from its own subscription while an unchanged memo descendant retains both render and host identity.
+- [packages/octane/tests/conformance/update-reconciliation.test.ts](../packages/octane/tests/conformance/update-reconciliation.test.ts) — “does not commit a memoized store update after its ancestor removes it” — Queues the deeper store update before the ancestor deletion and proves no committed DOM or effect work can publish from the disposed subtree.
 
-**Next action (test).** Combine memo with useSyncExternalStore, prove the owner updates while a stable memo grandchild bails, then queue/remove work and prove no zombie DOM or effects appear.
+**Executable evidence**
 
-Targets: `packages/octane/tests/conformance/memo-bailout.test.ts`, `packages/octane/tests/conformance/update-reconciliation.test.ts`.
+- [processes an owned external-store update while stable descendants bail out](../packages/octane/tests/conformance/memo-bailout.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+- [does not commit a memoized store update after its ancestor removes it](../packages/octane/tests/conformance/update-reconciliation.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+
+**Rationale.** Octane schedules hook-owned work directly on the owning block rather than re-entering through its parent memo gate. Its shallow-first queue and disposed-block guards then discard deeper work after an ancestor removes that subtree.
 
 
 ### package-resolution
