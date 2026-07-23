@@ -108,13 +108,16 @@ describe('NON-transition — DESCENDANT re-suspend still shows the @pending fall
 		const { promiseFor, d2 } = makeRegistry();
 		const r = mount(UrgentDescendantSuspend, { promiseFor });
 		await act(() => {});
-		expect(r.find('#content').textContent).toBe('content-1');
+		const content = r.find('#content') as HTMLElement;
+		expect(content.textContent).toBe('content-1');
 		expect(r.findAll('#fallback')).toHaveLength(0);
 
 		// Urgent (no transition) value change → descendant re-suspends → the
-		// boundary soft-detaches the child and shows the @pending fallback.
+		// boundary hides the committed child in place and shows the @pending fallback.
 		await act(() => setValueUrgent(2));
-		expect(r.findAll('#content')).toHaveLength(0);
+		expect(r.find('#content')).toBe(content);
+		expect(content.isConnected).toBe(true);
+		expect(content.style.display).toBe('none');
 		expect(r.find('#fallback').textContent).toBe('fallback');
 
 		// Resolve → the held child resumes with content-2 (state preserved).
@@ -122,7 +125,9 @@ describe('NON-transition — DESCENDANT re-suspend still shows the @pending fall
 			d2.resolve(2);
 		});
 		expect(r.findAll('#fallback')).toHaveLength(0);
-		expect(r.find('#content').textContent).toBe('content-2');
+		expect(r.find('#content')).toBe(content);
+		expect(content.style.display).toBe('');
+		expect(content.textContent).toBe('content-2');
 		r.unmount();
 	});
 });
