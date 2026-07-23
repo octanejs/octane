@@ -492,10 +492,15 @@ function importedName(specifier) {
  * rewrite. Side-effect imports and unused bindings are safe because their
  * target compiles to a no-op stub.
  */
-export function assertNoLiveClientOnlyImports(source, filename, clientOnlyImports = []) {
+export function assertNoLiveClientOnlyImports(
+	source,
+	filename,
+	clientOnlyImports = [],
+	parsedAst = null,
+) {
 	if (!Array.isArray(clientOnlyImports) || clientOnlyImports.length === 0) return;
 	const byRequest = new Map(clientOnlyImports.map((entry) => [entry.request, entry]));
-	const ast = parseModule(source, filename);
+	const ast = parsedAst ?? parseModule(source, filename);
 	const imported = new Map();
 
 	for (const statement of ast.body ?? []) {

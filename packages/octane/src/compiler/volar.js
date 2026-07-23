@@ -243,6 +243,9 @@ export function compileToVolarMappings(source, filename, options) {
 	const transformed = octaneTransform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
+		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
+		// `boundaryTokens: true`. Structural delimiters then carry their own
+		// one-character mappings without changing the virtual TSX bytes.
 		typeOnly: true,
 		errors,
 		comments: printComments,

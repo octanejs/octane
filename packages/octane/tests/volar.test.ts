@@ -97,6 +97,31 @@ describe('compileToVolarMappings', () => {
 		}
 	});
 
+	it('maps type-only structural closing tokens to their own source boundaries', () => {
+		const src =
+			'const value = { list: [run(input)] };\n' +
+			'export function Foo() @{ <p>{value.list[0] as string}</p> }\n';
+		const result = compileToVolarMappings(src, 'foo.tsrx');
+
+		const expectExactSpan = (text: string): void => {
+			const sourceOffset = src.indexOf(text);
+			const mapping = result.mappings.find(
+				(candidate) =>
+					candidate.sourceOffsets[0] === sourceOffset && candidate.lengths[0] === text.length,
+			);
+			expect(mapping).toBeDefined();
+			const generatedOffset = mapping!.generatedOffsets[0];
+			const generatedLength = mapping!.generatedLengths?.[0] ?? mapping!.lengths[0];
+			expect(result.code.slice(generatedOffset, generatedOffset + generatedLength)).toBe(text);
+		};
+
+		// @tsrx/core's typeOnly print enables esrap `boundaryTokens`: the closing
+		// object brace and computed-member bracket resolve at their own mapped
+		// positions instead of inheriting the preceding token's location.
+		expectExactSpan('{ list: [run(input)] }');
+		expectExactSpan('value.list[0]');
+	});
+
 	it('selects renderer intrinsics by canonical filename in the mapped virtual-code print', () => {
 		const src = 'export function Scene() @{ <line path="route"><mesh /></line> }\n';
 		const baseline = compileToVolarMappings(src, '/src/Scene.object.tsrx');

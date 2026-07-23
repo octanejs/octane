@@ -41,14 +41,9 @@ import {
 import { print as esrapPrint } from 'esrap';
 import esrapTsx from 'esrap/languages/tsx';
 import { applyHookDependencies } from './hook-deps.js';
+import { compileUniversal, UNIVERSAL_COMPILER_RUNTIME_IMPORTS } from './compile-universal.js';
 import {
-	addSourceMapNeedles,
-	compileUniversal,
-	composeSourceMaps,
-	retargetRuntimeImportAliasesWithMap,
-} from './compile-universal.js';
-import {
-	expandDomRendererRegions,
+	expandDomRendererRegionsAst,
 	prepareRendererBoundaryRegions,
 	prepareServerRendererBoundaryRegions,
 } from './compile-renderer-boundaries.js';
@@ -791,6 +786,13 @@ function importSpecifierPair(entry) {
 	return at === -1 ? [entry, entry] : [entry.slice(0, at), entry.slice(at + 4)];
 }
 
+function runtimeImportModuleFor(ctx, fallback, imported, local) {
+	for (const route of ctx.runtimeImportRoutes ?? []) {
+		if (route.locals?.has(local) || route.imported?.has(imported)) return route.module;
+	}
+	return fallback;
+}
+
 /**
  * Node form of buildRuntimeImport (client AST emit, M2): same specifiers, same
  * `imported as alias` sort order, returned as ImportDeclaration nodes. The
@@ -815,8 +817,16 @@ function buildRuntimeImportNodes(ctx, moduleName, origin) {
 			n === 'hookSlots' && ctx._hookSlotsHelperName ? ctx._hookSlotsHelperName : rtAlias(n);
 		specifiers.add(`${n} as ${alias}`);
 	}
-	if (specifiers.size > 0) {
-		nodes.push(b.imports([...specifiers].sort().map(importSpecifierPair), moduleName));
+	const grouped = new Map();
+	for (const entry of [...specifiers].sort()) {
+		const pair = importSpecifierPair(entry);
+		const request = runtimeImportModuleFor(ctx, moduleName, pair[0], pair[1]);
+		let pairs = grouped.get(request);
+		if (pairs === undefined) grouped.set(request, (pairs = []));
+		pairs.push(pair);
+	}
+	for (const [request, pairs] of grouped) {
+		nodes.push(b.imports(pairs, request));
 	}
 	return nodes.map((node) => inheritOriginLoc(node, origin));
 }
@@ -1102,12 +1112,12 @@ function lowerImportedErrorBoundaries(ast) {
 				end: node.end,
 				loc: node.loc,
 				block: b.block(node.children || []),
-				handler: {
-					type: 'CatchClause',
-					param: b.id(fallback.errorName),
-					resetParam: fallback.resetName == null ? null : b.id(fallback.resetName),
-					body: b.block(fallback.body),
-				},
+				handler: b.catch_clause(
+					b.id(fallback.errorName),
+					fallback.resetName == null ? null : b.id(fallback.resetName),
+					b.block(fallback.body),
+					node,
+				),
 				pending: null,
 				finalizer: null,
 				propagateSuspense: true,
@@ -2989,16 +2999,11 @@ function mapCallToForOf(expr) {
 			? { ...body, openingElement: { ...body.openingElement, attributes: kept } }
 			: { ...body, attributes: kept };
 	}
-	return {
-		type: 'ForOfStatement',
-		left: b.const(params[0], null),
-		right: expr.callee.object,
-		body: b.block([bodyEl]),
-		await: false,
+	return Object.assign(b.for_of(b.const(params[0], null), expr.callee.object, b.block([bodyEl])), {
 		key: keyExpr,
 		index: params[1] || null,
 		empty: null,
-	};
+	});
 }
 
 // Recognise `{style (expr)}` — TSRX parses it as a plain
@@ -3330,18 +3335,35 @@ function arrowComponentToFunctionDecl(varDecl) {
 	) {
 		return null;
 	}
-	return {
-		type: 'FunctionDeclaration',
-		id: d.id,
-		params: init.params || [],
-		body: init.body,
-		async: !!init.async,
-		generator: !!init.generator,
-		// Preserve source position for hashing / source maps / decl anchors.
-		start: varDecl.start,
-		end: varDecl.end,
-		loc: varDecl.loc,
-	};
+	const declaration = b.function_declaration(
+		d.id,
+		init.params || [],
+		init.body,
+		!!init.async,
+		init.typeParameters,
+	);
+	declaration.generator = !!init.generator;
+	if (init.returnType !== undefined) declaration.returnType = init.returnType;
+	if (init.predicate !== undefined) declaration.predicate = init.predicate;
+	declaration.start = varDecl.start;
+	declaration.end = varDecl.end;
+	declaration.loc = varDecl.loc;
+	return declaration;
+}
+
+function functionExpressionFromDeclaration(declaration, origin = declaration) {
+	const expression = b.function(
+		declaration.id,
+		declaration.params || [],
+		declaration.body,
+		!!declaration.async,
+		declaration.typeParameters,
+		origin,
+	);
+	expression.generator = !!declaration.generator;
+	if (declaration.returnType !== undefined) expression.returnType = declaration.returnType;
+	if (declaration.predicate !== undefined) expression.predicate = declaration.predicate;
+	return expression;
 }
 
 // Split a multi-declarator statement only when it contains a component. Keeping
@@ -4484,10 +4506,10 @@ function instrumentProfileComponents(ast, ctx) {
 		) {
 			const sourceDeclaration = visitNode(node.declaration);
 			ctx.profileRuntimeNeeded.add('__profileComponent');
-			const componentValue =
-				sourceDeclaration.type === 'FunctionDeclaration'
-					? { ...sourceDeclaration, type: 'FunctionExpression' }
-					: sourceDeclaration;
+			let componentValue = sourceDeclaration;
+			if (sourceDeclaration.type === 'FunctionDeclaration') {
+				componentValue = functionExpressionFromDeclaration(sourceDeclaration);
+			}
 			return {
 				...node,
 				declaration: profileComponentCallAst(
@@ -4680,9 +4702,9 @@ export function compile(source, filename, options) {
 // always validates authored source and only exposes the hydrate slice that the
 // same compilation already prepared for production void-export classification.
 export function compileForBundler(source, filename, options) {
-	const metadata = { hydrateSource: source };
+	const metadata = { hydrateAst: null };
 	const result = compileAuthored(source, filename, options, metadata);
-	return { result, hydrateSource: metadata.hydrateSource };
+	return { result, hydrateAst: metadata.hydrateAst };
 }
 
 function compileAuthored(source, filename, options, bundlerMetadata) {
@@ -4694,6 +4716,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const analyzedAst = parseModule(source, cleanFilename);
 	analyzeTsrx(analyzedAst, cleanFilename);
 	adoptParserAst(analyzedAst);
+	if (bundlerMetadata !== null) bundlerMetadata.hydrateAst = analyzedAst;
 	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
 }
 
@@ -4707,8 +4730,13 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		const cleanFilename = cleanCompileFilename(filename);
 		const hydratePreparation =
 			mode === 'client'
-				? prepareHydrateBoundaries(source, cleanFilename, hydrateBoundaryPathFromId(filename))
-				: prepareServerHydrateBoundaries(source, cleanFilename);
+				? prepareHydrateBoundaries(
+						source,
+						cleanFilename,
+						hydrateBoundaryPathFromId(filename),
+						analyzedAst,
+					)
+				: prepareServerHydrateBoundaries(source, cleanFilename, analyzedAst);
 		if (hydratePreparation !== null) {
 			const nativeChangeDiagnostics =
 				options?.__nativeChangeDiagnostics ??
@@ -4724,35 +4752,21 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 					},
 				).diagnostics;
 			if (bundlerMetadata !== null) {
-				bundlerMetadata.hydrateSource = hydratePreparation.source;
+				bundlerMetadata.hydrateAst = hydratePreparation.ast;
 			}
 			const compiled = compileInternal(
-				hydratePreparation.source,
+				source,
 				cleanFilename,
 				{
 					...options,
 					__hydratePrepared: true,
 					__hydrateBoundaryModule: hydratePreparation.boundaryPath !== null,
 					__nativeChangeDiagnostics: nativeChangeDiagnostics,
-					__styleRemap: composeStyleRemap(
-						options?.__styleRemap ?? null,
-						authoredSource,
-						hydratePreparation.origins ?? null,
-					),
 				},
-				null,
+				hydratePreparation.ast,
 				mode,
 				null,
 			);
-			if (hydratePreparation.map && compiled.map) {
-				compiled.map = composeSourceMaps(compiled.map, hydratePreparation.map);
-				compiled.map = addSourceMapNeedles(
-					compiled.map,
-					compiled.code,
-					authoredSource,
-					hydratePreparation.mappingNeedles,
-				);
-			}
 			return compiled;
 		}
 	}
@@ -4771,6 +4785,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			filename,
 			ownerRenderer,
 			options,
+			analyzedAst,
 		);
 		const serverAuthoredDiagnostics =
 			options?.__nativeChangeDiagnostics ??
@@ -4787,12 +4802,11 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 							rendererRegistry: options?.rendererRegistry,
 						},
 					).diagnostics);
-		if (serverBoundaryPreparation !== null) source = serverBoundaryPreparation.source;
-		assertNoLiveClientOnlyImports(source, filename, options?.clientOnlyImports);
-		const serverStyleRemap = composeStyleRemap(
-			options?.__styleRemap ?? null,
-			authoredSource,
-			serverBoundaryPreparation?.origins ?? null,
+		assertNoLiveClientOnlyImports(
+			source,
+			filename,
+			options?.clientOnlyImports,
+			serverBoundaryPreparation?.ast ?? analyzedAst,
 		);
 		// Server (SSR) codegen: static markup + dynamic holes + control flow +
 		// nested components + scoped CSS, emitted as HTML-string-building bodies
@@ -4808,12 +4822,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 					? null
 					: { __nativeChangeDiagnostics: serverAuthoredDiagnostics }),
 			},
-			serverStyleRemap,
-			serverBoundaryPreparation === null ? analyzedAst : null,
+			options?.__styleRemap ?? null,
+			serverBoundaryPreparation?.ast ?? analyzedAst,
 		);
-		if (serverBoundaryPreparation?.map && compiled.map) {
-			compiled.map = composeSourceMaps(compiled.map, serverBoundaryPreparation.map);
-		}
 		return compiled;
 	}
 	const ownerRenderer =
@@ -4824,7 +4835,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 				: { id: 'dom', module: 'octane', target: 'dom' };
 	const rendererBoundaryPreparation = options?.__rendererBoundariesLowered
 		? null
-		: prepareRendererBoundaryRegions(source, filename, ownerRenderer, options);
+		: prepareRendererBoundaryRegions(source, filename, ownerRenderer, options, analyzedAst);
 	const rendererAuthoredDiagnostics =
 		options?.__nativeChangeDiagnostics ??
 		(rendererBoundaryPreparation === null
@@ -4840,47 +4851,21 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						rendererRegistry: options?.rendererRegistry,
 					},
 				).diagnostics);
-	if (rendererBoundaryPreparation !== null) source = rendererBoundaryPreparation.source;
-	const clientStyleRemap = composeStyleRemap(
-		options?.__styleRemap ?? null,
-		authoredSource,
-		rendererBoundaryPreparation?.origins ?? null,
-	);
+	const clientStyleRemap = options?.__styleRemap ?? null;
 	if (options?.renderer?.target === 'universal') {
 		const renderer = options.renderer;
-		const validationRemap =
-			renderer.validation === undefined
-				? null
-				: composeStyleRemap(
-						options?.__styleRemap ?? null,
-						authoredSource,
-						rendererBoundaryPreparation?.validationOrigins ??
-							rendererBoundaryPreparation?.origins ??
-							null,
-					);
-		let reverseSourceMapComposed = false;
 		const result = compileUniversal(
 			source,
 			filename,
 			renderer,
-			(lowered, universal) => {
+			(loweredAst, universal) => {
 				const domRegions = rendererBoundaryPreparation?.domRegions;
-				let domSource = lowered;
-				let expansionMap = null;
-				if (domRegions && domRegions.length > 0) {
-					const authoredLoweredMap = rendererBoundaryPreparation
-						? composeSourceMaps(universal.sourceMap, rendererBoundaryPreparation.map)
-						: universal.sourceMap;
-					const expanded = expandDomRendererRegions(lowered, renderer, domRegions, {
-						filename,
-						map: authoredLoweredMap,
-						source: authoredSource,
-					});
-					domSource = expanded.source;
-					expansionMap = expanded.map;
-				}
+				const domAst =
+					domRegions && domRegions.length > 0
+						? expandDomRendererRegionsAst(loweredAst, domRegions)
+						: loweredAst;
 				const compiled = compileInternal(
-					domSource,
+					source,
 					filename,
 					{
 						...options,
@@ -4889,6 +4874,13 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						rendererBoundaries: undefined,
 						rendererRegistry: undefined,
 						__hookRuntimeModules: [...(options?.__hookRuntimeModules || []), renderer.module],
+						__runtimeImportRoutes: [
+							...(options?.__runtimeImportRoutes ?? []),
+							{
+								module: renderer.module,
+								imported: UNIVERSAL_COMPILER_RUNTIME_IMPORTS,
+							},
+						],
 						__rendererBoundariesLowered: true,
 						__universal: universal,
 						__universalUnits: rendererBoundaryPreparation?.universalUnits,
@@ -4900,43 +4892,32 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 						// with) — do not restamp against stale origins.
 						__styleRemap: undefined,
 					},
-					null,
+					domAst,
 					mode,
 					null,
 				);
-				if (expansionMap !== null) {
-					compiled.map = composeSourceMaps(compiled.map, expansionMap);
-					compiled.__universalSourceMapComposed = true;
-					reverseSourceMapComposed = true;
-				}
 				return compiled;
 			},
 			{
 				...options,
-				...(validationRemap === null ? null : { __universalValidationRemap: validationRemap }),
+				...(rendererBoundaryPreparation?.validationAst === undefined
+					? null
+					: {
+							__universalValidationAst: rendererBoundaryPreparation.validationAst,
+							__universalValidationExclusions: rendererBoundaryPreparation.validationExclusions,
+							__universalValidationRanges: rendererBoundaryPreparation.validationRanges,
+						}),
 			},
-			rendererBoundaryPreparation === null ? analyzedAst : null,
+			rendererBoundaryPreparation?.ast ?? analyzedAst,
 		);
-		if (rendererBoundaryPreparation !== null && result.map && !reverseSourceMapComposed) {
-			result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
-		}
-		if (rendererBoundaryPreparation !== null && result.map) {
-			result.map = addSourceMapNeedles(
-				result.map,
-				result.code,
-				authoredSource,
-				rendererBoundaryPreparation.mappingNeedles,
-			);
-		}
 		return {
 			...result,
 			diagnostics: rendererAuthoredDiagnostics ?? [],
 		};
 	}
 	const parsedAst =
-		rendererBoundaryPreparation === null && analyzedAst !== null
-			? analyzedAst
-			: adoptParserAst(parseModule(source, filename));
+		rendererBoundaryPreparation?.ast ??
+		(analyzedAst !== null ? analyzedAst : adoptParserAst(parseModule(source, filename)));
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
 		analyzeNativeChangeDiagnostics(parsedAst, source, filename, {
@@ -5020,6 +5001,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// inline-cache-vs-elsewhere in one line.
 	const inlineHookMemoEnabled =
 		options?.inlineHookMemo !== false && !hmrEnabled && !devEnabled && !profileEnabled;
+	const universalUnits =
+		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	const ctx = {
 		filename,
 		usedCompilerNames: collectIdentifierNames(ast),
@@ -5041,6 +5024,13 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		userRuntimeNames: new Set(), // specifiers USER code references — imported verbatim
 		userRuntimeNamespaces: new Set(), // `import * as ns from 'octane'`
 		userRuntimeDefaults: new Set(), // preserved verbatim; package resolution owns validity
+		runtimeImportRoutes: [
+			...(options?.__runtimeImportRoutes ?? []),
+			...universalUnits.map((unit) => ({
+				module: unit.renderer.module,
+				locals: new Set(unit.runtimeAliases ?? []),
+			})),
+		],
 		consumedRuntimeLocals,
 		inspect: inspectEnabled, // template-origin recording (see above)
 		hoistedTemplates: [], // { name, ast, html, ns, frag, origins }
@@ -5161,8 +5151,6 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			}
 		}
 	}
-	const universalUnits =
-		options?.__universalUnits ?? rendererBoundaryPreparation?.universalUnits ?? [];
 	ctx._universalRuntimeUnitsByBinding = new Map();
 	for (const unit of universalUnits) {
 		for (const binding of unit.bindings ?? []) {
@@ -5927,25 +5915,6 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			segments: buildFatSegments(printed.mappings, source, parsedAst),
 		};
 	}
-	for (const unit of universalUnits) {
-		const retargeted = retargetRuntimeImportAliasesWithMap(
-			result.code,
-			result.map,
-			unit.renderer.module,
-			unit.runtimeAliases,
-		);
-		result.code = retargeted.code;
-		result.map = retargeted.map;
-	}
-	if (rendererBoundaryPreparation !== null) {
-		result.map = composeSourceMaps(result.map, rendererBoundaryPreparation.map);
-		result.map = addSourceMapNeedles(
-			result.map,
-			result.code,
-			authoredSource,
-			rendererBoundaryPreparation.mappingNeedles,
-		);
-	}
 	return result;
 }
 
@@ -6246,7 +6215,7 @@ function compileServerComponent(node, ctx) {
 		return nodes;
 	}
 
-	const initializer = inheritOriginLoc({ ...fn, type: 'FunctionExpression' }, node);
+	const initializer = functionExpressionFromDeclaration(fn, node);
 	const declaration = inheritOriginLoc(b.const(name, initializer), node);
 	const nodes = [
 		isExported && !isDefault ? inheritOriginLoc(b.export(declaration), node) : declaration,
@@ -8823,7 +8792,7 @@ function compileComponent(node, ctx, options) {
 	// The declaration form embeds the compiled function at EXPRESSION position
 	// (`const X = function X(…) {…}`), preserving the user-facing function-name
 	// identity by naming the inner FunctionExpression.
-	const fnExpr = { ...fnNode, type: 'FunctionExpression' };
+	const fnExpr = functionExpressionFromDeclaration(fnNode);
 	const warmedFn = pendingWarm
 		? markPure(inheritOriginLoc(objectAssign(fnExpr, '__warm', pendingWarm), node))
 		: fnExpr;
@@ -12211,13 +12180,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const fc = ctx._foldCtx;
 			const ifNode =
 				t === 'JSXIfExpression'
-					? {
-							type: 'IfStatement',
-							test: child.test,
-							consequent: child.consequent,
-							alternate: child.alternate || null,
-							loc: child.loc, // preserve position for dev hydration LOC
-						}
+					? inheritOriginLoc(b.if(child.test, child.consequent, child.alternate || null), child)
 					: child;
 			const ic = makeIfCall(ifNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const condHole = `h${holeProps.length}`;
@@ -12257,17 +12220,14 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const fc = ctx._foldCtx;
 			const forNode =
 				t === 'JSXForExpression'
-					? {
-							type: 'ForOfStatement',
-							left: child.left,
-							right: child.right,
-							body: child.body,
-							await: !!child.await,
-							key: child.key || null,
-							index: child.index || null,
-							empty: child.empty || null,
-							loc: child.loc, // preserve position for dev hydration LOC
-						}
+					? Object.assign(
+							inheritOriginLoc(b.for_of(child.left, child.right, child.body, !!child.await), child),
+							{
+								key: child.key || null,
+								index: child.index || null,
+								empty: child.empty || null,
+							},
+						)
 					: child;
 			const rec = makeForCall(forNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const itemsHole = `h${holeProps.length}`;
@@ -12317,12 +12277,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const fc = ctx._foldCtx;
 			const swNode =
 				t === 'JSXSwitchExpression'
-					? {
-							type: 'SwitchStatement',
-							discriminant: child.discriminant,
-							cases: child.cases || [],
-							loc: child.loc, // preserve position for dev hydration LOC
-						}
+					? inheritOriginLoc(b.switch(child.discriminant, child.cases || []), child)
 					: child;
 			const rec = makeSwitchCall(swNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const discHole = `h${holeProps.length}`;
@@ -12364,14 +12319,15 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const fc = ctx._foldCtx;
 			const tryNode =
 				t === 'JSXTryExpression'
-					? {
-							type: 'TryStatement',
-							block: child.block,
-							handler: child.handler || null,
-							finalizer: child.finalizer || null,
-							pending: child.pending || null,
-							loc: child.loc, // preserve position for dev hydration LOC
-						}
+					? inheritOriginLoc(
+							b.try(
+								child.block,
+								child.handler || null,
+								child.finalizer || null,
+								child.pending || null,
+							),
+							child,
+						)
 					: child;
 			const rec = makeTryCall(tryNode, ctx, fc.compInlinedSubs, fc.parentNs, fc.cssHash);
 			const tryHole = `h${holeProps.length}`;
@@ -12489,7 +12445,7 @@ function lowerHostFragment(node, ctx, compInlinedSubs, parentNs = 'html', cssHas
 		// A returned JSX fragment may have multiple roots and must retain its range.
 		ctx.hoistedHelpers.push(
 			inheritOriginLoc(
-				b.const(fragName, singleRootInitializer(ctx, { ...renderer, type: 'FunctionExpression' })),
+				b.const(fragName, singleRootInitializer(ctx, functionExpressionFromDeclaration(renderer))),
 				node,
 			),
 		);
@@ -12535,12 +12491,15 @@ function rewriteTsrxBlocks(node, ctx, componentName, inlinedSubs) {
 			// body so its body.body (setup) + body.render (JSX) feed back through
 			// the standard compileFunctionBody path.
 			const helperName = `__tsrx$${ctx.nextHelperId++}`;
-			const fakeBody = {
-				type: 'FunctionDeclaration',
-				id: b.id(helperName),
-				params: n.params || [],
-				body: n.body,
-			};
+			const fakeBody = b.function_declaration(
+				b.id(helperName),
+				n.params || [],
+				n.body,
+				n.async,
+				n.typeParameters,
+			);
+			fakeBody.generator = n.generator;
+			if (n.returnType !== undefined) fakeBody.returnType = n.returnType;
 			inlinedSubs.push(compileFunctionBody(fakeBody, ctx, helperName));
 			return inheritOriginLoc(b.id(helperName), n);
 		}
@@ -12557,13 +12516,7 @@ const SETUP_VALUE_DIRECTIVE_TYPES = new Set([
 ]);
 
 function setupDirectiveFragment(directive) {
-	return {
-		type: 'JSXFragment',
-		children: [directive],
-		loc: directive.loc,
-		start: directive.start,
-		end: directive.end,
-	};
+	return inheritOriginLoc(b.jsx_fragment([directive]), directive);
 }
 
 function prepareSetupValueDirective(directive, ctx, componentName) {
@@ -12587,13 +12540,7 @@ function prepareSetupValueDirective(directive, ctx, componentName) {
 		// the server does not mistake the code-block node for another setup value
 		// and recurse indefinitely. normalizeChildren also owns the durable error
 		// for setup-bearing child blocks, keeping client/server diagnostics aligned.
-		return {
-			type: 'JSXFragment',
-			children: normalizeChildren([opaque]),
-			loc: opaque.loc,
-			start: opaque.start,
-			end: opaque.end,
-		};
+		return inheritOriginLoc(b.jsx_fragment(normalizeChildren([opaque])), opaque);
 	} finally {
 		ctx._puInlineLowering = prevPuInlineLowering;
 	}
@@ -13525,53 +13472,36 @@ function normalizeChildren(nodes, inSvg = false) {
 			// `@if (cond) { ... } @else { ... }` — lower to the old IfStatement
 			// shape so the existing makeIfCall path picks it up. `consequent` and
 			// `alternate` are already BlockStatements per the new AST.
-			out.push({
-				type: 'IfStatement',
-				loc: n.loc, // preserve template directive position for dev hydration LOC
-				test: n.test,
-				consequent: n.consequent,
-				alternate: n.alternate || null,
-			});
+			out.push(inheritOriginLoc(b.if(n.test, n.consequent, n.alternate || null), n));
 		} else if (n.type === 'JSXForExpression') {
 			// `@for (const x of items; index i; key x.id) { ... }` — lower to
 			// ForOfStatement plus the `key` and `index` fields the new AST gives
 			// us on the directive node. makeForCall reads these off the synthetic
 			// ForOfStatement to plan keyed reconciliation.
-			out.push({
-				type: 'ForOfStatement',
-				loc: n.loc, // preserve template directive position for dev hydration LOC
-				left: n.left,
-				right: n.right,
-				body: n.body,
-				await: !!n.await,
-				key: n.key || null,
-				index: n.index || null,
-				empty: n.empty || null,
-			});
+			out.push(
+				Object.assign(inheritOriginLoc(b.for_of(n.left, n.right, n.body, !!n.await), n), {
+					key: n.key || null,
+					index: n.index || null,
+					empty: n.empty || null,
+				}),
+			);
 		} else if (n.type === 'JSXTryExpression') {
 			// `@try { } @catch (err) { } @pending { }` — lower to TryStatement
 			// with the optional `pending` field tagged on (consumed by makeTryCall
 			// as the Suspense fallback branch).
-			out.push({
-				type: 'TryStatement',
-				start: n.start,
-				end: n.end,
-				loc: n.loc, // preserve template directive position for dev hydration LOC
-				block: n.block,
-				handler: n.handler || null,
-				finalizer: n.finalizer || null,
-				pending: n.pending || null,
-				propagateSuspense: n.propagateSuspense === true,
-			});
+			out.push(
+				Object.assign(
+					inheritOriginLoc(
+						b.try(n.block, n.handler || null, n.finalizer || null, n.pending || null),
+						n,
+					),
+					{ propagateSuspense: n.propagateSuspense === true },
+				),
+			);
 		} else if (n.type === 'JSXSwitchExpression') {
 			// `@switch (d) { @case 1: { ... } @default: { ... } }` — lower to a
 			// synthetic SwitchStatement for makeSwitchCall to consume.
-			out.push({
-				type: 'SwitchStatement',
-				loc: n.loc, // preserve template directive position for dev hydration LOC
-				discriminant: n.discriminant,
-				cases: n.cases || [],
-			});
+			out.push(inheritOriginLoc(b.switch(n.discriminant, n.cases || []), n));
 		} else if (n.type === 'JSXCodeBlock') {
 			// `@{ … }` at child position — tsrx 0.1.29 lets `@{}` appear here as
 			// well as on function bodies. The node has `.body` (setup statements)

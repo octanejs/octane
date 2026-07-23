@@ -193,10 +193,14 @@ function normalizeHmrDialect(value) {
  */
 export function findVoidComponentExports(source, id) {
 	let ast;
-	try {
-		ast = parseModule(source, id);
-	} catch {
-		return [];
+	if (source && typeof source === 'object' && source.type === 'Program') {
+		ast = source;
+	} else {
+		try {
+			ast = parseModule(source, id);
+		} catch {
+			return [];
+		}
 	}
 	const memoLocals = new Set();
 	const declarations = [];
@@ -907,11 +911,11 @@ class OctaneBundlerCompiler {
 			const collectVoidComponentExports =
 				environment === 'client' && options.collectVoidComponentExports === true;
 			let out;
-			let voidComponentSource = null;
+			let voidComponentAst = null;
 			if (collectVoidComponentExports) {
 				const compilation = compileForBundler(code, compileFilename, compileOptions);
 				out = compilation.result;
-				voidComponentSource = compilation.hydrateSource;
+				voidComponentAst = compilation.hydrateAst;
 			} else {
 				out = compile(code, compileFilename, compileOptions);
 			}
@@ -924,10 +928,10 @@ class OctaneBundlerCompiler {
 				renderer,
 				...(out.universalRuntime === undefined ? null : { universalRuntime: out.universalRuntime }),
 				...(clientReference === null ? null : { clientReference }),
-				...(voidComponentSource === null
+				...(voidComponentAst === null
 					? null
 					: {
-							voidComponentExports: findVoidComponentExports(voidComponentSource, filename),
+							voidComponentExports: findVoidComponentExports(voidComponentAst, filename),
 						}),
 				...finishMetadata(collected),
 			};

@@ -5,11 +5,12 @@ import {
 } from './renderer-boundaries.js';
 import {
 	lowerUniversalRendererRegion,
+	lowerUniversalRendererRegionAst,
 	originsFromSourceMap,
 	rendererValidationImportReferences,
 	sourceMapFromOrigins,
 } from './compile-universal.js';
-import { parseModule } from '@tsrx/core';
+import { builders as b, clone_ast_node, parseModule } from '@tsrx/core';
 
 const DOM_RENDERER = Object.freeze({ id: 'dom', module: 'octane', target: 'dom' });
 const AUTO_RUNTIME_HOOKS = new Set([
@@ -33,6 +34,54 @@ const AUTO_RUNTIME_HOOKS = new Set([
 	'useOptimistic',
 	'useContext',
 ]);
+const AST_SKIP_KEYS = new Set(['end', 'loc', 'metadata', 'parent', 'range', 'start']);
+
+function inheritGeneratedOrigin(root, origin) {
+	const seen = new WeakSet();
+	const visit = (value) => {
+		if (!value || typeof value !== 'object' || seen.has(value)) return;
+		seen.add(value);
+		if (Array.isArray(value)) {
+			for (const item of value) visit(item);
+			return;
+		}
+		if (typeof value.type === 'string' && value.loc == null && origin?.loc != null) {
+			value.start = origin.start;
+			value.end = origin.end;
+			value.loc = origin.loc;
+		}
+		for (const [key, child] of Object.entries(value)) {
+			if (!AST_SKIP_KEYS.has(key)) visit(child);
+		}
+	};
+	visit(root);
+	return root;
+}
+
+function mapAstCow(value, replace) {
+	if (!value || typeof value !== 'object') return value;
+	if (Array.isArray(value)) {
+		let output = null;
+		for (let index = 0; index < value.length; index++) {
+			const mapped = mapAstCow(value[index], replace);
+			if (output === null && mapped !== value[index]) output = value.slice(0, index);
+			if (output !== null && mapped !== null) output.push(mapped);
+		}
+		return output ?? value;
+	}
+	const replacement = replace(value);
+	if (replacement !== undefined) return replacement;
+	let output = null;
+	for (const [key, child] of Object.entries(value)) {
+		if (AST_SKIP_KEYS.has(key)) continue;
+		const mapped = mapAstCow(child, replace);
+		if (mapped !== child) {
+			if (output === null) output = { ...value };
+			output[key] = mapped;
+		}
+	}
+	return output ?? value;
+}
 
 function resolveRenderer(registry, id, filename) {
 	const entry = id === 'dom' ? (registry?.dom ?? DOM_RENDERER) : registry?.[id];
@@ -93,12 +142,19 @@ function validateBoundaryOwners(nodes, ownerRenderer, filename) {
 	}
 }
 
-function analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries) {
+function analyzeBoundaryTree(
+	source,
+	filename,
+	ownerRenderer,
+	rendererBoundaries,
+	parsedAst = null,
+) {
 	if (!rendererBoundaries || Object.keys(rendererBoundaries).length === 0) return null;
 	// Analyze every declared boundary first. Ownership is semantic: a nested
 	// boundary is interpreted under the renderer selected by its nearest owning
 	// region, not the file's lexical default.
 	const analysis = analyzeRendererBoundaries(source, {
+		ast: parsedAst,
 		filename,
 		rendererBoundaries,
 	});
@@ -497,8 +553,8 @@ function collectRuntimeCallNames(node, runtime) {
 	return output;
 }
 
-function collectLocalSpecializationInfo(source, filename) {
-	const ast = parseModule(source, filename);
+function collectLocalSpecializationInfo(source, filename, parsedAst = null) {
+	const ast = parsedAst ?? parseModule(source, filename);
 	const components = new Map();
 	const exported = new Set();
 	const runtime = { direct: new Map(), namespaces: new Set(), moduleBindings: new Set() };
@@ -590,6 +646,38 @@ function ownerReachableComponents(sourceLength, origins, localSpecializations) {
 		references.add(name);
 	};
 	walkScopedReferences(localSpecializations.ast, {
+		call: record,
+		tag: record,
+	});
+	const queue = [...reachable];
+	while (queue.length > 0) {
+		for (const dependency of dependencies.get(queue.shift()) ?? []) {
+			if (reachable.has(dependency)) continue;
+			reachable.add(dependency);
+			queue.push(dependency);
+		}
+	}
+	return reachable;
+}
+
+function ownerReachableComponentsAst(ast, localSpecializations) {
+	const localNames = new Set(localSpecializations.components.keys());
+	const dependencies = new Map();
+	const reachable = new Set(
+		[...localSpecializations.exported].filter((name) => localNames.has(name)),
+	);
+	const record = (node, name) => {
+		if (!localNames.has(name)) return;
+		const owner = owningComponentForReference(localSpecializations.components, node);
+		if (owner === null) {
+			reachable.add(name);
+			return;
+		}
+		let references = dependencies.get(owner);
+		if (references === undefined) dependencies.set(owner, (references = new Set()));
+		references.add(name);
+	};
+	walkScopedReferences(ast, {
 		call: record,
 		tag: record,
 	});
@@ -940,12 +1028,410 @@ function lowerBoundaryNode(node, ownerRenderer, state) {
 	);
 }
 
+function astNodeIndex(ast) {
+	const byRange = new Map();
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (!node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (typeof node.start === 'number' && typeof node.end === 'number') {
+			const key = `${node.start}:${node.end}`;
+			const nodes = byRange.get(key);
+			if (nodes === undefined) byRange.set(key, [node]);
+			else nodes.push(node);
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!AST_SKIP_KEYS.has(key)) visit(child);
+		}
+	};
+	visit(ast);
+	return byRange;
+}
+
+function findIndexedNode(index, range, predicate) {
+	return (index.get(`${range[0]}:${range[1]}`) ?? []).find(predicate) ?? null;
+}
+
+function attachBoundaryAstNodes(nodes, index) {
+	for (const node of nodes) {
+		node.astNode = findIndexedNode(
+			index,
+			node.boundary.elementRange,
+			(candidate) => candidate.type === 'JSXElement' || candidate.type === 'Element',
+		);
+		if (node.astNode === null) {
+			throw new Error('Octane renderer boundary could not resolve its parsed JSX element.');
+		}
+		attachBoundaryAstNodes(node.children, index);
+	}
+}
+
+function rendererBoundaryAttribute(boundary, element) {
+	if (boundary.region.kind !== 'attribute') return null;
+	const range = boundary.region.attributeRange;
+	return (element.openingElement?.attributes ?? element.attributes ?? []).find(
+		(attribute) => attribute.start === range[0] && attribute.end === range[1],
+	);
+}
+
+function rendererBoundaryPropAttribute(boundary, expression, origin) {
+	return inheritGeneratedOrigin(
+		b.jsx_attribute(
+			b.jsx_id(boundary.prop, origin),
+			b.jsx_expression_container(expression, origin),
+			false,
+			origin,
+		),
+		origin,
+	);
+}
+
+function replaceBoundaryPropAst(element, boundary, expression) {
+	const opening = element.openingElement;
+	const attributes = opening?.attributes ?? element.attributes ?? [];
+	let nextAttributes = attributes;
+	let nextChildren = element.children ?? [];
+	if (boundary.region.kind === 'children') {
+		nextAttributes = [
+			...attributes,
+			rendererBoundaryPropAttribute(boundary, expression, opening ?? element),
+		];
+		nextChildren = [];
+	} else if (boundary.region.kind === 'attribute') {
+		const selected = rendererBoundaryAttribute(boundary, element);
+		nextAttributes = attributes.map((attribute) =>
+			attribute === selected
+				? rendererBoundaryPropAttribute(boundary, expression, attribute)
+				: attribute,
+		);
+	} else {
+		nextAttributes = [
+			...attributes,
+			rendererBoundaryPropAttribute(boundary, expression, opening ?? element),
+		];
+	}
+	return inheritGeneratedOrigin(b.jsx_element(element, nextAttributes, nextChildren), element);
+}
+
+function boundaryRegionAst(element, boundary, nestedReplacements) {
+	const replaceNested = (value) =>
+		mapAstCow(value, (node) =>
+			nestedReplacements.has(node) ? nestedReplacements.get(node) : undefined,
+		);
+	const region = boundary.region;
+	if (region.kind === 'children') {
+		return inheritGeneratedOrigin(b.jsx_fragment(replaceNested(element.children ?? [])), element);
+	}
+	if (region.kind === 'absent') return inheritGeneratedOrigin(b.literal(null, 'null'), element);
+	if (region.valueKind === 'boolean') {
+		return inheritGeneratedOrigin(b.literal(true), rendererBoundaryAttribute(boundary, element));
+	}
+	if (region.valueKind === 'literal') {
+		return inheritGeneratedOrigin(
+			b.literal(region.value),
+			rendererBoundaryAttribute(boundary, element),
+		);
+	}
+	const attribute = rendererBoundaryAttribute(boundary, element);
+	return replaceNested(attribute?.value?.expression);
+}
+
+function astNameReplacement(node, name) {
+	return node.type === 'JSXIdentifier' ? b.jsx_id(name, node) : b.id(name, node);
+}
+
+function collectSpecializationAstReplacements(node, cloneNames, runtime, aliases, binding = null) {
+	const replacements = new WeakMap();
+	if (binding !== null)
+		replacements.set(binding.node, astNameReplacement(binding.node, binding.name));
+	walkScopedReferences(node, {
+		tag(name, local) {
+			const replacement = cloneNames.get(local);
+			if (replacement !== undefined) {
+				replacements.set(name, astNameReplacement(name, replacement));
+			}
+		},
+		call(callee, local) {
+			const component = cloneNames.get(local);
+			if (component !== undefined) {
+				replacements.set(callee, b.id(component, callee));
+				return;
+			}
+			const imported =
+				runtime.direct.get(local) ??
+				(AUTO_RUNTIME_HOOKS.has(local) && !runtime.moduleBindings.has(local) ? local : null);
+			const alias = imported === null ? undefined : aliases.get(imported);
+			if (alias !== undefined) replacements.set(callee, b.id(alias, callee));
+		},
+		memberCall(callee, namespace, imported) {
+			if (!runtime.namespaces.has(namespace)) return;
+			const alias = aliases.get(imported);
+			if (alias !== undefined) replacements.set(callee, b.id(alias, callee));
+		},
+	});
+	return replacements;
+}
+
+function specializeLocalComponentsAst(region, index, state) {
+	const localNames = new Set(state.localSpecializations.components.keys());
+	const selected = new Set([
+		...jsxComponentReferences(region, localNames),
+		...localCallReferences(region, localNames),
+	]);
+	const queue = [...selected];
+	while (queue.length > 0) {
+		const name = queue.shift();
+		const component = state.localSpecializations.components.get(name);
+		if (!component) continue;
+		for (const reference of new Set([
+			...jsxComponentReferences(component.declaration, localNames),
+			...localCallReferences(component.declaration, localNames),
+		])) {
+			if (selected.has(reference)) continue;
+			selected.add(reference);
+			queue.push(reference);
+		}
+	}
+	for (const name of selected) state.specializedLocalNames.add(name);
+
+	const prefix = `__octaneRendererRegion${index}`;
+	const cloneNames = new Map();
+	for (const name of selected) {
+		const preferred = /^use[A-Z]/.test(name)
+			? `useOctaneRendererRegion${index}${name.slice(3)}`
+			: `${prefix}${name}`;
+		cloneNames.set(name, state.names.name(preferred));
+	}
+	const runtimeNames = new Set(collectRuntimeCallNames(region, state.localSpecializations.runtime));
+	for (const name of selected) {
+		const component = state.localSpecializations.components.get(name);
+		if (!component) continue;
+		for (const imported of collectRuntimeCallNames(
+			component.declaration,
+			state.localSpecializations.runtime,
+		)) {
+			runtimeNames.add(imported);
+		}
+	}
+	const aliases = new Map();
+	for (const imported of runtimeNames) {
+		aliases.set(imported, state.names.name(`${imported}$${prefix}`));
+	}
+	const regionReplacements = collectSpecializationAstReplacements(
+		region,
+		cloneNames,
+		state.localSpecializations.runtime,
+		aliases,
+	);
+	const rewrittenRegion = clone_ast_node(
+		mapAstCow(region, (node) =>
+			regionReplacements.has(node) ? regionReplacements.get(node) : undefined,
+		),
+	);
+	const components = [];
+	const validationRanges =
+		region.type === 'JSXFragment'
+			? (region.children ?? []).map((node) => ({ start: node.start, end: node.end }))
+			: [{ start: region.start, end: region.end }];
+	for (const name of [...selected].sort(
+		(left, right) =>
+			state.localSpecializations.components.get(left).declaration.start -
+			state.localSpecializations.components.get(right).declaration.start,
+	)) {
+		const component = state.localSpecializations.components.get(name);
+		const replacements = collectSpecializationAstReplacements(
+			component.declaration,
+			cloneNames,
+			state.localSpecializations.runtime,
+			aliases,
+			{ node: component.id, name: cloneNames.get(name) },
+		);
+		const declaration = clone_ast_node(
+			mapAstCow(component.declaration, (node) =>
+				replacements.has(node) ? replacements.get(node) : undefined,
+			),
+		);
+		components.push(inheritGeneratedOrigin(b.export(declaration), component.declaration));
+		validationRanges.push({
+			start: component.declaration.start,
+			end: component.declaration.end,
+		});
+	}
+	return {
+		components,
+		region: rewrittenRegion,
+		runtimeImports: [...aliases].map(([imported, local]) => ({ imported, local })),
+		validationRanges,
+	};
+}
+
+function lowerBoundaryNodeAst(node, ownerRenderer, state) {
+	const boundary = node.boundary;
+	const childRenderer = resolveRenderer(
+		state.rendererRegistry,
+		boundary.childRenderer,
+		state.filename,
+	);
+	const nestedReplacements = new WeakMap();
+	for (const child of node.children) {
+		const lowered = lowerBoundaryNodeAst(child, childRenderer, state);
+		nestedReplacements.set(
+			child.astNode,
+			replaceBoundaryPropAst(child.astNode, child.boundary, lowered.expression),
+		);
+	}
+	const value = boundaryRegionAst(node.astNode, boundary, nestedReplacements);
+
+	if (childRenderer.target === 'universal') {
+		const index = state.names.universalIndex();
+		const specialization = specializeLocalComponentsAst(value, index, state);
+		const deferredRendererRegions = state.domRegions.filter((region) =>
+			containsIdentifier(specialization.region, region.token),
+		);
+		const lowered = lowerUniversalRendererRegionAst(
+			specialization.region,
+			state.filename,
+			ownerRenderer,
+			childRenderer,
+			index,
+			{
+				authoredAst: state.ast,
+				authoredSource: state.source,
+				components: specialization.components,
+				deferredRendererRegions,
+				hmr: state.hmr,
+				profile: state.profile,
+				profileFilename: state.profileFilename,
+				runtimeImports: specialization.runtimeImports,
+				universalRuntime: state.universalRuntime,
+				validationExclusions: deferredRendererRegions.map((region) => ({
+					start: region.source.start,
+					end: region.source.end,
+				})),
+				validationRanges: specialization.validationRanges,
+			},
+		);
+		for (const reference of lowered.validationImportReferences) {
+			state.childValidationImportReferences.set(`${reference.start}:${reference.end}`, reference);
+		}
+		state.preludes.push(...lowered.statements);
+		state.universalUnits.push(lowered.metadata);
+		return { expression: lowered.expression };
+	}
+
+	if (ownerRenderer.target === 'universal' && childRenderer.target === 'dom') {
+		const token = state.names.name('__octaneDomRendererRegionToken');
+		state.domRegions.push(
+			Object.freeze({
+				bind: state.names.name('__octaneBindRendererRegionOwner'),
+				body: state.names.name('__octaneDomRendererRegionBody'),
+				childRenderer,
+				helper: state.names.name('__octaneRendererRegionDescriptor'),
+				kind: boundary.region.kind === 'children' ? 'children' : 'expression',
+				ownerRenderer,
+				renderToken: state.names.name('__octaneDomRendererRegionRenderToken'),
+				source: clone_ast_node(value),
+				token,
+			}),
+		);
+		return { expression: inheritGeneratedOrigin(b.id(token), node.astNode) };
+	}
+
+	throw new Error(
+		`Octane renderer boundary ${JSON.stringify(`${boundary.moduleId}#${boundary.exportName}`)} cannot lower ${JSON.stringify(ownerRenderer.target)} -> ${JSON.stringify(childRenderer.target)} regions.`,
+	);
+}
+
+function containsIdentifier(root, name) {
+	let found = false;
+	const seen = new WeakSet();
+	const visit = (node) => {
+		if (found || !node || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (node.type === 'Identifier' && node.name === name) {
+			found = true;
+			return;
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!AST_SKIP_KEYS.has(key)) visit(child);
+		}
+	};
+	visit(root);
+	return found;
+}
+
+export function expandDomRendererRegionsAst(ast, domRegions) {
+	if (!domRegions || domRegions.length === 0) return ast;
+	const replacements = new Map();
+	const prelude = [];
+	for (const region of domRegions) {
+		const origin = region.source;
+		prelude.push(
+			inheritGeneratedOrigin(
+				b.imports([['rendererRegion', region.helper]], region.ownerRenderer.module),
+				origin,
+			),
+			inheritGeneratedOrigin(
+				b.imports([['bindRendererRegionOwner', region.bind]], 'octane'),
+				origin,
+			),
+			inheritGeneratedOrigin(
+				b.const(
+					region.body,
+					b.arrow(
+						[b.id('props')],
+						b.block([
+							b.stmt(b.call(region.bind, b.id('props'))),
+							b.return(b.call(b.member(b.id('props'), 'render'))),
+						]),
+					),
+				),
+				origin,
+			),
+		);
+	}
+	for (const region of domRegions) {
+		const source = mapAstCow(region.source, (node) =>
+			node.type === 'Identifier' && replacements.has(node.name)
+				? replacements.get(node.name)
+				: undefined,
+		);
+		const render = inheritGeneratedOrigin(b.arrow([], source), source);
+		const expression = inheritGeneratedOrigin(
+			b.call(
+				region.helper,
+				b.literal(region.ownerRenderer.id),
+				b.literal(region.childRenderer.id),
+				b.id(region.body),
+				b.object([b.prop('init', b.id('render'), render)]),
+			),
+			source,
+		);
+		replacements.set(region.renderToken, render);
+		replacements.set(region.token, expression);
+	}
+	const expanded = mapAstCow(ast, (node) =>
+		node.type === 'Identifier' && replacements.has(node.name)
+			? clone_ast_node(replacements.get(node.name))
+			: undefined,
+	);
+	return { ...expanded, body: [...prelude, ...(expanded.body ?? [])] };
+}
+
 /**
  * Replace renderer-owned JSX props with stable opaque region descriptors.
  * Boundary ownership is walked recursively so a DOM region may enter a
  * universal renderer, return to DOM, and enter another universal renderer.
  */
-export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, options = {}) {
+function prepareRendererBoundaryRegionsText(source, filename, ownerRenderer, options = {}) {
 	const { rendererBoundaries, rendererRegistry } = options;
 	const tree = analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries);
 	if (tree === null || tree.roots.length === 0) return null;
@@ -1035,6 +1521,97 @@ export function prepareRendererBoundaryRegions(source, filename, ownerRenderer, 
 	});
 }
 
+export function prepareRendererBoundaryRegions(
+	source,
+	filename,
+	ownerRenderer,
+	options = {},
+	parsedAst = null,
+) {
+	const { rendererBoundaries, rendererRegistry } = options;
+	const ast = parsedAst ?? parseModule(source, filename);
+	const tree = analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries, ast);
+	if (tree === null || tree.roots.length === 0) return null;
+	attachBoundaryAstNodes(tree.roots, astNodeIndex(ast));
+
+	const state = {
+		ast,
+		childValidationImportReferences: new Map(),
+		domRegions: [],
+		filename,
+		hmr: options?.hmr === true ? 'vite' : options?.hmr || false,
+		localSpecializations: collectLocalSpecializationInfo(source, filename, ast),
+		names: createNameAllocator(source),
+		preludes: [],
+		profile: options?.profile === true,
+		profileFilename: options?.profileFilename,
+		rendererRegistry,
+		source,
+		specializedLocalNames: new Set(),
+		universalRuntime: options?.universalRuntime,
+		universalUnits: [],
+	};
+	const replacements = new WeakMap();
+	for (const root of tree.roots) {
+		const lowered = lowerBoundaryNodeAst(root, ownerRenderer, state);
+		replacements.set(
+			root.astNode,
+			replaceBoundaryPropAst(root.astNode, root.boundary, lowered.expression),
+		);
+	}
+	let transformedAst = mapAstCow(ast, (node) =>
+		replacements.has(node) ? replacements.get(node) : undefined,
+	);
+	let validationRanges;
+	let validationExclusions;
+	if (ownerRenderer.validation !== undefined) {
+		const reachable = ownerReachableComponentsAst(transformedAst, state.localSpecializations);
+		validationRanges = Object.freeze([{ start: ast.start ?? 0, end: ast.end ?? source.length }]);
+		validationExclusions = Object.freeze([
+			...tree.roots
+				.map(({ boundary }) => {
+					const region = boundary.region;
+					const range =
+						region.kind === 'children'
+							? region.range
+							: region.kind === 'attribute'
+								? region.attributeRange
+								: null;
+					return range === null ? null : { start: range[0], end: range[1] };
+				})
+				.filter(Boolean),
+			...[...state.specializedLocalNames]
+				.filter((name) => !reachable.has(name))
+				.map((name) => state.localSpecializations.components.get(name)?.declaration)
+				.filter(Boolean)
+				.map((node) => ({ start: node.start, end: node.end })),
+		]);
+	}
+	if (state.preludes.length > 0) {
+		transformedAst = {
+			...transformedAst,
+			body: [...(transformedAst.body ?? []), ...state.preludes],
+		};
+	}
+	if (ownerRenderer.target === 'dom' && state.domRegions.length > 0) {
+		transformedAst = expandDomRendererRegionsAst(transformedAst, state.domRegions);
+		state.domRegions = [];
+	}
+	return Object.freeze({
+		analysis: tree.analysis,
+		ast: transformedAst,
+		domRegions: Object.freeze(state.domRegions),
+		universalUnits: Object.freeze(state.universalUnits),
+		...(ownerRenderer.validation === undefined
+			? null
+			: {
+					validationAst: ast,
+					validationExclusions,
+					validationRanges,
+				}),
+	});
+}
+
 function blankAuthoredText(source, start, end) {
 	const value = authoredText(source, start, end);
 	return {
@@ -1062,7 +1639,7 @@ function serverBoundaryDiagnostic(boundary, filename, message, code) {
  * the same source identity as the client compilation even when a large scene is
  * absent from the server body.
  */
-export function prepareServerRendererBoundaryRegions(
+function prepareServerRendererBoundaryRegionsText(
 	source,
 	filename,
 	ownerRenderer,
@@ -1116,6 +1693,74 @@ export function prepareServerRendererBoundaryRegions(
 		// restamping composes uniformly across sequential rewrites (compile.js).
 		origins: transformed.origins,
 		source: transformed.code,
+	});
+}
+
+export function prepareServerRendererBoundaryRegions(
+	source,
+	filename,
+	ownerRenderer,
+	{ rendererBoundaries, rendererRegistry } = {},
+	parsedAst = null,
+) {
+	const ast = parsedAst ?? parseModule(source, filename);
+	const tree = analyzeBoundaryTree(source, filename, ownerRenderer, rendererBoundaries, ast);
+	if (tree === null || tree.roots.length === 0) return null;
+	attachBoundaryAstNodes(tree.roots, astNodeIndex(ast));
+
+	const replacements = new WeakMap();
+	for (const node of tree.roots) {
+		const boundary = node.boundary;
+		if (boundary.server !== 'omit-child') {
+			throw serverBoundaryDiagnostic(
+				boundary,
+				filename,
+				'cannot compile for the server because renderer-owned client regions do not provide serialization or hydration',
+				'OCTANE_RENDERER_BOUNDARY_SERVER_UNSUPPORTED',
+			);
+		}
+		const childRenderer = resolveRenderer(rendererRegistry, boundary.childRenderer, filename);
+		if (childRenderer.server !== 'client-only') {
+			throw serverBoundaryDiagnostic(
+				boundary,
+				filename,
+				`declares server: "omit-child" but child renderer ${JSON.stringify(boundary.childRenderer)} is not server: "client-only"`,
+				'OCTANE_RENDERER_BOUNDARY_SERVER_POLICY_MISMATCH',
+			);
+		}
+		const element = node.astNode;
+		if (boundary.region.kind === 'children') {
+			replacements.set(
+				element,
+				inheritGeneratedOrigin(
+					b.jsx_element(
+						element,
+						element.openingElement?.attributes ?? element.attributes ?? [],
+						[],
+					),
+					element,
+				),
+			);
+		} else if (boundary.region.kind === 'attribute') {
+			const selected = rendererBoundaryAttribute(boundary, element);
+			replacements.set(
+				element,
+				inheritGeneratedOrigin(
+					b.jsx_element(
+						element,
+						(element.openingElement?.attributes ?? element.attributes ?? []).filter(
+							(attribute) => attribute !== selected,
+						),
+						element.children ?? [],
+					),
+					element,
+				),
+			);
+		}
+	}
+	return Object.freeze({
+		analysis: tree.analysis,
+		ast: mapAstCow(ast, (node) => (replacements.has(node) ? replacements.get(node) : undefined)),
 	});
 }
 

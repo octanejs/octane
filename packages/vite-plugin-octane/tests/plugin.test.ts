@@ -244,7 +244,7 @@ export default { compiler: { renderers } };
 				join(root, 'src/scenes/Scene.object.tsrx'),
 			);
 			expect(appConfigured.code).toMatch(/from ["']octane\/universal["']/);
-			expect(appConfigured.code).toContain('"object"');
+			expect(appConfigured.code).toMatch(/['"]object['"]/);
 
 			const add = vi.fn();
 			(meta.configureServer as (server: unknown) => void)({
@@ -280,7 +280,7 @@ export default { compiler: { renderers } };
 				'export function Scene() @{ <node /> }',
 				join(root, 'src/scenes/Scene.object.tsrx'),
 			);
-			expect(inlineConfigured.code).toContain('"inline"');
+			expect(inlineConfigured.code).toMatch(/['"]inline['"]/);
 		} finally {
 			await rm(root, { recursive: true, force: true });
 		}

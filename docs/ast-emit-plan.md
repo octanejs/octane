@@ -50,9 +50,12 @@ template IR rather than being maintained by ad hoc string concatenation.
 - The client runtime's `template(html, ns, frag)` string ABI remains unchanged.
   Shipping template IR as runtime object data would increase generated size and
   replace the browser's optimized HTML parser/clone path with runtime work.
-- All construction uses `@tsrx/core` builders with origin locations
-  (`loc_info` / `inheritOriginLoc`); the frozen-AST and loc-completeness
-  enforcement flags stay on and must stay green throughout.
+- All construction uses `@tsrx/core` builders and clone helpers wherever they
+  represent the required node or copy-on-write rewrite, with origin locations
+  (`loc_info` / `inheritOriginLoc`). Manual node construction is reserved for
+  unsupported ESTree shapes or preservation of parser-owned fields that the
+  helpers cannot express. The frozen-AST and loc-completeness enforcement flags
+  stay on and must stay green throughout.
 
 ## Milestones
 
@@ -150,6 +153,10 @@ Remove the intermediate generated-source round trips:
    metadata without generated-text needles.
 3. Select the final runtime module/specifiers before the one Program print, so
    no output is edited after printing.
+4. Audit the complete compilation chain for manually constructed AST nodes and
+   replace each safe case with the corresponding `@tsrx/core` builder or clone
+   helper. Cover both the newly converted emit paths and pre-existing transform
+   code; document the few manual constructions that must remain.
 
 `slot-hooks.js` is the sole intentional text-edit exception because preserving
 authored line numbers without a source map is its public debugging contract.
@@ -157,6 +164,16 @@ authored line numbers without a source map is its public debugging contract.
 Exit: client/dev/HMR/prod/profile, server/SSR, universal renderer, renderer
 boundary, hydrate split-module, type-only/Volar, and client-only-stub outputs all
 follow AST → one final print.
+
+Builder/clone audit result: the complete compiler chain uses `@tsrx/core`
+builders for supported generated nodes, including function-form conversions,
+and `clone_ast_node` where a rewrite needs an independent deep subtree (such as
+stylesheet transforms). Manual ESTree construction remains only where the
+builder surface has no equivalent: `Program`, `ImportExpression`,
+`MetaProperty`, `ChainExpression`, default-import specifiers, a dynamic
+`ThrowStatement`, and a labeled `BreakStatement`. TSRX-only parser nodes,
+compiler template IR records, and esrap comment records are not generated
+JavaScript AST and are intentionally outside this list.
 
 ### M7 — cleanup and durable controls
 
