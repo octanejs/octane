@@ -83,6 +83,7 @@ packageExtensions:
 catalogs:
   lynx:
     '@lynx-js/css-extract-webpack-plugin': 0.9.0
+    '@lynx-js/qrcode-rsbuild-plugin': 0.6.0
     '@lynx-js/rspeedy': 0.16.0
     '@lynx-js/runtime-wrapper-webpack-plugin': 0.2.2
     '@lynx-js/tasm': 0.0.39
