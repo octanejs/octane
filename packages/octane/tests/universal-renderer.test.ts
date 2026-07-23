@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { parseModule } from '@tsrx/core';
+import { builders as b, parseModule } from '@tsrx/core';
+import { print as esrapPrint } from 'esrap';
+import esrapTsx from 'esrap/languages/tsx';
 import { compile } from '../src/compiler/compile.js';
-import { lowerUniversalRendererRegion } from '../src/compiler/compile-universal.js';
+import { lowerUniversalRendererRegionAst } from '../src/compiler/compile-universal.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import * as UniversalRuntime from '../src/universal.js';
 import {
@@ -50,6 +52,72 @@ const validationRenderer = {
 		},
 	},
 } as const;
+
+function lowerUniversalRendererRegion(
+	regionSource: string,
+	filename: string,
+	ownerRenderer: any,
+	childRenderer: any,
+	index: number,
+	_kind: 'children' | 'expression' = 'children',
+	options: Record<string, any> = {},
+) {
+	const wrapped = parseModule(`const __region = <>${regionSource}</>;`, filename);
+	const regionExpression = wrapped.body[0]?.declarations?.[0]?.init;
+	if (!regionExpression) throw new Error('test region did not parse');
+	const authoredSource =
+		typeof options.authoredSource === 'string' ? options.authoredSource : regionSource;
+	const authoredAst = parseModule(authoredSource, filename);
+	const componentStatements = (options.components ?? []).flatMap((component: any) => {
+		if (component?.type) return [component];
+		const start =
+			component?.origins?.find?.((origin: number) => origin >= 0) ??
+			authoredSource.indexOf(component.code);
+		const authored = authoredAst.body.find(
+			(statement: any) =>
+				statement.start === start && statement.end === start + component.code.length,
+		);
+		return authored === undefined ? parseModule(component.code, filename).body : [authored];
+	});
+	const validationRanges = [
+		{
+			start: Math.max(0, authoredSource.indexOf(regionSource)),
+			end: Math.max(0, authoredSource.indexOf(regionSource)) + regionSource.length,
+		},
+		...(options.components ?? []).map((component: any) => {
+			const start =
+				component?.origins?.find?.((origin: number) => origin >= 0) ??
+				authoredSource.indexOf(component.code);
+			return { start, end: start + component.code.length };
+		}),
+	].filter((range) => range.start >= 0);
+	const lowered = lowerUniversalRendererRegionAst(
+		regionExpression,
+		filename,
+		ownerRenderer,
+		childRenderer,
+		index,
+		{
+			...options,
+			components: componentStatements,
+			authoredAst,
+			authoredSource,
+			validationRanges,
+		},
+	);
+	const prelude = esrapPrint(
+		{
+			type: 'Program',
+			sourceType: 'module',
+			body: [...lowered.statements],
+		},
+		esrapTsx(),
+	).code;
+	const expression = esrapPrint(b.stmt(lowered.expression), esrapTsx())
+		.code.trim()
+		.replace(/;$/, '');
+	return { ...lowered, prelude, expression };
+}
 
 const itemPlan = universalPlan('object', {
 	kind: 'range',

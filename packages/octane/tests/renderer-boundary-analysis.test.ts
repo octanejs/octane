@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
 import { prepareServerRendererBoundaryRegions } from '../src/compiler/compile-renderer-boundaries.js';
-import { decodeMappings } from '../src/compiler/compile-universal.js';
+import { decodeMappings } from './_source-map.js';
 import {
 	analyzeRendererBoundaries,
 	assertRendererBoundaryAnalysis,

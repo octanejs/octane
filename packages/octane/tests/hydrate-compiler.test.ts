@@ -2,7 +2,7 @@ import { parseModule } from '@tsrx/core';
 import { describe, expect, it } from 'vitest';
 import { createOctaneCompiler } from '../src/compiler/bundler.js';
 import { compile } from '../src/compiler/compile.js';
-import { decodeMappings } from '../src/compiler/compile-universal.js';
+import { decodeMappings } from './_source-map.js';
 
 const ROOT = '/project';
 const FILE = '/project/src/App.tsrx';

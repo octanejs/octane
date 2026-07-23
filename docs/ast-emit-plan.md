@@ -183,6 +183,33 @@ guidance to name AST emit plus template IR serialization as the norm. Re-baselin
 codegen size and compile benchmarks, and add an audit test that fails when a new
 generated-source/reparse or post-print mutation path is introduced.
 
+Completion result (2026-07-23):
+
+- Deleted the superseded text emitters, origin arrays, map encoders/composers,
+  replacement engines, runtime-import retargeting, universal validation remap,
+  and style remap compatibility paths from universal, renderer-boundary,
+  hydrate, and main compilation.
+- Added `compiler-ast-emit-audit.test.ts`. It pins the two compiler-owned final
+  Program print sites, restricts `parseModule` inputs to authored source,
+  rejects post-print edits/concatenation and retired compatibility APIs, and
+  inventories the few manual node objects that cannot use builders.
+- Moved the source-map decoder still needed by map assertions into test code;
+  production compiler modules no longer export a decoder solely for tests.
+- Added the AST-only/template-IR invariant, the `slot-hooks.js` exception,
+  Volar `boundaryTokens: true`, and the builder/clone requirement to the
+  RuleSync core-engineering source and regenerated all five targets.
+- Compared M7 directly with the committed M6 control under frozen-AST and
+  location enforcement: all 1,079 accepted fixture/mode outputs had
+  byte-identical code and maps. `attrs-events` dev/prod/server sizes were
+  unchanged (16,335 / 14,655 / 5,681 bytes). Alternating medians were within
+  measurement noise: client +0.23% on the 60-component harness and server
+  +0.98% on a 40-component bounded-memory variant. No performance improvement
+  is claimed.
+- The focused compiler matrix passed 472/472. The full Octane backstop passed
+  8,504/8,506; its only failures were the pre-existing load-sensitive
+  five-second Volar and production-HMR timeouts, and both files then passed
+  54/54 in isolation. Workspace typecheck and repository formatting passed.
+
 ## Test plan
 
 The conversion is verified against the COMPILER OUTPUT, not by re-running the

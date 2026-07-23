@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
-import { decodeMappings } from '../src/compiler/compile-universal.js';
+import { decodeMappings } from './_source-map.js';
 import { normalizeRendererConfig } from '../src/compiler/renderers.js';
 import {
 	createObjectContainer,
