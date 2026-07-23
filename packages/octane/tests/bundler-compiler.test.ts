@@ -14,6 +14,7 @@ import {
 	resolveOctaneRuntimeRequest,
 } from '../src/compiler/bundler.js';
 import { inspectProfileOutput, uniqueMetadata } from './_profile-output';
+import { decodeMappings } from './_source-map.js';
 
 const COMPONENT =
 	"import { useState } from 'octane';\n" +
@@ -278,6 +279,13 @@ export function Named() @{ <node /> }
 			sourcesContent: [source],
 		});
 		expect(server?.map?.mappings.length).toBeGreaterThan(0);
+		for (const line of decodeMappings(server!.map.mappings)) {
+			for (const segment of line) {
+				if (segment.length < 4) continue;
+				expect(segment[2], 'client-only stub source line').toBeGreaterThanOrEqual(0);
+				expect(segment[3], 'client-only stub source column').toBeGreaterThanOrEqual(0);
+			}
+		}
 		expect(server?.code).not.toContain('authored-setup');
 		expect(server?.code).not.toContain('__clientOnlyAuthoredSetup');
 		expect(server?.code).not.toContain("'client'");
@@ -346,6 +354,38 @@ export function Named() @{ <node /> }
 			filename: '/src/scenes/Scene.object.tsrx',
 		});
 		expect(useError.message).toMatch(/client-only export "default".*renderer "object"/i);
+	});
+
+	it('omits client-only server scaffolding when there are no runtime exports', () => {
+		const compiler = createOctaneCompiler({
+			root: '/project',
+			renderers: {
+				registry: {
+					object: {
+						module: '/src/object-renderer.js',
+						server: 'client-only',
+					},
+				},
+				rules: [{ include: 'src/**/*.object.tsrx', renderer: 'object' }],
+			},
+		});
+		const source = '\n';
+		const server = compiler.transform(source, '/project/src/scenes/Empty.object.tsrx', {
+			environment: 'server',
+		});
+
+		expect(server).toMatchObject({
+			kind: 'client-only-stub',
+			clientOnlyExports: [],
+			code: '',
+			ast: { type: 'Program', sourceType: 'module', body: [] },
+			map: {
+				version: 3,
+				sources: ['/src/scenes/Empty.object.tsrx'],
+				sourcesContent: [source],
+				mappings: '',
+			},
+		});
 	});
 
 	it('preserves quoted runtime export names in the client-only stub AST and module', async () => {

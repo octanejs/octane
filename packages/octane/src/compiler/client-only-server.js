@@ -284,6 +284,18 @@ function inheritGeneratedOrigin(root, origin) {
 	return root;
 }
 
+function createProgram(body, origin) {
+	return inheritGeneratedOrigin(
+		{
+			type: 'Program',
+			sourceType: 'module',
+			body,
+			metadata: { path: [] },
+		},
+		origin,
+	);
+}
+
 const jsonStringifyCall = (expression) => b.call(b.member(b.id('JSON'), 'stringify'), expression);
 
 function clientOnlyStubVisitors() {
@@ -306,6 +318,19 @@ function clientOnlyStubVisitors() {
 	};
 }
 
+function printClientOnlyServerStub(program, source, filename, exports) {
+	const printed = esrapPrint(program, clientOnlyStubVisitors(), {
+		sourceMapSource: filename,
+		sourceMapContent: source,
+	});
+	return {
+		ast: program,
+		code: printed.code,
+		map: printed.map,
+		exports,
+	};
+}
+
 /**
  * Emit an ESM module with the same explicit runtime export names but none of
  * the authored imports, declarations, or top-level setup.
@@ -314,6 +339,9 @@ export function createClientOnlyServerStub(source, filename, renderer) {
 	const ast = parseModule(source, filename);
 	const exportEntries = collectRuntimeExports(ast, filename);
 	const exports = exportEntries.map((entry) => entry.name);
+	if (exportEntries.length === 0) {
+		return printClientOnlyServerStub(createProgram([], ast), source, filename, exports);
+	}
 	const message = b.template(
 		[
 			b.quasi('Client-only export '),
@@ -399,25 +427,12 @@ export function createClientOnlyServerStub(source, filename, renderer) {
 		),
 	);
 	body.push(b.export(null, exportSpecifiers));
-	const program = inheritGeneratedOrigin(
-		{
-			type: 'Program',
-			sourceType: 'module',
-			body,
-			metadata: { path: [] },
-		},
-		ast,
-	);
-	const printed = esrapPrint(program, clientOnlyStubVisitors(), {
-		sourceMapSource: filename,
-		sourceMapContent: source,
-	});
-	return Object.freeze({
-		ast: program,
-		code: printed.code,
-		map: printed.map,
-		exports: Object.freeze(exports),
-	});
+	// A Program can end at column zero when the source has a trailing newline.
+	// Structural nodes need an authored syntax range whose end is a real token:
+	// esrap anchors a generated closing delimiter immediately before `loc.end`.
+	const scaffoldOrigin = exportEntries[0].origin;
+	const program = createProgram(body, scaffoldOrigin);
+	return printClientOnlyServerStub(program, source, filename, exports);
 }
 
 function bindingNames(pattern) {
