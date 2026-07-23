@@ -867,8 +867,9 @@ class OctaneBundlerCompiler {
 			if (environment === 'server' && clientReference !== null) {
 				const stub = createClientOnlyServerStub(code, filename, renderer.id);
 				return {
+					ast: stub.ast,
 					code: stub.code,
-					map: null,
+					map: stub.map,
 					kind: 'client-only-stub',
 					renderer,
 					clientReference,

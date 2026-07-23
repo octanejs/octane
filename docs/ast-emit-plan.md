@@ -127,13 +127,16 @@ Bring the smaller module-producing entry points under the same invariant:
 
 1. Add the Volar renderer pragma to the type-only AST/comment set before
    `@tsrx/core` performs its one print; remove `prelude + result.code` and manual
-   mapping shifts.
+   mapping shifts. Expose that exact transformed Program as `generatedAst` so
+   the playground's types target can render AST or generated TSX without
+   reparsing.
 2. Emit client-only server stubs as AST and print each stub once with a map.
 3. Audit other compiler helpers returning generated modules and convert any
    remaining line-array/template-string emitters.
 
 Exit: every type-only/Volar or auxiliary generated module exposes the AST it
-printed and has no post-print source concatenation.
+printed and has no post-print source concatenation. The playground can select
+the type-only Program/code/mappings as a first-class compilation target.
 
 ### M6 — universal, renderer-boundary, and hydrate pipelines
 
