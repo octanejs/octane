@@ -5318,12 +5318,17 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// statements) plus a coarse anchor at each component declaration line.
 	let bodyLine = countNewlines(body);
 	const bodySegments = [];
-	const pushEsrapSegments = (baseLine, colShift, mappings) => {
+	// `firstLineOnly`: the column shift applies to fragment line 0 alone — the
+	// shape of an expression pasted mid-line into generated code, whose
+	// continuation lines keep their printed columns (statement fragments instead
+	// re-indent every line, the default).
+	const pushEsrapSegments = (baseLine, colShift, mappings, firstLineOnly = false) => {
 		for (let i = 0; i < mappings.length; i++) {
+			const shift = firstLineOnly && i > 0 ? 0 : colShift;
 			for (const seg of mappings[i]) {
 				bodySegments.push({
 					genLine: baseLine + i,
-					genCol: seg[0] + colShift,
+					genCol: seg[0] + shift,
 					srcLine0: seg[2],
 					srcCol0: seg[3],
 				});
@@ -5345,7 +5350,9 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	// component that starts at body line `base`.
 	const drainSetupMaps = (base) => {
 		if (ctx._setupMaps) {
-			for (const e of ctx._setupMaps) pushEsrapSegments(base + e.fnRelLine, e.colShift, e.mappings);
+			for (const e of ctx._setupMaps) {
+				pushEsrapSegments(base + e.fnRelLine, e.colShift, e.mappings, e.firstLineOnly === true);
+			}
 			ctx._setupMaps = null;
 		}
 	};
@@ -8286,6 +8293,31 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			`  if (__s.locs === undefined) { __s.locs = ${plan.locs}; __s.locFile = ${JSON.stringify(ctx.mapSourceName)}; }`,
 		);
 	}
+	// Binding-expression fragment maps (docs: 2C). Each plan chunk carries the
+	// chunk-relative paste positions of its mapped expressions (joinChunks);
+	// convert them to function-relative entries at the exact line the chunk is
+	// pushed. Line 0 is `function NAME(sig) {`; +1 assumes the `__block` header,
+	// matching the setup-statement convention (the !needsBlock decrement below
+	// re-aligns both together). Column shifts apply to the first fragment line
+	// only — pasted expressions keep their printed columns on later lines.
+	const fragmentMapEntries = [];
+	const lineOffsetOfLines = () => {
+		let count = 0;
+		for (const entry of lines) count += countNewlines(entry) + 1;
+		return count;
+	};
+	const recordPlanMaps = (maps) => {
+		if (!collectSetupMaps || !maps || maps.length === 0) return;
+		const start = 2 + lineOffsetOfLines();
+		for (const m of maps) {
+			fragmentMapEntries.push({
+				fnRelLine: start + m.line,
+				colShift: m.col,
+				firstLineOnly: true,
+				mappings: m.mappings,
+			});
+		}
+	};
 	if (plan?.hasBag) {
 		lines.push(`  let _b = __s.slots[0];`);
 		// Deferred property-write diffs (plan.everyRender) run on BOTH mount and
@@ -8294,18 +8326,27 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 		// When there are none, drop the empty `else`.
 		if (plan.update) {
 			lines.push(`  if (_b === undefined) {`);
+			recordPlanMaps(plan.mountMaps);
 			lines.push(plan.mount);
 			lines.push(`  } else {`);
+			recordPlanMaps(plan.updateMaps);
 			lines.push(plan.update);
 			lines.push(`  }`);
 		} else {
 			lines.push(`  if (_b === undefined) {`);
+			recordPlanMaps(plan.mountMaps);
 			lines.push(plan.mount);
 			lines.push(`  }`);
 		}
-		if (plan.everyRender) lines.push(plan.everyRender);
+		if (plan.everyRender) {
+			recordPlanMaps(plan.everyRenderMaps);
+			lines.push(plan.everyRender);
+		}
 	}
-	if (plan?.after) lines.push(plan.after);
+	if (plan?.after) {
+		recordPlanMaps(plan.afterMaps);
+		lines.push(plan.after);
+	}
 	// Hoisted `<title>`/`<meta>`/`<link>` → headBlock into document.head
 	// (out-of-band; re-applied each render for reactivity, removed on unmount).
 	if (plan?.head) lines.push(plan.head);
@@ -8321,6 +8362,7 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 	// `App(props)` binds `props`, while compiled bodies still read `__s` by name.
 	const sig = params ? `${params}, __s, __extra` : `__props, __s, __extra`;
 	const bodyCode = lines.join('\n');
+	if (setupMaps && fragmentMapEntries.length > 0) setupMaps.push(...fragmentMapEntries);
 	const needsBlock = !returnedOutput && bodyCode.includes('__block');
 	if (!needsBlock && setupMaps) {
 		// Omitting the header shifts every setup statement up by one generated line.
@@ -11325,8 +11367,10 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				elseHoleName = `h${holeProps.length}`;
 				holeProps.push(objectProp(elseHoleName, b.id(ic.elseHelper)));
 			}
-			// Renderer-side, the call reads everything from `props.hN`.
+			// Renderer-side, the call reads everything from `props.hN`. The captured
+			// fragment map described the component-side print — drop it.
 			ic.condExpr = `props.${condHole}`;
+			ic.condExprMap = undefined;
 			ic.thenHelper = `props.${thenHole}`;
 			ic.elseHelper = elseHoleName ? `props.${elseHoleName}` : null;
 			// Phase 2: the hoisted helpers' env values are COMPONENT-scope
@@ -11371,6 +11415,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const bodyHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(bodyHole, b.id(rec.bodyHelper)));
 			rec.itemsExpr = `props.${itemsHole}`;
+			rec.itemsExprMap = undefined;
 			rec.bodyHelper = `props.${bodyHole}`;
 			if (rec.emptyHelper && rec.emptyHelper !== 'null') {
 				const emptyHole = `h${holeProps.length}`;
@@ -11424,6 +11469,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 			const discHole = `h${holeProps.length}`;
 			holeProps.push(objectProp(discHole, rewriteJsxValues(rec.discNode, ctx)));
 			rec.discExpr = `props.${discHole}`;
+			rec.discExprMap = undefined;
 			const casesHole = `h${holeProps.length}`;
 			holeProps.push(
 				objectProp(
@@ -11436,6 +11482,7 @@ function extractFragment(node, ctx, holeProps, parentNs = 'html') {
 				),
 			);
 			rec.casesArrayExpr = `props.${casesHole}`;
+			rec.casesChunk = null;
 			if (rec.defaultHelper && rec.defaultHelper !== 'null') {
 				const defHole = `h${holeProps.length}`;
 				holeProps.push(objectProp(defHole, b.id(rec.defaultHelper)));
@@ -12979,11 +13026,25 @@ function emitAutoMemoRegion(ctx, dependencies, slotIndex, statement, extraMiss, 
 		.map((name, index) => `${cache}[${cell.base + index}] = ${name};`)
 		.join(' ');
 	const writable = `if (${cache} === ${ctx.currentAutoMemoCommittedName}) ${cache} = ${cache}.slice();`;
+	// `statement` may be a plain string or an emit chunk carrying expression
+	// pastes (catChunks shape) — compose byte-identically and return the same
+	// shape the caller passed in.
+	const isChunk = typeof statement !== 'string';
 	if (!contextAware) {
-		return `{ ${depDecls} if (${misses.join(' || ')}) { ${statement} ${writable} ${publish} ${cache}[${cell.init}] = true; } }`;
+		const region = catChunks([
+			`{ ${depDecls} if (${misses.join(' || ')}) { `,
+			statement,
+			` ${writable} ${publish} ${cache}[${cell.init}] = true; } }`,
+		]);
+		return isChunk ? region : region.code;
 	}
 	ctx.runtimeNeeded.add('compilerCacheContext');
-	return `{ ${depDecls} if (${misses.join(' || ')}) { ${statement} const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); ${writable} ${publish} ${cache}[${contextIndex}] = _c; ${cache}[${cell.init}] = true; } else { const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); if (_c !== ${cache}[${contextIndex}]) { ${writable} ${cache}[${contextIndex}] = _c; } } }`;
+	const region = catChunks([
+		`{ ${depDecls} if (${misses.join(' || ')}) { `,
+		statement,
+		` const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); ${writable} ${publish} ${cache}[${contextIndex}] = _c; ${cache}[${cell.init}] = true; } else { const _c = _$compilerCacheContext(__s, ${slotIndex}, ${cache}[${contextIndex}]); if (_c !== ${cache}[${contextIndex}]) { ${writable} ${cache}[${contextIndex}] = _c; } } }`,
+	]);
+	return isChunk ? region : region.code;
 }
 
 function planJsx(
@@ -13394,8 +13455,15 @@ function planJsx(
 			const arrow = printNode(sink.arrow);
 			if (bindings.length === 1) {
 				const binding = bindings[0];
-				if (binding.kind === 'event') binding.expr = arrow;
-				else binding.fnExpr = arrow;
+				// The materialized arrow replaces the printed sink reference; the
+				// captured fragment map described the old text — drop it.
+				if (binding.kind === 'event') {
+					binding.expr = arrow;
+					binding.exprMap = undefined;
+				} else {
+					binding.fnExpr = arrow;
+					binding.fnExprMap = undefined;
+				}
 			} else {
 				mountLines.push(`    const ${name} = ${arrow};`);
 			}
@@ -13753,8 +13821,7 @@ function planJsx(
 		// list's trailing boundary. Let forBlock reuse it as its end marker instead
 		// of retaining it beside a newly-created `/for` comment.
 		const ownEndPart = fc.anchorVar ? ', true' : '';
-		const itemsArg = fc.autoMemoDeps !== null ? '_v' : fc.itemsExpr;
-		const call = `_$forBlock(__s, ${slotIndex}, ${hostExpr}, ${itemsArg}, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart}${ownEndPart});`;
+		const callTail = `, ${fc.keyHelper}, ${fc.bodyHelper}${flagsPart}${depsPart}${emptyPart}${anchorPart}${ownEndPart});`;
 		if (fc.autoMemoDeps !== null) {
 			const witnessMiss = fc.autoMemoWitnesses.length
 				? fc.autoMemoWitnesses
@@ -13765,13 +13832,27 @@ function planJsx(
 				ctx,
 				['_v', ...fc.autoMemoDeps],
 				slotIndex,
-				call,
+				`_$forBlock(__s, ${slotIndex}, ${hostExpr}, _v${callTail}`,
 				witnessMiss,
 				fc.autoMemoContextAware,
 			);
-			pushAfter(fc.id, `  { const _v = (${fc.itemsExpr}); ${guarded} }`);
+			pushAfter(
+				fc.id,
+				catChunks([
+					`  { const _v = (`,
+					exprChunk(fc.itemsExpr, fc.itemsExprMap),
+					`); ${guarded} }`,
+				]),
+			);
 		} else {
-			pushAfter(fc.id, `  ${call}`);
+			pushAfter(
+				fc.id,
+				catChunks([
+					`  _$forBlock(__s, ${slotIndex}, ${hostExpr}, `,
+					exprChunk(fc.itemsExpr, fc.itemsExprMap),
+					callTail,
+				]),
+			);
 		}
 	}
 	for (const ic of ifCalls) {
@@ -13795,7 +13876,11 @@ function planJsx(
 		const elseArg = ic.elseHelper || 'null';
 		pushAfter(
 			ic.id,
-			`  _$ifBlock(__s, ${slotIndex}, ${hostExpr}, (${ic.condExpr}), ${ic.thenHelper}, ${elseArg}${anchorArg}${ifEnvArg});`,
+			catChunks([
+				`  _$ifBlock(__s, ${slotIndex}, ${hostExpr}, (`,
+				exprChunk(ic.condExpr, ic.condExprMap),
+				`), ${ic.thenHelper}, ${elseArg}${anchorArg}${ifEnvArg});`,
+			]),
 		);
 	}
 	for (const cc of compCalls) {
@@ -13909,7 +13994,21 @@ function planJsx(
 				: null;
 			pushAfter(
 				cc.id,
-				`  ${emitAutoMemoRegion(ctx, cc.autoMemoDeps, slotIndex, `_$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${trailing});`, witnessMiss, cc.autoMemoContextAware)}`,
+				catChunks([
+					`  `,
+					emitAutoMemoRegion(
+						ctx,
+						cc.autoMemoDeps,
+						slotIndex,
+						catChunks([
+							`_$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
+							cc.propsChunk ?? cc.propsExpr,
+							`${trailing});`,
+						]),
+						witnessMiss,
+						cc.autoMemoContextAware,
+					),
+				]),
 			);
 			continue;
 		}
@@ -13928,7 +14027,11 @@ function planJsx(
 			const inheritAnchor = anchorExprFor(cc, 'compAnchor') ?? 'undefined';
 			pushAfter(
 				cc.id,
-				`  _$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}, ${inheritAnchor}, undefined, undefined, true);`,
+				catChunks([
+					`  _$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
+					cc.propsChunk ?? cc.propsExpr,
+					`, ${inheritAnchor}, undefined, undefined, true);`,
+				]),
 			);
 			continue;
 		}
@@ -13945,7 +14048,11 @@ function planJsx(
 			const anchorArg = liteAnchor ? `, ${liteAnchor}` : '';
 			pushAfter(
 				cc.id,
-				`  _$componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg});`,
+				catChunks([
+					`  _$componentSlotLite(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
+					cc.propsChunk ?? cc.propsExpr,
+					`${anchorArg});`,
+				]),
 			);
 			continue;
 		}
@@ -13961,10 +14068,10 @@ function planJsx(
 		// key is present but anchor isn't, supply `undefined` for the anchor slot
 		// so the key lands in the right argument position — the runtime's
 		// `anchor ?? null` still routes through appendChild as before.
-		let keyArg = '';
+		let keyParts = [];
 		if (cc.keyExpr != null) {
 			if (anchorArg === '') anchorArg = ', undefined';
-			keyArg = `, (${cc.keyExpr})`;
+			keyParts = [`, (`, exprChunk(cc.keyExpr, cc.keyExprMap), `)`];
 		}
 		// singleRoot is the 8th positional arg (after anchor, key). It's gated on
 		// no-key, so backfill anchor + key placeholders to land it in the right
@@ -13980,7 +14087,13 @@ function planJsx(
 		const keyedArg = cc.keyExpr != null ? ', undefined, undefined, true' : '';
 		pushAfter(
 			cc.id,
-			`  _$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, ${cc.propsExpr}${anchorArg}${keyArg}${singleRootArg}${keyedArg});`,
+			catChunks([
+				`  _$${componentHelper}(__s, ${slotIndex}, ${hostExpr}, ${cc.compExpr}, `,
+				cc.propsChunk ?? cc.propsExpr,
+				anchorArg,
+				...keyParts,
+				`${singleRootArg}${keyedArg});`,
+			]),
 		);
 	}
 	for (const pc of ctx._portalCalls) {
@@ -13990,7 +14103,13 @@ function planJsx(
 		const portalEnv = envExprFor(pc);
 		pushAfter(
 			pc.id,
-			`  _$portal(__s, ${slotIndex}, ${pc.targetExpr}, ${pc.bodyExpr}, ${pc.propsExpr}, ${hostExpr}${portalEnv ? `, ${portalEnv}` : ''});`,
+			catChunks([
+				`  _$portal(__s, ${slotIndex}, `,
+				exprChunk(pc.targetExpr, pc.targetExprMap),
+				`, `,
+				exprChunk(pc.bodyExpr, pc.bodyExprMap),
+				`, ${pc.propsExpr}, ${hostExpr}${portalEnv ? `, ${portalEnv}` : ''});`,
+			]),
 		);
 	}
 	// Restore the outer plan's portal-call list — pairs with the save above.
@@ -14025,7 +14144,13 @@ function planJsx(
 		const swEnvArg = swEnv ? (anchorArg ? `, ${swEnv}` : `, undefined, ${swEnv}`) : '';
 		pushAfter(
 			sc.id,
-			`  _$switchBlock(__s, ${slotIndex}, ${hostExpr}, (${sc.discExpr}), ${sc.casesArrayExpr}, ${sc.defaultHelper}${anchorArg}${swEnvArg});`,
+			catChunks([
+				`  _$switchBlock(__s, ${slotIndex}, ${hostExpr}, (`,
+				exprChunk(sc.discExpr, sc.discExprMap),
+				`), `,
+				sc.casesChunk ?? sc.casesArrayExpr,
+				`, ${sc.defaultHelper}${anchorArg}${swEnvArg});`,
+			]),
 		);
 	}
 	// Restore the outer plan's switch-call list — pairs with the save above.
@@ -14038,23 +14163,29 @@ function planJsx(
 	// Restore the outer plan's per-element LOC map — pairs with the save at planJsx top.
 	ctx._elemLocs = _prevElemLocs;
 
-	const updateJoined = updateLines.join('\n');
-	const everyRenderJoined = everyRenderLines.join('\n');
-	const afterJoined = afterCalls
-		.map((c, i) => ({ ...c, i }))
-		.sort((a, b) => a.id - b.id || a.i - b.i)
-		.map((c) => c.line)
-		.join('\n');
+	const updateJoined = joinChunks(updateLines);
+	const everyRenderJoined = joinChunks(everyRenderLines);
+	const mountJoined = joinChunks(mountLines);
+	const afterJoined = joinChunks(
+		afterCalls
+			.map((c, i) => ({ ...c, i }))
+			.sort((a, b) => a.id - b.id || a.i - b.i)
+			.map((c) => c.line),
+	);
 
 	return {
 		// Does this body carry a binding bag (`__s.slots[0]`)? Control-flow-only
 		// bodies don't → no `let _b … if (undefined) … else {}` wrapper in the
 		// assembled body (the slot calls use __block.parentNode directly).
 		hasBag: !noTemplate,
-		mount: mountLines.join('\n'),
-		update: updateJoined,
-		everyRender: everyRenderJoined,
-		after: afterJoined,
+		mount: mountJoined.code,
+		mountMaps: mountJoined.maps,
+		update: updateJoined.code,
+		updateMaps: updateJoined.maps,
+		everyRender: everyRenderJoined.code,
+		everyRenderMaps: everyRenderJoined.maps,
+		after: afterJoined.code,
+		afterMaps: afterJoined.maps,
 		head: headEmit,
 		// DEV ONLY (`''` in prod → no body emission, byte-identical output): a structured
 		// `{ slotIndex: [line, column] }` literal for hydration-mismatch warnings + a future
@@ -14185,29 +14316,46 @@ function emitBindingMount(b, elVar, bag) {
 			// mount is a bare `htext(el, _v)`. Seeding `_prev` to the client value
 			// makes the first update a no-op when it matches the server text (no
 			// hydration mismatch re-render).
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       ${bag.local(`_txt$${b.id}`)} = _$htext(${elVar}, _v);
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'htmlOnlyChild': {
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setDangerouslySetInnerHTML(${elVar}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'dangerValue': {
-			return `    ${bag.local(`_prev$${b.id}`)} = ${E};`;
+			return pasteChunk(`    ${bag.local(`_prev$${b.id}`)} = (`, b.expr, b.exprMap, `);`);
 		}
 		case 'formValue':
 		case 'hostValue': {
-			return `    ${bag.local(`_prev$${b.id}`)} = ${E};`;
+			return pasteChunk(`    ${bag.local(`_prev$${b.id}`)} = (`, b.expr, b.exprMap, `);`);
 		}
 		case 'hostSpread': {
-			return `    ${bag.local(`_sp$${b.id}`)} = ${E};`;
+			// `expr` is the creation site's `_$snapshotSpread(<inner>)`; re-derive the
+			// wrapper here so the paste position lands on the inner argument print.
+			return pasteChunk(
+				`    ${bag.local(`_sp$${b.id}`)} = (_$snapshotSpread(`,
+				b.exprInner,
+				b.exprMap,
+				`));`,
+			);
 		}
 		case 'dangerCommit': {
 			const sources = b.sources
@@ -14259,43 +14407,68 @@ function emitBindingMount(b, elVar, bag) {
 			// walk starts from `_root`/the cloned fragment). While hydrating it's the
 			// SERVER's text node at that logical position, which htextSwap ADOPTS.
 			// htextSwap coerces the value itself, so the mount is a bare call.
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       ${bag.local(`_txt$${b.id}`)} = _$htextSwap(${elVar}, _v);
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'attr': {
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'stringData': {
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setStringData(${elVar}, ${JSON.stringify(b.name)}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'booleanAttr': {
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setBooleanAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'ariaAttr': {
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setAriaAttribute(${elVar}, ${JSON.stringify(b.name)}, _v);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'value':
 		case 'checked':
@@ -14309,10 +14482,15 @@ function emitBindingMount(b, elVar, bag) {
 			// update must re-run every render to reassert drift (React's
 			// controlled contract). Not in DEFERRABLE_MOUNT_KINDS: the mount
 			// runs inside the hydration window and arms the element.
-			return `    {
-      _$${CONTROLLED_KIND_HELPERS[b.kind]}(${elVar}, ${E});
+			return pasteChunk(
+				`    {
+      _$${CONTROLLED_KIND_HELPERS[b.kind]}(${elVar}, (`,
+				b.expr,
+				b.exprMap,
+				`));
       ${bag.local(`_el$${b.id}`)} = ${elVar};
-    }`;
+    }`,
+			);
 		}
 		case 'autoFocus': {
 			// Mount-only (React ignores later autoFocus changes); the focus
@@ -14325,26 +14503,41 @@ function emitBindingMount(b, elVar, bag) {
 			const setter =
 				b.ns && b.ns !== 'html' ? `_$setClassAttr(${elVar}, _v)` : `_$setClassName(${elVar}, _v)`;
 			if (b.fresh) {
-				return `    {
-      const _v = ${E};
+				return pasteChunk(
+					`    {
+      const _v = (`,
+					b.expr,
+					b.exprMap,
+					`);
       ${setter};
       ${bag.local(`_el$${b.id}`)} = ${elVar};
-    }`;
+    }`,
+				);
 			}
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       ${setter};
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'style': {
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setStyle(${elVar}, _v, undefined);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_sty$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'spread': {
 			// Detach a spread-supplied `ref` on unmount. setSpread attaches/updates
@@ -14371,23 +14564,29 @@ function emitBindingMount(b, elVar, bag) {
     }`;
 		}
 		case 'event': {
-			const value = b.dev
-				? `_$devEventListener(${JSON.stringify(b.name)}, (${b.expr}))`
-				: `(${b.expr})`;
-			if (b.mountOnly) return `    ${elVar}[${JSON.stringify(b.slotKey)}] = ${value};`;
-			return `    ${bag.local(`_el$${b.id}`)} = ${elVar};
-    ${elVar}[${JSON.stringify(b.slotKey)}] = ${value};`;
+			const valueBefore = b.dev ? `_$devEventListener(${JSON.stringify(b.name)}, (` : `(`;
+			const valueAfter = b.dev ? `))` : `)`;
+			const before = b.mountOnly
+				? `    ${elVar}[${JSON.stringify(b.slotKey)}] = ${valueBefore}`
+				: `    ${bag.local(`_el$${b.id}`)} = ${elVar};
+    ${elVar}[${JSON.stringify(b.slotKey)}] = ${valueBefore}`;
+			return pasteChunk(before, b.expr, b.exprMap, `${valueAfter};`);
 		}
 		case 'formAction': {
 			// <form action={fn}> / <button formAction={fn}>: wire the submit handler
 			// (or fall back to the native attribute for string values). Diffed by
 			// function identity on update.
-			return `    {
-      const _v = ${E};
+			return pasteChunk(
+				`    {
+      const _v = (`,
+				b.expr,
+				b.exprMap,
+				`);
       _$setFormAction(${elVar}, ${JSON.stringify(b.name)}, _v, undefined);
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       ${bag.local(`_prev$${b.id}`)} = _v;
-    }`;
+    }`,
+			);
 		}
 		case 'event-bundle': {
 			// 3b (docs/compiled-output-optimization-plan.md): ONE shared-helper call
@@ -14396,17 +14595,37 @@ function emitBindingMount(b, elVar, bag) {
 			// update path mutates the descriptor in place; dispatch reads `el[key]`
 			// per event, so the mutation is observed without re-assignment).
 			const n = b.argExprs.length;
-			const argsPart = b.argExprs.map((e) => `, (${e})`).join('');
+			// One chunk, one paste per pasted expression: the bundle fn plus each arg
+			// (b.argExprMaps parallels b.argExprs; a sink-materialized fn has no map).
 			if (n <= 2) {
-				if (b.mountOnly) {
-					return `    _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (${b.fnExpr})${argsPart});`;
+				const head = b.mountOnly
+					? `    _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (`
+					: `    ${bag.local(`_ev$${b.id}`)} = _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (`;
+				const parts = [head, exprChunk(b.fnExpr, b.fnExprMap), `)`];
+				for (let i = 0; i < n; i++) {
+					parts.push(
+						`, (`,
+						exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
+						`)`,
+					);
 				}
-				return `    ${bag.local(`_ev$${b.id}`)} = _$evt${n}(${elVar}, ${JSON.stringify(b.slotKey)}, (${b.fnExpr})${argsPart});`;
+				parts.push(`);`);
+				return catChunks(parts);
 			}
-			if (b.mountOnly) {
-				return `    _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (${b.fnExpr}), [${b.argExprs.map((e) => `(${e})`).join(', ')}]);`;
+			const head = b.mountOnly
+				? `    _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (`
+				: `    ${bag.local(`_ev$${b.id}`)} = _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (`;
+			const parts = [head, exprChunk(b.fnExpr, b.fnExprMap), `), [`];
+			for (let i = 0; i < b.argExprs.length; i++) {
+				if (i > 0) parts.push(`, `);
+				parts.push(
+					`(`,
+					exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
+					`)`,
+				);
 			}
-			return `    ${bag.local(`_ev$${b.id}`)} = _$evtN(${elVar}, ${JSON.stringify(b.slotKey)}, (${b.fnExpr}), [${b.argExprs.map((e) => `(${e})`).join(', ')}]);`;
+			parts.push(`]);`);
+			return catChunks(parts);
 		}
 		case 'ref': {
 			// attachRef handles all three supported shapes: callback (function),
@@ -14425,13 +14644,18 @@ function emitBindingMount(b, elVar, bag) {
 			// releases ITS row's React-19 cleanup, not another row's.
 			// Both deferred closures read through the captured `_b` (committed by the
 			// time attach/cleanup run); `_ref$` must be a LIVE read — updates re-point it.
-			return `    {
-      const _r = (${b.expr});
+			return pasteChunk(
+				`    {
+      const _r = (`,
+				b.expr,
+				b.exprMap,
+				`);
       ${bag.local(`_ref$${b.id}`)} = _r;
       ${bag.local(`_el$${b.id}`)} = ${elVar};
       _$queueRefAttach(__s, () => _$attachRef(_r, _b.${bag.letter(`_el$${b.id}`)}));
       __s.cleanups.push(() => _$queueRefDetach(_b.${bag.letter(`_ref$${b.id}`)}, _b.${bag.letter(`_el$${b.id}`)}));
-    }`;
+    }`,
+			);
 		}
 		case 'fragmentRef': {
 			// <Fragment ref={r}>…</Fragment> — markers are two Comment nodes
@@ -14461,20 +14685,41 @@ function emitBindingUpdate(b, bag) {
 		}
 		case 'textOnlyChild':
 		case 'text': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setText(${F('_txt')}, _v); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'htmlOnlyChild': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setDangerouslySetInnerHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setDangerouslySetInnerHTML(${F('_el')}, _v); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'dangerValue': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`,
+			);
 		}
 		case 'formValue':
 		case 'hostValue': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) ${F('_prev')} = _v; }`,
+			);
 		}
 		case 'hostSpread': {
-			return `    ${F('_sp')} = ${E};`;
+			// Same wrapper re-derivation as the mount (paste on the inner argument).
+			return pasteChunk(`    ${F('_sp')} = (_$snapshotSpread(`, b.exprInner, b.exprMap, `));`);
 		}
 		case 'dangerCommit': {
 			const sources = b.sources
@@ -14505,16 +14750,36 @@ function emitBindingUpdate(b, bag) {
 			return `    ${F('_host')} = _$setHostPropSources(${F('_el')}, [${sources}], ${F('_host')}, __s, ${b.hasNestedChildren ? 'true' : 'false'});`;
 		}
 		case 'attr': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'stringData': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setStringData(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setStringData(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'booleanAttr': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setBooleanAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setBooleanAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'ariaAttr': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setAriaAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setAriaAttribute(${F('_el')}, ${JSON.stringify(b.name)}, _v); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'value':
 		case 'checked':
@@ -14527,7 +14792,12 @@ function emitBindingUpdate(b, bag) {
 			// reasserts on every commit — the helper's DOM-diff makes an
 			// unchanged value free, and a prev-guard would skip exactly the
 			// "unrelated re-render while the DOM drifted" reassert case.
-			return `    _$${CONTROLLED_KIND_HELPERS[b.kind]}(${F('_el')}, ${E});`;
+			return pasteChunk(
+				`    _$${CONTROLLED_KIND_HELPERS[b.kind]}(${F('_el')}, (`,
+				b.expr,
+				b.exprMap,
+				`));`,
+			);
 		}
 		case 'class': {
 			const setter =
@@ -14535,15 +14805,27 @@ function emitBindingUpdate(b, bag) {
 					? `_$setClassAttr(${F('_el')}, _v)`
 					: `_$setClassName(${F('_el')}, _v)`;
 			if (b.fresh) {
-				return `    ${setter.replace(', _v)', `, ${E})`)};`;
+				// Byte-equivalent to the historical `setter.replace(', _v)', …)` form.
+				const fn = b.ns && b.ns !== 'html' ? '_$setClassAttr' : '_$setClassName';
+				return pasteChunk(`    ${fn}(${F('_el')}, (`, b.expr, b.exprMap, `));`);
 			}
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { ${setter}; ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'style': {
 			// Object styles need per-prop diffing — call setStyle even when the
 			// reference is unchanged it'd just no-op via the internal diff. We DO
 			// skip identity matches to avoid the call overhead.
-			return `    { const _v = ${E}; if (${F('_sty')} !== _v) { _$setStyle(${F('_el')}, _v, ${F('_sty')}); ${F('_sty')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_sty')} !== _v) { _$setStyle(${F('_el')}, _v, ${F('_sty')}); ${F('_sty')} = _v; } }`,
+			);
 		}
 		case 'spread': {
 			// setSpread does its own per-key diffing internally and handles cleanup
@@ -14560,13 +14842,22 @@ function emitBindingUpdate(b, bag) {
 			return `    { const _v = ${E}; if (${F('_sp')} !== _v) { _$setSpread(${F('_el')}, _v, ${F('_sp')}, __s${flags}); ${F('_sp')} = _v; } }`;
 		}
 		case 'event': {
-			const value = b.dev
-				? `_$devEventListener(${JSON.stringify(b.name)}, (${b.expr}))`
-				: `(${b.expr})`;
-			return `    ${F('_el')}[${JSON.stringify(b.slotKey)}] = ${value};`;
+			const valueBefore = b.dev ? `_$devEventListener(${JSON.stringify(b.name)}, (` : `(`;
+			const valueAfter = b.dev ? `))` : `)`;
+			return pasteChunk(
+				`    ${F('_el')}[${JSON.stringify(b.slotKey)}] = ${valueBefore}`,
+				b.expr,
+				b.exprMap,
+				`${valueAfter};`,
+			);
 		}
 		case 'formAction': {
-			return `    { const _v = ${E}; if (${F('_prev')} !== _v) { _$setFormAction(${F('_el')}, ${JSON.stringify(b.name)}, _v, ${F('_prev')}); ${F('_prev')} = _v; } }`;
+			return pasteChunk(
+				`    { const _v = (`,
+				b.expr,
+				b.exprMap,
+				`); if (${F('_prev')} !== _v) { _$setFormAction(${F('_el')}, ${JSON.stringify(b.name)}, _v, ${F('_prev')}); ${F('_prev')} = _v; } }`,
+			);
 		}
 		case 'event-bundle': {
 			// 3b: mutate the mount-built descriptor in place — branch-free (two
@@ -14574,11 +14865,29 @@ function emitBindingUpdate(b, bag) {
 			// re-assign, and keyed-list survivors were already skipped one level
 			// up by the pure/deps short-circuit).
 			const n = b.argExprs.length;
-			const argsPart = b.argExprs.map((e) => `, (${e})`).join('');
 			if (n <= 2) {
-				return `    _$evt${n}u(${F('_ev')}, (${b.fnExpr})${argsPart});`;
+				const parts = [`    _$evt${n}u(${F('_ev')}, (`, exprChunk(b.fnExpr, b.fnExprMap), `)`];
+				for (let i = 0; i < n; i++) {
+					parts.push(
+						`, (`,
+						exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
+						`)`,
+					);
+				}
+				parts.push(`);`);
+				return catChunks(parts);
 			}
-			return `    _$evtNu(${F('_ev')}, (${b.fnExpr}), [${b.argExprs.map((e) => `(${e})`).join(', ')}]);`;
+			const parts = [`    _$evtNu(${F('_ev')}, (`, exprChunk(b.fnExpr, b.fnExprMap), `), [`];
+			for (let i = 0; i < b.argExprs.length; i++) {
+				if (i > 0) parts.push(`, `);
+				parts.push(
+					`(`,
+					exprChunk(b.argExprs[i], b.argExprMaps ? b.argExprMaps[i] : undefined),
+					`)`,
+				);
+			}
+			parts.push(`]);`);
+			return catChunks(parts);
 		}
 		case 'ref': {
 			// Ref expression identity may change across renders. React 19: detach
@@ -14594,15 +14903,20 @@ function emitBindingUpdate(b, bag) {
 			// the hopped ref). The outer `_r !== _b._ref$` guard already prevents
 			// re-firing a stable ref, so this never double-invokes an unchanged
 			// callback ref.
-			return `    {
-      const _r = (${b.expr});
+			return pasteChunk(
+				`    {
+      const _r = (`,
+				b.expr,
+				b.exprMap,
+				`);
       if (_r !== ${F('_ref')}) {
         const _old = ${F('_ref')};
         if (_old != null) _$queueRefDetach(_old, ${F('_el')});
         if (_r != null) _$queueRefAttach(__s, () => _$attachRef(_r, ${F('_el')}));
         ${F('_ref')} = _r;
       }
-    }`;
+    }`,
+			);
 		}
 		case 'fragmentRef': {
 			// A changing `<Fragment ref={…}>` expression must detach the old ref and
@@ -14645,10 +14959,12 @@ function emitNodeHtml(
 ) {
 	if (node.type === 'Text') {
 		if (isKnownStringExpression(node.expression, ctx.knownStringLocals)) {
+			const textMapped = printExprMapped(resolveStyleExpr(node.expression, cssHash), ctx);
 			bindings.push({
 				id: bindings.length,
 				kind: 'text',
-				expr: printExpr(resolveStyleExpr(node.expression, cssHash)),
+				expr: textMapped.code,
+				exprMap: textMapped.mappings,
 				knownString: true,
 				path: path.slice(0, -1),
 				childIndex: path[path.length - 1],
@@ -14929,11 +15245,15 @@ function emitElementHtml(
 		// the prior spread object to clear removed keys.
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
 			ctx.runtimeNeeded.add('snapshotSpread');
-			const expr = `_$snapshotSpread(${printExprWithTsrx(attr.argument, ctx, componentName, inlinedSubs)})`;
+			const spreadMapped = printExprWithTsrxMapped(attr.argument, ctx, componentName, inlinedSubs);
 			const binding = {
 				id: bindings.length,
 				kind: 'hostSpread',
-				expr,
+				expr: `_$snapshotSpread(${spreadMapped.code})`,
+				// The emit re-derives the `_$snapshotSpread(…)` wrapper around this
+				// inner print, so the paste lands on the argument, not the wrapper.
+				exprInner: spreadMapped.code,
+				exprMap: spreadMapped.mappings,
 				path,
 				ns: hostNs,
 			};
@@ -14956,6 +15276,7 @@ function emitElementHtml(
 			}
 			const val = attr.value;
 			let expr;
+			let exprMap;
 			if (val == null) {
 				expr = 'true';
 			} else {
@@ -14963,13 +15284,16 @@ function emitElementHtml(
 					val.type === 'JSXExpressionContainer' ? val.expression : val,
 					cssHash,
 				);
-				expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
+				const hostValMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
+				expr = hostValMapped.code;
+				exprMap = hostValMapped.mappings;
 			}
 			const binding = {
 				id: bindings.length,
 				kind: 'hostValue',
 				name: rawAttrName,
 				expr,
+				exprMap,
 				path,
 			};
 			bindings.push(binding);
@@ -15006,10 +15330,10 @@ function emitElementHtml(
 		// Keep it on the ordinary final-prop path so source-order updates and
 		// removal work, but never bake it into template HTML.
 		if (rawAttrName === 'suppressNativeChangeWarning') {
-			const expression =
+			const suppressMapped =
 				val == null
-					? 'true'
-					: printExprWithTsrx(
+					? null
+					: printExprWithTsrxMapped(
 							val.type === 'JSXExpressionContainer' ? val.expression : val,
 							ctx,
 							componentName,
@@ -15019,17 +15343,18 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'attr',
 				name: rawAttrName,
-				expr: expression,
+				expr: suppressMapped === null ? 'true' : suppressMapped.code,
+				exprMap: suppressMapped === null ? undefined : suppressMapped.mappings,
 				path,
 				ns: hostNs,
 			});
 			continue;
 		}
 		if (rawAttrName === 'children') {
-			const childExpr =
+			const childMapped =
 				val == null
-					? 'true'
-					: printExprWithTsrx(
+					? null
+					: printExprWithTsrxMapped(
 							val.type === 'JSXExpressionContainer' ? val.expression : val,
 							ctx,
 							componentName,
@@ -15039,7 +15364,8 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'hostValue',
 				name: 'children',
-				expr: childExpr,
+				expr: childMapped === null ? 'true' : childMapped.code,
+				exprMap: childMapped === null ? undefined : childMapped.mappings,
 				path,
 			};
 			bindings.push(binding);
@@ -15075,10 +15401,12 @@ function emitElementHtml(
 			}
 			sawRef = true;
 			const refInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
+			const refMapped = printExprMapped(refInner, ctx);
 			bindings.push({
 				id: bindings.length,
 				kind: 'ref',
-				expr: printExpr(refInner),
+				expr: refMapped.code,
+				exprMap: refMapped.mappings,
 				path,
 			});
 			continue;
@@ -15092,12 +15420,16 @@ function emitElementHtml(
 		// `dangerouslySetInnerHTML` property path reads `.__html` and sets innerHTML.
 		if (attrName === 'dangerouslySetInnerHTML') {
 			const obj = val == null ? null : val.type === 'JSXExpressionContainer' ? val.expression : val;
-			const expr = obj === null ? 'true' : printExprWithTsrx(obj, ctx, componentName, inlinedSubs);
+			const dangerMapped =
+				obj === null ? null : printExprWithTsrxMapped(obj, ctx, componentName, inlinedSubs);
+			const expr = dangerMapped === null ? 'true' : dangerMapped.code;
+			const dangerExprMap = dangerMapped === null ? undefined : dangerMapped.mappings;
 			if (resolveDangerouslySetInnerHTMLAcrossSpreads) {
 				const binding = {
 					id: bindings.length,
 					kind: 'dangerValue',
 					expr,
+					exprMap: dangerExprMap,
 					path,
 				};
 				bindings.push(binding);
@@ -15111,6 +15443,7 @@ function emitElementHtml(
 					id: bindings.length,
 					kind: 'htmlOnlyChild',
 					expr,
+					exprMap: dangerExprMap,
 					script: tag === 'script',
 					path,
 				});
@@ -15121,6 +15454,7 @@ function emitElementHtml(
 				kind: 'attr',
 				name: 'dangerouslySetInnerHTML',
 				expr,
+				exprMap: dangerExprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15135,10 +15469,10 @@ function emitElementHtml(
 			resolveFormControlsAcrossSpreads &&
 			(ctlKind !== null || (tag === 'select' && attrName === 'multiple'))
 		) {
-			const formExpr =
+			const formMapped =
 				val == null
-					? 'true'
-					: printExprWithTsrx(
+					? null
+					: printExprWithTsrxMapped(
 							val.type === 'JSXExpressionContainer' ? val.expression : val,
 							ctx,
 							componentName,
@@ -15148,7 +15482,8 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'formValue',
 				name: attrName,
-				expr: formExpr,
+				expr: formMapped === null ? 'true' : formMapped.code,
+				exprMap: formMapped === null ? undefined : formMapped.mappings,
 				path,
 			};
 			bindings.push(binding);
@@ -15162,13 +15497,23 @@ function emitElementHtml(
 				ctlKind = 'checkedCheckable';
 			}
 			let ctlExpr;
+			let ctlExprMap;
 			if (val == null) {
 				ctlExpr = 'true';
 			} else {
 				const ctlInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-				ctlExpr = printExprWithTsrx(ctlInner, ctx, componentName, inlinedSubs);
+				const ctlMapped = printExprWithTsrxMapped(ctlInner, ctx, componentName, inlinedSubs);
+				ctlExpr = ctlMapped.code;
+				ctlExprMap = ctlMapped.mappings;
 			}
-			bindings.push({ id: bindings.length, kind: ctlKind, expr: ctlExpr, path, ns: hostNs });
+			bindings.push({
+				id: bindings.length,
+				kind: ctlKind,
+				expr: ctlExpr,
+				exprMap: ctlExprMap,
+				path,
+				ns: hostNs,
+			});
 			continue;
 		}
 		// `autoFocus` never bakes/writes an attribute — React parity: the
@@ -15231,8 +15576,15 @@ function emitElementHtml(
 				if (css) attrHtml += ` style="${escapeAttr(css)}"`;
 				continue;
 			}
-			const expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
-			bindings.push({ id: bindings.length, kind: 'style', expr, path, ns: hostNs });
+			const styleMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
+			bindings.push({
+				id: bindings.length,
+				kind: 'style',
+				expr: styleMapped.code,
+				exprMap: styleMapped.mappings,
+				path,
+				ns: hostNs,
+			});
 			continue;
 		}
 
@@ -15254,7 +15606,9 @@ function emitElementHtml(
 
 		// Dynamic value — record a binding. (Also reached for literal values that
 		// come after a spread, since those need to win over the spread at runtime.)
-		const expr = printExprWithTsrx(inner, ctx, componentName, inlinedSubs);
+		const exprMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
+		const expr = exprMapped.code;
+		const exprMap = exprMapped.mappings;
 		if (isEventAttrName(attrName)) {
 			// React-shape: a trailing `Capture` selects the capture phase (fired
 			// root→target before bubble handlers), stamped under `$$capture:<type>`.
@@ -15282,6 +15636,15 @@ function emitElementHtml(
 			// unchanged (e.g. js-framework-benchmark swap rows).
 			const bundleInfo = detectStableEventBundle(inner);
 			if (bundleInfo) {
+				const fnMapped = printExprWithTsrxMapped(
+					bundleInfo.callee,
+					ctx,
+					componentName,
+					inlinedSubs,
+				);
+				const argsMapped = bundleInfo.args.map((a) =>
+					printExprWithTsrxMapped(a, ctx, componentName, inlinedSubs),
+				);
 				bindings.push({
 					id: bindings.length,
 					kind: 'event-bundle',
@@ -15289,10 +15652,10 @@ function emitElementHtml(
 					eventName,
 					slotKey,
 					ns: hostNs,
-					fnExpr: printExprWithTsrx(bundleInfo.callee, ctx, componentName, inlinedSubs),
-					argExprs: bundleInfo.args.map((a) =>
-						printExprWithTsrx(a, ctx, componentName, inlinedSubs),
-					),
+					fnExpr: fnMapped.code,
+					fnExprMap: fnMapped.mappings,
+					argExprs: argsMapped.map((a) => a.code),
+					argExprMaps: argsMapped.map((a) => a.mappings),
 					mountOnly:
 						isEventHandlerInvariantExpr(bundleInfo.callee, ctx) &&
 						bundleInfo.args.every((arg) => isInvariantBindingExpr(arg, ctx)),
@@ -15303,6 +15666,7 @@ function emitElementHtml(
 					kind: 'event',
 					name: attrName,
 					expr,
+					exprMap,
 					path,
 					eventName,
 					slotKey,
@@ -15317,6 +15681,7 @@ function emitElementHtml(
 				id: bindings.length,
 				kind: 'class',
 				expr,
+				exprMap,
 				path,
 				ns: hostNs,
 				fresh: isFreshBindingExpr(inner),
@@ -15336,6 +15701,7 @@ function emitElementHtml(
 				kind: 'formAction',
 				name: tag === 'form' ? 'action' : 'formaction',
 				expr,
+				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15349,6 +15715,7 @@ function emitElementHtml(
 				kind: 'ariaAttr',
 				name: attrName,
 				expr,
+				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15364,6 +15731,7 @@ function emitElementHtml(
 				kind: 'booleanAttr',
 				name: attrName.toLowerCase(),
 				expr,
+				exprMap,
 				path,
 				ns: hostNs,
 			});
@@ -15382,11 +15750,20 @@ function emitElementHtml(
 				kind: 'stringData',
 				name: attrName,
 				expr,
+				exprMap,
 				path,
 				ns: hostNs,
 			});
 		} else {
-			bindings.push({ id: bindings.length, kind: 'attr', name: attrName, expr, path, ns: hostNs });
+			bindings.push({
+				id: bindings.length,
+				kind: 'attr',
+				name: attrName,
+				expr,
+				exprMap,
+				path,
+				ns: hostNs,
+			});
 		}
 	}
 	if (resolveHostPropsAcrossSources) {
@@ -15462,10 +15839,12 @@ function emitElementHtml(
 			// merge concerns; mirrors the server `Literal` fast path.)
 			html += escapeHtml(staticLit);
 		} else if (isKnownStringExpression(txtChild.expression, ctx.knownStringLocals)) {
+			const textMapped = printExprMapped(resolveStyleExpr(txtChild.expression, cssHash), ctx);
 			bindings.push({
 				id: bindings.length,
 				kind: 'textOnlyChild',
-				expr: printExpr(resolveStyleExpr(txtChild.expression, cssHash)),
+				expr: textMapped.code,
+				exprMap: textMapped.mappings,
 				knownString: true,
 				path,
 			});
@@ -15564,10 +15943,12 @@ function emitElementHtml(
 					prevBakedText = true;
 					if (!prevBaked) childIdx++;
 				} else if (isKnownStringExpression(child.expression, ctx.knownStringLocals)) {
+					const childTextMapped = printExprMapped(resolveStyleExpr(child.expression, cssHash), ctx);
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
-						expr: printExpr(resolveStyleExpr(child.expression, cssHash)),
+						expr: childTextMapped.code,
+						exprMap: childTextMapped.mappings,
 						knownString: true,
 						path,
 						childIndex: childIdx,
@@ -15756,15 +16137,17 @@ function emitElementHtml(
 					ic.hostPath = path;
 					ifCalls.push(ic);
 				} else if (isKnownStringExpression(expr, ctx.knownStringLocals)) {
+					const holeMapped = printExprWithTsrxMapped(
+						resolveStyleExpr(expr, cssHash),
+						ctx,
+						componentName,
+						inlinedSubs,
+					);
 					bindings.push({
 						id: bindings.length,
 						kind: 'text',
-						expr: printExprWithTsrx(
-							resolveStyleExpr(expr, cssHash),
-							ctx,
-							componentName,
-							inlinedSubs,
-						),
+						expr: holeMapped.code,
+						exprMap: holeMapped.mappings,
 						knownString: true,
 						path,
 						childIndex: childIdx,
@@ -15826,6 +16209,7 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 	// block, so it must be hoisted here — otherwise the raw JSX would be
 	// printed verbatim into the emitted portal() call (invalid output).
 	let bodyExpr;
+	let bodyExprMap;
 	let envNames = null;
 	const bt = bodyArg ? bodyArg.type : null;
 	if (bt === 'Element' || bt === 'Fragment' || bt === 'JSXElement' || bt === 'JSXFragment') {
@@ -15842,16 +16226,20 @@ function makePortalCall(callNode, ctx, componentName, inlinedSubs, parentNs, css
 			envNames,
 		);
 	} else {
-		bodyExpr = printExprWithTsrx(bodyArg, ctx, componentName, inlinedSubs);
+		const bodyMapped = printExprWithTsrxMapped(bodyArg, ctx, componentName, inlinedSubs);
+		bodyExpr = bodyMapped.code;
+		bodyExprMap = bodyMapped.mappings;
 	}
-	const targetExpr = printExpr(targetArg);
+	const targetMapped = printExprMapped(targetArg, ctx);
 	const propsExpr = propsArg ? printExpr(propsArg) : 'undefined';
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, callNode),
 		envNames,
 		bodyExpr,
-		targetExpr,
+		bodyExprMap,
+		targetExpr: targetMapped.code,
+		targetExprMap: targetMapped.mappings,
 		propsExpr,
 	};
 }
@@ -15981,7 +16369,8 @@ function hoistBodyHelper(ctx, inlinedSubs, prefix, stmts, params, parentNs, cssH
 
 function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 	// node.test, node.consequent (BlockStatement | Element), node.alternate (BlockStatement | IfStatement | null)
-	const condExpr = printExpr(node.test);
+	const condMapped = printExprMapped(node.test, ctx);
+	const condExpr = condMapped.code;
 
 	const thenStmts =
 		node.consequent.type === 'BlockStatement' ? node.consequent.body : [node.consequent];
@@ -16024,6 +16413,7 @@ function makeIfCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
 		condExpr,
+		condExprMap: condMapped.mappings,
 		condTest: node.test, // raw test AST — the fold threads it as a `props.hN` hole
 		envNames,
 		thenHelper: thenHelperName,
@@ -16266,7 +16656,10 @@ function makeCompCall(
 	// bodies receive the merged object as `props` and only care about field
 	// values, not identity.
 	const attrs = node.attributes || node.openingElement?.attributes || [];
-	const propParts = [];
+	// Mixed string/chunk parts (catChunks shape): dynamic prop values carry their
+	// fragment maps; `propParts` below stays the derived plain-string view for the
+	// eligibility predicates and any string-only consumer.
+	const propChunks = [];
 	const propDependencyNodes = [];
 	// `key={expr}` is consumed by the componentSlot runtime (drives key-driven
 	// remount on identity change), NOT passed as a prop — matches React, where
@@ -16274,9 +16667,13 @@ function makeCompCall(
 	// spread, the spread cannot inject `key` either: we filter it out of the
 	// emitted propsExpr but keep its expression for the slot arg.
 	let keyExpr = null;
+	let keyExprMap;
 	for (const attr of attrs) {
 		if (attr.type === 'SpreadAttribute' || attr.type === 'JSXSpreadAttribute') {
-			propParts.push(`...(${printExprWithTsrx(attr.argument, ctx, componentName, inlinedSubs)})`);
+			const spreadMapped = printExprWithTsrxMapped(attr.argument, ctx, componentName, inlinedSubs);
+			propChunks.push(
+				catChunks([`...(`, exprChunk(spreadMapped.code, spreadMapped.mappings), `)`]),
+			);
 			continue;
 		}
 		if (attr.type !== 'Attribute' && attr.type !== 'JSXAttribute') continue;
@@ -16286,11 +16683,13 @@ function makeCompCall(
 			// `<Foo key/>` (no value) is meaningless — skip silently.
 			if (val == null) continue;
 			const keyInner = val.type === 'JSXExpressionContainer' ? val.expression : val;
-			keyExpr = printExprWithTsrx(keyInner, ctx, componentName, inlinedSubs);
+			const keyMapped = printExprWithTsrxMapped(keyInner, ctx, componentName, inlinedSubs);
+			keyExpr = keyMapped.code;
+			keyExprMap = keyMapped.mappings;
 			continue;
 		}
 		if (val == null) {
-			propParts.push(`${JSON.stringify(attrName)}: true`);
+			propChunks.push(`${JSON.stringify(attrName)}: true`);
 			continue;
 		}
 		let inner = val.type === 'JSXExpressionContainer' ? val.expression : val;
@@ -16300,10 +16699,15 @@ function makeCompCall(
 		// emits a real descriptor instead of raw (unprintable) JSX.
 		inner = resolveStyleExpr(rewriteJsxValues(inner, ctx), cssHash);
 		if (inner.type === 'Literal') {
-			propParts.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
+			propChunks.push(`${JSON.stringify(attrName)}: ${JSON.stringify(inner.value)}`);
 		} else {
-			propParts.push(
-				`${JSON.stringify(attrName)}: (${printExprWithTsrx(inner, ctx, componentName, inlinedSubs)})`,
+			const valueMapped = printExprWithTsrxMapped(inner, ctx, componentName, inlinedSubs);
+			propChunks.push(
+				catChunks([
+					`${JSON.stringify(attrName)}: (`,
+					exprChunk(valueMapped.code, valueMapped.mappings),
+					`)`,
+				]),
 			);
 		}
 	}
@@ -16320,8 +16724,18 @@ function makeCompCall(
 	const sourceChildren = node.children || [];
 	const renderPropChild = soleRenderPropChild(sourceChildren);
 	if (renderPropChild) {
-		propParts.push(
-			`"children": (${printExprWithTsrx(rewriteJsxValues(renderPropChild, ctx), ctx, componentName, inlinedSubs)})`,
+		const renderPropMapped = printExprWithTsrxMapped(
+			rewriteJsxValues(renderPropChild, ctx),
+			ctx,
+			componentName,
+			inlinedSubs,
+		);
+		propChunks.push(
+			catChunks([
+				`"children": (`,
+				exprChunk(renderPropMapped.code, renderPropMapped.mappings),
+				`)`,
+			]),
 		);
 	} else if (sourceChildren.length > 0) {
 		const children = rewriteOpaqueTitles(sourceChildren, ctx, 'opaque');
@@ -16348,10 +16762,19 @@ function makeCompCall(
 		// so React-ecosystem `typeof children === 'function'` checks need `isChildrenBlock` to
 		// exclude compiled element/text children. See runtime `markChildrenBlock`/`isChildrenBlock`.
 		ctx.runtimeNeeded.add('markChildrenBlock');
-		propParts.push(`"children": _$markChildrenBlock(${childrenHelperName})`);
+		propChunks.push(`"children": _$markChildrenBlock(${childrenHelperName})`);
 	}
 
-	const propsExpr = `{ ${propParts.join(', ')} }`;
+	const propParts = propChunks.map((c) => (typeof c === 'string' ? c : c.code));
+	// The props object as ONE chunk (byte-identical to `{ ${propParts.join(', ')} }`).
+	const propsParts = ['{ '];
+	propChunks.forEach((c, i) => {
+		if (i > 0) propsParts.push(', ');
+		propsParts.push(c);
+	});
+	propsParts.push(' }');
+	const propsChunk = catChunks(propsParts);
+	const propsExpr = propsChunk.code;
 
 	// Design (c) v0: decide whether the call site can use componentSlotLite
 	// (Scope-only, no Block / no Comment markers / no CompSlot wrapper).
@@ -16477,8 +16900,10 @@ function makeCompCall(
 		id,
 		compExpr,
 		propsExpr,
+		propsChunk,
 		hostPath: null,
 		keyExpr,
+		keyExprMap,
 		liteEligible,
 		autoMemoDeps,
 		autoMemoWitnesses,
@@ -16595,7 +17020,8 @@ function makeTryCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
  * completion (it's just a function call) and only that case's body renders.
  */
 function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) {
-	const discExpr = printExpr(node.discriminant);
+	const discMapped = printExprMapped(node.discriminant, ctx);
+	const discExpr = discMapped.code;
 	const caseRecords = [];
 	let defaultHelper = 'null';
 	// Phase 2: one shared env tuple across every case + default (see unionEnv).
@@ -16619,18 +17045,34 @@ function makeSwitchCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = nul
 		if (isDefault) {
 			defaultHelper = helperName;
 		} else {
-			caseRecords.push({ testExpr: printExpr(c.test), testNode: c.test, helper: helperName });
+			const testMapped = printExprMapped(c.test, ctx);
+			caseRecords.push({
+				testExpr: testMapped.code,
+				testExprMap: testMapped.mappings,
+				testNode: c.test,
+				helper: helperName,
+			});
 		}
 	}
-	const casesArrayExpr =
-		'[' + caseRecords.map((r) => `[(${r.testExpr}), ${r.helper}]`).join(', ') + ']';
+	// The cases array as ONE chunk carrying each test's paste (byte-identical to
+	// the historical `[[(t), helper], …]` join). The fold path replaces the whole
+	// array with a `props.hN` hole and nulls `casesChunk` alongside.
+	const casesParts = ['['];
+	caseRecords.forEach((r, i) => {
+		if (i > 0) casesParts.push(', ');
+		casesParts.push(`[(`, exprChunk(r.testExpr, r.testExprMap), `), ${r.helper}]`);
+	});
+	casesParts.push(']');
+	const casesChunk = catChunks(casesParts);
 	return {
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
 		discExpr,
+		discExprMap: discMapped.mappings,
 		discNode: node.discriminant, // AST — the fold threads it as a `props.hN` hole
 		envNames,
-		casesArrayExpr,
+		casesArrayExpr: casesChunk.code,
+		casesChunk,
 		caseRecords, // { testNode, helper } per case — the fold builds the cases hole
 		defaultHelper,
 		hostPath: null,
@@ -16674,7 +17116,8 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 	// we synthesize a fresh name and emit the destructuring inside the body so
 	// the keyFn still gets the whole item and the body still sees the fields.
 	const itemName = isDestructured ? '_item' : leftDeclId.name;
-	const itemsExpr = printExpr(node.right);
+	const itemsMapped = printExprMapped(node.right, ctx);
+	const itemsExpr = itemsMapped.code;
 	const subStmts = node.body.body;
 
 	// Key resolution priority (matches @tsrx/core's build_hoisted_for_of_with_hooks):
@@ -17037,6 +17480,7 @@ function makeForCall(node, ctx, inlinedSubs, parentNs = 'html', cssHash = null) 
 		id: ctx.nextHelperId++,
 		loc: devLoc(ctx, node),
 		itemsExpr,
+		itemsExprMap: itemsMapped.mappings,
 		keyHelper,
 		bodyHelper: itemHelperName,
 		pure,
@@ -17317,6 +17761,26 @@ function printExpr(node) {
 }
 
 /**
+ * Like printExpr, but also returns esrap's per-token source mappings for the
+ * printed expression (fragment-relative generated coordinates, absolute source
+ * positions — the printNodeWithMap contract). `code` is byte-identical to
+ * printExpr's: the trailing-`;` strip removes a character after the last
+ * mapped token and the statement print has no leading whitespace, so the
+ * fragment mappings need no adjustment.
+ */
+function printExprMapped(node, ctx) {
+	const expression = escapeMultilineStringLiterals(node);
+	const wrapped = {
+		...b.stmt(expression),
+		start: expression?.start,
+		end: expression?.end,
+		loc: expression?.loc,
+	};
+	const { code, mappings } = printNodeWithMap(wrapped, ctx);
+	return { code: code.trim().replace(/;$/, ''), mappings };
+}
+
+/**
  * Like printExpr, but first walks the AST and replaces any `<tsrx>...</tsrx>`
  * or `<tsx>...</tsx>` blocks with identifier references to hoisted render fns.
  * Used at attribute-value and prop-value sites where Tsrx is at expression position.
@@ -17351,6 +17815,91 @@ function printExprWithTsrx(node, ctx, componentName, inlinedSubs) {
 	const keyed = ctx.mode === 'server' ? rewriteHookCalls(node, ctx, componentName) : node;
 	const rewritten = rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs);
 	return printExpr(rewritten);
+}
+
+/**
+ * A generated chunk carrying the paste position of one embedded mapped
+ * expression: `{ code, pastes: [{ line, col, mappings }] }` with chunk-relative
+ * line/col. Emitters build the chunk from `before + expr + after` so the
+ * expression's column is derived, never hand-counted.
+ */
+function pasteChunk(before, expr, mappings, after) {
+	const line = countNewlines(before);
+	const lastNl = before.lastIndexOf('\n');
+	const col = lastNl === -1 ? before.length : before.length - lastNl - 1;
+	return { code: before + expr + after, pastes: mappings ? [{ line, col, mappings }] : [] };
+}
+
+/**
+ * A leaf chunk carrying ONE mapped expression (paste at its own 0:0). Compose
+ * with `catChunks` to embed several mapped fragments in one emit chunk.
+ */
+function exprChunk(expr, mappings) {
+	return { code: expr, pastes: mappings ? [{ line: 0, col: 0, mappings }] : [] };
+}
+
+/**
+ * Concatenate strings and chunks into ONE chunk, shifting every embedded
+ * paste to its concatenated position — pasteChunk generalized to multiple
+ * pastes. `code` is byte-identical to plain string concatenation of the
+ * parts; a paste on a chunk's first line shifts by the running column, later
+ * lines keep their own columns (the firstLineOnly contract downstream).
+ */
+function catChunks(parts) {
+	let code = '';
+	let line = 0;
+	let col = 0;
+	const pastes = [];
+	for (const p of parts) {
+		const s = typeof p === 'string' ? p : p.code;
+		if (typeof p !== 'string') {
+			for (const paste of p.pastes) {
+				pastes.push({
+					line: line + paste.line,
+					col: paste.line === 0 ? col + paste.col : paste.col,
+					mappings: paste.mappings,
+				});
+			}
+		}
+		code += s;
+		const nl = countNewlines(s);
+		if (nl > 0) {
+			line += nl;
+			col = s.length - s.lastIndexOf('\n') - 1;
+		} else {
+			col += s.length;
+		}
+	}
+	return { code, pastes };
+}
+
+/**
+ * Join mount/update chunk lists (plain strings and pasteChunk records) exactly
+ * like `.join('\n')`, additionally collecting each paste's joined-relative
+ * position. Returns `{ code, maps }`.
+ */
+function joinChunks(chunks) {
+	let line = 0;
+	const maps = [];
+	const parts = [];
+	for (const c of chunks) {
+		const code = typeof c === 'string' ? c : c.code;
+		if (typeof c !== 'string') {
+			for (const paste of c.pastes) {
+				maps.push({ line: line + paste.line, col: paste.col, mappings: paste.mappings });
+			}
+		}
+		parts.push(code);
+		line += countNewlines(code) + 1;
+	}
+	return { code: parts.join('\n'), maps };
+}
+
+/** printExprWithTsrx + fragment mappings (see printExprMapped). */
+function printExprWithTsrxMapped(node, ctx, componentName, inlinedSubs) {
+	const keyed = ctx.mode === 'server' ? rewriteHookCalls(node, ctx, componentName) : node;
+	const rewritten = rewriteTsrxBlocks(keyed, ctx, componentName, inlinedSubs);
+	return printExprMapped(rewritten, ctx);
 }
 
 // Identity-preserving copy-on-write map: `mutate` returns a replacement node
