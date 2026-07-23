@@ -19017,12 +19017,13 @@ interface BranchSlot {
 	end: Node | null;
 	/** Hydration compaction borrowed this slot's pair from its sole-range parent. */
 	borrowed: boolean;
-	/** A markerless arm suspended before its caller could publish its DOM boundary. */
-	markerlessPending: boolean;
-	/** Sibling immediately before that arm's first mount attempt (null at parent start). */
-	mountBefore: Node | null;
 	branch: number;
 	block: Block | null;
+	/**
+	 * Sibling immediately before a markerless arm's incomplete mount. `undefined`
+	 * means no pending mount; `null` means the pending arm started at the parent edge.
+	 */
+	markerlessBefore: Node | null | undefined;
 }
 
 /** True when a committed primary must survive a replacement that may suspend. */
@@ -19052,8 +19053,7 @@ function finalizeMarkerlessBranch(
 	before: Node | null,
 	after: Node | null,
 ): void {
-	state.markerlessPending = false;
-	state.mountBefore = null;
+	state.markerlessBefore = undefined;
 	if (state.borrowed && state.start === null) return;
 	const first = before ? before.nextSibling : domParent.firstChild;
 	const last = after ? after.previousSibling : domParent.lastChild;
@@ -19144,12 +19144,13 @@ function renderBranchSlot(
 			!transitionMode &&
 			state.block !== null &&
 			state.block.mounted &&
-			!state.markerlessPending &&
+			state.markerlessBefore === undefined &&
 			body !== null &&
 			hydration === null &&
 			preservesCommittedSuspense(parentBlock);
 		let provisionalAfter: Node | null = null;
-		if (state.markerlessPending && state.block !== null) {
+		const markerlessBefore = state.markerlessBefore;
+		if (markerlessBefore !== undefined && state.block !== null) {
 			// The first arm suspended before it could publish a stable boundary. Its
 			// end marker is only the insertion anchor, so normal `.nextSibling`
 			// positioning would mount a superseding arm after the following static
@@ -19157,10 +19158,9 @@ function renderBranchSlot(
 			// scope without range removal, then sweep exactly its provisional range.
 			const pending = state.block;
 			provisionalAfter = pending.endMarker;
-			let node = state.mountBefore ? state.mountBefore.nextSibling : domParent.firstChild;
+			let node = markerlessBefore ? markerlessBefore.nextSibling : domParent.firstChild;
 			state.block = null;
-			state.markerlessPending = false;
-			state.mountBefore = null;
+			state.markerlessBefore = undefined;
 			unmountBlock(pending, false);
 			if (parentBlock.disposed) return;
 			while (node !== null && node !== provisionalAfter) {
@@ -19352,8 +19352,7 @@ function renderBranchSlot(
 				env,
 			);
 			state.block = b;
-			state.markerlessPending = true;
-			state.mountBefore = before;
+			state.markerlessBefore = before;
 			renderBlock(b);
 			finalizeMarkerlessBranch(state, domParent, b, marker, before, after);
 			replaceSharedBlockBoundary(
@@ -19387,13 +19386,14 @@ function renderBranchSlot(
 		state.block.body = body!;
 		state.block.extra = env;
 		renderBlock(state.block);
-		if (state.markerlessPending) {
+		const markerlessBefore = state.markerlessBefore;
+		if (markerlessBefore !== undefined) {
 			finalizeMarkerlessBranch(
 				state,
 				domParent,
 				state.block,
 				marker,
-				state.mountBefore,
+				markerlessBefore,
 				state.block.endMarker,
 			);
 		}
@@ -19452,10 +19452,9 @@ export function ifBlock(
 			start,
 			end,
 			borrowed: passthrough,
-			markerlessPending: false,
-			mountBefore: null,
 			branch: -1,
 			block: null,
+			markerlessBefore: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
@@ -19957,10 +19956,9 @@ export function switchBlock(
 			start,
 			end,
 			borrowed: passthrough,
-			markerlessPending: false,
-			mountBefore: null,
 			branch: -1,
 			block: null,
+			markerlessBefore: undefined,
 		};
 		parentScope.slots[slotKey] = state;
 		registerSlot(parentScope, state);
