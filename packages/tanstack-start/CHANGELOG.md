@@ -1,5 +1,27 @@
 # @octanejs/tanstack-start
 
+## 0.1.3
+
+### Patch Changes
+
+- 7bd055d: Preserve opaque virtual module identities throughout TanStack Start compilation, harden server-only `ClientOnly` stripping, derive route HMR mode from the active bundler, and inline server checks so bundlers can analyze them directly.
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [8e01289]
+- Updated dependencies [7bd055d]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [1145d98]
+- Updated dependencies [07dff41]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [3686e54]
+  - octane@0.1.14
+  - @octanejs/tanstack-router@0.1.13
+
 ## 0.1.2
 
 ### Patch Changes
