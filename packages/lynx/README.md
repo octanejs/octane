@@ -347,7 +347,7 @@ Milestone 9 CI covers two exact, atomic source/build lanes. Both use Lynx SDK
 `3.9.0` with target SDK `3.9`, Rspeedy `0.16.0`, Rsbuild `2.1.4`, template
 plugin `0.13.0`, CSS extract plugin `0.9.0`, runtime wrapper `0.2.2`, dev
 transport `0.3.0`, tasm `0.0.39`, testing environment `0.3.0`, Lynx types
-`4.0.0`, TypeScript `5.9.3`, and the blocked Web control
+`4.1.0`, TypeScript `5.9.3`, and the blocked Web control
 `@lynx-js/web-core@0.22.2`. The minimum lane uses Rspack `2.1.3`; the current
 lane uses Rspack `2.1.5`, the newest patch allowed by Rsbuild `2.1.4`, and
 verifies registry drift. Newer standalone Lynx types releases remain excluded
@@ -358,10 +358,12 @@ builds. This is minimum/current source/build coverage, not native-engine or
 device execution. The immutable
 version and integrity audit in `audit/toolchain.json` covers the Phase 0 and
 Milestone 5 subset, including the minimum Rspack edge; it does not cover every
-Milestone 9 lane dependency or the current Rspack artifact. The canonical full
-lane maps live in the Rspeedy plugin's `src/toolchain-lanes.js`, and the current
-lane is supported here by that exact source map plus its live registry-drift
-check, not by committed tarball-integrity provenance.
+Milestone 9 lane dependency, the current Rspack artifact, or the live Lynx types
+package. The renderer-local declarations remain adapted from the audited Lynx
+types `4.0.0` artifact. The canonical full lane maps live in the Rspeedy
+plugin's `src/toolchain-lanes.js`, and the current lane is supported here by
+that exact source map plus its live registry-drift check, not by committed
+tarball-integrity provenance.
 
 Native applications keep Lynx's event spelling: `bind`, `catch`,
 `capture-bind`, `capture-catch`, and `global-bind`. There is no DOM-style event

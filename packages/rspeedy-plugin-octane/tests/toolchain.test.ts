@@ -109,9 +109,9 @@ describe('Milestone 9 Lynx toolchain guard', () => {
 			'0.2.0',
 		);
 		expect(LYNX_TOOLCHAIN_LANES.minimum.packages['@rspack/core']).toBe('2.1.3');
-		expect(LYNX_TOOLCHAIN_LANES.minimum.packages['@lynx-js/types']).toBe('4.0.0');
+		expect(LYNX_TOOLCHAIN_LANES.minimum.packages['@lynx-js/types']).toBe('4.1.0');
 		expect(LYNX_TOOLCHAIN_LANES.current.packages['@rspack/core']).toBe('2.1.5');
-		expect(LYNX_TOOLCHAIN_LANES.current.packages['@lynx-js/types']).toBe('4.0.0');
+		expect(LYNX_TOOLCHAIN_LANES.current.packages['@lynx-js/types']).toBe('4.1.0');
 		expect(LYNX_TOOLCHAIN_LANES.current.packages['@rsbuild/core']).toBe('2.1.4');
 		expect(LYNX_TOOLCHAIN_LANES.current.packages['@lynx-js/tasm']).toBe('0.0.39');
 		expect(LYNX_TOOLCHAIN_LANES.current.packages['@rsdoctor/rspack-plugin']).toBe('1.5.18');
