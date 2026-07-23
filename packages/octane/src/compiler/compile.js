@@ -33,8 +33,9 @@ import {
 	parseModule,
 	prepareStylesheetForRender,
 	renderStylesheets,
-	annotateWithHash,
+	builders as b,
 	createStyleClassMapFromStylesheet,
+	clone_ast_node as cloneAstNode,
 	strongHash,
 } from '@tsrx/core';
 import { print as esrapPrint } from 'esrap';
@@ -79,6 +80,50 @@ import {
 	hyphenateStyleName,
 } from '../dom-tables.js';
 import { sanitizeURLAttribute } from '../sanitize-url.js';
+
+// --- Parser-AST immutability enforcement ------------------------------------
+//
+// The compile pipeline receives parsed (and analyzed) module ASTs and must
+// never mutate them: the same tree is read by multiple passes
+// (analyzeNativeChangeDiagnostics, server codegen, the client transform), and
+// origin-location propagation for source mapping depends on parser nodes
+// staying pristine. Rewrites must build replacement nodes with @tsrx/core's
+// `builders` + `setLocation` (or clone first) instead of writing into the
+// received tree.
+//
+// Enforcement is test-only (OCTANE_COMPILE_FROZEN_AST=1 — set by the vitest
+// projects): every module AST is deep-frozen at the point the pipeline adopts
+// it, so any in-place write throws a TypeError whose stack names the exact
+// offending line. Production compiles skip the freeze walk entirely.
+const freezeAdoptedAsts = () =>
+	typeof process !== 'undefined' && process.env?.OCTANE_COMPILE_FROZEN_AST === '1';
+
+function deepFreezeAst(root) {
+	const stack = [root];
+	const seen = new WeakSet();
+	while (stack.length > 0) {
+		const value = stack.pop();
+		if (value === null || typeof value !== 'object' || seen.has(value)) continue;
+		seen.add(value);
+		Object.freeze(value);
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				if (item !== null && typeof item === 'object') stack.push(item);
+			}
+			continue;
+		}
+		for (const key of Object.keys(value)) {
+			const child = value[key];
+			if (child !== null && typeof child === 'object') stack.push(child);
+		}
+	}
+	return root;
+}
+
+/** Adopt a parser-produced module AST as pipeline input (frozen under tests). */
+function adoptParserAst(ast) {
+	return freezeAdoptedAsts() ? deepFreezeAst(ast) : ast;
+}
 
 // React parity: a void element must neither have children nor use
 // `dangerouslySetInnerHTML` — React throws (ReactDOMComponent-test.js:1794/:1807).
@@ -804,29 +849,23 @@ function annotatePureLazyCalls(ast) {
 			}
 		}
 	}
-	if (lazyLocals.size === 0) return;
+	if (lazyLocals.size === 0) return ast;
 	for (const name of collectNestedBindingNames(ast.body)) lazyLocals.delete(name);
-	if (lazyLocals.size === 0) return;
-	const seen = new Set();
-	const visit = (value) => {
-		if (!value || typeof value !== 'object' || seen.has(value)) return;
-		seen.add(value);
-		if (Array.isArray(value)) {
-			for (const item of value) visit(item);
-			return;
-		}
+	if (lazyLocals.size === 0) return ast;
+	// COW: the @__PURE__ mark rides on a shallow copy of the call node (marker
+	// props are compiler-owned annotations and may only live on rebuilt nodes).
+	const body = mapAst(ast.body, (node) => {
 		if (
-			value.type === 'CallExpression' &&
-			value.callee?.type === 'Identifier' &&
-			lazyLocals.has(value.callee.name)
+			node.type === 'CallExpression' &&
+			node.callee?.type === 'Identifier' &&
+			lazyLocals.has(node.callee.name) &&
+			node.__octanePure !== true
 		) {
-			value.__octanePure = true;
+			return { ...node, __octanePure: true };
 		}
-		for (const key in value) {
-			if (key !== 'loc') visit(value[key]);
-		}
-	};
-	visit(ast.body);
+		return null;
+	});
+	return body === ast.body ? ast : { ...ast, body };
 }
 
 /**
@@ -849,13 +888,13 @@ function lowerImportedErrorBoundaries(ast) {
 			}
 		}
 	}
-	if (boundaryLocals.size === 0) return new Set();
+	if (boundaryLocals.size === 0) return { ast, consumed: new Set() };
 	const shadowed = collectNestedBindingNames(ast.body);
 	for (const name of shadowed) boundaryLocals.delete(name);
-	if (boundaryLocals.size === 0) return new Set();
+	if (boundaryLocals.size === 0) return { ast, consumed: new Set() };
 
 	let lowered = false;
-	ast.body = mapAst(ast.body, (node) => {
+	const body = mapAst(ast.body, (node) => {
 		if (node.type !== 'JSXElement') return null;
 		const tag = node.openingElement?.name;
 		if (
@@ -896,12 +935,12 @@ function lowerImportedErrorBoundaries(ast) {
 			propagateSuspense: true,
 		};
 	});
-	if (!lowered) return new Set();
+	if (!lowered) return { ast, consumed: new Set() };
 	const consumed = new Set();
 	for (const name of boundaryLocals) {
-		if (!hasIdentifierReference(ast.body, name)) consumed.add(name);
+		if (!hasIdentifierReference(body, name)) consumed.add(name);
 	}
-	return consumed;
+	return { ast: { ...ast, body }, consumed };
 }
 
 // M3 marker elision (docs/comment-marker-elision-plan.md): a component body
@@ -1841,15 +1880,10 @@ function findMountEventCallbackSinks(statements, jsxNodes, stable, invariant, ct
 			continue;
 		}
 		// Reuse the compiler's scope-aware free-reference walker as the escape
-		// oracle. Temporarily hide the exact event-callee Identifier nodes; if the
-		// candidate remains free, some other render position observes it.
-		for (const node of nodes) node.name = '';
-		let escaped;
-		try {
-			escaped = collectFreeIdentifiers(jsxNodes, []).has(name);
-		} finally {
-			for (const node of nodes) node.name = name;
-		}
+		// oracle. The exact event-callee Identifier nodes are hidden from the
+		// walk; if the candidate remains free, some other render position
+		// observes it.
+		const escaped = collectFreeIdentifiers(jsxNodes, [], nodes).has(name);
 		if (escaped) candidates.delete(name);
 		else candidate.uses = nodes.size;
 	}
@@ -2018,7 +2052,10 @@ function allocCompilerName(ctx, preferred) {
  * locally (inside the subtree). Tracks block/function scopes so inner `const`
  * declarations correctly shadow outer references.
  */
-function collectFreeIdentifiers(root, initiallyBound) {
+// `ignoreNodes` (optional) hides those exact Identifier nodes from the free
+// set — used as a non-mutating escape oracle (findMountEventCallbackSinks)
+// instead of temporarily blanking names on the (read-only) tree.
+function collectFreeIdentifiers(root, initiallyBound, ignoreNodes = null) {
 	const free = new Set();
 	const seen = new WeakSet();
 	walk(root, new Set(initiallyBound));
@@ -2036,6 +2073,7 @@ function collectFreeIdentifiers(root, initiallyBound) {
 		if (!t) return;
 		if (seen.has(n)) return;
 		seen.add(n);
+		if (ignoreNodes !== null && ignoreNodes.has(n)) return;
 
 		// TypeScript annotations are erased and cannot be reactive dependencies.
 		// Preserve only wrappers whose `.expression` is runtime JavaScript.
@@ -3177,19 +3215,23 @@ function normalizeArrowComponentDeclaration(declaration) {
 // @{…}`, incl. `export const X = …`) to FunctionDeclaration form, so the rest
 // of the pipeline sees the canonical component shape. Multi-declarator
 // statements are split in source order when one declarator is a component.
-// Mutates `ast.body`.
-/** @param {any} ast @returns {void} */
+// Copy-on-write: returns the input module when nothing changed.
+/** @param {any} ast @returns {any} */
 function normalizeArrowComponents(ast) {
-	if (!ast || !Array.isArray(ast.body)) return;
+	if (!ast || !Array.isArray(ast.body)) return ast;
+	let changed = false;
 	const body = [];
 	for (const node of ast.body) {
 		if (node.type === 'VariableDeclaration') {
-			body.push(...normalizeArrowComponentDeclaration(node));
+			const declarations = normalizeArrowComponentDeclaration(node);
+			if (declarations.length !== 1 || declarations[0] !== node) changed = true;
+			body.push(...declarations);
 		} else if (node.type === 'ExportNamedDeclaration' && node.declaration) {
 			const declarations = normalizeArrowComponentDeclaration(node.declaration);
 			if (declarations.length === 1 && declarations[0] === node.declaration) {
 				body.push(node);
 			} else {
+				changed = true;
 				for (const declaration of declarations) {
 					body.push({
 						...node,
@@ -3204,7 +3246,7 @@ function normalizeArrowComponents(ast) {
 			body.push(node);
 		}
 	}
-	ast.body = body;
+	return changed ? { ...ast, body } : ast;
 }
 
 // A top-level statement that carries NO runtime value — pure TypeScript type
@@ -3416,7 +3458,7 @@ function assertServerModulesAreTopLevel(ast, filename) {
 
 /**
  * Validate the file-local server submodule contract once, before either
- * client or server codegen mutates the AST.
+ * client or server codegen rewrites the module. Read-only.
  */
 function analyzeServerModule(ast, filename) {
 	assertServerModulesAreTopLevel(ast, filename);
@@ -3790,8 +3832,10 @@ function stampAnonymousDefaultFunctionLoc(node, ctx) {
 	};
 }
 
-function profileSourceLoc(node) {
-	const loc = node?._octaneProfileLoc ?? node?.loc?.start;
+function profileSourceLoc(ctx, node) {
+	// Universal lowering records authored hook locations in an identity-keyed
+	// side channel on ctx (see annotateAuthoredHooks) — never on the tree.
+	const loc = (node && ctx.profileLocMarks?.get(node)) ?? node?.loc?.start;
 	return {
 		line: loc?.line ?? 0,
 		column: loc?.column ?? 0,
@@ -3799,7 +3843,7 @@ function profileSourceLoc(node) {
 }
 
 function profileComponentId(ctx, componentName, node) {
-	const loc = profileSourceLoc(node);
+	const loc = profileSourceLoc(ctx, node);
 	return `${ctx.profileFilename || '<anon>'}#${componentName}@${loc.line}:${loc.column}`;
 }
 
@@ -3811,7 +3855,7 @@ function profileOwner(ctx, node, name) {
 }
 
 function profileComponentMetadata(ctx, node, name, identityName = name) {
-	const loc = profileSourceLoc(node);
+	const loc = profileSourceLoc(ctx, node);
 	return {
 		id: profileComponentId(ctx, identityName, node),
 		name,
@@ -4002,9 +4046,11 @@ function collectProfileComponentCandidates(ast) {
 // function shapes. The normal compiler passes one owner name into a whole
 // passthrough statement, which is sufficient for slot identity but would label
 // hooks inside `const A = memo(() => …)` as belonging to `module` or its outer
-// function. A non-enumerable annotation keeps this profiling-only fact out of
-// printers, source maps, and ordinary compiler output.
+// function. The marks live in an identity-keyed WeakMap on ctx (returned
+// here) — never on the walked nodes — keeping this profiling-only fact out of
+// printers, source maps, ordinary compiler output, and the parser-owned tree.
 function annotateProfileHookOwners(root, ctx) {
+	const marks = new WeakMap();
 	const walk = (node, owner, boundOwner = false) => {
 		if (node == null || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
@@ -4039,11 +4085,8 @@ function annotateProfileHookOwners(root, ctx) {
 			nextOwner = profileOwner(ctx, node, node.id.name);
 		}
 		if (node.type === 'CallExpression') {
-			const authoredOwner = node._octaneUniversalProfileOwner;
-			Object.defineProperty(node, '_octaneProfileOwner', {
-				value: authoredOwner ?? nextOwner,
-				configurable: true,
-			});
+			const authoredOwner = ctx.universalProfileOwnerMarks?.get(node);
+			marks.set(node, authoredOwner ?? nextOwner);
 		}
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
@@ -4062,6 +4105,7 @@ function annotateProfileHookOwners(root, ctx) {
 		}
 	};
 	walk(root, profileOwner(ctx, null, 'module'), false);
+	return marks;
 }
 
 // Register generic component forms which do not enter compileComponent or
@@ -4070,18 +4114,23 @@ function annotateProfileHookOwners(root, ctx) {
 // registered inline at initialization (the helper returns the same identity);
 // declarations register immediately after their declaration, or at the module
 // tail for top-level/HMR-safe handoff ordering.
+// Copy-on-write: registration statements land in rebuilt statement lists and
+// wrapped initializers on rebuilt declarators; returns the (possibly new)
+// module — the input tree is never modified.
 function instrumentProfileComponents(ast, ctx) {
 	const visitStatementList = (statements, topLevel) => {
+		let changed = false;
 		const output = [];
-		for (const statement of statements || []) {
-			visitNode(statement);
-			output.push(statement);
-			let declaration = statement;
+		for (const statement of statements) {
+			const visited = visitNode(statement);
+			if (visited !== statement) changed = true;
+			output.push(visited);
+			let declaration = visited;
 			if (
-				statement.type === 'ExportNamedDeclaration' ||
-				statement.type === 'ExportDefaultDeclaration'
+				visited.type === 'ExportNamedDeclaration' ||
+				visited.type === 'ExportDefaultDeclaration'
 			) {
-				declaration = statement.declaration;
+				declaration = visited.declaration;
 			}
 			if (
 				declaration?.type === 'FunctionDeclaration' &&
@@ -4090,6 +4139,7 @@ function instrumentProfileComponents(ast, ctx) {
 					ctx.profileComponentCandidates.has(declaration.id.name))
 			) {
 				const name = declaration.id.name;
+				changed = true;
 				if (topLevel) {
 					const metadata = profileComponentMetadata(ctx, declaration, name);
 					recordProfileComponent(ctx, declaration, name);
@@ -4107,68 +4157,96 @@ function instrumentProfileComponents(ast, ctx) {
 				}
 			}
 		}
-		statements.splice(0, statements.length, ...output);
+		return changed ? output : statements;
 	};
 
 	const visitNode = (node) => {
-		if (node == null || typeof node !== 'object') return;
+		if (node == null || typeof node !== 'object') return node;
 		if (Array.isArray(node)) {
-			for (const child of node) visitNode(child);
-			return;
+			let out = null;
+			for (let i = 0; i < node.length; i++) {
+				const mapped = visitNode(node[i]);
+				if (out === null && mapped !== node[i]) out = node.slice(0, i);
+				if (out !== null) out.push(mapped);
+			}
+			return out ?? node;
 		}
 		if (node.type === 'VariableDeclaration') {
-			for (const declaration of node.declarations || []) {
-				visitNode(declaration.init);
+			let newDeclarations = null;
+			const declarations = node.declarations || [];
+			for (let i = 0; i < declarations.length; i++) {
+				const declaration = declarations[i];
+				let init = visitNode(declaration.init);
 				if (
 					declaration.id?.type === 'Identifier' &&
-					declaration.init &&
-					isProfileComponentValue(declaration.init, ctx, declaration.id.name)
+					init &&
+					isProfileComponentValue(init, ctx, declaration.id.name)
 				) {
 					const name = declaration.id.name;
 					ctx.profileRuntimeNeeded.add('__profileComponent');
-					declaration.init = profileComponentCallAst(
-						declaration.init,
-						profileComponentMetadata(ctx, declaration.id, name),
-					);
+					init = profileComponentCallAst(init, profileComponentMetadata(ctx, declaration.id, name));
 				}
+				const next = init === declaration.init ? declaration : { ...declaration, init };
+				if (newDeclarations === null && next !== declaration) {
+					newDeclarations = declarations.slice(0, i);
+				}
+				if (newDeclarations !== null) newDeclarations.push(next);
 			}
-			return;
+			return newDeclarations === null ? node : { ...node, declarations: newDeclarations };
 		}
 		if (
 			node.type === 'ExportDefaultDeclaration' &&
 			isProfileComponentValue(node.declaration, ctx, 'default') &&
 			(node.declaration?.type !== 'FunctionDeclaration' || !node.declaration.id)
 		) {
-			visitNode(node.declaration);
+			const sourceDeclaration = visitNode(node.declaration);
 			ctx.profileRuntimeNeeded.add('__profileComponent');
-			const sourceDeclaration = node.declaration;
 			const componentValue =
 				sourceDeclaration.type === 'FunctionDeclaration'
 					? { ...sourceDeclaration, type: 'FunctionExpression' }
 					: sourceDeclaration;
-			node.declaration = profileComponentCallAst(
-				componentValue,
-				profileComponentMetadata(ctx, sourceDeclaration, sourceDeclaration?.id?.name || 'default'),
-			);
-			return;
+			return {
+				...node,
+				declaration: profileComponentCallAst(
+					componentValue,
+					profileComponentMetadata(
+						ctx,
+						sourceDeclaration,
+						sourceDeclaration?.id?.name || 'default',
+					),
+				),
+			};
 		}
 		if (node.type === 'BlockStatement' || node.type === 'JSXCodeBlock') {
-			visitStatementList(node.body || [], false);
-			if (node.render) visitNode(node.render);
-			return;
+			const body = node.body ? visitStatementList(node.body, false) : node.body;
+			const render = node.render ? visitNode(node.render) : node.render;
+			if (body === node.body && render === node.render) return node;
+			const out = { ...node, body };
+			if (node.render) out.render = render;
+			return out;
 		}
 		if (node.type === 'SwitchCase') {
-			visitNode(node.test);
-			visitStatementList(node.consequent || [], false);
-			return;
+			const test = visitNode(node.test);
+			const consequent = node.consequent
+				? visitStatementList(node.consequent, false)
+				: node.consequent;
+			if (test === node.test && consequent === node.consequent) return node;
+			return { ...node, test, consequent };
 		}
+		let out = null;
 		for (const key in node) {
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			visitNode(node[key]);
+			const mapped = visitNode(node[key]);
+			if (mapped !== node[key]) {
+				if (out === null) out = { ...node };
+				out[key] = mapped;
+			}
 		}
+		return out ?? node;
 	};
 
-	visitStatementList(ast.body || [], true);
+	const body = ast.body ? visitStatementList(ast.body, true) : ast.body;
+	return body === ast.body ? ast : { ...ast, body };
 }
 
 /**
@@ -4252,15 +4330,21 @@ function collectScopedStyleNodes(node, found) {
 	}
 }
 
-/** Restamp every scoped <style> in `ast` with its authored-position hash. */
+/**
+ * Restamp every scoped <style> in `ast` with its authored-position hash.
+ * Copy-on-write: matched JSXStyleElement nodes (and their StyleSheet child)
+ * are rebuilt as shallow copies carrying the authored hash; returns the input
+ * module unchanged when no restamp applies.
+ */
 function restampAuthoredStyleHashes(ast, styleRemap, filename) {
-	if (!styleRemap?.origins) return;
+	if (!styleRemap?.origins) return ast;
 	const styles = [];
 	collectScopedStyleNodes(ast.body, styles);
-	if (styles.length === 0) return;
+	if (styles.length === 0) return ast;
 	const { authored, origins } = styleRemap;
 	let authoredHashByOffset = null;
-	for (const { node, sheet } of styles) {
+	const hashByNode = new Map();
+	for (const { node } of styles) {
 		const start =
 			typeof node.start === 'number' && node.start >= 0 && node.start < origins.length
 				? origins[node.start]
@@ -4278,9 +4362,21 @@ function restampAuthoredStyleHashes(ast, styleRemap, filename) {
 		}
 		const hash = authoredHashByOffset.get(start);
 		if (!hash) continue;
-		sheet.hash = hash;
-		node.metadata.styleScopeHash = hash;
+		hashByNode.set(node, hash);
 	}
+	if (hashByNode.size === 0) return ast;
+	const body = mapAst(ast.body, (node) => {
+		const hash = hashByNode.get(node);
+		if (hash === undefined) return null;
+		return {
+			...node,
+			metadata: { ...node.metadata, styleScopeHash: hash },
+			children: (node.children || []).map((child) =>
+				child && child.type === 'StyleSheet' ? { ...child, hash } : child,
+			),
+		};
+	});
+	return { ...ast, body };
 }
 
 function cleanCompileFilename(filename) {
@@ -4314,6 +4410,7 @@ function compileAuthored(source, filename, options, bundlerMetadata) {
 	const cleanFilename = cleanCompileFilename(filename);
 	const analyzedAst = parseModule(source, cleanFilename);
 	analyzeTsrx(analyzedAst, cleanFilename);
+	adoptParserAst(analyzedAst);
 	return compileInternal(source, filename, options, analyzedAst, mode, bundlerMetadata);
 }
 
@@ -4333,7 +4430,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			const nativeChangeDiagnostics =
 				options?.__nativeChangeDiagnostics ??
 				analyzeNativeChangeDiagnostics(
-					analyzedAst ?? parseModule(source, cleanFilename),
+					analyzedAst ?? adoptParserAst(parseModule(source, cleanFilename)),
 					source,
 					cleanFilename,
 					{
@@ -4397,7 +4494,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			(serverBoundaryPreparation === null
 				? undefined
 				: analyzeNativeChangeDiagnostics(
-						analyzedAst ?? parseModule(authoredSource, filename),
+						analyzedAst ?? adoptParserAst(parseModule(authoredSource, filename)),
 						authoredSource,
 						filename,
 						{
@@ -4450,7 +4547,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		(rendererBoundaryPreparation === null
 			? null
 			: analyzeNativeChangeDiagnostics(
-					analyzedAst ?? parseModule(authoredSource, filename),
+					analyzedAst ?? adoptParserAst(parseModule(authoredSource, filename)),
 					authoredSource,
 					filename,
 					{
@@ -4553,41 +4650,48 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			diagnostics: rendererAuthoredDiagnostics ?? [],
 		};
 	}
-	const ast =
+	const parsedAst =
 		rendererBoundaryPreparation === null && analyzedAst !== null
 			? analyzedAst
-			: parseModule(source, filename);
+			: adoptParserAst(parseModule(source, filename));
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
-		analyzeNativeChangeDiagnostics(ast, source, filename, {
+		analyzeNativeChangeDiagnostics(parsedAst, source, filename, {
 			dom: options?.renderer?.target !== 'universal',
 			renderer: options?.renderer,
 			rendererBoundaries: options?.rendererBoundaries,
 			rendererRegistry: options?.rendererRegistry,
 		});
 	const nativeChangeDiagnostics = rendererAuthoredDiagnostics ?? nativeChangeAnalysis.diagnostics;
-	restampAuthoredStyleHashes(ast, clientStyleRemap, filename);
+	// The received (parser-owned, possibly shared) tree is read-only — see
+	// adoptParserAst. Every rewrite below is copy-on-write: changed spines are
+	// rebuilt with builders/spreads (locations carried via setLocation) and
+	// untouched subtrees stay shared with the parse by reference.
+	let ast = parsedAst;
+	ast = restampAuthoredStyleHashes(ast, clientStyleRemap, filename);
 	// Drop type-only statements (interface / type / declare / import-export type)
 	// and inline `type` specifiers before emit — they carry no runtime value and
 	// would leak invalid TS into the .js (or crash the printer). Runtime-only;
 	// Volar keeps them.
-	ast.body = dropTypeOnlyStatements(ast.body);
+	ast = { ...ast, body: dropTypeOnlyStatements(ast.body) };
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	normalizeArrowComponents(ast);
-	annotatePureLazyCalls(ast);
-	const consumedRuntimeLocals = lowerImportedErrorBoundaries(ast);
+	ast = normalizeArrowComponents(ast);
+	ast = annotatePureLazyCalls(ast);
+	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
+	ast = errorBoundaryLowering.ast;
+	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
 	// A null-only shorthand guard is template control flow, not an arbitrary
 	// JavaScript return value. Lower it in every compiler mode so SSR, hydration,
 	// and HMR share one DOM-range shape. HMR still emits the generic component
 	// call ABI, and invalidates normally if an edit introduces a value return.
-	lowerNullishComponentExits(ast);
+	ast = lowerNullishComponentExits(ast);
 	// Omitted dependency lists are compiler-owned: infer reactive captures
 	// before any component splitting/hoisting so every lexical binding is still
 	// visible to the shared TSRX/TSX analysis. Explicit arrays and `null` pass
 	// through untouched.
-	applyHookDependencies(ast, {
+	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(
 			options,
@@ -4779,8 +4883,8 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 	for (const unit of universalUnits) transformUniversalParallelUse(ast, ctx, unit);
 	if (ctx.profile) {
 		ctx.profileComponentCandidates = collectProfileComponentCandidates(ast);
-		annotateProfileHookOwners(ast, ctx);
-		instrumentProfileComponents(ast, ctx);
+		ctx.profileOwnerMarks = annotateProfileHookOwners(ast, ctx);
+		ast = instrumentProfileComponents(ast, ctx);
 	}
 	// Imported local bindings (any source). Used by the M1 cross-module
 	// singleRoot sentinel: only an IMPORTED identifier is a stable component
@@ -5155,7 +5259,7 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 		}
 	};
 	const compileOpts = { hmrWrap: hmrEnabled, hmrMutable: hmrDialect === 'webpack' };
-	for (const node of ast.body) {
+	for (let node of ast.body) {
 		if (
 			node === serverModuleInfo?.declaration ||
 			(node.type === 'ImportDeclaration' && node.source?.value === 'server')
@@ -5239,11 +5343,12 @@ function compileInternal(source, filename, options, analyzedAst, mode, bundlerMe
 			// Style maps: rewrite `const x = <style>…</style>` before printing — the
 			// initialiser becomes an ObjectExpression with hashed class names, and
 			// the stylesheet flows through the regular cssInjections pipeline.
-			applyStyleMap(node, ctx);
+			node = applyStyleMap(node, ctx);
 			// Also handle `export const x = <style>…</style>` (declaration wrapped
 			// in an ExportNamedDeclaration).
 			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-				applyStyleMap(node.declaration, ctx);
+				const declaration = applyStyleMap(node.declaration, ctx);
+				if (declaration !== node.declaration) node = { ...node, declaration };
 			}
 			// HOOKS EVERYWHERE: a plain function (a custom hook, a helper) can hold
 			// octane hooks too — slot them the same way components do, so their base
@@ -5493,33 +5598,38 @@ function ssrUnsupported(what) {
 }
 
 function compileServer(source, filename, options, styleRemap = null, analyzedAst = null) {
-	const ast = analyzedAst ?? parseModule(source, filename);
+	const parsedAst = analyzedAst ?? adoptParserAst(parseModule(source, filename));
 	const nativeChangeAnalysis =
 		options?.__nativeChangeAnalysis ??
-		analyzeNativeChangeDiagnostics(ast, source, filename, {
+		analyzeNativeChangeDiagnostics(parsedAst, source, filename, {
 			dom: options?.renderer?.target !== 'universal',
 			renderer: options?.renderer,
 			rendererBoundaries: options?.rendererBoundaries,
 			rendererRegistry: options?.rendererRegistry,
 		});
-	restampAuthoredStyleHashes(ast, styleRemap, filename);
+	// Same contract as the client path: the received tree is read-only and
+	// server codegen rewrites are copy-on-write over it.
+	let ast = parsedAst;
+	ast = restampAuthoredStyleHashes(ast, styleRemap, filename);
 	// Drop type-only statements and inline `type` specifiers before emit (see
 	// isTypeOnlyStatement) — same as the client path; the server HTML-string
 	// output is plain JS too.
-	ast.body = dropTypeOnlyStatements(ast.body);
+	ast = { ...ast, body: dropTypeOnlyStatements(ast.body) };
 	const serverModuleInfo = analyzeServerModule(ast, filename);
 	// Normalize arrow-function components (`const X = () => @{…}`) to
 	// FunctionDeclaration form so the component pipeline recognizes them.
-	normalizeArrowComponents(ast);
-	annotatePureLazyCalls(ast);
-	const consumedRuntimeLocals = lowerImportedErrorBoundaries(ast);
+	ast = normalizeArrowComponents(ast);
+	ast = annotatePureLazyCalls(ast);
+	const errorBoundaryLowering = lowerImportedErrorBoundaries(ast);
+	ast = errorBoundaryLowering.ast;
+	const consumedRuntimeLocals = errorBoundaryLowering.consumed;
 	// Mirror the client transform so SSR emits the same control-flow ranges
 	// hydration expects in both development and production.
-	lowerNullishComponentExits(ast);
+	ast = lowerNullishComponentExits(ast);
 	// Mirror the client transform exactly. Effects are server no-ops, but
 	// useMemo/useCallback execute during SSR and must receive the same inferred
 	// dependency shape as hydration's client compile.
-	applyHookDependencies(ast, {
+	ast = applyHookDependencies(ast, {
 		filename,
 		hookRuntimeModules: hookRuntimeModulesForCompile(options),
 	});
@@ -5571,11 +5681,21 @@ function compileServer(source, filename, options, styleRemap = null, analyzedAst
 	// injectStyle runs while a render-local CSS collector exists. This mirrors the
 	// client module's eager registration without retaining CSS globally on the
 	// server (which would leak unrelated imports and request history into output).
-	for (const node of ast.body) {
-		applyStyleMap(node, ctx);
-		if (node.type === 'ExportNamedDeclaration' && node.declaration) {
-			applyStyleMap(node.declaration, ctx);
+	{
+		// COW: lowered style-map statements replace their originals in a rebuilt
+		// body so the emit loop below reads the ObjectExpression initialisers.
+		let newBody = null;
+		const statements = ast.body;
+		for (let i = 0; i < statements.length; i++) {
+			let node = applyStyleMap(statements[i], ctx);
+			if (node.type === 'ExportNamedDeclaration' && node.declaration) {
+				const declaration = applyStyleMap(node.declaration, ctx);
+				if (declaration !== node.declaration) node = { ...node, declaration };
+			}
+			if (newBody === null && node !== statements[i]) newBody = statements.slice(0, i);
+			if (newBody !== null) newBody.push(node);
 		}
+		if (newBody !== null) ast = { ...ast, body: newBody };
 	}
 	ctx.moduleCssInjections = ctx.cssInjections.slice();
 
@@ -5658,7 +5778,9 @@ function compileServerComponent(node, ctx) {
 	// Capture this component's entries to emit injectStyle INSIDE the body (so the
 	// active server render collects CSS only for components it actually renders).
 	const beforeCss = ctx.cssInjections.length;
-	const cssHash = applyCssScoping(node, ctx);
+	const scoping = applyCssScoping(node, ctx);
+	node = scoping.node;
+	const cssHash = scoping.cssHash;
 	const cssEntries = [...ctx.moduleCssInjections, ...ctx.cssInjections.slice(beforeCss)].sort(
 		(a, b) => a.order - b.order,
 	);
@@ -7190,27 +7312,41 @@ function ssrEmitTsrxExpression(node, ctx, name, inlinedSubs, parentNs, cssHash, 
  * concatenated (`.red.tsrx-abc`) so the matched element only needs the
  * hash on its `class` attribute.
  */
+// Copy-on-write: returns the (possibly rebuilt) statement; the input is never
+// modified. The core analyze/prepare pipeline mutates the sheet it is given,
+// so it runs over a clone of the (bounded) StyleSheet subtree.
 function applyStyleMap(stmt, ctx) {
-	if (stmt.type !== 'VariableDeclaration') return;
-	for (const decl of stmt.declarations) {
-		if (!decl.init || decl.init.type !== 'JSXStyleElement') continue;
-		const styleNode = decl.init;
-		const sheet = (styleNode.children || []).find((c) => c && c.type === 'StyleSheet');
-		if (!sheet) continue;
-		const hash = styleNode.metadata?.styleScopeHash || sheet.hash || null;
-		if (!hash) continue;
-		// `analyzeCss` marks `:global(...)` selectors (is_global / is_global_block
-		// metadata) so the renderer leaves them UNSCOPED. Without this pass
-		// `:global(a)` would be scoped to `.<hash>a`. Mirrors tsrx-ripple, which
-		// runs analyzeCss(stylesheet) before prepareStylesheetForRender.
-		analyzeCss(sheet);
-		prepareStylesheetForRender(sheet, true);
-		const css = renderStylesheets([sheet]);
-		ctx.cssInjections.push({ hash, css, order: styleNode.start ?? stmt.start ?? 0 });
-		ctx.runtimeNeeded.add('injectStyle');
-		// Replace the JSXStyleElement init with the class-map ObjectExpression.
-		decl.init = createStyleClassMapFromStylesheet(sheet);
+	if (stmt.type !== 'VariableDeclaration') return stmt;
+	let newDeclarations = null;
+	const declarations = stmt.declarations;
+	for (let i = 0; i < declarations.length; i++) {
+		const decl = declarations[i];
+		let next = decl;
+		const styleNode = decl.init && decl.init.type === 'JSXStyleElement' ? decl.init : null;
+		const parsedSheet = styleNode
+			? (styleNode.children || []).find((c) => c && c.type === 'StyleSheet')
+			: null;
+		const hash = parsedSheet
+			? styleNode.metadata?.styleScopeHash || parsedSheet.hash || null
+			: null;
+		if (parsedSheet && hash) {
+			const sheet = cloneAstNode(parsedSheet);
+			// `analyzeCss` marks `:global(...)` selectors (is_global / is_global_block
+			// metadata) so the renderer leaves them UNSCOPED. Without this pass
+			// `:global(a)` would be scoped to `.<hash>a`. Mirrors tsrx-ripple, which
+			// runs analyzeCss(stylesheet) before prepareStylesheetForRender.
+			analyzeCss(sheet);
+			prepareStylesheetForRender(sheet, true);
+			const css = renderStylesheets([sheet]);
+			ctx.cssInjections.push({ hash, css, order: styleNode.start ?? stmt.start ?? 0 });
+			ctx.runtimeNeeded.add('injectStyle');
+			// Replace the JSXStyleElement init with the class-map ObjectExpression.
+			next = { ...decl, init: createStyleClassMapFromStylesheet(sheet) };
+		}
+		if (newDeclarations === null && next !== decl) newDeclarations = declarations.slice(0, i);
+		if (newDeclarations !== null) newDeclarations.push(next);
 	}
+	return newDeclarations === null ? stmt : { ...stmt, declarations: newDeclarations };
 }
 
 // Wrap every DYNAMIC `class` / `className` expression in a `normalizeClass(...)` call
@@ -7224,11 +7360,19 @@ function applyStyleMap(stmt, ctx) {
 // normalize the raw value directly. String literals are left alone so they keep folding
 // into the static template. Stops at nested component function boundaries (their class
 // exprs belong to a different scope), mirroring annotate_with_hash's own traversal.
+// Copy-on-write: rebuilt spines only where a wrap lands; untouched subtrees
+// are returned by reference and the input node is never written to. Callers
+// must use the return value.
 function wrapScopedClassExprs(node, ctx) {
-	if (!node || typeof node !== 'object') return;
+	if (!node || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
-		for (const item of node) wrapScopedClassExprs(item, ctx);
-		return;
+		let out = null;
+		for (let i = 0; i < node.length; i++) {
+			const mapped = wrapScopedClassExprs(node[i], ctx);
+			if (out === null && mapped !== node[i]) out = node.slice(0, i);
+			if (out !== null) out.push(mapped);
+		}
+		return out ?? node;
 	}
 	if (
 		(node.type === 'FunctionDeclaration' ||
@@ -7236,12 +7380,16 @@ function wrapScopedClassExprs(node, ctx) {
 			node.type === 'ArrowFunctionExpression') &&
 		node.metadata?.tsrx_dynamic_wrapper !== true
 	) {
-		return;
+		return node;
 	}
+	let working = node;
 	if (node.type === 'JSXElement') {
 		const attrs = node.openingElement?.attributes;
 		if (Array.isArray(attrs)) {
-			for (const attr of attrs) {
+			let newAttrs = null;
+			for (let i = 0; i < attrs.length; i++) {
+				const attr = attrs[i];
+				let next = attr;
 				if (
 					attr?.type === 'JSXAttribute' &&
 					attr.name?.type === 'JSXIdentifier' &&
@@ -7256,24 +7404,167 @@ function wrapScopedClassExprs(node, ctx) {
 						!(expr.type === 'Literal' && typeof expr.value === 'string') &&
 						!isStyleCall(expr)
 					) {
-						attr.value.expression = {
-							type: 'CallExpression',
-							callee: { type: 'Identifier', name: '_$normalizeClass' },
-							arguments: [expr],
-							optional: false,
+						next = {
+							...attr,
+							value: {
+								...attr.value,
+								expression: {
+									type: 'CallExpression',
+									callee: { type: 'Identifier', name: '_$normalizeClass' },
+									arguments: [expr],
+									optional: false,
+								},
+							},
 						};
 						ctx.runtimeNeeded.add('normalizeClass');
 					}
 				}
+				if (newAttrs === null && next !== attr) newAttrs = attrs.slice(0, i);
+				if (newAttrs !== null) newAttrs.push(next);
+			}
+			if (newAttrs !== null) {
+				working = { ...node, openingElement: { ...node.openingElement, attributes: newAttrs } };
+				if ('attributes' in node) working.attributes = newAttrs;
 			}
 		}
 	}
-	for (const key of Object.keys(node)) {
+	// Generic descent AFTER the element-level wrap (mirrors the historical pass
+	// order): nested JSX inside attribute values and children is wrapped too.
+	let out = working === node ? null : working;
+	for (const key of Object.keys(working)) {
 		if (key === 'loc' || key === 'start' || key === 'end' || key === 'parent') continue;
 		if (key === 'metadata' || key === 'css') continue;
-		const v = node[key];
-		if (v && typeof v === 'object') wrapScopedClassExprs(v, ctx);
+		const v = working[key];
+		if (!v || typeof v !== 'object') continue;
+		const mapped = wrapScopedClassExprs(v, ctx);
+		if (mapped !== v) {
+			if (out === null) out = { ...node };
+			out[key] = mapped;
+		}
 	}
+	return out ?? working;
+}
+
+// Local copy-on-write mirror of @tsrx/core's annotate_with_hash (scoping.js):
+// stamps the scoped-CSS hash class onto native (and dynamic-tag) JSX elements
+// and drops JSXStyleElement nodes from the rendered tree. The core helper
+// mutates in place; this rebuilds changed spines with builders instead so the
+// component tree it runs over — reachable from the parser AST — stays shared
+// and unmodified. Traversal boundaries (nested functions, metadata/css keys,
+// composite elements, child filtering) intentionally match the core helper.
+function isCompositeJsxTag(node) {
+	const name = node?.openingElement?.name;
+	if (node?.type !== 'JSXElement' || !name) return false;
+	if (name.type === 'JSXIdentifier') return /^[A-Z]/.test(name.name);
+	return name.type === 'JSXMemberExpression';
+}
+
+function addHashClassToElement(element, hash, classAttrName) {
+	const openingElement = element.openingElement;
+	const attrs = openingElement?.attributes || [];
+	const index = attrs.findIndex(
+		(attr) =>
+			attr?.type === 'JSXAttribute' &&
+			attr.name?.type === 'JSXIdentifier' &&
+			(attr.name.name === 'class' || attr.name.name === 'className'),
+	);
+	let newAttrs;
+	if (index === -1) {
+		newAttrs = [
+			...attrs,
+			b.jsx_attribute(b.jsx_id(classAttrName), b.literal(hash, JSON.stringify(hash))),
+		];
+	} else {
+		const existing = attrs[index];
+		const value = existing.value;
+		let newAttr;
+		if (!value) {
+			newAttr = { ...existing, value: { type: 'Literal', value: hash, raw: JSON.stringify(hash) } };
+		} else if (value.type === 'Literal' && typeof value.value === 'string') {
+			const merged = `${value.value} ${hash}`;
+			newAttr = { ...existing, value: { ...value, value: merged, raw: JSON.stringify(merged) } };
+		} else {
+			const expression = value.type === 'JSXExpressionContainer' ? value.expression : value;
+			newAttr = {
+				...existing,
+				value: b.jsx_expression_container(
+					b.template([b.quasi('', false), b.quasi(` ${hash}`, true)], [expression]),
+				),
+			};
+		}
+		newAttrs = attrs.slice();
+		newAttrs[index] = newAttr;
+	}
+	// The core helper mirrors the attribute list onto `element.attributes` in
+	// every branch; keep that alias in sync on the rebuilt copy.
+	return {
+		...element,
+		openingElement: { ...openingElement, attributes: newAttrs },
+		attributes: newAttrs,
+	};
+}
+
+function annotateRootWithHash(node, hash, classAttrName) {
+	if (!node || typeof node !== 'object') return node;
+	if (
+		(node.type === 'FunctionDeclaration' ||
+			node.type === 'FunctionExpression' ||
+			node.type === 'ArrowFunctionExpression') &&
+		node.metadata?.tsrx_dynamic_wrapper !== true
+	) {
+		return node;
+	}
+	if (node.type === 'JSXElement') {
+		let working = node;
+		if (!isCompositeJsxTag(node) || node.metadata?.dynamicElement) {
+			working = addHashClassToElement(node, hash, classAttrName);
+		}
+		const children = working.children;
+		if (Array.isArray(children)) {
+			let newChildren = null;
+			for (let i = 0; i < children.length; i++) {
+				const mapped = annotateRootWithHash(children[i], hash, classAttrName);
+				// Dropped style elements are filtered out (core: .filter(Boolean)).
+				if (newChildren === null && (mapped !== children[i] || !mapped)) {
+					newChildren = children.slice(0, i);
+				}
+				if (newChildren !== null && mapped) newChildren.push(mapped);
+			}
+			if (newChildren !== null) {
+				if (working === node) working = { ...node, children: newChildren };
+				else working.children = newChildren;
+			}
+		}
+		return working;
+	}
+	if (node.type === 'JSXStyleElement') return null;
+	let out = null;
+	for (const key of Object.keys(node)) {
+		if (key === 'loc' || key === 'start' || key === 'end' || key === 'metadata' || key === 'css') {
+			continue;
+		}
+		const value = node[key];
+		if (!value || typeof value !== 'object') continue;
+		let mapped;
+		if (Array.isArray(value)) {
+			// Core maps generic arrays WITHOUT filtering — a dropped style element
+			// leaves a null slot the downstream child normalization skips.
+			let newArray = null;
+			for (let i = 0; i < value.length; i++) {
+				const item = annotateRootWithHash(value[i], hash, classAttrName);
+				if (newArray === null && item !== value[i]) newArray = value.slice(0, i);
+				if (newArray !== null) newArray.push(item);
+			}
+			mapped = newArray ?? value;
+		} else {
+			mapped = annotateRootWithHash(value, hash, classAttrName);
+		}
+		if (mapped !== value) {
+			if (out === null) out = { ...node };
+			out[key] = mapped;
+		}
+	}
+	return out ?? node;
 }
 
 /**
@@ -7286,16 +7577,7 @@ function componentStyleRoots(componentNode) {
 	const body = componentNode.body;
 	if (!body) return [];
 	if (body.type === 'JSXCodeBlock') {
-		return body.render
-			? [
-					{
-						node: body.render,
-						replace(next) {
-							body.render = next;
-						},
-					},
-				]
-			: [];
+		return body.render ? [{ kind: 'render', node: body.render }] : [];
 	}
 	if (body.type !== 'BlockStatement') return [];
 
@@ -7315,12 +7597,7 @@ function componentStyleRoots(componentNode) {
 		}
 		if (node.type === 'ReturnStatement') {
 			if (node.argument && isJsxNode(node.argument)) {
-				roots.push({
-					node: node.argument,
-					replace(next) {
-						node.argument = next;
-					},
-				});
+				roots.push({ kind: 'return', statement: node, node: node.argument });
 			}
 			return;
 		}
@@ -7345,16 +7622,17 @@ function componentStyleRoots(componentNode) {
  * Walk a component's owned render roots for `JSXStyleElement` nodes. For each
  * one found:
  *   - Pull the pre-parsed `StyleSheet` AST out of its children.
- *   - Run `prepareStylesheetForRender` (rewrites `.foo` → `.foo.<hash>` —
- *     mutates the sheet in place).
+ *   - Run `prepareStylesheetForRender` (rewrites `.foo` → `.foo.<hash>`) over a
+ *     clone of the sheet — the core pipeline mutates what it is given.
  *   - Collect into a list rendered via `renderStylesheets` to a CSS string.
  *   - Register `{hash, css}` on `ctx.cssInjections` so a module-level
  *     `injectStyle(hash, css)` is emitted in the prelude.
- *   - Run `annotateWithHash` over `body.render` to stamp the hash class on
- *     every native JSX element AND remove the JSXStyleElement nodes from
- *     the rendered tree (they don't contribute DOM in the new model).
+ *   - Rebuild the render roots via `annotateRootWithHash` (COW) to stamp the
+ *     hash class on every native JSX element AND remove the JSXStyleElement
+ *     nodes from the rendered tree (they don't contribute DOM in the new model).
  *
- * Returns the hash, or `null` when no `<style>` blocks are present.
+ * Returns `{ cssHash, node }` — the hash (or `null` when no `<style>` blocks
+ * are present) and the possibly-rebuilt component node the caller must use.
  *
  * The first `JSXStyleElement` contributes the canonical hash for the whole
  * component. @tsrx/core hashes individual style tags by source position, so
@@ -7363,7 +7641,7 @@ function componentStyleRoots(componentNode) {
  */
 function applyCssScoping(componentNode, ctx) {
 	const roots = componentStyleRoots(componentNode);
-	if (roots.length === 0) return null;
+	if (roots.length === 0) return { cssHash: null, node: componentNode };
 	let cssHash = null;
 	const styles = [];
 	function collect(node) {
@@ -7402,33 +7680,50 @@ function applyCssScoping(componentNode, ctx) {
 		}
 	}
 	for (const root of roots) collect(root.node);
-	if (!cssHash || styles.length === 0) return null;
-	for (const style of styles) {
-		// A component has one scope even when its CSS is split for readability.
-		// Rebase before analyze/render: selector and keyframe rewriting read
-		// `sheet.hash`, while DOM annotation below uses `cssHash`.
-		style.sheet.hash = cssHash;
-		if (style.node.metadata) style.node.metadata.styleScopeHash = cssHash;
+	if (!cssHash || styles.length === 0) return { cssHash: null, node: componentNode };
+	// A component has one scope even when its CSS is split for readability.
+	// Rebase before analyze/render: selector and keyframe rewriting read
+	// `sheet.hash`, while DOM annotation below uses `cssHash`. The core
+	// analyze/prepare pipeline mutates the sheet it is given, so it runs over a
+	// clone of each (bounded) StyleSheet subtree — the parser-owned sheet nodes
+	// stay pristine.
+	const preparedSheets = styles.map((style) => {
+		const sheet = cloneAstNode(style.sheet);
+		sheet.hash = cssHash;
 		// Mark `:global(...)` selectors before scoping so they render unscoped.
-		analyzeCss(style.sheet);
-		prepareStylesheetForRender(style.sheet);
-	}
-	const css = renderStylesheets(styles.map((style) => style.sheet));
+		analyzeCss(sheet);
+		prepareStylesheetForRender(sheet);
+		return sheet;
+	});
+	const css = renderStylesheets(preparedSheets);
 	ctx.cssInjections.push({
 		hash: cssHash,
 		css,
 		order: styles[0]?.sheet.start ?? styles[0]?.node.start ?? componentNode.start ?? 0,
 	});
 	ctx.runtimeNeeded.add('injectStyle');
-	// Mutate every owned render root: add the canonical hash class to native
-	// elements and strip JSXStyleElement nodes from DOM output.
+	// Rebuild every owned render root copy-on-write: add the canonical hash
+	// class to native elements and strip JSXStyleElement nodes from DOM output.
+	// The rebuilt roots are grafted back through a spine rebuild of the
+	// component node; the received component tree is never modified.
+	let node = componentNode;
+	const returnReplacements = new Map();
 	for (const root of roots) {
 		// Normalize dynamic class exprs BEFORE the hash is appended (see helper), so
 		// clsx array/object values compose correctly alongside the scope hash.
-		wrapScopedClassExprs(root.node, ctx);
-		root.replace(annotateWithHash(root.node, cssHash, 'class', false));
+		const wrapped = wrapScopedClassExprs(root.node, ctx);
+		const annotated = annotateRootWithHash(wrapped, cssHash, 'class');
+		if (annotated === root.node) continue;
+		if (root.kind === 'render') {
+			node = { ...node, body: { ...node.body, render: annotated } };
+		} else {
+			returnReplacements.set(root.statement, { ...root.statement, argument: annotated });
+		}
 	}
-	return cssHash;
+	if (returnReplacements.size > 0) {
+		node = mapAst(node, (n) => returnReplacements.get(n) ?? null);
+	}
+	return { cssHash, node };
 }
 
 // Strip comments and plain string literals so prose or route paths cannot
@@ -7469,7 +7764,9 @@ function compileComponent(node, ctx, options) {
 	// the hash class onto every element under this component), emit a single
 	// module-level `injectStyle(hash, css)`, and surface `cssHash` so
 	// resolveStyleExpr can also prefix any `{style (expr)}` class expressions.
-	let cssHash = applyCssScoping(node, ctx);
+	const scoping = applyCssScoping(node, ctx);
+	node = scoping.node;
+	let cssHash = scoping.cssHash;
 	// Backwards-compat: internal callers (legacy synthetic Component shapes)
 	// may still attach `.css` directly on the node.
 	if (!cssHash && node.css) {
@@ -8130,14 +8427,13 @@ function transformUniversalParallelUse(ast, ctx, metadata) {
 				}
 				const hook = queues.get(hookName)?.shift();
 				if (hook !== undefined) {
-					Object.defineProperty(node, '_octaneProfileLoc', {
-						value: { line: hook.line, column: hook.column },
-						configurable: true,
+					// Identity-keyed ctx side channels (see profileSourceLoc and
+					// annotateProfileHookOwners) — the walked tree is never written to.
+					(ctx.profileLocMarks ??= new WeakMap()).set(node, {
+						line: hook.line,
+						column: hook.column,
 					});
-					Object.defineProperty(node, '_octaneUniversalProfileOwner', {
-						value: owner,
-						configurable: true,
-					});
+					(ctx.universalProfileOwnerMarks ??= new WeakMap()).set(node, owner);
 				}
 			}
 			for (const [key, child] of Object.entries(node)) {
@@ -9932,7 +10228,11 @@ function stateTupleHookName(call, ctx) {
 	return null;
 }
 
+// Identity-keyed side channel (never written to the tree): rewriteHookCalls
+// reads these marks off the SAME node objects while it rebuilds, so a WeakMap
+// keyed by the walked nodes is exactly equivalent to the old node stamps.
 function markStateGetterUsage(root, ctx) {
+	const marks = new WeakMap();
 	const ancestors = [];
 	function walk(node) {
 		if (node == null || typeof node !== 'object') return;
@@ -9960,16 +10260,17 @@ function markStateGetterUsage(root, ctx) {
 			} else if (parent?.type === 'ExpressionStatement') {
 				observed = false;
 			}
-			node._octaneStateGetter = observed;
+			marks.set(node, observed);
 		}
 		ancestors.push(node);
 		for (const key in node) {
-			if (AST_WALK_SKIP_KEYS.has(key) || key === '_octaneStateGetter') continue;
+			if (AST_WALK_SKIP_KEYS.has(key)) continue;
 			walk(node[key]);
 		}
 		ancestors.pop();
 	}
 	walk(root);
+	return marks;
 }
 
 // A compiled `@{}` render body always executes inside a runtime-owned Scope, so
@@ -9978,6 +10279,7 @@ function markStateGetterUsage(root, ctx) {
 // helpers can execute in a caller's Scope, including alongside code from a
 // different module. Those sites retain globally unique, runtime-ranged Symbols.
 function markHookSlotLocality(root, enabled) {
+	const marks = new WeakMap();
 	const walk = (node, functionDepth) => {
 		if (node == null || typeof node !== 'object') return;
 		if (Array.isArray(node)) {
@@ -9985,10 +10287,7 @@ function markHookSlotLocality(root, enabled) {
 			return;
 		}
 		if (node.type === 'CallExpression') {
-			Object.defineProperty(node, '_octaneLocalHookSlot', {
-				value: enabled && functionDepth === 0,
-				configurable: true,
-			});
+			marks.set(node, enabled && functionDepth === 0);
 		}
 		const nestedDepth =
 			functionDepth +
@@ -10003,6 +10302,7 @@ function markHookSlotLocality(root, enabled) {
 		}
 	};
 	walk(root, 0);
+	return marks;
 }
 
 // ===========================================================================
@@ -10504,8 +10804,8 @@ function inlineHookMemoPass(stmts, ctx, authoredTier) {
 }
 
 function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
-	markStateGetterUsage(node, ctx);
-	markHookSlotLocality(node, localRoot);
+	const stateGetterMarks = markStateGetterUsage(node, ctx);
+	const localSlotMarks = markHookSlotLocality(node, localRoot);
 	return mapAst(node, (n) => {
 		// First-class subtemplates have their own compileFunctionBody pass. Leave
 		// their contents untouched here so hook sites are slotted exactly once and
@@ -10529,7 +10829,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 		if (n.type === 'CallExpression' && n.callee.type === 'Identifier') {
 			const localName = n.callee.name;
 			const generated = n.callee._octaneGenerated === true;
-			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
+			const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 			const profileOwner = annotatedOwner?.name || componentName;
 			const importedName = n._octaneImportedHook;
 			const hookRuntimeImportedName = n._octaneHookRuntimeImportedHook;
@@ -10565,11 +10865,11 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 				const numericSlot =
 					!ctx.hmr &&
 					!ctx.profile &&
-					n._octaneLocalHookSlot === true &&
+					localSlotMarks.get(n) === true &&
 					!hasSpread &&
 					(isBuiltin || isServerUse);
 				const forceSymbol = !numericSlot;
-				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
+				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
 				// A builtin hook call site is USER code (the user's own identifier), so
 				// its import stays bare — EXCEPT compiler-inserted calls (auto-callback's
 				// `useCallback`), whose callee is renamed to the `_$` alias below so a
@@ -10663,14 +10963,14 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			const isBuiltin = HOOK_NAMES.has(name);
 			const isServerUse = name === 'use' && ctx.mode === 'server';
 			if (isBuiltin || isServerUse) {
-				const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
+				const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 				const profileOwner = annotatedOwner?.name || componentName;
-				const getterHelper = n._octaneStateGetter ? STATE_GETTER_HELPERS[name] : null;
+				const getterHelper = stateGetterMarks.get(n) ? STATE_GETTER_HELPERS[name] : null;
 				if (getterHelper !== null) requireRuntimeForContext(ctx, getterHelper);
 				const numericSlot =
 					!ctx.hmr &&
 					!ctx.profile &&
-					n._octaneLocalHookSlot === true &&
+					localSlotMarks.get(n) === true &&
 					!n.arguments.some((arg) => arg.type === 'SpreadElement');
 				let slot;
 				if (numericSlot) {
@@ -10718,7 +11018,7 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 			/^use[A-Z]/.test(n.callee.property.name) &&
 			n.callee.property.name !== 'useContext'
 		) {
-			const annotatedOwner = ctx.profile ? n._octaneProfileOwner : null;
+			const annotatedOwner = ctx.profile ? ctx.profileOwnerMarks?.get(n) : null;
 			const profileOwner = annotatedOwner?.name || componentName;
 			const debug = `${profileOwner}.${n.callee.property.name}#${ctx.nextHookSymId}`;
 			const symVar = allocHookSymbol(
@@ -10768,7 +11068,9 @@ function rewriteHookCalls(node, ctx, componentName, localRoot = false) {
 function compileReturnJsxFunction(node, ctx, options) {
 	const name = node.id.name;
 	recordProfileComponent(ctx, node, name);
-	const cssHash = applyCssScoping(node, ctx);
+	const scoping = applyCssScoping(node, ctx);
+	node = scoping.node;
+	const cssHash = scoping.cssHash;
 	// A folded directive's branch helper functions (`__then$N`/`__else$N`) are
 	// collected here so they're emitted INSIDE this component function — preserving
 	// their closure over setup locals/props — and only their values + the control
@@ -11945,7 +12247,7 @@ function allocHookSymbol(ctx, debugName, profile = null, forceSymbol = false, pr
 			profile?.componentId ||
 			ctx.currentProfileComponentId ||
 			profileComponentId(ctx, componentName, profile?.node);
-		const loc = profileSourceLoc(profile?.node);
+		const loc = profileSourceLoc(ctx, profile?.node);
 		const metadata = {
 			id: `${componentId}#hook:${id}`,
 			componentId,
@@ -12757,10 +13059,16 @@ const TS_TYPE_PROPS = [
 	'implements', // `class X implements I` list
 ];
 
+// Copy-on-write: stripped shapes are shallow copies; nodes with no TS-only
+// surface are returned by reference, so printing an already-plain subtree
+// allocates nothing and the (possibly parser-owned, frozen-under-tests) input
+// is never written to.
 function stripTsOnlyWrappers(node) {
 	if (node === null || typeof node !== 'object') return node;
 	if (Array.isArray(node)) {
-		for (let i = node.length - 1; i >= 0; i--) {
+		let out = null;
+		for (let i = 0; i < node.length; i++) {
+			const item = node[i];
 			// Type-only STATEMENTS nested below module scope (a `type X = …` or
 			// `interface I {}` inside a function body) never hit the top-level
 			// `ast.body` filter, and stripping their annotations below would
@@ -12769,13 +13077,15 @@ function stripTsOnlyWrappers(node) {
 			// statement-only, so pruning from any AST array is safe (sparse
 			// ArrayExpression holes are `null` and isTypeOnlyStatement keeps
 			// them). Checked BEFORE the per-node strip so `declare` is intact.
-			if (isTypeOnlyStatement(node[i])) {
-				node.splice(i, 1);
-			} else {
-				node[i] = stripTsOnlyWrappers(node[i]);
+			if (isTypeOnlyStatement(item)) {
+				if (out === null) out = node.slice(0, i);
+				continue;
 			}
+			const mapped = stripTsOnlyWrappers(item);
+			if (out === null && mapped !== item) out = node.slice(0, i);
+			if (out !== null) out.push(mapped);
 		}
-		return node;
+		return out ?? node;
 	}
 	if (
 		node.type === 'TSAsExpression' ||
@@ -12786,6 +13096,7 @@ function stripTsOnlyWrappers(node) {
 	) {
 		return stripTsOnlyWrappers(node.expression);
 	}
+	let out = null;
 	// A TS `this` parameter (`function f(this: Foo, …)`) is type-only and is
 	// parsed as a leading plain Identifier named `this` — dropping only its
 	// annotation would leave `this` as a real (invalid) parameter name.
@@ -12795,12 +13106,17 @@ function stripTsOnlyWrappers(node) {
 		node.params[0].type === 'Identifier' &&
 		node.params[0].name === 'this'
 	) {
-		node.params.shift();
+		out = { ...node, params: node.params.slice(1) };
 	}
 	// Drop type-only properties before descending so esrap never sees them.
+	// Already-absent/falsy markers need no rewrite (esrap ignores them).
 	for (let i = 0; i < TS_TYPE_PROPS.length; i++) {
 		const prop = TS_TYPE_PROPS[i];
-		if (node[prop] !== undefined) node[prop] = null;
+		const value = node[prop];
+		if (value !== undefined && value !== null && value !== false) {
+			if (out === null) out = { ...node };
+			out[prop] = null;
+		}
 	}
 	// `optional` on a parameter / Identifier is the `x?: T` marker — esrap
 	// emits `x?` even if typeAnnotation is gone, which is also TS-only.
@@ -12814,7 +13130,8 @@ function stripTsOnlyWrappers(node) {
 		node.type !== 'OptionalMemberExpression' &&
 		node.type !== 'OptionalCallExpression'
 	) {
-		node.optional = false;
+		if (out === null) out = { ...node };
+		out.optional = false;
 	}
 	for (const key of Object.keys(node)) {
 		// Skip `loc`/`range`/`start`/`end` source-position fields and the parent
@@ -12822,11 +13139,15 @@ function stripTsOnlyWrappers(node) {
 		// wrapper nodes and walking them wastes work.
 		if (key === 'loc' || key === 'range' || key === 'start' || key === 'end' || key === 'parent')
 			continue;
-		const child = node[key];
+		const child = (out ?? node)[key];
 		if (child === null || typeof child !== 'object') continue;
-		node[key] = stripTsOnlyWrappers(child);
+		const mapped = stripTsOnlyWrappers(child);
+		if (mapped !== child) {
+			if (out === null) out = { ...node };
+			out[key] = mapped;
+		}
 	}
-	return node;
+	return out ?? node;
 }
 
 function emitAutoMemoRegion(ctx, dependencies, slotIndex, statement, extraMiss, contextAware) {
@@ -17073,20 +17394,31 @@ function rewriteEarlyExits(body, allowExplicitNull = false) {
  * its generic slot and invalidates if a later edit introduces a value return.
  */
 function lowerNullishComponentExits(ast) {
-	for (const statement of ast.body || []) {
-		const node =
-			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
-				? statement.declaration
-				: statement;
-		if (!hasOnlyLowerableNullishExits(node)) continue;
-		const body = node.body;
-		const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
-		const rewritten = rewriteEarlyExits(sequence, true);
-		const renderIndex = rewritten.findIndex(isJsxNode);
-		if (renderIndex === -1 || rewritten.slice(renderIndex + 1).some(isJsxNode)) continue;
-		body.body = rewritten.slice(0, renderIndex);
-		body.render = rewritten[renderIndex];
+	const statements = ast.body || [];
+	let out = null;
+	for (let i = 0; i < statements.length; i++) {
+		const statement = statements[i];
+		let replacement = statement;
+		const isExport =
+			statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration';
+		const node = isExport ? statement.declaration : statement;
+		if (hasOnlyLowerableNullishExits(node)) {
+			const body = node.body;
+			const sequence = [...(body.body || []), ...(body.render ? [body.render] : [])];
+			const rewritten = rewriteEarlyExits(sequence, true);
+			const renderIndex = rewritten.findIndex(isJsxNode);
+			if (renderIndex !== -1 && !rewritten.slice(renderIndex + 1).some(isJsxNode)) {
+				const loweredNode = {
+					...node,
+					body: { ...body, body: rewritten.slice(0, renderIndex), render: rewritten[renderIndex] },
+				};
+				replacement = isExport ? { ...statement, declaration: loweredNode } : loweredNode;
+			}
+		}
+		if (out === null && replacement !== statement) out = statements.slice(0, i);
+		if (out !== null) out.push(replacement);
 	}
+	return out === null ? ast : { ...ast, body: out };
 }
 
 function isJsxNode(node) {
@@ -17264,18 +17596,32 @@ function printExprWithTsrx(node, ctx, componentName, inlinedSubs) {
 	return printExpr(rewritten);
 }
 
+// Identity-preserving copy-on-write map: `mutate` returns a replacement node
+// (or null to keep descending). Untouched subtrees are returned BY REFERENCE —
+// only spines above a replacement are rebuilt (as shallow copies), so mapping
+// a tree with no matches returns the input itself. This is the sanctioned
+// rewrite shape over parser-owned (frozen under tests) ASTs.
 function mapAst(node, mutate) {
 	if (node == null || typeof node !== 'object') return node;
-	if (Array.isArray(node)) return node.map((c) => mapAst(c, mutate));
+	if (Array.isArray(node)) {
+		let out = null;
+		for (let i = 0; i < node.length; i++) {
+			const mapped = mapAst(node[i], mutate);
+			if (out === null && mapped !== node[i]) out = node.slice(0, i);
+			if (out !== null) out.push(mapped);
+		}
+		return out ?? node;
+	}
 	const replaced = mutate(node);
 	if (replaced != null) return replaced;
-	const out = {};
+	let out = null;
 	for (const k in node) {
-		if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') {
-			out[k] = node[k];
-			continue;
+		if (k === 'loc' || k === 'start' || k === 'end' || k === 'metadata') continue;
+		const mapped = mapAst(node[k], mutate);
+		if (mapped !== node[k]) {
+			if (out === null) out = { ...node };
+			out[k] = mapped;
 		}
-		out[k] = mapAst(node[k], mutate);
 	}
-	return out;
+	return out ?? node;
 }
