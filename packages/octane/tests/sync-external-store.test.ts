@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { mount, nextPaint } from './_helpers';
-import { makeStore, Reader, SwappableReader } from './_fixtures/sync-external-store.tsrx';
+import {
+	ConditionalReader,
+	makeRetainedCallbackStore,
+	makeStore,
+	Reader,
+	RenderObservedReader,
+	SwappableReader,
+} from './_fixtures/sync-external-store.tsrx';
 
 // React 18's useSyncExternalStore contract: subscribe on mount, unsubscribe
 // on unmount, re-render on every notify, fresh getSnapshot() every render.
@@ -32,6 +39,43 @@ describe('useSyncExternalStore', () => {
 		r.unmount();
 	});
 
+	it('subscribes outside render and converges when subscribe notifies synchronously', async () => {
+		let value = 0;
+		let rendering = false;
+		let subscribeCalls = 0;
+		let subscribedDuringRender = false;
+		const listeners = new Set<() => void>();
+		const store = {
+			get: () => value,
+			subscribe(notify: () => void) {
+				subscribeCalls++;
+				subscribedDuringRender ||= rendering;
+				listeners.add(notify);
+				value = 1;
+				notify();
+				return () => {
+					listeners.delete(notify);
+				};
+			},
+		};
+
+		const r = mount(RenderObservedReader, {
+			store,
+			onRenderState(next: boolean) {
+				rendering = next;
+			},
+		});
+		await nextPaint();
+
+		expect(subscribedDuringRender).toBe(false);
+		expect(subscribeCalls).toBe(1);
+		expect(listeners.size).toBe(1);
+		expect(r.find('.value').textContent).toBe('1');
+		r.unmount();
+		await nextPaint();
+		expect(listeners.size).toBe(0);
+	});
+
 	it('unsubscribes on unmount (store drops its listener)', async () => {
 		const store = makeStore(1);
 		const r = mount(Reader, { store });
@@ -51,6 +95,39 @@ describe('useSyncExternalStore', () => {
 		// No throw, no stray DOM mutation — the unsubscribe contract is honored.
 		expect(() => store.set(999)).not.toThrow();
 		expect(store.listenerCount()).toBe(0);
+	});
+
+	it('unsubscribes when its conditional owner removes it', async () => {
+		const store = makeStore(1);
+		const r = mount(ConditionalReader, { store, show: true });
+		await nextPaint();
+		expect(store.listenerCount()).toBe(1);
+
+		r.update(ConditionalReader, { store, show: false });
+		await nextPaint();
+		expect(store.listenerCount()).toBe(0);
+		expect(r.findAll('.value')).toHaveLength(0);
+		r.unmount();
+	});
+
+	it('ignores a retained stale callback after conditional removal', async () => {
+		const store = makeRetainedCallbackStore(0);
+		const r = mount(ConditionalReader, { store, show: true });
+		await nextPaint();
+		const host = r.find('#conditional-host');
+		const survivor = r.find('#conditional-survivor');
+
+		r.update(ConditionalReader, { store, show: false });
+		await nextPaint();
+		expect(store.listenerCount()).toBe(0);
+		expect(r.findAll('.value')).toHaveLength(0);
+
+		expect(store.notifyRetained(1)).toBe(true);
+		await nextPaint();
+		expect(r.find('#conditional-host')).toBe(host);
+		expect(r.find('#conditional-survivor')).toBe(survivor);
+		expect(r.findAll('.value')).toHaveLength(0);
+		r.unmount();
 	});
 
 	it('swapping the store unsubscribes from the old and subscribes to the new', async () => {
