@@ -4,11 +4,13 @@
 import { createElement } from 'octane';
 import { OctaneDevtoolsEventClient } from './client';
 import { startBridge } from './bridge';
-import { ComponentsTab } from './panel/ComponentsTab.tsrx';
+import { OctanePanel } from './panel/OctanePanel.tsrx';
 
 export { OctaneDevtoolsEventClient } from './client';
 export { startBridge } from './bridge';
 export { ComponentsTab } from './panel/ComponentsTab.tsrx';
+export { ProfilerTab } from './panel/ProfilerTab.tsrx';
+export { OctanePanel } from './panel/OctanePanel.tsrx';
 export type { TreeSnapshot, NodeDetail, WireTreeNode } from './client';
 
 /**
@@ -25,7 +27,7 @@ export function octaneDevtools() {
 		name: 'Octane',
 		render: () => {
 			if (stop === null) stop = startBridge(client);
-			return createElement(ComponentsTab, { client });
+			return createElement(OctanePanel, { client });
 		},
 	};
 }
