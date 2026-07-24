@@ -1073,6 +1073,11 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 
 			const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
 			await leaf.waitFor({ timeout: 10_000 });
+			// Browsers may deliver the source editor's mouseleave after its mobile
+			// panel is hidden. It must not clear the AST node we just revealed.
+			await page
+				.locator('.pg-panel[aria-label="Source editor"] .cm-content')
+				.dispatchEvent('mouseleave');
 			await leaf.locator(':scope > details > summary').click();
 			await page.waitForFunction(
 				() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),

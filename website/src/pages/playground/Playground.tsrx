@@ -635,7 +635,11 @@ export function Playground() @{
 					if (pair) revealPair(pair, null);
 					else clearMappedPair();
 				},
-				mouseleave() {
+				mouseleave(_event: MouseEvent, view: any) {
+					// Switching mobile panes can deliver mouseleave after this
+					// editor is display:none. That stale event must not clear the
+					// AST selection revealed in the newly visible result pane.
+					if (view.dom.getClientRects().length === 0) return;
 					clearMappedPair();
 					astPreview.clear();
 				},
