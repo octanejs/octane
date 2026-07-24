@@ -6,6 +6,9 @@ pnpm-workspace.yaml
 .changeset/
 
 # Build outputs
+packages/shadcn/registry/
+# Vendored pinned upstream shadcn sources (byte-exact provenance; do not reformat)
+packages/shadcn/tests/differential/upstream/
 **/dist/
 **/build/
 **/.netlify/

@@ -432,6 +432,9 @@ catalogs:
     chrome-launcher:
       specifier: 1.2.1
       version: 1.2.1
+    class-variance-authority:
+      specifier: 0.7.1
+      version: 0.7.1
     classnames:
       specifier: ^2.5.1
       version: 2.5.1
@@ -675,6 +678,9 @@ catalogs:
     tabbable:
       specifier: ^6.5.0
       version: 6.5.0
+    tailwind-merge:
+      specifier: 3.6.0
+      version: 3.6.0
     terser:
       specifier: ^5.49.0
       version: 5.49.0
@@ -4450,6 +4456,49 @@ importers:
         specifier: catalog:default
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@24.13.3)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
 
+  packages/shadcn:
+    dependencies:
+      '@octanejs/lucide':
+        specifier: 0.1.8
+        version: 0.1.8(octane@packages+octane)
+      '@octanejs/radix':
+        specifier: 0.1.12
+        version: 0.1.12(octane@packages+octane)
+      class-variance-authority:
+        specifier: catalog:default
+        version: 0.7.1
+      clsx:
+        specifier: catalog:default
+        version: 2.1.1
+      tailwind-merge:
+        specifier: catalog:default
+        version: 3.6.0
+    devDependencies:
+      '@tsrx/react':
+        specifier: catalog:default
+        version: 0.2.47(react@19.2.7)
+      esbuild:
+        specifier: catalog:default
+        version: 0.28.1
+      lucide-react:
+        specifier: catalog:default
+        version: 1.24.0(react@19.2.7)
+      octane:
+        specifier: workspace:*
+        version: link:../octane
+      radix-ui:
+        specifier: catalog:default
+        version: 1.6.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react:
+        specifier: catalog:default
+        version: 19.2.7
+      react-dom:
+        specifier: catalog:default
+        version: 19.2.7(react@19.2.7)
+      vitest:
+        specifier: catalog:default
+        version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@vitest/coverage-istanbul@4.1.10)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.0)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.1.5(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0))
+
   packages/sonner:
     devDependencies:
       '@tsrx/react':
@@ -7095,6 +7144,24 @@ packages:
   '@observablehq/plot@0.6.17':
     resolution: {integrity: sha512-/qaXP/7mc4MUS0s4cPPFASDRjtsWp85/TbfsciqDgU1HwYixbSbbytNuInD8AcTYC3xaxACgVX06agdfQy9W+g==}
     engines: {node: '>=12'}
+
+  '@octanejs/floating-ui@0.1.12':
+    resolution: {integrity: sha512-3K/Zjj3YwTQDWwbq7RdbGA11Ne8NJxCKaoUNr/NXFQlxq6PD3NBJrl+CMihGMcwpXcfitH4GD3O8W2tPsXZd8g==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: 0.1.13
+
+  '@octanejs/lucide@0.1.8':
+    resolution: {integrity: sha512-ejGj1op0+sWAq809XDLYPgG2zNB08tmpH/+SzcvjhMmKTM4oJF2nt6vpRS/weE6A4iw7JJdVhWp2MjGHj6YhFQ==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: 0.1.13
+
+  '@octanejs/radix@0.1.12':
+    resolution: {integrity: sha512-LMj8Cmj+XHiUT8v+/rgcY6WMCQfruoIYQ7nZAOtA8X5aWOTqZK3wPdksGqCviJXEHncyQRwj8V77Am/SPlURJA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: 0.1.13
 
   '@octokit/auth-token@6.0.0':
     resolution: {integrity: sha512-P4YJBPdPSpWTQ1NU4XYdvHvXJJDxM6YwpS0FZHRgP7YFkdVxsWcpWGy/NVqlAA7PcPCnMacXlRm1y2PFZRWL/w==}
@@ -10856,6 +10923,9 @@ packages:
 
   cjs-module-lexer@2.2.0:
     resolution: {integrity: sha512-4bHTS2YuzUvtoLjdy+98ykbNB5jS0+07EvFNXerqZQJ89F7DI6ET7OQo/HJuW6K0aVsKA9hj9/RVb2kQVOrPDQ==}
+
+  class-variance-authority@0.7.1:
+    resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
 
   classnames@2.5.1:
     resolution: {integrity: sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==}
@@ -17310,6 +17380,24 @@ snapshots:
       interval-tree-1d: 1.0.4
       isoformat: 0.2.1
 
+  '@octanejs/floating-ui@0.1.12(octane@packages+octane)':
+    dependencies:
+      '@floating-ui/dom': 1.8.0
+      '@floating-ui/utils': 0.2.12
+      octane: link:packages/octane
+      tabbable: 6.5.0
+
+  '@octanejs/lucide@0.1.8(octane@packages+octane)':
+    dependencies:
+      '@lucide/icons': 1.24.0
+      octane: link:packages/octane
+
+  '@octanejs/radix@0.1.12(octane@packages+octane)':
+    dependencies:
+      '@octanejs/floating-ui': 0.1.12(octane@packages+octane)
+      aria-hidden: 1.2.6
+      octane: link:packages/octane
+
   '@octokit/auth-token@6.0.0': {}
 
   '@octokit/core@7.0.6':
@@ -21925,6 +22013,10 @@ snapshots:
   ci-info@4.4.0: {}
 
   cjs-module-lexer@2.2.0: {}
+
+  class-variance-authority@0.7.1:
+    dependencies:
+      clsx: 2.1.1
 
   classnames@2.5.1: {}
 
