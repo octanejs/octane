@@ -793,6 +793,37 @@ export default defineConfig({
 			},
 			{
 				test: {
+					name: 'octane-devtools',
+					include: ['packages/octane-devtools/tests/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					// The @tanstack/devtools-event-client index folds to a no-op unless
+					// NODE_ENV === 'development'; the plugin only runs in dev anyway.
+					env: { NODE_ENV: 'development' },
+					// Starts a ClientEventBus so emit()/on() deliver over the window bus
+					// (the devtools host provides it in production).
+					setupFiles: ['packages/octane-devtools/tests/setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/octane-devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
+						},
+					],
+				},
+			},
+			{
+				test: {
 					name: 'tanstack-table',
 					include: ['packages/tanstack-table/tests/**/*.test.ts'],
 					environment: 'jsdom',
