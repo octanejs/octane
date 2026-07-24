@@ -333,6 +333,9 @@ export function Playground() @{
 				notice: string;
 			};
 			const typesCache = new Map<string, TypesEntry>();
+			// Track the last graph-level error so pane-only updates (AST stage, mode)
+			// don't wipe it when per-file inspection succeeds.
+			let lastGraphError = '';
 			const clientAstCache = new Map<
 				string,
 				{ source: string; ast: unknown; error: string | null }
@@ -442,7 +445,8 @@ export function Playground() @{
 					}
 					clearMappedPair();
 					astPreview.clear();
-					setError(error || '');
+					// Preserve a graph-level error when per-file inspection succeeds.
+					setError(error || lastGraphError);
 					return error;
 				}
 				const code = typesEntry(currentFile).code;
@@ -450,8 +454,8 @@ export function Playground() @{
 				// pair even when the cached Types document needs no replacement.
 				clearMappedPair();
 				astPreview.clear();
-				// Clear any stale error from a previous stage/mode.
-				setError('');
+				// Preserve a graph-level error when switching to Types mode.
+				setError(lastGraphError);
 				if (typeof code !== 'string' || code === lastShownOutput) return null;
 				replaceDoc(outputView, code);
 				lastShownOutput = code;
@@ -638,10 +642,12 @@ export function Playground() @{
 				// from compiling. Refresh inspection before handling graph failure.
 				const inspectionError = showOutput();
 				if (!graph.ok) {
+					lastGraphError = graph.error;
 					setWarnings([]);
 					setError(graph.error);
 					return;
 				}
+				lastGraphError = '';
 				setWarnings(
 					graph.warnings.map((warning: { diagnostic: CompileDiagnostic }) => warning.diagnostic),
 				);
