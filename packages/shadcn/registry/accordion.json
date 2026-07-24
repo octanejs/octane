@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "accordion",
+  "type": "registry:ui",
+  "title": "Accordion",
+  "files": [
+    {
+      "path": "ui/accordion.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/accordion.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/accordion.tsx (the `\"use client\"` directive\n// is dropped — octane has no RSC axis). IconPlaceholder resolves to lucide\n// (see spinner.tsrx).\n//\n// AccordionTrigger and AccordionContent forward opaque compiled children next\n// to sibling descriptors (the icons / the inner div), so they are composed\n// with createElement (the cmdk Command.Dialog precedent — see\n// breadcrumb.tsrx's comment).\nimport { Accordion as AccordionPrimitive } from '@octanejs/radix';\nimport { ChevronDownIcon, ChevronUpIcon } from '@octanejs/lucide';\nimport { createElement, type OctaneNode } from 'octane';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function Accordion({ className, ...props }: Props) @{\n\t<AccordionPrimitive.Root\n\t\tdata-slot=\"accordion\"\n\t\tclassName={cn('cn-accordion flex w-full flex-col', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function AccordionItem({ className, ...props }: Props) @{\n\t<AccordionPrimitive.Item\n\t\tdata-slot=\"accordion-item\"\n\t\tclassName={cn('cn-accordion-item', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function AccordionTrigger({ className, children, ...props }: Props & {\n\tchildren?: OctaneNode;\n}) {\n\treturn createElement(\n\t\tAccordionPrimitive.Header,\n\t\t{ className: 'flex' },\n\t\tcreateElement(\n\t\t\tAccordionPrimitive.Trigger,\n\t\t\t{\n\t\t\t\t'data-slot': 'accordion-trigger',\n\t\t\t\tclassName: cn(\n\t\t\t\t\t'cn-accordion-trigger group/accordion-trigger relative flex flex-1 items-start justify-between border border-transparent transition-all outline-none disabled:pointer-events-none disabled:opacity-50',\n\t\t\t\t\tclassName,\n\t\t\t\t),\n\t\t\t\t...props,\n\t\t\t},\n\t\t\tchildren,\n\t\t\tcreateElement(ChevronDownIcon, {\n\t\t\t\t'data-slot': 'accordion-trigger-icon',\n\t\t\t\tclassName: 'cn-accordion-trigger-icon pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden',\n\t\t\t}),\n\t\t\tcreateElement(ChevronUpIcon, {\n\t\t\t\t'data-slot': 'accordion-trigger-icon',\n\t\t\t\tclassName: 'cn-accordion-trigger-icon pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline',\n\t\t\t}),\n\t\t),\n\t);\n}\n\nexport function AccordionContent({ className, children, ...props }: Props & {\n\tchildren?: OctaneNode;\n}) {\n\treturn createElement(\n\t\tAccordionPrimitive.Content,\n\t\t{\n\t\t\t'data-slot': 'accordion-content',\n\t\t\tclassName: 'cn-accordion-content overflow-hidden',\n\t\t\t...props,\n\t\t},\n\t\tcreateElement(\n\t\t\t'div',\n\t\t\t{\n\t\t\t\tclassName: cn(\n\t\t\t\t\t'cn-accordion-content-inner h-(--radix-accordion-content-height) [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4',\n\t\t\t\t\tclassName,\n\t\t\t\t),\n\t\t\t},\n\t\t\tchildren,\n\t\t),\n\t);\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.8",
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

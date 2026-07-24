@@ -1,0 +1,49 @@
+import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
+const PKG_ROOT = join(__dirname, '..');
+const REGISTRY = join(PKG_ROOT, 'registry');
+
+describe('@octanejs/shadcn — registry emit', () => {
+	it('is current with the sources (build --check)', () => {
+		expect(() =>
+			execFileSync(process.execPath, ['scripts/build-registry.mjs', '--check'], {
+				cwd: PKG_ROOT,
+				stdio: 'pipe',
+			}),
+		).not.toThrow();
+	});
+
+	it('emits schema-shaped items whose registryDependencies resolve within the registry', () => {
+		const files = readdirSync(REGISTRY).filter((file) => file.endsWith('.json'));
+		const index = JSON.parse(readFileSync(join(REGISTRY, 'registry.json'), 'utf8'));
+		expect(index.name).toBe('octane');
+		const names = new Set(index.items.map((item: { name: string }) => item.name));
+		expect(names.size).toBe(index.items.length);
+		for (const file of files) {
+			if (file === 'registry.json') continue;
+			const item = JSON.parse(readFileSync(join(REGISTRY, file), 'utf8'));
+			expect(item.$schema).toBe('https://ui.shadcn.com/schema/registry-item.json');
+			expect(names.has(item.name)).toBe(true);
+			expect(item.files.length).toBeGreaterThan(0);
+			for (const entry of item.files) {
+				expect(typeof entry.content).toBe('string');
+				expect(entry.content.length).toBeGreaterThan(0);
+				// Emitted sources use consumer-alias imports, never package-relative ones.
+				expect(entry.content).not.toMatch(/from '\.\.?\/[^']*'/);
+			}
+			for (const dep of item.registryDependencies ?? []) {
+				expect(names.has(dep), `${item.name} → ${dep} unresolved`).toBe(true);
+			}
+		}
+	});
+
+	it('pins cross-binding npm dependencies to exact versions', () => {
+		const button = JSON.parse(readFileSync(join(REGISTRY, 'button.json'), 'utf8'));
+		expect(button.dependencies).toContain('@octanejs/radix@0.1.12');
+		const spinner = JSON.parse(readFileSync(join(REGISTRY, 'spinner.json'), 'utf8'));
+		expect(spinner.dependencies).toContain('@octanejs/lucide@0.1.8');
+	});
+});

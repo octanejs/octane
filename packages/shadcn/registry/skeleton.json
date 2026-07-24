@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "skeleton",
+  "type": "registry:ui",
+  "title": "Skeleton",
+  "files": [
+    {
+      "path": "ui/skeleton.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/skeleton.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/skeleton.tsx.\nimport { cn } from '@/lib/utils';\n\nexport interface SkeletonProps extends Record<string, unknown> {\n\tclassName?: string;\n}\n\nexport function Skeleton({ className, ...props }: SkeletonProps) @{\n\t<div data-slot=\"skeleton\" className={cn('cn-skeleton animate-pulse', className)} {...props} />\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

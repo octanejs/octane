@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "toggle",
+  "type": "registry:ui",
+  "title": "Toggle",
+  "files": [
+    {
+      "path": "ui/toggle.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/toggle.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/toggle.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis).\nimport { cva, type VariantProps } from 'class-variance-authority';\nimport { Toggle as TogglePrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport const toggleVariants = cva(\n\t'cn-toggle group/toggle inline-flex items-center justify-center whitespace-nowrap outline-none hover:bg-muted focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'cn-toggle-variant-default',\n\t\t\t\toutline: 'cn-toggle-variant-outline',\n\t\t\t},\n\t\t\tsize: {\n\t\t\t\tdefault: 'cn-toggle-size-default',\n\t\t\t\tsm: 'cn-toggle-size-sm',\n\t\t\t\tlg: 'cn-toggle-size-lg',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t\tsize: 'default',\n\t\t},\n\t},\n);\n\nexport interface ToggleProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvariant?: VariantProps<typeof toggleVariants>['variant'];\n\tsize?: VariantProps<typeof toggleVariants>['size'];\n}\n\nexport function Toggle({\n\tclassName,\n\tvariant = 'default',\n\tsize = 'default',\n\t...props\n}: ToggleProps) @{\n\t<TogglePrimitive.Root\n\t\tdata-slot=\"toggle\"\n\t\tclassName={cn(toggleVariants({ variant, size, className }))}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12",
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

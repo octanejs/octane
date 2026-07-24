@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "scroll-area",
+  "type": "registry:ui",
+  "title": "Scroll Area",
+  "files": [
+    {
+      "path": "ui/scroll-area.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/scroll-area.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/scroll-area.tsx (the `\"use client\"`\n// directive is dropped — octane has no RSC axis).\n//\n// ScrollArea forwards opaque compiled children into the Viewport next to\n// sibling descriptors (ScrollBar, Corner), so it is composed with\n// createElement (the cmdk Command.Dialog precedent — see breadcrumb.tsrx's\n// comment).\nimport { ScrollArea as ScrollAreaPrimitive } from '@octanejs/radix';\nimport { createElement, type OctaneNode } from 'octane';\n\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function ScrollArea({ className, children, ...props }: Props & { children?: OctaneNode }) {\n\treturn createElement(\n\t\tScrollAreaPrimitive.Root,\n\t\t{\n\t\t\t'data-slot': 'scroll-area',\n\t\t\tclassName: cn('cn-scroll-area relative', className),\n\t\t\t...props,\n\t\t},\n\t\tcreateElement(\n\t\t\tScrollAreaPrimitive.Viewport,\n\t\t\t{\n\t\t\t\t'data-slot': 'scroll-area-viewport',\n\t\t\t\tclassName: 'cn-scroll-area-viewport size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1',\n\t\t\t},\n\t\t\tchildren,\n\t\t),\n\t\tcreateElement(ScrollBar, {}),\n\t\tcreateElement(ScrollAreaPrimitive.Corner, {}),\n\t);\n}\n\nexport interface ScrollBarProps extends Record<string, unknown> {\n\tclassName?: string;\n\torientation?: 'vertical' | 'horizontal';\n}\n\nexport function ScrollBar({ className, orientation = 'vertical', ...props }: ScrollBarProps) @{\n\t<ScrollAreaPrimitive.ScrollAreaScrollbar\n\t\tdata-slot=\"scroll-area-scrollbar\"\n\t\tdata-orientation={orientation}\n\t\torientation={orientation}\n\t\tclassName={cn(\n\t\t\t'cn-scroll-area-scrollbar flex touch-none p-px transition-colors select-none',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t<ScrollAreaPrimitive.ScrollAreaThumb\n\t\t\tdata-slot=\"scroll-area-thumb\"\n\t\t\tclassName=\"cn-scroll-area-thumb relative flex-1 bg-border\"\n\t\t/>\n\t</ScrollAreaPrimitive.ScrollAreaScrollbar>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

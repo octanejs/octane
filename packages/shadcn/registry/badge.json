@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "badge",
+  "type": "registry:ui",
+  "title": "Badge",
+  "files": [
+    {
+      "path": "ui/badge.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/badge.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/badge.tsx.\n//\n// The cva variant map, class strings, and data-slot/data-variant attributes are\n// preserved byte-for-byte — they are the public styling contract the style CSS\n// and consumer selectors target. Renderer adaptations only: octane host JSX,\n// ref-as-prop, and `asChild` through @octanejs/radix's Slot.\nimport { cva, type VariantProps } from 'class-variance-authority';\nimport { Slot } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport const badgeVariants = cva(\n\t'cn-badge group/badge inline-flex w-fit shrink-0 items-center justify-center overflow-hidden whitespace-nowrap focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'cn-badge-variant-default',\n\t\t\t\tsecondary: 'cn-badge-variant-secondary',\n\t\t\t\tdestructive: 'cn-badge-variant-destructive',\n\t\t\t\toutline: 'cn-badge-variant-outline',\n\t\t\t\tghost: 'cn-badge-variant-ghost',\n\t\t\t\tlink: 'cn-badge-variant-link',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t},\n\t},\n);\n\nexport interface BadgeProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvariant?: VariantProps<typeof badgeVariants>['variant'];\n\t// OCTANE DIVERGENCE: asChild composes element descriptors (createElement),\n\t// not opaque compiled .tsrx children — the documented radix Slot contract.\n\tasChild?: boolean;\n\tref?: unknown;\n}\n\nexport function Badge({ className, variant = 'default', asChild = false, ...props }: BadgeProps) @{\n\t@if (asChild) {\n\t\t<Slot\n\t\t\tdata-slot=\"badge\"\n\t\t\tdata-variant={variant}\n\t\t\tclassName={cn(badgeVariants({ variant }), className)}\n\t\t\t{...props}\n\t\t/>\n\t} @else {\n\t\t<span\n\t\t\tdata-slot=\"badge\"\n\t\t\tdata-variant={variant}\n\t\t\tclassName={cn(badgeVariants({ variant }), className)}\n\t\t\t{...props}\n\t\t/>\n\t}\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12",
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

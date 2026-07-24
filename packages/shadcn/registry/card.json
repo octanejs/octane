@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "card",
+  "type": "registry:ui",
+  "title": "Card",
+  "files": [
+    {
+      "path": "ui/card.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/card.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/card.tsx.\nimport { cn } from '@/lib/utils';\n\ntype DivProps = { className?: string } & Record<string, unknown>;\n\nexport interface CardProps extends Record<string, unknown> {\n\tclassName?: string;\n\tsize?: 'default' | 'sm';\n}\n\nexport function Card({ className, size = 'default', ...props }: CardProps) @{\n\t<div\n\t\tdata-slot=\"card\"\n\t\tdata-size={size}\n\t\tclassName={cn('cn-card group/card flex flex-col', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function CardHeader({ className, ...props }: DivProps) @{\n\t<div\n\t\tdata-slot=\"card-header\"\n\t\tclassName={cn(\n\t\t\t'cn-card-header group/card-header @container/card-header grid auto-rows-min items-start has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto]',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function CardTitle({ className, ...props }: DivProps) @{\n\t<div\n\t\tdata-slot=\"card-title\"\n\t\tclassName={cn('cn-card-title cn-font-heading', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function CardDescription({ className, ...props }: DivProps) @{\n\t<div data-slot=\"card-description\" className={cn('cn-card-description', className)} {...props} />\n}\n\nexport function CardAction({ className, ...props }: DivProps) @{\n\t<div\n\t\tdata-slot=\"card-action\"\n\t\tclassName={cn(\n\t\t\t'cn-card-action col-start-2 row-span-2 row-start-1 self-start justify-self-end',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n\nexport function CardContent({ className, ...props }: DivProps) @{\n\t<div data-slot=\"card-content\" className={cn('cn-card-content', className)} {...props} />\n}\n\nexport function CardFooter({ className, ...props }: DivProps) @{\n\t<div\n\t\tdata-slot=\"card-footer\"\n\t\tclassName={cn('cn-card-footer flex items-center', className)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

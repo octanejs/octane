@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "table",
+  "type": "registry:ui",
+  "title": "Table",
+  "files": [
+    {
+      "path": "ui/table.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/table.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/table.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis). Table renders inside the upstream\n// table-container wrapper div.\nimport { cn } from '@/lib/utils';\n\ntype Props = { className?: string } & Record<string, unknown>;\n\nexport function Table({ className, ...props }: Props) @{\n\t<div data-slot=\"table-container\" className=\"cn-table-container\">\n\t\t<table data-slot=\"table\" className={cn('cn-table', className)} {...props} />\n\t</div>\n}\n\nexport function TableHeader({ className, ...props }: Props) @{\n\t<thead data-slot=\"table-header\" className={cn('cn-table-header', className)} {...props} />\n}\n\nexport function TableBody({ className, ...props }: Props) @{\n\t<tbody data-slot=\"table-body\" className={cn('cn-table-body', className)} {...props} />\n}\n\nexport function TableFooter({ className, ...props }: Props) @{\n\t<tfoot data-slot=\"table-footer\" className={cn('cn-table-footer', className)} {...props} />\n}\n\nexport function TableRow({ className, ...props }: Props) @{\n\t<tr\n\t\tdata-slot=\"table-row\"\n\t\tclassName={cn('cn-table-row has-aria-expanded:bg-muted/50', className)}\n\t\t{...props}\n\t/>\n}\n\nexport function TableHead({ className, ...props }: Props) @{\n\t<th data-slot=\"table-head\" className={cn('cn-table-head', className)} {...props} />\n}\n\nexport function TableCell({ className, ...props }: Props) @{\n\t<td data-slot=\"table-cell\" className={cn('cn-table-cell', className)} {...props} />\n}\n\nexport function TableCaption({ className, ...props }: Props) @{\n\t<caption data-slot=\"table-caption\" className={cn('cn-table-caption', className)} {...props} />\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

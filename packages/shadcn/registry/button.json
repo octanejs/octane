@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "button",
+  "type": "registry:ui",
+  "title": "Button",
+  "files": [
+    {
+      "path": "ui/button.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/button.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/button.tsx. Class strings, cva maps, and\n// data-slot/data-variant/data-size are preserved byte-for-byte.\nimport { cva, type VariantProps } from 'class-variance-authority';\nimport { Slot } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport const buttonVariants = cva(\n\t'cn-button group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',\n\t{\n\t\tvariants: {\n\t\t\tvariant: {\n\t\t\t\tdefault: 'cn-button-variant-default',\n\t\t\t\toutline: 'cn-button-variant-outline',\n\t\t\t\tsecondary: 'cn-button-variant-secondary',\n\t\t\t\tghost: 'cn-button-variant-ghost',\n\t\t\t\tdestructive: 'cn-button-variant-destructive',\n\t\t\t\tlink: 'cn-button-variant-link',\n\t\t\t},\n\t\t\tsize: {\n\t\t\t\tdefault: 'cn-button-size-default',\n\t\t\t\txs: 'cn-button-size-xs',\n\t\t\t\tsm: 'cn-button-size-sm',\n\t\t\t\tlg: 'cn-button-size-lg',\n\t\t\t\ticon: 'cn-button-size-icon',\n\t\t\t\t'icon-xs': 'cn-button-size-icon-xs',\n\t\t\t\t'icon-sm': 'cn-button-size-icon-sm',\n\t\t\t\t'icon-lg': 'cn-button-size-icon-lg',\n\t\t\t},\n\t\t},\n\t\tdefaultVariants: {\n\t\t\tvariant: 'default',\n\t\t\tsize: 'default',\n\t\t},\n\t},\n);\n\nexport interface ButtonProps extends Record<string, unknown> {\n\tclassName?: string;\n\tvariant?: VariantProps<typeof buttonVariants>['variant'];\n\tsize?: VariantProps<typeof buttonVariants>['size'];\n\t// OCTANE DIVERGENCE: asChild composes element descriptors (createElement),\n\t// not opaque compiled .tsrx children — the documented radix Slot contract.\n\tasChild?: boolean;\n\tref?: unknown;\n}\n\nexport function Button({\n\tclassName,\n\tvariant = 'default',\n\tsize = 'default',\n\tasChild = false,\n\t...props\n}: ButtonProps) @{\n\t@if (asChild) {\n\t\t<Slot\n\t\t\tdata-slot=\"button\"\n\t\t\tdata-variant={variant}\n\t\t\tdata-size={size}\n\t\t\tclassName={cn(buttonVariants({ variant, size, className }))}\n\t\t\t{...props}\n\t\t/>\n\t} @else {\n\t\t<button\n\t\t\tdata-slot=\"button\"\n\t\t\tdata-variant={variant}\n\t\t\tdata-size={size}\n\t\t\tclassName={cn(buttonVariants({ variant, size, className }))}\n\t\t\t{...props}\n\t\t/>\n\t}\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12",
+    "class-variance-authority"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

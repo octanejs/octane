@@ -1,0 +1,17 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "input",
+  "type": "registry:ui",
+  "title": "Input",
+  "files": [
+    {
+      "path": "ui/input.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/input.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/input.tsx.\n//\n// OCTANE DIVERGENCE: per-keystroke handling is the native `onInput` event, not\n// a synthetic `onChange`; native `change` keeps its commit-on-blur meaning.\nimport { cn } from '@/lib/utils';\n\nexport interface InputProps extends Record<string, unknown> {\n\tclassName?: string;\n\ttype?: string;\n}\n\nexport function Input({ className, type, ...props }: InputProps) @{\n\t<input\n\t\ttype={type}\n\t\tdata-slot=\"input\"\n\t\tclassName={cn(\n\t\t\t'cn-input w-full min-w-0 outline-none file:inline-flex file:border-0 file:bg-transparent file:text-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t/>\n}\n"
+    }
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

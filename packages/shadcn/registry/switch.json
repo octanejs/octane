@@ -1,0 +1,20 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "switch",
+  "type": "registry:ui",
+  "title": "Switch",
+  "files": [
+    {
+      "path": "ui/switch.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/switch.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/switch.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis).\nimport { Switch as SwitchPrimitive } from '@octanejs/radix';\n\nimport { cn } from '@/lib/utils';\n\nexport interface SwitchProps extends Record<string, unknown> {\n\tclassName?: string;\n\tsize?: 'sm' | 'default';\n}\n\nexport function Switch({ className, size = 'default', ...props }: SwitchProps) @{\n\t<SwitchPrimitive.Root\n\t\tdata-slot=\"switch\"\n\t\tdata-size={size}\n\t\tclassName={cn(\n\t\t\t'cn-switch peer group/switch relative inline-flex items-center transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:cursor-not-allowed data-disabled:opacity-50',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t<SwitchPrimitive.Thumb\n\t\t\tdata-slot=\"switch-thumb\"\n\t\t\tclassName=\"cn-switch-thumb pointer-events-none block ring-0 transition-transform\"\n\t\t/>\n\t</SwitchPrimitive.Root>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}

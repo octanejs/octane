@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "checkbox",
+  "type": "registry:ui",
+  "title": "Checkbox",
+  "files": [
+    {
+      "path": "ui/checkbox.tsrx",
+      "type": "registry:ui",
+      "target": "components/ui/checkbox.tsrx",
+      "content": "// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544\n// apps/v4/registry/bases/radix/ui/checkbox.tsx (the `\"use client\"` directive is\n// dropped — octane has no RSC axis). IconPlaceholder resolves to lucide (see\n// spinner.tsrx).\nimport { Checkbox as CheckboxPrimitive } from '@octanejs/radix';\nimport { CheckIcon } from '@octanejs/lucide';\n\nimport { cn } from '@/lib/utils';\n\nexport interface CheckboxProps extends Record<string, unknown> {\n\tclassName?: string;\n}\n\nexport function Checkbox({ className, ...props }: CheckboxProps) @{\n\t<CheckboxPrimitive.Root\n\t\tdata-slot=\"checkbox\"\n\t\tclassName={cn(\n\t\t\t'cn-checkbox peer relative shrink-0 outline-none after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50',\n\t\t\tclassName,\n\t\t)}\n\t\t{...props}\n\t>\n\t\t<CheckboxPrimitive.Indicator\n\t\t\tdata-slot=\"checkbox-indicator\"\n\t\t\tclassName=\"cn-checkbox-indicator grid place-content-center text-current transition-none\"\n\t\t>\n\t\t\t<CheckIcon />\n\t\t</CheckboxPrimitive.Indicator>\n\t</CheckboxPrimitive.Root>\n}\n"
+    }
+  ],
+  "dependencies": [
+    "@octanejs/lucide@0.1.8",
+    "@octanejs/radix@0.1.12"
+  ],
+  "registryDependencies": [
+    "utils"
+  ]
+}
