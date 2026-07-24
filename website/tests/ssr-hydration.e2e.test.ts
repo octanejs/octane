@@ -1087,7 +1087,17 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 
 			await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
 			await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
-			expect(await page.locator('.pg-editor .cm-mapped').count()).toBe(1);
+			// CodeMirror may split one logical marked range across lines and
+			// syntax spans. The observable contract is that the pinned source
+			// range remains visibly highlighted after returning to the editor.
+			await page.waitForFunction(
+				() =>
+					Array.from(
+						document.querySelectorAll('.pg-panel[aria-label="Source editor"] .cm-mapped'),
+					).some((mark) => getComputedStyle(mark).backgroundColor === 'rgba(255, 234, 0, 0.42)'),
+				null,
+				{ timeout: 10_000 },
+			);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
