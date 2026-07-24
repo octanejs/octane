@@ -90,6 +90,9 @@ function safePreview(value: unknown, depth = 0): unknown {
 
 function classifyCell(cell: any): DevtoolsHookCell | null {
 	if (cell === null || typeof cell !== 'object') return null;
+	// Effect slots are reported separately as `effectCount`; skip them here so
+	// they don't also surface as untyped `other` rows in the hook list.
+	if (cell.effect === true) return null;
 	if ('setter' in cell) return { kind: 'state', value: safePreview(cell.value) };
 	if ('dispatch' in cell && 'reducer' in cell)
 		return { kind: 'reducer', value: safePreview(cell.value) };
