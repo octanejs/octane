@@ -1,7 +1,7 @@
-// The Profiler tab: subscribes to the app-side bridge's `profile` event (Task 2's
-// startBridge, which reads globalThis.__OCTANE_PROFILER__ per flush) and renders a
-// ranked self-time table plus a recent-commits list. Absent a profiler global on the
-// app side, no `profile` event ever arrives and the tab stays in its empty state.
+// The Profiler tab: subscribes to the app-side bridge's `profile` event (startBridge,
+// which reads globalThis.__OCTANE_PROFILER__ per flush) and renders a ranked
+// self-time table plus a recent-commits list. Absent a profiler global on the app
+// side, no `profile` event ever arrives and the tab stays in its empty state.
 import { useEffect, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { OctaneDevtoolsEventClient, type ProfileSnapshot } from '../client';
@@ -19,48 +19,45 @@ export function ProfilerTab(props: { client: OctaneDevtoolsEventClient }): Octan
 		return () => off();
 	});
 
-	return <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-		@if (snapshot === null || snapshot.summaries.length === 0) {
-			<em>No profiling data yet — interact with the app.</em>
-		} @else {
-			<>
-				<h4>Slowest components (self time)</h4>
-				<table>
-					<thead>
-						<tr>
-							<th>Component</th>
-							<th>Renders</th>
-							<th>Self ms</th>
-							<th>Max ms</th>
-							<th>Queue ms</th>
-							<th>Cause</th>
-						</tr>
-					</thead>
-					<tbody>
-						@for (const s of snapshot.summaries; index i) {
+	return (
+		<div>
+			@if (snapshot === null || snapshot.summaries.length === 0) {
+				<div class="odt-empty">No profiling data yet — interact with the app.</div>
+			} @else {
+				<>
+					<div class="odt-h">Slowest components (self time)</div>
+					<table class="odt-table">
+						<thead>
 							<tr>
-								<td>{s.component}</td>
-								<td>{s.attempts}</td>
-								<td>{fmt(s.totalSelfTime)}</td>
-								<td>{fmt(s.maxInclusiveTime)}</td>
-								<td>{fmt(s.averageQueueDelay)}</td>
-								<td>{(s.dominantCause ?? '-') as string}</td>
+								<th>Component</th>
+								<th class="odt-num">Renders</th>
+								<th class="odt-num">Self ms</th>
+								<th class="odt-num">Max ms</th>
+								<th class="odt-num">Queue ms</th>
+								<th>Cause</th>
 							</tr>
-						}
-					</tbody>
-				</table>
-				<h4>Recent commits</h4>
-				@for (const ev of snapshot.recentEvents; index i) {
-					<div>
-						{ev.component}
-						·
-						{ev.phase}
-						·
-						{fmt(ev.selfDuration)}ms ·
-						{ev.causes.join(',') || ev.outcome}
-					</div>
-				}
-			</>
-		}
-	</div>;
+						</thead>
+						<tbody>
+							@for (const s of snapshot.summaries; index i) {
+								<tr>
+									<td class="odt-name-cell">{s.component}</td>
+									<td class="odt-num">{s.attempts}</td>
+									<td class="odt-num">{fmt(s.totalSelfTime)}</td>
+									<td class="odt-num">{fmt(s.maxInclusiveTime)}</td>
+									<td class="odt-num">{fmt(s.averageQueueDelay)}</td>
+									<td class="odt-muted">{(s.dominantCause ?? '-') as string}</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+					<div class="odt-h">Recent commits</div>
+					@for (const ev of snapshot.recentEvents; index i) {
+						<div class="odt-commit-row">
+							{ev.component} · {ev.phase} · {fmt(ev.selfDuration)}ms · {ev.causes.join(',') || ev.outcome}
+						</div>
+					}
+				</>
+			}
+		</div>
+	);
 }

@@ -72,6 +72,9 @@ type OctaneDevtoolsEventMap = {
 	'inspect-request': InspectRequest;
 	profile: ProfileSnapshot;
 	transition: TransitionSnapshot;
+	// Panel → bridge: "send me a fresh snapshot now" (emitted when the panel
+	// mounts, so tabs populate regardless of subscribe-vs-first-flush timing).
+	refresh: Record<string, never>;
 };
 
 export class OctaneDevtoolsEventClient extends EventClient<OctaneDevtoolsEventMap> {

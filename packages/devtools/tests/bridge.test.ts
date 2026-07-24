@@ -36,24 +36,42 @@ afterEach(() => {
 });
 
 describe('bridge', () => {
-	it('emits a coalesced tree snapshot when the runtime flushes', async () => {
-		const { hook } = installFakeHook();
-		const client = new OctaneDevtoolsEventClient();
-		const stop = startBridge(client);
-		const emit = vi.spyOn(client, 'emit');
+	it('coalesces bursts of flushes into one throttled emit and dedupes unchanged data', async () => {
+		vi.useFakeTimers();
+		try {
+			const { hook } = installFakeHook();
+			let tree = [{ id: 1, name: 'App', kind: 'root', children: [] as unknown[] }];
+			(hook as unknown as { getTree: () => unknown }).getTree = () => tree;
+			const client = new OctaneDevtoolsEventClient();
+			const stop = startBridge(client); // initial emit caches the current tree
+			const emit = vi.spyOn(client, 'emit');
 
-		// Two synchronous flushes must coalesce into a single microtask emission
-		// (one `tree` emit plus one `transition` emit from the fake hook's default
-		// getTransitionState — not one pair per flush).
-		hook._fire();
-		hook._fire();
-		await Promise.resolve();
+			// Change the tree, then flush several times synchronously.
+			tree = [{ id: 2, name: 'Next', kind: 'root', children: [] }];
+			hook._fire();
+			hook._fire();
+			hook._fire();
 
-		expect(emit).toHaveBeenCalledTimes(2);
-		expect(emit).toHaveBeenCalledWith('tree', {
-			nodes: [{ id: 1, name: 'App', kind: 'root', children: [] }],
-		});
-		stop();
+			// Throttled: nothing is emitted synchronously in the burst.
+			expect(emit.mock.calls.filter((c) => c[0] === 'tree')).toHaveLength(0);
+
+			// After the throttle window, exactly ONE `tree` emit carrying the new value.
+			await vi.advanceTimersByTimeAsync(400);
+			const treeCalls = emit.mock.calls.filter((c) => c[0] === 'tree');
+			expect(treeCalls).toHaveLength(1);
+			expect(treeCalls[0][1]).toEqual({
+				nodes: [{ id: 2, name: 'Next', kind: 'root', children: [] }],
+			});
+
+			// A further flush with unchanged data emits no new `tree` (deduped).
+			hook._fire();
+			await vi.advanceTimersByTimeAsync(400);
+			expect(emit.mock.calls.filter((c) => c[0] === 'tree')).toHaveLength(1);
+
+			stop();
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('answers an inspect-request emitted by another client with the node detail', async () => {

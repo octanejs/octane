@@ -1,8 +1,8 @@
 // The Performance-model tab: derives aggregate "what's slow" views from the SAME
-// `profile` event the Profiler tab (Task 2) already consumes — no new event, bridge
-// path, or runtime probe. Where the Profiler tab shows a per-commit table, this tab
-// shows ranked aggregates: slowest mounts by self time, queue-delay hotspots, and a
-// recent commit self-time trend.
+// `profile` event the Profiler tab already consumes — no new event, bridge path, or
+// runtime probe. Where the Profiler tab shows a per-commit table, this tab shows
+// ranked aggregates: slowest mounts by self time, queue-delay hotspots, and a recent
+// commit self-time trend.
 import { useEffect, useMemo, useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { OctaneDevtoolsEventClient, type ProfileSnapshot } from '../client';
@@ -28,8 +28,8 @@ export function PerfModelTab(props: { client: OctaneDevtoolsEventClient }): Octa
 	}, [snapshot]);
 
 	// Excludes components already surfaced by the mounts list above — the two
-	// aggregate lists are meant to highlight distinct signals (heavy initial
-	// renders vs. scheduling delay), not repeat the same component twice.
+	// aggregate lists highlight distinct signals (heavy initial renders vs.
+	// scheduling delay), not the same component twice.
 	const queueHotspots = useMemo(() => {
 		if (snapshot === null) return [];
 		const alreadyShown = new Set(slowestMounts.map((e) => e.component));
@@ -37,41 +37,52 @@ export function PerfModelTab(props: { client: OctaneDevtoolsEventClient }): Octa
 		return others.sort((a, b) => b.averageQueueDelay - a.averageQueueDelay).slice(0, 5);
 	}, [snapshot, slowestMounts]);
 
-	return <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-		@if (snapshot === null || snapshot.summaries.length === 0) {
-			<em>No performance data yet — interact with the app.</em>
-		} @else {
-			<>
-				<h4>Slowest mounts (self time)</h4>
-				@if (slowestMounts.length === 0) {
-					<div>No mounts recorded yet.</div>
-				} @else {
-					@for (const e of slowestMounts; index i) {
-						<div>{e.component} · {fmt(e.selfDuration)}ms</div>
+	const maxSelf = useMemo(() => {
+		if (snapshot === null) return 1;
+		return Math.max(1, ...snapshot.recentEvents.map((e) => e.selfDuration));
+	}, [snapshot]);
+
+	return (
+		<div>
+			@if (snapshot === null || snapshot.summaries.length === 0) {
+				<div class="odt-empty">No performance data yet — interact with the app.</div>
+			} @else {
+				<>
+					<div class="odt-h">Slowest mounts (self time)</div>
+					@if (slowestMounts.length === 0) {
+						<div class="odt-empty odt-muted">No mounts recorded yet.</div>
+					} @else {
+						@for (const e of slowestMounts; index i) {
+							<div class="odt-commit-row">
+								<span class="odt-name-cell">{e.component}</span>
+								<span class="odt-bar" style={{ width: `${Math.max(6, (e.selfDuration / maxSelf) * 120)}px` }}></span>
+								<span class="odt-num">{fmt(e.selfDuration)}ms</span>
+							</div>
+						}
 					}
-				}
-				<h4>Queue-delay hotspots</h4>
-				@if (queueHotspots.length === 0) {
-					<div>No additional hotspots.</div>
-				} @else {
-					@for (const s of queueHotspots; index i) {
-						<div>{s.component} · {fmt(s.averageQueueDelay)}ms avg queue</div>
+					<div class="odt-h">Queue-delay hotspots</div>
+					@if (queueHotspots.length === 0) {
+						<div class="odt-empty odt-muted">No additional hotspots.</div>
+					} @else {
+						@for (const s of queueHotspots; index i) {
+							<div class="odt-commit-row">
+								<span class="odt-name-cell">{s.component}</span>
+								<span class="odt-muted">{fmt(s.averageQueueDelay)}ms avg queue</span>
+							</div>
+						}
 					}
-				}
-				<h4>Recent commit self-time</h4>
-				<div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '28px' }}>
-					@for (const ev of snapshot.recentEvents; index i) {
-						<div
-							title={`${ev.component}: ${fmt(ev.selfDuration)}ms`}
-							style={{
-								width: '8px',
-								height: `${Math.min(24, Math.max(2, ev.selfDuration))}px`,
-								background: '#7c9cff',
-							}}
-						></div>
-					}
-				</div>
-			</>
-		}
-	</div>;
+					<div class="odt-h">Recent commit self-time</div>
+					<div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '30px' }}>
+						@for (const ev of snapshot.recentEvents; index i) {
+							<span
+								class="odt-bar"
+								title={`${ev.component}: ${fmt(ev.selfDuration)}ms`}
+								style={{ width: '7px', height: `${Math.min(28, Math.max(2, (ev.selfDuration / maxSelf) * 28))}px` }}
+							></span>
+						}
+					</div>
+				</>
+			}
+		</div>
+	);
 }

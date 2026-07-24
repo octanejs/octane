@@ -1,6 +1,6 @@
 // The Components tab: subscribes to the app-side bridge's `tree`/`inspect` events
-// (Task 5's startBridge) and renders the live component tree plus a selected-node
-// state inspector. Read-only — selecting a node only asks the app to describe it
+// (startBridge) and renders the live component tree plus a selected-node state
+// inspector. Read-only — selecting a node only asks the app to describe it
 // (`inspect-request`); it never mutates app state (see docs/devtools.md P1 scope).
 import { useEffect, useState } from 'octane';
 import type { OctaneNode } from 'octane';
@@ -11,13 +11,20 @@ function TreeRow(props: {
 	onSelect: (id: number) => void;
 	selected: number | null;
 }) @{
-	<div style={{ paddingLeft: '12px' }}>
+	<div>
 		<button
+			class={['odt-tree-row', props.selected === props.node.id && 'odt-selected']}
 			onClick={() => props.onSelect(props.node.id)}
-			style={{ fontWeight: props.selected === props.node.id ? 'bold' : 'normal' }}
-		>{props.node.name}</button>
-		@for (const child of props.node.children; key child.id) {
-			<TreeRow node={child} onSelect={props.onSelect} selected={props.selected} />
+		>
+			<span class={['odt-kind', props.node.kind === 'root' && 'odt-kind-root']}>{props.node.kind}</span>
+			<span>{props.node.name}</span>
+		</button>
+		@if (props.node.children.length > 0) {
+			<div class="odt-child">
+				@for (const child of props.node.children; key child.id) {
+					<TreeRow node={child} onSelect={props.onSelect} selected={props.selected} />
+				}
+			</div>
 		}
 	</div>
 }
@@ -42,33 +49,52 @@ export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): Oct
 		client.emit('inspect-request', { id });
 	};
 
-	return <div style={{ display: 'flex', gap: '16px', fontFamily: 'monospace', fontSize: '12px' }}>
-		<div style={{ flex: '1', overflow: 'auto' }}>
-			@if (nodes.length === 0) {
-				<em>No mounted roots yet.</em>
-			} @else {
-				@for (const node of nodes; key node.id) {
-					<TreeRow node={node} onSelect={onSelect} selected={selected} />
+	return (
+		<div class="odt-split">
+			<div class="odt-col odt-col-tree">
+				<div class="odt-h">Component tree</div>
+				@if (nodes.length === 0) {
+					<div class="odt-empty">No mounted roots yet.</div>
+				} @else {
+					@for (const node of nodes; key node.id) {
+						<TreeRow node={node} onSelect={onSelect} selected={selected} />
+					}
 				}
-			}
-		</div>
-		<div style={{ flex: '1', overflow: 'auto' }}>
-			@if (detail) {
-				<div>
-					<h4>{detail.name}</h4>
-					<div>effects: {detail.effectCount}</div>
-					@for (const cell of detail.hooks; index i) {
-						<div>{cell.kind}: {JSON.stringify(cell.value)}</div>
-					}
-					@if (detail.context.length > 0) {
-						@for (const c of detail.context; index i) {
-							<div>{c.name}: {JSON.stringify(c.value)}</div>
+			</div>
+			<div class="odt-col">
+				@if (detail) {
+					<div>
+						<div class="odt-node-name">
+							{detail.name}
+							<span class="odt-badge">{detail.effectCount} effects</span>
+						</div>
+						<div class="odt-h">Hooks</div>
+						@if (detail.hooks.length === 0) {
+							<div class="odt-empty odt-muted">No tracked hooks.</div>
+						} @else {
+							@for (const cell of detail.hooks; index i) {
+								<div class="odt-kv">
+									<span class="odt-kv-key">{cell.kind}</span>
+									<span class="odt-kv-val"> {JSON.stringify(cell.value)}</span>
+								</div>
+							}
 						}
-					}
-				</div>
-			} @else {
-				<em>Select a component.</em>
-			}
+						@if (detail.context.length > 0) {
+							<>
+								<div class="odt-h">Context</div>
+								@for (const c of detail.context; index i) {
+									<div class="odt-kv">
+										<span class="odt-kv-key">{c.name}</span>
+										<span class="odt-kv-val"> {JSON.stringify(c.value)}</span>
+									</div>
+								}
+							</>
+						}
+					</div>
+				} @else {
+					<div class="odt-empty">Select a component.</div>
+				}
+			</div>
 		</div>
-	</div>;
+	);
 }
