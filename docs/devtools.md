@@ -34,6 +34,12 @@ no-op unless the app was built with `devtools: true`, so it's safe to leave the
 plugin registered and gate only `TanStackDevtools` behind `import.meta.env.DEV`
 or `lazy()`.
 
+## Two tabs
+
+The panel is a small tab bar — **Components** and **Profiler** — with one tab
+visible at a time. Both read from the same `octaneDevtools()` bridge; switching
+tabs doesn't reset either one's subscription.
+
 ## The Components tab
 
 The Components tab shows the live component tree — every mounted root and its
@@ -44,6 +50,26 @@ app to describe it and shows:
   `memo-or-callback`) and current value.
 - **Context** — the context values the node reads, by name.
 - **Effect count** — the number of effects registered on the node.
+
+## The Profiler tab
+
+The Profiler tab reads the same profiling data the runtime already collects
+internally (`octane/profiling`, tree-shaken out of non-devtools/profile
+builds) and renders it as two views:
+
+- **Slowest components (self time)** — a table of every profiled component,
+  ranked by total self time, with columns for **Component**, **Renders**
+  (attempt count), **Self ms**, **Max ms** (the slowest single render's
+  inclusive time), **Queue ms** (average scheduling delay before the render
+  ran), and **Cause** (the component's most frequent re-render trigger, or `-`
+  when none was recorded).
+- **Recent commits** — a chronological list of the latest render events, each
+  showing the component name, phase (`mount` or `update`), self time in
+  milliseconds, and its causes (or the render's outcome when no cause was
+  recorded).
+
+Until the app has rendered anything with profiling enabled, the tab shows
+"No profiling data yet — interact with the app." instead of empty tables.
 
 ## Guarantees
 
@@ -65,5 +91,6 @@ Octane has no way to tell them apart once mounted.
 
 ## Coming next
 
-P1 ships the Components tab described above. Planned follow-ups (P2–P4): a
-Profiler tab, a Transitions & Suspense tab, and a Performance-model tab.
+P1 shipped the Components tab; P2 shipped the Profiler tab above (both
+described here). Remaining follow-ups (P3–P4): a Transitions & Suspense tab,
+and a Performance-model tab plus a website demo.

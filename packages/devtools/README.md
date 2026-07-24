@@ -31,6 +31,9 @@ The Components tab shows the live component tree, and on selecting a node: its
 hook cells (state/reducer/ref/memo-or-callback), context values, and effect
 count. It's read-only in v1 — selecting a node never mutates app state.
 
+The Profiler tab ranks components by self time (renders, self/max/queue ms,
+dominant cause) and lists recent commits (mount/update, self ms, causes).
+
 Only include the devtools in development, e.g. behind an `import.meta.env.DEV`
 check or via `lazy()`.
 
