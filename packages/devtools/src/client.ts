@@ -54,12 +54,24 @@ export interface ProfileSnapshot {
 	summaries: ProfileSummaryWire[];
 	recentEvents: ProfileEventWire[];
 }
+export interface BoundaryWire {
+	id: number;
+	branch: number;
+	state: 'init' | 'catch' | 'resolved' | 'pending';
+	hasResolved: boolean;
+	label: string;
+}
+export interface TransitionSnapshot {
+	pendingCount: number;
+	boundaries: BoundaryWire[];
+}
 
 type OctaneDevtoolsEventMap = {
 	tree: TreeSnapshot;
 	inspect: NodeDetail;
 	'inspect-request': InspectRequest;
 	profile: ProfileSnapshot;
+	transition: TransitionSnapshot;
 };
 
 export class OctaneDevtoolsEventClient extends EventClient<OctaneDevtoolsEventMap> {

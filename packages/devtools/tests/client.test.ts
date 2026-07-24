@@ -31,4 +31,14 @@ describe('OctaneDevtoolsEventClient', () => {
 		await Promise.resolve();
 		expect(received).toHaveBeenCalledWith({ summaries: [], recentEvents: [] });
 	});
+
+	it('round-trips a transition snapshot', async () => {
+		const app = new OctaneDevtoolsEventClient();
+		const panel = new OctaneDevtoolsEventClient();
+		const received = vi.fn();
+		panel.on('transition', (e) => received(e.payload));
+		app.emit('transition', { pendingCount: 1, boundaries: [] });
+		await Promise.resolve();
+		expect(received).toHaveBeenCalledWith({ pendingCount: 1, boundaries: [] });
+	});
 });
