@@ -16,7 +16,7 @@
     "class-variance-authority"
   ],
   "registryDependencies": [
-    "utils",
-    "toggle"
+    "@octane/utils",
+    "@octane/toggle"
   ]
 }

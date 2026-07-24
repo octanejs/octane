@@ -15,8 +15,8 @@
     "class-variance-authority"
   ],
   "registryDependencies": [
-    "utils",
-    "label",
-    "separator"
+    "@octane/utils",
+    "@octane/label",
+    "@octane/separator"
   ]
 }

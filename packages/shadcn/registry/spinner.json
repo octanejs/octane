@@ -15,6 +15,6 @@
     "@octanejs/lucide@0.1.8"
   ],
   "registryDependencies": [
-    "utils"
+    "@octane/utils"
   ]
 }

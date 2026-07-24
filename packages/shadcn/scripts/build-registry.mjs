@@ -129,7 +129,13 @@ async function buildItems() {
 			],
 		};
 		if (npm.length) item.dependencies = npm;
-		item.registryDependencies = ['utils', ...registry.filter((dep) => dep !== 'utils')];
+		// Namespace-qualified: bare names would resolve against the DEFAULT
+		// @shadcn registry, not this one (the namespace protocol's rule for
+		// third-party registries).
+		item.registryDependencies = [
+			'@octane/utils',
+			...registry.filter((dep) => dep !== 'utils').map((dep) => `@octane/${dep}`),
+		];
 		items.push(item);
 	}
 

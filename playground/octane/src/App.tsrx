@@ -5,8 +5,10 @@ import { Conditional } from './demos/Conditional.tsrx';
 import { Inputs } from './demos/Inputs.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
+import { ShadcnDemo } from './demos/Shadcn.tsrx';
 
 const DEMOS = [
+	{ id: 'shadcn', label: 'shadcn/ui' },
 	{ id: 'counter', label: 'Counter' },
 	{ id: 'list', label: 'Keyed list' },
 	{ id: 'cond', label: 'Conditional' },
@@ -33,6 +35,9 @@ export function App() @{
 		</nav>
 		<main class="demo-stage">
 			@switch (active) {
+				@case 'shadcn': {
+					<ShadcnDemo />
+				}
 				@case 'counter': {
 					<Counter />
 				}

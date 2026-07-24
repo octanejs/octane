@@ -54,7 +54,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -72,8 +72,8 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils",
-        "button"
+        "@octane/utils",
+        "@octane/button"
       ],
       "files": [
         {
@@ -91,7 +91,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -109,7 +109,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -127,7 +127,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -146,7 +146,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -165,7 +165,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -184,7 +184,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -199,7 +199,7 @@
       "type": "registry:ui",
       "title": "Card",
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -218,7 +218,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -236,7 +236,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -255,7 +255,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -274,8 +274,8 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils",
-        "button"
+        "@octane/utils",
+        "@octane/button"
       ],
       "files": [
         {
@@ -294,7 +294,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -312,7 +312,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -330,9 +330,9 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils",
-        "label",
-        "separator"
+        "@octane/utils",
+        "@octane/label",
+        "@octane/separator"
       ],
       "files": [
         {
@@ -350,7 +350,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -365,7 +365,7 @@
       "type": "registry:ui",
       "title": "Input",
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -384,8 +384,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils",
-        "separator"
+        "@octane/utils",
+        "@octane/separator"
       ],
       "files": [
         {
@@ -400,7 +400,7 @@
       "type": "registry:ui",
       "title": "Kbd",
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -418,7 +418,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -437,7 +437,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -455,7 +455,7 @@
         "@octanejs/lucide@0.1.8"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -475,7 +475,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -493,8 +493,8 @@
         "@octanejs/lucide@0.1.8"
       ],
       "registryDependencies": [
-        "utils",
-        "button"
+        "@octane/utils",
+        "@octane/button"
       ],
       "files": [
         {
@@ -512,7 +512,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -530,7 +530,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -548,7 +548,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -566,7 +566,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -585,7 +585,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -603,7 +603,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -622,8 +622,8 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils",
-        "button"
+        "@octane/utils",
+        "@octane/button"
       ],
       "files": [
         {
@@ -643,14 +643,14 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils",
-        "button",
-        "input",
-        "separator",
-        "sheet",
-        "skeleton",
-        "tooltip",
-        "use-mobile"
+        "@octane/utils",
+        "@octane/button",
+        "@octane/input",
+        "@octane/separator",
+        "@octane/sheet",
+        "@octane/skeleton",
+        "@octane/tooltip",
+        "@octane/use-mobile"
       ],
       "files": [
         {
@@ -665,7 +665,7 @@
       "type": "registry:ui",
       "title": "Skeleton",
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -683,7 +683,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -701,7 +701,7 @@
         "@octanejs/lucide@0.1.8"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -719,7 +719,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -734,7 +734,7 @@
       "type": "registry:ui",
       "title": "Table",
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -753,7 +753,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -768,7 +768,7 @@
       "type": "registry:ui",
       "title": "Textarea",
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -787,8 +787,8 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils",
-        "toggle"
+        "@octane/utils",
+        "@octane/toggle"
       ],
       "files": [
         {
@@ -807,7 +807,7 @@
         "class-variance-authority"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {
@@ -825,7 +825,7 @@
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
-        "utils"
+        "@octane/utils"
       ],
       "files": [
         {

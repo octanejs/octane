@@ -35,7 +35,12 @@ describe('@octanejs/shadcn — registry emit', () => {
 				expect(entry.content).not.toMatch(/from '\.\.?\/[^']*'/);
 			}
 			for (const dep of item.registryDependencies ?? []) {
-				expect(names.has(dep), `${item.name} → ${dep} unresolved`).toBe(true);
+				// Deps are namespace-qualified (@octane/x) so the CLI never falls
+				// back to the default @shadcn registry; they must resolve locally.
+				expect(dep.startsWith('@octane/'), `${item.name} → ${dep} not namespaced`).toBe(true);
+				expect(names.has(dep.slice('@octane/'.length)), `${item.name} → ${dep} unresolved`).toBe(
+					true,
+				);
 			}
 		}
 	});

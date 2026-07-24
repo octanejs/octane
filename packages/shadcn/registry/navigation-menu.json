@@ -17,6 +17,6 @@
     "class-variance-authority"
   ],
   "registryDependencies": [
-    "utils"
+    "@octane/utils"
   ]
 }

@@ -16,7 +16,7 @@
     "@octanejs/radix@0.1.12"
   ],
   "registryDependencies": [
-    "utils",
-    "button"
+    "@octane/utils",
+    "@octane/button"
   ]
 }

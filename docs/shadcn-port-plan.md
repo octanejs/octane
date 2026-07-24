@@ -223,6 +223,17 @@ stamp updated in place (cmdk-plan convention).
   the REAL upstream CLI (`npx shadcn@4.14.1 add @octane/button …`) against the
   built registry in a scratch octane+Vite app and asserts the installed app
   compiles and renders. *Exit:* e2e green in CI; `website/` serves `/r/*`.
+  **Partially proven 2026-07-24 (playground, live):** the real CLI resolved the
+  `@octane` namespace over HTTP, fetched 11 items, installed the `.tsrx`
+  sources to the aliased targets, and auto-installed the pinned npm deps
+  (registryDependencies are emitted namespace-qualified — bare names resolve
+  against the default @shadcn registry). FINDING: the CLI's local style engine
+  strips semantic `cn-*` classes from third-party item content (upstream's own
+  server avoids this by serving style-RESOLVED content per requested style);
+  until the hosted `/r/` endpoint performs the same per-style resolution, the
+  registry payloads install verbatim only outside the CLI's transform. The
+  hosted-serving design must resolve `cn-*` against the requested style
+  (`{style}` URL placeholder) exactly as upstream does.
 - **Phase 5 — SSR/hydration hardening.** `-ssr` vitest project (node env,
   `octane({ ssr: true })`, sonner-project pattern `vitest.config.js:1761-1781`)
   plus `hydrateRoot` adoption tests for the overlay components; `status.json`

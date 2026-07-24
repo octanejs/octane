@@ -157,7 +157,10 @@
 			}
 		</style>
 	</head>
-	<body>
+	<!-- style-nova scopes the shadcn visual layer; it only targets cn-* classes,
+	     so the playground chrome is unaffected. On body (not a subtree) because
+	     dialog/menu portals mount into document.body. -->
+	<body class="style-nova">
 		<div id="app"></div>
 		<script type="module" src="/src/main.ts"></script>
 	</body>
