@@ -246,7 +246,7 @@ catalogs:
     nuqs: 2.9.1
     '@standard-schema/spec': 1.1.0
     playwright: ^1.61.1
-    prettier: ^3.9.5
+    prettier: ^3.9.6
     preact: ^10.29.7
     preact-render-to-string: ^6.7.0
     prettier-plugin-svelte: ^4.1.1
