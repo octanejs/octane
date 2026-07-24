@@ -1,8 +1,6 @@
 // A small interactive app that exercises useState, useReducer, useTransition, and
 // two Suspense boundaries, with the Octane DevTools panel mounted alongside it (dev
-// only) so every panel tab has live data to show. Suspense promises are created via
-// useMemo so they're STABLE across renders — a fresh promise per render would
-// re-suspend forever and break hydration (see the SSR/hydration note in the P4 plan).
+// only) so every panel tab has live data to show.
 import { Suspense, use, useMemo, useReducer, useState, useTransition } from 'octane';
 import type { OctaneNode } from 'octane';
 import { TanStackDevtools } from '@octanejs/tanstack-devtools';
@@ -11,6 +9,14 @@ import { octaneDevtools } from '@octanejs/devtools';
 function makeDelayed(label: string, ms: number): Promise<string> {
 	return new Promise((resolve) => setTimeout(() => resolve(label), ms));
 }
+
+// Created once at module scope — OUTSIDE any render — so identity is stable across
+// every SSR render pass and client hydration. A promise created during render (even
+// via useMemo) can be handed a fresh identity on an SSR replay pass, so the boundary
+// can never resolve by identity. Octane seeds the resolved value for hydration, so
+// the client adopts the server result instead of re-waiting.
+const boundaryAPromise = makeDelayed('boundary A loaded', 400);
+const boundaryBPromise = makeDelayed('boundary B loaded', 800);
 
 function Slow(props: { label: string }): OctaneNode {
 	// Intentionally-slow render so the Profiler / Performance tabs show it. Kept
@@ -61,8 +67,6 @@ function FilterList(): OctaneNode @{
 }
 
 export function DevtoolsDemo(): OctaneNode @{
-	const p1 = useMemo(() => makeDelayed('boundary A loaded', 400), []);
-	const p2 = useMemo(() => makeDelayed('boundary B loaded', 800), []);
 	const showDevtools = import.meta.env.DEV;
 	<main style={{ padding: '1rem' }}>
 		<h1>Octane DevTools demo</h1>
@@ -70,10 +74,10 @@ export function DevtoolsDemo(): OctaneNode @{
 		<Counter />
 		<FilterList />
 		<Suspense fallback={<em>loading A…</em>}>
-			<AsyncChild promise={p1} />
+			<AsyncChild promise={boundaryAPromise} />
 		</Suspense>
 		<Suspense fallback={<em>loading B…</em>}>
-			<AsyncChild promise={p2} />
+			<AsyncChild promise={boundaryBPromise} />
 		</Suspense>
 		@if (showDevtools) {
 			<TanStackDevtools plugins={[octaneDevtools()]} />
