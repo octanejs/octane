@@ -430,7 +430,7 @@ export function Playground() @{
 				if (resultModeRef.current.view !== 'compiled') return null;
 				if (resultModeRef.current.compiledMode === 'ast') {
 					const { entry, error } = astEntry(currentFile);
-					if (entry && entry.ast !== lastShownAst?.ast) {
+					if (entry && (entry.ast !== lastShownAst?.ast || entry.label !== lastShownAst?.label)) {
 						astPreview.setAst(entry.ast, currentFile, {
 							label: entry.label,
 							notice: entry.notice,
@@ -635,12 +635,12 @@ export function Playground() @{
 					setError(PLAYGROUND_SOURCE_LIMIT_ERROR);
 					return;
 				}
-				const graph = await pgModules.buildModuleGraph(wsFiles, entry);
-				if (disposed || seq !== compileSeq) return;
 				// AST and Types describe the active source file, independently of
 				// whether another workspace file prevents the runnable module graph
-				// from compiling. Refresh inspection before handling graph failure.
+				// from compiling. Refresh inspection before the graph wait.
 				const inspectionError = showOutput();
+				const graph = await pgModules.buildModuleGraph(wsFiles, entry);
+				if (disposed || seq !== compileSeq) return;
 				if (!graph.ok) {
 					lastGraphError = graph.error;
 					setWarnings([]);
