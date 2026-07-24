@@ -193,12 +193,6 @@ export default defineConfig({
 			'@octanejs/tanstack-router > @tanstack/history',
 			'@octanejs/tanstack-router > @tanstack/router-core',
 			'@octanejs/tanstack-router > @tanstack/store',
-			// The DevTools panel host (Solid core) is imported from
-			// @octanejs/tanstack-devtools's raw .tsrx source, so the scanner never
-			// sees it; its lazy `mount-impl` chunk would otherwise be optimized in a
-			// second pass at client-mount time, invalidating the just-served page
-			// ("504 Outdated Optimize Dep"). Pre-declare it so it pre-bundles once.
-			'@octanejs/tanstack-devtools > @tanstack/devtools',
 			// The home page's 3D logo section is reached only through a deferred
 			// Hydrate chunk, so the scanner never sees three; pre-declare it (and
 			// the SVGLoader example module) to avoid a mid-session optimize pass.
@@ -215,6 +209,25 @@ export default defineConfig({
 			'@octanejs/visx > d3-time',
 			'@octanejs/visx > reduce-css-calc',
 			'@octanejs/visx > svg-path-properties',
+			// TanStack DevTools panel-host island. The whole island is reached only
+			// through @octanejs/tanstack-devtools's raw .tsrx source and the host's
+			// internal dynamic import, so Vite's scanner sees none of it. Pre-declare
+			// the ENTIRE island so it optimizes in ONE startup pass: that keeps the
+			// host's lazy mount chunk on a hash consistent with its entry (no
+			// mid-mount re-optimize → no "504 Outdated Optimize Dep") and bundles the
+			// CJS dep dayjs with a synthesized `default` export. solid-js is pinned to
+			// 1.9.9 for this island via the pnpm override (Solid 2 dropped
+			// solid-js/web); remove this block once @tanstack/devtools ships Solid 2.
+			'@tanstack/devtools',
+			'@tanstack/devtools-ui',
+			'@tanstack/devtools-client',
+			'@tanstack/devtools-event-bus',
+			'@tanstack/devtools-event-client',
+			'dayjs',
+			'goober',
+			'@solid-primitives/event-listener',
+			'@solid-primitives/keyboard',
+			'@solid-primitives/resize-observer',
 		],
 	},
 
