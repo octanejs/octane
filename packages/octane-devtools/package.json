@@ -27,6 +27,7 @@
   "peerDependencies": { "octane": "workspace:*" },
   "devDependencies": {
     "@octanejs/testing-library": "workspace:*",
+    "@tanstack/devtools-event-bus": "catalog:default",
     "@testing-library/jest-dom": "catalog:default",
     "octane": "workspace:*",
     "vitest": "catalog:default"

@@ -210,6 +210,9 @@ catalogs:
     '@tanstack/devtools':
       specifier: 0.12.5
       version: 0.12.5
+    '@tanstack/devtools-event-bus':
+      specifier: 0.4.2
+      version: 0.4.2
     '@tanstack/devtools-event-client':
       specifier: 0.5.0
       version: 0.5.0
@@ -4154,6 +4157,9 @@ importers:
       '@octanejs/testing-library':
         specifier: workspace:*
         version: link:../testing-library
+      '@tanstack/devtools-event-bus':
+        specifier: catalog:default
+        version: 0.4.2
       '@testing-library/jest-dom':
         specifier: catalog:default
         version: 6.9.1
