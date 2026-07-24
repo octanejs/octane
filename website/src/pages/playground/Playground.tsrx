@@ -524,12 +524,13 @@ export function Playground() @{
 				scroll: boolean,
 			) => {
 				const limit = targetView.state.doc.length;
-				const clamped = ranges.filter((range: { from: number }) => range.from < limit).map(
-					(range: { from: number; to: number }) => ({
+				const clamped = ranges
+					.filter((range: { from: number }) => range.from < limit)
+					.map((range: { from: number; to: number }) => ({
 						from: range.from,
 						to: Math.min(range.to, limit),
-					}),
-				);
+					}))
+					.filter((range) => range.to > range.from);
 				if (clamped.length === 0) {
 					// Same contract as an unmapped position: no lingering marks.
 					clearMappedIn(targetView);
