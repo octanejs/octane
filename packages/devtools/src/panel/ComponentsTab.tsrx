@@ -56,7 +56,7 @@ export function ComponentsTab(props: { client: OctaneDevtoolsEventClient }): Oct
 			@if (detail) {
 				<div>
 					<h4>{detail.name}</h4>
-					<div>effects: {detail.effectCount as string}</div>
+					<div>effects: {detail.effectCount}</div>
 					@for (const cell of detail.hooks; index i) {
 						<div>{cell.kind}: {JSON.stringify(cell.value)}</div>
 					}

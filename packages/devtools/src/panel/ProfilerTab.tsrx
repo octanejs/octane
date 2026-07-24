@@ -40,7 +40,7 @@ export function ProfilerTab(props: { client: OctaneDevtoolsEventClient }): Octan
 						@for (const s of snapshot.summaries; index i) {
 							<tr>
 								<td>{s.component}</td>
-								<td>{s.attempts as string}</td>
+								<td>{s.attempts}</td>
 								<td>{fmt(s.totalSelfTime)}</td>
 								<td>{fmt(s.maxInclusiveTime)}</td>
 								<td>{fmt(s.averageQueueDelay)}</td>

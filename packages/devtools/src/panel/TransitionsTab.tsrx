@@ -17,7 +17,7 @@ export function TransitionsTab(props: { client: OctaneDevtoolsEventClient }): Oc
 	});
 
 	return <div style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-		<div>Pending transitions: {snapshot.pendingCount as string}</div>
+		<div>Pending transitions: {snapshot.pendingCount}</div>
 		<h4>Suspense boundaries</h4>
 		@if (snapshot.boundaries.length === 0) {
 			<em>No Suspense boundaries.</em>
