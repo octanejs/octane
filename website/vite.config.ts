@@ -130,7 +130,9 @@ export default defineConfig({
 		tanstackStart({
 			// Scene modules stay client-only during Start SSR, matching the website's
 			// existing Octane renderer contract while still shipping through Vite.
-			octane: { renderers: threeRenderers },
+			// devtools: true enables profiling instrumentation in dev (compiled out
+			// of prod) for the /devtools demo route's <TanStackDevtools> panel.
+			octane: { renderers: threeRenderers, devtools: true },
 		}),
 		nitro({
 			// Keep production on the runtime selected by the previous Vercel

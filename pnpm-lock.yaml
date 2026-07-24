@@ -5366,9 +5366,15 @@ importers:
       '@codemirror/view':
         specifier: catalog:default
         version: 6.43.6
+      '@octanejs/devtools':
+        specifier: workspace:*
+        version: link:../packages/devtools
       '@octanejs/mdx':
         specifier: workspace:*
         version: link:../packages/mdx
+      '@octanejs/tanstack-devtools':
+        specifier: workspace:*
+        version: link:../packages/tanstack-devtools
       '@octanejs/tanstack-router':
         specifier: workspace:*
         version: link:../packages/tanstack-router
