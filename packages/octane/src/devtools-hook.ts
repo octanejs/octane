@@ -6,7 +6,7 @@
 // from runtime.ts) to avoid a module cycle; runtime.ts hands us the name resolver
 // via __devtoolsSetNameResolver so we don't duplicate its HMR-unwrapping logic.
 
-export const DEVTOOLS_HOOK_VERSION = 1;
+export const DEVTOOLS_HOOK_VERSION = 2;
 
 /** The subset of a runtime Scope/Block the walker reads. */
 export interface DevtoolsScopeLike {
@@ -40,11 +40,27 @@ export interface DevtoolsNodeDetail {
 	effectCount: number;
 }
 
+export type DevtoolsBoundaryState = 'init' | 'catch' | 'resolved' | 'pending';
+
+export interface DevtoolsBoundary {
+	id: number;
+	branch: number;
+	state: DevtoolsBoundaryState;
+	hasResolved: boolean;
+	label: string;
+}
+
+export interface DevtoolsTransitionState {
+	pendingCount: number;
+	boundaries: DevtoolsBoundary[];
+}
+
 export interface OctaneDevtoolsHook {
 	version: number;
 	getTree(): DevtoolsTreeNode[];
 	inspect(id: number): DevtoolsNodeDetail | null;
 	subscribe(listener: () => void): () => void;
+	getTransitionState(): DevtoolsTransitionState;
 }
 
 const roots = new Set<DevtoolsScopeLike>();
@@ -58,6 +74,17 @@ let idIndex = new Map<number, DevtoolsScopeLike>();
 
 let nameResolver: (block: any) => string = (b) =>
 	(b && b.body && (b.body.displayName || b.body.name)) || 'Unknown';
+
+let transitionPendingCount = 0;
+const boundaries = new Map<number, DevtoolsBoundary>();
+
+function branchToState(branch: number): DevtoolsBoundaryState {
+	// TrySlot legend: -1 init, 0 catch, 1 try (resolved), 2 pending.
+	if (branch === 0) return 'catch';
+	if (branch === 1) return 'resolved';
+	if (branch === 2) return 'pending';
+	return 'init';
+}
 
 function idOf(scope: object): number {
 	let id = ids.get(scope);
@@ -161,6 +188,12 @@ const hook: OctaneDevtoolsHook = {
 			subscribers.delete(listener);
 		};
 	},
+	getTransitionState() {
+		return {
+			pendingCount: transitionPendingCount,
+			boundaries: [...boundaries.values()],
+		};
+	},
 };
 
 declare global {
@@ -199,4 +232,22 @@ export function __devtoolsNotifyFlush(): void {
 			console.error(err);
 		}
 	}
+}
+
+export function __devtoolsSetTransitionCount(count: number): void {
+	transitionPendingCount = count < 0 ? 0 : count;
+}
+
+export function __devtoolsSetBoundaryState(
+	slot: object,
+	branch: number,
+	hasResolved: boolean,
+	label: string,
+): void {
+	const id = idOf(slot);
+	boundaries.set(id, { id, branch, state: branchToState(branch), hasResolved, label });
+}
+
+export function __devtoolsClearBoundary(slot: object): void {
+	boundaries.delete(idOf(slot));
 }

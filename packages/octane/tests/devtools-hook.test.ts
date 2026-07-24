@@ -5,6 +5,9 @@ import {
 	__devtoolsUnregisterRoot,
 	__devtoolsNotifyFlush,
 	__devtoolsSetNameResolver,
+	__devtoolsSetTransitionCount,
+	__devtoolsSetBoundaryState,
+	__devtoolsClearBoundary,
 	installDevtoolsGlobal,
 	DEVTOOLS_HOOK_VERSION,
 	type DevtoolsScopeLike,
@@ -96,5 +99,29 @@ describe('devtools hook registry', () => {
 		off();
 		__devtoolsNotifyFlush();
 		expect(calls).toBe(2);
+	});
+
+	it('tracks transition count and boundary state via the hook', () => {
+		installDevtoolsGlobal();
+		const hook = (globalThis as any)
+			.__OCTANE_DEVTOOLS__ as import('../src/devtools-hook').OctaneDevtoolsHook;
+		__devtoolsSetTransitionCount(2);
+		const slotA = {};
+		__devtoolsSetBoundaryState(slotA, 2, false, 'List'); // pending
+		let st = hook.getTransitionState();
+		expect(st.pendingCount).toBe(2);
+		expect(st.boundaries).toHaveLength(1);
+		expect(st.boundaries[0]).toMatchObject({
+			branch: 2,
+			state: 'pending',
+			hasResolved: false,
+			label: 'List',
+		});
+		__devtoolsSetBoundaryState(slotA, 1, true, 'List'); // resolved (same slot → same id, updated in place)
+		st = hook.getTransitionState();
+		expect(st.boundaries).toHaveLength(1);
+		expect(st.boundaries[0]).toMatchObject({ branch: 1, state: 'resolved', hasResolved: true });
+		__devtoolsClearBoundary(slotA);
+		expect(hook.getTransitionState().boundaries).toEqual([]);
 	});
 });
