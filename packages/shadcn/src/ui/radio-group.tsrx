@@ -1,40 +1,37 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
-// apps/v4/registry/bases/radix/ui/radio-group.tsx (the `"use client"` directive
-// is dropped — octane has no RSC axis).
+// Default-Tailwind radio-group flavor (package canonical) — utilities-inlined
+// upstream styling. Octane adaptations: "use client" dropped, lucide-react →
+// @octanejs/lucide, radix-ui → @octanejs/radix; pure template JSX.
 import { RadioGroup as RadioGroupPrimitive } from '@octanejs/radix';
+import { CircleIcon } from '@octanejs/lucide';
 
 import { cn } from '../lib/utils';
 
-export interface RadioGroupProps extends Record<string, unknown> {
-	className?: string;
-}
+type Props = { className?: string } & Record<string, unknown>;
 
-export function RadioGroup({ className, ...props }: RadioGroupProps) @{
+export function RadioGroup({ className, ...props }: Props) @{
 	<RadioGroupPrimitive.Root
 		data-slot="radio-group"
-		className={cn('cn-radio-group w-full', className)}
+		className={cn('grid gap-3', className)}
 		{...props}
 	/>
 }
 
-export interface RadioGroupItemProps extends Record<string, unknown> {
-	className?: string;
-}
-
-export function RadioGroupItem({ className, ...props }: RadioGroupItemProps) @{
+export function RadioGroupItem({ className, ...props }: Props) @{
 	<RadioGroupPrimitive.Item
 		data-slot="radio-group-item"
 		className={cn(
-			'cn-radio-group-item group/radio-group-item peer relative aspect-square shrink-0 border outline-none after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50',
+			'aspect-square size-4 shrink-0 rounded-full border border-input text-primary shadow-xs transition-[color,box-shadow] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:ring-destructive/40',
 			className,
 		)}
 		{...props}
 	>
 		<RadioGroupPrimitive.Indicator
 			data-slot="radio-group-indicator"
-			className="cn-radio-group-indicator"
+			className="relative flex items-center justify-center"
 		>
-			<span className="cn-radio-group-indicator-icon" />
+			<CircleIcon
+				className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 fill-primary"
+			/>
 		</RadioGroupPrimitive.Indicator>
 	</RadioGroupPrimitive.Item>
 }

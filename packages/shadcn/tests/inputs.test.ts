@@ -72,7 +72,7 @@ describe('@octanejs/shadcn — Checkbox', () => {
 		expect(checkbox.getAttribute('role')).toBe('checkbox');
 		expect(checkbox.getAttribute('aria-checked')).toBe('false');
 		expect(checkbox.getAttribute('data-state')).toBe('unchecked');
-		expect(checkbox.className).toContain('cn-checkbox');
+		expect(checkbox.className).toContain('border-input');
 		expect(checkbox.className).toContain('extra');
 		expect($('[data-slot="checkbox-indicator"]')).toBe(null);
 
@@ -83,7 +83,7 @@ describe('@octanejs/shadcn — Checkbox', () => {
 		// onCheckedChange is a component callback observed by the app.
 		expect($('[data-testid="checked"]')!.textContent).toBe('true');
 		const indicator = $('[data-slot="checkbox-indicator"]')!;
-		expect(indicator.className).toContain('cn-checkbox-indicator');
+		expect(indicator.className).toContain('place-content-center');
 		expect(indicator.querySelector('svg')).not.toBe(null);
 
 		click(checkbox);
@@ -107,12 +107,12 @@ describe('@octanejs/shadcn — RadioGroup', () => {
 		const group = $('[data-testid="group"]')!;
 		expect(group.getAttribute('data-slot')).toBe('radio-group');
 		expect(group.getAttribute('role')).toBe('radiogroup');
-		expect(group.className).toContain('cn-radio-group');
+		expect(group.className).toContain('grid gap-3');
 		const a = $('[data-testid="item-a"]')!;
 		const b = $('[data-testid="item-b"]')!;
 		expect(a.getAttribute('data-slot')).toBe('radio-group-item');
 		expect(a.getAttribute('role')).toBe('radio');
-		expect(a.className).toContain('cn-radio-group-item');
+		expect(a.className).toContain('rounded-full');
 		expect($('[data-slot="radio-group-indicator"]')).toBe(null);
 
 		click(a);
@@ -121,8 +121,8 @@ describe('@octanejs/shadcn — RadioGroup', () => {
 		expect(a.getAttribute('data-state')).toBe('checked');
 		expect($('[data-testid="value"]')!.textContent).toBe('a');
 		const indicator = $('[data-slot="radio-group-indicator"]')!;
-		expect(indicator.className).toContain('cn-radio-group-indicator');
-		expect(indicator.querySelector('.cn-radio-group-indicator-icon')).not.toBe(null);
+		expect(indicator.className).toContain('items-center justify-center');
+		expect(indicator.querySelector('svg')).not.toBe(null);
 
 		click(b);
 		await settle();
@@ -146,9 +146,9 @@ describe('@octanejs/shadcn — Switch', () => {
 		expect(sw.getAttribute('data-slot')).toBe('switch');
 		expect(sw.getAttribute('role')).toBe('switch');
 		expect(sw.getAttribute('data-size')).toBe('sm');
-		expect(sw.className).toContain('cn-switch');
+		expect(sw.className).toContain('group/switch');
 		const thumb = $('[data-slot="switch-thumb"]')!;
-		expect(thumb.className).toContain('cn-switch-thumb');
+		expect(thumb.className).toContain('pointer-events-none');
 		expect(thumb.getAttribute('data-state')).toBe('unchecked');
 
 		click(sw);
@@ -172,9 +172,9 @@ describe('@octanejs/shadcn — Slider', () => {
 		await settle();
 		const root = $('[data-testid="slider"]')!;
 		expect(root.getAttribute('data-slot')).toBe('slider');
-		expect(root.className).toContain('cn-slider');
-		expect($('[data-slot="slider-track"]')!.className).toContain('cn-slider-track');
-		expect($('[data-slot="slider-range"]')!.className).toContain('cn-slider-range');
+		expect(root.className).toContain('touch-none');
+		expect($('[data-slot="slider-track"]')!.className).toContain('overflow-hidden');
+		expect($('[data-slot="slider-range"]')!.className).toContain('bg-primary');
 		const thumbs = r.container.querySelectorAll('[data-slot="slider-thumb"]');
 		expect(thumbs.length).toBe(1);
 		const slider = r.container.querySelector('[role="slider"]')!;
@@ -318,22 +318,22 @@ describe('@octanejs/shadcn — Tabs', () => {
 		const tabs = $('[data-testid="tabs"]')!;
 		expect(tabs.getAttribute('data-slot')).toBe('tabs');
 		expect(tabs.getAttribute('data-orientation')).toBe('horizontal');
-		expect(tabs.className).toContain('cn-tabs');
+		expect(tabs.className).toContain('group/tabs');
 		const list = $('[data-testid="list"]')!;
 		expect(list.getAttribute('data-slot')).toBe('tabs-list');
 		expect(list.getAttribute('data-variant')).toBe('line');
 		expect(list.getAttribute('role')).toBe('tablist');
-		expect(list.className).toContain('cn-tabs-list-variant-line');
+		expect(list.className).toContain('bg-transparent');
 		const one = $('[data-testid="t-one"]')!;
 		const two = $('[data-testid="t-two"]')!;
 		expect(one.getAttribute('data-slot')).toBe('tabs-trigger');
 		expect(one.getAttribute('role')).toBe('tab');
 		expect(one.getAttribute('data-state')).toBe('active');
-		expect(one.className).toContain('cn-tabs-trigger');
+		expect(one.className).toContain('whitespace-nowrap');
 		const panelOne = $('[data-testid="c-one"]')!;
 		expect(panelOne.getAttribute('data-slot')).toBe('tabs-content');
 		expect(panelOne.getAttribute('role')).toBe('tabpanel');
-		expect(panelOne.className).toContain('cn-tabs-content');
+		expect(panelOne.className).toContain('flex-1');
 		expect(panelOne.hasAttribute('hidden')).toBe(false);
 		expect($('[data-testid="c-two"]')!.hasAttribute('hidden')).toBe(true);
 
@@ -366,9 +366,9 @@ describe('@octanejs/shadcn — Toggle', () => {
 		expect(toggle.getAttribute('data-slot')).toBe('toggle');
 		expect(toggle.getAttribute('aria-pressed')).toBe('false');
 		expect(toggle.getAttribute('data-state')).toBe('off');
-		expect(toggle.className).toContain('cn-toggle');
-		expect(toggle.className).toContain('cn-toggle-variant-outline');
-		expect(toggle.className).toContain('cn-toggle-size-sm');
+		expect(toggle.className).toContain('data-[state=on]:bg-accent');
+		expect(toggle.className).toContain('border-input');
+		expect(toggle.className).toContain('min-w-8');
 
 		click(toggle);
 		await settle();
@@ -394,7 +394,7 @@ describe('@octanejs/shadcn — ToggleGroup', () => {
 		expect(group.getAttribute('data-size')).toBe('sm');
 		expect(group.getAttribute('data-spacing')).toBe('0');
 		expect(group.getAttribute('data-orientation')).toBe('horizontal');
-		expect(group.className).toContain('cn-toggle-group');
+		expect(group.className).toContain('group/toggle-group');
 		expect(group.style.getPropertyValue('--gap')).toBe('0');
 		const a = $('[data-testid="item-a"]')!;
 		expect(a.getAttribute('data-slot')).toBe('toggle-group-item');
@@ -402,9 +402,9 @@ describe('@octanejs/shadcn — ToggleGroup', () => {
 		expect(a.getAttribute('data-variant')).toBe('outline');
 		expect(a.getAttribute('data-size')).toBe('sm');
 		expect(a.getAttribute('data-spacing')).toBe('0');
-		expect(a.className).toContain('cn-toggle-group-item');
-		expect(a.className).toContain('cn-toggle-variant-outline');
-		expect(a.className).toContain('cn-toggle-size-sm');
+		expect(a.className).toContain('first:rounded-l-md');
+		expect(a.className).toContain('border-input');
+		expect(a.className).toContain('min-w-8');
 		r.unmount();
 	});
 
@@ -441,7 +441,7 @@ describe('@octanejs/shadcn — ToggleGroup', () => {
 		const y = $('[data-testid="item-y"]')!;
 		expect(x.getAttribute('data-variant')).toBe('default');
 		expect(x.getAttribute('data-size')).toBe('default');
-		expect(x.className).toContain('cn-toggle-variant-default');
+		expect(x.className).toContain('bg-transparent');
 
 		click(x);
 		await settle();

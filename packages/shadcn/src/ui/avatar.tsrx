@@ -1,16 +1,13 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
-// apps/v4/registry/bases/radix/ui/avatar.tsx (the `"use client"` directive is
-// dropped — octane has no RSC axis). Image load state lives in the radix
-// primitive: AvatarImage renders only once its src has loaded; AvatarFallback
-// renders whenever it hasn't.
+// Default-Tailwind avatar flavor (package canonical) — user-supplied styling,
+// class strings verbatim. Octane adaptations: "use client" dropped, radix-ui →
+// @octanejs/radix; pure template JSX.
 import { Avatar as AvatarPrimitive } from '@octanejs/radix';
 
 import { cn } from '../lib/utils';
 
 type Props = { className?: string } & Record<string, unknown>;
 
-export interface AvatarProps extends Record<string, unknown> {
-	className?: string;
+export interface AvatarProps extends Props {
 	size?: 'default' | 'sm' | 'lg';
 }
 
@@ -19,7 +16,7 @@ export function Avatar({ className, size = 'default', ...props }: AvatarProps) @
 		data-slot="avatar"
 		data-size={size}
 		className={cn(
-			'cn-avatar group/avatar relative flex shrink-0 select-none after:absolute after:inset-0 after:border after:border-border after:mix-blend-darken dark:after:mix-blend-lighten',
+			'group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:border after:border-border after:mix-blend-darken data-[size=lg]:size-10 data-[size=sm]:size-6 dark:after:mix-blend-lighten',
 			className,
 		)}
 		{...props}
@@ -29,7 +26,7 @@ export function Avatar({ className, size = 'default', ...props }: AvatarProps) @
 export function AvatarImage({ className, ...props }: Props) @{
 	<AvatarPrimitive.Image
 		data-slot="avatar-image"
-		className={cn('cn-avatar-image aspect-square size-full object-cover', className)}
+		className={cn('aspect-square size-full rounded-full object-cover', className)}
 		{...props}
 	/>
 }
@@ -38,7 +35,7 @@ export function AvatarFallback({ className, ...props }: Props) @{
 	<AvatarPrimitive.Fallback
 		data-slot="avatar-fallback"
 		className={cn(
-			'cn-avatar-fallback flex size-full items-center justify-center text-sm group-data-[size=sm]/avatar:text-xs',
+			'flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs',
 			className,
 		)}
 		{...props}
@@ -49,7 +46,7 @@ export function AvatarBadge({ className, ...props }: Props) @{
 	<span
 		data-slot="avatar-badge"
 		className={cn(
-			'cn-avatar-badge absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-blend-color ring-2 select-none',
+			'absolute right-0 bottom-0 z-10 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground bg-blend-color ring-2 ring-background select-none',
 			'group-data-[size=sm]/avatar:size-2 group-data-[size=sm]/avatar:[&>svg]:hidden',
 			'group-data-[size=default]/avatar:size-2.5 group-data-[size=default]/avatar:[&>svg]:size-2',
 			'group-data-[size=lg]/avatar:size-3 group-data-[size=lg]/avatar:[&>svg]:size-2',
@@ -63,7 +60,7 @@ export function AvatarGroup({ className, ...props }: Props) @{
 	<div
 		data-slot="avatar-group"
 		className={cn(
-			'cn-avatar-group group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background',
+			'group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background',
 			className,
 		)}
 		{...props}
@@ -74,8 +71,7 @@ export function AvatarGroupCount({ className, ...props }: Props) @{
 	<div
 		data-slot="avatar-group-count"
 		className={cn(
-			'cn-avatar-group-count relative flex shrink-0 items-center justify-center ring-2 ring-background',
-			'',
+			'relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3',
 			className,
 		)}
 		{...props}

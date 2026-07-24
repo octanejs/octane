@@ -21,17 +21,9 @@ import {
 } from '../_fixtures/tier1-app.tsrx';
 
 const FIXTURES: Array<[string, () => unknown, string[]]> = [
-	['Alert', AlertFixture, ['data-slot="alert"', 'role="alert"', 'cn-alert-variant-destructive']],
-	[
-		'Button',
-		ButtonFixture,
-		['data-slot="button"', 'cn-button-variant-destructive', 'type="submit"'],
-	],
-	[
-		'Button asChild',
-		ButtonAsChildFixture,
-		['<a', 'data-slot="button"', 'href="#docs"', 'cn-button-size-lg'],
-	],
+	['Alert', AlertFixture, ['data-slot="alert"', 'role="alert"', 'text-destructive']],
+	['Button', ButtonFixture, ['data-slot="button"', 'text-destructive', 'type="submit"']],
+	['Button asChild', ButtonAsChildFixture, ['<a', 'data-slot="button"', 'href="#docs"', 'h-9']],
 	[
 		'Breadcrumb',
 		BreadcrumbFixture,

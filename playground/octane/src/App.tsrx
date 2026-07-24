@@ -6,6 +6,7 @@ import { Inputs } from './demos/Inputs.tsrx';
 import { SuspenseDemo } from './demos/Suspense.tsrx';
 import { DynamicDemo } from './demos/Dynamic.tsrx';
 import { ShadcnDemo } from './demos/Shadcn.tsrx';
+import { ThemeToggle } from './components/theme-toggle.tsrx';
 
 const DEMOS = [
 	{ id: 'shadcn', label: 'shadcn/ui' },
@@ -22,8 +23,11 @@ export function App() @{
 
 	<>
 		<header class="demo-header">
-			<h1>{'octane playground'}</h1>
-			<p>{'Template-clone renderer + TSRX directives. Each demo exercises a distinctive corner of the surface.'}</p>
+			<div>
+				<h1>{'octane playground'}</h1>
+				<p>{'Template-clone renderer + TSRX directives. Each demo exercises a distinctive corner of the surface.'}</p>
+			</div>
+			<ThemeToggle />
 		</header>
 		<nav class="demo-nav">
 			@for (const d of DEMOS; key d.id) {

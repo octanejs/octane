@@ -14,8 +14,8 @@ describe('@octanejs/shadcn — Badge', () => {
 		expect(badge).not.toBeNull();
 		expect(badge.tagName).toBe('SPAN');
 		expect(badge.getAttribute('data-variant')).toBe('default');
-		expect(badge.className).toContain('cn-badge');
-		expect(badge.className).toContain('cn-badge-variant-default');
+		expect(badge.className).toContain('group/badge');
+		expect(badge.className).toMatch(/(?:^| )bg-primary(?: |$)/);
 		expect(badge.textContent).toBe('New');
 		unmount();
 	});
@@ -24,8 +24,8 @@ describe('@octanejs/shadcn — Badge', () => {
 		const { container, unmount } = mount(SecondaryBadge);
 		const badge = container.querySelector('[data-slot="badge"]') as HTMLElement;
 		expect(badge.getAttribute('data-variant')).toBe('secondary');
-		expect(badge.className).toContain('cn-badge-variant-secondary');
-		expect(badge.className).not.toContain('cn-badge-variant-default');
+		expect(badge.className).toContain('bg-secondary');
+		expect(badge.className).not.toMatch(/(?:^| )bg-primary(?: |$)/);
 		// Consumer classes land after the variant classes (cn() order).
 		expect(badge.className.endsWith('custom-extra')).toBe(true);
 		unmount();
@@ -48,7 +48,7 @@ describe('@octanejs/shadcn — Badge', () => {
 		expect(badge.tagName).toBe('A');
 		expect(badge.getAttribute('href')).toBe('#releases');
 		expect(badge.getAttribute('data-variant')).toBe('outline');
-		expect(badge.className).toContain('cn-badge-variant-outline');
+		expect(badge.className).toContain('border-border');
 		expect(badge.textContent).toBe('Releases');
 		expect(container.querySelector('span[data-slot="badge"]')).toBeNull();
 		unmount();

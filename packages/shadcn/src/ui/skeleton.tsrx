@@ -1,4 +1,4 @@
-// Ported from shadcn-ui/ui@4baadbc6517070ae8f8feb2c97037adc2b305544
+// Default-Tailwind flavor (package canonical) — utilities-inlined upstream styling.
 // apps/v4/registry/bases/radix/ui/skeleton.tsx.
 import { cn } from '../lib/utils';
 
@@ -7,5 +7,9 @@ export interface SkeletonProps extends Record<string, unknown> {
 }
 
 export function Skeleton({ className, ...props }: SkeletonProps) @{
-	<div data-slot="skeleton" className={cn('cn-skeleton animate-pulse', className)} {...props} />
+	<div
+		data-slot="skeleton"
+		className={cn('animate-pulse rounded-md bg-accent', className)}
+		{...props}
+	/>
 }

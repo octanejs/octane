@@ -31,10 +31,10 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const { container, unmount } = mount(AlertFixture);
 		const alert = slot(container, 'alert');
 		expect(alert.getAttribute('role')).toBe('alert');
-		expect(alert.className).toContain('cn-alert');
-		expect(alert.className).toContain('cn-alert-variant-destructive');
+		expect(alert.className).toContain('group/alert');
+		expect(alert.className).toContain('text-destructive');
 		expect(slot(container, 'alert-title').textContent).toBe('Heads up');
-		expect(slot(container, 'alert-description').className).toContain('cn-alert-description');
+		expect(slot(container, 'alert-description').className).toContain('text-muted-foreground');
 		expect(slot(container, 'alert-action').textContent).toBe('Retry');
 		unmount();
 	});
@@ -43,11 +43,11 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const { container, unmount } = mount(ButtonFixture);
 		const button = slot(container, 'button');
 		expect(button.tagName).toBe('BUTTON');
-		expect(button.getAttribute('data-variant')).toBe('destructive');
-		expect(button.getAttribute('data-size')).toBe('sm');
-		expect(button.className).toContain('cn-button');
-		expect(button.className).toContain('cn-button-variant-destructive');
-		expect(button.className).toContain('cn-button-size-sm');
+		expect(button.className).toContain('bg-destructive/10');
+		expect(button.className).toContain('h-7');
+		expect(button.className).toContain('group/button');
+		expect(button.className).toContain('text-destructive');
+		expect(button.className).toContain('rounded-lg');
 		expect(button.className).toContain('extra');
 		expect((button as HTMLButtonElement).type).toBe('submit');
 		unmount();
@@ -58,9 +58,9 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const host = slot(container, 'button');
 		expect(host.tagName).toBe('A');
 		expect(host.getAttribute('href')).toBe('#docs');
-		expect(host.getAttribute('data-variant')).toBe('outline');
-		expect(host.className).toContain('cn-button-variant-outline');
-		expect(host.className).toContain('cn-button-size-lg');
+		expect(host.className).toContain('border-border');
+		expect(host.className).toContain('bg-background');
+		expect(host.className).toContain('h-9');
 		expect(host.textContent).toBe('Docs');
 		unmount();
 	});
@@ -92,15 +92,16 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 	it('Card: size attr and all part slots', () => {
 		const { container, unmount } = mount(CardFixture);
 		expect(slot(container, 'card').getAttribute('data-size')).toBe('sm');
-		for (const part of [
-			'card-header',
-			'card-title',
-			'card-description',
-			'card-action',
-			'card-content',
-			'card-footer',
-		]) {
-			expect(slot(container, part).className).toContain(`cn-${part}`);
+		const partMarkers: Record<string, string> = {
+			'card-header': '@container/card-header',
+			'card-title': 'cn-font-heading',
+			'card-description': 'text-muted-foreground',
+			'card-action': 'justify-self-end',
+			'card-content': 'px-(--card-spacing)',
+			'card-footer': 'border-t',
+		};
+		for (const [part, marker] of Object.entries(partMarkers)) {
+			expect(slot(container, part).className).toContain(marker);
 		}
 		unmount();
 	});
@@ -120,7 +121,7 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const input = slot(container, 'input') as HTMLInputElement;
 		expect(input.type).toBe('email');
 		expect(input.placeholder).toBe('mail');
-		expect(input.className).toContain('cn-input');
+		expect(input.className).toContain('border-input');
 		expect(input.className).toContain('w-3');
 		unmount();
 	});
@@ -155,7 +156,7 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const label = slot(container, 'label');
 		expect(label.tagName).toBe('LABEL');
 		expect(label.getAttribute('for')).toBe('name');
-		expect(label.className).toContain('cn-label');
+		expect(label.className).toContain('leading-none');
 		unmount();
 	});
 
@@ -185,11 +186,11 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		expect(active).not.toBeNull();
 		expect(active.tagName).toBe('A');
 		expect(active.getAttribute('data-active')).toBe('true');
-		expect(active.className).toContain('cn-button');
-		expect(active.className).toContain('cn-button-variant-outline');
+		expect(active.className).toContain('group/button');
+		expect(active.className).toContain('border-border');
 		expect(active.className).toContain('cn-pagination-link');
 		const prev = container.querySelector('[aria-label="Go to previous page"]') as HTMLElement;
-		expect(prev.className).toContain('cn-button-variant-ghost');
+		expect(prev.className).toContain('hover:bg-muted');
 		expect(prev.className).toContain('cn-pagination-previous');
 		expect(prev.querySelector('svg')).not.toBeNull();
 		expect(prev.textContent).toContain('Previous');
@@ -208,7 +209,7 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 
 	it('Skeleton, Spinner, Textarea: hosts, roles, merged classes', () => {
 		const s = mount(SkeletonFixture);
-		expect(slot(s.container, 'skeleton').className).toContain('cn-skeleton');
+		expect(slot(s.container, 'skeleton').className).toContain('animate-pulse');
 		s.unmount();
 		const sp = mount(SpinnerFixture);
 		const spinner = slot(sp.container, 'spinner');
@@ -221,7 +222,7 @@ describe('@octanejs/shadcn — Tier 1 contract', () => {
 		const t = mount(TextareaFixture);
 		const textarea = slot(t.container, 'textarea') as HTMLTextAreaElement;
 		expect(textarea.placeholder).toBe('notes');
-		expect(textarea.className).toContain('cn-textarea');
+		expect(textarea.className).toContain('border-input');
 		t.unmount();
 	});
 

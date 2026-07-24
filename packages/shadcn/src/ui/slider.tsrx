@@ -41,7 +41,7 @@ export function Slider({
 			min,
 			max,
 			className: cn(
-				'cn-slider relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:w-auto data-vertical:flex-col',
+				'relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col',
 				className,
 			),
 			...props,
@@ -50,11 +50,11 @@ export function Slider({
 			SliderPrimitive.Track,
 			{
 				'data-slot': 'slider-track',
-				className: 'cn-slider-track relative grow overflow-hidden data-horizontal:w-full data-vertical:h-full',
+				className: 'relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5',
 			},
 			createElement(SliderPrimitive.Range, {
 				'data-slot': 'slider-range',
-				className: 'cn-slider-range absolute select-none data-horizontal:h-full data-vertical:w-full',
+				className: 'absolute bg-primary data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full',
 			}),
 		),
 		...Array.from(
@@ -62,7 +62,7 @@ export function Slider({
 			(_, index) => createElement(SliderPrimitive.Thumb, {
 				'data-slot': 'slider-thumb',
 				key: index,
-				className: 'cn-slider-thumb block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50',
+				className: 'block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50',
 			}),
 		),
 	);

@@ -243,6 +243,7 @@ export {
 } from './ui/sidebar.tsrx';
 export { Slider } from './ui/slider.tsrx';
 export { Skeleton } from './ui/skeleton.tsrx';
+export { Toaster } from './ui/sonner.tsrx';
 export { Spinner } from './ui/spinner.tsrx';
 export { Switch } from './ui/switch.tsrx';
 export {

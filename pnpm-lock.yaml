@@ -4476,6 +4476,9 @@ importers:
       '@octanejs/radix':
         specifier: 0.1.12
         version: 0.1.12(octane@packages+octane)
+      '@octanejs/sonner':
+        specifier: 0.1.8
+        version: 0.1.8(octane@packages+octane)
       class-variance-authority:
         specifier: catalog:default
         version: 0.7.1
@@ -5380,6 +5383,9 @@ importers:
       '@octanejs/radix':
         specifier: 0.1.12
         version: 0.1.12(octane@packages+octane)
+      '@octanejs/sonner':
+        specifier: 0.1.8
+        version: 0.1.8(octane@packages+octane)
       class-variance-authority:
         specifier: catalog:default
         version: 0.7.1
@@ -7253,6 +7259,12 @@ packages:
 
   '@octanejs/radix@0.1.12':
     resolution: {integrity: sha512-LMj8Cmj+XHiUT8v+/rgcY6WMCQfruoIYQ7nZAOtA8X5aWOTqZK3wPdksGqCviJXEHncyQRwj8V77Am/SPlURJA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      octane: 0.1.13
+
+  '@octanejs/sonner@0.1.8':
+    resolution: {integrity: sha512-kJbhb4msrmIV7xJ/LBPTQ3feiAvYJPZuLHTiYlKx1hsvnUrhhPCGLo4QLlt8wilmXWnctPAY6DrAx5leQa5j0g==}
     engines: {node: '>=22'}
     peerDependencies:
       octane: 0.1.13
@@ -17934,6 +17946,10 @@ snapshots:
     dependencies:
       '@octanejs/floating-ui': 0.1.12(octane@packages+octane)
       aria-hidden: 1.2.6
+      octane: link:packages/octane
+
+  '@octanejs/sonner@0.1.8(octane@packages+octane)':
+    dependencies:
       octane: link:packages/octane
 
   '@octokit/auth-token@6.0.0': {}

@@ -90,7 +90,7 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		expect(input.tagName).toBe('INPUT');
 		expect(input.getAttribute('data-sidebar')).toBe('input');
 		expect(input.className).toContain('cn-sidebar-input');
-		expect(input.className).toContain('cn-input');
+		expect(input.className).toContain('border-input');
 
 		// SidebarSeparator keeps the Separator host with its own slot name.
 		const separator = slot(container, 'sidebar-separator');
@@ -129,8 +129,8 @@ describe('@octanejs/shadcn — Sidebar', () => {
 		const trigger = container.querySelector('[data-testid="sidebar-trigger"]') as HTMLElement;
 		expect(trigger.getAttribute('data-slot')).toBe('sidebar-trigger');
 		expect(trigger.getAttribute('data-sidebar')).toBe('trigger');
-		expect(trigger.className).toContain('cn-button-variant-ghost');
-		expect(trigger.className).toContain('cn-button-size-icon-sm');
+		expect(trigger.className).toContain('hover:bg-muted');
+		expect(trigger.className).toContain('size-7');
 		expect(trigger.querySelector('svg')).not.toBeNull();
 		expect(trigger.querySelector('.sr-only')!.textContent).toBe('Toggle Sidebar');
 		expect(slot(container, 'sidebar-inset').tagName).toBe('MAIN');
@@ -353,7 +353,7 @@ describe('@octanejs/shadcn — Field', () => {
 		expect(label).not.toBeNull();
 		expect(label.getAttribute('for')).toBe('display-name');
 		expect(label.className).toContain('cn-field-label');
-		expect(label.className).toContain('cn-label'); // the composed Label contract
+		expect(label.className).toContain('leading-none'); // the composed Label contract
 		unmount();
 	});
 

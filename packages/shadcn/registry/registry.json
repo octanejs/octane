@@ -545,6 +545,7 @@
       "type": "registry:ui",
       "title": "Radio Group",
       "dependencies": [
+        "@octanejs/lucide@0.1.8",
         "@octanejs/radix@0.1.12"
       ],
       "registryDependencies": [
@@ -690,6 +691,24 @@
           "path": "ui/slider.tsrx",
           "type": "registry:ui",
           "target": "components/ui/slider.tsrx"
+        }
+      ]
+    },
+    {
+      "name": "sonner",
+      "type": "registry:ui",
+      "title": "Sonner",
+      "dependencies": [
+        "@octanejs/lucide@0.1.8"
+      ],
+      "registryDependencies": [
+        "@octane/utils"
+      ],
+      "files": [
+        {
+          "path": "ui/sonner.tsrx",
+          "type": "registry:ui",
+          "target": "components/ui/sonner.tsrx"
         }
       ]
     },

@@ -48,6 +48,20 @@ Registry items are emitted from the SAME sources the tests run against — the
 registry is generated output with a `--check` twin, never hand-edited (the
 bindings-status/packages-inventory pattern, `scripts/generate-bindings-status.mjs`).
 
+## Styling-flavor pivot (2026-07-25)
+
+By maintainer direction, the package's canonical styling is switching from the
+pinned `bases/radix` semantic-hook (`cn-*`) system to the **default-Tailwind
+utilities-inlined flavor** — class strings supplied verbatim by the maintainer
+per component (or taken from upstream `new-york-v4` where not yet supplied).
+Consequences, all applied: migrated components style against any Tailwind v4
+build without a shadcn style sheet; registry items for migrated components
+install through the upstream CLI without its `cn-*` style-transform stripping
+(closing part of the Phase-4 finding); the differential rig's vendored React
+references switch flavor together with their components. `status.json` tracks
+the exact migrated/pending split; the pending families still use `cn-*` +
+style-sheet styling until their flavors are supplied.
+
 ## Scope
 
 Tiered by what the octane ecosystem already provides. ~62 upstream components;

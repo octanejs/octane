@@ -15,12 +15,12 @@ export interface ProgressProps extends Record<string, unknown> {
 export function Progress({ className, value, ...props }: ProgressProps) @{
 	<ProgressPrimitive.Root
 		data-slot="progress"
-		className={cn('cn-progress relative flex w-full items-center overflow-x-hidden', className)}
+		className={cn('relative h-2 w-full overflow-hidden rounded-full bg-primary/20', className)}
 		{...props}
 	>
 		<ProgressPrimitive.Indicator
 			data-slot="progress-indicator"
-			className="cn-progress-indicator size-full flex-1 transition-all"
+			className="h-full w-full flex-1 bg-primary transition-all"
 			style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
 		/>
 	</ProgressPrimitive.Root>

@@ -6,11 +6,11 @@ import { ButtonAsChildFixture, SkeletonFixture, TableFixture } from './_fixtures
 // the same fixtures (the framework-marker comments are hydration input, not an
 // asserted contract).
 const SERVER = {
-	skeleton: '<div data-slot="skeleton" class="cn-skeleton animate-pulse h-4"></div>',
+	skeleton: '<div data-slot="skeleton" class="animate-pulse rounded-md bg-accent h-4"></div>',
 	buttonAsChild:
-		'<!--[--><!--[--><!--[--><!--[--><!--[--><a href="#docs" data-slot="button" data-variant="outline" data-size="lg" class="cn-button group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-all outline-none select-none disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 cn-button-variant-outline cn-button-size-lg">Docs</a><!--]--><!--]--><!--]--><!--]--><!--]-->',
+		'<!--[--><!--[--><!--[--><!--[--><!--[--><a href="#docs" data-slot="button" class="group/button inline-flex shrink-0 items-center justify-center rounded-lg border bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*=\'size-\'])]:size-4 border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50 h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2">Docs</a><!--]--><!--]--><!--]--><!--]--><!--]-->',
 	table:
-		'<div data-slot="table-container" class="cn-table-container"><table data-slot="table" class="cn-table mine"><!--[--><!--[--><caption data-slot="table-caption" class="cn-table-caption"><!--[-->People<!--]--></caption><!--]--><!--[--><thead data-slot="table-header" class="cn-table-header"><!--[--><!--[--><tr data-slot="table-row" class="cn-table-row has-aria-expanded:bg-muted/50"><!--[--><!--[--><th data-slot="table-head" class="cn-table-head"><!--[-->Name<!--]--></th><!--]--><!--]--></tr><!--]--><!--]--></thead><!--]--><!--[--><tbody data-slot="table-body" class="cn-table-body"><!--[--><!--[--><tr data-slot="table-row" class="cn-table-row has-aria-expanded:bg-muted/50"><!--[--><!--[--><td data-slot="table-cell" class="cn-table-cell"><!--[-->Ada<!--]--></td><!--]--><!--]--></tr><!--]--><!--]--></tbody><!--]--><!--]--></table></div>',
+		'<div data-slot="table-container" class="relative w-full overflow-x-auto"><table data-slot="table" class="w-full caption-bottom text-sm mine"><!--[--><!--[--><caption data-slot="table-caption" class="text-muted-foreground mt-4 text-sm"><!--[-->People<!--]--></caption><!--]--><!--[--><thead data-slot="table-header" class="[&amp;_tr]:border-b"><!--[--><!--[--><tr data-slot="table-row" class="hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors"><!--[--><!--[--><th data-slot="table-head" class="text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 [&amp;>[role=checkbox]]:translate-y-[2px]"><!--[-->Name<!--]--></th><!--]--><!--]--></tr><!--]--><!--]--></thead><!--]--><!--[--><tbody data-slot="table-body" class="[&amp;_tr:last-child]:border-0"><!--[--><!--[--><tr data-slot="table-row" class="hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors"><!--[--><!--[--><td data-slot="table-cell" class="p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 [&amp;>[role=checkbox]]:translate-y-[2px]"><!--[-->Ada<!--]--></td><!--]--><!--]--></tr><!--]--><!--]--></tbody><!--]--><!--]--></table></div>',
 } as const;
 
 function hydrate(serverHtml: string, body: () => unknown) {
@@ -41,7 +41,9 @@ describe('@octanejs/shadcn — hydration adoption (Tier 1)', () => {
 		expect(error).not.toHaveBeenCalled();
 		expect(container.querySelector('a[data-slot="button"]')).toBe(anchor);
 		expect(anchor!.textContent).toBe('Docs');
-		expect(anchor!.getAttribute('data-variant')).toBe('outline');
+		// The default-Tailwind button flavor carries the variant in its classes,
+		// not a data-variant attribute.
+		expect(anchor!.className).toContain('bg-background');
 		root.unmount();
 		error.mockRestore();
 		container.remove();

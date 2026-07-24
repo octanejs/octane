@@ -40,18 +40,18 @@ describe('@octanejs/shadcn — Accordion', () => {
 	it('renders the data-slot/class contract with the Header>Trigger composition and both trigger icons', () => {
 		const { container, unmount } = mount(AccordionFixture);
 		const root = slot(container, 'accordion');
-		expect(root.className).toContain('cn-accordion');
+		expect(root.className).toContain('flex w-full flex-col');
 		expect(root.className).toContain('extra-accordion');
 
 		const items = container.querySelectorAll('[data-slot="accordion-item"]');
 		expect(items.length).toBe(2);
-		expect(items[1].className).toContain('cn-accordion-item');
+		expect(items[1].className).toContain('not-last:border-b');
 		expect(items[1].className).toContain('extra-item');
 
 		// Trigger sits inside the radix Header (an h3 with class "flex").
 		const trigger = container.querySelector('[data-testid="t-a"]') as HTMLElement;
 		expect(trigger.getAttribute('data-slot')).toBe('accordion-trigger');
-		expect(trigger.className).toContain('cn-accordion-trigger');
+		expect(trigger.className).toContain('group/accordion-trigger');
 		expect(trigger.closest('h3')).not.toBeNull();
 		expect(trigger.closest('h3')!.getAttribute('class')).toBe('flex');
 		const triggerB = container.querySelector('[data-testid="t-b"]') as HTMLElement;
@@ -73,9 +73,9 @@ describe('@octanejs/shadcn — Accordion', () => {
 		// lands on the inner wrapper with the consumer children.
 		const content = container.querySelector('[data-testid="c-a"]') as HTMLElement;
 		expect(content.getAttribute('data-slot')).toBe('accordion-content');
-		expect(content.className).toBe('cn-accordion-content overflow-hidden');
+		expect(content.className).toContain('overflow-hidden');
 		const inner = content.querySelector('div') as HTMLElement;
-		expect(inner.className).toContain('cn-accordion-content-inner');
+		expect(inner.className).toContain('h-(--radix-accordion-content-height)');
 		expect(inner.className).toContain('extra-content');
 		expect(inner.textContent!.trim()).toBe('Panel A');
 		unmount();
@@ -184,7 +184,7 @@ describe('@octanejs/shadcn — Avatar', () => {
 		const avatar = slot(container, 'avatar');
 		expect(avatar.tagName).toBe('SPAN');
 		expect(avatar.getAttribute('data-size')).toBe('sm');
-		expect(avatar.className).toContain('cn-avatar');
+		expect(avatar.className).toContain('group/avatar');
 		expect(avatar.className).toContain('extra-avatar');
 
 		// The image never reaches "loaded" in jsdom → the primitive renders
@@ -192,22 +192,22 @@ describe('@octanejs/shadcn — Avatar', () => {
 		expect(container.querySelector('[data-slot="avatar-image"]')).toBeNull();
 		expect(container.querySelector('img')).toBeNull();
 		const fallback = slot(container, 'avatar-fallback');
-		expect(fallback.className).toContain('cn-avatar-fallback');
+		expect(fallback.className).toContain('bg-muted');
 		expect(fallback.textContent).toBe('AL');
 
 		const badge = slot(container, 'avatar-badge');
-		expect(badge.className).toContain('cn-avatar-badge');
+		expect(badge.className).toContain('ring-background');
 		unmount();
 	});
 
 	it('AvatarGroup wraps avatars and the group count', () => {
 		const { container, unmount } = mount(AvatarGroupFixture);
 		const group = slot(container, 'avatar-group');
-		expect(group.className).toContain('cn-avatar-group');
+		expect(group.className).toContain('-space-x-2');
 		expect(group.className).toContain('extra-group');
 		expect(group.querySelectorAll('[data-slot="avatar"]').length).toBe(2);
 		const count = slot(container, 'avatar-group-count');
-		expect(count.className).toContain('cn-avatar-group-count');
+		expect(count.className).toContain('ring-background');
 		expect(count.textContent).toBe('+3');
 		unmount();
 	});
@@ -237,7 +237,7 @@ describe('@octanejs/shadcn — Progress', () => {
 		expect(progress.getAttribute('aria-valuemin')).toBe('0');
 		expect(progress.getAttribute('aria-valuemax')).toBe('100');
 		expect(progress.getAttribute('aria-label')).toBe('Loading progress');
-		expect(progress.className).toContain('cn-progress');
+		expect(progress.className).toContain('bg-primary/20');
 		expect(progress.className).toContain('extra-progress');
 		// Upstream destructures `value` off (indicator-transform only): the
 		// radix Root sees no value → indeterminate data-state, no aria-valuenow.
@@ -246,7 +246,7 @@ describe('@octanejs/shadcn — Progress', () => {
 		expect(progress.getAttribute('data-max')).toBe('100');
 
 		const indicator = slot(container, 'progress-indicator');
-		expect(indicator.className).toBe('cn-progress-indicator size-full flex-1 transition-all');
+		expect(indicator.className).toBe('h-full w-full flex-1 bg-primary transition-all');
 		expect(indicator.style.transform).toBe('translateX(-50%)');
 		unmount();
 	});

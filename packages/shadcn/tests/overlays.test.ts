@@ -71,32 +71,34 @@ describe('@octanejs/shadcn — Dialog', () => {
 		expect(content).not.toBe(null);
 		expect(r.container.contains(content)).toBe(false);
 		expect(document.body.contains(content)).toBe(true);
-		expect(content.className).toContain('cn-dialog-content');
+		expect(content.className).toContain('bg-popover');
 		expect(content.className).toContain('extra-content');
 		expect(content.getAttribute('role')).toBe('dialog');
 		expect(content.getAttribute('data-state')).toBe('open');
-		expect(overlay.className).toContain('cn-dialog-overlay');
+		expect(overlay.className).toContain('fixed inset-0');
 		expect(overlay.getAttribute('data-state')).toBe('open');
 
 		// Title/description ids are wired to the content's ARIA.
 		const title = $('[data-slot="dialog-title"]')!;
 		const desc = $('[data-slot="dialog-description"]')!;
-		expect(title.className).toContain('cn-dialog-title');
+		expect(title.className).toContain('leading-none');
 		expect(title.className).toContain('cn-font-heading');
-		expect(desc.className).toContain('cn-dialog-description');
+		expect(desc.className).toContain('text-muted-foreground');
 		expect(content.getAttribute('aria-labelledby')).toBe(title.getAttribute('id'));
 		expect(content.getAttribute('aria-describedby')).toBe(desc.getAttribute('id'));
-		expect($('[data-slot="dialog-header"]')!.className).toContain('cn-dialog-header');
-		expect($('[data-slot="dialog-footer"]')!.className).toContain('cn-dialog-footer');
+		expect($('[data-slot="dialog-header"]')!.className).toContain('flex-col');
+		expect($('[data-slot="dialog-footer"]')!.className).toContain('border-t');
 
 		// The default close button: a ghost icon-sm Button hosting an icon + sr-only label.
 		const closeButtons = $$('[data-slot="dialog-close"]');
-		const iconClose = closeButtons.find((el) => el.className.includes('cn-dialog-close'))!;
+		const iconClose = $$('[data-slot="dialog-close"]').find((el) =>
+			el.className.includes('absolute'),
+		)!;
 		expect(iconClose).not.toBe(undefined);
 		expect(iconClose.tagName).toBe('BUTTON');
-		expect(iconClose.className).toContain('cn-button');
-		expect(iconClose.className).toContain('cn-button-variant-ghost');
-		expect(iconClose.className).toContain('cn-button-size-icon-sm');
+		expect(iconClose.className).toContain('group/button');
+		expect(iconClose.className).toContain('hover:bg-muted');
+		expect(iconClose.className).toContain('size-7');
 		expect(iconClose.querySelector('svg')).not.toBe(null);
 		expect(iconClose.querySelector('.sr-only')!.textContent).toBe('Close');
 
@@ -105,7 +107,7 @@ describe('@octanejs/shadcn — Dialog', () => {
 			(el) => el.textContent === 'Close',
 		)!;
 		expect(footerClose).not.toBe(undefined);
-		expect(footerClose.className).toContain('cn-button-variant-outline');
+		expect(footerClose.className).toContain('bg-background');
 
 		// Focus moved into the dialog.
 		expect(content.contains(document.activeElement)).toBe(true);
@@ -121,7 +123,7 @@ describe('@octanejs/shadcn — Dialog', () => {
 
 		// Portal'd close button — outside the container-scoped click helper.
 		const iconClose = $$('[data-slot="dialog-close"]').find((el) =>
-			el.className.includes('cn-dialog-close'),
+			el.className.includes('absolute'),
 		)!;
 		flushSync(() => iconClose.click());
 		await settle();
@@ -153,7 +155,11 @@ describe('@octanejs/shadcn — Dialog', () => {
 		await settle();
 		const content = $('[data-slot="dialog-content"]')!;
 		expect(content).not.toBe(null);
-		expect(content.querySelector('[data-slot="dialog-close"]')).toBe(null);
+		expect(
+			Array.from(content.querySelectorAll('[data-slot="button"]')).find((el) =>
+				el.className.includes('absolute'),
+			),
+		).toBe(undefined);
 		r.unmount();
 	});
 });
@@ -178,16 +184,16 @@ describe('@octanejs/shadcn — AlertDialog', () => {
 		expect(document.body.contains(content)).toBe(true);
 		expect(content.getAttribute('role')).toBe('alertdialog');
 		expect(content.getAttribute('data-size')).toBe('sm');
-		expect(content.className).toContain('cn-alert-dialog-content');
+		expect(content.className).toContain('bg-popover');
 		expect(content.className).toContain('group/alert-dialog-content');
-		expect($('[data-slot="alert-dialog-overlay"]')!.className).toContain('cn-alert-dialog-overlay');
-		expect($('[data-slot="alert-dialog-header"]')!.className).toContain('cn-alert-dialog-header');
-		expect($('[data-slot="alert-dialog-media"]')!.className).toContain('cn-alert-dialog-media');
-		expect($('[data-slot="alert-dialog-footer"]')!.className).toContain('cn-alert-dialog-footer');
+		expect($('[data-slot="alert-dialog-overlay"]')!.className).toContain('fixed inset-0');
+		expect($('[data-slot="alert-dialog-header"]')!.className).toContain('place-items-center');
+		expect($('[data-slot="alert-dialog-media"]')!.className).toContain('bg-muted');
+		expect($('[data-slot="alert-dialog-footer"]')!.className).toContain('border-t');
 
 		const title = $('[data-slot="alert-dialog-title"]')!;
 		const desc = $('[data-slot="alert-dialog-description"]')!;
-		expect(title.className).toContain('cn-alert-dialog-title');
+		expect(title.className).toContain('cn-font-heading');
 		expect(content.getAttribute('aria-labelledby')).toBe(title.getAttribute('id'));
 		expect(content.getAttribute('aria-describedby')).toBe(desc.getAttribute('id'));
 
@@ -195,13 +201,13 @@ describe('@octanejs/shadcn — AlertDialog', () => {
 		const action = $('[data-testid="alert-action"]')!;
 		expect(action.tagName).toBe('BUTTON');
 		expect(action.getAttribute('data-slot')).toBe('alert-dialog-action');
-		expect(action.className).toContain('cn-button');
-		expect(action.className).toContain('cn-button-variant-destructive');
-		expect(action.className).toContain('cn-alert-dialog-action');
+		expect(action.className).toContain('group/button');
+		expect(action.className).toContain('bg-destructive/10');
+		expect(action.getAttribute('data-slot')).toBe('alert-dialog-action');
 		const cancel = $('[data-testid="alert-cancel"]')!;
 		expect(cancel.getAttribute('data-slot')).toBe('alert-dialog-cancel');
-		expect(cancel.className).toContain('cn-button-variant-outline');
-		expect(cancel.className).toContain('cn-alert-dialog-cancel');
+		expect(cancel.className).toContain('bg-background');
+		expect(cancel.getAttribute('data-slot')).toBe('alert-dialog-cancel');
 
 		// Opening autofocuses the CANCEL action (the safe choice).
 		expect(document.activeElement).toBe(cancel);
@@ -275,8 +281,8 @@ describe('@octanejs/shadcn — Sheet', () => {
 			el.className.includes('cn-sheet-close'),
 		)!;
 		expect(iconClose).not.toBe(undefined);
-		expect(iconClose.className).toContain('cn-button-variant-ghost');
-		expect(iconClose.className).toContain('cn-button-size-icon-sm');
+		expect(iconClose.className).toContain('hover:bg-muted');
+		expect(iconClose.className).toContain('size-7');
 		expect(iconClose.querySelector('svg')).not.toBe(null);
 		expect(iconClose.querySelector('.sr-only')!.textContent).toBe('Close');
 		r.unmount();
