@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { mount, createLog } from '../_helpers';
-import { BailoutHost, ContextHost, CustomCompareHost } from '../_fixtures/memo-bailout.tsrx';
+import { flushSync } from '../../src/index.js';
+import { mount, createLog, flushEffects } from '../_helpers';
+import {
+	BailoutHost,
+	ContextHost,
+	CustomCompareHost,
+	makeMemoStore,
+	MemoStoreHost,
+} from '../_fixtures/memo-bailout.tsrx';
 
 // Ports of memo() bailout heuristics from
 // packages/react-reconciler/src/__tests__/ReactMemo-test.js
@@ -62,5 +69,38 @@ describe('memo bailout', () => {
 		expect(log.drain()).toEqual(['compare:0->1', 'render:1']);
 
 		r.unmount();
+	});
+
+	it('processes an owned external-store update while stable descendants bail out', () => {
+		// Redact-derived RDX-MEM-001: stable props may block a parent-driven
+		// re-render, but they must not swallow work scheduled by the memoized
+		// component itself.
+		const store = makeMemoStore(0);
+		const log = createLog();
+		const r = mount(MemoStoreHost, { store, log: log.push });
+		flushEffects();
+		expect(log.drain()).toEqual(['owner:0', 'leaf:stable']);
+		expect(store.listenerCount()).toBe(1);
+
+		const host = r.find('[data-tick]');
+		const owner = r.find('#memo-store-owner');
+		const leaf = r.find('#memo-store-leaf');
+
+		// Unchanged props take the ordinary memo bailout.
+		r.click('#memo-store-parent-update');
+		expect(host.getAttribute('data-tick')).toBe('1');
+		expect(log.drain()).toEqual([]);
+
+		// The owner's subscription schedules that owner directly. It must cross
+		// its memo gate, while the stable memoized leaf still bails out.
+		flushSync(() => store.set(1));
+		expect(r.find('#memo-store-value').textContent).toBe('1');
+		expect(r.find('#memo-store-owner')).toBe(owner);
+		expect(r.find('#memo-store-leaf')).toBe(leaf);
+		expect(log.drain()).toEqual(['owner:1']);
+
+		r.unmount();
+		flushEffects();
+		expect(store.listenerCount()).toBe(0);
 	});
 });

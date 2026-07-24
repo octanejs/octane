@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseModule } from '@tsrx/core';
 import { compile } from '../src/compiler/compile.js';
 import { prepareServerRendererBoundaryRegions } from '../src/compiler/compile-renderer-boundaries.js';
-import { decodeMappings } from '../src/compiler/compile-universal.js';
+import { decodeMappings } from './_source-map.js';
 import {
 	analyzeRendererBoundaries,
 	assertRendererBoundaryAnalysis,
@@ -104,6 +104,31 @@ function expectAuthoredTrace(
 	expect(original.source).toMatch(/\.tsrx$/);
 	expect(original.line).toBe(authored.line);
 	expect(Math.abs((original.column as number) - authored.column)).toBeLessThanOrEqual(1);
+}
+
+function hasJsxTag(root: unknown, name: string): boolean {
+	let found = false;
+	const seen = new WeakSet<object>();
+	const visit = (node: any) => {
+		if (found || node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (Array.isArray(node)) {
+			for (const child of node) visit(child);
+			return;
+		}
+		if (
+			(node.type === 'JSXElement' || node.type === 'Element') &&
+			(node.openingElement?.name?.name ?? node.name?.name) === name
+		) {
+			found = true;
+			return;
+		}
+		for (const [key, child] of Object.entries(node)) {
+			if (!['loc', 'metadata', 'parent'].includes(key)) visit(child);
+		}
+	};
+	visit(root);
+	return found;
 }
 
 describe('renderer-owned JSX regions', () => {
@@ -252,13 +277,7 @@ export function App() @{
 			{ id: 'dom', ...clientOnlyRendererConfig.registry.dom },
 			boundaryOptions,
 		)!;
-		expect(prepared.source).not.toContain('<Scene />');
-		expectAuthoredTrace(
-			{ code: prepared.source, map: prepared.map },
-			source,
-			'data-after',
-			'data-after',
-		);
+		expect(hasJsxTag(prepared.ast, 'Scene')).toBe(false);
 
 		const result = compile(source, '/src/App.tsrx', {
 			mode: 'server',

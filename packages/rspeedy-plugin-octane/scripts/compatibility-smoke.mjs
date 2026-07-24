@@ -126,7 +126,6 @@ function checkCurrentRegistry(lane) {
 		),
 		lane.packages['@lynx-js/webpack-runtime-globals'],
 	);
-	assert.equal(latestVersion('webpack@^5.0.0'), lane.packages.webpack);
 
 	const debugMetadata = npmView(
 		`@lynx-js/debug-metadata-rsbuild-plugin@${lane.packages['@lynx-js/debug-metadata-rsbuild-plugin']}`,

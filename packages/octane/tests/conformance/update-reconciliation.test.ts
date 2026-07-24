@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createRoot, flushSync, startTransition, type Root } from '../../src/index.js';
-import { createLog, mount } from '../_helpers';
+import { createLog, flushEffects, mount } from '../_helpers';
 import * as Fixture from './_fixtures/update-reconciliation.tsrx';
 
 function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
@@ -218,6 +218,34 @@ describe('ReactUpdates update reconciliation', () => {
 		expect(r.findAll('#delete-child')).toHaveLength(0);
 		expect(r.find('#deleted').textContent).toBe('deleted');
 		expect(log.drain()).toEqual([]);
+		r.unmount();
+	});
+
+	// Redact-derived RDX-MEM-001: pending work beneath an ancestor removed in
+	// the same batch cannot revive that memoized subtree.
+	it('does not commit a memoized store update after its ancestor removes it', () => {
+		const store = Fixture.makeDeleteStore(0);
+		const log = createLog();
+		const r = mount(Fixture.DeletePendingStoreChild, { store, log: log.push });
+		flushEffects();
+		expect(log.drain()).toEqual(['store-child-effect:0']);
+		expect(store.listenerCount()).toBe(1);
+
+		flushSync(() => {
+			// Queue the child first, then queue its ancestor's removal. The
+			// ancestor must win regardless of enqueue order.
+			store.set(1);
+			Fixture.setDeleteStoreParent(false);
+		});
+
+		expect(r.findAll('#delete-store-child')).toHaveLength(0);
+		expect(r.find('#store-child-deleted').textContent).toBe('deleted');
+		expect(log.drain()).toEqual([]);
+
+		flushEffects();
+		expect(log.drain()).toEqual(['store-child-cleanup:0']);
+		expect(store.listenerCount()).toBe(0);
+		expect(r.findAll('#delete-store-child')).toHaveLength(0);
 		r.unmount();
 	});
 

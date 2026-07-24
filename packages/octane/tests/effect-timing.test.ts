@@ -1,9 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
+import { flushSync } from '../src/index.js';
 import { mount, nextPaint } from './_helpers';
 import {
 	PhaseOrder,
 	LayoutReadsDom,
 	PassiveDeferred,
+	CoalescedPassiveArtifact,
 	ManyPassiveEffects,
 	PassiveBeforeCascadeRender,
 } from './_fixtures/effect-timing.tsrx';
@@ -77,6 +79,52 @@ describe('effect timing', () => {
 		await nextPaint();
 		expect(log).toEqual(['layout', 'passive']);
 		r.unmount();
+	});
+
+	it('coalesced dependency changes leave one live passive side effect', async () => {
+		const log: string[] = [];
+		const r = mount(CoalescedPassiveArtifact, { label: 'a', log });
+		await nextPaint();
+
+		const host = r.find('#coalesced-passive-host');
+		expect(Array.from(host.children, (child) => child.getAttribute('data-label'))).toEqual(['a']);
+		expect(log).toEqual(['render:a', 'body:a']);
+
+		// Commit b, but issue c before the ordinary asynchronous passive drain.
+		// Octane settles b's queued passive work before beginning the c render,
+		// so each committed revision owns exactly one artifact at the boundary.
+		flushSync(() => r.root.render(CoalescedPassiveArtifact, { label: 'b', log }));
+		expect(log).toEqual(['render:a', 'body:a', 'render:b']);
+
+		flushSync(() => r.root.render(CoalescedPassiveArtifact, { label: 'c', log }));
+		expect(Array.from(host.children, (child) => child.getAttribute('data-label'))).toEqual(['b']);
+		expect(log).toEqual(['render:a', 'body:a', 'render:b', 'cleanup:a', 'body:b', 'render:c']);
+
+		await nextPaint();
+		expect(Array.from(host.children, (child) => child.getAttribute('data-label'))).toEqual(['c']);
+		expect(log).toEqual([
+			'render:a',
+			'body:a',
+			'render:b',
+			'cleanup:a',
+			'body:b',
+			'render:c',
+			'cleanup:b',
+			'body:c',
+		]);
+		r.unmount();
+		await nextPaint();
+		expect(log).toEqual([
+			'render:a',
+			'body:a',
+			'render:b',
+			'cleanup:a',
+			'body:b',
+			'render:c',
+			'cleanup:b',
+			'body:c',
+			'cleanup:c',
+		]);
 	});
 
 	it('pending passive effects flush BEFORE a layout-cascade render mounts new children', async () => {

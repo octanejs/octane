@@ -70,6 +70,51 @@ describe('Rsbuild renderer configuration', () => {
 		rmSync(root, { recursive: true, force: true });
 	});
 
+	it('preserves asymmetric public compiler booleans through custom client/server environments', async () => {
+		writeProject(root, true);
+		for (const compilerOptions of [
+			{ hmr: true, profile: false, requireDirective: false },
+			{ hmr: false, profile: true, requireDirective: false },
+			{ hmr: false, profile: false, requireDirective: true },
+		]) {
+			const instance = await createRsbuild({
+				cwd: root,
+				rsbuildConfig: {
+					plugins: [
+						pluginOctane({
+							clientEnvironment: 'browser',
+							serverEnvironment: 'ssr',
+							...compilerOptions,
+						}),
+					],
+				},
+			});
+			const configs = await instance.initConfigs({ action: 'build' });
+			const pluginsByConfig = new Map(
+				configs.map((config) => [
+					config.name,
+					(config.plugins ?? []).find(
+						(plugin): plugin is OctaneRspackPlugin => plugin instanceof OctaneRspackPlugin,
+					),
+				]),
+			);
+
+			expect([...pluginsByConfig.keys()]).toEqual(expect.arrayContaining(['browser', 'ssr']));
+			expect(pluginsByConfig.get('browser')?.options).toMatchObject({
+				environment: 'client',
+				...compilerOptions,
+				transpile: false,
+			});
+			expect(pluginsByConfig.get('ssr')?.options).toMatchObject({
+				environment: 'server',
+				hmr: compilerOptions.hmr,
+				profile: false,
+				requireDirective: compilerOptions.requireDirective,
+				transpile: false,
+			});
+		}
+	});
+
 	it.each([
 		['compiler-only', false],
 		['routed app', true],
