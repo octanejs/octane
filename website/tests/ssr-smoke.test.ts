@@ -70,7 +70,7 @@ function readJavaScriptFiles(root: string): string[] {
 
 beforeAll(async () => {
 	await new Promise<void>((resolve, reject) => {
-		const build = spawn('pnpm', ['exec', 'vite', 'build'], {
+		const build = spawn('pnpm', ['exec', 'vite', 'build', '--configLoader', 'runner'], {
 			cwd: websiteRoot,
 			stdio: 'ignore',
 			env: { ...process.env, NODE_ENV: 'production', NITRO_PRESET: 'node-server' },
