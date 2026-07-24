@@ -577,8 +577,8 @@ catalogs:
       specifier: ^6.7.0
       version: 6.7.0
     prettier:
-      specifier: ^3.9.5
-      version: 3.9.5
+      specifier: ^3.9.6
+      version: 3.9.6
     prettier-plugin-svelte:
       specifier: ^4.1.1
       version: 4.1.1
@@ -774,7 +774,7 @@ importers:
         version: 2.31.1(@types/node@24.13.3)
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.3.110(prettier@3.9.5)
+        version: 0.3.110(prettier@3.9.6)
       '@tsrx/typescript-plugin':
         specifier: catalog:default
         version: 0.3.110(@tsrx/react@0.2.48(react@19.2.7))(@tsrx/ripple@0.1.49)(@tsrx/solid@0.1.48(@solidjs/web@2.0.0-beta.15(solid-js@2.0.0-beta.15))(solid-js@2.0.0-beta.15))(octane@0.1.13(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)))(typescript@5.9.3)
@@ -795,10 +795,10 @@ importers:
         version: 29.1.1(@noble/hashes@2.2.0)
       prettier:
         specifier: catalog:default
-        version: 3.9.5
+        version: 3.9.6
       prettier-plugin-svelte:
         specifier: catalog:default
-        version: 4.1.1(prettier@3.9.5)(svelte@5.56.7)
+        version: 4.1.1(prettier@3.9.6)(svelte@5.56.7)
       rulesync:
         specifier: catalog:default
         version: 8.32.0(supports-color@10.2.2)(valibot@1.4.2(typescript@5.9.3))
@@ -3976,7 +3976,7 @@ importers:
         version: link:../octane
       prettier:
         specifier: catalog:default
-        version: 3.9.5
+        version: 3.9.6
       react:
         specifier: catalog:default
         version: 19.2.7
@@ -4806,7 +4806,7 @@ importers:
         version: 4.0.5
       prettier:
         specifier: catalog:default
-        version: 3.9.5
+        version: 3.9.6
       seroval:
         specifier: ^1.5.4
         version: 1.5.6
@@ -5371,7 +5371,7 @@ importers:
         version: 0.1.48
       '@tsrx/prettier-plugin':
         specifier: catalog:default
-        version: 0.3.110(prettier@3.9.5)
+        version: 0.3.110(prettier@3.9.6)
       '@types/three':
         specifier: catalog:default
         version: 0.172.0
@@ -5389,7 +5389,7 @@ importers:
         version: 1.61.1
       prettier:
         specifier: catalog:default
-        version: 3.9.5
+        version: 3.9.6
       sucrase:
         specifier: catalog:default
         version: 3.35.1
@@ -9509,9 +9509,6 @@ packages:
 
   '@toon-format/toon@2.3.0':
     resolution: {integrity: sha512-/Ew9etdRQKVMnm9fDaCG0JjyAOK/O7T0M97oum1aW4W+UR8ZhVVPBanIV7oWgHBiGlnVxV9M55PWQCHofDV07w==}
-
-  '@tsrx/core@0.1.47':
-    resolution: {integrity: sha512-tuhPcqpc+HipVtxpTCHTQG/30Yfvt+gwJPxUW85M+imimCH9AeNRb0Q2xTcx4Hyaq8H8KNqG8HBwiZExX4rI/w==}
 
   '@tsrx/core@0.1.48':
     resolution: {integrity: sha512-IgkkLjApPKCGvBvwcOtLT6bACFglB5RBKW9fYErYMXJC6bxk/GM1lVAnuV9FiadiZ5jXrTw9uTxbZULncycSQQ==}
@@ -13844,6 +13841,11 @@ packages:
 
   prettier@3.9.5:
     resolution: {integrity: sha512-/FVl766LpUfB5vXgCYOYa0MeV/441Ia99AeICQIQFTY/Nw0roZwULcXpku5i1/m5kt/baz+s4Zogspd839HSMg==}
+    engines: {node: '>=14'}
+    hasBin: true
+
+  prettier@3.9.6:
+    resolution: {integrity: sha512-OpN0zzVdiaiAhxpuuj5efpIS4sY9j7bY6uR5mnj5yPzGkdkjNKSJeUThPb60Jw29QuAZgA4o+/iB49kFiaBX6g==}
     engines: {node: '>=14'}
     hasBin: true
 
@@ -20362,22 +20364,6 @@ snapshots:
 
   '@toon-format/toon@2.3.0': {}
 
-  '@tsrx/core@0.1.47':
-    dependencies:
-      '@jridgewell/sourcemap-codec': 1.5.5
-      '@noble/hashes': 2.2.0
-      '@sveltejs/acorn-typescript': 1.0.11(acorn@8.17.0)
-      '@types/estree': 1.0.9
-      '@types/estree-jsx': 1.0.5
-      acorn: 8.17.0
-      esrap: 2.3.0
-      is-reference: 3.0.3
-      magic-string: 0.30.21
-      zimmerframe: 1.1.4
-    transitivePeerDependencies:
-      - '@typescript-eslint/types'
-    optional: true
-
   '@tsrx/core@0.1.48':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -20393,10 +20379,10 @@ snapshots:
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
-  '@tsrx/prettier-plugin@0.3.110(prettier@3.9.5)':
+  '@tsrx/prettier-plugin@0.3.110(prettier@3.9.6)':
     dependencies:
       '@tsrx/core': 0.1.48
-      prettier: 3.9.5
+      prettier: 3.9.6
     transitivePeerDependencies:
       - '@typescript-eslint/types'
 
@@ -25067,7 +25053,7 @@ snapshots:
 
   octane@0.1.13(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(vite@8.1.5(@types/node@24.13.3)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.49.0)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
-      '@tsrx/core': 0.1.47
+      '@tsrx/core': 0.1.48
       '@types/react': 19.2.17
       devalue: 5.8.2
       esrap: 2.3.0
@@ -25438,14 +25424,16 @@ snapshots:
     optionalDependencies:
       preact-render-to-string: 6.7.0(preact@10.29.7)
 
-  prettier-plugin-svelte@4.1.1(prettier@3.9.5)(svelte@5.56.7):
+  prettier-plugin-svelte@4.1.1(prettier@3.9.6)(svelte@5.56.7):
     dependencies:
-      prettier: 3.9.5
+      prettier: 3.9.6
       svelte: 5.56.7
 
   prettier@2.8.8: {}
 
   prettier@3.9.5: {}
+
+  prettier@3.9.6: {}
 
   pretty-format@27.5.1:
     dependencies:
