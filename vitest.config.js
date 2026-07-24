@@ -240,6 +240,7 @@ export default defineConfig({
 						...configDefaults.exclude,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
 						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -318,6 +319,7 @@ export default defineConfig({
 						...configDefaults.exclude,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
 						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -395,6 +397,7 @@ export default defineConfig({
 					include: [
 						'packages/octane/tests/profiling-runtime.test.tsrx',
 						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 					],
 					environment: 'jsdom',
 					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
