@@ -79,4 +79,66 @@ describe('bridge', () => {
 		expect(typeof stop).toBe('function');
 		stop();
 	});
+
+	it('emits a profile snapshot from the profiler global on flush', () => {
+		const { hook } = installFakeHook();
+		(globalThis as any).__OCTANE_PROFILER__ = {
+			summary: () => [
+				{
+					componentId: 'c1',
+					component: 'App',
+					file: 'a.tsrx',
+					attempts: 2,
+					completed: 2,
+					suspended: 0,
+					errored: 0,
+					bails: 0,
+					totalTime: 5,
+					totalSelfTime: 3,
+					averageSelfTime: 1.5,
+					maxInclusiveTime: 4,
+					averageQueueDelay: 0,
+					dominantCause: 'mount',
+				},
+			],
+			getEvents: () => [
+				{
+					type: 'component-render',
+					component: 'App',
+					phase: 'mount',
+					outcome: 'completed',
+					duration: 4,
+					selfDuration: 3,
+					queueDelay: 0,
+					causes: [{ type: 'mount' }],
+					startTime: 0,
+				},
+			],
+		};
+		const client = new OctaneDevtoolsEventClient();
+		const emit = vi.spyOn(client, 'emit');
+		const stop = startBridge(client);
+		hook._fire();
+		expect(emit).toHaveBeenCalledWith(
+			'profile',
+			expect.objectContaining({
+				summaries: [expect.objectContaining({ component: 'App', totalSelfTime: 3 })],
+				recentEvents: [
+					expect.objectContaining({ component: 'App', phase: 'mount', causes: ['mount'] }),
+				],
+			}),
+		);
+		stop();
+		delete (globalThis as any).__OCTANE_PROFILER__;
+	});
+
+	it('does not emit profile when the profiler global is absent', () => {
+		const { hook } = installFakeHook();
+		const client = new OctaneDevtoolsEventClient();
+		const emit = vi.spyOn(client, 'emit');
+		const stop = startBridge(client);
+		hook._fire();
+		expect(emit).not.toHaveBeenCalledWith('profile', expect.anything());
+		stop();
+	});
 });
