@@ -1,11 +1,18 @@
 // /playground — write TSRX (or TSX) on the left, and on the right either the
-// LIVE rendered app or the compiled octane output, switchable with a tab. The
+// LIVE rendered app or the compiled output, switchable with a tab. The
+// compiled pane has two modes: AST (the parser tree, exact typed Program, and
+// exact client Program + template IR) and TYPES (the typed virtual TSX
+// the IDE language service sees via `octane/compiler/volar`). Hovering or
+// selecting source reveals the corresponding AST node where the compiler has
+// a mapping; hovering a tree node highlights its source origin. Types uses
+// the Volar token mappings bidirectionally (see playground-mapping.ts). The
 // whole pipeline runs in the browser: `octane/compiler` (and sucrase for
 // React-host `.react.tsx` files) compiles the virtual files on a debounce, the
 // module graph executes inside a SANDBOXED IFRAME with an opaque origin (see
 // src/lib/playground.ts + playground-modules.ts + playground-sandbox.ts —
 // never in this page), and CodeMirror highlights through Shiki with the real
-// TSRX TextMate grammar (src/lib/shiki-codemirror.ts).
+// TSRX TextMate grammar (src/lib/shiki-codemirror.ts). Editors, panels, and
+// the preview canvas all follow the site's light/dark theme.
 //
 // Everything editor-related boots in an effect (dynamic imports), so SSR
 // renders just the static shell and hydration stays clean. A workspace is a
@@ -23,18 +30,35 @@
 // the default sources auto-run as before.
 import { useState, useRef, useEffect } from 'octane';
 import type { CompileDiagnostic } from 'octane/compiler';
-import type { PlaygroundLang } from '../../lib/playground.ts';
+import type { PlaygroundAstStage, PlaygroundLang } from '../../lib/playground.ts';
 import {
 	decodePlaygroundHash,
 	encodePlaygroundHash,
 	MAX_PLAYGROUND_SOURCE_LENGTH,
 	PLAYGROUND_SOURCE_LIMIT_ERROR,
 } from '../../lib/playground-hash.ts';
-import { EXAMPLES, CUSTOM_EXAMPLE_ID, DEFAULT_EXAMPLE_ID } from '../../lib/playground-examples.ts';
+import * as pgExamples from '../../lib/playground-examples.ts';
 import { useTitle } from '../../hooks/use-title.ts';
+
+const { EXAMPLES, CUSTOM_EXAMPLE_ID, DEFAULT_EXAMPLE_ID } = pgExamples;
 
 const HASH_DEBOUNCE_MS = 400;
 const COMPILE_DEBOUNCE_MS = 250;
+
+const AST_STAGE_META: Record<PlaygroundAstStage, { label: string; notice: string }> = {
+	source: {
+		label: 'Parsed source AST',
+		notice: 'The parser tree for the authored source.',
+	},
+	types: {
+		label: 'Types output AST',
+		notice: 'The exact Program printed as the typed virtual TSX.',
+	},
+	client: {
+		label: 'Client output AST',
+		notice: 'The exact emitted Program and static-template IR.',
+	},
+};
 
 // sessionStorage record of the last hash THIS tab wrote (plus the example it
 // came from). A payload matching it is the visitor's own work surviving a
@@ -56,6 +80,9 @@ export function Playground() @{
 	useTitle('Octane — Playground');
 	const [lang, setLang] = useState<PlaygroundLang>('tsrx');
 	const [view, setView] = useState<'preview' | 'compiled'>('preview');
+	// Which compiler artifact the right pane shows.
+	const [compiledMode, setCompiledMode] = useState<'ast' | 'types'>('ast');
+	const [astStage, setAstStage] = useState<PlaygroundAstStage>('source');
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
@@ -75,7 +102,20 @@ export function Playground() @{
 
 	const sourceHostRef = useRef<HTMLDivElement | null>(null);
 	const outputHostRef = useRef<HTMLDivElement | null>(null);
+	const astHostRef = useRef<HTMLDivElement | null>(null);
 	const previewHostRef = useRef<HTMLDivElement | null>(null);
+	// The boot closure runs once, so it can't read the view/mode STATE — this
+	// ref mirrors it (updated by the same handlers that set state) for the
+	// closure's output-refresh and position-mapping paths.
+	const resultModeRef = useRef<{
+		view: 'preview' | 'compiled';
+		compiledMode: 'ast' | 'types';
+		astStage: PlaygroundAstStage;
+	}>({
+		view: 'preview',
+		compiledMode: 'ast',
+		astStage: 'source',
+	});
 	// Imperative bridge into the boot closure below — populated once the editor
 	// stack has loaded; the toolbar buttons (and the consent overlay's Run
 	// button) call through it.
@@ -85,17 +125,36 @@ export function Playground() @{
 		selectFile?: (name: string) => void;
 		formatActive?: () => void;
 		approveRun?: () => void;
+		syncOutput?: () => void;
 	}>({});
+
+	const selectView = (next: 'preview' | 'compiled') => {
+		setView(next);
+		resultModeRef.current.view = next;
+		controllerRef.current.syncOutput?.();
+	};
+	const selectCompiledMode = (next: 'ast' | 'types') => {
+		setCompiledMode(next);
+		resultModeRef.current.compiledMode = next;
+		controllerRef.current.syncOutput?.();
+	};
+	const selectAstStage = (next: typeof astStage) => {
+		setAstStage(next);
+		resultModeRef.current.astStage = next;
+		controllerRef.current.syncOutput?.();
+	};
 
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
 		const outputHost = outputHostRef.current;
+		const astHost = astHostRef.current;
 		const previewHost = previewHostRef.current;
-		if (!sourceHost || !outputHost || !previewHost) return;
+		if (!sourceHost || !outputHost || !astHost || !previewHost) return;
 
 		let disposed = false;
 		let sourceView: any;
 		let outputView: any;
+		let astPreview: any;
 		let preview: any = null;
 		let compileDebounceId = 0;
 		let hashDebounceId = 0;
@@ -109,17 +168,19 @@ export function Playground() @{
 
 		(async () => {
 			let stateMod: any, commandsMod: any, viewMod: any, shikiMod: any, pg: any, pgModules: any;
-			let pgExamples: any;
+			let pgMapping: any, pgAst: any;
 			try {
-				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgExamples] = await Promise.all([
-					import('@codemirror/state'),
-					import('@codemirror/commands'),
-					import('@codemirror/view'),
-					import('../../lib/shiki-codemirror.ts'),
-					import('../../lib/playground.ts'),
-					import('../../lib/playground-modules.ts'),
-					import('../../lib/playground-examples.ts'),
-				]);
+				[stateMod, commandsMod, viewMod, shikiMod, pg, pgModules, pgMapping, pgAst] =
+					await Promise.all([
+						import('@codemirror/state'),
+						import('@codemirror/commands'),
+						import('@codemirror/view'),
+						import('../../lib/shiki-codemirror.ts'),
+						import('../../lib/playground.ts'),
+						import('../../lib/playground-modules.ts'),
+						import('../../lib/playground-mapping.ts'),
+						import('../../lib/playground-ast.ts'),
+					]);
 			} catch (bootError) {
 				// A load failure after unmount (e.g. a test env torn down mid-import)
 				// must not become an unhandled rejection; while mounted, surface it.
@@ -130,9 +191,16 @@ export function Playground() @{
 			}
 			if (disposed) return;
 
-			const { EditorState, Compartment } = stateMod;
+			const { EditorState, Compartment, StateEffect, StateField } = stateMod;
 			const { history, defaultKeymap, historyKeymap, indentWithTab } = commandsMod;
-			const { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } = viewMod;
+			const {
+				EditorView,
+				keymap,
+				lineNumbers,
+				highlightActiveLine,
+				drawSelection,
+				Decoration,
+			} = viewMod;
 			const { shikiHighlight } = shikiMod;
 
 			type Workspace = { files: { name: string; source: string }[]; entry: string };
@@ -209,36 +277,35 @@ export function Playground() @{
 				setVariants(variantAvailability());
 			};
 
-			// github-dark canvas so the Shiki token colors sit on the palette they
-			// were designed for.
-			const sharedTheme = EditorView.theme(
-				{
-					'&': {
-						height: '100%',
-						backgroundColor: '#0d1117',
-						color: '#e6edf3',
-						fontSize: '0.85rem',
-					},
-					'.cm-scroller': {
-						overflow: 'auto',
-						fontFamily: 'ui-monospace, SFMono-Regular, \'SF Mono\', Menlo, Consolas, \'Liberation Mono\', monospace',
-					},
-					'.cm-content': { padding: '1rem 0.25rem 1.25rem' },
-					'.cm-gutters': {
-						backgroundColor: '#0d1117',
-						color: 'rgba(230, 237, 243, 0.35)',
-						border: 'none',
-					},
-					'.cm-activeLine, .cm-activeLineGutter': {
-						backgroundColor: 'rgba(110, 118, 129, 0.12)',
-					},
-					'.cm-selectionBackground': {
-						backgroundColor: 'rgba(56, 139, 253, 0.35) !important',
-					},
-					'.cm-cursor': { borderLeftColor: '#e6edf3' },
+			// Theme-variable canvas: the same custom properties the rest of the
+			// site swaps per `data-theme`, so both editors follow the ThemeToggle
+			// live (token colors flip through the dual-theme .cm-shiki rules).
+			const sharedTheme = EditorView.theme({
+				'&': {
+					height: '100%',
+					backgroundColor: 'var(--code-bg)',
+					color: 'var(--text)',
+					fontSize: '0.85rem',
 				},
-				{ dark: true },
-			);
+				'.cm-scroller': {
+					overflow: 'auto',
+					fontFamily: 'ui-monospace, SFMono-Regular, \'SF Mono\', Menlo, Consolas, \'Liberation Mono\', monospace',
+				},
+				'.cm-content': { padding: '1rem 0.25rem 1.25rem' },
+				'.cm-gutters': {
+					backgroundColor: 'var(--code-bg)',
+					color: 'var(--text-secondary)',
+					border: 'none',
+					opacity: '0.7',
+				},
+				'.cm-activeLine, .cm-activeLineGutter': {
+					backgroundColor: 'var(--surface)',
+				},
+				'.cm-selectionBackground': {
+					backgroundColor: 'rgba(56, 139, 253, 0.35) !important',
+				},
+				'.cm-cursor': { borderLeftColor: 'var(--text)' },
+			});
 
 			preview = pg.createPreview(previewHost, (message: string) => {
 				if (!disposed) setError(message);
@@ -248,13 +315,307 @@ export function Playground() @{
 				view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: doc } });
 			};
 
-			// The compiled-output pane tracks the ACTIVE file; keep the last good
-			// graph around so switching tabs doesn't need a recompile.
-			let lastCompiled: Map<string, string> | null = null;
-			const showCompiledFor = (name: string) => {
-				const code = lastCompiled?.get(name);
-				if (typeof code === 'string') replaceDoc(outputView, code);
+			// Type output and both of its ASTs come from one Volar pass. Client AST
+			// inspection stays separately lazy so the normal preview path pays none
+			// of the compiler's opt-in inspection cost.
+			type TypesEntry = {
+				source: string;
+				code: string;
+				volarMappings: any;
+				mapping: any;
+				asts: [unknown, unknown] | null;
+				error: string | null;
 			};
+			type AstEntry = {
+				source: string;
+				ast: unknown;
+				label: string;
+				notice: string;
+			};
+			const typesCache = new Map<string, TypesEntry>();
+			const clientAstCache = new Map<
+				string,
+				{ source: string; ast: unknown; error: string | null }
+			>();
+
+			const typesEntry = (name: string) => {
+				const source = fileSource(name);
+				const cached = typesCache.get(name);
+				if (cached && cached.source === source) return cached;
+				let entry: TypesEntry;
+				if (pgModules.isReactHostFile(name)) {
+					entry = {
+						source,
+						// React-host source already is the typed TSX document.
+						code: source,
+						volarMappings: null,
+						mapping: pgMapping.identityMapping(source.length),
+						asts: null,
+						error: null,
+					};
+				} else {
+					const result = pg.compileTypes(source, name);
+					entry = result.ok
+						? {
+								source,
+								code: result.code,
+								volarMappings: result.mappings,
+								mapping: undefined,
+								asts: [result.sourceAst, result.generatedAst],
+								error: null,
+							}
+						: {
+								source,
+								code: '// Types generation failed:\n// ' + result.error,
+								volarMappings: null,
+								mapping: null,
+								asts: null,
+								error: result.error,
+							};
+				}
+				typesCache.set(name, entry);
+				return entry;
+			};
+			type AstEntryResult = { entry: AstEntry | null; error: string | null };
+			const astEntry = (name: string): AstEntryResult => {
+				if (pgModules.isReactHostFile(name)) return { entry: null, error: null };
+				const source = fileSource(name);
+				const stage = resultModeRef.current.astStage;
+				const meta = AST_STAGE_META[stage];
+				if (stage !== 'client') {
+					const types = typesEntry(name);
+					if (!types.asts) {
+						return {
+							entry: null,
+							error: types.error ? `AST generation failed: ${types.error}` : null,
+						};
+					}
+					return {
+						entry: {
+							source,
+							ast: types.asts[stage === 'source' ? 0 : 1],
+							...meta,
+						},
+						error: null,
+					};
+				}
+				let cached = clientAstCache.get(name);
+				if (!cached || cached.source !== source) {
+					const result = pg.compileClientAst(source, name);
+					cached = result.ok
+						? { source, ast: result.ast, error: null }
+						: { source, ast: null, error: result.error };
+					clientAstCache.set(name, cached);
+				}
+				return cached.error
+					? { entry: null, error: `AST generation failed: ${cached.error}` }
+					: { entry: { source, ast: cached.ast, ...meta }, error: null };
+			};
+
+			// The exact string the output editor currently displays. The output
+			// view is read-only and written ONLY here, so this makes both the
+			// refresh no-op check and activeMapping's staleness check a string
+			// reference compare instead of an O(doc) toString per call.
+			const OUTPUT_PLACEHOLDER = '// Types output appears here.';
+			let lastShownOutput = OUTPUT_PLACEHOLDER;
+			let lastShownAst: AstEntry | null = null;
+			const showOutput = (): string | null => {
+				// The compiled pane is not visible: skip entirely — no types
+				// generation, no doc replacement, and (the dominant cost) no Shiki
+				// re-tokenize of the output document. syncOutput re-runs this when
+				// the pane is revealed, so it refreshes exactly once, on demand.
+				if (resultModeRef.current.view !== 'compiled') return null;
+				if (resultModeRef.current.compiledMode === 'ast') {
+					const { entry, error } = astEntry(currentFile);
+					if (entry && entry.ast !== lastShownAst?.ast) {
+						astPreview.setAst(entry.ast, currentFile, {
+							label: entry.label,
+							notice: entry.notice,
+						});
+						lastShownAst = entry;
+					} else if (!entry) {
+						const message = pgModules.isReactHostFile(currentFile)
+							? 'AST trace covers Octane-owned .tsrx and .tsx files. React-host files use the separate Sucrase pipeline.'
+							: 'AST generation failed. Fix the source to generate a new tree.';
+						astPreview.setUnavailable(message, currentFile);
+						lastShownAst = null;
+					}
+					clearMappedPair();
+					astPreview.clear();
+					setError(error || '');
+					return error;
+				}
+				const code = typesEntry(currentFile).code;
+				// AST and Types highlights describe different artifacts. Clear the
+				// pair even when the cached Types document needs no replacement.
+				clearMappedPair();
+				astPreview.clear();
+				// Clear any stale error from a previous stage/mode.
+				setError('');
+				if (typeof code !== 'string' || code === lastShownOutput) return null;
+				replaceDoc(outputView, code);
+				lastShownOutput = code;
+				// The output half of the pair changed — source marks were computed
+				// against the previous artifact (the output field self-cleared via
+				// its own doc change just now).
+				clearMappedIn(sourceView);
+				return null;
+			};
+
+			// ── Source ↔ output position mapping ─────────────────────────────
+			// Placing the cursor in one editor highlights and reveals the mapped
+			// ranges in the other (see playground-mapping.ts for the semantics).
+			// Marks are only valid for the exact (source doc, output doc) PAIR
+			// they were computed against, so a change to either side must clear
+			// BOTH editors: each field self-clears on its own doc change, and
+			// clearMappedIn handles the cross-editor half (a source edit leaves
+			// output marks orphaned — visibly so when a broken edit means no
+			// recompile ever replaces the output doc — and setState doc swaps
+			// produce no transaction at all).
+			const setMapped = StateEffect.define();
+			const mappedMark = Decoration.mark({ class: 'cm-mapped' });
+			const mappedField = StateField.define({
+				create: () => Decoration.none,
+				update(value: any, tr: any) {
+					for (const effect of tr.effects) if (effect.is(setMapped)) return effect.value;
+					// Any edit (or an output refresh) invalidates the offsets.
+					return tr.docChanged ? Decoration.none : value;
+				},
+				provide: (field: any) => EditorView.decorations.from(field),
+			});
+			// Per-keystroke safe: one O(1) field-size read, and a transaction is
+			// dispatched only when marks actually exist to clear.
+			const clearMappedIn = (targetView: any) => {
+				if (targetView.state.field(mappedField, false)?.size) {
+					targetView.dispatch({ effects: setMapped.of(Decoration.none) });
+				}
+			};
+
+			// Per-cursor lookups only consult the visible cached artifact. Immutable
+			// AST nodes and template origins both retain authored source offsets.
+			const activeAstEntry = (): AstEntry | null => {
+				if (
+					resultModeRef.current.view !== 'compiled' || resultModeRef.current.compiledMode !== 'ast'
+				) return null;
+				return lastShownAst?.source === fileSource(currentFile) ? lastShownAst : null;
+			};
+			const activeMapping = () => {
+				if (
+					resultModeRef.current.view !== 'compiled' ||
+						resultModeRef.current.compiledMode !== 'types'
+				) return null;
+				const entry = typesCache.get(currentFile);
+				if (
+					!entry || entry.source !== fileSource(currentFile) || entry.code !== lastShownOutput
+				) return null;
+				if (entry.mapping === undefined) {
+					entry.mapping = pgMapping.mappingFromVolar(entry.volarMappings);
+				}
+				return entry.mapping;
+			};
+
+			const revealRanges = (
+				targetView: any,
+				ranges: { from: number; to: number }[],
+				scroll: boolean,
+			) => {
+				const limit = targetView.state.doc.length;
+				const clamped = ranges.filter((range: { from: number }) => range.from < limit).map(
+					(range: { from: number; to: number }) => ({
+						from: range.from,
+						to: Math.min(range.to, limit),
+					}),
+				);
+				if (clamped.length === 0) {
+					// Same contract as an unmapped position: no lingering marks.
+					clearMappedIn(targetView);
+					return;
+				}
+				const effects = [
+					setMapped.of(
+						Decoration.set(
+							clamped.map(
+								(range: { from: number; to: number }) => mappedMark.range(range.from, range.to),
+							),
+						),
+					),
+				];
+				if (scroll) effects.push(EditorView.scrollIntoView(clamped[0].from, { y: 'center' }));
+				targetView.dispatch({ effects });
+			};
+
+			const mappedPair = (side: 'source' | 'output', offset: number) => {
+				const mapping = activeMapping();
+				if (!mapping) return null;
+				return side === 'source'
+					? mapping.pairFromSource(offset)
+					: mapping.pairFromGenerated(offset);
+			};
+			const clearMappedPair = () => {
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
+			};
+			const revealPair = (
+				pair: { source: { from: number; to: number }[]; output: { from: number; to: number }[] },
+				scrollSide: 'source' | 'output' | null,
+			) => {
+				revealRanges(sourceView, pair.source, scrollSide === 'source');
+				revealRanges(outputView, pair.output, scrollSide === 'output');
+			};
+			const revealAstRange = (range: { from: number; to: number } | null, scroll: boolean) => {
+				if (resultModeRef.current.compiledMode !== 'ast') return;
+				if (!range || !activeAstEntry()) {
+					clearMappedPair();
+					return;
+				}
+				clearMappedIn(outputView);
+				revealRanges(sourceView, [range], scroll);
+			};
+
+			astPreview = pgAst.createAstPreview(astHost, {
+				onNodeRange: revealAstRange,
+			});
+
+			const crossNavigate = (side: 'source' | 'output') => EditorView.updateListener.of((
+				update: any,
+			) => {
+				if (!update.selectionSet || update.docChanged) return;
+				// Only user-driven cursor moves navigate — programmatic dispatches
+				// (doc replacement, highlight effects) must not feed back.
+				if (!update.transactions.some((tr: any) => tr.isUserEvent('select'))) return;
+				if (resultModeRef.current.view !== 'compiled') return;
+				const offset = update.state.selection.main.head;
+				if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
+					if (activeAstEntry()) astPreview.reveal(offset, true);
+					return;
+				}
+				const pair = mappedPair(side, offset);
+				// Marks reflect the CURRENT selection — an unmapped one clears.
+				if (pair) revealPair(pair, side === 'source' ? 'output' : 'source');
+				else clearMappedPair();
+			});
+
+			// Hovering either document highlights the corresponding ranges without moving its scroll
+			// position; clicking/cursor movement above additionally reveals them.
+			const crossHover = (side: 'source' | 'output') => EditorView.domEventObservers({
+				mousemove(event: MouseEvent, view: any) {
+					if (resultModeRef.current.view !== 'compiled') return;
+					const offset = view.posAtCoords({ x: event.clientX, y: event.clientY });
+					if (resultModeRef.current.compiledMode === 'ast' && side === 'source') {
+						if (offset == null || !activeAstEntry()) clearMappedPair();
+						else astPreview.reveal(offset, false);
+						return;
+					}
+					const pair =
+						offset == null ? null : mappedPair(side, offset);
+					if (pair) revealPair(pair, null);
+					else clearMappedPair();
+				},
+				mouseleave() {
+					clearMappedPair();
+					astPreview.clear();
+				},
+			});
 
 			let compileSeq = 0;
 			const compileAndRun = async () => {
@@ -272,6 +633,10 @@ export function Playground() @{
 				}
 				const graph = await pgModules.buildModuleGraph(wsFiles, entry);
 				if (disposed || seq !== compileSeq) return;
+				// AST and Types describe the active source file, independently of
+				// whether another workspace file prevents the runnable module graph
+				// from compiling. Refresh inspection before handling graph failure.
+				const inspectionError = showOutput();
 				if (!graph.ok) {
 					setWarnings([]);
 					setError(graph.error);
@@ -280,9 +645,7 @@ export function Playground() @{
 				setWarnings(
 					graph.warnings.map((warning: { diagnostic: CompileDiagnostic }) => warning.diagnostic),
 				);
-				setError('');
-				lastCompiled = graph.compiled;
-				showCompiledFor(currentFile);
+				setError(inspectionError || '');
 				// While a shared payload is gated, everything except EXECUTION
 				// happens — the visitor can inspect source and compiled output.
 				if (executionGated) return;
@@ -369,8 +732,19 @@ export function Playground() @{
 					EditorState.tabSize.of(2),
 					shikiHighlight(grammarFor(name)),
 					sharedTheme,
+					mappedField,
+					crossHover('source'),
+					crossNavigate('source'),
 					EditorView.updateListener.of((update: any) => {
 						if (!update.docChanged) return;
+						// The source half of the pair changed — orphan any marks still
+						// shown in the output (this field self-clears; a failed
+						// recompile would otherwise leave the output's marks forever).
+						clearMappedIn(outputView);
+						if (resultModeRef.current.compiledMode === 'ast') {
+							astPreview.setUnavailable('Waiting for the next successful compile…', currentFile);
+							lastShownAst = null;
+						}
 						const next = update.state.doc.toString();
 						const file = workspace().files.find(
 							(candidate: { name: string }) => candidate.name === currentFile,
@@ -393,8 +767,12 @@ export function Playground() @{
 				currentFile = name;
 				const existing = editorStates.get(stateKey(name));
 				sourceView.setState(existing ?? makeEditorState(name, fileSource(name)));
+				// setState fires no transaction: a restored state may carry marks
+				// from an old pair, and the output's marks belong to the old file.
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
 				setActiveFile(name);
-				showCompiledFor(name);
+				showOutput();
 			};
 
 			sourceView = new EditorView({
@@ -404,7 +782,7 @@ export function Playground() @{
 
 			outputView = new EditorView({
 				state: EditorState.create({
-					doc: '// Compiled output appears here.',
+					doc: OUTPUT_PLACEHOLDER,
 					extensions: [
 						lineNumbers(),
 						EditorState.readOnly.of(true),
@@ -412,6 +790,9 @@ export function Playground() @{
 						EditorView.lineWrapping,
 						shikiHighlight('tsx'),
 						sharedTheme,
+						mappedField,
+						crossHover('output'),
+						crossNavigate('output'),
 					],
 				}),
 				parent: outputHost,
@@ -434,6 +815,8 @@ export function Playground() @{
 					: workspace().entry;
 				const existing = editorStates.get(stateKey(currentFile));
 				sourceView.setState(existing ?? makeEditorState(currentFile, fileSource(currentFile)));
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
 				publishWorkspaceState();
 				window.clearTimeout(compileDebounceId);
 				void compileAndRun();
@@ -454,10 +837,13 @@ export function Playground() @{
 				currentLang = nextLang;
 				workspaces.tsrx = undefined;
 				workspaces.tsx = undefined;
-				workspaces[nextLang] = pgExamples.exampleWorkspace(example, nextLang);
+				workspaces[nextLang] = pgExamples.exampleWorkspace(example, nextLang) ?? undefined;
 				currentFile = workspace().entry;
 				editorStates.clear();
+				typesCache.clear();
+				clientAstCache.clear();
 				sourceView.setState(makeEditorState(currentFile, fileSource(currentFile)));
+				clearMappedIn(outputView);
 				// Picking an example is the visitor's own action — never gated.
 				executionGated = false;
 				setGated(false);
@@ -503,6 +889,17 @@ export function Playground() @{
 				updateHash();
 			};
 
+			controllerRef.current.syncOutput = () => {
+				if (disposed) return;
+				if (resultModeRef.current.view === 'compiled') {
+					showOutput();
+					return;
+				}
+				// Leaving the compiled view: marks pair with a pane no longer shown.
+				clearMappedIn(sourceView);
+				clearMappedIn(outputView);
+			};
+
 			publishWorkspaceState();
 			void compileAndRun();
 			if (initialDiagnostic) setError(initialDiagnostic);
@@ -516,10 +913,12 @@ export function Playground() @{
 			controllerRef.current.selectFile = undefined;
 			controllerRef.current.formatActive = undefined;
 			controllerRef.current.approveRun = undefined;
+			controllerRef.current.syncOutput = undefined;
 			window.clearTimeout(compileDebounceId);
 			window.clearTimeout(hashDebounceId);
 			sourceView?.destroy();
 			outputView?.destroy();
+			astPreview?.destroy();
 			preview?.destroy();
 		};
 	}, []);
@@ -578,16 +977,16 @@ export function Playground() @{
 				<button
 					type="button"
 					class={['pg-seg-btn', view === 'preview' && 'active']}
-					onClick={() => setView('preview')}
+					onClick={() => selectView('preview')}
 				>
 					Preview
 				</button>
 				<button
 					type="button"
 					class={['pg-seg-btn', view === 'compiled' && 'active']}
-					onClick={() => setView('compiled')}
+					onClick={() => selectView('compiled')}
 				>
-					Compiled output
+					Compiled
 				</button>
 			</div>
 		</div>
@@ -646,8 +1045,43 @@ export function Playground() @{
 			<section class={['pg-panel', pane !== 'result' && 'mobile-hidden']} aria-label="Result">
 				<div class="pg-panel-head">
 					<span>
-						{view === 'preview' ? 'Live preview' : 'Compiled output · ' + (activeFile || '…')}
+						{view === 'preview'
+							? 'Live preview'
+							: (compiledMode === 'types' ? 'Types output · ' : 'AST output · ') +
+								(activeFile || '…')}
 					</span>
+					@if (view === 'compiled') {
+						<div class="pg-compiled-controls">
+							@if (compiledMode === 'ast') {
+								<select
+									class="pg-select pg-ast-stage-select"
+									aria-label="AST compiler stage"
+									value={astStage}
+									onChange={(event) => selectAstStage(event.currentTarget.value as typeof astStage)}
+								>
+									<option value="source">Parsed source</option>
+									<option value="types">Types output</option>
+									<option value="client">Client output</option>
+								</select>
+							}
+							<div class="pg-seg pg-seg-sm" role="group" aria-label="Compiled output mode">
+								<button
+									type="button"
+									class={['pg-seg-btn', compiledMode === 'ast' && 'active']}
+									onClick={() => selectCompiledMode('ast')}
+								>
+									AST
+								</button>
+								<button
+									type="button"
+									class={['pg-seg-btn', compiledMode === 'types' && 'active']}
+									onClick={() => selectCompiledMode('types')}
+								>
+									Types
+								</button>
+							</div>
+						</div>
+					}
 				</div>
 				<div class={['pg-result', view !== 'preview' && 'hidden']}>
 					<div class="pg-preview" ref={previewHostRef} />
@@ -671,7 +1105,12 @@ export function Playground() @{
 						</div>
 					}
 				</div>
-				<div class={['pg-editor', view !== 'compiled' && 'hidden']} ref={outputHostRef} />
+				<div class={['pg-compiled', view !== 'compiled' && 'hidden']}>
+					<div class={['pg-ast-host', compiledMode !== 'ast' && 'hidden']} ref={astHostRef} />
+					<div class={['pg-output', compiledMode !== 'types' && 'hidden']}>
+						<div class="pg-editor" ref={outputHostRef} />
+					</div>
+				</div>
 			</section>
 		</div>
 
@@ -768,6 +1207,28 @@ export function Playground() @{
 				border: 1px solid var(--border);
 				background: var(--surface-subtle);
 			}
+			/* Compact variant for the panel-head AST/Types switch. */
+			.pg-seg-sm {
+				padding: 2px;
+			}
+			.pg-seg-sm .pg-seg-btn {
+				font-size: 0.68rem;
+				padding: 0.12rem 0.6rem;
+				letter-spacing: 0.06em;
+			}
+			.pg-compiled-controls {
+				display: flex;
+				align-items: center;
+				gap: 0.45rem;
+			}
+			.pg-ast-stage-select {
+				max-width: 9.5rem;
+				padding: 0.18rem 1.7rem 0.18rem 0.55rem;
+				background-position: right 0.55rem center;
+				font-size: 0.68rem;
+				letter-spacing: 0;
+				text-transform: none;
+			}
 			.pg-seg-btn {
 				border: none;
 				background: transparent;
@@ -842,12 +1303,12 @@ export function Playground() @{
 				flex-direction: column;
 				min-width: 0;
 				min-height: 0;
-				border-top: 1px solid rgba(255, 255, 255, 0.1);
+				border-top: 1px solid var(--border);
 				overflow: hidden;
-				background: #0d1117;
+				background: var(--code-bg);
 			}
 			.pg-panel + .pg-panel {
-				border-left: 1px solid rgba(255, 255, 255, 0.1);
+				border-left: 1px solid var(--border);
 			}
 			.pg-panel-head {
 				display: flex;
@@ -855,9 +1316,9 @@ export function Playground() @{
 				justify-content: space-between;
 				gap: 1rem;
 				padding: 0.45rem 0.9rem;
-				border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-				background: rgba(255, 255, 255, 0.03);
-				color: #99a1b3;
+				border-bottom: 1px solid var(--border);
+				background: var(--surface-subtle);
+				color: var(--text-secondary);
 				font-size: 0.72rem;
 				letter-spacing: 0.08em;
 				text-transform: uppercase;
@@ -870,7 +1331,7 @@ export function Playground() @{
 			.pg-tab {
 				border: none;
 				background: transparent;
-				color: #99a1b3;
+				color: var(--text-secondary);
 				font: inherit;
 				font-size: 0.78rem;
 				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -881,10 +1342,10 @@ export function Playground() @{
 				cursor: pointer;
 			}
 			.pg-tab:hover {
-				color: #f4eee8;
+				color: var(--text);
 			}
 			.pg-tab.active {
-				color: #ff5d72;
+				color: var(--accent-text);
 				background: rgba(255, 65, 90, 0.14);
 			}
 			.pg-loading {
@@ -896,14 +1357,127 @@ export function Playground() @{
 				min-height: 0;
 			}
 			.pg-editor.hidden,
+			.pg-compiled.hidden,
 			.pg-result.hidden {
 				display: none;
+			}
+			.pg-compiled {
+				display: flex;
+				flex: 1;
+				min-height: 0;
+				flex-direction: column;
+			}
+			.pg-output {
+				display: flex;
+				flex: 1;
+				min-height: 0;
+				flex-direction: column;
+			}
+			.pg-output.hidden {
+				display: none;
+			}
+			.pg-ast-host {
+				flex: 1;
+				min-height: 0;
+				overflow: hidden;
+			}
+			.pg-ast-host.hidden {
+				display: none;
+			}
+			.pg-ast-host :global(.pg-ast-shell) {
+				display: flex;
+				height: 100%;
+				min-height: 0;
+				flex-direction: column;
+				background: var(--code-bg);
+				color: var(--text);
+				font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+				font-size: 0.75rem;
+			}
+			.pg-ast-host :global(.pg-ast-status),
+			.pg-ast-host :global(.pg-ast-notice) {
+				padding: 0.18rem 0.45rem;
+				border-bottom: 1px solid var(--border);
+				color: var(--text-secondary);
+				font-family: var(--font-sans, system-ui, sans-serif);
+				font-size: 0.65rem;
+			}
+			.pg-ast-host :global(.pg-ast-status) {
+				color: var(--text);
+				font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+			}
+			.pg-ast-host :global(.pg-ast-notice) {
+				border-top: 1px solid var(--border);
+				border-bottom: 0;
+			}
+			.pg-ast-host :global(.pg-ast-scroll) {
+				flex: 1;
+				min-height: 0;
+				overflow: auto;
+				padding: 0.35rem 0.45rem 0.65rem;
+			}
+			.pg-ast-host :global(.pg-ast-tree),
+			.pg-ast-host :global(.pg-ast-node ul) {
+				margin: 0;
+				padding: 0;
+				list-style: none;
+			}
+			.pg-ast-host :global(.pg-ast-node ul) {
+				padding-left: 1rem;
+			}
+			.pg-ast-host :global(.pg-ast-node summary),
+			.pg-ast-host :global(.pg-ast-value),
+			.pg-ast-host :global(.pg-ast-closing) {
+				display: block;
+				width: max-content;
+				padding: 0 0.1rem;
+				border-radius: 2px;
+				white-space: pre;
+			}
+			.pg-ast-host :global(.pg-ast-node summary) {
+				cursor: pointer;
+			}
+			.pg-ast-host :global(.pg-ast-node[data-ast-path='true'] > details:not([open]) > summary),
+			.pg-ast-host :global(.pg-ast-node[data-ast-leaf='true'] > details > summary) {
+				background: rgba(255, 234, 0, 0.2);
+				box-shadow: inset 0 0 0 1px rgba(214, 185, 0, 0.2);
+			}
+			.pg-ast-host :global(.pg-ast-node[data-ast-leaf='true'] > details > summary) {
+				background: rgba(255, 234, 0, 0.34);
+			}
+			.pg-ast-host :global(.pg-ast-key) {
+				color: var(--text);
+				text-decoration: underline;
+				text-decoration-color: var(--border-strong);
+			}
+			.pg-ast-host :global(.pg-ast-type) {
+				color: var(--accent-text);
+			}
+			.pg-ast-host :global(.pg-ast-range),
+			.pg-ast-host :global(.pg-ast-reference),
+			.pg-ast-host :global(.pg-ast-undefined),
+			.pg-ast-host :global(.pg-ast-null) {
+				color: var(--text-secondary);
+			}
+			.pg-ast-host :global(.pg-ast-string) {
+				color: var(--syntax-string, #a56a12);
+			}
+			.pg-ast-host :global(.pg-ast-number),
+			.pg-ast-host :global(.pg-ast-boolean),
+			.pg-ast-host :global(.pg-ast-bigint) {
+				color: var(--syntax-number, #2f8f46);
 			}
 			.pg-grid:not(.ready) :global(.cm-editor) {
 				opacity: 0;
 			}
 			.pg-editor :global(.cm-editor) {
 				height: 100%;
+			}
+			/* Ranges revealed by source↔output position mapping. */
+			.pg-editor :global(.cm-mapped) {
+				background: rgba(255, 234, 0, 0.42);
+				box-shadow: inset 0 0 0 1px rgba(214, 185, 0, 0.28);
+				border-radius: 2px;
 			}
 			.pg-result {
 				position: relative;
@@ -912,11 +1486,12 @@ export function Playground() @{
 				min-height: 0;
 			}
 			/* The preview is a sandboxed iframe (opaque origin) — the content's
-			   background/padding live in its srcdoc, not here. */
+			   background/padding live in its srcdoc, not here (the parent relays
+			   theme flips over the sandbox protocol). */
 			.pg-preview {
 				flex: 1;
 				min-height: 0;
-				background: #16181d;
+				background: var(--code-bg);
 			}
 			.pg-consent {
 				position: absolute;
@@ -924,7 +1499,7 @@ export function Playground() @{
 				display: grid;
 				place-items: center;
 				padding: 1.25rem;
-				background: rgba(13, 17, 23, 0.72);
+				background: var(--header-bg);
 				backdrop-filter: blur(6px);
 			}
 			.pg-consent-card {
@@ -934,14 +1509,14 @@ export function Playground() @{
 				justify-items: start;
 				padding: 1.1rem 1.25rem;
 				border-radius: 12px;
-				border: 1px solid rgba(255, 255, 255, 0.12);
-				background: #16181d;
-				color: #f4eee8;
+				border: 1px solid var(--border-strong);
+				background: var(--panel);
+				color: var(--text);
 				font-size: 0.9rem;
 			}
 			.pg-consent-card p {
 				margin: 0;
-				color: #99a1b3;
+				color: var(--text-secondary);
 			}
 			.pg-consent-run {
 				font: inherit;
@@ -950,7 +1525,7 @@ export function Playground() @{
 				border-radius: 8px;
 				border: 1px solid rgba(255, 93, 114, 0.5);
 				background: rgba(255, 65, 90, 0.14);
-				color: #ff5d72;
+				color: var(--accent-text);
 				cursor: pointer;
 			}
 			.pg-consent-run:disabled {
