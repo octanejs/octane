@@ -24,6 +24,7 @@ function installFakeHook() {
 			subs.add(l);
 			return () => subs.delete(l);
 		},
+		getTransitionState: () => ({ pendingCount: 0, boundaries: [] }),
 		_fire: () => subs.forEach((l) => l()),
 	};
 	(globalThis as any).__OCTANE_DEVTOOLS__ = hook;
@@ -41,12 +42,14 @@ describe('bridge', () => {
 		const stop = startBridge(client);
 		const emit = vi.spyOn(client, 'emit');
 
-		// Two synchronous flushes must coalesce into a single microtask emission.
+		// Two synchronous flushes must coalesce into a single microtask emission
+		// (one `tree` emit plus one `transition` emit from the fake hook's default
+		// getTransitionState — not one pair per flush).
 		hook._fire();
 		hook._fire();
 		await Promise.resolve();
 
-		expect(emit).toHaveBeenCalledTimes(1);
+		expect(emit).toHaveBeenCalledTimes(2);
 		expect(emit).toHaveBeenCalledWith('tree', {
 			nodes: [{ id: 1, name: 'App', kind: 'root', children: [] }],
 		});
@@ -139,6 +142,23 @@ describe('bridge', () => {
 		const stop = startBridge(client);
 		hook._fire();
 		expect(emit).not.toHaveBeenCalledWith('profile', expect.anything());
+		stop();
+	});
+
+	it('emits a transition snapshot from the hook on flush', () => {
+		const { hook } = installFakeHook();
+		(hook as any).getTransitionState = () => ({
+			pendingCount: 1,
+			boundaries: [{ id: 1, branch: 2, state: 'pending', hasResolved: false, label: 'List' }],
+		});
+		const client = new OctaneDevtoolsEventClient();
+		const emit = vi.spyOn(client, 'emit');
+		const stop = startBridge(client);
+		hook._fire();
+		expect(emit).toHaveBeenCalledWith('transition', {
+			pendingCount: 1,
+			boundaries: [{ id: 1, branch: 2, state: 'pending', hasResolved: false, label: 'List' }],
+		});
 		stop();
 	});
 });

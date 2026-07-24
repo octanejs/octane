@@ -3,6 +3,7 @@ import {
 	type NodeDetail,
 	type ProfileEventWire,
 	type ProfileSnapshot,
+	type TransitionSnapshot,
 	type WireTreeNode,
 } from './client';
 
@@ -11,6 +12,7 @@ interface RuntimeHook {
 	getTree(): WireTreeNode[];
 	inspect(id: number): NodeDetail | null;
 	subscribe(listener: () => void): () => void;
+	getTransitionState(): TransitionSnapshot;
 }
 
 function getHook(): RuntimeHook | undefined {
@@ -82,6 +84,8 @@ export function startBridge(
 		client.emit('tree', { nodes: hook.getTree() });
 		const profiler = getProfiler();
 		if (profiler) client.emit('profile', toSnapshot(profiler));
+		if (typeof hook.getTransitionState === 'function')
+			client.emit('transition', hook.getTransitionState());
 	};
 	const offFlush = hook.subscribe(() => {
 		if (scheduled) return;
