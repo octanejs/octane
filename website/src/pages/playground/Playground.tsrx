@@ -100,6 +100,7 @@ export function Playground() @{
 	const [outputTarget, setOutputTarget] = useState<PlaygroundOutputTarget>('client');
 	// Mobile only: which panel is visible (desktop always shows both).
 	const [pane, setPane] = useState<'editor' | 'result'>('editor');
+	const paneRef = useRef<'editor' | 'result'>('editor');
 	const [error, setError] = useState('');
 	const [warnings, setWarnings] = useState<CompileDiagnostic[]>([]);
 	const [ready, setReady] = useState(false);
@@ -165,11 +166,13 @@ export function Playground() @{
 	};
 	const openMobilePreview = () => {
 		selectView('preview');
+		paneRef.current = 'result';
 		setPane('result');
 	};
 	const openMobileAst = () => {
 		setView('compiled');
 		setCompiledMode('ast');
+		paneRef.current = 'result';
 		setPane('result');
 		resultModeRef.current.view = 'compiled';
 		resultModeRef.current.compiledMode = 'ast';
@@ -684,11 +687,14 @@ export function Playground() @{
 					if (pair) revealPair(pair, null);
 					else clearMappedPair();
 				},
-				mouseleave(_event: MouseEvent, view: any) {
-					// Switching mobile panes can deliver mouseleave after this
-					// editor is display:none. That stale event must not clear the
-					// AST selection revealed in the newly visible result pane.
-					if (view.dom.getClientRects().length === 0) return;
+				mouseleave() {
+					// The browser can deliver mouseleave before the mobile pane's
+					// display:none reaches layout. The synchronous pane ref makes
+					// that stale event harmless from the instant Inspect is clicked.
+					if (
+						side === 'source' && paneRef.current === 'result' &&
+							window.matchMedia('(max-width: 980px)').matches
+					) return;
 					clearMappedPair();
 					astPreview.clear();
 				},
@@ -1207,7 +1213,10 @@ export function Playground() @{
 			<button
 				type="button"
 				class={['pg-seg-btn', pane === 'editor' && 'active']}
-				onClick={() => setPane('editor')}
+				onClick={() => {
+					paneRef.current = 'editor';
+					setPane('editor');
+				}}
 			>
 				Code
 			</button>
