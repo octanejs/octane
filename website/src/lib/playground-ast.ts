@@ -221,14 +221,15 @@ export function createAstPreview(
 			path.push(current);
 		}
 		path.reverse();
-		if (scroll) {
-			for (const current of path.slice(0, -1)) {
-				const li = elements.get(current);
-				const details = li?.firstElementChild;
-				if (details instanceof doc.defaultView!.HTMLDetailsElement) {
-					details.open = true;
-					details.dispatchEvent(new doc.defaultView!.Event('ast-open'));
-				}
+		// Always open ancestor <details> so the leaf node exists in the DOM and
+		// can receive highlight markers. Lazy rendering means collapsed ancestors
+		// haven't rendered their children yet.
+		for (const current of path.slice(0, -1)) {
+			const li = elements.get(current);
+			const details = li?.firstElementChild;
+			if (details instanceof doc.defaultView!.HTMLDetailsElement) {
+				details.open = true;
+				details.dispatchEvent(new doc.defaultView!.Event('ast-open'));
 			}
 		}
 		for (const current of path) {
