@@ -18,6 +18,7 @@ const repositoryRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url
 const profilerGlobal = '__OCTANE_PROFILER__';
 const runGlobal = '__octane_rspack_profile_bundle_runs__';
 const productionErrorGlobal = '__octane_rspack_production_error__';
+const transpileGlobal = '__octane_rspack_transpiled_value__';
 
 function write(root: string, relativePath: string, content: string) {
 	const file = join(root, relativePath);
@@ -184,6 +185,7 @@ export function App() @{
 		Reflect.deleteProperty(globalThis, profilerGlobal);
 		Reflect.deleteProperty(globalThis, runGlobal);
 		Reflect.deleteProperty(globalThis, productionErrorGlobal);
+		Reflect.deleteProperty(globalThis, transpileGlobal);
 		rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 	});
 
@@ -273,6 +275,33 @@ ${includeRawBinding ? "export { Raw } from '@fixture/raw';" : ''}
 				true,
 			);
 		}
+	}, 30_000);
+
+	it('transpiles TypeScript only when plugin transpilation is enabled', async () => {
+		write(
+			root,
+			'src/typed-entry.ts',
+			`const value: number = 42;\nglobalThis.${transpileGlobal} = value;\n`,
+		);
+		const build = async (transpile: boolean) => {
+			const outputPath = join(root, `dist-transpile-${transpile}`);
+			await compile({
+				context: root,
+				mode: 'development',
+				target: 'node',
+				entry: './src/typed-entry.ts',
+				optimization: { minimize: false },
+				output: { path: outputPath, filename: 'bundle.cjs' },
+				plugins: [new OctaneRspackPlugin({ transpile })],
+			});
+			return join(outputPath, 'bundle.cjs');
+		};
+
+		const enabled = await build(true);
+		await import(`${pathToFileURL(enabled).href}?enabled`);
+		expect((globalThis as any)[transpileGlobal]).toBe(42);
+
+		await expect(build(false)).rejects.toThrow();
 	}, 30_000);
 
 	it('builds one source with layer-specific compiler and runtime identities', async () => {

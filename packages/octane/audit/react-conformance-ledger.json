@@ -61106,11 +61106,11 @@
       "classification": "adaptable",
       "owner": "runtime + SSR + hydration",
       "workstream": "React DOM residual audit",
-      "rationale": "Executable evidence in “server useId is preserved byte-for-byte after hydrateRoot()” covers the supported public DOM outcome.",
+      "rationale": "Executable evidence in “starts hydrated useId sequences from each server-rendered root” covers the supported public DOM outcome.",
       "evidence": [
         {
           "file": "packages/octane/tests/conformance/useid-determinism.test.ts",
-          "testName": "server useId is preserved byte-for-byte after hydrateRoot()",
+          "testName": "starts hydrated useId sequences from each server-rendered root",
           "modes": ["server-string", "hydrate-match", "production-compile"]
         }
       ]

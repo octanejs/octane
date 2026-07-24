@@ -29,6 +29,7 @@ export const MODES = [
 	'vite-ssr',
 	'rspack',
 	'rsbuild',
+	'rspeedy',
 	'benchmark',
 ];
 export const OBSERVABLES = [
@@ -44,7 +45,10 @@ export const OBSERVABLES = [
 	'events',
 	'errors',
 	'streaming',
+	'emitted-code',
 	'package-resolution',
+	'resolved-configuration',
+	'bundle-contents',
 	'performance',
 ];
 

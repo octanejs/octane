@@ -98,6 +98,43 @@ describe('loader with the neutral compiler', () => {
 		});
 	});
 
+	it('removes hot-update output when hmr is explicitly false in a hot compilation', () => {
+		const source = `export function App() @{ <button>ready</button> }\n`;
+		const resourcePath = write(root, 'src/HmrDisabled.tsrx', source);
+		const result = transform({
+			root,
+			resourcePath,
+			source,
+			hot: true,
+			options: { hmr: false },
+		});
+
+		expect(String(result.content)).not.toContain('import.meta.webpackHot');
+		expect(getOctaneRspackBuildInfo(result.module)?.transformKind).toBe('compile');
+	});
+
+	it('changes development metadata for both explicit dev values', () => {
+		const source = `export function App(props) @{
+	<main>@if (props.ready) { <span>ready</span> }</main>
+}\n`;
+		const resourcePath = write(root, 'src/DevMetadata.tsrx', source);
+		const enabled = transform({
+			root,
+			resourcePath,
+			source,
+			options: { dev: true, hmr: false },
+		});
+		const disabled = transform({
+			root,
+			resourcePath,
+			source,
+			options: { dev: false, hmr: false },
+		});
+
+		expect(String(enabled.content)).toContain('DevMetadata.tsrx');
+		expect(String(disabled.content)).not.toContain('DevMetadata.tsrx');
+	});
+
 	it('selects server codegen from a node target', async () => {
 		const resourcePath = write(root, 'src/App.tsrx', `export function App() @{ <p>server</p> }\n`);
 		const result = transform({
@@ -171,6 +208,25 @@ describe('loader with the neutral compiler', () => {
 			"/** @jsxImportSource octane */\nexport function Badge() @{ <p>{'badge'}</p> }";
 		const hookSource =
 			"import { useState } from 'octane';\nexport function useCount() { return useState(0); }\n";
+		const unmarkedOctaneSource = "export function Owned() @{ <p>{'owned'}</p> }\n";
+
+		// The same unmarked project source is compiled when the gate is disabled
+		// and left to the host toolchain when it is enabled.
+		const ungated = transform({
+			root,
+			resourcePath: write(root, 'src/Ungated.tsx', unmarkedOctaneSource),
+			source: unmarkedOctaneSource,
+			options: { requireDirective: false },
+		});
+		expect(getOctaneRspackBuildInfo(ungated.module)?.transformKind).toBe('compile');
+		const gated = transform({
+			root,
+			resourcePath: write(root, 'src/Gated.tsx', unmarkedOctaneSource),
+			source: unmarkedOctaneSource,
+			options,
+		});
+		expect(gated.content).toBe(unmarkedOctaneSource);
+		expect(getOctaneRspackBuildInfo(gated.module)).toBeNull();
 
 		// An unmarked project .tsx belongs to the host toolchain: untouched,
 		// no Octane build metadata.

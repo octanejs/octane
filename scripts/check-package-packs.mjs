@@ -26,6 +26,10 @@ import {
 	renderPackedExampleWorkspace,
 } from './package-pack-canaries.mjs';
 import { LYNX_TOOLCHAIN_LANES } from '../packages/rspeedy-plugin-octane/src/toolchain-lanes.js';
+import {
+	assertRequiredPublicValueExports,
+	REQUIRED_PUBLIC_VALUE_EXPORTS,
+} from '../packages/octane/scripts/verify-dist.mjs';
 
 const privatePackScaffolds = new Set(['@octanejs/lynx', '@octanejs/rspeedy-plugin']);
 const packages = getWorkspacePackages().filter(
@@ -125,6 +129,14 @@ function validatePackedPackage(pkg, manifest, files) {
 	}
 
 	if (!manifest.exports) errors.push('package.json has no exports field');
+	if (pkg.name === 'octane' && manifest.exports) {
+		const packedSubpaths = new Set(Object.keys(manifest.exports));
+		for (const subpath of Object.keys(pkg.manifest.exports)) {
+			if (!packedSubpaths.has(subpath)) {
+				errors.push(`packed exports omit advertised source subpath ${JSON.stringify(subpath)}`);
+			}
+		}
+	}
 	if (manifest.engines?.node !== '>=22') {
 		errors.push(
 			`packed engines.node is ${JSON.stringify(manifest.engines?.node)}, expected ">=22"`,
@@ -415,27 +427,43 @@ import * as coreApi from '@octanejs/three/core';
 import * as rendererApi from '@octanejs/three/renderer';
 import config, { threeRenderers } from '@octanejs/three/config';
 import testing, { create, fireEvent } from '@octanejs/three/testing';
+import { map_iterable } from 'octane/tsrx-iterable';
+import {
+	normalize_spread_props,
+	normalize_spread_props_for_ref_attr,
+} from 'octane/tsrx-spread';
+import type { JSX as OctaneRuntimeJSX } from 'octane/jsx-runtime';
+import type { JSX as OctaneDevRuntimeJSX } from 'octane/jsx-dev-runtime';
 import type { JSX as IntrinsicJSX } from '@octanejs/three/intrinsics';
 import type { JSX as RuntimeJSX } from '@octanejs/three/intrinsics/jsx-runtime';
 import type { ReconcilerRoot, ThreeElements } from '@octanejs/three';
 
+type OctaneRuntimeDiv = OctaneRuntimeJSX.IntrinsicElements['div'];
+type OctaneDevRuntimeDiv = OctaneDevRuntimeJSX.IntrinsicElements['div'];
 type IntrinsicMesh = IntrinsicJSX.IntrinsicElements['mesh'];
 type RuntimeMesh = RuntimeJSX.IntrinsicElements['mesh'];
 type RootMesh = ThreeElements['mesh'];
 
+const octaneRuntimeDiv: OctaneRuntimeDiv = {};
+const octaneDevRuntimeDiv: OctaneDevRuntimeDiv = octaneRuntimeDiv;
 const intrinsicMesh: IntrinsicMesh = { position: [1, 2, 3] };
 const runtimeMesh: RuntimeMesh = intrinsicMesh;
 const rootMesh: RootMesh = runtimeMesh;
 const reconcilerRoot: ReconcilerRoot<HTMLCanvasElement> | undefined = undefined;
 
 export function packageSurfaceProbe() {
+	void octaneDevRuntimeDiv;
 	void rootMesh;
 	void reconcilerRoot;
 	return {
 		config: config === threeRenderers,
 		core: typeof coreApi.createRoot === 'function',
+		iterable: typeof map_iterable === 'function',
 		publicApi: typeof publicApi.Canvas === 'function',
 		renderer: typeof rendererApi.createUniversalRoot === 'function',
+		spread:
+			typeof normalize_spread_props === 'function' &&
+			typeof normalize_spread_props_for_ref_attr === 'function',
 		testing: testing.create === create && typeof fireEvent === 'function',
 	};
 }
@@ -523,6 +551,36 @@ export function renderProbe() {
 
 	const consumerRequire = createRequire(path.join(consumerDirectory, 'package.json'));
 	const directRuntime = realpathSync(consumerRequire.resolve('octane'));
+	// Resolve through real ESM package specifiers from the installed consumer,
+	// not a CommonJS-resolved file URL, so conditional `import` branches remain
+	// part of the packed contract. React-hosted entries require their intentionally
+	// optional React peer and remain covered by the package build's fresh imports.
+	const packedRuntimeSpecifiers = Object.keys(REQUIRED_PUBLIC_VALUE_EXPORTS)
+		.filter((subpath) => subpath !== './react' && subpath !== './react/server')
+		.map((subpath) => [subpath, subpath === '.' ? 'octane' : `octane/${subpath.slice(2)}`]);
+	const packedRuntimeExports = JSON.parse(
+		execFileSync(
+			process.execPath,
+			[
+				'--input-type=module',
+				'-e',
+				`const result = Object.create(null);
+for (const specifier of ${JSON.stringify(packedRuntimeSpecifiers.map(([, specifier]) => specifier))}) {
+	result[specifier] = Object.keys(await import(specifier));
+}
+process.stdout.write(JSON.stringify(result));`,
+			],
+			{
+				cwd: consumerDirectory,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'inherit'],
+				timeout: 30_000,
+			},
+		),
+	);
+	for (const [subpath, specifier] of packedRuntimeSpecifiers) {
+		assertRequiredPublicValueExports(subpath, packedRuntimeExports[specifier]);
+	}
 	const bindingEntry = consumerRequire.resolve('@octanejs/hook-form');
 	const peerRuntime = realpathSync(createRequire(bindingEntry).resolve('octane'));
 	if (peerRuntime !== directRuntime) {
