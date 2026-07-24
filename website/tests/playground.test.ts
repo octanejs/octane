@@ -393,7 +393,7 @@ describe('/playground route', () => {
 		// The mobile pane toggle exists (CSS shows it only under 980px).
 		const paneGroup = container.querySelector('.pg-mobile-toggle');
 		const paneButtons = Array.from(paneGroup?.querySelectorAll('button') ?? []);
-		expect(paneButtons.map((b) => b.textContent?.trim())).toEqual(['Editor', 'Result']);
+		expect(paneButtons.map((b) => b.textContent?.trim())).toEqual(['Code', 'Preview', 'Inspect']);
 
 		// The nav carries the playground link.
 		const navLink = Array.from(container.querySelectorAll('a.nav-link')).find(

@@ -119,6 +119,32 @@ describe('playground AST preparation', () => {
 		expect(ranges.at(-1)).toBeNull();
 		preview.destroy();
 	});
+
+	it('keeps a clicked node highlighted after pointer and focus leave it', () => {
+		const host = document.createElement('div');
+		const ranges: Array<{ from: number; to: number } | null> = [];
+		const preview = createAstPreview(host, {
+			onNodeRange(range) {
+				ranges.push(range);
+			},
+		});
+		preview.setAst({ type: 'Program', start: 0, end: 10, body: [] }, 'App.tsrx');
+
+		const summary = host.querySelector('summary')!;
+		const node = summary.closest<HTMLElement>('.pg-ast-node')!;
+		node.scrollIntoView = () => {};
+		summary.click();
+		summary.dispatchEvent(new MouseEvent('mouseleave'));
+		summary.dispatchEvent(new FocusEvent('blur'));
+
+		expect(ranges.at(-1)).toEqual({ from: 0, to: 10 });
+		expect(node.dataset.astPinned).toBe('true');
+
+		preview.clear();
+		expect(ranges.at(-1)).toBeNull();
+		expect(node.dataset.astPinned).toBeUndefined();
+		preview.destroy();
+	});
 });
 
 describe.each([

@@ -1061,6 +1061,34 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 30_000);
 
+	it('playground reveals and pins source AST ranges from the mobile controls', async () => {
+		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
+		try {
+			await page.setViewportSize({ width: 390, height: 667 });
+			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
+			await page
+				.locator('.pg-panel[aria-label="Source editor"] .cm-content')
+				.click({ position: { x: 150, y: 70 } });
+			await page.locator('.pg-mobile-toggle button', { hasText: 'Inspect' }).click();
+
+			const leaf = page.locator('.pg-ast-node[data-ast-leaf="true"]');
+			await leaf.waitFor({ timeout: 10_000 });
+			await leaf.locator(':scope > details > summary').click();
+			await page.waitForFunction(
+				() => !!document.querySelector('.pg-ast-node[data-ast-pinned="true"]'),
+				null,
+				{ timeout: 10_000 },
+			);
+
+			await page.locator('.pg-mobile-toggle button', { hasText: 'Code' }).click();
+			await page.locator('.pg-panel[aria-label="Source editor"]').waitFor();
+			expect(await page.locator('.pg-editor .cm-mapped').count()).toBe(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}, 45_000);
+
 	it('playground compiled pane offers AST and types mapping', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {

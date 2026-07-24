@@ -48,15 +48,15 @@ const COMPILE_DEBOUNCE_MS = 250;
 const AST_STAGE_META: Record<PlaygroundAstStage, { label: string; notice: string }> = {
 	source: {
 		label: 'Parsed source AST',
-		notice: 'The parser tree for the authored source.',
+		notice: 'The parser tree for the authored source. Tap a node to pin its highlight.',
 	},
 	types: {
 		label: 'Types output AST',
-		notice: 'The exact Program printed as the typed virtual TSX.',
+		notice: 'The exact Program printed as the typed virtual TSX. Tap a node to pin its highlight.',
 	},
 	client: {
 		label: 'Client output AST',
-		notice: 'The exact emitted Program and static-template IR.',
+		notice: 'The exact emitted Program and static-template IR. Tap a node to pin its highlight.',
 	},
 };
 
@@ -126,6 +126,7 @@ export function Playground() @{
 		formatActive?: () => void;
 		approveRun?: () => void;
 		syncOutput?: () => void;
+		revealAst?: () => void;
 	}>({});
 
 	const selectView = (next: 'preview' | 'compiled') => {
@@ -142,6 +143,19 @@ export function Playground() @{
 		setAstStage(next);
 		resultModeRef.current.astStage = next;
 		controllerRef.current.syncOutput?.();
+	};
+	const openMobilePreview = () => {
+		selectView('preview');
+		setPane('result');
+	};
+	const openMobileAst = () => {
+		setView('compiled');
+		setCompiledMode('ast');
+		setPane('result');
+		resultModeRef.current.view = 'compiled';
+		resultModeRef.current.compiledMode = 'ast';
+		controllerRef.current.syncOutput?.();
+		controllerRef.current.revealAst?.();
 	};
 
 	useEffect(() => {
@@ -905,6 +919,10 @@ export function Playground() @{
 				clearMappedIn(sourceView);
 				clearMappedIn(outputView);
 			};
+			controllerRef.current.revealAst = () => {
+				if (disposed || !activeAstEntry()) return;
+				astPreview.reveal(sourceView.state.selection.main.head, true);
+			};
 
 			publishWorkspaceState();
 			void compileAndRun();
@@ -920,6 +938,7 @@ export function Playground() @{
 			controllerRef.current.formatActive = undefined;
 			controllerRef.current.approveRun = undefined;
 			controllerRef.current.syncOutput = undefined;
+			controllerRef.current.revealAst = undefined;
 			window.clearTimeout(compileDebounceId);
 			window.clearTimeout(hashDebounceId);
 			sourceView?.destroy();
@@ -979,7 +998,7 @@ export function Playground() @{
 					onClick={() => controllerRef.current.formatActive?.()}
 				>{(formatting ? 'Formatting…' : 'Format') as string}</button>
 			</div>
-			<div class="pg-seg" role="group" aria-label="Result view">
+			<div class="pg-seg pg-view-switch" role="group" aria-label="Result view">
 				<button
 					type="button"
 					class={['pg-seg-btn', view === 'preview' && 'active']}
@@ -1126,14 +1145,22 @@ export function Playground() @{
 				class={['pg-seg-btn', pane === 'editor' && 'active']}
 				onClick={() => setPane('editor')}
 			>
-				Editor
+				Code
 			</button>
 			<button
 				type="button"
-				class={['pg-seg-btn', pane === 'result' && 'active']}
-				onClick={() => setPane('result')}
+				class={['pg-seg-btn', pane === 'result' && view === 'preview' && 'active']}
+				onClick={openMobilePreview}
 			>
-				Result
+				Preview
+			</button>
+			<button
+				type="button"
+				class={['pg-seg-btn', pane === 'result' && view === 'compiled' && 'active']}
+				title="Inspect the AST at the current cursor"
+				onClick={openMobileAst}
+			>
+				Inspect
 			</button>
 		</div>
 
@@ -1141,6 +1168,7 @@ export function Playground() @{
 			.pg {
 				display: flex;
 				flex-direction: column;
+				position: relative;
 				/* Fill the viewport below the sticky nav (60px + 1px border), edge to
 				   edge — the layout renders no footer on this page, so nothing
 				   scrolls. dvh tracks mobile browser chrome. */
@@ -1451,6 +1479,9 @@ export function Playground() @{
 			.pg-ast-host :global(.pg-ast-node[data-ast-leaf='true'] > details > summary) {
 				background: rgba(255, 234, 0, 0.34);
 			}
+			.pg-ast-host :global(.pg-ast-node[data-ast-pinned='true'] > details > summary) {
+				box-shadow: inset 0 0 0 1px rgba(214, 185, 0, 0.55);
+			}
 			.pg-ast-host :global(.pg-ast-key) {
 				color: var(--text);
 				text-decoration: underline;
@@ -1540,7 +1571,28 @@ export function Playground() @{
 			}
 			@media (max-width: 980px) {
 				.pg-toolbar {
-					padding: 0.65rem 0.75rem;
+					display: block;
+					padding: 0.45rem 0.6rem;
+				}
+				.pg-toolbar-side {
+					display: grid;
+					grid-template-columns: minmax(7rem, 1fr) auto auto;
+					gap: 0.4rem;
+					width: 100%;
+				}
+				.pg-toolbar-side .pg-select {
+					width: 100%;
+					min-width: 0;
+				}
+				.pg-toolbar-side .pg-seg {
+					padding: 2px;
+				}
+				.pg-toolbar-side .pg-seg-btn,
+				.pg-format {
+					padding: 0.3rem 0.55rem;
+				}
+				.pg-view-switch {
+					display: none;
 				}
 				/* One panel at a time — the bottom toggle switches editor ↔ result. */
 				.pg-grid {
@@ -1554,19 +1606,38 @@ export function Playground() @{
 				}
 				.pg-mobile-toggle {
 					display: flex;
-					justify-content: center;
+					position: absolute;
+					z-index: 10;
+					left: 50%;
+					bottom: max(0.45rem, env(safe-area-inset-bottom));
+					width: min(calc(100% - 1rem), 23rem);
+					transform: translateX(-50%);
 					gap: 0.25rem;
 					padding: 3px;
 					border-radius: 9999px;
 					border: 1px solid var(--border);
 					background: var(--header-bg-solid);
 					backdrop-filter: blur(12px);
-					align-self: center;
-					margin: 0.5rem auto;
 				}
 				.pg-mobile-toggle .pg-seg-btn {
-					min-width: 6.5rem;
+					flex: 1;
+					min-width: 0;
 					padding: 0.45rem 0.9rem;
+				}
+				.pg-editor :global(.cm-content),
+				.pg-ast-host :global(.pg-ast-scroll) {
+					padding-bottom: 4rem;
+				}
+				.pg-ast-host :global(.pg-ast-notice) {
+					order: 1;
+					border-top: 0;
+					border-bottom: 1px solid var(--border);
+				}
+				.pg-ast-host :global(.pg-ast-scroll) {
+					order: 2;
+				}
+				.pg-ast-host :global(.pg-ast-node summary) {
+					padding-block: 0.12rem;
 				}
 			}
 		</style>

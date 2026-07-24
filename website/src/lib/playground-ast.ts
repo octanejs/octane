@@ -184,6 +184,7 @@ export function createAstPreview(
 	let unavailable = '';
 	let destroyed = false;
 	let activeNodes: PlaygroundAstNode[] = [];
+	let pinnedNode: PlaygroundAstNode | null = null;
 	const elements = new Map<PlaygroundAstNode, HTMLLIElement>();
 	let renderedBranches = new WeakSet<PlaygroundAstNode>();
 
@@ -206,6 +207,7 @@ export function createAstPreview(
 			if (element) {
 				delete element.dataset.astPath;
 				delete element.dataset.astLeaf;
+				delete element.dataset.astPinned;
 			}
 		}
 		activeNodes = [];
@@ -237,6 +239,7 @@ export function createAstPreview(
 		const leaf = elements.get(node);
 		if (leaf) {
 			leaf.dataset.astLeaf = 'true';
+			if (node === pinnedNode) leaf.dataset.astPinned = 'true';
 			if (scroll) leaf.scrollIntoView({ block: 'center' });
 		}
 		activeNodes = path;
@@ -294,11 +297,18 @@ export function createAstPreview(
 				setActiveNodes(node, false);
 				options.onNodeRange(range, scroll);
 			};
+			const restorePinned = () => {
+				setActiveNodes(pinnedNode, false);
+				options.onNodeRange(pinnedNode?.range ?? null, false);
+			};
 			summary.addEventListener('mouseenter', () => activate(false));
 			summary.addEventListener('focus', () => activate(false));
-			summary.addEventListener('click', () => activate(true));
-			summary.addEventListener('mouseleave', () => options.onNodeRange(null, false));
-			summary.addEventListener('blur', () => options.onNodeRange(null, false));
+			summary.addEventListener('click', () => {
+				pinnedNode = node;
+				activate(true);
+			});
+			summary.addEventListener('mouseleave', restorePinned);
+			summary.addEventListener('blur', restorePinned);
 		}
 		details.append(summary);
 
@@ -331,6 +341,7 @@ export function createAstPreview(
 		elements.clear();
 		renderedBranches = new WeakSet<PlaygroundAstNode>();
 		activeNodes = [];
+		pinnedNode = null;
 		status.textContent = `${label} · ${filename}`;
 		if (unavailable) {
 			scrollHost.textContent = unavailable;
@@ -364,12 +375,15 @@ export function createAstPreview(
 			renderAst();
 		},
 		reveal(offset, scroll) {
+			pinnedNode = null;
 			const node = prepared ? findDeepestAstNode(prepared, offset) : null;
 			setActiveNodes(node, scroll);
 			options.onNodeRange(node?.range ?? null, false);
 		},
 		clear() {
+			pinnedNode = null;
 			setActiveNodes(null, false);
+			options.onNodeRange(null, false);
 		},
 		destroy() {
 			destroyed = true;
