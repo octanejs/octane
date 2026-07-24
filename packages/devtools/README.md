@@ -38,6 +38,10 @@ The Transitions & Suspense tab shows the live pending-transition count and
 each Suspense boundary's state (init/pending/resolved/caught), with a
 "(resolved once)" marker once a boundary has shown its primary content.
 
+The Performance-model tab is an aggregate "what's slow" view over the same
+profiler data as the Profiler tab: slowest mounts by self time, queue-delay
+hotspots, and a recent commit self-time trend.
+
 Only include the devtools in development, e.g. behind an `import.meta.env.DEV`
 check or via `lazy()`.
 

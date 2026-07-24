@@ -34,12 +34,12 @@ no-op unless the app was built with `devtools: true`, so it's safe to leave the
 plugin registered and gate only `TanStackDevtools` behind `import.meta.env.DEV`
 or `lazy()`.
 
-## Three tabs
+## Four tabs
 
-The panel is a small tab bar — **Components**, **Profiler**, and **Transitions
-& Suspense** — with one tab visible at a time. All three read from the same
-`octaneDevtools()` bridge; switching tabs doesn't reset any of their
-subscriptions.
+The panel is a small tab bar — **Components**, **Profiler**, **Transitions
+& Suspense**, and **Performance** — with one tab visible at a time. All four
+read from the same `octaneDevtools()` bridge; switching tabs doesn't reset
+any of their subscriptions.
 
 ## The Components tab
 
@@ -100,6 +100,28 @@ Known v1 limitation: on a boundary's very first reveal, the "(resolved
 once)" marker can lag by one transition; this is a display-only artifact of
 when the marker is recomputed and does not affect the runtime.
 
+## The Performance-model tab
+
+The Performance-model tab is an **aggregate** "what's slow" view over the
+exact same `profile` event the Profiler tab already consumes — it derives its
+lists from that snapshot, not from any new data source, event, or runtime
+probe. Where the Profiler tab is a per-commit table, this tab ranks:
+
+- **Slowest mounts (self time)** — the five slowest `mount`-phase render
+  events by self time, each showing the component name and its self time in
+  milliseconds.
+- **Queue-delay hotspots** — the five components with the highest average
+  scheduling delay (`averageQueueDelay`), excluding any component already
+  shown in the slowest-mounts list above, so the two lists highlight distinct
+  signals (heavy initial renders vs. scheduling delay) instead of repeating
+  the same component twice.
+- **Recent commit self-time** — a small bar trend of every recent render
+  event's self time, in event order, for an at-a-glance sense of whether
+  commits are trending slower.
+
+Until the app has rendered anything with profiling enabled, the tab shows
+"No performance data yet — interact with the app." instead of empty lists.
+
 ## Guarantees
 
 - **Read-only.** Selecting a node only requests a description from the app; the
@@ -118,8 +140,22 @@ not from the source call that created it. `useMemo` and `useCallback` produce th
 same shape at runtime, so both show up as a single `memo-or-callback` kind —
 Octane has no way to tell them apart once mounted.
 
+## Live demo
+
+The website has a `/devtools` route (dev only) that mounts an interactive
+Octane app — state, a reducer, a `useTransition` filter, two Suspense
+boundaries, and an intentionally slow component — alongside the panel, so all
+four tabs light up. Run `pnpm --dir website dev` and open `/devtools`.
+
+The website enables devtools through its TanStack Start plugin option
+instead of the plain `octane({ devtools: true })` shown above —
+`tanstackStart({ octane: { devtools: true } })` — since the website is a
+`@octanejs/tanstack-start` app; a plain Vite-plugin app still uses
+`octane({ devtools: true })`.
+
 ## Coming next
 
-P1 shipped the Components tab, P2 shipped the Profiler tab, and P3 shipped
-the Transitions & Suspense tab above (all described here). Remaining
-follow-up (P4): a Performance-model tab plus a website demo route.
+P1 shipped the Components tab, P2 shipped the Profiler tab, P3 shipped the
+Transitions & Suspense tab, and P4 shipped the Performance-model tab plus the
+`/devtools` live demo route above (all described here). The DevTools feature
+is complete for this milestone.
