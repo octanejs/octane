@@ -4,11 +4,11 @@
 import { createElement } from 'octane';
 import { OctaneDevtoolsEventClient } from './client';
 import { startBridge } from './bridge';
-import { ComponentsTab } from './panel/ComponentsTab';
+import { ComponentsTab } from './panel/ComponentsTab.tsrx';
 
 export { OctaneDevtoolsEventClient } from './client';
 export { startBridge } from './bridge';
-export { ComponentsTab } from './panel/ComponentsTab';
+export { ComponentsTab } from './panel/ComponentsTab.tsrx';
 export type { TreeSnapshot, NodeDetail, WireTreeNode } from './client';
 
 /**

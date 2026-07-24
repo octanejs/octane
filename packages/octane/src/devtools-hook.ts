@@ -77,7 +77,7 @@ function safePreview(value: unknown, depth = 0): unknown {
 	if (t === 'function') return '[Function]';
 	if (t === 'symbol') return String(value);
 	if (depth >= 2) return Array.isArray(value) ? '[Array]' : '[Object]';
-	if (value instanceof Node) return `[${(value as Node).nodeName}]`;
+	if (typeof Node !== 'undefined' && value instanceof Node) return `[${(value as Node).nodeName}]`;
 	if (Array.isArray(value)) return value.slice(0, 20).map((v) => safePreview(v, depth + 1));
 	const out: Record<string, unknown> = {};
 	let n = 0;
