@@ -16,7 +16,7 @@
 
 import { parseModule } from '@tsrx/core';
 import { HOOK_NAMES, hookSlotHash } from './compile.js';
-import { analyzeHookDependencies } from './hook-deps.js';
+import { annotateHookCalls } from './hook-deps.js';
 
 // Build a cheap import-presence gate. Precise call identity is annotated by the
 // lexical scope analysis in analyzeHookDependencies below; this gate only avoids
@@ -1016,12 +1016,16 @@ export function slotHooks(source, id, options) {
 		typeof options?.isVoidComponentImport === 'function' &&
 		importInfo.hasOctaneImport;
 	if (!importInfo.importsHook && !canSpecializeRoot) return null;
-	const inferred = importInfo.importsHook
-		? analyzeHookDependencies(ast, {
-				filename: id,
-				onlyImported: true,
-			})
-		: new Map();
+	// The parsed tree is never mutated: annotateHookCalls returns a COW-rebuilt
+	// module whose hook calls carry their `_octane*` props (start/end offsets are
+	// preserved, so the text edits below stay valid), with the dependency
+	// inference keyed by the rebuilt calls.
+	let inferred = new Map();
+	if (importInfo.importsHook) {
+		const annotated = annotateHookCalls(ast, { filename: id, onlyImported: true });
+		ast = annotated.ast;
+		inferred = annotated.inferred;
+	}
 
 	const st = {
 		locals: importInfo.locals,

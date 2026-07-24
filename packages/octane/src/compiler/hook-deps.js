@@ -2,6 +2,8 @@
 // omitted. The same analysis feeds the full TSRX/TSX compiler and the
 // surgical plain-TS hook pass, keeping custom hooks and components aligned.
 
+import { builders as b } from '@tsrx/core';
+
 const DEPENDENCY_HOOKS = new Map([
 	['useEffect', { callback: 0, deps: 1 }],
 	['useLayoutEffect', { callback: 0, deps: 1 }],
@@ -276,6 +278,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 	const functions = [];
 	const functionRecords = new WeakMap();
 	const trustedHookNames = new WeakMap();
+	const callAnnotations = new Map();
 	predeclareDirect(ast.body, moduleScope, hookRuntimeModules);
 	collectHoistedVars(ast, moduleScope);
 
@@ -402,9 +405,11 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 			// Preserve lexical import identity for the later slotting pass. A module-
 			// level name map is insufficient: a component can shadow either a named
 			// alias or an Octane namespace inside any nested scope. The annotation is
-			// copied with the call AST when the full compiler lowers setup statements.
+			// recorded here (keyed by the parser node) and stamped onto rebuilt call
+			// copies by rebuildWithHookMetadata — the parser tree itself is never
+			// written to. Rebuilt copies carry the props through later `{ ...node }`
+			// lowering, exactly as the in-place stamps used to.
 			const octaneImportedName = canonicalOctaneHookName(node, scope);
-			if (octaneImportedName !== null) node._octaneImportedHook = octaneImportedName;
 			// The auto-callback stability pass also preserves Octane's historical
 			// unbound-hook shorthand (`useState(...)` without an import). Record that
 			// fact from this lexical scope walk so it can distinguish a genuinely
@@ -413,18 +418,23 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 			// callee must never inherit stability merely because its spelling looks
 			// like a built-in hook.
 			const callee = unwrapValue(node.callee);
-			if (callee?.type === 'Identifier' && resolveBinding(scope, callee.name) === null) {
-				node._octaneUnboundCallee = true;
-			}
+			const unboundCallee =
+				callee?.type === 'Identifier' && resolveBinding(scope, callee.name) === null;
 			const name = canonicalHookName(node, scope, onlyImported);
 			const config = DEPENDENCY_HOOKS.get(name);
 			const hookRuntimeImportedName = canonicalHookName(node, scope, true);
-			if (octaneImportedName === null && hookRuntimeImportedName !== null) {
-				node._octaneHookRuntimeImportedHook = hookRuntimeImportedName;
+			if (octaneImportedName !== null || unboundCallee || hookRuntimeImportedName !== null) {
+				const props = {};
+				if (octaneImportedName !== null) props._octaneImportedHook = octaneImportedName;
+				if (unboundCallee) props._octaneUnboundCallee = true;
+				if (octaneImportedName === null && hookRuntimeImportedName !== null) {
+					props._octaneHookRuntimeImportedHook = hookRuntimeImportedName;
+				}
+				callAnnotations.set(node, props);
 			}
 			const trustedName =
 				hasFullCompilerHookBoundary(node, hookRuntimeImportedName) &&
-				(hookRuntimeImportedName !== null || node._octaneUnboundCallee === true)
+				(hookRuntimeImportedName !== null || unboundCallee)
 					? (hookRuntimeImportedName ?? name)
 					: null;
 			const trustedConfig = DEPENDENCY_HOOKS.get(trustedName);
@@ -484,6 +494,7 @@ function buildScopes(ast, onlyImported, hookRuntimeModules) {
 		calls,
 		functions,
 		trustedHookNames,
+		callAnnotations,
 	};
 	// The surgical plain-TS pass slots base hooks only; without a custom-hook
 	// withSlot boundary, two local wrapper calls would share their inner slots.
@@ -1003,12 +1014,8 @@ function cloneDependency(node) {
 	return { ...node };
 }
 
-/**
- * Return inferred dependency expressions for every supported hook call whose
- * dependency argument is omitted. Explicit arrays, `null`, and any other
- * explicit dependency expression are left untouched.
- */
-export function analyzeHookDependencies(ast, options = {}) {
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} options */
+function analyzeInternal(ast, options) {
 	const onlyImported = options.onlyImported === true;
 	const hookRuntimeModules = new Set(['octane', ...(options.hookRuntimeModules || [])]);
 	const analysis = buildScopes(ast, onlyImported, hookRuntimeModules);
@@ -1041,17 +1048,101 @@ export function analyzeHookDependencies(ast, options = {}) {
 			dependencies,
 		});
 	}
-	return inferred;
+	return { analysis, inferred };
 }
 
-/** Add inferred arrays directly to a full-compiler AST. */
-export function applyHookDependencies(ast, options = {}) {
-	const inferred = analyzeHookDependencies(ast, options);
-	for (const [call, result] of inferred) {
-		call.arguments.splice(result.depsIndex, 0, {
-			type: 'ArrayExpression',
-			elements: result.dependencies.map((dependency) => cloneDependency(dependency.node)),
-		});
+/**
+ * Return inferred dependency expressions for every supported hook call whose
+ * dependency argument is omitted. Explicit arrays, `null`, and any other
+ * explicit dependency expression are left untouched. Read-only: the input AST
+ * is never modified.
+ */
+export function analyzeHookDependencies(ast, options = {}) {
+	return analyzeInternal(ast, options).inferred;
+}
+
+/**
+ * Copy-on-write rebuild carrying hook metadata: every call the scope walk
+ * annotated is replaced by a shallow copy stamped with its `_octane*` props
+ * (so later `{ ...node }` lowering keeps them), and — when `insertDeps` —
+ * candidate calls also receive their inferred dependency `ArrayExpression`.
+ * Untouched subtrees stay shared with the input by reference. Returns the
+ * rebuilt module plus the inference map re-keyed to the rebuilt call nodes.
+ */
+/** @param {any} ast @param {any} analysis @param {Map<any, any>} inferred @param {boolean} insertDeps */
+function rebuildWithHookMetadata(ast, analysis, inferred, insertDeps) {
+	const annotations = analysis.callAnnotations;
+	const rekeyedInferred = new Map();
+	/** @param {any} node @returns {any} */
+	function rebuild(node) {
+		if (node === null || typeof node !== 'object') return node;
+		if (Array.isArray(node)) {
+			let out = null;
+			for (let i = 0; i < node.length; i++) {
+				const mapped = rebuild(node[i]);
+				if (out === null && mapped !== node[i]) out = node.slice(0, i);
+				if (out !== null) out.push(mapped);
+			}
+			return out ?? node;
+		}
+		let out = null;
+		for (const key in node) {
+			if (AST_META_KEYS.has(key)) continue;
+			const mapped = rebuild(node[key]);
+			if (mapped !== node[key]) {
+				if (out === null) out = { ...node };
+				out[key] = mapped;
+			}
+		}
+		const props = annotations.get(node);
+		const result = inferred.get(node);
+		if (props !== undefined || result !== undefined) {
+			if (out === null) out = { ...node };
+			if (props !== undefined) Object.assign(out, props);
+			if (result !== undefined) {
+				if (insertDeps) {
+					const args = out.arguments.slice();
+					// The synthesized array maps to the hook call it belongs to; each
+					// dependency clone keeps its authored position.
+					args.splice(result.depsIndex, 0, {
+						...b.array(
+							result.dependencies.map((/** @type {any} */ dependency) =>
+								cloneDependency(dependency.node),
+							),
+						),
+						start: node.start,
+						end: node.end,
+						loc: node.loc,
+					});
+					out.arguments = args;
+				}
+				rekeyedInferred.set(out, result);
+			}
+		}
+		return out ?? node;
 	}
-	return inferred;
+	return { ast: rebuild(ast), inferred: rekeyedInferred };
+}
+
+/**
+ * Annotation-only rebuild for the surgical plain-TS pass: returns a rebuilt
+ * module whose hook calls carry their `_octane*` props, plus the inference map
+ * keyed by the rebuilt calls. Dependency arrays are NOT inserted — that pass
+ * edits source text from the inference results instead of reprinting the tree.
+ */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} [options] */
+export function annotateHookCalls(ast, options = {}) {
+	const { analysis, inferred } = analyzeInternal(ast, options);
+	return rebuildWithHookMetadata(ast, analysis, inferred, false);
+}
+
+/**
+ * Full-compiler entry: rebuild the module with hook annotations AND inferred
+ * dependency arrays inserted at each candidate call. Copy-on-write — the input
+ * AST is never modified; callers must use the returned module.
+ */
+/** @param {any} ast @param {{ onlyImported?: boolean, hookRuntimeModules?: readonly string[], filename?: string }} [options] */
+export function applyHookDependencies(ast, options = {}) {
+	const { analysis, inferred } = analyzeInternal(ast, options);
+	return rebuildWithHookMetadata(ast, analysis, inferred, true).ast;
 }

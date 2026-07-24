@@ -230,15 +230,18 @@ describe('hmr — runtime wrapper', () => {
 		const evaluate = (code: string, data: Record<string, any> | undefined) => {
 			const transformed =
 				code
-					.replace(/^import \{ ([^}]+) \} from 'octane';/m, (_match, imports: string) => {
-						const properties = imports
-							.split(', ')
-							.map((specifier) => specifier.replace(' as ', ': '))
-							.join(', ');
-						return `const { ${properties} } = runtime;`;
-					})
+					.replace(
+						/^import\s*\{([\s\S]*?)\}\s*from\s*(['"])octane\2;/m,
+						(_match, imports: string) => {
+							const properties = imports
+								.split(',')
+								.map((specifier) => specifier.trim().replace(/\s+as\s+/, ': '))
+								.join(', ');
+							return `const { ${properties} } = runtime;`;
+						},
+					)
 					.replace(/\bexport let /g, 'let ')
-					.replace(/export \{ Default as default \};/g, '')
+					.replace(/export\s*\{\s*Default\s+as\s+default\s*\};/g, '')
 					.replaceAll('import.meta.webpackHot', 'hot') + '\nreturn { Named, default: Default };';
 			let dispose: ((value: Record<string, any>) => void) | undefined;
 			let accepted = false;

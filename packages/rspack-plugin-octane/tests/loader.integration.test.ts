@@ -98,7 +98,44 @@ describe('loader with the neutral compiler', () => {
 		});
 	});
 
-	it('selects server codegen from a node target', () => {
+	it('removes hot-update output when hmr is explicitly false in a hot compilation', () => {
+		const source = `export function App() @{ <button>ready</button> }\n`;
+		const resourcePath = write(root, 'src/HmrDisabled.tsrx', source);
+		const result = transform({
+			root,
+			resourcePath,
+			source,
+			hot: true,
+			options: { hmr: false },
+		});
+
+		expect(String(result.content)).not.toContain('import.meta.webpackHot');
+		expect(getOctaneRspackBuildInfo(result.module)?.transformKind).toBe('compile');
+	});
+
+	it('changes development metadata for both explicit dev values', () => {
+		const source = `export function App(props) @{
+	<main>@if (props.ready) { <span>ready</span> }</main>
+}\n`;
+		const resourcePath = write(root, 'src/DevMetadata.tsrx', source);
+		const enabled = transform({
+			root,
+			resourcePath,
+			source,
+			options: { dev: true, hmr: false },
+		});
+		const disabled = transform({
+			root,
+			resourcePath,
+			source,
+			options: { dev: false, hmr: false },
+		});
+
+		expect(String(enabled.content)).toContain('DevMetadata.tsrx');
+		expect(String(disabled.content)).not.toContain('DevMetadata.tsrx');
+	});
+
+	it('selects server codegen from a node target', async () => {
 		const resourcePath = write(root, 'src/App.tsrx', `export function App() @{ <p>server</p> }\n`);
 		const result = transform({
 			root,
@@ -108,9 +145,11 @@ describe('loader with the neutral compiler', () => {
 			hot: true,
 		});
 		const code = String(result.content);
-		expect(code).toContain('return "<p>" + "server" + "</p>"');
 		expect(code).not.toContain('_$template');
 		expect(code).not.toContain('webpackHot');
+		const moduleUrl = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+		const generated = await import(moduleUrl);
+		expect(generated.App()).toBe('<p>server</p>');
 	});
 
 	it('attaches the same client-reference metadata to client code and its server stub', () => {
@@ -144,6 +183,8 @@ describe('loader with the neutral compiler', () => {
 			clientReference: clientInfo.clientReference,
 		});
 		expect(String(server.content)).not.toContain('authored-setup');
+		expect(server.map).toMatchObject({ version: 3 });
+		expect((server.map as { mappings: string }).mappings.length).toBeGreaterThan(0);
 	});
 
 	it('marks module-server owners in server build metadata', () => {
@@ -167,6 +208,25 @@ describe('loader with the neutral compiler', () => {
 			"/** @jsxImportSource octane */\nexport function Badge() @{ <p>{'badge'}</p> }";
 		const hookSource =
 			"import { useState } from 'octane';\nexport function useCount() { return useState(0); }\n";
+		const unmarkedOctaneSource = "export function Owned() @{ <p>{'owned'}</p> }\n";
+
+		// The same unmarked project source is compiled when the gate is disabled
+		// and left to the host toolchain when it is enabled.
+		const ungated = transform({
+			root,
+			resourcePath: write(root, 'src/Ungated.tsx', unmarkedOctaneSource),
+			source: unmarkedOctaneSource,
+			options: { requireDirective: false },
+		});
+		expect(getOctaneRspackBuildInfo(ungated.module)?.transformKind).toBe('compile');
+		const gated = transform({
+			root,
+			resourcePath: write(root, 'src/Gated.tsx', unmarkedOctaneSource),
+			source: unmarkedOctaneSource,
+			options,
+		});
+		expect(gated.content).toBe(unmarkedOctaneSource);
+		expect(getOctaneRspackBuildInfo(gated.module)).toBeNull();
 
 		// An unmarked project .tsx belongs to the host toolchain: untouched,
 		// no Octane build metadata.

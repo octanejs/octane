@@ -1,3 +1,4 @@
+import { parseModule } from '@tsrx/core';
 import { describe, it, expect } from 'vitest';
 import { compile } from 'octane/compiler';
 
@@ -14,6 +15,29 @@ function clientCode(src: string): string {
 }
 function serverCode(src: string): string {
 	return compile(src, 'f.tsx', { mode: 'server' }).code;
+}
+
+function childrenValues(code: string): any[] {
+	const values: any[] = [];
+	const seen = new WeakSet<object>();
+	const visit = (node: any) => {
+		if (node === null || typeof node !== 'object' || seen.has(node)) return;
+		seen.add(node);
+		if (
+			node.type === 'Property' &&
+			!node.computed &&
+			(node.key?.name === 'children' || node.key?.value === 'children')
+		) {
+			values.push(node.value);
+		}
+		for (const [key, value] of Object.entries(node)) {
+			if (key === 'loc' || key === 'metadata') continue;
+			if (Array.isArray(value)) value.forEach(visit);
+			else visit(value);
+		}
+	};
+	visit(parseModule(code, 'compiled.js'));
+	return values;
 }
 
 describe('.tsx return-form component children — server matches client (descriptors)', () => {
@@ -37,9 +61,19 @@ describe('.tsx return-form component children — server matches client (descrip
 		const code = serverCode(RETURN_FORM);
 		// children must be a createElement(Inner, …) descriptor — matching the client —
 		// so `{props.children}` → ssrChild(descriptor) is ONE block, like childSlot.
-		expect(code).toMatch(/"children":\s*\(_\$createElement\(\s*Inner/);
+		const values = childrenValues(code);
+		expect(
+			values.some(
+				(value) =>
+					value.type === 'CallExpression' &&
+					value.callee?.name === '_$createElement' &&
+					value.arguments[0]?.name === 'Inner',
+			),
+		).toBe(true);
 		// It must NOT wrap children in a __schildren render-fn (that adds a block).
-		expect(code).not.toMatch(/"children":\s*__schildren/);
+		expect(
+			values.some((value) => value.type === 'Identifier' && value.name.startsWith('__schildren')),
+		).toBe(false);
 	});
 
 	it('`@{}` (template-form) children stay a __schildren render-fn on the server', () => {
@@ -55,6 +89,14 @@ describe('.tsx return-form component children — server matches client (descrip
 		// Tagged with markChildrenBlock (like the client) so render-prop checks
 		// (`typeof children === 'function' && !isChildrenBlock(children)`) agree
 		// on both runtimes.
-		expect(code).toMatch(/"children":\s*_\$markChildrenBlock\(__schildren/);
+		expect(
+			childrenValues(code).some(
+				(value) =>
+					value.type === 'CallExpression' &&
+					value.callee?.name === '_$markChildrenBlock' &&
+					value.arguments[0]?.type === 'Identifier' &&
+					value.arguments[0].name.startsWith('__schildren'),
+			),
+		).toBe(true);
 	});
 });

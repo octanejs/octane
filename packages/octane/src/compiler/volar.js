@@ -115,7 +115,7 @@ function hasAuthoredLeadingPragma(ast, comments) {
 	);
 }
 
-function createRendererTypePrelude(renderer) {
+function createRendererTypePragma(renderer, ast) {
 	// A `.tsrx` file's JSX is octane's dialect BY DEFINITION, so the built-in
 	// DOM renderer pins the virtual TSX to octane's jsx-runtime types even when
 	// the registry entry declares no `intrinsics`. Without the pragma the host
@@ -130,16 +130,18 @@ function createRendererTypePrelude(renderer) {
 		(renderer.module === DOM_RENDERER_MODULE && renderer.target === 'dom'
 			? DOM_RENDERER_MODULE
 			: undefined);
-	if (intrinsics === undefined) return '';
-	return `/** @jsxImportSource ${intrinsics} */\n`;
-}
-
-function shiftGeneratedOffsets(mappings, offset) {
-	if (offset === 0) return mappings;
-	return mappings.map((mapping) => ({
-		...mapping,
-		generatedOffsets: mapping.generatedOffsets.map((generatedOffset) => generatedOffset + offset),
-	}));
+	if (intrinsics === undefined) return null;
+	const start = ast.loc?.start ?? { line: 1, column: 0 };
+	return {
+		type: 'Block',
+		// @tsrx/core's semantic-comment formatter turns this into the canonical
+		// `/** @jsxImportSource … */` spelling during the one type-only print.
+		value: `*@jsxImportSource ${intrinsics}`,
+		start: ast.start ?? 0,
+		end: ast.start ?? 0,
+		loc: { start: { ...start }, end: { ...start } },
+		context: null,
+	};
 }
 
 /**
@@ -192,7 +194,10 @@ function markNativeTemplateBodies(root) {
  * element types cannot leak into files owned by another renderer.
  *
  * @param {{ loose?: boolean, renderers?: unknown }} [options]
- * @returns {import('@tsrx/core/types').VolarMappingsResult & { diagnostics: readonly unknown[] }}
+ * @returns {import('@tsrx/core/types').VolarMappingsResult & {
+ *   diagnostics: readonly unknown[],
+ *   generatedAst: import('estree').Program,
+ * }}
  */
 export function compileToVolarMappings(source, filename, options) {
 	/** @type {import('@tsrx/core/types').CompileError[]} */
@@ -222,6 +227,13 @@ export function compileToVolarMappings(source, filename, options) {
 		rendererBoundaries: rendererConfig.boundaries,
 		rendererRegistry: rendererConfig.registry,
 	}).diagnostics;
+	// The renderer pragma belongs to the semantic comment set consumed by
+	// @tsrx/core's type-only Program print. This keeps code and mappings in one
+	// coordinate system instead of prepending text and shifting every mapping.
+	const rendererPragma = hasAuthoredLeadingPragma(ast, comments)
+		? null
+		: createRendererTypePragma(renderer, ast);
+	const printComments = rendererPragma === null ? comments : [rendererPragma, ...comments];
 	// The `module server { … }` dialect is lowered to plain checkable TS by
 	// the shared transform itself (via the platform's `serverModule` option)
 	// before the typeOnly print. The lowering is copy-on-write inside
@@ -231,16 +243,16 @@ export function compileToVolarMappings(source, filename, options) {
 	const transformed = octaneTransform(ast, source, filename, {
 		collect: true,
 		loose: !!options?.loose,
+		// @tsrx/core routes `typeOnly: true` to its TSX esrap language with
+		// `boundaryTokens: true`. Structural delimiters then carry their own
+		// one-character mappings without changing the virtual TSX bytes.
 		typeOnly: true,
 		errors,
-		comments,
+		comments: printComments,
 	});
 	// After the transform: the copy-on-write lowering must not observe the
 	// marker mid-flight, and `ast` is what ships below as `sourceAst`.
 	markNativeTemplateBodies(ast);
-	const prelude = hasAuthoredLeadingPragma(ast, comments)
-		? ''
-		: createRendererTypePrelude(renderer);
 	const result = createVolarMappingsResult({
 		ast: transformed.ast,
 		ast_from_source: ast,
@@ -252,8 +264,8 @@ export function compileToVolarMappings(source, filename, options) {
 	const mappings = dedupeMappings(result.mappings);
 	return {
 		...result,
-		code: prelude + result.code,
-		mappings: shiftGeneratedOffsets(mappings, prelude.length),
+		mappings,
 		diagnostics,
+		generatedAst: transformed.ast,
 	};
 }
