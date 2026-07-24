@@ -155,11 +155,14 @@ export function Playground() @{
 		resultModeRef.current.view = 'compiled';
 		resultModeRef.current.compiledMode = 'ast';
 		controllerRef.current.syncOutput?.();
-		// The mobile result panel is still display:none until this state update
-		// commits. Reveal on the next frame so scrollIntoView can position the
-		// selected node inside a visible AST scroller.
-		requestAnimationFrame(() => controllerRef.current.revealAst?.());
 	};
+	// Reveal only after the mobile result panel has committed as visible;
+	// scrollIntoView cannot position a node while its panel is display:none.
+	useEffect(() => {
+		if (ready && pane === 'result' && view === 'compiled' && compiledMode === 'ast') {
+			controllerRef.current.revealAst?.();
+		}
+	}, [ready, pane, view, compiledMode]);
 
 	useEffect(() => {
 		const sourceHost = sourceHostRef.current;
