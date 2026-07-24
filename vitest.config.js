@@ -793,15 +793,15 @@ export default defineConfig({
 			},
 			{
 				test: {
-					name: 'octane-devtools',
-					include: ['packages/octane-devtools/tests/**/*.test.{ts,tsx}'],
+					name: 'devtools',
+					include: ['packages/devtools/tests/**/*.test.{ts,tsx}'],
 					environment: 'jsdom',
 					// The @tanstack/devtools-event-client index folds to a no-op unless
 					// NODE_ENV === 'development'; the plugin only runs in dev anyway.
 					env: { NODE_ENV: 'development' },
 					// Starts a ClientEventBus so emit()/on() deliver over the window bus
 					// (the devtools host provides it in production).
-					setupFiles: ['packages/octane-devtools/tests/setup.ts'],
+					setupFiles: ['packages/devtools/tests/setup.ts'],
 					globals: false,
 				},
 				plugins: [octane()],
@@ -809,7 +809,7 @@ export default defineConfig({
 					alias: [
 						{
 							find: /^@octanejs\/devtools$/,
-							replacement: resolve(import.meta.dirname, 'packages/octane-devtools/src/index.ts'),
+							replacement: resolve(import.meta.dirname, 'packages/devtools/src/index.ts'),
 						},
 						{
 							find: /^@octanejs\/testing-library$/,

@@ -11,7 +11,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
-    "directory": "packages/octane-devtools"
+    "directory": "packages/devtools"
   },
   "main": "src/index.ts",
   "module": "src/index.ts",
