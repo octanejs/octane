@@ -34,11 +34,12 @@ no-op unless the app was built with `devtools: true`, so it's safe to leave the
 plugin registered and gate only `TanStackDevtools` behind `import.meta.env.DEV`
 or `lazy()`.
 
-## Two tabs
+## Three tabs
 
-The panel is a small tab bar — **Components** and **Profiler** — with one tab
-visible at a time. Both read from the same `octaneDevtools()` bridge; switching
-tabs doesn't reset either one's subscription.
+The panel is a small tab bar — **Components**, **Profiler**, and **Transitions
+& Suspense** — with one tab visible at a time. All three read from the same
+`octaneDevtools()` bridge; switching tabs doesn't reset any of their
+subscriptions.
 
 ## The Components tab
 
@@ -71,6 +72,34 @@ builds) and renders it as two views:
 Until the app has rendered anything with profiling enabled, the tab shows
 "No profiling data yet — interact with the app." instead of empty tables.
 
+## The Transitions & Suspense tab
+
+The Transitions & Suspense tab shows the live pending-transition count — how
+many transitions are in flight right now — and, below it, every mounted
+Suspense boundary's current state:
+
+- **init** — the boundary has never suspended.
+- **pending** — a descendant is currently suspended and the fallback may be
+  showing.
+- **resolved** — the boundary's primary content is showing.
+- **caught** — the boundary is displaying a thrown error.
+
+A boundary that has resolved at least once also carries a **"(resolved
+once)"** marker alongside its current state, so a boundary that's back in
+`pending` (e.g. re-suspended by a later transition) still shows it has
+successfully resolved before. Before any transition has fired, the tab shows
+"Pending transitions: 0" and "No Suspense boundaries."
+
+This tab reads two new dev-only runtime probes — one on the scheduler's
+transition-pending counter, the other on each Suspense boundary's `TrySlot`
+state transitions — both gated behind the same profile compile flag as the
+rest of the devtools hook, and stripped from production builds like
+everything else here.
+
+Known v1 limitation: on a boundary's very first reveal, the "(resolved
+once)" marker can lag by one transition; this is a display-only artifact of
+when the marker is recomputed and does not affect the runtime.
+
 ## Guarantees
 
 - **Read-only.** Selecting a node only requests a description from the app; the
@@ -91,6 +120,6 @@ Octane has no way to tell them apart once mounted.
 
 ## Coming next
 
-P1 shipped the Components tab; P2 shipped the Profiler tab above (both
-described here). Remaining follow-ups (P3–P4): a Transitions & Suspense tab,
-and a Performance-model tab plus a website demo.
+P1 shipped the Components tab, P2 shipped the Profiler tab, and P3 shipped
+the Transitions & Suspense tab above (all described here). Remaining
+follow-up (P4): a Performance-model tab plus a website demo route.
