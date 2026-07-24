@@ -5,7 +5,7 @@ import {
 	preparePlaygroundAst,
 	type PlaygroundAstNode,
 } from '../src/lib/playground-ast.ts';
-import { compileClientAst, compileTypes } from '../src/lib/playground.ts';
+import { compileRuntimeAst, compileTypes } from '../src/lib/playground.ts';
 
 const nodeTypes = (root: PlaygroundAstNode): Set<string> => {
 	const types = new Set<string>();
@@ -177,7 +177,7 @@ export function App() {
 	});
 
 	it('uses the client Program and template IR without reparsing emitted code', () => {
-		const result = compileClientAst(source, filename);
+		const result = compileRuntimeAst(source, filename, 'client');
 		if (!result.ok) throw new Error(result.error);
 		const inspection = result.ast as {
 			program: { type: string; start: number; end: number };
@@ -193,7 +193,7 @@ export function App() {
 
 it('uses compiler template origins as authored source ranges', () => {
 	const source = `export function App() @{ <button>Styled</button> }`;
-	const result = compileClientAst(source, 'App.tsrx');
+	const result = compileRuntimeAst(source, 'App.tsrx', 'client');
 	if (!result.ok) throw new Error(result.error);
 	const prepared = preparePlaygroundAst(result.ast);
 	const start = source.indexOf('button');
@@ -202,6 +202,19 @@ it('uses compiler template origins as authored source ranges', () => {
 		from: start,
 		to: start + 'button'.length,
 	});
+});
+
+it('uses the server Program exposed by compiler inspection', () => {
+	const source = `export function App() @{ <h1>{'Rendered on the server'}</h1> }`;
+	const result = compileRuntimeAst(source, 'App.tsrx', 'server');
+	if (!result.ok) throw new Error(result.error);
+	const inspection = result.ast as {
+		program: { type: string; start: number; end: number };
+		templates: unknown[];
+	};
+
+	expect(inspection.program).toMatchObject({ type: 'Program', start: 0, end: source.length });
+	expect(inspection.templates).toEqual([]);
 });
 
 it('exposes the exact typed AST when the source contains a scoped style block', () => {

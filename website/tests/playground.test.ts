@@ -65,6 +65,19 @@ describe('playground compile pipeline', () => {
 		}
 	});
 
+	it('compiles playground source to server runtime code on demand', () => {
+		const source = `export function App() @{ <h1>{'Rendered on the server'}</h1> }`;
+		const result = compilePlayground(source, 'App.tsrx', 'server');
+		const client = compilePlayground(source, 'App.tsrx');
+		expect(result.ok).toBe(true);
+		expect(client.ok).toBe(true);
+		if (result.ok && client.ok) {
+			expect(result.warnings).toEqual([]);
+			expect(result.code).not.toBe(client.code);
+			expect(result.code).toContain('Rendered on the server');
+		}
+	});
+
 	it('reports compile errors instead of throwing', () => {
 		const result = compilePlayground('export function App() @{ <div>{oops</div> }', 'App.tsrx');
 		expect(result.ok).toBe(false);

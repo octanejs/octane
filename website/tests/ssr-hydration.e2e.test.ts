@@ -1094,7 +1094,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		}
 	}, 45_000);
 
-	it('playground compiled pane offers AST and types mapping', async () => {
+	it('playground selects client, server, types, and parsed code or AST output', async () => {
 		const { page, errors } = await loadRoute(`http://localhost:${PREVIEW_PORT}`, '/playground');
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
@@ -1172,20 +1172,43 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 					[paneIndex, token] as const,
 					{ timeout: 10_000 },
 				);
-			// AST is the default compiler artifact. It shows one source AST and
-			// reveals the deepest containing node.
+			// Client code is the default compiled artifact. Server and Types use
+			// the same output selector; Parsed exists only for AST inspection.
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			const outputSelector = page.locator('[aria-label="Compiler output"]');
+			const outputFormat = page.locator('[aria-label="Output format"]');
+			await outputIncludes("from 'octane'");
+			expect(await outputSelector.inputValue()).toBe('client');
+			expect(await outputSelector.locator('option').allTextContents()).toEqual([
+				'Client',
+				'Server',
+				'Types',
+			]);
+			expect(await outputFormat.locator('button.active', { hasText: 'Code' }).count()).toBe(1);
+			await outputSelector.selectOption('server');
+			await outputIncludes("from 'octane/server'");
+			await outputSelector.selectOption('types');
+			await outputIncludes('@jsxImportSource octane');
+			// Clicking a source token reveals the mapped token in Types code…
+			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
+			await mappedIn(1, 'useState');
+			// …and hovering the output maps back into the source too.
+			await hoverToken(1, 'setCount', 1);
+			await mappedIn(0, 'setCount');
+			await mappedIn(1, 'setCount');
+			// Clicking keeps that bidirectional mapping and scrolls it into view.
+			await clickToken(1, 'setCount', 1);
+			await mappedIn(0, 'setCount');
+
+			await outputFormat.locator('button', { hasText: 'AST' }).click();
 			await page.locator('.pg-ast-tree').waitFor();
-			expect(
-				await page
-					.locator('[aria-label="Compiled output mode"] button', { hasText: 'Prod' })
-					.count(),
-			).toBe(0);
-			expect(
-				await page
-					.locator('[aria-label="AST compiler stage"] option', { hasText: 'Server output' })
-					.count(),
-			).toBe(0);
+			expect(await outputSelector.locator('option').allTextContents()).toEqual([
+				'Client',
+				'Server',
+				'Types',
+				'Parsed',
+			]);
+			// The Types AST reveals the deepest node containing the cursor.
 			await clickToken(0, 'useState', 2);
 			await page.waitForFunction(
 				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
@@ -1201,41 +1224,28 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 				null,
 				{ timeout: 10_000 },
 			);
-			// Client output exposes the final Program plus template IR. Template
+			// Client AST exposes the final Program plus template IR. Template
 			// origins keep the selected static tag in authored-source coordinates.
-			await page.locator('[aria-label="AST compiler stage"]').selectOption('client');
+			await outputSelector.selectOption('client');
 			await hoverToken(0, 'button', 1);
 			await mappedIn(0, 'button');
 			expect(await page.locator('.pg-ast-status').textContent()).toMatch(/\[(\d+), (\d+)\)/);
-			await page.locator('[aria-label="AST compiler stage"]').selectOption('source');
-			// Types swaps the pane to the typed virtual TSX (the language-service
-			// view), without recompiling the preview.
+			await outputSelector.selectOption('server');
 			await page
-				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
-				.click();
-			await outputIncludes('@jsxImportSource octane');
-			// Clicking a source token reveals the mapped token in the output…
-			await clickToken(0, 'useState', 2); // the useState(0) call, not the import
-			await mappedIn(1, 'useState');
-			// …and hovering the output maps back into the source too.
-			await hoverToken(1, 'setCount', 1);
-			await mappedIn(0, 'setCount');
-			await mappedIn(1, 'setCount');
-			// Clicking keeps that bidirectional mapping and scrolls it into view.
-			await clickToken(1, 'setCount', 1);
-			await mappedIn(0, 'setCount');
-			// A cached Types document must not retain the source highlight from
-			// AST when the user switches back to it.
-			await page.locator('[aria-label="Compiled output mode"] button', { hasText: 'AST' }).click();
-			await clickToken(0, 'useState', 2);
-			await page.waitForFunction(
-				() => !!document.querySelector('.pg-ast-node[data-ast-leaf="true"]'),
-				null,
-				{ timeout: 10_000 },
-			);
+				.getByText('The final server-rendering Program. Tap a node to pin its highlight.')
+				.waitFor();
+			await outputSelector.selectOption('source');
 			await page
-				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
-				.click();
+				.getByText('The parser tree for the authored source. Tap a node to pin its highlight.')
+				.waitFor();
+			// Parsed has no code form, so switching to Code falls back to the
+			// most common output: Client.
+			await outputFormat.locator('button', { hasText: 'Code' }).click();
+			expect(await outputSelector.inputValue()).toBe('client');
+			expect(await outputSelector.locator('option', { hasText: 'Parsed' }).count()).toBe(0);
+			await outputIncludes("from 'octane'");
+			// A cached Types document must not retain an AST source highlight.
+			await outputSelector.selectOption('types');
 			await page.waitForFunction(() => !document.querySelector('.pg-editor .cm-mapped'), null, {
 				timeout: 5_000,
 			});
@@ -1266,7 +1276,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			);
 			// A failed AST generation replaces the prior tree and cannot map
 			// source hover through its stale ranges.
-			await page.locator('[aria-label="Compiled output mode"] button', { hasText: 'AST' }).click();
+			await outputFormat.locator('button', { hasText: 'AST' }).click();
 			await page
 				.getByText('AST generation failed. Fix the source to generate a new tree.')
 				.waitFor();
@@ -1303,6 +1313,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 		try {
 			await page.waitForSelector('.pg-grid.ready', { timeout: 20_000 });
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
+			await page.locator('[aria-label="Output format"] button', { hasText: 'AST' }).click();
 			await page.locator('.pg-ast-tree').waitFor();
 
 			// Break an inactive dependency so the runnable module graph fails.
@@ -1452,9 +1463,7 @@ describe.sequential('website production build → hydration (Nitro Vercel previe
 			await page.selectOption('.pg-select', 'octane-compat');
 			await page.locator('.pg-tab', { hasText: 'Island.tsrx' }).waitFor({ timeout: 10_000 });
 			await page.locator('[aria-label="Result view"] button', { hasText: 'Compiled' }).click();
-			await page
-				.locator('[aria-label="Compiled output mode"] button', { hasText: 'Types' })
-				.click();
+			await page.locator('[aria-label="Compiler output"]').selectOption('types');
 			await page.waitForFunction(
 				() =>
 					(document.querySelectorAll('.pg-editor .cm-content')[1]?.textContent ?? '').includes(

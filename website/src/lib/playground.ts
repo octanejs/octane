@@ -26,6 +26,8 @@ import type { VolarTokenMapping } from './playground-mapping.ts';
 export type { CompileDiagnostic };
 
 export type PlaygroundLang = 'tsrx' | 'tsx';
+export type PlaygroundRuntimeTarget = 'client' | 'server';
+export type PlaygroundOutputTarget = PlaygroundRuntimeTarget | 'types' | 'source';
 
 export interface CompileSuccess {
 	ok: true;
@@ -46,9 +48,10 @@ export interface CompileFailure {
 export function compilePlayground(
 	source: string,
 	filename: string,
+	mode: PlaygroundRuntimeTarget = 'client',
 ): CompileSuccess | CompileFailure {
 	try {
-		const out = compile(source, filename, { mode: 'client' });
+		const out = compile(source, filename, { mode });
 		return { ok: true, code: out.code, warnings: out.diagnostics };
 	} catch (error) {
 		return { ok: false, error: error instanceof Error ? error.message : String(error) };
@@ -66,15 +69,14 @@ export interface TypesSuccess {
 	generatedAst: unknown;
 }
 
-export type PlaygroundAstStage = 'source' | 'types' | 'client';
-
-/** Inspect the final client AST lazily; normal preview compiles pay no inspection cost. */
-export function compileClientAst(
+/** Inspect a final runtime AST lazily; normal preview compiles pay no inspection cost. */
+export function compileRuntimeAst(
 	source: string,
 	filename: string,
+	mode: PlaygroundRuntimeTarget,
 ): { ok: true; ast: unknown } | CompileFailure {
 	try {
-		const result = compile(source, filename, { mode: 'client', inspect: true });
+		const result = compile(source, filename, { mode, inspect: true });
 		if (!result.inspect) throw new Error('Compiler inspection result is unavailable.');
 		return {
 			ok: true,
