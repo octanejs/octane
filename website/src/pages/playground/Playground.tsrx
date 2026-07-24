@@ -155,7 +155,10 @@ export function Playground() @{
 		resultModeRef.current.view = 'compiled';
 		resultModeRef.current.compiledMode = 'ast';
 		controllerRef.current.syncOutput?.();
-		controllerRef.current.revealAst?.();
+		// The mobile result panel is still display:none until this state update
+		// commits. Reveal on the next frame so scrollIntoView can position the
+		// selected node inside a visible AST scroller.
+		requestAnimationFrame(() => controllerRef.current.revealAst?.());
 	};
 
 	useEffect(() => {
