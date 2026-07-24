@@ -51,6 +51,9 @@ export function ToggleGroup({
 			'data-size': size,
 			'data-spacing': spacing,
 			'data-orientation': orientation,
+			// Forwarded to the primitive: it drives RovingFocusGroup's arrow-key
+			// axis (a vertical group must ignore left/right and use up/down).
+			orientation,
 			style: { '--gap': spacing },
 			className: cn(
 				'group/toggle-group flex w-fit items-center gap-[--spacing(var(--gap))] rounded-md data-[spacing=default]:data-[variant=outline]:shadow-xs',

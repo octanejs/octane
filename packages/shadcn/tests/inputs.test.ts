@@ -11,6 +11,7 @@ import {
 	TabsFixture,
 	ToggleFixture,
 	ToggleGroupFixture,
+	VerticalToggleGroupFixture,
 	ToggleGroupMultipleFixture,
 	UnvaluedSliderFixture,
 } from './_fixtures/inputs-app.tsrx';
@@ -382,6 +383,28 @@ describe('@octanejs/shadcn — Toggle', () => {
 describe('@octanejs/shadcn — ToggleGroup', () => {
 	afterEach(async () => {
 		await settle();
+	});
+
+	it('forwards orientation to the primitive: a vertical group roves focus on up/down, not left/right', async () => {
+		const r = mount(VerticalToggleGroupFixture);
+		const $ = inC(r.container);
+		await settle();
+		const group = $('[data-testid="vgroup"]')!;
+		expect(group.getAttribute('data-orientation')).toBe('vertical');
+		const a = $('[data-testid="vitem-a"]') as HTMLElement;
+		const b = $('[data-testid="vitem-b"]') as HTMLElement;
+		a.focus();
+		await settle();
+		// The vertical axis moves focus…
+		keydown(a, 'ArrowDown');
+		await settle();
+		expect(document.activeElement).toBe(b);
+		// …and the horizontal axis is ignored (pre-fix, orientation never reached
+		// RovingFocusGroup, so ArrowRight also roved).
+		keydown(b, 'ArrowRight');
+		await settle();
+		expect(document.activeElement).toBe(b);
+		r.unmount();
 	});
 
 	it('threads variant/size/spacing from the group context into items', async () => {

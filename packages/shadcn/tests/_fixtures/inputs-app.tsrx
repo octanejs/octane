@@ -164,3 +164,17 @@ export function ToggleGroupMultipleFixture() @{
 		</ToggleGroupItem>
 	</ToggleGroup>
 }
+
+export function VerticalToggleGroupFixture() @{
+	<ToggleGroup
+		type="single"
+		orientation="vertical"
+		defaultValue="a"
+		aria-label="Vertical"
+		data-testid="vgroup"
+	>
+		<ToggleGroupItem value="a" data-testid="vitem-a">A</ToggleGroupItem>
+		<ToggleGroupItem value="b" data-testid="vitem-b">B</ToggleGroupItem>
+		<ToggleGroupItem value="c" data-testid="vitem-c">C</ToggleGroupItem>
+	</ToggleGroup>
+}
