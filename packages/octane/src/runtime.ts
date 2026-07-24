@@ -54,6 +54,12 @@ import {
 	__profileTrackComponent,
 	type ProfileFrame,
 } from './profiling.js';
+import {
+	__devtoolsRegisterRoot,
+	__devtoolsUnregisterRoot,
+	__devtoolsNotifyFlush,
+	__devtoolsSetNameResolver,
+} from './devtools-hook.js';
 import type {
 	HydrateProps,
 	HydrationPrefetchFunction,
@@ -2072,6 +2078,8 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__devtoolsNotifyFlush();
 		if (clearViewTransitionTypes) viewTransitionDriver!.clearTypes();
 	}
 }
@@ -2397,6 +2405,8 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__devtoolsNotifyFlush();
 		}
 		if (QUEUE.length > 0 && !scheduled) {
 			scheduled = true;
@@ -21820,6 +21830,12 @@ function makeRoot(
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
 			registerRootDisposer(rootBlock);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__devtoolsSetNameResolver(componentName);
+				__devtoolsRegisterRoot(
+					rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+				);
+			}
 			currentBody = body;
 			currentKey = nextKey;
 			// React parity: render() inside a transition never commits synchronously
@@ -21887,6 +21903,10 @@ function makeRoot(
 			try {
 				if (rootBlock) {
 					DOM_ROOT_DISPOSERS.delete(rootBlock);
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__devtoolsUnregisterRoot(
+							rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+						);
 					// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
 					// Block in the tree). Run cleanups + scope teardown only, then clear
 					// the container in one shot. Portals self-detach during the recursive
@@ -22026,6 +22046,10 @@ export function hydrateRoot(
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__devtoolsSetNameResolver(componentName);
+		__devtoolsRegisterRoot(rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike);
+	}
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',
 		next: 0,
