@@ -29,4 +29,11 @@ describe('OctanePanel', () => {
 		screen.getByRole('button', { name: /transitions/i }).click();
 		expect(await screen.findByText(/pending transitions: 0/i)).toBeInTheDocument();
 	});
+
+	it('switches to the Performance tab', async () => {
+		const client = new OctaneDevtoolsEventClient();
+		render(<OctanePanel client={client} />);
+		screen.getByRole('button', { name: /performance/i }).click();
+		expect(await screen.findByText(/no performance data yet/i)).toBeInTheDocument();
+	});
 });

@@ -1,13 +1,15 @@
-// The tab shell hosting the Components (P1), Profiler (P2), and Transitions
-// (P3) tabs. This is the plugin's top-level render() node — see ../index.ts.
+// The tab shell hosting the Components (P1), Profiler (P2), Transitions (P3),
+// and Performance-model (P4) tabs. This is the plugin's top-level render()
+// node — see ../index.ts.
 import { useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { OctaneDevtoolsEventClient } from '../client';
 import { ComponentsTab } from './ComponentsTab.tsrx';
 import { ProfilerTab } from './ProfilerTab.tsrx';
 import { TransitionsTab } from './TransitionsTab.tsrx';
+import { PerfModelTab } from './PerfModelTab.tsrx';
 
-type Tab = 'components' | 'profiler' | 'transitions';
+type Tab = 'components' | 'profiler' | 'transitions' | 'performance';
 
 export function OctanePanel(props: { client: OctaneDevtoolsEventClient }): OctaneNode {
 	const { client } = props;
@@ -33,14 +35,22 @@ export function OctanePanel(props: { client: OctaneDevtoolsEventClient }): Octan
 			>
 				Transitions
 			</button>
+			<button
+				onClick={() => setTab('performance')}
+				style={{ fontWeight: tab === 'performance' ? 'bold' : 'normal' }}
+			>
+				Performance
+			</button>
 		</div>
 		<div style={{ flex: '1', overflow: 'auto' }}>
 			@if (tab === 'components') {
 				<ComponentsTab client={client} />
 			} @else if (tab === 'profiler') {
 				<ProfilerTab client={client} />
-			} @else {
+			} @else if (tab === 'transitions') {
 				<TransitionsTab client={client} />
+			} @else {
+				<PerfModelTab client={client} />
 			}
 		</div>
 	</div>;
