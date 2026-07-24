@@ -1,12 +1,13 @@
-// The tab shell hosting the Components (P1) and Profiler (Task 3) tabs. This is
-// the plugin's top-level render() node — see ../index.ts.
+// The tab shell hosting the Components (P1), Profiler (P2), and Transitions
+// (P3) tabs. This is the plugin's top-level render() node — see ../index.ts.
 import { useState } from 'octane';
 import type { OctaneNode } from 'octane';
 import { OctaneDevtoolsEventClient } from '../client';
 import { ComponentsTab } from './ComponentsTab.tsrx';
 import { ProfilerTab } from './ProfilerTab.tsrx';
+import { TransitionsTab } from './TransitionsTab.tsrx';
 
-type Tab = 'components' | 'profiler';
+type Tab = 'components' | 'profiler' | 'transitions';
 
 export function OctanePanel(props: { client: OctaneDevtoolsEventClient }): OctaneNode {
 	const { client } = props;
@@ -26,12 +27,20 @@ export function OctanePanel(props: { client: OctaneDevtoolsEventClient }): Octan
 			>
 				Profiler
 			</button>
+			<button
+				onClick={() => setTab('transitions')}
+				style={{ fontWeight: tab === 'transitions' ? 'bold' : 'normal' }}
+			>
+				Transitions
+			</button>
 		</div>
 		<div style={{ flex: '1', overflow: 'auto' }}>
 			@if (tab === 'components') {
 				<ComponentsTab client={client} />
-			} @else {
+			} @else if (tab === 'profiler') {
 				<ProfilerTab client={client} />
+			} @else {
+				<TransitionsTab client={client} />
 			}
 		</div>
 	</div>;

@@ -22,4 +22,11 @@ describe('OctanePanel', () => {
 		screen.getByRole('button', { name: /profiler/i }).click();
 		expect(await screen.findByText(/no profiling data/i)).toBeInTheDocument();
 	});
+
+	it('switches to the Transitions tab', async () => {
+		const client = new OctaneDevtoolsEventClient();
+		render(<OctanePanel client={client} />);
+		screen.getByRole('button', { name: /transitions/i }).click();
+		expect(await screen.findByText(/pending transitions: 0/i)).toBeInTheDocument();
+	});
 });
