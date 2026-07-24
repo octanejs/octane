@@ -26,11 +26,40 @@ export interface NodeDetail {
 export interface InspectRequest {
 	id: number;
 }
+export interface ProfileSummaryWire {
+	componentId: string;
+	component: string;
+	file: string;
+	attempts: number;
+	completed: number;
+	suspended: number;
+	errored: number;
+	bails: number;
+	totalSelfTime: number;
+	maxInclusiveTime: number;
+	averageSelfTime: number;
+	averageQueueDelay: number;
+	dominantCause: string | null;
+}
+export interface ProfileEventWire {
+	component: string;
+	phase: 'mount' | 'update';
+	outcome: 'completed' | 'suspended' | 'errored' | 'bailout';
+	selfDuration: number;
+	duration: number;
+	queueDelay: number;
+	causes: string[]; // cause.type values, flattened for display
+}
+export interface ProfileSnapshot {
+	summaries: ProfileSummaryWire[];
+	recentEvents: ProfileEventWire[];
+}
 
 type OctaneDevtoolsEventMap = {
 	tree: TreeSnapshot;
 	inspect: NodeDetail;
 	'inspect-request': InspectRequest;
+	profile: ProfileSnapshot;
 };
 
 export class OctaneDevtoolsEventClient extends EventClient<OctaneDevtoolsEventMap> {

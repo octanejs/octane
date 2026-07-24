@@ -21,4 +21,14 @@ describe('OctaneDevtoolsEventClient', () => {
 	it('uses the octane plugin id', () => {
 		expect(PLUGIN_ID).toBe('octane');
 	});
+
+	it('round-trips a profile snapshot', async () => {
+		const app = new OctaneDevtoolsEventClient();
+		const panel = new OctaneDevtoolsEventClient();
+		const received = vi.fn();
+		panel.on('profile', (e) => received(e.payload));
+		app.emit('profile', { summaries: [], recentEvents: [] });
+		await Promise.resolve();
+		expect(received).toHaveBeenCalledWith({ summaries: [], recentEvents: [] });
+	});
 });
