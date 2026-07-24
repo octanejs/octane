@@ -193,6 +193,12 @@ export default defineConfig({
 			'@octanejs/tanstack-router > @tanstack/history',
 			'@octanejs/tanstack-router > @tanstack/router-core',
 			'@octanejs/tanstack-router > @tanstack/store',
+			// The DevTools panel host (Solid core) is imported from
+			// @octanejs/tanstack-devtools's raw .tsrx source, so the scanner never
+			// sees it; its lazy `mount-impl` chunk would otherwise be optimized in a
+			// second pass at client-mount time, invalidating the just-served page
+			// ("504 Outdated Optimize Dep"). Pre-declare it so it pre-bundles once.
+			'@octanejs/tanstack-devtools > @tanstack/devtools',
 			// The home page's 3D logo section is reached only through a deferred
 			// Hydrate chunk, so the scanner never sees three; pre-declare it (and
 			// the SVGLoader example module) to avoid a mid-session optimize pass.
