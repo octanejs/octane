@@ -1,15 +1,9 @@
-import { OctaneDevtoolsEventClient, type WireTreeNode } from './client';
+import { OctaneDevtoolsEventClient, type NodeDetail, type WireTreeNode } from './client';
 
 interface RuntimeHook {
 	version: number;
 	getTree(): WireTreeNode[];
-	inspect(id: number): {
-		id: number;
-		name: string;
-		hooks: Array<{ kind: string; value: unknown }>;
-		context: Array<{ name: string; value: unknown }>;
-		effectCount: number;
-	} | null;
+	inspect(id: number): NodeDetail | null;
 	subscribe(listener: () => void): () => void;
 }
 
@@ -23,7 +17,9 @@ function getHook(): RuntimeHook | undefined {
  * the selected node is serialized). Returns a stop function. No-op if the runtime
  * devtools hook is not installed (e.g. a non-profile build).
  */
-export function startBridge(client: OctaneDevtoolsEventClient = new OctaneDevtoolsEventClient()): () => void {
+export function startBridge(
+	client: OctaneDevtoolsEventClient = new OctaneDevtoolsEventClient(),
+): () => void {
 	const hook = getHook();
 	if (!hook) return () => {};
 
