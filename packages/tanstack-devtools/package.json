@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/tanstack-devtools",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "license": "MIT",
   "type": "module",
   "engines": {
