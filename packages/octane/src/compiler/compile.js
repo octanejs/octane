@@ -938,28 +938,30 @@ function collectNestedBindingNames(root) {
 }
 
 function hasIdentifierReference(root, name) {
-	let found = false;
+	// The visited guard is load-bearing: passes share subtrees, so without it
+	// this walk goes exponential on shared shapes.
 	const seen = new WeakSet();
 	const walk = (value) => {
-		if (found || !value || typeof value !== 'object') return;
 		if (Array.isArray(value)) {
-			for (const child of value) walk(child);
-			return;
+			for (const child of value) {
+				if (child !== null && typeof child === 'object' && walk(child)) return true;
+			}
+			return false;
 		}
-		if (seen.has(value)) return;
+		if (seen.has(value)) return false;
 		seen.add(value);
-		if (value.type === 'ImportDeclaration') return;
-		if ((value.type === 'Identifier' || value.type === 'JSXIdentifier') && value.name === name) {
-			found = true;
-			return;
-		}
+		if (value.type === 'ImportDeclaration') return false;
+		if ((value.type === 'Identifier' || value.type === 'JSXIdentifier') && value.name === name)
+			return true;
 		for (const key in value) {
+			const child = value[key];
+			if (child === null || typeof child !== 'object') continue;
 			if (AST_WALK_SKIP_KEYS.has(key)) continue;
-			walk(value[key]);
+			if (walk(child)) return true;
 		}
+		return false;
 	};
-	walk(root);
-	return found;
+	return root !== null && typeof root === 'object' ? walk(root) : false;
 }
 
 function errorBoundaryFallback(node, fallbackAttribute) {
