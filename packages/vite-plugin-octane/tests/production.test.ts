@@ -120,7 +120,7 @@ beforeAll(async () => {
 	const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 	productionServer = createNodeServer(handler, {
 		staticDir: path.join(distDir, 'client'),
-	}).listen(0, '127.0.0.1');
+	}).listen(0);
 	await once(productionServer, 'listening');
 	const productionAddress = productionServer.address();
 	if (!productionAddress || typeof productionAddress !== 'object') {
