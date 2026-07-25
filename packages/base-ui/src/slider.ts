@@ -12,6 +12,8 @@
 // React hydration-warning no-op). With the default `center` alignment, thumb/indicator positions
 // are pure math (`valueToPercent`), so mount and keyboard interaction render identically without
 // layout (pointer drag needs real layout — inert in jsdom, so not differential-covered).
+// Edge-aligned visibility uses octane's real server/hydration snapshot; the
+// React-specific pre-hydration script is not needed for that snapshot contract.
 import {
 	createContext,
 	createElement,
@@ -1016,7 +1018,7 @@ function SliderIndicator(componentProps: any): any {
 	const { render, className, style: styleProp, ref, ...elementProps } = componentProps;
 	const { indicatorPosition, inset, max, min, orientation, renderBeforeHydration, state, values } =
 		useSliderRootContext();
-	const isHydrating = useIsHydrating();
+	const isHydrating = useIsHydrating(subSlot(slot, 'hydrating'));
 	const vertical = orientation === 'vertical';
 	const range = values.length > 1;
 
@@ -1180,7 +1182,7 @@ function SliderThumb(componentProps: any): any {
 		undefined,
 		subSlot(slot, 'posPct'),
 	);
-	const isHydrating = useIsHydrating();
+	const isHydrating = useIsHydrating(subSlot(slot, 'hydrating'));
 
 	const safeLastUsedThumbIndex =
 		lastUsedThumbIndex >= 0 && lastUsedThumbIndex < sliderValues.length ? lastUsedThumbIndex : -1;

@@ -1,9 +1,26 @@
-// Ported from .base-ui/packages/react/src/utils/useIsHydrating.ts. React drives this via
-// `useSyncExternalStore` (server snapshot `true`, client snapshot `false`) so the first client
-// paint of a hydrated tree matches the server, then flips to `false`. octane's binding renders
-// client-only in these tests, so a fresh mount is never hydrating — returns `false`. It only
-// gates the `thumbAlignment: 'edge'` pre-hydration visibility path (inert for the default
-// `center` alignment).
-export function useIsHydrating(): boolean {
+// Ported from Base UI's useIsHydrating: the server snapshot must also be used
+// for the first hydration render so layout-dependent slider styles are adopted
+// before the client snapshot makes the hydrated controls visible.
+import { useSyncExternalStore } from 'octane';
+
+import { S, splitSlot, subSlot } from '../internal';
+
+function subscribe(): () => void {
+	return () => {};
+}
+
+function getSnapshot(): boolean {
 	return false;
+}
+
+function getServerSnapshot(): boolean {
+	return true;
+}
+
+export function useIsHydrating(): boolean;
+export function useIsHydrating(slot: symbol | undefined): boolean;
+export function useIsHydrating(...args: unknown[]): boolean {
+	const [, slotArg] = splitSlot(args);
+	const slot = slotArg ?? S('useIsHydrating');
+	return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot, subSlot(slot, 'store'));
 }

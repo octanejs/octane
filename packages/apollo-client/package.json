@@ -40,6 +40,10 @@
       "types": "./src/react/internal/index.d.ts",
       "default": "./src/react/internal/index.js"
     },
+    "./react/ssr": {
+      "types": "./src/react/ssr/index.d.ts",
+      "default": "./src/react/ssr/index.js"
+    },
     "./testing": {
       "types": "./src/testing/index.d.ts",
       "default": "./src/testing/index.js"

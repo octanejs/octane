@@ -1,6 +1,11 @@
 import { defineConfig, RenderRoute, OCTANE_NONCE_STATE_KEY } from '@octanejs/vite-plugin';
 
 export default defineConfig({
+	server: {
+		rpc: {
+			allowedOrigins: ['http://127.0.0.1'],
+		},
+	},
 	compiler: {
 		renderers: {
 			registry: {

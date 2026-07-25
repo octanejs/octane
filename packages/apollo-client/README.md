@@ -77,6 +77,32 @@ For tests, import Apollo's framework-neutral mocks from
 `@octanejs/apollo-client/testing` and the Octane `MockedProvider` from
 `@octanejs/apollo-client/testing/react`.
 
+## Server rendering
+
+Apollo's `useQuery` does not suspend, so a single server-rendering pass cannot
+wait for network data. Use the Apollo-aware prepass to retain subscriptions,
+finish nested queries, and return Octane's final HTML and scoped CSS:
+
+```ts
+import { createElement } from 'octane';
+import { renderToString } from 'octane/server';
+import { prerenderStatic } from '@octanejs/apollo-client/react/ssr';
+
+const rendered = await prerenderStatic({
+	tree: createElement(App, { client }),
+	renderFunction: renderToString,
+});
+
+const { html, css } = rendered.renderFnResult;
+const apolloState = client.extract();
+```
+
+Create a separate Apollo client for every server request. Restore `apolloState`
+into the browser client's `InMemoryCache` before calling `hydrateRoot` so cached
+queries adopt the server markup without duplicate network requests. Queries
+using `ssr: false` or `fetchPolicy: 'no-cache'` remain client-only, matching
+Apollo 4.2.6. Streaming cache patches are not provided.
+
 ## Compatibility
 
 - Hooks and public TypeScript overloads track Apollo Client 4.2.6.
@@ -88,8 +114,8 @@ For tests, import Apollo's framework-neutral mocks from
 - React Server Components and Apollo's React Compiler output are out of scope.
 - `MockedProvider` accepts normal Octane children blocks; use a descriptor-style
   `children={<App />}` prop when `childProps` must be cloned onto the child.
-- Apollo-aware buffered SSR/cache extraction is not included in this first
-  client release.
+- Apollo-aware buffered SSR is available from `/react/ssr`; streaming cache
+  patches remain out of scope.
 
 The adapter sources are derived from Apollo Client at commit
 `f934b60720fc828a61e04b00988eeefb83d273bc`, under Apollo's MIT license. Local

@@ -10,6 +10,14 @@ work around it in the binding.**
 
 ## Progress (reverse-chronological)
 
+> **SSR foundation (2026-07-25).** `useIsHydrating` now uses Octane's actual
+> server and client external-store snapshots and threads manual hook slots into
+> both slider call sites. A dedicated Node-mode project verifies the hydration
+> snapshot, accessible separators, hidden edge-aligned slider parts, and closed
+> dialog rendering without a DOM. Client hydration adopts real upstream Base UI
+> separator markup, transitions to the client snapshot, and remains interactive.
+> Open-overlay and remaining component hydration are still follow-up work.
+
 > **Phase 3 — ALERTDIALOG COMPLETE (2026-07). Green: 58 base-ui tests (54 differential + 4 behavior),
 > full suite green.** `src/alert-dialog.ts` — a thin Dialog variant (the whole Dialog foundation
 > already supported it): `AlertDialogRoot` = `useRenderDialogRoot(props, 'alert-dialog')` (forces

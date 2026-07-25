@@ -8,8 +8,10 @@ import {
 	useReadQuery,
 } from '@octanejs/apollo-client/react';
 import type { QueryRef } from '@octanejs/apollo-client/react/internal';
+import { prerenderStatic } from '@octanejs/apollo-client/react/ssr';
 import { MockedProvider, type MockedProviderProps } from '@octanejs/apollo-client/testing/react';
 import type { ElementDescriptor } from 'octane';
+import { renderToString, type RenderResult } from 'octane/server';
 
 declare function expectType<T>(value: T): void;
 
@@ -123,3 +125,19 @@ const mockedProviderProps: MockedProviderProps = {
 };
 expectType<MockedProviderProps>(mockedProviderProps);
 expectType<MockedProviderProps>({} as Parameters<typeof MockedProvider>[0]);
+
+const prerendered = prerenderStatic({
+	tree: child,
+	context: { client },
+	renderFunction: renderToString,
+	diagnostics: true,
+});
+prerendered.then((result) => {
+	expectType<string>(result.result);
+	expectType<RenderResult>(result.renderFnResult);
+	expectType<boolean>(result.aborted);
+	expectType<number | undefined>(result.diagnostics?.renderCount);
+});
+
+// @ts-expect-error an Apollo-aware prepass requires an Octane render function
+prerenderStatic({ tree: child });

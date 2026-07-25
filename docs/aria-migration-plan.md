@@ -1,5 +1,13 @@
 # React Aria → octane migration plan (`@octanejs/aria`)
 
+> **Progress (2026-07-25): foundational SSR and hydration covered.** A
+> dedicated Node-mode test project now verifies `SSRProvider`, server snapshots,
+> explicit accessible label relationships, and injected LTR/RTL locales without
+> a browser DOM. The client suite hydrates real upstream React Aria server
+> markup, verifies host-node adoption and consistent ARIA references, observes
+> the server-to-client snapshot transition, and proves event interactivity.
+> Overlay and collection SSR registration remain Phase-8 follow-up work.
+
 > **Progress (2026-07-19, later): Tree/Table follow-up COMPLETE.** The two
 > deferred collection verticals landed: stately grid
 > (`GridCollection`/`useGridState`) + the full stately table area
