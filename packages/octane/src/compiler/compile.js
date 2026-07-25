@@ -2174,6 +2174,84 @@ function rewriteAutoCallback(stmt, stable, componentLocals, ctx) {
 	return modified ? { ...stmt, declarations: newDecls } : stmt;
 }
 
+// Auto-calculation: lower a derived `const X = <expr containing a render-time
+// call>` to `useMemo(() => <expr>, [deps])` so its identity is stable while its
+// inputs are. Without this, an idiomatic `const visible = todos.filter(...)`
+// allocates a fresh array every render, and every downstream consumer keyed on
+// its identity — an autoMemo region's dependency tuple, a memo() child's prop —
+// misses unconditionally. The region cache is only as good as the stability of
+// what it keys on.
+//
+// This is the calculation half of the same pure-render, immutable-snapshot
+// contract autoMemo's regions assume, and it is deliberately NOT gated on the
+// callee-shape rule that governs regions: a calculation is a value the author
+// hoisted into a local, and React Compiler memoizes those unconditionally.
+// docs/differences-from-react.md documents the resulting staleness contract.
+//
+// Scope: single-declarator `const` with an Identifier id whose init reaches a
+// render-time call (isPropCreationExpr — no JSX, no hook-shaped calls), whose
+// value the render tree actually reads (memoizing a value nothing renders only
+// adds cells), and whose dependencies are all component locals. Bodies that
+// already went through Pass A′ arrive with hook-shaped inits and are skipped.
+function rewriteAutoCalculation(stmt, componentLocals, renderReadNames, ctx) {
+	if (stmt.type !== 'VariableDeclaration' || stmt.kind !== 'const') return stmt;
+	if (stmt.declarations?.length !== 1) return stmt;
+	const decl = stmt.declarations[0];
+	if (!decl || decl.id?.type !== 'Identifier' || !decl.init) return stmt;
+	if (!renderReadNames.has(decl.id.name)) return stmt;
+	const init = unwrapTsExpr(decl.init);
+	// An arrow/function init is auto-callback's job, not ours.
+	if (FN_TYPES.has(init?.type)) return stmt;
+	if (!isPropCreationExpr(init, ctx)) return stmt;
+	const deps = [];
+	const seen = new Set();
+	for (const name of collectFreeIdentifiers(init, [])) {
+		if (name === decl.id.name) return stmt; // self-referential; leave alone
+		if (!componentLocals.has(name)) continue;
+		if (seen.has(name)) continue;
+		seen.add(name);
+		deps.push(name);
+	}
+	// Every free name must be a witnessed component local. An unwitnessed
+	// module/global read would make the cache freeze on something no dependency
+	// can observe, which is a different bargain from the one above.
+	for (const name of collectFreeIdentifiers(init, [])) {
+		if (
+			!componentLocals.has(name) &&
+			!ctx.moduleFunctionDeclarations?.has(name) &&
+			!ctx.importedNames?.has(name)
+		) {
+			return stmt;
+		}
+	}
+	return {
+		...stmt,
+		declarations: [
+			{
+				...decl,
+				init: inheritOriginLoc(
+					b.call(
+						{ ...b.id('useMemo'), _octaneGenerated: true },
+						b.arrow([], init),
+						b.array(deps.map((n) => b.id(n))),
+					),
+					init,
+				),
+			},
+		],
+	};
+}
+
+// Names the render tree actually reads, resolved against the scopes the
+// statement walker cannot see (nested functions, loops, `@for` item bindings,
+// directive-arm blocks) so a shadowing inner binding never nominates an
+// unrelated body const.
+function collectRenderReadNames(jsxNodes, ctx) {
+	const into = new Set();
+	collectUseArgumentRoots(jsxNodes, ctx, into, true, true);
+	return into;
+}
+
 function allocAutoMemoCell(ctx, dependencyCount) {
 	const base = ctx.currentAutoMemoOffset || 0;
 	const init = base + dependencyCount;
@@ -2858,6 +2936,12 @@ function containsRenderCall(stmts, memoCtx = null) {
 	return found;
 }
 
+// A hook call is identified by naming convention — the same signal React and
+// React Compiler key on. Prefixed forms (`unstable_useRouterState`) count: a
+// binding that mirrors React Router's `unstable_` naming is still a hook, and
+// wrapping one in a cache would freeze its subscription rather than merely
+// stale a value.
+const HOOK_NAME_CONVENTION_RE = /(?:^|_)use(?:$|[A-Z])/;
 const HOOK_CALLEE_NAME_RE = /^use[A-Z]/;
 
 function isHookCalleeName(name) {
@@ -9386,6 +9470,19 @@ function compileFunctionBody(node, ctx, name, parentNs = 'html', cssHash = null,
 			creations,
 			puParamNames,
 		);
+		// Auto-calculation runs AFTER Pass A′ so use()-fed chains keep their
+		// Symbol-slot treatment (their rewritten inits are hook-shaped and are
+		// skipped here), and BEFORE Pass A/B so the numeric-slot useMemo it mints is
+		// lowered by the authored inline tier rather than re-wrapped. Client only:
+		// a server render evaluates each body once, so a cache is pure overhead.
+		if (ctx.currentComponentLocals && ctx.mode !== 'server') {
+			const renderReadNames = collectRenderReadNames(jsxNodes, ctx);
+			if (renderReadNames.size > 0) {
+				workingStatements = workingStatements.map((statement) =>
+					rewriteAutoCalculation(statement, ctx.currentComponentLocals, renderReadNames, ctx),
+				);
+			}
+		}
 		workingStatements = parallelUseMemoizePass(workingStatements, ctx, name, creations, [], null);
 		jsxNodes = parallelUseWalkJsx(jsxNodes, ctx, name, creations, warmChildren, [], new Set());
 		const warm = buildWarmArtifacts(node, ctx, name, creations, warmChildren);
@@ -10210,14 +10307,17 @@ function isPropCreationExpr(expr, ctx) {
 	function isHookishCallee(callee) {
 		if (callee.type === 'Identifier') {
 			return (
-				/^use($|[A-Z])/.test(callee.name) || ctx?._parallelUseAliases?.has(callee.name) === true
+				HOOK_NAME_CONVENTION_RE.test(callee.name) ||
+				ctx?._parallelUseAliases?.has(callee.name) === true
 			);
 		}
 		if (
 			(callee.type === 'MemberExpression' || callee.type === 'OptionalMemberExpression') &&
 			!callee.computed
 		) {
-			return callee.property.type === 'Identifier' && /^use($|[A-Z])/.test(callee.property.name);
+			return (
+				callee.property.type === 'Identifier' && HOOK_NAME_CONVENTION_RE.test(callee.property.name)
+			);
 		}
 		return false;
 	}
@@ -10632,7 +10732,13 @@ function memoizeUseFedCreations(stmts, jsxNodes, ctx, componentName, creations, 
 // Deep scan (nested functions and render-tree nodes included — a consumer
 // anywhere makes stability load-bearing) for `use(<arg>)` arguments' free
 // identifier roots.
-function collectUseArgumentRoots(root, ctx, into, startInRenderTree = false) {
+function collectUseArgumentRoots(
+	root,
+	ctx,
+	into,
+	startInRenderTree = false,
+	seedRenderReads = false,
+) {
 	walk(root, EMPTY_BOUND_SET, startInRenderTree);
 
 	// `bound` carries every name introduced by a scope the candidate collector
@@ -10701,6 +10807,9 @@ function collectUseArgumentRoots(root, ctx, into, startInRenderTree = false) {
 			walk(n.body, inner, true);
 			walk(n.empty, bound, true);
 			return;
+		}
+		if (seedRenderReads && inRenderTree && n.type === 'Identifier' && !bound.has(n.name)) {
+			into.add(n.name);
 		}
 		if (inRenderTree && n.type === 'BlockStatement') {
 			const inner = new Set(bound);
