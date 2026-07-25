@@ -96,6 +96,7 @@ jobs:
               { owner, repo, run_id: runId, per_page: 100 },
             );
             const requiredJobs = new Set([
+              "examples",
               "lint",
               "Lynx compatibility (current)",
               "Lynx compatibility (minimum)",

@@ -364,8 +364,8 @@ jobs:
       - name: Build octane package and verify dist
         run: pnpm build
 
-  typecheck_run:
-    name: typecheck packages, website, and examples
+  typecheck:
+    name: typecheck
     runs-on: ubuntu-latest
 
     steps:
@@ -390,7 +390,7 @@ jobs:
       - name: Validate example catalog and orchestration
         run: pnpm examples:static:check
 
-  examples:
+  example_shard:
     name: example apps (${{ matrix.shard }})
     runs-on: ubuntu-latest
 
@@ -424,22 +424,20 @@ jobs:
       - name: Run example browser journeys
         run: pnpm examples:e2e -- --shard=${{ matrix.shard }}
 
-  # Keep the existing protected `typecheck` context stable while the actual
-  # typecheck and browser-heavy example gate run in parallel. `always()` turns
-  # either failed dependency into a failed required check instead of a skip.
-  typecheck:
-    needs: [typecheck_run, examples]
+  # Keep browser journeys behind their own stable aggregate check so the
+  # protected `typecheck` context can finish as soon as typechecking does.
+  # `always()` makes a failed shard produce a failed example check, not a skip.
+  examples:
+    name: examples
+    needs: example_shard
     if: ${{ always() }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Verify typecheck and example apps passed
+      - name: Verify all example shards passed
         env:
-          TYPECHECK_RESULT: ${{ needs.typecheck_run.result }}
-          EXAMPLES_RESULT: ${{ needs.examples.result }}
-        run: |
-          test "$TYPECHECK_RESULT" = success
-          test "$EXAMPLES_RESULT" = success
+          EXAMPLE_SHARD_RESULT: ${{ needs.example_shard.result }}
+        run: test "$EXAMPLE_SHARD_RESULT" = success
 
   three_compat:
     name: Three compatibility (${{ matrix.lane }})
