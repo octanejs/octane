@@ -1,5 +1,14 @@
 # @octanejs/apollo-client
 
+## 0.1.10
+
+### Patch Changes
+
+- faa2ba9: Add Apollo's Octane-native multi-pass server renderer and correct Base UI's server and hydration snapshots.
+- Updated dependencies [16dc385]
+- Updated dependencies [7fa4075]
+  - octane@0.1.15
+
 ## 0.1.9
 
 ### Patch Changes

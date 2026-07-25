@@ -1,5 +1,13 @@
 # @octanejs/tanstack-ai
 
+## 0.0.9
+
+### Patch Changes
+
+- Updated dependencies [16dc385]
+- Updated dependencies [7fa4075]
+  - octane@0.1.15
+
 ## 0.0.8
 
 ### Patch Changes
