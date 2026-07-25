@@ -57,11 +57,12 @@ maintainer tools):
 
 ## Tools (always available)
 
-The server initialization instructions direct coding agents to call
-`octane_engineering_plan` and load `build-octane-software` before creating or
-materially changing Octane code. This makes the correctness, performance
-evidence, adversarial self-review, and handoff requirements available even when
-the host does not automatically discover skills.
+The server initialization instructions are one orienting sentence plus a pointer
+to `octane_engineering_plan`, because they are injected into every session
+whether or not it touches Octane. The correctness, performance-evidence,
+self-review, and handoff requirements live in that tool response, so they stay
+reachable even on hosts that do not discover skills. Each tool description says
+when to call it.
 
 ### `octane_engineering_plan`
 
@@ -112,24 +113,30 @@ without registering its React-package mapping fails CI.
 
 Returns a skill by name. Bundled skills (shipped with this package):
 
-- `bridge-react-package` — the full workflow for porting a React library.
-- `build-octane-software` — production engineering, performance, validation,
+- `bridge-react-package`: the full workflow for porting a React library.
+- `build-octane-software`: production engineering, performance, validation,
   and adversarial self-review gates for Octane code.
-- `migrate-react-component` — React JSX to `.tsrx` conversion reference.
-- `react-divergences` — Octane's intentional differences from React.
-- `setup-ssr` — server rendering and hydration setup.
+- `migrate-react-component`: React JSX to `.tsrx` conversion reference.
+- `react-divergences`: Octane's intentional differences from React.
+- `setup-ssr`: server rendering and hydration setup.
 
-When running inside the octane monorepo, the maintainer skills from
-`.ai/skills` are also available: `react-library-port`, `bug-hunter`,
+When running inside the octane monorepo, the skills from `.rulesync/skills` are
+also available: `authoring-tsrx`, `react-library-port`, `bug-hunter`,
 `create-a-pr`, `handle-issue`, `octane-core-extend`, `triage`,
-`performance-audit`.
+`performance-audit`. A test compares this map against the directory in both
+directions, so a new skill cannot stay unreachable here. This tool reads the RuleSync source, and
+`pnpm rules:generate` writes the per-agent copies (`.claude/skills/`,
+`.github/skills/`, `.cursor/skills/`, `.gemini/skills/`) from the same text, so
+hosts that discover skills natively and hosts that call this tool see the same
+thing.
 
 ## Tools (octane monorepo only)
 
 ### `octane_project_map`
 
-Returns `.ai/project-map.md` with package layout, authoritative sources,
-invariants, and validation commands.
+Returns `AGENTS.md`: the RuleSync-generated root rule, covering what Octane is,
+which source owns which behavior, the intentional divergences from React, and the
+validation commands. CI fails if it drifts from its source in `.rulesync/rules/`.
 
 ### `octane_triage_paths`
 
