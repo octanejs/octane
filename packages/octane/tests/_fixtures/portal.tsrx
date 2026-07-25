@@ -2,6 +2,24 @@ import { useState, createContext, use, createPortal } from 'octane';
 
 export const Theme = createContext('light');
 
+export type PortalPlacementMode = 'portal' | 'null' | 'inline';
+
+export interface PortalPlacementControls {
+	setMode(mode: PortalPlacementMode): void;
+	rerender(): void;
+}
+
+interface PortalTargetProps {
+	target: Element;
+}
+
+interface PortalPlacementProps extends PortalTargetProps {
+	initialMode: PortalPlacementMode;
+	bind(controls: PortalPlacementControls): void;
+}
+
+const PlacementMode = createContext<PortalPlacementMode>('portal');
+
 export function PortalledChild() @{
 	const theme = use(Theme);
 	<span class="child">{theme as string}</span>
@@ -48,4 +66,44 @@ export function InlineModal(props) @{
 		<button id="bump" onClick={() => setN(n + 1)}>{'bump'}</button>
 		{createPortal(<div class="inline-modal">{'count:' + n}</div>, props.target)}
 	</section>
+}
+
+function PortalOwnedStateChild() {
+	const [updated, setUpdated] = useState(false);
+	if (updated) {
+		return <section data-slot="portal-owned-child">{'updated'}</section>;
+	}
+	return <button
+		data-slot="portal-owned-child"
+		onClick={() => setUpdated(true)}
+	>{'initial'}</button>;
+}
+
+export function PortalOwnedStateApp(props: PortalTargetProps) @{
+	<div data-slot="portal-owner">{createPortal(<PortalOwnedStateChild />, props.target)}</div>
+}
+
+function PlacementFirstChild(props: PortalTargetProps) {
+	const mode = use(PlacementMode);
+	if (mode === 'portal') {
+		return createPortal(<div data-slot="portalled">{'PORTALLED'}</div>, props.target);
+	}
+	if (mode === 'null') return null;
+	return <div data-slot="first">{'FIRST'}</div>;
+}
+
+export function PortalPlacementApp(props: PortalPlacementProps) @{
+	const [mode, setMode] = useState<PortalPlacementMode>(props.initialMode);
+	const [tick, setTick] = useState(0);
+	props.bind({
+		setMode,
+		rerender: () => setTick(tick + 1),
+	});
+	<PlacementMode.Provider value={mode}>
+		<div data-slot="parent" data-tick={tick as string}>
+			<PlacementFirstChild target={props.target} />
+			<main data-slot="second">{'SECOND'}</main>
+			<aside data-slot="third">{'THIRD'}</aside>
+		</div>
+	</PlacementMode.Provider>
 }

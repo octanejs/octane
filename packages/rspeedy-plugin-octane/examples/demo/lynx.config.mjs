@@ -29,7 +29,9 @@ export default defineConfig(({ command }) => {
 			},
 			...(testOutputRoot === undefined ? {} : { distPath: { root: testOutputRoot } }),
 		},
-		...(testServerPort === undefined ? {} : { server: { port: Number(testServerPort) } }),
+		...(testServerPort === undefined
+			? {}
+			: { server: { port: Number(testServerPort), strictPort: true } }),
 		source: {
 			entry: {
 				main: './src/index.ts',

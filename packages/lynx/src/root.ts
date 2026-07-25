@@ -18,6 +18,11 @@ import { createLynxBackgroundTransport, type LynxBackgroundTransport } from './c
 import type { LynxContextProxy, LynxMainThreadWorkletWireDescriptor } from './core/protocol.js';
 import type { LynxCreateSelectorQuery } from './core/nodes-ref.js';
 import {
+	lynxEnvironmentIsInjected,
+	readAmbientQueueMicrotask,
+	readLynxEnvironment,
+} from './core/environment.js';
+import {
 	createLynxBackgroundFunctionRegistry,
 	installBackgroundCallBridge,
 	type LynxBackgroundFunctionDescriptor,
@@ -36,7 +41,7 @@ interface LynxBackgroundGlobals {
 }
 
 export interface CreateLynxRootOptions {
-	/** Background-thread global object. Defaults to the current global object. */
+	/** Background-thread global object. Defaults to the current Lynx wrapper environment. */
 	readonly target?: object;
 	/** Explicit public ContextProxy, primarily for framework bootstrap and tests. */
 	readonly context?: LynxContextProxy;
@@ -69,6 +74,17 @@ function readBackgroundGlobals(target: object): LynxBackgroundGlobals {
 		throw new Error('Octane Lynx roots are available only in the Lynx background runtime.');
 	}
 	return globals;
+}
+
+function defaultBackgroundTarget(): object {
+	// An ordinary global host keeps globalThis as the target: nothing is
+	// allocated, every ambient binding stays reachable, and ambient functions
+	// keep their original receiver. Only the official wrapper's lexical-only
+	// injection needs a synthetic target.
+	if (!lynxEnvironmentIsInjected()) return globalThis;
+	const queueMicrotask = readAmbientQueueMicrotask();
+	const lynx = readLynxEnvironment();
+	return queueMicrotask === undefined ? { lynx } : { lynx, queueMicrotask };
 }
 
 function resolveContext(
@@ -143,7 +159,7 @@ function batchBackgroundExecutionIds(batch: UniversalHostBatch): Set<string> {
 
 /** Create one background-owned root and its isolated async transport state. */
 export function createLynxRoot(options: CreateLynxRootOptions = {}): LynxRoot {
-	const target = readBackgroundGlobals(options.target ?? globalThis);
+	const target = readBackgroundGlobals(options.target ?? defaultBackgroundTarget());
 	const context = resolveContext(target, options.context);
 	const scheduleMicrotask = resolveMicrotaskScheduler(target, options.scheduleMicrotask);
 	const createSelectorQuery = target.lynx?.createSelectorQuery;

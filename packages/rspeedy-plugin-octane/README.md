@@ -1,4 +1,4 @@
-# `@octanejs/rspeedy-plugin` (private Milestones 6–10 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestones 6–11 native application path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
@@ -16,15 +16,37 @@ imports, and Rspeedy's debug metadata remain in Rspeedy's normal build graph.
 Development builds wire the pinned Lynx dev transport when Rspeedy enables HMR
 or live reload.
 
-This is a **private source/build milestone**, not a published technical preview.
-The repository proves graph specialization, bundle construction, decoding, and
-dual-layer lazy-chunk emission; it does not yet prove first paint, adoption, or
-dynamic chunk execution on Lynx Web, Android Explorer, or iOS Explorer, nor
-does it prove state-preserving HMR on those targets.
+This is a **private native-application milestone**, not a published technical
+preview. The repository proves graph specialization, bundle construction,
+decoding, dual-layer lazy-chunk emission, and one visible first paint in the
+official macOS Explorer 3.9 arm64 asset. It does not prove adopted-node
+identity, automated native interaction, dynamic chunk execution on Lynx Web,
+Android Explorer, or iOS Explorer, or state-preserving HMR on those targets.
 
 ## One-command repository demo
 
-From the repository root, run:
+On macOS arm64 or x64, the native acceptance path is one command:
+
+```bash
+pnpm lynx:demo:native
+```
+
+The launcher selects the matching official Lynx 3.9.0 macOS Explorer artifact,
+downloads its archive from the release only when absent, verifies the pinned
+SHA-256 digest on every launch, and builds a per-run application lease under
+`~/Library/Caches/octane/lynx-explorer/3.9.0`. The verified archive persists;
+the isolated extraction is removed after Explorer's process group stops. The
+launcher then starts the existing demo server on an available strict localhost
+port, verifies the Lynx binary response, and directly launches the Explorer
+executable with that exact `main.lynx.bundle` URL. Closing Explorer or pressing
+Ctrl-C terminates both Explorer and the development server.
+
+Use `OCTANE_LYNX_EXPLORER_CACHE_DIR` to move the cache,
+`OCTANE_LYNX_EXPLORER_EXECUTABLE` to use an already-installed executable, or
+`OCTANE_LYNX_DEMO_PORT` to request a particular free port. The launcher does not
+run `codesign`; integrity comes from the pinned release URL and checksum.
+
+For an Android/iOS device, simulator, or a separately installed Explorer, run:
 
 ```bash
 pnpm lynx:demo
@@ -41,9 +63,11 @@ layout and CSS, dual-thread startup, and a background-owned state update through
 checks.
 
 The repository's automated gate starts the development command on an isolated
-port, fetches and decodes this exact bundle, and verifies server teardown. It
-does not replace the Explorer/device acceptance gate or prove native first
-paint, adoption, tap delivery, or live reload.
+port, fetches and decodes this exact bundle, and verifies server teardown.
+Launcher unit tests do not download Explorer or open a native window.
+The qualified native evidence records a visible `Count 0` first screen and
+clean Octane main/background transport logs. It does not claim the native tap,
+because synthetic input required macOS accessibility permission during capture.
 
 ## Application mode
 

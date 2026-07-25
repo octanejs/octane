@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22"
   },
-  "description": "Private Milestone 10 dual-thread Rspeedy integration and one-command demo for Octane Lynx.",
+  "description": "Private Milestone 11 dual-thread Rspeedy integration and checksum-pinned macOS Explorer runner for Octane Lynx.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/octanejs/octane.git",
@@ -34,6 +34,7 @@
   },
   "scripts": {
     "demo": "rspeedy dev --root examples/demo",
+    "demo:native": "node scripts/run-lynx-explorer-demo.mjs",
     "demo:build": "rspeedy build --root examples/demo",
     "demo:typecheck": "tsrx-tsc --noEmit -p examples/demo/tsconfig.json",
     "demo:check": "pnpm demo:typecheck && pnpm demo:build",

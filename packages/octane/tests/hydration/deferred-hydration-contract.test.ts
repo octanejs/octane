@@ -14,10 +14,22 @@ import {
 import { renderToString } from 'octane/server';
 import { flushEffects } from '../_helpers.js';
 import { loadServerFixture } from '../_server-fixture.js';
+import {
+	createHydrationInteractionEvent,
+	expectedHydrationReplayMetadata,
+	HYDRATION_INTERACTION_CROSS_REALM_CASES,
+	HYDRATION_INTERACTION_EVENT_CASES,
+	HYDRATION_INTERACTION_EVENT_TYPES,
+	observeHydrationReplays,
+} from './_hydration-interaction-event-matrix.js';
 import * as client from './_fixtures/deferred-hydration-contract.tsrx';
+import * as eventReplayClient from './_fixtures/deferred-hydration-event-replay.tsrx';
 
 const FIXTURE = 'packages/octane/tests/hydration/_fixtures/deferred-hydration-contract.tsrx';
 const server = loadServerFixture<typeof client>(FIXTURE);
+const EVENT_REPLAY_FIXTURE =
+	'packages/octane/tests/hydration/_fixtures/deferred-hydration-event-replay.tsrx';
+const eventReplayServer = loadServerFixture<typeof eventReplayClient>(EVENT_REPLAY_FIXTURE);
 
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 	let resolve!: (value: T) => void;
@@ -116,6 +128,312 @@ describe('deferred hydration contract edges', () => {
 			expect(onClick).toHaveBeenCalledOnce();
 		});
 	}
+
+	it('replays every public interaction event once with its platform shape and queue semantics', () => {
+		const when = interaction({ events: HYDRATION_INTERACTION_EVENT_TYPES });
+		container.innerHTML = renderToString(eventReplayServer.DeferredHydrationEventReplay, {
+			when,
+		}).html;
+		const parent = container.querySelector('#hydration-replay-parent')!;
+		const target = container.querySelector('#hydration-replay-target')!;
+		const relatedTarget = container.querySelector('#hydration-replay-related')!;
+		const initialHash = location.hash;
+		const originalOutcomes: Array<{
+			type: string;
+			dispatched: boolean;
+			defaultPrevented: boolean;
+		}> = [];
+
+		initializeHydrationEventCapture(document);
+		for (const testCase of HYDRATION_INTERACTION_EVENT_CASES) {
+			const event = createHydrationInteractionEvent(document.defaultView!, relatedTarget, testCase);
+			originalOutcomes.push({
+				type: testCase.type,
+				dispatched: target.dispatchEvent(event),
+				defaultPrevented: event.defaultPrevented,
+			});
+		}
+
+		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
+		const onHydrated = vi.fn(() => {
+			observation = observeHydrationReplays(parent, target);
+		});
+		root = hydrateRoot(container, eventReplayClient.DeferredHydrationEventReplay, {
+			when,
+			onHydrated,
+		});
+		flushSync(() => {});
+		flushEffects();
+
+		expect(container.querySelector('#hydration-replay-target')).toBe(target);
+		expect(onHydrated).toHaveBeenCalledOnce();
+		expect(originalOutcomes).toEqual(
+			HYDRATION_INTERACTION_EVENT_CASES.map((testCase) => ({
+				type: testCase.type,
+				dispatched: !(testCase.bubbles && testCase.cancelable),
+				defaultPrevented: testCase.bubbles && testCase.cancelable,
+			})),
+		);
+
+		const records = observation!.records;
+		const targetRecords = records.filter((record) => record.phase === 'target');
+		const parentRecords = records.filter((record) => record.phase === 'parent');
+		const bubblingCases = HYDRATION_INTERACTION_EVENT_CASES.filter((testCase) => testCase.bubbles);
+		expect(targetRecords.map((record) => record.type)).toEqual(HYDRATION_INTERACTION_EVENT_TYPES);
+		expect(parentRecords.map((record) => record.type)).toEqual(
+			bubblingCases.map((testCase) => testCase.type),
+		);
+
+		for (let i = 0; i < HYDRATION_INTERACTION_EVENT_CASES.length; i++) {
+			const testCase = HYDRATION_INTERACTION_EVENT_CASES[i];
+			expect(targetRecords[i]).toMatchObject({
+				phase: 'target',
+				type: testCase.type,
+				targetId: 'hydration-replay-target',
+				currentTargetId: 'hydration-replay-target',
+				targetIsOriginal: true,
+				bubbles: testCase.bubbles,
+				cancelable: testCase.cancelable,
+				composed: testCase.composed,
+				defaultPreventedBefore: false,
+				defaultPreventedAfter: testCase.type === 'click',
+				...expectedHydrationReplayMetadata(testCase),
+			});
+		}
+
+		for (let i = 0; i < parentRecords.length; i++) {
+			const testCase = bubblingCases[i];
+			expect(parentRecords[i]).toMatchObject({
+				phase: 'parent',
+				type: testCase.type,
+				targetId: 'hydration-replay-target',
+				currentTargetId: 'hydration-replay-parent',
+				targetIsOriginal: true,
+				bubbles: true,
+				cancelable: testCase.cancelable,
+				composed: testCase.composed,
+				defaultPreventedBefore: testCase.type === 'click',
+				defaultPreventedAfter: testCase.type === 'click',
+				...expectedHydrationReplayMetadata(testCase),
+			});
+		}
+		expect(location.hash).toBe(initialHash);
+		observation!.cleanup();
+	});
+
+	it('preserves replay event subclasses from another document realm', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
+		try {
+			const foreignDocument = iframe.contentDocument!;
+			const foreignWindow = iframe.contentWindow!;
+			const foreignContainer = foreignDocument.createElement('div');
+			foreignDocument.body.appendChild(foreignContainer);
+			const replayCases = HYDRATION_INTERACTION_EVENT_CASES.filter(
+				(testCase) => testCase.type === 'keydown' || testCase.type === 'pointerdown',
+			);
+			const when = interaction({ events: replayCases.map((testCase) => testCase.type) });
+			foreignContainer.innerHTML = renderToString(eventReplayServer.DeferredHydrationEventReplay, {
+				when,
+			}).html;
+			const parent = foreignContainer.querySelector('#hydration-replay-parent')!;
+			const target = foreignContainer.querySelector('#hydration-replay-target')!;
+			const relatedTarget = foreignContainer.querySelector('#hydration-replay-related')!;
+
+			initializeHydrationEventCapture(foreignDocument);
+			for (const testCase of replayCases) {
+				target.dispatchEvent(
+					createHydrationInteractionEvent(foreignWindow, relatedTarget, testCase),
+				);
+			}
+
+			root = hydrateRoot(foreignContainer, eventReplayClient.DeferredHydrationEventReplay, {
+				when,
+				onHydrated() {
+					observation = observeHydrationReplays(parent, target);
+				},
+			});
+			flushSync(() => {});
+			flushEffects();
+
+			const records = observation!.records.filter((record) => record.phase === 'target');
+			expect(records.map((record) => record.type)).toEqual(['keydown', 'pointerdown']);
+			for (let i = 0; i < replayCases.length; i++) {
+				expect(records[i]).toMatchObject({
+					type: replayCases[i].type,
+					targetIsOriginal: true,
+					...expectedHydrationReplayMetadata(replayCases[i]),
+				});
+			}
+		} finally {
+			observation?.cleanup();
+			root?.unmount();
+			root = undefined;
+			iframe.remove();
+		}
+	});
+
+	it('classifies parent-realm events before replaying them in an iframe realm', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
+		try {
+			const foreignDocument = iframe.contentDocument!;
+			const foreignWindow = iframe.contentWindow!;
+			const foreignContainer = foreignDocument.createElement('div');
+			foreignDocument.body.appendChild(foreignContainer);
+			const replayCases = HYDRATION_INTERACTION_CROSS_REALM_CASES;
+			const when = interaction({ events: replayCases.map((testCase) => testCase.type) });
+			foreignContainer.innerHTML = renderToString(eventReplayServer.DeferredHydrationEventReplay, {
+				when,
+			}).html;
+			const parent = foreignContainer.querySelector('#hydration-replay-parent')!;
+			const target = foreignContainer.querySelector('#hydration-replay-target')!;
+			const relatedTarget = foreignContainer.querySelector('#hydration-replay-related')!;
+
+			initializeHydrationEventCapture(foreignDocument);
+			for (const testCase of replayCases) {
+				target.dispatchEvent(
+					createHydrationInteractionEvent(document.defaultView!, relatedTarget, testCase),
+				);
+			}
+
+			const targetRealmMatches: boolean[] = [];
+			root = hydrateRoot(foreignContainer, eventReplayClient.DeferredHydrationEventReplay, {
+				when,
+				onHydrated() {
+					for (const testCase of replayCases) {
+						target.addEventListener(
+							testCase.type,
+							(event) => {
+								switch (testCase.family) {
+									case 'focus':
+										targetRealmMatches.push(event instanceof foreignWindow.FocusEvent);
+										break;
+									case 'keyboard':
+										targetRealmMatches.push(event instanceof foreignWindow.KeyboardEvent);
+										break;
+									case 'mouse':
+										targetRealmMatches.push(event instanceof foreignWindow.MouseEvent);
+										break;
+									case 'pointer':
+										targetRealmMatches.push(event instanceof foreignWindow.PointerEvent);
+										break;
+								}
+							},
+							{ once: true },
+						);
+					}
+					observation = observeHydrationReplays(parent, target);
+				},
+			});
+			flushSync(() => {});
+			flushEffects();
+
+			const records = observation!.records.filter((record) => record.phase === 'target');
+			expect(records.map((record) => record.type)).toEqual([
+				'focusin',
+				'keydown',
+				'mousedown',
+				'pointerdown',
+			]);
+			expect(targetRealmMatches).toEqual([true, true, true, true]);
+			for (let i = 0; i < replayCases.length; i++) {
+				expect(records[i]).toMatchObject({
+					type: replayCases[i].type,
+					targetIsOriginal: true,
+					...expectedHydrationReplayMetadata(replayCases[i]),
+				});
+			}
+		} finally {
+			observation?.cleanup();
+			root?.unmount();
+			root = undefined;
+			iframe.remove();
+		}
+	});
+
+	// The replay clone is built from the TARGET's constructors, never the incoming
+	// event's, so the same realm crossing must hold in the opposite direction: an
+	// embedded widget can dispatch an event of its own realm into its host document.
+	it('classifies iframe-realm events before replaying them at a host-document target', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
+		try {
+			const foreignWindow = iframe.contentWindow!;
+			expect(foreignWindow.MouseEvent).not.toBe(MouseEvent);
+			const replayCases = HYDRATION_INTERACTION_CROSS_REALM_CASES;
+			const when = interaction({ events: replayCases.map((testCase) => testCase.type) });
+			container.innerHTML = renderToString(eventReplayServer.DeferredHydrationEventReplay, {
+				when,
+			}).html;
+			const parent = container.querySelector('#hydration-replay-parent')!;
+			const target = container.querySelector('#hydration-replay-target')!;
+			const relatedTarget = container.querySelector('#hydration-replay-related')!;
+
+			initializeHydrationEventCapture(document);
+			for (const testCase of replayCases) {
+				target.dispatchEvent(
+					createHydrationInteractionEvent(foreignWindow, relatedTarget, testCase),
+				);
+			}
+
+			const targetRealmMatches: boolean[] = [];
+			root = hydrateRoot(container, eventReplayClient.DeferredHydrationEventReplay, {
+				when,
+				onHydrated() {
+					for (const testCase of replayCases) {
+						target.addEventListener(
+							testCase.type,
+							(event) => {
+								switch (testCase.family) {
+									case 'focus':
+										targetRealmMatches.push(event instanceof FocusEvent);
+										break;
+									case 'keyboard':
+										targetRealmMatches.push(event instanceof KeyboardEvent);
+										break;
+									case 'mouse':
+										targetRealmMatches.push(event instanceof MouseEvent);
+										break;
+									case 'pointer':
+										targetRealmMatches.push(event instanceof PointerEvent);
+										break;
+								}
+							},
+							{ once: true },
+						);
+					}
+					observation = observeHydrationReplays(parent, target);
+				},
+			});
+			flushSync(() => {});
+			flushEffects();
+
+			const records = observation!.records.filter((record) => record.phase === 'target');
+			expect(records.map((record) => record.type)).toEqual([
+				'focusin',
+				'keydown',
+				'mousedown',
+				'pointerdown',
+			]);
+			expect(targetRealmMatches).toEqual([true, true, true, true]);
+			for (let i = 0; i < replayCases.length; i++) {
+				expect(records[i]).toMatchObject({
+					type: replayCases[i].type,
+					targetIsOriginal: true,
+					...expectedHydrationReplayMetadata(replayCases[i]),
+				});
+			}
+		} finally {
+			observation?.cleanup();
+			root?.unmount();
+			root = undefined;
+			iframe.remove();
+		}
+	});
 
 	it('keeps function-form visibility dormant after hydrateRoot interaction setup', async () => {
 		let intersect!: IntersectionObserverCallback;

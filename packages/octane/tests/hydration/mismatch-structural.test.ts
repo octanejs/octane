@@ -450,3 +450,141 @@ describe('hydrateRoot — PROD runtime validation (root nodeType+tag only, parse
 		expect(warns()).toEqual([]);
 	});
 });
+
+// RDX-HYD-006 — adapted from TanStack/redact's
+// hydration-mismatch-recovery.test.tsx. Octane recovers its compiler-owned DOM
+// ranges in place rather than unwinding Redact checkpoints, so the observable
+// contract is identity outside the failed range plus live replacement content.
+describe.each([
+	{
+		name: 'development compile',
+		client: devClientModule(STRUCTURAL, 'structural.tsrx'),
+		warns: true,
+	},
+	{
+		name: 'production compile',
+		client: prodClientModule(STRUCTURAL, 'structural.tsrx'),
+		warns: false,
+	},
+])('hydrateRoot — mismatch containment ($name)', ({ client, warns: shouldWarn }) => {
+	const server = serverModule(STRUCTURAL, 'structural.tsrx');
+	let container: HTMLElement;
+	let errSpy: ReturnType<typeof vi.spyOn>;
+
+	beforeEach(() => {
+		container = document.createElement('div');
+		document.body.appendChild(container);
+		errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+	});
+
+	afterEach(() => {
+		container.remove();
+		errSpy.mockRestore();
+	});
+
+	function expectDiagnostics(): void {
+		const messages = errSpy.mock.calls
+			.map((call) => String(call[0]))
+			.filter((message) => message.includes('hydration mismatch'));
+		if (shouldWarn) expect(messages.length).toBeGreaterThanOrEqual(1);
+		else expect(messages).toEqual([]);
+	}
+
+	// Per Redact hydration-mismatch-recovery.test.tsx:53-64.
+	it('root recovery leaves one clean client tree with a live replacement handler', async () => {
+		const { html } = await ServerRT.renderToString(server.RootScopedRecovery, {
+			isClient: false,
+		});
+		container.innerHTML = html;
+		const staleRoot = container.querySelector('#root-server')!;
+		const staleLeaf = container.querySelector('#root-stale')!;
+		const root = hydrateRoot(container, client.RootScopedRecovery, { isClient: true });
+		flushSync(() => {});
+
+		try {
+			expect(staleRoot.isConnected).toBe(false);
+			expect(staleLeaf.isConnected).toBe(false);
+			expect(container.querySelectorAll('#root-client')).toHaveLength(1);
+			expect(container.querySelector('#root-server')).toBeNull();
+
+			const action = container.querySelector<HTMLButtonElement>('#root-recovered-action')!;
+			expect(action.textContent?.trim()).toBe('root:0');
+			flushSync(() => action.click());
+			expect(action.textContent?.trim()).toBe('root:1');
+			expectDiagnostics();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Per Redact hydration-mismatch-recovery.test.tsx:262-297.
+	it('nearest-host recovery preserves outside objects and both outside and regenerated handlers', async () => {
+		const { html } = await ServerRT.renderToString(server.HostScopedRecovery, {
+			isClient: false,
+		});
+		container.innerHTML = html;
+		const stableRoot = container.querySelector('#host-recovery-root')!;
+		const stableHeader = container.querySelector('#host-stable-header')!;
+		const stableScope = container.querySelector('#host-recovery-scope')!;
+		const stableFooter = container.querySelector('#host-stable-footer')!;
+		const outsideAction = container.querySelector<HTMLButtonElement>('#host-outside-action')!;
+		const staleRange = container.querySelector('#host-server-range')!;
+		const root = hydrateRoot(container, client.HostScopedRecovery, { isClient: true });
+		flushSync(() => {});
+
+		try {
+			expect(container.querySelector('#host-recovery-root')).toBe(stableRoot);
+			expect(container.querySelector('#host-stable-header')).toBe(stableHeader);
+			expect(container.querySelector('#host-recovery-scope')).toBe(stableScope);
+			expect(container.querySelector('#host-stable-footer')).toBe(stableFooter);
+			expect(container.querySelector('#host-outside-action')).toBe(outsideAction);
+			expect(staleRange.isConnected).toBe(false);
+			expect(container.querySelectorAll('#host-client-range')).toHaveLength(1);
+
+			const recoveredAction = container.querySelector<HTMLButtonElement>('#host-recovered-action')!;
+			flushSync(() => recoveredAction.click());
+			expect(recoveredAction.textContent?.trim()).toBe('inside:1');
+			flushSync(() => outsideAction.click());
+			expect(outsideAction.textContent?.trim()).toBe('outside:1');
+			expectDiagnostics();
+		} finally {
+			root.unmount();
+		}
+	});
+
+	// Per Redact hydration-mismatch-recovery.test.tsx:183-260.
+	it('Suspense-scoped recovery preserves outside objects and installs the regenerated handler', async () => {
+		const { html } = await ServerRT.renderToString(server.SuspenseScopedRecovery, {
+			isClient: false,
+		});
+		container.innerHTML = html;
+		const stableRoot = container.querySelector('#suspense-recovery-root')!;
+		const stableHeader = container.querySelector('#suspense-stable-header')!;
+		const outsideAction = container.querySelector<HTMLButtonElement>('#suspense-outside-action')!;
+		const stableFooter = container.querySelector('#suspense-stable-footer')!;
+		const staleRange = container.querySelector('#suspense-server-range')!;
+		const root = hydrateRoot(container, client.SuspenseScopedRecovery, { isClient: true });
+		flushSync(() => {});
+
+		try {
+			expect(container.querySelector('#suspense-recovery-root')).toBe(stableRoot);
+			expect(container.querySelector('#suspense-stable-header')).toBe(stableHeader);
+			expect(container.querySelector('#suspense-outside-action')).toBe(outsideAction);
+			expect(container.querySelector('#suspense-stable-footer')).toBe(stableFooter);
+			expect(staleRange.isConnected).toBe(false);
+			expect(container.querySelectorAll('#suspense-client-range')).toHaveLength(1);
+			expect(container.querySelector('#suspense-recovery-fallback')).toBeNull();
+
+			const recoveredAction = container.querySelector<HTMLButtonElement>(
+				'#suspense-recovered-action',
+			)!;
+			flushSync(() => recoveredAction.click());
+			expect(recoveredAction.textContent?.trim()).toBe('inside:1');
+			flushSync(() => outsideAction.click());
+			expect(outsideAction.textContent?.trim()).toBe('outside:1');
+			expectDiagnostics();
+		} finally {
+			root.unmount();
+		}
+	});
+});
