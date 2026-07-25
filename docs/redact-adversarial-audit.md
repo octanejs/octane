@@ -25,7 +25,7 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 | `tests/child-reorder.test.tsx` | mapped | [`RDX-REC-001`](#rdx-rec-001) | Exact source mapping. |
 | `tests/controlled-input.test.tsx` | folded | [`RDX-EVT-001`](#rdx-evt-001) | The native-event observation boundary transfers; Redact's synthetic onChange mapping is an explicit Octane divergence. |
 | `tests/create-root-clear-container.test.tsx` | mapped | [`RDX-ROOT-001`](#rdx-root-001) | Exact source mapping. |
-| `tests/document-hydration.test.tsx` | mapped | [`RDX-HYD-001`](#rdx-hyd-001), [`RDX-HYD-002`](#rdx-hyd-002), [`RDX-HYD-003`](#rdx-hyd-003), [`RDX-HYD-004`](#rdx-hyd-004) | Exact source mapping. |
+| `tests/document-hydration.test.tsx` | mapped | [`RDX-HYD-001`](#rdx-hyd-001), [`RDX-HYD-002`](#rdx-hyd-002), [`RDX-HYD-003`](#rdx-hyd-003), [`RDX-HYD-004`](#rdx-hyd-004), [`RDX-HYD-007`](#rdx-hyd-007) | Exact source mapping. |
 | `tests/event-replay.test.ts` | mapped | [`RDX-EVT-002`](#rdx-evt-002) | Exact source mapping. |
 | `tests/external-store-unmount.test.tsx` | mapped | [`RDX-STORE-001`](#rdx-store-001) | Exact source mapping. |
 | `tests/floating-ui-pattern.test.tsx` | mapped | [`RDX-PORT-002`](#rdx-port-002) | Exact source mapping. |
@@ -58,17 +58,17 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 | Status | Entries |
 | --- | ---: |
-| planned | 13 |
+| planned | 0 |
 | in progress | 0 |
-| covered | 9 |
+| covered | 23 |
 | documented | 5 |
 | decision required | 1 |
 | blocked | 0 |
 
 | Classification | Entries |
 | --- | ---: |
-| portable | 13 |
-| adaptable | 11 |
+| portable | 12 |
+| adaptable | 13 |
 | divergence | 2 |
 | non goal | 2 |
 
@@ -76,20 +76,7 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 | ID | Risk | Area | Contract | Status | Owner |
 | --- | --- | --- | --- | --- | --- |
-| [`RDX-HYD-001`](#rdx-hyd-001) | critical | hydration | Suspending hydration recovery must not leak an uncaught mismatch | planned | Octane runtime hydration and browser tests |
-| [`RDX-HYD-002`](#rdx-hyd-002) | critical | head-hydration | Hoisted head markers must only claim the intended element | planned | Octane compiler and runtime head hydration |
-| [`RDX-SUS-001`](#rdx-sus-001) | critical | suspense-preservation | Re-suspension preserves browser-owned state in committed UI | planned | Octane Suspense runtime and browser tests |
-| [`RDX-EVT-002`](#rdx-evt-002) | high | event-replay | Hydration event replay preserves platform event shape and queue semantics | planned | Octane deferred hydration and DOM events |
-| [`RDX-HYD-003`](#rdx-hyd-003) | high | raw-text-hydration | Raw script and style hydration must use their parsing contexts | planned | Octane DOM hydration and SSR serialization |
-| [`RDX-HYD-006`](#rdx-hyd-006) | high | hydration-recovery | Mismatch recovery is bounded to the failed ownership scope | planned | Octane hydration cursor and ownership ranges |
-| [`RDX-LIF-001`](#rdx-lif-001) | high | effects | Coalesced dependency changes leave one live passive side effect | planned | Octane scheduler and effect hooks |
-| [`RDX-MEM-001`](#rdx-mem-001) | high | memo-scheduling | Memo prop bailouts do not swallow owned updates or revive removed work | planned | Octane memo and scheduler |
-| [`RDX-PORT-002`](#rdx-port-002) | high | portal-updates | A stateful portal descendant resolves its foreign host for owned updates | planned | Octane portal host resolution |
-| [`RDX-REC-002`](#rdx-rec-002) | high | reconciliation-placement | Topology transitions use the correct absolute anchor without stable reattachment | planned | Octane reconciler and portal placement |
-| [`RDX-STORE-001`](#rdx-store-001) | high | external-store | External-store subscription races cannot create zombie DOM | planned | Octane useSyncExternalStore and scheduler |
-| [`RDX-CFG-001`](#rdx-cfg-001) | medium | build-configuration | Public options must change the emitted build at their observation boundary | planned | Octane compiler and Vite/Rspack/Rsbuild integrations |
 | [`RDX-HYD-005`](#rdx-hyd-005) | medium | hydration-errors | Hydration recovery reporting has an explicit public contract | decision required | Octane public root API |
-| [`RDX-PKG-001`](#rdx-pkg-001) | medium | public-exports | Advertised named exports are locked at the consumer boundary | planned | Octane package surface |
 
 ## Contract ledger
 
@@ -99,7 +86,7 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 #### RDX-CFG-001 — Public options must change the emitted build at their observation boundary
 
-**Disposition:** medium risk; adaptable; planned; owner: Octane compiler and Vite/Rspack/Rsbuild integrations.
+**Disposition:** medium risk; adaptable; covered; owner: Octane compiler and Vite/Rspack/Rsbuild/Rspeedy integrations.
 
 **Upstream evidence**
 
@@ -108,20 +95,46 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 **Consumer-visible symptom.** A documented false-valued feature flag silently left the full implementation in the bundle because an internal folder name was cast to an unrelated public option key.
 
-**Octane contract.** Every public compiler or bundler boolean must have a test proving the option changes emitted code, resolution, bundle contents, or runtime behavior in each environment where it is supported.
+**Octane contract.** Every public compiler or bundler boolean must be traced through each adapter's resolved host configuration and the owning compiler's emitted code, module resolution, bundle contents, or runtime behavior. Pass-through host build controls lock both values in resolved configuration; options with Octane-owned output also require an executable output or bundle proof.
 
-**Applicable modes:** `production-compile`, `vite-client`, `vite-ssr`, `rspack`, `rsbuild`. **Observables:** `markup`, `package-resolution`.
+**Applicable modes:** `production-compile`, `vite-client`, `vite-ssr`, `rspack`, `rsbuild`, `rspeedy`. **Observables:** `emitted-code`, `resolved-configuration`, `bundle-contents`, `package-resolution`.
 
 **Octane references**
 
-- [packages/octane/tests/hmr.test.ts](../packages/octane/tests/hmr.test.ts) — “hmr option off → no wrapping, no accept block” — Representative direct option-to-output coverage; not yet a complete public-option matrix.
-- [packages/rspack-plugin-octane/tests/rspack.test.ts](../packages/rspack-plugin-octane/tests/rspack.test.ts) — “erases profiling and full diagnostics from a real production bundle”
+- [packages/octane/tests/compiler-vite-options.test.ts](../packages/octane/tests/compiler-vite-options.test.ts) — “changes emitted hot-update support for both hmr values” — Direct Vite integration coverage for explicit HMR, SSR-mode, and ownership booleans.
+- [packages/rspack-plugin-octane/tests/rspack.test.ts](../packages/rspack-plugin-octane/tests/rspack.test.ts) — “erases profiling and full diagnostics from a real production bundle” — Real bundle proof for the disabled profiling path; the adjacent profiled-runtime test covers the enabled path.
+- [packages/rsbuild-plugin-octane/tests/target.test.ts](../packages/rsbuild-plugin-octane/tests/target.test.ts) — “maps build.minify=false to webworker optimization” — Preserves both values of the shared app build boolean.
+- [packages/rspeedy-plugin-octane/tests/plugin.test.ts](../packages/rspeedy-plugin-octane/tests/plugin.test.ts) — “preserves an asymmetric public-boolean matrix in the installed Rspack integration” — Locks the newest public Rspack-backed adapter into an asymmetric option matrix that detects cross-wiring.
 
-**Next action (test).** Inventory public booleans and renderer mappings, then prove both enabled and disabled behavior at emitted-output or resolved-module boundaries without relying on unchecked name casts.
+**Executable evidence**
 
-Targets: `packages/octane/tests`, `packages/vite-plugin-octane/tests`, `packages/rspack-plugin-octane/tests`, `packages/rsbuild-plugin-octane/tests`.
+- [changes emitted hot-update support for both hmr values](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `vite-client`; observables: `emitted-code`
+- [forces server output despite a client transform signal](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `production-compile`, `vite-client`, `vite-ssr`; observables: `emitted-code`
+- [forces client output despite a server transform signal](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `production-compile`, `vite-client`, `vite-ssr`; observables: `emitted-code`
+- [changes ownership of an unmarked project TSX module for both directive values](../packages/octane/tests/compiler-vite-options.test.ts) — modes: `vite-client`, `vite-ssr`; observables: `emitted-code`
+- [preserves both hmr values at the compiler output boundary](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `vite-client`; observables: `emitted-code`
+- [preserves both requireDirective values at the compiler ownership boundary](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `vite-client`; observables: `emitted-code`
+- [preserves build.minify=true and build.target=false in resolved Vite config](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `production-compile`, `vite-client`; observables: `resolved-configuration`
+- [preserves build.minify=false and build.target=false in resolved Vite config](../packages/vite-plugin-octane/tests/plugin.test.ts) — modes: `production-compile`, `vite-client`; observables: `resolved-configuration`
+- [erases profiling from normal builds and installs it in profile builds](../packages/vite-plugin-octane/tests/profile-bundle.test.ts) — modes: `production-compile`, `vite-client`; observables: `bundle-contents`
+- [removes hot-update output when hmr is explicitly false in a hot compilation](../packages/rspack-plugin-octane/tests/loader.integration.test.ts) — modes: `rspack`; observables: `emitted-code`
+- [changes development metadata for both explicit dev values](../packages/rspack-plugin-octane/tests/loader.integration.test.ts) — modes: `rspack`; observables: `emitted-code`
+- [gates ownership behind requireDirective and reports forgotten pragmas](../packages/rspack-plugin-octane/tests/loader.integration.test.ts) — modes: `rspack`; observables: `emitted-code`
+- [honors explicit client mode and serializable loader options](../packages/rspack-plugin-octane/tests/plugin.test.ts) — modes: `rspack`; observables: `resolved-configuration`
+- [transpiles TypeScript only when plugin transpilation is enabled](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`; observables: `bundle-contents`
+- [splits client-only renderer dependencies from the raw server graph with stable module identity](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`; observables: `bundle-contents`, `package-resolution`
+- [erases profiling and full diagnostics from a real production bundle](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`, `production-compile`; observables: `bundle-contents`
+- [executes the profiled runtime](../packages/rspack-plugin-octane/tests/rspack.test.ts) — modes: `rspack`, `production-compile`; observables: `bundle-contents`
+- [preserves asymmetric public compiler booleans through custom client/server environments](../packages/rsbuild-plugin-octane/tests/renderer-config.test.ts) — modes: `rsbuild`; observables: `resolved-configuration`
+- [maps build.minify=true to webworker optimization](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `resolved-configuration`
+- [maps build.minify=false to webworker optimization](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `resolved-configuration`
+- [maps build.target=false without dropping the false-valued configuration](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `resolved-configuration`
+- [emits profiling only in the client production bundle](../packages/rsbuild-plugin-octane/tests/target.test.ts) — modes: `rsbuild`, `production-compile`; observables: `bundle-contents`
+- [preserves an asymmetric public-boolean matrix in the installed Rspack integration](../packages/rspeedy-plugin-octane/tests/plugin.test.ts) — modes: `rspeedy`; observables: `resolved-configuration`
+- [removes hot-update entries when hmr is explicitly false in development](../packages/rspeedy-plugin-octane/tests/plugin.test.ts) — modes: `rspeedy`; observables: `resolved-configuration`
+- [assembles a normal Octane application and generated receiver into a native bundle](../packages/rspeedy-plugin-octane/tests/build.test.ts) — modes: `rspeedy`; observables: `bundle-contents`, `package-resolution`
 
-**Rationale.** Redact's forwardRef and class-component flags are out of scope; the transferable lesson is to test configuration where consumers observe it.
+**Rationale.** Redact's forwardRef and class-component flags are out of scope. Octane's inventory composes adapter-level resolved-configuration checks with executable owning-compiler proofs, including real Vite/Rspack/Rsbuild/Rspeedy bundles, renderer routing, shared minification, Rspack transpilation, and the false-valued target sentinel. Diagnostic-only compiler escape hatches and unrelated runtime/server config are excluded.
 
 
 ### document-serialization
@@ -191,7 +204,7 @@ Targets: `packages/octane/tests`, `packages/vite-plugin-octane/tests`, `packages
 
 #### RDX-LIF-001 — Coalesced dependency changes leave one live passive side effect
 
-**Disposition:** high risk; portable; planned; owner: Octane scheduler and effect hooks.
+**Disposition:** high risk; portable; covered; owner: Octane scheduler and effect hooks.
 
 **Upstream evidence**
 
@@ -205,11 +218,13 @@ Targets: `packages/octane/tests`, `packages/vite-plugin-octane/tests`, `packages
 
 **Octane references**
 
-- [packages/octane/tests/effect-timing.test.ts](../packages/octane/tests/effect-timing.test.ts) — “phase order on re-render: cleanups fire before bodies of same phase” — Strong ordering coverage, but not the exact two-renders-before-passive-drain race.
+- [packages/octane/tests/effect-timing.test.ts](../packages/octane/tests/effect-timing.test.ts) — “coalesced dependency changes leave one live passive side effect” — Commits b, requests c before the ordinary passive task drains, and proves Octane settles b's queued passive work before the c render while preserving one live artifact and exactly-once cleanup.
 
-**Next action (test).** Drive a→b→c before passive drain, assert one live imperative artifact, exact cleanup order through c, and one final cleanup on unmount in development and production compile modes.
+**Executable evidence**
 
-Targets: `packages/octane/tests/effect-timing.test.ts`.
+- [coalesced dependency changes leave one live passive side effect](../packages/octane/tests/effect-timing.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+
+**Rationale.** Same-batch root renders coalesce before an intermediate effect can enqueue. When an intermediate revision does commit, Octane drains its pending passive work before the next render begins. The portable single-live-artifact and exactly-once cleanup contract therefore holds without exposing Redact's two-entry queue shape.
 
 
 ### event-replay
@@ -218,7 +233,7 @@ Targets: `packages/octane/tests/effect-timing.test.ts`.
 
 #### RDX-EVT-002 — Hydration event replay preserves platform event shape and queue semantics
 
-**Disposition:** high risk; adaptable; planned; owner: Octane deferred hydration and DOM events.
+**Disposition:** high risk; adaptable; covered; owner: Octane deferred hydration and DOM events.
 
 **Upstream evidence**
 
@@ -232,14 +247,18 @@ Targets: `packages/octane/tests/effect-timing.test.ts`.
 
 **Octane references**
 
-- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `notifyHydrateBoundary` — Mouse and focus families retain subclasses; other buffered families currently fall back to Event.
-- [packages/octane/tests/streaming-ssr.test.ts](../packages/octane/tests/streaming-ssr.test.ts) — “replays pre-root interaction after the pending stream reveals” — Covers click delivery and target survival, not the cross-family event-shape matrix.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `cloneHydrationReplayEvent` — Clones every public event family with the target realm's platform constructor, falling back to the Web IDL brand when instanceof cannot cross realms; pointer detection precedes mouse detection.
+- [packages/octane/tests/hydration/deferred-hydration-contract.test.ts](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — “replays every public interaction event once with its platform shape and queue semantics” — An exhaustive type-level-locked matrix covers all 15 public interaction events in development and production compilation.
+- [packages/octane/tests/hydration/deferred-hydration-contract.test.ts](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — “classifies parent-realm events before replaying them in an iframe realm” — Parent-created focus, keyboard, mouse, and pointer events replay with the iframe target's constructors and retain their metadata.
+- [packages/octane/tests/hydration/deferred-hydration-contract.test.ts](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — “classifies iframe-realm events before replaying them at a host-document target” — The opposite realm crossing: an embedded widget's own events replay with the host document's constructors, proving the clone follows the target rather than the incoming event.
+- [packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts](../packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts) — “preserves every public event family, metadata, order, target, and cancellation” — Real Chromium proves platform subclasses, metadata, FIFO delivery, original target, default cancellation, and one queue drain.
 
-**Next action (test).** Exercise every public HydrationInteractionEvent family in a real browser: click/auxclick/contextmenu/dblclick, focusin, keydown/keyup, mouse, and pointer events. Assert subclass, supported metadata, target, FIFO ordering, preventDefault visibility, queue drain, and no duplicate replay; keep input/change/submit excluded unless a separate API decision expands the public union.
+**Executable evidence**
 
-Targets: `packages/octane/tests/hydration/deferred-hydration-contract.test.ts`, `packages/octane/tests/browser`.
+- [replays every public interaction event once with its platform shape and queue semantics](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — modes: `deferred-hydration`; observables: `events`
+- [preserves every public event family, metadata, order, target, and cancellation](../packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts) — modes: `deferred-hydration`, `real-browser`; observables: `events`
 
-**Rationale.** Octane replays interaction intent rather than cloning every native event field, so the transferable contract must explicitly define which event shape it promises instead of silently copying Redact's implementation.
+**Rationale.** Octane continues to replay only its documented interaction-intent union. The clone is now realm-aware and constructor-specific, while exhaustive unit and Chromium evidence lock every public family to its supported platform metadata and exactly-once FIFO semantics.
 
 
 ### events
@@ -275,7 +294,7 @@ Targets: `packages/octane/tests/hydration/deferred-hydration-contract.test.ts`, 
 
 #### RDX-STORE-001 — External-store subscription races cannot create zombie DOM
 
-**Disposition:** high risk; portable; planned; owner: Octane useSyncExternalStore and scheduler.
+**Disposition:** high risk; portable; covered; owner: Octane useSyncExternalStore and scheduler.
 
 **Upstream evidence**
 
@@ -286,16 +305,24 @@ Targets: `packages/octane/tests/hydration/deferred-hydration-contract.test.ts`, 
 
 **Octane contract.** useSyncExternalStore subscribes after render, converges when subscribe synchronously notifies, unsubscribes on conditional/root removal, and ignores every post-unmount notification.
 
-**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `effects`.
+**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `node-identity`, `effects`.
 
 **Octane references**
 
-- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “post-unmount store mutations do NOT trigger any work” — Covers root unmount but not synchronous subscribe notification or conditional stale-listener delivery.
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “subscribes outside render and converges when subscribe notifies synchronously” — Proves subscription timing at the public callback boundary and commits the synchronously published snapshot without resubscribing.
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “unsubscribes on unmount (store drops its listener)”
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “unsubscribes when its conditional owner removes it”
+- [packages/octane/tests/sync-external-store.test.ts](../packages/octane/tests/sync-external-store.test.ts) — “ignores a retained stale callback after conditional removal” — Invokes the exact callback retained by the store and proves the removed reader stays absent while unrelated host and sibling objects survive.
 - [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `useSyncExternalStore`
 
-**Next action (test).** Prove subscription occurs outside render, a synchronous notifier converges without looping, conditional removal unsubscribes, and a retained stale callback cannot resurrect DOM.
+**Executable evidence**
 
-Targets: `packages/octane/tests/sync-external-store.test.ts`.
+- [subscribes outside render and converges when subscribe notifies synchronously](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+- [unsubscribes on unmount (store drops its listener)](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `effects`
+- [unsubscribes when its conditional owner removes it](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+- [ignores a retained stale callback after conditional removal](../packages/octane/tests/sync-external-store.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `effects`
+
+**Rationale.** Octane subscribes through a passive effect, owns unsubscribe in that effect slot, and schedules notifications onto a block whose disposed guards make stale callbacks inert after removal.
 
 
 ### head-hydration
@@ -304,7 +331,7 @@ Targets: `packages/octane/tests/sync-external-store.test.ts`.
 
 #### RDX-HYD-002 — Hoisted head markers must only claim the intended element
 
-**Disposition:** critical risk; adaptable; planned; owner: Octane compiler and runtime head hydration.
+**Disposition:** critical risk; adaptable; covered; owner: Octane compiler and runtime head hydration.
 
 **Upstream evidence**
 
@@ -313,20 +340,61 @@ Targets: `packages/octane/tests/sync-external-store.test.ts`.
 
 **Consumer-visible symptom.** Weak head-node identity allowed one logical head entry to adopt a different server node and validate or update the wrong content.
 
-**Octane contract.** A compiled head marker may adopt only an element with the expected tag and ownership; missing, duplicated, reordered, or corrupted markers must create or recover the expected node without mutating unrelated head content.
+**Octane contract.** Within a valid paired head-ownership interval, hydration adopts only an element with the expected tag. It preserves interposed wrong-tag nodes and, when no expected-tag candidate exists before the matching closing marker, creates the expected node without claiming unrelated head content.
 
-**Applicable modes:** `hydrate-match`, `hydrate-mismatch`, `production-compile`, `real-browser`. **Observables:** `markup`, `node-identity`, `errors`.
+**Applicable modes:** `server-string`, `hydrate-match`, `hydrate-mismatch`, `production-compile`. **Observables:** `markup`, `node-identity`, `dom-mutations`.
 
 **Octane references**
 
-- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `adoptServerHeadEl` — The current helper returns the first element after a matching marker without validating the expected tag.
-- [packages/octane/tests/hydration/head-hydrate.test.ts](../packages/octane/tests/hydration/head-hydrate.test.ts) — “adopts the server head (one &lt;title&gt;/&lt;meta&gt;, markers removed) + single-root body, removed on unmount” — Happy-path adoption only.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `adoptServerHeadEl` — Claims only a matching tag inside a valid interval closed by that entry's paired ownership marker.
+- [packages/octane/tests/hydration/head-hydrate.test.ts](../packages/octane/tests/hydration/head-hydrate.test.ts) — “adopts the server head and single-root body, then removes owned nodes on unmount” — Happy-path adoption and lifecycle ownership.
+- [packages/octane/tests/hydration/head-hydrate.test.ts](../packages/octane/tests/hydration/head-hydrate.test.ts) — “skips an interposed foreign element and adopts the intended head element”
+- [packages/octane/tests/hydration/head-hydrate.test.ts](../packages/octane/tests/hydration/head-hydrate.test.ts) — “creates a missing expected head element without claiming a wrong-tag neighbor”
 
-**Next action (test).** Cover a foreign wrong-tag node between marker and target, missing target, duplicate marker, reordered metadata, and preservation of unrelated head nodes before deciding whether runtime validation is needed.
+**Executable evidence**
 
-Targets: `packages/octane/tests/hydration/head-hydrate.test.ts`.
+- [adopts the server head and single-root body, then removes owned nodes on unmount](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [skips an interposed foreign element and adopts the intended head element](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [creates a missing expected head element without claiming a wrong-tag neighbor](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
 
-**Rationale.** Redact matches scripts by attributes while Octane uses compiler markers; the portable contract is ownership-safe claiming, not Redact's matching algorithm.
+**Rationale.** Redact matches scripts by attributes while Octane uses compiler markers, so the transferable contract is ownership-safe claiming rather than Redact's matcher. This closes wrong-tag and missing-target corruption within one paired ownership interval. Compiler key uniqueness and ambiguous same-tag collisions remain explicitly tracked by RDX-HYD-007.
+
+<a id="rdx-hyd-007"></a>
+
+#### RDX-HYD-007 — Head ownership keys are unique across compiled modules and tags
+
+**Disposition:** high risk; adaptable; covered; owner: Octane compiler and runtime head hydration.
+
+**Upstream evidence**
+
+- [issue #17](https://github.com/TanStack/redact/issues/17) — Hydration bugs: async-resume mismatch escapes uncaught; head-script claiming; innerHTML probe escaping; foreign-node strictness
+- [test: claims typeless and typed head scripts in document order](https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/document-hydration.test.tsx#L171-L206) (`tests/document-hydration.test.tsx`)
+
+**Consumer-visible symptom.** A marker derived only from a source offset can collide across modules or tags, making same-tag ownership ambiguous even when runtime claiming validates the element tag.
+
+**Octane contract.** Compiler-emitted head ownership keys are stable between server and client builds and collision-resistant across modules and tags; the existing distinct identifierPrefix contract isolates sibling roots. Duplicate, reordered, or missing marker pairs cannot make one logical entry claim another same-tag element.
+
+**Applicable modes:** `server-string`, `server-stream`, `hydrate-match`, `hydrate-mismatch`, `production-compile`. **Observables:** `markup`, `node-identity`, `dom-mutations`.
+
+**Octane references**
+
+- [packages/octane/src/compiler/compile.js](../packages/octane/src/compiler/compile.js) — `headKey` — Hashes the canonical module ID, element tag, and source position into a fixed-size compiler key shared by client and server output.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `adoptServerHeadEl` — Adopts exactly one expected-tag element only inside a structurally valid paired ownership interval.
+- [packages/octane/tests/hydration/head-hydrate.test.ts](../packages/octane/tests/hydration/head-hydrate.test.ts) — “uses the root namespace for a head entry emitted before a streamed boundary suspends” — A genuinely suspending readable stream proves boundary-local useId prefixes cannot desynchronize head ownership.
+- [packages/octane/tests/hydration/head-hydrate.test.ts](../packages/octane/tests/hydration/head-hydrate.test.ts) — “contains reordered ownership markers without cross-claiming same-tag server entries” — Malformed pairs create fresh client metadata while preserving both unclaimed server entries.
+
+**Executable evidence**
+
+- [keeps streamed head ownership byte-compatible with client hydration](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-stream`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [uses the root namespace for a head entry emitted before a streamed boundary suspends](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-stream`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [keeps cross-module same-tag ownership stable when roots hydrate out of order](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [uses existing identifierPrefix semantics to isolate same-module sibling roots](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [does not claim or delete a server title when its opening ownership marker is missing](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [does not claim or delete a server title when its closing ownership marker is missing](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [treats a duplicate ownership marker as ambiguous instead of claiming a server title](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [contains reordered ownership markers without cross-claiming same-tag server entries](../packages/octane/tests/hydration/head-hydrate.test.ts) — modes: `server-string`, `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+
+**Rationale.** The compiler now separates modules and tags, the existing root identifierPrefix separates repeated roots, and paired delimiters make same-tag claiming fail closed under missing, duplicate, or reordered markers. Root-only namespacing also stays stable through streamed boundary-local useId subspaces.
 
 
 ### host-serialization-security
@@ -376,7 +444,7 @@ Targets: `packages/octane/tests/hydration/head-hydrate.test.ts`.
 
 #### RDX-HYD-001 — Suspending hydration recovery must not leak an uncaught mismatch
 
-**Disposition:** critical risk; adaptable; planned; owner: Octane runtime hydration and browser tests.
+**Disposition:** critical risk; adaptable; covered; owner: Octane runtime hydration and browser tests.
 
 **Upstream evidence**
 
@@ -387,18 +455,20 @@ Targets: `packages/octane/tests/hydration/head-hydrate.test.ts`.
 
 **Octane contract.** A client suspension encountered during hydration must converge to exactly one live client arm, report through Octane's chosen hydration channel only, preserve unaffected siblings, and never emit an uncaught error or rejection.
 
-**Applicable modes:** `hydrate-mismatch`, `deferred-hydration`, `production-compile`, `real-browser`. **Observables:** `markup`, `node-identity`, `events`, `errors`.
+**Applicable modes:** `server-stream`, `hydrate-mismatch`, `deferred-hydration`, `production-compile`, `real-browser`. **Observables:** `markup`, `node-identity`, `events`, `errors`, `streaming`.
 
 **Octane references**
 
-- [packages/octane/tests/conformance/fizz-readiness-hydration.test.ts](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — “reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch” — Already proves one final client arm and one expected diagnostic in development and production compile modes.
+- [packages/octane/tests/conformance/fizz-readiness-hydration.test.ts](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — “reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch” — Proves one final client arm, one expected diagnostic, and identity plus continued interactivity of a stateful sibling outside the recovered boundary.
+- [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “contains async hydration recovery and preserves an interactive outside sibling” — Captures browser error and unhandled-rejection channels before hydration and exercises the streamed reveal script in Chromium.
 - [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `hideTryContentAndMountPending`
 
-**Next action (test).** Retain the existing one-final-arm oracle, add global error/unhandled-rejection capture, and prove an outside sibling keeps identity and remains interactive after resolution.
+**Executable evidence**
 
-Targets: `packages/octane/tests/conformance/fizz-readiness-hydration.test.ts`, `packages/octane/tests/browser`.
+- [reports eager pending-arm recovery instead of deferring a streamed-boundary mismatch](../packages/octane/tests/conformance/fizz-readiness-hydration.test.ts) — modes: `server-stream`, `hydrate-mismatch`, `deferred-hydration`, `production-compile`; observables: `markup`, `node-identity`, `events`, `errors`, `streaming`
+- [contains async hydration recovery and preserves an interactive outside sibling](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `server-stream`, `hydrate-mismatch`, `deferred-hydration`, `real-browser`; observables: `markup`, `node-identity`, `events`, `errors`, `streaming`
 
-**Rationale.** Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly; only the missing global-error and outside-sibling observations remain.
+**Rationale.** Issue #17 remained open when captured, but Redact main commit e1620a13aab8935c806238f117ba58559b7cd002 contains the matching fix and regression, so the resolution is inferred rather than administratively confirmed. Octane eagerly leaves synchronous hydration for a fresh client arm, so Redact's resumed-cursor implementation bug does not transfer directly. The transferred risk is covered at Octane's observation boundary by the one-arm, outside-sibling, and real-browser global-error evidence.
 
 
 ### hydration-errors
@@ -437,7 +507,7 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 
 #### RDX-HYD-006 — Mismatch recovery is bounded to the failed ownership scope
 
-**Disposition:** high risk; adaptable; planned; owner: Octane hydration cursor and ownership ranges.
+**Disposition:** high risk; adaptable; covered; owner: Octane hydration cursor and ownership ranges.
 
 **Upstream evidence**
 
@@ -456,13 +526,18 @@ Targets: `packages/octane/src/runtime.ts`, `docs/ssr.md`.
 **Octane references**
 
 - [packages/octane/tests/conformance/hydration-mismatch.test.ts](../packages/octane/tests/conformance/hydration-mismatch.test.ts) — “hydration continues past a mismatch: the next sibling adopts + is interactive” — Proves final content and sibling interactivity, but does not retain and compare the sibling object across the recovery.
-- [packages/octane/tests/hydration/mismatch-structural.test.ts](../packages/octane/tests/hydration/mismatch-structural.test.ts) — “PROD build: @if branch swap rebuilds SILENTLY (recovery is not gated on the dev loc)” — Proves production recovery but not a nearest-host/Suspense containment matrix.
+- [packages/octane/tests/hydration/mismatch-structural.test.ts](../packages/octane/tests/hydration/mismatch-structural.test.ts) — “nearest-host recovery preserves outside objects and both outside and regenerated handlers” — Runs under explicit development and production compilation and retains every stable host object.
+- [packages/octane/tests/hydration/mismatch-structural.test.ts](../packages/octane/tests/hydration/mismatch-structural.test.ts) — “Suspense-scoped recovery preserves outside objects and installs the regenerated handler” — Pins boundary-external identity and both surviving and regenerated handler delivery.
+- [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “contains async hydration recovery and preserves an interactive outside sibling” — Real Chromium drives the streamed mismatch, surviving sibling, and regenerated action.
 
-**Next action (test).** For root, nearest-host, and Suspense-scoped structural mismatches, capture outside siblings before hydration and assert the same objects and handlers survive while the failed subtree is regenerated and its handlers become live in development and production.
+**Executable evidence**
 
-Targets: `packages/octane/tests/conformance/hydration-mismatch.test.ts`, `packages/octane/tests/browser`.
+- [root recovery leaves one clean client tree with a live replacement handler](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
+- [nearest-host recovery preserves outside objects and both outside and regenerated handlers](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
+- [Suspense-scoped recovery preserves outside objects and installs the regenerated handler](../packages/octane/tests/hydration/mismatch-structural.test.ts) — modes: `hydrate-mismatch`, `production-compile`; observables: `markup`, `node-identity`, `events`
+- [contains async hydration recovery and preserves an interactive outside sibling](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `hydrate-mismatch`, `real-browser`; observables: `markup`, `node-identity`, `events`
 
-**Rationale.** Octane recovers ranges in place instead of following Redact's checkpoint stack, so the transferable requirement is the observable containment boundary rather than checkpoint implementation parity.
+**Rationale.** Octane's compiler-owned ranges recover in place rather than unwinding Redact checkpoints. The completed root, nearest-host, Suspense, production-compile, and Chromium matrix now proves the equivalent observable containment boundary and live event wiring.
 
 
 ### memo-scheduling
@@ -471,7 +546,7 @@ Targets: `packages/octane/tests/conformance/hydration-mismatch.test.ts`, `packag
 
 #### RDX-MEM-001 — Memo prop bailouts do not swallow owned updates or revive removed work
 
-**Disposition:** high risk; portable; planned; owner: Octane memo and scheduler.
+**Disposition:** high risk; portable; covered; owner: Octane memo and scheduler.
 
 **Upstream evidence**
 
@@ -482,16 +557,19 @@ Targets: `packages/octane/tests/conformance/hydration-mismatch.test.ts`, `packag
 
 **Octane contract.** A memoized component processes its own state/store updates without disabling descendant memo bailouts, and pending work beneath a removed ancestor cannot mount new DOM.
 
-**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `effects`.
+**Applicable modes:** `client`, `production-compile`. **Observables:** `markup`, `node-identity`, `effects`.
 
 **Octane references**
 
-- [packages/octane/tests/conformance/update-reconciliation.test.ts](../packages/octane/tests/conformance/update-reconciliation.test.ts) — “should update children even if parent blocks updates”
-- [packages/octane/tests/conformance/update-reconciliation.test.ts](../packages/octane/tests/conformance/update-reconciliation.test.ts) — “does not call render after a component as been deleted”
+- [packages/octane/tests/conformance/memo-bailout.test.ts](../packages/octane/tests/conformance/memo-bailout.test.ts) — “processes an owned external-store update while stable descendants bail out” — The memo owner updates from its own subscription while an unchanged memo descendant retains both render and host identity.
+- [packages/octane/tests/conformance/update-reconciliation.test.ts](../packages/octane/tests/conformance/update-reconciliation.test.ts) — “does not commit a memoized store update after its ancestor removes it” — Queues the deeper store update before the ancestor deletion and proves no committed DOM or effect work can publish from the disposed subtree.
 
-**Next action (test).** Combine memo with useSyncExternalStore, prove the owner updates while a stable memo grandchild bails, then queue/remove work and prove no zombie DOM or effects appear.
+**Executable evidence**
 
-Targets: `packages/octane/tests/conformance/memo-bailout.test.ts`, `packages/octane/tests/conformance/update-reconciliation.test.ts`.
+- [processes an owned external-store update while stable descendants bail out](../packages/octane/tests/conformance/memo-bailout.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+- [does not commit a memoized store update after its ancestor removes it](../packages/octane/tests/conformance/update-reconciliation.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`
+
+**Rationale.** Octane schedules hook-owned work directly on the owning block rather than re-entering through its parent memo gate. Its shallow-first queue and disposed-block guards then discard deeper work after an ancestor removes that subtree.
 
 
 ### package-resolution
@@ -564,7 +642,7 @@ Targets: `packages/octane/tests/conformance/memo-bailout.test.ts`, `packages/oct
 
 #### RDX-PORT-002 — A stateful portal descendant resolves its foreign host for owned updates
 
-**Disposition:** high risk; adaptable; planned; owner: Octane portal host resolution.
+**Disposition:** high risk; adaptable; covered; owner: Octane portal host resolution.
 
 **Upstream evidence**
 
@@ -578,11 +656,14 @@ Targets: `packages/octane/tests/conformance/memo-bailout.test.ts`, `packages/oct
 
 **Octane references**
 
-- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “compiles and renders an inline host-element body into the target, updating reactively” — Updates state owned outside the portal, so it does not exercise descendant-owned host resolution.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `renderPortalState` — The portal Block stores the foreign target directly as parentNode, so descendant-owned rerenders retain the correct host without an ancestor walk.
+- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “keeps a descendant-owned root replacement inside its portal target” — A portal child owns the update and replaces its host-root kind while the logical root and foreign target siblings retain identity.
 
-**Next action (test).** Render a child component with its own useState inside a portal, schedule its update from that child, and assert the same target and unaffected target siblings retain identity while only the child's host content changes in development and production compile modes.
+**Executable evidence**
 
-Targets: `packages/octane/tests/portal.test.ts`.
+- [keeps a descendant-owned root replacement inside its portal target](../packages/octane/tests/portal.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+
+**Rationale.** Octane does not need Redact's ancestor host resolver: the portal Block captures the supplied target, and each descendant Block captures its actual DOM parent when created. The regression replaces the descendant's host-root kind rather than only updating a text binding, proving that owned rerenders still use the retained foreign-host chain.
 
 
 ### portals
@@ -621,7 +702,7 @@ Targets: `packages/octane/tests/portal.test.ts`.
 
 #### RDX-PKG-001 — Advertised named exports are locked at the consumer boundary
 
-**Disposition:** medium risk; portable; planned; owner: Octane package surface.
+**Disposition:** medium risk; portable; covered; owner: Octane package surface.
 
 **Upstream evidence**
 
@@ -636,12 +717,16 @@ Targets: `packages/octane/tests/portal.test.ts`.
 
 **Octane references**
 
-- [packages/octane/scripts/verify-dist.mjs](../packages/octane/scripts/verify-dist.mjs) — `smokeDist` — Proves every JS entry imports, but not that a specific named export remains present.
-- [scripts/check-package-packs.mjs](../scripts/check-package-packs.mjs) — Builds isolated consumers from packed workspace artifacts.
+- [packages/octane/scripts/verify-dist.mjs](../packages/octane/scripts/verify-dist.mjs) — `REQUIRED_PUBLIC_VALUE_EXPORTS` — Defines a required subset for every published JavaScript namespace; additions remain compatible while removals fail the prepack build.
+- [scripts/check-package-packs.mjs](../scripts/check-package-packs.mjs) — Builds an isolated packed consumer that imports the JSX type-runtime and TSRX helper subpaths.
 
-**Next action (test).** Derive or explicitly declare intended named-export sets for public core subpaths and validate them from the built or packed artifact without making harmless additive exports unnecessarily brittle.
+**Executable evidence**
 
-Targets: `packages/octane/scripts/verify-dist.mjs`, `scripts/check-package-packs.mjs`.
+- [requires committed names while permitting additive exports](../packages/octane/tests/public-exports.test.ts) — modes: `production-compile`; observables: `package-resolution`
+- [publishes every subpath advertised to source consumers](../packages/octane/tests/public-exports.test.ts) — modes: `production-compile`, `packaged-consumer`; observables: `package-resolution`
+- command: `pnpm packages:pack:check` — modes: `packaged-consumer`, `production-compile`; observables: `package-resolution`
+
+**Rationale.** The audit found four source-advertised subpaths missing from the packed manifest. The package now publishes them, typechecks all four from an outside-workspace tarball consumer, executes the two value-bearing TSRX helpers there, and locks every JavaScript subpath to an additive-friendly required export subset.
 
 
 ### raw-text-hydration
@@ -650,7 +735,7 @@ Targets: `packages/octane/scripts/verify-dist.mjs`, `scripts/check-package-packs
 
 #### RDX-HYD-003 — Raw script and style hydration must use their parsing contexts
 
-**Disposition:** high risk; portable; planned; owner: Octane DOM hydration and SSR serialization.
+**Disposition:** high risk; portable; covered; owner: Octane DOM hydration and SSR serialization.
 
 **Upstream evidence**
 
@@ -667,13 +752,18 @@ Targets: `packages/octane/scripts/verify-dist.mjs`, `scripts/check-package-packs
 
 - [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `setHTML` — Script uses textContent; other hosts use a same-tag contextual probe.
 - [packages/octane/tests/script-innerhtml.test.ts](../packages/octane/tests/script-innerhtml.test.ts) — “hydrates the server-safe script spelling by adoption and applies later updates” — Script coverage is already strong.
-- [packages/octane/tests/conformance/fizz-main-wave4c.test.ts](../packages/octane/tests/conformance/fizz-main-wave4c.test.ts) — “keeps raw style text in one element when it contains closing-tag-like tokens” — Current style evidence is server-only.
+- [packages/octane/tests/conformance/fizz-main-wave4c.test.ts](../packages/octane/tests/conformance/fizz-main-wave4c.test.ts) — “keeps raw style text in one element when it contains closing-tag-like tokens” — Pins the server serializer's closing-tag safety.
+- [packages/octane/tests/script-innerhtml.test.ts](../packages/octane/tests/script-innerhtml.test.ts) — “adopts server-parsed raw text without diagnostics and updates the same stylesheet” — Covers buffered and streamed parsing, strict adoption, diagnostics, and same-node updates.
+- [packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts](../packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts) — “prod adopts server CSS and preserves raw-text semantics through update” — Chromium verifies production hydration identity plus CSSOM and computed-style semantics.
 
-**Next action (test).** Add server-render, parse, hydrate, and update coverage for raw style text containing &amp;&amp;, &lt;, entity-like text, and closing-tag-like tokens; assert adoption and no warning in the unit lane, then use Chromium/CSSOM to prove intact stylesheet semantics.
+**Executable evidence**
 
-Targets: `packages/octane/tests/script-innerhtml.test.ts`, `packages/octane/tests/browser`.
+- [hydrates the server-safe script spelling by adoption and applies later updates](../packages/octane/tests/script-innerhtml.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `errors`
+- [adopts server-parsed raw text without diagnostics and updates the same stylesheet](../packages/octane/tests/script-innerhtml.test.ts) — modes: `server-string`, `server-stream`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`, `errors`
+- [dev adopts server CSS and preserves raw-text semantics through update](../packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts) — modes: `server-string`, `hydrate-match`, `real-browser`; observables: `markup`, `node-identity`, `errors`
+- [prod adopts server CSS and preserves raw-text semantics through update](../packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`, `real-browser`; observables: `markup`, `node-identity`, `errors`
 
-**Rationale.** The Redact script failure is already prevented; the remaining gap is direct hydration evidence for style's distinct raw-text and SSR-escape behavior.
+**Rationale.** Script already used script-data comparison; the completed style matrix now proves its distinct raw-text parser context through buffered and streamed SSR, strict dev/prod adoption, same-node updates, breakout-token safety, and real Chromium CSSOM semantics.
 
 
 ### reconciliation
@@ -713,7 +803,7 @@ Targets: `packages/octane/tests/script-innerhtml.test.ts`, `packages/octane/test
 
 #### RDX-REC-002 — Topology transitions use the correct absolute anchor without stable reattachment
 
-**Disposition:** high risk; adaptable; planned; owner: Octane reconciler and portal placement.
+**Disposition:** high risk; adaptable; covered; owner: Octane reconciler and portal placement.
 
 **Upstream evidence**
 
@@ -731,13 +821,18 @@ Targets: `packages/octane/tests/script-innerhtml.test.ts`, `packages/octane/test
 **Octane references**
 
 - [packages/octane/tests/differential/anchor-order.test.ts](../packages/octane/tests/differential/anchor-order.test.ts) — Covers final source order across control-flow transitions, but differential HTML cannot see host reattachment and has no portal topology case.
-- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “unmounts portal content when the if-branch closes” — Covers removal/recreation, not Portal→ordinary replacement around stable siblings.
+- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “places a Portal-to-element first-child transition before stable later siblings” — Pins portal cleanup, exact absolute order, and identity of the parent plus both later siblings in development and production compilation.
+- [packages/octane/tests/portal.test.ts](../packages/octane/tests/portal.test.ts) — “places a null-to-element first-child transition before stable later siblings” — Pins materialization at index zero while both later siblings retain identity.
+- [packages/octane/tests/browser/portal-placement/portal-placement.test.ts](../packages/octane/tests/browser/portal-placement/portal-placement.test.ts) — “prod preserves absolute order without reattaching stable host nodes” — Real Chromium observes both the logical parent and foreign target and proves a child-topology-equivalent rerender emits zero child-list records.
 
-**Next action (test).** Port Portal→element and null→element first-child transitions with multiple stable later siblings; retain every survivor object, assert exact final order, and use MutationObserver in Chromium to prove a stable rerender produces no child-list records.
+**Executable evidence**
 
-Targets: `packages/octane/tests/portal.test.ts`, `packages/octane/tests/browser`.
+- [places a Portal-to-element first-child transition before stable later siblings](../packages/octane/tests/portal.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+- [places a null-to-element first-child transition before stable later siblings](../packages/octane/tests/portal.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`
+- [dev preserves absolute order without reattaching stable host nodes](../packages/octane/tests/browser/portal-placement/portal-placement.test.ts) — modes: `client`, `real-browser`; observables: `markup`, `node-identity`, `dom-mutations`
+- [prod preserves absolute order without reattaching stable host nodes](../packages/octane/tests/browser/portal-placement/portal-placement.test.ts) — modes: `production-compile`, `real-browser`; observables: `markup`, `node-identity`, `dom-mutations`
 
-**Rationale.** The existing keyed identity suite proves a different reconciler contract. Redact's topology cases require portal-aware absolute placement plus a mutation-level oracle, so they remain an explicit gap instead of being hidden under RDX-REC-001.
+**Rationale.** This is distinct from keyed-list identity: compiler-owned component anchors reserve the source position while portal or null output has no in-flow host. The regressions prove that later materialization stays inside that range and that the existing absolute-anchor path does not reattach stable hosts.
 
 
 ### redact-specific-surfaces
@@ -904,30 +999,77 @@ Targets: `packages/octane/tests/portal.test.ts`, `packages/octane/tests/browser`
 
 #### RDX-SUS-001 — Re-suspension preserves browser-owned state in committed UI
 
-**Disposition:** critical risk; portable; planned; owner: Octane Suspense runtime and browser tests.
+**Disposition:** critical risk; adaptable; covered; owner: Octane Suspense runtime and browser tests.
 
 **Upstream evidence**
 
 - [pull request #16](https://github.com/TanStack/redact/pull/16) — fix(redact): preserve committed DOM across Suspense re-suspension
+- [test: keeps the same scrollable DOM node when Suspense suspends after initial commit](https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L29-L102) (`tests/suspense-preserves-dom.test.tsx`)
+- [test: preserves a sibling scrollable when the swapped-in child suspends](https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L108-L167) (`tests/suspense-preserves-dom.test.tsx`)
 - [test: preserves focus on an input across a sibling suspension](https://github.com/TanStack/redact/blob/e1620a13aab8935c806238f117ba58559b7cd002/tests/suspense-preserves-dom.test.tsx#L170-L220) (`tests/suspense-preserves-dom.test.tsx`)
 
-**Consumer-visible symptom.** Navigating through a suspension destroyed a committed sidebar, resetting scroll and focus even though the logical UI survived.
+**Consumer-visible symptom.** Navigating through a suspension detached committed hosts, resetting scroll and DOM Range anchors even though the logical UI and host objects survived.
 
-**Octane contract.** An already committed Suspense primary tree preserves node identity, component state, scroll, focus, selection, uncontrolled values, and other browser-owned state through urgent and transitioned re-suspension, while refs/effects follow Octane's documented lifecycle.
+**Octane contract.** Once primary content has committed, a fallback-visible re-suspension keeps its host tree connected but visually hidden. Replacement work is proven before the prior committed range is destroyed across control-flow, component, value-child, and returned-output slots, and reentrant deletion cannot resurrect discarded work. Stable hosts, component state, uncontrolled values, input selection offsets, DOM Range anchors, and scroll offsets survive reveal. Focus remains browser-managed rather than being explicitly blurred or restored; a transition that continues showing prior content retains focus. Refs and layout effects detach or clean up once on hide and reattach or recreate in source order on reveal; passive effects remain connected until actual deletion.
 
-**Applicable modes:** `client`, `production-compile`, `real-browser`. **Observables:** `node-identity`, `focus`, `selection`, `scroll`, `live-properties`, `effects`, `refs`.
+**Applicable modes:** `client`, `production-compile`, `real-browser`. **Observables:** `markup`, `node-identity`, `dom-mutations`, `focus`, `selection`, `scroll`, `live-properties`, `effects`, `refs`, `errors`.
 
 **Octane references**
 
-- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `softDetachTryBlock` — Ordinary Suspense currently parks committed DOM in savedDom before reinsertion.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `hideTryBlock` — Keeps primary hosts connected, hides logical portal ranges, preserves authored display state, and composes nested hidden ownership.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “keeps same-tree primary hosts connected and restores authored display/text” — A companion covers a route-swap tree; the file also covers portals, direct text, nested ownership, and hidden unmount cleanup in development and production compilation.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “reconnects memoized effects at their source position without re-running the body” — Proves reveal reconnects a bailed memo descendant in source order without defeating memo semantics.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “reconnects memo-bailed effects in declaration order after staggered updates” — Prevents historical changed-dependency commit time from reordering effect recreation on reveal.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “keeps passive effects connected across hide and reveal” — Distinguishes passive subscriptions, which remain live while content is hidden, from layout effects, which disconnect and reconnect.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “does not detach a hidden primary ref again when its retry enters catch” — A React-19 callback-ref cleanup fires exactly once when fallback-visible work rejects into the terminal catch arm.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “does not suppress ref teardown in an independent root during hidden cleanup” — Ref-detach suppression is scoped to exact hidden hosts, so reentrant cleanup still detaches unrelated roots normally.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “never detaches a completed child from an aborted parent mount” — Exact-host suppression spans recursive teardown so a child whose attach never committed cannot receive a manufactured detach.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “stops a reveal when fallback cleanup unmounts the owning root” — A reentrant root deletion during fallback cleanup prevents the prepared primary and captured lifecycle from publishing.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “stops a catch commit when primary cleanup unmounts the owning root” — Terminal error routing cannot insert a catch arm after cleanup disposes the boundary.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “keeps a superseding markerless branch inside the preserved try range” — A partial first arm is swept before a fulfilled superseding arm mounts, and stale settlement cannot mutate the live branch.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “preserves an urgent componentSlot replacement that suspends” — Companion cases cover value-child and returned-output kind replacements so urgent preservation is not limited to @if branches.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “does not commit an urgent WIP after old-branch cleanup unmounts the root” — Publishes completed replacement ownership before invoking old-tree user cleanup and proves reentrant root deletion cannot resurrect it.
+- [packages/octane/tests/suspense-preserves-dom.test.ts](../packages/octane/tests/suspense-preserves-dom.test.ts) — “does not commit a transition component WIP after old cleanup unmounts the root” — A value-child companion covers the separate range-move path; neither captured lifecycle nor detached WIP DOM can publish after reentrant deletion.
+- [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “preserves same-tree browser state through an urgent fallback” — Chromium observes connectivity, visibility, state, uncontrolled value, input selection, focus, scroll, refs, effects, and subscriptions; a route-swap companion covers the second structure.
+- [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “pins React 19.2.7 focus behavior for fallback-visible primary content” — A React DOM reference case in the same Chromium harness proves the hidden primary remains connected and that React does not automatically restore focus after reveal.
+- [packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — “keeps a direct-root boundary empty when ref detach synchronously unmounts it” — Covers reentrant user code during ref cycling and proves a late thenable cannot resurrect disposed fallback state.
 - [packages/octane/tests/conformance/suspense-refs.test.ts](../packages/octane/tests/conformance/suspense-refs.test.ts) — “detaches host refs on suspend and re-attaches on reveal” — Proves reuse of the same node, not browser focus/scroll preservation.
 - [packages/octane/tests/conformance/suspense-effects-semantics.test.ts](../packages/octane/tests/conformance/suspense-effects-semantics.test.ts) — “destroys the committed layout effect on re-suspend, recreates on reveal”
+- [packages/octane/tests/universal-renderer.test.ts](../packages/octane/tests/universal-renderer.test.ts) — “retains suspended ownership for retry and tears it down when the retry errors” — Universal host ownership survives a DOM fallback retry but is permanently released when that retained retry errors; companion boundary coverage proves an abandoned initial suspension leaves an uncommitted root reusable.
 
-**Next action (test).** In real Chromium, cover same-tree and route-swap re-suspension with identity, scrollTop, activeElement, selection, uncontrolled value, state, refs, and effect logs for urgent and transitioned paths before changing the hiding mechanism.
+**Executable evidence**
 
-Targets: `packages/octane/tests/browser`, `packages/octane/tests/suspense.test.ts`.
+- [keeps same-tree primary hosts connected and restores authored display/text](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`, `live-properties`
+- [keeps swap-tree primary hosts connected and restores authored display/text](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`, `live-properties`
+- [cycles portal lifecycle once and fully tears a hidden primary down](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`, `refs`
+- [keeps a nested portal hidden when the inner boundary resolves first](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [reconnects memoized effects at their source position without re-running the body](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `effects`
+- [reconnects memo-bailed effects in declaration order after staggered updates](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `effects`
+- [keeps passive effects connected across hide and reveal](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `effects`
+- [does not detach a hidden primary ref again when its retry enters catch](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `refs`, `errors`
+- [does not suppress ref teardown in an independent root during hidden cleanup](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `refs`, `effects`, `errors`
+- [never detaches a completed child from an aborted parent mount](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `refs`, `errors`
+- [stops a reveal when fallback cleanup unmounts the owning root](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`, `errors`
+- [stops a catch commit when primary cleanup unmounts the owning root](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `effects`, `errors`
+- [keeps a superseding markerless branch inside the preserved try range](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [preserves an urgent componentSlot replacement that suspends](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [preserves an urgent childSlot replacement that suspends](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [preserves an urgent return-slot kind replacement that suspends](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `node-identity`, `dom-mutations`
+- [does not commit an urgent WIP after old-branch cleanup unmounts the root](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `refs`, `effects`, `errors`
+- [does not commit a transition component WIP after old cleanup unmounts the root](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `refs`, `effects`, `errors`
+- [does not commit a transition child WIP after old cleanup unmounts the root](../packages/octane/tests/suspense-preserves-dom.test.ts) — modes: `client`, `production-compile`; observables: `markup`, `refs`, `effects`, `errors`
+- [pins React 19.2.7 focus behavior for fallback-visible primary content](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `node-identity`, `focus`, `errors`
+- [preserves same-tree browser state through an urgent fallback](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `node-identity`, `focus`, `selection`, `scroll`, `live-properties`, `effects`, `refs`, `errors`
+- [preserves swap-tree browser state through an urgent fallback](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `node-identity`, `focus`, `selection`, `scroll`, `live-properties`, `effects`, `refs`, `errors`
+- [preserves a DOM Range anchor through a fallback-visible route swap](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `node-identity`, `selection`, `scroll`, `errors`
+- [keeps browser state live when a transition resolves before fallback](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `node-identity`, `focus`, `selection`, `scroll`, `live-properties`, `effects`, `refs`, `errors`
+- [preserves browser state when a transition crosses its fallback timeout](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `node-identity`, `focus`, `selection`, `scroll`, `live-properties`, `errors`
+- [keeps a direct-root boundary empty when ref detach synchronously unmounts it](../packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts) — modes: `client`, `real-browser`; observables: `markup`, `node-identity`, `refs`, `errors`
+- [detaches host refs on suspend and re-attaches on reveal](../packages/octane/tests/conformance/suspense-refs.test.ts) — modes: `client`, `production-compile`; observables: `node-identity`, `refs`
+- [destroys the committed layout effect on re-suspend, recreates on reveal](../packages/octane/tests/conformance/suspense-effects-semantics.test.ts) — modes: `client`, `production-compile`; observables: `effects`
+- [retains suspended ownership for retry and tears it down when the retry errors](../packages/octane/tests/universal-renderer.test.ts) — modes: `client`, `production-compile`; observables: `errors`
 
-**Rationale.** The observable preservation contract transfers; Redact's display:none and detached-fallback fiber implementation does not. JSDOM is insufficient for the browser-owned state assertions.
+**Rationale.** The preservation outcome transfers, but Redact's implementation and jsdom-only focus assertion do not. A committed React 19.2.7 Chromium reference case shows the primary stays connected while hidden and that React does not automatically restore focus after reveal; the exact moment Chromium normalizes focus is deliberately not part of the contract. Octane likewise leaves focus browser-managed and promises no automatic refocus. Transitions that resolve before a fallback appears retain focus and do not cycle refs or effects.
 
 
 ### use-id
@@ -947,15 +1089,15 @@ Targets: `packages/octane/tests/browser`, `packages/octane/tests/suspense.test.t
 
 **Octane contract.** Sibling client roots are independently namespaced, server IDs hydrate byte-for-byte, and explicit identifier prefixes compose with root-local allocation.
 
-**Applicable modes:** `client`, `server-string`, `server-stream`, `hydrate-match`, `production-compile`. **Observables:** `markup`.
+**Applicable modes:** `client`, `server-string`, `server-stream`, `hydrate-match`, `production-compile`. **Observables:** `markup`, `node-identity`.
 
 **Octane references**
 
 - [packages/octane/tests/conformance/useid-determinism.test.ts](../packages/octane/tests/conformance/useid-determinism.test.ts) — “automatically namespaces sibling createRoot roots”
-- [packages/octane/tests/conformance/useid-determinism.test.ts](../packages/octane/tests/conformance/useid-determinism.test.ts) — “server useId is preserved byte-for-byte after hydrateRoot()”
+- [packages/octane/tests/conformance/useid-determinism.test.ts](../packages/octane/tests/conformance/useid-determinism.test.ts) — “starts hydrated useId sequences from each server-rendered root”
 
 **Executable evidence**
 
 - [automatically namespaces sibling createRoot roots](../packages/octane/tests/conformance/useid-determinism.test.ts) — modes: `client`, `production-compile`; observables: `markup`
-- [server useId is preserved byte-for-byte after hydrateRoot()](../packages/octane/tests/conformance/useid-determinism.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`; observables: `markup`
-- [hydrates completed boundary useId values in its opaque stream namespace](../packages/octane/tests/streaming-ssr.test.ts) — modes: `server-stream`, `hydrate-match`, `production-compile`; observables: `markup`
+- [starts hydrated useId sequences from each server-rendered root](../packages/octane/tests/conformance/useid-determinism.test.ts) — modes: `server-string`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`
+- [hydrates completed boundary useId values in its opaque stream namespace](../packages/octane/tests/streaming-ssr.test.ts) — modes: `server-stream`, `hydrate-match`, `production-compile`; observables: `markup`, `node-identity`

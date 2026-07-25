@@ -630,7 +630,13 @@ describe('production SSR build', { timeout: 30_000 }, () => {
 		await fetch(devOrigin + '/');
 		const { handler } = await import(pathToFileURL(path.join(distDir, 'server/entry.js')).href);
 		const hash = createHash('sha256').update('/src/Page.tsrx#fixtureRpc').digest('hex').slice(0, 8);
-		const cases = [
+		const cases: Array<{
+			name: string;
+			method: string;
+			headers: HeadersInit;
+			body?: string;
+			status: number;
+		}> = [
 			{
 				name: 'non-POST request',
 				method: 'GET',

@@ -219,7 +219,8 @@ describe('held-then-urgent-resuspend still honours the transition-fallback timeo
 
 			const r = mount(HeldUrgentResuspend, { promiseFor, store, bindStart });
 			await act(() => {});
-			expect(r.find('#content').textContent).toBe('content-1');
+			const content = r.find('#content') as HTMLElement;
+			expect(content.textContent).toBe('content-1');
 
 			// Transition → hold on d2 (arms the 100ms timeout).
 			await act(() => start(() => store.setUrgent(2)));
@@ -248,7 +249,9 @@ describe('held-then-urgent-resuspend still honours the transition-fallback timeo
 			await act(() => {
 				vi.advanceTimersByTime(60);
 			});
-			expect(r.findAll('#content')).toHaveLength(0);
+			expect(r.find('#content')).toBe(content);
+			expect(content.isConnected).toBe(true);
+			expect(content.style.display).toBe('none');
 			expect(r.find('#fallback').textContent).toBe('fallback');
 			expect(r.find('#pending').textContent).toBe('pending');
 
@@ -257,7 +260,9 @@ describe('held-then-urgent-resuspend still honours the transition-fallback timeo
 				d3.resolve(3);
 			});
 			expect(r.findAll('#fallback')).toHaveLength(0);
-			expect(r.find('#content').textContent).toBe('content-3');
+			expect(r.find('#content')).toBe(content);
+			expect(content.textContent).toBe('content-3');
+			expect(content.style.display).toBe('');
 			expect(r.find('#pending').textContent).toBe('idle');
 			r.unmount();
 		} finally {

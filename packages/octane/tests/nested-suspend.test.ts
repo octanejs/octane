@@ -42,12 +42,18 @@ describe('nested suspend — hook state survives a descendant suspend', () => {
 		expect(r.find('#counter').textContent).toBe('2/R/M');
 		expect(r.find('#sibling').textContent).toBe('1');
 		expect(getMemoCalls()).toBe(1);
+		const counter = r.find('#counter') as HTMLElement;
+		const sibling = r.find('#sibling') as HTMLElement;
 
-		// NESTED descendant suspend: the Counter swaps to a pending promise on its
-		// OWN re-render, so handleSuspense sees sourceBlock === the child block,
-		// not the try-body block. Fallback shows.
+		// A nested descendant suspend shows the fallback while retaining the
+		// already-committed primary hosts in place and hiding them.
 		await act(() => goChild());
-		expect(r.findAll('#counter')).toHaveLength(0);
+		expect(r.find('#counter')).toBe(counter);
+		expect(r.find('#sibling')).toBe(sibling);
+		expect(counter.isConnected).toBe(true);
+		expect(sibling.isConnected).toBe(true);
+		expect(counter.style.display).toBe('none');
+		expect(sibling.style.display).toBe('none');
 		expect(r.find('#fallback').textContent).toBe('loading');
 
 		// Resolve — the try subtree resumes. Before the fix this re-mounted the
@@ -55,6 +61,10 @@ describe('nested suspend — hook state survives a descendant suspend', () => {
 		// factory. With the fix, every hook's state is intact.
 		await act(() => gate.resolve('G'));
 		expect(r.findAll('#fallback')).toHaveLength(0);
+		expect(r.find('#counter')).toBe(counter);
+		expect(r.find('#sibling')).toBe(sibling);
+		expect(counter.style.display).toBe('');
+		expect(sibling.style.display).toBe('');
 		expect(r.find('#counter').textContent).toBe('2/G/M'); // n + memo preserved
 		expect(r.find('#sibling').textContent).toBe('1'); // sibling state preserved
 		expect(getMemoCalls()).toBe(1); // memo factory NOT re-run

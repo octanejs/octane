@@ -39,22 +39,28 @@ describe('octane.async-product', () => {
 			first.resolve({ id: 'p-1', name: 'Desk lamp', priceCents: 1234 });
 		});
 		expect(view.container.querySelector('.loading')).toBeNull();
-		expect(view.container.querySelector('.product')?.getAttribute('data-product-id')).toBe('p-1');
+		const product = view.container.querySelector('.product') as HTMLElement;
+		expect(product.getAttribute('data-product-id')).toBe('p-1');
 		expect(view.container.querySelector('h2')?.textContent).toBe('Desk lamp');
 		expect(view.container.querySelector('.price')?.textContent).toBe('$12.34');
 
 		view.rerender({ props: { productId: 'p-1', loadProduct } });
+		expect(view.container.querySelector('.product')).toBe(product);
 		expect(loadProduct.mock.calls).toEqual([['p-1']]);
 		expect(view.container.querySelector('h2')?.textContent).toBe('Desk lamp');
 
 		view.rerender({ props: { productId: 'p-2', loadProduct } });
 		expect(view.container.querySelector('.loading')?.textContent).toBe('Loading product…');
-		expect(view.container.querySelector('.product')).toBeNull();
+		expect(view.container.querySelector('.product')).toBe(product);
+		expect(product.isConnected).toBe(true);
+		expect(product.style.display).toBe('none');
 		expect(loadProduct.mock.calls).toEqual([['p-1'], ['p-2']]);
 
 		await act(() => {
 			second.resolve({ id: 'p-2', name: 'Reading chair', priceCents: 5099 });
 		});
+		expect(view.container.querySelector('.product')).toBe(product);
+		expect(product.style.display).toBe('');
 		expect(view.container.querySelector('h2')?.textContent).toBe('Reading chair');
 		expect(view.container.querySelector('.price')?.textContent).toBe('$50.99');
 	});

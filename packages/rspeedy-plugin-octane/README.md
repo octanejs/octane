@@ -1,4 +1,4 @@
-# `@octanejs/rspeedy-plugin` (private Milestones 6–10 source/build path)
+# `@octanejs/rspeedy-plugin` (private Milestones 6–11 native application path)
 
 This private package turns an Octane Lynx application entry into the two
 programs required by a Lynx template:
@@ -16,15 +16,37 @@ imports, and Rspeedy's debug metadata remain in Rspeedy's normal build graph.
 Development builds wire the pinned Lynx dev transport when Rspeedy enables HMR
 or live reload.
 
-This is a **private source/build milestone**, not a published technical preview.
-The repository proves graph specialization, bundle construction, decoding, and
-dual-layer lazy-chunk emission; it does not yet prove first paint, adoption, or
-dynamic chunk execution on Lynx Web, Android Explorer, or iOS Explorer, nor
-does it prove state-preserving HMR on those targets.
+This is a **private native-application milestone**, not a published technical
+preview. The repository proves graph specialization, bundle construction,
+decoding, dual-layer lazy-chunk emission, and one visible first paint in the
+official macOS Explorer 3.9 arm64 asset. It does not prove adopted-node
+identity, automated native interaction, dynamic chunk execution on Lynx Web,
+Android Explorer, or iOS Explorer, or state-preserving HMR on those targets.
 
 ## One-command repository demo
 
-From the repository root, run:
+On macOS arm64 or x64, the native acceptance path is one command:
+
+```bash
+pnpm lynx:demo:native
+```
+
+The launcher selects the matching official Lynx 3.9.0 macOS Explorer artifact,
+downloads its archive from the release only when absent, verifies the pinned
+SHA-256 digest on every launch, and builds a per-run application lease under
+`~/Library/Caches/octane/lynx-explorer/3.9.0`. The verified archive persists;
+the isolated extraction is removed after Explorer's process group stops. The
+launcher then starts the existing demo server on an available strict localhost
+port, verifies the Lynx binary response, and directly launches the Explorer
+executable with that exact `main.lynx.bundle` URL. Closing Explorer or pressing
+Ctrl-C terminates both Explorer and the development server.
+
+Use `OCTANE_LYNX_EXPLORER_CACHE_DIR` to move the cache,
+`OCTANE_LYNX_EXPLORER_EXECUTABLE` to use an already-installed executable, or
+`OCTANE_LYNX_DEMO_PORT` to request a particular free port. The launcher does not
+run `codesign`; integrity comes from the pinned release URL and checksum.
+
+For an Android/iOS device, simulator, or a separately installed Explorer, run:
 
 ```bash
 pnpm lynx:demo
@@ -41,9 +63,11 @@ layout and CSS, dual-thread startup, and a background-owned state update through
 checks.
 
 The repository's automated gate starts the development command on an isolated
-port, fetches and decodes this exact bundle, and verifies server teardown. It
-does not replace the Explorer/device acceptance gate or prove native first
-paint, adoption, tap delivery, or live reload.
+port, fetches and decodes this exact bundle, and verifies server teardown.
+Launcher unit tests do not download Explorer or open a native window.
+The qualified native evidence records a visible `Count 0` first screen and
+clean Octane main/background transport logs. It does not claim the native tap,
+because synthetic input required macOS accessibility permission during capture.
 
 ## Application mode
 
@@ -105,7 +129,7 @@ pluginOctane({ thread: 'main-thread' });
 ## Compatibility lanes
 
 Milestone 9 covers two exact, indivisible source/build graphs. Registry
-metadata was checked on 2026-07-22:
+metadata was checked on 2026-07-23:
 
 | Component | Minimum | Current |
 | --- | ---: | ---: |
@@ -128,7 +152,7 @@ metadata was checked on 2026-07-22:
 | `@lynx-js/webpack-runtime-globals` | `0.0.7` | `0.0.7` |
 | `@lynx-js/tasm` | `0.0.39` | `0.0.39` |
 | `@lynx-js/testing-environment` | `0.3.0` | `0.3.0` |
-| `@lynx-js/types` | `4.0.0` | `4.0.0` |
+| `@lynx-js/types` | `4.1.0` | `4.1.0` |
 | `@lynx-js/web-core` | `0.22.2` | `0.22.2` |
 | TypeScript | `5.9.3` | `5.9.3` |
 | Webpack (tooling peer only) | `5.108.4` | `5.108.4` |
@@ -137,10 +161,16 @@ Rspeedy `0.16.0` requires Rsbuild `2.1.4` exactly. That Rsbuild release accepts
 Rspack `~2.1.2`, so the current lane advances only Rspack to the newest allowed
 patch. It does not mix in Rsbuild `2.1.7`. Likewise, template plugin `0.13.0`
 requires tasm `0.0.39` exactly, so the standalone tasm `0.0.48` release is not
-part of this graph. The lane also pins every direct Rspeedy dependency selected
-through a caret or tilde range, the debug-metadata payload, runtime globals, and
-the required Webpack 5 tooling peer. The current registry check recomputes the
-newest version inside each upstream range before accepting the recorded graph.
+part of this graph. `@octanejs/lynx` also remains pinned to its audited
+`@lynx-js/types@4.0.0` compatibility slice; newer standalone types releases are
+reported by the registry check but are not accepted into either lane without a
+new compatibility audit. The lane also pins every direct Rspeedy dependency
+selected through a caret or tilde range, the debug-metadata payload, runtime
+globals, and the required Webpack 5 tooling peer. Webpack remains an audited
+tooling pin rather than a moving current-lane edge; the strict external install
+and production builds prove that peer is compatible. The current registry check
+recomputes the newest versions selected by the upstream build graph before
+accepting the recorded graph.
 
 `pnpm test:compat` packs Octane, the Lynx renderer, and both compiler plugins,
 then installs each lane into an external temporary consumer without creating a

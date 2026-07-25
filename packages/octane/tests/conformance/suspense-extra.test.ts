@@ -211,17 +211,24 @@ describe('Suspense — use() inside @if branches', () => {
 			dA.resolve('A!');
 		});
 		expect(r.findAll('.fallback')).toHaveLength(0);
-		expect(r.find('.a').textContent).toBe('A!');
+		const branchA = r.find('.a') as HTMLElement;
+		expect(branchA.textContent).toBe('A!');
 
-		// Swap branches → now use(pB) becomes active, dB still pending.
+		// Swap branches → now use(pB) becomes active and dB is still pending. The
+		// committed A host remains connected but hidden while the fallback is visible.
 		r.update(UseInIf, { which: 'b', pA: dA.promise, pB: dB.promise });
-		expect(r.findAll('.a')).toHaveLength(0);
+		expect(r.find('.a')).toBe(branchA);
+		expect(branchA.isConnected).toBe(true);
+		expect(branchA.style.display).toBe('none');
 		expect(r.find('.fallback').textContent).toBe('pending');
 
 		await act(() => {
 			dB.resolve('B!');
 		});
-		expect(r.find('.b').textContent).toBe('B!');
+		const branchB = r.find('.b') as HTMLElement;
+		expect(branchB.textContent).toBe('B!');
+		expect(branchB.style.display).toBe('');
+		expect(r.findAll('.a')).toHaveLength(0);
 		r.unmount();
 	});
 });

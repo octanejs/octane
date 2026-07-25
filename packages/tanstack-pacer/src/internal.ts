@@ -20,12 +20,19 @@ type SelectionSource<T> = {
 	};
 };
 
+// An omitted optional selector can be occupied by Octane's trailing hook slot.
+// Preserve Pacer's non-reactive empty selection without treating that slot as a selector.
+const selectEmpty = () => ({});
+
 export function useSelectorSlot<TSource, TSelected>(
 	source: SelectionSource<TSource>,
-	selector: (snapshot: TSource) => TSelected,
+	selector: ((snapshot: TSource) => TSelected) | symbol,
 	options: { compare?: (a: TSelected, b: TSelected) => boolean } | undefined,
 	slot: symbol,
 ): TSelected {
+	const resolvedSelector =
+		typeof selector === 'symbol' ? (selectEmpty as (snapshot: TSource) => TSelected) : selector;
+
 	return (
 		useSelector as (
 			source: SelectionSource<TSource>,
@@ -33,5 +40,5 @@ export function useSelectorSlot<TSource, TSelected>(
 			options: { compare?: (a: TSelected, b: TSelected) => boolean } | undefined,
 			slot: symbol,
 		) => TSelected
-	)(source, selector, options, slot);
+	)(source, resolvedSelector, options, slot);
 }

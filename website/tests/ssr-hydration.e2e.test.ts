@@ -703,7 +703,10 @@ describe.sequential('website dev-SSR → hydration (real browser)', () => {
 			);
 
 			await page.click('.on-this-page a[href="#rspack"]');
-			await page.click('.sidebar-link[href="/docs/quick-start"]');
+			// The first click intentionally starts collapsing the mobile panel. Fire
+			// the competing Link activation through the DOM so this cancellation
+			// test does not race Playwright's hit-testing against that CSS animation.
+			await page.locator('.sidebar-link[href="/docs/quick-start"]').dispatchEvent('click');
 			await page.waitForFunction(
 				() =>
 					location.pathname === '/docs/quick-start' &&

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { parseModule } from '@tsrx/core';
 import { describe, expect, it } from 'vitest';
 import { compile } from '../src/compiler/compile.js';
 
@@ -37,8 +38,13 @@ describe('module server compilation', () => {
 
 	it('emits a server namespace, external imports, and dev registrations', () => {
 		const code = compile(source, filename, { mode: 'server' }).code;
+		const output = parseModule(code, 'compiled.js');
 		expect(code).toContain('export const _$_server_$_ = (() => {');
-		expect(code).toContain('from "node:path"');
+		expect(
+			output.body.some(
+				(node) => node.type === 'ImportDeclaration' && node.source.value === 'node:path',
+			),
+		).toBe(true);
 		expect(code).toContain('server["greet"] = greet');
 		expect(code).toContain(`set("${hash('greet')}", ["${filename}", "greet"])`);
 		expect(code).toContain('const callGreet = _$_server_$_["greet"]');

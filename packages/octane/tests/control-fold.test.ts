@@ -612,11 +612,15 @@ describe('template directives in a returned fragment', () => {
 		expect(link?.getAttribute('href')).toBe('/hydrated');
 		expect(body?.textContent).toBe('Hydrated body');
 		for (const headElement of [title!, meta!, link!]) {
-			const adjacentServerNode = headElement.previousSibling;
-			if (adjacentServerNode?.nodeType === Node.COMMENT_NODE) {
-				document.head.append(adjacentServerNode);
+			const precedingServerNode = headElement.previousSibling;
+			const followingServerNode = headElement.nextSibling;
+			if (precedingServerNode?.nodeType === Node.COMMENT_NODE) {
+				document.head.append(precedingServerNode);
 			}
 			document.head.append(headElement);
+			if (followingServerNode?.nodeType === Node.COMMENT_NODE) {
+				document.head.append(followingServerNode);
+			}
 		}
 		const container = document.createElement('div');
 		document.body.appendChild(container);

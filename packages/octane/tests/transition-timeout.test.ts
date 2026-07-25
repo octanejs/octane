@@ -61,8 +61,9 @@ describe('useTransition — transition-timeout fallback', () => {
 				readyValue: 'second',
 			});
 			await act(() => {});
+			const leaf = r.find('.leaf') as HTMLElement;
 			expect(readyRef.current).toBeNull();
-			expect(r.find('.leaf').textContent).toBe('first');
+			expect(leaf.textContent).toBe('first');
 			expect(r.find('#pending').textContent).toBe('0');
 			expect(r.findAll('#fallback')).toHaveLength(0);
 
@@ -74,23 +75,28 @@ describe('useTransition — transition-timeout fallback', () => {
 			expect(r.find('#pending').textContent).toBe('1');
 			expect(r.findAll('#fallback')).toHaveLength(0);
 
-			// Advance time PAST the timeout — the runtime swaps to @pending.
+			// Advance time PAST the timeout — the runtime shows @pending while
+			// keeping the committed primary connected and visually hidden.
 			// isPending stays true (the transition is still in progress).
 			await act(() => {
 				vi.advanceTimersByTime(150);
 			});
-			expect(r.findAll('.leaf')).toHaveLength(0);
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.isConnected).toBe(true);
+			expect(leaf.style.display).toBe('none');
 			expect(r.find('#fallback').textContent).toBe('pending-shown');
 			expect(r.find('#pending').textContent).toBe('1');
 
-			// Promise resolves AFTER the fallback was shown — the saved try-body
-			// re-attaches with the resolved value AND isPending drops to false.
+			// Promise resolves AFTER the fallback was shown — the hidden try-body
+			// reveals with the resolved value AND isPending drops to false.
 			await act(() => {
 				next.resolve('second');
 			});
 			expect(r.findAll('#fallback')).toHaveLength(0);
-			expect(r.find('.leaf').textContent).toBe('second');
-			expect(readyRef.current).toBe(r.find('.leaf'));
+			expect(r.find('.leaf')).toBe(leaf);
+			expect(leaf.textContent).toBe('second');
+			expect(leaf.style.display).toBe('');
+			expect(readyRef.current).toBe(leaf);
 			expect(r.find('#pending').textContent).toBe('0');
 			r.unmount();
 		} finally {

@@ -31,6 +31,20 @@ export function tanstackStart(options) {
 	const { octane: octaneOptions, ...startOptions } = options ?? {};
 	validateOctaneCompilerOptions(octaneOptions);
 
+	// `devtools: true` is Start's shorthand for the compiler's command-aware
+	// profiling signal (mirrors `@octanejs/vite-plugin`'s `devtools` option): an
+	// explicit `profile` always wins, otherwise `devtools` maps to `'auto'`
+	// (profiling on in `vite dev`, compiled out of `vite build`). `octane()`
+	// itself only understands `profile`, so this is resolved before the plugin
+	// is created and the `devtools` key never reaches it.
+	const resolvedOctaneOptions = octaneOptions ? { ...octaneOptions } : octaneOptions;
+	if (resolvedOctaneOptions) {
+		if (resolvedOctaneOptions.profile === undefined && resolvedOctaneOptions.devtools === true) {
+			resolvedOctaneOptions.profile = 'auto';
+		}
+		delete resolvedOctaneOptions.devtools;
+	}
+
 	const corePluginOptions = {
 		framework: 'octane',
 		defaultEntryPaths: octaneStartDefaultEntryPaths,
@@ -44,7 +58,7 @@ export function tanstackStart(options) {
 		// Must run before the octane compiler: strips <ClientOnly> children on
 		// the server (the octane analogue of start-compiler handleClientOnlyJSX).
 		octaneClientOnlyServerStrip(),
-		octane(octaneOptions),
+		octane(resolvedOctaneOptions),
 		{
 			name: 'octanejs-tanstack-start:workspace-source-deps',
 			configEnvironment(environmentName, environmentOptions) {

@@ -59,6 +59,27 @@ not cleanup work for a later change.
   state require an invalidation/lifetime argument and tests for cleanup,
   reentrancy, errors, and aborts where applicable.
 
+## Preserve the compiler emission architecture
+
+- Generated JavaScript and TypeScript syntax exists only as AST. Build and
+  rewrite it copy-on-write with `@tsrx/core` builders and clone helpers, preserve
+  authored origin locations, and print each emitted Program exactly once. Do not
+  assemble generated syntax as strings, print fragments for interpolation,
+  reparse generated output, or edit code after the final print.
+- Static template HTML exists as compiler-owned template IR with authored
+  origins. Serialize each completed template exactly once into the existing
+  runtime HTML string ABI, then embed that string as an AST literal. HTML, CSS,
+  module specifier values, diagnostics, and ordinary string literals remain
+  textual data; they are not permission to construct JavaScript through text.
+- `slot-hooks.js` is the sole text-edit exception: its append-only authored
+  source edits intentionally preserve user line numbers without a source map.
+  Volar/type-only generation delegates its one Program print to `@tsrx/core`;
+  keep `boundaryTokens: true` so structural token boundaries resolve through
+  its source map without changing output bytes.
+- Before adding a manual ESTree object, verify that no builder or clone helper
+  represents the shape. Keep any unavoidable unsupported shape in the compiler
+  AST emit audit's explicit inventory and explain why it cannot use a builder.
+
 ## Perform an adversarial self-review
 
 Before handoff, inspect the complete diff as if rejecting another author's

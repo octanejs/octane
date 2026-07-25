@@ -49,4 +49,20 @@ describe('conditional hooks — guard before useEffect', () => {
 		expect(log).toEqual(['seen:0:0', 'seen:1:0', 'seen:1:1']);
 		r.unmount();
 	});
+
+	it('disconnects an effect when a previously-open guard closes', async () => {
+		const log: string[] = [];
+		const r = mount(Guarded, { hide: false, log, initialN: 7 });
+		await nextPaint();
+		expect(log).toEqual(['mount:7']);
+
+		r.update(Guarded, { hide: true, log, initialN: 7 });
+		await nextPaint();
+		expect(log).toEqual(['mount:7', 'cleanup:7']);
+
+		r.update(Guarded, { hide: false, log, initialN: 7 });
+		await nextPaint();
+		expect(log).toEqual(['mount:7', 'cleanup:7', 'mount:7']);
+		r.unmount();
+	});
 });

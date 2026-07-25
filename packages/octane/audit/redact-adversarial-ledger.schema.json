@@ -329,6 +329,7 @@
         "vite-ssr",
         "rspack",
         "rsbuild",
+        "rspeedy",
         "benchmark"
       ]
     },
@@ -346,7 +347,10 @@
         "events",
         "errors",
         "streaming",
+        "emitted-code",
         "package-resolution",
+        "resolved-configuration",
+        "bundle-contents",
         "performance"
       ]
     },
