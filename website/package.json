@@ -5,9 +5,9 @@
   "type": "module",
   "description": "The official Octane website",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 3000",
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner",
+    "preview": "vite preview --configLoader runner --port 3000",
     "start": "node .output/server/index.mjs",
     "typecheck": "tsrx-tsc --noEmit -p tsconfig.json"
   },

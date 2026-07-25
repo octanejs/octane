@@ -29,8 +29,42 @@ declare module 'octane/compiler' {
 			mode?: 'client' | 'server';
 			hmr?: boolean;
 			dev?: boolean;
+			inspect?: boolean;
 		},
-	): { code: string; map: unknown; diagnostics: CompileDiagnostic[] };
+	): {
+		code: string;
+		diagnostics: CompileDiagnostic[];
+		inspect?: {
+			ast: unknown;
+			templates: Array<{ name: string; ast: unknown }>;
+		};
+	};
+}
+
+// The Volar (language-service) pipeline — the playground's TYPES output pane.
+declare module 'octane/compiler/volar' {
+	export interface VolarMapping {
+		sourceOffsets: number[];
+		generatedOffsets: number[];
+		lengths: number[];
+		generatedLengths?: number[];
+		data?: Record<string, unknown>;
+	}
+	export function compileToVolarMappings(
+		source: string,
+		filename?: string,
+		options?: {
+			loose?: boolean;
+			renderers?: unknown;
+		},
+	): {
+		code: string;
+		mappings: VolarMapping[];
+		errors: readonly unknown[];
+		diagnostics: readonly unknown[];
+		sourceAst: unknown;
+		generatedAst: unknown;
+	};
 }
 
 // `.mdx` documents compile (via @octanejs/mdx) to octane component modules with

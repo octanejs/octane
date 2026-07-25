@@ -32,8 +32,6 @@ export interface ModuleGraph {
 	/** Dependency order — every module precedes its importers. */
 	modules: { name: string; code: string }[];
 	warnings: { file: string; diagnostic: CompileDiagnostic }[];
-	/** Per-file compiled output (pre-rewrite), for the "Compiled output" pane. */
-	compiled: Map<string, string>;
 }
 
 export interface ModuleGraphFailure {
@@ -123,7 +121,6 @@ export async function buildModuleGraph(
 	const { init, parse } = await import('es-module-lexer');
 	await init;
 
-	const compiled = new Map<string, string>();
 	const rewritten = new Map<string, string>();
 	const siblingDeps = new Map<string, string[]>();
 	const warnings: ModuleGraph['warnings'] = [];
@@ -131,7 +128,6 @@ export async function buildModuleGraph(
 	for (const file of files) {
 		const out = await compileFile(file);
 		if (!out.ok) return { ok: false, error: out.error };
-		compiled.set(file.name, out.code);
 		for (const diagnostic of out.warnings) warnings.push({ file: file.name, diagnostic });
 
 		let imports;
@@ -235,6 +231,5 @@ export async function buildModuleGraph(
 		entryKind: isReactHostFile(entry) ? 'react' : 'octane',
 		modules,
 		warnings,
-		compiled,
 	};
 }

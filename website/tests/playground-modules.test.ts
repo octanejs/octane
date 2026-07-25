@@ -197,11 +197,4 @@ describe('diagnostics', () => {
 			filename: 'Field.tsrx',
 		});
 	});
-
-	it('keeps per-file compiled output for the output pane', async () => {
-		const graph = await buildModuleGraph([app('export default function App() @{ <b>x</b> }')], APP);
-		expect(graph.ok).toBe(true);
-		if (!graph.ok) return;
-		expect(graph.compiled.get(APP)).toContain("from 'octane'");
-	});
 });

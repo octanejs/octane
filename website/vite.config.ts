@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import { createRequire } from 'node:module';
+import { build as esbuildBuild } from 'esbuild';
 import { octaneMdx } from '@octanejs/mdx/vite';
 import { threeRenderers } from '@octanejs/three/config';
 import { tanstackStart } from '@octanejs/tanstack-start/plugin/vite';
@@ -23,9 +24,8 @@ function playgroundRuntime(): Plugin {
 	const MANIFEST_PATH = '/playground-runtime.json'; // = RUNTIME_MANIFEST_PATH in playground-sandbox.ts
 
 	async function bundle(): Promise<string> {
-		const esbuild = await import('esbuild');
 		const require = createRequire(import.meta.url);
-		const out = await esbuild.build({
+		const out = await esbuildBuild({
 			// Workspace link: website/node_modules/octane → packages/octane, whose
 			// exports map points entries at raw TS sources — esbuild handles them.
 			entryPoints: {

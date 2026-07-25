@@ -18,9 +18,15 @@ import { type Extension, StateEffect, StateField } from '@codemirror/state';
 import { createHighlighter, type ThemedToken, type Highlighter } from 'shiki';
 import tsrxGrammar from '../assets/tsrx.tmLanguage.json';
 
-// Match the site's MDX code fences (mdx-options.ts): github-dark, and the TSRX
-// grammar registered with embedded JSX/TS/CSS islands under the name 'tsrx'.
-export const PLAYGROUND_SHIKI_THEME = 'github-dark';
+// Match the site's MDX code fences (mdx-options.ts): the SAME dual light/dark
+// theme pair, emitted as `--shiki-light`/`--shiki-dark` custom properties per
+// token so the active site theme picks the color via CSS (the `.cm-shiki`
+// rules in __root.tsrx's BASE_STYLES) — no re-tokenize on theme flip. The
+// TSRX grammar is registered with embedded JSX/TS/CSS islands as 'tsrx'.
+export const PLAYGROUND_SHIKI_THEMES = {
+	light: 'github-light',
+	dark: 'github-dark-high-contrast',
+} as const;
 
 const modifiedTsrxGrammar = {
 	...(tsrxGrammar as object),
@@ -32,7 +38,7 @@ let highlighterPromise: Promise<Highlighter> | null = null;
 function getHighlighter(): Promise<Highlighter> {
 	if (!highlighterPromise) {
 		highlighterPromise = createHighlighter({
-			themes: [PLAYGROUND_SHIKI_THEME],
+			themes: [PLAYGROUND_SHIKI_THEMES.light, PLAYGROUND_SHIKI_THEMES.dark],
 			langs: [
 				'javascript',
 				'typescript',
@@ -46,6 +52,26 @@ function getHighlighter(): Promise<Highlighter> {
 	return highlighterPromise;
 }
 
+// Re-highlighting allocates per TOKEN (thousands per document, every
+// keystroke), but the number of distinct token styles is bounded by the
+// theme palette (a few dozen pairs) — so mark decorations are interned by
+// their style string and reused across tokens, documents, and re-highlights.
+const tokenDecorations = new Map<string, Decoration>();
+
+function tokenDecoration(style: Record<string, string>): Decoration {
+	// With defaultColor: false the per-theme colors arrive as custom
+	// properties in htmlStyle; the stylesheet maps them to `color`. The
+	// serialized declaration doubles as the intern key.
+	let styleText = '';
+	for (const property in style) styleText += `${property}:${style[property]};`;
+	let deco = tokenDecorations.get(styleText);
+	if (!deco) {
+		deco = Decoration.mark({ class: 'cm-shiki', attributes: { style: styleText } });
+		tokenDecorations.set(styleText, deco);
+	}
+	return deco;
+}
+
 function buildDecorations(doc: string, highlighter: Highlighter, lang: string): DecorationSet {
 	if (!doc) return Decoration.none;
 
@@ -53,7 +79,8 @@ function buildDecorations(doc: string, highlighter: Highlighter, lang: string): 
 	try {
 		tokens = highlighter.codeToTokens(doc, {
 			lang: lang as any,
-			theme: PLAYGROUND_SHIKI_THEME,
+			themes: PLAYGROUND_SHIKI_THEMES,
+			defaultColor: false,
 		}).tokens;
 	} catch {
 		return Decoration.none;
@@ -64,12 +91,9 @@ function buildDecorations(doc: string, highlighter: Highlighter, lang: string): 
 		for (const token of line) {
 			const from = token.offset;
 			const to = from + token.content.length;
-			if (token.color && to <= doc.length) {
-				ranges.push({
-					from,
-					to,
-					deco: Decoration.mark({ attributes: { style: `color: ${token.color}` } }),
-				});
+			const style = token.htmlStyle;
+			if (style && to <= doc.length) {
+				ranges.push({ from, to, deco: tokenDecoration(style) });
 			}
 		}
 	}
