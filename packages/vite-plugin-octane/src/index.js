@@ -214,7 +214,12 @@ function collect_hydrate_module_paths(config) {
  * `handler`/`nodeHandler` module; webworker-target adapters get an importable
  * `createWebWorkerHandler` factory for their deployment wrapper.
  *
- * @param {{ hmr?: boolean, profile?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
+ * `devtools: true` enables the compiler's profile mode in DEV ONLY: profiling
+ * is on in `vite dev` and fully off in `vite build` (so production tree-shakes
+ * it). An explicit `profile` (true or false) always takes precedence over
+ * `devtools`.
+ *
+ * @param {{ hmr?: boolean, profile?: boolean, devtools?: boolean, exclude?: string[], requireDirective?: boolean, renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions }} [inlineOptions]
  * @returns {Plugin[]}
  */
 export function octane(inlineOptions = {}) {
@@ -873,7 +878,7 @@ export function octane(inlineOptions = {}) {
 	/**
 	 * @type {{
 	 *   hmr?: boolean,
-	 *   profile?: boolean,
+	 *   profile?: boolean | 'auto',
 	 *   exclude?: string[],
 	 *   requireDirective?: boolean,
 	 *   renderers?: import('@octanejs/app-core').ExperimentalRendererConfigOptions,
@@ -881,7 +886,10 @@ export function octane(inlineOptions = {}) {
 	 */
 	const compilerOptions = {};
 	if (inlineOptions.hmr !== undefined) compilerOptions.hmr = inlineOptions.hmr;
+	// Explicit `profile` wins; otherwise `devtools: true` opts into the
+	// command-aware `'auto'` signal the compiler resolves to DEV-only profiling.
 	if (inlineOptions.profile !== undefined) compilerOptions.profile = inlineOptions.profile;
+	else if (inlineOptions.devtools === true) compilerOptions.profile = 'auto';
 	if (inlineOptions.exclude !== undefined) compilerOptions.exclude = inlineOptions.exclude;
 	if (inlineOptions.requireDirective !== undefined) {
 		compilerOptions.requireDirective = inlineOptions.requireDirective;
