@@ -8,12 +8,19 @@ and `{segText(seg, done)}` are ordinary value projections, but a single one of
 them previously disqualified the whole component — and, transitively, every
 component that rendered it — from region memoization.
 
-Calls through a **method on your data** (`{header.getIsSorted()}`) still
-disqualify the region: the receiver can return a new answer while the object
-identity that would witness the change stays the same, which is the shape
-table/grid/store bindings produce. Hook calls (`use()` and any `use*`) are never
-treated as value projections either, since they own suspension, hook cells,
-context subscriptions, and effect lifecycles.
+A call is admitted only when its callee is a module-scope immutable identity: an
+imported binding, or a same-module `function` declaration that is never
+reassigned and whose own body is itself a value projection. Everything else
+still fails closed, because each can hide state that no dependency witnesses:
+
+- a method on your data (`{header.getIsSorted()}`), including a helper that
+  merely wraps one — the same hazard one call frame away;
+- a component-local callee, which nothing pins to an immutable identity;
+- hook calls (`use()` and any `use*`), which own suspension, hook cells, context
+  subscriptions, and effect lifecycles rather than projecting a value;
+- `new Foo()` and tagged templates.
+
+Arguments carry the same contract, so `{format(row.get())}` stays disqualified.
 
 Same-module `function` helpers that are never reassigned are also now accepted
 as memo-region witnesses, on the same immutable-identity grounds already given
