@@ -126,6 +126,8 @@ describe('@octanejs/tanstack-hotkeys', () => {
 		flushEffects();
 
 		result.unmount();
+		flushEffects();
+		expect(HotkeyManager.getInstance().registrations.state.size).toBe(0);
 		pressKey('k', { ctrlKey: true });
 
 		expect(onShortcut).not.toHaveBeenCalled();
