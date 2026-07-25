@@ -527,7 +527,13 @@ export function App() @{
 			.update('/src/actions.tsrx#projectRpc')
 			.digest('hex')
 			.slice(0, 8);
-		for (const scenario of [
+		const rpcSecurityScenarios: Array<{
+			name: string;
+			method: string;
+			headers: HeadersInit;
+			body?: string;
+			status: number;
+		}> = [
 			{
 				name: 'non-POST request',
 				method: 'GET',
@@ -568,7 +574,8 @@ export function App() @{
 				body: '[[1],"unauthorized"]',
 				status: 401,
 			},
-		]) {
+		];
+		for (const scenario of rpcSecurityScenarios) {
 			const rpcResponse = await server.handler(
 				new Request(`http://example.test/_$_ripple_rpc_$_/${projectRpcHash}`, {
 					method: scenario.method,

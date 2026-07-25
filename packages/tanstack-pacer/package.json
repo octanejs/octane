@@ -6,13 +6,6 @@
   "engines": {
     "node": ">=22"
   },
-  "octane": {
-    "hookSlots": {
-      "manual": [
-        "src"
-      ]
-    }
-  },
   "description": "TanStack Pacer bindings for Octane — debouncing, throttling, rate limiting, queuing, and batching hooks over the framework-agnostic @tanstack/pacer core.",
   "author": {
     "name": "Dominic Gannaway",
