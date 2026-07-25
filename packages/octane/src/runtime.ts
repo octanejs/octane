@@ -5910,81 +5910,45 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 }
 
 function cloneHydrationReplayEvent(event: Event, target: Element): Event {
-	// Event constructors are realm-specific. Hydrating an iframe-owned root from
-	// its parent realm must still replay an event created by the iframe's Window.
-	const ownerWindow = target.ownerDocument.defaultView;
-	if (ownerWindow !== null) {
-		// PointerEvent extends MouseEvent, so it must be selected first or pointer-
-		// specific metadata (pressure, pointerId, tilt, etc.) is discarded.
-		if (
-			typeof ownerWindow.PointerEvent !== 'undefined' &&
-			event instanceof ownerWindow.PointerEvent
-		) {
-			return new ownerWindow.PointerEvent(event.type, event);
-		}
-		if (
-			typeof ownerWindow.KeyboardEvent !== 'undefined' &&
-			event instanceof ownerWindow.KeyboardEvent
-		) {
-			return new ownerWindow.KeyboardEvent(event.type, event);
-		}
-		if (typeof ownerWindow.MouseEvent !== 'undefined' && event instanceof ownerWindow.MouseEvent) {
-			return new ownerWindow.MouseEvent(event.type, event);
-		}
-		if (typeof ownerWindow.FocusEvent !== 'undefined' && event instanceof ownerWindow.FocusEvent) {
-			return new ownerWindow.FocusEvent(event.type, event);
-		}
-		// Programmatic dispatch may cross realms: the original event can come from
-		// a parent Window while its target belongs to this iframe Window. Web IDL's
-		// toStringTag preserves the platform family across that identity boundary;
-		// always construct the replay with the target realm's constructor.
-		const eventBrand = Object.prototype.toString.call(event);
-		if (eventBrand === '[object PointerEvent]' && typeof ownerWindow.PointerEvent !== 'undefined') {
-			return new ownerWindow.PointerEvent(event.type, event);
-		}
-		if (
-			eventBrand === '[object KeyboardEvent]' &&
-			typeof ownerWindow.KeyboardEvent !== 'undefined'
-		) {
-			return new ownerWindow.KeyboardEvent(event.type, event);
-		}
-		if (eventBrand === '[object MouseEvent]' && typeof ownerWindow.MouseEvent !== 'undefined') {
-			return new ownerWindow.MouseEvent(event.type, event);
-		}
-		if (eventBrand === '[object FocusEvent]' && typeof ownerWindow.FocusEvent !== 'undefined') {
-			return new ownerWindow.FocusEvent(event.type, event);
-		}
-		return new ownerWindow.Event(event.type, event);
+	// Event constructors are realm-specific, so the clone is always built with the
+	// TARGET's constructors: hydrating an iframe-owned root from its parent realm
+	// must still replay an event the iframe's own code recognizes. A detached
+	// synthetic Document has no defaultView and falls back to the ambient realm.
+	const realm = target.ownerDocument.defaultView ?? globalThis;
+	// Same-realm replay is the overwhelmingly common case, so it stays a plain
+	// constructor walk: no brand string, no comparisons beyond `instanceof`.
+	// PointerEvent extends MouseEvent, so it must be tested first or pointer-
+	// specific metadata (pressure, pointerId, tilt, etc.) is discarded.
+	if (realm.PointerEvent !== undefined && event instanceof realm.PointerEvent) {
+		return new realm.PointerEvent(event.type, event);
 	}
-
-	// A detached synthetic Document can have no defaultView. Preserve the
-	// previous ambient-realm fallback for that uncommon host shape.
-	if (typeof PointerEvent !== 'undefined' && event instanceof PointerEvent) {
-		return new PointerEvent(event.type, event);
+	if (realm.KeyboardEvent !== undefined && event instanceof realm.KeyboardEvent) {
+		return new realm.KeyboardEvent(event.type, event);
 	}
-	if (typeof KeyboardEvent !== 'undefined' && event instanceof KeyboardEvent) {
-		return new KeyboardEvent(event.type, event);
+	if (realm.MouseEvent !== undefined && event instanceof realm.MouseEvent) {
+		return new realm.MouseEvent(event.type, event);
 	}
-	if (typeof MouseEvent !== 'undefined' && event instanceof MouseEvent) {
-		return new MouseEvent(event.type, event);
+	if (realm.FocusEvent !== undefined && event instanceof realm.FocusEvent) {
+		return new realm.FocusEvent(event.type, event);
 	}
-	if (typeof FocusEvent !== 'undefined' && event instanceof FocusEvent) {
-		return new FocusEvent(event.type, event);
+	// Cold: a programmatic dispatch may cross realms, where the original event
+	// came from a parent Window while its target belongs to an iframe Window (or
+	// the reverse). No local constructor claims it, but Web IDL's toStringTag
+	// still reports the platform family across that identity boundary.
+	const brand = Object.prototype.toString.call(event);
+	if (realm.PointerEvent !== undefined && brand === '[object PointerEvent]') {
+		return new realm.PointerEvent(event.type, event);
 	}
-	const eventBrand = Object.prototype.toString.call(event);
-	if (eventBrand === '[object PointerEvent]' && typeof PointerEvent !== 'undefined') {
-		return new PointerEvent(event.type, event);
+	if (realm.KeyboardEvent !== undefined && brand === '[object KeyboardEvent]') {
+		return new realm.KeyboardEvent(event.type, event);
 	}
-	if (eventBrand === '[object KeyboardEvent]' && typeof KeyboardEvent !== 'undefined') {
-		return new KeyboardEvent(event.type, event);
+	if (realm.MouseEvent !== undefined && brand === '[object MouseEvent]') {
+		return new realm.MouseEvent(event.type, event);
 	}
-	if (eventBrand === '[object MouseEvent]' && typeof MouseEvent !== 'undefined') {
-		return new MouseEvent(event.type, event);
+	if (realm.FocusEvent !== undefined && brand === '[object FocusEvent]') {
+		return new realm.FocusEvent(event.type, event);
 	}
-	if (eventBrand === '[object FocusEvent]' && typeof FocusEvent !== 'undefined') {
-		return new FocusEvent(event.type, event);
-	}
-	return new Event(event.type, event);
+	return new realm.Event(event.type, event);
 }
 
 function notifyHydrateBoundary(state: HydrateSlot): void {
@@ -10467,8 +10431,7 @@ function adoptServerHeadEl(key: string, tag: string): Element | null {
 			let candidate: Node | null = n.nextSibling;
 			let match: Element | null = null;
 			let end: Comment | null = null;
-			let malformed = false;
-			let ambiguous = false;
+			let matches = 0;
 			while (candidate !== null) {
 				if (candidate.nodeType === 8) {
 					const marker = (candidate as Comment).data;
@@ -10477,27 +10440,20 @@ function adoptServerHeadEl(key: string, tag: string): Element | null {
 						break;
 					}
 					// A nested/reordered ownership marker means this interval cannot
-					// prove which same-tag node belongs to the requested entry.
-					if (marker.startsWith('rnh-') || marker.startsWith('/rnh-')) {
-						malformed = true;
-						break;
-					}
+					// prove which same-tag node belongs to the requested entry. Leaving
+					// `end` unset below is what makes that case adopt nothing.
+					if (marker.startsWith('rnh-') || marker.startsWith('/rnh-')) break;
 				}
 				if (candidate.nodeType === 1 && (candidate as Element).localName === tag) {
-					if (match !== null) {
-						ambiguous = true;
-					} else {
-						match = candidate as Element;
-					}
+					if (matches++ === 0) match = candidate as Element;
 				}
 				candidate = candidate.nextSibling;
 			}
 			(n as Comment).remove();
-			if (!malformed && end !== null) {
-				end.remove();
-				return ambiguous ? null : match;
-			}
-			return null;
+			if (end === null) return null;
+			end.remove();
+			// Two same-tag candidates are as unprovable as none.
+			return matches === 1 ? match : null;
 		}
 	}
 	return null;

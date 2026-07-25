@@ -491,7 +491,7 @@
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
           "symbol": "cloneHydrationReplayEvent",
-          "note": "Clones every public event family with its realm-specific platform constructor; pointer detection precedes mouse detection."
+          "note": "Clones every public event family with the target realm's platform constructor, falling back to the Web IDL brand when instanceof cannot cross realms; pointer detection precedes mouse detection."
         },
         {
           "kind": "test",
@@ -504,6 +504,12 @@
           "file": "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
           "testName": "classifies parent-realm events before replaying them in an iframe realm",
           "note": "Parent-created focus, keyboard, mouse, and pointer events replay with the iframe target's constructors and retain their metadata."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
+          "testName": "classifies iframe-realm events before replaying them at a host-document target",
+          "note": "The opposite realm crossing: an embedded widget's own events replay with the host document's constructors, proving the clone follows the target rather than the incoming event."
         },
         {
           "kind": "test",

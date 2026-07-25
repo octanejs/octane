@@ -249,9 +249,10 @@ This is the explicit artifact sample reviewed at the pinned snapshot; broad sour
 
 **Octane references**
 
-- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `cloneHydrationReplayEvent` — Clones every public event family with its realm-specific platform constructor; pointer detection precedes mouse detection.
+- [packages/octane/src/runtime.ts](../packages/octane/src/runtime.ts) — `cloneHydrationReplayEvent` — Clones every public event family with the target realm's platform constructor, falling back to the Web IDL brand when instanceof cannot cross realms; pointer detection precedes mouse detection.
 - [packages/octane/tests/hydration/deferred-hydration-contract.test.ts](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — “replays every public interaction event once with its platform shape and queue semantics” — An exhaustive type-level-locked matrix covers all 15 public interaction events in development and production compilation.
 - [packages/octane/tests/hydration/deferred-hydration-contract.test.ts](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — “classifies parent-realm events before replaying them in an iframe realm” — Parent-created focus, keyboard, mouse, and pointer events replay with the iframe target's constructors and retain their metadata.
+- [packages/octane/tests/hydration/deferred-hydration-contract.test.ts](../packages/octane/tests/hydration/deferred-hydration-contract.test.ts) — “classifies iframe-realm events before replaying them at a host-document target” — The opposite realm crossing: an embedded widget's own events replay with the host document's constructors, proving the clone follows the target rather than the incoming event.
 - [packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts](../packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts) — “preserves every public event family, metadata, order, target, and cancellation” — Real Chromium proves platform subclasses, metadata, FIFO delivery, original target, default cancellation, and one queue drain.
 
 **Executable evidence**

@@ -354,6 +354,87 @@ describe('deferred hydration contract edges', () => {
 		}
 	});
 
+	// The replay clone is built from the TARGET's constructors, never the incoming
+	// event's, so the same realm crossing must hold in the opposite direction: an
+	// embedded widget can dispatch an event of its own realm into its host document.
+	it('classifies iframe-realm events before replaying them at a host-document target', () => {
+		const iframe = document.createElement('iframe');
+		document.body.appendChild(iframe);
+		let observation: ReturnType<typeof observeHydrationReplays> | undefined;
+		try {
+			const foreignWindow = iframe.contentWindow!;
+			expect(foreignWindow.MouseEvent).not.toBe(MouseEvent);
+			const replayCases = HYDRATION_INTERACTION_CROSS_REALM_CASES;
+			const when = interaction({ events: replayCases.map((testCase) => testCase.type) });
+			container.innerHTML = renderToString(eventReplayServer.DeferredHydrationEventReplay, {
+				when,
+			}).html;
+			const parent = container.querySelector('#hydration-replay-parent')!;
+			const target = container.querySelector('#hydration-replay-target')!;
+			const relatedTarget = container.querySelector('#hydration-replay-related')!;
+
+			initializeHydrationEventCapture(document);
+			for (const testCase of replayCases) {
+				target.dispatchEvent(
+					createHydrationInteractionEvent(foreignWindow, relatedTarget, testCase),
+				);
+			}
+
+			const targetRealmMatches: boolean[] = [];
+			root = hydrateRoot(container, eventReplayClient.DeferredHydrationEventReplay, {
+				when,
+				onHydrated() {
+					for (const testCase of replayCases) {
+						target.addEventListener(
+							testCase.type,
+							(event) => {
+								switch (testCase.family) {
+									case 'focus':
+										targetRealmMatches.push(event instanceof FocusEvent);
+										break;
+									case 'keyboard':
+										targetRealmMatches.push(event instanceof KeyboardEvent);
+										break;
+									case 'mouse':
+										targetRealmMatches.push(event instanceof MouseEvent);
+										break;
+									case 'pointer':
+										targetRealmMatches.push(event instanceof PointerEvent);
+										break;
+								}
+							},
+							{ once: true },
+						);
+					}
+					observation = observeHydrationReplays(parent, target);
+				},
+			});
+			flushSync(() => {});
+			flushEffects();
+
+			const records = observation!.records.filter((record) => record.phase === 'target');
+			expect(records.map((record) => record.type)).toEqual([
+				'focusin',
+				'keydown',
+				'mousedown',
+				'pointerdown',
+			]);
+			expect(targetRealmMatches).toEqual([true, true, true, true]);
+			for (let i = 0; i < replayCases.length; i++) {
+				expect(records[i]).toMatchObject({
+					type: replayCases[i].type,
+					targetIsOriginal: true,
+					...expectedHydrationReplayMetadata(replayCases[i]),
+				});
+			}
+		} finally {
+			observation?.cleanup();
+			root?.unmount();
+			root = undefined;
+			iframe.remove();
+		}
+	});
+
 	it('keeps function-form visibility dormant after hydrateRoot interaction setup', async () => {
 		let intersect!: IntersectionObserverCallback;
 		const observe = vi.fn();
