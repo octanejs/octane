@@ -85,6 +85,8 @@ function mountHydrationCase(): void {
 					container.querySelectorAll('#hydration-text'),
 					(node) => node.textContent,
 				),
+				recoveredActionText:
+					container.querySelector('#hydration-recovered-action')?.textContent?.trim() ?? '',
 				globalFailures: globalFailures.slice(),
 			};
 		},

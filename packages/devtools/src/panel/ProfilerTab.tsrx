@@ -19,45 +19,48 @@ export function ProfilerTab(props: { client: OctaneDevtoolsEventClient }): Octan
 		return () => off();
 	});
 
-	return (
-		<div>
-			@if (snapshot === null || snapshot.summaries.length === 0) {
-				<div class="odt-empty">No profiling data yet — interact with the app.</div>
-			} @else {
-				<>
-					<div class="odt-h">Slowest components (self time)</div>
-					<table class="odt-table">
-						<thead>
+	return <div>
+		@if (snapshot === null || snapshot.summaries.length === 0) {
+			<div class="odt-empty">No profiling data yet — interact with the app.</div>
+		} @else {
+			<>
+				<div class="odt-h">Slowest components (self time)</div>
+				<table class="odt-table">
+					<thead>
+						<tr>
+							<th>Component</th>
+							<th class="odt-num">Renders</th>
+							<th class="odt-num">Self ms</th>
+							<th class="odt-num">Max ms</th>
+							<th class="odt-num">Queue ms</th>
+							<th>Cause</th>
+						</tr>
+					</thead>
+					<tbody>
+						@for (const s of snapshot.summaries; index i) {
 							<tr>
-								<th>Component</th>
-								<th class="odt-num">Renders</th>
-								<th class="odt-num">Self ms</th>
-								<th class="odt-num">Max ms</th>
-								<th class="odt-num">Queue ms</th>
-								<th>Cause</th>
+								<td class="odt-name-cell">{s.component}</td>
+								<td class="odt-num">{s.attempts}</td>
+								<td class="odt-num">{fmt(s.totalSelfTime)}</td>
+								<td class="odt-num">{fmt(s.maxInclusiveTime)}</td>
+								<td class="odt-num">{fmt(s.averageQueueDelay)}</td>
+								<td class="odt-muted">{(s.dominantCause ?? '-') as string}</td>
 							</tr>
-						</thead>
-						<tbody>
-							@for (const s of snapshot.summaries; index i) {
-								<tr>
-									<td class="odt-name-cell">{s.component}</td>
-									<td class="odt-num">{s.attempts}</td>
-									<td class="odt-num">{fmt(s.totalSelfTime)}</td>
-									<td class="odt-num">{fmt(s.maxInclusiveTime)}</td>
-									<td class="odt-num">{fmt(s.averageQueueDelay)}</td>
-									<td class="odt-muted">{(s.dominantCause ?? '-') as string}</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-					<div class="odt-h">Recent commits</div>
-					@for (const ev of snapshot.recentEvents; index i) {
-						<div class="odt-commit-row">
-							{ev.component} · {ev.phase} · {fmt(ev.selfDuration)}ms · {ev.causes.join(',') || ev.outcome}
-						</div>
-					}
-				</>
-			}
-		</div>
-	);
+						}
+					</tbody>
+				</table>
+				<div class="odt-h">Recent commits</div>
+				@for (const ev of snapshot.recentEvents; index i) {
+					<div class="odt-commit-row">
+						{ev.component}
+						·
+						{ev.phase}
+						·
+						{fmt(ev.selfDuration)}ms ·
+						{ev.causes.join(',') || ev.outcome}
+					</div>
+				}
+			</>
+		}
+	</div>;
 }

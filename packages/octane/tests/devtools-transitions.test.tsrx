@@ -33,5 +33,6 @@ describe('runtime devtools transition/suspense probes (profile build)', () => {
 		});
 		expect(hook().getTransitionState().boundaries.some((b) => b.state === 'resolved')).toBe(true);
 		unmount();
+		expect(hook().getTransitionState().boundaries).toEqual([]);
 	});
 });

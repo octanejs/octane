@@ -38,26 +38,25 @@ export function OctanePanel(props: { client: OctaneDevtoolsEventClient }): Octan
 		client.emit('refresh', {});
 	});
 
-	return (
-		<div class="odt-root">
-			<div class="odt-tabs">
-				@for (const t of TABS; key t.id) {
-					<button class={['odt-tab', tab === t.id && 'odt-tab-active']} onClick={() => setTab(t.id)}>
-						{t.label}
-					</button>
-				}
-			</div>
-			<div class="odt-body">
-				@if (tab === 'components') {
-					<ComponentsTab client={client} />
-				} @else if (tab === 'profiler') {
-					<ProfilerTab client={client} />
-				} @else if (tab === 'transitions') {
-					<TransitionsTab client={client} />
-				} @else {
-					<PerfModelTab client={client} />
-				}
-			</div>
+	return <div class="odt-root">
+		<div class="odt-tabs">
+			@for (const t of TABS; key t.id) {
+				<button
+					class={['odt-tab', tab === t.id && 'odt-tab-active']}
+					onClick={() => setTab(t.id)}
+				>{t.label}</button>
+			}
 		</div>
-	);
+		<div class="odt-body">
+			@if (tab === 'components') {
+				<ComponentsTab client={client} />
+			} @else if (tab === 'profiler') {
+				<ProfilerTab client={client} />
+			} @else if (tab === 'transitions') {
+				<TransitionsTab client={client} />
+			} @else {
+				<PerfModelTab client={client} />
+			}
+		</div>
+	</div>;
 }

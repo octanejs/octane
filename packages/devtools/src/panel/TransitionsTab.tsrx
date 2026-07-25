@@ -23,23 +23,21 @@ export function TransitionsTab(props: { client: OctaneDevtoolsEventClient }): Oc
 		return () => off();
 	});
 
-	return (
-		<div>
-			<div class="odt-stat">Pending transitions: {snapshot.pendingCount}</div>
-			<div class="odt-h">Suspense boundaries</div>
-			@if (snapshot.boundaries.length === 0) {
-				<div class="odt-empty">No Suspense boundaries.</div>
-			} @else {
-				@for (const b of snapshot.boundaries; index i) {
-					<div class="odt-boundary">
-						<span class={stateClass(b)}>{b.state}</span>
-						<span>{b.label}</span>
-						@if (b.hasResolved && b.state !== 'resolved') {
-							<span class="odt-muted">resolved once</span>
-						}
-					</div>
-				}
+	return <div>
+		<div class="odt-stat">Pending transitions: {snapshot.pendingCount}</div>
+		<div class="odt-h">Suspense boundaries</div>
+		@if (snapshot.boundaries.length === 0) {
+			<div class="odt-empty">No Suspense boundaries.</div>
+		} @else {
+			@for (const b of snapshot.boundaries; index i) {
+				<div class="odt-boundary">
+					<span class={stateClass(b)}>{b.state}</span>
+					<span>{b.label}</span>
+					@if (b.hasResolved && b.state !== 'resolved') {
+						<span class="odt-muted">resolved once</span>
+					}
+				</div>
 			}
-		</div>
-	);
+		}
+	</div>;
 }

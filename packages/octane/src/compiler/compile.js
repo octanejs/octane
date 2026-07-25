@@ -12879,20 +12879,19 @@ function isHoistableHeadElementNode(n) {
 }
 
 // Deterministic per-element key bridging the client `headBlock` (its scope-state
-// key + SSR-marker adoption) and the server `ssrHeadEl` marker. Must be
-// byte-identical across the client and server compiles of the SAME source, so it
-// is keyed ONLY on the element's SOURCE POSITION (same AST → same offset in both
-// modes), NOT the filename. Unique per head element WITHIN a file.
-/** @param {any} node @param {number} index @returns {string} */
-function headKey(node, index) {
+// key + SSR-marker adoption) and the server `ssrHeadEl` marker. Bundlers pass a
+// canonical root-relative module id; direct compiler callers already need to
+// use the same filename for client/server parity. Hashing the cleaned id keeps
+// output path-free while separating identical source offsets across modules.
+/** @param {any} node @param {number} index @param {any} ctx @returns {string} */
+function headKey(node, index, ctx) {
 	const pos =
 		node && node.openingElement && node.openingElement.start != null
 			? node.openingElement.start
 			: index;
-	const src = `head:${pos}`;
-	let h = 5381;
-	for (let i = 0; i < src.length; i++) h = (Math.imul(h, 33) + src.charCodeAt(i)) | 0;
-	return 'rnh-' + (h >>> 0).toString(36);
+	const tag = jsxTagName(node) ?? '';
+	const filename = cleanCompileFilename(ctx.filename || '<anon>');
+	return 'rnh-' + strongHash(`${filename}\0${tag}\0${pos}`);
 }
 
 // Shared title-text expression for ordinary head hoists and namespace-deferred
@@ -12974,7 +12973,7 @@ function deferredTitleElement(el, ctx) {
 		}
 	}
 	const args = [
-		b.literal(headKey(el, 0)),
+		b.literal(headKey(el, 0, ctx)),
 		b.literal('title'),
 		deferredHeadAttrs(el),
 		headTextExpression(el),
@@ -13105,8 +13104,8 @@ function rewriteOpaqueTitles(node, ctx, namespace = 'html') {
 // object-literal expression (dynamic values stay live expressions, so the
 // metadata is reactive); a `<title>`'s text becomes a string-concat expression;
 // void tags (`<meta>`/`<link>`) pass `null` for text.
-/** @param {any} node @param {number} index @returns {string} */
-function headElementArgNodes(node, index) {
+/** @param {any} node @param {number} index @param {any} ctx @returns {string} */
+function headElementArgNodes(node, index, ctx) {
 	const el = node.element;
 	const tag = jsxTagName(el);
 	const attrProps = [];
@@ -13144,7 +13143,7 @@ function headElementArgNodes(node, index) {
 	const attrsExpr = attrProps.length ? b.object(attrProps) : b.literal(null);
 	const textExpr = VOID_ELEMENTS.has(tag) ? b.literal(null) : headTextExpression(el);
 	return [
-		b.literal(headKey(el, index), undefined, el),
+		b.literal(headKey(el, index, ctx), undefined, el),
 		b.literal(tag, undefined, el),
 		inheritOriginLoc(attrsExpr, el),
 		inheritOriginLoc(textExpr, el),
@@ -13162,7 +13161,12 @@ function emitHeadClient(headNodes, ctx, slotBase) {
 	return headNodes.map((h, i) =>
 		inheritOriginLoc(
 			b.stmt(
-				b.call('_$headBlock', b.id('__s'), b.literal(slotBase + i), ...headElementArgNodes(h, i)),
+				b.call(
+					'_$headBlock',
+					b.id('__s'),
+					b.literal(slotBase + i),
+					...headElementArgNodes(h, i, ctx),
+				),
 			),
 			h.element ?? h,
 		),
@@ -13177,7 +13181,7 @@ function emitHeadServer(headNodes, ctx) {
 	ctx.runtimeNeeded.add('ssrHeadEl');
 	return headNodes.map((head, index) =>
 		inheritOriginLoc(
-			b.stmt(b.call('_$ssrHeadEl', ...headElementArgNodes(head, index))),
+			b.stmt(b.call('_$ssrHeadEl', ...headElementArgNodes(head, index, ctx))),
 			head.element ?? head,
 		),
 	);

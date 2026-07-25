@@ -26,6 +26,7 @@ export function Triple(props) @{
 	const a = useId();
 	const b = useId();
 	const c = useId();
+	props?.onIds?.([a, b, c]);
 	const [n, setN] = useState(0);
 	<div>
 		<span id="a" data-testid={a}>{a as string}</span>

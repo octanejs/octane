@@ -58,20 +58,20 @@ function toSnapshot(profiler: ProfilerGlobal): ProfileSnapshot {
 		.summary()
 		.filter((s) => !DEVTOOLS_OWN_COMPONENTS.has(String(s.component)))
 		.map((s) => ({
-		componentId: String(s.componentId),
-		component: String(s.component),
-		file: String(s.file),
-		attempts: Number(s.attempts) || 0,
-		completed: Number(s.completed) || 0,
-		suspended: Number(s.suspended) || 0,
-		errored: Number(s.errored) || 0,
-		bails: Number(s.bails) || 0,
-		totalSelfTime: Number(s.totalSelfTime) || 0,
-		maxInclusiveTime: Number(s.maxInclusiveTime) || 0,
-		averageSelfTime: Number(s.averageSelfTime) || 0,
-		averageQueueDelay: Number(s.averageQueueDelay) || 0,
-		dominantCause: (s.dominantCause as string | null) ?? null,
-	}));
+			componentId: String(s.componentId),
+			component: String(s.component),
+			file: String(s.file),
+			attempts: Number(s.attempts) || 0,
+			completed: Number(s.completed) || 0,
+			suspended: Number(s.suspended) || 0,
+			errored: Number(s.errored) || 0,
+			bails: Number(s.bails) || 0,
+			totalSelfTime: Number(s.totalSelfTime) || 0,
+			maxInclusiveTime: Number(s.maxInclusiveTime) || 0,
+			averageSelfTime: Number(s.averageSelfTime) || 0,
+			averageQueueDelay: Number(s.averageQueueDelay) || 0,
+			dominantCause: (s.dominantCause as string | null) ?? null,
+		}));
 	const recentEvents = profiler
 		.getEvents()
 		.filter((e) => !DEVTOOLS_OWN_COMPONENTS.has(String(e.component)))
