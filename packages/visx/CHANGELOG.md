@@ -1,5 +1,14 @@
 # @octanejs/visx
 
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies [16dc385]
+- Updated dependencies [7fa4075]
+  - octane@0.1.15
+  - @octanejs/floating-ui@0.1.14
+
 ## 0.1.8
 
 ### Patch Changes
