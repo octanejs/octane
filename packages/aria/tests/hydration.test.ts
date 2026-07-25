@@ -11,7 +11,7 @@ import { flushSync, hydrateRoot } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../octane/tests/_helpers';
-import { AriaServerFixture } from './ssr/_fixtures/server.tsrx';
+import { AriaServerFixture } from './ssr/_fixtures/server.tsx';
 
 function ReactAriaServerContents() {
 	const labelId = useReactAriaId('aria-hydration-label');

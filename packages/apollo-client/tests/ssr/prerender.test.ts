@@ -15,7 +15,7 @@ import {
 	ApolloStyledFixture,
 	ApolloWaterfallFixture,
 	GET_SERVER_VALUE,
-} from './_fixtures/server.tsrx';
+} from './_fixtures/server.tsx';
 
 function createServerClient(values: Record<string, Record<string, unknown>>) {
 	const operations: string[] = [];
@@ -146,7 +146,7 @@ describe('@octanejs/apollo-client server rendering', () => {
 
 			expect(result.result).toContain('data:styled-ready');
 			expect(result.renderFnResult.css).toContain('data-octane=');
-			expect(result.renderFnResult.css).toContain('rgb(17, 34, 51)');
+			expect(result.renderFnResult.css).toContain('color: red');
 		} finally {
 			client.stop();
 		}

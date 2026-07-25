@@ -1,7 +1,7 @@
 import { renderToString } from 'octane/server';
 import { describe, expect, it } from 'vitest';
 
-import { AriaServerFixture } from './_fixtures/server.tsrx';
+import { AriaServerFixture } from './_fixtures/server.tsx';
 
 describe('@octanejs/aria server rendering', () => {
 	it('renders stable label relationships and reads the server snapshot without a DOM', () => {

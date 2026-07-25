@@ -15,7 +15,7 @@ import { flushSync, hydrateRoot } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../octane/tests/_helpers';
-import { ApolloServerFixture, GET_SERVER_VALUE } from './ssr/_fixtures/server.tsrx';
+import { ApolloServerFixture, GET_SERVER_VALUE } from './ssr/_fixtures/server.tsx';
 
 function ReactServerValue(props: { client: ApolloClient }) {
 	const result = useReactQuery(GET_SERVER_VALUE);

@@ -5,7 +5,7 @@ import {
 	BaseClosedDialogFixture,
 	BaseEdgeSliderFixture,
 	BaseHydrationFixture,
-} from './_fixtures/server.tsrx';
+} from './_fixtures/server.tsx';
 
 describe('@octanejs/base-ui server rendering', () => {
 	it('uses the server hydration snapshot and renders accessible primitives without a DOM', () => {

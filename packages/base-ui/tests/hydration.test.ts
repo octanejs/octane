@@ -9,7 +9,7 @@ import { flushSync, hydrateRoot } from 'octane';
 import { describe, expect, it, vi } from 'vitest';
 
 import { flushEffects } from '../../octane/tests/_helpers';
-import { BaseHydrationFixture } from './ssr/_fixtures/server.tsrx';
+import { BaseHydrationFixture } from './ssr/_fixtures/server.tsx';
 
 function subscribe(): () => void {
 	return () => {};
