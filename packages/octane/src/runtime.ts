@@ -43,6 +43,7 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { headOwnershipKey } from './head-ownership.js';
 import {
 	__profileBail,
 	__profileBeginRender,
@@ -5908,6 +5909,84 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
 }
 
+function cloneHydrationReplayEvent(event: Event, target: Element): Event {
+	// Event constructors are realm-specific. Hydrating an iframe-owned root from
+	// its parent realm must still replay an event created by the iframe's Window.
+	const ownerWindow = target.ownerDocument.defaultView;
+	if (ownerWindow !== null) {
+		// PointerEvent extends MouseEvent, so it must be selected first or pointer-
+		// specific metadata (pressure, pointerId, tilt, etc.) is discarded.
+		if (
+			typeof ownerWindow.PointerEvent !== 'undefined' &&
+			event instanceof ownerWindow.PointerEvent
+		) {
+			return new ownerWindow.PointerEvent(event.type, event);
+		}
+		if (
+			typeof ownerWindow.KeyboardEvent !== 'undefined' &&
+			event instanceof ownerWindow.KeyboardEvent
+		) {
+			return new ownerWindow.KeyboardEvent(event.type, event);
+		}
+		if (typeof ownerWindow.MouseEvent !== 'undefined' && event instanceof ownerWindow.MouseEvent) {
+			return new ownerWindow.MouseEvent(event.type, event);
+		}
+		if (typeof ownerWindow.FocusEvent !== 'undefined' && event instanceof ownerWindow.FocusEvent) {
+			return new ownerWindow.FocusEvent(event.type, event);
+		}
+		// Programmatic dispatch may cross realms: the original event can come from
+		// a parent Window while its target belongs to this iframe Window. Web IDL's
+		// toStringTag preserves the platform family across that identity boundary;
+		// always construct the replay with the target realm's constructor.
+		const eventBrand = Object.prototype.toString.call(event);
+		if (eventBrand === '[object PointerEvent]' && typeof ownerWindow.PointerEvent !== 'undefined') {
+			return new ownerWindow.PointerEvent(event.type, event);
+		}
+		if (
+			eventBrand === '[object KeyboardEvent]' &&
+			typeof ownerWindow.KeyboardEvent !== 'undefined'
+		) {
+			return new ownerWindow.KeyboardEvent(event.type, event);
+		}
+		if (eventBrand === '[object MouseEvent]' && typeof ownerWindow.MouseEvent !== 'undefined') {
+			return new ownerWindow.MouseEvent(event.type, event);
+		}
+		if (eventBrand === '[object FocusEvent]' && typeof ownerWindow.FocusEvent !== 'undefined') {
+			return new ownerWindow.FocusEvent(event.type, event);
+		}
+		return new ownerWindow.Event(event.type, event);
+	}
+
+	// A detached synthetic Document can have no defaultView. Preserve the
+	// previous ambient-realm fallback for that uncommon host shape.
+	if (typeof PointerEvent !== 'undefined' && event instanceof PointerEvent) {
+		return new PointerEvent(event.type, event);
+	}
+	if (typeof KeyboardEvent !== 'undefined' && event instanceof KeyboardEvent) {
+		return new KeyboardEvent(event.type, event);
+	}
+	if (typeof MouseEvent !== 'undefined' && event instanceof MouseEvent) {
+		return new MouseEvent(event.type, event);
+	}
+	if (typeof FocusEvent !== 'undefined' && event instanceof FocusEvent) {
+		return new FocusEvent(event.type, event);
+	}
+	const eventBrand = Object.prototype.toString.call(event);
+	if (eventBrand === '[object PointerEvent]' && typeof PointerEvent !== 'undefined') {
+		return new PointerEvent(event.type, event);
+	}
+	if (eventBrand === '[object KeyboardEvent]' && typeof KeyboardEvent !== 'undefined') {
+		return new KeyboardEvent(event.type, event);
+	}
+	if (eventBrand === '[object MouseEvent]' && typeof MouseEvent !== 'undefined') {
+		return new MouseEvent(event.type, event);
+	}
+	if (eventBrand === '[object FocusEvent]' && typeof FocusEvent !== 'undefined') {
+		return new FocusEvent(event.type, event);
+	}
+	return new Event(event.type, event);
+}
+
 function notifyHydrateBoundary(state: HydrateSlot): void {
 	if (state.didNotify || !state.hydrated) return;
 	state.didNotify = true;
@@ -5939,14 +6018,8 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
 			// `click` is the platform exception among untrusted events: dispatching
 			// the clone still runs its native activation behavior, so links navigate
 			// and submit controls submit unless a hydrated handler prevents default.
-			// Keep dispatchEvent here to preserve the original mouse-event metadata.
-			target.dispatchEvent(
-				typeof MouseEvent !== 'undefined' && event instanceof MouseEvent
-					? new MouseEvent(event.type, event)
-					: typeof FocusEvent !== 'undefined' && event instanceof FocusEvent
-						? new FocusEvent(event.type, event)
-						: new Event(event.type, event),
-			);
+			// Keep dispatchEvent here to preserve native activation and cancellation.
+			target.dispatchEvent(cloneHydrationReplayEvent(event, target));
 		}
 	}
 }
@@ -10370,7 +10443,7 @@ const _injectedStyles = new Set<string>();
 // and text are re-applied each render (so `<title>{state}</title>` is reactive),
 // and it is removed from <head> when the owning scope unmounts (so a route swap
 // replaces the page's metadata). On a hydrated page the server wrote
-// `<!--key-->` + the element into <head> (ssrHeadEl → RenderResult.head →
+// paired key markers + the element into <head> (ssrHeadEl → RenderResult.head →
 // <!--ssr-head-->); headBlock ADOPTS that element rather than appending a copy.
 // ---------------------------------------------------------------------------
 
@@ -10380,30 +10453,59 @@ interface HeadSlot {
 	handlers?: Map<string, EventListener>;
 }
 
-// Find the server-rendered `tag` inside `key`'s marker interval in <head>, remove
-// the marker so a later mount can't re-match it, and return the element. A foreign
+// Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
+// remove the pair so a later mount can't re-match it, and return the element. A foreign
 // node can be injected between the marker and the server element (extensions,
 // analytics, or document transforms); never claim or mutate it merely because it
-// is adjacent. The next Octane head marker closes this ownership interval.
+// is adjacent. Nested, missing, or reordered delimiters make the interval
+// unprovable, so recovery creates fresh metadata without claiming a same-tag node.
 // Returns null on a fresh client render or when the expected element is missing.
 function adoptServerHeadEl(key: string, tag: string): Element | null {
+	const closeKey = '/' + key;
 	for (let n: Node | null = document.head.firstChild; n !== null; n = n.nextSibling) {
 		if (n.nodeType === 8 && (n as Comment).data === key) {
 			let candidate: Node | null = n.nextSibling;
-			(n as Comment).remove();
+			let match: Element | null = null;
+			let end: Comment | null = null;
+			let malformed = false;
+			let ambiguous = false;
 			while (candidate !== null) {
-				if (candidate.nodeType === 8 && (candidate as Comment).data.startsWith('rnh-')) {
-					break;
+				if (candidate.nodeType === 8) {
+					const marker = (candidate as Comment).data;
+					if (marker === closeKey) {
+						end = candidate as Comment;
+						break;
+					}
+					// A nested/reordered ownership marker means this interval cannot
+					// prove which same-tag node belongs to the requested entry.
+					if (marker.startsWith('rnh-') || marker.startsWith('/rnh-')) {
+						malformed = true;
+						break;
+					}
 				}
 				if (candidate.nodeType === 1 && (candidate as Element).localName === tag) {
-					return candidate as Element;
+					if (match !== null) {
+						ambiguous = true;
+					} else {
+						match = candidate as Element;
+					}
 				}
 				candidate = candidate.nextSibling;
+			}
+			(n as Comment).remove();
+			if (!malformed && end !== null) {
+				end.remove();
+				return ambiguous ? null : match;
 			}
 			return null;
 		}
 	}
 	return null;
+}
+
+function rootIdentifierPrefix(block: Block): string {
+	while (block.parentBlock !== null) block = block.parentBlock;
+	return block.idState.prefix;
 }
 
 export function headBlock(
@@ -10416,11 +10518,11 @@ export function headBlock(
 ): void {
 	if (typeof document === 'undefined') return;
 	// State lives in the dense `slots` array (like every other slot) so the scope
-	// shape stays monomorphic; `key` is only the content hash used to adopt the
+	// shape stays monomorphic; `key` is only the ownership hash used to adopt the
 	// matching server-rendered head element on hydration.
 	let state = scope.slots[slot] as HeadSlot | undefined;
 	if (state === undefined) {
-		let el = adoptServerHeadEl(key, tag);
+		let el = adoptServerHeadEl(headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		if (el === null) {
 			el = document.createElement(tag);
 			document.head.appendChild(el);

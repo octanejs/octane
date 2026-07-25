@@ -7,6 +7,7 @@ import { loadCompiledFixtureSource, loadServerFixture } from './_server-fixture.
 import { collectPipeableStream } from './_server-stream.js';
 import { mount } from './_helpers.js';
 import * as client from './_fixtures/script-innerhtml.tsrx';
+import { RAW_STYLE_SOURCE, UPDATED_RAW_STYLE_SOURCE } from './_fixtures/raw-style-content.js';
 
 const FIXTURE = 'packages/octane/tests/_fixtures/script-innerhtml.tsrx';
 const FIXTURE_SOURCE = readFileSync(resolve(process.cwd(), FIXTURE), 'utf8');
@@ -462,5 +463,55 @@ describe('<script> content contract', () => {
 		expect(JSON.parse(split.querySelector('script')?.textContent ?? '')).toEqual(
 			SPLIT_DESCRIPTOR_VALUE,
 		);
+	});
+});
+
+describe('<style> raw-text hydration', () => {
+	it('adopts server-parsed raw text without diagnostics and updates the same stylesheet', async () => {
+		const props = { tag: 'style', source: RAW_STYLE_SOURCE };
+		const buffered = ServerRuntime.renderToString(server.RawStyle, props);
+		const streamed = await collectPipeableStream(server.RawStyle, props);
+		expect(streamed.errors).toEqual([]);
+
+		for (const html of [buffered.html, streamed.html]) {
+			const fragment = parseFragment(html);
+			const style = fragment.querySelector('#raw-style-sheet');
+			expect(fragment.querySelectorAll('style')).toHaveLength(1);
+			expect(fragment.querySelector('[data-pwn]')).toBeNull();
+			expect(style?.textContent).toContain('amp=&');
+			expect(style?.textContent).toContain('less=<');
+			expect(style?.textContent).toContain('entity=&amp;');
+		}
+
+		const container = document.createElement('div');
+		container.innerHTML = buffered.html;
+		document.body.appendChild(container);
+		const serverStyle = container.querySelector('#raw-style-sheet');
+		const serverTarget = container.querySelector('#raw-style-target');
+		const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const root = hydrateRoot(container, client.RawStyle, props);
+		try {
+			flushSync(() => {});
+			expect(container.querySelector('#raw-style-sheet')).toBe(serverStyle);
+			expect(container.querySelector('#raw-style-target')).toBe(serverTarget);
+			expect(warning).not.toHaveBeenCalled();
+
+			flushSync(() =>
+				root.render(client.RawStyle, {
+					tag: 'style',
+					source: UPDATED_RAW_STYLE_SOURCE,
+				}),
+			);
+			expect(container.querySelector('#raw-style-sheet')).toBe(serverStyle);
+			expect(container.querySelector('#raw-style-target')).toBe(serverTarget);
+			expect(container.querySelectorAll('style')).toHaveLength(1);
+			expect(container.querySelector('[data-pwn]')).toBeNull();
+			expect(serverStyle?.textContent).toBe(UPDATED_RAW_STYLE_SOURCE);
+			expect(warning).not.toHaveBeenCalled();
+		} finally {
+			root.unmount();
+			warning.mockRestore();
+			container.remove();
+		}
 	});
 });
