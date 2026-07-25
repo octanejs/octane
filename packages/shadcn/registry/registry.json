@@ -699,7 +699,8 @@
       "type": "registry:ui",
       "title": "Sonner",
       "dependencies": [
-        "@octanejs/lucide@0.1.8"
+        "@octanejs/lucide@0.1.8",
+        "@octanejs/sonner@0.1.8"
       ],
       "registryDependencies": [
         "@octane/utils"

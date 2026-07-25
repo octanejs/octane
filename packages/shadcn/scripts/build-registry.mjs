@@ -19,13 +19,17 @@ const SCHEMA = 'https://ui.shadcn.com/schema/registry-item.json';
 
 const pkg = JSON.parse(await readFile(join(PKG_ROOT, 'package.json'), 'utf8'));
 
-// Pinned npm versions for cross-binding deps (the maintainer pinning policy —
-// registry consumers install exactly what this repo tested against).
-const NPM_PINS = {
-	'@octanejs/radix': pkg.dependencies['@octanejs/radix'],
-	'@octanejs/lucide': pkg.dependencies['@octanejs/lucide'],
-};
-const PLAIN_NPM = new Set(['class-variance-authority', 'clsx', 'tailwind-merge']);
+// Installable dependency spec per import, derived from package.json so a new
+// import can never silently ship without its dependency: @octanejs/* siblings
+// pinned to the exact tested version (maintainer pinning policy), public npm
+// deps by bare name (upstream registry convention). `octane` itself is a peer,
+// like react upstream, and is deliberately not emitted.
+const DEP_SPECS = Object.fromEntries(
+	Object.entries(pkg.dependencies).map(([name, version]) => [
+		name,
+		name.startsWith('@octanejs/') ? `${name}@${version}` : name,
+	]),
+);
 
 function toConsumerSource(source) {
 	// Emitted file content uses the consumer-alias import shape the shadcn CLI
@@ -41,9 +45,12 @@ function collectDeps(source) {
 	const registry = new Set();
 	for (const match of source.matchAll(/from '([^']+)'/g)) {
 		const spec = match[1];
-		if (spec in NPM_PINS) npm.add(`${spec}@${NPM_PINS[spec]}`);
-		else if (PLAIN_NPM.has(spec)) npm.add(spec);
-		else if (spec === '../lib/utils') registry.add('utils');
+		if (spec in DEP_SPECS) npm.add(DEP_SPECS[spec]);
+		else if (spec.startsWith('@octanejs/') && spec !== 'octane') {
+			// An import the package does not declare cannot be installed by the
+			// CLI — fail the build instead of shipping a broken item.
+			throw new Error(`registry: undeclared dependency "${spec}" imported by a component`);
+		} else if (spec === '../lib/utils') registry.add('utils');
 		else if (spec.startsWith('./')) registry.add(spec.slice(2).replace(/\.tsrx$/, ''));
 		else if (spec.startsWith('../hooks/')) registry.add(spec.slice('../hooks/'.length));
 	}

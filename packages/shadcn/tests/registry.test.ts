@@ -45,6 +45,22 @@ describe('@octanejs/shadcn — registry emit', () => {
 		}
 	});
 
+	it('every @octanejs import in emitted content is a declared, pinned dependency', () => {
+		// The guard that catches an item shipping code whose runtime the CLI
+		// would never install (the sonner regression).
+		const files = readdirSync(REGISTRY).filter((file) => file.endsWith('.json'));
+		for (const file of files) {
+			if (file === 'registry.json') continue;
+			const item = JSON.parse(readFileSync(join(REGISTRY, file), 'utf8'));
+			for (const entry of item.files) {
+				for (const match of String(entry.content).matchAll(/from '(@octanejs\/[^']+)'/g)) {
+					const dep = (item.dependencies ?? []).find((d: string) => d.startsWith(match[1] + '@'));
+					expect(dep, `${item.name} imports ${match[1]} without a pinned dependency`).toBeTruthy();
+				}
+			}
+		}
+	});
+
 	it('pins cross-binding npm dependencies to exact versions', () => {
 		const button = JSON.parse(readFileSync(join(REGISTRY, 'button.json'), 'utf8'));
 		expect(button.dependencies).toContain('@octanejs/radix@0.1.12');
