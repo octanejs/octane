@@ -131,7 +131,7 @@ function DevtoolsPortal(props: { target: HTMLElement; content: Renderable }) {
 export function TanStackDevtools(props: TanStackDevtoolsOctaneInit) {
 	const { plugins, config, eventBusConfig } = props;
 
-	const devToolRef = useRef<HTMLDivElement>(null);
+	const devToolRef = useRef<HTMLDivElement | null>(null);
 
 	const [pluginContainers, setPluginContainers] = useState<ContainerMap>({});
 	const [titleContainers, setTitleContainers] = useState<ContainerMap>({});

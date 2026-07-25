@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root.tsrx'
 import { Route as IndexRouteImport } from './routes/index.tsrx'
 import { Route as BenchmarksRouteImport } from './routes/benchmarks.tsrx'
+import { Route as DevtoolsRouteImport } from './routes/devtools.tsrx'
 import { Route as DocsRouteImport } from './routes/docs.tsrx'
 import { Route as ErrorsRouteImport } from './routes/errors.tsrx'
 import { Route as PlaygroundRouteImport } from './routes/playground.tsrx'
@@ -27,6 +28,11 @@ const IndexRoute = IndexRouteImport.update({
 const BenchmarksRoute = BenchmarksRouteImport.update({
   id: '/benchmarks',
   path: '/benchmarks',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevtoolsRoute = DevtoolsRouteImport.update({
+  id: '/devtools',
+  path: '/devtools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsRoute = DocsRouteImport.update({
@@ -68,6 +74,7 @@ const ErrorsCodeRoute = ErrorsCodeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/benchmarks': typeof BenchmarksRoute
+  '/devtools': typeof DevtoolsRoute
   '/docs': typeof DocsRouteWithChildren
   '/errors': typeof ErrorsRouteWithChildren
   '/playground': typeof PlaygroundRoute
@@ -79,6 +86,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/benchmarks': typeof BenchmarksRoute
+  '/devtools': typeof DevtoolsRoute
   '/playground': typeof PlaygroundRoute
   '/docs/$slug': typeof DocsSlugRoute
   '/errors/$code': typeof ErrorsCodeRoute
@@ -89,6 +97,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/benchmarks': typeof BenchmarksRoute
+  '/devtools': typeof DevtoolsRoute
   '/docs': typeof DocsRouteWithChildren
   '/errors': typeof ErrorsRouteWithChildren
   '/playground': typeof PlaygroundRoute
@@ -102,6 +111,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/benchmarks'
+    | '/devtools'
     | '/docs'
     | '/errors'
     | '/playground'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/benchmarks'
+    | '/devtools'
     | '/playground'
     | '/docs/$slug'
     | '/errors/$code'
@@ -122,6 +133,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/benchmarks'
+    | '/devtools'
     | '/docs'
     | '/errors'
     | '/playground'
@@ -134,6 +146,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BenchmarksRoute: typeof BenchmarksRoute
+  DevtoolsRoute: typeof DevtoolsRoute
   DocsRoute: typeof DocsRouteWithChildren
   ErrorsRoute: typeof ErrorsRouteWithChildren
   PlaygroundRoute: typeof PlaygroundRoute
@@ -153,6 +166,13 @@ declare module '@octanejs/tanstack-router' {
       path: '/benchmarks'
       fullPath: '/benchmarks'
       preLoaderRoute: typeof BenchmarksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/devtools': {
+      id: '/devtools'
+      path: '/devtools'
+      fullPath: '/devtools'
+      preLoaderRoute: typeof DevtoolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs': {
@@ -235,6 +255,7 @@ const ErrorsRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BenchmarksRoute: BenchmarksRoute,
+  DevtoolsRoute: DevtoolsRoute,
   DocsRoute: DocsRouteWithChildren,
   ErrorsRoute: ErrorsRouteWithChildren,
   PlaygroundRoute: PlaygroundRoute,

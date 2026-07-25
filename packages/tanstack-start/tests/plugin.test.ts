@@ -30,3 +30,48 @@ describe('TanStack Start Vite integration', () => {
 		expect(generatorIndex).toBeGreaterThan(compilerIndex);
 	});
 });
+
+describe('octane.devtools', () => {
+	const PROFILE_DEFINE = '__OCTANE_PROFILE_ENABLED__';
+
+	function compilerConfigHook(options: Parameters<typeof tanstackStart>[0]) {
+		const plugins = flattenPlugins(tanstackStart(options));
+		const compiler = plugins.find((plugin) => plugin.name === 'octane');
+		return compiler?.config as
+			| ((
+					config: { root?: string; define?: Record<string, unknown> },
+					env: { command: 'serve' | 'build' },
+			  ) => unknown)
+			| undefined;
+	}
+
+	async function profileDefine(
+		options: Parameters<typeof tanstackStart>[0],
+		command: 'serve' | 'build',
+	): Promise<unknown> {
+		const config = compilerConfigHook(options);
+		const result = (await config?.({}, { command })) as { define?: Record<string, unknown> };
+		return result?.define?.[PROFILE_DEFINE];
+	}
+
+	it('enables profiling in dev and compiles it out of a build, like @octanejs/vite-plugin', async () => {
+		const options = { octane: { devtools: true } } as unknown as Parameters<
+			typeof tanstackStart
+		>[0];
+
+		expect(await profileDefine(options, 'serve')).toBe(JSON.stringify(true));
+		expect(await profileDefine(options, 'build')).toBe(JSON.stringify(false));
+	});
+
+	it('lets an explicit profile override devtools', async () => {
+		const off = {
+			octane: { devtools: true, profile: false },
+		} as unknown as Parameters<typeof tanstackStart>[0];
+		expect(await profileDefine(off, 'serve')).toBe(JSON.stringify(false));
+
+		const on = {
+			octane: { devtools: false, profile: true },
+		} as unknown as Parameters<typeof tanstackStart>[0];
+		expect(await profileDefine(on, 'build')).toBe(JSON.stringify(true));
+	});
+});

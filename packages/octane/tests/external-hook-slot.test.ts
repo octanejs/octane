@@ -650,6 +650,7 @@ describe('manifest-declared manual hook slots', () => {
 		expect(declared).toEqual([
 			'aria',
 			'base-ui',
+			'devtools',
 			'dexie',
 			'dnd-kit',
 			'floating-ui',

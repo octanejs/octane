@@ -55,6 +55,15 @@ import {
 	__profileTrackComponent,
 	type ProfileFrame,
 } from './profiling.js';
+import {
+	__devtoolsRegisterRoot,
+	__devtoolsUnregisterRoot,
+	__devtoolsNotifyFlush,
+	__devtoolsSetNameResolver,
+	__devtoolsSetTransitionCount,
+	__devtoolsSetBoundaryState,
+	__devtoolsClearBoundary,
+} from './devtools-hook.js';
 import type {
 	HydrateProps,
 	HydrationPrefetchFunction,
@@ -1551,6 +1560,8 @@ function ensureViewTransitionDriver(): ViewTransitionDriver {
 function tickTransitionCount(delta: number): void {
 	TRANSITION_PENDING_COUNT += delta;
 	if (TRANSITION_PENDING_COUNT < 0) TRANSITION_PENDING_COUNT = 0;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+		__devtoolsSetTransitionCount(TRANSITION_PENDING_COUNT);
 	TRANSITION_LISTENER_PUBLISH_DEPTH++;
 	try {
 		for (const fn of TRANSITION_LISTENERS) {
@@ -2073,6 +2084,8 @@ function flushWork(): void {
 		if (pendingError !== null) throw pendingError.err;
 	} finally {
 		inFlush = false;
+		if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+			__devtoolsNotifyFlush();
 		if (clearViewTransitionTypes) viewTransitionDriver!.clearTypes();
 	}
 }
@@ -2398,6 +2411,8 @@ export function flushSync<T>(fn: () => T): T {
 			}
 		} finally {
 			inFlush = false;
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+				__devtoolsNotifyFlush();
 		}
 		if (QUEUE.length > 0 && !scheduled) {
 			scheduled = true;
@@ -4085,6 +4100,10 @@ function unmountScopeChildrenAndSlots(scope: Scope, detachDom: boolean): void {
 						clearTimeout(val.transitionTimeoutId);
 						val.transitionTimeoutId = null;
 					}
+					// The DevTools boundary registry follows the TrySlot lifetime.
+					// Reset through the shared branch mutation point so profile
+					// builds remove this slot from the registry on teardown.
+					setTryBranch(val, -1);
 				} else if (k === 'portalSlotSlot' && val.target) {
 					unregisterDelegationTarget(val.target);
 				}
@@ -16830,6 +16849,25 @@ interface TrySlot {
 	passthrough: boolean;
 }
 
+// Single mutation point for `TrySlot.branch`. The bare assignment is the hot
+// path; the devtools probe is fully behind the profile gate (dead-code
+// eliminated in non-profile builds), so this adds only a boolean-guarded call
+// over the plain assignment and no allocation/closure when unobserved.
+function setTryBranch(slot: TrySlot, next: -1 | 0 | 1 | 2): void {
+	slot.branch = next;
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		if (next === -1) {
+			__devtoolsClearBoundary(slot);
+		} else {
+			const label =
+				slot.parentBlock !== null && slot.parentBlock !== undefined
+					? componentName(slot.parentBlock)
+					: 'Suspense';
+			__devtoolsSetBoundaryState(slot, next, slot.hasResolved, label);
+		}
+	}
+}
+
 function clearPassthroughTry(state: TrySlot): void {
 	const visible = state.block;
 	const persistent = state.tryBlock;
@@ -16842,7 +16880,7 @@ function clearPassthroughTry(state: TrySlot): void {
 function mountPassthroughCatch(state: TrySlot, error: unknown): void {
 	clearPassthroughTry(state);
 	state.pendingThenable = null;
-	state.branch = 0;
+	setTryBranch(state, 0);
 	state.err = error;
 	if (state.catchBody === null) throw error;
 	const block = createBlock(
@@ -16861,7 +16899,7 @@ function mountPassthroughCatch(state: TrySlot, error: unknown): void {
 
 function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unknown>): void {
 	clearPassthroughTry(state);
-	state.branch = 2;
+	setTryBranch(state, 2);
 	state.pendingThenable = thenable;
 	if (state.pendingBody !== null) {
 		const block = createBlock(
@@ -16880,7 +16918,7 @@ function mountPassthroughPending(state: TrySlot, thenable: TrackedThenable<unkno
 	const retry = () => {
 		if (state.pendingThenable !== thenable || state.parentBlock.disposed) return;
 		state.pendingThenable = null;
-		state.branch = -1;
+		setTryBranch(state, -1);
 		scheduleRender(state.parentBlock);
 	};
 	thenable.then(retry, retry);
@@ -16917,7 +16955,7 @@ function renderPassthroughTry(state: TrySlot): void {
 		);
 		state.tryBlock = block;
 		state.block = block;
-		state.branch = 1;
+		setTryBranch(state, 1);
 		(block as any).$$tryHandler = (error: unknown) => {
 			try {
 				mountPassthroughCatch(state, error);
@@ -17111,7 +17149,7 @@ function mountTry(state: TrySlot): void {
 	state.block = null;
 	state.hiddenDom = null;
 	state.hasResolved = false;
-	state.branch = 1;
+	setTryBranch(state, 1);
 	let bStart: Node;
 	let bEnd: Node;
 	// Streamed-boundary seed scope: the swap runtime ($OCTRC) left a
@@ -17545,7 +17583,7 @@ function hideTryContentAndMountPending(
 	// not as the visible arm, so its already-detached refs are not detached twice.
 	const previousArm = state.block !== null && state.block !== state.tryBlock ? state.block : null;
 	state.block = null;
-	state.branch = 2;
+	setTryBranch(state, 2);
 	if (previousArm !== null) {
 		unmountBlock(previousArm);
 		if (state.parentBlock.disposed || state.block !== null || state.branch !== 2) return false;
@@ -17711,7 +17749,7 @@ function commitResumeInner(state: TrySlot): void {
 				showTryBlock(state);
 			}
 			state.block = tryBlock;
-			state.branch = 1;
+			setTryBranch(state, 1);
 			tryBlock.body = state.tryBody;
 			// Preserve transition priority on the retry render — the retry is a
 			// continuation of the same transition, so a re-suspend on a different
@@ -18076,7 +18114,7 @@ function attemptHiddenReveal(state: TrySlot, scheduledMode?: 'urgent' | 'transit
 			unmountBlock(state.block);
 		}
 		state.block = tryBlock;
-		state.branch = 1;
+		setTryBranch(state, 1);
 		state.hasResolved = true;
 		// Invalidate the wired resume: when the original thenable eventually
 		// settles, its retry sees a mismatched pendingThenable and no-ops.
@@ -18827,7 +18865,7 @@ function requestReset(state: TrySlot): void {
 	// then let the normal commit cycle decide what to render. The currently
 	// visible catch block stays mounted for one tick; mountTry's teardown
 	// (state.block != null branch) removes it on the next render.
-	state.branch = -1;
+	setTryBranch(state, -1);
 	state.err = null;
 	state.hasResolved = false;
 	state.detachedRefs = null;
@@ -18922,7 +18960,7 @@ function switchToCatch(state: TrySlot, err: any, adoptedStart?: Node, adoptedEnd
 	// owns a catch arm (including primitive and null rejection reasons).
 	const hydrationRejection = hydration?.isRejection(err) === true;
 	const caughtError = hydrationRejection ? err.reason : err;
-	state.branch = 0;
+	setTryBranch(state, 0);
 	state.err = caughtError;
 	const adopting = adoptedStart !== undefined && adoptedEnd !== undefined;
 	const bStart = adoptedStart ?? document.createComment('catch-b');
@@ -21878,6 +21916,12 @@ function makeRoot(
 				__profileTrackComponent(rootBlock, body);
 			rootBlock.idState = idState;
 			registerRootDisposer(rootBlock);
+			if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+				__devtoolsSetNameResolver(componentName);
+				__devtoolsRegisterRoot(
+					rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+				);
+			}
 			currentBody = body;
 			currentKey = nextKey;
 			// React parity: render() inside a transition never commits synchronously
@@ -21945,6 +21989,10 @@ function makeRoot(
 			try {
 				if (rootBlock) {
 					DOM_ROOT_DISPOSERS.delete(rootBlock);
+					if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
+						__devtoolsUnregisterRoot(
+							rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike,
+						);
 					// Skip the per-Block DOM walk recursion (~3 removeChild ops × every
 					// Block in the tree). Run cleanups + scope teardown only, then clear
 					// the container in one shot. Portals self-detach during the recursive
@@ -22084,6 +22132,10 @@ export function hydrateRoot(
 	);
 	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__)
 		__profileTrackComponent(rootBlock, body);
+	if (typeof __OCTANE_PROFILE_ENABLED__ !== 'undefined' && __OCTANE_PROFILE_ENABLED__) {
+		__devtoolsSetNameResolver(componentName);
+		__devtoolsRegisterRoot(rootBlock as unknown as import('./devtools-hook.js').DevtoolsScopeLike);
+	}
 	const idState: RootIdState = {
 		prefix: rootOptions?.identifierPrefix ?? '',
 		next: 0,

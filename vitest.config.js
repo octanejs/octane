@@ -239,6 +239,8 @@ export default defineConfig({
 					exclude: [
 						...configDefaults.exclude,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -316,6 +318,8 @@ export default defineConfig({
 					exclude: [
 						...configDefaults.exclude,
 						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
 						'packages/octane/tests/browser/**/*.test.ts',
 					],
 					environment: 'jsdom',
@@ -390,7 +394,11 @@ export default defineConfig({
 				// the entire Octane suite a third time.
 				test: {
 					name: 'octane-profile',
-					include: ['packages/octane/tests/profiling-runtime.test.tsrx'],
+					include: [
+						'packages/octane/tests/profiling-runtime.test.tsrx',
+						'packages/octane/tests/devtools-runtime.test.tsrx',
+						'packages/octane/tests/devtools-transitions.test.tsrx',
+					],
 					environment: 'jsdom',
 					setupFiles: ['packages/octane/tests/_per-test-setup.ts'],
 					globals: false,
@@ -782,6 +790,37 @@ export default defineConfig({
 						{
 							find: /^@octanejs\/tanstack-devtools$/,
 							replacement: resolve(import.meta.dirname, 'packages/tanstack-devtools/src/index.ts'),
+						},
+					],
+				},
+			},
+			{
+				test: {
+					name: 'devtools',
+					include: ['packages/devtools/tests/**/*.test.{ts,tsx}'],
+					environment: 'jsdom',
+					// The @tanstack/devtools-event-client index folds to a no-op unless
+					// NODE_ENV === 'development'; the plugin only runs in dev anyway.
+					env: { NODE_ENV: 'development' },
+					// Starts a ClientEventBus so emit()/on() deliver over the window bus
+					// (the devtools host provides it in production).
+					setupFiles: ['packages/devtools/tests/setup.ts'],
+					globals: false,
+				},
+				plugins: [octane()],
+				resolve: {
+					alias: [
+						{
+							find: /^@octanejs\/devtools$/,
+							replacement: resolve(import.meta.dirname, 'packages/devtools/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src/index.ts'),
+						},
+						{
+							find: /^@octanejs\/testing-library\/(.*)$/,
+							replacement: resolve(import.meta.dirname, 'packages/testing-library/src') + '/$1.ts',
 						},
 					],
 				},

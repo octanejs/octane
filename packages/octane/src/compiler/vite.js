@@ -163,7 +163,23 @@ export function octane(options = {}) {
 	let emitClientReferenceManifest = options.ssr !== true;
 	// Profiling is intentionally independent of serve/HMR. `ssr: true` is the
 	// adapter's explicit server-only override, where client profiling must stay off.
-	const profileEnabled = options.profile === true && options.ssr !== true;
+	//
+	// `profile` accepts `true`/`false` (command-independent, unchanged) and the
+	// command-aware `'auto'` sentinel — the DEV-only devtools signal the meta
+	// plugin maps `devtools: true` to: profiling on in `vite dev`
+	// (command === 'serve'), off in `vite build` so production tree-shakes it.
+	// Like `hmrEnabled`, the effective value is resolved LAZILY once Vite's
+	// command is known (the `config`/`configResolved` hooks), then feeds the
+	// compiler, the transform gating, and the reserved define consistently.
+	const profileOption = options.profile;
+	const resolveProfileEnabled = (command) => {
+		if (options.ssr === true) return false;
+		if (profileOption === 'auto') return command === 'serve';
+		return profileOption === true;
+	};
+	// Conservative pre-command default: explicit `profile: true` is honored
+	// immediately; `'auto'` stays off until the serve command is observed.
+	let profileEnabled = resolveProfileEnabled(undefined);
 	let projectRoot = nodePath.resolve(process.cwd());
 	// The mixed-toolchain ownership gate: with `requireDirective: true`, a
 	// project `.tsrx` is Octane's by extension, and Octane compiles a project
@@ -200,7 +216,11 @@ export function octane(options = {}) {
 	return {
 		name: 'octane',
 		enforce: 'pre',
-		config(config) {
+		config(config, env) {
+			// Resolve the command-aware profile signal before recreating the
+			// compiler or emitting the define, so `'auto'` (devtools) picks up
+			// serve→on / build→off from Vite's command.
+			profileEnabled = resolveProfileEnabled(env?.command);
 			assertProfilingDefineAvailable(config.define, profileEnabled);
 			resetCompiler(config.root ?? process.cwd());
 			const discovery = compiler.discoverSourceDependencies();
@@ -235,6 +255,11 @@ export function octane(options = {}) {
 		},
 		configResolved(config) {
 			logger = config.logger ?? null;
+			// Re-resolve from the finalized command (ResolvedConfig.command) so a
+			// command-aware `'auto'` signal stays correct even if `config` ran
+			// without an env, keeping the compiler, transform gating, and define in
+			// lockstep.
+			profileEnabled = resolveProfileEnabled(config.command);
 			// Re-check the final merged value so a later plugin cannot silently win the
 			// reserved definition and desynchronize compiler metadata from the runtime.
 			assertProfilingDefineAvailable(config.define, profileEnabled);

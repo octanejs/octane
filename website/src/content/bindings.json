@@ -74,7 +74,8 @@
       "@octanejs/stylex",
       "@octanejs/styled-components",
       "@octanejs/testing-library",
-      "@octanejs/tanstack-devtools"
+      "@octanejs/tanstack-devtools",
+      "@octanejs/devtools"
     ]
   }
 ]

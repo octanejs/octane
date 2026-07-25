@@ -1,9 +1,10 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-// React package → maintained @octanejs binding. bridge.test.js derives the
-// expected value set from the workspace manifests, so publishing a new binding
-// without registering it here fails the mcp-server tests.
+// React package → maintained @octanejs binding. Bindings with no React-package
+// equivalent live in KNOWN_NATIVE_BINDINGS below. bridge.test.js derives the
+// expected union from the workspace manifests, so publishing a new binding
+// without registering it in either catalog fails the mcp-server tests.
 export const KNOWN_BINDINGS = {
 	zustand: '@octanejs/zustand',
 	jotai: '@octanejs/jotai',
@@ -97,11 +98,18 @@ export const KNOWN_BINDINGS = {
 	'dexie-react-hooks': '@octanejs/dexie',
 };
 
+// Octane-specific ecosystem packages that have no React import to rewrite.
+// Keep these out of KNOWN_BINDINGS so the React bridge never invents a source
+// package mapping for native tooling.
+export const KNOWN_NATIVE_BINDINGS = new Set(['@octanejs/devtools']);
+
 // Workspace directory names for the maintained bindings. Keep this derived
-// from KNOWN_BINDINGS so repository path routing cannot drift from the public
+// from both catalogs so repository path routing cannot drift from the public
 // binding list (aliases such as `motion` intentionally collapse to one dir).
 export const KNOWN_BINDING_PACKAGE_DIRS = new Set(
-	Object.values(KNOWN_BINDINGS).map((name) => name.slice('@octanejs/'.length)),
+	[...Object.values(KNOWN_BINDINGS), ...KNOWN_NATIVE_BINDINGS].map((name) =>
+		name.slice('@octanejs/'.length),
+	),
 );
 
 export const KNOWN_VANILLA_CORES = {

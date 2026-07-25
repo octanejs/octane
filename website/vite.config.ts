@@ -130,7 +130,9 @@ export default defineConfig({
 		tanstackStart({
 			// Scene modules stay client-only during Start SSR, matching the website's
 			// existing Octane renderer contract while still shipping through Vite.
-			octane: { renderers: threeRenderers },
+			// devtools: true enables profiling instrumentation in dev (compiled out
+			// of prod) for the /devtools demo route's <TanStackDevtools> panel.
+			octane: { renderers: threeRenderers, devtools: true },
 		}),
 		nitro({
 			// Keep production on the runtime selected by the previous Vercel
@@ -207,6 +209,25 @@ export default defineConfig({
 			'@octanejs/visx > d3-time',
 			'@octanejs/visx > reduce-css-calc',
 			'@octanejs/visx > svg-path-properties',
+			// TanStack DevTools panel-host island. The whole island is reached only
+			// through @octanejs/tanstack-devtools's raw .tsrx source and the host's
+			// internal dynamic import, so Vite's scanner sees none of it. Pre-declare
+			// the ENTIRE island so it optimizes in ONE startup pass: that keeps the
+			// host's lazy mount chunk on a hash consistent with its entry (no
+			// mid-mount re-optimize → no "504 Outdated Optimize Dep") and bundles the
+			// CJS dep dayjs with a synthesized `default` export. solid-js is pinned to
+			// 1.9.9 for this island via the pnpm override (Solid 2 dropped
+			// solid-js/web); remove this block once @tanstack/devtools ships Solid 2.
+			'@tanstack/devtools',
+			'@tanstack/devtools-ui',
+			'@tanstack/devtools-client',
+			'@tanstack/devtools-event-bus',
+			'@tanstack/devtools-event-client',
+			'dayjs',
+			'goober',
+			'@solid-primitives/event-listener',
+			'@solid-primitives/keyboard',
+			'@solid-primitives/resize-observer',
 		],
 	},
 
