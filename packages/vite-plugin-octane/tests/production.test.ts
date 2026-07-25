@@ -110,7 +110,7 @@ beforeAll(async () => {
 	devServer = await createServer({
 		root: fixtureRoot,
 		logLevel: 'silent',
-		server: { host: '127.0.0.1', port: 0 },
+		server: { cors: false, host: '127.0.0.1', port: 0 },
 	});
 	await devServer.listen();
 	const address = devServer.httpServer?.address();
