@@ -15,6 +15,18 @@ import {
 const FIXTURE = 'packages/octane/tests/_fixtures/svg-title-hoist.tsrx';
 const server = loadServerFixture(FIXTURE);
 
+function moveServerHeadElement(element: Element): void {
+	const precedingServerNode = element.previousSibling;
+	const followingServerNode = element.nextSibling;
+	if (precedingServerNode?.nodeType === Node.COMMENT_NODE) {
+		document.head.append(precedingServerNode);
+	}
+	document.head.append(element);
+	if (followingServerNode?.nodeType === Node.COMMENT_NODE) {
+		document.head.append(followingServerNode);
+	}
+}
+
 afterEach(() => {
 	for (const node of document.head.querySelectorAll(
 		'[data-opaque-boundary-document-title], [data-lexical-document-title], [data-opaque-boundary-html-title], [data-directive-document-title]',
@@ -289,11 +301,7 @@ describe('title placement across HTML and SVG namespaces', () => {
 		const documentTitle = serverMarkup.content.querySelector(
 			'[data-opaque-boundary-document-title]',
 		) as HTMLTitleElement;
-		const adjacentServerNode = documentTitle.previousSibling;
-		if (adjacentServerNode?.nodeType === Node.COMMENT_NODE) {
-			document.head.append(adjacentServerNode);
-		}
-		document.head.append(documentTitle);
+		moveServerHeadElement(documentTitle);
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -336,11 +344,7 @@ describe('title placement across HTML and SVG namespaces', () => {
 		const documentTitle = serverMarkup.content.querySelector(
 			'[data-opaque-boundary-html-title]',
 		) as HTMLTitleElement;
-		const adjacentServerNode = documentTitle.previousSibling;
-		if (adjacentServerNode?.nodeType === Node.COMMENT_NODE) {
-			document.head.append(adjacentServerNode);
-		}
-		document.head.append(documentTitle);
+		moveServerHeadElement(documentTitle);
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);
@@ -377,11 +381,7 @@ describe('title placement across HTML and SVG namespaces', () => {
 		const documentTitle = serverMarkup.content.querySelector(
 			'[data-directive-document-title]',
 		) as HTMLTitleElement;
-		const adjacentServerNode = documentTitle.previousSibling;
-		if (adjacentServerNode?.nodeType === Node.COMMENT_NODE) {
-			document.head.append(adjacentServerNode);
-		}
-		document.head.append(documentTitle);
+		moveServerHeadElement(documentTitle);
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);

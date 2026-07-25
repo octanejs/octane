@@ -59,6 +59,7 @@ import {
 	// static-markup emission of `ssrEmitElement`.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { headOwnershipSuffix } from './head-ownership.js';
 import type { HydrateProps, HydrationStrategy } from './hydration/types.js';
 
 // Shared client/SSR CSS helpers (single source in css.ts so class strings and
@@ -143,6 +144,8 @@ interface HeadBuffer {
 	html: string;
 	/** Resource-hint dedupe keys emitted into `html` during this pass. */
 	hints: Set<string>;
+	/** Precomputed caller root namespace, unaffected by streamed useId subspaces. */
+	rootSuffix: string;
 }
 let HEAD: HeadBuffer | null = null;
 
@@ -4533,10 +4536,11 @@ export function injectStyle(id: string, css: string): void {
 }
 
 // Compiler-emitted for each hoisted `<title>`/`<meta>`/`<link>` (rendered
-// anywhere in a component). Serializes the element — prefixed with a `<!--key-->`
-// marker the client's headBlock adopts — into the active render pass's head
-// buffer (null-guarded like injectStyle, so it only collects during a
-// synchronous pass). Returned as RenderResult.head and injected at <!--ssr-head-->.
+// anywhere in a component). Serializes the element inside a paired ownership
+// marker interval that the client's headBlock adopts and appends it to the active
+// render-pass head buffer (null-guarded like injectStyle, so it only collects
+// during a synchronous pass). Returned as RenderResult.head and injected at
+// <!--ssr-head-->.
 const HEAD_VOID_ELEMENTS = new Set(['meta', 'link', 'base']);
 
 export function ssrHeadEl(
@@ -4546,9 +4550,11 @@ export function ssrHeadEl(
 	text: unknown,
 ): void {
 	if (HEAD === null) return;
-	// The `<!--key-->` prefix is the client headBlock's adoption marker; static
-	// markup is non-hydratable, so it's omitted there.
-	let s = (MARKERS ? '<!--' + key + '-->' : '') + '<' + tag;
+	// Paired ownership comments bound the exact adoption interval; static markup
+	// is non-hydratable, so both are omitted there.
+	const rootSuffix = HEAD.rootSuffix;
+	const ownershipKey = MARKERS ? (rootSuffix === '' ? key : key + rootSuffix) : '';
+	let s = (MARKERS ? '<!--' + ownershipKey + '-->' : '') + '<' + tag;
 	if (attrs !== null) {
 		for (const k in attrs) {
 			// Hoisted metadata must share ordinary-host value filtering and DEV
@@ -4562,6 +4568,7 @@ export function ssrHeadEl(
 	} else {
 		s += '>' + (text == null ? '' : escapeHtml(text)) + '</' + tag + '>';
 	}
+	if (MARKERS) s += '<!--/' + ownershipKey + '-->';
 	HEAD.html += s;
 }
 
@@ -4945,7 +4952,11 @@ function runFullFramedPass(
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	const cssMap = (CSS = new Map<string, string>());
-	const headBuf = (HEAD = { html: '', hints: new Set() });
+	const headBuf = (HEAD = {
+		html: '',
+		hints: new Set(),
+		rootSuffix: markers ? headOwnershipSuffix(identifierPrefix) : '',
+	});
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	const serial = (SERIAL = [] as unknown[]);
 	const deferred = (DEFERRED = [] as Job[]);
@@ -5037,7 +5048,7 @@ function runDiscoveryRound(
 	VT_SSR_HAS_CANDIDATES = false;
 	VT_SSR_STACK.length = 0;
 	CSS = new Map();
-	HEAD = { html: '', hints: new Set() };
+	HEAD = { html: '', hints: new Set(), rootSuffix: headOwnershipSuffix(identifierPrefix) };
 	const suspended = (SUSPENDED = [] as SuspendedList);
 	SERIAL = [] as unknown[];
 	const deferred = (DEFERRED = [] as Job[]);

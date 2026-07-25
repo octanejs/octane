@@ -32,6 +32,10 @@ function profileFiles(code: string | undefined): Set<string> {
 	return new Set(uniqueMetadata([...output.components, ...output.hooks]).map(({ file }) => file));
 }
 
+function emittedHeadKey(code: string | undefined): string | undefined {
+	return code?.match(/["'](rnh-[0-9a-f]{8})["']/)?.[1];
+}
+
 describe('bundler-neutral compiler integration', () => {
 	it('normalizes the canonical cross-adapter client-reference manifest', () => {
 		const first = {
@@ -90,6 +94,23 @@ describe('bundler-neutral compiler integration', () => {
 			'C:/external/App.tsrx',
 		);
 		expect(canonicalModuleId('#nitro/virtual/polyfills', root)).toBe('#nitro/virtual/polyfills');
+	});
+
+	it('uses the shared canonical module id for client/server head ownership', () => {
+		const compiler = createOctaneCompiler({ root: '/project' });
+		const source = 'export function Page() @{ <title>module title</title> }';
+		const client = compiler.transform(source, '/project/src/Page.tsrx?client=1', {
+			environment: 'client',
+		});
+		const server = compiler.transform(source, '/project/src/Page.tsrx?server=1', {
+			environment: 'server',
+		});
+		const otherModule = compiler.transform(source, '/project/src/OtherPage.tsrx', {
+			environment: 'client',
+		});
+
+		expect(emittedHeadKey(client?.code)).toBe(emittedHeadKey(server?.code));
+		expect(emittedHeadKey(otherModule?.code)).not.toBe(emittedHeadKey(client?.code));
 	});
 
 	it('compiles the same source for client and server with maps', () => {

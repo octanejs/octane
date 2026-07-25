@@ -18,6 +18,11 @@ export interface ConditionalSpreadScriptProps extends ScriptSpreadProps {
 	show: boolean;
 }
 
+export interface RawStyleProps {
+	source: string;
+	tag: string;
+}
+
 export function ExecutableScript(props: ScriptSourceProps) @{
 	<script data-kind="executable" dangerouslySetInnerHTML={{ __html: props.source }} />
 }
@@ -87,4 +92,12 @@ export function ConditionalWhitespaceScript(props: { show: boolean }) @{
 	<section>{props.show && <script data-kind="conditional-whitespace">
 
 	</script>}</section>
+}
+
+export function RawStyle(props: RawStyleProps) @{
+	const Tag = props.tag;
+	<>
+		<Tag id="raw-style-sheet" dangerouslySetInnerHTML={{ __html: props.source }} />
+		<div id="raw-style-target">{'styled target'}</div>
+	</>
 }

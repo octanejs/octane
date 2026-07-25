@@ -193,8 +193,11 @@ describe.sequential('real-browser Suspense and async hydration evidence', () => 
 		expect(state.outsideSame).toBe(true);
 		expect(state.fallbackCount).toBe(0);
 		expect(state.headings).toEqual(['replaced']);
+		expect(state.recoveredActionText).toBe('recovered:0');
 		expect(state.globalFailures).toEqual([]);
 		expect(hydrationDiagnostics).toHaveLength(1);
+		await page.locator('#hydration-recovered-action').click();
+		expect((await snapshot()).recoveredActionText).toBe('recovered:1');
 		await page.locator('#hydration-outside').click();
 		expect((await snapshot()).outsideText).toBe('outside:2');
 	});

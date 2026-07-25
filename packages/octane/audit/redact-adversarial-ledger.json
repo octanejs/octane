@@ -481,7 +481,7 @@
       "symptom": "A replay queue delivered the right event names but degraded keyboard and input events to generic Event objects, lost target/default semantics, changed order, or replayed an item twice.",
       "octaneContract": "For every event Octane buffers, replay must preserve the documented platform subclass and supported metadata, original target, FIFO order, bubbling/cancelability/default behavior, and exactly-once delivery.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane deferred hydration and DOM events",
       "applicableModes": ["deferred-hydration", "real-browser"],
@@ -490,25 +490,49 @@
         {
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
-          "symbol": "notifyHydrateBoundary",
-          "note": "Mouse and focus families retain subclasses; other buffered families currently fall back to Event."
+          "symbol": "cloneHydrationReplayEvent",
+          "note": "Clones every public event family with the target realm's platform constructor, falling back to the Web IDL brand when instanceof cannot cross realms; pointer detection precedes mouse detection."
         },
         {
           "kind": "test",
-          "file": "packages/octane/tests/streaming-ssr.test.ts",
-          "testName": "replays pre-root interaction after the pending stream reveals",
-          "note": "Covers click delivery and target survival, not the cross-family event-shape matrix."
+          "file": "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
+          "testName": "replays every public interaction event once with its platform shape and queue semantics",
+          "note": "An exhaustive type-level-locked matrix covers all 15 public interaction events in development and production compilation."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
+          "testName": "classifies parent-realm events before replaying them in an iframe realm",
+          "note": "Parent-created focus, keyboard, mouse, and pointer events replay with the iframe target's constructors and retain their metadata."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
+          "testName": "classifies iframe-realm events before replaying them at a host-document target",
+          "note": "The opposite realm crossing: an embedded widget's own events replay with the host document's constructors, proving the clone follows the target rather than the incoming event."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts",
+          "testName": "preserves every public event family, metadata, order, target, and cancellation",
+          "note": "Real Chromium proves platform subclasses, metadata, FIFO delivery, original target, default cancellation, and one queue drain."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": [
-          "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
-          "packages/octane/tests/browser"
-        ],
-        "acceptance": "Exercise every public HydrationInteractionEvent family in a real browser: click/auxclick/contextmenu/dblclick, focusin, keydown/keyup, mouse, and pointer events. Assert subclass, supported metadata, target, FIFO ordering, preventDefault visibility, queue drain, and no duplicate replay; keep input/change/submit excluded unless a separate API decision expands the public union."
-      },
-      "rationale": "Octane replays interaction intent rather than cloning every native event field, so the transferable contract must explicitly define which event shape it promises instead of silently copying Redact's implementation."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/deferred-hydration-contract.test.ts",
+          "testName": "replays every public interaction event once with its platform shape and queue semantics",
+          "modes": ["deferred-hydration"],
+          "observables": ["events"]
+        },
+        {
+          "file": "packages/octane/tests/browser/deferred-hydration-event-replay/deferred-hydration-event-replay.test.ts",
+          "testName": "preserves every public event family, metadata, order, target, and cancellation",
+          "modes": ["deferred-hydration", "real-browser"],
+          "observables": ["events"]
+        }
+      ],
+      "rationale": "Octane continues to replay only its documented interaction-intent union. The clone is now realm-aware and constructor-specific, while exhaustive unit and Chromium evidence lock every public family to its supported platform metadata and exactly-once FIFO semantics."
     },
     {
       "id": "RDX-HYD-001",
@@ -603,7 +627,7 @@
         }
       ],
       "symptom": "Weak head-node identity allowed one logical head entry to adopt a different server node and validate or update the wrong content.",
-      "octaneContract": "Within a matching head-marker interval, hydration adopts only an element with the expected tag. It preserves interposed wrong-tag nodes and, when no expected-tag candidate exists before the next Octane marker, creates the expected node without claiming unrelated head content.",
+      "octaneContract": "Within a valid paired head-ownership interval, hydration adopts only an element with the expected tag. It preserves interposed wrong-tag nodes and, when no expected-tag candidate exists before the matching closing marker, creates the expected node without claiming unrelated head content.",
       "classification": "adaptable",
       "status": "covered",
       "risk": "critical",
@@ -620,12 +644,12 @@
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
           "symbol": "adoptServerHeadEl",
-          "note": "Claims only a matching tag inside the ownership interval closed by the next Octane head marker."
+          "note": "Claims only a matching tag inside a valid interval closed by that entry's paired ownership marker."
         },
         {
           "kind": "test",
           "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
-          "testName": "adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount",
+          "testName": "adopts the server head and single-root body, then removes owned nodes on unmount",
           "note": "Happy-path adoption and lifecycle ownership."
         },
         {
@@ -642,7 +666,7 @@
       "evidence": [
         {
           "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
-          "testName": "adopts the server head (one <title>/<meta>, markers removed) + single-root body, removed on unmount",
+          "testName": "adopts the server head and single-root body, then removes owned nodes on unmount",
           "modes": ["server-string", "hydrate-match", "production-compile"],
           "observables": ["markup", "node-identity", "dom-mutations"]
         },
@@ -659,7 +683,7 @@
           "observables": ["markup", "node-identity", "dom-mutations"]
         }
       ],
-      "rationale": "Redact matches scripts by attributes while Octane uses compiler markers, so the transferable contract is ownership-safe claiming rather than Redact's matcher. This closes wrong-tag and missing-target corruption within one marker interval. Compiler key uniqueness and ambiguous same-tag collisions remain explicitly tracked by RDX-HYD-007."
+      "rationale": "Redact matches scripts by attributes while Octane uses compiler markers, so the transferable contract is ownership-safe claiming rather than Redact's matcher. This closes wrong-tag and missing-target corruption within one paired ownership interval. Compiler key uniqueness and ambiguous same-tag collisions remain explicitly tracked by RDX-HYD-007."
     },
     {
       "id": "RDX-HYD-003",
@@ -683,7 +707,7 @@
       "symptom": "Byte-equivalent script or style text containing ampersands or less-than signs was parsed through a generic div and falsely reported as mismatched.",
       "octaneContract": "Hydration comparison must respect script-data and style raw-text parsing, preserve node identity for equivalent server bytes, avoid false diagnostics, and remain safe against closing-tag injection.",
       "classification": "portable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane DOM hydration and SSR serialization",
       "applicableModes": [
@@ -711,18 +735,48 @@
           "kind": "test",
           "file": "packages/octane/tests/conformance/fizz-main-wave4c.test.ts",
           "testName": "keeps raw style text in one element when it contains closing-tag-like tokens",
-          "note": "Current style evidence is server-only."
+          "note": "Pins the server serializer's closing-tag safety."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/script-innerhtml.test.ts",
+          "testName": "adopts server-parsed raw text without diagnostics and updates the same stylesheet",
+          "note": "Covers buffered and streamed parsing, strict adoption, diagnostics, and same-node updates."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts",
+          "testName": "prod adopts server CSS and preserves raw-text semantics through update",
+          "note": "Chromium verifies production hydration identity plus CSSOM and computed-style semantics."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": [
-          "packages/octane/tests/script-innerhtml.test.ts",
-          "packages/octane/tests/browser"
-        ],
-        "acceptance": "Add server-render, parse, hydrate, and update coverage for raw style text containing &&, <, entity-like text, and closing-tag-like tokens; assert adoption and no warning in the unit lane, then use Chromium/CSSOM to prove intact stylesheet semantics."
-      },
-      "rationale": "The Redact script failure is already prevented; the remaining gap is direct hydration evidence for style's distinct raw-text and SSR-escape behavior."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/script-innerhtml.test.ts",
+          "testName": "hydrates the server-safe script spelling by adoption and applies later updates",
+          "modes": ["server-string", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/script-innerhtml.test.ts",
+          "testName": "adopts server-parsed raw text without diagnostics and updates the same stylesheet",
+          "modes": ["server-string", "server-stream", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts",
+          "testName": "dev adopts server CSS and preserves raw-text semantics through update",
+          "modes": ["server-string", "hydrate-match", "real-browser"],
+          "observables": ["markup", "node-identity", "errors"]
+        },
+        {
+          "file": "packages/octane/tests/browser/raw-style-hydration/raw-style-hydration.test.ts",
+          "testName": "prod adopts server CSS and preserves raw-text semantics through update",
+          "modes": ["server-string", "hydrate-match", "production-compile", "real-browser"],
+          "observables": ["markup", "node-identity", "errors"]
+        }
+      ],
+      "rationale": "Script already used script-data comparison; the completed style matrix now proves its distinct raw-text parser context through buffered and streamed SSR, strict dev/prod adoption, same-node updates, breakout-token safety, and real Chromium CSSOM semantics."
     },
     {
       "id": "RDX-HYD-004",
@@ -861,7 +915,7 @@
       "symptom": "Recovering one mismatched host or Suspense subtree could remount unaffected siblings, abandon the hydration cursor, or leave the regenerated subtree without live handlers.",
       "octaneContract": "A structural hydration mismatch rebuilds only its owning failed range, preserves the object identity of unaffected siblings outside that range, and installs events on regenerated content.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane hydration cursor and ownership ranges",
       "applicableModes": ["hydrate-mismatch", "production-compile", "real-browser"],
@@ -876,19 +930,49 @@
         {
           "kind": "test",
           "file": "packages/octane/tests/hydration/mismatch-structural.test.ts",
-          "testName": "PROD build: @if branch swap rebuilds SILENTLY (recovery is not gated on the dev loc)",
-          "note": "Proves production recovery but not a nearest-host/Suspense containment matrix."
+          "testName": "nearest-host recovery preserves outside objects and both outside and regenerated handlers",
+          "note": "Runs under explicit development and production compilation and retains every stable host object."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/mismatch-structural.test.ts",
+          "testName": "Suspense-scoped recovery preserves outside objects and installs the regenerated handler",
+          "note": "Pins boundary-external identity and both surviving and regenerated handler delivery."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "contains async hydration recovery and preserves an interactive outside sibling",
+          "note": "Real Chromium drives the streamed mismatch, surviving sibling, and regenerated action."
         }
       ],
-      "nextAction": {
-        "kind": "test",
-        "targets": [
-          "packages/octane/tests/conformance/hydration-mismatch.test.ts",
-          "packages/octane/tests/browser"
-        ],
-        "acceptance": "For root, nearest-host, and Suspense-scoped structural mismatches, capture outside siblings before hydration and assert the same objects and handlers survive while the failed subtree is regenerated and its handlers become live in development and production."
-      },
-      "rationale": "Octane recovers ranges in place instead of following Redact's checkpoint stack, so the transferable requirement is the observable containment boundary rather than checkpoint implementation parity."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/mismatch-structural.test.ts",
+          "testName": "root recovery leaves one clean client tree with a live replacement handler",
+          "modes": ["hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "events"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/mismatch-structural.test.ts",
+          "testName": "nearest-host recovery preserves outside objects and both outside and regenerated handlers",
+          "modes": ["hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "events"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/mismatch-structural.test.ts",
+          "testName": "Suspense-scoped recovery preserves outside objects and installs the regenerated handler",
+          "modes": ["hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "events"]
+        },
+        {
+          "file": "packages/octane/tests/browser/suspense-hydration/suspense-hydration.test.ts",
+          "testName": "contains async hydration recovery and preserves an interactive outside sibling",
+          "modes": ["hydrate-mismatch", "real-browser"],
+          "observables": ["markup", "node-identity", "events"]
+        }
+      ],
+      "rationale": "Octane's compiler-owned ranges recover in place rather than unwinding Redact checkpoints. The completed root, nearest-host, Suspense, production-compile, and Chromium matrix now proves the equivalent observable containment boundary and live event wiring."
     },
     {
       "id": "RDX-HYD-007",
@@ -910,9 +994,9 @@
         }
       ],
       "symptom": "A marker derived only from a source offset can collide across modules or tags, making same-tag ownership ambiguous even when runtime claiming validates the element tag.",
-      "octaneContract": "Compiler-emitted head ownership keys are stable between server and client builds and collision-resistant across modules, tags, and multiple roots; duplicate, reordered, or missing markers cannot make one logical entry claim another same-tag element.",
+      "octaneContract": "Compiler-emitted head ownership keys are stable between server and client builds and collision-resistant across modules and tags; the existing distinct identifierPrefix contract isolates sibling roots. Duplicate, reordered, or missing marker pairs cannot make one logical entry claim another same-tag element.",
       "classification": "adaptable",
-      "status": "planned",
+      "status": "covered",
       "risk": "high",
       "owner": "Octane compiler and runtime head hydration",
       "applicableModes": [
@@ -928,25 +1012,78 @@
           "kind": "source",
           "file": "packages/octane/src/compiler/compile.js",
           "symbol": "headKey",
-          "note": "The current key hashes only the element source position, which is unique within one file but not across modules."
+          "note": "Hashes the canonical module ID, element tag, and source position into a fixed-size compiler key shared by client and server output."
         },
         {
           "kind": "source",
           "file": "packages/octane/src/runtime.ts",
           "symbol": "adoptServerHeadEl",
-          "note": "Tag validation closes wrong-tag claiming but cannot distinguish colliding same-tag owners."
+          "note": "Adopts exactly one expected-tag element only inside a structurally valid paired ownership interval."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "uses the root namespace for a head entry emitted before a streamed boundary suspends",
+          "note": "A genuinely suspending readable stream proves boundary-local useId prefixes cannot desynchronize head ownership."
+        },
+        {
+          "kind": "test",
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "contains reordered ownership markers without cross-claiming same-tag server entries",
+          "note": "Malformed pairs create fresh client metadata while preserving both unclaimed server entries."
         }
       ],
-      "nextAction": {
-        "kind": "implementation",
-        "targets": [
-          "packages/octane/src/compiler/compile.js",
-          "packages/octane/tests/compiler.test.ts",
-          "packages/octane/tests/hydration/head-hydrate.test.ts"
-        ],
-        "acceptance": "Define a server/client-stable module-aware key, prove identical compilation modes emit the same key, and cover cross-module same-tag collisions plus duplicate, missing, and reordered markers without claiming or deleting unrelated head nodes."
-      },
-      "rationale": "RDX-HYD-002 deliberately closes the runtime's wrong-tag corruption without overstating marker identity. Redact's ownership failure exposed this distinct Octane compiler protocol risk, which needs a cross-module fixture rather than another adjacent-node unit case."
+      "evidence": [
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "keeps streamed head ownership byte-compatible with client hydration",
+          "modes": ["server-stream", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "uses the root namespace for a head entry emitted before a streamed boundary suspends",
+          "modes": ["server-stream", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "keeps cross-module same-tag ownership stable when roots hydrate out of order",
+          "modes": ["server-string", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "uses existing identifierPrefix semantics to isolate same-module sibling roots",
+          "modes": ["server-string", "hydrate-match", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "does not claim or delete a server title when its opening ownership marker is missing",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "does not claim or delete a server title when its closing ownership marker is missing",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "treats a duplicate ownership marker as ambiguous instead of claiming a server title",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        },
+        {
+          "file": "packages/octane/tests/hydration/head-hydrate.test.ts",
+          "testName": "contains reordered ownership markers without cross-claiming same-tag server entries",
+          "modes": ["server-string", "hydrate-mismatch", "production-compile"],
+          "observables": ["markup", "node-identity", "dom-mutations"]
+        }
+      ],
+      "rationale": "The compiler now separates modules and tags, the existing root identifierPrefix separates repeated roots, and paired delimiters make same-tag claiming fail closed under missing, duplicate, or reordered markers. Root-only namespacing also stays stable through streamed boundary-local useId subspaces."
     },
     {
       "id": "RDX-ID-001",

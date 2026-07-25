@@ -43,6 +43,7 @@ import {
 	// Read only on setAttribute's cold dangerouslySetInnerHTML arm.
 	VOID_ELEMENTS,
 } from './constants.js';
+import { headOwnershipKey } from './head-ownership.js';
 import {
 	__profileBail,
 	__profileBeginRender,
@@ -5908,6 +5909,48 @@ function activateHydrateBoundary(state: HydrateSlot): void {
 	if (completed && hydration.hasAdjacentRangePair) hydration.coalesce();
 }
 
+function cloneHydrationReplayEvent(event: Event, target: Element): Event {
+	// Event constructors are realm-specific, so the clone is always built with the
+	// TARGET's constructors: hydrating an iframe-owned root from its parent realm
+	// must still replay an event the iframe's own code recognizes. A detached
+	// synthetic Document has no defaultView and falls back to the ambient realm.
+	const realm = target.ownerDocument.defaultView ?? globalThis;
+	// Same-realm replay is the overwhelmingly common case, so it stays a plain
+	// constructor walk: no brand string, no comparisons beyond `instanceof`.
+	// PointerEvent extends MouseEvent, so it must be tested first or pointer-
+	// specific metadata (pressure, pointerId, tilt, etc.) is discarded.
+	if (realm.PointerEvent !== undefined && event instanceof realm.PointerEvent) {
+		return new realm.PointerEvent(event.type, event);
+	}
+	if (realm.KeyboardEvent !== undefined && event instanceof realm.KeyboardEvent) {
+		return new realm.KeyboardEvent(event.type, event);
+	}
+	if (realm.MouseEvent !== undefined && event instanceof realm.MouseEvent) {
+		return new realm.MouseEvent(event.type, event);
+	}
+	if (realm.FocusEvent !== undefined && event instanceof realm.FocusEvent) {
+		return new realm.FocusEvent(event.type, event);
+	}
+	// Cold: a programmatic dispatch may cross realms, where the original event
+	// came from a parent Window while its target belongs to an iframe Window (or
+	// the reverse). No local constructor claims it, but Web IDL's toStringTag
+	// still reports the platform family across that identity boundary.
+	const brand = Object.prototype.toString.call(event);
+	if (realm.PointerEvent !== undefined && brand === '[object PointerEvent]') {
+		return new realm.PointerEvent(event.type, event);
+	}
+	if (realm.KeyboardEvent !== undefined && brand === '[object KeyboardEvent]') {
+		return new realm.KeyboardEvent(event.type, event);
+	}
+	if (realm.MouseEvent !== undefined && brand === '[object MouseEvent]') {
+		return new realm.MouseEvent(event.type, event);
+	}
+	if (realm.FocusEvent !== undefined && brand === '[object FocusEvent]') {
+		return new realm.FocusEvent(event.type, event);
+	}
+	return new realm.Event(event.type, event);
+}
+
 function notifyHydrateBoundary(state: HydrateSlot): void {
 	if (state.didNotify || !state.hydrated) return;
 	state.didNotify = true;
@@ -5939,14 +5982,8 @@ function notifyHydrateBoundary(state: HydrateSlot): void {
 			// `click` is the platform exception among untrusted events: dispatching
 			// the clone still runs its native activation behavior, so links navigate
 			// and submit controls submit unless a hydrated handler prevents default.
-			// Keep dispatchEvent here to preserve the original mouse-event metadata.
-			target.dispatchEvent(
-				typeof MouseEvent !== 'undefined' && event instanceof MouseEvent
-					? new MouseEvent(event.type, event)
-					: typeof FocusEvent !== 'undefined' && event instanceof FocusEvent
-						? new FocusEvent(event.type, event)
-						: new Event(event.type, event),
-			);
+			// Keep dispatchEvent here to preserve native activation and cancellation.
+			target.dispatchEvent(cloneHydrationReplayEvent(event, target));
 		}
 	}
 }
@@ -10370,7 +10407,7 @@ const _injectedStyles = new Set<string>();
 // and text are re-applied each render (so `<title>{state}</title>` is reactive),
 // and it is removed from <head> when the owning scope unmounts (so a route swap
 // replaces the page's metadata). On a hydrated page the server wrote
-// `<!--key-->` + the element into <head> (ssrHeadEl → RenderResult.head →
+// paired key markers + the element into <head> (ssrHeadEl → RenderResult.head →
 // <!--ssr-head-->); headBlock ADOPTS that element rather than appending a copy.
 // ---------------------------------------------------------------------------
 
@@ -10380,30 +10417,51 @@ interface HeadSlot {
 	handlers?: Map<string, EventListener>;
 }
 
-// Find the server-rendered `tag` inside `key`'s marker interval in <head>, remove
-// the marker so a later mount can't re-match it, and return the element. A foreign
+// Find the server-rendered `tag` inside `key`'s paired marker interval in <head>,
+// remove the pair so a later mount can't re-match it, and return the element. A foreign
 // node can be injected between the marker and the server element (extensions,
 // analytics, or document transforms); never claim or mutate it merely because it
-// is adjacent. The next Octane head marker closes this ownership interval.
+// is adjacent. Nested, missing, or reordered delimiters make the interval
+// unprovable, so recovery creates fresh metadata without claiming a same-tag node.
 // Returns null on a fresh client render or when the expected element is missing.
 function adoptServerHeadEl(key: string, tag: string): Element | null {
+	const closeKey = '/' + key;
 	for (let n: Node | null = document.head.firstChild; n !== null; n = n.nextSibling) {
 		if (n.nodeType === 8 && (n as Comment).data === key) {
 			let candidate: Node | null = n.nextSibling;
-			(n as Comment).remove();
+			let match: Element | null = null;
+			let end: Comment | null = null;
+			let matches = 0;
 			while (candidate !== null) {
-				if (candidate.nodeType === 8 && (candidate as Comment).data.startsWith('rnh-')) {
-					break;
+				if (candidate.nodeType === 8) {
+					const marker = (candidate as Comment).data;
+					if (marker === closeKey) {
+						end = candidate as Comment;
+						break;
+					}
+					// A nested/reordered ownership marker means this interval cannot
+					// prove which same-tag node belongs to the requested entry. Leaving
+					// `end` unset below is what makes that case adopt nothing.
+					if (marker.startsWith('rnh-') || marker.startsWith('/rnh-')) break;
 				}
 				if (candidate.nodeType === 1 && (candidate as Element).localName === tag) {
-					return candidate as Element;
+					if (matches++ === 0) match = candidate as Element;
 				}
 				candidate = candidate.nextSibling;
 			}
-			return null;
+			(n as Comment).remove();
+			if (end === null) return null;
+			end.remove();
+			// Two same-tag candidates are as unprovable as none.
+			return matches === 1 ? match : null;
 		}
 	}
 	return null;
+}
+
+function rootIdentifierPrefix(block: Block): string {
+	while (block.parentBlock !== null) block = block.parentBlock;
+	return block.idState.prefix;
 }
 
 export function headBlock(
@@ -10416,11 +10474,11 @@ export function headBlock(
 ): void {
 	if (typeof document === 'undefined') return;
 	// State lives in the dense `slots` array (like every other slot) so the scope
-	// shape stays monomorphic; `key` is only the content hash used to adopt the
+	// shape stays monomorphic; `key` is only the ownership hash used to adopt the
 	// matching server-rendered head element on hydration.
 	let state = scope.slots[slot] as HeadSlot | undefined;
 	if (state === undefined) {
-		let el = adoptServerHeadEl(key, tag);
+		let el = adoptServerHeadEl(headOwnershipKey(key, rootIdentifierPrefix(scope.block)), tag);
 		if (el === null) {
 			el = document.createElement(tag);
 			document.head.appendChild(el);

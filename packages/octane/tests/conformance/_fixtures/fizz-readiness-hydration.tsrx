@@ -56,9 +56,13 @@ export function ContentAndNestedFallbackSuspend(props) @{
 }
 
 export function HydrationLeaf(props) @{
+	const [count, setCount] = useState(0);
 	<>
 		<p id="hydration-leaf">{'A'}</p>
 		<h2 id="hydration-text">{props.text as string}</h2>
+		<button id="hydration-recovered-action" onClick={() => setCount(count + 1)}>
+			{'recovered:' + count}
+		</button>
 	</>
 }
 
