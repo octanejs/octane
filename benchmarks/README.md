@@ -173,6 +173,7 @@ internally, get their own baseline and guard namespace.
 | `recursive-context` | recursive-context | Octane + reference frameworks | context fan-out |
 | `signal-favoring` | signal-favoring | Octane + reference frameworks | cascade vs targeted |
 | `news` | news | none (builds) | SSR + hydration, per-target |
+| `hydration-interactivity` | hydration-interactivity | none (builds) | real pre-hydration typing, controlled inputs, native event replay, and 1×/6× Chromium CPU throttling across Octane, React, Preact, Solid 2, Svelte, and Vue Vapor |
 | `effectful-list` | effectful-list | Octane + reference frameworks | effect/ref cleanup churn |
 | `memo-wall` | memo-wall | Octane + reference frameworks | memo bail + context walk |
 | `portal-swarm` | portal-swarm | Octane + reference frameworks | portal render/dispatch |

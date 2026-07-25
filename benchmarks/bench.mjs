@@ -236,6 +236,21 @@ const SUITES = [
 		})),
 	},
 	{
+		// Real pre-hydration typing against a withheld production client chunk,
+		// measured with Chromium CDP CPU throttling. The six target apps reuse
+		// news's existing SSR toolchains, including Solid 2 and Vue Vapor; Octane's
+		// real early-capture bootstrap additionally proves exactly-once replay.
+		name: 'hydration-interactivity',
+		cwd: 'hydration-interactivity',
+		servers: [],
+		iter: { normal: 5, quick: 2 },
+		runs: ['octane-tsrx', 'react', 'preact', 'solid', 'svelte', 'vue-vapor'].map((target) => ({
+			label: target,
+			script: 'run.mjs',
+			args: (n) => [target, String(n)],
+		})),
+	},
+	{
 		name: 'effectful-list',
 		cwd: 'effectful-list',
 		servers: [
