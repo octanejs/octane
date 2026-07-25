@@ -1,5 +1,153 @@
 # octane
 
+## 0.1.14
+
+### Patch Changes
+
+- cc79ac5: Type-only/Volar compilation now emits renderer JSX pragmas as part of its
+  single mapped Program print and exposes that exact transformed Program as
+  `generatedAst` for editor and playground consumers. Client-only server stubs
+  are likewise built as origin-stamped AST, printed once with esrap, and return a
+  real source map plus the Program used to produce them.
+- cc79ac5: The client compiler now builds each component function as a single AST
+  (`@tsrx/core` builders end to end — bindings, path walks, control-flow call
+  sites, memo regions, sub-templates) and prints it once with esrap, replacing
+  the string-assembled function interiors and the custom per-fragment source-map
+  stitching. Emitted programs are structurally identical (verified by parsing
+  old and new output across every fixture and mode); formatting follows esrap's
+  printer, and generated code is marginally smaller. Function-level source maps
+  are now complete by construction. The module frame and server emitter keep
+  their existing emission pending the next milestones.
+- cc79ac5: The client compiler now assembles imports, templates, styles, event delegation,
+  hoisted helpers, component declarations, HMR, profiling, and metadata tails into
+  one module AST and prints it once with esrap. Module source maps now come directly
+  from that print, including generated helper regions that the previous
+  string-stitching path could not map.
+
+  The server compiler now follows the same AST-first, single-print path. SSR
+  function/module scaffolding and HTML template literals carry authored origins,
+  so server source maps and opt-in inspection segments now cover generated SSR
+  code instead of returning an empty mapping.
+
+- cc79ac5: The DOM compiler now builds static templates as structured, origin-carrying
+  template IR and serializes each completed template once into the unchanged
+  runtime HTML string ABI. Opt-in compiler inspection exposes both the exact
+  Program AST used for the module's single esrap print and each hoisted template's
+  structured IR, enabling playground source-to-generated-code and
+  source-to-template navigation without reparsing emitted output.
+- 3ea0855: Automatic memoization no longer gives up on a component because its template
+  renders a value through a function call. `{formatPrice(cents)}`, `{t('total')}`,
+  and `{segText(seg, done)}` are ordinary value projections, but a single one of
+  them previously disqualified the whole component — and, transitively, every
+  component that rendered it — from region memoization.
+
+  A call is admitted only when its callee is a module-scope immutable identity: an
+  imported binding, or a same-module `function` declaration that is never
+  reassigned and whose own body is itself a value projection. Everything else
+  still fails closed, because each can hide state that no dependency witnesses:
+
+  - a method on your data (`{header.getIsSorted()}`), including a helper that
+    merely wraps one — the same hazard one call frame away;
+  - a component-local callee, which nothing pins to an immutable identity;
+  - hook calls (`use()` and any `use*`), which own suspension, hook cells, context
+    subscriptions, and effect lifecycles rather than projecting a value;
+  - `new Foo()` and tagged templates.
+
+  Arguments carry the same contract, so `{format(row.get())}` stays disqualified.
+
+  Same-module `function` helpers that are never reassigned are also now accepted
+  as memo-region witnesses, on the same immutable-identity grounds already given
+  to same-module components and `const X = memo(C)` walls.
+
+  Measured on `benchmarks/chat-stream` (paired runs, same machine): 160 keystrokes
+  through the controlled composer 2.22ms → 0.78ms, streaming a reply into a
+  200-message history 1.56ms → 0.72ms, fine-grained token streaming 1.58ms →
+  0.96ms.
+
+  See "Automatic memoization and calls in templates" in
+  `docs/differences-from-react.md`.
+
+- 08843da: Restore the published JSX type-runtime and TSRX type-helper subpaths, and verify
+  the required named exports of every built public JavaScript entry point.
+- 8e01289: Add universal-renderer lazy components, retained transition and deferred-value
+  scheduling, and conservative memo bailouts with context and local-update
+  invalidation.
+- cc79ac5: Every node the compiler prints now carries an origin location: synthetic
+  scaffolding (hook-slot arguments, withSlot wrappers, inferred dependency
+  arrays, scoped-CSS class bakes, warm plans, lowered guards, profile
+  instrumentation, fragment renderers, and the rest) inherits the position of
+  the authored construct it derives from, while authored subtrees keep their
+  exact positions. Emitted source maps gain segments for previously unmapped
+  generated code, laying the groundwork for source↔output navigation tooling.
+  Manual AST construction was replaced with `@tsrx/core` builders (which attach
+  origin locations directly) across the compiler. The test suites enforce
+  completeness (`OCTANE_COMPILE_ASSERT_LOC`, set in `vitest.config.js`): a
+  printed node without an origin fails with the offending construction listed.
+- 3ea0855: De-opt child reconciliation keys skip the JSON serializer at the unwrapped top
+  level — the shape every `{items.map(...)}` list and every `@octanejs/*` binding's
+  rendered output produces. That level re-keyed every child on every parent
+  render, including renders where all children went on to bail, so a 1,000-row
+  list allocated 1,000 serialized strings per update. Nested wrapper paths keep
+  the serialized encoding, and the two aliasing properties it provides (an
+  explicit `key="0"` stays distinct from an implicit index 0; a user key cannot
+  resemble a wrapper path) are preserved.
+
+  On the `benchmarks/memo-wall` value-position wall, a Chromium CPU profile of the
+  all-bail parent re-render drops the flatten step from 13.4% to 6.0% of samples
+  and total samples by 13.8%; the timed op moves from 1.48x to 1.39x React.
+
+- f96e7c4: Preserve keyboard, pointer, focus, and mouse event subclasses and metadata when deferred hydration replays interaction intent, including roots owned by another document realm.
+- cc79ac5: The compiler no longer mutates the parsed module AST. Every transform over the
+  parser-owned tree — type stripping, arrow-component normalization, scoped-CSS
+  hashing and style maps, hook dependency inference and slotting annotations,
+  error-boundary lowering, profile instrumentation, and print-time TS stripping —
+  is now copy-on-write: changed spines are rebuilt with `@tsrx/core` builders and
+  untouched subtrees stay shared with the parse. Compiled output is byte-identical
+  and compile time is unchanged. The test suites enforce the invariant by
+  deep-freezing every adopted parser AST (`OCTANE_COMPILE_FROZEN_AST=1`), so any
+  in-place write fails loudly with the offending line.
+- cc79ac5: The client compiler's module source map now covers render-plan expressions:
+  event handlers (including compiled event bundles), dynamic text holes,
+  attribute/class/style bindings, controlled-form and `dangerouslySetInnerHTML`
+  values, refs, spreads, `@if`/ternary conditions, `@for` iterables, `@switch`
+  discriminants and case tests, component props and keys, and portal
+  expressions all map from the emitted positions (mount and update paths alike)
+  back to their authored source. Emitted code is byte-identical — only the map
+  gains segments — improving devtools debugging, error-stack resolution, and
+  chained maps such as MDX's two-stage `.mdx` map. Module-scope hoisted helper
+  bodies and the server (SSR) emit keep their previous mapping density for now.
+- cc79ac5: New opt-in compiler inspection surface: `compile(source, file, { inspect:
+true })` (client mode) returns `result.inspect` with `templates` — per hoisted
+  template, `(offset range in the template HTML) → (authored source range)`
+  origin entries for baked tags, static attributes (escaped values included),
+  and static text, recorded at append time with no re-lexing — and `segments` —
+  the module map's decoded segments enriched with absolute source offsets
+  including node-exact source ENDS (which standard source maps cannot express),
+  resolved via a smallest-node-at-offset index over the parse. Emitted code is
+  byte-identical with the option on or off, and normal compiles skip all
+  recording. This is the data contract for source↔output navigation tooling
+  such as the playground.
+- 971ec0c: Add a dev-only DevTools runtime hook (`globalThis.__OCTANE_DEVTOOLS__`) exposing
+  the live component tree, per-node state/context inspection, and a per-flush
+  subscribe channel. It is fully gated behind the profile compile flag, so normal
+  production builds tree-shake it away.
+- 971ec0c: Extend the dev-only DevTools hook with transition-count and Suspense-boundary-state probes (gated behind the profile flag).
+- 1145d98: Preserve committed Suspense DOM, browser-owned state, and hidden subtree lifecycle while fallbacks are visible, and prevent head hydration from claiming wrong-tag foreign nodes.
+- e19989d: Harden server functions with same-origin JSON POST validation, bounded request
+  bodies, global authorization middleware, trusted-proxy-aware origin policies,
+  and production-safe error responses across Vite, Rsbuild, and platform servers.
+  Add hook-slot-safe Hotkeys and Pacer bindings, typed router-query SSR exports,
+  and dedicated behavioral and type-check coverage for all three TanStack bindings.
+- f96e7c4: Make hoisted head ownership module-, tag-, and root-aware, and reject malformed
+  marker intervals without claiming unrelated server metadata.
+- 07dff41: Reject asynchronous effects, asynchronous cleanups, and non-cleanup return
+  values in the public effect-hook types.
+- cc79ac5: Keep client-only renderer server-stub source maps valid when the authored
+  module ends with a newline. Client-only modules without runtime exports now
+  emit an empty server stub.
+- 3686e54: Reuse warmed SSR fetches when child components read statically named computed
+  props such as `props['aria-label']`.
+
 ## 0.1.13
 
 ### Patch Changes

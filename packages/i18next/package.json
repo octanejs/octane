@@ -1,6 +1,6 @@
 {
   "name": "@octanejs/i18next",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "license": "MIT",
   "type": "module",
   "sideEffects": false,

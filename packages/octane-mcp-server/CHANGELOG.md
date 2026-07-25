@@ -1,5 +1,12 @@
 # @octanejs/mcp-server
 
+## 0.2.7
+
+### Patch Changes
+
+- 9d4b8c0: Expose the deterministic Lynx preview/IFR bundle-size suite through the
+  benchmark runner tool.
+
 ## 0.2.6
 
 ### Patch Changes

@@ -1,5 +1,40 @@
 # @octanejs/tanstack-router-ssr-query
 
+## 0.0.3
+
+### Patch Changes
+
+- e19989d: Harden server functions with same-origin JSON POST validation, bounded request
+  bodies, global authorization middleware, trusted-proxy-aware origin policies,
+  and production-safe error responses across Vite, Rsbuild, and platform servers.
+  Add hook-slot-safe Hotkeys and Pacer bindings, typed router-query SSR exports,
+  and dedicated behavioral and type-check coverage for all three TanStack bindings.
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [3ea0855]
+- Updated dependencies [08843da]
+- Updated dependencies [8e01289]
+- Updated dependencies [7bd055d]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [3ea0855]
+- Updated dependencies [f96e7c4]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [971ec0c]
+- Updated dependencies [971ec0c]
+- Updated dependencies [1145d98]
+- Updated dependencies [e19989d]
+- Updated dependencies [f96e7c4]
+- Updated dependencies [07dff41]
+- Updated dependencies [cc79ac5]
+- Updated dependencies [3686e54]
+  - octane@0.1.14
+  - @octanejs/tanstack-router@0.1.13
+  - @octanejs/tanstack-query@0.1.13
+
 ## 0.0.2
 
 ### Patch Changes
